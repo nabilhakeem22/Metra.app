@@ -1,0 +1,10 @@
+// Deterministic ids so the isolation test knows the two tenants without needing
+// to query across the RLS boundary (which is impossible by design).
+export const ORG_A_ID = '00000000-0000-4000-8000-00000000000a';
+export const ORG_B_ID = '00000000-0000-4000-8000-00000000000b';
+
+export const USER_A_ID = '00000000-0000-4000-8000-0000000000a1';
+export const USER_B_ID = '00000000-0000-4000-8000-0000000000b1';
+
+export const FILE_A_ID = '00000000-0000-4000-8000-0000000000fa';
+export const FILE_B_ID = '00000000-0000-4000-8000-0000000000fb';
