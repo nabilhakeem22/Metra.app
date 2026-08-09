@@ -37,8 +37,10 @@ export async function withOrgContext<T>(
 /**
  * User-scoped transaction WITHOUT an org context, used only to resolve which
  * org(s) a user belongs to before an org context exists (e.g. requireOrg).
- * Sets `app.current_user_id` and switches to `merta_app`; the `self_memberships`
- * RLS policy exposes only the caller's own membership rows.
+ * Sets `app.current_user_id` and switches to `merta_app`. Business tables remain
+ * fully RLS-isolated here (no permissive policy); the only sanctioned read is via
+ * the SECURITY DEFINER function `public.app_current_user_memberships()`, which is
+ * scoped to `app.current_user_id`.
  */
 export async function withUserContext<T>(
   db: MertaDb,

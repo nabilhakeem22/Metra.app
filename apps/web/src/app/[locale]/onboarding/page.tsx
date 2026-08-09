@@ -1,5 +1,4 @@
-import { memberships } from '@merta/db';
-import { eq } from 'drizzle-orm';
+import { sql } from 'drizzle-orm';
 import { getTranslations } from 'next-intl/server';
 import { redirect } from 'next/navigation';
 import { Button } from '@/components/ui/button';
@@ -15,13 +14,11 @@ export default async function OnboardingPage() {
     redirect('/login');
   }
 
-  const existing = await withUserContext(user.id, (tx) =>
-    tx
-      .select({ id: memberships.id })
-      .from(memberships)
-      .where(eq(memberships.userId, user.id))
-      .limit(1),
-  );
+  const existing = (await withUserContext(user.id, (tx) =>
+    tx.execute(
+      sql`select org_id from public.app_current_user_memberships() limit 1`,
+    ),
+  )) as unknown as unknown[];
   if (existing.length > 0) {
     redirect('/dashboard');
   }

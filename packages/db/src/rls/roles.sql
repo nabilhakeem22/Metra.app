@@ -28,3 +28,6 @@ grant select, insert on public.audit_log to merta_app;
 
 -- Future-proofing for composite-FK trigger functions.
 grant execute on function public.enforce_same_org() to merta_app;
+
+-- Bootstrap user->org lookup (SECURITY DEFINER, scoped to app.current_user_id).
+grant execute on function public.app_current_user_memberships() to merta_app;

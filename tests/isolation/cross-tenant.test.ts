@@ -142,6 +142,56 @@ describe('cross-tenant isolation', () => {
     expect(own).toBeGreaterThan(0);
     expect(all).toBe(own); // sees only its own
   });
+
+  it('MULTI-ORG USER does not leak: USER_A is in org A AND org B, org A context hides the org B membership', async () => {
+    // USER_A has memberships in BOTH orgs (seeded). This is the exact scenario a
+    // permissive self-policy would leak. Under org A context USER_A must see
+    // ONLY their org A membership row.
+    const res = await withOrgContext(db, ctxA, async (tx) => {
+      const total = await tx.execute(
+        sql.raw(
+          `select count(*)::int as n from public.memberships where user_id = '${USER_A_ID}'`,
+        ),
+      );
+      const bLeak = await tx.execute(
+        sql.raw(
+          `select count(*)::int as n from public.memberships where user_id = '${USER_A_ID}' and org_id = '${ORG_B_ID}'`,
+        ),
+      );
+      return {
+        total: Number((total as unknown as Array<{ n: number }>)[0].n),
+        bLeak: Number((bLeak as unknown as Array<{ n: number }>)[0].n),
+      };
+    });
+    expect(res.bLeak, 'org A context leaked USER_A org B membership').toBe(0);
+    expect(
+      res.total,
+      'USER_A should see exactly one (org A) membership under org A context',
+    ).toBe(1);
+  });
+
+  it('bootstrap fn app_current_user_memberships() enumerates the user across orgs (for requireOrg), scoped to the user', async () => {
+    // withOrgContext sets app.current_user_id = USER_A, so the SECURITY DEFINER
+    // function returns BOTH of USER_A's memberships — that is how requireOrg
+    // discovers the org before any context. This is user-scoped, not a widening
+    // of org RLS (proven by the assertion above).
+    const rows = (await withOrgContext(db, ctxA, (tx) =>
+      tx.execute(
+        sql.raw(`select org_id from public.app_current_user_memberships()`),
+      ),
+    )) as unknown as Array<{ org_id: string }>;
+    const orgs = rows.map((r) => r.org_id).sort();
+    expect(orgs).toContain(ORG_A_ID);
+    expect(orgs).toContain(ORG_B_ID);
+
+    // And a DIFFERENT user's context never returns USER_A's rows.
+    const asB = (await withOrgContext(db, ctxB, (tx) =>
+      tx.execute(
+        sql.raw(`select org_id from public.app_current_user_memberships()`),
+      ),
+    )) as unknown as Array<{ org_id: string }>;
+    expect(asB.every((r) => r.org_id === ORG_B_ID)).toBe(true);
+  });
 });
 
 describe('audit_log immutability (§4.4)', () => {

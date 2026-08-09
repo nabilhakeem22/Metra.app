@@ -109,6 +109,21 @@ async function main() {
       await seedOrg(db, org);
       console.log(`Seeded org ${org.nameEn} (${org.orgId}).`);
     }
+
+    // Multi-org user: USER_A is ALSO a member of org B (as viewer). This is the
+    // exact cross-tenant leak scenario the isolation test must catch — under
+    // org A's context, USER_A must NOT see this org B membership row.
+    await withOrgContext(
+      db,
+      { orgId: ORG_B_ID, userId: USER_B_ID, role: 'owner' },
+      (tx) =>
+        tx
+          .insert(memberships)
+          .values({ orgId: ORG_B_ID, userId: USER_A_ID, role: 'viewer' })
+          .onConflictDoNothing(),
+    );
+    console.log(`Cross-membership: USER_A added to org B (viewer).`);
+
     console.log('Seed complete.');
   } finally {
     await pg.end();

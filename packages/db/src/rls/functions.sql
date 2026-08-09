@@ -41,3 +41,21 @@ begin
   return NEW;
 end
 $$;
+
+-- Bootstrap lookup for requireOrg: resolve which org(s) the CURRENT authenticated
+-- user belongs to BEFORE any org context exists. SECURITY DEFINER runs as the
+-- owner (postgres, BYPASSRLS) so it is not filtered by FORCE RLS, but it is
+-- tightly scoped to exactly `app.current_user_id` — it can never return another
+-- user's rows and never widens org visibility (no permissive policy on the
+-- business table). empty search_path forces fully-qualified names.
+create or replace function public.app_current_user_memberships()
+returns table (org_id uuid, role public.member_role)
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select m.org_id, m.role
+  from public.memberships m
+  where m.user_id = nullif(current_setting('app.current_user_id', true), '')::uuid
+$$;

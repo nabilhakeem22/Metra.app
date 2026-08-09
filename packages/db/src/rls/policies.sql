@@ -23,14 +23,14 @@ create policy org_isolation on public.memberships
   using      (org_id = nullif(current_setting('app.current_org_id', true), '')::uuid)
   with check (org_id = nullif(current_setting('app.current_org_id', true), '')::uuid);
 
--- Additional SELECT-only policy: a user may read their OWN membership rows even
--- with no org context set. Needed by requireOrg to resolve user -> org before a
--- context exists. Permissive policies are OR'd, so this never widens visibility
--- to another user's rows (still scoped to app.current_user_id).
+-- NOTE: memberships intentionally has ONLY the strict org-isolation policy —
+-- identical to every other business table, no widening. The pre-context
+-- user->org bootstrap is done by the SECURITY DEFINER function
+-- public.app_current_user_memberships() (functions.sql), NOT a permissive policy.
+-- (An earlier self_memberships policy was removed: permissive policies are OR'd,
+-- so `org_id = current_org OR user_id = current_user` leaked a multi-org user's
+-- other-org membership row under one org's context.)
 drop policy if exists self_memberships on public.memberships;
-create policy self_memberships on public.memberships
-  for select
-  using (user_id = nullif(current_setting('app.current_user_id', true), '')::uuid);
 
 -- files
 alter table public.files enable row level security;
