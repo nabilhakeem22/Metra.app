@@ -1,6 +1,6 @@
-import { MEMBER_ROLES, type MemberRole } from '@merta/db';
+import { MEMBER_ROLES, type MemberRole } from '@metra/db';
 
-// Single source of truth is the DB enum (@merta/db). Re-exported so the web app
+// Single source of truth is the DB enum (@metra/db). Re-exported so the web app
 // imports roles from one place. Order matches the Postgres `member_role` enum.
 export { MEMBER_ROLES };
 export type { MemberRole };

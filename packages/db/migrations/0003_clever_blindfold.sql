@@ -1,0 +1,1 @@
+ALTER TABLE "files" ALTER COLUMN "bucket" SET DEFAULT 'metra-files';

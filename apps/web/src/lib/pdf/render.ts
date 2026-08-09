@@ -37,7 +37,7 @@ export async function renderPdf(html: string): Promise<Uint8Array> {
     const pdf = await page.pdf({
       format: 'A4',
       printBackground: true,
-      // eslint-disable-next-line merta/no-physical-inline-direction -- Puppeteer PDF margin API keys, not CSS
+      // eslint-disable-next-line metra/no-physical-inline-direction -- Puppeteer PDF margin API keys, not CSS
       margin: { top: '16mm', bottom: '16mm', left: '14mm', right: '14mm' },
     });
     return pdf as Uint8Array;

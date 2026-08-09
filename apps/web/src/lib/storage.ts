@@ -1,11 +1,11 @@
 import 'server-only';
 import { randomUUID } from 'node:crypto';
-import { files } from '@merta/db';
+import { files } from '@metra/db';
 import { eq } from 'drizzle-orm';
 import { withOrgContext, type OrgContext } from '@/lib/db/context';
 import { createSupabaseAdminClient } from '@/lib/supabase/admin';
 
-export const FILES_BUCKET = 'merta-files';
+export const FILES_BUCKET = 'metra-files';
 
 export interface SignedUpload {
   fileId: string;

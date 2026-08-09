@@ -71,7 +71,7 @@ async function seedOrg(db: Parameters<typeof withOrgContext>[0], org: OrgSeed) {
           id: org.fileId,
           orgId: org.orgId,
           entity: 'seed',
-          bucket: 'merta-files',
+          bucket: 'metra-files',
           objectKey: `${org.orgId}/seed/${org.fileId}`,
           originalName: 'seed.txt',
           createdBy: org.userId,

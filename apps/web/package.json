@@ -1,5 +1,5 @@
 {
-  "name": "@merta/web",
+  "name": "@metra/web",
   "version": "0.0.0",
   "private": true,
   "scripts": {
@@ -10,7 +10,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@merta/db": "*",
+    "@metra/db": "*",
     "@radix-ui/react-label": "^2.1.1",
     "@radix-ui/react-slot": "^1.1.1",
     "@sparticuz/chromium": "^131.0.0",

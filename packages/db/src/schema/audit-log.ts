@@ -3,7 +3,7 @@ import { auditAction } from './enums';
 import { orgScoped } from './org-scoped';
 
 /**
- * §4.4 immutable audit trail. The app role (`merta_app`) is granted
+ * §4.4 immutable audit trail. The app role (`metra_app`) is granted
  * SELECT + INSERT only — updates/deletes are rejected at the DB, not just here.
  */
 export const auditLog = pgTable(

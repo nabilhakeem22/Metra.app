@@ -2,7 +2,7 @@ import { pgEnum } from 'drizzle-orm/pg-core';
 
 /**
  * §2.1 roles. Order is a contract shared with the TS `MemberRole` union in
- * @merta/web (lib/permissions/roles.ts). Do not reorder or rename.
+ * @metra/web (lib/permissions/roles.ts). Do not reorder or rename.
  */
 export const MEMBER_ROLES = [
   'owner',

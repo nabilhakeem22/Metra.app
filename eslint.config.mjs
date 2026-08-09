@@ -1,12 +1,12 @@
 // Root ESLint flat config (ESLint v9).
-// Includes the Merta house rule `merta/no-physical-inline-direction` which bans
+// Includes the Metra house rule `metra/no-physical-inline-direction` which bans
 // physical left/right in Tailwind class names and inline style objects. Use CSS
 // logical properties instead (margin-inline-start, text-align: start, ms-*, etc).
 import js from '@eslint/js';
 import tseslint from 'typescript-eslint';
 import { noPhysicalInlineDirection } from './eslint-rules/no-physical-inline-direction.mjs';
 
-const mertaPlugin = {
+const metraPlugin = {
   rules: { 'no-physical-inline-direction': noPhysicalInlineDirection },
 };
 
@@ -26,9 +26,9 @@ export default tseslint.config(
   ...tseslint.configs.recommended,
   {
     files: ['**/*.{ts,tsx,js,jsx,mjs}'],
-    plugins: { merta: mertaPlugin },
+    plugins: { metra: metraPlugin },
     rules: {
-      'merta/no-physical-inline-direction': 'error',
+      'metra/no-physical-inline-direction': 'error',
       '@typescript-eslint/no-unused-vars': [
         'warn',
         { argsIgnorePattern: '^_', varsIgnorePattern: '^_' },

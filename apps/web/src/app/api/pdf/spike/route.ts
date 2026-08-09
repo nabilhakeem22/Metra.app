@@ -28,7 +28,7 @@ export async function GET() {
       status: 200,
       headers: {
         'content-type': 'application/pdf',
-        'content-disposition': 'inline; filename="merta-arabic-spike.pdf"',
+        'content-disposition': 'inline; filename="metra-arabic-spike.pdf"',
         'x-render-ms': String(elapsedMs),
         'cache-control': 'no-store',
       },

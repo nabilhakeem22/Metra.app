@@ -2,9 +2,9 @@ import 'server-only';
 import {
   withOrgContext as coreWithOrgContext,
   withUserContext as coreWithUserContext,
-  type MertaDb,
+  type MetraDb,
   type OrgContext,
-} from '@merta/db';
+} from '@metra/db';
 import { getDb } from './client';
 
 export type { OrgContext };
@@ -15,7 +15,7 @@ export type { OrgContext };
  */
 export function withOrgContext<T>(
   ctx: OrgContext,
-  fn: (tx: MertaDb) => Promise<T>,
+  fn: (tx: MetraDb) => Promise<T>,
 ): Promise<T> {
   return coreWithOrgContext(getDb(), ctx, fn);
 }
@@ -23,7 +23,7 @@ export function withOrgContext<T>(
 /** User-scoped (no org) — only for resolving a user's org in requireOrg. */
 export function withUserContext<T>(
   userId: string,
-  fn: (tx: MertaDb) => Promise<T>,
+  fn: (tx: MetraDb) => Promise<T>,
 ): Promise<T> {
   return coreWithUserContext(getDb(), userId, fn);
 }

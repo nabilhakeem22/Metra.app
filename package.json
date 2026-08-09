@@ -1,8 +1,8 @@
 {
-  "name": "merta",
+  "name": "metra",
   "private": true,
   "version": "0.0.0",
-  "description": "Merta — project and cost control for fit-out contractors (P0 foundations)",
+  "description": "Metra — project and cost control for fit-out contractors (P0 foundations)",
   "workspaces": [
     "apps/*",
     "packages/*"
@@ -11,15 +11,15 @@
     "node": ">=20"
   },
   "scripts": {
-    "dev": "npm run dev -w @merta/web",
-    "build": "npm run build -w @merta/web",
+    "dev": "npm run dev -w @metra/web",
+    "build": "npm run build -w @metra/web",
     "lint": "eslint . --config eslint.config.mjs",
-    "test": "npm run test -w @merta/web && npm run test -w @merta/db",
-    "test:isolation": "npm run test:isolation -w @merta/db",
-    "db:generate": "npm run generate -w @merta/db",
-    "db:migrate": "npm run migrate -w @merta/db",
-    "db:apply-rls": "npm run apply-rls -w @merta/db",
-    "db:seed": "npm run seed -w @merta/db"
+    "test": "npm run test -w @metra/web && npm run test -w @metra/db",
+    "test:isolation": "npm run test:isolation -w @metra/db",
+    "db:generate": "npm run generate -w @metra/db",
+    "db:migrate": "npm run migrate -w @metra/db",
+    "db:apply-rls": "npm run apply-rls -w @metra/db",
+    "db:seed": "npm run seed -w @metra/db"
   },
   "devDependencies": {
     "typescript": "^5.6.3"

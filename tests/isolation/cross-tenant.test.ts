@@ -13,7 +13,7 @@ import {
   withOrgContext,
   type MertaDb,
   type OrgContext,
-} from '@merta/db';
+} from '@metra/db';
 import { sql } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
@@ -60,7 +60,7 @@ beforeAll(async () => {
   db = created.db;
   pg = created.sql;
 
-  // Discover org_id-bearing tables (runs as the connection role, not merta_app).
+  // Discover org_id-bearing tables (runs as the connection role, not metra_app).
   const discovered = await pg<{ table_name: string }[]>`
     select c.table_name
     from information_schema.columns c
@@ -114,7 +114,7 @@ describe('cross-tenant isolation', () => {
   it('with no org context, every org_id table returns 0 rows (fails closed)', async () => {
     for (const table of orgIdTables) {
       const rows = await pg.begin(async (tx) => {
-        await tx`set local role merta_app`;
+        await tx`set local role metra_app`;
         return tx.unsafe(`select count(*)::int as n from public."${table}"`);
       });
       expect(Number(rows[0].n), `${table} leaked without context`).toBe(0);

@@ -1,5 +1,5 @@
 import 'server-only';
-import type { MemberRole } from '@merta/db';
+import type { MemberRole } from '@metra/db';
 import { sql } from 'drizzle-orm';
 import { redirect } from 'next/navigation';
 import { withUserContext, type OrgContext } from '@/lib/db/context';

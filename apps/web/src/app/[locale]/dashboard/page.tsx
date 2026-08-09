@@ -1,4 +1,4 @@
-import { organizations } from '@merta/db';
+import { organizations } from '@metra/db';
 import { getLocale, getTranslations } from 'next-intl/server';
 import { Button } from '@/components/ui/button';
 import { requireOrg } from '@/lib/auth/require-org';

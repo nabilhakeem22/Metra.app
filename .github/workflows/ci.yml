@@ -46,19 +46,19 @@ jobs:
         run: npm run lint
 
       - name: Unit tests (db)
-        run: npm run test -w @merta/db
+        run: npm run test -w @metra/db
 
       - name: Unit tests (web)
-        run: npm run test -w @merta/web
+        run: npm run test -w @metra/web
 
       - name: Apply migrations
-        run: npm run migrate -w @merta/db
+        run: npm run migrate -w @metra/db
 
-      - name: Apply RLS, roles (merta_app) and functions
-        run: npm run apply-rls -w @merta/db
+      - name: Apply RLS, roles (metra_app) and functions
+        run: npm run apply-rls -w @metra/db
 
       - name: Seed two orgs
-        run: npm run seed -w @merta/db
+        run: npm run seed -w @metra/db
 
       - name: Cross-tenant isolation (P0 exit gate)
-        run: npm run test:isolation -w @merta/db
+        run: npm run test:isolation -w @metra/db

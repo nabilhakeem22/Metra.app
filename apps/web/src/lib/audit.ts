@@ -1,5 +1,5 @@
 import 'server-only';
-import { auditLog, type AuditAction, type MertaDb } from '@merta/db';
+import { auditLog, type AuditAction, type MetraDb } from '@metra/db';
 import { sql } from 'drizzle-orm';
 
 export interface AuditEntry {
@@ -13,11 +13,11 @@ export interface AuditEntry {
 /**
  * Appends an immutable audit row (§4.4). `org_id` and `actor_user_id` are taken
  * from the ambient request GUCs, so this MUST be called inside a withOrgContext
- * transaction (pass that tx). merta_app has INSERT but not UPDATE/DELETE on
+ * transaction (pass that tx). metra_app has INSERT but not UPDATE/DELETE on
  * audit_log, so history cannot be rewritten.
  */
 export async function recordAudit(
-  tx: MertaDb,
+  tx: MetraDb,
   entry: AuditEntry,
 ): Promise<void> {
   await tx.insert(auditLog).values({

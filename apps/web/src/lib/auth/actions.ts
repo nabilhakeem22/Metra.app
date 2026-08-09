@@ -1,7 +1,7 @@
 'use server';
 
 import { randomUUID } from 'node:crypto';
-import { memberships, organizations } from '@merta/db';
+import { memberships, organizations } from '@metra/db';
 import { sql } from 'drizzle-orm';
 import { redirect } from 'next/navigation';
 import { recordAudit } from '@/lib/audit';

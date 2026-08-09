@@ -2,7 +2,7 @@ import { bigint, pgTable, text, unique, uuid } from 'drizzle-orm/pg-core';
 import { orgScoped } from './org-scoped';
 
 /**
- * Metadata for objects in the private `merta-files` bucket. `object_key` is
+ * Metadata for objects in the private `metra-files` bucket. `object_key` is
  * always `{org_id}/{entity}/{uuid}` so storage RLS can key on the path prefix.
  */
 export const files = pgTable(
@@ -11,7 +11,7 @@ export const files = pgTable(
     ...orgScoped(),
     entity: text('entity').notNull(),
     entityId: uuid('entity_id'),
-    bucket: text('bucket').notNull().default('merta-files'),
+    bucket: text('bucket').notNull().default('metra-files'),
     objectKey: text('object_key').notNull(),
     contentType: text('content_type'),
     sizeBytes: bigint('size_bytes', { mode: 'number' }),

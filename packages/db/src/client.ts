@@ -24,7 +24,7 @@ export function createSql(url: string, opts: CreateSqlOptions = {}) {
 }
 
 export type PostgresJs = ReturnType<typeof createSql>;
-export type MertaDb = ReturnType<typeof drizzle<typeof schema>>;
+export type MetraDb = ReturnType<typeof drizzle<typeof schema>>;
 
 /** Drizzle db + underlying sql handle. Caller owns closing `sql`. */
 export function createDb(url: string, opts: CreateSqlOptions = {}) {
