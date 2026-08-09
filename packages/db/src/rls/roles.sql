@@ -30,4 +30,23 @@ grant select, insert on public.audit_log to merta_app;
 grant execute on function public.enforce_same_org() to merta_app;
 
 -- Bootstrap user->org lookup (SECURITY DEFINER, scoped to app.current_user_id).
+-- Least privilege: CREATE FUNCTION grants EXECUTE to PUBLIC by default. Revoke
+-- that (and the Supabase api roles where they exist) so ONLY merta_app can call
+-- this bypass-RLS function. Guarded so it is safe on a plain Postgres (CI) where
+-- anon/authenticated/service_role do not exist.
 grant execute on function public.app_current_user_memberships() to merta_app;
+revoke execute on function public.app_current_user_memberships() from public;
+do $$
+declare
+  r text;
+begin
+  foreach r in array array['anon', 'authenticated', 'service_role'] loop
+    if exists (select 1 from pg_roles where rolname = r) then
+      execute format(
+        'revoke execute on function public.app_current_user_memberships() from %I',
+        r
+      );
+    end if;
+  end loop;
+end
+$$;
