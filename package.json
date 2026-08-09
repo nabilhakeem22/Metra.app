@@ -1,0 +1,27 @@
+{
+  "name": "merta",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Merta — project and cost control for fit-out contractors (P0 foundations)",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "npm run dev -w @merta/web",
+    "build": "npm run build -w @merta/web",
+    "lint": "eslint . --config eslint.config.mjs",
+    "test": "npm run test -w @merta/web && npm run test -w @merta/db",
+    "test:isolation": "npm run test:isolation -w @merta/db",
+    "db:generate": "npm run generate -w @merta/db",
+    "db:migrate": "npm run migrate -w @merta/db",
+    "db:apply-rls": "npm run apply-rls -w @merta/db",
+    "db:seed": "npm run seed -w @merta/db"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.3"
+  }
+}
