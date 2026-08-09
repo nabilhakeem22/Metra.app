@@ -1,0 +1,64 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      # Local Postgres service. createSql() disables SSL for localhost.
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/postgres
+      # No Chromium needed for lint / isolation; the PDF spike isn't exercised in CI.
+      PUPPETEER_SKIP_DOWNLOAD: 'true'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Lint (includes physical left/right ban)
+        run: npm run lint
+
+      - name: Unit tests (db)
+        run: npm run test -w @merta/db
+
+      - name: Unit tests (web)
+        run: npm run test -w @merta/web
+
+      - name: Apply migrations
+        run: npm run migrate -w @merta/db
+
+      - name: Apply RLS, roles (merta_app) and functions
+        run: npm run apply-rls -w @merta/db
+
+      - name: Seed two orgs
+        run: npm run seed -w @merta/db
+
+      - name: Cross-tenant isolation (P0 exit gate)
+        run: npm run test:isolation -w @merta/db
