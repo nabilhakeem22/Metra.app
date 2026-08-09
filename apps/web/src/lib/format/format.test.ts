@@ -43,6 +43,19 @@ describe('formatMoney', () => {
     expect(s).toBe('1,234.50 ج.م');
     expect(ARABIC_INDIC.test(s)).toBe(false);
   });
+
+  it('accepts a numeric string', () => {
+    expect(formatMoney('2300.0000', 'en')).toBe('2,300.00 EGP');
+  });
+
+  it('returns "" for absent/invalid input (no fabricated 0.00, no bare " EGP")', () => {
+    expect(formatMoney('', 'en')).toBe('');
+    expect(formatMoney('   ', 'ar-EG')).toBe('');
+    expect(formatMoney(null, 'en')).toBe('');
+    expect(formatMoney(undefined, 'ar-EG')).toBe('');
+    expect(formatMoney('not-a-number', 'en')).toBe('');
+    expect(formatMoney(Number.NaN, 'en')).toBe('');
+  });
 });
 
 describe('formatDate — DD/MM/YYYY, Africa/Cairo', () => {

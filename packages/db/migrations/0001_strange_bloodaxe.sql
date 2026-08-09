@@ -1,0 +1,2 @@
+ALTER TABLE "organizations" DROP CONSTRAINT "organizations_name_present";--> statement-breakpoint
+ALTER TABLE "organizations" ADD CONSTRAINT "organizations_name_present" CHECK (length(btrim(coalesce("name_ar", ''))) > 0 or length(btrim(coalesce("name_en", ''))) > 0);

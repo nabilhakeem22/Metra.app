@@ -30,5 +30,7 @@ export function pickLocale(
     return { value: other, isFallback: true };
   }
 
-  return { value: '', isFallback: false };
+  // Both absent/empty. Never crash; surface as a fallback so the UI can flag it.
+  // (The DB present-check should make this unreachable for persisted rows.)
+  return { value: '', isFallback: true };
 }

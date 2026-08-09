@@ -25,14 +25,24 @@ describe('pickLocale', () => {
     });
   });
 
-  it('never throws on empty/absent rows', () => {
+  it('treats whitespace-only as absent and falls back', () => {
+    expect(
+      pickLocale({ nameAr: '   ', nameEn: 'Org A' }, 'name', 'ar-EG'),
+    ).toEqual({ value: 'Org A', isFallback: true });
+  });
+
+  it('both empty -> empty value marked as fallback, never crashes', () => {
     expect(pickLocale(null, 'name', 'en')).toEqual({
       value: '',
       isFallback: false,
     });
     expect(pickLocale({ nameAr: '', nameEn: '' }, 'name', 'ar-EG')).toEqual({
       value: '',
-      isFallback: false,
+      isFallback: true,
+    });
+    expect(pickLocale({ nameAr: '  ', nameEn: null }, 'name', 'en')).toEqual({
+      value: '',
+      isFallback: true,
     });
   });
 });

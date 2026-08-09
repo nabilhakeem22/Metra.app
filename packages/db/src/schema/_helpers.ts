@@ -28,13 +28,16 @@ export function bilingual<B extends string>(base: B) {
 }
 
 /**
- * Check constraint enforcing at least one of `<base>_ar` / `<base>_en` is set.
- * §4.1: "Neither is required, but at least one must be non-null."
+ * Check constraint enforcing at least one of `<base>_ar` / `<base>_en` is a
+ * NON-EMPTY (trimmed) value. §4.1: never render an empty cell — an empty string
+ * must not satisfy "present", or a row can render blank in both locales.
  */
 export function bilingualCheck(table: string, base: string) {
   return check(
     `${table}_${base}_present`,
-    sql.raw(`"${base}_ar" is not null or "${base}_en" is not null`),
+    sql.raw(
+      `length(btrim(coalesce("${base}_ar", ''))) > 0 or length(btrim(coalesce("${base}_en", ''))) > 0`,
+    ),
   );
 }
 
