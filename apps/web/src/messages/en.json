@@ -1,0 +1,37 @@
+{
+  "app": {
+    "name": "Merta",
+    "descriptor": "Project and cost control for fit-out contractors"
+  },
+  "home": {
+    "title": "Merta",
+    "tagline": "Project and cost control for fit-out contractors",
+    "intro": "Every pound of a project's value, traceable from the line you quoted to the line you invoiced.",
+    "getStarted": "Get started",
+    "signIn": "Sign in",
+    "localeName": "English"
+  },
+  "login": {
+    "title": "Sign in to Merta",
+    "emailLabel": "Work email",
+    "emailPlaceholder": "you@firm.com",
+    "sendCode": "Send code",
+    "codeLabel": "Verification code",
+    "verify": "Verify",
+    "phoneLabel": "Phone number",
+    "phoneHint": "Site engineers can sign in with a phone code.",
+    "checkEmail": "We sent a 6-digit code to your email.",
+    "error": "Something went wrong. Please try again."
+  },
+  "onboarding": {
+    "title": "Create your firm",
+    "nameEnLabel": "Firm name (English)",
+    "nameArLabel": "Firm name (Arabic)",
+    "hint": "You will be the owner. At least one name is required.",
+    "create": "Create firm",
+    "welcome": "Welcome to {name}"
+  },
+  "common": {
+    "untranslated": "untranslated"
+  }
+}
