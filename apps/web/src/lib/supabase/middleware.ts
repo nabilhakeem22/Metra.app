@@ -33,8 +33,23 @@ export async function updateSession(
     },
   });
 
-  // Touch the user to trigger a token refresh when needed.
-  await supabase.auth.getUser();
+  // Touch the user to trigger a token refresh when needed. Fail OPEN: if GoTrue
+  // is slow or errors, proceed WITHOUT a refreshed session rather than throwing
+  // a 500 on every page. Auth is still enforced server-side by requireOrg().
+  // getUser() takes no AbortSignal, so race it against a timeout.
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    await Promise.race([
+      supabase.auth.getUser(),
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(new Error('auth-getUser-timeout')), 4000);
+      }),
+    ]);
+  } catch {
+    // timeout or transport error — skip the refresh for this request.
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
 
   return response;
 }
