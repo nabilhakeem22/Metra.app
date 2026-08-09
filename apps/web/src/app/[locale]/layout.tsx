@@ -6,7 +6,7 @@ import { LOCALES, dirFor, type Locale } from '@/i18n/routing';
 import '../globals.css';
 
 export const metadata = {
-  title: 'Merta — Project and cost control for fit-out contractors',
+  title: 'Metra — Project and cost control for fit-out contractors',
   description: 'إدارة وتكاليف مشاريع التشطيبات',
 };
 

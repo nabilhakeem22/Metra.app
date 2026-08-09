@@ -1,10 +1,10 @@
 {
   "app": {
-    "name": "Merta",
+    "name": "Metra",
     "descriptor": "Project and cost control for fit-out contractors"
   },
   "home": {
-    "title": "Merta",
+    "title": "Metra",
     "tagline": "Project and cost control for fit-out contractors",
     "intro": "Every pound of a project's value, traceable from the line you quoted to the line you invoiced.",
     "getStarted": "Get started",
@@ -12,7 +12,7 @@
     "localeName": "English"
   },
   "login": {
-    "title": "Sign in to Merta",
+    "title": "Sign in to Metra",
     "emailLabel": "Work email",
     "emailPlaceholder": "you@firm.com",
     "sendCode": "Send code",

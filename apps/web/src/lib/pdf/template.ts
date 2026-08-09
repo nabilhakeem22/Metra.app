@@ -105,7 +105,7 @@ export function buildSpikeHtml(): string {
 </style>
 </head>
 <body>
-  <h1>مرتا — Merta</h1>
+  <h1>ميترا — Metra</h1>
   <div class="descriptor">إدارة وتكاليف مشاريع التشطيبات · Project and cost control for fit-out contractors</div>
 
   <div class="mixed-line">غرفة المعيشة Living Room — 12 m² @ 1,250.00 EGP</div>
@@ -131,7 +131,7 @@ export function buildSpikeHtml(): string {
     </tfoot>
   </table>
 
-  <div class="footer">أُنشئ بواسطة مرتا · merta.app — Generated with Merta · merta.app</div>
+  <div class="footer">أُنشئ بواسطة ميترا · metra.app — Generated with Metra · metra.app</div>
 </body>
 </html>`;
 }

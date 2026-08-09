@@ -1,4 +1,4 @@
-# Merta
+# Metra
 
 **Project and cost control for fit-out contractors** · *إدارة وتكاليف مشاريع التشطيبات*
 
@@ -9,7 +9,7 @@ file storage, and an audit log, with row-level-security cross-tenant isolation
 proven by an automated test.
 
 > The git remote is named `Metra.app`; the product and all code identifiers use
-> `Merta` / `@merta/*`. That mismatch is intentional — do not "fix" it.
+> `Metra` / `@metra/*`. That mismatch is intentional — do not "fix" it.
 
 ---
 
@@ -22,7 +22,7 @@ proven by an automated test.
 | Database | Postgres (hosted Supabase), RLS-enforced multi-tenancy |
 | ORM | Drizzle over postgres.js |
 | Auth | Supabase Auth (email OTP; phone OTP path in place) |
-| Files | Supabase Storage, signed URLs, private `merta-files` bucket |
+| Files | Supabase Storage, signed URLs, private `metra-files` bucket |
 | PDF | Puppeteer (`puppeteer-core` + `@sparticuz/chromium` in prod), embedded Arabic fonts |
 | Tests | Vitest |
 
@@ -30,8 +30,8 @@ proven by an automated test.
 
 ```
 merta/
-  apps/web        @merta/web  — Next.js app
-  packages/db     @merta/db   — Drizzle schema, RLS SQL, migrations, seed, isolation test
+  apps/web        @metra/web  — Next.js app
+  packages/db     @metra/db   — Drizzle schema, RLS SQL, migrations, seed, isolation test
 ```
 
 Managed with **npm workspaces** (no pnpm).
@@ -96,7 +96,7 @@ See `.env.example` for the full list. Key notes:
 Business tables carry `org_id UUID NOT NULL` and have **`FORCE ROW LEVEL
 SECURITY`**. The connection identity is the `postgres` role, which owns the
 tables; `FORCE` is what makes even the owner obey policies. Inside every request
-we `SET LOCAL ROLE merta_app` (a `NOLOGIN NOBYPASSRLS` role) and set
+we `SET LOCAL ROLE metra_app` (a `NOLOGIN NOBYPASSRLS` role) and set
 `app.current_org_id` / `app.current_user_id` as `SET LOCAL` config. Policies key
 every row to `current_setting('app.current_org_id')`.
 
