@@ -229,3 +229,61 @@ describe('audit_log immutability (§4.4)', () => {
     ).rejects.toThrow();
   });
 });
+
+describe('bilingual present-check (§4.1) — whitespace is not "present"', () => {
+  // Own probe org so RLS with_check (id = current_org) passes for the insert.
+  const PROBE_ORG = '00000000-0000-4000-8000-0000000000e1';
+  const ctxProbe: OrgContext = {
+    orgId: PROBE_ORG,
+    userId: USER_A_ID,
+    role: 'owner',
+  };
+
+  function lit(v: string | null): string {
+    return v === null ? 'null' : `'${v.replace(/'/g, "''")}'`;
+  }
+
+  async function tryInsertOrg(
+    nameAr: string | null,
+    nameEn: string | null,
+  ): Promise<void> {
+    await withOrgContext(db, ctxProbe, async (tx) => {
+      await tx.execute(
+        sql.raw(
+          `insert into public.organizations (id, name_ar, name_en)
+           values ('${PROBE_ORG}', ${lit(nameAr)}, ${lit(nameEn)})`,
+        ),
+      );
+    });
+  }
+
+  async function cleanup(): Promise<void> {
+    await withOrgContext(db, ctxProbe, (tx) =>
+      tx.execute(
+        sql.raw(`delete from public.organizations where id = '${PROBE_ORG}'`),
+      ),
+    );
+  }
+
+  afterAll(cleanup);
+
+  it('REJECTS tab/newline-only names (btrim would have missed these)', async () => {
+    await cleanup();
+    await expect(tryInsertOrg('\t\n ', '  \t')).rejects.toThrow();
+  });
+
+  it('REJECTS space-only, empty-string and NULL both sides', async () => {
+    await cleanup();
+    await expect(tryInsertOrg('   ', '')).rejects.toThrow();
+    await expect(tryInsertOrg(null, null)).rejects.toThrow();
+    await expect(tryInsertOrg('', null)).rejects.toThrow();
+  });
+
+  it('ACCEPTS a real value in either language', async () => {
+    await cleanup();
+    await expect(tryInsertOrg('شركة حقيقية', null)).resolves.toBeUndefined();
+    await cleanup();
+    await expect(tryInsertOrg(null, 'Real Co')).resolves.toBeUndefined();
+    await cleanup();
+  });
+});

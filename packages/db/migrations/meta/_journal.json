@@ -15,6 +15,13 @@
       "when": 1786302847280,
       "tag": "0001_strange_bloodaxe",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1786306013846,
+      "tag": "0002_real_mimic",
+      "breakpoints": true
     }
   ]
 }

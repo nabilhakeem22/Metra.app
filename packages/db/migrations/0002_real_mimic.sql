@@ -1,0 +1,2 @@
+ALTER TABLE "organizations" DROP CONSTRAINT "organizations_name_present";--> statement-breakpoint
+ALTER TABLE "organizations" ADD CONSTRAINT "organizations_name_present" CHECK (length(regexp_replace(coalesce("name_ar", ''), '[[:space:]]', '', 'g')) > 0 or length(regexp_replace(coalesce("name_en", ''), '[[:space:]]', '', 'g')) > 0);

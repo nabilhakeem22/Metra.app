@@ -28,15 +28,17 @@ export function bilingual<B extends string>(base: B) {
 }
 
 /**
- * Check constraint enforcing at least one of `<base>_ar` / `<base>_en` is a
- * NON-EMPTY (trimmed) value. §4.1: never render an empty cell — an empty string
- * must not satisfy "present", or a row can render blank in both locales.
+ * Check constraint enforcing at least one of `<base>_ar` / `<base>_en` has a
+ * value with a non-whitespace character. §4.1: never render an empty cell.
+ * Uses regexp_replace over ALL whitespace ([[:space:]] = space/tab/newline/…),
+ * so tab/newline-only values are rejected too — aligning the DB's notion of
+ * "empty" with pickLocale's JS `.trim()`. btrim() would miss tabs/newlines.
  */
 export function bilingualCheck(table: string, base: string) {
   return check(
     `${table}_${base}_present`,
     sql.raw(
-      `length(btrim(coalesce("${base}_ar", ''))) > 0 or length(btrim(coalesce("${base}_en", ''))) > 0`,
+      `length(regexp_replace(coalesce("${base}_ar", ''), '[[:space:]]', '', 'g')) > 0 or length(regexp_replace(coalesce("${base}_en", ''), '[[:space:]]', '', 'g')) > 0`,
     ),
   );
 }
