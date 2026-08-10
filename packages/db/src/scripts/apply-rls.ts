@@ -8,7 +8,14 @@ import { MIGRATION_DATABASE_URL } from '../env';
 
 const here = dirname(fileURLToPath(import.meta.url)); // packages/db/src/scripts
 const rlsDir = resolve(here, '../rls');
-const files = ['functions.sql', 'roles.sql', 'policies.sql'];
+// Order: functions + immutability (create fns) -> roles (grant execute) ->
+// policies (reference fns).
+const files = [
+  'functions.sql',
+  'immutability.sql',
+  'roles.sql',
+  'policies.sql',
+];
 
 async function main() {
   const sql = createSql(MIGRATION_DATABASE_URL(), { max: 1, prepare: false });

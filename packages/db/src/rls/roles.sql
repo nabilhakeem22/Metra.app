@@ -30,6 +30,9 @@ grant select, insert on public.audit_log to metra_app;
 -- Future-proofing for composite-FK trigger functions.
 grant execute on function public.enforce_same_org() to metra_app;
 
+-- Immutability trigger factory (status-locked business rows).
+grant execute on function public.enforce_immutable_when() to metra_app;
+
 -- Bootstrap user->org lookup (SECURITY DEFINER, scoped to app.current_user_id).
 -- Least privilege: CREATE FUNCTION grants EXECUTE to PUBLIC by default. Revoke
 -- that (and the Supabase api roles where they exist) so ONLY metra_app can call

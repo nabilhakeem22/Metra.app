@@ -270,3 +270,42 @@ the language switcher is labeled with the current (not destination) language.
 verify a Resend **sending domain** so invites deliver to anyone (test sender only
 reaches the account owner); rotate the DB password; trademark/domain for
 "Metra / ميترا"; validate the مستخلص template against real certificates before P3.
+
+---
+
+## Immutability (P1-prep)
+
+Two mechanisms make records tamper-resistant. Pick per the matrix:
+
+| Need | Mechanism |
+|---|---|
+| Append-only ledger (never edited, e.g. `audit_log`) | GRANTs — `metra_app` gets `select, insert` only (no `update`/`delete`) |
+| Status-locked business row (e.g. invoice/contract/variation frozen once issued/signed) | `enforce_immutable_when()` trigger factory |
+
+Adoption for a status-locked table (`rls/*.sql`, applied by `db:apply-rls`):
+
+```sql
+create trigger trg_invoices_immutable
+  before update or delete on public.invoices
+  for each row
+  execute function public.enforce_immutable_when('status','issued','credited,superseded');
+-- TG_ARGV: [0] status column, [1] locked statuses (csv),
+--          [2] allowed target statuses a locked row may transition to (csv; '' = none).
+```
+
+Once a row's status is in the locked set, the trigger:
+- rejects `DELETE` with SQLSTATE **`MT100`**;
+- rejects any `UPDATE` except a transition to a whitelisted status where only
+  `status` + `updated_at` changed (`raise ... MT100` otherwise).
+
+`MT100` is reserved for immutability violations. Rows whose status is not locked
+are unrestricted.
+
+## Composite same-org foreign keys (P1-prep)
+
+Prefer `sameOrgRef` / `sameOrgFk` (`packages/db/src/schema/org-ref.ts`) for
+child→parent references within an org. The composite FK `(org_id, <name>_id) ->
+target(org_id, id)` makes a cross-org reference impossible at the database
+(requires the target's universal `unique(org_id, id)`), and ships an
+`(org_id, <name>_id)` index. The older `enforce_same_org()` trigger is deprecated
+for hot paths (kept only for non-composite / cross-schema targets).
