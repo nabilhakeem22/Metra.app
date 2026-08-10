@@ -19,6 +19,7 @@ export default tseslint.config(
       '**/dist/**',
       '**/migrations/**',
       '**/*.config.*',
+      '**/.claude/**',
       'packages/db/src/rls/**',
     ],
   },

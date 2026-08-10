@@ -132,8 +132,10 @@ export function Sidebar({
                   title={collapsed ? nav(item.key) : undefined}
                   className={cn(
                     itemBase,
+                    'relative',
                     active
-                      ? 'bg-primary/10 text-primary'
+                      ? // copper trace bar at the inline-start marks the active item
+                        'bg-primary/10 text-primary before:absolute before:inset-y-1.5 before:start-0 before:w-[3px] before:rounded-full before:bg-brand'
                       : 'text-muted-foreground hover:bg-muted hover:text-foreground',
                     collapsed && 'justify-center',
                   )}
