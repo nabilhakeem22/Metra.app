@@ -18,21 +18,22 @@ export function AuthShell({ children, showValueProp, className }: AuthShellProps
     <main className="flex min-h-screen items-center justify-center bg-background p-4">
       <div
         className={cn(
-          'grid w-full max-w-4xl overflow-hidden rounded-2xl border bg-card shadow-card',
+          // Commit to elevation (shadow), not a border + wide shadow together.
+          'grid w-full max-w-4xl overflow-hidden rounded-2xl bg-card shadow-card',
           showValueProp && 'lg:grid-cols-2',
           className,
         )}
       >
         {showValueProp && (
-          <div className="hidden flex-col justify-between gap-8 bg-gradient-to-br from-primary to-primary/80 p-10 text-primary-foreground lg:flex">
+          <div className="hidden flex-col justify-between gap-8 bg-primary p-10 text-primary-foreground lg:flex">
             <Wordmark size="lg" className="text-primary-foreground" />
             <div className="space-y-2">
               <p className="text-2xl font-semibold leading-snug">
                 {home('tagline')}
               </p>
-              <p className="text-primary-foreground/80">{home('intro')}</p>
+              <p className="text-primary-foreground/90">{home('intro')}</p>
             </div>
-            <p className="text-sm text-primary-foreground/70">
+            <p className="text-sm text-primary-foreground/90">
               {onboarding('valueProp')}
             </p>
           </div>

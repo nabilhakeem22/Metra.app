@@ -58,8 +58,8 @@ const config: Config = {
         },
       },
       boxShadow: {
-        soft: '0 1px 2px 0 hsl(198 40% 10% / 0.05), 0 2px 8px -2px hsl(198 40% 10% / 0.08)',
-        card: '0 4px 20px -4px hsl(198 40% 10% / 0.12)',
+        soft: '0 1px 2px 0 hsl(198 40% 10% / 0.05), 0 2px 6px -2px hsl(198 40% 10% / 0.08)',
+        card: '0 4px 14px -4px hsl(198 40% 10% / 0.13)',
       },
       borderRadius: {
         '2xl': 'calc(var(--radius) + 0.25rem)',
