@@ -1,13 +1,7 @@
 'use server';
 
-import { randomUUID } from 'node:crypto';
-import { memberships, organizations } from '@metra/db';
-import { sql } from 'drizzle-orm';
 import { redirect } from 'next/navigation';
-import { recordAudit } from '@/lib/audit';
-import { withOrgContext, withUserContext } from '@/lib/db/context';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
-import { getSessionUser } from './session';
 
 export interface ActionResult {
   ok: boolean;
@@ -80,55 +74,4 @@ export async function signOut(): Promise<void> {
   redirect('/login');
 }
 
-// --- Org onboarding (atomic: org + owner membership + audit) ---------------
-// Form action: returns void. Success ends in a redirect() (which throws
-// NEXT_REDIRECT and never returns); invalid input throws.
-export async function createOrg(formData: FormData): Promise<void> {
-  const user = await getSessionUser();
-  if (!user) {
-    redirect('/login');
-  }
-
-  // Prevent org spam: if this user is already a member of an org, don't create
-  // another — send them to their dashboard. Checked via the SECURITY DEFINER
-  // bootstrap (scoped to app.current_user_id), the same path requireOrg uses.
-  const existing = (await withUserContext(user.id, (tx) =>
-    tx.execute(
-      sql`select 1 from public.app_current_user_memberships() limit 1`,
-    ),
-  )) as unknown as unknown[];
-  if (existing.length > 0) {
-    redirect('/dashboard');
-  }
-
-  const nameEn = String(formData.get('nameEn') ?? '').trim() || null;
-  const nameAr = String(formData.get('nameAr') ?? '').trim() || null;
-  if (!nameEn && !nameAr) {
-    throw new Error('At least one firm name is required.');
-  }
-
-  const orgId = randomUUID();
-
-  await withOrgContext(
-    { orgId, userId: user.id, role: 'owner' },
-    async (tx) => {
-      await tx
-        .insert(organizations)
-        .values({ id: orgId, nameEn, nameAr, defaultLocale: 'ar-EG' });
-
-      await tx
-        .insert(memberships)
-        .values({ orgId, userId: user.id, role: 'owner' });
-
-      await recordAudit(tx, {
-        entity: 'organization',
-        entityId: orgId,
-        action: 'create',
-        before: null,
-        after: { name_en: nameEn, name_ar: nameAr },
-      });
-    },
-  );
-
-  redirect('/dashboard');
-}
+// Org onboarding moved to lib/org/actions.ts (createOrg + logo upload).
