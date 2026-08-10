@@ -1,3 +1,8 @@
+-- DEPRECATED for hot paths — prefer the declarative composite FK from
+-- sameOrgFk() (packages/db/src/schema/org-ref.ts): (org_id, <name>_id) ->
+-- target(org_id, id) enforces same-org at the DB with no per-row trigger.
+-- Reserve enforce_same_org for non-composite / cross-schema targets only.
+--
 -- Reusable trigger function for composite same-org foreign keys. Not attached to
 -- any table in P0 (no child business tables exist yet), but shipped so P1+ child
 -- tables can guarantee a referenced row lives in the same org as the referrer.

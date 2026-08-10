@@ -1,10 +1,12 @@
-import { getTableConfig, pgTable } from 'drizzle-orm/pg-core';
+import { getTableConfig, pgTable, unique } from 'drizzle-orm/pg-core';
 import { describe, expect, it } from 'vitest';
 import { money } from './_helpers';
 import { auditLog } from './audit-log';
 import { MEMBER_ROLES } from './enums';
 import { files } from './files';
 import { memberships } from './memberships';
+import { orgScoped } from './org-scoped';
+import { sameOrgFk, sameOrgRef } from './org-ref';
 import { organizations } from './organizations';
 
 describe('bilingual helper', () => {
@@ -47,6 +49,47 @@ describe('org-scoped mixin', () => {
     );
     expect(composite).toBeDefined();
     expect(composite!.columns.map((c) => c.name).sort()).toEqual(['id', 'org_id']);
+  });
+});
+
+describe('composite same-org FK helper (org-ref)', () => {
+  const parent = pgTable('cfk_parent', { ...orgScoped() }, (t) => [
+    unique('cfk_parent_org_id_id_unique').on(t.orgId, t.id),
+  ]);
+  const child = pgTable(
+    'cfk_child',
+    { ...orgScoped(), ...sameOrgRef('parent') },
+    (t) => [
+      unique('cfk_child_org_id_id_unique').on(t.orgId, t.id),
+      ...sameOrgFk(t, 'parent', parent),
+    ],
+  );
+
+  it('sameOrgRef adds a <name>_id column', () => {
+    const cols = getTableConfig(child).columns.map((c) => c.name);
+    expect(cols).toContain('parent_id');
+  });
+
+  it('sameOrgFk builds the composite (org_id,<name>_id) -> (org_id,id) FK', () => {
+    const cfg = getTableConfig(child);
+    const fk = cfg.foreignKeys.find(
+      (f) => f.getName() === 'cfk_child_parent_same_org_fk',
+    );
+    expect(fk).toBeDefined();
+    const ref = fk!.reference();
+    expect(ref.columns.map((c) => c.name)).toEqual(['org_id', 'parent_id']);
+    expect(ref.foreignColumns.map((c) => c.name)).toEqual(['org_id', 'id']);
+  });
+
+  it('sameOrgFk ships an (org_id,<name>_id) index leading with org_id', () => {
+    const cfg = getTableConfig(child);
+    const idx = cfg.indexes.find(
+      (i) => i.config.name === 'cfk_child_parent_idx',
+    );
+    expect(idx).toBeDefined();
+    expect(
+      idx!.config.columns.map((c) => (c as { name?: string }).name),
+    ).toEqual(['org_id', 'parent_id']);
   });
 });
 
