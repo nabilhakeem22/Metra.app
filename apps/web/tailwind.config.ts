@@ -23,6 +23,14 @@ const config: Config = {
         ring: 'hsl(var(--ring))',
         background: 'hsl(var(--background))',
         foreground: 'hsl(var(--foreground))',
+        card: {
+          DEFAULT: 'hsl(var(--card))',
+          foreground: 'hsl(var(--card-foreground))',
+        },
+        popover: {
+          DEFAULT: 'hsl(var(--popover))',
+          foreground: 'hsl(var(--popover-foreground))',
+        },
         primary: {
           DEFAULT: 'hsl(var(--primary))',
           foreground: 'hsl(var(--primary-foreground))',
@@ -44,10 +52,16 @@ const config: Config = {
           foreground: 'hsl(var(--destructive-foreground))',
         },
       },
+      boxShadow: {
+        soft: '0 1px 2px 0 hsl(220 43% 11% / 0.04), 0 2px 8px -2px hsl(220 43% 11% / 0.08)',
+        card: '0 4px 20px -4px hsl(220 43% 11% / 0.10)',
+      },
       borderRadius: {
-        lg: 'var(--radius)',
-        md: 'calc(var(--radius) - 2px)',
-        sm: 'calc(var(--radius) - 4px)',
+        '2xl': 'calc(var(--radius) + 0.25rem)',
+        xl: 'var(--radius)',
+        lg: 'calc(var(--radius) - 0.25rem)',
+        md: 'calc(var(--radius) - 0.5rem)',
+        sm: 'calc(var(--radius) - 0.625rem)',
       },
     },
   },
