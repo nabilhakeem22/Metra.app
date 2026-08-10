@@ -435,22 +435,21 @@ export async function acceptInvite(rawToken: string): Promise<TeamActionResult> 
     if (inv.email.toLowerCase() !== user.email.toLowerCase()) return DECLINED;
 
     const outcome = await withOrgContext(
-      { orgId: inv.org_id, userId: user.id, role: inv.role },
+      {
+        orgId: inv.org_id,
+        userId: user.id,
+        role: inv.role,
+        email: user.email,
+      },
       async (tx): Promise<'joined' | 'already' | 'declined'> => {
         // R3: claim the invite FIRST — atomic single-consumption regardless of
         // which user id accepts (two accounts sharing an email can't both win).
-        const claimed = await tx
-          .update(invitations)
-          .set({
-            status: 'accepted',
-            acceptedBy: user.id,
-            acceptedAt: new Date(),
-            updatedAt: new Date(),
-          })
-          .where(
-            and(eq(invitations.id, inv.id), eq(invitations.status, 'pending')),
-          )
-          .returning({ id: invitations.id });
+        // Uses the SECURITY DEFINER claim fn (the invitation row is invisible to
+        // a not-yet-member under the new membership-gated policy). The claim also
+        // arms app_can_bootstrap_membership() for the membership insert below.
+        const claimed = (await tx.execute(
+          sql`select id from public.app_claim_invitation(${inv.id})`,
+        )) as unknown as Array<{ id: string }>;
 
         if (claimed.length === 1) {
           const inserted = await tx
