@@ -2,14 +2,13 @@
 
 import { sql } from 'drizzle-orm';
 import { redirect } from 'next/navigation';
+import { err, ok, type ActionResult } from '@/lib/actions/result';
 import { withUserContext } from '@/lib/db/context';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { getSessionUser } from './session';
 
-export interface ActionResult {
-  ok: boolean;
-  error?: string;
-}
+// Single source of the result type (A4). Re-exported for back-compat imports.
+export type { ActionResult };
 
 /**
  * Where to send a user right after login: their dashboard if they belong to at
@@ -25,10 +24,8 @@ export async function resolvePostLoginPath(): Promise<string> {
   return orgs.length > 0 ? '/dashboard' : '/onboarding';
 }
 
-// Generic client-facing messages. Internal/Supabase error detail is logged
-// server-side, never returned to the browser.
-const SEND_ERROR = 'Could not send the code. Please try again.';
-const VERIFY_ERROR = 'That code did not work. Please try again.';
+// Coded results only — the client localizes via resolveActionError. Supabase
+// error detail is logged server-side, never returned to the browser.
 
 // --- Email OTP -------------------------------------------------------------
 export async function sendEmailOtp(email: string): Promise<ActionResult> {
@@ -39,9 +36,9 @@ export async function sendEmailOtp(email: string): Promise<ActionResult> {
   });
   if (error) {
     console.error('sendEmailOtp failed:', error.message);
-    return { ok: false, error: SEND_ERROR };
+    return err('otp_send_failed');
   }
-  return { ok: true };
+  return ok();
 }
 
 export async function verifyEmailOtp(
@@ -56,9 +53,9 @@ export async function verifyEmailOtp(
   });
   if (error) {
     console.error('verifyEmailOtp failed:', error.message);
-    return { ok: false, error: VERIFY_ERROR };
+    return err('otp_verify_failed');
   }
-  return { ok: true };
+  return ok();
 }
 
 // --- Phone OTP (site engineers) — path in place ----------------------------
@@ -67,9 +64,9 @@ export async function sendPhoneOtp(phone: string): Promise<ActionResult> {
   const { error } = await supabase.auth.signInWithOtp({ phone });
   if (error) {
     console.error('sendPhoneOtp failed:', error.message);
-    return { ok: false, error: SEND_ERROR };
+    return err('otp_send_failed');
   }
-  return { ok: true };
+  return ok();
 }
 
 export async function verifyPhoneOtp(
@@ -80,9 +77,9 @@ export async function verifyPhoneOtp(
   const { error } = await supabase.auth.verifyOtp({ phone, token, type: 'sms' });
   if (error) {
     console.error('verifyPhoneOtp failed:', error.message);
-    return { ok: false, error: VERIFY_ERROR };
+    return err('otp_verify_failed');
   }
-  return { ok: true };
+  return ok();
 }
 
 export async function signOut(): Promise<void> {

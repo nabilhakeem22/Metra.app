@@ -3,6 +3,7 @@
 import { ArrowLeft, Loader2 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { useState, useTransition } from 'react';
+import { resolveActionError } from '@/lib/actions/error-message';
 import { AuthShell } from '@/components/auth/auth-shell';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -26,6 +27,7 @@ const RESEND_SECONDS = 60;
 
 export default function LoginPage() {
   const t = useTranslations('login');
+  const te = useTranslations('errors');
   const router = useRouter();
   const [, startTransition] = useTransition();
   const countdown = useCountdown(RESEND_SECONDS);
@@ -56,7 +58,7 @@ export default function LoginPage() {
         countdown.start(RESEND_SECONDS);
       } else {
         setStatus('error');
-        setError(res.error ?? t('error'));
+        setError(resolveActionError(res.error, te));
       }
     });
   }
@@ -79,7 +81,7 @@ export default function LoginPage() {
       } else {
         // Stay on the verify step; show a localized error.
         setStatus('error');
-        setError(res.error ?? t('error'));
+        setError(resolveActionError(res.error, te));
       }
     });
   }

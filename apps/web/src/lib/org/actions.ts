@@ -1,7 +1,7 @@
 'use server';
 
 import { randomUUID } from 'node:crypto';
-import { files, memberships, organizations } from '@metra/db';
+import { files, organizations } from '@metra/db';
 import { eq, sql } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
 import { cookies } from 'next/headers';
@@ -21,30 +21,13 @@ import {
   ensureFilesBucket,
   type SignedUpload,
 } from '@/lib/storage';
+import {
+  createOrgCore,
+  profileWithinLimits,
+  type OrgProfileInput,
+} from './core';
 
-export interface OrgProfileInput {
-  nameEn?: string | null;
-  nameAr?: string | null;
-  city?: string | null;
-  taxRegistrationNumber?: string | null;
-}
-
-// Cap user-supplied text at the action boundary (defense-in-depth).
-const LIMITS = { name: 200, city: 120, taxReg: 64 } as const;
-
-function profileWithinLimits(
-  nameEn: string | null,
-  nameAr: string | null,
-  city: string | null,
-  tax: string | null,
-): boolean {
-  return (
-    (nameEn?.length ?? 0) <= LIMITS.name &&
-    (nameAr?.length ?? 0) <= LIMITS.name &&
-    (city?.length ?? 0) <= LIMITS.city &&
-    (tax?.length ?? 0) <= LIMITS.taxReg
-  );
-}
+export type { OrgProfileInput };
 
 /**
  * Creates the org + owner membership + audit atomically, persisting the profile
@@ -67,49 +50,12 @@ export async function createOrg(input: OrgProfileInput): Promise<void> {
     redirect('/dashboard');
   }
 
-  const nameEn = input.nameEn?.trim() || null;
-  const nameAr = input.nameAr?.trim() || null;
-  if (!nameEn && !nameAr) {
-    throw new Error('At least one firm name is required.');
-  }
-  const city = input.city?.trim() || null;
-  const taxRegistrationNumber = input.taxRegistrationNumber?.trim() || null;
-  if (!profileWithinLimits(nameEn, nameAr, city, taxRegistrationNumber)) {
-    throw new Error('invalid');
-  }
-
-  const orgId = randomUUID();
-
-  await withOrgContext(
-    { orgId, userId: user.id, role: 'owner' },
-    async (tx) => {
-      await tx.insert(organizations).values({
-        id: orgId,
-        nameEn,
-        nameAr,
-        city,
-        taxRegistrationNumber,
-        defaultLocale: 'ar-EG',
-      });
-
-      await tx
-        .insert(memberships)
-        .values({ orgId, userId: user.id, role: 'owner' });
-
-      await recordAudit(tx, {
-        entity: 'organization',
-        entityId: orgId,
-        action: 'create',
-        before: null,
-        after: {
-          name_en: nameEn,
-          name_ar: nameAr,
-          city,
-          tax_registration_number: taxRegistrationNumber,
-        },
-      });
-    },
+  const res = await createOrgCore(
+    { orgId: randomUUID(), userId: user.id, role: 'owner' },
+    input,
   );
+  // Throw the code so the wizard can localize it (contract preserved).
+  if (!res.ok) throw new Error(res.error ?? 'invalid');
 }
 
 /** Signed upload URL for the org logo (org must already exist). */

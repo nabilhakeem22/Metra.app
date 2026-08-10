@@ -16,6 +16,8 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from '@/hooks/use-toast';
+import { resolveActionError } from '@/lib/actions/error-message';
+import type { ActionCode } from '@/lib/actions/result';
 import { formatDate } from '@/lib/format/date';
 import { MEMBER_ROLES, type MemberRole } from '@/lib/permissions/roles';
 import {
@@ -62,6 +64,7 @@ export function TeamClient({
   currentUserId,
 }: TeamClientProps) {
   const t = useTranslations('team');
+  const te = useTranslations('errors');
   const roles = useTranslations('roles');
   const locale = useLocale();
   const { confirm, dialog } = useConfirm();
@@ -71,19 +74,7 @@ export function TeamClient({
   const [inviteRole, setInviteRole] = useState<MemberRole>('viewer');
   const [lastLink, setLastLink] = useState<string | null>(null);
 
-  function errorMessage(code?: string): string {
-    const map: Record<string, string> = {
-      forbidden: 'errorForbidden',
-      invalid: 'errorInvalid',
-      already_member: 'errorAlreadyMember',
-      pending_exists: 'errorPendingExists',
-      last_owner: 'errorLastOwner',
-      owner_immutable: 'errorOwnerImmutable',
-      self: 'errorSelf',
-      generic: 'errorGeneric',
-    };
-    return t(map[code ?? 'generic'] ?? 'errorGeneric');
-  }
+  const errorMessage = (code?: ActionCode) => resolveActionError(code, te);
 
   function roleLabel(role: MemberRole): string {
     return roles(`${role}.label`);

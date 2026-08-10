@@ -14,6 +14,8 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from '@/hooks/use-toast';
+import { resolveActionError } from '@/lib/actions/error-message';
+import type { ActionCode } from '@/lib/actions/result';
 import {
   createLogoUpload,
   setOrgLogo,
@@ -38,6 +40,7 @@ export function SettingsClient({
   initial: Initial;
 }) {
   const t = useTranslations('settings');
+  const te = useTranslations('errors');
   const [savingProfile, startProfile] = useTransition();
   const [savingSettings, startSettings] = useTransition();
   const [uploading, startUpload] = useTransition();
@@ -50,11 +53,7 @@ export function SettingsClient({
   const [restrictDash, setRestrictDash] = useState(initial.restrictFirmDashboard);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
 
-  function errorMessage(code?: string): string {
-    if (code === 'forbidden') return t('errorForbidden');
-    if (code === 'name_required') return t('errorNameRequired');
-    return t('errorGeneric');
-  }
+  const errorMessage = (code?: ActionCode) => resolveActionError(code, te);
 
   function saveProfile() {
     startProfile(async () => {

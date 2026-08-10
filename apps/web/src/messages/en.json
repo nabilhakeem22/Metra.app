@@ -248,6 +248,21 @@
     "dark": "Dark",
     "system": "System"
   },
+  "errors": {
+    "forbidden": "You don't have permission to do that.",
+    "invalid": "That didn't work. Please try again.",
+    "generic": "Something went wrong. Please try again.",
+    "name_required": "Enter at least one company name.",
+    "last_owner": "You can't remove or demote the last owner.",
+    "owner_immutable": "Only an owner can change an owner.",
+    "self": "You can't change your own role or remove yourself here.",
+    "already_member": "That person is already a member.",
+    "pending_exists": "There's already a pending invite for that email.",
+    "declined": "This link can't be used.",
+    "otp_send_failed": "Could not send the code. Please try again.",
+    "otp_verify_failed": "That code did not work. Please try again.",
+    "immutable": "This record is locked and can't be changed."
+  },
   "common": {
     "untranslated": "untranslated"
   }

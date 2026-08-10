@@ -4,7 +4,6 @@ import { createHash, randomBytes } from 'node:crypto';
 import {
   invitations,
   MEMBER_ROLES,
-  memberships,
   organizations,
   type MemberRole,
 } from '@metra/db';
@@ -21,20 +20,17 @@ import { getSessionUser } from '@/lib/auth/session';
 import { withOrgContext, withUserContext, type OrgContext } from '@/lib/db/context';
 import { sendInviteEmail } from '@/lib/email/resend';
 import { canManageOrg } from '@/lib/permissions/can';
+import { type ActionResult } from '@/lib/actions/result';
 import {
-  ensureNotLastOwner,
-  lockOrgMemberships,
-} from '@/lib/aggregates/membership';
+  acceptInviteCore,
+  changeMemberRoleCore,
+  removeMemberCore,
+} from './core';
 import { getOrgMemberIdentities } from './identities';
 
-// Stable error CODES (the UI maps them to localized strings). acceptInvite uses
-// ONLY 'declined' for every failure — no oracle for wrong-email vs expired etc.
-export interface TeamActionResult {
-  ok: boolean;
-  error?: string;
-  link?: string;
-  already?: boolean;
-}
+// One ActionResult everywhere (A4). Coded errors; the UI localizes via
+// resolveActionError. acceptInvite uses ONLY 'declined' for every failure —
+// no oracle for wrong-email vs expired etc.
 
 const INVITE_TTL_DAYS = 7;
 
@@ -112,7 +108,7 @@ async function orgDisplayName(ctx: OrgContext): Promise<string> {
 export async function inviteMember(input: {
   email: string;
   role: MemberRole;
-}): Promise<TeamActionResult> {
+}): Promise<ActionResult> {
   const ctx = await requireOrg();
   if (!canManageOrg(ctx.role)) return { ok: false, error: 'forbidden' };
 
@@ -195,7 +191,7 @@ export async function inviteMember(input: {
 }
 
 // --- Resend (mints a fresh token; also the "copy link" path) ---------------
-export async function resendInvite(id: string): Promise<TeamActionResult> {
+export async function resendInvite(id: string): Promise<ActionResult> {
   const ctx = await requireOrg();
   if (!canManageOrg(ctx.role)) return { ok: false, error: 'forbidden' };
 
@@ -251,7 +247,7 @@ export async function resendInvite(id: string): Promise<TeamActionResult> {
 }
 
 // --- Revoke ----------------------------------------------------------------
-export async function revokeInvite(id: string): Promise<TeamActionResult> {
+export async function revokeInvite(id: string): Promise<ActionResult> {
   const ctx = await requireOrg();
   if (!canManageOrg(ctx.role)) return { ok: false, error: 'forbidden' };
 
@@ -283,119 +279,26 @@ export async function revokeInvite(id: string): Promise<TeamActionResult> {
   return { ok: true };
 }
 
-// --- Change role -----------------------------------------------------------
+// --- Change role / remove member (delegate to pure cores) ------------------
 export async function changeMemberRole(input: {
   userId: string;
   role: MemberRole;
-}): Promise<TeamActionResult> {
+}): Promise<ActionResult> {
   const ctx = await requireOrg();
-  if (!canManageOrg(ctx.role)) return { ok: false, error: 'forbidden' };
-  if (!isMemberRole(input.role)) return { ok: false, error: 'invalid' };
-  // F6: cannot change your own role here.
-  if (input.userId === ctx.userId) return { ok: false, error: 'self' };
-  const role = input.role;
-
-  try {
-    await withOrgContext(ctx, async (tx) => {
-      // R1: serialize owner mutations per org so concurrent demotes/removes
-      // can't both pass the last-owner guard. The count/guard runs AFTER this.
-      await lockOrgMemberships(tx, ctx.orgId);
-
-      const [target] = await tx
-        .select({ id: memberships.id, role: memberships.role })
-        .from(memberships)
-        .where(eq(memberships.userId, input.userId))
-        .limit(1);
-      if (!target) throw new Error('invalid');
-
-      // Only an owner may touch an owner or grant the owner role.
-      if ((target.role === 'owner' || role === 'owner') && ctx.role !== 'owner') {
-        throw new Error('owner_immutable');
-      }
-      // Never demote the last remaining owner (re-read under the lock).
-      if (target.role === 'owner' && role !== 'owner') {
-        await ensureNotLastOwner(tx);
-      }
-      if (target.role === role) return;
-
-      await tx
-        .update(memberships)
-        .set({ role, updatedAt: new Date() })
-        .where(eq(memberships.id, target.id));
-
-      await recordAudit(tx, {
-        entity: 'membership',
-        entityId: target.id,
-        action: 'update',
-        before: { role: target.role },
-        after: { role },
-      });
-    });
-  } catch (e) {
-    const code = e instanceof Error ? e.message : 'invalid';
-    return {
-      ok: false,
-      error: ['owner_immutable', 'last_owner', 'self', 'invalid'].includes(code)
-        ? code
-        : 'invalid',
-    };
-  }
-  return { ok: true };
+  return changeMemberRoleCore(ctx, input);
 }
 
-// --- Remove member ---------------------------------------------------------
-export async function removeMember(userId: string): Promise<TeamActionResult> {
+export async function removeMember(userId: string): Promise<ActionResult> {
   const ctx = await requireOrg();
-  if (!canManageOrg(ctx.role)) return { ok: false, error: 'forbidden' };
-  // F6: cannot remove yourself here.
-  if (userId === ctx.userId) return { ok: false, error: 'self' };
-
-  try {
-    await withOrgContext(ctx, async (tx) => {
-      // R1: serialize owner mutations per org (see changeMemberRole).
-      await lockOrgMemberships(tx, ctx.orgId);
-
-      const [target] = await tx
-        .select({ id: memberships.id, role: memberships.role })
-        .from(memberships)
-        .where(eq(memberships.userId, userId))
-        .limit(1);
-      if (!target) throw new Error('invalid');
-
-      if (target.role === 'owner' && ctx.role !== 'owner') {
-        throw new Error('owner_immutable');
-      }
-      if (target.role === 'owner') {
-        await ensureNotLastOwner(tx);
-      }
-
-      await tx.delete(memberships).where(eq(memberships.id, target.id));
-
-      await recordAudit(tx, {
-        entity: 'membership',
-        entityId: target.id,
-        action: 'delete',
-        before: { user_id: userId, role: target.role },
-        after: null,
-      });
-    });
-  } catch (e) {
-    const code = e instanceof Error ? e.message : 'invalid';
-    return {
-      ok: false,
-      error: ['owner_immutable', 'last_owner', 'self', 'invalid'].includes(code)
-        ? code
-        : 'invalid',
-    };
-  }
-  return { ok: true };
+  return removeMemberCore(ctx, userId);
 }
 
 // --- Accept invite ---------------------------------------------------------
-// Every failure returns the SAME generic 'declined' (no oracle). Success may be
-// { ok } (just joined) or { ok, already:true } (already a member — F4).
-export async function acceptInvite(rawToken: string): Promise<TeamActionResult> {
-  const DECLINED: TeamActionResult = { ok: false, error: 'declined' };
+// Wrapper does session + token lookup + expiry/email validation, then delegates
+// the claim/membership/F4 to acceptInviteCore. Every failure -> generic
+// 'declined' (no oracle). On success, sets the active-org cookie.
+export async function acceptInvite(rawToken: string): Promise<ActionResult> {
+  const DECLINED: ActionResult = { ok: false, error: 'declined' };
 
   const user = await getSessionUser();
   if (!user?.email) return DECLINED;
@@ -424,72 +327,15 @@ export async function acceptInvite(rawToken: string): Promise<TeamActionResult> 
     if (new Date(inv.expires_at).getTime() <= Date.now()) return DECLINED;
     if (inv.email.toLowerCase() !== user.email.toLowerCase()) return DECLINED;
 
-    const outcome = await withOrgContext(
-      {
-        orgId: inv.org_id,
-        userId: user.id,
-        role: inv.role,
-        email: user.email,
-      },
-      async (tx): Promise<'joined' | 'already' | 'declined'> => {
-        // R3: claim the invite FIRST — atomic single-consumption regardless of
-        // which user id accepts (two accounts sharing an email can't both win).
-        // Uses the SECURITY DEFINER claim fn (the invitation row is invisible to
-        // a not-yet-member under the new membership-gated policy). The claim also
-        // arms app_can_bootstrap_membership() for the membership insert below.
-        const claimed = (await tx.execute(
-          sql`select id from public.app_claim_invitation(${inv.id})`,
-        )) as unknown as Array<{ id: string }>;
-
-        if (claimed.length === 1) {
-          const inserted = await tx
-            .insert(memberships)
-            .values({ orgId: inv.org_id, userId: user.id, role: inv.role })
-            .onConflictDoNothing()
-            .returning({ id: memberships.id });
-
-          if (inserted[0]) {
-            await recordAudit(tx, {
-              entity: 'membership',
-              entityId: inserted[0].id,
-              action: 'create',
-              before: null,
-              after: {
-                user_id: user.id,
-                role: inv.role,
-                via: 'invitation',
-                invitation_id: inv.id,
-              },
-            });
-          }
-          return 'joined';
-        }
-
-        // Claimed 0 rows: already consumed. F4 — if it is now accepted and THIS
-        // caller is already a member of that org, treat as an already-joined
-        // success (the caller holds a valid token for that org, not an oracle).
-        const [current] = await tx
-          .select({ status: invitations.status })
-          .from(invitations)
-          .where(eq(invitations.id, inv.id))
-          .limit(1);
-        const [mine] = await tx
-          .select({ id: memberships.id })
-          .from(memberships)
-          .where(eq(memberships.userId, user.id))
-          .limit(1);
-
-        if (current?.status === 'accepted' && mine) return 'already';
-        return 'declined';
-      },
+    const res = await acceptInviteCore(
+      { orgId: inv.org_id, userId: user.id, role: inv.role, email: user.email },
+      inv.id,
     );
-
-    if (outcome === 'declined') return DECLINED;
+    if (!res.ok) return DECLINED;
 
     const cookieStore = await cookies();
     cookieStore.set(ACTIVE_ORG_COOKIE, inv.org_id, activeOrgCookieOptions());
-
-    return outcome === 'already' ? { ok: true, already: true } : { ok: true };
+    return res;
   } catch (e) {
     console.error('acceptInvite failed:', e);
     return DECLINED;

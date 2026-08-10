@@ -8,6 +8,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from '@/hooks/use-toast';
 import { useRouter } from '@/i18n/routing';
+import { resolveActionError } from '@/lib/actions/error-message';
+import type { ActionCode } from '@/lib/actions/result';
 import {
   createLogoUpload,
   createOrg,
@@ -19,6 +21,7 @@ const STEPS = 3;
 
 export function OnboardingWizard() {
   const t = useTranslations('onboarding');
+  const te = useTranslations('errors');
   const home = useTranslations('home');
   const locale = useLocale();
   const router = useRouter();
@@ -96,7 +99,13 @@ export function OnboardingWizard() {
         toast({ title: t('createdTitle') });
         router.push('/dashboard');
       } catch (e) {
-        setError(e instanceof Error ? e.message : t('errorGeneric'));
+        // createOrg throws an ActionCode; localize it (fallback generic).
+        setError(
+          resolveActionError(
+            e instanceof Error ? (e.message as ActionCode) : undefined,
+            te,
+          ),
+        );
       }
     });
   }
