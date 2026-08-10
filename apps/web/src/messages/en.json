@@ -110,7 +110,8 @@
     "noProjectsDescription": "Your projects will appear here once you start quoting.",
     "ledgerTitle": "Project ledger",
     "ctaCompleteProfile": "Complete company profile",
-    "ctaInviteTeam": "Invite your team"
+    "ctaInviteTeam": "Invite your team",
+    "ctaManageTeam": "Manage your team"
   },
   "team": {
     "title": "Team",

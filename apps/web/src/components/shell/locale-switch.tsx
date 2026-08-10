@@ -1,16 +1,23 @@
 'use client';
 
 import { Languages } from 'lucide-react';
-import { useLocale, useTranslations } from 'next-intl';
+import { useLocale } from 'next-intl';
 import { Button } from '@/components/ui/button';
 import { usePathname, useRouter } from '@/i18n/routing';
 
+// Autonyms — always shown in the language's own script.
+const LOCALE_AUTONYM: Record<string, string> = {
+  en: 'English',
+  'ar-EG': 'العربية',
+};
+
 export function LocaleSwitch({ className }: { className?: string }) {
-  const t = useTranslations('home');
   const locale = useLocale();
   const pathname = usePathname();
   const router = useRouter();
   const target = locale === 'ar-EG' ? 'en' : 'ar-EG';
+  // Label with the language you'll switch TO (the target autonym).
+  const targetLabel = LOCALE_AUTONYM[target];
 
   return (
     <Button
@@ -19,10 +26,10 @@ export function LocaleSwitch({ className }: { className?: string }) {
       size="sm"
       className={className}
       onClick={() => router.replace(pathname, { locale: target })}
-      aria-label={t('localeName')}
+      aria-label={targetLabel}
     >
       <Languages className="size-4" aria-hidden />
-      <span>{t('localeName')}</span>
+      <span>{targetLabel}</span>
     </Button>
   );
 }

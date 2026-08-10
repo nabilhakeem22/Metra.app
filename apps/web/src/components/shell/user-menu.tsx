@@ -23,6 +23,12 @@ const THEME_OPTIONS = [
   { value: 'system', icon: Monitor },
 ] as const;
 
+// Autonyms — the language you'll switch TO, in its own script.
+const LOCALE_AUTONYM: Record<string, string> = {
+  en: 'English',
+  'ar-EG': 'العربية',
+};
+
 export function UserMenu({
   email,
   role,
@@ -32,7 +38,6 @@ export function UserMenu({
 }) {
   const nav = useTranslations('nav');
   const shell = useTranslations('shell');
-  const home = useTranslations('home');
   const roles = useTranslations('roles');
   const th = useTranslations('theme');
   const locale = useLocale();
@@ -43,6 +48,7 @@ export function UserMenu({
   useEffect(() => setMounted(true), []);
 
   const target = locale === 'ar-EG' ? 'en' : 'ar-EG';
+  const targetLabel = LOCALE_AUTONYM[target];
   const initial = (email?.trim()?.[0] ?? '?').toUpperCase();
 
   return (
@@ -82,7 +88,7 @@ export function UserMenu({
           }}
         >
           <Languages className="size-4" aria-hidden />
-          {home('localeName')}
+          {targetLabel}
         </DropdownMenuItem>
 
         <DropdownMenuSeparator />

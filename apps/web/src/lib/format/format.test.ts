@@ -48,6 +48,12 @@ describe('formatMoney', () => {
     expect(formatMoney('2300.0000', 'en')).toBe('2,300.00 EGP');
   });
 
+  it('normalizes negative zero (no "-0.00")', () => {
+    expect(formatMoney(-0, 'en')).toBe('0.00 EGP');
+    expect(formatMoney('-0', 'en')).toBe('0.00 EGP');
+    expect(formatMoney('-0.00', 'ar-EG')).toBe('0.00 ج.م');
+  });
+
   it('returns "" for absent/invalid input (no fabricated 0.00, no bare " EGP")', () => {
     expect(formatMoney('', 'en')).toBe('');
     expect(formatMoney('   ', 'ar-EG')).toBe('');

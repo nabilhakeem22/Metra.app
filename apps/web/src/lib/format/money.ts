@@ -11,8 +11,10 @@ export function formatMoney(
 ): string {
   if (value === null || value === undefined) return '';
   if (typeof value === 'string' && value.trim() === '') return '';
-  const n = typeof value === 'string' ? Number(value) : value;
+  let n = typeof value === 'string' ? Number(value) : value;
   if (!Number.isFinite(n)) return '';
+  // Normalize negative zero so -0 formats as "0.00", not "-0.00".
+  if (Object.is(n, -0)) n = 0;
 
   const amount = formatNumber(n, locale, {
     minimumFractionDigits: 2,

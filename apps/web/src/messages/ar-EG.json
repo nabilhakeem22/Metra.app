@@ -110,7 +110,8 @@
     "noProjectsDescription": "ستظهر مشاريعك هنا بمجرد أن تبدأ التسعير.",
     "ledgerTitle": "سجلّ المشروع",
     "ctaCompleteProfile": "أكمل ملف الشركة",
-    "ctaInviteTeam": "ادعُ فريقك"
+    "ctaInviteTeam": "ادعُ فريقك",
+    "ctaManageTeam": "إدارة فريقك"
   },
   "team": {
     "title": "الفريق",

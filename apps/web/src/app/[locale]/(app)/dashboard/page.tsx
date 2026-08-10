@@ -30,24 +30,38 @@ export default async function DashboardPage() {
   const roles = await getTranslations('roles');
   const tc = await getTranslations('common');
 
-  const { org, memberCount } = await withOrgContext(ctx, async (tx) => {
-    const [o] = await tx.select().from(organizations).limit(1);
-    const rows = (await tx.execute(
-      sql`select count(*)::int as n from public.memberships`,
-    )) as unknown as Array<{ n: number }>;
-    return { org: o, memberCount: Number(rows[0]?.n ?? 0) };
-  });
+  const { org, memberCount, pendingInvites } = await withOrgContext(
+    ctx,
+    async (tx) => {
+      const [o] = await tx.select().from(organizations).limit(1);
+      const mem = (await tx.execute(
+        sql`select count(*)::int as n from public.memberships`,
+      )) as unknown as Array<{ n: number }>;
+      const inv = (await tx.execute(
+        sql`select count(*)::int as n from public.invitations where status = 'pending'`,
+      )) as unknown as Array<{ n: number }>;
+      return {
+        org: o,
+        memberCount: Number(mem[0]?.n ?? 0),
+        pendingInvites: Number(inv[0]?.n ?? 0),
+      };
+    },
+  );
 
   const name = pickLocale(org, 'name', locale);
   const profileComplete = isProfileComplete(org);
-  const teamInvited = memberCount > 1;
+  // Ticks on SEND (a live pending invite) as well as on accept.
+  const teamInvited = memberCount > 1 || pendingInvites > 0;
   const dismissed = user?.user_metadata?.checklist_dismissed === true;
   const allActionableDone = profileComplete && teamInvited;
 
-  // A real primary action, never a dead disabled control.
+  // A real primary action, never a dead disabled control. Once an invite is
+  // pending we stop pushing "Invite your team".
   const primary = !profileComplete
     ? { label: d('ctaCompleteProfile'), href: '/settings' as const }
-    : { label: d('ctaInviteTeam'), href: '/team' as const };
+    : !teamInvited
+      ? { label: d('ctaInviteTeam'), href: '/team' as const }
+      : { label: d('ctaManageTeam'), href: '/team' as const };
 
   return (
     <div className="space-y-6">
