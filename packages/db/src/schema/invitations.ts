@@ -1,10 +1,10 @@
 import { sql } from 'drizzle-orm';
 import {
-  index,
   pgTable,
   text,
   timestamp,
   unique,
+  uniqueIndex,
   uuid,
 } from 'drizzle-orm/pg-core';
 import { invitationStatus, memberRole } from './enums';
@@ -31,8 +31,9 @@ export const invitations = pgTable(
   (t) => [
     unique('invitations_org_id_id_unique').on(t.orgId, t.id),
     unique('invitations_token_hash_unique').on(t.tokenHash),
-    // At most one live pending invite per (org, email).
-    index('invitations_org_email_pending_idx')
+    // At most one live pending invite per (org, email) — enforced at the DB so
+    // it is the race arbiter, not just an app-level check.
+    uniqueIndex('invitations_org_email_pending_idx')
       .on(t.orgId, t.email)
       .where(sql`status = 'pending'`),
   ],

@@ -1,0 +1,2 @@
+DROP INDEX IF EXISTS "invitations_org_email_pending_idx";--> statement-breakpoint
+CREATE UNIQUE INDEX IF NOT EXISTS "invitations_org_email_pending_idx" ON "invitations" USING btree ("org_id","email") WHERE status = 'pending';
