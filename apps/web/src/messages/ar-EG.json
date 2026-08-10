@@ -193,6 +193,50 @@
     "signInButton": "تسجيل الدخول",
     "backToDashboard": "الذهاب إلى لوحة التحكم"
   },
+  "settings": {
+    "title": "الإعدادات",
+    "subtitle": "أدِر ملف شركتك وتفضيلاتها.",
+    "readonly": "لديك صلاحية قراءة فقط للإعدادات.",
+    "profileTitle": "ملف الشركة",
+    "profileSubtitle": "يظهر على المستندات وفي جميع أنحاء التطبيق.",
+    "changeLogo": "تغيير الشعار",
+    "logoUpdated": "تم تحديث الشعار",
+    "nameEnLabel": "اسم الشركة (بالإنجليزية)",
+    "nameArLabel": "اسم الشركة (بالعربية)",
+    "cityLabel": "المدينة",
+    "taxLabel": "الرقم الضريبي",
+    "save": "حفظ",
+    "saved": "تم الحفظ",
+    "visibilityTitle": "الظهور",
+    "visibilitySubtitle": "تحكّم فيما يمكن لفريقك رؤيته.",
+    "hideMarginLabel": "إخفاء الهامش عن مديري المشاريع",
+    "hideMarginDesc": "لن يرى مديرو المشاريع أرقام التكلفة أو الهامش.",
+    "restrictDashLabel": "تقييد لوحة تحكم الشركة",
+    "restrictDashDesc": "قصر أرقام الشركة على المالكين والمسؤولين.",
+    "errorForbidden": "ليس لديك صلاحية لتغيير الإعدادات.",
+    "errorNameRequired": "أدخل اسمًا واحدًا على الأقل للشركة.",
+    "errorGeneric": "حدث خطأ ما. من فضلك حاول مرة أخرى."
+  },
+  "account": {
+    "title": "الحساب",
+    "subtitle": "تفضيلاتك الشخصية.",
+    "profileTitle": "الملف الشخصي",
+    "emailLabel": "البريد الإلكتروني",
+    "fullNameLabel": "اسم العرض",
+    "languageLabel": "اللغة",
+    "save": "حفظ",
+    "saved": "تم الحفظ",
+    "sessionTitle": "الجلسة",
+    "signOut": "تسجيل الخروج",
+    "errorGeneric": "حدث خطأ ما. من فضلك حاول مرة أخرى."
+  },
+  "org": {
+    "unnamed": "شركة بدون اسم",
+    "switcherLabel": "تبديل الشركة",
+    "yourCompanies": "شركاتك",
+    "createOrJoin": "أنشئ أو انضم إلى شركة أخرى",
+    "switchError": "تعذّر تبديل الشركة. من فضلك حاول مرة أخرى."
+  },
   "common": {
     "untranslated": "غير مترجم"
   }

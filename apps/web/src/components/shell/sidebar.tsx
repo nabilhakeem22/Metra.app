@@ -8,12 +8,15 @@ import { Link, usePathname } from '@/i18n/routing';
 import { signOut } from '@/lib/auth/actions';
 import { cn } from '@/lib/utils';
 import { NAV_GROUPS } from './nav-items';
+import { OrgSwitcher, type OrgOption } from './org-switcher';
 
 export interface SidebarProps {
   collapsed?: boolean;
   onToggleCollapse?: () => void;
   onNavigate?: () => void;
   className?: string;
+  orgs?: OrgOption[];
+  activeOrgId?: string;
 }
 
 export function Sidebar({
@@ -21,6 +24,8 @@ export function Sidebar({
   onToggleCollapse,
   onNavigate,
   className,
+  orgs,
+  activeOrgId,
 }: SidebarProps) {
   const nav = useTranslations('nav');
   const shell = useTranslations('shell');
@@ -47,6 +52,12 @@ export function Sidebar({
           <Wordmark size="sm" />
         )}
       </div>
+
+      {!collapsed && orgs && orgs.length > 0 && activeOrgId && (
+        <div className="px-1">
+          <OrgSwitcher orgs={orgs} activeOrgId={activeOrgId} />
+        </div>
+      )}
 
       <nav className="flex flex-1 flex-col gap-6 overflow-y-auto">
         {NAV_GROUPS.map((group) => (

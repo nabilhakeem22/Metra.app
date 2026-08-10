@@ -193,6 +193,50 @@
     "signInButton": "Sign in",
     "backToDashboard": "Go to dashboard"
   },
+  "settings": {
+    "title": "Settings",
+    "subtitle": "Manage your company profile and preferences.",
+    "readonly": "You have read-only access to settings.",
+    "profileTitle": "Company profile",
+    "profileSubtitle": "Shown on documents and across the app.",
+    "changeLogo": "Change logo",
+    "logoUpdated": "Logo updated",
+    "nameEnLabel": "Company name (English)",
+    "nameArLabel": "Company name (Arabic)",
+    "cityLabel": "City",
+    "taxLabel": "Tax registration number",
+    "save": "Save",
+    "saved": "Saved",
+    "visibilityTitle": "Visibility",
+    "visibilitySubtitle": "Control what your team can see.",
+    "hideMarginLabel": "Hide margin from project managers",
+    "hideMarginDesc": "PMs won't see cost or margin figures.",
+    "restrictDashLabel": "Restrict the firm-level dashboard",
+    "restrictDashDesc": "Limit firm-wide figures to owners and admins.",
+    "errorForbidden": "You don't have permission to change settings.",
+    "errorNameRequired": "Enter at least one company name.",
+    "errorGeneric": "Something went wrong. Please try again."
+  },
+  "account": {
+    "title": "Account",
+    "subtitle": "Your personal preferences.",
+    "profileTitle": "Profile",
+    "emailLabel": "Email",
+    "fullNameLabel": "Display name",
+    "languageLabel": "Language",
+    "save": "Save",
+    "saved": "Saved",
+    "sessionTitle": "Session",
+    "signOut": "Sign out",
+    "errorGeneric": "Something went wrong. Please try again."
+  },
+  "org": {
+    "unnamed": "Untitled company",
+    "switcherLabel": "Switch company",
+    "yourCompanies": "Your companies",
+    "createOrJoin": "Create or join another company",
+    "switchError": "Couldn't switch company. Please try again."
+  },
   "common": {
     "untranslated": "untranslated"
   }

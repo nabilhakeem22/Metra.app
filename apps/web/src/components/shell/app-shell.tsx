@@ -5,16 +5,25 @@ import { useState, type ReactNode } from 'react';
 import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet';
 import { Toaster } from '@/components/ui/toaster';
 import type { MemberRole } from '@/lib/permissions/roles';
+import type { OrgOption } from './org-switcher';
 import { Sidebar } from './sidebar';
 import { TopBar } from './top-bar';
 
 export interface AppShellProps {
   email?: string;
   role: MemberRole;
+  orgs: OrgOption[];
+  activeOrgId: string;
   children: ReactNode;
 }
 
-export function AppShell({ email, role, children }: AppShellProps) {
+export function AppShell({
+  email,
+  role,
+  orgs,
+  activeOrgId,
+  children,
+}: AppShellProps) {
   const shell = useTranslations('shell');
   const [collapsed, setCollapsed] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -27,6 +36,8 @@ export function AppShell({ email, role, children }: AppShellProps) {
         className="hidden md:flex"
         collapsed={collapsed}
         onToggleCollapse={() => setCollapsed((c) => !c)}
+        orgs={orgs}
+        activeOrgId={activeOrgId}
       />
 
       <Sheet open={drawerOpen} onOpenChange={setDrawerOpen}>
@@ -35,6 +46,8 @@ export function AppShell({ email, role, children }: AppShellProps) {
           <Sidebar
             className="w-full border-e-0"
             onNavigate={() => setDrawerOpen(false)}
+            orgs={orgs}
+            activeOrgId={activeOrgId}
           />
         </SheetContent>
       </Sheet>
