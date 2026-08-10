@@ -3,6 +3,7 @@
 import { useTranslations } from 'next-intl';
 import { useState, type ReactNode } from 'react';
 import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet';
+import { Toaster } from '@/components/ui/toaster';
 import type { MemberRole } from '@/lib/permissions/roles';
 import { Sidebar } from './sidebar';
 import { TopBar } from './top-bar';
@@ -46,6 +47,8 @@ export function AppShell({ email, role, children }: AppShellProps) {
         />
         <main className="flex-1 p-4 md:p-6">{children}</main>
       </div>
+
+      <Toaster />
     </div>
   );
 }
