@@ -1,4 +1,12 @@
-import { bigint, pgTable, text, unique, uuid } from 'drizzle-orm/pg-core';
+import {
+  bigint,
+  pgTable,
+  text,
+  unique,
+  uuid,
+  type AnyPgColumn,
+} from 'drizzle-orm/pg-core';
+import { organizations } from './organizations';
 import { orgScoped } from './org-scoped';
 
 /**
@@ -9,6 +17,9 @@ export const files = pgTable(
   'files',
   {
     ...orgScoped(),
+    orgId: uuid('org_id')
+      .notNull()
+      .references((): AnyPgColumn => organizations.id, { onDelete: 'restrict' }),
     entity: text('entity').notNull(),
     entityId: uuid('entity_id'),
     bucket: text('bucket').notNull().default('metra-files'),

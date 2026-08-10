@@ -6,8 +6,10 @@ import {
   unique,
   uniqueIndex,
   uuid,
+  type AnyPgColumn,
 } from 'drizzle-orm/pg-core';
 import { invitationStatus, memberRole } from './enums';
+import { organizations } from './organizations';
 import { orgScoped } from './org-scoped';
 
 /**
@@ -18,6 +20,9 @@ export const invitations = pgTable(
   'invitations',
   {
     ...orgScoped(),
+    orgId: uuid('org_id')
+      .notNull()
+      .references((): AnyPgColumn => organizations.id, { onDelete: 'restrict' }),
     // Stored lowercased by the action layer.
     email: text('email').notNull(),
     role: memberRole('role').notNull(),

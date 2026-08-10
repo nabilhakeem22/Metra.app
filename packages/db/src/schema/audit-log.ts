@@ -1,5 +1,14 @@
-import { jsonb, pgTable, text, timestamp, unique, uuid } from 'drizzle-orm/pg-core';
+import {
+  jsonb,
+  pgTable,
+  text,
+  timestamp,
+  unique,
+  uuid,
+  type AnyPgColumn,
+} from 'drizzle-orm/pg-core';
 import { auditAction } from './enums';
+import { organizations } from './organizations';
 import { orgScoped } from './org-scoped';
 
 /**
@@ -10,6 +19,9 @@ export const auditLog = pgTable(
   'audit_log',
   {
     ...orgScoped(),
+    orgId: uuid('org_id')
+      .notNull()
+      .references((): AnyPgColumn => organizations.id, { onDelete: 'restrict' }),
     actorUserId: uuid('actor_user_id').notNull(),
     at: timestamp('at', { withTimezone: true }).notNull().defaultNow(),
     entity: text('entity').notNull(),

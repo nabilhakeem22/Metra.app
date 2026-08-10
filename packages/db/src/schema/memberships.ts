@@ -1,5 +1,6 @@
-import { pgTable, unique, uuid } from 'drizzle-orm/pg-core';
+import { pgTable, unique, uuid, type AnyPgColumn } from 'drizzle-orm/pg-core';
 import { memberRole } from './enums';
+import { organizations } from './organizations';
 import { orgScoped } from './org-scoped';
 
 /**
@@ -10,6 +11,10 @@ export const memberships = pgTable(
   'memberships',
   {
     ...orgScoped(),
+    // org_id FK attached here via the deferred thunk (see org-scoped.ts note).
+    orgId: uuid('org_id')
+      .notNull()
+      .references((): AnyPgColumn => organizations.id, { onDelete: 'restrict' }),
     userId: uuid('user_id').notNull(),
     role: memberRole('role').notNull(),
   },
