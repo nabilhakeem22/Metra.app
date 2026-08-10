@@ -35,11 +35,60 @@
     --radius: 1rem;
   }
 
+  /* Direction-aware font stack: Plex Sans leads in LTR, Plex Sans Arabic in RTL. */
+  html[dir='ltr'] {
+    --font-sans: var(--font-plex-sans), var(--font-plex-arabic), system-ui,
+      sans-serif;
+  }
+  html[dir='rtl'] {
+    --font-sans: var(--font-plex-arabic), var(--font-plex-sans), system-ui,
+      sans-serif;
+  }
+
   * {
     @apply border-border;
   }
 
   body {
     @apply bg-background text-foreground;
+    font-family: var(--font-sans);
+  }
+
+  /* Themed browser surfaces (commit to the world). */
+  html {
+    caret-color: hsl(var(--primary));
+  }
+  ::selection {
+    background: hsl(var(--primary) / 0.18);
+    color: hsl(var(--foreground));
+  }
+
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--muted-foreground) / 0.4) transparent;
+  }
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: hsl(var(--muted-foreground) / 0.35);
+    border-radius: 9999px;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--muted-foreground) / 0.55);
+    background-clip: padding-box;
+  }
+}
+
+@layer utilities {
+  /* Tabular figures for money / metric / ledger values. */
+  .tabular {
+    font-variant-numeric: tabular-nums;
   }
 }

@@ -63,7 +63,7 @@ export function Gauge({
             x="100"
             y="92"
             textAnchor="middle"
-            className="fill-foreground text-2xl font-bold"
+            className="tabular fill-foreground text-2xl font-bold"
           >
             {Math.round(clamped)}%
           </text>

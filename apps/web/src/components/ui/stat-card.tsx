@@ -66,7 +66,7 @@ export function StatCard({
 
       <p
         className={cn(
-          'mt-3 text-3xl font-bold tabular-nums tracking-tight',
+          'tabular mt-3 text-3xl font-bold tracking-tight',
           isGradient ? 'text-current' : 'text-foreground',
         )}
       >
