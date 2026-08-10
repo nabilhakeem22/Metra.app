@@ -1,7 +1,7 @@
-import { MEMBER_ROLES, type MemberRole } from '@metra/db';
+import { MEMBER_ROLES, type MemberRole } from './member-roles';
 
-// Single source of truth is the DB enum (@metra/db). Re-exported so the web app
-// imports roles from one place. Order matches the Postgres `member_role` enum.
+// Web-app source of truth (client-safe). Order mirrors the Postgres `member_role`
+// enum; the match is verified by permissions.test.ts + schema.test.ts.
 export { MEMBER_ROLES };
 export type { MemberRole };
 

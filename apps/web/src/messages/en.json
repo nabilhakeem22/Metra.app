@@ -18,6 +18,7 @@
     "contracts": "Contracts",
     "costing": "Costing",
     "invoices": "Invoices",
+    "team": "Team",
     "settings": "Settings",
     "help": "Help",
     "signOut": "Sign out",
@@ -106,6 +107,87 @@
     "taskFirstProposal": "Create your first proposal",
     "noProjectsTitle": "No active projects yet",
     "noProjectsDescription": "Your projects will appear here once you start quoting."
+  },
+  "team": {
+    "title": "Team",
+    "subtitle": "Invite teammates and manage roles.",
+    "inviteTitle": "Invite a teammate",
+    "emailLabel": "Email",
+    "emailPlaceholder": "name@firm.com",
+    "roleLabel": "Role",
+    "sendInvite": "Send invite",
+    "inviteSent": "Invite sent",
+    "inviteResent": "Invite resent",
+    "inviteRevoked": "Invitation revoked",
+    "inviteLink": "Invite link (copy and share)",
+    "copyLink": "Copy link",
+    "copied": "Link copied",
+    "membersTitle": "Members",
+    "pendingTitle": "Pending invitations",
+    "noMembers": "No members yet",
+    "noPending": "No pending invitations",
+    "you": "You",
+    "unknownUser": "Unknown user",
+    "readonly": "You have read-only access to the team.",
+    "resend": "Resend",
+    "revoke": "Revoke",
+    "remove": "Remove",
+    "cancel": "Cancel",
+    "expiresOn": "expires",
+    "roleChanged": "Role updated",
+    "memberRemoved": "Member removed",
+    "confirmRevokeTitle": "Revoke invitation?",
+    "confirmRevokeDesc": "This invitation link will stop working.",
+    "confirmRemoveTitle": "Remove member?",
+    "confirmRemoveDesc": "{name} will lose access to this firm.",
+    "errorForbidden": "You don't have permission to do that.",
+    "errorInvalid": "That didn't work. Please try again.",
+    "errorAlreadyMember": "That person is already a member.",
+    "errorPendingExists": "There's already a pending invite for that email.",
+    "errorLastOwner": "You can't remove or demote the last owner.",
+    "errorOwnerImmutable": "Only an owner can change an owner.",
+    "errorGeneric": "Something went wrong. Please try again."
+  },
+  "roles": {
+    "owner": {
+      "label": "Owner",
+      "desc": "Full access, including firm margin and settings. Signs contracts."
+    },
+    "admin": {
+      "label": "Admin",
+      "desc": "Manages projects, people and settings; can approve and issue."
+    },
+    "project_manager": {
+      "label": "Project Manager",
+      "desc": "Builds proposals, schedules work, records costs and drafts invoices."
+    },
+    "site_engineer": {
+      "label": "Site Engineer",
+      "desc": "Phone-first: updates progress and logs costs and custody spend."
+    },
+    "accountant": {
+      "label": "Accountant",
+      "desc": "Costs, custody, invoices, payments and exports."
+    },
+    "client": {
+      "label": "Client",
+      "desc": "Portal access: views progress and approves proposals and variations."
+    },
+    "viewer": {
+      "label": "Viewer",
+      "desc": "Read-only access, without financial margin."
+    }
+  },
+  "accept": {
+    "title": "Accept your invitation",
+    "body": "You've been invited to join a firm on Metra. Accept to continue.",
+    "acceptButton": "Accept invitation",
+    "declinedTitle": "This invitation can't be used",
+    "declinedBody": "The link may be invalid, expired, already used, or meant for a different account.",
+    "signInTitle": "Sign in to accept",
+    "signInBody": "Sign in with the invited email, then open this link again.",
+    "signInButton": "Sign in",
+    "backToDashboard": "Go to dashboard"
   },
   "common": {
     "untranslated": "untranslated"

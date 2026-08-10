@@ -8,6 +8,7 @@ import {
   LogOut,
   ReceiptText,
   Settings,
+  Users,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -44,6 +45,7 @@ export const NAV_GROUPS: NavGroup[] = [
     groupKey: 'support',
     labelKey: 'support',
     items: [
+      { key: 'team', href: '/team', icon: Users },
       { key: 'settings', icon: Settings, disabled: true },
       { key: 'help', icon: HelpCircle, disabled: true },
       { key: 'signOut', icon: LogOut, action: 'signout' },
