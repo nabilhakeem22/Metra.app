@@ -23,6 +23,7 @@
     "help": "المساعدة",
     "signOut": "تسجيل الخروج",
     "soon": "قريبًا",
+    "comingSoon": "قريبًا",
     "support": "الدعم"
   },
   "shell": {
@@ -106,7 +107,10 @@
     "taskImportPriceBook": "استورد دفتر أسعارك",
     "taskFirstProposal": "أنشئ أول عرض لك",
     "noProjectsTitle": "لا توجد مشاريع نشطة بعد",
-    "noProjectsDescription": "ستظهر مشاريعك هنا بمجرد أن تبدأ التسعير."
+    "noProjectsDescription": "ستظهر مشاريعك هنا بمجرد أن تبدأ التسعير.",
+    "ledgerTitle": "سجلّ المشروع",
+    "ctaCompleteProfile": "أكمل ملف الشركة",
+    "ctaInviteTeam": "ادعُ فريقك"
   },
   "team": {
     "title": "الفريق",

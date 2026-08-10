@@ -1,11 +1,28 @@
 'use server';
 
+import { sql } from 'drizzle-orm';
 import { redirect } from 'next/navigation';
+import { withUserContext } from '@/lib/db/context';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
+import { getSessionUser } from './session';
 
 export interface ActionResult {
   ok: boolean;
   error?: string;
+}
+
+/**
+ * Where to send a user right after login: their dashboard if they belong to at
+ * least one org, otherwise onboarding. Membership resolved server-side via the
+ * SECURITY DEFINER fn (scoped to the caller).
+ */
+export async function resolvePostLoginPath(): Promise<string> {
+  const user = await getSessionUser();
+  if (!user) return '/login';
+  const orgs = (await withUserContext(user.id, (tx) =>
+    tx.execute(sql`select 1 from public.app_current_user_orgs() limit 1`),
+  )) as unknown as unknown[];
+  return orgs.length > 0 ? '/dashboard' : '/onboarding';
 }
 
 // Generic client-facing messages. Internal/Supabase error detail is logged

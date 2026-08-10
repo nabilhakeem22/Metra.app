@@ -23,6 +23,7 @@
     "help": "Help",
     "signOut": "Sign out",
     "soon": "Soon",
+    "comingSoon": "Coming soon",
     "support": "Support"
   },
   "shell": {
@@ -106,7 +107,10 @@
     "taskImportPriceBook": "Import your price book",
     "taskFirstProposal": "Create your first proposal",
     "noProjectsTitle": "No active projects yet",
-    "noProjectsDescription": "Your projects will appear here once you start quoting."
+    "noProjectsDescription": "Your projects will appear here once you start quoting.",
+    "ledgerTitle": "Project ledger",
+    "ctaCompleteProfile": "Complete company profile",
+    "ctaInviteTeam": "Invite your team"
   },
   "team": {
     "title": "Team",

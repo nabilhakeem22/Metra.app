@@ -11,6 +11,7 @@ import { OtpInput } from '@/components/ui/otp-input';
 import { useCountdown } from '@/hooks/use-countdown';
 import { useRouter } from '@/i18n/routing';
 import {
+  resolvePostLoginPath,
   sendEmailOtp,
   sendPhoneOtp,
   verifyEmailOtp,
@@ -72,7 +73,9 @@ export default function LoginPage() {
           : await verifyPhoneOtp(identifier, value);
       if (res.ok) {
         setStatus('success');
-        router.push('/onboarding');
+        // Route by membership: dashboard if they already have an org, else onboarding.
+        const path = await resolvePostLoginPath();
+        router.push(path);
       } else {
         // Stay on the verify step; show a localized error.
         setStatus('error');

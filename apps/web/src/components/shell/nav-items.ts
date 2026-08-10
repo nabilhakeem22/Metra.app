@@ -32,14 +32,7 @@ export interface NavGroup {
 export const NAV_GROUPS: NavGroup[] = [
   {
     groupKey: 'main',
-    items: [
-      { key: 'dashboard', href: '/dashboard', icon: LayoutDashboard },
-      { key: 'projects', icon: FolderKanban, disabled: true },
-      { key: 'proposals', icon: FileText, disabled: true },
-      { key: 'contracts', icon: FileSignature, disabled: true },
-      { key: 'costing', icon: Calculator, disabled: true },
-      { key: 'invoices', icon: ReceiptText, disabled: true },
-    ],
+    items: [{ key: 'dashboard', href: '/dashboard', icon: LayoutDashboard }],
   },
   {
     groupKey: 'support',
@@ -51,4 +44,16 @@ export const NAV_GROUPS: NavGroup[] = [
       { key: 'signOut', icon: LogOut, action: 'signout' },
     ],
   },
+];
+
+/**
+ * The spine modules (P1) — collapsed behind a single "Coming soon" disclosure so
+ * the shell isn't 5 always-visible dead rows.
+ */
+export const COMING_SOON_ITEMS: NavItem[] = [
+  { key: 'projects', icon: FolderKanban, disabled: true },
+  { key: 'proposals', icon: FileText, disabled: true },
+  { key: 'contracts', icon: FileSignature, disabled: true },
+  { key: 'costing', icon: Calculator, disabled: true },
+  { key: 'invoices', icon: ReceiptText, disabled: true },
 ];

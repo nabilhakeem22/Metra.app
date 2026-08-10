@@ -1,13 +1,14 @@
 'use client';
 
-import { PanelLeft } from 'lucide-react';
+import { ChevronRight, PanelLeft } from 'lucide-react';
 import { useTranslations } from 'next-intl';
+import { useState } from 'react';
 import { Wordmark } from '@/components/brand/wordmark';
 import { Button } from '@/components/ui/button';
 import { Link, usePathname } from '@/i18n/routing';
 import { signOut } from '@/lib/auth/actions';
 import { cn } from '@/lib/utils';
-import { NAV_GROUPS } from './nav-items';
+import { COMING_SOON_ITEMS, NAV_GROUPS } from './nav-items';
 import { OrgSwitcher, type OrgOption } from './org-switcher';
 
 export interface SidebarProps {
@@ -30,6 +31,7 @@ export function Sidebar({
   const nav = useTranslations('nav');
   const shell = useTranslations('shell');
   const pathname = usePathname();
+  const [soonOpen, setSoonOpen] = useState(false);
 
   const itemBase =
     'group flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition-colors';
@@ -44,10 +46,7 @@ export function Sidebar({
     >
       <div className={cn('flex items-center px-2 py-1', collapsed && 'justify-center')}>
         {collapsed ? (
-          <span
-            aria-hidden
-            className="size-3 rounded-md bg-gradient-to-br from-primary to-accent"
-          />
+          <span aria-hidden className="size-2.5 rounded-full bg-brand" />
         ) : (
           <Wordmark size="sm" />
         )}
@@ -144,6 +143,55 @@ export function Sidebar({
                 </Link>
               );
             })}
+
+            {group.groupKey === 'main' && !collapsed && (
+              <div className="mt-1">
+                <button
+                  type="button"
+                  onClick={() => setSoonOpen((o) => !o)}
+                  aria-expanded={soonOpen}
+                  className={cn(
+                    itemBase,
+                    'w-full text-muted-foreground hover:bg-muted hover:text-foreground',
+                  )}
+                >
+                  <ChevronRight
+                    className={cn(
+                      'size-4 shrink-0 transition-transform motion-reduce:transition-none',
+                      soonOpen && 'rotate-90 rtl:-rotate-90',
+                    )}
+                    aria-hidden
+                  />
+                  <span className="flex-1 text-start">{nav('comingSoon')}</span>
+                </button>
+
+                {soonOpen && (
+                  <div className="mt-1 flex flex-col gap-1">
+                    {COMING_SOON_ITEMS.map((item) => {
+                      const Icon = item.icon;
+                      return (
+                        <span
+                          key={item.key}
+                          aria-disabled
+                          className={cn(
+                            itemBase,
+                            'ms-4 cursor-not-allowed text-muted-foreground/50',
+                          )}
+                        >
+                          <Icon className="size-5 shrink-0" aria-hidden />
+                          <span className="flex-1 truncate">
+                            {nav(item.key)}
+                          </span>
+                          <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+                            {nav('soon')}
+                          </span>
+                        </span>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         ))}
       </nav>
