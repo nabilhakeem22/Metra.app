@@ -4,14 +4,16 @@
 // context zero org B rows are visible (and vice versa). Also asserts every such
 // table has FORCE RLS + a policy, so the test FAILS if a future table ships
 // without protection. Requires: migrations applied, RLS applied, seed run.
+import { randomUUID } from 'node:crypto';
 import {
+  INVITE_A_ID,
   ORG_A_ID,
   ORG_B_ID,
   USER_A_ID,
   USER_B_ID,
   createDb,
   withOrgContext,
-  type MertaDb,
+  type MetraDb,
   type OrgContext,
 } from '@metra/db';
 import { sql } from 'drizzle-orm';
@@ -19,7 +21,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 const DATABASE_URL = process.env.DATABASE_URL;
 
-let db: MertaDb;
+let db: MetraDb;
 let pg: ReturnType<typeof createDb>['sql'];
 let orgIdTables: string[] = [];
 
@@ -258,10 +260,11 @@ describe('bilingual present-check (§4.1) — whitespace is not "present"', () =
   }
 
   async function cleanup(): Promise<void> {
-    await withOrgContext(db, ctxProbe, (tx) =>
-      tx.execute(
-        sql.raw(`delete from public.organizations where id = '${PROBE_ORG}'`),
-      ),
+    // Delete via the postgres (BYPASSRLS) connection — the throwaway org has no
+    // membership, so the new membership-gated policy would block a metra_app
+    // delete. postgres bypasses RLS, so teardown always succeeds.
+    await pg.unsafe(
+      `delete from public.organizations where id = '${PROBE_ORG}'`,
     );
   }
 
@@ -285,5 +288,212 @@ describe('bilingual present-check (§4.1) — whitespace is not "present"', () =
     await cleanup();
     await expect(tryInsertOrg(null, 'Real Co')).resolves.toBeUndefined();
     await cleanup();
+  });
+});
+
+// USER_B is a member of org B only — NOT of org A. A context claiming org A with
+// USER_B is a forged context (e.g. a hand-set app.current_org_id or a stolen
+// org id). The membership second factor must deny everything.
+const USER_C_ID = '00000000-0000-4000-8000-0000000000c3';
+const ctxForged: OrgContext = {
+  orgId: ORG_A_ID,
+  userId: USER_B_ID,
+  role: 'owner',
+  email: 'attacker@evil.example',
+};
+
+async function rowsUnder(ctx: OrgContext, rawSql: string): Promise<unknown[]> {
+  return withOrgContext(db, ctx, (tx) =>
+    tx.execute(sql.raw(rawSql)),
+  ) as unknown as Promise<unknown[]>;
+}
+
+describe('membership second factor — forged context is denied', () => {
+  it('forged {orgA, USER_B} sees 0 rows in every org_id table (incl A own rows)', async () => {
+    for (const table of orgIdTables) {
+      const n = await countAll(ctxForged, table);
+      expect(n, `${table} visible to a forged non-member`).toBe(0);
+    }
+  });
+
+  it('forged context cannot INSERT into files / invitations / audit_log', async () => {
+    await expect(
+      rowsUnder(
+        ctxForged,
+        `insert into public.files (id, org_id, entity, object_key)
+         values (gen_random_uuid(), '${ORG_A_ID}', 'x', '${ORG_A_ID}/x/${randomUUID()}')`,
+      ),
+    ).rejects.toThrow();
+
+    await expect(
+      rowsUnder(
+        ctxForged,
+        `insert into public.invitations (id, org_id, email, role, token_hash, status, invited_by, expires_at)
+         values (gen_random_uuid(), '${ORG_A_ID}', 'x@x.com', 'viewer', 'h-${randomUUID()}', 'pending', '${USER_B_ID}', now() + interval '7 days')`,
+      ),
+    ).rejects.toThrow();
+
+    await expect(
+      rowsUnder(
+        ctxForged,
+        `insert into public.audit_log (id, org_id, actor_user_id, entity, action)
+         values (gen_random_uuid(), '${ORG_A_ID}', '${USER_B_ID}', 'x', 'create')`,
+      ),
+    ).rejects.toThrow();
+  });
+
+  it('forged context cannot UPDATE or DELETE org A rows (0 affected; rows survive)', async () => {
+    const upd = await rowsUnder(
+      ctxForged,
+      `update public.memberships set role = 'admin' where org_id = '${ORG_A_ID}' returning id`,
+    );
+    expect(upd.length, 'forged UPDATE affected org A memberships').toBe(0);
+
+    const del = await rowsUnder(
+      ctxForged,
+      `delete from public.files where org_id = '${ORG_A_ID}' returning id`,
+    );
+    expect(del.length, 'forged DELETE affected org A files').toBe(0);
+
+    // Confirm A's rows still exist (postgres/BYPASSRLS view).
+    const mem = await pg.unsafe(
+      `select count(*)::int as n from public.memberships where org_id = '${ORG_A_ID}'`,
+    );
+    expect(Number(mem[0].n)).toBeGreaterThan(0);
+  });
+
+  it('forged context cannot insert its OWN membership (self-join) nor another user membership', async () => {
+    // {A, USER_B}: bootstrap branch needs app_can_bootstrap_membership() — org A
+    // already has members and USER_B has no accepted invite -> rejected.
+    await expect(
+      rowsUnder(
+        ctxForged,
+        `insert into public.memberships (id, org_id, user_id, role)
+         values (gen_random_uuid(), '${ORG_A_ID}', '${USER_B_ID}', 'admin')`,
+      ),
+    ).rejects.toThrow();
+
+    // {A, USER_C}: user_id != current_user -> bootstrap branch false -> rejected.
+    await expect(
+      rowsUnder(
+        ctxForged,
+        `insert into public.memberships (id, org_id, user_id, role)
+         values (gen_random_uuid(), '${ORG_A_ID}', '${USER_C_ID}', 'admin')`,
+      ),
+    ).rejects.toThrow();
+  });
+
+  it('app_claim_invitation with a non-matching email claims nothing (invite stays pending)', async () => {
+    const claimed = await rowsUnder(
+      ctxForged,
+      `select id from public.app_claim_invitation('${INVITE_A_ID}')`,
+    );
+    expect(claimed.length, 'forged email claimed the invite').toBe(0);
+
+    const status = await pg.unsafe(
+      `select status from public.invitations where id = '${INVITE_A_ID}'`,
+    );
+    expect(status[0].status).toBe('pending');
+  });
+});
+
+describe('membership second factor — bootstrap carve-outs still work', () => {
+  const O1 = randomUUID(); // createOrg sim
+  const U1 = randomUUID();
+  const O2 = randomUUID(); // acceptInvite sim
+  const OWNER_D = randomUUID();
+  const UC = randomUUID();
+  const INV2 = randomUUID();
+  const UC_EMAIL = 'boot-uc@example.com';
+
+  afterAll(async () => {
+    // Teardown via postgres/BYPASSRLS.
+    await pg.unsafe(
+      `delete from public.memberships where org_id in ('${O1}','${O2}')`,
+    );
+    await pg.unsafe(
+      `delete from public.invitations where org_id in ('${O1}','${O2}')`,
+    );
+    await pg.unsafe(
+      `delete from public.organizations where id in ('${O1}','${O2}')`,
+    );
+  });
+
+  it('createOrg bootstrap: founding org + owner membership insert AND read back', async () => {
+    const res = await withOrgContext(
+      db,
+      { orgId: O1, userId: U1, role: 'owner' },
+      async (tx) => {
+        await tx.execute(
+          sql.raw(
+            `insert into public.organizations (id, name_en) values ('${O1}', 'Boot Co')`,
+          ),
+        );
+        await tx.execute(
+          sql.raw(
+            `insert into public.memberships (id, org_id, user_id, role)
+             values (gen_random_uuid(), '${O1}', '${U1}', 'owner')`,
+          ),
+        );
+        const org = (await tx.execute(
+          sql.raw(
+            `select count(*)::int as n from public.organizations where id = '${O1}'`,
+          ),
+        )) as unknown as Array<{ n: number }>;
+        const mem = (await tx.execute(
+          sql.raw(
+            `select count(*)::int as n from public.memberships where org_id = '${O1}'`,
+          ),
+        )) as unknown as Array<{ n: number }>;
+        return { org: Number(org[0].n), mem: Number(mem[0].n) };
+      },
+    );
+    expect(res.org).toBe(1);
+    expect(res.mem).toBe(1);
+  });
+
+  it('acceptInvite bootstrap: claim + own-membership insert when the org already has a member', async () => {
+    // Setup via postgres/BYPASSRLS: org + an existing owner + a pending invite
+    // for UC's email. Zero-members branch is false, so bootstrap must rely on the
+    // accepted-invite branch (armed by app_claim_invitation).
+    await pg.unsafe(
+      `insert into public.organizations (id, name_en) values ('${O2}', 'Invite Co')`,
+    );
+    await pg.unsafe(
+      `insert into public.memberships (id, org_id, user_id, role)
+       values (gen_random_uuid(), '${O2}', '${OWNER_D}', 'owner')`,
+    );
+    await pg.unsafe(
+      `insert into public.invitations (id, org_id, email, role, token_hash, status, invited_by, expires_at)
+       values ('${INV2}', '${O2}', '${UC_EMAIL}', 'viewer', 'boot-hash-${INV2}', 'pending', '${OWNER_D}', now() + interval '7 days')`,
+    );
+
+    const res = await withOrgContext(
+      db,
+      { orgId: O2, userId: UC, role: 'viewer', email: UC_EMAIL },
+      async (tx) => {
+        const claimed = (await tx.execute(
+          sql.raw(`select id from public.app_claim_invitation('${INV2}')`),
+        )) as unknown as unknown[];
+
+        await tx.execute(
+          sql.raw(
+            `insert into public.memberships (id, org_id, user_id, role)
+             values (gen_random_uuid(), '${O2}', '${UC}', 'viewer')`,
+          ),
+        );
+
+        const mine = (await tx.execute(
+          sql.raw(
+            `select count(*)::int as n from public.memberships where user_id = '${UC}'`,
+          ),
+        )) as unknown as Array<{ n: number }>;
+
+        return { claimed: claimed.length, mine: Number(mine[0].n) };
+      },
+    );
+
+    expect(res.claimed, 'claim did not return the invite').toBe(1);
+    expect(res.mine, 'own membership not inserted/visible').toBe(1);
   });
 });

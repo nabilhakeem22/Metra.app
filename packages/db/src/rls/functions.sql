@@ -157,8 +157,12 @@ $$;
 -- Atomically claim a pending invitation for the session user (marks it accepted
 -- with accepted_by=current user). Returns the id iff it was claimed. Guarded to
 -- the current org + the invite email matching the session email. VOLATILE.
+-- Dropped first because the return type changed from an earlier setof uuid form
+-- (create or replace cannot change a function's return type). No policy depends
+-- on this function, so the drop is safe.
+drop function if exists public.app_claim_invitation(uuid);
 create or replace function public.app_claim_invitation(p_invitation_id uuid)
-returns setof uuid
+returns table (id uuid)
 language sql
 volatile
 security definer
