@@ -6,6 +6,8 @@ export interface OrgContext {
   orgId: string;
   userId: string;
   role: MemberRole;
+  /** Session user's email — used by the bootstrap-membership RLS check. */
+  email?: string;
 }
 
 /**
@@ -28,6 +30,9 @@ export async function withOrgContext<T>(
     );
     await tx.execute(
       sql`select set_config('app.current_user_id', ${ctx.userId}, true)`,
+    );
+    await tx.execute(
+      sql`select set_config('app.current_user_email', ${ctx.email ?? ''}, true)`,
     );
     await tx.execute(sql`set local role metra_app`);
     return fn(tx as unknown as MetraDb);

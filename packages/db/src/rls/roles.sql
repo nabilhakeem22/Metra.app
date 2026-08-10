@@ -46,6 +46,14 @@ revoke execute on function public.app_invitation_by_token(text) from public;
 grant execute on function public.app_current_user_orgs() to metra_app;
 revoke execute on function public.app_current_user_orgs() from public;
 
+-- Membership second-factor helpers for RLS (SECURITY DEFINER); same treatment.
+grant execute on function public.app_is_current_org_member() to metra_app;
+revoke execute on function public.app_is_current_org_member() from public;
+grant execute on function public.app_can_bootstrap_membership() to metra_app;
+revoke execute on function public.app_can_bootstrap_membership() from public;
+grant execute on function public.app_claim_invitation(uuid) to metra_app;
+revoke execute on function public.app_claim_invitation(uuid) from public;
+
 do $$
 declare
   r text;
@@ -62,6 +70,18 @@ begin
       );
       execute format(
         'revoke execute on function public.app_current_user_orgs() from %I',
+        r
+      );
+      execute format(
+        'revoke execute on function public.app_is_current_org_member() from %I',
+        r
+      );
+      execute format(
+        'revoke execute on function public.app_can_bootstrap_membership() from %I',
+        r
+      );
+      execute format(
+        'revoke execute on function public.app_claim_invitation(uuid) from %I',
         r
       );
     end if;

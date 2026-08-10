@@ -104,3 +104,74 @@ as $$
   join public.organizations o on o.id = m.org_id
   where m.user_id = nullif(current_setting('app.current_user_id', true), '')::uuid
 $$;
+
+-- ===========================================================================
+-- Membership second factor for RLS. These run inside the request transaction
+-- (as metra_app, which is granted execute) and read the request GUCs. SECURITY
+-- DEFINER so they can consult memberships/invitations WITHOUT being filtered by
+-- the very policies they support (no recursion). Each is tightly scoped to the
+-- session's own org/user/email — never widens visibility.
+-- ===========================================================================
+
+-- Is the session user a member of the current org? Used in every table's USING.
+create or replace function public.app_is_current_org_member()
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select exists (
+    select 1 from public.memberships m
+    where m.org_id  = nullif(current_setting('app.current_org_id',  true), '')::uuid
+      and m.user_id = nullif(current_setting('app.current_user_id', true), '')::uuid
+  );
+$$;
+
+-- May the session user create their OWN founding/accepted membership? True only
+-- when (a) the org has NO members yet (createOrg founding owner), or (b) the
+-- session user has an ACCEPTED invitation in this org matching their email
+-- (acceptInvite). This is the ONLY bootstrap carve-out; it is scoped to the
+-- caller's own user/email so it can never become a self-join backdoor.
+create or replace function public.app_can_bootstrap_membership()
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select
+    not exists (
+      select 1 from public.memberships m
+      where m.org_id = nullif(current_setting('app.current_org_id', true), '')::uuid
+    )
+    or exists (
+      select 1 from public.invitations i
+      where i.org_id      = nullif(current_setting('app.current_org_id',   true), '')::uuid
+        and i.status      = 'accepted'
+        and i.accepted_by = nullif(current_setting('app.current_user_id',  true), '')::uuid
+        and lower(i.email) = lower(nullif(current_setting('app.current_user_email', true), ''))
+    );
+$$;
+
+-- Atomically claim a pending invitation for the session user (marks it accepted
+-- with accepted_by=current user). Returns the id iff it was claimed. Guarded to
+-- the current org + the invite email matching the session email. VOLATILE.
+create or replace function public.app_claim_invitation(p_invitation_id uuid)
+returns setof uuid
+language sql
+volatile
+security definer
+set search_path = ''
+as $$
+  update public.invitations
+     set status = 'accepted',
+         accepted_by = nullif(current_setting('app.current_user_id', true), '')::uuid,
+         accepted_at = now(),
+         updated_at = now()
+   where id = p_invitation_id
+     and status = 'pending'
+     and org_id = nullif(current_setting('app.current_org_id', true), '')::uuid
+     and lower(email) = lower(nullif(current_setting('app.current_user_email', true), ''))
+   returning id;
+$$;
