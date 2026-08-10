@@ -12,17 +12,35 @@ export function AcceptInvite({ token }: { token: string }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [declined, setDeclined] = useState(false);
+  const [already, setAlready] = useState(false);
 
   function accept() {
     startTransition(async () => {
       const res = await acceptInvite(token);
-      if (res.ok) {
+      if (res.ok && res.already) {
+        // F4: legit re-opener who is already a member — success, not decline.
+        setAlready(true);
+      } else if (res.ok) {
         router.push('/dashboard');
       } else {
         // Single generic decline for every failure path — no oracle.
         setDeclined(true);
       }
     });
+  }
+
+  if (already) {
+    return (
+      <div className="space-y-3">
+        <h1 className="text-2xl font-bold tracking-tight">
+          {t('alreadyTitle')}
+        </h1>
+        <p className="text-sm text-muted-foreground">{t('alreadyBody')}</p>
+        <Button asChild>
+          <Link href="/dashboard">{t('backToDashboard')}</Link>
+        </Button>
+      </div>
+    );
   }
 
   if (declined) {

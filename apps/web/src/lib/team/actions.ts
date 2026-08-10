@@ -10,7 +10,7 @@ import {
 } from '@metra/db';
 import { and, eq, sql } from 'drizzle-orm';
 import { getLocale } from 'next-intl/server';
-import { cookies } from 'next/headers';
+import { cookies, headers } from 'next/headers';
 import { recordAudit } from '@/lib/audit';
 import { requireOrg } from '@/lib/auth/require-org';
 import { getSessionUser } from '@/lib/auth/session';
@@ -25,6 +25,7 @@ export interface TeamActionResult {
   ok: boolean;
   error?: string;
   link?: string;
+  already?: boolean;
 }
 
 const INVITE_TTL_DAYS = 7;
@@ -48,6 +49,14 @@ function isMemberRole(role: string): role is MemberRole {
   return (MEMBER_ROLES as readonly string[]).includes(role);
 }
 
+function isUniqueViolation(e: unknown): boolean {
+  return (
+    typeof e === 'object' &&
+    e !== null &&
+    (e as { code?: string }).code === '23505'
+  );
+}
+
 async function currentLocale(): Promise<string> {
   try {
     return await getLocale();
@@ -56,9 +65,30 @@ async function currentLocale(): Promise<string> {
   }
 }
 
-function acceptUrl(locale: string, rawToken: string): string {
-  const base = (process.env.NEXT_PUBLIC_APP_URL ?? '').replace(/\/$/, '');
-  return `${base}/${locale}/invite/${rawToken}`;
+/**
+ * Absolute origin for invite links. Prefers NEXT_PUBLIC_APP_URL when set,
+ * otherwise derives it from the request headers. THROWS if no origin can be
+ * determined — never emits a relative/empty link.
+ */
+async function resolveOrigin(): Promise<string> {
+  const override = process.env.NEXT_PUBLIC_APP_URL?.trim().replace(/\/$/, '');
+  if (override) return override;
+
+  const h = await headers();
+  const host = h.get('x-forwarded-host') ?? h.get('host');
+  const proto = h.get('x-forwarded-proto') ?? 'https';
+  if (!host) {
+    throw new Error('cannot resolve request origin for invite link');
+  }
+  return `${proto}://${host}`;
+}
+
+async function buildAcceptUrl(
+  locale: string,
+  rawToken: string,
+): Promise<string> {
+  const origin = await resolveOrigin();
+  return `${origin}/${locale}/invite/${rawToken}`;
 }
 
 async function orgDisplayName(ctx: OrgContext): Promise<string> {
@@ -98,8 +128,15 @@ export async function inviteMember(input: {
   const { raw, hash } = mintToken();
   const expiresAt = new Date(Date.now() + INVITE_TTL_DAYS * 86400_000);
 
+  // Resolve the absolute link BEFORE creating the invite — if the origin can't
+  // be determined we throw here and never persist a half-usable invite.
+  const locale = await currentLocale();
+  const link = await buildAcceptUrl(locale, raw);
+
   try {
     await withOrgContext(ctx, async (tx) => {
+      // App-level pre-check for the common case; the partial UNIQUE index
+      // (org_id,email) where pending is the real race arbiter below.
       const pending = await tx
         .select({ id: invitations.id })
         .from(invitations)
@@ -129,15 +166,18 @@ export async function inviteMember(input: {
       });
     });
   } catch (e) {
-    if (e instanceof Error && e.message === 'pending_exists') {
+    // The DB is the arbiter: a concurrent invite to the same email trips the
+    // partial unique index (23505) — same result as the app guard.
+    if (
+      (e instanceof Error && e.message === 'pending_exists') ||
+      isUniqueViolation(e)
+    ) {
       return { ok: false, error: 'pending_exists' };
     }
     console.error('inviteMember failed:', e);
     return { ok: false, error: 'invalid' };
   }
 
-  const locale = await currentLocale();
-  const link = acceptUrl(locale, raw);
   await sendInviteEmail({
     to: email,
     orgName: await orgDisplayName(ctx),
@@ -156,6 +196,8 @@ export async function resendInvite(id: string): Promise<TeamActionResult> {
 
   const { raw, hash } = mintToken();
   const expiresAt = new Date(Date.now() + INVITE_TTL_DAYS * 86400_000);
+  const locale = await currentLocale();
+  const link = await buildAcceptUrl(locale, raw);
 
   let email = '';
   let role: MemberRole = 'viewer';
@@ -192,8 +234,6 @@ export async function resendInvite(id: string): Promise<TeamActionResult> {
     return { ok: false, error: 'invalid' };
   }
 
-  const locale = await currentLocale();
-  const link = acceptUrl(locale, raw);
   await sendInviteEmail({
     to: email,
     orgName: await orgDisplayName(ctx),
@@ -246,10 +286,18 @@ export async function changeMemberRole(input: {
   const ctx = await requireOrg();
   if (!canManage(ctx.role)) return { ok: false, error: 'forbidden' };
   if (!isMemberRole(input.role)) return { ok: false, error: 'invalid' };
+  // F6: cannot change your own role here.
+  if (input.userId === ctx.userId) return { ok: false, error: 'self' };
   const role = input.role;
 
   try {
     await withOrgContext(ctx, async (tx) => {
+      // R1: serialize owner mutations per org so concurrent demotes/removes
+      // can't both pass the last-owner guard. The count/guard runs AFTER this.
+      await tx.execute(
+        sql`select pg_advisory_xact_lock(hashtext(${ctx.orgId}))`,
+      );
+
       const [target] = await tx
         .select({ id: memberships.id, role: memberships.role })
         .from(memberships)
@@ -261,7 +309,7 @@ export async function changeMemberRole(input: {
       if ((target.role === 'owner' || role === 'owner') && ctx.role !== 'owner') {
         throw new Error('owner_immutable');
       }
-      // Never demote the last remaining owner.
+      // Never demote the last remaining owner (re-read under the lock).
       if (target.role === 'owner' && role !== 'owner') {
         const owners = await tx
           .select({ id: memberships.id })
@@ -288,7 +336,7 @@ export async function changeMemberRole(input: {
     const code = e instanceof Error ? e.message : 'invalid';
     return {
       ok: false,
-      error: ['owner_immutable', 'last_owner', 'invalid'].includes(code)
+      error: ['owner_immutable', 'last_owner', 'self', 'invalid'].includes(code)
         ? code
         : 'invalid',
     };
@@ -300,9 +348,16 @@ export async function changeMemberRole(input: {
 export async function removeMember(userId: string): Promise<TeamActionResult> {
   const ctx = await requireOrg();
   if (!canManage(ctx.role)) return { ok: false, error: 'forbidden' };
+  // F6: cannot remove yourself here.
+  if (userId === ctx.userId) return { ok: false, error: 'self' };
 
   try {
     await withOrgContext(ctx, async (tx) => {
+      // R1: serialize owner mutations per org (see changeMemberRole).
+      await tx.execute(
+        sql`select pg_advisory_xact_lock(hashtext(${ctx.orgId}))`,
+      );
+
       const [target] = await tx
         .select({ id: memberships.id, role: memberships.role })
         .from(memberships)
@@ -335,7 +390,7 @@ export async function removeMember(userId: string): Promise<TeamActionResult> {
     const code = e instanceof Error ? e.message : 'invalid';
     return {
       ok: false,
-      error: ['owner_immutable', 'last_owner', 'invalid'].includes(code)
+      error: ['owner_immutable', 'last_owner', 'self', 'invalid'].includes(code)
         ? code
         : 'invalid',
     };
@@ -343,7 +398,9 @@ export async function removeMember(userId: string): Promise<TeamActionResult> {
   return { ok: true };
 }
 
-// --- Accept invite (every failure returns the SAME generic 'declined') ------
+// --- Accept invite ---------------------------------------------------------
+// Every failure returns the SAME generic 'declined' (no oracle). Success may be
+// { ok } (just joined) or { ok, already:true } (already a member — F4).
 export async function acceptInvite(rawToken: string): Promise<TeamActionResult> {
   const DECLINED: TeamActionResult = { ok: false, error: 'declined' };
 
@@ -371,21 +428,15 @@ export async function acceptInvite(rawToken: string): Promise<TeamActionResult> 
 
     const inv = rows[0];
     if (!inv) return DECLINED;
-    if (inv.status !== 'pending') return DECLINED;
     if (new Date(inv.expires_at).getTime() <= Date.now()) return DECLINED;
     if (inv.email.toLowerCase() !== user.email.toLowerCase()) return DECLINED;
 
-    await withOrgContext(
+    const outcome = await withOrgContext(
       { orgId: inv.org_id, userId: user.id, role: inv.role },
-      async (tx) => {
-        const inserted = await tx
-          .insert(memberships)
-          .values({ orgId: inv.org_id, userId: user.id, role: inv.role })
-          .onConflictDoNothing()
-          .returning({ id: memberships.id });
-
-        // Mark accepted only if still pending (replay-safe).
-        await tx
+      async (tx): Promise<'joined' | 'already' | 'declined'> => {
+        // R3: claim the invite FIRST — atomic single-consumption regardless of
+        // which user id accepts (two accounts sharing an email can't both win).
+        const claimed = await tx
           .update(invitations)
           .set({
             status: 'accepted',
@@ -395,33 +446,63 @@ export async function acceptInvite(rawToken: string): Promise<TeamActionResult> 
           })
           .where(
             and(eq(invitations.id, inv.id), eq(invitations.status, 'pending')),
-          );
+          )
+          .returning({ id: invitations.id });
 
-        if (inserted[0]) {
-          await recordAudit(tx, {
-            entity: 'membership',
-            entityId: inserted[0].id,
-            action: 'create',
-            before: null,
-            after: {
-              user_id: user.id,
-              role: inv.role,
-              via: 'invitation',
-              invitation_id: inv.id,
-            },
-          });
+        if (claimed.length === 1) {
+          const inserted = await tx
+            .insert(memberships)
+            .values({ orgId: inv.org_id, userId: user.id, role: inv.role })
+            .onConflictDoNothing()
+            .returning({ id: memberships.id });
+
+          if (inserted[0]) {
+            await recordAudit(tx, {
+              entity: 'membership',
+              entityId: inserted[0].id,
+              action: 'create',
+              before: null,
+              after: {
+                user_id: user.id,
+                role: inv.role,
+                via: 'invitation',
+                invitation_id: inv.id,
+              },
+            });
+          }
+          return 'joined';
         }
+
+        // Claimed 0 rows: already consumed. F4 — if it is now accepted and THIS
+        // caller is already a member of that org, treat as an already-joined
+        // success (the caller holds a valid token for that org, not an oracle).
+        const [current] = await tx
+          .select({ status: invitations.status })
+          .from(invitations)
+          .where(eq(invitations.id, inv.id))
+          .limit(1);
+        const [mine] = await tx
+          .select({ id: memberships.id })
+          .from(memberships)
+          .where(eq(memberships.userId, user.id))
+          .limit(1);
+
+        if (current?.status === 'accepted' && mine) return 'already';
+        return 'declined';
       },
     );
+
+    if (outcome === 'declined') return DECLINED;
 
     const cookieStore = await cookies();
     cookieStore.set(ACTIVE_ORG_COOKIE, inv.org_id, {
       httpOnly: true,
       sameSite: 'lax',
+      secure: process.env.NODE_ENV === 'production',
       path: '/',
     });
 
-    return { ok: true };
+    return outcome === 'already' ? { ok: true, already: true } : { ok: true };
   } catch (e) {
     console.error('acceptInvite failed:', e);
     return DECLINED;

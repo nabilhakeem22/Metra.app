@@ -26,12 +26,14 @@ export default async function TeamPage() {
       .where(eq(invitations.status, 'pending')),
   );
 
+  const now = Date.now();
   const pendingSerialized = pending.map((p) => ({
     id: p.id,
     email: p.email,
     role: p.role,
     expiresAt: p.expiresAt.toISOString(),
     createdAt: p.createdAt.toISOString(),
+    expired: p.expiresAt.getTime() <= now,
   }));
 
   return (

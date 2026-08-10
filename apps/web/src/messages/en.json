@@ -128,6 +128,7 @@
     "noPending": "No pending invitations",
     "you": "You",
     "unknownUser": "Unknown user",
+    "expired": "Expired",
     "readonly": "You have read-only access to the team.",
     "resend": "Resend",
     "revoke": "Revoke",
@@ -146,6 +147,7 @@
     "errorPendingExists": "There's already a pending invite for that email.",
     "errorLastOwner": "You can't remove or demote the last owner.",
     "errorOwnerImmutable": "Only an owner can change an owner.",
+    "errorSelf": "You can't change your own role or remove yourself here.",
     "errorGeneric": "Something went wrong. Please try again."
   },
   "roles": {
@@ -182,6 +184,8 @@
     "title": "Accept your invitation",
     "body": "You've been invited to join a firm on Metra. Accept to continue.",
     "acceptButton": "Accept invitation",
+    "alreadyTitle": "You're already in",
+    "alreadyBody": "You're already a member of this firm.",
     "declinedTitle": "This invitation can't be used",
     "declinedBody": "The link may be invalid, expired, already used, or meant for a different account.",
     "signInTitle": "Sign in to accept",

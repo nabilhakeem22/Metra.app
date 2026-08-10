@@ -41,6 +41,7 @@ interface Pending {
   role: MemberRole;
   expiresAt: string;
   createdAt: string;
+  expired: boolean;
 }
 
 export interface TeamClientProps {
@@ -71,16 +72,6 @@ export function TeamClient({
   const [lastLink, setLastLink] = useState<string | null>(null);
 
   function errorMessage(code?: string): string {
-    const known = [
-      'forbidden',
-      'invalid',
-      'already_member',
-      'pending_exists',
-      'last_owner',
-      'owner_immutable',
-    ];
-    const key = code && known.includes(code) ? code : 'generic';
-    // t() keys are camelCased in the message file.
     const map: Record<string, string> = {
       forbidden: 'errorForbidden',
       invalid: 'errorInvalid',
@@ -88,9 +79,10 @@ export function TeamClient({
       pending_exists: 'errorPendingExists',
       last_owner: 'errorLastOwner',
       owner_immutable: 'errorOwnerImmutable',
+      self: 'errorSelf',
       generic: 'errorGeneric',
     };
-    return t(map[key]);
+    return t(map[code ?? 'generic'] ?? 'errorGeneric');
   }
 
   function roleLabel(role: MemberRole): string {
@@ -343,8 +335,15 @@ export function TeamClient({
                 className="flex flex-wrap items-center justify-between gap-3 rounded-xl border p-3"
               >
                 <div className="min-w-0">
-                  <p className="truncate text-sm font-medium" dir="ltr">
-                    {p.email}
+                  <p className="flex items-center gap-2 truncate text-sm font-medium">
+                    <span dir="ltr" className="truncate">
+                      {p.email}
+                    </span>
+                    {p.expired && (
+                      <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+                        {t('expired')}
+                      </span>
+                    )}
                   </p>
                   <p className="text-xs text-muted-foreground">
                     {roleLabel(p.role)} · {t('expiresOn')}{' '}
@@ -353,16 +352,18 @@ export function TeamClient({
                 </div>
                 {canManage && (
                   <div className="flex items-center gap-1">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => onResend(p.id)}
-                      disabled={isPending}
-                    >
-                      <RefreshCw className="size-4" aria-hidden />
-                      {t('resend')}
-                    </Button>
+                    {!p.expired && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => onResend(p.id)}
+                        disabled={isPending}
+                      >
+                        <RefreshCw className="size-4" aria-hidden />
+                        {t('resend')}
+                      </Button>
+                    )}
                     <Button
                       type="button"
                       variant="ghost"
