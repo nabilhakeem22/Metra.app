@@ -241,6 +241,12 @@
     "createOrJoin": "Create or join another company",
     "switchError": "Couldn't switch company. Please try again."
   },
+  "theme": {
+    "label": "Theme",
+    "light": "Light",
+    "dark": "Dark",
+    "system": "System"
+  },
   "common": {
     "untranslated": "untranslated"
   }

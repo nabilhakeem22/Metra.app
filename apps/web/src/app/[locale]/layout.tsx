@@ -3,6 +3,7 @@ import { getMessages } from 'next-intl/server';
 import { IBM_Plex_Sans, IBM_Plex_Sans_Arabic } from 'next/font/google';
 import { notFound } from 'next/navigation';
 import type { ReactNode } from 'react';
+import { ThemeProvider } from '@/components/theme-provider';
 import { LOCALES, dirFor, type Locale } from '@/i18n/routing';
 import '../globals.css';
 
@@ -44,11 +45,19 @@ export default async function LocaleLayout({
       lang={locale}
       dir={dirFor(locale)}
       className={`${plexSans.variable} ${plexArabic.variable}`}
+      suppressHydrationWarning
     >
       <body className="min-h-screen bg-background font-sans text-foreground antialiased">
-        <NextIntlClientProvider messages={messages}>
-          {children}
-        </NextIntlClientProvider>
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="system"
+          enableSystem
+          disableTransitionOnChange
+        >
+          <NextIntlClientProvider messages={messages}>
+            {children}
+          </NextIntlClientProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

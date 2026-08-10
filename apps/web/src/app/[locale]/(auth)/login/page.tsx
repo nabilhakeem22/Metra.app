@@ -152,7 +152,7 @@ export default function LoginPage() {
             </div>
 
             <Button
-              className="w-full"
+              className="h-11 w-full"
               onClick={send}
               disabled={busy || identifier.trim().length === 0}
             >
@@ -190,7 +190,7 @@ export default function LoginPage() {
             />
 
             <Button
-              className="w-full"
+              className="h-11 w-full"
               onClick={() => verify()}
               disabled={busy || code.length < OTP_LENGTH}
             >
@@ -217,7 +217,13 @@ export default function LoginPage() {
           </div>
         )}
 
-        {error && <p className="text-sm text-destructive">{error}</p>}
+        <p
+          role="status"
+          aria-live="polite"
+          className="min-h-[1.25rem] text-sm text-destructive"
+        >
+          {error}
+        </p>
       </div>
     </AuthShell>
   );

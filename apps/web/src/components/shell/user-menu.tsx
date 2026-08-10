@@ -1,7 +1,9 @@
 'use client';
 
-import { ChevronDown, Languages, LogOut } from 'lucide-react';
+import { Check, ChevronDown, Languages, LogOut, Monitor, Moon, Sun } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
+import { useTheme } from 'next-themes';
+import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -15,6 +17,12 @@ import { usePathname, useRouter } from '@/i18n/routing';
 import { signOut } from '@/lib/auth/actions';
 import type { MemberRole } from '@/lib/permissions/roles';
 
+const THEME_OPTIONS = [
+  { value: 'light', icon: Sun },
+  { value: 'dark', icon: Moon },
+  { value: 'system', icon: Monitor },
+] as const;
+
 export function UserMenu({
   email,
   role,
@@ -25,9 +33,15 @@ export function UserMenu({
   const nav = useTranslations('nav');
   const shell = useTranslations('shell');
   const home = useTranslations('home');
+  const roles = useTranslations('roles');
+  const th = useTranslations('theme');
   const locale = useLocale();
   const pathname = usePathname();
   const router = useRouter();
+  const { theme, setTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+
   const target = locale === 'ar-EG' ? 'en' : 'ar-EG';
   const initial = (email?.trim()?.[0] ?? '?').toUpperCase();
 
@@ -48,14 +62,15 @@ export function UserMenu({
         </Button>
       </DropdownMenuTrigger>
 
-      <DropdownMenuContent align="end" className="min-w-[14rem]">
+      <DropdownMenuContent align="end" className="min-w-[15rem]">
         {email && (
           <DropdownMenuLabel className="truncate text-foreground">
             {email}
           </DropdownMenuLabel>
         )}
         <DropdownMenuLabel className="font-normal">
-          {shell('role')}: <span className="font-medium">{role}</span>
+          {shell('role')}:{' '}
+          <span className="font-medium">{roles(`${role}.label`)}</span>
         </DropdownMenuLabel>
 
         <DropdownMenuSeparator />
@@ -69,6 +84,27 @@ export function UserMenu({
           <Languages className="size-4" aria-hidden />
           {home('localeName')}
         </DropdownMenuItem>
+
+        <DropdownMenuSeparator />
+
+        <DropdownMenuLabel className="font-normal text-muted-foreground">
+          {th('label')}
+        </DropdownMenuLabel>
+        {THEME_OPTIONS.map(({ value, icon: Icon }) => (
+          <DropdownMenuItem
+            key={value}
+            onSelect={(e) => {
+              e.preventDefault();
+              setTheme(value);
+            }}
+          >
+            <Icon className="size-4" aria-hidden />
+            <span className="flex-1">{th(value)}</span>
+            {mounted && theme === value && (
+              <Check className="size-4 text-primary" aria-hidden />
+            )}
+          </DropdownMenuItem>
+        ))}
 
         <DropdownMenuSeparator />
 

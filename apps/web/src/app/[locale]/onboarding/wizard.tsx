@@ -265,13 +265,19 @@ export function OnboardingWizard() {
         {step < STEPS ? (
           <Button
             type="button"
+            className="h-11"
             onClick={next}
             disabled={step === 1 && !canProceedStep1}
           >
             {t('next')}
           </Button>
         ) : (
-          <Button type="button" onClick={finish} disabled={pending}>
+          <Button
+            type="button"
+            className="h-11"
+            onClick={finish}
+            disabled={pending}
+          >
             {pending && <Loader2 className="size-4 animate-spin" aria-hidden />}
             {pending ? t('creating') : t('finish')}
           </Button>
