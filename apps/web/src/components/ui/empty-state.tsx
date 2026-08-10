@@ -6,6 +6,8 @@ export interface EmptyStateProps {
   title: string;
   description?: string;
   hint?: string;
+  /** Primary CTA slot — the template P1 modules inherit. */
+  action?: ReactNode;
   className?: string;
 }
 
@@ -14,6 +16,7 @@ export function EmptyState({
   title,
   description,
   hint,
+  action,
   className,
 }: EmptyStateProps) {
   return (
@@ -39,6 +42,7 @@ export function EmptyState({
           {hint}
         </span>
       )}
+      {action && <div className="pt-1">{action}</div>}
     </div>
   );
 }
