@@ -12,7 +12,11 @@ export async function updateAccount(input: {
   const supabase = await createSupabaseServerClient();
 
   const data: Record<string, unknown> = {};
-  if (input.fullName !== undefined) data.full_name = input.fullName.trim();
+  if (input.fullName !== undefined) {
+    const fullName = input.fullName.trim();
+    if (fullName.length > 200) return { ok: false, error: 'invalid' };
+    data.full_name = fullName;
+  }
   if (input.locale) data.locale = input.locale;
 
   const { error } = await supabase.auth.updateUser({ data });

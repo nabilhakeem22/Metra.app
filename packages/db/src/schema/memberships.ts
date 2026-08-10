@@ -1,4 +1,10 @@
-import { pgTable, unique, uuid, type AnyPgColumn } from 'drizzle-orm/pg-core';
+import {
+  index,
+  pgTable,
+  unique,
+  uuid,
+  type AnyPgColumn,
+} from 'drizzle-orm/pg-core';
 import { memberRole } from './enums';
 import { organizations } from './organizations';
 import { orgScoped } from './org-scoped';
@@ -21,6 +27,9 @@ export const memberships = pgTable(
   (t) => [
     unique('memberships_org_id_id_unique').on(t.orgId, t.id),
     unique('memberships_org_user_unique').on(t.orgId, t.userId),
+    // Speeds the un-joined `where user_id = $1` lookup in
+    // app_current_user_memberships()/app_current_user_orgs().
+    index('memberships_user_id_idx').on(t.userId),
   ],
 );
 

@@ -1,7 +1,7 @@
 'use server';
 
 import { randomUUID } from 'node:crypto';
-import { memberships, organizations } from '@metra/db';
+import { files, memberships, organizations } from '@metra/db';
 import { eq, sql } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
 import { cookies } from 'next/headers';
@@ -27,6 +27,23 @@ export interface OrgProfileInput {
   nameAr?: string | null;
   city?: string | null;
   taxRegistrationNumber?: string | null;
+}
+
+// Cap user-supplied text at the action boundary (defense-in-depth).
+const LIMITS = { name: 200, city: 120, taxReg: 64 } as const;
+
+function profileWithinLimits(
+  nameEn: string | null,
+  nameAr: string | null,
+  city: string | null,
+  tax: string | null,
+): boolean {
+  return (
+    (nameEn?.length ?? 0) <= LIMITS.name &&
+    (nameAr?.length ?? 0) <= LIMITS.name &&
+    (city?.length ?? 0) <= LIMITS.city &&
+    (tax?.length ?? 0) <= LIMITS.taxReg
+  );
 }
 
 /**
@@ -57,6 +74,9 @@ export async function createOrg(input: OrgProfileInput): Promise<void> {
   }
   const city = input.city?.trim() || null;
   const taxRegistrationNumber = input.taxRegistrationNumber?.trim() || null;
+  if (!profileWithinLimits(nameEn, nameAr, city, taxRegistrationNumber)) {
+    throw new Error('invalid');
+  }
 
   const orgId = randomUUID();
 
@@ -105,10 +125,18 @@ export async function createLogoUpload(input: {
   });
 }
 
-/** Points the org at an uploaded logo file. */
-export async function setOrgLogo(fileId: string): Promise<void> {
+/** Points the org at an uploaded logo file — only if the file is in the org. */
+export async function setOrgLogo(fileId: string): Promise<ActionResult> {
   const ctx = await requireOrg();
-  await withOrgContext(ctx, async (tx) => {
+  return withOrgContext(ctx, async (tx) => {
+    // Confirm the file belongs to the caller's org (RLS-scoped). Reject otherwise.
+    const [owned] = await tx
+      .select({ id: files.id })
+      .from(files)
+      .where(eq(files.id, fileId))
+      .limit(1);
+    if (!owned) return { ok: false, error: 'invalid' };
+
     await tx
       .update(organizations)
       .set({ logoFileId: fileId, updatedAt: new Date() })
@@ -121,6 +149,7 @@ export async function setOrgLogo(fileId: string): Promise<void> {
       before: null,
       after: { logo_file_id: fileId },
     });
+    return { ok: true };
   });
 }
 
@@ -140,6 +169,9 @@ export async function updateOrgProfile(
   if (!nameEn && !nameAr) return { ok: false, error: 'name_required' };
   const city = input.city?.trim() || null;
   const taxRegistrationNumber = input.taxRegistrationNumber?.trim() || null;
+  if (!profileWithinLimits(nameEn, nameAr, city, taxRegistrationNumber)) {
+    return { ok: false, error: 'invalid' };
+  }
 
   await withOrgContext(ctx, async (tx) => {
     const [before] = await tx

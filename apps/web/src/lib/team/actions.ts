@@ -117,7 +117,9 @@ export async function inviteMember(input: {
   if (!canManage(ctx.role)) return { ok: false, error: 'forbidden' };
 
   const email = normalizeEmail(input.email);
-  if (!isValidEmail(email)) return { ok: false, error: 'invalid' };
+  if (!isValidEmail(email) || email.length > 254) {
+    return { ok: false, error: 'invalid' };
+  }
   if (!isMemberRole(input.role) || input.role === 'owner') {
     return { ok: false, error: 'invalid' };
   }
