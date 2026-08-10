@@ -51,10 +51,15 @@ const config: Config = {
           DEFAULT: 'hsl(var(--destructive))',
           foreground: 'hsl(var(--destructive-foreground))',
         },
+        brand: {
+          DEFAULT: 'hsl(var(--brand))',
+          foreground: 'hsl(var(--brand-foreground))',
+          strong: 'hsl(var(--brand-strong))',
+        },
       },
       boxShadow: {
-        soft: '0 1px 2px 0 hsl(220 43% 11% / 0.04), 0 2px 8px -2px hsl(220 43% 11% / 0.08)',
-        card: '0 4px 20px -4px hsl(220 43% 11% / 0.10)',
+        soft: '0 1px 2px 0 hsl(198 40% 10% / 0.05), 0 2px 8px -2px hsl(198 40% 10% / 0.08)',
+        card: '0 4px 20px -4px hsl(198 40% 10% / 0.12)',
       },
       borderRadius: {
         '2xl': 'calc(var(--radius) + 0.25rem)',

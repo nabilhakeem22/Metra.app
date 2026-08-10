@@ -28,16 +28,18 @@ export function StatCard({
   const isGradient = variant === 'gradient';
   const display = value == null || value === '' ? empty : value;
 
-  const gradient =
+  // Solid strong fills (teal / copper-strong) keep on-color text >= 4.5:1 —
+  // an opacity fade toward the light card would break contrast.
+  const strong =
     accent === 'amber'
-      ? 'bg-gradient-to-br from-accent to-accent/80 text-accent-foreground'
-      : 'bg-gradient-to-br from-primary to-primary/80 text-primary-foreground';
+      ? 'bg-brand-strong text-brand-foreground'
+      : 'bg-primary text-primary-foreground';
 
   return (
     <Card
       className={cn(
         'p-5',
-        isGradient ? cn('border-transparent shadow-card', gradient) : '',
+        isGradient ? cn('border-transparent shadow-card', strong) : '',
         className,
       )}
     >

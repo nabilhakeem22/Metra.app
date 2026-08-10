@@ -3,36 +3,78 @@
 @tailwind utilities;
 
 @layer base {
+  /* Light — warm paper canvas, teal ink, copper accent. */
   :root {
-    --background: 220 33% 97%;
-    --foreground: 222 47% 11%;
+    --background: 40 30% 97%;
+    --foreground: 198 28% 14%;
 
-    --card: 0 0% 100%;
-    --card-foreground: 222 47% 11%;
+    --card: 40 33% 99%;
+    --card-foreground: 198 28% 14%;
 
-    --popover: 0 0% 100%;
-    --popover-foreground: 222 47% 11%;
+    --popover: 40 33% 99%;
+    --popover-foreground: 198 28% 14%;
 
-    --primary: 221 83% 53%;
-    --primary-foreground: 0 0% 100%;
+    --primary: 196 44% 23%;
+    --primary-foreground: 40 30% 97%;
 
-    --accent: 32 95% 52%;
-    --accent-foreground: 0 0% 100%;
+    --secondary: 40 20% 93%;
+    --secondary-foreground: 198 28% 18%;
 
-    --secondary: 220 24% 95%;
-    --secondary-foreground: 222 47% 11%;
+    --muted: 40 18% 92%;
+    --muted-foreground: 198 13% 36%;
 
-    --muted: 220 20% 94%;
-    --muted-foreground: 220 12% 45%;
+    --accent: 30 40% 91%;
+    --accent-foreground: 198 28% 16%;
 
-    --destructive: 0 72% 51%;
-    --destructive-foreground: 0 0% 100%;
+    --destructive: 4 66% 44%;
+    --destructive-foreground: 40 30% 97%;
 
-    --border: 220 22% 90%;
-    --input: 220 22% 90%;
-    --ring: 221 83% 53%;
+    --border: 38 16% 87%;
+    --input: 38 16% 85%;
+    --ring: 196 44% 30%;
 
-    --radius: 1rem;
+    /* Copper brand: --brand for lines/marks/active indicators/icon accents;
+       --brand-strong for any copper fill that carries text (never raw --brand). */
+    --brand: 22 68% 42%;
+    --brand-foreground: 40 30% 97%;
+    --brand-strong: 22 72% 33%;
+
+    --radius: 0.625rem;
+  }
+
+  /* Dark — ink canvas. */
+  .dark {
+    --background: 200 28% 9%;
+    --foreground: 40 22% 92%;
+
+    --card: 200 26% 12%;
+    --card-foreground: 40 22% 92%;
+
+    --popover: 200 26% 12%;
+    --popover-foreground: 40 22% 92%;
+
+    --primary: 190 48% 60%;
+    --primary-foreground: 200 30% 10%;
+
+    --secondary: 200 18% 18%;
+    --secondary-foreground: 40 22% 92%;
+
+    --muted: 200 16% 18%;
+    --muted-foreground: 200 12% 66%;
+
+    --accent: 200 18% 20%;
+    --accent-foreground: 40 22% 92%;
+
+    --destructive: 4 60% 56%;
+    --destructive-foreground: 200 30% 10%;
+
+    --border: 200 16% 20%;
+    --input: 200 16% 22%;
+    --ring: 190 48% 55%;
+
+    --brand: 24 72% 60%;
+    --brand-foreground: 200 30% 10%;
+    --brand-strong: 24 72% 52%;
   }
 
   /* Direction-aware font stack: Plex Sans leads in LTR, Plex Sans Arabic in RTL. */
@@ -59,7 +101,7 @@
     caret-color: hsl(var(--primary));
   }
   ::selection {
-    background: hsl(var(--primary) / 0.18);
+    background: hsl(var(--brand) / 0.18);
     color: hsl(var(--foreground));
   }
 
