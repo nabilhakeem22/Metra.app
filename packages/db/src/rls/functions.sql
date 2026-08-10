@@ -59,3 +59,27 @@ as $$
   from public.memberships m
   where m.user_id = nullif(current_setting('app.current_user_id', true), '')::uuid
 $$;
+
+-- Invitation lookup by token hash, BEFORE any org context exists (the accept
+-- flow does not know which org it is until it resolves the token). SECURITY
+-- DEFINER bypasses FORCE RLS but returns at most the single row matching the
+-- exact token hash — no enumeration, no widening. The caller re-validates
+-- status/expiry/email and only then enters that org's context.
+create or replace function public.app_invitation_by_token(p_token_hash text)
+returns table (
+  id uuid,
+  org_id uuid,
+  email text,
+  role public.member_role,
+  status public.invitation_status,
+  expires_at timestamptz
+)
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select i.id, i.org_id, i.email, i.role, i.status, i.expires_at
+  from public.invitations i
+  where i.token_hash = p_token_hash
+$$;

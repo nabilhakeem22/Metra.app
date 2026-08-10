@@ -47,3 +47,11 @@ drop policy if exists org_isolation on public.audit_log;
 create policy org_isolation on public.audit_log
   using      (org_id = nullif(current_setting('app.current_org_id', true), '')::uuid)
   with check (org_id = nullif(current_setting('app.current_org_id', true), '')::uuid);
+
+-- invitations
+alter table public.invitations enable row level security;
+alter table public.invitations force  row level security;
+drop policy if exists org_isolation on public.invitations;
+create policy org_isolation on public.invitations
+  using      (org_id = nullif(current_setting('app.current_org_id', true), '')::uuid)
+  with check (org_id = nullif(current_setting('app.current_org_id', true), '')::uuid);

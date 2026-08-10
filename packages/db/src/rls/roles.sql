@@ -21,6 +21,7 @@ grant usage on schema public to metra_app;
 grant select, insert, update, delete on public.organizations to metra_app;
 grant select, insert, update, delete on public.memberships   to metra_app;
 grant select, insert, update, delete on public.files         to metra_app;
+grant select, insert, update, delete on public.invitations   to metra_app;
 
 -- ...except audit_log, which is append-only (§4.4). No UPDATE / DELETE grant,
 -- so any attempt raises a permission error at the database.
@@ -36,6 +37,11 @@ grant execute on function public.enforce_same_org() to metra_app;
 -- anon/authenticated/service_role do not exist.
 grant execute on function public.app_current_user_memberships() to metra_app;
 revoke execute on function public.app_current_user_memberships() from public;
+
+-- Invitation-by-token lookup (SECURITY DEFINER); same least-privilege treatment.
+grant execute on function public.app_invitation_by_token(text) to metra_app;
+revoke execute on function public.app_invitation_by_token(text) from public;
+
 do $$
 declare
   r text;
@@ -44,6 +50,10 @@ begin
     if exists (select 1 from pg_roles where rolname = r) then
       execute format(
         'revoke execute on function public.app_current_user_memberships() from %I',
+        r
+      );
+      execute format(
+        'revoke execute on function public.app_invitation_by_token(text) from %I',
         r
       );
     end if;
