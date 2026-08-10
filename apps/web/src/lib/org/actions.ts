@@ -15,7 +15,7 @@ import type { ActionResult } from '@/lib/auth/actions';
 import { requireOrg } from '@/lib/auth/require-org';
 import { getSessionUser } from '@/lib/auth/session';
 import { withOrgContext, withUserContext } from '@/lib/db/context';
-import { can } from '@/lib/permissions/can';
+import { canManageOrg } from '@/lib/permissions/can';
 import {
   createSignedUploadUrl,
   ensureFilesBucket,
@@ -154,15 +154,12 @@ export async function setOrgLogo(fileId: string): Promise<ActionResult> {
 }
 
 // --- Org settings (owner/admin only) ---------------------------------------
-function canManage(role: Parameters<typeof can>[0]): boolean {
-  return can(role, 'users_settings', 'update');
-}
 
 export async function updateOrgProfile(
   input: OrgProfileInput,
 ): Promise<ActionResult> {
   const ctx = await requireOrg();
-  if (!canManage(ctx.role)) return { ok: false, error: 'forbidden' };
+  if (!canManageOrg(ctx.role)) return { ok: false, error: 'forbidden' };
 
   const nameEn = input.nameEn?.trim() || null;
   const nameAr = input.nameAr?.trim() || null;
@@ -208,7 +205,7 @@ export async function updateOrgSettings(input: {
   restrictFirmDashboard: boolean;
 }): Promise<ActionResult> {
   const ctx = await requireOrg();
-  if (!canManage(ctx.role)) return { ok: false, error: 'forbidden' };
+  if (!canManageOrg(ctx.role)) return { ok: false, error: 'forbidden' };
 
   const hideMarginFromPm = !!input.hideMarginFromPm;
   const restrictFirmDashboard = !!input.restrictFirmDashboard;

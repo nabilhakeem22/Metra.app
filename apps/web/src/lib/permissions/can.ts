@@ -21,3 +21,11 @@ export function can(
   const cell = PERMISSION_MATRIX[capability]?.[role] ?? '';
   return cell.includes(ACTION_TO_LETTER[action]);
 }
+
+/**
+ * The single "can this role administer the org / its people" gate (owner/admin).
+ * Used by team + org-settings actions — one definition, not per-file copies.
+ */
+export function canManageOrg(role: MemberRole): boolean {
+  return can(role, 'users_settings', 'update');
+}

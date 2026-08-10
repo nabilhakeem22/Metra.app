@@ -20,7 +20,11 @@ import { requireOrg } from '@/lib/auth/require-org';
 import { getSessionUser } from '@/lib/auth/session';
 import { withOrgContext, withUserContext, type OrgContext } from '@/lib/db/context';
 import { sendInviteEmail } from '@/lib/email/resend';
-import { can } from '@/lib/permissions/can';
+import { canManageOrg } from '@/lib/permissions/can';
+import {
+  ensureNotLastOwner,
+  lockOrgMemberships,
+} from '@/lib/aggregates/membership';
 import { getOrgMemberIdentities } from './identities';
 
 // Stable error CODES (the UI maps them to localized strings). acceptInvite uses
@@ -104,17 +108,13 @@ async function orgDisplayName(ctx: OrgContext): Promise<string> {
   return org?.nameEn || org?.nameAr || 'Metra';
 }
 
-function canManage(role: MemberRole): boolean {
-  return can(role, 'users_settings', 'update');
-}
-
 // --- Invite ----------------------------------------------------------------
 export async function inviteMember(input: {
   email: string;
   role: MemberRole;
 }): Promise<TeamActionResult> {
   const ctx = await requireOrg();
-  if (!canManage(ctx.role)) return { ok: false, error: 'forbidden' };
+  if (!canManageOrg(ctx.role)) return { ok: false, error: 'forbidden' };
 
   const email = normalizeEmail(input.email);
   if (!isValidEmail(email) || email.length > 254) {
@@ -197,7 +197,7 @@ export async function inviteMember(input: {
 // --- Resend (mints a fresh token; also the "copy link" path) ---------------
 export async function resendInvite(id: string): Promise<TeamActionResult> {
   const ctx = await requireOrg();
-  if (!canManage(ctx.role)) return { ok: false, error: 'forbidden' };
+  if (!canManageOrg(ctx.role)) return { ok: false, error: 'forbidden' };
 
   const { raw, hash } = mintToken();
   const expiresAt = new Date(Date.now() + INVITE_TTL_DAYS * 86400_000);
@@ -253,7 +253,7 @@ export async function resendInvite(id: string): Promise<TeamActionResult> {
 // --- Revoke ----------------------------------------------------------------
 export async function revokeInvite(id: string): Promise<TeamActionResult> {
   const ctx = await requireOrg();
-  if (!canManage(ctx.role)) return { ok: false, error: 'forbidden' };
+  if (!canManageOrg(ctx.role)) return { ok: false, error: 'forbidden' };
 
   try {
     await withOrgContext(ctx, async (tx) => {
@@ -289,7 +289,7 @@ export async function changeMemberRole(input: {
   role: MemberRole;
 }): Promise<TeamActionResult> {
   const ctx = await requireOrg();
-  if (!canManage(ctx.role)) return { ok: false, error: 'forbidden' };
+  if (!canManageOrg(ctx.role)) return { ok: false, error: 'forbidden' };
   if (!isMemberRole(input.role)) return { ok: false, error: 'invalid' };
   // F6: cannot change your own role here.
   if (input.userId === ctx.userId) return { ok: false, error: 'self' };
@@ -299,9 +299,7 @@ export async function changeMemberRole(input: {
     await withOrgContext(ctx, async (tx) => {
       // R1: serialize owner mutations per org so concurrent demotes/removes
       // can't both pass the last-owner guard. The count/guard runs AFTER this.
-      await tx.execute(
-        sql`select pg_advisory_xact_lock(hashtext(${ctx.orgId}))`,
-      );
+      await lockOrgMemberships(tx, ctx.orgId);
 
       const [target] = await tx
         .select({ id: memberships.id, role: memberships.role })
@@ -316,11 +314,7 @@ export async function changeMemberRole(input: {
       }
       // Never demote the last remaining owner (re-read under the lock).
       if (target.role === 'owner' && role !== 'owner') {
-        const owners = await tx
-          .select({ id: memberships.id })
-          .from(memberships)
-          .where(eq(memberships.role, 'owner'));
-        if (owners.length <= 1) throw new Error('last_owner');
+        await ensureNotLastOwner(tx);
       }
       if (target.role === role) return;
 
@@ -352,16 +346,14 @@ export async function changeMemberRole(input: {
 // --- Remove member ---------------------------------------------------------
 export async function removeMember(userId: string): Promise<TeamActionResult> {
   const ctx = await requireOrg();
-  if (!canManage(ctx.role)) return { ok: false, error: 'forbidden' };
+  if (!canManageOrg(ctx.role)) return { ok: false, error: 'forbidden' };
   // F6: cannot remove yourself here.
   if (userId === ctx.userId) return { ok: false, error: 'self' };
 
   try {
     await withOrgContext(ctx, async (tx) => {
       // R1: serialize owner mutations per org (see changeMemberRole).
-      await tx.execute(
-        sql`select pg_advisory_xact_lock(hashtext(${ctx.orgId}))`,
-      );
+      await lockOrgMemberships(tx, ctx.orgId);
 
       const [target] = await tx
         .select({ id: memberships.id, role: memberships.role })
@@ -374,11 +366,7 @@ export async function removeMember(userId: string): Promise<TeamActionResult> {
         throw new Error('owner_immutable');
       }
       if (target.role === 'owner') {
-        const owners = await tx
-          .select({ id: memberships.id })
-          .from(memberships)
-          .where(eq(memberships.role, 'owner'));
-        if (owners.length <= 1) throw new Error('last_owner');
+        await ensureNotLastOwner(tx);
       }
 
       await tx.delete(memberships).where(eq(memberships.id, target.id));
