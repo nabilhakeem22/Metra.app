@@ -42,6 +42,10 @@ revoke execute on function public.app_current_user_memberships() from public;
 grant execute on function public.app_invitation_by_token(text) to metra_app;
 revoke execute on function public.app_invitation_by_token(text) from public;
 
+-- Current-user orgs (SECURITY DEFINER); same least-privilege treatment.
+grant execute on function public.app_current_user_orgs() to metra_app;
+revoke execute on function public.app_current_user_orgs() from public;
+
 do $$
 declare
   r text;
@@ -54,6 +58,10 @@ begin
       );
       execute format(
         'revoke execute on function public.app_invitation_by_token(text) from %I',
+        r
+      );
+      execute format(
+        'revoke execute on function public.app_current_user_orgs() from %I',
         r
       );
     end if;

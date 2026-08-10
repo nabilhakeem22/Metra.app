@@ -83,3 +83,24 @@ as $$
   from public.invitations i
   where i.token_hash = p_token_hash
 $$;
+
+-- The current user's orgs (with role + display names), for the org switcher and
+-- requireOrg's active-org validation. SECURITY DEFINER, scoped to
+-- app.current_user_id — returns only the caller's own memberships, no widening.
+create or replace function public.app_current_user_orgs()
+returns table (
+  org_id uuid,
+  role public.member_role,
+  name_ar text,
+  name_en text
+)
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select m.org_id, m.role, o.name_ar, o.name_en
+  from public.memberships m
+  join public.organizations o on o.id = m.org_id
+  where m.user_id = nullif(current_setting('app.current_user_id', true), '')::uuid
+$$;

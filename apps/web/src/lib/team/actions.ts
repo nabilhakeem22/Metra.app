@@ -12,6 +12,10 @@ import { and, eq, sql } from 'drizzle-orm';
 import { getLocale } from 'next-intl/server';
 import { cookies, headers } from 'next/headers';
 import { recordAudit } from '@/lib/audit';
+import {
+  ACTIVE_ORG_COOKIE,
+  activeOrgCookieOptions,
+} from '@/lib/auth/active-org';
 import { requireOrg } from '@/lib/auth/require-org';
 import { getSessionUser } from '@/lib/auth/session';
 import { withOrgContext, withUserContext, type OrgContext } from '@/lib/db/context';
@@ -29,7 +33,6 @@ export interface TeamActionResult {
 }
 
 const INVITE_TTL_DAYS = 7;
-const ACTIVE_ORG_COOKIE = 'metra_active_org';
 
 function mintToken() {
   const raw = randomBytes(32).toString('base64url');
@@ -495,12 +498,7 @@ export async function acceptInvite(rawToken: string): Promise<TeamActionResult> 
     if (outcome === 'declined') return DECLINED;
 
     const cookieStore = await cookies();
-    cookieStore.set(ACTIVE_ORG_COOKIE, inv.org_id, {
-      httpOnly: true,
-      sameSite: 'lax',
-      secure: process.env.NODE_ENV === 'production',
-      path: '/',
-    });
+    cookieStore.set(ACTIVE_ORG_COOKIE, inv.org_id, activeOrgCookieOptions());
 
     return outcome === 'already' ? { ok: true, already: true } : { ok: true };
   } catch (e) {
