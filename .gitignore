@@ -37,3 +37,6 @@ Thumbs.db
 # --- logs ---
 *.log
 npm-debug.log*
+
+# local design tooling (impeccable skill)
+.claude/skills/
