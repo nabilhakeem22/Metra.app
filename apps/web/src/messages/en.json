@@ -11,6 +11,27 @@
     "signIn": "Sign in",
     "localeName": "English"
   },
+  "nav": {
+    "dashboard": "Dashboard",
+    "projects": "Projects",
+    "proposals": "Proposals",
+    "contracts": "Contracts",
+    "costing": "Costing",
+    "invoices": "Invoices",
+    "settings": "Settings",
+    "help": "Help",
+    "signOut": "Sign out",
+    "soon": "Soon",
+    "support": "Support"
+  },
+  "shell": {
+    "search": "Search",
+    "menu": "Menu",
+    "userMenu": "User menu",
+    "role": "Role",
+    "locale": "Language",
+    "collapse": "Collapse sidebar"
+  },
   "login": {
     "title": "Sign in to Metra",
     "emailLabel": "Work email",
@@ -21,7 +42,15 @@
     "phoneLabel": "Phone number",
     "phoneHint": "Site engineers can sign in with a phone code.",
     "checkEmail": "We sent a 6-digit code to your email.",
-    "error": "Something went wrong. Please try again."
+    "error": "Something went wrong. Please try again.",
+    "signUpHint": "New here? We'll create your account automatically.",
+    "changeEmail": "Change",
+    "resend": "Resend code",
+    "resendIn": "Resend in {time}",
+    "verifying": "Verifying…",
+    "sending": "Sending…",
+    "codeSentTitle": "Enter the 6-digit code",
+    "back": "Back"
   },
   "onboarding": {
     "title": "Create your firm",
@@ -29,7 +58,22 @@
     "nameArLabel": "Firm name (Arabic)",
     "hint": "You will be the owner. At least one name is required.",
     "create": "Create firm",
-    "welcome": "Welcome to {name}"
+    "welcome": "Welcome to {name}",
+    "valueProp": "Set up your firm in under a minute."
+  },
+  "dashboard": {
+    "title": "Dashboard",
+    "welcomeBack": "Welcome back",
+    "activeProjects": "Active projects",
+    "revisedContractValue": "Revised contract value",
+    "billedToDate": "Billed to date",
+    "collected": "Collected",
+    "openAR": "Open AR",
+    "costVariance": "Cost variance",
+    "p1Hint": "Available in P1",
+    "gaugeTitle": "Portfolio progress",
+    "gaugeEmpty": "No active projects yet",
+    "noData": "No data yet"
   },
   "common": {
     "untranslated": "untranslated"

@@ -112,7 +112,6 @@ export function OtpInput({
           inputMode="numeric"
           autoComplete="one-time-code"
           maxLength={1}
-          // eslint-disable-next-line jsx-a11y/no-autofocus
           autoFocus={autoFocus && i === 0}
           aria-label={`digit ${i + 1} of ${length}`}
           className="size-12 rounded-xl border border-input bg-background text-center text-lg font-semibold tabular-nums outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
