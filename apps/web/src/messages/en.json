@@ -25,7 +25,8 @@
     "soon": "Soon",
     "comingSoon": "Coming soon",
     "support": "Support",
-    "priceBook": "Price Book"
+    "priceBook": "Price Book",
+    "clients": "Clients"
   },
   "shell": {
     "search": "Search",
@@ -267,7 +268,9 @@
     "code_taken": "This code is already used",
     "invalid_percentage": "Enter a percentage between -100 and 1000",
     "import_empty": "There are no rows to import",
-    "import_too_large": "The file is too large or has too many rows"
+    "import_too_large": "The file is too large or has too many rows",
+    "client_required": "Select a client",
+    "invalid_dates": "End date must be on or after the start date"
   },
   "common": {
     "untranslated": "untranslated"
@@ -403,6 +406,116 @@
       "starterLoaded": "Starter catalogue loaded ({count} items)",
       "starterExists": "Starter items are already present",
       "importFailed": "Import failed"
+    }
+  },
+  "clients": {
+    "title": "Clients",
+    "subtitle": "The companies and people you build for.",
+    "search": "Search by name",
+    "activeOnly": "Active only",
+    "itemsCount": "{count} clients",
+    "status": {
+      "active": "Active",
+      "inactive": "Inactive"
+    },
+    "table": {
+      "name": "Name",
+      "contact": "Contact",
+      "email": "Email",
+      "phone": "Phone",
+      "city": "City",
+      "status": "Status",
+      "actions": "Actions"
+    },
+    "empty": {
+      "title": "No clients yet",
+      "description": "Add your first client to start creating projects."
+    },
+    "actions": {
+      "new": "New client",
+      "edit": "Edit",
+      "activate": "Activate",
+      "deactivate": "Deactivate"
+    },
+    "form": {
+      "newTitle": "New client",
+      "editTitle": "Edit client",
+      "nameEn": "Name (English)",
+      "nameAr": "Name (Arabic)",
+      "contactName": "Contact name",
+      "email": "Email",
+      "phone": "Phone",
+      "city": "City",
+      "address": "Address",
+      "taxCode": "Tax registration number",
+      "notes": "Notes",
+      "save": "Save",
+      "cancel": "Cancel"
+    },
+    "toast": {
+      "created": "Client created",
+      "updated": "Client updated",
+      "activated": "Client activated",
+      "deactivated": "Client deactivated"
+    }
+  },
+  "projects": {
+    "title": "Projects",
+    "subtitle": "Your fit-out jobs, each tied to a client.",
+    "search": "Search code or name",
+    "allStatuses": "All statuses",
+    "activeOnly": "Active only",
+    "itemsCount": "{count} projects",
+    "archived": "Archived",
+    "statuses": {
+      "draft": "Draft",
+      "active": "Active",
+      "on_hold": "On hold",
+      "completed": "Completed",
+      "cancelled": "Cancelled"
+    },
+    "table": {
+      "code": "Code",
+      "name": "Name",
+      "client": "Client",
+      "status": "Status",
+      "dates": "Dates",
+      "actions": "Actions"
+    },
+    "empty": {
+      "title": "No projects yet",
+      "description": "Create your first project and link it to a client.",
+      "needClient": "Add an active client first — projects must belong to one."
+    },
+    "actions": {
+      "new": "New project",
+      "edit": "Edit",
+      "activate": "Activate",
+      "deactivate": "Deactivate"
+    },
+    "form": {
+      "newTitle": "New project",
+      "editTitle": "Edit project",
+      "code": "Code",
+      "nameEn": "Name (English)",
+      "nameAr": "Name (Arabic)",
+      "client": "Client",
+      "status": "Status",
+      "startDate": "Start date",
+      "endDate": "End date",
+      "city": "City",
+      "address": "Address",
+      "notes": "Notes",
+      "save": "Save",
+      "cancel": "Cancel",
+      "noClients": "You need an active client before creating a project.",
+      "selectClient": "Select a client"
+    },
+    "toast": {
+      "created": "Project created",
+      "updated": "Project updated",
+      "activated": "Project activated",
+      "deactivated": "Project deactivated"
     }
   }
 }

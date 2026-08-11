@@ -1,5 +1,6 @@
 import {
   BookText,
+  Building2,
   Calculator,
   FileSignature,
   FileText,
@@ -38,6 +39,13 @@ export const NAV_GROUPS: NavGroup[] = [
     groupKey: 'main',
     items: [
       { key: 'dashboard', href: '/dashboard', icon: LayoutDashboard },
+      { key: 'clients', href: '/clients', icon: Building2, capability: 'clients' },
+      {
+        key: 'projects',
+        href: '/projects',
+        icon: FolderKanban,
+        capability: 'projects',
+      },
       {
         key: 'priceBook',
         href: '/price-book',
@@ -63,7 +71,6 @@ export const NAV_GROUPS: NavGroup[] = [
  * the shell isn't 5 always-visible dead rows.
  */
 export const COMING_SOON_ITEMS: NavItem[] = [
-  { key: 'projects', icon: FolderKanban, disabled: true },
   { key: 'proposals', icon: FileText, disabled: true },
   { key: 'contracts', icon: FileSignature, disabled: true },
   { key: 'costing', icon: Calculator, disabled: true },
