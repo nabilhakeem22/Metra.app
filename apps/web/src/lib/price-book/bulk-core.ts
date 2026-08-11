@@ -45,6 +45,11 @@ export async function bulkUpdatePricesCore(
   ctx: OrgContext,
   input: BulkUpdateInput,
 ): Promise<ActionResult & { data?: BulkUpdateSummary }> {
+  // Reject a blank/whitespace pct BEFORE coercion — Number('') is 0, which would
+  // otherwise pass the guard and write a no-op 0% history event.
+  if (typeof input.pct === 'string' && input.pct.trim() === '') {
+    return err('invalid_percentage');
+  }
   const pct = typeof input.pct === 'string' ? Number(input.pct) : input.pct;
   if (!Number.isFinite(pct) || pct < -100 || pct > 1000) {
     return err('invalid_percentage');

@@ -57,8 +57,18 @@ function buildLookup<T extends string>(
 const CATEGORY_LOOKUP = buildLookup(CATEGORY_ALIASES);
 const UNIT_LOOKUP = buildLookup(UNIT_ALIASES);
 
+// §4.1 Arabic normalization so plain/hamza'd forms match: fold alef variants,
+// taa-marbuta -> haa, alef-maqsura -> yaa, and drop tashkeel + tatweel.
 function norm(s: string): string {
-  return s.trim().toLowerCase().replace(/\s+/g, ' ');
+  return s
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .replace(/[ً-ْ]/g, '') // tashkeel (harakat)
+    .replace(/ـ/g, '') // tatweel
+    .replace(/[أإآ]/g, 'ا') // أ إ آ -> ا
+    .replace(/ة/g, 'ه') // ة -> ه
+    .replace(/ى/g, 'ي'); // ى -> ي
 }
 
 export function resolveCategory(text: string): CostItemCategory | null {
@@ -124,15 +134,21 @@ function cell(row: string[], i: number | undefined): string {
   return typeof v === 'string' ? v.trim() : '';
 }
 
-// A money cell is valid if it is a finite number >= 0. Accepts thousands commas
-// and a leading currency-ish noise stripped; stores the normalized decimal.
+// STRICT money parse. Accepts ONLY: (a) a plain non-negative decimal, or
+// (b) comma-as-thousands grouping (then strips the grouping commas). Everything
+// else -> null (the row becomes cost_invalid/price_invalid). This deliberately
+// rejects ambiguous separators like "1,5" / "1.234,56" / "1,2,3", as well as
+// negatives, ".5", "1.", "1e3", currency prefixes, and Arabic-Indic digits
+// (\d is ASCII-only). Blank -> "0".
+const PLAIN_DECIMAL = /^\d+(\.\d+)?$/;
+const GROUPED_DECIMAL = /^\d{1,3}(,\d{3})+(\.\d+)?$/;
+
 function parseMoney(raw: string): string | null {
-  if (raw === '') return '0';
-  const cleaned = raw.replace(/,/g, '').trim();
-  if (!/^\d+(\.\d+)?$/.test(cleaned)) return null;
-  const n = Number(cleaned);
-  if (!Number.isFinite(n) || n < 0) return null;
-  return cleaned;
+  const s = raw.trim();
+  if (s === '') return '0';
+  if (PLAIN_DECIMAL.test(s)) return s;
+  if (GROUPED_DECIMAL.test(s)) return s.replace(/,/g, '');
+  return null;
 }
 
 /**
@@ -167,9 +183,10 @@ export function validateImportRows(
 
     if (!anyFilled) return fail('row_empty');
     if (!code) return fail('code_missing');
-    const codeKey = code.toLowerCase();
-    if (seen.has(codeKey)) return fail('code_duplicate_in_file');
-    if (existingCodes.has(codeKey)) return fail('code_exists');
+    // Case-SENSITIVE: the DB unique(org_id, code) is case-sensitive, so `ABC`
+    // and `abc` are distinct codes and must not be collapsed here.
+    if (seen.has(code)) return fail('code_duplicate_in_file');
+    if (existingCodes.has(code)) return fail('code_exists');
     if (!nameEn && !nameAr) return fail('name_missing');
 
     const category = resolveCategory(categoryRaw);
@@ -182,7 +199,7 @@ export function validateImportRows(
     const defaultUnitPrice = parseMoney(priceRaw);
     if (defaultUnitPrice === null) return fail('price_invalid');
 
-    seen.add(codeKey);
+    seen.add(code);
     out.push({
       index,
       code,

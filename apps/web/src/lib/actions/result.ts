@@ -18,7 +18,8 @@ export type ActionCode =
   | 'code_required'
   | 'code_taken'
   | 'invalid_percentage'
-  | 'import_empty';
+  | 'import_empty'
+  | 'import_too_large';
 
 export interface ActionResult {
   ok: boolean;

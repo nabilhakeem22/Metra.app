@@ -36,12 +36,15 @@ export function listCostItems(
   });
 }
 
-/** The org's existing cost-item codes, lowercased — for insert-only import. */
+/**
+ * The org's existing cost-item codes (case-SENSITIVE, matching the DB unique) —
+ * for insert-only import collision detection.
+ */
 export async function getExistingCodes(ctx: OrgContext): Promise<Set<string>> {
   const rows = await withOrgContext(ctx, (tx) =>
     tx.select({ code: costItems.code }).from(costItems),
   );
-  return new Set(rows.map((r) => r.code.toLowerCase()));
+  return new Set(rows.map((r) => r.code));
 }
 
 /** Distinct count per category (for the empty-state / grouped headers). */

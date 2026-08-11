@@ -13,20 +13,27 @@ import {
   type ColumnMapping,
   type ValidatedRow,
 } from './import';
-import { parseSpreadsheet, SpreadsheetError, type ParsedSheet } from './parse';
+import {
+  MAX_IMPORT_ROWS,
+  parseSpreadsheet,
+  SpreadsheetError,
+  type ParsedSheet,
+} from './parse';
 
-export function parseCostImportCore(
+export async function parseCostImportCore(
   ctx: OrgContext,
   input: { bytes: Uint8Array },
-): ActionResult & { data?: ParsedSheet } {
+): Promise<ActionResult & { data?: ParsedSheet }> {
   if (!can(ctx.role, 'price_book', 'create')) return err('forbidden');
   try {
-    const sheet = parseSpreadsheet(input.bytes);
+    const sheet = await parseSpreadsheet(input.bytes);
     if (sheet.data.length === 0) return err('import_empty');
     return { ok: true, data: sheet };
   } catch (e) {
     if (e instanceof SpreadsheetError) {
-      return err(e.reason === 'empty' ? 'import_empty' : 'invalid');
+      if (e.reason === 'empty') return err('import_empty');
+      if (e.reason === 'too_many_rows') return err('import_too_large');
+      return err('invalid');
     }
     console.error('parseCostImportCore failed:', e);
     return err('generic');
@@ -52,6 +59,9 @@ export async function importCostItemsCore(
   input: { rows: string[][]; mapping: ColumnMapping },
 ): Promise<ActionResult & { data?: ImportSummary }> {
   if (input.rows.length === 0) return err('import_empty');
+  // Enforce the same 2000-row cap the parser applies, so a hand-built payload
+  // that skips parseCostImport can't blow past it.
+  if (input.rows.length > MAX_IMPORT_ROWS) return err('import_too_large');
 
   return mutateInOrg(
     ctx,
@@ -60,9 +70,8 @@ export async function importCostItemsCore(
       const existing = await tx
         .select({ code: costItems.code })
         .from(costItems);
-      const existingCodes = new Set(
-        existing.map((r) => r.code.toLowerCase()),
-      );
+      // Case-SENSITIVE, matching the DB unique(org_id, code).
+      const existingCodes = new Set(existing.map((r) => r.code));
 
       const results = validateImportRows(input.rows, input.mapping, existingCodes);
       const valid = results.filter((r) => r.ok && r.data);

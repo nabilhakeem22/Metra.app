@@ -85,10 +85,8 @@ export function ImportWizard({
   const [mapping, setMapping] = useState<ColumnMapping | null>(null);
   const [pending, startTransition] = useTransition();
 
-  const existing = useMemo(
-    () => new Set(existingCodes.map((c) => c.toLowerCase())),
-    [existingCodes],
-  );
+  // Case-SENSITIVE, matching the DB unique(org_id, code).
+  const existing = useMemo(() => new Set(existingCodes), [existingCodes]);
 
   const preview: ValidatedRow[] = useMemo(() => {
     if (step !== 'preview' || !mapping) return [];

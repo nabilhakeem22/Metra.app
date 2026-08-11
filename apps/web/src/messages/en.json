@@ -266,7 +266,8 @@
     "code_required": "Code is required",
     "code_taken": "This code is already used",
     "invalid_percentage": "Enter a percentage between -100 and 1000",
-    "import_empty": "There are no rows to import"
+    "import_empty": "There are no rows to import",
+    "import_too_large": "The file is too large or has too many rows"
   },
   "common": {
     "untranslated": "untranslated"

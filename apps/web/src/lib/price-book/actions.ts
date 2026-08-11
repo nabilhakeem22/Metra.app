@@ -22,7 +22,7 @@ import {
   parseCostImportCore,
   type ImportSummary,
 } from './import-core';
-import type { ParsedSheet } from './parse';
+import { MAX_IMPORT_BYTES, type ParsedSheet } from './parse';
 
 function refreshApp(): void {
   // Server components re-run; the list/table re-fetch. Matches org-settings.
@@ -81,6 +81,8 @@ export async function parseCostImport(
   const ctx = await requireOrg();
   const file = formData.get('file');
   if (!(file instanceof File)) return err('invalid');
+  // Reject oversize BEFORE buffering the whole file into memory.
+  if (file.size > MAX_IMPORT_BYTES) return err('import_too_large');
   const bytes = new Uint8Array(await file.arrayBuffer());
   return parseCostImportCore(ctx, { bytes });
 }
