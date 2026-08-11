@@ -16,6 +16,7 @@
     "lint": "eslint . --config eslint.config.mjs",
     "test": "npm run test -w @metra/web && npm run test -w @metra/db",
     "test:isolation": "npm run test:isolation -w @metra/db",
+    "test:actions": "npm run test:actions -w @metra/web",
     "db:generate": "npm run generate -w @metra/db",
     "db:migrate": "npm run migrate -w @metra/db",
     "db:apply-rls": "npm run apply-rls -w @metra/db",

@@ -2,6 +2,7 @@
 // no server-only. Take an OrgContext + validated input; the 'use server'
 // wrappers in ./actions do requireOrg()/cookie/token work and delegate here.
 // These are exercised directly (no Next layer) by tests/actions/*.dbtest.ts.
+import { randomUUID } from 'node:crypto';
 import { invitations, MEMBER_ROLES, memberships, type MemberRole } from '@metra/db';
 import { eq, sql } from 'drizzle-orm';
 import {
@@ -116,25 +117,32 @@ export async function acceptInviteCore(
       )) as unknown as unknown[];
 
       if (claimed.length === 1) {
-        const inserted = await tx
-          .insert(memberships)
-          .values({ orgId: ctx.orgId, userId: ctx.userId, role: ctx.role })
-          .onConflictDoNothing()
-          .returning({ id: memberships.id });
-        if (inserted[0]) {
-          await recordAudit(tx, {
-            entity: 'membership',
-            entityId: inserted[0].id,
-            action: 'create',
-            before: null,
-            after: {
-              user_id: ctx.userId,
-              role: ctx.role,
-              via: 'invitation',
-              invitation_id: invitationId,
-            },
-          });
-        }
+        // Raw single-statement insert — NOT the drizzle builder and NOT
+        // onConflictDoNothing. The bootstrap accepted-invite WITH CHECK reads the
+        // invitation THIS tx just claimed; both ON CONFLICT (speculative read) and
+        // drizzle's `.returning()` builder issue a shape that loses that same-tx
+        // visibility and the RLS check fails. A raw INSERT with a client-side id
+        // (mirrors tests/isolation) evaluates the check against the live snapshot.
+        // A claim==1 path can never collide: inviteMember refuses to invite an
+        // existing member, so a user holding a freshly-pending invite is provably
+        // not yet a member. Nothing may run between the claim and this insert.
+        const membershipId = randomUUID();
+        await tx.execute(
+          sql`insert into public.memberships (id, org_id, user_id, role)
+              values (${membershipId}, ${ctx.orgId}, ${ctx.userId}, ${ctx.role})`,
+        );
+        await recordAudit(tx, {
+          entity: 'membership',
+          entityId: membershipId,
+          action: 'create',
+          before: null,
+          after: {
+            user_id: ctx.userId,
+            role: ctx.role,
+            via: 'invitation',
+            invitation_id: invitationId,
+          },
+        });
         return 'joined';
       }
 

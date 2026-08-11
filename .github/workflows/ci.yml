@@ -62,3 +62,6 @@ jobs:
 
       - name: Cross-tenant isolation (P0 exit gate)
         run: npm run test:isolation -w @metra/db
+
+      - name: Action-core DB tests (seeded DB, fabricated OrgContext)
+        run: npm run test:actions -w @metra/web
