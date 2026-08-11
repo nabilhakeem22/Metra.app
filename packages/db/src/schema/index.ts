@@ -10,6 +10,10 @@ export * from './cost-items';
 export * from './price-changes';
 export * from './clients';
 export * from './projects';
+export * from './proposals';
+export * from './proposal-sections';
+export * from './proposal-lines';
+export * from './proposal-events';
 
 import { organizations } from './organizations';
 import { memberships } from './memberships';
@@ -20,6 +24,10 @@ import { costItems } from './cost-items';
 import { priceChanges, priceChangeLines } from './price-changes';
 import { clients } from './clients';
 import { projects } from './projects';
+import { proposals } from './proposals';
+import { proposalSections } from './proposal-sections';
+import { proposalLines } from './proposal-lines';
+import { proposalEvents } from './proposal-events';
 
 /** Every org-scoped business table (carries org_id). Drives RLS generation. */
 export const orgScopedTables = {
@@ -32,6 +40,10 @@ export const orgScopedTables = {
   priceChangeLines,
   clients,
   projects,
+  proposals,
+  proposalSections,
+  proposalLines,
+  proposalEvents,
 } as const;
 
 /** All tables including the tenant root. */
@@ -46,4 +58,8 @@ export const allTables = {
   priceChangeLines,
   clients,
   projects,
+  proposals,
+  proposalSections,
+  proposalLines,
+  proposalEvents,
 } as const;

@@ -73,9 +73,22 @@ export const PROJECT_STATUSES = [
 
 export const projectStatus = pgEnum('project_status', PROJECT_STATUSES);
 
+/** P1 Slice 3 — proposal (عرض السعر) lifecycle. Order is a contract. */
+export const PROPOSAL_STATUSES = [
+  'draft',
+  'sent',
+  'accepted',
+  'rejected',
+  'expired',
+  'superseded',
+] as const;
+
+export const proposalStatus = pgEnum('proposal_status', PROPOSAL_STATUSES);
+
 export type MemberRole = (typeof MEMBER_ROLES)[number];
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];
 export type InvitationStatus = (typeof INVITATION_STATUSES)[number];
 export type CostItemCategory = (typeof COST_ITEM_CATEGORIES)[number];
 export type CostItemUnit = (typeof COST_ITEM_UNITS)[number];
 export type ProjectStatus = (typeof PROJECT_STATUSES)[number];
+export type ProposalStatus = (typeof PROPOSAL_STATUSES)[number];
