@@ -85,10 +85,17 @@ export const raw = {
       `select user_id, role from public.memberships where org_id = '${orgId}'`,
     )) as unknown as Array<{ user_id: string; role: string }>;
   },
+  /** Arbitrary read over the BYPASSRLS connection. */
+  async query<T = Record<string, unknown>>(text: string): Promise<T[]> {
+    return (await pg.unsafe(text)) as unknown as T[];
+  },
 };
 
 export async function teardown(orgIds: string[]): Promise<void> {
   for (const id of orgIds) {
+    await pg.unsafe(`delete from public.price_change_lines where org_id='${id}'`);
+    await pg.unsafe(`delete from public.price_changes where org_id='${id}'`);
+    await pg.unsafe(`delete from public.cost_items where org_id='${id}'`);
     await pg.unsafe(`delete from public.audit_log where org_id='${id}'`);
     await pg.unsafe(`delete from public.invitations where org_id='${id}'`);
     await pg.unsafe(`delete from public.memberships where org_id='${id}'`);
