@@ -3,6 +3,7 @@
 import { Menu } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { Wordmark } from '@/components/brand/wordmark';
+import { HelpMenu } from '@/components/onboarding/help-menu';
 import { Button } from '@/components/ui/button';
 import type { MemberRole } from '@/lib/permissions/roles';
 import { cn } from '@/lib/utils';
@@ -43,6 +44,7 @@ export function TopBar({ email, role, onOpenDrawer, className }: TopBarProps) {
       </div>
 
       <div className="ms-auto flex items-center gap-1">
+        <HelpMenu />
         <LocaleSwitch />
         <UserMenu email={email} role={role} />
       </div>

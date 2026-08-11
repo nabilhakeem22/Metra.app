@@ -6,6 +6,7 @@ import { AppShell } from '@/components/shell/app-shell';
 import { requireOrg } from '@/lib/auth/require-org';
 import { getSessionUser } from '@/lib/auth/session';
 import { withUserContext } from '@/lib/db/context';
+import { readOnboarding } from '@/lib/onboarding/merge';
 
 export default async function AppLayout({
   children,
@@ -17,6 +18,7 @@ export default async function AppLayout({
   // deny it the whole (app) area (defense-in-depth beyond per-page read gates).
   if (ctx.role === 'client') notFound();
   const user = await getSessionUser();
+  const onboarding = readOnboarding(user?.user_metadata);
 
   const orgs = (await withUserContext(ctx.userId, (tx) =>
     tx.execute(
@@ -32,6 +34,8 @@ export default async function AppLayout({
       role={ctx.role}
       orgs={orgs}
       activeOrgId={ctx.orgId}
+      tourSeen={!!onboarding.tourSeen}
+      tourStep={onboarding.tourStep ?? null}
     >
       {children}
     </AppShell>
