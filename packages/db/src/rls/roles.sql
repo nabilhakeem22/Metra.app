@@ -26,18 +26,29 @@ grant select, insert, update, delete on public.invitations   to metra_app;
 grant select, insert, update, delete on public.cost_items    to metra_app;
 grant select, insert, update, delete on public.clients       to metra_app;
 grant select, insert, update, delete on public.projects      to metra_app;
+grant select, insert, update, delete on public.proposals         to metra_app;
+grant select, insert, update, delete on public.proposal_sections to metra_app;
+grant select, insert, update, delete on public.proposal_lines    to metra_app;
 
--- ...except audit_log and the price-history tables, which are append-only. No
--- UPDATE / DELETE grant, so any attempt raises a permission error at the database.
+-- ...except audit_log and the append-only logs (price history, proposal events).
+-- No UPDATE / DELETE grant, so any attempt raises a permission error at the database.
 grant select, insert on public.audit_log          to metra_app;
 grant select, insert on public.price_changes       to metra_app;
 grant select, insert on public.price_change_lines  to metra_app;
+grant select, insert on public.proposal_events     to metra_app;
 
 -- Future-proofing for composite-FK trigger functions.
 grant execute on function public.enforce_same_org() to metra_app;
 
 -- Immutability trigger factory (status-locked business rows).
 grant execute on function public.enforce_immutable_when() to metra_app;
+
+-- Proposals (P1 Slice 3): child-draft guard trigger fn + public token SDFs. The
+-- token functions run on the PUBLIC accept path (no session) via the base
+-- connection role, and are also grantable to metra_app for authenticated callers.
+grant execute on function public.enforce_proposal_child_draft() to metra_app;
+grant execute on function public.app_proposal_by_token(text) to metra_app;
+grant execute on function public.app_proposal_respond_by_token(text, text, text, text, text) to metra_app;
 
 -- Bootstrap user->org lookup (SECURITY DEFINER, scoped to app.current_user_id).
 -- Least privilege: CREATE FUNCTION grants EXECUTE to PUBLIC by default. Revoke
