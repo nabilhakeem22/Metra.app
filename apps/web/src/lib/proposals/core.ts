@@ -399,7 +399,7 @@ export async function expireProposalCore(
   return mutateInOrg(
     ctx,
     { capability: 'proposals_send', action: 'approve' },
-    async (tx, audit) => {
+    async (tx) => {
       const updated = await tx
         .update(proposals)
         .set({ status: 'expired', updatedAt: new Date() })
