@@ -19,6 +19,7 @@ import { useRouter } from '@/i18n/routing';
 import { resolveActionError } from '@/lib/actions/error-message';
 import type { ActionCode } from '@/lib/actions/result';
 import {
+  coerceMoneyInput,
   computeLine,
   computeSection,
   computeTotals,
@@ -43,6 +44,7 @@ interface CostItemOption {
 }
 
 interface LineState {
+  id: string | null;
   costItemId: string | null;
   descriptionEn: string;
   descriptionAr: string;
@@ -51,6 +53,16 @@ interface LineState {
   unitCost: string;
   unitPrice: string;
   discountPct: string;
+}
+
+// Live preview must match persistence: input the server would reject -> 0.
+function previewLine(l: LineState) {
+  return computeLine({
+    qty: coerceMoneyInput(l.qty),
+    unitCost: coerceMoneyInput(l.unitCost),
+    unitPrice: coerceMoneyInput(l.unitPrice),
+    discountPct: coerceMoneyInput(l.discountPct),
+  });
 }
 
 interface SectionState {
@@ -95,6 +107,7 @@ export function ProposalBuilder({
       titleEn: s.titleEn ?? '',
       titleAr: s.titleAr ?? '',
       lines: s.lines.map((l) => ({
+        id: l.id,
         costItemId: l.costItemId,
         descriptionEn: l.descriptionEn ?? '',
         descriptionAr: l.descriptionAr ?? '',
@@ -109,16 +122,7 @@ export function ProposalBuilder({
 
   const totals = useMemo(() => {
     const sectionTotals = sections.map((s) =>
-      computeSection(
-        s.lines.map((l) =>
-          computeLine({
-            qty: l.qty || '0',
-            unitCost: l.unitCost || '0',
-            unitPrice: l.unitPrice || '0',
-            discountPct: l.discountPct || '0',
-          }),
-        ),
-      ),
+      computeSection(s.lines.map(previewLine)),
     );
     const doc = computeTotals(sectionTotals, {
       discountPct: discountPct || '0',
@@ -148,6 +152,7 @@ export function ProposalBuilder({
   function addLine(si: number, ci?: CostItemOption) {
     const line: LineState = ci
       ? {
+          id: null,
           costItemId: ci.id,
           descriptionEn: ci.nameEn ?? '',
           descriptionAr: ci.nameAr ?? '',
@@ -158,6 +163,7 @@ export function ProposalBuilder({
           discountPct: '0',
         }
       : {
+          id: null,
           costItemId: null,
           descriptionEn: '',
           descriptionAr: '',
@@ -182,13 +188,16 @@ export function ProposalBuilder({
         titleAr: s.titleAr || null,
         sortOrder: si,
         lines: s.lines.map((l, li) => ({
+          // Round-trip the stable id so the server preserves each line's stored
+          // cost (ids aren't secret; sent even when margin is hidden).
+          id: l.id,
           costItemId: l.costItemId,
           descriptionEn: l.descriptionEn || null,
           descriptionAr: l.descriptionAr || null,
           qty: l.qty || '0',
           unit: l.unit as LineState['unit'],
           // Only send cost when the role may see it; otherwise the core keeps
-          // cost-item-derived costs (null -> defaulted).
+          // the stored cost by line id (null -> preserved / defaulted).
           unitCost: seeMargin ? l.unitCost || '0' : null,
           unitPrice: l.unitPrice || '0',
           discountPct: l.discountPct || '0',
@@ -326,12 +335,7 @@ export function ProposalBuilder({
                   </thead>
                   <tbody>
                     {sec.lines.map((l, li) => {
-                      const lt = computeLine({
-                        qty: l.qty || '0',
-                        unitCost: l.unitCost || '0',
-                        unitPrice: l.unitPrice || '0',
-                        discountPct: l.discountPct || '0',
-                      });
+                      const lt = previewLine(l);
                       return (
                         <tr key={li} className="border-t">
                           <td className="px-1 py-1">

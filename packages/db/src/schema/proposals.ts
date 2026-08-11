@@ -69,6 +69,10 @@ export const proposals = pgTable(
       'proposals_expiry_after_issue',
       sql`expiry_date is null or issue_date is null or expiry_date >= issue_date`,
     ),
+    check(
+      'proposals_discount_pct_range',
+      sql`discount_pct >= 0 and discount_pct <= 100`,
+    ),
     ...sameOrgFk(t, 'client', clients, { onDelete: 'restrict' }),
     ...sameOrgFk(t, 'project', projects, { onDelete: 'restrict' }),
     // Self-reference: a superseding draft points at the proposal it replaced.

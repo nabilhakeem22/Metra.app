@@ -78,6 +78,13 @@
       "when": 1786468724358,
       "tag": "0010_polite_odin",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1786473123711,
+      "tag": "0011_right_black_bolt",
+      "breakpoints": true
     }
   ]
 }

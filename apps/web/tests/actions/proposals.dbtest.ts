@@ -3,6 +3,8 @@ import { afterAll, describe, expect, it } from 'vitest';
 import { createClientCore } from '@/lib/clients/core';
 import { listClients } from '@/lib/clients/queries';
 import { withOrgContext } from '@/lib/db/context';
+import { createCostItemCore } from '@/lib/price-book/core';
+import { listCostItems } from '@/lib/price-book/queries';
 import { createProjectCore } from '@/lib/projects/core';
 import { listProjects } from '@/lib/projects/queries';
 import {
@@ -19,6 +21,7 @@ import {
 import { getProposalWithLines, listProposals } from '@/lib/proposals/queries';
 import { closeFixture, ctxFor, raw, seedOrg, teardown } from './fixture';
 import type { OrgContext } from '@/lib/db/context';
+import type { MemberRole } from '@metra/db';
 
 const orgIds: string[] = [];
 afterAll(async () => {
@@ -26,7 +29,7 @@ afterAll(async () => {
   await closeFixture();
 });
 
-async function setup(members: Array<{ role: 'project_manager' | 'admin' }> = []) {
+async function setup(members: Array<{ role: MemberRole }> = []) {
   const { orgId, ownerIds, memberIds } = await seedOrg({ owners: 1, members });
   orgIds.push(orgId);
   const ctx = ctxFor(orgId, ownerIds[0], 'owner');
@@ -237,5 +240,166 @@ describe('supersede (deep copy)', () => {
       `select status from public.proposals where id = '${id}'`,
     );
     expect(orig.status).toBe('superseded');
+  });
+});
+
+describe('F1 — margin-blind save preserves stored cost', () => {
+  async function marginBlindSetup() {
+    const base = await setup([{ role: 'project_manager' }]);
+    await raw.query(
+      `update public.organizations set hide_margin_from_pm = true where id = '${base.orgId}'`,
+    );
+    const pm = ctxFor(base.orgId, base.memberIds[0], 'project_manager');
+    return { ...base, pm };
+  }
+
+  it('(a) preserves a manual line cost when a margin-blind PM re-saves', async () => {
+    const { ctx, pm, clientId, projectId } = await marginBlindSetup();
+    const id = ((await createProposalCore(ctx, { clientId, projectId })) as { data?: string }).data!;
+    await saveProposalDraftCore(ctx, {
+      id,
+      sections: [{ titleEn: 'S', lines: [{ descriptionEn: 'Manual', qty: '2', unit: 'sqm', unitCost: '500', unitPrice: '800', discountPct: '0' }] }],
+    });
+    const d1 = await getProposalWithLines(ctx, id, true);
+    const lineId = d1!.sections[0].lines[0].id;
+    expect(d1!.sections[0].lines[0].lineCost).toBe('1000.0000');
+
+    const res = await saveProposalDraftCore(pm, {
+      id,
+      sections: [{ titleEn: 'S', lines: [{ id: lineId, descriptionEn: 'Manual', qty: '2', unit: 'sqm', unitCost: null, unitPrice: '800', discountPct: '0' }] }],
+    });
+    expect(res.ok).toBe(true);
+    const d2 = await getProposalWithLines(ctx, id, true);
+    expect(d2!.sections[0].lines[0].unitCost).toBe('500.0000');
+    expect(d2!.sections[0].lines[0].lineCost).toBe('1000.0000');
+  });
+
+  it('(b) keeps an owner-overridden costItem cost when PM re-saves', async () => {
+    const { ctx, pm, clientId, projectId } = await marginBlindSetup();
+    await createCostItemCore(ctx, { code: 'CI-1', nameEn: 'Item', category: 'civil', unit: 'sqm', defaultUnitCost: '100', defaultUnitPrice: '150' });
+    const [ci] = await listCostItems(ctx, {});
+    const id = ((await createProposalCore(ctx, { clientId, projectId })) as { data?: string }).data!;
+    // New cost-item line -> seeds cost from the price book (100).
+    await saveProposalDraftCore(ctx, {
+      id,
+      sections: [{ titleEn: 'S', lines: [{ costItemId: ci.id, descriptionEn: 'x', qty: '1', unit: 'sqm', unitPrice: '150', discountPct: '0' }] }],
+    });
+    const d0 = await getProposalWithLines(ctx, id, true);
+    expect(d0!.sections[0].lines[0].unitCost).toBe('100.0000');
+
+    // A margin-visible OWNER edits that existing line's cost to 999.
+    const lineId0 = d0!.sections[0].lines[0].id;
+    await saveProposalDraftCore(ctx, {
+      id,
+      sections: [{ titleEn: 'S', lines: [{ id: lineId0, costItemId: ci.id, descriptionEn: 'x', qty: '1', unit: 'sqm', unitCost: '999', unitPrice: '150', discountPct: '0' }] }],
+    });
+    const d1 = await getProposalWithLines(ctx, id, true);
+    expect(d1!.sections[0].lines[0].unitCost).toBe('999.0000');
+
+    // A margin-blind PM re-saves -> the override is preserved (not reverted to 100).
+    const lineId = d1!.sections[0].lines[0].id;
+    await saveProposalDraftCore(pm, {
+      id,
+      sections: [{ titleEn: 'S', lines: [{ id: lineId, costItemId: ci.id, descriptionEn: 'x', qty: '1', unit: 'sqm', unitCost: null, unitPrice: '150', discountPct: '0' }] }],
+    });
+    const d2 = await getProposalWithLines(ctx, id, true);
+    expect(d2!.sections[0].lines[0].unitCost).toBe('999.0000');
+  });
+
+  it('(c) a NEW costItem line seeds cost from the price book', async () => {
+    const { ctx, clientId, projectId } = await marginBlindSetup();
+    await createCostItemCore(ctx, { code: 'CI-2', nameEn: 'Item2', category: 'civil', unit: 'sqm', defaultUnitCost: '77', defaultUnitPrice: '150' });
+    const [ci] = await listCostItems(ctx, {});
+    const id = ((await createProposalCore(ctx, { clientId, projectId })) as { data?: string }).data!;
+    await saveProposalDraftCore(ctx, {
+      id,
+      sections: [{ titleEn: 'S', lines: [{ costItemId: ci.id, descriptionEn: 'x', qty: '1', unit: 'sqm', unitPrice: '150', discountPct: '0' }] }],
+    });
+    const d = await getProposalWithLines(ctx, id, true);
+    expect(d!.sections[0].lines[0].unitCost).toBe('77.0000');
+  });
+});
+
+describe('F2 — discount out of range', () => {
+  it('rejects line + doc discount > 100; nothing persists', async () => {
+    const { ctx, clientId, projectId } = await setup();
+    const id = ((await createProposalCore(ctx, { clientId, projectId })) as { data?: string }).data!;
+    expect(
+      await saveProposalDraftCore(ctx, { id, sections: [{ titleEn: 'S', lines: [{ descriptionEn: 'x', qty: '1', unit: 'sqm', unitCost: '0', unitPrice: '100', discountPct: '150' }] }] }),
+    ).toEqual({ ok: false, error: 'discount_out_of_range' });
+    expect(
+      await saveProposalDraftCore(ctx, { id, header: { discountPct: '150' }, sections: [] }),
+    ).toEqual({ ok: false, error: 'discount_out_of_range' });
+    const d = await getProposalWithLines(ctx, id, true);
+    expect(d!.sections).toHaveLength(0);
+  });
+});
+
+describe('S1 — only owner/admin may send', () => {
+  it('client/viewer/site_engineer/accountant are forbidden', async () => {
+    const { orgId, ctx, clientId, projectId } = await setup([
+      { role: 'client' }, { role: 'viewer' }, { role: 'site_engineer' }, { role: 'accountant' },
+    ]);
+    const id = ((await createProposalCore(ctx, { clientId, projectId })) as { data?: string }).data!;
+    await saveProposalDraftCore(ctx, { id, sections: twoSections });
+    const mems = await raw.memberships(orgId);
+    for (const role of ['client', 'viewer', 'site_engineer', 'accountant'] as const) {
+      const uid = mems.find((m) => m.role === role)!.user_id;
+      expect(await sendProposalCore(ctxFor(orgId, uid, role), { id })).toMatchObject({ ok: false, error: 'forbidden' });
+    }
+  });
+});
+
+describe('R1/R3 — atomic transition gates', () => {
+  it('R3: double-send -> 2nd proposal_not_draft, one sent event', async () => {
+    const { ctx, clientId, projectId } = await setup();
+    const id = ((await createProposalCore(ctx, { clientId, projectId })) as { data?: string }).data!;
+    await saveProposalDraftCore(ctx, { id, sections: twoSections });
+    expect((await sendProposalCore(ctx, { id })).ok).toBe(true);
+    expect(await sendProposalCore(ctx, { id })).toMatchObject({ ok: false, error: 'proposal_not_draft' });
+    const [ev] = await raw.query<{ n: number }>(`select count(*)::int as n from public.proposal_events where proposal_id='${id}' and kind='sent'`);
+    expect(Number(ev.n)).toBe(1);
+  });
+
+  it('R1: double-supersede -> 2nd invalid, exactly one v2 + one event', async () => {
+    const { ctx, clientId, projectId } = await setup();
+    const id = ((await createProposalCore(ctx, { clientId, projectId })) as { data?: string }).data!;
+    await saveProposalDraftCore(ctx, { id, sections: twoSections });
+    await sendProposalCore(ctx, { id });
+    expect((await supersedeProposalCore(ctx, { id })).ok).toBe(true);
+    expect(await supersedeProposalCore(ctx, { id })).toEqual({ ok: false, error: 'invalid' });
+    const [copies] = await raw.query<{ n: number }>(`select count(*)::int as n from public.proposals where supersedes_id='${id}'`);
+    expect(Number(copies.n)).toBe(1);
+    const [ev] = await raw.query<{ n: number }>(`select count(*)::int as n from public.proposal_events where proposal_id='${id}' and kind='superseded'`);
+    expect(Number(ev.n)).toBe(1);
+  });
+});
+
+describe('R2 — line caps + batching', () => {
+  it('rejects over the total-line cap; ~200 lines saves fine with correct totals', async () => {
+    const { ctx, clientId, projectId } = await setup();
+    const id = ((await createProposalCore(ctx, { clientId, projectId })) as { data?: string }).data!;
+    const big = Array.from({ length: 5 }, (_, si) => ({
+      titleEn: `S${si}`,
+      lines: Array.from({ length: 500 }, () => ({ descriptionEn: 'x', qty: '1', unit: 'sqm' as const, unitCost: '0', unitPrice: '1', discountPct: '0' })),
+    }));
+    expect(await saveProposalDraftCore(ctx, { id, sections: big })).toEqual({ ok: false, error: 'too_many_lines' });
+
+    const ok = [{ titleEn: 'S', lines: Array.from({ length: 200 }, () => ({ descriptionEn: 'x', qty: '1', unit: 'sqm' as const, unitCost: '0', unitPrice: '10', discountPct: '0' })) }];
+    expect((await saveProposalDraftCore(ctx, { id, sections: ok })).ok).toBe(true);
+    const d = await getProposalWithLines(ctx, id, true);
+    expect(d!.sections[0].lines).toHaveLength(200);
+    expect(d!.subtotal).toBe('2000.0000');
+  });
+});
+
+describe('F4 — date + amount bounds', () => {
+  it('invalid date and oversized amount are coded (not generic)', async () => {
+    const { ctx, clientId, projectId } = await setup();
+    expect(await createProposalCore(ctx, { clientId, projectId, issueDate: '2026-13-40' })).toEqual({ ok: false, error: 'invalid_date' });
+    const id = ((await createProposalCore(ctx, { clientId, projectId })) as { data?: string }).data!;
+    expect(
+      await saveProposalDraftCore(ctx, { id, sections: [{ titleEn: 'S', lines: [{ descriptionEn: 'x', qty: '1', unit: 'sqm', unitCost: '0', unitPrice: '9999999999999', discountPct: '0' }] }] }),
+    ).toEqual({ ok: false, error: 'amount_too_large' });
   });
 });

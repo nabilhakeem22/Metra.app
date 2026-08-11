@@ -275,7 +275,11 @@
     "line_required": "Add at least one line",
     "token_invalid": "This link is not valid",
     "token_expired": "This link has expired",
-    "already_responded": "A response was already recorded for this proposal"
+    "already_responded": "A response was already recorded for this proposal",
+    "discount_out_of_range": "Discount must be between 0 and 100",
+    "too_many_lines": "This proposal has too many lines",
+    "invalid_date": "Enter a valid date",
+    "amount_too_large": "That amount is too large"
   },
   "common": {
     "untranslated": "untranslated"

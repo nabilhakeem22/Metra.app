@@ -4,6 +4,15 @@
 
 const SCALE = 10000n; // 1e4 (4 decimal places)
 
+/** The money shape the server accepts. Shared with the builder's live preview so
+ * the preview matches persistence (input the server would reject -> treated as 0). */
+export const MONEY_RE = /^-?\d+(\.\d+)?$/;
+
+export function coerceMoneyInput(s: string): string {
+  const t = s.trim();
+  return MONEY_RE.test(t) && !t.startsWith('-') ? t : '0';
+}
+
 /** floor(a / b) for b > 0 (BigInt / truncates toward zero). */
 function floorDiv(a: bigint, b: bigint): bigint {
   const q = a / b;

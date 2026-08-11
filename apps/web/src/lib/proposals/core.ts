@@ -13,13 +13,15 @@ import {
   type CostItemUnit,
   type MetraDb,
 } from '@metra/db';
-import { and, eq, sql } from 'drizzle-orm';
+import { organizations } from '@metra/db';
+import { and, eq, inArray, sql } from 'drizzle-orm';
 import { fail, mutateInOrg } from '@/lib/actions/mutate';
 import { err, type ActionResult } from '@/lib/actions/result';
 import {
   computeLine,
   computeSection,
   computeTotals,
+  MONEY_RE,
   type LineTotals,
   type SectionTotals,
 } from '@/lib/aggregates/proposal-totals';
@@ -28,11 +30,20 @@ import {
   formatProposalNumber,
   proposalYear,
 } from '@/lib/format/proposal-number';
+import { canSeeMargin } from '@/lib/permissions/can';
 
 const SHARE_TTL_DAYS = 30;
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const MONEY_RE = /^-?\d+(\.\d+)?$/;
+const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+// R2 boundary caps (named so the tests + UI can agree on them).
+export const MAX_SECTIONS = 100;
+export const MAX_LINES_PER_SECTION = 500;
+export const MAX_TOTAL_LINES = 2000;
+// F4 money magnitude cap — numeric(18,4) tops out near 1e14; stay well under.
+export const MAX_AMOUNT = 1_000_000_000_000; // 1e12
+const LINE_INSERT_CHUNK = 500;
 
 function clean(v: string | null | undefined): string | null {
   return v?.trim() || null;
@@ -44,6 +55,27 @@ function money(v: string | null | undefined, fallback = '0'): string | null {
   if (s === undefined || s === '') return fallback;
   if (!MONEY_RE.test(s) || s.startsWith('-')) return null;
   return s;
+}
+
+function withinMagnitude(s: string): boolean {
+  return Math.abs(Number(s)) <= MAX_AMOUNT;
+}
+
+function pctInRange(s: string): boolean {
+  const n = Number(s);
+  return Number.isFinite(n) && n >= 0 && n <= 100;
+}
+
+function validIsoDate(s: string): boolean {
+  if (!ISO_DATE_RE.test(s)) return false;
+  const d = new Date(`${s}T00:00:00Z`);
+  return Number.isFinite(d.getTime()) && d.toISOString().slice(0, 10) === s;
+}
+
+function chunk<T>(arr: T[], size: number): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
+  return out;
 }
 
 function mintToken(): { raw: string; hash: string } {
@@ -101,6 +133,8 @@ export async function createProposalCore(
   if (!projectId || !UUID_RE.test(projectId)) return err('invalid');
   const issueDate = clean(input.issueDate);
   const expiryDate = clean(input.expiryDate);
+  if (issueDate && !validIsoDate(issueDate)) return err('invalid_date');
+  if (expiryDate && !validIsoDate(expiryDate)) return err('invalid_date');
 
   return mutateInOrg(
     ctx,
@@ -146,6 +180,9 @@ export async function createProposalCore(
 }
 
 export interface LineInput {
+  /** Stable identity of an EXISTING line (round-tripped by the builder) so its
+   * stored cost is preserved on save. Absent/unknown -> treated as a new line. */
+  id?: string | null;
   costItemId?: string | null;
   descriptionAr?: string | null;
   descriptionEn?: string | null;
@@ -199,61 +236,136 @@ export async function saveProposalDraftCore(
       if (!prop) fail('invalid');
       if (prop.status !== 'draft') fail('proposal_not_draft');
 
+      // Cost-visibility is org+role scoped: only margin-visible callers may
+      // change a cost. (Loaded inside the txn under RLS.)
+      const [orgRow] = await tx
+        .select({ hide: organizations.hideMarginFromPm })
+        .from(organizations)
+        .limit(1);
+      const seeMargin = canSeeMargin(ctx.role, orgRow?.hide ?? true);
+
       const h = input.header ?? {};
       const discountPct = money(h.discountPct, prop.discountPct);
       const taxRate = money(h.taxRate, prop.taxRate);
       if (discountPct === null || taxRate === null) fail('invalid');
+      if (!pctInRange(discountPct!)) fail('discount_out_of_range');
       const titleEn = h.titleEn !== undefined ? clean(h.titleEn) : prop.titleEn;
       const titleAr = h.titleAr !== undefined ? clean(h.titleAr) : prop.titleAr;
       if (!titleEn && !titleAr) fail('name_required');
+
+      const issueDate =
+        h.issueDate !== undefined ? clean(h.issueDate) : prop.issueDate;
+      const expiryDate =
+        h.expiryDate !== undefined ? clean(h.expiryDate) : prop.expiryDate;
+      if (issueDate && !validIsoDate(issueDate)) fail('invalid_date');
+      if (expiryDate && !validIsoDate(expiryDate)) fail('invalid_date');
+
+      // R2 caps.
+      if (input.sections.length > MAX_SECTIONS) fail('too_many_lines');
+      let totalLines = 0;
+      for (const s of input.sections) {
+        if (s.lines.length > MAX_LINES_PER_SECTION) fail('too_many_lines');
+        totalLines += s.lines.length;
+      }
+      if (totalLines > MAX_TOTAL_LINES) fail('too_many_lines');
+
+      // F1: snapshot this proposal's current line costs by stable id.
+      const existingLines = await tx
+        .select({ id: proposalLines.id, unitCost: proposalLines.unitCost })
+        .from(proposalLines)
+        .where(eq(proposalLines.proposalId, input.id));
+      const costSnapshot = new Map(existingLines.map((l) => [l.id, l.unitCost]));
+
+      // R2: one lookup for every referenced cost item (validate exist + active).
+      const costItemIds = [
+        ...new Set(
+          input.sections.flatMap((s) =>
+            s.lines
+              .map((l) => l.costItemId?.trim())
+              .filter((x): x is string => !!x),
+          ),
+        ),
+      ];
+      const costItemMap = new Map<
+        string,
+        { unit: CostItemUnit; defaultUnitCost: string; defaultUnitPrice: string; nameEn: string | null; nameAr: string | null }
+      >();
+      if (costItemIds.length) {
+        const cis = await tx
+          .select()
+          .from(costItems)
+          .where(inArray(costItems.id, costItemIds));
+        for (const ci of cis) {
+          if (!ci.active) fail('invalid');
+          costItemMap.set(ci.id, ci);
+        }
+        for (const cid of costItemIds) {
+          if (!costItemMap.has(cid)) fail('invalid');
+        }
+      }
 
       // Rebuild sections + lines from scratch (cascade wipes old lines).
       await tx
         .delete(proposalSections)
         .where(eq(proposalSections.proposalId, input.id));
 
+      // Resolve everything in memory FIRST (no per-line statements), then batch.
+      interface ResolvedLine {
+        costItemId: string | null;
+        descriptionAr: string | null;
+        descriptionEn: string | null;
+        qty: string;
+        unit: CostItemUnit;
+        unitCost: string;
+        unitPrice: string;
+        discountPct: string;
+        lineCost: string;
+        lineTotal: string;
+        lineMargin: string;
+        sortOrder: number;
+      }
+      const resolvedSections: Array<{
+        titleAr: string | null;
+        titleEn: string | null;
+        sortOrder: number;
+        subtotal: string;
+        lines: ResolvedLine[];
+      }> = [];
       const sectionTotals: SectionTotals[] = [];
+
       for (const [si, sec] of input.sections.entries()) {
         const secTitleEn = clean(sec.titleEn);
         const secTitleAr = clean(sec.titleAr);
         if (!secTitleEn && !secTitleAr) fail('name_required');
 
-        const [secRow] = await tx
-          .insert(proposalSections)
-          .values({
-            orgId: ctx.orgId,
-            proposalId: input.id,
-            titleAr: secTitleAr,
-            titleEn: secTitleEn,
-            sortOrder: sec.sortOrder ?? si,
-          })
-          .returning({ id: proposalSections.id });
-
         const lineTotals: LineTotals[] = [];
+        const lines: ResolvedLine[] = [];
         for (const [li, line] of sec.lines.entries()) {
-          let unit = line.unit ?? null;
-          let unitCost = line.unitCost;
-          let unitPrice = line.unitPrice;
-          let descriptionEn = clean(line.descriptionEn);
-          let descriptionAr = clean(line.descriptionAr);
           const costItemId = line.costItemId?.trim() || null;
+          const ci = costItemId ? costItemMap.get(costItemId) : undefined;
+          const unit = line.unit ?? ci?.unit ?? null;
+          const unitPrice = line.unitPrice ?? ci?.defaultUnitPrice ?? null;
+          const descriptionEn = clean(line.descriptionEn) ?? ci?.nameEn ?? null;
+          const descriptionAr = clean(line.descriptionAr) ?? ci?.nameAr ?? null;
 
-          if (costItemId) {
-            const [ci] = await tx
-              .select()
-              .from(costItems)
-              .where(eq(costItems.id, costItemId))
-              .limit(1);
-            if (!ci || !ci.active) fail('invalid');
-            unit = unit ?? ci.unit;
-            unitCost = unitCost ?? ci.defaultUnitCost;
-            unitPrice = unitPrice ?? ci.defaultUnitPrice;
-            descriptionEn = descriptionEn ?? ci.nameEn;
-            descriptionAr = descriptionAr ?? ci.nameAr;
+          // F1 cost resolution by stable identity.
+          const lineId = line.id?.trim() || null;
+          const isExisting = !!lineId && costSnapshot.has(lineId);
+          let rawCost: string | null;
+          if (isExisting) {
+            rawCost = seeMargin
+              ? (line.unitCost ?? costSnapshot.get(lineId!)!)
+              : costSnapshot.get(lineId!)!;
+          } else {
+            rawCost = costItemId
+              ? ci!.defaultUnitCost
+              : seeMargin
+                ? line.unitCost || '0'
+                : '0';
           }
 
           const qty = money(line.qty);
-          const uCost = money(unitCost);
+          const uCost = money(rawCost);
           const uPrice = money(unitPrice);
           const disc = money(line.discountPct);
           if (
@@ -266,6 +378,10 @@ export async function saveProposalDraftCore(
           ) {
             fail('line_required');
           }
+          if (!withinMagnitude(qty!) || !withinMagnitude(uCost!) || !withinMagnitude(uPrice!)) {
+            fail('amount_too_large');
+          }
+          if (!pctInRange(disc!)) fail('discount_out_of_range');
 
           const totals = computeLine({
             qty: qty!,
@@ -273,11 +389,8 @@ export async function saveProposalDraftCore(
             unitPrice: uPrice!,
             discountPct: disc!,
           });
-
-          await tx.insert(proposalLines).values({
-            orgId: ctx.orgId,
-            proposalId: input.id,
-            sectionId: secRow.id,
+          lineTotals.push(totals);
+          lines.push({
             costItemId,
             descriptionAr,
             descriptionEn,
@@ -291,15 +404,45 @@ export async function saveProposalDraftCore(
             lineMargin: totals.lineMargin,
             sortOrder: line.sortOrder ?? li,
           });
-          lineTotals.push(totals);
         }
-
         const secTotals = computeSection(lineTotals);
-        await tx
-          .update(proposalSections)
-          .set({ sectionSubtotal: secTotals.sectionSubtotal })
-          .where(eq(proposalSections.id, secRow.id));
         sectionTotals.push(secTotals);
+        resolvedSections.push({
+          titleAr: secTitleAr,
+          titleEn: secTitleEn,
+          sortOrder: sec.sortOrder ?? si,
+          subtotal: secTotals.sectionSubtotal,
+          lines,
+        });
+      }
+
+      // Batch insert sections (subtotal already computed), then all lines.
+      if (resolvedSections.length) {
+        const secRows = await tx
+          .insert(proposalSections)
+          .values(
+            resolvedSections.map((s) => ({
+              orgId: ctx.orgId,
+              proposalId: input.id,
+              titleAr: s.titleAr,
+              titleEn: s.titleEn,
+              sortOrder: s.sortOrder,
+              sectionSubtotal: s.subtotal,
+            })),
+          )
+          .returning({ id: proposalSections.id });
+
+        const lineRows = resolvedSections.flatMap((s, i) =>
+          s.lines.map((l) => ({
+            orgId: ctx.orgId,
+            proposalId: input.id,
+            sectionId: secRows[i].id,
+            ...l,
+          })),
+        );
+        for (const part of chunk(lineRows, LINE_INSERT_CHUNK)) {
+          await tx.insert(proposalLines).values(part);
+        }
       }
 
       const totals = computeTotals(sectionTotals, { discountPct, taxRate });
@@ -309,9 +452,8 @@ export async function saveProposalDraftCore(
         .set({
           titleAr,
           titleEn,
-          issueDate: h.issueDate !== undefined ? clean(h.issueDate) : prop.issueDate,
-          expiryDate:
-            h.expiryDate !== undefined ? clean(h.expiryDate) : prop.expiryDate,
+          issueDate,
+          expiryDate,
           currency: clean(h.currency) ?? prop.currency,
           notesAr: h.notesAr !== undefined ? clean(h.notesAr) : prop.notesAr,
           notesEn: h.notesEn !== undefined ? clean(h.notesEn) : prop.notesEn,
@@ -349,18 +491,13 @@ export async function sendProposalCore(
     ctx,
     { capability: 'proposals_send', action: 'approve' },
     async (tx, audit) => {
-      const [prop] = await tx
-        .select({ status: proposals.status })
-        .from(proposals)
-        .where(eq(proposals.id, input.id))
-        .limit(1);
-      if (!prop) fail('invalid');
-      if (prop.status !== 'draft') fail('proposal_not_draft');
-
       const { raw, hash } = mintToken();
       const shareExpiresAt = new Date(Date.now() + SHARE_TTL_DAYS * 86400_000);
 
-      await tx
+      // R3: the draft->sent transition IS the admission gate. A concurrent 2nd
+      // send finds status<>'draft' -> 0 rows -> proposal_not_draft, no event, no
+      // link (and never overwrites the live token).
+      const gated = await tx
         .update(proposals)
         .set({
           status: 'sent',
@@ -368,7 +505,9 @@ export async function sendProposalCore(
           shareExpiresAt,
           updatedAt: new Date(),
         })
-        .where(eq(proposals.id, input.id));
+        .where(and(eq(proposals.id, input.id), eq(proposals.status, 'draft')))
+        .returning({ id: proposals.id });
+      if (!gated[0]) fail('proposal_not_draft');
 
       await tx.insert(proposalEvents).values({
         orgId: ctx.orgId,
@@ -427,13 +566,15 @@ export async function supersedeProposalCore(
     ctx,
     { capability: 'proposals_build', action: 'create' },
     async (tx, audit) => {
+      // R1: the sent->superseded transition IS the admission gate. A concurrent
+      // 2nd call finds status<>'sent' -> 0 rows -> invalid, and NO copy is made.
+      // The returned row carries the original field values (only status flipped).
       const [old] = await tx
-        .select()
-        .from(proposals)
-        .where(eq(proposals.id, input.id))
-        .limit(1);
+        .update(proposals)
+        .set({ status: 'superseded', updatedAt: new Date() })
+        .where(and(eq(proposals.id, input.id), eq(proposals.status, 'sent')))
+        .returning();
       if (!old) fail('invalid');
-      if (old.status !== 'sent') fail('invalid');
 
       const number = await nextNumber(tx, ctx.orgId);
       const [copy] = await tx
@@ -467,52 +608,53 @@ export async function supersedeProposalCore(
         })
         .returning({ id: proposals.id });
 
-      // Deep-copy sections then their lines into the new draft.
+      // Deep-copy sections + lines into the new draft (batched, no N+1).
       const oldSections = await tx
         .select()
         .from(proposalSections)
-        .where(eq(proposalSections.proposalId, old.id));
-      for (const s of oldSections) {
-        const [ns] = await tx
+        .where(eq(proposalSections.proposalId, old.id))
+        .orderBy(proposalSections.sortOrder);
+      if (oldSections.length) {
+        const newSecs = await tx
           .insert(proposalSections)
-          .values({
-            orgId: ctx.orgId,
-            proposalId: copy.id,
-            titleAr: s.titleAr,
-            titleEn: s.titleEn,
-            sortOrder: s.sortOrder,
-            sectionSubtotal: s.sectionSubtotal,
-          })
+          .values(
+            oldSections.map((s) => ({
+              orgId: ctx.orgId,
+              proposalId: copy.id,
+              titleAr: s.titleAr,
+              titleEn: s.titleEn,
+              sortOrder: s.sortOrder,
+              sectionSubtotal: s.sectionSubtotal,
+            })),
+          )
           .returning({ id: proposalSections.id });
+        const idMap = new Map(oldSections.map((s, i) => [s.id, newSecs[i].id]));
+
         const oldLines = await tx
           .select()
           .from(proposalLines)
-          .where(eq(proposalLines.sectionId, s.id));
-        for (const l of oldLines) {
-          await tx.insert(proposalLines).values({
-            orgId: ctx.orgId,
-            proposalId: copy.id,
-            sectionId: ns.id,
-            costItemId: l.costItemId,
-            descriptionAr: l.descriptionAr,
-            descriptionEn: l.descriptionEn,
-            qty: l.qty,
-            unit: l.unit,
-            unitCost: l.unitCost,
-            unitPrice: l.unitPrice,
-            discountPct: l.discountPct,
-            lineCost: l.lineCost,
-            lineTotal: l.lineTotal,
-            lineMargin: l.lineMargin,
-            sortOrder: l.sortOrder,
-          });
+          .where(eq(proposalLines.proposalId, old.id));
+        const newLineRows = oldLines.map((l) => ({
+          orgId: ctx.orgId,
+          proposalId: copy.id,
+          sectionId: idMap.get(l.sectionId)!,
+          costItemId: l.costItemId,
+          descriptionAr: l.descriptionAr,
+          descriptionEn: l.descriptionEn,
+          qty: l.qty,
+          unit: l.unit,
+          unitCost: l.unitCost,
+          unitPrice: l.unitPrice,
+          discountPct: l.discountPct,
+          lineCost: l.lineCost,
+          lineTotal: l.lineTotal,
+          lineMargin: l.lineMargin,
+          sortOrder: l.sortOrder,
+        }));
+        for (const part of chunk(newLineRows, LINE_INSERT_CHUNK)) {
+          await tx.insert(proposalLines).values(part);
         }
       }
-
-      await tx
-        .update(proposals)
-        .set({ status: 'superseded', updatedAt: new Date() })
-        .where(eq(proposals.id, old.id));
 
       await tx.insert(proposalEvents).values({
         orgId: ctx.orgId,

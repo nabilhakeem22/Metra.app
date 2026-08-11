@@ -1,4 +1,6 @@
+import { sql } from 'drizzle-orm';
 import {
+  check,
   index,
   integer,
   pgTable,
@@ -45,6 +47,10 @@ export const proposalLines = pgTable(
   (t) => [
     unique('proposal_lines_org_id_id_unique').on(t.orgId, t.id),
     bilingualCheck('proposal_lines', 'description'),
+    check(
+      'proposal_lines_discount_pct_range',
+      sql`discount_pct >= 0 and discount_pct <= 100`,
+    ),
     ...sameOrgFk(t, 'proposal', proposals, { onDelete: 'cascade' }),
     ...sameOrgFk(t, 'section', proposalSections, { onDelete: 'cascade' }),
     ...sameOrgFk(t, 'costItem', costItems, { onDelete: 'set null' }),

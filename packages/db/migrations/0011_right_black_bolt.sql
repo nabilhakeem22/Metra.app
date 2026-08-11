@@ -1,0 +1,2 @@
+ALTER TABLE "proposals" ADD CONSTRAINT "proposals_discount_pct_range" CHECK (discount_pct >= 0 and discount_pct <= 100);--> statement-breakpoint
+ALTER TABLE "proposal_lines" ADD CONSTRAINT "proposal_lines_discount_pct_range" CHECK (discount_pct >= 0 and discount_pct <= 100);
