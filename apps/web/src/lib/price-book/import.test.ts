@@ -15,6 +15,14 @@ describe('resolveCategory', () => {
     expect(resolveCategory('nope')).toBeNull();
     expect(resolveCategory('')).toBeNull();
   });
+
+  // F3 — Arabic normalization (§4.1): plain-alef / haa forms resolve too.
+  it('normalizes Arabic alef/taa-marbuta/maqsura and tashkeel', () => {
+    expect(resolveCategory('اعمال مدنية')).toBe('civil'); // plain alef
+    expect(resolveCategory('إعمال مدنيه')).toBe('civil'); // hamza-under + haa
+    expect(resolveCategory('أَعْمَال مَدَنِيَّة')).toBe('civil'); // with tashkeel
+    expect(resolveUnit('قطعه')).toBe('pcs'); // ة -> ه
+  });
 });
 
 describe('resolveUnit', () => {
@@ -66,7 +74,7 @@ describe('validateImportRows', () => {
       ['CO', 'x', 'civil', 'sqm', 'abc', '2'], // 8 cost_invalid
       ['PR', 'x', 'civil', 'sqm', '1', 'xyz'], // 9 price_invalid
     ];
-    const out = validateImportRows(rows, MAP, new Set(['exist']));
+    const out = validateImportRows(rows, MAP, new Set(['EXIST']));
     expect(out.map((r) => (r.ok ? 'ok' : r.error))).toEqual([
       'row_empty',
       'code_missing',
@@ -81,10 +89,19 @@ describe('validateImportRows', () => {
     ]);
   });
 
-  it('code_exists is case-insensitive', () => {
-    const rows = [['abc', 'x', 'civil', 'sqm', '1', '2']];
-    const [r] = validateImportRows(rows, MAP, new Set(['ABC'.toLowerCase()]));
-    expect(r.error).toBe('code_exists');
+  // F4 — code matching is case-SENSITIVE (matches the DB unique(org_id, code)),
+  // so distinct-cased codes are NOT collapsed.
+  it('treats codes as case-sensitive (ABC vs abc are distinct)', () => {
+    const existRow = [['abc', 'x', 'civil', 'sqm', '1', '2']];
+    expect(validateImportRows(existRow, MAP, new Set(['ABC']))[0].ok).toBe(true);
+
+    const dupRows = [
+      ['abc', 'x', 'civil', 'sqm', '1', '2'],
+      ['ABC', 'x', 'civil', 'sqm', '1', '2'],
+    ];
+    const out = validateImportRows(dupRows, MAP, new Set());
+    expect(out[0].ok).toBe(true);
+    expect(out[1].ok).toBe(true); // not a duplicate — different case
   });
 
   it('treats an empty money cell as 0', () => {
@@ -93,5 +110,37 @@ describe('validateImportRows', () => {
     expect(r.ok).toBe(true);
     expect(r.data?.defaultUnitCost).toBe('0');
     expect(r.data?.defaultUnitPrice).toBe('0');
+  });
+
+  // F1 — strict money parser.
+  it('accepts plain and comma-grouped decimals; rejects ambiguous separators', () => {
+    const money = (raw: string) =>
+      validateImportRows([['K', 'x', 'civil', 'sqm', raw, '1']], MAP, new Set())[0];
+
+    // valid
+    expect(money('1234.56').data?.defaultUnitCost).toBe('1234.56');
+    expect(money('1,234.56').data?.defaultUnitCost).toBe('1234.56');
+    expect(money('1,000,000').data?.defaultUnitCost).toBe('1000000');
+    expect(money('0').ok).toBe(true);
+
+    // invalid -> cost_invalid (whole file never rejected)
+    for (const bad of [
+      '1,5',
+      '1.234,56',
+      '1,2,3',
+      '-5',
+      '.5',
+      '1.',
+      '1e3',
+      'Infinity',
+      'NaN',
+      '$5',
+      '١٢٣', // Arabic-Indic digits
+      '12,34',
+    ]) {
+      expect(money(bad).error, `"${bad}" should be cost_invalid`).toBe(
+        'cost_invalid',
+      );
+    }
   });
 });

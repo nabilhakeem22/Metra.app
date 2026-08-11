@@ -6,9 +6,11 @@
 // without protection. Requires: migrations applied, RLS applied, seed run.
 import { randomUUID } from 'node:crypto';
 import {
+  COST_ITEM_A_ID,
   INVITE_A_ID,
   ORG_A_ID,
   ORG_B_ID,
+  PRICE_CHANGE_A_ID,
   USER_A_ID,
   USER_B_ID,
   createDb,
@@ -232,6 +234,33 @@ describe('audit_log immutability (§4.4)', () => {
   });
 });
 
+describe('price history is append-only (§ price book, grants)', () => {
+  it('accepts INSERT but rejects UPDATE and DELETE on price_changes / price_change_lines', async () => {
+    // INSERT succeeds under a real member context.
+    await withOrgContext(db, ctxA, async (tx) => {
+      await tx.execute(
+        sql.raw(
+          `insert into public.price_changes
+             (id, org_id, category, pct_change, target, effective_date, applied_by, item_count)
+           values (gen_random_uuid(), '${ORG_A_ID}', 'civil', 5, 'both', current_date, '${USER_A_ID}', 0)`,
+        ),
+      );
+    });
+
+    // UPDATE / DELETE rejected (no grant) on both history tables.
+    for (const stmt of [
+      `update public.price_changes set item_count = 999 where org_id = '${ORG_A_ID}'`,
+      `delete from public.price_changes where org_id = '${ORG_A_ID}'`,
+      `update public.price_change_lines set new_unit_cost = 0 where org_id = '${ORG_A_ID}'`,
+      `delete from public.price_change_lines where org_id = '${ORG_A_ID}'`,
+    ]) {
+      await expect(
+        withOrgContext(db, ctxA, (tx) => tx.execute(sql.raw(stmt))),
+      ).rejects.toThrow();
+    }
+  });
+});
+
 describe('bilingual present-check (§4.1) — whitespace is not "present"', () => {
   // Own probe org so RLS with_check (id = current_org) passes for the insert.
   const PROBE_ORG = '00000000-0000-4000-8000-0000000000e1';
@@ -338,6 +367,34 @@ describe('membership second factor — forged context is denied', () => {
         ctxForged,
         `insert into public.audit_log (id, org_id, actor_user_id, entity, action)
          values (gen_random_uuid(), '${ORG_A_ID}', '${USER_B_ID}', 'x', 'create')`,
+      ),
+    ).rejects.toThrow();
+  });
+
+  it('forged context cannot INSERT into cost_items / price_changes / price_change_lines', async () => {
+    await expect(
+      rowsUnder(
+        ctxForged,
+        `insert into public.cost_items (id, org_id, code, name_en, category, unit)
+         values (gen_random_uuid(), '${ORG_A_ID}', 'FORGE-${randomUUID()}', 'x', 'civil', 'sqm')`,
+      ),
+    ).rejects.toThrow();
+
+    await expect(
+      rowsUnder(
+        ctxForged,
+        `insert into public.price_changes (id, org_id, category, pct_change, target, effective_date, applied_by, item_count)
+         values (gen_random_uuid(), '${ORG_A_ID}', 'civil', 10, 'both', current_date, '${USER_B_ID}', 0)`,
+      ),
+    ).rejects.toThrow();
+
+    // Valid composite FKs (seeded rows) so RLS — not a FK error — is the reason.
+    await expect(
+      rowsUnder(
+        ctxForged,
+        `insert into public.price_change_lines
+           (id, org_id, price_change_id, cost_item_id, old_unit_cost, new_unit_cost, old_unit_price, new_unit_price)
+         values (gen_random_uuid(), '${ORG_A_ID}', '${PRICE_CHANGE_A_ID}', '${COST_ITEM_A_ID}', 1, 2, 1, 2)`,
       ),
     ).rejects.toThrow();
   });
