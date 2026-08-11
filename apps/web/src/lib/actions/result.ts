@@ -14,7 +14,11 @@ export type ActionCode =
   | 'declined'
   | 'otp_send_failed'
   | 'otp_verify_failed'
-  | 'immutable';
+  | 'immutable'
+  | 'code_required'
+  | 'code_taken'
+  | 'invalid_percentage'
+  | 'import_empty';
 
 export interface ActionResult {
   ok: boolean;
