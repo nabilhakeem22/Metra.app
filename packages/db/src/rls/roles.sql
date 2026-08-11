@@ -24,6 +24,8 @@ grant select, insert, update, delete on public.files         to metra_app;
 grant select, insert, update, delete on public.invitations   to metra_app;
 
 grant select, insert, update, delete on public.cost_items    to metra_app;
+grant select, insert, update, delete on public.clients       to metra_app;
+grant select, insert, update, delete on public.projects      to metra_app;
 
 -- ...except audit_log and the price-history tables, which are append-only. No
 -- UPDATE / DELETE grant, so any attempt raises a permission error at the database.

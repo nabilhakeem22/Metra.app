@@ -6,13 +6,17 @@ import { createDb } from '../client';
 import { MIGRATION_DATABASE_URL } from '../env';
 import { withOrgContext } from '../org-context';
 import { auditLog } from '../schema/audit-log';
+import { clients } from '../schema/clients';
 import { costItems } from '../schema/cost-items';
 import { files } from '../schema/files';
 import { invitations } from '../schema/invitations';
 import { memberships } from '../schema/memberships';
 import { organizations } from '../schema/organizations';
 import { priceChangeLines, priceChanges } from '../schema/price-changes';
+import { projects } from '../schema/projects';
 import {
+  CLIENT_A_ID,
+  CLIENT_B_ID,
   COST_ITEM_A_ID,
   COST_ITEM_B_ID,
   FILE_A_ID,
@@ -25,6 +29,8 @@ import {
   PRICE_CHANGE_B_ID,
   PRICE_LINE_A_ID,
   PRICE_LINE_B_ID,
+  PROJECT_A_ID,
+  PROJECT_B_ID,
   USER_A_ID,
   USER_B_ID,
 } from './seed-constants';
@@ -42,6 +48,9 @@ interface OrgSeed {
   priceChangeId: string;
   priceLineId: string;
   costItemCode: string;
+  clientId: string;
+  projectId: string;
+  projectCode: string;
 }
 
 const orgs: OrgSeed[] = [
@@ -58,6 +67,9 @@ const orgs: OrgSeed[] = [
     priceChangeId: PRICE_CHANGE_A_ID,
     priceLineId: PRICE_LINE_A_ID,
     costItemCode: 'SEED-A-001',
+    clientId: CLIENT_A_ID,
+    projectId: PROJECT_A_ID,
+    projectCode: 'PRJ-A-001',
   },
   {
     orgId: ORG_B_ID,
@@ -72,6 +84,9 @@ const orgs: OrgSeed[] = [
     priceChangeId: PRICE_CHANGE_B_ID,
     priceLineId: PRICE_LINE_B_ID,
     costItemCode: 'SEED-B-001',
+    clientId: CLIENT_B_ID,
+    projectId: PROJECT_B_ID,
+    projectCode: 'PRJ-B-001',
   },
 ];
 
@@ -137,6 +152,34 @@ async function seedOrg(db: Parameters<typeof withOrgContext>[0], org: OrgSeed) {
           unit: 'sqm',
           defaultUnitCost: '100.0000',
           defaultUnitPrice: '150.0000',
+        })
+        .onConflictDoNothing();
+
+      // A client + a project referencing that client (same org).
+      await tx
+        .insert(clients)
+        .values({
+          id: org.clientId,
+          orgId: org.orgId,
+          nameEn: 'Seed client',
+          nameAr: 'عميل تجريبي',
+          contactName: 'Seed Contact',
+          email: 'client@example.com',
+          city: 'Cairo',
+        })
+        .onConflictDoNothing();
+
+      await tx
+        .insert(projects)
+        .values({
+          id: org.projectId,
+          orgId: org.orgId,
+          code: org.projectCode,
+          nameEn: 'Seed project',
+          nameAr: 'مشروع تجريبي',
+          clientId: org.clientId,
+          status: 'active',
+          city: 'Cairo',
         })
         .onConflictDoNothing();
 

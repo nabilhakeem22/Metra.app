@@ -139,3 +139,31 @@ create policy org_isolation on public.price_change_lines
     org_id = nullif(current_setting('app.current_org_id', true), '')::uuid
     and public.app_is_current_org_member()
   );
+
+-- clients (P1 Slice 2)
+alter table public.clients enable row level security;
+alter table public.clients force  row level security;
+drop policy if exists org_isolation on public.clients;
+create policy org_isolation on public.clients
+  using (
+    org_id = nullif(current_setting('app.current_org_id', true), '')::uuid
+    and public.app_is_current_org_member()
+  )
+  with check (
+    org_id = nullif(current_setting('app.current_org_id', true), '')::uuid
+    and public.app_is_current_org_member()
+  );
+
+-- projects (P1 Slice 2)
+alter table public.projects enable row level security;
+alter table public.projects force  row level security;
+drop policy if exists org_isolation on public.projects;
+create policy org_isolation on public.projects
+  using (
+    org_id = nullif(current_setting('app.current_org_id', true), '')::uuid
+    and public.app_is_current_org_member()
+  )
+  with check (
+    org_id = nullif(current_setting('app.current_org_id', true), '')::uuid
+    and public.app_is_current_org_member()
+  );

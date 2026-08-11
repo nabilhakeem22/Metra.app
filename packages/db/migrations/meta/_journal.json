@@ -64,6 +64,13 @@
       "when": 1786454776994,
       "tag": "0008_smiling_catseye",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1786461532916,
+      "tag": "0009_early_siren",
+      "breakpoints": true
     }
   ]
 }
