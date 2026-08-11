@@ -55,7 +55,7 @@ export function ProposalsClient({
     formatProposalNumber(p.number, proposalYear(p.issueDate, p.createdAt));
 
   const newButton = canManage && hasClients && (
-    <Button onClick={() => router.push('/proposals/new')}>
+    <Button data-tour="proposals-new" onClick={() => router.push('/proposals/new')}>
       <Plus className="size-4" aria-hidden />
       {t('actions.new')}
     </Button>

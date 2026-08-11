@@ -78,7 +78,7 @@ export function ClientsClient({ items, canManage }: ClientsClientProps) {
               description={t('empty.description')}
               action={
                 canManage ? (
-                  <Button onClick={openNew}>
+                  <Button data-tour="clients-new" onClick={openNew}>
                     <Plus className="size-4" aria-hidden />
                     {t('actions.new')}
                   </Button>
@@ -117,7 +117,7 @@ export function ClientsClient({ items, canManage }: ClientsClientProps) {
           {t('activeOnly')}
         </label>
         {canManage && (
-          <Button className="ms-auto" onClick={openNew}>
+          <Button data-tour="clients-new" className="ms-auto" onClick={openNew}>
             <Plus className="size-4" aria-hidden />
             {t('actions.new')}
           </Button>

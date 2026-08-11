@@ -1,8 +1,10 @@
 'use client';
 
-import { Check } from 'lucide-react';
+import { Check, Play } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { useState, useTransition } from 'react';
+import { useTour } from '@/components/onboarding/tour/use-tour';
+import { Button } from '@/components/ui/button';
 import {
   Card,
   CardContent,
@@ -10,35 +12,28 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
+import { Link } from '@/i18n/routing';
+import type { ChecklistResult } from '@/lib/onboarding/checklist';
 import { dismissChecklist } from '@/lib/onboarding/state';
 import { cn } from '@/lib/utils';
 
 export interface GettingStartedProps {
-  profileComplete: boolean;
-  teamInvited: boolean;
-  dismissed: boolean;
+  result: ChecklistResult;
   orgId: string;
+  dismissed: boolean;
 }
 
 export function GettingStarted({
-  profileComplete,
-  teamInvited,
-  dismissed: initialDismissed,
+  result,
   orgId,
+  dismissed: initialDismissed,
 }: GettingStartedProps) {
-  const t = useTranslations('dashboard');
-  const nav = useTranslations('nav');
+  const t = useTranslations('onboarding');
+  const { goto } = useTour();
   const [dismissed, setDismissed] = useState(initialDismissed);
   const [, startTransition] = useTransition();
 
-  if (dismissed) return null;
-
-  const items = [
-    { key: 'taskCompleteProfile', done: profileComplete, soon: false },
-    { key: 'taskInviteTeammate', done: teamInvited, soon: false },
-    { key: 'taskImportPriceBook', done: false, soon: true },
-    { key: 'taskFirstProposal', done: false, soon: true },
-  ] as const;
+  if (dismissed || result.allDone) return null;
 
   function dismiss() {
     setDismissed(true);
@@ -47,12 +42,24 @@ export function GettingStarted({
     });
   }
 
+  // A role with no create grants gets a role-appropriate line, never prompts.
+  if (result.items.length === 0) {
+    return (
+      <Card data-tour="dashboard-checklist">
+        <CardHeader>
+          <CardTitle>{t('readOnlyTitle')}</CardTitle>
+          <CardDescription>{t('readOnlyBody')}</CardDescription>
+        </CardHeader>
+      </Card>
+    );
+  }
+
   return (
-    <Card>
+    <Card data-tour="dashboard-checklist">
       <CardHeader className="flex-row items-start justify-between gap-3 space-y-0">
         <div className="space-y-1">
-          <CardTitle>{t('gettingStartedTitle')}</CardTitle>
-          <CardDescription>{t('gettingStartedSubtitle')}</CardDescription>
+          <CardTitle>{t('title')}</CardTitle>
+          <CardDescription>{t('subtitle')}</CardDescription>
         </div>
         <button
           type="button"
@@ -62,16 +69,23 @@ export function GettingStarted({
           {t('dismiss')}
         </button>
       </CardHeader>
-      <CardContent>
+      <CardContent className="space-y-4">
+        <div className="space-y-1">
+          <p className="text-xs font-medium text-muted-foreground">
+            {t('progress', { percent: result.percent })}
+          </p>
+          <div className="h-1.5 overflow-hidden rounded-full bg-muted">
+            <div
+              className="h-full rounded-full bg-primary transition-[width] motion-reduce:transition-none"
+              style={{ width: `${result.percent}%` }}
+            />
+          </div>
+        </div>
+
         <ol className="relative space-y-4">
-          {/* Trace line — the quote->invoice traceability motif. Logical start-3
-              so it flips in RTL; bullets sit above it. */}
-          <span
-            aria-hidden
-            className="absolute inset-y-3 start-3 w-px bg-border"
-          />
-          {items.map((item) => (
-            <li key={item.key} className="relative flex items-start gap-3">
+          <span aria-hidden className="absolute inset-y-3 start-3 w-px bg-border" />
+          {result.items.map((item) => (
+            <li key={item.key} className="relative flex flex-wrap items-center gap-3">
               <span
                 className={cn(
                   'z-10 flex size-6 shrink-0 items-center justify-center rounded-full border bg-card',
@@ -84,21 +98,32 @@ export function GettingStarted({
                   <span className="size-2 rounded-full bg-muted-foreground/40" />
                 )}
               </span>
-              <div className="flex flex-1 items-center gap-2">
-                <p
-                  className={cn(
-                    'text-sm font-medium',
-                    item.done && 'text-muted-foreground line-through',
-                  )}
-                >
-                  {t(item.key)}
-                </p>
-                {item.soon && (
-                  <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
-                    {nav('soon')}
-                  </span>
+              <p
+                className={cn(
+                  'flex-1 text-sm font-medium',
+                  item.done && 'text-muted-foreground line-through',
                 )}
-              </div>
+              >
+                {t(`items.${item.key}`)}
+              </p>
+              {!item.done && (
+                <div className="flex items-center gap-2">
+                  {item.tourStep && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => goto(item.tourStep as string)}
+                    >
+                      <Play className="size-4" aria-hidden />
+                      {t('launch')}
+                    </Button>
+                  )}
+                  <Button asChild variant="outline" size="sm">
+                    <Link href={item.href}>{t('open')}</Link>
+                  </Button>
+                </div>
+              )}
             </li>
           ))}
         </ol>

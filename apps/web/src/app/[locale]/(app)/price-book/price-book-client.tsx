@@ -138,7 +138,7 @@ export function PriceBookClient({ items, canManage }: PriceBookClientProps) {
               action={
                 canManage ? (
                   <div className="flex flex-wrap justify-center gap-2">
-                    <Button onClick={onLoadStarter} disabled={pending}>
+                    <Button data-tour="price-book-new" onClick={onLoadStarter} disabled={pending}>
                       {pending && (
                         <Loader2 className="size-4 animate-spin" aria-hidden />
                       )}
@@ -213,7 +213,7 @@ export function PriceBookClient({ items, canManage }: PriceBookClientProps) {
               <Upload className="size-4" aria-hidden />
               {t('actions.import')}
             </Button>
-            <Button onClick={openNew}>
+            <Button data-tour="price-book-new" onClick={openNew}>
               <Plus className="size-4" aria-hidden />
               {t('actions.new')}
             </Button>

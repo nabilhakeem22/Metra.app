@@ -1,5 +1,4 @@
 import { organizations } from '@metra/db';
-import { sql } from 'drizzle-orm';
 import { getLocale, getTranslations } from 'next-intl/server';
 import { GettingStarted } from '@/components/dashboard/getting-started';
 import { Button } from '@/components/ui/button';
@@ -11,8 +10,9 @@ import { requireOrg } from '@/lib/auth/require-org';
 import { getSessionUser } from '@/lib/auth/session';
 import { withOrgContext } from '@/lib/db/context';
 import { pickLocale } from '@/lib/i18n/pick-locale';
+import { buildChecklist } from '@/lib/onboarding/checklist';
 import { readOnboarding } from '@/lib/onboarding/merge';
-import { isProfileComplete } from '@/lib/org/profile';
+import { getOnboardingProgress } from '@/lib/onboarding/progress';
 
 const LEDGER_ROWS = [
   { key: 'activeProjects', value: '0' },
@@ -31,33 +31,21 @@ export default async function DashboardPage() {
   const roles = await getTranslations('roles');
   const tc = await getTranslations('common');
 
-  const { org, memberCount, pendingInvites } = await withOrgContext(
-    ctx,
-    async (tx) => {
-      const [o] = await tx.select().from(organizations).limit(1);
-      const mem = (await tx.execute(
-        sql`select count(*)::int as n from public.memberships`,
-      )) as unknown as Array<{ n: number }>;
-      const inv = (await tx.execute(
-        sql`select count(*)::int as n from public.invitations where status = 'pending'`,
-      )) as unknown as Array<{ n: number }>;
-      return {
-        org: o,
-        memberCount: Number(mem[0]?.n ?? 0),
-        pendingInvites: Number(inv[0]?.n ?? 0),
-      };
-    },
+  const [org] = await withOrgContext(ctx, (tx) =>
+    tx.select().from(organizations).limit(1),
   );
 
+  // Single aggregate drives the checklist; role gates which items appear.
+  const progress = await getOnboardingProgress(ctx, org);
+  const checklist = buildChecklist(progress, ctx.role, org.hideMarginFromPm);
+
   const name = pickLocale(org, 'name', locale);
-  const profileComplete = isProfileComplete(org);
-  // Ticks on SEND (a live pending invite) as well as on accept.
-  const teamInvited = memberCount > 1 || pendingInvites > 0;
+  const profileComplete = progress.profileComplete;
+  const teamInvited = progress.teamInvited;
   // Per-org dismiss (onboarding.dismissedOrgs), replacing the old global flag.
   const dismissed = (readOnboarding(user?.user_metadata).dismissedOrgs ?? []).includes(
     ctx.orgId,
   );
-  const allActionableDone = profileComplete && teamInvited;
 
   // A real primary action, never a dead disabled control. Once an invite is
   // pending we stop pushing "Invite your team".
@@ -91,14 +79,7 @@ export default async function DashboardPage() {
         }
       />
 
-      {!allActionableDone && (
-        <GettingStarted
-          profileComplete={profileComplete}
-          teamInvited={teamInvited}
-          dismissed={dismissed}
-          orgId={ctx.orgId}
-        />
-      )}
+      <GettingStarted result={checklist} orgId={ctx.orgId} dismissed={dismissed} />
 
       <div className="grid gap-4 lg:grid-cols-3">
         {/* Quiet, authored "ledger" block — honest empty figures, tabular, ruled. */}

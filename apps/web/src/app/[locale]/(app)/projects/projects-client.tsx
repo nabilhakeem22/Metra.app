@@ -108,7 +108,7 @@ export function ProjectsClient({
               hint={clientOptions.length === 0 ? t('empty.needClient') : undefined}
               action={
                 canManage && clientOptions.length > 0 ? (
-                  <Button onClick={openNew}>
+                  <Button data-tour="projects-new" onClick={openNew}>
                     <Plus className="size-4" aria-hidden />
                     {t('actions.new')}
                   </Button>
@@ -160,7 +160,7 @@ export function ProjectsClient({
           {t('activeOnly')}
         </label>
         {canManage && clientOptions.length > 0 && (
-          <Button className="ms-auto" onClick={openNew}>
+          <Button data-tour="projects-new" className="ms-auto" onClick={openNew}>
             <Plus className="size-4" aria-hidden />
             {t('actions.new')}
           </Button>
