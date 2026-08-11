@@ -24,7 +24,7 @@ describe('§2.2 permission matrix', () => {
     ['site_engineer', 'cost_entries', 'create', true],
     ['site_engineer', 'cost_entries', 'approve', false],
     ['accountant', 'cost_entries', 'approve', true],
-    ['client', 'proposals_send', 'approve', true],
+    ['client', 'proposals_send', 'approve', false], // S1: client send removed
     ['client', 'proposals_build', 'read', false],
     ['viewer', 'margin_pnl', 'read', false],
     ['owner', 'margin_pnl', 'read', true],
