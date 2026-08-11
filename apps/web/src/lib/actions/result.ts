@@ -21,7 +21,12 @@ export type ActionCode =
   | 'import_empty'
   | 'import_too_large'
   | 'client_required'
-  | 'invalid_dates';
+  | 'invalid_dates'
+  | 'proposal_not_draft'
+  | 'line_required'
+  | 'token_invalid'
+  | 'token_expired'
+  | 'already_responded';
 
 export interface ActionResult {
   ok: boolean;

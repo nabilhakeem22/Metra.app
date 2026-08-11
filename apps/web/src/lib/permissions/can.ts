@@ -29,3 +29,17 @@ export function can(
 export function canManageOrg(role: MemberRole): boolean {
   return can(role, 'users_settings', 'update');
 }
+
+/**
+ * May this role see cost/margin figures? Derived from the §2.2 margin_pnl grant
+ * (owner/admin/PM/accountant have R; site_engineer/client/viewer don't) AND the
+ * org's `hide_margin_from_pm` toggle, which removes PMs when on (default).
+ */
+export function canSeeMargin(
+  role: MemberRole,
+  hideMarginFromPm: boolean,
+): boolean {
+  if (!can(role, 'margin_pnl', 'read')) return false;
+  if (role === 'project_manager' && hideMarginFromPm) return false;
+  return true;
+}

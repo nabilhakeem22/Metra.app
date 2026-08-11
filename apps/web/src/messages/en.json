@@ -270,7 +270,12 @@
     "import_empty": "There are no rows to import",
     "import_too_large": "The file is too large or has too many rows",
     "client_required": "Select a client",
-    "invalid_dates": "End date must be on or after the start date"
+    "invalid_dates": "End date must be on or after the start date",
+    "proposal_not_draft": "This proposal is no longer a draft",
+    "line_required": "Add at least one line",
+    "token_invalid": "This link is not valid",
+    "token_expired": "This link has expired",
+    "already_responded": "A response was already recorded for this proposal"
   },
   "common": {
     "untranslated": "untranslated"
