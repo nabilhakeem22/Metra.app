@@ -97,3 +97,45 @@ create policy org_isolation on public.invitations
     org_id = nullif(current_setting('app.current_org_id', true), '')::uuid
     and public.app_is_current_org_member()
   );
+
+-- cost_items (P1 Price Book)
+alter table public.cost_items enable row level security;
+alter table public.cost_items force  row level security;
+drop policy if exists org_isolation on public.cost_items;
+create policy org_isolation on public.cost_items
+  using (
+    org_id = nullif(current_setting('app.current_org_id', true), '')::uuid
+    and public.app_is_current_org_member()
+  )
+  with check (
+    org_id = nullif(current_setting('app.current_org_id', true), '')::uuid
+    and public.app_is_current_org_member()
+  );
+
+-- price_changes (append-only via grants; still org-isolated + membership-gated)
+alter table public.price_changes enable row level security;
+alter table public.price_changes force  row level security;
+drop policy if exists org_isolation on public.price_changes;
+create policy org_isolation on public.price_changes
+  using (
+    org_id = nullif(current_setting('app.current_org_id', true), '')::uuid
+    and public.app_is_current_org_member()
+  )
+  with check (
+    org_id = nullif(current_setting('app.current_org_id', true), '')::uuid
+    and public.app_is_current_org_member()
+  );
+
+-- price_change_lines (append-only via grants; org-isolated + membership-gated)
+alter table public.price_change_lines enable row level security;
+alter table public.price_change_lines force  row level security;
+drop policy if exists org_isolation on public.price_change_lines;
+create policy org_isolation on public.price_change_lines
+  using (
+    org_id = nullif(current_setting('app.current_org_id', true), '')::uuid
+    and public.app_is_current_org_member()
+  )
+  with check (
+    org_id = nullif(current_setting('app.current_org_id', true), '')::uuid
+    and public.app_is_current_org_member()
+  );

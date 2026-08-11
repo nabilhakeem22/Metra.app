@@ -23,9 +23,13 @@ grant select, insert, update, delete on public.memberships   to metra_app;
 grant select, insert, update, delete on public.files         to metra_app;
 grant select, insert, update, delete on public.invitations   to metra_app;
 
--- ...except audit_log, which is append-only (§4.4). No UPDATE / DELETE grant,
--- so any attempt raises a permission error at the database.
-grant select, insert on public.audit_log to metra_app;
+grant select, insert, update, delete on public.cost_items    to metra_app;
+
+-- ...except audit_log and the price-history tables, which are append-only. No
+-- UPDATE / DELETE grant, so any attempt raises a permission error at the database.
+grant select, insert on public.audit_log          to metra_app;
+grant select, insert on public.price_changes       to metra_app;
+grant select, insert on public.price_change_lines  to metra_app;
 
 -- Future-proofing for composite-FK trigger functions.
 grant execute on function public.enforce_same_org() to metra_app;

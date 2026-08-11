@@ -57,6 +57,13 @@
       "when": 1786402801338,
       "tag": "0007_wild_leper_queen",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1786454776994,
+      "tag": "0008_smiling_catseye",
+      "breakpoints": true
     }
   ]
 }

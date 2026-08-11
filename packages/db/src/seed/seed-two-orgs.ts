@@ -6,17 +6,25 @@ import { createDb } from '../client';
 import { MIGRATION_DATABASE_URL } from '../env';
 import { withOrgContext } from '../org-context';
 import { auditLog } from '../schema/audit-log';
+import { costItems } from '../schema/cost-items';
 import { files } from '../schema/files';
 import { invitations } from '../schema/invitations';
 import { memberships } from '../schema/memberships';
 import { organizations } from '../schema/organizations';
+import { priceChangeLines, priceChanges } from '../schema/price-changes';
 import {
+  COST_ITEM_A_ID,
+  COST_ITEM_B_ID,
   FILE_A_ID,
   FILE_B_ID,
   INVITE_A_ID,
   INVITE_B_ID,
   ORG_A_ID,
   ORG_B_ID,
+  PRICE_CHANGE_A_ID,
+  PRICE_CHANGE_B_ID,
+  PRICE_LINE_A_ID,
+  PRICE_LINE_B_ID,
   USER_A_ID,
   USER_B_ID,
 } from './seed-constants';
@@ -30,6 +38,10 @@ interface OrgSeed {
   inviteTokenHash: string;
   nameAr: string;
   nameEn: string;
+  costItemId: string;
+  priceChangeId: string;
+  priceLineId: string;
+  costItemCode: string;
 }
 
 const orgs: OrgSeed[] = [
@@ -42,6 +54,10 @@ const orgs: OrgSeed[] = [
     inviteTokenHash: 'seed-token-hash-a',
     nameAr: 'شركة ألف للتشطيبات',
     nameEn: 'Org A Fit-out',
+    costItemId: COST_ITEM_A_ID,
+    priceChangeId: PRICE_CHANGE_A_ID,
+    priceLineId: PRICE_LINE_A_ID,
+    costItemCode: 'SEED-A-001',
   },
   {
     orgId: ORG_B_ID,
@@ -52,6 +68,10 @@ const orgs: OrgSeed[] = [
     inviteTokenHash: 'seed-token-hash-b',
     nameAr: 'شركة باء للتشطيبات',
     nameEn: 'Org B Fit-out',
+    costItemId: COST_ITEM_B_ID,
+    priceChangeId: PRICE_CHANGE_B_ID,
+    priceLineId: PRICE_LINE_B_ID,
+    costItemCode: 'SEED-B-001',
   },
 ];
 
@@ -103,6 +123,51 @@ async function seedOrg(db: Parameters<typeof withOrgContext>[0], org: OrgSeed) {
           expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
         })
         .onConflictDoNothing();
+
+      // A price-book cost item (idempotent on its fixed id).
+      await tx
+        .insert(costItems)
+        .values({
+          id: org.costItemId,
+          orgId: org.orgId,
+          code: org.costItemCode,
+          nameEn: 'Seed cost item',
+          nameAr: 'بند تكلفة تجريبي',
+          category: 'civil',
+          unit: 'sqm',
+          defaultUnitCost: '100.0000',
+          defaultUnitPrice: '150.0000',
+        })
+        .onConflictDoNothing();
+
+      // A price-change header + one line (append-only; guard re-seed by id).
+      const changeExists = await tx
+        .select({ id: priceChanges.id })
+        .from(priceChanges)
+        .where(sql`${priceChanges.id} = ${org.priceChangeId}`)
+        .limit(1);
+      if (changeExists.length === 0) {
+        await tx.insert(priceChanges).values({
+          id: org.priceChangeId,
+          orgId: org.orgId,
+          category: 'civil',
+          pctChange: '10.0000',
+          target: 'both',
+          effectiveDate: '2026-01-01',
+          appliedBy: org.userId,
+          itemCount: 1,
+        });
+        await tx.insert(priceChangeLines).values({
+          id: org.priceLineId,
+          orgId: org.orgId,
+          priceChangeId: org.priceChangeId,
+          costItemId: org.costItemId,
+          oldUnitCost: '100.0000',
+          newUnitCost: '110.0000',
+          oldUnitPrice: '150.0000',
+          newUnitPrice: '165.0000',
+        });
+      }
 
       // audit_log is append-only; guard against duplicate spam on re-seed.
       const existing = await tx

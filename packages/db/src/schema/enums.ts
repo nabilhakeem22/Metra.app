@@ -31,6 +31,39 @@ export const INVITATION_STATUSES = [
 
 export const invitationStatus = pgEnum('invitation_status', INVITATION_STATUSES);
 
+/**
+ * P1 Price Book — cost-item categories (§ price book). Order is a contract; UI
+ * labels are localized at render time, never stored. Do not reorder/rename.
+ */
+export const COST_ITEM_CATEGORIES = [
+  'civil',
+  'gypsum',
+  'electrical',
+  'plumbing',
+  'joinery',
+  'finishes',
+  'furniture',
+  'preliminaries',
+] as const;
+
+export const costItemCategory = pgEnum(
+  'cost_item_category',
+  COST_ITEM_CATEGORIES,
+);
+
+/** Cost-item units of measure. Labels localized (not stored). */
+export const COST_ITEM_UNITS = [
+  'sqm',
+  'linear_meter',
+  'pcs',
+  'lump_sum',
+  'day',
+] as const;
+
+export const costItemUnit = pgEnum('cost_item_unit', COST_ITEM_UNITS);
+
 export type MemberRole = (typeof MEMBER_ROLES)[number];
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];
 export type InvitationStatus = (typeof INVITATION_STATUSES)[number];
+export type CostItemCategory = (typeof COST_ITEM_CATEGORIES)[number];
+export type CostItemUnit = (typeof COST_ITEM_UNITS)[number];

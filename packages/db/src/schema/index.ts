@@ -6,12 +6,16 @@ export * from './memberships';
 export * from './audit-log';
 export * from './files';
 export * from './invitations';
+export * from './cost-items';
+export * from './price-changes';
 
 import { organizations } from './organizations';
 import { memberships } from './memberships';
 import { auditLog } from './audit-log';
 import { files } from './files';
 import { invitations } from './invitations';
+import { costItems } from './cost-items';
+import { priceChanges, priceChangeLines } from './price-changes';
 
 /** Every org-scoped business table (carries org_id). Drives RLS generation. */
 export const orgScopedTables = {
@@ -19,6 +23,9 @@ export const orgScopedTables = {
   auditLog,
   files,
   invitations,
+  costItems,
+  priceChanges,
+  priceChangeLines,
 } as const;
 
 /** All tables including the tenant root. */
@@ -28,4 +35,7 @@ export const allTables = {
   auditLog,
   files,
   invitations,
+  costItems,
+  priceChanges,
+  priceChangeLines,
 } as const;
