@@ -64,12 +64,9 @@ export async function createOrgCore(
       entityId: ctx.orgId,
       action: 'create',
       before: null,
-      after: {
-        name_en: nameEn,
-        name_ar: nameAr,
-        city,
-        tax_registration_number: taxRegistrationNumber,
-      },
+      // camelCase to match updateOrgProfile's audit shape — one key path for
+      // the organization entity's history.
+      after: { nameEn, nameAr, city, taxRegistrationNumber },
     });
   });
 }

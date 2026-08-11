@@ -1,8 +1,8 @@
 import { afterAll, describe, expect, it } from 'vitest';
 import { ensureNotLastOwner } from '@/lib/aggregates/membership';
 import { withOrgContext } from '@/lib/db/context';
-import { removeMemberCore } from '@/lib/team/core';
-import { closeFixture, ctxFor, seedOrg, teardown } from './fixture';
+import { changeMemberRoleCore, removeMemberCore } from '@/lib/team/core';
+import { closeFixture, ctxFor, raw, seedOrg, teardown } from './fixture';
 
 const orgIds: string[] = [];
 
@@ -53,5 +53,33 @@ describe('removeMemberCore', () => {
       ownerIds[0],
     );
     expect(res).toEqual({ ok: false, error: 'self' });
+  });
+});
+
+describe('mutateInOrg capability gate', () => {
+  it('refuses a viewer and writes nothing (removeMemberCore + changeMemberRoleCore)', async () => {
+    const { orgId, ownerIds, memberIds } = await seedOrg({
+      owners: 1,
+      members: [{ role: 'viewer' }],
+    });
+    orgIds.push(orgId);
+    const viewerCtx = ctxFor(orgId, memberIds[0], 'viewer');
+
+    const membersBefore = await raw.count('memberships', orgId);
+    const auditBefore = await raw.count('audit_log', orgId);
+
+    // A viewer cannot remove a member...
+    const remove = await removeMemberCore(viewerCtx, ownerIds[0]);
+    expect(remove).toEqual({ ok: false, error: 'forbidden' });
+
+    // ...nor change a role. The gate fires before withOrgContext opens, so no row moves.
+    const change = await changeMemberRoleCore(viewerCtx, {
+      userId: ownerIds[0],
+      role: 'admin',
+    });
+    expect(change).toEqual({ ok: false, error: 'forbidden' });
+
+    expect(await raw.count('memberships', orgId)).toBe(membersBefore);
+    expect(await raw.count('audit_log', orgId)).toBe(auditBefore);
   });
 });

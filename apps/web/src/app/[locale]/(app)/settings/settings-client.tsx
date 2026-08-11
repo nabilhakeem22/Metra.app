@@ -95,6 +95,8 @@ export function SettingsClient({
           contentType: file.type,
           originalName: file.name,
         });
+        // Manage-gated server-side; the inner catch surfaces the generic toast.
+        if ('ok' in signed) throw new Error('logo_forbidden');
         const put = await fetch(signed.signedUrl, {
           method: 'PUT',
           headers: { 'content-type': file.type, 'x-upsert': 'true' },

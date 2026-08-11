@@ -81,6 +81,9 @@ export function OnboardingWizard() {
               contentType: logo.type,
               originalName: logo.name,
             });
+            // A viewer (or a demoted user) is refused here — the inner catch
+            // surfaces the same logo-upload-failed toast.
+            if ('ok' in signed) throw new Error('logo_forbidden');
             const res = await fetch(signed.signedUrl, {
               method: 'PUT',
               headers: { 'content-type': logo.type, 'x-upsert': 'true' },

@@ -11,7 +11,7 @@ import {
   ACTIVE_ORG_COOKIE,
   activeOrgCookieOptions,
 } from '@/lib/auth/active-org';
-import type { ActionResult } from '@/lib/auth/actions';
+import { err, type ActionResult } from '@/lib/actions/result';
 import { requireOrg } from '@/lib/auth/require-org';
 import { getSessionUser } from '@/lib/auth/session';
 import { withOrgContext, withUserContext } from '@/lib/db/context';
@@ -58,12 +58,13 @@ export async function createOrg(input: OrgProfileInput): Promise<void> {
   if (!res.ok) throw new Error(res.error ?? 'invalid');
 }
 
-/** Signed upload URL for the org logo (org must already exist). */
+/** Signed upload URL for the org logo (org must already exist). Manage-only. */
 export async function createLogoUpload(input: {
   contentType?: string;
   originalName?: string;
-}): Promise<SignedUpload> {
+}): Promise<SignedUpload | ActionResult> {
   const ctx = await requireOrg();
+  if (!canManageOrg(ctx.role)) return err('forbidden');
   await ensureFilesBucket();
   return createSignedUploadUrl(ctx, 'org-logo', {
     contentType: input.contentType,
@@ -74,6 +75,7 @@ export async function createLogoUpload(input: {
 /** Points the org at an uploaded logo file — only if the file is in the org. */
 export async function setOrgLogo(fileId: string): Promise<ActionResult> {
   const ctx = await requireOrg();
+  if (!canManageOrg(ctx.role)) return err('forbidden');
   return withOrgContext(ctx, async (tx) => {
     // Confirm the file belongs to the caller's org (RLS-scoped). Reject otherwise.
     const [owned] = await tx
