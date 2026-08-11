@@ -138,4 +138,47 @@ describe('updateProjectCore', () => {
     const [after] = await listProjects(ctx, {});
     expect(after.status).toBe('active');
   });
+
+  // F1: editing a project whose client was later archived must still succeed as
+  // long as the client isn't being reassigned.
+  it('allows editing a project whose (unchanged) client is now archived', async () => {
+    const { ctx, clientId } = await orgWithClient();
+    await createProjectCore(ctx, baseProject(clientId));
+    const [p] = await listProjects(ctx, {});
+
+    await setClientActiveCore(ctx, { id: clientId, active: false });
+
+    const res = await updateProjectCore(ctx, {
+      id: p.id,
+      ...baseProject(clientId),
+      status: 'completed',
+    });
+    expect(res).toEqual({ ok: true });
+
+    const [after] = await listProjects(ctx, {});
+    expect(after.status).toBe('completed');
+  });
+});
+
+describe('date + client-id edge cases', () => {
+  // F3: non-zero-padded dates order chronologically, not lexically.
+  it('accepts non-zero-padded start/end dates in order', async () => {
+    const { ctx, clientId } = await orgWithClient();
+    const res = await createProjectCore(ctx, {
+      ...baseProject(clientId),
+      startDate: '2026-9-01',
+      endDate: '2026-10-01',
+    });
+    expect(res.ok).toBe(true);
+  });
+
+  // F2: a malformed (non-UUID) client id -> client_required, no DB uuid-cast.
+  it('rejects a malformed client id with client_required', async () => {
+    const { ctx } = await orgWithClient();
+    const res = await createProjectCore(ctx, {
+      ...baseProject('not-a-uuid'),
+      code: 'BADUUID',
+    });
+    expect(res).toEqual({ ok: false, error: 'client_required' });
+  });
 });

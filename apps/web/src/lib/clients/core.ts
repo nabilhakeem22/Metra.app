@@ -23,6 +23,20 @@ function clean(v: string | null | undefined): string | null {
   return v?.trim() || null;
 }
 
+// Boundary length caps (defense-in-depth), mirroring org/core profileWithinLimits.
+const LIMITS = {
+  name: 200,
+  contactName: 200,
+  email: 254,
+  phone: 40,
+  city: 120,
+  address: 300,
+  taxReg: 64,
+  notes: 2000,
+} as const;
+
+type NormalizedClient = ReturnType<typeof normalized>;
+
 function normalized(input: ClientInput) {
   return {
     nameEn: clean(input.nameEn),
@@ -37,12 +51,28 @@ function normalized(input: ClientInput) {
   };
 }
 
+function withinLimits(v: NormalizedClient): boolean {
+  const ok = (s: string | null, max: number) => (s?.length ?? 0) <= max;
+  return (
+    ok(v.nameEn, LIMITS.name) &&
+    ok(v.nameAr, LIMITS.name) &&
+    ok(v.contactName, LIMITS.contactName) &&
+    ok(v.email, LIMITS.email) &&
+    ok(v.phone, LIMITS.phone) &&
+    ok(v.city, LIMITS.city) &&
+    ok(v.address, LIMITS.address) &&
+    ok(v.taxRegistrationNumber, LIMITS.taxReg) &&
+    ok(v.notes, LIMITS.notes)
+  );
+}
+
 export async function createClientCore(
   ctx: OrgContext,
   input: ClientInput,
 ): Promise<ActionResult> {
   const v = normalized(input);
   if (!v.nameEn && !v.nameAr) return err('name_required');
+  if (!withinLimits(v)) return err('invalid');
 
   return mutateInOrg(
     ctx,
@@ -70,6 +100,7 @@ export async function updateClientCore(
 ): Promise<ActionResult> {
   const v = normalized(input);
   if (!v.nameEn && !v.nameAr) return err('name_required');
+  if (!withinLimits(v)) return err('invalid');
 
   return mutateInOrg(
     ctx,

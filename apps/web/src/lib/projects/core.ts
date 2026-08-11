@@ -29,9 +29,21 @@ function isStatus(v: unknown): v is ProjectStatus {
   return (PROJECT_STATUSES as readonly string[]).includes(v as string);
 }
 
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 function clean(v: string | null | undefined): string | null {
   return v?.trim() || null;
 }
+
+// Boundary length caps (defense-in-depth), mirroring org/core profileWithinLimits.
+const LIMITS = {
+  code: 64,
+  name: 200,
+  city: 120,
+  address: 300,
+  notes: 2000,
+} as const;
 
 interface Validated {
   code: string;
@@ -54,22 +66,46 @@ function validate(input: ProjectInput): ActionResult | Validated {
   const nameAr = clean(input.nameAr);
   if (!nameEn && !nameAr) return err('name_required');
   if (!isStatus(input.status)) return err('invalid');
-  if (!input.clientId?.trim()) return err('client_required');
+  // A missing OR malformed client id -> client_required (no DB uuid-cast throw).
+  const clientId = input.clientId?.trim();
+  if (!clientId || !UUID_RE.test(clientId)) return err('client_required');
+
   const startDate = clean(input.startDate);
   const endDate = clean(input.endDate);
-  if (startDate && endDate && endDate < startDate) return err('invalid_dates');
+  // Compare chronologically (not lexically) so non-zero-padded dates still order.
+  if (startDate && endDate) {
+    const s = new Date(startDate).getTime();
+    const e = new Date(endDate).getTime();
+    if (Number.isFinite(s) && Number.isFinite(e) && e < s) {
+      return err('invalid_dates');
+    }
+  }
+
+  const city = clean(input.city);
+  const address = clean(input.address);
+  const notes = clean(input.notes);
+  if (
+    code.length > LIMITS.code ||
+    (nameEn?.length ?? 0) > LIMITS.name ||
+    (nameAr?.length ?? 0) > LIMITS.name ||
+    (city?.length ?? 0) > LIMITS.city ||
+    (address?.length ?? 0) > LIMITS.address ||
+    (notes?.length ?? 0) > LIMITS.notes
+  ) {
+    return err('invalid');
+  }
 
   return {
     code,
     nameEn,
     nameAr,
-    clientId: input.clientId,
+    clientId,
     status: input.status,
     startDate,
     endDate,
-    city: clean(input.city),
-    address: clean(input.address),
-    notes: clean(input.notes),
+    city,
+    address,
+    notes,
   };
 }
 
@@ -137,7 +173,7 @@ export async function updateProjectCore(
     { capability: 'projects', action: 'update' },
     async (tx, audit) => {
       const [before] = await tx
-        .select({ id: projects.id })
+        .select({ id: projects.id, clientId: projects.clientId })
         .from(projects)
         .where(eq(projects.id, input.id))
         .limit(1);
@@ -149,7 +185,12 @@ export async function updateProjectCore(
         .where(and(eq(projects.code, v.code), ne(projects.id, input.id)))
         .limit(1);
       if (dup) fail('code_taken');
-      await assertClientUsable(tx, v.clientId);
+      // Only require an active client when REASSIGNING to a different one.
+      // Editing other fields with the same (possibly now-archived) client is
+      // allowed; the composite FK still enforces same-org either way.
+      if (v.clientId !== before.clientId) {
+        await assertClientUsable(tx, v.clientId);
+      }
 
       await tx
         .update(projects)
