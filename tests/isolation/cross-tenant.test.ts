@@ -6,6 +6,8 @@
 // without protection. Requires: migrations applied, RLS applied, seed run.
 import { randomUUID } from 'node:crypto';
 import {
+  CLIENT_A_ID,
+  CLIENT_B_ID,
   COST_ITEM_A_ID,
   INVITE_A_ID,
   ORG_A_ID,
@@ -234,6 +236,35 @@ describe('audit_log immutability (§4.4)', () => {
   });
 });
 
+describe('projects composite same-org FK (§ clients+projects)', () => {
+  it('a legit org-A member cannot reference org B client_id (cross-org FK -> 23503)', async () => {
+    await expect(
+      withOrgContext(db, ctxA, (tx) =>
+        tx.execute(
+          sql.raw(
+            `insert into public.projects (id, org_id, code, name_en, client_id, status)
+             values (gen_random_uuid(), '${ORG_A_ID}', 'XORG-${randomUUID()}', 'x', '${CLIENT_B_ID}', 'draft')`,
+          ),
+        ),
+      ),
+    ).rejects.toMatchObject({ code: '23503' });
+  });
+
+  it('references its OWN org client fine (control)', async () => {
+    const code = `OWN-${randomUUID()}`;
+    await withOrgContext(db, ctxA, (tx) =>
+      tx.execute(
+        sql.raw(
+          `insert into public.projects (id, org_id, code, name_en, client_id, status)
+           values (gen_random_uuid(), '${ORG_A_ID}', '${code}', 'x', '${CLIENT_A_ID}', 'draft')`,
+        ),
+      ),
+    );
+    // Cleanup via BYPASSRLS.
+    await pg.unsafe(`delete from public.projects where code = '${code}'`);
+  });
+});
+
 describe('price history is append-only (§ price book, grants)', () => {
   it('accepts INSERT but rejects UPDATE and DELETE on price_changes / price_change_lines', async () => {
     // INSERT succeeds under a real member context.
@@ -395,6 +426,25 @@ describe('membership second factor — forged context is denied', () => {
         `insert into public.price_change_lines
            (id, org_id, price_change_id, cost_item_id, old_unit_cost, new_unit_cost, old_unit_price, new_unit_price)
          values (gen_random_uuid(), '${ORG_A_ID}', '${PRICE_CHANGE_A_ID}', '${COST_ITEM_A_ID}', 1, 2, 1, 2)`,
+      ),
+    ).rejects.toThrow();
+  });
+
+  it('forged context cannot INSERT into clients / projects', async () => {
+    await expect(
+      rowsUnder(
+        ctxForged,
+        `insert into public.clients (id, org_id, name_en)
+         values (gen_random_uuid(), '${ORG_A_ID}', 'Forged client')`,
+      ),
+    ).rejects.toThrow();
+
+    // Valid org-A client_id (seeded) so RLS — not the FK — is the reason.
+    await expect(
+      rowsUnder(
+        ctxForged,
+        `insert into public.projects (id, org_id, code, name_en, client_id, status)
+         values (gen_random_uuid(), '${ORG_A_ID}', 'FORGE-${randomUUID()}', 'x', '${CLIENT_A_ID}', 'draft')`,
       ),
     ).rejects.toThrow();
   });

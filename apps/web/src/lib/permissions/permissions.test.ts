@@ -73,3 +73,40 @@ describe('price_book capability (P1 Slice 1)', () => {
     }
   });
 });
+
+describe('clients + projects capabilities (P1 Slice 2)', () => {
+  it('owner and admin have full CRUA on both', () => {
+    for (const role of ['owner', 'admin'] as const) {
+      for (const cap of ['clients', 'projects'] as const) {
+        for (const a of ['create', 'read', 'update', 'approve'] as const) {
+          expect(can(role, cap, a)).toBe(true);
+        }
+      }
+    }
+  });
+
+  it('project_manager has CRU (no approve) on both', () => {
+    for (const cap of ['clients', 'projects'] as const) {
+      expect(can('project_manager', cap, 'create')).toBe(true);
+      expect(can('project_manager', cap, 'read')).toBe(true);
+      expect(can('project_manager', cap, 'update')).toBe(true);
+      expect(can('project_manager', cap, 'approve')).toBe(false);
+    }
+  });
+
+  it('site_engineer, accountant and viewer are read-only on both', () => {
+    for (const role of ['site_engineer', 'accountant', 'viewer'] as const) {
+      for (const cap of ['clients', 'projects'] as const) {
+        expect(can(role, cap, 'read')).toBe(true);
+        expect(can(role, cap, 'create')).toBe(false);
+        expect(can(role, cap, 'update')).toBe(false);
+      }
+    }
+  });
+
+  it('client role: no clients access (404), but can read projects', () => {
+    expect(can('client', 'clients', 'read')).toBe(false);
+    expect(can('client', 'projects', 'read')).toBe(true);
+    expect(can('client', 'projects', 'create')).toBe(false);
+  });
+});

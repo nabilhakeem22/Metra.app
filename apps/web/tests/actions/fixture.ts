@@ -95,6 +95,9 @@ export async function teardown(orgIds: string[]): Promise<void> {
   for (const id of orgIds) {
     await pg.unsafe(`delete from public.price_change_lines where org_id='${id}'`);
     await pg.unsafe(`delete from public.price_changes where org_id='${id}'`);
+    // projects reference clients (restrict) -> delete projects first.
+    await pg.unsafe(`delete from public.projects where org_id='${id}'`);
+    await pg.unsafe(`delete from public.clients where org_id='${id}'`);
     await pg.unsafe(`delete from public.cost_items where org_id='${id}'`);
     await pg.unsafe(`delete from public.audit_log where org_id='${id}'`);
     await pg.unsafe(`delete from public.invitations where org_id='${id}'`);
