@@ -7,6 +7,8 @@ import { Wordmark } from '@/components/brand/wordmark';
 import { Button } from '@/components/ui/button';
 import { Link, usePathname } from '@/i18n/routing';
 import { signOut } from '@/lib/auth/actions';
+import { can } from '@/lib/permissions/can';
+import type { MemberRole } from '@/lib/permissions/roles';
 import { cn } from '@/lib/utils';
 import { COMING_SOON_ITEMS, NAV_GROUPS } from './nav-items';
 import { OrgSwitcher, type OrgOption } from './org-switcher';
@@ -18,6 +20,7 @@ export interface SidebarProps {
   className?: string;
   orgs?: OrgOption[];
   activeOrgId?: string;
+  role?: MemberRole;
 }
 
 export function Sidebar({
@@ -27,6 +30,7 @@ export function Sidebar({
   className,
   orgs,
   activeOrgId,
+  role,
 }: SidebarProps) {
   const nav = useTranslations('nav');
   const shell = useTranslations('shell');
@@ -67,7 +71,13 @@ export function Sidebar({
               </p>
             )}
 
-            {group.items.map((item) => {
+            {group.items
+              .filter(
+                (item) =>
+                  !item.capability ||
+                  (role && can(role, item.capability, 'read')),
+              )
+              .map((item) => {
               const Icon = item.icon;
               const active =
                 !!item.href &&

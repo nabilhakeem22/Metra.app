@@ -24,7 +24,8 @@
     "signOut": "Sign out",
     "soon": "Soon",
     "comingSoon": "Coming soon",
-    "support": "Support"
+    "support": "Support",
+    "priceBook": "Price Book"
   },
   "shell": {
     "search": "Search",
@@ -261,9 +262,146 @@
     "declined": "This link can't be used.",
     "otp_send_failed": "Could not send the code. Please try again.",
     "otp_verify_failed": "That code did not work. Please try again.",
-    "immutable": "This record is locked and can't be changed."
+    "immutable": "This record is locked and can't be changed.",
+    "code_required": "Code is required",
+    "code_taken": "This code is already used",
+    "invalid_percentage": "Enter a percentage between -100 and 1000",
+    "import_empty": "There are no rows to import"
   },
   "common": {
     "untranslated": "untranslated"
+  },
+  "priceBook": {
+    "title": "Price Book",
+    "subtitle": "Your catalogue of cost items — costs, prices, and bulk updates.",
+    "search": "Search code or name",
+    "allCategories": "All categories",
+    "activeOnly": "Active only",
+    "showAll": "Show all",
+    "itemsCount": "{count} items",
+    "categories": {
+      "civil": "Civil",
+      "gypsum": "Gypsum",
+      "electrical": "Electrical",
+      "plumbing": "Plumbing",
+      "joinery": "Joinery",
+      "finishes": "Finishes",
+      "furniture": "Furniture",
+      "preliminaries": "Preliminaries"
+    },
+    "units": {
+      "sqm": "m²",
+      "linear_meter": "Linear meter",
+      "pcs": "Pcs",
+      "lump_sum": "Lump sum",
+      "day": "Day"
+    },
+    "status": {
+      "active": "Active",
+      "inactive": "Inactive"
+    },
+    "table": {
+      "code": "Code",
+      "name": "Name",
+      "category": "Category",
+      "unit": "Unit",
+      "cost": "Unit cost",
+      "price": "Unit price",
+      "status": "Status",
+      "actions": "Actions"
+    },
+    "empty": {
+      "title": "Your price book is empty",
+      "description": "Load our starter catalogue of common fit-out items, or import your own from Excel.",
+      "loadStarter": "Load starter catalogue",
+      "importExcel": "Import from Excel"
+    },
+    "actions": {
+      "new": "New item",
+      "edit": "Edit",
+      "activate": "Activate",
+      "deactivate": "Deactivate",
+      "bulkUpdate": "Bulk price update",
+      "import": "Import from Excel",
+      "loadStarter": "Load starter catalogue"
+    },
+    "form": {
+      "newTitle": "New cost item",
+      "editTitle": "Edit cost item",
+      "code": "Code",
+      "nameEn": "Name (English)",
+      "nameAr": "Name (Arabic)",
+      "category": "Category",
+      "unit": "Unit",
+      "cost": "Default unit cost",
+      "price": "Default unit price",
+      "taxCode": "Tax code",
+      "etaItemCode": "ETA item code",
+      "etaCodeType": "ETA code type",
+      "active": "Active",
+      "save": "Save",
+      "cancel": "Cancel"
+    },
+    "bulk": {
+      "title": "Bulk price update",
+      "description": "Apply a percentage change to every item in a category. Applied immediately.",
+      "category": "Category",
+      "percentage": "Percentage change (%)",
+      "target": "Apply to",
+      "targetCost": "Cost",
+      "targetPrice": "Price",
+      "targetBoth": "Both",
+      "effectiveDate": "Effective date",
+      "apply": "Apply",
+      "cancel": "Cancel",
+      "applied": "Updated {count} items."
+    },
+    "import": {
+      "title": "Import from Excel",
+      "chooseFile": "Choose a .xlsx or .csv file",
+      "upload": "Upload",
+      "map": "Map columns",
+      "preview": "Preview",
+      "mapDescription": "Match each column in your file to a field.",
+      "none": "— Not mapped —",
+      "fields": {
+        "code": "Code",
+        "nameEn": "Name (English)",
+        "nameAr": "Name (Arabic)",
+        "category": "Category",
+        "unit": "Unit",
+        "cost": "Unit cost",
+        "price": "Unit price"
+      },
+      "previewSummary": "{valid} of {total} rows are ready to import.",
+      "rowColumn": "Row",
+      "statusColumn": "Status",
+      "willImport": "Will import",
+      "willSkip": "Skip",
+      "importNow": "Import {count} items",
+      "back": "Back",
+      "cancel": "Cancel",
+      "done": "Imported {imported}, skipped {skipped}.",
+      "errors": {
+        "row_empty": "Empty row",
+        "code_missing": "Missing code",
+        "code_duplicate_in_file": "Duplicate code in file",
+        "code_exists": "Code already exists",
+        "name_missing": "Missing name",
+        "category_invalid": "Unknown category",
+        "unit_invalid": "Unknown unit",
+        "cost_invalid": "Invalid cost",
+        "price_invalid": "Invalid price"
+      }
+    },
+    "toast": {
+      "created": "Cost item created",
+      "updated": "Cost item updated",
+      "activated": "Item activated",
+      "deactivated": "Item deactivated",
+      "starterLoaded": "Starter catalogue loaded ({count} items)",
+      "starterExists": "Starter items are already present",
+      "importFailed": "Import failed"
+    }
   }
 }

@@ -1,4 +1,5 @@
 import {
+  BookText,
   Calculator,
   FileSignature,
   FileText,
@@ -11,6 +12,7 @@ import {
   Users,
   type LucideIcon,
 } from 'lucide-react';
+import type { Capability } from '@/lib/permissions/roles';
 
 export interface NavItem {
   /** Maps to a `nav.<key>` message. */
@@ -20,6 +22,8 @@ export interface NavItem {
   disabled?: boolean;
   /** Non-link actions (rendered as a form button by the caller). */
   action?: 'signout';
+  /** If set, the item shows only when the role has read on this capability. */
+  capability?: Capability;
 }
 
 export interface NavGroup {
@@ -32,7 +36,15 @@ export interface NavGroup {
 export const NAV_GROUPS: NavGroup[] = [
   {
     groupKey: 'main',
-    items: [{ key: 'dashboard', href: '/dashboard', icon: LayoutDashboard }],
+    items: [
+      { key: 'dashboard', href: '/dashboard', icon: LayoutDashboard },
+      {
+        key: 'priceBook',
+        href: '/price-book',
+        icon: BookText,
+        capability: 'price_book',
+      },
+    ],
   },
   {
     groupKey: 'support',

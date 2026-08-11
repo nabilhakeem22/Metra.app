@@ -38,6 +38,7 @@ export function AppShell({
         onToggleCollapse={() => setCollapsed((c) => !c)}
         orgs={orgs}
         activeOrgId={activeOrgId}
+        role={role}
       />
 
       <Sheet open={drawerOpen} onOpenChange={setDrawerOpen}>
@@ -48,6 +49,7 @@ export function AppShell({
             onNavigate={() => setDrawerOpen(false)}
             orgs={orgs}
             activeOrgId={activeOrgId}
+            role={role}
           />
         </SheetContent>
       </Sheet>

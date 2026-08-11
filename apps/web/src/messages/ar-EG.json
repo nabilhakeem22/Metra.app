@@ -24,7 +24,8 @@
     "signOut": "تسجيل الخروج",
     "soon": "قريبًا",
     "comingSoon": "قريبًا",
-    "support": "الدعم"
+    "support": "الدعم",
+    "priceBook": "دليل الأسعار"
   },
   "shell": {
     "search": "بحث",
@@ -261,9 +262,146 @@
     "declined": "لا يمكن استخدام هذا الرابط.",
     "otp_send_failed": "تعذّر إرسال الرمز. من فضلك حاول مرة أخرى.",
     "otp_verify_failed": "لم ينجح هذا الرمز. من فضلك حاول مرة أخرى.",
-    "immutable": "هذا السجل مقفل ولا يمكن تغييره."
+    "immutable": "هذا السجل مقفل ولا يمكن تغييره.",
+    "code_required": "الكود مطلوب",
+    "code_taken": "هذا الكود مستخدم بالفعل",
+    "invalid_percentage": "أدخل نسبة بين -100 و 1000",
+    "import_empty": "لا توجد صفوف للاستيراد"
   },
   "common": {
     "untranslated": "غير مترجم"
+  },
+  "priceBook": {
+    "title": "دليل الأسعار",
+    "subtitle": "كتالوج بنود التكلفة — التكاليف والأسعار والتحديثات الجماعية.",
+    "search": "ابحث بالكود أو الاسم",
+    "allCategories": "كل الفئات",
+    "activeOnly": "المفعّلة فقط",
+    "showAll": "عرض الكل",
+    "itemsCount": "{count} بند",
+    "categories": {
+      "civil": "أعمال مدنية",
+      "gypsum": "جبس",
+      "electrical": "كهرباء",
+      "plumbing": "سباكة",
+      "joinery": "نجارة",
+      "finishes": "تشطيبات",
+      "furniture": "أثاث",
+      "preliminaries": "أعمال تمهيدية"
+    },
+    "units": {
+      "sqm": "م²",
+      "linear_meter": "متر طولي",
+      "pcs": "قطعة",
+      "lump_sum": "مقطوعية",
+      "day": "يوم"
+    },
+    "status": {
+      "active": "مفعّل",
+      "inactive": "غير مفعّل"
+    },
+    "table": {
+      "code": "الكود",
+      "name": "الاسم",
+      "category": "الفئة",
+      "unit": "الوحدة",
+      "cost": "تكلفة الوحدة",
+      "price": "سعر الوحدة",
+      "status": "الحالة",
+      "actions": "إجراءات"
+    },
+    "empty": {
+      "title": "دليل الأسعار فارغ",
+      "description": "حمّل الكتالوج الابتدائي لبنود التشطيبات الشائعة، أو استورد بنودك من ملف Excel.",
+      "loadStarter": "تحميل الكتالوج الابتدائي",
+      "importExcel": "استيراد من Excel"
+    },
+    "actions": {
+      "new": "بند جديد",
+      "edit": "تعديل",
+      "activate": "تفعيل",
+      "deactivate": "إلغاء التفعيل",
+      "bulkUpdate": "تحديث جماعي للأسعار",
+      "import": "استيراد من Excel",
+      "loadStarter": "تحميل الكتالوج الابتدائي"
+    },
+    "form": {
+      "newTitle": "بند تكلفة جديد",
+      "editTitle": "تعديل بند التكلفة",
+      "code": "الكود",
+      "nameEn": "الاسم (بالإنجليزية)",
+      "nameAr": "الاسم (بالعربية)",
+      "category": "الفئة",
+      "unit": "الوحدة",
+      "cost": "تكلفة الوحدة الافتراضية",
+      "price": "سعر الوحدة الافتراضي",
+      "taxCode": "الكود الضريبي",
+      "etaItemCode": "كود الصنف بمصلحة الضرائب",
+      "etaCodeType": "نوع الكود الضريبي",
+      "active": "مفعّل",
+      "save": "حفظ",
+      "cancel": "إلغاء"
+    },
+    "bulk": {
+      "title": "تحديث جماعي للأسعار",
+      "description": "طبّق نسبة تغيير على كل بنود فئة معينة. يُطبَّق فورًا.",
+      "category": "الفئة",
+      "percentage": "نسبة التغيير (%)",
+      "target": "التطبيق على",
+      "targetCost": "التكلفة",
+      "targetPrice": "السعر",
+      "targetBoth": "الاثنين",
+      "effectiveDate": "تاريخ السريان",
+      "apply": "تطبيق",
+      "cancel": "إلغاء",
+      "applied": "تم تحديث {count} بند."
+    },
+    "import": {
+      "title": "استيراد من Excel",
+      "chooseFile": "اختر ملف xlsx أو csv",
+      "upload": "رفع",
+      "map": "مطابقة الأعمدة",
+      "preview": "معاينة",
+      "mapDescription": "طابق كل عمود في ملفك مع الحقل المناسب.",
+      "none": "— غير مطابَق —",
+      "fields": {
+        "code": "الكود",
+        "nameEn": "الاسم (بالإنجليزية)",
+        "nameAr": "الاسم (بالعربية)",
+        "category": "الفئة",
+        "unit": "الوحدة",
+        "cost": "تكلفة الوحدة",
+        "price": "سعر الوحدة"
+      },
+      "previewSummary": "{valid} من {total} صف جاهزة للاستيراد.",
+      "rowColumn": "الصف",
+      "statusColumn": "الحالة",
+      "willImport": "سيُستورد",
+      "willSkip": "تخطٍّ",
+      "importNow": "استيراد {count} بند",
+      "back": "رجوع",
+      "cancel": "إلغاء",
+      "done": "تم استيراد {imported} وتخطّي {skipped}.",
+      "errors": {
+        "row_empty": "صف فارغ",
+        "code_missing": "كود مفقود",
+        "code_duplicate_in_file": "كود مكرر في الملف",
+        "code_exists": "الكود موجود بالفعل",
+        "name_missing": "اسم مفقود",
+        "category_invalid": "فئة غير معروفة",
+        "unit_invalid": "وحدة غير معروفة",
+        "cost_invalid": "تكلفة غير صالحة",
+        "price_invalid": "سعر غير صالح"
+      }
+    },
+    "toast": {
+      "created": "تم إنشاء بند التكلفة",
+      "updated": "تم تحديث بند التكلفة",
+      "activated": "تم تفعيل البند",
+      "deactivated": "تم إلغاء تفعيل البند",
+      "starterLoaded": "تم تحميل الكتالوج الابتدائي ({count} بند)",
+      "starterExists": "بنود الكتالوج الابتدائي موجودة بالفعل",
+      "importFailed": "فشل الاستيراد"
+    }
   }
 }
