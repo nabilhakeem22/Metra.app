@@ -1,4 +1,5 @@
 import { sql } from 'drizzle-orm';
+import { notFound } from 'next/navigation';
 import type { ReactNode } from 'react';
 import type { OrgOption } from '@/components/shell/org-switcher';
 import { AppShell } from '@/components/shell/app-shell';
@@ -12,6 +13,9 @@ export default async function AppLayout({
   children: ReactNode;
 }) {
   const ctx = await requireOrg();
+  // The 'client' role belongs to the P4 client portal, not the internal shell —
+  // deny it the whole (app) area (defense-in-depth beyond per-page read gates).
+  if (ctx.role === 'client') notFound();
   const user = await getSessionUser();
 
   const orgs = (await withUserContext(ctx.userId, (tx) =>

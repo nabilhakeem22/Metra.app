@@ -20,6 +20,7 @@ import { resolveActionError } from '@/lib/actions/error-message';
 import type { ActionCode } from '@/lib/actions/result';
 import { formatDate } from '@/lib/format/date';
 import { MEMBER_ROLES, type MemberRole } from '@/lib/permissions/roles';
+import { INVITABLE_ROLES } from '@/lib/team/invitable';
 import {
   changeMemberRole,
   inviteMember,
@@ -54,7 +55,6 @@ export interface TeamClientProps {
   currentUserId: string;
 }
 
-const INVITABLE_ROLES = MEMBER_ROLES.filter((r) => r !== 'owner');
 
 export function TeamClient({
   members,

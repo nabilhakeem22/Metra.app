@@ -1,12 +1,7 @@
 'use server';
 
 import { createHash, randomBytes } from 'node:crypto';
-import {
-  invitations,
-  MEMBER_ROLES,
-  organizations,
-  type MemberRole,
-} from '@metra/db';
+import { invitations, organizations, type MemberRole } from '@metra/db';
 import { and, eq, sql } from 'drizzle-orm';
 import { getLocale } from 'next-intl/server';
 import { cookies, headers } from 'next/headers';
@@ -27,6 +22,7 @@ import {
   removeMemberCore,
 } from './core';
 import { getOrgMemberIdentities } from './identities';
+import { isInvitableRole } from './invitable';
 
 // One ActionResult everywhere (A4). Coded errors; the UI localizes via
 // resolveActionError. acceptInvite uses ONLY 'declined' for every failure —
@@ -46,10 +42,6 @@ function normalizeEmail(email: string): string {
 
 function isValidEmail(email: string): boolean {
   return /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email);
-}
-
-function isMemberRole(role: string): role is MemberRole {
-  return (MEMBER_ROLES as readonly string[]).includes(role);
 }
 
 function isUniqueViolation(e: unknown): boolean {
@@ -116,7 +108,9 @@ export async function inviteMember(input: {
   if (!isValidEmail(email) || email.length > 254) {
     return { ok: false, error: 'invalid' };
   }
-  if (!isMemberRole(input.role) || input.role === 'owner') {
+  // 'owner' is never invitable; 'client' has no internal use (the client portal
+  // is P4) — reject it like any out-of-range role.
+  if (!isInvitableRole(input.role)) {
     return { ok: false, error: 'invalid' };
   }
   const role = input.role;
