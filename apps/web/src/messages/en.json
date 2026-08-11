@@ -57,36 +57,24 @@
     "back": "Back"
   },
   "onboarding": {
-    "title": "Create your firm",
-    "nameEnLabel": "Firm name (English)",
-    "nameArLabel": "Firm name (Arabic)",
-    "hint": "You will be the owner. At least one name is required.",
-    "create": "Create firm",
-    "welcome": "Welcome to {name}",
-    "valueProp": "Set up your firm in under a minute.",
-    "stepOf": "Step {current} of {total}",
-    "step1Title": "Company profile",
-    "step2Title": "Confirm defaults",
-    "step3Title": "Invite your team",
-    "cityLabel": "City (optional)",
-    "taxLabel": "Tax registration number (optional)",
-    "logoLabel": "Company logo (optional)",
-    "logoChoose": "Choose image",
-    "logoRemove": "Remove",
-    "next": "Next",
-    "back": "Back",
-    "finish": "Finish",
-    "confirmHint": "You can change these later in settings.",
-    "confirmLanguage": "Language",
-    "confirmCurrency": "Currency",
-    "currencyEgp": "Egyptian Pound (EGP)",
-    "inviteHint": "Invite teammates to collaborate. You can do this now or later.",
-    "inviteComingSoon": "Team invites arrive next — skip for now.",
-    "creating": "Creating…",
-    "createdTitle": "Firm created",
-    "logoUploadFailed": "Logo upload failed, but your firm was created.",
-    "errorRequired": "Enter at least one company name.",
-    "errorGeneric": "Something went wrong. Please try again."
+    "title": "Get started",
+    "subtitle": "A few steps to set up your firm.",
+    "dismiss": "Dismiss",
+    "progress": "{percent}% complete",
+    "launch": "Show me",
+    "open": "Open",
+    "allDoneTitle": "You're all set",
+    "allDoneBody": "Your firm is set up. This card will stay out of your way.",
+    "readOnlyTitle": "You're all set",
+    "readOnlyBody": "Your role has read-only access — nothing to set up here.",
+    "items": {
+      "completeProfile": "Complete your company profile",
+      "addClient": "Add your first client",
+      "addProject": "Create your first project",
+      "addCostItem": "Add a price-book item",
+      "buildProposal": "Build a proposal",
+      "sendProposal": "Send a proposal"
+    }
   },
   "dashboard": {
     "title": "Dashboard",
@@ -656,5 +644,39 @@
       "notes": "Notes",
       "terms": "Terms"
     }
+  },
+  "tour": {
+    "next": "Next",
+    "back": "Back",
+    "done": "Done",
+    "skip": "Skip tour",
+    "stepOf": "Step {current} of {total}",
+    "welcome": {
+      "title": "Welcome to Metra",
+      "body": "A quick tour of your workspace. Follow the checklist to set up your firm — you can replay this anytime from the “?” menu."
+    },
+    "clients": {
+      "title": "Add your clients",
+      "body": "Every project belongs to a client. Start here, then create projects for them."
+    },
+    "projects": {
+      "title": "Create projects",
+      "body": "Group your fit-out jobs under a client. Proposals are built per project."
+    },
+    "priceBook": {
+      "title": "Build your price book",
+      "body": "Your catalogue of cost items with costs and prices — reused across proposals."
+    },
+    "proposals": {
+      "title": "Send proposals",
+      "body": "Assemble a sectioned quotation, then send a share link your client can accept."
+    }
+  },
+  "help": {
+    "menu": "Help",
+    "title": "Help",
+    "restartTour": "Restart the tour",
+    "openChecklist": "Open the setup checklist",
+    "howThisPage": "How this page works"
   }
 }
