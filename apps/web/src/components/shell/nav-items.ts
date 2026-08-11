@@ -52,6 +52,12 @@ export const NAV_GROUPS: NavGroup[] = [
         icon: BookText,
         capability: 'price_book',
       },
+      {
+        key: 'proposals',
+        href: '/proposals',
+        icon: FileText,
+        capability: 'proposals_build',
+      },
     ],
   },
   {
@@ -71,7 +77,6 @@ export const NAV_GROUPS: NavGroup[] = [
  * the shell isn't 5 always-visible dead rows.
  */
 export const COMING_SOON_ITEMS: NavItem[] = [
-  { key: 'proposals', icon: FileText, disabled: true },
   { key: 'contracts', icon: FileSignature, disabled: true },
   { key: 'costing', icon: Calculator, disabled: true },
   { key: 'invoices', icon: ReceiptText, disabled: true },

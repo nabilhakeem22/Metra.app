@@ -23,8 +23,19 @@ function fontsDir(): string {
   throw new Error('PDF fonts directory not found');
 }
 
-function fontBase64(file: string): string {
+export function fontBase64(file: string): string {
   return readFileSync(resolve(fontsDir(), file)).toString('base64');
+}
+
+/** Shared @font-face block (IBM Plex Sans Arabic + Cairo, base64-embedded). */
+export function fontFaceCss(): string {
+  return `
+  @font-face { font-family: 'IBM Plex Sans Arabic'; font-weight: 400;
+    src: url(data:font/ttf;base64,${fontBase64('IBMPlexSansArabic-Regular.ttf')}) format('truetype'); }
+  @font-face { font-family: 'IBM Plex Sans Arabic'; font-weight: 700;
+    src: url(data:font/ttf;base64,${fontBase64('IBMPlexSansArabic-Bold.ttf')}) format('truetype'); }
+  @font-face { font-family: 'Cairo'; font-weight: 400 900;
+    src: url(data:font/ttf;base64,${fontBase64('Cairo-Variable.ttf')}) format('truetype'); }`;
 }
 
 /**
