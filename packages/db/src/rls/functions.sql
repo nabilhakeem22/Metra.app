@@ -346,7 +346,7 @@ begin
   if exp is not null and exp <= now() then return 'expired'; end if;
 
   update public.proposals
-    set status = target, updated_at = now()
+    set status = target::public.proposal_status, updated_at = now()
     where id = pid and status = 'sent';
   get diagnostics n = row_count;
   if n = 0 then return 'already'; end if;

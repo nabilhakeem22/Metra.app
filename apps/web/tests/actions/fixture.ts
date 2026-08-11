@@ -92,17 +92,35 @@ export const raw = {
 };
 
 export async function teardown(orgIds: string[]): Promise<void> {
-  for (const id of orgIds) {
-    await pg.unsafe(`delete from public.price_change_lines where org_id='${id}'`);
-    await pg.unsafe(`delete from public.price_changes where org_id='${id}'`);
-    // projects reference clients (restrict) -> delete projects first.
-    await pg.unsafe(`delete from public.projects where org_id='${id}'`);
-    await pg.unsafe(`delete from public.clients where org_id='${id}'`);
-    await pg.unsafe(`delete from public.cost_items where org_id='${id}'`);
-    await pg.unsafe(`delete from public.audit_log where org_id='${id}'`);
-    await pg.unsafe(`delete from public.invitations where org_id='${id}'`);
-    await pg.unsafe(`delete from public.memberships where org_id='${id}'`);
-    await pg.unsafe(`delete from public.organizations where id='${id}'`);
+  // Proposals + their children are frozen once sent (immutable + child-draft
+  // triggers). The BYPASSRLS/owner connection drops those guards to tear down.
+  const guards = [
+    'alter table public.proposal_sections disable trigger trg_proposal_sections_parent_draft',
+    'alter table public.proposal_lines disable trigger trg_proposal_lines_parent_draft',
+    'alter table public.proposals disable trigger trg_proposals_immutable',
+  ];
+  for (const g of guards) await pg.unsafe(g);
+  try {
+    for (const id of orgIds) {
+      await pg.unsafe(`delete from public.proposal_events where org_id='${id}'`);
+      await pg.unsafe(`delete from public.proposal_lines where org_id='${id}'`);
+      await pg.unsafe(`delete from public.proposal_sections where org_id='${id}'`);
+      await pg.unsafe(`delete from public.proposals where org_id='${id}'`);
+      await pg.unsafe(`delete from public.price_change_lines where org_id='${id}'`);
+      await pg.unsafe(`delete from public.price_changes where org_id='${id}'`);
+      // projects reference clients (restrict) -> delete projects first.
+      await pg.unsafe(`delete from public.projects where org_id='${id}'`);
+      await pg.unsafe(`delete from public.clients where org_id='${id}'`);
+      await pg.unsafe(`delete from public.cost_items where org_id='${id}'`);
+      await pg.unsafe(`delete from public.audit_log where org_id='${id}'`);
+      await pg.unsafe(`delete from public.invitations where org_id='${id}'`);
+      await pg.unsafe(`delete from public.memberships where org_id='${id}'`);
+      await pg.unsafe(`delete from public.organizations where id='${id}'`);
+    }
+  } finally {
+    for (const g of guards) {
+      await pg.unsafe(g.replace('disable', 'enable'));
+    }
   }
 }
 
