@@ -19,7 +19,9 @@ export type ActionCode =
   | 'code_taken'
   | 'invalid_percentage'
   | 'import_empty'
-  | 'import_too_large';
+  | 'import_too_large'
+  | 'client_required'
+  | 'invalid_dates';
 
 export interface ActionResult {
   ok: boolean;
