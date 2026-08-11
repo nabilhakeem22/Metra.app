@@ -44,3 +44,32 @@ describe('§2.2 permission matrix', () => {
     expect(can('site_engineer', 'price_book', 'read')).toBe(false);
   });
 });
+
+describe('price_book capability (P1 Slice 1)', () => {
+  const actions = ['create', 'read', 'update', 'approve'] as const;
+
+  it('owner and admin have full CRUA', () => {
+    for (const role of ['owner', 'admin'] as const) {
+      for (const a of actions) {
+        expect(can(role, 'price_book', a)).toBe(true);
+      }
+    }
+  });
+
+  it('project_manager and accountant are read-only', () => {
+    for (const role of ['project_manager', 'accountant'] as const) {
+      expect(can(role, 'price_book', 'read')).toBe(true);
+      expect(can(role, 'price_book', 'create')).toBe(false);
+      expect(can(role, 'price_book', 'update')).toBe(false);
+      expect(can(role, 'price_book', 'approve')).toBe(false);
+    }
+  });
+
+  it('site_engineer, client and viewer have no access', () => {
+    for (const role of ['site_engineer', 'client', 'viewer'] as const) {
+      for (const a of actions) {
+        expect(can(role, 'price_book', a)).toBe(false);
+      }
+    }
+  });
+});
