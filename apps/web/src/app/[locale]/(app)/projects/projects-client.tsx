@@ -3,7 +3,6 @@
 import { FolderKanban, Pencil, Plus, Power, Search } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
 import { useMemo, useState, useTransition } from 'react';
-import { PROJECT_STATUSES } from '@metra/db';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -14,6 +13,7 @@ import type { ActionCode } from '@/lib/actions/result';
 import { formatDate } from '@/lib/format/date';
 import { pickLocale } from '@/lib/i18n/pick-locale';
 import { setProjectActive } from '@/lib/projects/actions';
+import { PROJECT_STATUSES } from '@/lib/projects/statuses';
 import { ProjectForm } from './project-form';
 import type { ClientOption, ProjectListItem } from './types';
 

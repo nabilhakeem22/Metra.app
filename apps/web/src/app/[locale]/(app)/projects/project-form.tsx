@@ -3,7 +3,7 @@
 import { Loader2 } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
 import { useEffect, useState, useTransition } from 'react';
-import { PROJECT_STATUSES, type ProjectStatus } from '@metra/db';
+import type { ProjectStatus } from '@metra/db';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -18,6 +18,7 @@ import { resolveActionError } from '@/lib/actions/error-message';
 import type { ActionCode } from '@/lib/actions/result';
 import { pickLocale } from '@/lib/i18n/pick-locale';
 import { createProject, updateProject } from '@/lib/projects/actions';
+import { PROJECT_STATUSES } from '@/lib/projects/statuses';
 import type { ClientOption, ProjectListItem } from './types';
 
 export interface ProjectFormProps {
