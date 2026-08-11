@@ -124,11 +124,17 @@ describe('proposals capabilities + canSeeMargin (P1 Slice 3)', () => {
     }
   });
 
-  it('proposals_send (approve): owner/admin/client only', () => {
-    for (const role of ['owner', 'admin', 'client'] as const) {
+  it('proposals_send (approve): owner/admin only (S1: client removed)', () => {
+    for (const role of ['owner', 'admin'] as const) {
       expect(can(role, 'proposals_send', 'approve')).toBe(true);
     }
-    for (const role of ['project_manager', 'site_engineer', 'accountant', 'viewer'] as const) {
+    for (const role of [
+      'project_manager',
+      'site_engineer',
+      'accountant',
+      'client',
+      'viewer',
+    ] as const) {
       expect(can(role, 'proposals_send', 'approve')).toBe(false);
     }
   });

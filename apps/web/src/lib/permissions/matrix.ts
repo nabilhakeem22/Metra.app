@@ -24,7 +24,10 @@ const ROWS: Record<Capability, string[]> = {
   projects: ['CRUA', 'CRUA', 'CRU', 'R', 'R', 'R', 'R'],
   price_book: ['CRUA', 'CRUA', 'R', '', 'R', '', ''],
   proposals_build: ['CRU', 'CRU', 'CRU', '', '', '', 'R'],
-  proposals_send: ['A', 'A', '', '', '', 'A', ''],
+  // 'client' send removed (S1): a client-role session must not mint share links /
+  // expire proposals it cannot read. Client acceptance is the unauthenticated
+  // token path, which never consults this matrix.
+  proposals_send: ['A', 'A', '', '', '', '', ''],
   contracts_generate: ['CRU', 'CRU', '', '', '', '', 'R'],
   contracts_issue: ['A', 'A', '', '', '', 'A', ''],
   variations_draft: ['CRU', 'CRU', 'CRU', 'C', '', '', 'R'],
