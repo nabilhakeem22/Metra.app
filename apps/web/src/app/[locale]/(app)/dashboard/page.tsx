@@ -11,6 +11,7 @@ import { requireOrg } from '@/lib/auth/require-org';
 import { getSessionUser } from '@/lib/auth/session';
 import { withOrgContext } from '@/lib/db/context';
 import { pickLocale } from '@/lib/i18n/pick-locale';
+import { readOnboarding } from '@/lib/onboarding/merge';
 import { isProfileComplete } from '@/lib/org/profile';
 
 const LEDGER_ROWS = [
@@ -52,7 +53,10 @@ export default async function DashboardPage() {
   const profileComplete = isProfileComplete(org);
   // Ticks on SEND (a live pending invite) as well as on accept.
   const teamInvited = memberCount > 1 || pendingInvites > 0;
-  const dismissed = user?.user_metadata?.checklist_dismissed === true;
+  // Per-org dismiss (onboarding.dismissedOrgs), replacing the old global flag.
+  const dismissed = (readOnboarding(user?.user_metadata).dismissedOrgs ?? []).includes(
+    ctx.orgId,
+  );
   const allActionableDone = profileComplete && teamInvited;
 
   // A real primary action, never a dead disabled control. Once an invite is
@@ -92,6 +96,7 @@ export default async function DashboardPage() {
           profileComplete={profileComplete}
           teamInvited={teamInvited}
           dismissed={dismissed}
+          orgId={ctx.orgId}
         />
       )}
 

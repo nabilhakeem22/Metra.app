@@ -10,19 +10,21 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
-import { dismissGettingStarted } from '@/lib/user/actions';
+import { dismissChecklist } from '@/lib/onboarding/state';
 import { cn } from '@/lib/utils';
 
 export interface GettingStartedProps {
   profileComplete: boolean;
   teamInvited: boolean;
   dismissed: boolean;
+  orgId: string;
 }
 
 export function GettingStarted({
   profileComplete,
   teamInvited,
   dismissed: initialDismissed,
+  orgId,
 }: GettingStartedProps) {
   const t = useTranslations('dashboard');
   const nav = useTranslations('nav');
@@ -41,7 +43,7 @@ export function GettingStarted({
   function dismiss() {
     setDismissed(true);
     startTransition(() => {
-      void dismissGettingStarted();
+      void dismissChecklist(orgId);
     });
   }
 
