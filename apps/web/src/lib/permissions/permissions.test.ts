@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { can } from './can';
+import { can, canSeeMargin } from './can';
 import { PERMISSION_MATRIX } from './matrix';
 import { MEMBER_ROLES } from './roles';
 
@@ -108,5 +108,41 @@ describe('clients + projects capabilities (P1 Slice 2)', () => {
     expect(can('client', 'clients', 'read')).toBe(false);
     expect(can('client', 'projects', 'read')).toBe(true);
     expect(can('client', 'projects', 'create')).toBe(false);
+  });
+});
+
+describe('proposals capabilities + canSeeMargin (P1 Slice 3)', () => {
+  it('proposals_build: owner/admin/PM CRU, viewer read-only, others none', () => {
+    for (const role of ['owner', 'admin', 'project_manager'] as const) {
+      expect(can(role, 'proposals_build', 'create')).toBe(true);
+      expect(can(role, 'proposals_build', 'update')).toBe(true);
+    }
+    expect(can('viewer', 'proposals_build', 'read')).toBe(true);
+    expect(can('viewer', 'proposals_build', 'create')).toBe(false);
+    for (const role of ['site_engineer', 'accountant', 'client'] as const) {
+      expect(can(role, 'proposals_build', 'read')).toBe(false);
+    }
+  });
+
+  it('proposals_send (approve): owner/admin/client only', () => {
+    for (const role of ['owner', 'admin', 'client'] as const) {
+      expect(can(role, 'proposals_send', 'approve')).toBe(true);
+    }
+    for (const role of ['project_manager', 'site_engineer', 'accountant', 'viewer'] as const) {
+      expect(can(role, 'proposals_send', 'approve')).toBe(false);
+    }
+  });
+
+  it('canSeeMargin: owner/admin/accountant always; PM gated by hide flag; others never', () => {
+    for (const hide of [true, false]) {
+      expect(canSeeMargin('owner', hide)).toBe(true);
+      expect(canSeeMargin('admin', hide)).toBe(true);
+      expect(canSeeMargin('accountant', hide)).toBe(true);
+      for (const role of ['site_engineer', 'client', 'viewer'] as const) {
+        expect(canSeeMargin(role, hide)).toBe(false);
+      }
+    }
+    expect(canSeeMargin('project_manager', false)).toBe(true);
+    expect(canSeeMargin('project_manager', true)).toBe(false);
   });
 });

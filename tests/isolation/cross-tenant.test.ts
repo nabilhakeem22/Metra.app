@@ -13,6 +13,7 @@ import {
   ORG_A_ID,
   ORG_B_ID,
   PRICE_CHANGE_A_ID,
+  PROJECT_A_ID,
   USER_A_ID,
   USER_B_ID,
   createDb,
@@ -263,6 +264,19 @@ describe('projects composite same-org FK (§ clients+projects)', () => {
     // Cleanup via BYPASSRLS.
     await pg.unsafe(`delete from public.projects where code = '${code}'`);
   });
+
+  it('a proposal cannot reference org B client_id (cross-org FK -> 23503)', async () => {
+    await expect(
+      withOrgContext(db, ctxA, (tx) =>
+        tx.execute(
+          sql.raw(
+            `insert into public.proposals (id, org_id, number, title_en, client_id, project_id)
+             values (gen_random_uuid(), '${ORG_A_ID}', 90002, 'x', '${CLIENT_B_ID}', '${PROJECT_A_ID}')`,
+          ),
+        ),
+      ),
+    ).rejects.toMatchObject({ code: '23503' });
+  });
 });
 
 describe('price history is append-only (§ price book, grants)', () => {
@@ -445,6 +459,17 @@ describe('membership second factor — forged context is denied', () => {
         ctxForged,
         `insert into public.projects (id, org_id, code, name_en, client_id, status)
          values (gen_random_uuid(), '${ORG_A_ID}', 'FORGE-${randomUUID()}', 'x', '${CLIENT_A_ID}', 'draft')`,
+      ),
+    ).rejects.toThrow();
+  });
+
+  it('forged context cannot INSERT a proposal', async () => {
+    // Valid org-A client + project (seeded) so RLS — not a FK — is the reason.
+    await expect(
+      rowsUnder(
+        ctxForged,
+        `insert into public.proposals (id, org_id, number, title_en, client_id, project_id)
+         values (gen_random_uuid(), '${ORG_A_ID}', 90001, 'Forged', '${CLIENT_A_ID}', '${PROJECT_A_ID}')`,
       ),
     ).rejects.toThrow();
   });
