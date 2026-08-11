@@ -1,8 +1,39 @@
 import 'server-only';
 
+// R4: in-process render concurrency limit so a burst of PDF requests can't spawn
+// unbounded Chromium instances. (A pooled/edge throttle stays P0 backlog.)
+const MAX_CONCURRENT_RENDERS = 2;
+const PAGE_TIMEOUT_MS = 20_000;
+let active = 0;
+const waiters: Array<() => void> = [];
+
+async function acquire(): Promise<void> {
+  if (active < MAX_CONCURRENT_RENDERS) {
+    active += 1;
+    return;
+  }
+  await new Promise<void>((resolve) => waiters.push(resolve));
+  active += 1;
+}
+
+function release(): void {
+  active -= 1;
+  const next = waiters.shift();
+  if (next) next();
+}
+
+export async function renderPdf(html: string): Promise<Uint8Array> {
+  await acquire();
+  try {
+    return await renderPdfInner(html);
+  } finally {
+    release();
+  }
+}
+
 // Renders HTML to a PDF buffer. In serverless/production uses puppeteer-core +
 // @sparticuz/chromium; in local dev uses full puppeteer (bundled Chromium).
-export async function renderPdf(html: string): Promise<Uint8Array> {
+async function renderPdfInner(html: string): Promise<Uint8Array> {
   const serverless =
     !!process.env.AWS_LAMBDA_FUNCTION_NAME ||
     !!process.env.VERCEL ||
@@ -33,7 +64,12 @@ export async function renderPdf(html: string): Promise<Uint8Array> {
 
   try {
     const page = await browser.newPage();
-    await page.setContent(html, { waitUntil: 'networkidle0' });
+    page.setDefaultTimeout(PAGE_TIMEOUT_MS);
+    page.setDefaultNavigationTimeout(PAGE_TIMEOUT_MS);
+    await page.setContent(html, {
+      waitUntil: 'networkidle0',
+      timeout: PAGE_TIMEOUT_MS,
+    });
     const pdf = await page.pdf({
       format: 'A4',
       printBackground: true,

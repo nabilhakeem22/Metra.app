@@ -35,7 +35,13 @@ export interface ListProposalsFilter {
   projectId?: string;
   clientId?: string;
   q?: string;
+  limit?: number;
+  offset?: number;
 }
+
+// R5: always bounded — never stream an unbounded proposal set.
+const DEFAULT_LIMIT = 100;
+const MAX_LIMIT = 500;
 
 export function listProposals(
   ctx: OrgContext,
@@ -50,6 +56,8 @@ export function listProposals(
       const p = `%${filter.q.trim()}%`;
       conds.push(or(ilike(proposals.titleEn, p), ilike(proposals.titleAr, p)));
     }
+    const limit = Math.min(Math.max(filter.limit ?? DEFAULT_LIMIT, 1), MAX_LIMIT);
+    const offset = Math.max(filter.offset ?? 0, 0);
     const rows = await tx
       .select({
         id: proposals.id,
@@ -70,7 +78,9 @@ export function listProposals(
       .leftJoin(clients, eq(clients.id, proposals.clientId))
       .leftJoin(projects, eq(projects.id, proposals.projectId))
       .where(conds.length ? and(...conds) : undefined)
-      .orderBy(desc(proposals.number));
+      .orderBy(desc(proposals.number))
+      .limit(limit)
+      .offset(offset);
     return rows.map((r) => ({ ...r, createdAt: r.createdAt.toISOString() }));
   });
 }
@@ -191,8 +201,16 @@ async function loadDetail(
       .where(eq(proposalLines.proposalId, id))
       .orderBy(asc(proposalLines.sortOrder));
 
+    // R5: group lines by section once (avoids an O(sections*lines) nested filter).
+    const linesBySection = new Map<string, typeof allLines>();
+    for (const l of allLines) {
+      const arr = linesBySection.get(l.sectionId);
+      if (arr) arr.push(l);
+      else linesBySection.set(l.sectionId, [l]);
+    }
+
     const sections: ProposalDetailSection[] = secs.map((s) => {
-      const secLines = allLines.filter((l) => l.sectionId === s.id);
+      const secLines = linesBySection.get(s.id) ?? [];
       const lines: ProposalDetailLine[] = secLines.map((l) => {
         const base: ProposalDetailLine = {
           id: l.id,

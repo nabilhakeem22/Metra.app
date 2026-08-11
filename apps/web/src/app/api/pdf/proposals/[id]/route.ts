@@ -6,6 +6,7 @@ import { withOrgContext } from '@/lib/db/context';
 import { renderPdf } from '@/lib/pdf/render';
 import { buildProposalHtml } from '@/lib/pdf/proposal-template';
 import { can, canSeeMargin } from '@/lib/permissions/can';
+import { MAX_TOTAL_LINES } from '@/lib/proposals/core';
 import { getProposalForPdf } from '@/lib/proposals/queries';
 
 // Chromium is Node-only; this API endpoint gates itself (the i18n matcher skips /api).
@@ -44,6 +45,12 @@ export async function GET(
   const detail = await getProposalForPdf(ctx, id, seeMargin);
   if (!detail) {
     return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  }
+
+  // R4: refuse to render a DOM larger than the R2 line cap (protects maxDuration).
+  const lineCount = detail.sections.reduce((n, s) => n + s.lines.length, 0);
+  if (lineCount > MAX_TOTAL_LINES) {
+    return NextResponse.json({ error: 'Proposal too large to render' }, { status: 413 });
   }
 
   try {

@@ -16,11 +16,13 @@ export async function respondToProposal(
   actorName?: string,
 ): Promise<{ ok: boolean; error?: RespondError }> {
   const h = await headers();
-  const ip = h.get('x-forwarded-for')?.split(',')[0]?.trim() ?? null;
-  const ua = h.get('user-agent') ?? null;
+  // S2: cap the audit fields before they reach the DB.
+  const ip = h.get('x-forwarded-for')?.split(',')[0]?.trim().slice(0, 45) || null;
+  const ua = h.get('user-agent')?.slice(0, 512) || null;
+  const name = actorName?.trim().slice(0, 120) || null;
   return respondToProposalByToken(token, {
     decision,
-    actorName: actorName?.trim() || null,
+    actorName: name,
     ip,
     userAgent: ua,
   });
