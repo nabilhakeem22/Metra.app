@@ -48,16 +48,25 @@ export function PreviewModal({
     async (v: Variant) => {
       setLoading(true);
       setHtml(null);
-      const res = await getProposalPreviewHtml(proposalId, v);
-      if (res.ok && res.html) {
-        setHtml(res.html);
-      } else {
+      try {
+        const res = await getProposalPreviewHtml(proposalId, v);
+        if (res.ok && res.html) {
+          setHtml(res.html);
+        } else {
+          toast({
+            title: resolveActionError(res.error as ActionCode, te),
+            variant: 'destructive',
+          });
+        }
+      } catch {
+        // Never leave the spinner hanging if the action rejects.
         toast({
-          title: resolveActionError(res.error as ActionCode, te),
+          title: resolveActionError('generic', te),
           variant: 'destructive',
         });
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     },
     [proposalId, te],
   );

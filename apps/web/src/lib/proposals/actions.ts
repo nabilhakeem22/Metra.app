@@ -100,31 +100,36 @@ export async function getProposalPreviewHtml(
   if (!can(ctx.role, 'proposals_build', 'read')) {
     return { ok: false, error: 'forbidden' };
   }
-  const [org] = await withOrgContext(ctx, (tx) =>
-    tx
-      .select({
-        nameEn: organizations.nameEn,
-        nameAr: organizations.nameAr,
-        hide: organizations.hideMarginFromPm,
-        defaultLocale: organizations.defaultLocale,
-      })
-      .from(organizations)
-      .limit(1),
-  );
-  const seeMargin = canSeeMargin(ctx.role, org?.hide ?? true);
-  if (variant === 'internal' && !seeMargin) {
-    return { ok: false, error: 'forbidden' };
-  }
-  const detail = await getProposalForPdf(ctx, id, variant === 'internal');
-  if (!detail) return { ok: false, error: 'invalid' };
+  try {
+    const [org] = await withOrgContext(ctx, (tx) =>
+      tx
+        .select({
+          nameEn: organizations.nameEn,
+          nameAr: organizations.nameAr,
+          hide: organizations.hideMarginFromPm,
+          defaultLocale: organizations.defaultLocale,
+        })
+        .from(organizations)
+        .limit(1),
+    );
+    const seeMargin = canSeeMargin(ctx.role, org?.hide ?? true);
+    if (variant === 'internal' && !seeMargin) {
+      return { ok: false, error: 'forbidden' };
+    }
+    const detail = await getProposalForPdf(ctx, id, variant === 'internal');
+    if (!detail) return { ok: false, error: 'invalid' };
 
-  const html = buildProposalHtml(detail, {
-    locale: org?.defaultLocale ?? 'ar-EG',
-    variant,
-    orgNameAr: org?.nameAr ?? null,
-    orgNameEn: org?.nameEn ?? null,
-  });
-  return { ok: true, html };
+    const html = buildProposalHtml(detail, {
+      locale: org?.defaultLocale ?? 'ar-EG',
+      variant,
+      orgNameAr: org?.nameAr ?? null,
+      orgNameEn: org?.nameEn ?? null,
+    });
+    return { ok: true, html };
+  } catch (err) {
+    console.error('getProposalPreviewHtml failed:', err);
+    return { ok: false, error: 'generic' };
+  }
 }
 
 export async function deleteDraftProposal(id: string): Promise<ActionResult> {
