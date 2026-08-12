@@ -20,7 +20,7 @@ export function StatCard({
   value,
   icon,
   variant = 'plain',
-  accent: _accent = 'blue',
+  accent = 'blue',
   hint,
   empty = '—',
   className,
@@ -28,9 +28,12 @@ export function StatCard({
   const isGradient = variant === 'gradient';
   const display = value == null || value === '' ? empty : value;
 
-  // Snap Line: KPI blocks collapse to a solid CARBON fill (gypsum text, 16.9:1) —
-  // chalk stays rare (the datum + one primary action only), not on every stat.
-  const strong = 'bg-foreground text-background';
+  // Solid strong fills (teal / copper-strong) keep on-color text >= 4.5:1 —
+  // an opacity fade toward the light card would break contrast.
+  const strong =
+    accent === 'amber'
+      ? 'bg-brand-strong text-brand-foreground'
+      : 'bg-primary text-primary-foreground';
 
   return (
     <Card
@@ -65,7 +68,7 @@ export function StatCard({
 
       <p
         className={cn(
-          'num mt-3 text-3xl font-semibold tracking-tight',
+          'tabular mt-3 text-3xl font-bold tracking-tight',
           isGradient ? 'text-current' : 'text-foreground',
         )}
       >

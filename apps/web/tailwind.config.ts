@@ -16,9 +16,6 @@ const config: Config = {
     extend: {
       fontFamily: {
         sans: ['var(--font-sans)', 'system-ui', 'sans-serif'],
-        display: ['var(--font-display)', 'system-ui', 'sans-serif'],
-        ar: ['var(--font-ar)', 'system-ui', 'sans-serif'],
-        mono: ['var(--font-mono)', 'ui-monospace', 'monospace'],
       },
       colors: {
         border: 'hsl(var(--border))',
@@ -59,27 +56,17 @@ const config: Config = {
           foreground: 'hsl(var(--brand-foreground))',
           strong: 'hsl(var(--brand-strong))',
         },
-        // Snap Line variance-ladder + status fills.
-        set: 'hsl(var(--set))',
-        datum: 'hsl(var(--datum))',
-        track: 'hsl(var(--track))',
-        fill: {
-          DEFAULT: 'hsl(var(--fill))',
-          ok: 'hsl(var(--fill-ok))',
-        },
-        spill: 'hsl(var(--spill))',
       },
       boxShadow: {
-        soft: '0 1px 2px 0 hsl(225 11% 7% / 0.05), 0 2px 6px -2px hsl(225 11% 7% / 0.08)',
-        card: '0 4px 14px -4px hsl(225 11% 7% / 0.13)',
+        soft: '0 1px 2px 0 hsl(198 40% 10% / 0.05), 0 2px 6px -2px hsl(198 40% 10% / 0.08)',
+        card: '0 4px 14px -4px hsl(198 40% 10% / 0.13)',
       },
-      // Zero radius everywhere (Snap Line: sharp blocks, no escape hatch).
       borderRadius: {
-        '2xl': '0',
-        xl: '0',
-        lg: '0',
-        md: '0',
-        sm: '0',
+        '2xl': 'calc(var(--radius) + 0.25rem)',
+        xl: 'var(--radius)',
+        lg: 'calc(var(--radius) - 0.25rem)',
+        md: 'calc(var(--radius) - 0.5rem)',
+        sm: 'calc(var(--radius) - 0.625rem)',
       },
     },
   },

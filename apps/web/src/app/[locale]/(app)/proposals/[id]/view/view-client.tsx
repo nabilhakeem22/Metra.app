@@ -3,8 +3,6 @@
 import { FileDown, Loader2 } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
 import { useTransition } from 'react';
-import { AnimatedNumber } from '@/components/data/animated-number';
-import { VarianceLadder, type LadderRow } from '@/components/data/variance-ladder';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { toast } from '@/hooks/use-toast';
@@ -12,7 +10,6 @@ import { useRouter } from '@/i18n/routing';
 import { resolveActionError } from '@/lib/actions/error-message';
 import type { ActionCode } from '@/lib/actions/result';
 import { formatMoney } from '@/lib/format/money';
-import { formatNumber } from '@/lib/format/number';
 import { pickLocale } from '@/lib/i18n/pick-locale';
 import { expireProposal, supersedeProposal } from '@/lib/proposals/actions';
 import type { ProposalDetail } from '@/lib/proposals/queries';
@@ -30,7 +27,6 @@ export function ProposalView({
 }) {
   const t = useTranslations('proposals');
   const te = useTranslations('errors');
-  const tv = useTranslations('variance');
   const locale = useLocale();
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -38,17 +34,6 @@ export function ProposalView({
   const money = (v: string) => formatMoney(v, locale);
   const loc = (ar: string | null, en: string | null) =>
     pickLocale({ nameAr: ar, nameEn: en }, 'name', locale).value;
-
-  // Real price-vs-cost per section (margin-gated). NEVER demo rows.
-  const ladderRows: LadderRow[] | null = seeMargin
-    ? detail.sections.map((s) => {
-        const actual = Number(s.sectionCost ?? '0');
-        const contracted = Number(s.sectionSubtotal);
-        return { name: loc(s.titleAr, s.titleEn), actual, contracted, over: actual > contracted };
-      })
-    : null;
-  const num0 = (n: number) =>
-    formatNumber(n, locale, { maximumFractionDigits: 0 });
 
   function onSupersede() {
     startTransition(async () => {
@@ -108,7 +93,9 @@ export function ProposalView({
           <CardContent className="p-0">
             <div className="flex items-center justify-between border-b px-4 py-2">
               <h2 className="text-sm font-semibold">{loc(s.titleAr, s.titleEn)}</h2>
-              <span className="num text-sm">{money(s.sectionSubtotal)}</span>
+              <span className="text-sm" dir="ltr">
+                {money(s.sectionSubtotal)}
+              </span>
             </div>
             <table className="w-full text-sm">
               <tbody>
@@ -118,8 +105,8 @@ export function ProposalView({
                     <td className="px-4 py-2 text-muted-foreground" dir="ltr">
                       {l.qty} {l.unit}
                     </td>
-                    <td className="px-4 py-2 num text-end" dir="ltr">{money(l.unitPrice)}</td>
-                    <td className="px-4 py-2 num text-end" dir="ltr">{money(l.lineTotal)}</td>
+                    <td className="px-4 py-2 text-end" dir="ltr">{money(l.unitPrice)}</td>
+                    <td className="px-4 py-2 text-end" dir="ltr">{money(l.lineTotal)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -128,33 +115,12 @@ export function ProposalView({
         </Card>
       ))}
 
-      {seeMargin && (
-        <Card>
-          <CardContent className="space-y-3 py-4">
-            <p className="text-xs font-medium text-muted-foreground">
-              {tv('title')}
-            </p>
-            <VarianceLadder
-              rows={ladderRows}
-              emptyLabel={tv('empty')}
-              formatPair={(r) => `${num0(r.actual)} / ${num0(r.contracted)}`}
-            />
-          </CardContent>
-        </Card>
-      )}
-
       <Card>
         <CardContent className="ms-auto max-w-xs space-y-1 py-4 text-sm" dir="ltr">
           <Row label={t('p.subtotal')} value={money(detail.subtotal)} />
           <Row label={t('p.discount')} value={money(detail.discountAmount)} />
           <Row label={t('p.tax')} value={money(detail.taxAmount)} />
-          <div className="flex justify-between font-semibold">
-            <span className="text-muted-foreground">{t('p.total')}</span>
-            <AnimatedNumber
-              value={Number(detail.total)}
-              format={(n) => money(String(n))}
-            />
-          </div>
+          <Row label={t('p.total')} value={money(detail.total)} bold />
           {seeMargin && detail.totalMargin !== undefined && (
             <Row label={t('builder.margin')} value={money(detail.totalMargin)} />
           )}
@@ -166,9 +132,9 @@ export function ProposalView({
 
 function Row({ label, value, bold }: { label: string; value: string; bold?: boolean }) {
   return (
-    <div className={`flex justify-between ${bold ? "font-semibold" : ""}`}>
+    <div className={`flex justify-between ${bold ? 'font-semibold' : ''}`}>
       <span className="text-muted-foreground">{label}</span>
-      <span className="num">{value}</span>
+      <span>{value}</span>
     </div>
   );
 }

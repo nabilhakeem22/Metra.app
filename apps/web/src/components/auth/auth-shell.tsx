@@ -1,6 +1,6 @@
 import { useTranslations } from 'next-intl';
 import type { ReactNode } from 'react';
-import { AnimatedLogo } from '@/components/brand/animated-logo';
+import { Wordmark } from '@/components/brand/wordmark';
 import { cn } from '@/lib/utils';
 
 export interface AuthShellProps {
@@ -26,10 +26,7 @@ export function AuthShell({ children, showValueProp, className }: AuthShellProps
       >
         {showValueProp && (
           <div className="hidden flex-col justify-between gap-8 bg-primary p-10 text-primary-foreground lg:flex">
-            {/* The chalk panel IS the brand field — wordmark in white, no mark. */}
-            <span className="text-3xl font-bold uppercase tracking-tight">
-              {app('name')}
-            </span>
+            <Wordmark size="lg" className="text-primary-foreground" />
             <div className="space-y-2">
               <p className="text-2xl font-semibold leading-snug">
                 {home('tagline')}
@@ -43,8 +40,8 @@ export function AuthShell({ children, showValueProp, className }: AuthShellProps
         )}
 
         <div className="p-8">
-          <div className="mb-6 space-y-2">
-            <AnimatedLogo />
+          <div className="mb-6 space-y-1">
+            <Wordmark size="md" />
             <p className="text-sm text-muted-foreground">{app('descriptor')}</p>
           </div>
           {children}

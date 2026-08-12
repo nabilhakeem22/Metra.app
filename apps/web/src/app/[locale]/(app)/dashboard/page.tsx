@@ -1,7 +1,5 @@
 import { organizations } from '@metra/db';
 import { getLocale, getTranslations } from 'next-intl/server';
-import type { CSSProperties } from 'react';
-import { VarianceLadder } from '@/components/data/variance-ladder';
 import { GettingStarted } from '@/components/dashboard/getting-started';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -32,7 +30,6 @@ export default async function DashboardPage() {
   const d = await getTranslations('dashboard');
   const roles = await getTranslations('roles');
   const tc = await getTranslations('common');
-  const v = await getTranslations('variance');
 
   const [org] = await withOrgContext(ctx, (tx) =>
     tx.select().from(organizations).limit(1),
@@ -86,10 +83,7 @@ export default async function DashboardPage() {
 
       <div className="grid gap-4 lg:grid-cols-3">
         {/* Quiet, authored "ledger" block — honest empty figures, tabular, ruled. */}
-        <Card
-          className="stagger-in lg:col-span-2"
-          style={{ ['--i']: 0 } as CSSProperties}
-        >
+        <Card className="lg:col-span-2">
           <CardHeader className="flex-row items-center justify-between gap-2 space-y-0">
             <CardTitle>{d('ledgerTitle')}</CardTitle>
             <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
@@ -105,11 +99,11 @@ export default async function DashboardPage() {
                 <span className="flex items-center gap-2 text-sm text-muted-foreground">
                   <span
                     aria-hidden
-                    className="size-1.5 rounded-full bg-muted-foreground/50"
+                    className="size-1.5 rounded-full bg-brand/50"
                   />
                   {d(row.key)}
                 </span>
-                <span className="num text-sm font-semibold text-foreground">
+                <span className="tabular text-sm font-semibold text-foreground">
                   {row.value}
                 </span>
               </div>
@@ -117,7 +111,7 @@ export default async function DashboardPage() {
           </div>
         </Card>
 
-        <Card className="stagger-in" style={{ ['--i']: 1 } as CSSProperties}>
+        <Card>
           <CardHeader>
             <CardTitle>{d('gaugeTitle')}</CardTitle>
           </CardHeader>
@@ -126,17 +120,6 @@ export default async function DashboardPage() {
           </CardContent>
         </Card>
       </div>
-
-      {/* The signature variance ladder — honest empty state until job-costing.
-          NEVER a demo row. */}
-      <Card className="stagger-in" style={{ ['--i']: 2 } as CSSProperties}>
-        <CardHeader>
-          <CardTitle>{v('title')}</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <VarianceLadder rows={null} emptyLabel={v('empty')} />
-        </CardContent>
-      </Card>
     </div>
   );
 }

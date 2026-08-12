@@ -142,7 +142,8 @@ export function ProposalsClient({
                           {t(`statuses.${p.status}`)}
                         </span>
                       </td>
-                      <td className="px-4 py-2 num text-end" dir="ltr">{formatMoney(p.total, locale)}
+                      <td className="px-4 py-2 text-end" dir="ltr">
+                        {formatMoney(p.total, locale)}
                       </td>
                     </tr>
                   );

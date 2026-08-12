@@ -31,8 +31,10 @@ export function PageHeader({
           <div className="text-sm text-muted-foreground">{breadcrumb}</div>
         )}
         <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight">
-          {/* Carbon tick — chalk stays reserved for the active nav + primary action. */}
-          <span aria-hidden className="h-5 w-[3px] bg-foreground" />
+          <span
+            aria-hidden
+            className="h-5 w-[3px] rounded-full bg-brand"
+          />
           {title}
         </h1>
         {description && (
