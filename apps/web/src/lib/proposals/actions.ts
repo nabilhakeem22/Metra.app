@@ -1,10 +1,14 @@
 'use server';
 
+import { organizations } from '@metra/db';
 import { getLocale } from 'next-intl/server';
 import { revalidatePath } from 'next/cache';
 import { headers } from 'next/headers';
 import type { ActionResult } from '@/lib/actions/result';
 import { requireOrg } from '@/lib/auth/require-org';
+import { withOrgContext } from '@/lib/db/context';
+import { buildProposalHtml } from '@/lib/pdf/proposal-template';
+import { can, canSeeMargin } from '@/lib/permissions/can';
 import {
   createProposalCore,
   deleteDraftProposalCore,
@@ -15,6 +19,7 @@ import {
   type CreateProposalInput,
   type SaveDraftInput,
 } from './core';
+import { getProposalForPdf } from './queries';
 
 function refreshApp(): void {
   revalidatePath('/', 'layout');
@@ -79,6 +84,47 @@ export async function supersedeProposal(
   const res = await supersedeProposalCore(ctx, { id });
   if (res.ok) refreshApp();
   return res;
+}
+
+/**
+ * Renders the same HTML the PDF route uses, for an in-app preview (iframe
+ * srcDoc). The internal (cost) variant is margin-gated exactly like the route;
+ * the client variant strips every cost figure. Never returns cost for a caller
+ * who cannot see margin.
+ */
+export async function getProposalPreviewHtml(
+  id: string,
+  variant: 'client' | 'internal',
+): Promise<ActionResult & { html?: string }> {
+  const ctx = await requireOrg();
+  if (!can(ctx.role, 'proposals_build', 'read')) {
+    return { ok: false, error: 'forbidden' };
+  }
+  const [org] = await withOrgContext(ctx, (tx) =>
+    tx
+      .select({
+        nameEn: organizations.nameEn,
+        nameAr: organizations.nameAr,
+        hide: organizations.hideMarginFromPm,
+        defaultLocale: organizations.defaultLocale,
+      })
+      .from(organizations)
+      .limit(1),
+  );
+  const seeMargin = canSeeMargin(ctx.role, org?.hide ?? true);
+  if (variant === 'internal' && !seeMargin) {
+    return { ok: false, error: 'forbidden' };
+  }
+  const detail = await getProposalForPdf(ctx, id, variant === 'internal');
+  if (!detail) return { ok: false, error: 'invalid' };
+
+  const html = buildProposalHtml(detail, {
+    locale: org?.defaultLocale ?? 'ar-EG',
+    variant,
+    orgNameAr: org?.nameAr ?? null,
+    orgNameEn: org?.nameEn ?? null,
+  });
+  return { ok: true, html };
 }
 
 export async function deleteDraftProposal(id: string): Promise<ActionResult> {

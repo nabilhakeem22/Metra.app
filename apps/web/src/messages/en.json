@@ -674,6 +674,17 @@
       "termsEn": "Terms (EN)",
       "termsAr": "Terms (AR)"
     },
+    "preview": {
+      "open": "Preview",
+      "title": "Preview",
+      "client": "Client copy",
+      "internal": "Internal copy",
+      "download": "Download PDF",
+      "downloadInternal": "Download internal PDF",
+      "send": "Send",
+      "close": "Close",
+      "loading": "Rendering preview…"
+    },
     "view": {
       "title": "Proposal",
       "shareTitle": "Share link",

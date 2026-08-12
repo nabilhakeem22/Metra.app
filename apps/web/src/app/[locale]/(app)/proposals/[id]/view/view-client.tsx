@@ -13,6 +13,7 @@ import { formatMoney } from '@/lib/format/money';
 import { pickLocale } from '@/lib/i18n/pick-locale';
 import { expireProposal, supersedeProposal } from '@/lib/proposals/actions';
 import type { ProposalDetail } from '@/lib/proposals/queries';
+import { PreviewModal } from '../preview-modal';
 
 export function ProposalView({
   detail,
@@ -68,6 +69,7 @@ export function ProposalView({
           {t('view.version', { n: detail.version })}
         </span>
         <div className="ms-auto flex flex-wrap gap-2">
+          <PreviewModal proposalId={detail.id} canSeeInternal={seeMargin} />
           <a href={`/api/pdf/proposals/${detail.id}`} target="_blank" rel="noreferrer">
             <Button variant="outline" size="sm">
               <FileDown className="size-4" aria-hidden />
@@ -120,6 +122,7 @@ export function ProposalView({
           <Row label={t('p.subtotal')} value={money(detail.subtotal)} />
           <Row label={t('p.discount')} value={money(detail.discountAmount)} />
           <Row label={t('p.tax')} value={money(detail.taxAmount)} />
+          <Row label={t('builder.supervision')} value={money(detail.supervisionAmount)} />
           <Row label={t('p.total')} value={money(detail.total)} bold />
           {seeMargin && detail.totalMargin !== undefined && (
             <Row label={t('builder.margin')} value={money(detail.totalMargin)} />

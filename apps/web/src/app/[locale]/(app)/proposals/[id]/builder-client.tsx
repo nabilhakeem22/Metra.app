@@ -17,6 +17,7 @@ import { Input } from '@/components/ui/input';
 import { useConfirm } from '@/components/ui/confirm-dialog';
 import { toast } from '@/hooks/use-toast';
 import { useRouter } from '@/i18n/routing';
+import { PreviewModal } from './preview-modal';
 import { SectionCombobox, type SectionOption } from './section-combobox';
 import { addSectionLibraryEntry } from '@/lib/section-library/actions';
 import { resolveActionError } from '@/lib/actions/error-message';
@@ -514,6 +515,12 @@ export function ProposalBuilder({
           {pending && <Loader2 className="size-4 animate-spin" aria-hidden />}
           {t('builder.save')}
         </Button>
+        <PreviewModal
+          proposalId={detail.id}
+          canSeeInternal={seeMargin}
+          canSend={canSend}
+          isDraft
+        />
         {canSend && (
           <Button onClick={onSend} disabled={pending}>
             <Send className="size-4" aria-hidden />

@@ -674,6 +674,17 @@
       "termsEn": "الشروط (إنجليزي)",
       "termsAr": "الشروط (عربي)"
     },
+    "preview": {
+      "open": "معاينة",
+      "title": "معاينة",
+      "client": "نسخة العميل",
+      "internal": "النسخة الداخلية",
+      "download": "تنزيل PDF",
+      "downloadInternal": "تنزيل PDF الداخلي",
+      "send": "إرسال",
+      "close": "إغلاق",
+      "loading": "جارٍ تجهيز المعاينة…"
+    },
     "view": {
       "title": "العرض",
       "shareTitle": "رابط المشاركة",
