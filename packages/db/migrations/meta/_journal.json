@@ -85,6 +85,13 @@
       "when": 1786473123711,
       "tag": "0011_right_black_bolt",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1786551222045,
+      "tag": "0012_curvy_eternity",
+      "breakpoints": true
     }
   ]
 }

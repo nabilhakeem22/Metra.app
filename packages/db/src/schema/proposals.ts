@@ -43,11 +43,14 @@ export const proposals = pgTable(
     expiryDate: date('expiry_date'),
     discountPct: money('discount_pct').notNull().default('0'),
     taxRate: money('tax_rate').notNull().default('14'),
+    // Supervision fee % (of the taxable base), charged after VAT and untaxed.
+    supervisionPct: money('supervision_pct').notNull().default('0'),
     // Server-written totals cache (scale-4 money).
     subtotal: money('subtotal').notNull().default('0'),
     discountAmount: money('discount_amount').notNull().default('0'),
     taxableBase: money('taxable_base').notNull().default('0'),
     taxAmount: money('tax_amount').notNull().default('0'),
+    supervisionAmount: money('supervision_amount').notNull().default('0'),
     total: money('total').notNull().default('0'),
     totalCost: money('total_cost').notNull().default('0'),
     totalMargin: money('total_margin').notNull().default('0'),
@@ -72,6 +75,10 @@ export const proposals = pgTable(
     check(
       'proposals_discount_pct_range',
       sql`discount_pct >= 0 and discount_pct <= 100`,
+    ),
+    check(
+      'proposals_supervision_pct_range',
+      sql`supervision_pct >= 0 and supervision_pct <= 100`,
     ),
     ...sameOrgFk(t, 'client', clients, { onDelete: 'restrict' }),
     ...sameOrgFk(t, 'project', projects, { onDelete: 'restrict' }),

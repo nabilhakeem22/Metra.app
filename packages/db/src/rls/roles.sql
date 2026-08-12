@@ -29,6 +29,7 @@ grant select, insert, update, delete on public.projects      to metra_app;
 grant select, insert, update, delete on public.proposals         to metra_app;
 grant select, insert, update, delete on public.proposal_sections to metra_app;
 grant select, insert, update, delete on public.proposal_lines    to metra_app;
+grant select, insert, update, delete on public.proposal_section_library to metra_app;
 
 -- ...except audit_log and the append-only logs (price history, proposal events).
 -- No UPDATE / DELETE grant, so any attempt raises a permission error at the database.

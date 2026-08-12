@@ -229,6 +229,20 @@ create policy org_isolation on public.proposal_events
     and public.app_is_current_org_member()
   );
 
+-- proposal_section_library (create-on-use section-title suggestions)
+alter table public.proposal_section_library enable row level security;
+alter table public.proposal_section_library force  row level security;
+drop policy if exists org_isolation on public.proposal_section_library;
+create policy org_isolation on public.proposal_section_library
+  using (
+    org_id = nullif(current_setting('app.current_org_id', true), '')::uuid
+    and public.app_is_current_org_member()
+  )
+  with check (
+    org_id = nullif(current_setting('app.current_org_id', true), '')::uuid
+    and public.app_is_current_org_member()
+  );
+
 -- Proposals are frozen once they leave 'draft': only a whitelisted status
 -- transition may change the row (nothing else), enforced by the shared factory.
 drop trigger if exists trg_proposals_immutable on public.proposals;
