@@ -6,7 +6,7 @@ import { createPortal } from 'react-dom';
 import { Button } from '@/components/ui/button';
 import { usePathname } from '@/i18n/routing';
 import { cn } from '@/lib/utils';
-import { coachmarkKey, inlineStartOffset } from './coachmark-logic';
+import { cardTop, clampInset, coachmarkKey, inlineStartOffset } from './coachmark-logic';
 import { useTour } from './use-tour';
 
 export function Coachmark({ paused = false }: { paused?: boolean }) {
@@ -14,6 +14,7 @@ export function Coachmark({ paused = false }: { paused?: boolean }) {
   const pathname = usePathname();
   const t = useTranslations();
   const [rect, setRect] = useState<DOMRect | null>(null);
+  const [cardSize, setCardSize] = useState({ w: 288, h: 168 });
   const [mounted, setMounted] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
 
@@ -103,18 +104,46 @@ export function Coachmark({ paused = false }: { paused?: boolean }) {
     };
   }, [rect, next, prev, stop]);
 
+  // Measure the card so placement can keep it fully on-screen (its height varies
+  // by step content). Guarded so it never loops on identical measurements.
+  useEffect(() => {
+    const card = cardRef.current;
+    if (!card) return;
+    const r = card.getBoundingClientRect();
+    setCardSize((s) =>
+      Math.abs(s.w - r.width) < 1 && Math.abs(s.h - r.height) < 1
+        ? s
+        : { w: r.width, h: r.height },
+    );
+  }, [rect, current?.id]);
+
   if (!mounted || !current || !onPage || paused || !rect) return null;
 
   const reduced =
     window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
   const rtl = document.documentElement.dir === 'rtl';
   const pad = 6;
+  const margin = 16; // keep the card this far from every viewport edge
+  const gap = 10; // space between the anchor and the card
   // Logical inset — the distance from the INLINE-START edge (flips in RTL).
   const insetStart = inlineStartOffset(
     rect.left,
     rect.right,
     rtl,
     window.innerWidth,
+  );
+  // Viewport-aware card placement: clamp horizontally so the card can't run off
+  // the inline-end edge (e.g. an anchor near the right edge), and flip above the
+  // anchor when there's no room below.
+  const cardW = Math.min(cardSize.w, window.innerWidth - margin * 2);
+  const cardInset = clampInset(insetStart, cardW, window.innerWidth, margin);
+  const cardTopPx = cardTop(
+    rect.top,
+    rect.bottom,
+    cardSize.h,
+    window.innerHeight,
+    gap,
+    margin,
   );
   const titleId = `tour-${current.id}-title`;
   const isLast = index >= total - 1;
@@ -147,7 +176,7 @@ export function Coachmark({ paused = false }: { paused?: boolean }) {
         aria-labelledby={titleId}
         tabIndex={-1}
         className="fixed z-[62] w-72 max-w-[calc(100vw-2rem)] rounded-xl border bg-card p-4 shadow-lg focus:outline-none"
-        style={{ top: rect.bottom + 10, insetInlineStart: insetStart }}
+        style={{ top: cardTopPx, insetInlineStart: cardInset }}
       >
         <p id={titleId} className="text-sm font-semibold">
           {t(current.titleKey)}
