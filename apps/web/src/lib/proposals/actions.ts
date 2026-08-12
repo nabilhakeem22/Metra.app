@@ -7,8 +7,15 @@ import { headers } from 'next/headers';
 import type { ActionResult } from '@/lib/actions/result';
 import { requireOrg } from '@/lib/auth/require-org';
 import { withOrgContext } from '@/lib/db/context';
+import { sendProposalEmail } from '@/lib/email/resend';
+import { formatMoney } from '@/lib/format/money';
+import {
+  formatProposalNumber,
+  proposalYear,
+} from '@/lib/format/proposal-number';
 import { buildProposalHtml } from '@/lib/pdf/proposal-template';
 import { can, canSeeMargin } from '@/lib/permissions/can';
+import { eq } from 'drizzle-orm';
 import {
   createProposalCore,
   deleteDraftProposalCore,
@@ -19,7 +26,7 @@ import {
   type CreateProposalInput,
   type SaveDraftInput,
 } from './core';
-import { getProposalForPdf } from './queries';
+import { getProposalForPdf, getProposalSendMeta } from './queries';
 
 function refreshApp(): void {
   revalidatePath('/', 'layout');
@@ -53,9 +60,13 @@ export async function saveProposalDraft(
   return { ok: res.ok, error: res.error };
 }
 
-export async function sendProposal(
-  id: string,
-): Promise<ActionResult & { link?: string }> {
+export async function sendProposal(id: string): Promise<
+  ActionResult & {
+    link?: string;
+    emailSent?: boolean;
+    emailSkippedNoAddress?: boolean;
+  }
+> {
   const ctx = await requireOrg();
   const res = await sendProposalCore(ctx, { id });
   if (!res.ok || !res.data) return { ok: res.ok, error: res.error };
@@ -66,8 +77,49 @@ export async function sendProposal(
     /* default locale */
   }
   const origin = await resolveOrigin();
+  const link = `${origin}/${locale}/p/${res.data}`;
   refreshApp();
-  return { ok: true, link: `${origin}/${locale}/p/${res.data}` };
+
+  // Best-effort client email. The proposal is ALREADY sent (core committed); a
+  // meta-load or email failure must never roll that back or throw here.
+  let emailSent = false;
+  let emailSkippedNoAddress = false;
+  try {
+    const meta = await getProposalSendMeta(ctx, id);
+    const clientEmail = meta?.clientEmail?.trim() || null;
+    if (!clientEmail) {
+      emailSkippedNoAddress = true;
+    } else if (meta) {
+      const [org] = await withOrgContext(ctx, (tx) =>
+        tx
+          .select({ nameEn: organizations.nameEn, nameAr: organizations.nameAr })
+          .from(organizations)
+          .where(eq(organizations.id, ctx.orgId))
+          .limit(1),
+      );
+      const orgName =
+        (locale.startsWith('ar')
+          ? org?.nameAr || org?.nameEn
+          : org?.nameEn || org?.nameAr) ?? 'Metra';
+      const sent = await sendProposalEmail({
+        to: clientEmail,
+        orgName,
+        proposalNumber: formatProposalNumber(
+          meta.number,
+          proposalYear(null, new Date()),
+        ),
+        totalDisplay: formatMoney(meta.total, locale),
+        expiryDate: meta.expiryDate,
+        acceptUrl: link,
+        locale,
+      });
+      emailSent = sent.sent;
+    }
+  } catch (err) {
+    console.error('sendProposal email step failed (send unaffected):', err);
+  }
+
+  return { ok: true, link, emailSent, emailSkippedNoAddress };
 }
 
 export async function expireProposal(id: string): Promise<ActionResult> {
