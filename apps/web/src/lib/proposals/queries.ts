@@ -132,10 +132,12 @@ export interface ProposalDetail {
   clientNameAr: string | null;
   discountPct: string;
   taxRate: string;
+  supervisionPct: string;
   subtotal: string;
   discountAmount: string;
   taxableBase: string;
   taxAmount: string;
+  supervisionAmount: string;
   total: string;
   notesAr: string | null;
   notesEn: string | null;
@@ -170,10 +172,12 @@ async function loadDetail(
         projectId: proposals.projectId,
         discountPct: proposals.discountPct,
         taxRate: proposals.taxRate,
+        supervisionPct: proposals.supervisionPct,
         subtotal: proposals.subtotal,
         discountAmount: proposals.discountAmount,
         taxableBase: proposals.taxableBase,
         taxAmount: proposals.taxAmount,
+        supervisionAmount: proposals.supervisionAmount,
         total: proposals.total,
         totalCost: proposals.totalCost,
         totalMargin: proposals.totalMargin,
@@ -273,10 +277,12 @@ async function loadDetail(
       clientNameAr: p.clientNameAr,
       discountPct: p.discountPct,
       taxRate: p.taxRate,
+      supervisionPct: p.supervisionPct,
       subtotal: p.subtotal,
       discountAmount: p.discountAmount,
       taxableBase: p.taxableBase,
       taxAmount: p.taxAmount,
+      supervisionAmount: p.supervisionAmount,
       total: p.total,
       notesAr: p.notesAr,
       notesEn: p.notesEn,

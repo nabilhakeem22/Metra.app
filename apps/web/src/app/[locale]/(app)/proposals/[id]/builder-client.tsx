@@ -12,10 +12,13 @@ import { useLocale, useTranslations } from 'next-intl';
 import { useMemo, useState, useTransition } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { FieldHint } from '@/components/ui/field-hint';
 import { Input } from '@/components/ui/input';
 import { useConfirm } from '@/components/ui/confirm-dialog';
 import { toast } from '@/hooks/use-toast';
 import { useRouter } from '@/i18n/routing';
+import { SectionCombobox, type SectionOption } from './section-combobox';
+import { addSectionLibraryEntry } from '@/lib/section-library/actions';
 import { resolveActionError } from '@/lib/actions/error-message';
 import type { ActionCode } from '@/lib/actions/result';
 import {
@@ -86,15 +89,19 @@ export function ProposalBuilder({
   canSend,
   seeMargin,
   costItems,
+  sectionLibrary,
 }: {
   detail: ProposalDetail;
   canSend: boolean;
   seeMargin: boolean;
   costItems: CostItemOption[];
+  sectionLibrary: SectionOption[];
 }) {
   const t = useTranslations('proposals');
+  const th = useTranslations('hints.proposal');
   const te = useTranslations('errors');
   const locale = useLocale();
+  const isAr = locale.startsWith('ar');
   const router = useRouter();
   const { confirm, dialog } = useConfirm();
   const [pending, startTransition] = useTransition();
@@ -102,6 +109,7 @@ export function ProposalBuilder({
 
   const [discountPct, setDiscountPct] = useState(detail.discountPct);
   const [taxRate, setTaxRate] = useState(detail.taxRate);
+  const [supervisionPct, setSupervisionPct] = useState(detail.supervisionPct);
   const [sections, setSections] = useState<SectionState[]>(
     detail.sections.map((s) => ({
       titleEn: s.titleEn ?? '',
@@ -127,9 +135,10 @@ export function ProposalBuilder({
     const doc = computeTotals(sectionTotals, {
       discountPct: discountPct || '0',
       taxRate: taxRate || '0',
+      supervisionPct: supervisionPct || '0',
     });
     return { sectionTotals, doc };
-  }, [sections, discountPct, taxRate]);
+  }, [sections, discountPct, taxRate, supervisionPct]);
 
   function patchSection(si: number, patch: Partial<SectionState>) {
     setSections((s) => s.map((sec, i) => (i === si ? { ...sec, ...patch } : sec)));
@@ -182,7 +191,11 @@ export function ProposalBuilder({
   function buildPayload() {
     return {
       id: detail.id,
-      header: { discountPct: discountPct || '0', taxRate: taxRate || '0' },
+      header: {
+        discountPct: discountPct || '0',
+        taxRate: taxRate || '0',
+        supervisionPct: supervisionPct || '0',
+      },
       sections: sections.map((s, si) => ({
         titleEn: s.titleEn || null,
         titleAr: s.titleAr || null,
@@ -294,20 +307,39 @@ export function ProposalBuilder({
           <Card key={si}>
             <CardContent className="space-y-3 py-4">
               <div className="flex flex-wrap items-center gap-2">
-                <Input
-                  dir="ltr"
-                  placeholder={t('builder.sectionTitleEn')}
-                  value={sec.titleEn}
-                  onChange={(e) => patchSection(si, { titleEn: e.target.value })}
+                <SectionCombobox
                   className="min-w-40 flex-1"
+                  locale={locale}
+                  valueEn={sec.titleEn}
+                  valueAr={sec.titleAr}
+                  options={sectionLibrary}
+                  placeholder={
+                    isAr ? t('builder.sectionTitleAr') : t('builder.sectionTitleEn')
+                  }
+                  onChange={(patch) => patchSection(si, patch)}
+                  onCreate={(name) => {
+                    // Fire-and-forget: recording the title never blocks the build.
+                    void addSectionLibraryEntry(name);
+                  }}
+                  aria-describedby={`sec-hint-${si}`}
                 />
                 <Input
-                  dir="rtl"
-                  placeholder={t('builder.sectionTitleAr')}
-                  value={sec.titleAr}
-                  onChange={(e) => patchSection(si, { titleAr: e.target.value })}
+                  dir={isAr ? 'ltr' : 'rtl'}
+                  placeholder={
+                    isAr ? t('builder.sectionTitleEn') : t('builder.sectionTitleAr')
+                  }
+                  value={isAr ? sec.titleEn : sec.titleAr}
+                  onChange={(e) =>
+                    patchSection(
+                      si,
+                      isAr
+                        ? { titleEn: e.target.value }
+                        : { titleAr: e.target.value },
+                    )
+                  }
                   className="min-w-40 flex-1"
                 />
+                <FieldHint id={`sec-hint-${si}`} hint={th('sectionTitle')} />
                 <Button variant="ghost" size="icon" aria-label={t('builder.moveUp')} onClick={() => setSections(move(sections, si, -1))}>
                   <ArrowUp className="size-4" aria-hidden />
                 </Button>
@@ -324,11 +356,33 @@ export function ProposalBuilder({
                   <thead>
                     <tr className="text-xs text-muted-foreground">
                       <th className="px-1 py-1 text-start font-medium">{t('builder.description')}</th>
-                      <th className="px-1 py-1 font-medium">{t('builder.qty')}</th>
+                      <th className="px-1 py-1 font-medium">
+                        <span className="inline-flex items-center">
+                          {t('builder.qty')}
+                          <FieldHint hint={th('lineQty')} />
+                        </span>
+                      </th>
                       <th className="px-1 py-1 font-medium">{t('builder.unit')}</th>
-                      {seeMargin && <th className="px-1 py-1 font-medium">{t('builder.unitCost')}</th>}
-                      <th className="px-1 py-1 font-medium">{t('builder.unitPrice')}</th>
-                      <th className="px-1 py-1 font-medium">{t('builder.discount')}</th>
+                      {seeMargin && (
+                        <th className="px-1 py-1 font-medium">
+                          <span className="inline-flex items-center">
+                            {t('builder.unitCost')}
+                            <FieldHint hint={th('lineUnitCost')} />
+                          </span>
+                        </th>
+                      )}
+                      <th className="px-1 py-1 font-medium">
+                        <span className="inline-flex items-center">
+                          {t('builder.unitPrice')}
+                          <FieldHint hint={th('lineUnitPrice')} />
+                        </span>
+                      </th>
+                      <th className="px-1 py-1 font-medium">
+                        <span className="inline-flex items-center">
+                          {t('builder.discount')}
+                          <FieldHint hint={th('lineDiscountPct')} />
+                        </span>
+                      </th>
                       <th className="px-1 py-1 text-end font-medium">{t('builder.sectionSubtotal')}</th>
                       <th className="px-1 py-1" />
                     </tr>
@@ -417,19 +471,27 @@ export function ProposalBuilder({
       <Card>
         <CardContent className="space-y-2 py-4">
           <div className="flex flex-wrap items-center gap-3">
-            <label className="flex items-center gap-2 text-sm">
+            <label className="flex items-center gap-1.5 text-sm">
               {t('builder.discountPct')}
+              <FieldHint hint={th('discountPct')} />
               <Input dir="ltr" inputMode="decimal" value={discountPct} onChange={(e) => setDiscountPct(e.target.value)} className={`${inp} w-20`} />
             </label>
-            <label className="flex items-center gap-2 text-sm">
+            <label className="flex items-center gap-1.5 text-sm">
               {t('builder.taxRate')}
+              <FieldHint hint={th('taxRate')} />
               <Input dir="ltr" inputMode="decimal" value={taxRate} onChange={(e) => setTaxRate(e.target.value)} className={`${inp} w-20`} />
+            </label>
+            <label className="flex items-center gap-1.5 text-sm">
+              {t('builder.supervisionPct')}
+              <FieldHint hint={th('supervisionPct')} />
+              <Input dir="ltr" inputMode="decimal" value={supervisionPct} onChange={(e) => setSupervisionPct(e.target.value)} className={`${inp} w-20`} />
             </label>
           </div>
           <div className="ms-auto max-w-xs space-y-1 text-sm" dir="ltr">
             <Row label={t('builder.subtotal')} value={formatMoney(totals.doc.subtotal, locale)} />
             <Row label={t('builder.docDiscount')} value={formatMoney(totals.doc.discountAmount, locale)} />
             <Row label={t('builder.tax')} value={formatMoney(totals.doc.taxAmount, locale)} />
+            <Row label={t('builder.supervision')} value={formatMoney(totals.doc.supervisionAmount, locale)} />
             <Row label={t('builder.total')} value={formatMoney(totals.doc.total, locale)} bold />
             {seeMargin ? (
               <>

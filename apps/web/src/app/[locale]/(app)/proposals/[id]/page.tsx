@@ -7,6 +7,7 @@ import { withOrgContext } from '@/lib/db/context';
 import { listCostItems } from '@/lib/price-book/queries';
 import { can, canSeeMargin } from '@/lib/permissions/can';
 import { getProposalWithLines } from '@/lib/proposals/queries';
+import { listSectionLibrary } from '@/lib/section-library/queries';
 import { formatProposalNumber, proposalYear } from '@/lib/format/proposal-number';
 import { ProposalBuilder } from './builder-client';
 
@@ -33,6 +34,7 @@ export default async function ProposalBuilderPage({
 
   const t = await getTranslations('proposals');
   const costItems = await listCostItems(ctx, { active: true });
+  const sectionLibrary = await listSectionLibrary(ctx);
 
   return (
     <div className="space-y-6">
@@ -52,6 +54,11 @@ export default async function ProposalBuilderPage({
           unit: c.unit,
           defaultUnitCost: c.defaultUnitCost,
           defaultUnitPrice: c.defaultUnitPrice,
+        }))}
+        sectionLibrary={sectionLibrary.map((s) => ({
+          id: s.id,
+          nameEn: s.nameEn,
+          nameAr: s.nameAr,
         }))}
       />
     </div>
