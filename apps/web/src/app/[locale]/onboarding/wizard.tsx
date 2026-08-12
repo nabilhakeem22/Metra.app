@@ -4,6 +4,7 @@ import { Check, Loader2, Upload, X } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
 import { useState, useTransition, type ChangeEvent } from 'react';
 import { Button } from '@/components/ui/button';
+import { FieldHint } from '@/components/ui/field-hint';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from '@/hooks/use-toast';
@@ -21,6 +22,7 @@ const STEPS = 3;
 
 export function OnboardingWizard() {
   const t = useTranslations('onboarding');
+  const th = useTranslations('hints.onboarding');
   const te = useTranslations('errors');
   const home = useTranslations('home');
   const locale = useLocale();
@@ -141,19 +143,27 @@ export function OnboardingWizard() {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="nameEn">{t('nameEnLabel')}</Label>
+            <Label htmlFor="nameEn" className="flex items-center">
+              {t('nameEnLabel')}
+              <FieldHint id="onb-name-hint" hint={th('orgName')} />
+            </Label>
             <Input
               id="nameEn"
               dir="ltr"
+              aria-describedby="onb-name-hint"
               value={nameEn}
               onChange={(e) => setNameEn(e.target.value)}
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="nameAr">{t('nameArLabel')}</Label>
+            <Label htmlFor="nameAr" className="flex items-center">
+              {t('nameArLabel')}
+              <FieldHint id="onb-namear-hint" hint={th('orgName')} />
+            </Label>
             <Input
               id="nameAr"
               dir="rtl"
+              aria-describedby="onb-namear-hint"
               value={nameAr}
               onChange={(e) => setNameAr(e.target.value)}
             />

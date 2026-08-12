@@ -4,6 +4,7 @@ import { Loader2 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { useState, useTransition } from 'react';
 import { Button } from '@/components/ui/button';
+import { FieldHint } from '@/components/ui/field-hint';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -28,6 +29,7 @@ type Target = 'cost' | 'price' | 'both';
 
 export function BulkUpdateDialog({ open, onOpenChange }: BulkUpdateDialogProps) {
   const t = useTranslations('priceBook');
+  const th = useTranslations('hints.priceBook');
   const te = useTranslations('errors');
   const [category, setCategory] = useState<string>(CATEGORY_TOKENS[0]);
   const [pct, setPct] = useState('0');
@@ -70,10 +72,14 @@ export function BulkUpdateDialog({ open, onOpenChange }: BulkUpdateDialogProps) 
 
         <div className="mt-4 space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="bulk-category">{t('bulk.category')}</Label>
+            <Label htmlFor="bulk-category" className="flex items-center">
+              {t('bulk.category')}
+              <FieldHint id="bulk-category-hint" hint={th('category')} />
+            </Label>
             <select
               id="bulk-category"
               className={selectClass}
+              aria-describedby="bulk-category-hint"
               value={category}
               onChange={(e) => setCategory(e.target.value)}
             >
@@ -86,18 +92,25 @@ export function BulkUpdateDialog({ open, onOpenChange }: BulkUpdateDialogProps) 
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="bulk-pct">{t('bulk.percentage')}</Label>
+            <Label htmlFor="bulk-pct" className="flex items-center">
+              {t('bulk.percentage')}
+              <FieldHint id="bulk-pct-hint" hint={th('pctChange')} />
+            </Label>
             <Input
               id="bulk-pct"
               dir="ltr"
               inputMode="decimal"
+              aria-describedby="bulk-pct-hint"
               value={pct}
               onChange={(e) => setPct(e.target.value)}
             />
           </div>
 
           <div className="space-y-2">
-            <span className="text-sm font-medium">{t('bulk.target')}</span>
+            <span className="inline-flex items-center text-sm font-medium">
+              {t('bulk.target')}
+              <FieldHint hint={th('target')} />
+            </span>
             <div className="flex gap-4">
               {(['cost', 'price', 'both'] as Target[]).map((tg) => (
                 <label key={tg} className="flex items-center gap-2 text-sm">

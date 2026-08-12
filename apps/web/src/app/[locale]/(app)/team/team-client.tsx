@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/card';
 import { useConfirm } from '@/components/ui/confirm-dialog';
 import { EmptyState } from '@/components/ui/empty-state';
+import { FieldHint } from '@/components/ui/field-hint';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from '@/hooks/use-toast';
@@ -64,6 +65,7 @@ export function TeamClient({
   currentUserId,
 }: TeamClientProps) {
   const t = useTranslations('team');
+  const th = useTranslations('hints.team');
   const te = useTranslations('errors');
   const roles = useTranslations('roles');
   const locale = useLocale();
@@ -172,20 +174,28 @@ export function TeamClient({
           <CardContent className="space-y-4">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
               <div className="flex-1 space-y-2">
-                <Label htmlFor="inviteEmail">{t('emailLabel')}</Label>
+                <Label htmlFor="inviteEmail" className="flex items-center">
+                  {t('emailLabel')}
+                  <FieldHint id="inviteEmail-hint" hint={th('email')} />
+                </Label>
                 <Input
                   id="inviteEmail"
                   type="email"
                   dir="ltr"
+                  aria-describedby="inviteEmail-hint"
                   placeholder={t('emailPlaceholder')}
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="inviteRole">{t('roleLabel')}</Label>
+                <Label htmlFor="inviteRole" className="flex items-center">
+                  {t('roleLabel')}
+                  <FieldHint id="inviteRole-hint" hint={th('role')} />
+                </Label>
                 <select
                   id="inviteRole"
+                  aria-describedby="inviteRole-hint"
                   value={inviteRole}
                   onChange={(e) => setInviteRole(e.target.value as MemberRole)}
                   className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm sm:w-48"

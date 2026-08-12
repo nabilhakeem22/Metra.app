@@ -4,6 +4,7 @@ import { Loader2 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { useEffect, useState, useTransition } from 'react';
 import { Button } from '@/components/ui/button';
+import { FieldHint } from '@/components/ui/field-hint';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -55,6 +56,7 @@ function emptyState(): FormState {
 
 export function CostItemForm({ open, onOpenChange, item }: CostItemFormProps) {
   const t = useTranslations('priceBook');
+  const th = useTranslations('hints.costItem');
   const te = useTranslations('errors');
   const [form, setForm] = useState<FormState>(emptyState());
   const [pending, startTransition] = useTransition();
@@ -124,10 +126,14 @@ export function CostItemForm({ open, onOpenChange, item }: CostItemFormProps) {
 
         <div className="mt-4 space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="ci-code">{t('form.code')}</Label>
+            <Label htmlFor="ci-code" className="flex items-center">
+              {t('form.code')}
+              <FieldHint id="ci-code-hint" hint={th('code')} />
+            </Label>
             <Input
               id="ci-code"
               dir="ltr"
+              aria-describedby="ci-code-hint"
               value={form.code}
               onChange={(e) => set('code')(e.target.value)}
             />
@@ -135,19 +141,27 @@ export function CostItemForm({ open, onOpenChange, item }: CostItemFormProps) {
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="space-y-2">
-              <Label htmlFor="ci-nameEn">{t('form.nameEn')}</Label>
+              <Label htmlFor="ci-nameEn" className="flex items-center">
+                {t('form.nameEn')}
+                <FieldHint id="ci-name-hint" hint={th('name')} />
+              </Label>
               <Input
                 id="ci-nameEn"
                 dir="ltr"
+                aria-describedby="ci-name-hint"
                 value={form.nameEn}
                 onChange={(e) => set('nameEn')(e.target.value)}
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="ci-nameAr">{t('form.nameAr')}</Label>
+              <Label htmlFor="ci-nameAr" className="flex items-center">
+                {t('form.nameAr')}
+                <FieldHint id="ci-namear-hint" hint={th('name')} />
+              </Label>
               <Input
                 id="ci-nameAr"
                 dir="rtl"
+                aria-describedby="ci-namear-hint"
                 value={form.nameAr}
                 onChange={(e) => set('nameAr')(e.target.value)}
               />
@@ -156,10 +170,14 @@ export function CostItemForm({ open, onOpenChange, item }: CostItemFormProps) {
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="space-y-2">
-              <Label htmlFor="ci-category">{t('form.category')}</Label>
+              <Label htmlFor="ci-category" className="flex items-center">
+                {t('form.category')}
+                <FieldHint id="ci-category-hint" hint={th('category')} />
+              </Label>
               <select
                 id="ci-category"
                 className={selectClass}
+                aria-describedby="ci-category-hint"
                 value={form.category}
                 onChange={(e) => set('category')(e.target.value)}
               >
@@ -171,10 +189,14 @@ export function CostItemForm({ open, onOpenChange, item }: CostItemFormProps) {
               </select>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="ci-unit">{t('form.unit')}</Label>
+              <Label htmlFor="ci-unit" className="flex items-center">
+                {t('form.unit')}
+                <FieldHint id="ci-unit-hint" hint={th('unit')} />
+              </Label>
               <select
                 id="ci-unit"
                 className={selectClass}
+                aria-describedby="ci-unit-hint"
                 value={form.unit}
                 onChange={(e) => set('unit')(e.target.value)}
               >
@@ -189,21 +211,29 @@ export function CostItemForm({ open, onOpenChange, item }: CostItemFormProps) {
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="space-y-2">
-              <Label htmlFor="ci-cost">{t('form.cost')}</Label>
+              <Label htmlFor="ci-cost" className="flex items-center">
+                {t('form.cost')}
+                <FieldHint id="ci-cost-hint" hint={th('defaultUnitCost')} />
+              </Label>
               <Input
                 id="ci-cost"
                 dir="ltr"
                 inputMode="decimal"
+                aria-describedby="ci-cost-hint"
                 value={form.defaultUnitCost}
                 onChange={(e) => set('defaultUnitCost')(e.target.value)}
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="ci-price">{t('form.price')}</Label>
+              <Label htmlFor="ci-price" className="flex items-center">
+                {t('form.price')}
+                <FieldHint id="ci-price-hint" hint={th('defaultUnitPrice')} />
+              </Label>
               <Input
                 id="ci-price"
                 dir="ltr"
                 inputMode="decimal"
+                aria-describedby="ci-price-hint"
                 value={form.defaultUnitPrice}
                 onChange={(e) => set('defaultUnitPrice')(e.target.value)}
               />

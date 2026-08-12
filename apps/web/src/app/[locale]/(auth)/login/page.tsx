@@ -6,6 +6,7 @@ import { useState, useTransition } from 'react';
 import { resolveActionError } from '@/lib/actions/error-message';
 import { AuthShell } from '@/components/auth/auth-shell';
 import { Button } from '@/components/ui/button';
+import { FieldHint } from '@/components/ui/field-hint';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { OtpInput } from '@/components/ui/otp-input';
@@ -27,6 +28,7 @@ const RESEND_SECONDS = 60;
 
 export default function LoginPage() {
   const t = useTranslations('login');
+  const th = useTranslations('hints.auth');
   const te = useTranslations('errors');
   const router = useRouter();
   const [, startTransition] = useTransition();
@@ -131,13 +133,15 @@ export default function LoginPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="identifier">
+              <Label htmlFor="identifier" className="flex items-center">
                 {channel === 'email' ? t('emailLabel') : t('phoneLabel')}
+                <FieldHint id="identifier-hint" hint={th('email')} />
               </Label>
               <Input
                 id="identifier"
                 type={channel === 'email' ? 'email' : 'tel'}
                 dir="ltr"
+                aria-describedby="identifier-hint"
                 inputMode={channel === 'email' ? 'email' : 'tel'}
                 placeholder={
                   channel === 'email' ? t('emailPlaceholder') : '+20…'
@@ -165,7 +169,10 @@ export default function LoginPage() {
         ) : (
           <div className="space-y-4">
             <div className="space-y-1">
-              <p className="font-medium">{t('codeSentTitle')}</p>
+              <p className="inline-flex items-center font-medium">
+                {t('codeSentTitle')}
+                <FieldHint hint={th('otp')} />
+              </p>
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <span dir="ltr" className="truncate">
                   {identifier}

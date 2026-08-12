@@ -4,6 +4,7 @@ import { Loader2 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { useMemo, useState, useTransition } from 'react';
 import { Button } from '@/components/ui/button';
+import { FieldHint } from '@/components/ui/field-hint';
 import { Label } from '@/components/ui/label';
 import {
   Sheet,
@@ -79,6 +80,7 @@ export function ImportWizard({
   existingCodes,
 }: ImportWizardProps) {
   const t = useTranslations('priceBook');
+  const th = useTranslations('hints.priceBook');
   const [step, setStep] = useState<Step>('upload');
   const [header, setHeader] = useState<string[]>([]);
   const [data, setData] = useState<string[][]>([]);
@@ -171,11 +173,15 @@ export function ImportWizard({
         <div className="mt-4 space-y-4">
           {step === 'upload' && (
             <div className="space-y-2">
-              <Label htmlFor="import-file">{t('import.chooseFile')}</Label>
+              <Label htmlFor="import-file" className="flex items-center">
+                {t('import.chooseFile')}
+                <FieldHint id="import-file-hint" hint={th('importFile')} />
+              </Label>
               <input
                 id="import-file"
                 type="file"
                 accept=".xlsx,.xls,.csv"
+                aria-describedby="import-file-hint"
                 disabled={pending}
                 onChange={(e) => {
                   const f = e.target.files?.[0];

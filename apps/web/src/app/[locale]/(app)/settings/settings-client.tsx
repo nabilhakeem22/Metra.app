@@ -11,6 +11,7 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
+import { FieldHint } from '@/components/ui/field-hint';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from '@/hooks/use-toast';
@@ -40,6 +41,7 @@ export function SettingsClient({
   initial: Initial;
 }) {
   const t = useTranslations('settings');
+  const th = useTranslations('hints.org');
   const te = useTranslations('errors');
   const [savingProfile, startProfile] = useTransition();
   const [savingSettings, startSettings] = useTransition();
@@ -162,20 +164,28 @@ export function SettingsClient({
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
-              <Label htmlFor="nameEn">{t('nameEnLabel')}</Label>
+              <Label htmlFor="nameEn" className="flex items-center">
+                {t('nameEnLabel')}
+                <FieldHint id="org-name-hint" hint={th('name')} />
+              </Label>
               <Input
                 id="nameEn"
                 dir="ltr"
+                aria-describedby="org-name-hint"
                 value={nameEn}
                 onChange={(e) => setNameEn(e.target.value)}
                 disabled={disabled}
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="nameAr">{t('nameArLabel')}</Label>
+              <Label htmlFor="nameAr" className="flex items-center">
+                {t('nameArLabel')}
+                <FieldHint id="org-namear-hint" hint={th('name')} />
+              </Label>
               <Input
                 id="nameAr"
                 dir="rtl"
+                aria-describedby="org-namear-hint"
                 value={nameAr}
                 onChange={(e) => setNameAr(e.target.value)}
                 disabled={disabled}
@@ -228,8 +238,9 @@ export function SettingsClient({
               disabled={disabled}
             />
             <span>
-              <span className="block text-sm font-medium">
+              <span className="flex items-center text-sm font-medium">
                 {t('hideMarginLabel')}
+                <FieldHint hint={th('hideMarginFromPm')} />
               </span>
               <span className="block text-xs text-muted-foreground">
                 {t('hideMarginDesc')}

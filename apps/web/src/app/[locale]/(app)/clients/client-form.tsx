@@ -4,6 +4,7 @@ import { Loader2 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { useEffect, useState, useTransition } from 'react';
 import { Button } from '@/components/ui/button';
+import { FieldHint } from '@/components/ui/field-hint';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -50,6 +51,7 @@ const EMPTY: FormState = {
 
 export function ClientForm({ open, onOpenChange, item }: ClientFormProps) {
   const t = useTranslations('clients');
+  const th = useTranslations('hints.client');
   const te = useTranslations('errors');
   const [form, setForm] = useState<FormState>(EMPTY);
   const [pending, startTransition] = useTransition();
@@ -108,12 +110,17 @@ export function ClientForm({ open, onOpenChange, item }: ClientFormProps) {
     k: keyof FormState,
     label: string,
     dir: 'ltr' | 'rtl' = 'ltr',
+    hint?: string,
   ) => (
     <div className="space-y-2">
-      <Label htmlFor={`cl-${k}`}>{label}</Label>
+      <Label htmlFor={`cl-${k}`} className="flex items-center">
+        {label}
+        {hint && <FieldHint id={`cl-${k}-hint`} hint={hint} />}
+      </Label>
       <Input
         id={`cl-${k}`}
         dir={dir}
+        aria-describedby={hint ? `cl-${k}-hint` : undefined}
         value={form[k]}
         onChange={(e) => set(k)(e.target.value)}
       />
@@ -130,20 +137,20 @@ export function ClientForm({ open, onOpenChange, item }: ClientFormProps) {
 
         <div className="mt-4 space-y-4">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            {field('nameEn', t('form.nameEn'))}
-            {field('nameAr', t('form.nameAr'), 'rtl')}
+            {field('nameEn', t('form.nameEn'), 'ltr', th('name'))}
+            {field('nameAr', t('form.nameAr'), 'rtl', th('name'))}
           </div>
-          {field('contactName', t('form.contactName'))}
+          {field('contactName', t('form.contactName'), 'ltr', th('contactName'))}
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            {field('email', t('form.email'))}
-            {field('phone', t('form.phone'))}
+            {field('email', t('form.email'), 'ltr', th('email'))}
+            {field('phone', t('form.phone'), 'ltr', th('phone'))}
           </div>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            {field('city', t('form.city'))}
-            {field('taxRegistrationNumber', t('form.taxCode'))}
+            {field('city', t('form.city'), 'ltr', th('city'))}
+            {field('taxRegistrationNumber', t('form.taxCode'), 'ltr', th('taxRegistrationNumber'))}
           </div>
-          {field('address', t('form.address'))}
-          {field('notes', t('form.notes'))}
+          {field('address', t('form.address'), 'ltr', th('address'))}
+          {field('notes', t('form.notes'), 'ltr', th('notes'))}
 
           <div className="flex justify-end gap-2 pt-2">
             <Button

@@ -10,6 +10,7 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
+import { FieldHint } from '@/components/ui/field-hint';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from '@/hooks/use-toast';
@@ -29,6 +30,7 @@ export function AccountClient({
   currentLocale: Locale;
 }) {
   const t = useTranslations('account');
+  const th = useTranslations('hints.account');
   const router = useRouter();
   const pathname = usePathname();
   const [saving, startSaving] = useTransition();
@@ -62,9 +64,13 @@ export function AccountClient({
             <Input id="email" dir="ltr" value={email} readOnly disabled />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="fullName">{t('fullNameLabel')}</Label>
+            <Label htmlFor="fullName" className="flex items-center">
+              {t('fullNameLabel')}
+              <FieldHint id="acct-name-hint" hint={th('displayName')} />
+            </Label>
             <Input
               id="fullName"
+              aria-describedby="acct-name-hint"
               value={fullName}
               onChange={(e) => setFullName(e.target.value)}
             />

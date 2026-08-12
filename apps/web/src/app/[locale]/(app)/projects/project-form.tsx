@@ -5,6 +5,7 @@ import { useLocale, useTranslations } from 'next-intl';
 import { useEffect, useState, useTransition } from 'react';
 import type { ProjectStatus } from '@metra/db';
 import { Button } from '@/components/ui/button';
+import { FieldHint } from '@/components/ui/field-hint';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -63,6 +64,7 @@ export function ProjectForm({
   clientOptions,
 }: ProjectFormProps) {
   const t = useTranslations('projects');
+  const th = useTranslations('hints.project');
   const te = useTranslations('errors');
   const locale = useLocale();
   const [form, setForm] = useState<FormState>(emptyState(clientOptions));
@@ -139,10 +141,14 @@ export function ProjectForm({
         ) : (
           <div className="mt-4 space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="pr-code">{t('form.code')}</Label>
+              <Label htmlFor="pr-code" className="flex items-center">
+                {t('form.code')}
+                <FieldHint id="pr-code-hint" hint={th('code')} />
+              </Label>
               <Input
                 id="pr-code"
                 dir="ltr"
+                aria-describedby="pr-code-hint"
                 value={form.code}
                 onChange={(e) => set('code')(e.target.value)}
               />
@@ -150,19 +156,27 @@ export function ProjectForm({
 
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div className="space-y-2">
-                <Label htmlFor="pr-nameEn">{t('form.nameEn')}</Label>
+                <Label htmlFor="pr-nameEn" className="flex items-center">
+                  {t('form.nameEn')}
+                  <FieldHint id="pr-name-hint" hint={th('name')} />
+                </Label>
                 <Input
                   id="pr-nameEn"
                   dir="ltr"
+                  aria-describedby="pr-name-hint"
                   value={form.nameEn}
                   onChange={(e) => set('nameEn')(e.target.value)}
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="pr-nameAr">{t('form.nameAr')}</Label>
+                <Label htmlFor="pr-nameAr" className="flex items-center">
+                  {t('form.nameAr')}
+                  <FieldHint id="pr-namear-hint" hint={th('name')} />
+                </Label>
                 <Input
                   id="pr-nameAr"
                   dir="rtl"
+                  aria-describedby="pr-namear-hint"
                   value={form.nameAr}
                   onChange={(e) => set('nameAr')(e.target.value)}
                 />
@@ -170,10 +184,14 @@ export function ProjectForm({
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="pr-client">{t('form.client')}</Label>
+              <Label htmlFor="pr-client" className="flex items-center">
+                {t('form.client')}
+                <FieldHint id="pr-client-hint" hint={th('client')} />
+              </Label>
               <select
                 id="pr-client"
                 className={selectClass}
+                aria-describedby="pr-client-hint"
                 value={form.clientId}
                 onChange={(e) => set('clientId')(e.target.value)}
               >
@@ -190,10 +208,14 @@ export function ProjectForm({
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="pr-status">{t('form.status')}</Label>
+              <Label htmlFor="pr-status" className="flex items-center">
+                {t('form.status')}
+                <FieldHint id="pr-status-hint" hint={th('status')} />
+              </Label>
               <select
                 id="pr-status"
                 className={selectClass}
+                aria-describedby="pr-status-hint"
                 value={form.status}
                 onChange={(e) => set('status')(e.target.value)}
               >
