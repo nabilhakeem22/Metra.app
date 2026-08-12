@@ -6,6 +6,8 @@ export * from './memberships';
 export * from './audit-log';
 export * from './files';
 export * from './invitations';
+export * from './sections';
+export * from './section-defaults';
 export * from './cost-items';
 export * from './price-changes';
 export * from './clients';
@@ -21,6 +23,7 @@ import { memberships } from './memberships';
 import { auditLog } from './audit-log';
 import { files } from './files';
 import { invitations } from './invitations';
+import { sections } from './sections';
 import { costItems } from './cost-items';
 import { priceChanges, priceChangeLines } from './price-changes';
 import { clients } from './clients';
@@ -37,6 +40,7 @@ export const orgScopedTables = {
   auditLog,
   files,
   invitations,
+  sections,
   costItems,
   priceChanges,
   priceChangeLines,
@@ -56,6 +60,7 @@ export const allTables = {
   auditLog,
   files,
   invitations,
+  sections,
   costItems,
   priceChanges,
   priceChangeLines,
