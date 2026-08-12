@@ -3,6 +3,7 @@
 import { FileDown, Loader2 } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
 import { useTransition } from 'react';
+import { AnimatedNumber } from '@/components/data/animated-number';
 import { VarianceLadder, type LadderRow } from '@/components/data/variance-ladder';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -147,7 +148,13 @@ export function ProposalView({
           <Row label={t('p.subtotal')} value={money(detail.subtotal)} />
           <Row label={t('p.discount')} value={money(detail.discountAmount)} />
           <Row label={t('p.tax')} value={money(detail.taxAmount)} />
-          <Row label={t('p.total')} value={money(detail.total)} bold />
+          <div className="flex justify-between font-semibold">
+            <span className="text-muted-foreground">{t('p.total')}</span>
+            <AnimatedNumber
+              value={Number(detail.total)}
+              format={(n) => money(String(n))}
+            />
+          </div>
           {seeMargin && detail.totalMargin !== undefined && (
             <Row label={t('builder.margin')} value={money(detail.totalMargin)} />
           )}

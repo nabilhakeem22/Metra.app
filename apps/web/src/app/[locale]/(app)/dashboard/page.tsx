@@ -1,5 +1,6 @@
 import { organizations } from '@metra/db';
 import { getLocale, getTranslations } from 'next-intl/server';
+import type { CSSProperties } from 'react';
 import { VarianceLadder } from '@/components/data/variance-ladder';
 import { GettingStarted } from '@/components/dashboard/getting-started';
 import { Button } from '@/components/ui/button';
@@ -85,7 +86,10 @@ export default async function DashboardPage() {
 
       <div className="grid gap-4 lg:grid-cols-3">
         {/* Quiet, authored "ledger" block — honest empty figures, tabular, ruled. */}
-        <Card className="lg:col-span-2">
+        <Card
+          className="stagger-in lg:col-span-2"
+          style={{ ['--i']: 0 } as CSSProperties}
+        >
           <CardHeader className="flex-row items-center justify-between gap-2 space-y-0">
             <CardTitle>{d('ledgerTitle')}</CardTitle>
             <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
@@ -113,7 +117,7 @@ export default async function DashboardPage() {
           </div>
         </Card>
 
-        <Card>
+        <Card className="stagger-in" style={{ ['--i']: 1 } as CSSProperties}>
           <CardHeader>
             <CardTitle>{d('gaugeTitle')}</CardTitle>
           </CardHeader>
@@ -125,7 +129,7 @@ export default async function DashboardPage() {
 
       {/* The signature variance ladder — honest empty state until job-costing.
           NEVER a demo row. */}
-      <Card>
+      <Card className="stagger-in" style={{ ['--i']: 2 } as CSSProperties}>
         <CardHeader>
           <CardTitle>{v('title')}</CardTitle>
         </CardHeader>
