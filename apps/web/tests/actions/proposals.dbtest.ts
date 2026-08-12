@@ -320,6 +320,68 @@ describe('F1 — margin-blind save preserves stored cost', () => {
   });
 });
 
+describe('supervision fee (after VAT, untaxed; persisted + guarded)', () => {
+  it('LOCKED: 100,000 / discount 0 / VAT 14% / supervision 10% -> total 124,000', async () => {
+    const { ctx, clientId, projectId } = await setup();
+    const id = ((await createProposalCore(ctx, { clientId, projectId })) as { data?: string }).data!;
+    const res = await saveProposalDraftCore(ctx, {
+      id,
+      header: { discountPct: '0', taxRate: '14', supervisionPct: '10' },
+      sections: [
+        {
+          titleEn: 'S',
+          lines: [
+            { descriptionEn: 'x', qty: '1', unit: 'lump_sum', unitCost: '0', unitPrice: '100000', discountPct: '0' },
+          ],
+        },
+      ],
+    });
+    expect(res.ok).toBe(true);
+    const d = await getProposalWithLines(ctx, id, true);
+    expect(d!.taxableBase).toBe('100000.0000');
+    expect(d!.taxAmount).toBe('14000.0000');
+    expect(d!.supervisionPct).toBe('10.0000');
+    expect(d!.supervisionAmount).toBe('10000.0000');
+    expect(d!.total).toBe('124000.0000');
+  });
+
+  it('rejects supervisionPct out of range; nothing persists', async () => {
+    const { ctx, clientId, projectId } = await setup();
+    const id = ((await createProposalCore(ctx, { clientId, projectId })) as { data?: string }).data!;
+    expect(
+      await saveProposalDraftCore(ctx, { id, header: { supervisionPct: '150' }, sections: [] }),
+    ).toEqual({ ok: false, error: 'supervision_out_of_range' });
+    const d = await getProposalWithLines(ctx, id, true);
+    expect(d!.supervisionPct).toBe('0.0000');
+  });
+
+  it('DB CHECK rejects a direct supervision_pct = 150 write (23514)', async () => {
+    const { ctx, clientId, projectId } = await setup();
+    const id = ((await createProposalCore(ctx, { clientId, projectId })) as { data?: string }).data!;
+    await expect(
+      raw.query(
+        `update public.proposals set supervision_pct = 150 where id = '${id}'`,
+      ),
+    ).rejects.toMatchObject({ code: '23514' });
+  });
+
+  it('supersede deep-copies supervision into the new draft', async () => {
+    const { ctx, clientId, projectId } = await setup();
+    const id = ((await createProposalCore(ctx, { clientId, projectId })) as { data?: string }).data!;
+    await saveProposalDraftCore(ctx, {
+      id,
+      header: { taxRate: '14', supervisionPct: '10' },
+      sections: twoSections,
+    });
+    await sendProposalCore(ctx, { id });
+    const res = await supersedeProposalCore(ctx, { id });
+    expect(res.ok).toBe(true);
+    const copy = await getProposalWithLines(ctx, (res as { data?: string }).data!, true);
+    expect(copy!.supervisionPct).toBe('10.0000');
+    expect(copy!.status).toBe('draft');
+  });
+});
+
 describe('F2 — discount out of range', () => {
   it('rejects line + doc discount > 100; nothing persists', async () => {
     const { ctx, clientId, projectId } = await setup();
