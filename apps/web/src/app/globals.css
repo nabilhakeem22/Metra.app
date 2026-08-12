@@ -133,4 +133,77 @@
   .tabular {
     font-variant-numeric: tabular-nums;
   }
+
+  /* The money law: every figure is mono, tabular, LTR, aligned to the inline end. */
+  .num {
+    font-family: var(--font-mono), ui-monospace, monospace;
+    font-variant-numeric: tabular-nums;
+    direction: ltr;
+    text-align: end;
+  }
+
+  /* First-load stagger entrance. Delay via inline `style={{ '--i': n }}`. */
+  .stagger-in {
+    animation: stagger-in var(--dur-2) var(--ease-out) both;
+    animation-delay: calc(var(--i, 0) * 40ms);
+  }
+
+  /* Snap-line draw: scaleX(0->1) with the taut-string overshoot. */
+  .snap-draw {
+    transform-origin: center;
+    animation: snapin var(--dur-snap) var(--ease-snap) both;
+  }
+}
+
+/* Motion tokens (Snap Line). */
+:root {
+  --dur-1: 120ms;
+  --dur-2: 220ms;
+  --dur-3: 400ms;
+  --dur-snap: 500ms;
+  --ease-out: cubic-bezier(0.2, 0.7, 0.3, 1);
+  --ease-snap: cubic-bezier(0.2, 1.4, 0.4, 1);
+}
+
+@keyframes stagger-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.99);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes snapin {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+/* Line-draw: base state is fully drawn (offset 0), so reduced-motion lands there. */
+@keyframes draw {
+  from {
+    stroke-dashoffset: var(--draw-len, 100);
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+/* Global reduced-motion guard — kill animation + transitions; every animated
+   element's BASE style is its composed final state, so this lands correctly. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
 }
