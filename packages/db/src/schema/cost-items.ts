@@ -10,15 +10,18 @@ import {
   type AnyPgColumn,
 } from 'drizzle-orm/pg-core';
 import { bilingual, bilingualCheck, money } from './_helpers';
-import { costItemCategory, costItemUnit } from './enums';
+import { costItemUnit } from './enums';
 import { organizations } from './organizations';
 import { orgScoped } from './org-scoped';
+import { sameOrgFk } from './org-ref';
+import { sections } from './sections';
 
 /**
  * Price Book cost items (P1 Slice 1). One catalogue row per org: a code, a
- * bilingual name, a category + unit, and default cost/price in EGP money().
- * `unique(org_id, id)` is the universal composite-FK target; `unique(org_id,
- * code)` makes code the human key within an org (import is insert-only on it).
+ * bilingual name, a `section_id` (per-tenant, shared with the proposal builder)
+ * + unit, and default cost/price in EGP money(). `unique(org_id, id)` is the
+ * universal composite-FK target; `unique(org_id, code)` makes code the human
+ * key within an org (import is insert-only on it).
  */
 export const costItems = pgTable(
   'cost_items',
@@ -29,7 +32,7 @@ export const costItems = pgTable(
       .references((): AnyPgColumn => organizations.id, { onDelete: 'restrict' }),
     code: text('code').notNull(),
     ...bilingual('name'),
-    category: costItemCategory('category').notNull(),
+    sectionId: uuid('section_id').notNull(),
     unit: costItemUnit('unit').notNull(),
     defaultUnitCost: money('default_unit_cost').notNull().default('0'),
     defaultUnitPrice: money('default_unit_price').notNull().default('0'),
@@ -47,7 +50,7 @@ export const costItems = pgTable(
       'cost_items_default_unit_price_nonneg',
       sql`${t.defaultUnitPrice} >= 0`,
     ),
-    index('cost_items_org_category_idx').on(t.orgId, t.category),
+    ...sameOrgFk(t, 'section', sections, { onDelete: 'restrict' }),
     index('cost_items_org_active_idx').on(t.orgId, t.active),
   ],
 );

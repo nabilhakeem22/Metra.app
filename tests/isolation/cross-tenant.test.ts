@@ -417,11 +417,15 @@ describe('membership second factor — forged context is denied', () => {
   });
 
   it('forged context cannot INSERT into cost_items / price_changes / price_change_lines', async () => {
+    // A valid org-A section id (seeded) so RLS — not the FK — is the reason.
+    const [sec] = await pg<{ id: string }[]>`
+      select id from public.sections where org_id = ${ORG_A_ID} and key = 'civil' limit 1
+    `;
     await expect(
       rowsUnder(
         ctxForged,
-        `insert into public.cost_items (id, org_id, code, name_en, category, unit)
-         values (gen_random_uuid(), '${ORG_A_ID}', 'FORGE-${randomUUID()}', 'x', 'civil', 'sqm')`,
+        `insert into public.cost_items (id, org_id, code, name_en, section_id, unit)
+         values (gen_random_uuid(), '${ORG_A_ID}', 'FORGE-${randomUUID()}', 'x', '${sec.id}', 'sqm')`,
       ),
     ).rejects.toThrow();
 

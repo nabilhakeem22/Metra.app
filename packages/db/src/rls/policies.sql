@@ -98,6 +98,20 @@ create policy org_isolation on public.invitations
     and public.app_is_current_org_member()
   );
 
+-- sections (per-tenant work sections; shared by Price Book + proposal builder)
+alter table public.sections enable row level security;
+alter table public.sections force  row level security;
+drop policy if exists org_isolation on public.sections;
+create policy org_isolation on public.sections
+  using (
+    org_id = nullif(current_setting('app.current_org_id', true), '')::uuid
+    and public.app_is_current_org_member()
+  )
+  with check (
+    org_id = nullif(current_setting('app.current_org_id', true), '')::uuid
+    and public.app_is_current_org_member()
+  );
+
 -- cost_items (P1 Price Book)
 alter table public.cost_items enable row level security;
 alter table public.cost_items force  row level security;
@@ -220,20 +234,6 @@ alter table public.proposal_events enable row level security;
 alter table public.proposal_events force  row level security;
 drop policy if exists org_isolation on public.proposal_events;
 create policy org_isolation on public.proposal_events
-  using (
-    org_id = nullif(current_setting('app.current_org_id', true), '')::uuid
-    and public.app_is_current_org_member()
-  )
-  with check (
-    org_id = nullif(current_setting('app.current_org_id', true), '')::uuid
-    and public.app_is_current_org_member()
-  );
-
--- proposal_section_library (create-on-use section-title suggestions)
-alter table public.proposal_section_library enable row level security;
-alter table public.proposal_section_library force  row level security;
-drop policy if exists org_isolation on public.proposal_section_library;
-create policy org_isolation on public.proposal_section_library
   using (
     org_id = nullif(current_setting('app.current_org_id', true), '')::uuid
     and public.app_is_current_org_member()

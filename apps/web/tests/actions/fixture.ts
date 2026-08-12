@@ -112,9 +112,8 @@ export async function teardown(orgIds: string[]): Promise<void> {
       await pg.unsafe(`delete from public.projects where org_id='${id}'`);
       await pg.unsafe(`delete from public.clients where org_id='${id}'`);
       await pg.unsafe(`delete from public.cost_items where org_id='${id}'`);
-      await pg.unsafe(
-        `delete from public.proposal_section_library where org_id='${id}'`,
-      );
+      // sections are referenced by cost_items (restrict) -> after cost_items.
+      await pg.unsafe(`delete from public.sections where org_id='${id}'`);
       await pg.unsafe(`delete from public.audit_log where org_id='${id}'`);
       await pg.unsafe(`delete from public.invitations where org_id='${id}'`);
       await pg.unsafe(`delete from public.memberships where org_id='${id}'`);

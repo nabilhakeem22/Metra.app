@@ -10,7 +10,6 @@ import {
 } from 'drizzle-orm/pg-core';
 import { money } from './_helpers';
 import { costItems } from './cost-items';
-import { costItemCategory } from './enums';
 import { organizations } from './organizations';
 import { orgScoped } from './org-scoped';
 import { sameOrgFk } from './org-ref';
@@ -28,7 +27,9 @@ export const priceChanges = pgTable(
     orgId: uuid('org_id')
       .notNull()
       .references((): AnyPgColumn => organizations.id, { onDelete: 'restrict' }),
-    category: costItemCategory('category').notNull(),
+    // Frozen text snapshot of the section (key ?? nameEn ?? nameAr) at the time
+    // the bulk change ran — NOT an FK, so renaming a section never rewrites it.
+    category: text('category').notNull(),
     pctChange: numeric('pct_change', { precision: 9, scale: 4 }).notNull(),
     // 'cost' | 'price' | 'both'
     target: text('target').notNull(),

@@ -14,6 +14,8 @@ import { memberships } from '../schema/memberships';
 import { organizations } from '../schema/organizations';
 import { priceChangeLines, priceChanges } from '../schema/price-changes';
 import { projects } from '../schema/projects';
+import { DEFAULT_SECTIONS } from '../schema/section-defaults';
+import { sections } from '../schema/sections';
 import {
   CLIENT_A_ID,
   CLIENT_B_ID,
@@ -139,6 +141,24 @@ async function seedOrg(db: Parameters<typeof withOrgContext>[0], org: OrgSeed) {
         })
         .onConflictDoNothing();
 
+      // The 8 default sections (shared source for Price Book + builder).
+      await tx
+        .insert(sections)
+        .values(
+          DEFAULT_SECTIONS.map((s) => ({
+            orgId: org.orgId,
+            key: s.key,
+            nameEn: s.nameEn,
+            nameAr: s.nameAr,
+          })),
+        )
+        .onConflictDoNothing();
+      const [civilSection] = await tx
+        .select({ id: sections.id })
+        .from(sections)
+        .where(sql`${sections.key} = 'civil'`)
+        .limit(1);
+
       // A price-book cost item (idempotent on its fixed id).
       await tx
         .insert(costItems)
@@ -148,7 +168,7 @@ async function seedOrg(db: Parameters<typeof withOrgContext>[0], org: OrgSeed) {
           code: org.costItemCode,
           nameEn: 'Seed cost item',
           nameAr: 'بند تكلفة تجريبي',
-          category: 'civil',
+          sectionId: civilSection.id,
           unit: 'sqm',
           defaultUnitCost: '100.0000',
           defaultUnitPrice: '150.0000',

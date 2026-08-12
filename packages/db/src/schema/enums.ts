@@ -32,8 +32,9 @@ export const INVITATION_STATUSES = [
 export const invitationStatus = pgEnum('invitation_status', INVITATION_STATUSES);
 
 /**
- * P1 Price Book — cost-item categories (§ price book). Order is a contract; UI
- * labels are localized at render time, never stored. Do not reorder/rename.
+ * P1 Price Book — the ORIGINAL cost-item category keys. The pgEnum is retired
+ * (categories are now per-tenant `sections`); this plain const is kept as the
+ * seed key list + import alias source. Do not reorder/rename.
  */
 export const COST_ITEM_CATEGORIES = [
   'civil',
@@ -45,11 +46,6 @@ export const COST_ITEM_CATEGORIES = [
   'furniture',
   'preliminaries',
 ] as const;
-
-export const costItemCategory = pgEnum(
-  'cost_item_category',
-  COST_ITEM_CATEGORIES,
-);
 
 /** Cost-item units of measure. Labels localized (not stored). */
 export const COST_ITEM_UNITS = [
