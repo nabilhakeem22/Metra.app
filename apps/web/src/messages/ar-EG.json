@@ -342,7 +342,9 @@
     "title": "دليل الأسعار",
     "subtitle": "كتالوج بنود التكلفة — التكاليف والأسعار والتحديثات الجماعية.",
     "search": "ابحث بالكود أو الاسم",
-    "allCategories": "كل الفئات",
+    "allCategories": "كل الأقسام",
+    "addSection": "إضافة قسم",
+    "addSectionPlaceholder": "اسم القسم الجديد",
     "activeOnly": "المفعّلة فقط",
     "showAll": "عرض الكل",
     "itemsCount": "{count} بند",
@@ -370,7 +372,8 @@
     "table": {
       "code": "الكود",
       "name": "الاسم",
-      "category": "الفئة",
+      "category": "القسم",
+      "section": "القسم",
       "unit": "الوحدة",
       "cost": "تكلفة الوحدة",
       "price": "سعر الوحدة",
@@ -468,6 +471,7 @@
       "deactivated": "تم إلغاء تفعيل البند",
       "starterLoaded": "تم تحميل الكتالوج الابتدائي ({count} بند)",
       "starterExists": "بنود الكتالوج الابتدائي موجودة بالفعل",
+      "sectionAdded": "تمت إضافة القسم",
       "importFailed": "فشل الاستيراد"
     }
   },

@@ -19,7 +19,7 @@ import { toast } from '@/hooks/use-toast';
 import { useRouter } from '@/i18n/routing';
 import { PreviewModal } from './preview-modal';
 import { SectionCombobox, type SectionOption } from './section-combobox';
-import { addSectionLibraryEntry } from '@/lib/section-library/actions';
+import { addSection as recordSection } from '@/lib/sections/actions';
 import { resolveActionError } from '@/lib/actions/error-message';
 import type { ActionCode } from '@/lib/actions/result';
 import {
@@ -320,7 +320,7 @@ export function ProposalBuilder({
                   onChange={(patch) => patchSection(si, patch)}
                   onCreate={(name) => {
                     // Fire-and-forget: recording the title never blocks the build.
-                    void addSectionLibraryEntry(name);
+                    void recordSection(name);
                   }}
                   aria-describedby={`sec-hint-${si}`}
                 />

@@ -33,6 +33,23 @@ export async function seedOrg(opts: {
     `insert into public.organizations (id, name_en) values ('${orgId}', 'Test Org')`,
   );
 
+  // Seed the 8 default sections (mirrors createOrgCore) so Price Book + builder
+  // cores have a valid section_id to reference.
+  await pg.unsafe(
+    `insert into public.sections (org_id, key, name_en, name_ar)
+     select '${orgId}', d.key, d.name_en, d.name_ar
+     from (values
+       ('civil','Civil','أعمال مدنية'),
+       ('gypsum','Gypsum','جبس'),
+       ('electrical','Electrical','كهرباء'),
+       ('plumbing','Plumbing','سباكة'),
+       ('joinery','Joinery','نجارة'),
+       ('finishes','Finishes','تشطيبات'),
+       ('furniture','Furniture','أثاث'),
+       ('preliminaries','Preliminaries','أعمال تمهيدية')
+     ) as d(key, name_en, name_ar)`,
+  );
+
   const ownerIds: string[] = [];
   for (let i = 0; i < (opts.owners ?? 1); i += 1) {
     const uid = randomUUID();
@@ -84,6 +101,13 @@ export const raw = {
     return (await pg.unsafe(
       `select user_id, role from public.memberships where org_id = '${orgId}'`,
     )) as unknown as Array<{ user_id: string; role: string }>;
+  },
+  /** A seeded section's id by key (default 'civil') — for cost-item cores. */
+  async sectionId(orgId: string, key = 'civil'): Promise<string> {
+    const rows = (await pg.unsafe(
+      `select id from public.sections where org_id = '${orgId}' and key = '${key}' limit 1`,
+    )) as unknown as Array<{ id: string }>;
+    return rows[0].id;
   },
   /** Arbitrary read over the BYPASSRLS connection. */
   async query<T = Record<string, unknown>>(text: string): Promise<T[]> {

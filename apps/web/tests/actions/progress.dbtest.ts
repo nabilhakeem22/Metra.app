@@ -14,6 +14,7 @@ import {
 import {
   closeFixture,
   ctxFor,
+  raw,
   seedOrg,
   seedPendingInvite,
   teardown,
@@ -38,7 +39,7 @@ describe('getOnboardingProgress — in-org rows only', () => {
     const [client] = await listClients(ctx, {});
     await createProjectCore(ctx, { code: 'P', nameEn: 'Proj', clientId: client.id, status: 'active' });
     const [project] = await listProjects(ctx, {});
-    await createCostItemCore(ctx, { code: 'CI', nameEn: 'Item', category: 'civil', unit: 'sqm', defaultUnitCost: '1', defaultUnitPrice: '2' });
+    await createCostItemCore(ctx, { code: 'CI', nameEn: 'Item', sectionId: await raw.sectionId(orgId), unit: 'sqm', defaultUnitCost: '1', defaultUnitPrice: '2' });
     const propId = ((await createProposalCore(ctx, { clientId: client.id, projectId: project.id })) as { data?: string }).data!;
     await saveProposalDraftCore(ctx, { id: propId, sections: [{ titleEn: 'S', lines: [{ descriptionEn: 'x', qty: '1', unit: 'sqm', unitCost: '0', unitPrice: '1', discountPct: '0' }] }] });
     await sendProposalCore(ctx, { id: propId });

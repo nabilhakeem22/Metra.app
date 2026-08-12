@@ -19,11 +19,13 @@ import {
   type ColumnMapping,
   type ValidatedRow,
 } from '@/lib/price-book/import';
+import type { SectionOption } from './types';
 
 export interface ImportWizardProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   existingCodes: string[];
+  sections: SectionOption[];
 }
 
 type Step = 'upload' | 'map' | 'preview';
@@ -78,6 +80,7 @@ export function ImportWizard({
   open,
   onOpenChange,
   existingCodes,
+  sections,
 }: ImportWizardProps) {
   const t = useTranslations('priceBook');
   const th = useTranslations('hints.priceBook');
@@ -92,8 +95,8 @@ export function ImportWizard({
 
   const preview: ValidatedRow[] = useMemo(() => {
     if (step !== 'preview' || !mapping) return [];
-    return validateImportRows(data, mapping, existing);
-  }, [step, mapping, data, existing]);
+    return validateImportRows(data, mapping, existing, sections);
+  }, [step, mapping, data, existing, sections]);
 
   const validCount = preview.filter((r) => r.ok).length;
 

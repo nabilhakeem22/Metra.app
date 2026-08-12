@@ -17,6 +17,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Input } from '@/components/ui/input';
 import { toast } from '@/hooks/use-toast';
+import { useRouter } from '@/i18n/routing';
 import { resolveActionError } from '@/lib/actions/error-message';
 import type { ActionCode } from '@/lib/actions/result';
 import { formatMoney } from '@/lib/format/money';
@@ -25,25 +26,32 @@ import {
   loadStarterCatalogue,
   setCostItemActive,
 } from '@/lib/price-book/actions';
-import { CATEGORY_TOKENS } from '@/lib/price-book/import';
+import { addSection } from '@/lib/sections/actions';
 import { BulkUpdateDialog } from './bulk-update-dialog';
 import { CostItemForm } from './cost-item-form';
 import { ImportWizard } from './import-wizard';
-import type { PriceBookItem } from './types';
+import type { PriceBookItem, SectionOption } from './types';
 
 export interface PriceBookClientProps {
   items: PriceBookItem[];
+  sections: SectionOption[];
   canManage: boolean;
 }
 
-export function PriceBookClient({ items, canManage }: PriceBookClientProps) {
+export function PriceBookClient({
+  items,
+  sections,
+  canManage,
+}: PriceBookClientProps) {
   const t = useTranslations('priceBook');
   const te = useTranslations('errors');
   const locale = useLocale();
+  const router = useRouter();
 
   const [q, setQ] = useState('');
-  const [category, setCategory] = useState<string>('all');
+  const [sectionFilter, setSectionFilter] = useState<string>('all');
   const [activeOnly, setActiveOnly] = useState(false);
+  const [newSection, setNewSection] = useState('');
 
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<PriceBookItem | null>(null);
@@ -51,10 +59,13 @@ export function PriceBookClient({ items, canManage }: PriceBookClientProps) {
   const [importOpen, setImportOpen] = useState(false);
   const [pending, startTransition] = useTransition();
 
+  const sectionName = (s: SectionOption) =>
+    pickLocale({ nameAr: s.nameAr, nameEn: s.nameEn }, 'name', locale).value;
+
   const filtered = useMemo(() => {
     const needle = q.trim().toLowerCase();
     return items.filter((i) => {
-      if (category !== 'all' && i.category !== category) return false;
+      if (sectionFilter !== 'all' && i.sectionId !== sectionFilter) return false;
       if (activeOnly && !i.active) return false;
       if (needle) {
         const hay = `${i.code} ${i.nameEn ?? ''} ${i.nameAr ?? ''}`.toLowerCase();
@@ -62,14 +73,36 @@ export function PriceBookClient({ items, canManage }: PriceBookClientProps) {
       }
       return true;
     });
-  }, [items, q, category, activeOnly]);
+  }, [items, q, sectionFilter, activeOnly]);
 
   const grouped = useMemo(() => {
-    return CATEGORY_TOKENS.map((cat) => ({
-      category: cat,
-      rows: filtered.filter((i) => i.category === cat),
-    })).filter((g) => g.rows.length > 0);
-  }, [filtered]);
+    return sections
+      .map((s) => ({
+        section: s,
+        rows: filtered.filter((i) => i.sectionId === s.id),
+      }))
+      .filter((g) => g.rows.length > 0);
+  }, [filtered, sections]);
+
+  function onAddSection() {
+    const name = newSection.trim();
+    if (!name) return;
+    startTransition(async () => {
+      const res = await addSection(
+        locale.startsWith('ar') ? { nameAr: name } : { nameEn: name },
+      );
+      if (res.ok) {
+        setNewSection('');
+        toast({ title: t('toast.sectionAdded') });
+        router.refresh();
+      } else {
+        toast({
+          title: resolveActionError(res.error as ActionCode, te),
+          variant: 'destructive',
+        });
+      }
+    });
+  }
 
   function openNew() {
     setEditing(null);
@@ -115,12 +148,22 @@ export function PriceBookClient({ items, canManage }: PriceBookClientProps) {
 
   const dialogs = canManage && (
     <>
-      <CostItemForm open={formOpen} onOpenChange={setFormOpen} item={editing} />
-      <BulkUpdateDialog open={bulkOpen} onOpenChange={setBulkOpen} />
+      <CostItemForm
+        open={formOpen}
+        onOpenChange={setFormOpen}
+        item={editing}
+        sections={sections}
+      />
+      <BulkUpdateDialog
+        open={bulkOpen}
+        onOpenChange={setBulkOpen}
+        sections={sections}
+      />
       <ImportWizard
         open={importOpen}
         onOpenChange={setImportOpen}
         existingCodes={items.map((i) => i.code)}
+        sections={sections}
       />
     </>
   );
@@ -181,15 +224,15 @@ export function PriceBookClient({ items, canManage }: PriceBookClientProps) {
         </div>
 
         <select
-          value={category}
-          onChange={(e) => setCategory(e.target.value)}
+          value={sectionFilter}
+          onChange={(e) => setSectionFilter(e.target.value)}
           className="h-10 rounded-md border border-input bg-background px-3 text-sm"
-          aria-label={t('table.category')}
+          aria-label={t('table.section')}
         >
           <option value="all">{t('allCategories')}</option>
-          {CATEGORY_TOKENS.map((c) => (
-            <option key={c} value={c}>
-              {t(`categories.${c}`)}
+          {sections.map((s) => (
+            <option key={s.id} value={s.id}>
+              {sectionName(s)}
             </option>
           ))}
         </select>
@@ -204,7 +247,27 @@ export function PriceBookClient({ items, canManage }: PriceBookClientProps) {
         </label>
 
         {canManage && (
-          <div className="ms-auto flex flex-wrap gap-2">
+          <div className="ms-auto flex flex-wrap items-center gap-2">
+            <div className="flex items-center gap-1">
+              <Input
+                value={newSection}
+                onChange={(e) => setNewSection(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') onAddSection();
+                }}
+                placeholder={t('addSectionPlaceholder')}
+                className="h-10 w-40"
+                aria-label={t('addSection')}
+              />
+              <Button
+                variant="outline"
+                onClick={onAddSection}
+                disabled={pending || newSection.trim() === ''}
+              >
+                <Plus className="size-4" aria-hidden />
+                {t('addSection')}
+              </Button>
+            </div>
             <Button variant="outline" onClick={() => setBulkOpen(true)}>
               <Percent className="size-4" aria-hidden />
               {t('actions.bulkUpdate')}
@@ -229,11 +292,11 @@ export function PriceBookClient({ items, canManage }: PriceBookClientProps) {
         </Card>
       ) : (
         grouped.map((group) => (
-          <Card key={group.category}>
+          <Card key={group.section.id}>
             <CardContent className="p-0">
               <div className="flex items-center justify-between border-b px-4 py-2.5">
                 <h2 className="text-sm font-semibold">
-                  {t(`categories.${group.category}`)}
+                  {sectionName(group.section)}
                 </h2>
                 <span className="text-xs text-muted-foreground">
                   {t('itemsCount', { count: group.rows.length })}

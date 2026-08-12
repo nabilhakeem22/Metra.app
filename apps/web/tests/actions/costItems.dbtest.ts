@@ -16,7 +16,6 @@ afterAll(async () => {
 const base = {
   nameEn: 'Wall paint',
   nameAr: 'دهان حائط',
-  category: 'finishes' as const,
   unit: 'sqm' as const,
   defaultUnitCost: '45',
   defaultUnitPrice: '70',
@@ -27,8 +26,9 @@ describe('createCostItemCore', () => {
     const { orgId, ownerIds } = await seedOrg({ owners: 1 });
     orgIds.push(orgId);
     const ctx = ctxFor(orgId, ownerIds[0], 'owner');
+    const sectionId = await raw.sectionId(orgId);
 
-    const res = await createCostItemCore(ctx, { code: 'PB-1', ...base });
+    const res = await createCostItemCore(ctx, { code: 'PB-1', sectionId, ...base });
     expect(res.ok).toBe(true);
     expect(await raw.count('cost_items', orgId)).toBe(1);
     expect(await raw.count('audit_log', orgId)).toBe(1);
@@ -38,8 +38,9 @@ describe('createCostItemCore', () => {
     const { orgId, ownerIds } = await seedOrg({ owners: 1 });
     orgIds.push(orgId);
     const ctx = ctxFor(orgId, ownerIds[0], 'owner');
-    await createCostItemCore(ctx, { code: 'DUP', ...base });
-    const res = await createCostItemCore(ctx, { code: 'DUP', ...base });
+    const sectionId = await raw.sectionId(orgId);
+    await createCostItemCore(ctx, { code: 'DUP', sectionId, ...base });
+    const res = await createCostItemCore(ctx, { code: 'DUP', sectionId, ...base });
     expect(res).toEqual({ ok: false, error: 'code_taken' });
     expect(await raw.count('cost_items', orgId)).toBe(1);
   });
@@ -48,18 +49,37 @@ describe('createCostItemCore', () => {
     const { orgId, ownerIds } = await seedOrg({ owners: 1 });
     orgIds.push(orgId);
     const ctx = ctxFor(orgId, ownerIds[0], 'owner');
-    expect(await createCostItemCore(ctx, { code: '  ', ...base })).toEqual({
+    const sectionId = await raw.sectionId(orgId);
+    expect(
+      await createCostItemCore(ctx, { code: '  ', sectionId, ...base }),
+    ).toEqual({
       ok: false,
       error: 'code_required',
     });
     expect(
       await createCostItemCore(ctx, {
         code: 'X',
+        sectionId,
         ...base,
         nameEn: '',
         nameAr: '',
       }),
     ).toEqual({ ok: false, error: 'name_required' });
+  });
+
+  it('rejects a section from another org (invalid)', async () => {
+    const a = await seedOrg({ owners: 1 });
+    const b = await seedOrg({ owners: 1 });
+    orgIds.push(a.orgId, b.orgId);
+    const ctxA = ctxFor(a.orgId, a.ownerIds[0], 'owner');
+    const foreignSection = await raw.sectionId(b.orgId);
+    const res = await createCostItemCore(ctxA, {
+      code: 'XORG',
+      sectionId: foreignSection,
+      ...base,
+    });
+    expect(res).toEqual({ ok: false, error: 'invalid' });
+    expect(await raw.count('cost_items', a.orgId)).toBe(0);
   });
 
   it('forbids a viewer, a PM and an accountant from creating', async () => {
@@ -72,13 +92,14 @@ describe('createCostItemCore', () => {
       ],
     });
     orgIds.push(orgId);
+    const sectionId = await raw.sectionId(orgId);
     for (const uid of memberIds) {
       const role = (await raw.memberships(orgId)).find(
         (m) => m.user_id === uid,
       )!.role;
       const res = await createCostItemCore(
         ctxFor(orgId, uid, role as never),
-        { code: `C-${uid.slice(0, 4)}`, ...base },
+        { code: `C-${uid.slice(0, 4)}`, sectionId, ...base },
       );
       expect(res).toEqual({ ok: false, error: 'forbidden' });
     }
@@ -91,12 +112,14 @@ describe('update + activate', () => {
     const { orgId, ownerIds } = await seedOrg({ owners: 1 });
     orgIds.push(orgId);
     const ctx = ctxFor(orgId, ownerIds[0], 'owner');
-    await createCostItemCore(ctx, { code: 'UP-1', ...base });
+    const sectionId = await raw.sectionId(orgId);
+    await createCostItemCore(ctx, { code: 'UP-1', sectionId, ...base });
     const [item] = await listCostItems(ctx, {});
 
     const upd = await updateCostItemCore(ctx, {
       id: item.id,
       code: 'UP-1',
+      sectionId,
       ...base,
       defaultUnitPrice: '99',
     });

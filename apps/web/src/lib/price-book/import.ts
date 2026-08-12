@@ -1,19 +1,8 @@
 // PURE price-book import validator + resolvers. No server-only deps, no drizzle
-// values — importable by the client preview AND vitest. Category/unit tokens are
-// declared locally (typed against @metra/db's unions so a drift is a type error)
-// so this module never pulls the schema/drizzle into a client bundle.
-import type { CostItemCategory, CostItemUnit } from '@metra/db';
-
-export const CATEGORY_TOKENS: readonly CostItemCategory[] = [
-  'civil',
-  'gypsum',
-  'electrical',
-  'plumbing',
-  'joinery',
-  'finishes',
-  'furniture',
-  'preliminaries',
-];
+// values — importable by the client preview AND vitest. Section resolution maps a
+// spreadsheet token to one of the org's `sections` (passed in); unknown tokens
+// are REJECTED per-row (category_invalid) — import never auto-creates a section.
+import type { CostItemUnit } from '@metra/db';
 
 export const UNIT_TOKENS: readonly CostItemUnit[] = [
   'sqm',
@@ -23,9 +12,9 @@ export const UNIT_TOKENS: readonly CostItemUnit[] = [
   'day',
 ];
 
-// EN + AR aliases the resolver accepts in addition to the token itself. Kept in
-// sync with the localized labels shown in the UI (priceBook.categories/units.*).
-const CATEGORY_ALIASES: Record<CostItemCategory, string[]> = {
+// Retained EN + AR aliases for the 8 seeded defaults (keyed by section.key), so
+// a spreadsheet using the old category words still resolves after the unify.
+const DEFAULT_SECTION_ALIASES: Record<string, string[]> = {
   civil: ['civil', 'أعمال مدنية', 'مدني'],
   gypsum: ['gypsum', 'جبس', 'جبسوم'],
   electrical: ['electrical', 'كهرباء', 'كهربائي'],
@@ -54,7 +43,6 @@ function buildLookup<T extends string>(
   return m;
 }
 
-const CATEGORY_LOOKUP = buildLookup(CATEGORY_ALIASES);
 const UNIT_LOOKUP = buildLookup(UNIT_ALIASES);
 
 // §4.1 Arabic normalization so plain/hamza'd forms match: fold alef variants,
@@ -71,9 +59,37 @@ function norm(s: string): string {
     .replace(/ى/g, 'ي'); // ى -> ي
 }
 
-export function resolveCategory(text: string): CostItemCategory | null {
+/** The minimal shape resolveSection needs — a row from listSections. */
+export interface ImportSection {
+  id: string;
+  key: string | null;
+  nameEn: string | null;
+  nameAr: string | null;
+}
+
+/**
+ * Resolve a spreadsheet section token to one of the org's section ids. Matches
+ * (case/whitespace/Arabic-normalized) against each section's key, English name
+ * and Arabic name, then falls back to the retained aliases for the 8 defaults.
+ * Returns null for an unknown token (the row becomes category_invalid).
+ */
+export function resolveSection(
+  text: string,
+  sections: ImportSection[],
+): string | null {
   if (!text) return null;
-  return CATEGORY_LOOKUP.get(norm(text)) ?? null;
+  const n = norm(text);
+  for (const s of sections) {
+    if (s.key && norm(s.key) === n) return s.id;
+    if (s.nameEn && norm(s.nameEn) === n) return s.id;
+    if (s.nameAr && norm(s.nameAr) === n) return s.id;
+  }
+  for (const s of sections) {
+    if (s.key && DEFAULT_SECTION_ALIASES[s.key]?.some((a) => norm(a) === n)) {
+      return s.id;
+    }
+  }
+  return null;
 }
 
 export function resolveUnit(text: string): CostItemUnit | null {
@@ -110,7 +126,7 @@ export interface ParsedCostItem {
   code: string;
   nameEn: string | null;
   nameAr: string | null;
-  category: CostItemCategory;
+  sectionId: string;
   unit: CostItemUnit;
   defaultUnitCost: string;
   defaultUnitPrice: string;
@@ -152,15 +168,17 @@ function parseMoney(raw: string): string | null {
 }
 
 /**
- * Validates parsed spreadsheet rows against a column mapping and the org's
- * existing codes. Pure: returns one ValidatedRow per input row (same order),
- * each either { ok:true, data } or { ok:false, error }. Insert-only — a code
- * that already exists is a per-row `code_exists`, never a whole-file failure.
+ * Validates parsed spreadsheet rows against a column mapping, the org's existing
+ * codes AND its sections (the section token must resolve to one of them). Pure:
+ * returns one ValidatedRow per input row (same order), each either
+ * { ok:true, data } or { ok:false, error }. Insert-only — a code that already
+ * exists is a per-row `code_exists`, never a whole-file failure.
  */
 export function validateImportRows(
   rows: string[][],
   mapping: ColumnMapping,
   existingCodes: Set<string>,
+  sections: ImportSection[],
 ): ValidatedRow[] {
   const seen = new Set<string>();
   const out: ValidatedRow[] = [];
@@ -189,8 +207,8 @@ export function validateImportRows(
     if (existingCodes.has(code)) return fail('code_exists');
     if (!nameEn && !nameAr) return fail('name_missing');
 
-    const category = resolveCategory(categoryRaw);
-    if (!category) return fail('category_invalid');
+    const sectionId = resolveSection(categoryRaw, sections);
+    if (!sectionId) return fail('category_invalid');
     const unit = resolveUnit(unitRaw);
     if (!unit) return fail('unit_invalid');
 
@@ -208,7 +226,7 @@ export function validateImportRows(
         code,
         nameEn: nameEn || null,
         nameAr: nameAr || null,
-        category,
+        sectionId,
         unit,
         defaultUnitCost,
         defaultUnitPrice,

@@ -1,4 +1,4 @@
-import type { CostItemCategory, CostItemUnit } from '@metra/db';
+import type { CostItemUnit } from '@metra/db';
 
 /** Serialized cost item passed from the server page to the client. */
 export interface PriceBookItem {
@@ -6,7 +6,7 @@ export interface PriceBookItem {
   code: string;
   nameEn: string | null;
   nameAr: string | null;
-  category: CostItemCategory;
+  sectionId: string;
   unit: CostItemUnit;
   defaultUnitCost: string;
   defaultUnitPrice: string;
@@ -14,4 +14,12 @@ export interface PriceBookItem {
   etaItemCode: string | null;
   etaCodeType: string | null;
   active: boolean;
+}
+
+/** A section option for the Price Book filter/group + form select. */
+export interface SectionOption {
+  id: string;
+  key: string | null;
+  nameEn: string | null;
+  nameAr: string | null;
 }

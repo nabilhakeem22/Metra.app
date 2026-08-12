@@ -16,21 +16,24 @@ import {
 import { toast } from '@/hooks/use-toast';
 import { resolveActionError } from '@/lib/actions/error-message';
 import type { ActionCode } from '@/lib/actions/result';
+import { useLocale } from 'next-intl';
 import { createCostItem, updateCostItem } from '@/lib/price-book/actions';
-import { CATEGORY_TOKENS, UNIT_TOKENS } from '@/lib/price-book/import';
-import type { PriceBookItem } from './types';
+import { pickLocale } from '@/lib/i18n/pick-locale';
+import { UNIT_TOKENS } from '@/lib/price-book/import';
+import type { PriceBookItem, SectionOption } from './types';
 
 export interface CostItemFormProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   item?: PriceBookItem | null;
+  sections: SectionOption[];
 }
 
 interface FormState {
   code: string;
   nameEn: string;
   nameAr: string;
-  category: string;
+  sectionId: string;
   unit: string;
   defaultUnitCost: string;
   defaultUnitPrice: string;
@@ -39,12 +42,12 @@ interface FormState {
   etaCodeType: string;
 }
 
-function emptyState(): FormState {
+function emptyState(sections: SectionOption[]): FormState {
   return {
     code: '',
     nameEn: '',
     nameAr: '',
-    category: CATEGORY_TOKENS[0],
+    sectionId: sections[0]?.id ?? '',
     unit: UNIT_TOKENS[0],
     defaultUnitCost: '0',
     defaultUnitPrice: '0',
@@ -54,11 +57,17 @@ function emptyState(): FormState {
   };
 }
 
-export function CostItemForm({ open, onOpenChange, item }: CostItemFormProps) {
+export function CostItemForm({
+  open,
+  onOpenChange,
+  item,
+  sections,
+}: CostItemFormProps) {
   const t = useTranslations('priceBook');
   const th = useTranslations('hints.costItem');
   const te = useTranslations('errors');
-  const [form, setForm] = useState<FormState>(emptyState());
+  const locale = useLocale();
+  const [form, setForm] = useState<FormState>(emptyState(sections));
   const [pending, startTransition] = useTransition();
 
   useEffect(() => {
@@ -69,7 +78,7 @@ export function CostItemForm({ open, onOpenChange, item }: CostItemFormProps) {
             code: item.code,
             nameEn: item.nameEn ?? '',
             nameAr: item.nameAr ?? '',
-            category: item.category,
+            sectionId: item.sectionId,
             unit: item.unit,
             defaultUnitCost: item.defaultUnitCost,
             defaultUnitPrice: item.defaultUnitPrice,
@@ -77,9 +86,9 @@ export function CostItemForm({ open, onOpenChange, item }: CostItemFormProps) {
             etaItemCode: item.etaItemCode ?? '',
             etaCodeType: item.etaCodeType ?? '',
           }
-        : emptyState(),
+        : emptyState(sections),
     );
-  }, [open, item]);
+  }, [open, item, sections]);
 
   const set = (k: keyof FormState) => (v: string) =>
     setForm((f) => ({ ...f, [k]: v }));
@@ -90,7 +99,7 @@ export function CostItemForm({ open, onOpenChange, item }: CostItemFormProps) {
         code: form.code,
         nameEn: form.nameEn || null,
         nameAr: form.nameAr || null,
-        category: form.category as PriceBookItem['category'],
+        sectionId: form.sectionId,
         unit: form.unit as PriceBookItem['unit'],
         defaultUnitCost: form.defaultUnitCost,
         defaultUnitPrice: form.defaultUnitPrice,
@@ -178,12 +187,12 @@ export function CostItemForm({ open, onOpenChange, item }: CostItemFormProps) {
                 id="ci-category"
                 className={selectClass}
                 aria-describedby="ci-category-hint"
-                value={form.category}
-                onChange={(e) => set('category')(e.target.value)}
+                value={form.sectionId}
+                onChange={(e) => set('sectionId')(e.target.value)}
               >
-                {CATEGORY_TOKENS.map((c) => (
-                  <option key={c} value={c}>
-                    {t(`categories.${c}`)}
+                {sections.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {pickLocale({ nameAr: s.nameAr, nameEn: s.nameEn }, 'name', locale).value}
                   </option>
                 ))}
               </select>

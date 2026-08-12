@@ -276,7 +276,7 @@ describe('F1 — margin-blind save preserves stored cost', () => {
 
   it('(b) keeps an owner-overridden costItem cost when PM re-saves', async () => {
     const { ctx, pm, clientId, projectId } = await marginBlindSetup();
-    await createCostItemCore(ctx, { code: 'CI-1', nameEn: 'Item', category: 'civil', unit: 'sqm', defaultUnitCost: '100', defaultUnitPrice: '150' });
+    await createCostItemCore(ctx, { code: 'CI-1', nameEn: 'Item', sectionId: await raw.sectionId(ctx.orgId), unit: 'sqm', defaultUnitCost: '100', defaultUnitPrice: '150' });
     const [ci] = await listCostItems(ctx, {});
     const id = ((await createProposalCore(ctx, { clientId, projectId })) as { data?: string }).data!;
     // New cost-item line -> seeds cost from the price book (100).
@@ -308,7 +308,7 @@ describe('F1 — margin-blind save preserves stored cost', () => {
 
   it('(c) a NEW costItem line seeds cost from the price book', async () => {
     const { ctx, clientId, projectId } = await marginBlindSetup();
-    await createCostItemCore(ctx, { code: 'CI-2', nameEn: 'Item2', category: 'civil', unit: 'sqm', defaultUnitCost: '77', defaultUnitPrice: '150' });
+    await createCostItemCore(ctx, { code: 'CI-2', nameEn: 'Item2', sectionId: await raw.sectionId(ctx.orgId), unit: 'sqm', defaultUnitCost: '77', defaultUnitPrice: '150' });
     const [ci] = await listCostItems(ctx, {});
     const id = ((await createProposalCore(ctx, { clientId, projectId })) as { data?: string }).data!;
     await saveProposalDraftCore(ctx, {

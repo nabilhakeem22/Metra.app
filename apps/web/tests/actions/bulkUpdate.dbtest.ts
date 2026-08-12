@@ -17,25 +17,27 @@ describe('bulkUpdatePricesCore — piastre-exact', () => {
     const { orgId, ownerIds } = await seedOrg({ owners: 1 });
     orgIds.push(orgId);
     const ctx = ctxFor(orgId, ownerIds[0], 'owner');
+    const civil = await raw.sectionId(orgId, 'civil');
+    const gypsum = await raw.sectionId(orgId, 'gypsum');
 
     await createCostItemCore(ctx, {
       code: 'CIV-A',
-      nameEn: 'Round', category: 'civil', unit: 'sqm',
+      nameEn: 'Round', sectionId: civil, unit: 'sqm',
       defaultUnitCost: '100.0000', defaultUnitPrice: '200.0000',
     });
     await createCostItemCore(ctx, {
       code: 'CIV-B',
-      nameEn: 'Third', category: 'civil', unit: 'sqm',
+      nameEn: 'Third', sectionId: civil, unit: 'sqm',
       defaultUnitCost: '33.3333', defaultUnitPrice: '33.3333',
     });
     await createCostItemCore(ctx, {
       code: 'GYP-A',
-      nameEn: 'Other', category: 'gypsum', unit: 'sqm',
+      nameEn: 'Other', sectionId: gypsum, unit: 'sqm',
       defaultUnitCost: '500.0000', defaultUnitPrice: '500.0000',
     });
 
     const res = await bulkUpdatePricesCore(ctx, {
-      category: 'civil',
+      sectionId: civil,
       pct: 15,
       target: 'both',
     });
@@ -63,11 +65,12 @@ describe('bulkUpdatePricesCore — piastre-exact', () => {
     const { orgId, ownerIds } = await seedOrg({ owners: 1 });
     orgIds.push(orgId);
     const ctx = ctxFor(orgId, ownerIds[0], 'owner');
+    const civil = await raw.sectionId(orgId, 'civil');
     expect(
-      await bulkUpdatePricesCore(ctx, { category: 'civil', pct: 2000, target: 'both' }),
+      await bulkUpdatePricesCore(ctx, { sectionId: civil, pct: 2000, target: 'both' }),
     ).toEqual({ ok: false, error: 'invalid_percentage' });
     expect(
-      await bulkUpdatePricesCore(ctx, { category: 'civil', pct: -150, target: 'cost' }),
+      await bulkUpdatePricesCore(ctx, { sectionId: civil, pct: -150, target: 'cost' }),
     ).toEqual({ ok: false, error: 'invalid_percentage' });
   });
 
@@ -77,9 +80,10 @@ describe('bulkUpdatePricesCore — piastre-exact', () => {
       members: [{ role: 'project_manager' }],
     });
     orgIds.push(orgId);
+    const civil = await raw.sectionId(orgId, 'civil');
     const res = await bulkUpdatePricesCore(
       ctxFor(orgId, memberIds[0], 'project_manager'),
-      { category: 'civil', pct: 10, target: 'both' },
+      { sectionId: civil, pct: 10, target: 'both' },
     );
     expect(res).toEqual({ ok: false, error: 'forbidden' });
   });
@@ -90,11 +94,12 @@ describe('price history is append-only', () => {
     const { orgId, ownerIds } = await seedOrg({ owners: 1 });
     orgIds.push(orgId);
     const ctx = ctxFor(orgId, ownerIds[0], 'owner');
+    const civil = await raw.sectionId(orgId, 'civil');
     await createCostItemCore(ctx, {
-      code: 'H-1', nameEn: 'H', category: 'civil', unit: 'sqm',
+      code: 'H-1', nameEn: 'H', sectionId: civil, unit: 'sqm',
       defaultUnitCost: '10', defaultUnitPrice: '20',
     });
-    await bulkUpdatePricesCore(ctx, { category: 'civil', pct: 5, target: 'both' });
+    await bulkUpdatePricesCore(ctx, { sectionId: civil, pct: 5, target: 'both' });
 
     await expect(
       withOrgContext(ctx, (tx) =>

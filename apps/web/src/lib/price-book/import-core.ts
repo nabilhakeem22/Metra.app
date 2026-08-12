@@ -3,7 +3,8 @@
 // importCostItemsCore writes through mutateInOrg. Partial success is a hard
 // contract: valid rows import, invalid rows are per-row errors, the whole file
 // is NEVER rejected.
-import { costItems } from '@metra/db';
+import { costItems, sections } from '@metra/db';
+import { eq } from 'drizzle-orm';
 import { mutateInOrg } from '@/lib/actions/mutate';
 import { err, type ActionResult } from '@/lib/actions/result';
 import type { OrgContext } from '@/lib/db/context';
@@ -73,7 +74,23 @@ export async function importCostItemsCore(
       // Case-SENSITIVE, matching the DB unique(org_id, code).
       const existingCodes = new Set(existing.map((r) => r.code));
 
-      const results = validateImportRows(input.rows, input.mapping, existingCodes);
+      // The org's sections drive resolution; an unknown token -> category_invalid.
+      const orgSections = await tx
+        .select({
+          id: sections.id,
+          key: sections.key,
+          nameEn: sections.nameEn,
+          nameAr: sections.nameAr,
+        })
+        .from(sections)
+        .where(eq(sections.active, true));
+
+      const results = validateImportRows(
+        input.rows,
+        input.mapping,
+        existingCodes,
+        orgSections,
+      );
       const valid = results.filter((r) => r.ok && r.data);
 
       if (valid.length > 0) {
@@ -83,7 +100,7 @@ export async function importCostItemsCore(
             code: r.data!.code,
             nameEn: r.data!.nameEn,
             nameAr: r.data!.nameAr,
-            category: r.data!.category,
+            sectionId: r.data!.sectionId,
             unit: r.data!.unit,
             defaultUnitCost: r.data!.defaultUnitCost,
             defaultUnitPrice: r.data!.defaultUnitPrice,

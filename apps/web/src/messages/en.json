@@ -342,7 +342,9 @@
     "title": "Price Book",
     "subtitle": "Your catalogue of cost items — costs, prices, and bulk updates.",
     "search": "Search code or name",
-    "allCategories": "All categories",
+    "allCategories": "All sections",
+    "addSection": "Add section",
+    "addSectionPlaceholder": "New section name",
     "activeOnly": "Active only",
     "showAll": "Show all",
     "itemsCount": "{count} items",
@@ -370,7 +372,8 @@
     "table": {
       "code": "Code",
       "name": "Name",
-      "category": "Category",
+      "category": "Section",
+      "section": "Section",
       "unit": "Unit",
       "cost": "Unit cost",
       "price": "Unit price",
@@ -468,6 +471,7 @@
       "deactivated": "Item deactivated",
       "starterLoaded": "Starter catalogue loaded ({count} items)",
       "starterExists": "Starter items are already present",
+      "sectionAdded": "Section added",
       "importFailed": "Import failed"
     }
   },

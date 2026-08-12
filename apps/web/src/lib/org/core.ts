@@ -1,7 +1,7 @@
 // PURE core for org creation (no next/*, no getSessionUser, no cookies). The
 // 'use server' createOrg wrapper does the session/existing-check/redirect and
 // delegates here. Exercised directly by tests/actions/createOrg.dbtest.ts.
-import { memberships, organizations } from '@metra/db';
+import { DEFAULT_SECTIONS, memberships, organizations, sections } from '@metra/db';
 import { mutateInOrg } from '@/lib/actions/mutate';
 import { err, type ActionResult } from '@/lib/actions/result';
 import type { OrgContext } from '@/lib/db/context';
@@ -59,6 +59,15 @@ export async function createOrgCore(
     await tx
       .insert(memberships)
       .values({ orgId: ctx.orgId, userId: ctx.userId, role: 'owner' });
+    // Seed the 8 default work sections (shared by Price Book + proposal builder).
+    await tx.insert(sections).values(
+      DEFAULT_SECTIONS.map((s) => ({
+        orgId: ctx.orgId,
+        key: s.key,
+        nameEn: s.nameEn,
+        nameAr: s.nameAr,
+      })),
+    );
     await audit({
       entity: 'organization',
       entityId: ctx.orgId,

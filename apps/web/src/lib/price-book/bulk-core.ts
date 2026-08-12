@@ -2,23 +2,24 @@
 // the multiply+round happens in SQL (numeric), never in JS float. It writes a
 // first-class price_changes header + one price_change_line per touched item
 // (A2 append-only), all in one transaction.
-import { costItems, priceChangeLines, priceChanges } from '@metra/db';
-import { sql } from 'drizzle-orm';
-import { mutateInOrg } from '@/lib/actions/mutate';
+import { costItems, priceChangeLines, priceChanges, sections } from '@metra/db';
+import { eq, sql } from 'drizzle-orm';
+import { fail, mutateInOrg } from '@/lib/actions/mutate';
 import { err, type ActionResult } from '@/lib/actions/result';
 import type { OrgContext } from '@/lib/db/context';
-import { CATEGORY_TOKENS } from './import';
 import { STARTER_CATALOGUE } from './starter-catalogue';
-import type { CostItemCategory } from '@metra/db';
 
 export type PriceTarget = 'cost' | 'price' | 'both';
 
 export interface BulkUpdateInput {
-  category: CostItemCategory;
+  sectionId: string;
   pct: number | string;
   target: PriceTarget;
   effectiveDate?: string; // YYYY-MM-DD; metadata only
 }
+
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export interface BulkUpdateSummary {
   changeId: string;
@@ -57,7 +58,7 @@ export async function bulkUpdatePricesCore(
   if (input.target !== 'cost' && input.target !== 'price' && input.target !== 'both') {
     return err('invalid');
   }
-  if (!CATEGORY_TOKENS.includes(input.category)) return err('invalid');
+  if (!UUID_RE.test(input.sectionId ?? '')) return err('invalid');
   const effectiveDate =
     input.effectiveDate && ISO_DATE.test(input.effectiveDate)
       ? input.effectiveDate
@@ -71,6 +72,21 @@ export async function bulkUpdatePricesCore(
     ctx,
     { capability: 'price_book', action: 'update' },
     async (tx, audit) => {
+      // The section must exist in THIS org (RLS-scoped). Its snapshot text is
+      // frozen onto the price_changes row (NOT an FK).
+      const [section] = await tx
+        .select({
+          key: sections.key,
+          nameEn: sections.nameEn,
+          nameAr: sections.nameAr,
+        })
+        .from(sections)
+        .where(eq(sections.id, input.sectionId))
+        .limit(1);
+      if (!section) fail('invalid');
+      const categorySnapshot =
+        section.key ?? section.nameEn ?? section.nameAr ?? input.sectionId;
+
       // Atomic: capture old values (pre-update snapshot via the FROM subquery),
       // apply round(x * (1 + pct/100), 4) in SQL, return old + new per row.
       const updated = (await tx.execute(sql`
@@ -90,7 +106,7 @@ export async function bulkUpdatePricesCore(
         from (
           select id, default_unit_cost as old_cost, default_unit_price as old_price
           from public.cost_items
-          where category::text = ${input.category}
+          where section_id = ${input.sectionId}
         ) old
         where c.id = old.id
         returning
@@ -105,7 +121,7 @@ export async function bulkUpdatePricesCore(
         .insert(priceChanges)
         .values({
           orgId: ctx.orgId,
-          category: input.category,
+          category: categorySnapshot,
           pctChange: pct.toString(),
           target: input.target,
           effectiveDate,
@@ -134,7 +150,8 @@ export async function bulkUpdatePricesCore(
         action: 'create',
         before: null,
         after: {
-          category: input.category,
+          section_id: input.sectionId,
+          category: categorySnapshot,
           pct_change: pct.toString(),
           target: input.target,
           item_count: updated.length,
@@ -162,24 +179,38 @@ export async function loadStarterCatalogueCore(
     ctx,
     { capability: 'price_book', action: 'create' },
     async (tx, audit) => {
-      const inserted = await tx
-        .insert(costItems)
-        .values(
-          STARTER_CATALOGUE.map((it) => ({
-            orgId: ctx.orgId,
-            code: it.code,
-            nameEn: it.nameEn,
-            nameAr: it.nameAr,
-            category: it.category,
-            unit: it.unit,
-            defaultUnitCost: it.defaultUnitCost,
-            defaultUnitPrice: it.defaultUnitPrice,
-          })),
-        )
-        .onConflictDoNothing({
-          target: [costItems.orgId, costItems.code],
-        })
-        .returning({ id: costItems.id });
+      // Map each starter item's category KEY to this org's section id.
+      const orgSections = await tx
+        .select({ id: sections.id, key: sections.key })
+        .from(sections);
+      const sectionByKey = new Map(
+        orgSections.filter((s) => s.key).map((s) => [s.key as string, s.id]),
+      );
+
+      const rows = STARTER_CATALOGUE.flatMap((it) => {
+        const sectionId = sectionByKey.get(it.category);
+        return sectionId
+          ? [
+              {
+                orgId: ctx.orgId,
+                code: it.code,
+                nameEn: it.nameEn,
+                nameAr: it.nameAr,
+                sectionId,
+                unit: it.unit,
+                defaultUnitCost: it.defaultUnitCost,
+                defaultUnitPrice: it.defaultUnitPrice,
+              },
+            ]
+          : [];
+      });
+      const inserted = rows.length
+        ? await tx
+            .insert(costItems)
+            .values(rows)
+            .onConflictDoNothing({ target: [costItems.orgId, costItems.code] })
+            .returning({ id: costItems.id })
+        : [];
 
       if (inserted.length > 0) {
         await audit({

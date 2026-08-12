@@ -1,22 +1,18 @@
 // PURE price-book CRUD cores — no next/*, no getSessionUser, no cookies. Take an
 // OrgContext + validated input; the 'use server' wrappers in ./actions do the
 // session/requireOrg work and delegate. Exercised directly by *.dbtest.ts.
-import {
-  costItems,
-  type CostItemCategory,
-  type CostItemUnit,
-} from '@metra/db';
+import { costItems, sections, type CostItemUnit, type MetraDb } from '@metra/db';
 import { and, eq, ne } from 'drizzle-orm';
 import { fail, mutateInOrg } from '@/lib/actions/mutate';
 import { err, type ActionResult } from '@/lib/actions/result';
 import type { OrgContext } from '@/lib/db/context';
-import { CATEGORY_TOKENS, UNIT_TOKENS } from './import';
+import { UNIT_TOKENS } from './import';
 
 export interface CostItemInput {
   code: string;
   nameEn?: string | null;
   nameAr?: string | null;
-  category: CostItemCategory;
+  sectionId: string;
   unit: CostItemUnit;
   defaultUnitCost?: string | null;
   defaultUnitPrice?: string | null;
@@ -25,11 +21,24 @@ export interface CostItemInput {
   etaCodeType?: string | null;
 }
 
-function isCategory(v: unknown): v is CostItemCategory {
-  return CATEGORY_TOKENS.includes(v as CostItemCategory);
-}
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 function isUnit(v: unknown): v is CostItemUnit {
   return UNIT_TOKENS.includes(v as CostItemUnit);
+}
+
+/** The section must exist in THIS org (RLS-scoped tx). Returns true if usable. */
+async function sectionUsable(
+  tx: MetraDb,
+  sectionId: string,
+): Promise<boolean> {
+  const [row] = await tx
+    .select({ id: sections.id })
+    .from(sections)
+    .where(eq(sections.id, sectionId))
+    .limit(1);
+  return !!row;
 }
 
 /** Normalize a money input to a non-negative decimal string, or null if bad. */
@@ -50,7 +59,9 @@ export async function createCostItemCore(
   const nameEn = input.nameEn?.trim() || null;
   const nameAr = input.nameAr?.trim() || null;
   if (!nameEn && !nameAr) return err('name_required');
-  if (!isCategory(input.category) || !isUnit(input.unit)) return err('invalid');
+  if (!UUID_RE.test(input.sectionId ?? '') || !isUnit(input.unit)) {
+    return err('invalid');
+  }
   const cost = normMoney(input.defaultUnitCost);
   const price = normMoney(input.defaultUnitPrice);
   if (cost === null || price === null) return err('invalid');
@@ -59,6 +70,8 @@ export async function createCostItemCore(
     ctx,
     { capability: 'price_book', action: 'create' },
     async (tx, audit) => {
+      if (!(await sectionUsable(tx, input.sectionId))) fail('invalid');
+
       const [dup] = await tx
         .select({ id: costItems.id })
         .from(costItems)
@@ -73,7 +86,7 @@ export async function createCostItemCore(
           code,
           nameEn,
           nameAr,
-          category: input.category,
+          sectionId: input.sectionId,
           unit: input.unit,
           defaultUnitCost: cost,
           defaultUnitPrice: price,
@@ -88,7 +101,7 @@ export async function createCostItemCore(
         entityId: row.id,
         action: 'create',
         before: null,
-        after: { code, nameEn, nameAr, category: input.category, unit: input.unit },
+        after: { code, nameEn, nameAr, section_id: input.sectionId, unit: input.unit },
       });
       return row.id;
     },
@@ -104,7 +117,9 @@ export async function updateCostItemCore(
   const nameEn = input.nameEn?.trim() || null;
   const nameAr = input.nameAr?.trim() || null;
   if (!nameEn && !nameAr) return err('name_required');
-  if (!isCategory(input.category) || !isUnit(input.unit)) return err('invalid');
+  if (!UUID_RE.test(input.sectionId ?? '') || !isUnit(input.unit)) {
+    return err('invalid');
+  }
   const cost = normMoney(input.defaultUnitCost);
   const price = normMoney(input.defaultUnitPrice);
   if (cost === null || price === null) return err('invalid');
@@ -119,6 +134,7 @@ export async function updateCostItemCore(
         .where(eq(costItems.id, input.id))
         .limit(1);
       if (!before) fail('invalid');
+      if (!(await sectionUsable(tx, input.sectionId))) fail('invalid');
 
       // Code must stay unique within the org (excluding this row).
       const [dup] = await tx
@@ -134,7 +150,7 @@ export async function updateCostItemCore(
           code,
           nameEn,
           nameAr,
-          category: input.category,
+          sectionId: input.sectionId,
           unit: input.unit,
           defaultUnitCost: cost,
           defaultUnitPrice: price,

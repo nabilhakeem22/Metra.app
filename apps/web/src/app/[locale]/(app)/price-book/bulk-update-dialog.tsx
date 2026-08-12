@@ -1,7 +1,7 @@
 'use client';
 
 import { Loader2 } from 'lucide-react';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import { useState, useTransition } from 'react';
 import { Button } from '@/components/ui/button';
 import { FieldHint } from '@/components/ui/field-hint';
@@ -16,22 +16,28 @@ import {
 import { toast } from '@/hooks/use-toast';
 import { resolveActionError } from '@/lib/actions/error-message';
 import type { ActionCode } from '@/lib/actions/result';
+import { pickLocale } from '@/lib/i18n/pick-locale';
 import { bulkUpdatePrices } from '@/lib/price-book/actions';
-import { CATEGORY_TOKENS } from '@/lib/price-book/import';
-import type { PriceBookItem } from './types';
+import type { SectionOption } from './types';
 
 export interface BulkUpdateDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  sections: SectionOption[];
 }
 
 type Target = 'cost' | 'price' | 'both';
 
-export function BulkUpdateDialog({ open, onOpenChange }: BulkUpdateDialogProps) {
+export function BulkUpdateDialog({
+  open,
+  onOpenChange,
+  sections,
+}: BulkUpdateDialogProps) {
   const t = useTranslations('priceBook');
   const th = useTranslations('hints.priceBook');
   const te = useTranslations('errors');
-  const [category, setCategory] = useState<string>(CATEGORY_TOKENS[0]);
+  const locale = useLocale();
+  const [sectionId, setSectionId] = useState<string>(sections[0]?.id ?? '');
   const [pct, setPct] = useState('0');
   const [target, setTarget] = useState<Target>('both');
   const [effectiveDate, setEffectiveDate] = useState(
@@ -42,7 +48,7 @@ export function BulkUpdateDialog({ open, onOpenChange }: BulkUpdateDialogProps) 
   function apply() {
     startTransition(async () => {
       const res = await bulkUpdatePrices({
-        category: category as PriceBookItem['category'],
+        sectionId,
         pct,
         target,
         effectiveDate,
@@ -80,12 +86,12 @@ export function BulkUpdateDialog({ open, onOpenChange }: BulkUpdateDialogProps) 
               id="bulk-category"
               className={selectClass}
               aria-describedby="bulk-category-hint"
-              value={category}
-              onChange={(e) => setCategory(e.target.value)}
+              value={sectionId}
+              onChange={(e) => setSectionId(e.target.value)}
             >
-              {CATEGORY_TOKENS.map((c) => (
-                <option key={c} value={c}>
-                  {t(`categories.${c}`)}
+              {sections.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {pickLocale({ nameAr: s.nameAr, nameEn: s.nameEn }, 'name', locale).value}
                 </option>
               ))}
             </select>
