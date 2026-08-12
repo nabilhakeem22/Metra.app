@@ -184,6 +184,18 @@
   }
 }
 
+/* Coachmark: origin-aware scale-in from the anchored element. */
+@keyframes coach-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
 /* Motion tokens (Snap Line). */
 :root {
   --dur-1: 120ms;

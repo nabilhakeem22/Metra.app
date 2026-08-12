@@ -2,10 +2,10 @@
 
 import { useTranslations } from 'next-intl';
 import { useEffect, useRef, useState } from 'react';
+import type { CSSProperties } from 'react';
 import { createPortal } from 'react-dom';
 import { Button } from '@/components/ui/button';
 import { usePathname } from '@/i18n/routing';
-import { cn } from '@/lib/utils';
 import { coachmarkKey, inlineStartOffset } from './coachmark-logic';
 import { useTour } from './use-tour';
 
@@ -118,36 +118,55 @@ export function Coachmark({ paused = false }: { paused?: boolean }) {
   );
   const titleId = `tour-${current.id}-title`;
   const isLast = index >= total - 1;
+  // Origin-aware scale-in from the anchor's inline-start top (flips in RTL).
+  // Re-keyed per step, so a move between anchors replays the entrance in place
+  // (transform/opacity only — no position tween).
+  const scaleIn: CSSProperties = reduced
+    ? {}
+    : {
+        animation: 'coach-in var(--dur-2) var(--ease-out) both',
+        transformOrigin: rtl ? '100% 0' : '0 0',
+      };
 
   return createPortal(
     <>
+      {/* Spotlight: the ring cuts a lit hole and a huge box-shadow dims the rest
+          (mask reveal). Non-blocking — the shadow is visual, ring is inert. */}
       <div
+        key={`ring-${current.id}`}
         aria-hidden
-        className="fixed inset-0 z-[60] bg-foreground/30"
-        style={{ pointerEvents: 'none' }}
-      />
-      <div
-        aria-hidden
-        className={cn(
-          'fixed z-[61] rounded-lg border-2 border-primary',
-          !reduced && 'transition-all',
-        )}
+        className="fixed z-[61] border-2 border-primary"
         style={{
           top: rect.top - pad,
           insetInlineStart: insetStart - pad,
           width: rect.width + pad * 2,
           height: rect.height + pad * 2,
+          boxShadow: '0 0 0 9999px hsl(225 11% 7% / 0.5)',
           pointerEvents: 'none',
+          ...scaleIn,
+        }}
+      />
+      {/* Snap-line through-line: a chalk stroke drawing the ring down to the card. */}
+      <div
+        aria-hidden
+        className="fixed z-[61] w-0.5 bg-primary"
+        style={{
+          top: rect.bottom + pad,
+          height: 10 - pad,
+          insetInlineStart: insetStart,
+          pointerEvents: 'none',
+          ...scaleIn,
         }}
       />
       <div
+        key={`card-${current.id}`}
         ref={cardRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
         tabIndex={-1}
-        className="fixed z-[62] w-72 max-w-[calc(100vw-2rem)] rounded-xl border bg-card p-4 shadow-lg focus:outline-none"
-        style={{ top: rect.bottom + 10, insetInlineStart: insetStart }}
+        className="fixed z-[62] w-72 max-w-[calc(100vw-2rem)] border bg-card p-4 shadow-lg focus:outline-none"
+        style={{ top: rect.bottom + 10, insetInlineStart: insetStart, ...scaleIn }}
       >
         <p id={titleId} className="text-sm font-semibold">
           {t(current.titleKey)}
