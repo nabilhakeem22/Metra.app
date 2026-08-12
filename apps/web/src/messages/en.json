@@ -271,7 +271,72 @@
     "amount_too_large": "That amount is too large"
   },
   "common": {
-    "untranslated": "untranslated"
+    "untranslated": "untranslated",
+    "hint": "More info"
+  },
+  "hints": {
+    "proposal": {
+      "title": "The proposal's headline, shown to the client. Leave blank to use the quote number.",
+      "issueDate": "The date the quote is issued. Used in the quote number and validity window.",
+      "expiryDate": "The last day this quote is valid. Must be on or after the issue date.",
+      "discountPct": "A document-wide discount applied to the subtotal before VAT.",
+      "taxRate": "VAT rate applied to the taxable base (subtotal minus discount).",
+      "supervisionPct": "Supervision fee charged after VAT, as a percentage of the taxable base. The client pays it.",
+      "currency": "The currency shown on this quote. Defaults to EGP.",
+      "sectionTitle": "Name of this section. Pick a saved title or type a new one to add it to your library.",
+      "lineQty": "Quantity in the line's unit.",
+      "lineUnitPrice": "Price charged to the client per unit, before any line discount.",
+      "lineUnitCost": "Your internal cost per unit. Never shown to the client.",
+      "lineDiscountPct": "A discount applied to this line only."
+    },
+    "auth": {
+      "email": "We email you a one-time code to sign in. No password needed.",
+      "otp": "The six-character code we just emailed you. It expires shortly."
+    },
+    "onboarding": {
+      "orgName": "Your company name, shown on quotes and to your team."
+    },
+    "org": {
+      "name": "Your organisation's name, shown across the app and on client documents.",
+      "hideMarginFromPm": "When on, project managers cannot see cost or margin figures."
+    },
+    "account": {
+      "displayName": "The name teammates see next to your activity."
+    },
+    "client": {
+      "name": "The client's name, in Arabic or English. At least one is required.",
+      "contactName": "The person you usually deal with at this client.",
+      "email": "Primary email for sending this client proposals.",
+      "phone": "A contact phone number for this client.",
+      "city": "The client's city.",
+      "address": "The client's full address, shown on documents.",
+      "taxRegistrationNumber": "The client's tax registration number, printed on invoices.",
+      "notes": "Private notes about this client. Never shown to the client."
+    },
+    "project": {
+      "code": "A short unique code for this project within your organisation.",
+      "name": "The project's name, in Arabic or English. At least one is required.",
+      "client": "The client this project belongs to.",
+      "status": "The project's current stage."
+    },
+    "costItem": {
+      "code": "A short unique code for this item within your price book.",
+      "name": "The item's name, in Arabic or English. At least one is required.",
+      "category": "The trade or discipline this item belongs to.",
+      "unit": "The unit this item is measured in.",
+      "defaultUnitCost": "Your default internal cost per unit. Never shown to clients.",
+      "defaultUnitPrice": "The default price charged to clients per unit."
+    },
+    "priceBook": {
+      "category": "Limit the update to one category, or apply it to all.",
+      "pctChange": "The percentage to raise or lower by. Use a negative value to reduce.",
+      "target": "Whether the change applies to cost, price, or both.",
+      "importFile": "A CSV file of cost items. Existing codes are skipped, new ones added."
+    },
+    "team": {
+      "email": "The email address to send the invitation to.",
+      "role": "The permissions this teammate will have."
+    }
   },
   "priceBook": {
     "title": "Price Book",
