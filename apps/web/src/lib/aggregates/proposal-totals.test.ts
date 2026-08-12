@@ -76,3 +76,68 @@ describe('computeSection / computeTotals (AC12: sums line up)', () => {
     expect(marginPct('50', '200')).toBeCloseTo(25, 5);
   });
 });
+
+describe('supervision fee (after VAT, untaxed; base = taxableBase)', () => {
+  // A single section worth exactly 100,000 with no cost.
+  const base100k = [
+    computeSection([
+      computeLine({ qty: '1', unitCost: '0', unitPrice: '100000', discountPct: '0' }),
+    ]),
+  ];
+
+  it('LOCKED: 100,000 / discount 0 / VAT 14% / supervision 10% -> total 124,000', () => {
+    const t = computeTotals(base100k, {
+      discountPct: '0',
+      taxRate: '14',
+      supervisionPct: '10',
+    });
+    expect(t.taxableBase).toBe('100000.0000');
+    expect(t.taxAmount).toBe('14000.0000');
+    expect(t.supervisionAmount).toBe('10000.0000');
+    expect(t.total).toBe('124000.0000');
+  });
+
+  it('supervisionPct = 0 is byte-identical to omitting it', () => {
+    const withZero = computeTotals(base100k, {
+      discountPct: '0',
+      taxRate: '14',
+      supervisionPct: '0',
+    });
+    const absent = computeTotals(base100k, { discountPct: '0', taxRate: '14' });
+    expect(withZero).toEqual(absent);
+    // And the total carries VAT only (100,000 + 14,000).
+    expect(absent.supervisionAmount).toBe('0.0000');
+    expect(absent.total).toBe('114000.0000');
+  });
+
+  it('supervision base is the taxable base, so a doc discount reduces it', () => {
+    const t = computeTotals(base100k, {
+      discountPct: '10',
+      taxRate: '14',
+      supervisionPct: '10',
+    });
+    // taxableBase = 90,000; VAT = 12,600; supervision = 9,000; total = 111,600
+    expect(t.taxableBase).toBe('90000.0000');
+    expect(t.taxAmount).toBe('12600.0000');
+    expect(t.supervisionAmount).toBe('9000.0000');
+    expect(t.total).toBe('111600.0000');
+  });
+
+  it('100% and beyond compute without clamping (validation lives above the engine)', () => {
+    const at100 = computeTotals(base100k, {
+      discountPct: '0',
+      taxRate: '0',
+      supervisionPct: '100',
+    });
+    expect(at100.supervisionAmount).toBe('100000.0000');
+    expect(at100.total).toBe('200000.0000');
+
+    const over = computeTotals(base100k, {
+      discountPct: '0',
+      taxRate: '0',
+      supervisionPct: '150',
+    });
+    expect(over.supervisionAmount).toBe('150000.0000');
+    expect(over.total).toBe('250000.0000');
+  });
+});

@@ -113,6 +113,9 @@ export function computeSection(lines: LineTotals[]): SectionTotals {
 export interface DocInput {
   discountPct: string;
   taxRate: string;
+  // Supervision fee as a percentage of the taxable base, charged AFTER VAT and
+  // itself untaxed. Optional so existing call sites/tests compile unchanged.
+  supervisionPct?: string;
 }
 
 export interface DocTotals {
@@ -120,6 +123,7 @@ export interface DocTotals {
   discountAmount: string;
   taxableBase: string;
   taxAmount: string;
+  supervisionAmount: string;
   total: string;
   totalCost: string;
   totalMargin: string;
@@ -137,11 +141,14 @@ export function computeTotals(
   }
   const discountPct = parseMoney4(doc.discountPct);
   const taxRate = parseMoney4(doc.taxRate);
+  const supervisionPct = parseMoney4(doc.supervisionPct ?? '0');
 
   const discountAmount = pctOf(subtotal, discountPct);
   const taxableBase = subtotal - discountAmount;
   const taxAmount = pctOf(taxableBase, taxRate);
-  const total = taxableBase + taxAmount;
+  // Supervision is levied on the taxable base and NOT taxed itself.
+  const supervisionAmount = pctOf(taxableBase, supervisionPct);
+  const total = taxableBase + taxAmount + supervisionAmount;
   const totalMargin = taxableBase - totalCost;
 
   return {
@@ -149,6 +156,7 @@ export function computeTotals(
     discountAmount: formatMoney4(discountAmount),
     taxableBase: formatMoney4(taxableBase),
     taxAmount: formatMoney4(taxAmount),
+    supervisionAmount: formatMoney4(supervisionAmount),
     total: formatMoney4(total),
     totalCost: formatMoney4(totalCost),
     totalMargin: formatMoney4(totalMargin),
