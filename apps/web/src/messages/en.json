@@ -265,6 +265,7 @@
     "token_expired": "This link has expired",
     "already_responded": "A response was already recorded for this proposal",
     "discount_out_of_range": "Discount must be between 0 and 100",
+    "supervision_out_of_range": "Supervision must be between 0 and 100",
     "too_many_lines": "This proposal has too many lines",
     "invalid_date": "Enter a valid date",
     "amount_too_large": "That amount is too large"

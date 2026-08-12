@@ -211,6 +211,7 @@ export interface SaveDraftInput {
     expiryDate?: string | null;
     discountPct?: string | null;
     taxRate?: string | null;
+    supervisionPct?: string | null;
     currency?: string | null;
     notesAr?: string | null;
     notesEn?: string | null;
@@ -247,8 +248,12 @@ export async function saveProposalDraftCore(
       const h = input.header ?? {};
       const discountPct = money(h.discountPct, prop.discountPct);
       const taxRate = money(h.taxRate, prop.taxRate);
-      if (discountPct === null || taxRate === null) fail('invalid');
+      const supervisionPct = money(h.supervisionPct, prop.supervisionPct);
+      if (discountPct === null || taxRate === null || supervisionPct === null) {
+        fail('invalid');
+      }
       if (!pctInRange(discountPct!)) fail('discount_out_of_range');
+      if (!pctInRange(supervisionPct!)) fail('supervision_out_of_range');
       const titleEn = h.titleEn !== undefined ? clean(h.titleEn) : prop.titleEn;
       const titleAr = h.titleAr !== undefined ? clean(h.titleAr) : prop.titleAr;
       if (!titleEn && !titleAr) fail('name_required');
@@ -445,7 +450,11 @@ export async function saveProposalDraftCore(
         }
       }
 
-      const totals = computeTotals(sectionTotals, { discountPct, taxRate });
+      const totals = computeTotals(sectionTotals, {
+        discountPct,
+        taxRate,
+        supervisionPct,
+      });
 
       await tx
         .update(proposals)
@@ -461,10 +470,12 @@ export async function saveProposalDraftCore(
           termsEn: h.termsEn !== undefined ? clean(h.termsEn) : prop.termsEn,
           discountPct,
           taxRate,
+          supervisionPct,
           subtotal: totals.subtotal,
           discountAmount: totals.discountAmount,
           taxableBase: totals.taxableBase,
           taxAmount: totals.taxAmount,
+          supervisionAmount: totals.supervisionAmount,
           total: totals.total,
           totalCost: totals.totalCost,
           totalMargin: totals.totalMargin,
@@ -592,10 +603,12 @@ export async function supersedeProposalCore(
           expiryDate: old.expiryDate,
           discountPct: old.discountPct,
           taxRate: old.taxRate,
+          supervisionPct: old.supervisionPct,
           subtotal: old.subtotal,
           discountAmount: old.discountAmount,
           taxableBase: old.taxableBase,
           taxAmount: old.taxAmount,
+          supervisionAmount: old.supervisionAmount,
           total: old.total,
           totalCost: old.totalCost,
           totalMargin: old.totalMargin,

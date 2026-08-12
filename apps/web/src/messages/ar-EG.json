@@ -265,6 +265,7 @@
     "token_expired": "انتهت صلاحية هذا الرابط",
     "already_responded": "تم تسجيل رد على هذا العرض بالفعل",
     "discount_out_of_range": "يجب أن يكون الخصم بين 0 و 100",
+    "supervision_out_of_range": "يجب أن يكون الإشراف بين 0 و 100",
     "too_many_lines": "هذا العرض يحتوي على بنود أكثر من المسموح",
     "invalid_date": "أدخل تاريخًا صالحًا",
     "amount_too_large": "هذا المبلغ كبير جدًا"
