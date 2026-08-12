@@ -77,14 +77,12 @@
     --brand-strong: 24 72% 52%;
   }
 
-  /* Direction-aware font stack: Plex Sans leads in LTR, Plex Sans Arabic in RTL. */
+  /* Direction-aware display stack: Archivo leads in LTR, Almarai in RTL. */
   html[dir='ltr'] {
-    --font-sans: var(--font-plex-sans), var(--font-plex-arabic), system-ui,
-      sans-serif;
+    --font-sans: var(--font-display), var(--font-ar), system-ui, sans-serif;
   }
   html[dir='rtl'] {
-    --font-sans: var(--font-plex-arabic), var(--font-plex-sans), system-ui,
-      sans-serif;
+    --font-sans: var(--font-ar), var(--font-display), system-ui, sans-serif;
   }
 
   * {

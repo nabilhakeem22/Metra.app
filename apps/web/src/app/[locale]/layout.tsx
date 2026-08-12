@@ -1,23 +1,32 @@
 import { NextIntlClientProvider } from 'next-intl';
 import { getMessages } from 'next-intl/server';
-import { IBM_Plex_Sans, IBM_Plex_Sans_Arabic } from 'next/font/google';
+import { Almarai, Archivo, IBM_Plex_Mono } from 'next/font/google';
 import { notFound } from 'next/navigation';
 import type { ReactNode } from 'react';
 import { ThemeProvider } from '@/components/theme-provider';
 import { LOCALES, dirFor, type Locale } from '@/i18n/routing';
 import '../globals.css';
 
-const plexSans = IBM_Plex_Sans({
+// Snap Line type system: Archivo (LTR display), Almarai (Arabic display — NO
+// 500/600 weights), IBM Plex Mono (every figure).
+const display = Archivo({
   subsets: ['latin'],
-  weight: ['400', '500', '600', '700'],
-  variable: '--font-plex-sans',
+  weight: ['400', '500', '600', '700', '800'],
+  variable: '--font-display',
   display: 'swap',
 });
 
-const plexArabic = IBM_Plex_Sans_Arabic({
-  subsets: ['arabic', 'latin'],
-  weight: ['400', '500', '600', '700'],
-  variable: '--font-plex-arabic',
+const arabic = Almarai({
+  subsets: ['arabic'],
+  weight: ['300', '400', '700', '800'],
+  variable: '--font-ar',
+  display: 'swap',
+});
+
+const mono = IBM_Plex_Mono({
+  subsets: ['latin'],
+  weight: ['400', '500', '600'],
+  variable: '--font-mono',
   display: 'swap',
 });
 
@@ -44,7 +53,7 @@ export default async function LocaleLayout({
     <html
       lang={locale}
       dir={dirFor(locale)}
-      className={`${plexSans.variable} ${plexArabic.variable}`}
+      className={`${display.variable} ${arabic.variable} ${mono.variable}`}
       suppressHydrationWarning
     >
       <body className="min-h-screen bg-background font-sans text-foreground antialiased">
