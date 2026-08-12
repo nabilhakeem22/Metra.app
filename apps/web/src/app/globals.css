@@ -3,78 +3,91 @@
 @tailwind utilities;
 
 @layer base {
-  /* Light — warm paper canvas, teal ink, copper accent. */
+  /* Snap Line — LIGHT. Cool gypsum surface, carbon type, ONE chalk-pigment accent.
+     Every value is a material off an Egyptian fit-out site. AA-verified. */
   :root {
-    --background: 40 30% 97%;
-    --foreground: 198 28% 14%;
+    --background: 90 14% 95%; /* gypsum #F1F3EF */
+    --foreground: 225 11% 7%; /* carbon  #101114 */
 
-    --card: 40 33% 99%;
-    --card-foreground: 198 28% 14%;
+    --card: 0 0% 100%; /* white */
+    --card-foreground: 225 11% 7%;
 
-    --popover: 40 33% 99%;
-    --popover-foreground: 198 28% 14%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 225 11% 7%;
 
-    --primary: 196 44% 23%;
-    --primary-foreground: 40 30% 97%;
+    --primary: 230 78% 46%; /* chalk #1A38D0 — the single accent, kept rare */
+    --primary-foreground: 0 0% 100%; /* white on chalk (8.33:1) */
 
-    --secondary: 40 20% 93%;
-    --secondary-foreground: 198 28% 18%;
+    --secondary: 84 9% 89%; /* dust-lo #E3E5E0 */
+    --secondary-foreground: 225 11% 7%;
 
-    --muted: 40 18% 92%;
-    --muted-foreground: 198 13% 36%;
+    --muted: 84 9% 89%;
+    --muted-foreground: 93 5% 39%; /* darkened screed for AA text (5.19:1) */
 
-    --accent: 30 40% 91%;
-    --accent-foreground: 198 28% 16%;
+    --accent: 84 9% 89%;
+    --accent-foreground: 225 11% 7%;
 
-    --destructive: 4 66% 44%;
-    --destructive-foreground: 40 30% 97%;
+    --destructive: 5 70% 51%; /* over #D93A2B */
+    --destructive-foreground: 0 0% 100%;
 
-    --border: 38 16% 87%;
-    --input: 38 16% 85%;
-    --ring: 196 44% 30%;
+    --border: 86 7% 81%; /* dust #CFD2CB — dividers/blocks, not text */
+    --input: 84 4% 53%; /* stronger dust so inputs are identifiable (3.07:1) */
+    --ring: 230 78% 46%; /* chalk */
 
-    /* Copper brand: --brand for lines/marks/active indicators/icon accents;
-       --brand-strong for any copper fill that carries text (never raw --brand). */
-    --brand: 22 68% 42%;
-    --brand-foreground: 40 30% 97%;
-    --brand-strong: 22 72% 33%;
+    /* Snap Line data device + brand accent. */
+    --brand: 230 78% 46%; /* chalk — lines/mark/active nav/datum */
+    --brand-foreground: 0 0% 100%;
+    --brand-strong: 230 79% 28%; /* chalk-hi #0F2280 */
+    --set: 156 79% 27%; /* set #0E7A4F — approved/paid */
+    --datum: 230 78% 46%; /* the contracted line (chalk) */
+    --track: 84 9% 89%; /* empty track (dust-lo) */
+    --fill: 97 4% 44%; /* actual spend fill (screed) */
+    --fill-ok: 225 11% 7%; /* on-track fill (carbon) */
+    --spill: 5 70% 51%; /* past the line (over) */
 
-    --radius: 0.625rem;
+    --radius: 0px; /* zero radius everywhere */
   }
 
-  /* Dark — ink canvas. */
+  /* Snap Line — DARK. Carbon canvas, gypsum type, lightened chalk on carbon;
+     raw chalk only as a fill under white text. AA-verified. */
   .dark {
-    --background: 200 28% 9%;
-    --foreground: 40 22% 92%;
+    --background: 225 11% 7%; /* carbon */
+    --foreground: 90 14% 95%; /* gypsum */
 
-    --card: 200 26% 12%;
-    --card-foreground: 40 22% 92%;
+    --card: 228 10% 10%; /* #17181C */
+    --card-foreground: 90 14% 95%;
 
-    --popover: 200 26% 12%;
-    --popover-foreground: 40 22% 92%;
+    --popover: 228 10% 10%;
+    --popover-foreground: 90 14% 95%;
 
-    --primary: 190 48% 60%;
-    --primary-foreground: 200 30% 10%;
+    --primary: 230 78% 46%; /* raw chalk fill (white text, 8.33:1) */
+    --primary-foreground: 0 0% 100%;
 
-    --secondary: 200 18% 18%;
-    --secondary-foreground: 40 22% 92%;
+    --secondary: 223 9% 15%; /* #23252A */
+    --secondary-foreground: 90 14% 95%;
 
-    --muted: 200 16% 18%;
-    --muted-foreground: 200 12% 66%;
+    --muted: 223 9% 15%;
+    --muted-foreground: 105 4% 62%; /* lightened screed for AA text (7.15:1) */
 
-    --accent: 200 18% 20%;
-    --accent-foreground: 40 22% 92%;
+    --accent: 223 9% 15%;
+    --accent-foreground: 90 14% 95%;
 
-    --destructive: 4 60% 56%;
-    --destructive-foreground: 200 30% 10%;
+    --destructive: 5 83% 65%; /* over(dark) #F06A5D */
+    --destructive-foreground: 225 11% 7%; /* carbon text on it (6.23:1) */
 
-    --border: 200 16% 20%;
-    --input: 200 16% 22%;
-    --ring: 190 48% 55%;
+    --border: 223 8% 18%; /* #2A2C31 dust-block equivalent */
+    --input: 224 5% 43%; /* identifiable on carbon (3.59:1) */
+    --ring: 228 83% 65%; /* chalk(dark) #5B78F0 */
 
-    --brand: 24 72% 60%;
-    --brand-foreground: 200 30% 10%;
-    --brand-strong: 24 72% 52%;
+    --brand: 228 83% 65%; /* lightened chalk on carbon (4.85:1) */
+    --brand-foreground: 0 0% 100%;
+    --brand-strong: 230 78% 46%; /* raw chalk */
+    --set: 154 51% 49%; /* set(dark) #3DBB85 (7.77:1) */
+    --datum: 228 83% 65%;
+    --track: 223 9% 15%;
+    --fill: 97 4% 44%; /* screed fill, visible on carbon */
+    --fill-ok: 90 14% 95%; /* on-track fill = gypsum (light on dark) */
+    --spill: 5 83% 65%; /* over(dark) */
   }
 
   /* Direction-aware display stack: Archivo leads in LTR, Almarai in RTL. */

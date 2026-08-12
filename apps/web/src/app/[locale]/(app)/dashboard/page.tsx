@@ -99,7 +99,7 @@ export default async function DashboardPage() {
                 <span className="flex items-center gap-2 text-sm text-muted-foreground">
                   <span
                     aria-hidden
-                    className="size-1.5 rounded-full bg-brand/50"
+                    className="size-1.5 rounded-full bg-muted-foreground/50"
                   />
                   {d(row.key)}
                 </span>
