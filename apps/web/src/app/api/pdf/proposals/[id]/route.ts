@@ -15,10 +15,15 @@ export const dynamic = 'force-dynamic';
 export const maxDuration = 30;
 
 export async function GET(
-  _req: Request,
+  req: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
   const { id } = await params;
+  // Client is the default; only ?variant=internal opts into the cost copy.
+  const variant =
+    new URL(req.url).searchParams.get('variant') === 'internal'
+      ? 'internal'
+      : 'client';
 
   const user = await getSessionUser();
   if (!user) {
@@ -42,7 +47,13 @@ export async function GET(
   );
   const seeMargin = canSeeMargin(ctx.role, org?.hide ?? true);
 
-  const detail = await getProposalForPdf(ctx, id, seeMargin);
+  // The internal (cost) copy is margin-gated; everyone else gets the client copy.
+  if (variant === 'internal' && !seeMargin) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
+
+  // Load cost only for the internal copy; the client copy never fetches cost.
+  const detail = await getProposalForPdf(ctx, id, variant === 'internal');
   if (!detail) {
     return NextResponse.json({ error: 'Not found' }, { status: 404 });
   }
@@ -57,16 +68,17 @@ export async function GET(
     const locale = org?.defaultLocale ?? 'ar-EG';
     const html = buildProposalHtml(detail, {
       locale,
-      seeMargin,
+      variant,
       orgNameAr: org?.nameAr ?? null,
       orgNameEn: org?.nameEn ?? null,
     });
     const pdf = await renderPdf(html);
+    const suffix = variant === 'internal' ? '-internal' : '';
     return new NextResponse(pdf as BodyInit, {
       status: 200,
       headers: {
         'content-type': 'application/pdf',
-        'content-disposition': `inline; filename="proposal-${detail.number}.pdf"`,
+        'content-disposition': `inline; filename="proposal-${detail.number}${suffix}.pdf"`,
         'cache-control': 'no-store',
       },
     });

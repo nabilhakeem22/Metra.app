@@ -20,15 +20,23 @@ function pick(ar: string | null, en: string | null, locale: string): string {
 
 /**
  * Proposal PDF. Groups lines under section headings, each with a subtotal row,
- * then the document subtotal -> discount -> VAT -> total. Cost/margin columns are
- * included ONLY when `seeMargin` (the route strips them otherwise). RTL, Western
- * numerals via formatMoney. `buildProposalHtml` is the single render source.
+ * then the document subtotal -> discount -> VAT -> supervision -> total. Cost and
+ * margin (per-line cost + document cost/margin) appear ONLY on the 'internal'
+ * variant; the 'client' variant keeps prices but strips every cost figure.
+ * Supervision is NOT a cost — the client pays it — so it shows on BOTH variants.
+ * RTL, Western numerals via formatMoney. Single render source for route+preview.
  */
 export function buildProposalHtml(
   detail: ProposalDetail,
-  opts: { locale: string; seeMargin: boolean; orgNameAr: string | null; orgNameEn: string | null },
+  opts: {
+    locale: string;
+    variant: 'client' | 'internal';
+    orgNameAr: string | null;
+    orgNameEn: string | null;
+  },
 ): string {
-  const { locale, seeMargin } = opts;
+  const { locale } = opts;
+  const showCost = opts.variant === 'internal';
   const m = (v: string) => formatMoney(v, locale);
   const num = formatProposalNumber(
     detail.number,
@@ -37,7 +45,7 @@ export function buildProposalHtml(
   const orgName = pick(opts.orgNameAr, opts.orgNameEn, locale);
   const clientName = pick(detail.clientNameAr, detail.clientNameEn, locale);
   const title = pick(detail.titleAr, detail.titleEn, locale);
-  const extraCols = seeMargin ? 2 : 0;
+  const extraCols = showCost ? 2 : 0;
 
   const sectionsHtml = detail.sections
     .map((s) => {
@@ -47,11 +55,11 @@ export function buildProposalHtml(
         <tr>
           <td class="desc">${pick(l.descriptionAr, l.descriptionEn, locale)}</td>
           <td class="num">${esc(l.qty)} ${esc(l.unit)}</td>
-          ${seeMargin ? `<td class="num">${m(l.unitCost ?? '0')}</td>` : ''}
+          ${showCost ? `<td class="num">${m(l.unitCost ?? '0')}</td>` : ''}
           <td class="num">${m(l.unitPrice)}</td>
           <td class="num">${esc(l.discountPct)}%</td>
           <td class="num">${m(l.lineTotal)}</td>
-          ${seeMargin ? `<td class="num">${m(l.lineMargin ?? '0')}</td>` : ''}
+          ${showCost ? `<td class="num">${m(l.lineMargin ?? '0')}</td>` : ''}
         </tr>`,
         )
         .join('');
@@ -61,7 +69,7 @@ export function buildProposalHtml(
       <tr class="subtotal">
         <td colspan="${4 + extraCols}">${'—'}</td>
         <td class="num">${m(s.sectionSubtotal)}</td>
-        ${seeMargin ? '<td></td>' : ''}
+        ${showCost ? '<td></td>' : ''}
       </tr>`;
     })
     .join('');
@@ -103,11 +111,11 @@ export function buildProposalHtml(
       <tr>
         <th>${pick('الوصف', 'Description', locale)}</th>
         <th class="num">${pick('الكمية', 'Qty', locale)}</th>
-        ${seeMargin ? `<th class="num">${pick('التكلفة', 'Cost', locale)}</th>` : ''}
+        ${showCost ? `<th class="num">${pick('التكلفة', 'Cost', locale)}</th>` : ''}
         <th class="num">${pick('سعر الوحدة', 'Unit price', locale)}</th>
         <th class="num">${pick('خصم', 'Disc', locale)}</th>
         <th class="num">${pick('الإجمالي', 'Total', locale)}</th>
-        ${seeMargin ? `<th class="num">${pick('الهامش', 'Margin', locale)}</th>` : ''}
+        ${showCost ? `<th class="num">${pick('الهامش', 'Margin', locale)}</th>` : ''}
       </tr>
     </thead>
     <tbody>
@@ -119,8 +127,9 @@ export function buildProposalHtml(
     <tr><td>${pick('المجموع الفرعي', 'Subtotal', locale)}</td><td class="num">${m(detail.subtotal)}</td></tr>
     <tr><td>${pick('الخصم', 'Discount', locale)}</td><td class="num">${m(detail.discountAmount)}</td></tr>
     <tr><td>${pick('ضريبة القيمة المضافة', 'VAT', locale)} (${esc(detail.taxRate)}%)</td><td class="num">${m(detail.taxAmount)}</td></tr>
+    <tr><td>${pick('الإشراف', 'Supervision', locale)} (${esc(detail.supervisionPct)}%)</td><td class="num">${m(detail.supervisionAmount)}</td></tr>
     <tr class="grand"><td>${pick('الإجمالي', 'Total', locale)}</td><td class="num">${m(detail.total)}</td></tr>
-    ${seeMargin && detail.totalMargin !== undefined ? `<tr><td>${pick('هامش الربح', 'Margin', locale)}</td><td class="num">${m(detail.totalMargin)}</td></tr>` : ''}
+    ${showCost && detail.totalMargin !== undefined ? `<tr><td>${pick('هامش الربح', 'Margin', locale)}</td><td class="num">${m(detail.totalMargin)}</td></tr>` : ''}
   </table>
 
   <div class="footer">${esc(orgName)} · ${num}</div>
