@@ -164,6 +164,24 @@
     transform-origin: center;
     animation: snapin var(--dur-snap) var(--ease-snap) both;
   }
+
+  /* Variance-ladder fill grows via scaleX from the inline-start edge (flips RTL). */
+  .ladder-fill {
+    transform-origin: 0 50%;
+  }
+}
+
+:where([dir='rtl']) .ladder-fill {
+  transform-origin: 100% 50%;
+}
+
+@keyframes ladder-grow {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
 }
 
 /* Motion tokens (Snap Line). */

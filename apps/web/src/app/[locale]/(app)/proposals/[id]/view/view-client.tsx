@@ -3,6 +3,7 @@
 import { FileDown, Loader2 } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
 import { useTransition } from 'react';
+import { VarianceLadder, type LadderRow } from '@/components/data/variance-ladder';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { toast } from '@/hooks/use-toast';
@@ -10,6 +11,7 @@ import { useRouter } from '@/i18n/routing';
 import { resolveActionError } from '@/lib/actions/error-message';
 import type { ActionCode } from '@/lib/actions/result';
 import { formatMoney } from '@/lib/format/money';
+import { formatNumber } from '@/lib/format/number';
 import { pickLocale } from '@/lib/i18n/pick-locale';
 import { expireProposal, supersedeProposal } from '@/lib/proposals/actions';
 import type { ProposalDetail } from '@/lib/proposals/queries';
@@ -27,6 +29,7 @@ export function ProposalView({
 }) {
   const t = useTranslations('proposals');
   const te = useTranslations('errors');
+  const tv = useTranslations('variance');
   const locale = useLocale();
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -34,6 +37,17 @@ export function ProposalView({
   const money = (v: string) => formatMoney(v, locale);
   const loc = (ar: string | null, en: string | null) =>
     pickLocale({ nameAr: ar, nameEn: en }, 'name', locale).value;
+
+  // Real price-vs-cost per section (margin-gated). NEVER demo rows.
+  const ladderRows: LadderRow[] | null = seeMargin
+    ? detail.sections.map((s) => {
+        const actual = Number(s.sectionCost ?? '0');
+        const contracted = Number(s.sectionSubtotal);
+        return { name: loc(s.titleAr, s.titleEn), actual, contracted, over: actual > contracted };
+      })
+    : null;
+  const num0 = (n: number) =>
+    formatNumber(n, locale, { maximumFractionDigits: 0 });
 
   function onSupersede() {
     startTransition(async () => {
@@ -112,6 +126,21 @@ export function ProposalView({
           </CardContent>
         </Card>
       ))}
+
+      {seeMargin && (
+        <Card>
+          <CardContent className="space-y-3 py-4">
+            <p className="text-xs font-medium text-muted-foreground">
+              {tv('title')}
+            </p>
+            <VarianceLadder
+              rows={ladderRows}
+              emptyLabel={tv('empty')}
+              formatPair={(r) => `${num0(r.actual)} / ${num0(r.contracted)}`}
+            />
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardContent className="ms-auto max-w-xs space-y-1 py-4 text-sm" dir="ltr">

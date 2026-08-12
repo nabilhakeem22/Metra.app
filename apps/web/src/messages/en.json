@@ -678,5 +678,9 @@
     "restartTour": "Restart the tour",
     "openChecklist": "Open the setup checklist",
     "howThisPage": "How this page works"
+  },
+  "variance": {
+    "title": "Cost vs. price by section",
+    "empty": "The variance ladder lights up once job-costing begins."
   }
 }

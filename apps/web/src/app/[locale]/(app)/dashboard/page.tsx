@@ -1,5 +1,6 @@
 import { organizations } from '@metra/db';
 import { getLocale, getTranslations } from 'next-intl/server';
+import { VarianceLadder } from '@/components/data/variance-ladder';
 import { GettingStarted } from '@/components/dashboard/getting-started';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -30,6 +31,7 @@ export default async function DashboardPage() {
   const d = await getTranslations('dashboard');
   const roles = await getTranslations('roles');
   const tc = await getTranslations('common');
+  const v = await getTranslations('variance');
 
   const [org] = await withOrgContext(ctx, (tx) =>
     tx.select().from(organizations).limit(1),
@@ -120,6 +122,17 @@ export default async function DashboardPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* The signature variance ladder — honest empty state until job-costing.
+          NEVER a demo row. */}
+      <Card>
+        <CardHeader>
+          <CardTitle>{v('title')}</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <VarianceLadder rows={null} emptyLabel={v('empty')} />
+        </CardContent>
+      </Card>
     </div>
   );
 }
