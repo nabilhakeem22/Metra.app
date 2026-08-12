@@ -93,9 +93,7 @@ export function ProposalView({
           <CardContent className="p-0">
             <div className="flex items-center justify-between border-b px-4 py-2">
               <h2 className="text-sm font-semibold">{loc(s.titleAr, s.titleEn)}</h2>
-              <span className="text-sm" dir="ltr">
-                {money(s.sectionSubtotal)}
-              </span>
+              <span className="num text-sm">{money(s.sectionSubtotal)}</span>
             </div>
             <table className="w-full text-sm">
               <tbody>
@@ -105,8 +103,8 @@ export function ProposalView({
                     <td className="px-4 py-2 text-muted-foreground" dir="ltr">
                       {l.qty} {l.unit}
                     </td>
-                    <td className="px-4 py-2 text-end" dir="ltr">{money(l.unitPrice)}</td>
-                    <td className="px-4 py-2 text-end" dir="ltr">{money(l.lineTotal)}</td>
+                    <td className="px-4 py-2 num text-end" dir="ltr">{money(l.unitPrice)}</td>
+                    <td className="px-4 py-2 num text-end" dir="ltr">{money(l.lineTotal)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -132,9 +130,9 @@ export function ProposalView({
 
 function Row({ label, value, bold }: { label: string; value: string; bold?: boolean }) {
   return (
-    <div className={`flex justify-between ${bold ? 'font-semibold' : ''}`}>
+    <div className={`flex justify-between ${bold ? "font-semibold" : ""}`}>
       <span className="text-muted-foreground">{label}</span>
-      <span>{value}</span>
+      <span className="num">{value}</span>
     </div>
   );
 }

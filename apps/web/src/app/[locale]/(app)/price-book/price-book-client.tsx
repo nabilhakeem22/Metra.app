@@ -283,11 +283,9 @@ export function PriceBookClient({ items, canManage }: PriceBookClientProps) {
                           <td className="px-4 py-2 text-muted-foreground">
                             {t(`units.${item.unit}`)}
                           </td>
-                          <td className="px-4 py-2 text-end" dir="ltr">
-                            {formatMoney(item.defaultUnitCost, locale)}
+                          <td className="px-4 py-2 num text-end" dir="ltr">{formatMoney(item.defaultUnitCost, locale)}
                           </td>
-                          <td className="px-4 py-2 text-end" dir="ltr">
-                            {formatMoney(item.defaultUnitPrice, locale)}
+                          <td className="px-4 py-2 num text-end" dir="ltr">{formatMoney(item.defaultUnitPrice, locale)}
                           </td>
                           <td className="px-4 py-2">
                             <span

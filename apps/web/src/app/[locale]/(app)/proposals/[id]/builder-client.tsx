@@ -362,7 +362,7 @@ export function ProposalBuilder({
                           <td className="px-1 py-1">
                             <Input dir="ltr" inputMode="decimal" value={l.discountPct} onChange={(e) => patchLine(si, li, { discountPct: e.target.value })} className={`${inp} w-14`} />
                           </td>
-                          <td className="px-1 py-1 text-end" dir="ltr">{formatMoney(lt.lineTotal, locale)}</td>
+                          <td className="px-1 py-1 num text-end" dir="ltr">{formatMoney(lt.lineTotal, locale)}</td>
                           <td className="px-1 py-1">
                             <Button variant="ghost" size="icon" aria-label={t('builder.removeLine')} onClick={() => removeLine(si, li)}>
                               <Trash2 className="size-4" aria-hidden />
@@ -400,7 +400,7 @@ export function ProposalBuilder({
                   )}
                 </div>
                 <span className="text-sm font-medium" dir="ltr">
-                  {t('builder.sectionSubtotal')}: {formatMoney(st.sectionSubtotal, locale)}
+                  {t('builder.sectionSubtotal')}: <span className="num">{formatMoney(st.sectionSubtotal, locale)}</span>
                 </span>
               </div>
             </CardContent>
@@ -467,7 +467,7 @@ function Row({ label, value, bold }: { label: string; value: string; bold?: bool
   return (
     <div className={`flex justify-between ${bold ? 'font-semibold' : ''}`}>
       <span className="text-muted-foreground">{label}</span>
-      <span>{value}</span>
+      <span className="num">{value}</span>
     </div>
   );
 }

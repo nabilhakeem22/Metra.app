@@ -103,7 +103,7 @@ export default async function DashboardPage() {
                   />
                   {d(row.key)}
                 </span>
-                <span className="tabular text-sm font-semibold text-foreground">
+                <span className="num text-sm font-semibold text-foreground">
                   {row.value}
                 </span>
               </div>
