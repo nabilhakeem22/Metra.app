@@ -1,7 +1,16 @@
 // PURE core for org creation (no next/*, no getSessionUser, no cookies). The
 // 'use server' createOrg wrapper does the session/existing-check/redirect and
 // delegates here. Exercised directly by tests/actions/createOrg.dbtest.ts.
-import { DEFAULT_SECTIONS, memberships, organizations, sections } from '@metra/db';
+import {
+  DEFAULT_PROJECT_TYPES,
+  DEFAULT_SECTIONS,
+  DEFAULT_STAGE_TEMPLATES,
+  memberships,
+  organizations,
+  projectTypes,
+  sections,
+  stageTemplates,
+} from '@metra/db';
 import { mutateInOrg } from '@/lib/actions/mutate';
 import { err, type ActionResult } from '@/lib/actions/result';
 import type { OrgContext } from '@/lib/db/context';
@@ -66,6 +75,25 @@ export async function createOrgCore(
         key: s.key,
         nameEn: s.nameEn,
         nameAr: s.nameAr,
+      })),
+    );
+    // Seed the 5 default project types + 10 default stage templates.
+    await tx.insert(projectTypes).values(
+      DEFAULT_PROJECT_TYPES.map((tpe) => ({
+        orgId: ctx.orgId,
+        key: tpe.key,
+        nameEn: tpe.nameEn,
+        nameAr: tpe.nameAr,
+        sortOrder: tpe.sortOrder,
+      })),
+    );
+    await tx.insert(stageTemplates).values(
+      DEFAULT_STAGE_TEMPLATES.map((s) => ({
+        orgId: ctx.orgId,
+        key: s.key,
+        nameEn: s.nameEn,
+        nameAr: s.nameAr,
+        sortOrder: s.sortOrder,
       })),
     );
     await audit({
