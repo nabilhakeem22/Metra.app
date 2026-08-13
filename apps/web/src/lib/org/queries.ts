@@ -1,6 +1,11 @@
 import 'server-only';
 import { organizations } from '@metra/db';
-import { withOrgContext, type OrgContext } from '@/lib/db/context';
+import { sql } from 'drizzle-orm';
+import {
+  withOrgContext,
+  withUserContext,
+  type OrgContext,
+} from '@/lib/db/context';
 import { canSeeMargin } from '@/lib/permissions/can';
 
 /**
@@ -16,4 +21,37 @@ export async function resolveSeeMargin(ctx: OrgContext): Promise<boolean> {
       .limit(1),
   );
   return canSeeMargin(ctx.role, org?.hide ?? true);
+}
+
+/** A row from the current-user org list (for the org switcher). */
+export interface UserOrgOption {
+  orgId: string;
+  role: string;
+  nameAr: string | null;
+  nameEn: string | null;
+}
+
+/** The orgs the current user belongs to (name-ordered) — org-switcher source. */
+export async function listCurrentUserOrgs(
+  userId: string,
+): Promise<UserOrgOption[]> {
+  return (await withUserContext(userId, (tx) =>
+    tx.execute(
+      sql`select org_id as "orgId", role, name_ar as "nameAr", name_en as "nameEn"
+          from public.app_current_user_orgs()
+          order by name_en nulls last, name_ar nulls last`,
+    ),
+  )) as unknown as UserOrgOption[];
+}
+
+/** Whether the current user is a member of ANY org (onboarding redirect gate). */
+export async function currentUserHasMembership(
+  userId: string,
+): Promise<boolean> {
+  const rows = (await withUserContext(userId, (tx) =>
+    tx.execute(
+      sql`select org_id from public.app_current_user_memberships() limit 1`,
+    ),
+  )) as unknown as unknown[];
+  return rows.length > 0;
 }

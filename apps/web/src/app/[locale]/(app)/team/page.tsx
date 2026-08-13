@@ -1,11 +1,9 @@
-import { invitations } from '@metra/db';
-import { eq } from 'drizzle-orm';
 import { getTranslations } from 'next-intl/server';
 import { PageHeader } from '@/components/ui/page-header';
 import { requireOrg } from '@/lib/auth/require-org';
-import { withOrgContext } from '@/lib/db/context';
 import { can } from '@/lib/permissions/can';
 import { getOrgMemberIdentities } from '@/lib/team/identities';
+import { listPendingInvitations } from '@/lib/team/queries';
 import { TeamClient } from './team-client';
 
 export default async function TeamPage() {
@@ -13,18 +11,7 @@ export default async function TeamPage() {
   const t = await getTranslations('team');
 
   const members = await getOrgMemberIdentities(ctx);
-  const pending = await withOrgContext(ctx, (tx) =>
-    tx
-      .select({
-        id: invitations.id,
-        email: invitations.email,
-        role: invitations.role,
-        expiresAt: invitations.expiresAt,
-        createdAt: invitations.createdAt,
-      })
-      .from(invitations)
-      .where(eq(invitations.status, 'pending')),
-  );
+  const pending = await listPendingInvitations(ctx);
 
   const now = Date.now();
   const pendingSerialized = pending.map((p) => ({
