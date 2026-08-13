@@ -111,6 +111,34 @@ describe('clients + projects capabilities (P1 Slice 2)', () => {
   });
 });
 
+describe('client_activity capability (P1 Slice 4)', () => {
+  it('create granted to owner/admin/PM/site_engineer/accountant; denied to viewer/client', () => {
+    for (const role of [
+      'owner',
+      'admin',
+      'project_manager',
+      'site_engineer',
+      'accountant',
+    ] as const) {
+      expect(can(role, 'client_activity', 'create')).toBe(true);
+    }
+    for (const role of ['viewer', 'client'] as const) {
+      expect(can(role, 'client_activity', 'create')).toBe(false);
+    }
+  });
+
+  it('is matrix-driven (not a bare role check) — differs from clients/update', () => {
+    // site_engineer + accountant can add activity but CANNOT edit client details.
+    for (const role of ['site_engineer', 'accountant'] as const) {
+      expect(can(role, 'client_activity', 'create')).toBe(true);
+      expect(can(role, 'clients', 'update')).toBe(false);
+    }
+    // viewer can read a client but cannot add activity.
+    expect(can('viewer', 'clients', 'read')).toBe(true);
+    expect(can('viewer', 'client_activity', 'create')).toBe(false);
+  });
+});
+
 describe('proposals capabilities + canSeeMargin (P1 Slice 3)', () => {
   it('proposals_build: owner/admin/PM CRU, viewer read-only, others none', () => {
     for (const role of ['owner', 'admin', 'project_manager'] as const) {

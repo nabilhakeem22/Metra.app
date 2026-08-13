@@ -10,6 +10,7 @@ export type PermissionAction = 'create' | 'read' | 'update' | 'approve';
 /** Capabilities from the §2.2 permission matrix. */
 export type Capability =
   | 'clients'
+  | 'client_activity'
   | 'projects'
   | 'price_book'
   | 'proposals_build'

@@ -21,6 +21,9 @@ const COLS: MemberRole[] = [
 
 const ROWS: Record<Capability, string[]> = {
   clients: ['CRUA', 'CRUA', 'CRU', 'R', 'R', '', 'R'],
+  // Activity notes + document uploads on a client: everyone operational
+  // (owner/admin/PM/site_engineer/accountant) may create; viewer + client cannot.
+  client_activity: ['CR', 'CR', 'CR', 'CR', 'CR', '', ''],
   projects: ['CRUA', 'CRUA', 'CRU', 'R', 'R', 'R', 'R'],
   price_book: ['CRUA', 'CRUA', 'R', '', 'R', '', ''],
   proposals_build: ['CRU', 'CRU', 'CRU', '', '', '', 'R'],
