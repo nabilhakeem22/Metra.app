@@ -19,14 +19,18 @@ interface Option {
   nameEn: string | null;
   nameAr: string | null;
   code?: string;
+  clientId?: string;
 }
 
 export function ProposalCreateForm({
   clients,
   projects,
+  defaultProjectId,
 }: {
   clients: Option[];
   projects: Option[];
+  /** Preselect this project (e.g. arriving from a project profile). */
+  defaultProjectId?: string;
 }) {
   const t = useTranslations('proposals');
   const te = useTranslations('errors');
@@ -34,8 +38,18 @@ export function ProposalCreateForm({
   const router = useRouter();
   const [pending, startTransition] = useTransition();
 
-  const [clientId, setClientId] = useState(clients[0]?.id ?? '');
-  const [projectId, setProjectId] = useState(projects[0]?.id ?? '');
+  // Arriving from a project's "new proposal" CTA: preselect that project (and
+  // its client), else fall back to the first option.
+  const preselected =
+    defaultProjectId && projects.some((p) => p.id === defaultProjectId)
+      ? projects.find((p) => p.id === defaultProjectId)
+      : undefined;
+  const [clientId, setClientId] = useState(
+    preselected?.clientId ?? clients[0]?.id ?? '',
+  );
+  const [projectId, setProjectId] = useState(
+    preselected?.id ?? projects[0]?.id ?? '',
+  );
   const [titleEn, setTitleEn] = useState('');
   const [titleAr, setTitleAr] = useState('');
   const [issueDate, setIssueDate] = useState('');

@@ -8,6 +8,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Input } from '@/components/ui/input';
 import { toast } from '@/hooks/use-toast';
+import { Link } from '@/i18n/routing';
 import { resolveActionError } from '@/lib/actions/error-message';
 import type { ActionCode } from '@/lib/actions/result';
 import { formatDate } from '@/lib/format/date';
@@ -215,7 +216,9 @@ export function ProjectsClient({
                         {p.code}
                       </td>
                       <td className="px-4 py-2">
-                        {name}
+                        <Link href={`/projects/${p.id}`} className="hover:underline">
+                          {name}
+                        </Link>
                         {!p.active && (
                           <span className="ms-2 rounded-full bg-muted px-2 py-0.5 text-[10px] text-muted-foreground">
                             {t('archived')}

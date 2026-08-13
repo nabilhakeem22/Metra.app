@@ -7,7 +7,12 @@ import { can } from '@/lib/permissions/can';
 import { listProjects } from '@/lib/projects/queries';
 import { ProposalCreateForm } from './create-form';
 
-export default async function NewProposalPage() {
+export default async function NewProposalPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ projectId?: string }>;
+}) {
+  const { projectId } = await searchParams;
   const ctx = await requireOrg();
   if (!can(ctx.role, 'proposals_build', 'create')) notFound();
 
@@ -27,7 +32,9 @@ export default async function NewProposalPage() {
           code: p.code,
           nameEn: p.nameEn,
           nameAr: p.nameAr,
+          clientId: p.clientId,
         }))}
+        defaultProjectId={projectId}
       />
     </div>
   );
