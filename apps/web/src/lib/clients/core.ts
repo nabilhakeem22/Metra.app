@@ -1,21 +1,31 @@
 // PURE client cores — no next/*, no cookies. Take an OrgContext + input; the
 // 'use server' wrappers in ./actions do the session/requireOrg work and delegate.
 // Exercised directly by tests/actions/clients.dbtest.ts.
-import { clients } from '@metra/db';
+import { CLIENT_TYPES, clients, type ClientType } from '@metra/db';
 import { eq } from 'drizzle-orm';
 import { fail, mutateInOrg } from '@/lib/actions/mutate';
 import { err, type ActionResult } from '@/lib/actions/result';
+import { appendSystemActivity } from '@/lib/activities/core';
 import type { OrgContext } from '@/lib/db/context';
 
 export interface ClientInput {
   nameEn?: string | null;
   nameAr?: string | null;
+  type?: ClientType | null;
   contactName?: string | null;
   email?: string | null;
   phone?: string | null;
   city?: string | null;
   address?: string | null;
   taxRegistrationNumber?: string | null;
+  commercialRegister?: string | null;
+  taxCardNumber?: string | null;
+  nationalId?: string | null;
+  segment?: string | null;
+  leadSource?: string | null;
+  creditTerms?: string | null;
+  advancePct?: string | null;
+  retentionPct?: string | null;
   notes?: string | null;
 }
 
@@ -32,8 +42,26 @@ const LIMITS = {
   city: 120,
   address: 300,
   taxReg: 64,
+  commercialRegister: 64,
+  taxCardNumber: 64,
+  nationalId: 32,
+  segment: 120,
+  leadSource: 120,
+  creditTerms: 200,
   notes: 2000,
 } as const;
+
+const PCT_RE = /^\d+(\.\d+)?$/;
+
+/** Non-negative percentage in [0,100], normalized to a decimal string, or null. */
+function normPct(v: string | null | undefined): string | null {
+  const s = v?.trim();
+  if (s === undefined || s === '') return '0';
+  if (!PCT_RE.test(s)) return null;
+  const n = Number(s);
+  if (!Number.isFinite(n) || n < 0 || n > 100) return null;
+  return s;
+}
 
 type NormalizedClient = ReturnType<typeof normalized>;
 
@@ -41,12 +69,19 @@ function normalized(input: ClientInput) {
   return {
     nameEn: clean(input.nameEn),
     nameAr: clean(input.nameAr),
+    type: input.type ?? undefined,
     contactName: clean(input.contactName),
     email: clean(input.email),
     phone: clean(input.phone),
     city: clean(input.city),
     address: clean(input.address),
     taxRegistrationNumber: clean(input.taxRegistrationNumber),
+    commercialRegister: clean(input.commercialRegister),
+    taxCardNumber: clean(input.taxCardNumber),
+    nationalId: clean(input.nationalId),
+    segment: clean(input.segment),
+    leadSource: clean(input.leadSource),
+    creditTerms: clean(input.creditTerms),
     notes: clean(input.notes),
   };
 }
@@ -62,8 +97,18 @@ function withinLimits(v: NormalizedClient): boolean {
     ok(v.city, LIMITS.city) &&
     ok(v.address, LIMITS.address) &&
     ok(v.taxRegistrationNumber, LIMITS.taxReg) &&
+    ok(v.commercialRegister, LIMITS.commercialRegister) &&
+    ok(v.taxCardNumber, LIMITS.taxCardNumber) &&
+    ok(v.nationalId, LIMITS.nationalId) &&
+    ok(v.segment, LIMITS.segment) &&
+    ok(v.leadSource, LIMITS.leadSource) &&
+    ok(v.creditTerms, LIMITS.creditTerms) &&
     ok(v.notes, LIMITS.notes)
   );
+}
+
+function validType(t: ClientType | undefined): boolean {
+  return t === undefined || CLIENT_TYPES.includes(t);
 }
 
 export async function createClientCore(
@@ -72,7 +117,10 @@ export async function createClientCore(
 ): Promise<ActionResult> {
   const v = normalized(input);
   if (!v.nameEn && !v.nameAr) return err('name_required');
-  if (!withinLimits(v)) return err('invalid');
+  if (!withinLimits(v) || !validType(v.type)) return err('invalid');
+  const advancePct = normPct(input.advancePct);
+  const retentionPct = normPct(input.retentionPct);
+  if (advancePct === null || retentionPct === null) return err('invalid');
 
   return mutateInOrg(
     ctx,
@@ -80,8 +128,13 @@ export async function createClientCore(
     async (tx, audit) => {
       const [row] = await tx
         .insert(clients)
-        .values({ orgId: ctx.orgId, ...v })
+        .values({ orgId: ctx.orgId, ...v, advancePct, retentionPct })
         .returning({ id: clients.id });
+      await appendSystemActivity(tx, ctx, {
+        entityType: 'client',
+        entityId: row.id,
+        kind: 'client_created',
+      });
       await audit({
         entity: 'client',
         entityId: row.id,
@@ -100,7 +153,10 @@ export async function updateClientCore(
 ): Promise<ActionResult> {
   const v = normalized(input);
   if (!v.nameEn && !v.nameAr) return err('name_required');
-  if (!withinLimits(v)) return err('invalid');
+  if (!withinLimits(v) || !validType(v.type)) return err('invalid');
+  const advancePct = normPct(input.advancePct);
+  const retentionPct = normPct(input.retentionPct);
+  if (advancePct === null || retentionPct === null) return err('invalid');
 
   return mutateInOrg(
     ctx,
@@ -115,7 +171,7 @@ export async function updateClientCore(
 
       await tx
         .update(clients)
-        .set({ ...v, updatedAt: new Date() })
+        .set({ ...v, advancePct, retentionPct, updatedAt: new Date() })
         .where(eq(clients.id, input.id));
       await audit({
         entity: 'client',

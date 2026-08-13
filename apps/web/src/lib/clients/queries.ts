@@ -1,6 +1,13 @@
 import 'server-only';
-import { clients, type Client } from '@metra/db';
-import { and, asc, eq, ilike, or } from 'drizzle-orm';
+import {
+  activities,
+  clients,
+  projects,
+  proposals,
+  type Activity,
+  type Client,
+} from '@metra/db';
+import { and, asc, desc, eq, ilike, inArray, or, sql } from 'drizzle-orm';
 import { withOrgContext, type OrgContext } from '@/lib/db/context';
 
 export interface ListClientsFilter {
@@ -45,4 +52,83 @@ export function getClientOptions(ctx: OrgContext): Promise<ClientOption[]> {
       .where(eq(clients.active, true))
       .orderBy(asc(clients.nameEn)),
   );
+}
+
+/** One client by id (org-scoped via RLS). Null if not found in this org. */
+export function getClientById(
+  ctx: OrgContext,
+  id: string,
+): Promise<Client | null> {
+  return withOrgContext(ctx, async (tx) => {
+    const [row] = await tx
+      .select()
+      .from(clients)
+      .where(eq(clients.id, id))
+      .limit(1);
+    return row ?? null;
+  });
+}
+
+export interface ClientOverview {
+  projectCount: number;
+  activeProposalCount: number;
+  /** Sum of ACCEPTED proposal totals for this client (scale-4 money string). */
+  contractedTotal: string;
+  recentActivity: Activity[];
+  // Invoiced/outstanding are intentionally ABSENT — the UI renders a locked
+  // state until invoicing ships. No demo numbers.
+}
+
+/** Overview figures for a client's profile: real counts + contracted total. */
+export function getClientOverview(
+  ctx: OrgContext,
+  clientId: string,
+): Promise<ClientOverview> {
+  return withOrgContext(ctx, async (tx) => {
+    const [projRow] = await tx
+      .select({ n: sql<number>`count(*)::int` })
+      .from(projects)
+      .where(eq(projects.clientId, clientId));
+
+    const [activeRow] = await tx
+      .select({ n: sql<number>`count(*)::int` })
+      .from(proposals)
+      .where(
+        and(
+          eq(proposals.clientId, clientId),
+          inArray(proposals.status, ['draft', 'sent']),
+        ),
+      );
+
+    const [contractedRow] = await tx
+      .select({
+        total: sql<string>`coalesce(sum(${proposals.total}), 0)::text`,
+      })
+      .from(proposals)
+      .where(
+        and(
+          eq(proposals.clientId, clientId),
+          eq(proposals.status, 'accepted'),
+        ),
+      );
+
+    const recentActivity = await tx
+      .select()
+      .from(activities)
+      .where(
+        and(
+          eq(activities.entityType, 'client'),
+          eq(activities.entityId, clientId),
+        ),
+      )
+      .orderBy(desc(activities.createdAt))
+      .limit(5);
+
+    return {
+      projectCount: Number(projRow?.n ?? 0),
+      activeProposalCount: Number(activeRow?.n ?? 0),
+      contractedTotal: contractedRow?.total ?? '0',
+      recentActivity,
+    };
+  });
 }
