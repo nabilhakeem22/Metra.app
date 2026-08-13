@@ -328,6 +328,7 @@ declare
   exp    timestamptz;
   pid    uuid;
   oid    uuid;
+  cid    uuid;
   n      int;
 begin
   target := case
@@ -337,8 +338,8 @@ begin
   end;
   if target is null then return 'invalid'; end if;
 
-  select status, share_expires_at, id, org_id
-    into st, exp, pid, oid
+  select status, share_expires_at, id, org_id, client_id
+    into st, exp, pid, oid, cid
     from public.proposals
     where token_hash = p_hash;
   if not found then return 'not_found'; end if;
@@ -354,6 +355,17 @@ begin
   insert into public.proposal_events
     (id, org_id, proposal_id, kind, actor_name, ip, user_agent, from_status, to_status)
     values (gen_random_uuid(), oid, pid, target, p_name, p_ip, p_ua, 'sent', target);
+
+  -- On acceptance, append to the client's activity feed (system event). The
+  -- function is SECURITY DEFINER, so this insert runs as the owner (bypasses the
+  -- unauthenticated FORCE-RLS on activities, exactly like proposal_events above).
+  if target = 'accepted' then
+    insert into public.activities
+      (id, org_id, entity_type, entity_id, actor_user_id, kind, note, meta)
+      values (gen_random_uuid(), oid, 'client', cid, null, 'proposal_accepted', null,
+              jsonb_build_object('proposal_id', pid));
+  end if;
+
   return 'ok';
 end
 $$;

@@ -17,6 +17,7 @@ import { organizations } from '@metra/db';
 import { and, eq, inArray, sql } from 'drizzle-orm';
 import { fail, mutateInOrg } from '@/lib/actions/mutate';
 import { err, type ActionResult } from '@/lib/actions/result';
+import { appendSystemActivity } from '@/lib/activities/core';
 import {
   computeLine,
   computeSection,
@@ -517,7 +518,7 @@ export async function sendProposalCore(
           updatedAt: new Date(),
         })
         .where(and(eq(proposals.id, input.id), eq(proposals.status, 'draft')))
-        .returning({ id: proposals.id });
+        .returning({ id: proposals.id, clientId: proposals.clientId });
       if (!gated[0]) fail('proposal_not_draft');
 
       await tx.insert(proposalEvents).values({
@@ -527,6 +528,14 @@ export async function sendProposalCore(
         actorUserId: ctx.userId,
         fromStatus: 'draft',
         toStatus: 'sent',
+      });
+
+      // Client activity feed: a proposal was sent.
+      await appendSystemActivity(tx, ctx, {
+        entityType: 'client',
+        entityId: gated[0].clientId,
+        kind: 'proposal_sent',
+        meta: { proposal_id: input.id },
       });
 
       await audit({
