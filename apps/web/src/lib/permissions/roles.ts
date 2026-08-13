@@ -12,6 +12,7 @@ export type Capability =
   | 'clients'
   | 'client_activity'
   | 'projects'
+  | 'project_activity'
   | 'price_book'
   | 'proposals_build'
   | 'proposals_send'

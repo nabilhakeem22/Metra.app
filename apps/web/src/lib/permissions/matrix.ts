@@ -25,6 +25,9 @@ const ROWS: Record<Capability, string[]> = {
   // (owner/admin/PM/site_engineer/accountant) may create; viewer + client cannot.
   client_activity: ['CR', 'CR', 'CR', 'CR', 'CR', '', ''],
   projects: ['CRUA', 'CRUA', 'CRU', 'R', 'R', 'R', 'R'],
+  // Activity notes + document uploads on a project: everyone operational
+  // (owner/admin/PM/site_engineer/accountant) may create; viewer + client cannot.
+  project_activity: ['CR', 'CR', 'CR', 'CR', 'CR', '', ''],
   price_book: ['CRUA', 'CRUA', 'R', '', 'R', '', ''],
   proposals_build: ['CRU', 'CRU', 'CRU', '', '', '', 'R'],
   // 'client' send removed (S1): a client-role session must not mint share links /

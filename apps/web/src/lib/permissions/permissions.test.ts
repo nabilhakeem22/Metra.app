@@ -139,6 +139,35 @@ describe('client_activity capability (P1 Slice 4)', () => {
   });
 });
 
+describe('project_activity capability (P1 Slice 5)', () => {
+  it('create granted to owner/admin/PM/site_engineer/accountant; denied to viewer/client', () => {
+    for (const role of [
+      'owner',
+      'admin',
+      'project_manager',
+      'site_engineer',
+      'accountant',
+    ] as const) {
+      expect(can(role, 'project_activity', 'create')).toBe(true);
+    }
+    for (const role of ['viewer', 'client'] as const) {
+      expect(can(role, 'project_activity', 'create')).toBe(false);
+    }
+  });
+
+  it('is matrix-driven — config writes stay projects/update (manager-only)', () => {
+    // site_engineer + accountant may add project activity but NOT edit config.
+    for (const role of ['site_engineer', 'accountant'] as const) {
+      expect(can(role, 'project_activity', 'create')).toBe(true);
+      expect(can(role, 'projects', 'update')).toBe(false);
+    }
+    // viewer/client can read a project but cannot add activity.
+    expect(can('viewer', 'projects', 'read')).toBe(true);
+    expect(can('viewer', 'project_activity', 'create')).toBe(false);
+    expect(can('client', 'project_activity', 'create')).toBe(false);
+  });
+});
+
 describe('proposals capabilities + canSeeMargin (P1 Slice 3)', () => {
   it('proposals_build: owner/admin/PM CRU, viewer read-only, others none', () => {
     for (const role of ['owner', 'admin', 'project_manager'] as const) {
