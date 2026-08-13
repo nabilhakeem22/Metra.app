@@ -22,7 +22,11 @@ const NOTE_MAX = 4000;
 export interface SystemActivityInput {
   entityType: ActivityEntityType;
   entityId: string;
-  kind: 'client_created' | 'proposal_sent' | 'proposal_accepted';
+  kind:
+    | 'client_created'
+    | 'proposal_sent'
+    | 'proposal_accepted'
+    | 'project_created';
   meta?: Record<string, unknown> | null;
 }
 

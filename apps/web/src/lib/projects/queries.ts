@@ -1,7 +1,19 @@
 import 'server-only';
-import { clients, projects, type ProjectStatus } from '@metra/db';
-import { and, asc, eq, ilike, or } from 'drizzle-orm';
+import {
+  activities,
+  clients,
+  projects,
+  projectStages,
+  projectTypes,
+  proposals,
+  type Activity,
+  type Project,
+  type ProjectStage,
+  type ProjectStatus,
+} from '@metra/db';
+import { and, asc, desc, eq, ilike, or, sql } from 'drizzle-orm';
 import { withOrgContext, type OrgContext } from '@/lib/db/context';
+import { currentStage } from '@/lib/project-stages/queries';
 
 export interface ListProjectsFilter {
   status?: ProjectStatus;
@@ -68,5 +80,108 @@ export function listProjects(
       .leftJoin(clients, eq(clients.id, projects.clientId))
       .where(conds.length ? and(...conds) : undefined)
       .orderBy(asc(projects.code));
+  });
+}
+
+export interface ProjectWithType extends Project {
+  typeNameEn: string | null;
+  typeNameAr: string | null;
+}
+
+/** One project by id (org-scoped) with its resolved type name. Null if absent. */
+export function getProjectById(
+  ctx: OrgContext,
+  id: string,
+): Promise<ProjectWithType | null> {
+  return withOrgContext(ctx, async (tx) => {
+    const [row] = await tx
+      .select({
+        project: projects,
+        typeNameEn: projectTypes.nameEn,
+        typeNameAr: projectTypes.nameAr,
+      })
+      .from(projects)
+      .leftJoin(projectTypes, eq(projectTypes.id, projects.typeId))
+      .where(eq(projects.id, id))
+      .limit(1);
+    if (!row) return null;
+    return {
+      ...row.project,
+      typeNameEn: row.typeNameEn,
+      typeNameAr: row.typeNameAr,
+    };
+  });
+}
+
+export interface ProjectOverview {
+  status: ProjectStatus;
+  currentStage: ProjectStage | null;
+  totalStages: number;
+  doneStages: number;
+  /** round(avg(progress_pct)) across all stages, 0 if none. */
+  overallProgress: number;
+  /** Sum of ACCEPTED proposal totals for this project (scale-4 money string). */
+  contractedTotal: string;
+  recentActivity: Activity[];
+  // Job-costing figures are intentionally ABSENT — UI renders a locked state.
+}
+
+/** Overview figures for a project's profile: status, derived stage, progress. */
+export function getProjectOverview(
+  ctx: OrgContext,
+  projectId: string,
+): Promise<ProjectOverview> {
+  return withOrgContext(ctx, async (tx) => {
+    const [proj] = await tx
+      .select({ status: projects.status })
+      .from(projects)
+      .where(eq(projects.id, projectId))
+      .limit(1);
+
+    const stages = await tx
+      .select()
+      .from(projectStages)
+      .where(eq(projectStages.projectId, projectId))
+      .orderBy(asc(projectStages.sortOrder), asc(projectStages.createdAt));
+
+    const doneStages = stages.filter((s) => s.status === 'done').length;
+    const overallProgress = stages.length
+      ? Math.round(
+          stages.reduce((sum, s) => sum + Number(s.progressPct), 0) /
+            stages.length,
+        )
+      : 0;
+
+    const [contractedRow] = await tx
+      .select({ total: sql<string>`coalesce(sum(${proposals.total}), 0)::text` })
+      .from(proposals)
+      .where(
+        and(
+          eq(proposals.projectId, projectId),
+          eq(proposals.status, 'accepted'),
+        ),
+      );
+
+    const recentActivity = await tx
+      .select()
+      .from(activities)
+      .where(
+        and(
+          eq(activities.entityType, 'project'),
+          eq(activities.entityId, projectId),
+        ),
+      )
+      .orderBy(desc(activities.createdAt))
+      .limit(5);
+
+    return {
+      status: proj?.status ?? 'draft',
+      currentStage: currentStage(stages),
+      totalStages: stages.length,
+      doneStages,
+      overallProgress,
+      contractedTotal: contractedRow?.total ?? '0',
+      recentActivity,
+    };
   });
 }
