@@ -100,9 +100,21 @@ export const ACTIVITY_KINDS = [
   'client_created',
   'proposal_sent',
   'proposal_accepted',
+  'project_created',
 ] as const;
 
 export const activityKind = pgEnum('activity_kind', ACTIVITY_KINDS);
+
+/** P1 Slice 5 — per-project stage status. Order is a contract; labels localized. */
+export const STAGE_STATUSES = [
+  'not_started',
+  'in_progress',
+  'blocked',
+  'done',
+  'skipped',
+] as const;
+
+export const stageStatus = pgEnum('stage_status', STAGE_STATUSES);
 
 export type MemberRole = (typeof MEMBER_ROLES)[number];
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];
@@ -114,3 +126,4 @@ export type ProposalStatus = (typeof PROPOSAL_STATUSES)[number];
 export type ClientType = (typeof CLIENT_TYPES)[number];
 export type ActivityEntityType = (typeof ACTIVITY_ENTITY_TYPES)[number];
 export type ActivityKind = (typeof ACTIVITY_KINDS)[number];
+export type StageStatus = (typeof STAGE_STATUSES)[number];
