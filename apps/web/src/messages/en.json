@@ -328,7 +328,12 @@
       "code": "A short unique code for this project within your organisation.",
       "name": "The project's name, in Arabic or English. At least one is required.",
       "client": "The client this project belongs to.",
-      "status": "The project's current stage."
+      "status": "The project's current stage.",
+      "type": "The kind of project (villa, office, …). Pick one or add a new type.",
+      "contractRef": "Your internal contract or agreement reference for this project.",
+      "description": "A short description of the scope of work.",
+      "advancePct": "Advance payment percentage agreed for this project.",
+      "retentionPct": "Retention percentage withheld on this project's payments."
     },
     "costItem": {
       "code": "A short unique code for this item within your price book.",
@@ -688,7 +693,111 @@
       "created": "Project created",
       "updated": "Project updated",
       "activated": "Project activated",
-      "deactivated": "Project deactivated"
+      "deactivated": "Project deactivated",
+      "typeAdded": "Type added",
+      "stageAdded": "Stage added",
+      "stageSaved": "Stage saved",
+      "stageDeleted": "Stage removed"
+    },
+    "stageStatuses": {
+      "not_started": "Not started",
+      "in_progress": "In progress",
+      "blocked": "Blocked",
+      "done": "Done",
+      "skipped": "Skipped"
+    },
+    "profile": {
+      "back": "Back to projects",
+      "noType": "No type",
+      "tabs": {
+        "sectionsLabel": "Project sections",
+        "overview": "Overview",
+        "details": "Details",
+        "stages": "Stages",
+        "financials": "Financials",
+        "team": "Team",
+        "proposals": "Proposals",
+        "documents": "Documents",
+        "activity": "Activity"
+      },
+      "overview": {
+        "status": "Status",
+        "currentStage": "Current stage",
+        "progress": "Overall progress",
+        "stages": "Stages",
+        "stagesDone": "{done} of {total} done",
+        "contracted": "Contracted value",
+        "recentActivity": "Recent activity",
+        "noActivity": "No activity yet.",
+        "noStage": "—"
+      },
+      "details": {
+        "title": "Project details",
+        "type": "Type",
+        "addType": "Add type",
+        "addTypePlaceholder": "New type name",
+        "contractRef": "Contract reference",
+        "description": "Description",
+        "advancePct": "Advance %",
+        "retentionPct": "Retention %",
+        "save": "Save details",
+        "saved": "Details saved"
+      },
+      "stages": {
+        "title": "Stages",
+        "add": "Add stage",
+        "name": "Stage",
+        "status": "Status",
+        "progress": "Progress %",
+        "startDate": "Start",
+        "endDate": "End",
+        "delete": "Delete",
+        "empty": "No stages yet.",
+        "newName": "New stage name",
+        "save": "Save",
+        "cancel": "Cancel"
+      },
+      "financials": {
+        "contracted": "Contracted value",
+        "advance": "Advance %",
+        "retention": "Retention %",
+        "jobCost": "Job cost",
+        "margin": "Margin",
+        "lockedTitle": "Job costing not enabled",
+        "lockedBody": "Job-cost and margin figures activate once job costing begins."
+      },
+      "team": {
+        "title": "Team",
+        "lockedTitle": "Project roles not enabled",
+        "lockedBody": "Assigning a project team activates with project roles."
+      },
+      "proposals": {
+        "title": "Proposals",
+        "newForProject": "New proposal for this project",
+        "empty": "No proposals for this project yet."
+      },
+      "documents": {
+        "title": "Documents",
+        "upload": "Upload document",
+        "empty": "No documents yet.",
+        "download": "Download",
+        "delete": "Delete",
+        "uploaded": "Document uploaded",
+        "deleted": "Document deleted"
+      },
+      "activity": {
+        "title": "Activity",
+        "add": "Add note",
+        "notePlaceholder": "Add a note…",
+        "empty": "No activity yet.",
+        "kinds": {
+          "note": "Note",
+          "client_created": "Client created",
+          "proposal_sent": "Proposal sent",
+          "proposal_accepted": "Proposal accepted",
+          "project_created": "Project created"
+        }
+      }
     }
   },
   "proposals": {
