@@ -11,6 +11,8 @@ export * from './section-defaults';
 export * from './cost-items';
 export * from './price-changes';
 export * from './clients';
+export * from './client-contacts';
+export * from './activities';
 export * from './projects';
 export * from './proposals';
 export * from './proposal-sections';
@@ -26,6 +28,8 @@ import { sections } from './sections';
 import { costItems } from './cost-items';
 import { priceChanges, priceChangeLines } from './price-changes';
 import { clients } from './clients';
+import { clientContacts } from './client-contacts';
+import { activities } from './activities';
 import { projects } from './projects';
 import { proposals } from './proposals';
 import { proposalSections } from './proposal-sections';
@@ -43,6 +47,8 @@ export const orgScopedTables = {
   priceChanges,
   priceChangeLines,
   clients,
+  clientContacts,
+  activities,
   projects,
   proposals,
   proposalSections,
@@ -62,6 +68,8 @@ export const allTables = {
   priceChanges,
   priceChangeLines,
   clients,
+  clientContacts,
+  activities,
   projects,
   proposals,
   proposalSections,

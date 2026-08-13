@@ -1,5 +1,7 @@
+import { sql } from 'drizzle-orm';
 import {
   boolean,
+  check,
   index,
   pgTable,
   text,
@@ -7,14 +9,17 @@ import {
   uuid,
   type AnyPgColumn,
 } from 'drizzle-orm/pg-core';
-import { bilingual, bilingualCheck } from './_helpers';
+import { bilingual, bilingualCheck, money } from './_helpers';
+import { clientType } from './enums';
 import { organizations } from './organizations';
 import { orgScoped } from './org-scoped';
 
 /**
- * Clients (P1 Slice 2). Bilingual name + one inline contact. Soft-deleted via
- * `active` (no hard DELETE in the UI). `unique(org_id, id)` is the universal
- * composite-FK target so projects reference a client within the same org.
+ * Clients (P1 Slice 2 + Slice 4 profile). Bilingual name + a `type`, commercial
+ * identifiers, and advance/retention percentages. The flat `contact_name/email/
+ * phone` columns are KEPT (proposal send reads `clients.email`); richer contacts
+ * live in `client_contacts`. Soft-deleted via `active`. `unique(org_id, id)` is
+ * the universal composite-FK target so projects reference a client in-org.
  */
 export const clients = pgTable(
   'clients',
@@ -24,18 +29,32 @@ export const clients = pgTable(
       .notNull()
       .references((): AnyPgColumn => organizations.id, { onDelete: 'restrict' }),
     ...bilingual('name'),
+    type: clientType('type').notNull().default('company'),
     contactName: text('contact_name'),
     email: text('email'),
     phone: text('phone'),
     city: text('city'),
     address: text('address'),
     taxRegistrationNumber: text('tax_registration_number'),
+    commercialRegister: text('commercial_register'),
+    taxCardNumber: text('tax_card_number'),
+    nationalId: text('national_id'),
+    segment: text('segment'),
+    leadSource: text('lead_source'),
+    creditTerms: text('credit_terms'),
+    advancePct: money('advance_pct').notNull().default('0'),
+    retentionPct: money('retention_pct').notNull().default('0'),
     notes: text('notes'),
     active: boolean('active').notNull().default(true),
   },
   (t) => [
     unique('clients_org_id_id_unique').on(t.orgId, t.id),
     bilingualCheck('clients', 'name'),
+    check('clients_advance_pct_range', sql`advance_pct >= 0 and advance_pct <= 100`),
+    check(
+      'clients_retention_pct_range',
+      sql`retention_pct >= 0 and retention_pct <= 100`,
+    ),
     index('clients_org_active_idx').on(t.orgId, t.active),
   ],
 );
