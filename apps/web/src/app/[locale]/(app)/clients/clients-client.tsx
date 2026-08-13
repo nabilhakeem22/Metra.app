@@ -8,6 +8,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Input } from '@/components/ui/input';
 import { toast } from '@/hooks/use-toast';
+import { Link } from '@/i18n/routing';
 import { resolveActionError } from '@/lib/actions/error-message';
 import type { ActionCode } from '@/lib/actions/result';
 import { setClientActive } from '@/lib/clients/actions';
@@ -147,7 +148,14 @@ export function ClientsClient({ items, canManage }: ClientsClientProps) {
                   ).value;
                   return (
                     <tr key={c.id} className="border-b last:border-0 hover:bg-muted/40">
-                      <td className="px-4 py-2 font-medium">{name}</td>
+                      <td className="px-4 py-2 font-medium">
+                        <Link
+                          href={`/clients/${c.id}`}
+                          className="hover:underline"
+                        >
+                          {name}
+                        </Link>
+                      </td>
                       <td className="px-4 py-2 text-muted-foreground">
                         {c.contactName || '—'}
                       </td>

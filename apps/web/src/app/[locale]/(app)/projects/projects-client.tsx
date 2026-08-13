@@ -2,7 +2,7 @@
 
 import { FolderKanban, Pencil, Plus, Power, Search } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
-import { useMemo, useState, useTransition } from 'react';
+import { useEffect, useMemo, useState, useTransition } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -21,6 +21,8 @@ export interface ProjectsClientProps {
   items: ProjectListItem[];
   clientOptions: ClientOption[];
   canManage: boolean;
+  /** When arriving from a client profile's "new project" CTA. */
+  initialNewClientId?: string;
 }
 
 const STATUS_STYLE: Record<string, string> = {
@@ -35,6 +37,7 @@ export function ProjectsClient({
   items,
   clientOptions,
   canManage,
+  initialNewClientId,
 }: ProjectsClientProps) {
   const t = useTranslations('projects');
   const te = useTranslations('errors');
@@ -46,6 +49,15 @@ export function ProjectsClient({
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<ProjectListItem | null>(null);
   const [pending, startTransition] = useTransition();
+
+  // Arrived from a client profile's "new project for this client" CTA: open the
+  // new-project form once, with that client preselected.
+  useEffect(() => {
+    if (canManage && initialNewClientId) {
+      setEditing(null);
+      setFormOpen(true);
+    }
+  }, [canManage, initialNewClientId]);
 
   const filtered = useMemo(() => {
     const needle = q.trim().toLowerCase();
@@ -92,6 +104,7 @@ export function ProjectsClient({
       onOpenChange={setFormOpen}
       item={editing}
       clientOptions={clientOptions}
+      defaultClientId={initialNewClientId}
     />
   );
 

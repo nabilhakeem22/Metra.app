@@ -27,6 +27,8 @@ export interface ProjectFormProps {
   onOpenChange: (open: boolean) => void;
   item?: ProjectListItem | null;
   clientOptions: ClientOption[];
+  /** Preselected client for a NEW project (e.g. opened from a client profile). */
+  defaultClientId?: string;
 }
 
 interface FormState {
@@ -42,12 +44,19 @@ interface FormState {
   notes: string;
 }
 
-function emptyState(clientOptions: ClientOption[]): FormState {
+function emptyState(
+  clientOptions: ClientOption[],
+  defaultClientId?: string,
+): FormState {
+  const preselected =
+    defaultClientId && clientOptions.some((c) => c.id === defaultClientId)
+      ? defaultClientId
+      : (clientOptions[0]?.id ?? '');
   return {
     code: '',
     nameEn: '',
     nameAr: '',
-    clientId: clientOptions[0]?.id ?? '',
+    clientId: preselected,
     status: 'draft',
     startDate: '',
     endDate: '',
@@ -62,6 +71,7 @@ export function ProjectForm({
   onOpenChange,
   item,
   clientOptions,
+  defaultClientId,
 }: ProjectFormProps) {
   const t = useTranslations('projects');
   const th = useTranslations('hints.project');
@@ -86,9 +96,9 @@ export function ProjectForm({
             address: item.address ?? '',
             notes: item.notes ?? '',
           }
-        : emptyState(clientOptions),
+        : emptyState(clientOptions, defaultClientId),
     );
-  }, [open, item, clientOptions]);
+  }, [open, item, clientOptions, defaultClientId]);
 
   const set = (k: keyof FormState) => (v: string) =>
     setForm((f) => ({ ...f, [k]: v }));

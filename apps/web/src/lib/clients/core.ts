@@ -114,7 +114,7 @@ function validType(t: ClientType | undefined): boolean {
 export async function createClientCore(
   ctx: OrgContext,
   input: ClientInput,
-): Promise<ActionResult> {
+): Promise<ActionResult & { data?: string }> {
   const v = normalized(input);
   if (!v.nameEn && !v.nameAr) return err('name_required');
   if (!withinLimits(v) || !validType(v.type)) return err('invalid');

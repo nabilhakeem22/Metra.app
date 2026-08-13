@@ -8,7 +8,12 @@ import { listProjects } from '@/lib/projects/queries';
 import { ProjectsClient } from './projects-client';
 import type { ClientOption, ProjectListItem } from './types';
 
-export default async function ProjectsPage() {
+export default async function ProjectsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ newFor?: string }>;
+}) {
+  const { newFor } = await searchParams;
   const ctx = await requireOrg();
   if (!can(ctx.role, 'projects', 'read')) notFound();
 
@@ -50,6 +55,7 @@ export default async function ProjectsPage() {
         items={items}
         clientOptions={options}
         canManage={canManage}
+        initialNewClientId={newFor}
       />
     </div>
   );
