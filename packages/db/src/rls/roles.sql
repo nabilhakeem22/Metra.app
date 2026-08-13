@@ -26,6 +26,8 @@ grant select, insert, update, delete on public.invitations   to metra_app;
 grant select, insert, update, delete on public.sections      to metra_app;
 grant select, insert, update, delete on public.cost_items    to metra_app;
 grant select, insert, update, delete on public.clients       to metra_app;
+grant select, insert, update, delete on public.client_contacts to metra_app;
+grant select, insert, update, delete on public.activities    to metra_app;
 grant select, insert, update, delete on public.projects      to metra_app;
 grant select, insert, update, delete on public.proposals         to metra_app;
 grant select, insert, update, delete on public.proposal_sections to metra_app;

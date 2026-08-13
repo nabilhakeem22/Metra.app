@@ -99,6 +99,13 @@
       "when": 1786562004133,
       "tag": "0013_sections_unify",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1786587178851,
+      "tag": "0014_client_profile",
+      "breakpoints": true
     }
   ]
 }

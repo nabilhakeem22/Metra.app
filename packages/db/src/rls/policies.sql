@@ -168,6 +168,34 @@ create policy org_isolation on public.clients
     and public.app_is_current_org_member()
   );
 
+-- client_contacts (P1 Slice 4)
+alter table public.client_contacts enable row level security;
+alter table public.client_contacts force  row level security;
+drop policy if exists org_isolation on public.client_contacts;
+create policy org_isolation on public.client_contacts
+  using (
+    org_id = nullif(current_setting('app.current_org_id', true), '')::uuid
+    and public.app_is_current_org_member()
+  )
+  with check (
+    org_id = nullif(current_setting('app.current_org_id', true), '')::uuid
+    and public.app_is_current_org_member()
+  );
+
+-- activities (P1 Slice 4; polymorphic feed)
+alter table public.activities enable row level security;
+alter table public.activities force  row level security;
+drop policy if exists org_isolation on public.activities;
+create policy org_isolation on public.activities
+  using (
+    org_id = nullif(current_setting('app.current_org_id', true), '')::uuid
+    and public.app_is_current_org_member()
+  )
+  with check (
+    org_id = nullif(current_setting('app.current_org_id', true), '')::uuid
+    and public.app_is_current_org_member()
+  );
+
 -- projects (P1 Slice 2)
 alter table public.projects enable row level security;
 alter table public.projects force  row level security;

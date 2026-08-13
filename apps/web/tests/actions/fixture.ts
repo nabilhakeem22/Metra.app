@@ -134,6 +134,13 @@ export async function teardown(orgIds: string[]): Promise<void> {
       await pg.unsafe(`delete from public.price_changes where org_id='${id}'`);
       // projects reference clients (restrict) -> delete projects first.
       await pg.unsafe(`delete from public.projects where org_id='${id}'`);
+      // Client children must go before clients (contacts cascade, but be
+      // explicit; activities + client files carry no cascade to clients).
+      await pg.unsafe(`delete from public.activities where org_id='${id}'`);
+      await pg.unsafe(`delete from public.client_contacts where org_id='${id}'`);
+      await pg.unsafe(
+        `delete from public.files where org_id='${id}' and entity='client'`,
+      );
       await pg.unsafe(`delete from public.clients where org_id='${id}'`);
       await pg.unsafe(`delete from public.cost_items where org_id='${id}'`);
       // sections are referenced by cost_items (restrict) -> after cost_items.
