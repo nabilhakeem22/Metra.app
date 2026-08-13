@@ -20,22 +20,41 @@ function fontsDir(): string {
       return dir;
     }
   }
-  throw new Error('PDF fonts directory not found');
+  // Not found — callers degrade to fallback fonts rather than crashing the
+  // render (the in-app preview still shows; the browser has its own fonts).
+  return '';
 }
 
 export function fontBase64(file: string): string {
-  return readFileSync(resolve(fontsDir(), file)).toString('base64');
+  const dir = fontsDir();
+  if (!dir) return '';
+  try {
+    return readFileSync(resolve(dir, file)).toString('base64');
+  } catch {
+    return '';
+  }
 }
 
-/** Shared @font-face block (IBM Plex Sans Arabic + Cairo, base64-embedded). */
+/**
+ * Shared @font-face block (IBM Plex Sans Arabic + Cairo, base64-embedded).
+ * Emits a face only when its file actually loaded, so a missing fonts dir
+ * degrades to the fallback family instead of throwing / emitting a broken URI.
+ */
 export function fontFaceCss(): string {
-  return `
-  @font-face { font-family: 'IBM Plex Sans Arabic'; font-weight: 400;
-    src: url(data:font/ttf;base64,${fontBase64('IBMPlexSansArabic-Regular.ttf')}) format('truetype'); }
-  @font-face { font-family: 'IBM Plex Sans Arabic'; font-weight: 700;
-    src: url(data:font/ttf;base64,${fontBase64('IBMPlexSansArabic-Bold.ttf')}) format('truetype'); }
-  @font-face { font-family: 'Cairo'; font-weight: 400 900;
-    src: url(data:font/ttf;base64,${fontBase64('Cairo-Variable.ttf')}) format('truetype'); }`;
+  const face = (family: string, weight: string, file: string): string => {
+    const b64 = fontBase64(file);
+    return b64
+      ? `@font-face { font-family: '${family}'; font-weight: ${weight};
+    src: url(data:font/ttf;base64,${b64}) format('truetype'); }`
+      : '';
+  };
+  return [
+    face('IBM Plex Sans Arabic', '400', 'IBMPlexSansArabic-Regular.ttf'),
+    face('IBM Plex Sans Arabic', '700', 'IBMPlexSansArabic-Bold.ttf'),
+    face('Cairo', '400 900', 'Cairo-Variable.ttf'),
+  ]
+    .filter(Boolean)
+    .join('\n');
 }
 
 /**
