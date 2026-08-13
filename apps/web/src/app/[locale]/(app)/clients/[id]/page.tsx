@@ -16,7 +16,8 @@ import { DetailsTab } from './details-tab';
 import { DocumentsTab } from './documents-tab';
 import { FinancialsTab } from './financials-tab';
 import { OverviewTab } from './overview-tab';
-import { CLIENT_TABS, ProfileTabs, type ClientTab } from './profile-tabs';
+import { ProfileTabs } from './profile-tabs';
+import { CLIENT_TABS, type ClientTab } from './tabs';
 import { ProjectsTab } from './projects-tab';
 
 export default async function ClientProfilePage({

@@ -4,18 +4,7 @@ import { useTranslations } from 'next-intl';
 import { useRef } from 'react';
 import { Link, useRouter } from '@/i18n/routing';
 import { cn } from '@/lib/utils';
-
-export const CLIENT_TABS = [
-  'overview',
-  'details',
-  'contacts',
-  'projects',
-  'financials',
-  'documents',
-  'activity',
-] as const;
-
-export type ClientTab = (typeof CLIENT_TABS)[number];
+import { CLIENT_TABS, type ClientTab } from './tabs';
 
 /**
  * Deep-linkable client-profile tabs. ARIA tablist over next/link hrefs (?tab=…),
