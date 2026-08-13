@@ -10,17 +10,19 @@ import {
   uuid,
   type AnyPgColumn,
 } from 'drizzle-orm/pg-core';
-import { bilingual, bilingualCheck } from './_helpers';
+import { bilingual, bilingualCheck, money } from './_helpers';
 import { clients } from './clients';
 import { projectStatus } from './enums';
 import { organizations } from './organizations';
 import { orgScoped } from './org-scoped';
 import { sameOrgFk } from './org-ref';
+import { projectTypes } from './project-types';
 
 /**
- * Projects (P1 Slice 2). User-entered `code` (unique per org), bilingual name,
- * a same-org client (composite FK is the cross-org backstop), a lifecycle
- * status, optional dates/location, soft-deleted via `active`.
+ * Projects (P1 Slice 2 + Slice 5 profile). User-entered `code` (unique per org),
+ * bilingual name, a same-org client, a nullable `type_id` referencing editable
+ * project_types (set null on type delete), advance/retention %, optional
+ * contract ref + description, a lifecycle status, dates/location, soft-deleted.
  */
 export const projects = pgTable(
   'projects',
@@ -32,7 +34,12 @@ export const projects = pgTable(
     code: text('code').notNull(),
     ...bilingual('name'),
     clientId: uuid('client_id').notNull(),
+    typeId: uuid('type_id'),
     status: projectStatus('status').notNull().default('draft'),
+    contractRef: text('contract_ref'),
+    description: text('description'),
+    advancePct: money('advance_pct').notNull().default('0'),
+    retentionPct: money('retention_pct').notNull().default('0'),
     startDate: date('start_date'),
     endDate: date('end_date'),
     city: text('city'),
@@ -48,7 +55,14 @@ export const projects = pgTable(
       'projects_date_order',
       sql`end_date is null or start_date is null or end_date >= start_date`,
     ),
+    check('projects_advance_pct_range', sql`advance_pct >= 0 and advance_pct <= 100`),
+    check(
+      'projects_retention_pct_range',
+      sql`retention_pct >= 0 and retention_pct <= 100`,
+    ),
     ...sameOrgFk(t, 'client', clients, { onDelete: 'restrict' }),
+    // Nullable type reference (set null when a type is deleted).
+    ...sameOrgFk(t, 'type', projectTypes, { onDelete: 'set null' }),
     index('projects_org_status_idx').on(t.orgId, t.status),
     index('projects_org_active_idx').on(t.orgId, t.active),
   ],

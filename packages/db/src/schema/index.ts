@@ -13,7 +13,12 @@ export * from './price-changes';
 export * from './clients';
 export * from './client-contacts';
 export * from './activities';
+export * from './project-types';
+export * from './project-type-defaults';
+export * from './stage-templates';
+export * from './stage-defaults';
 export * from './projects';
+export * from './project-stages';
 export * from './proposals';
 export * from './proposal-sections';
 export * from './proposal-lines';
@@ -30,7 +35,10 @@ import { priceChanges, priceChangeLines } from './price-changes';
 import { clients } from './clients';
 import { clientContacts } from './client-contacts';
 import { activities } from './activities';
+import { projectTypes } from './project-types';
+import { stageTemplates } from './stage-templates';
 import { projects } from './projects';
+import { projectStages } from './project-stages';
 import { proposals } from './proposals';
 import { proposalSections } from './proposal-sections';
 import { proposalLines } from './proposal-lines';
@@ -49,7 +57,10 @@ export const orgScopedTables = {
   clients,
   clientContacts,
   activities,
+  projectTypes,
+  stageTemplates,
   projects,
+  projectStages,
   proposals,
   proposalSections,
   proposalLines,
@@ -70,7 +81,10 @@ export const allTables = {
   clients,
   clientContacts,
   activities,
+  projectTypes,
+  stageTemplates,
   projects,
+  projectStages,
   proposals,
   proposalSections,
   proposalLines,
