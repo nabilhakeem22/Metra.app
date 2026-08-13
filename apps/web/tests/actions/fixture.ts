@@ -50,6 +50,36 @@ export async function seedOrg(opts: {
      ) as d(key, name_en, name_ar)`,
   );
 
+  // Seed the 5 default project types + 10 default stage templates (mirrors
+  // createOrgCore) so project cores have valid config to read.
+  await pg.unsafe(
+    `insert into public.project_types (org_id, key, name_en, name_ar, sort_order)
+     select '${orgId}', d.key, d.name_en, d.name_ar, d.sort_order
+     from (values
+       ('villa','Villa','فيلا',0),
+       ('apartment','Apartment','شقة',1),
+       ('office','Office','مكتب',2),
+       ('retail','Retail','محل تجاري',3),
+       ('restaurant','Restaurant','مطعم',4)
+     ) as d(key, name_en, name_ar, sort_order)`,
+  );
+  await pg.unsafe(
+    `insert into public.stage_templates (org_id, key, name_en, name_ar, sort_order)
+     select '${orgId}', d.key, d.name_en, d.name_ar, d.sort_order
+     from (values
+       ('design_drawings','Design & drawings','التصميم والرسومات',0),
+       ('civil_demolition','Civil & demolition','الأعمال المدنية والهدم',1),
+       ('mep_first_fix','MEP first fix','التمديدات الأولية',2),
+       ('gypsum_plaster','Gypsum & plaster','الجبس والمحارة',3),
+       ('flooring_tiling','Flooring & tiling','الأرضيات والبلاط',4),
+       ('painting_finishes','Painting & finishes','الدهانات والتشطيبات',5),
+       ('joinery','Joinery','النجارة',6),
+       ('mep_second_fix','MEP second fix','التمديدات النهائية',7),
+       ('snagging','Snagging','المعالجات',8),
+       ('handover','Handover','التسليم',9)
+     ) as d(key, name_en, name_ar, sort_order)`,
+  );
+
   const ownerIds: string[] = [];
   for (let i = 0; i < (opts.owners ?? 1); i += 1) {
     const uid = randomUUID();
@@ -132,8 +162,17 @@ export async function teardown(orgIds: string[]): Promise<void> {
       await pg.unsafe(`delete from public.proposals where org_id='${id}'`);
       await pg.unsafe(`delete from public.price_change_lines where org_id='${id}'`);
       await pg.unsafe(`delete from public.price_changes where org_id='${id}'`);
+      // Project children first: stages cascade from projects, but be explicit;
+      // project files carry no cascade.
+      await pg.unsafe(`delete from public.project_stages where org_id='${id}'`);
+      await pg.unsafe(
+        `delete from public.files where org_id='${id}' and entity='project'`,
+      );
       // projects reference clients (restrict) -> delete projects first.
       await pg.unsafe(`delete from public.projects where org_id='${id}'`);
+      // project_types (referenced by projects, set null) + stage_templates.
+      await pg.unsafe(`delete from public.project_types where org_id='${id}'`);
+      await pg.unsafe(`delete from public.stage_templates where org_id='${id}'`);
       // Client children must go before clients (contacts cascade, but be
       // explicit; activities + client files carry no cascade to clients).
       await pg.unsafe(`delete from public.activities where org_id='${id}'`);

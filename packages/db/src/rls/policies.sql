@@ -210,6 +210,48 @@ create policy org_isolation on public.projects
     and public.app_is_current_org_member()
   );
 
+-- project_types (P1 Slice 5; editable classifications)
+alter table public.project_types enable row level security;
+alter table public.project_types force  row level security;
+drop policy if exists org_isolation on public.project_types;
+create policy org_isolation on public.project_types
+  using (
+    org_id = nullif(current_setting('app.current_org_id', true), '')::uuid
+    and public.app_is_current_org_member()
+  )
+  with check (
+    org_id = nullif(current_setting('app.current_org_id', true), '')::uuid
+    and public.app_is_current_org_member()
+  );
+
+-- stage_templates (P1 Slice 5; org-wide stage process)
+alter table public.stage_templates enable row level security;
+alter table public.stage_templates force  row level security;
+drop policy if exists org_isolation on public.stage_templates;
+create policy org_isolation on public.stage_templates
+  using (
+    org_id = nullif(current_setting('app.current_org_id', true), '')::uuid
+    and public.app_is_current_org_member()
+  )
+  with check (
+    org_id = nullif(current_setting('app.current_org_id', true), '')::uuid
+    and public.app_is_current_org_member()
+  );
+
+-- project_stages (P1 Slice 5; per-project stages)
+alter table public.project_stages enable row level security;
+alter table public.project_stages force  row level security;
+drop policy if exists org_isolation on public.project_stages;
+create policy org_isolation on public.project_stages
+  using (
+    org_id = nullif(current_setting('app.current_org_id', true), '')::uuid
+    and public.app_is_current_org_member()
+  )
+  with check (
+    org_id = nullif(current_setting('app.current_org_id', true), '')::uuid
+    and public.app_is_current_org_member()
+  );
+
 -- =============================================================================
 -- P1 Slice 3 — Proposals (org isolation for all 4 tables; append-only events;
 -- status-immutable proposals; child-draft guard on sections + lines)
