@@ -31,10 +31,3 @@ export type Capability =
   | 'margin_pnl'
   | 'firm_dashboard'
   | 'users_settings';
-
-export const LETTER_TO_ACTION: Record<string, PermissionAction> = {
-  C: 'create',
-  R: 'read',
-  U: 'update',
-  A: 'approve',
-};

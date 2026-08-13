@@ -32,8 +32,3 @@ export function stepsForPage(pathname: string): TourStep[] {
   const norm = normalizePath(pathname);
   return TOUR_STEPS.filter((s) => s.page === norm).sort((a, b) => a.order - b.order);
 }
-
-export function stepById(id: string | null | undefined): TourStep | undefined {
-  if (!id) return undefined;
-  return TOUR_STEPS.find((s) => s.id === id);
-}

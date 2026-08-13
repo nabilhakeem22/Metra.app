@@ -35,14 +35,3 @@ export function listCostItems(
       .orderBy(asc(costItems.sectionId), asc(costItems.code));
   });
 }
-
-/**
- * The org's existing cost-item codes (case-SENSITIVE, matching the DB unique) —
- * for insert-only import collision detection.
- */
-export async function getExistingCodes(ctx: OrgContext): Promise<Set<string>> {
-  const rows = await withOrgContext(ctx, (tx) =>
-    tx.select({ code: costItems.code }).from(costItems),
-  );
-  return new Set(rows.map((r) => r.code));
-}

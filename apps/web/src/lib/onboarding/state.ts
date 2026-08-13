@@ -1,6 +1,5 @@
 'use server';
 
-import { getSessionUser } from '@/lib/auth/session';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import {
   mergeOnboardingMetadata,
@@ -8,12 +7,6 @@ import {
   withDismissedOrg,
   type OnboardingUserState,
 } from './merge';
-
-/** Read the current user's onboarding state from Supabase user_metadata. */
-export async function getOnboardingState(): Promise<OnboardingUserState> {
-  const user = await getSessionUser();
-  return readOnboarding(user?.user_metadata);
-}
 
 // Read-merge-write against the FRESHEST metadata so we never clobber other keys.
 async function patchOnboarding(

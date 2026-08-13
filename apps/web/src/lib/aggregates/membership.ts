@@ -14,8 +14,8 @@ export async function lockOrgMemberships(
   await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${orgId}))`);
 }
 
-/** Number of owners visible in the current org context. */
-export async function ownerCount(tx: MetraDb): Promise<number> {
+/** Number of owners visible in the current org context. Used only internally. */
+async function ownerCount(tx: MetraDb): Promise<number> {
   const rows = await tx
     .select({ id: memberships.id })
     .from(memberships)
