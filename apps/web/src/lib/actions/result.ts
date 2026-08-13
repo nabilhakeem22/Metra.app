@@ -31,7 +31,8 @@ export type ActionCode =
   | 'supervision_out_of_range'
   | 'too_many_lines'
   | 'invalid_date'
-  | 'amount_too_large';
+  | 'amount_too_large'
+  | 'last_primary_contact';
 
 export interface ActionResult {
   ok: boolean;

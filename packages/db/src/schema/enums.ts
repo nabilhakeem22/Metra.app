@@ -81,6 +81,29 @@ export const PROPOSAL_STATUSES = [
 
 export const proposalStatus = pgEnum('proposal_status', PROPOSAL_STATUSES);
 
+/** P1 Slice 4 — client classification. Order is a contract; labels localized. */
+export const CLIENT_TYPES = ['individual', 'company', 'consultant'] as const;
+
+export const clientType = pgEnum('client_type', CLIENT_TYPES);
+
+/** Polymorphic activity-feed subject. `project` is provisioned now, wired later. */
+export const ACTIVITY_ENTITY_TYPES = ['client', 'project'] as const;
+
+export const activityEntityType = pgEnum(
+  'activity_entity_type',
+  ACTIVITY_ENTITY_TYPES,
+);
+
+/** Activity kinds: a manual note + the system events we emit. */
+export const ACTIVITY_KINDS = [
+  'note',
+  'client_created',
+  'proposal_sent',
+  'proposal_accepted',
+] as const;
+
+export const activityKind = pgEnum('activity_kind', ACTIVITY_KINDS);
+
 export type MemberRole = (typeof MEMBER_ROLES)[number];
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];
 export type InvitationStatus = (typeof INVITATION_STATUSES)[number];
@@ -88,3 +111,6 @@ export type CostItemCategory = (typeof COST_ITEM_CATEGORIES)[number];
 export type CostItemUnit = (typeof COST_ITEM_UNITS)[number];
 export type ProjectStatus = (typeof PROJECT_STATUSES)[number];
 export type ProposalStatus = (typeof PROPOSAL_STATUSES)[number];
+export type ClientType = (typeof CLIENT_TYPES)[number];
+export type ActivityEntityType = (typeof ACTIVITY_ENTITY_TYPES)[number];
+export type ActivityKind = (typeof ACTIVITY_KINDS)[number];
