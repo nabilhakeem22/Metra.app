@@ -1,10 +1,9 @@
-import { organizations } from '@metra/db';
 import { getTranslations } from 'next-intl/server';
 import { notFound, redirect } from 'next/navigation';
 import { PageHeader } from '@/components/ui/page-header';
 import { requireOrg } from '@/lib/auth/require-org';
-import { withOrgContext } from '@/lib/db/context';
-import { can, canSeeMargin } from '@/lib/permissions/can';
+import { resolveSeeMargin } from '@/lib/org/queries';
+import { can } from '@/lib/permissions/can';
 import { getProposalWithLines } from '@/lib/proposals/queries';
 import { formatProposalNumber, proposalYear } from '@/lib/format/proposal-number';
 import { ProposalView } from './view-client';
@@ -18,10 +17,7 @@ export default async function ProposalViewPage({
   const ctx = await requireOrg();
   if (!can(ctx.role, 'proposals_build', 'read')) notFound();
 
-  const [org] = await withOrgContext(ctx, (tx) =>
-    tx.select({ hide: organizations.hideMarginFromPm }).from(organizations).limit(1),
-  );
-  const seeMargin = canSeeMargin(ctx.role, org?.hide ?? true);
+  const seeMargin = await resolveSeeMargin(ctx);
 
   const detail = await getProposalWithLines(ctx, id, seeMargin);
   if (!detail) notFound();
