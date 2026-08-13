@@ -66,19 +66,10 @@ BEGIN
   CREATE INDEX IF NOT EXISTS client_contacts_client_idx
     ON public.client_contacts (org_id, client_id);
 
-  ALTER TABLE public.client_contacts ENABLE ROW LEVEL SECURITY;
-  ALTER TABLE public.client_contacts FORCE ROW LEVEL SECURITY;
-  DROP POLICY IF EXISTS org_isolation ON public.client_contacts;
-  CREATE POLICY org_isolation ON public.client_contacts
-    USING (
-      org_id = nullif(current_setting('app.current_org_id', true), '')::uuid
-      AND public.app_is_current_org_member()
-    )
-    WITH CHECK (
-      org_id = nullif(current_setting('app.current_org_id', true), '')::uuid
-      AND public.app_is_current_org_member()
-    );
-  GRANT SELECT, INSERT, UPDATE, DELETE ON public.client_contacts TO metra_app;
+  -- RLS (enable + FORCE + org_isolation + grants) is applied by db:apply-rls
+  -- (rls/policies.sql + rls/roles.sql), not inline — the policy references
+  -- app_is_current_org_member() and the metra_app role, which apply-rls creates
+  -- AFTER migrate, so inlining them made a fresh migrate fail.
 
   -- 4) activities (polymorphic; NO composite FK to the subject).
   CREATE TABLE IF NOT EXISTS public.activities (
@@ -99,19 +90,7 @@ BEGIN
   CREATE INDEX IF NOT EXISTS activities_org_entity_idx
     ON public.activities (org_id, entity_type, entity_id, created_at);
 
-  ALTER TABLE public.activities ENABLE ROW LEVEL SECURITY;
-  ALTER TABLE public.activities FORCE ROW LEVEL SECURITY;
-  DROP POLICY IF EXISTS org_isolation ON public.activities;
-  CREATE POLICY org_isolation ON public.activities
-    USING (
-      org_id = nullif(current_setting('app.current_org_id', true), '')::uuid
-      AND public.app_is_current_org_member()
-    )
-    WITH CHECK (
-      org_id = nullif(current_setting('app.current_org_id', true), '')::uuid
-      AND public.app_is_current_org_member()
-    );
-  GRANT SELECT, INSERT, UPDATE, DELETE ON public.activities TO metra_app;
+  -- RLS + grants applied by db:apply-rls (see note above), not inline.
 
   -- 5) Backfill: one primary contact per client that already had a flat contact
   --    and has no primary contact yet.

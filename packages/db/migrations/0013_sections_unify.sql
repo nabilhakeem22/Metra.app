@@ -30,20 +30,11 @@ BEGIN
   CREATE INDEX IF NOT EXISTS sections_org_active_idx
     ON public.sections (org_id, active);
 
-  -- 2) RLS: enable + FORCE + org_isolation (org match AND membership) + grants.
-  ALTER TABLE public.sections ENABLE ROW LEVEL SECURITY;
-  ALTER TABLE public.sections FORCE ROW LEVEL SECURITY;
-  DROP POLICY IF EXISTS org_isolation ON public.sections;
-  CREATE POLICY org_isolation ON public.sections
-    USING (
-      org_id = nullif(current_setting('app.current_org_id', true), '')::uuid
-      AND public.app_is_current_org_member()
-    )
-    WITH CHECK (
-      org_id = nullif(current_setting('app.current_org_id', true), '')::uuid
-      AND public.app_is_current_org_member()
-    );
-  GRANT SELECT, INSERT, UPDATE, DELETE ON public.sections TO metra_app;
+  -- 2) RLS (enable + FORCE + org_isolation + grants) is applied by db:apply-rls
+  --    (rls/policies.sql + rls/roles.sql), NOT here: the org_isolation policy
+  --    references app_is_current_org_member() and the metra_app role, which
+  --    apply-rls creates AFTER migrate. Inlining them made a fresh migrate fail
+  --    (function/role absent). Migrations create schema; apply-rls owns RLS.
 
   -- 3) Seed the 8 defaults for every existing org (idempotent).
   INSERT INTO public.sections (org_id, key, name_en, name_ar)
