@@ -1,0 +1,91 @@
+'use server';
+
+import { clients, files } from '@metra/db';
+import { and, eq } from 'drizzle-orm';
+import { revalidatePath } from 'next/cache';
+import { recordAudit } from '@/lib/audit';
+import { err, type ActionResult } from '@/lib/actions/result';
+import { requireOrg } from '@/lib/auth/require-org';
+import { withOrgContext } from '@/lib/db/context';
+import { can } from '@/lib/permissions/can';
+import {
+  createSignedUploadUrl,
+  ensureFilesBucket,
+  getSignedUrl,
+  type SignedUpload,
+} from '@/lib/storage';
+
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * Signed upload for a client document. Gated by client_activity (the broad
+ * activity/doc audience). The file is stamped entity='client', entity_id=clientId
+ * (and confirmed the client is in-org first).
+ */
+export async function createClientDocumentUpload(input: {
+  clientId: string;
+  contentType?: string;
+  originalName?: string;
+}): Promise<SignedUpload | ActionResult> {
+  const ctx = await requireOrg();
+  if (!can(ctx.role, 'client_activity', 'create')) return err('forbidden');
+  if (!UUID_RE.test(input.clientId ?? '')) return err('invalid');
+
+  // The client must be in this org (RLS-scoped) before we attach a file to it.
+  const [client] = await withOrgContext(ctx, (tx) =>
+    tx
+      .select({ id: clients.id })
+      .from(clients)
+      .where(eq(clients.id, input.clientId))
+      .limit(1),
+  );
+  if (!client) return err('invalid');
+
+  await ensureFilesBucket();
+  return createSignedUploadUrl(ctx, 'client', {
+    contentType: input.contentType,
+    originalName: input.originalName,
+    entityId: input.clientId,
+  });
+}
+
+/** A signed download URL for a client document (org-scoped). */
+export async function getClientDocumentUrl(
+  fileId: string,
+): Promise<ActionResult & { url?: string }> {
+  const ctx = await requireOrg();
+  if (!can(ctx.role, 'clients', 'read')) return err('forbidden');
+  try {
+    const url = await getSignedUrl(ctx, fileId);
+    return { ok: true, url };
+  } catch {
+    return { ok: false, error: 'invalid' };
+  }
+}
+
+/** Delete a client document row (basic). Gated by client_activity. */
+export async function deleteClientDocument(
+  fileId: string,
+): Promise<ActionResult> {
+  const ctx = await requireOrg();
+  if (!can(ctx.role, 'client_activity', 'create')) return err('forbidden');
+  return withOrgContext(ctx, async (tx) => {
+    const [owned] = await tx
+      .select({ id: files.id })
+      .from(files)
+      .where(and(eq(files.id, fileId), eq(files.entity, 'client')))
+      .limit(1);
+    if (!owned) return { ok: false, error: 'invalid' };
+    await tx.delete(files).where(eq(files.id, fileId));
+    await recordAudit(tx, {
+      entity: 'file',
+      entityId: fileId,
+      action: 'delete',
+      before: null,
+      after: null,
+    });
+    revalidatePath('/', 'layout');
+    return { ok: true };
+  });
+}

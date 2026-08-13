@@ -22,7 +22,7 @@ export interface SignedUpload {
 export async function createSignedUploadUrl(
   ctx: OrgContext,
   entity: string,
-  opts?: { originalName?: string; contentType?: string },
+  opts?: { originalName?: string; contentType?: string; entityId?: string },
 ): Promise<SignedUpload> {
   const fileId = randomUUID();
   const objectKey = `${ctx.orgId}/${entity}/${fileId}`;
@@ -32,6 +32,7 @@ export async function createSignedUploadUrl(
       id: fileId,
       orgId: ctx.orgId,
       entity,
+      entityId: opts?.entityId ?? null,
       bucket: FILES_BUCKET,
       objectKey,
       originalName: opts?.originalName ?? null,

@@ -268,7 +268,8 @@
     "supervision_out_of_range": "Supervision must be between 0 and 100",
     "too_many_lines": "This proposal has too many lines",
     "invalid_date": "Enter a valid date",
-    "amount_too_large": "That amount is too large"
+    "amount_too_large": "That amount is too large",
+    "last_primary_contact": "Set another contact as primary before removing this one"
   },
   "common": {
     "untranslated": "untranslated",
@@ -311,6 +312,15 @@
       "city": "The client's city.",
       "address": "The client's full address, shown on documents.",
       "taxRegistrationNumber": "The client's tax registration number, printed on invoices.",
+      "type": "Whether this client is an individual, a company, or a consultant.",
+      "commercialRegister": "The client's commercial register number.",
+      "taxCardNumber": "The client's tax card number.",
+      "nationalId": "The client's national ID (for individuals).",
+      "segment": "A label you use to group clients (e.g. retail, hospitality).",
+      "leadSource": "How this client first came to you.",
+      "creditTerms": "Payment terms agreed with this client (e.g. net 30).",
+      "advancePct": "Default advance payment percentage for this client's contracts.",
+      "retentionPct": "Default retention percentage withheld on this client's contracts.",
       "notes": "Private notes about this client. Never shown to the client."
     },
     "project": {
@@ -509,21 +519,115 @@
       "editTitle": "Edit client",
       "nameEn": "Name (English)",
       "nameAr": "Name (Arabic)",
+      "type": "Type",
       "contactName": "Contact name",
       "email": "Email",
       "phone": "Phone",
       "city": "City",
       "address": "Address",
       "taxCode": "Tax registration number",
+      "commercialRegister": "Commercial register",
+      "taxCardNumber": "Tax card number",
+      "nationalId": "National ID",
+      "segment": "Segment",
+      "leadSource": "Lead source",
+      "creditTerms": "Credit terms",
+      "advancePct": "Advance %",
+      "retentionPct": "Retention %",
       "notes": "Notes",
       "save": "Save",
       "cancel": "Cancel"
+    },
+    "types": {
+      "individual": "Individual",
+      "company": "Company",
+      "consultant": "Consultant"
     },
     "toast": {
       "created": "Client created",
       "updated": "Client updated",
       "activated": "Client activated",
       "deactivated": "Client deactivated"
+    },
+    "profile": {
+      "back": "Back to clients",
+      "tabs": {
+        "overview": "Overview",
+        "details": "Details",
+        "contacts": "Contacts",
+        "projects": "Projects",
+        "financials": "Financials",
+        "documents": "Documents",
+        "activity": "Activity"
+      },
+      "overview": {
+        "projects": "Projects",
+        "activeProposals": "Active proposals",
+        "contracted": "Contracted value",
+        "recentActivity": "Recent activity",
+        "noActivity": "No activity yet."
+      },
+      "details": {
+        "title": "Client details",
+        "save": "Save details",
+        "saved": "Details saved"
+      },
+      "contacts": {
+        "title": "Contacts",
+        "add": "Add contact",
+        "name": "Name",
+        "role": "Role",
+        "phone": "Phone",
+        "email": "Email",
+        "whatsapp": "WhatsApp",
+        "primary": "Primary",
+        "makePrimary": "Make primary",
+        "setAsPrimary": "Set as primary contact",
+        "delete": "Delete",
+        "empty": "No contacts yet.",
+        "newTitle": "New contact",
+        "editTitle": "Edit contact",
+        "save": "Save",
+        "cancel": "Cancel",
+        "primaryOnCreate": "Set as primary"
+      },
+      "projects": {
+        "title": "Projects",
+        "newForClient": "New project for this client",
+        "empty": "No projects for this client yet."
+      },
+      "financials": {
+        "contracted": "Contracted value",
+        "advance": "Advance %",
+        "retention": "Retention %",
+        "invoiced": "Invoiced",
+        "outstanding": "Outstanding",
+        "lockedTitle": "Invoicing not enabled",
+        "lockedBody": "Invoiced and outstanding figures activate once invoicing begins."
+      },
+      "documents": {
+        "title": "Documents",
+        "upload": "Upload document",
+        "uploading": "Uploading…",
+        "empty": "No documents yet.",
+        "download": "Download",
+        "delete": "Delete",
+        "uploaded": "Document uploaded",
+        "deleted": "Document deleted"
+      },
+      "activity": {
+        "title": "Activity",
+        "add": "Add note",
+        "notePlaceholder": "Add a note…",
+        "empty": "No activity yet.",
+        "system": "System",
+        "kinds": {
+          "note": "Note",
+          "client_created": "Client created",
+          "proposal_sent": "Proposal sent",
+          "proposal_accepted": "Proposal accepted"
+        }
+      }
     }
   },
   "projects": {
