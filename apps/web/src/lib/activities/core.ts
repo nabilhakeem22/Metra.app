@@ -59,8 +59,9 @@ export interface AddActivityInput {
 }
 
 /**
- * Manual activity (a note) on a client (or project, provisioned). Gated by the
- * matrix `client_activity` capability. A note MUST carry text. The parent entity
+ * Manual activity (a note) on a client or project. Gated by the matrix
+ * capability that matches the subject — `client_activity` for clients,
+ * `project_activity` for projects. A note MUST carry text. The parent entity
  * MUST exist in-org (RLS-scoped load) — else `invalid`, so a caller can't spray
  * activities at arbitrary/foreign ids. actorUserId = ctx.userId.
  */
@@ -74,9 +75,12 @@ export async function addActivityCore(
   if (kind === 'note' && !note) return err('invalid');
   if ((note?.length ?? 0) > NOTE_MAX) return err('invalid');
 
+  const capability =
+    input.entityType === 'project' ? 'project_activity' : 'client_activity';
+
   return mutateInOrg(
     ctx,
-    { capability: 'client_activity', action: 'create' },
+    { capability, action: 'create' },
     async (tx, audit) => {
       // The parent entity must be in THIS org (RLS-scoped).
       const parentTable =
