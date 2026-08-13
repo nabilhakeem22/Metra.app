@@ -553,6 +553,7 @@
     "profile": {
       "back": "Back to clients",
       "tabs": {
+        "sectionsLabel": "Client sections",
         "overview": "Overview",
         "details": "Details",
         "contacts": "Contacts",

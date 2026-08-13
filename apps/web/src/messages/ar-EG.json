@@ -553,6 +553,7 @@
     "profile": {
       "back": "الرجوع إلى العملاء",
       "tabs": {
+        "sectionsLabel": "أقسام العميل",
         "overview": "نظرة عامة",
         "details": "التفاصيل",
         "contacts": "جهات الاتصال",

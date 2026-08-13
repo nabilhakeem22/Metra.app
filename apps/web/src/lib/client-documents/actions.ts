@@ -56,6 +56,16 @@ export async function getClientDocumentUrl(
 ): Promise<ActionResult & { url?: string }> {
   const ctx = await requireOrg();
   if (!can(ctx.role, 'clients', 'read')) return err('forbidden');
+  // Only sign URLs for this org's CLIENT documents (mirrors the delete guard):
+  // don't let a client-doc endpoint mint URLs for unrelated in-org files.
+  const [owned] = await withOrgContext(ctx, (tx) =>
+    tx
+      .select({ id: files.id })
+      .from(files)
+      .where(and(eq(files.id, fileId), eq(files.entity, 'client')))
+      .limit(1),
+  );
+  if (!owned) return err('invalid');
   try {
     const url = await getSignedUrl(ctx, fileId);
     return { ok: true, url };

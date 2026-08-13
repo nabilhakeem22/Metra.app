@@ -8,6 +8,8 @@ import { Card, CardContent } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { toast } from '@/hooks/use-toast';
 import { useRouter } from '@/i18n/routing';
+import { resolveActionError } from '@/lib/actions/error-message';
+import type { ActionCode } from '@/lib/actions/result';
 import {
   createClientDocumentUpload,
   deleteClientDocument,
@@ -26,6 +28,7 @@ export function DocumentsTab({
   canManage: boolean;
 }) {
   const t = useTranslations('clients.profile.documents');
+  const te = useTranslations('errors');
   const locale = useLocale();
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -41,7 +44,13 @@ export function DocumentsTab({
           contentType: file.type,
           originalName: file.name,
         });
-        if ('ok' in signed) throw new Error('forbidden');
+        if ('ok' in signed) {
+          toast({
+            title: resolveActionError(signed.error as ActionCode, te),
+            variant: 'destructive',
+          });
+          return;
+        }
         const put = await fetch(signed.signedUrl, {
           method: 'PUT',
           headers: { 'content-type': file.type, 'x-upsert': 'true' },
@@ -51,7 +60,7 @@ export function DocumentsTab({
         toast({ title: t('uploaded') });
         router.refresh();
       } catch {
-        toast({ title: t('upload'), variant: 'destructive' });
+        toast({ title: te('generic'), variant: 'destructive' });
       } finally {
         if (inputRef.current) inputRef.current.value = '';
       }

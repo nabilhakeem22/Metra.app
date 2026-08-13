@@ -10,6 +10,7 @@ import { FieldHint } from '@/components/ui/field-hint';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from '@/hooks/use-toast';
+import { useRouter } from '@/i18n/routing';
 import { resolveActionError } from '@/lib/actions/error-message';
 import type { ActionCode } from '@/lib/actions/result';
 import { updateClient } from '@/lib/clients/actions';
@@ -70,6 +71,7 @@ export function DetailsTab({
   const t = useTranslations('clients');
   const th = useTranslations('hints.client');
   const te = useTranslations('errors');
+  const router = useRouter();
   const [form, setForm] = useState<FormState>(fromClient(client));
   const [pending, startTransition] = useTransition();
 
@@ -99,14 +101,15 @@ export function DetailsTab({
         retentionPct: form.retentionPct || '0',
         notes: form.notes || null,
       });
-      toast(
-        res.ok
-          ? { title: t('profile.details.saved') }
-          : {
-              title: resolveActionError(res.error as ActionCode, te),
-              variant: 'destructive',
-            },
-      );
+      if (res.ok) {
+        toast({ title: t('profile.details.saved') });
+        router.refresh();
+      } else {
+        toast({
+          title: resolveActionError(res.error as ActionCode, te),
+          variant: 'destructive',
+        });
+      }
     });
   }
 

@@ -40,7 +40,7 @@ export function ProfileTabs({
   return (
     <div
       role="tablist"
-      aria-label={t('overview')}
+      aria-label={t('sectionsLabel')}
       className="flex flex-wrap gap-1 border-b"
     >
       {CLIENT_TABS.map((tab, i) => {
