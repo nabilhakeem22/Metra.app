@@ -1,4 +1,10 @@
 import 'server-only';
+import {
+  digestEmailTemplate,
+  followupReminderEmailTemplate,
+  stageReminderEmailTemplate,
+  type EmailContent,
+} from './templates/automation';
 import { inviteEmailTemplate } from './templates/invite';
 import { proposalSentEmailTemplate } from './templates/proposal-sent';
 
@@ -83,4 +89,74 @@ export async function sendProposalEmail(
     console.error('sendProposalEmail failed:', err);
     return { sent: false };
   }
+}
+
+/** Best-effort dispatch of a pre-built automation email. No key/from -> no-op. */
+async function sendAutomationEmail(
+  to: string,
+  content: EmailContent,
+  label: string,
+): Promise<{ sent: boolean }> {
+  const apiKey = process.env.RESEND_API_KEY;
+  const from = process.env.RESEND_FROM;
+  if (!apiKey || !from) return { sent: false };
+  try {
+    const { Resend } = await import('resend');
+    const resend = new Resend(apiKey);
+    const res = await resend.emails.send({
+      from,
+      to,
+      subject: content.subject,
+      html: content.html,
+      text: content.text,
+    });
+    return { sent: !res.error };
+  } catch (err) {
+    console.error(`${label} failed:`, err);
+    return { sent: false };
+  }
+}
+
+export function sendFollowupReminderEmail(input: {
+  to: string;
+  proposalNumber: string;
+  days: number;
+  reviewUrl: string;
+  locale: string;
+}): Promise<{ sent: boolean }> {
+  return sendAutomationEmail(
+    input.to,
+    followupReminderEmailTemplate(input),
+    'sendFollowupReminderEmail',
+  );
+}
+
+export function sendDigestEmail(input: {
+  to: string;
+  activeProjects: number;
+  awaitingResponse: number;
+  expiringSoon: number;
+  overdueStages: number;
+  dashboardUrl: string;
+  locale: string;
+}): Promise<{ sent: boolean }> {
+  return sendAutomationEmail(
+    input.to,
+    digestEmailTemplate(input),
+    'sendDigestEmail',
+  );
+}
+
+export function sendStageReminderEmail(input: {
+  to: string;
+  overdueCount: number;
+  upcomingCount: number;
+  projectsUrl: string;
+  locale: string;
+}): Promise<{ sent: boolean }> {
+  return sendAutomationEmail(
+    input.to,
+    stageReminderEmailTemplate(input),
+    'sendStageReminderEmail',
+  );
 }
