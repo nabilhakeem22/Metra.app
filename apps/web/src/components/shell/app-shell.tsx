@@ -16,6 +16,7 @@ export interface AppShellProps {
   role: MemberRole;
   orgs: OrgOption[];
   activeOrgId: string;
+  unreadCount: number;
   tourSeen: boolean;
   tourStep: string | null;
   children: ReactNode;
@@ -26,6 +27,7 @@ export function AppShell({
   role,
   orgs,
   activeOrgId,
+  unreadCount,
   tourSeen,
   tourStep,
   children,
@@ -72,6 +74,7 @@ export function AppShell({
           <TopBar
             email={email}
             role={role}
+            unreadCount={unreadCount}
             onOpenDrawer={() => setDrawerOpen(true)}
           />
           <main className="flex-1 p-4 md:p-6">{children}</main>

@@ -8,16 +8,24 @@ import { Button } from '@/components/ui/button';
 import type { MemberRole } from '@/lib/permissions/roles';
 import { cn } from '@/lib/utils';
 import { LocaleSwitch } from './locale-switch';
+import { NotificationBell } from './notification-bell';
 import { UserMenu } from './user-menu';
 
 export interface TopBarProps {
   email?: string;
   role: MemberRole;
+  unreadCount: number;
   onOpenDrawer: () => void;
   className?: string;
 }
 
-export function TopBar({ email, role, onOpenDrawer, className }: TopBarProps) {
+export function TopBar({
+  email,
+  role,
+  unreadCount,
+  onOpenDrawer,
+  className,
+}: TopBarProps) {
   const shell = useTranslations('shell');
 
   return (
@@ -44,6 +52,7 @@ export function TopBar({ email, role, onOpenDrawer, className }: TopBarProps) {
       </div>
 
       <div className="ms-auto flex items-center gap-1">
+        <NotificationBell unreadCount={unreadCount} />
         <HelpMenu />
         <LocaleSwitch />
         <UserMenu email={email} role={role} />

@@ -976,5 +976,46 @@
     "restartTour": "إعادة الجولة",
     "openChecklist": "فتح قائمة الإعداد",
     "howThisPage": "كيف تعمل هذه الصفحة"
+  },
+  "notifications": {
+    "title": "الإشعارات",
+    "subtitle": "تذكيرات وتحديثات خاصة بعملك.",
+    "bell": "الإشعارات",
+    "bellWithCount": "الإشعارات، {count} غير مقروء",
+    "markAll": "تعليم الكل كمقروء",
+    "markRead": "تعليم كمقروء",
+    "markFailed": "تعذّر تحديث الإشعار.",
+    "empty": "لا توجد إشعارات بعد.",
+    "kinds": {
+      "followup_reminder": "تذكير بالمتابعة",
+      "expire_nudge": "عرض سعر يوشك على الانتهاء",
+      "portfolio_digest": "ملخص المحفظة",
+      "stage_reminder": "تذكير بالمراحل"
+    },
+    "body": {
+      "proposal_expiring": "ينتهي عرض السعر {number} في {date}.",
+      "proposal_followup": "ظل عرض السعر {number} بانتظار الرد منذ {days} يومًا.",
+      "portfolio_digest": "{active} مشاريع نشطة، {awaiting} بانتظار الرد، {expiring} تنتهي قريبًا، {overdue} مراحل متأخرة.",
+      "stage_reminder": "{overdue} مراحل متأخرة و{upcoming} قادمة."
+    }
+  },
+  "automation": {
+    "title": "الأتمتة",
+    "subtitle": "تذكيرات تلقائية لفريقك. لا يتم التواصل مع العملاء تلقائيًا أبدًا.",
+    "expireLabel": "إنهاء العروض تلقائيًا",
+    "expireDesc": "تعليم عروض السعر المرسلة كمنتهية بعد تجاوز تاريخ صلاحيتها.",
+    "expireNudgeLabel": "تذكير قبل الانتهاء",
+    "expireNudgeDesc": "تنبيه المُرسِل قبل تاريخ انتهاء عرض السعر.",
+    "leadDaysLabel": "الأيام قبل الانتهاء",
+    "followupLabel": "تذكيرات المتابعة",
+    "followupDesc": "تنبيه المُرسِل عند عدم الرد على عرض سعر مُرسَل.",
+    "thresholdLabel": "الأيام دون رد",
+    "digestLabel": "ملخص المحفظة",
+    "digestDesc": "إرسال ملخص للمحفظة إلى المالكين والمشرفين.",
+    "cadenceLabel": "التكرار",
+    "cadenceDaily": "يومي",
+    "cadenceWeekly": "أسبوعي",
+    "stageLabel": "تذكيرات المراحل",
+    "stageDesc": "تنبيه المالكين والمشرفين بالمراحل المتأخرة والقادمة."
   }
 }

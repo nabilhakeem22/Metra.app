@@ -2,8 +2,10 @@ import { organizations } from '@metra/db';
 import { getTranslations } from 'next-intl/server';
 import { PageHeader } from '@/components/ui/page-header';
 import { requireOrg } from '@/lib/auth/require-org';
+import { getAutomationSettings } from '@/lib/automation/settings-queries';
 import { withOrgContext } from '@/lib/db/context';
 import { can } from '@/lib/permissions/can';
+import { AutomationSettingsClient } from './automation-settings-client';
 import { SettingsClient } from './settings-client';
 
 export default async function SettingsPage() {
@@ -13,12 +15,14 @@ export default async function SettingsPage() {
   const [org] = await withOrgContext(ctx, (tx) =>
     tx.select().from(organizations).limit(1),
   );
+  const automation = await getAutomationSettings(ctx);
+  const canManage = can(ctx.role, 'users_settings', 'update');
 
   return (
     <div className="space-y-6">
       <PageHeader title={t('title')} description={t('subtitle')} />
       <SettingsClient
-        canManage={can(ctx.role, 'users_settings', 'update')}
+        canManage={canManage}
         initial={{
           nameEn: org?.nameEn ?? '',
           nameAr: org?.nameAr ?? '',
@@ -26,6 +30,19 @@ export default async function SettingsPage() {
           taxRegistrationNumber: org?.taxRegistrationNumber ?? '',
           hideMarginFromPm: org?.hideMarginFromPm ?? false,
           restrictFirmDashboard: org?.restrictFirmDashboard ?? false,
+        }}
+      />
+      <AutomationSettingsClient
+        canManage={canManage}
+        initial={{
+          expireEnabled: automation?.expireEnabled ?? true,
+          expireNudgeEnabled: automation?.expireNudgeEnabled ?? false,
+          expireNudgeLeadDays: automation?.expireNudgeLeadDays ?? 3,
+          followupEnabled: automation?.followupEnabled ?? true,
+          followupThresholdDays: automation?.followupThresholdDays ?? 5,
+          digestEnabled: automation?.digestEnabled ?? true,
+          digestCadence: automation?.digestCadence ?? 'weekly',
+          stageRemindersEnabled: automation?.stageRemindersEnabled ?? true,
         }}
       />
     </div>

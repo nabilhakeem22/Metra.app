@@ -976,5 +976,46 @@
     "restartTour": "Restart the tour",
     "openChecklist": "Open the setup checklist",
     "howThisPage": "How this page works"
+  },
+  "notifications": {
+    "title": "Notifications",
+    "subtitle": "Reminders and updates for your work.",
+    "bell": "Notifications",
+    "bellWithCount": "Notifications, {count} unread",
+    "markAll": "Mark all read",
+    "markRead": "Mark read",
+    "markFailed": "Could not update the notification.",
+    "empty": "You have no notifications yet.",
+    "kinds": {
+      "followup_reminder": "Follow-up reminder",
+      "expire_nudge": "Quotation expiring soon",
+      "portfolio_digest": "Portfolio digest",
+      "stage_reminder": "Stage reminder"
+    },
+    "body": {
+      "proposal_expiring": "Quotation {number} expires on {date}.",
+      "proposal_followup": "Quotation {number} has been awaiting a response for {days} days.",
+      "portfolio_digest": "{active} active projects, {awaiting} awaiting response, {expiring} expiring soon, {overdue} overdue stages.",
+      "stage_reminder": "{overdue} overdue stages and {upcoming} upcoming."
+    }
+  },
+  "automation": {
+    "title": "Automation",
+    "subtitle": "Automatic reminders for your team. Clients are never contacted automatically.",
+    "expireLabel": "Expire proposals automatically",
+    "expireDesc": "Mark sent quotations as expired once their validity date passes.",
+    "expireNudgeLabel": "Remind before expiry",
+    "expireNudgeDesc": "Notify the sender ahead of a quotation's expiry date.",
+    "leadDaysLabel": "Days before expiry",
+    "followupLabel": "Follow-up reminders",
+    "followupDesc": "Nudge the sender when a sent quotation goes unanswered.",
+    "thresholdLabel": "Days without a response",
+    "digestLabel": "Portfolio digest",
+    "digestDesc": "Send owners and admins a summary of the portfolio.",
+    "cadenceLabel": "Frequency",
+    "cadenceDaily": "Daily",
+    "cadenceWeekly": "Weekly",
+    "stageLabel": "Stage reminders",
+    "stageDesc": "Alert owners and admins about overdue and upcoming project stages."
   }
 }
