@@ -29,14 +29,33 @@ export function dueForExpiry(
     );
 }
 
+export interface NudgeCandidate {
+  id: string;
+  number: number;
+  expiryDate: string | null;
+  senderUserId: string | null;
+}
+
 /** Sent proposals expiring exactly on `targetDate` (today + lead) — pre-nudge. */
 export function dueForExpiryNudge(
   tx: MetraDb,
   targetDate: string,
-): Promise<Array<{ id: string; expiryDate: string | null }>> {
+): Promise<NudgeCandidate[]> {
   return tx
-    .select({ id: proposals.id, expiryDate: proposals.expiryDate })
+    .select({
+      id: proposals.id,
+      number: proposals.number,
+      expiryDate: proposals.expiryDate,
+      senderUserId: proposalEvents.actorUserId,
+    })
     .from(proposals)
+    .innerJoin(
+      proposalEvents,
+      and(
+        eq(proposalEvents.proposalId, proposals.id),
+        eq(proposalEvents.kind, 'sent'),
+      ),
+    )
     .where(
       and(eq(proposals.status, 'sent'), eq(proposals.expiryDate, targetDate)),
     );
