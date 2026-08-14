@@ -11,6 +11,7 @@ import { costItems } from '../schema/cost-items';
 import { files } from '../schema/files';
 import { invitations } from '../schema/invitations';
 import { memberships } from '../schema/memberships';
+import { automationSettings } from '../schema/automation-settings';
 import { organizations } from '../schema/organizations';
 import { priceChangeLines, priceChanges } from '../schema/price-changes';
 import { projects } from '../schema/projects';
@@ -107,6 +108,12 @@ async function seedOrg(db: Parameters<typeof withOrgContext>[0], org: OrgSeed) {
           nameEn: org.nameEn,
           defaultLocale: 'ar-EG',
         })
+        .onConflictDoNothing();
+
+      // Default automation settings (mirrors createOrgCore + the 0016 backfill).
+      await tx
+        .insert(automationSettings)
+        .values({ orgId: org.orgId })
         .onConflictDoNothing();
 
       await tx

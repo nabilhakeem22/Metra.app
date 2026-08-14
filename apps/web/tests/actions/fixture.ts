@@ -33,6 +33,12 @@ export async function seedOrg(opts: {
     `insert into public.organizations (id, name_en) values ('${orgId}', 'Test Org')`,
   );
 
+  // Seed the default automation_settings row (mirrors the 0016 backfill /
+  // createOrgCore) so automation cores have config to read.
+  await pg.unsafe(
+    `insert into public.automation_settings (org_id) values ('${orgId}')`,
+  );
+
   // Seed the 8 default sections (mirrors createOrgCore) so Price Book + builder
   // cores have a valid section_id to reference.
   await pg.unsafe(
@@ -184,6 +190,10 @@ export async function teardown(orgIds: string[]): Promise<void> {
       await pg.unsafe(`delete from public.cost_items where org_id='${id}'`);
       // sections are referenced by cost_items (restrict) -> after cost_items.
       await pg.unsafe(`delete from public.sections where org_id='${id}'`);
+      // Automation tables (org FK restrict, no children) before organizations.
+      await pg.unsafe(`delete from public.notifications where org_id='${id}'`);
+      await pg.unsafe(`delete from public.automation_run_log where org_id='${id}'`);
+      await pg.unsafe(`delete from public.automation_settings where org_id='${id}'`);
       await pg.unsafe(`delete from public.audit_log where org_id='${id}'`);
       await pg.unsafe(`delete from public.invitations where org_id='${id}'`);
       await pg.unsafe(`delete from public.memberships where org_id='${id}'`);

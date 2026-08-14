@@ -35,13 +35,18 @@ grant select, insert, update, delete on public.projects      to metra_app;
 grant select, insert, update, delete on public.proposals         to metra_app;
 grant select, insert, update, delete on public.proposal_sections to metra_app;
 grant select, insert, update, delete on public.proposal_lines    to metra_app;
+grant select, insert, update, delete on public.automation_settings to metra_app;
+-- notifications: recipients read + mark-read (no delete); the runner inserts.
+grant select, insert, update on public.notifications to metra_app;
 
--- ...except audit_log and the append-only logs (price history, proposal events).
--- No UPDATE / DELETE grant, so any attempt raises a permission error at the database.
+-- ...except audit_log and the append-only logs (price history, proposal events,
+-- the automation idempotency claim log). No UPDATE / DELETE grant, so any attempt
+-- raises a permission error at the database.
 grant select, insert on public.audit_log          to metra_app;
 grant select, insert on public.price_changes       to metra_app;
 grant select, insert on public.price_change_lines  to metra_app;
 grant select, insert on public.proposal_events     to metra_app;
+grant select, insert on public.automation_run_log  to metra_app;
 
 -- Future-proofing for composite-FK trigger functions.
 grant execute on function public.enforce_same_org() to metra_app;
