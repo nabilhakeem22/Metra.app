@@ -23,6 +23,9 @@ export * from './proposals';
 export * from './proposal-sections';
 export * from './proposal-lines';
 export * from './proposal-events';
+export * from './notifications';
+export * from './automation-settings';
+export * from './automation-run-log';
 
 import { organizations } from './organizations';
 import { memberships } from './memberships';
@@ -43,6 +46,9 @@ import { proposals } from './proposals';
 import { proposalSections } from './proposal-sections';
 import { proposalLines } from './proposal-lines';
 import { proposalEvents } from './proposal-events';
+import { notifications } from './notifications';
+import { automationSettings } from './automation-settings';
+import { automationRunLog } from './automation-run-log';
 
 /** Every org-scoped business table (carries org_id). Drives RLS generation. */
 export const orgScopedTables = {
@@ -65,6 +71,9 @@ export const orgScopedTables = {
   proposalSections,
   proposalLines,
   proposalEvents,
+  notifications,
+  automationSettings,
+  automationRunLog,
 } as const;
 
 /** All tables including the tenant root. */
@@ -89,4 +98,7 @@ export const allTables = {
   proposalSections,
   proposalLines,
   proposalEvents,
+  notifications,
+  automationSettings,
+  automationRunLog,
 } as const;
