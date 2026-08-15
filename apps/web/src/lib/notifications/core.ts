@@ -18,25 +18,28 @@ export interface NotificationInput {
   params?: Record<string, unknown> | null;
 }
 
-/** Insert a notification for a recipient within the caller's tx. Returns its id. */
+/**
+ * Insert a notification for a recipient within the caller's tx. Deliberately NO
+ * `RETURNING`: the notifications SELECT policy is recipient-scoped, and
+ * `INSERT ... RETURNING` re-checks the new row against that SELECT policy — which
+ * would reject the runner-as-owner inserting for ANY OTHER recipient (its whole
+ * job). The WITH CHECK (org + membership) still guards the write; we never read
+ * the row back here.
+ */
 export async function insertNotification(
   tx: MetraDb,
   orgId: string,
   input: NotificationInput,
-): Promise<string> {
-  const [row] = await tx
-    .insert(notifications)
-    .values({
-      orgId,
-      recipientUserId: input.recipientUserId,
-      kind: input.kind,
-      entityType: input.entityType ?? null,
-      entityId: input.entityId ?? null,
-      bodyKey: input.bodyKey,
-      params: (input.params ?? {}) as never,
-    })
-    .returning({ id: notifications.id });
-  return row.id;
+): Promise<void> {
+  await tx.insert(notifications).values({
+    orgId,
+    recipientUserId: input.recipientUserId,
+    kind: input.kind,
+    entityType: input.entityType ?? null,
+    entityId: input.entityId ?? null,
+    bodyKey: input.bodyKey,
+    params: (input.params ?? {}) as never,
+  });
 }
 
 /** Mark one of the caller's notifications read (RLS scopes to the recipient). */
