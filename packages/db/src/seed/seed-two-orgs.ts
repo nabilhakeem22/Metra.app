@@ -110,15 +110,17 @@ async function seedOrg(db: Parameters<typeof withOrgContext>[0], org: OrgSeed) {
         })
         .onConflictDoNothing();
 
-      // Default automation settings (mirrors createOrgCore + the 0016 backfill).
-      await tx
-        .insert(automationSettings)
-        .values({ orgId: org.orgId })
-        .onConflictDoNothing();
-
       await tx
         .insert(memberships)
         .values({ orgId: org.orgId, userId: org.userId, role: 'owner' })
+        .onConflictDoNothing();
+
+      // Default automation settings — MUST come after the owner membership:
+      // org_isolation's app_is_current_org_member() second factor requires the
+      // member to exist first, else this insert is rejected on a fresh DB.
+      await tx
+        .insert(automationSettings)
+        .values({ orgId: org.orgId })
         .onConflictDoNothing();
 
       await tx
