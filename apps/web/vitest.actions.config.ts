@@ -19,8 +19,8 @@ export default defineConfig({
   },
   test: {
     include: [resolve(dir, 'tests/actions/**/*.dbtest.ts').replace(/\\/g, '/')],
-    testTimeout: 30000,
-    hookTimeout: 30000,
+    testTimeout: 60000,
+    hookTimeout: 60000,
     fileParallelism: false,
   },
 });

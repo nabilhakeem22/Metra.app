@@ -2,6 +2,7 @@
 // 'use server' createOrg wrapper does the session/existing-check/redirect and
 // delegates here. Exercised directly by tests/actions/createOrg.dbtest.ts.
 import {
+  automationSettings,
   DEFAULT_PROJECT_TYPES,
   DEFAULT_SECTIONS,
   DEFAULT_STAGE_TEMPLATES,
@@ -68,6 +69,9 @@ export async function createOrgCore(
     await tx
       .insert(memberships)
       .values({ orgId: ctx.orgId, userId: ctx.userId, role: 'owner' });
+    // Automation defaults (mirrors the 0016 backfill) so the cron acts on this
+    // org from day one; every field is user-configurable in Settings.
+    await tx.insert(automationSettings).values({ orgId: ctx.orgId });
     // Seed the 8 default work sections (shared by Price Book + proposal builder).
     await tx.insert(sections).values(
       DEFAULT_SECTIONS.map((s) => ({
