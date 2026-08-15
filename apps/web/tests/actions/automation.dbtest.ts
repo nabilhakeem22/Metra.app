@@ -107,7 +107,7 @@ describe('resolveSystemContext', () => {
     const { orgId, memberIds } = await setup({ owners: 0, members: [{ role: 'admin' }] });
     const ctx = await resolveSystemContext(orgId);
     expect(ctx?.userId).toBe(memberIds[0]);
-    expect(ctx?.role).toBe('owner');
+    expect(ctx?.role).toBe('admin');
   });
 
   it('returns null when the org has no owner or admin', async () => {

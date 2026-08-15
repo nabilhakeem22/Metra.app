@@ -8,10 +8,11 @@ import type { OrgContext } from '@/lib/db/context';
  * The system actor for a session-less automation run: the org's earliest-created
  * `owner` membership (fallback: earliest `admin`). Read on the PRIVILEGED runtime
  * connection (no session, no withOrgContext) — only the system table
- * `memberships`. Returns an OrgContext acting AS owner so downstream cores run
- * their owner/admin-gated work; null if the org has no owner/admin (runner skips
- * it). All subsequent business reads/writes happen inside a single-org
- * withOrgContext RLS tx keyed on this actor.
+ * `memberships`. Returns an OrgContext with the actor's ACTUAL role (owner or
+ * admin) so the capability matrix — not a hardcoded role — decides what the run
+ * may do (least privilege); null if the org has no owner/admin (runner skips it).
+ * All subsequent business reads/writes happen inside a single-org withOrgContext
+ * RLS tx keyed on this actor.
  */
 export async function resolveSystemContext(
   orgId: string,
@@ -34,5 +35,5 @@ export async function resolveSystemContext(
   const actor =
     rows.find((r) => r.role === 'owner') ?? rows.find((r) => r.role === 'admin');
   if (!actor) return null;
-  return { orgId, userId: actor.userId, role: 'owner' };
+  return { orgId, userId: actor.userId, role: actor.role };
 }

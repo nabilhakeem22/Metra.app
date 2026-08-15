@@ -1,5 +1,5 @@
 import 'server-only';
-import { daysBetween, todayInCairo } from './clock';
+import { daysBetween, todayInCairo, weekPeriodKey } from './clock';
 import { claimPeriod } from './claim';
 import { dueForFollowup } from './due-work';
 import { resolveUserEmail } from './recipients';
@@ -11,9 +11,10 @@ import { insertNotification } from '@/lib/notifications/core';
 /**
  * For each `sent` (not-yet-accepted) proposal idle longer than the org threshold,
  * notify the ORIGINAL SENDER (fallback: the system actor) and best-effort email
- * them. Re-nudges once per N-day window (windowIndex = floor(age / threshold)) so
- * a lingering proposal is chased again, never twice for the same window. The
- * recipient is always an internal user — never the client (HUMAN-IN-THE-LOOP).
+ * them. At most one nudge per proposal per Cairo-week — the claim is keyed on an
+ * ABSOLUTE week, not the mutable threshold, so lowering the threshold can't rewind
+ * the window and re-fire. The recipient is always an internal user — never the
+ * client (HUMAN-IN-THE-LOOP).
  */
 export async function runFollowupReminders(
   deps: AutomationDeps,
@@ -37,7 +38,6 @@ export async function runFollowupReminders(
   for (const c of candidates) {
     const age = daysBetween(todayInCairo(c.sentAt), today);
     if (age < threshold) continue;
-    const windowIndex = Math.floor(age / threshold);
     const recipient = c.senderUserId ?? ctx.userId;
 
     const won = await withOrgContext(ctx, async (tx) => {
@@ -45,7 +45,7 @@ export async function runFollowupReminders(
         tx,
         ctx.orgId,
         'followup',
-        `${c.id}:${windowIndex}`,
+        `${c.id}:${weekPeriodKey(now)}`,
       );
       if (!claimed) return false;
       await insertNotification(tx, ctx.orgId, {
