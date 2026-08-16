@@ -4,6 +4,11 @@ import { runDueAutomations } from '@/lib/automation/runner';
 
 // Session-less cron. Node-only (crypto + privileged DB); the i18n matcher skips
 // /api. Vercel Cron sends `Authorization: Bearer ${CRON_SECRET}` on each tick.
+// Schedule is HOURLY (vercel.json) by design, not for granularity: the digest
+// and stage automations gate on `cairoHour === 7`, and only an hourly tick hits
+// that wall-clock hour reliably across Egypt's DST shift (UTC+2 <-> UTC+3). A
+// daily UTC cron would drift off 07:00 Cairo for half the year. Each automation
+// still claims its own period, so extra ticks are no-ops, not duplicates.
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
