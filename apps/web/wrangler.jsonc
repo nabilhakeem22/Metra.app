@@ -1,0 +1,33 @@
+{
+  // Cloudflare Workers config for the OpenNext adapter (@opennextjs/cloudflare).
+  // SPIKE: de-risk only. `main`/`assets` point at the `.open-next` build output.
+  // nodejs_compat keeps the Node runtime so postgres.js / node:crypto /
+  // supabase-js / server actions keep working (the reason we chose OpenNext over
+  // the legacy @cloudflare/next-on-pages).
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "metra-web",
+  "main": ".open-next/worker.js",
+  "compatibility_date": "2025-03-25",
+  "compatibility_flags": ["nodejs_compat"],
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS"
+  },
+  // Runtime Postgres reaches Supabase through Hyperdrive (pooling + edge cache).
+  // `id` is a placeholder for the spike — Nabil must create the real Hyperdrive
+  // config and paste its id before any cloud deploy. `localConnectionString` is
+  // ONLY used by `wrangler dev` local emulation and MUST point at a throwaway
+  // local Postgres, never the shared Supabase project.
+  "hyperdrive": [
+    {
+      "binding": "HYPERDRIVE",
+      "id": "0000000000000000000000000000cafe",
+      "localConnectionString": "postgres://postgres:postgres@localhost:5432/metra_cf_spike"
+    }
+  ],
+  // Cloudflare Browser Rendering binding for the future PDF path
+  // (TODO(cf-migration): rewrite lib/pdf/render.ts onto @cloudflare/puppeteer).
+  "browser": {
+    "binding": "BROWSER"
+  }
+}
