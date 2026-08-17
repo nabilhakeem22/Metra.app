@@ -21,6 +21,12 @@ export default tseslint.config(
       '**/*.config.*',
       '**/.claude/**',
       'packages/db/src/rls/**',
+      // Cloudflare/OpenNext generated artifacts (gitignored build output +
+      // wrangler-generated env types) — never lint these.
+      '**/.open-next/**',
+      '**/.wrangler/**',
+      '**/cloudflare-env.d.ts',
+      '**/worker-configuration.d.ts',
     ],
   },
   js.configs.recommended,
