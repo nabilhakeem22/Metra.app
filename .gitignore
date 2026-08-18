@@ -24,6 +24,7 @@ build/
 .wrangler/
 apps/web/cloudflare-env.d.ts
 apps/web/worker-configuration.d.ts
+workers/cron/worker-configuration.d.ts
 
 # --- test / coverage ---
 coverage/

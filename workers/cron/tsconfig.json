@@ -1,0 +1,17 @@
+{
+  // Standalone config for the cron Worker — it is NOT part of the Next.js app's
+  // tsconfig. Runtime types come from worker-configuration.d.ts (`wrangler types`).
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ES2022",
+    "moduleResolution": "Bundler",
+    "lib": ["ES2022"],
+    "types": [],
+    "strict": true,
+    "skipLibCheck": true,
+    "noEmit": true,
+    "isolatedModules": true,
+    "esModuleInterop": true
+  },
+  "include": ["src/**/*.ts", "worker-configuration.d.ts"]
+}

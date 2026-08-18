@@ -1,0 +1,24 @@
+{
+  // Standalone Cloudflare Worker that drives the automation cron. It does NOT
+  // run any app logic — it only pings the Next.js route on a schedule with the
+  // shared bearer secret. The route (apps/web/src/app/api/cron/automations) owns
+  // all automation work and auth; a wrong/absent bearer returns 401 there.
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "metra-cron",
+  "main": "src/index.ts",
+  "compatibility_date": "2025-03-25",
+  // HOURLY by design, not for granularity: the digest + stage automations gate
+  // on `cairoHour === 7`, and only an hourly tick hits that wall-clock hour
+  // reliably across Egypt's DST shift (UTC+2 <-> UTC+3). A daily UTC cron would
+  // drift off 07:00 Cairo for half the year. Mirrors the old vercel.json schedule.
+  "triggers": {
+    "crons": ["0 * * * *"]
+  },
+  "vars": {
+    // Origin of the deployed Next.js app, e.g. "https://metra.app" (no trailing
+    // slash). Placeholder — the owner sets the real origin before deploy.
+    "APP_ORIGIN": "https://REPLACE_WITH_APP_ORIGIN"
+  }
+  // CRON_SECRET is NOT a var — it is a secret. Set it (matching the app's
+  // CRON_SECRET) with:  wrangler secret put CRON_SECRET   (run in workers/cron).
+}
