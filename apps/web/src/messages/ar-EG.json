@@ -398,9 +398,9 @@
     },
     "empty": {
       "title": "دليل الأسعار فارغ",
-      "description": "حمّل الكتالوج الابتدائي لبنود التشطيبات الشائعة، أو استورد بنودك من ملف Excel.",
+      "description": "حمّل الكتالوج الابتدائي لبنود التشطيبات الشائعة، أو استورد بنودك من ملف CSV.",
       "loadStarter": "تحميل الكتالوج الابتدائي",
-      "importExcel": "استيراد من Excel"
+      "importExcel": "استيراد من CSV"
     },
     "actions": {
       "new": "بند جديد",
@@ -408,7 +408,7 @@
       "activate": "تفعيل",
       "deactivate": "إلغاء التفعيل",
       "bulkUpdate": "تحديث جماعي للأسعار",
-      "import": "استيراد من Excel",
+      "import": "استيراد من CSV",
       "loadStarter": "تحميل الكتالوج الابتدائي"
     },
     "form": {
@@ -443,8 +443,8 @@
       "applied": "تم تحديث {count} بند."
     },
     "import": {
-      "title": "استيراد من Excel",
-      "chooseFile": "اختر ملف xlsx أو csv",
+      "title": "استيراد من CSV",
+      "chooseFile": "اختر ملف CSV",
       "upload": "رفع",
       "map": "مطابقة الأعمدة",
       "preview": "معاينة",

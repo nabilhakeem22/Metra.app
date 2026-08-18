@@ -183,7 +183,7 @@ export function ImportWizard({
               <input
                 id="import-file"
                 type="file"
-                accept=".xlsx,.xls,.csv"
+                accept=".csv"
                 aria-describedby="import-file-hint"
                 disabled={pending}
                 onChange={(e) => {

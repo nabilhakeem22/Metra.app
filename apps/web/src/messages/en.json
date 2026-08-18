@@ -398,9 +398,9 @@
     },
     "empty": {
       "title": "Your price book is empty",
-      "description": "Load our starter catalogue of common fit-out items, or import your own from Excel.",
+      "description": "Load our starter catalogue of common fit-out items, or import your own from a CSV file.",
       "loadStarter": "Load starter catalogue",
-      "importExcel": "Import from Excel"
+      "importExcel": "Import from CSV"
     },
     "actions": {
       "new": "New item",
@@ -408,7 +408,7 @@
       "activate": "Activate",
       "deactivate": "Deactivate",
       "bulkUpdate": "Bulk price update",
-      "import": "Import from Excel",
+      "import": "Import from CSV",
       "loadStarter": "Load starter catalogue"
     },
     "form": {
@@ -443,8 +443,8 @@
       "applied": "Updated {count} items."
     },
     "import": {
-      "title": "Import from Excel",
-      "chooseFile": "Choose a .xlsx or .csv file",
+      "title": "Import from CSV",
+      "chooseFile": "Choose a .csv file",
       "upload": "Upload",
       "map": "Map columns",
       "preview": "Preview",
