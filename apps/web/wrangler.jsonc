@@ -14,14 +14,14 @@
     "binding": "ASSETS"
   },
   // Runtime Postgres reaches Supabase through Hyperdrive (pooling + edge cache).
-  // `id` is a placeholder for the spike — Nabil must create the real Hyperdrive
-  // config and paste its id before any cloud deploy. `localConnectionString` is
-  // ONLY used by `wrangler dev` local emulation and MUST point at a throwaway
-  // local Postgres, never the shared Supabase project.
+  // `id` is the real `metra-db` Hyperdrive config (Supabase session pooler,
+  // aws-1-eu-west-1, :5432). `localConnectionString` is ONLY used by `wrangler
+  // dev` local emulation and MUST point at a throwaway local Postgres, never the
+  // shared Supabase project.
   "hyperdrive": [
     {
       "binding": "HYPERDRIVE",
-      "id": "0000000000000000000000000000cafe",
+      "id": "acc17973ea6847328d6b523bb54953f0",
       "localConnectionString": "postgres://postgres:postgres@localhost:5432/metra_cf_spike"
     }
   ],
