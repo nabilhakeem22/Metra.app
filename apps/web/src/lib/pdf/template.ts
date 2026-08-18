@@ -1,4 +1,4 @@
-import { cfEnv } from '@/lib/cf/context';
+import { cfEnv, isCloudflareRuntime } from '@/lib/cf/context';
 
 // The three PDF webfonts live in `public/fonts/*.ttf`, which OpenNext copies into
 // the Workers static-assets output (served via the ASSETS binding, NOT bundled
@@ -22,18 +22,27 @@ const FONT_FACES: ReadonlyArray<{
 let cachedFontFaceCss: string | null = null;
 
 async function fontBase64(file: string): Promise<string> {
-  // ASSETS is optional in the merged CloudflareEnv type; off-platform or without
-  // the binding there's nothing to fetch, so degrade to the fallback family.
+  // Off-platform (next dev / Node PDF preview / Vitest) there is no ASSETS
+  // binding and cfEnv()/getCloudflareContext() THROWS, so guard first and
+  // degrade to the fallback family rather than crash the render. ASSETS is also
+  // optional in the merged CloudflareEnv type, so tolerate a missing binding.
+  if (!isCloudflareRuntime()) return '';
   const assets = cfEnv().ASSETS;
   if (!assets) return '';
-  // `assets.local` is an arbitrary same-origin base for the ASSETS fetch; only
-  // the path (/fonts/<file>) selects the served asset.
-  const response = await assets.fetch(
-    new URL(`/fonts/${file}`, 'https://assets.local'),
-  );
-  if (!response.ok) return '';
-  const bytes = new Uint8Array(await response.arrayBuffer());
-  return Buffer.from(bytes).toString('base64');
+  try {
+    // `assets.local` is an arbitrary same-origin base for the ASSETS fetch; only
+    // the path (/fonts/<file>) selects the served asset.
+    const response = await assets.fetch(
+      new URL(`/fonts/${file}`, 'https://assets.local'),
+    );
+    if (!response.ok) return '';
+    const bytes = new Uint8Array(await response.arrayBuffer());
+    return Buffer.from(bytes).toString('base64');
+  } catch {
+    // A transient ASSETS error (rejected fetch / arrayBuffer) must degrade to the
+    // fallback font, not bubble up and turn the PDF route into a 500.
+    return '';
+  }
 }
 
 /**

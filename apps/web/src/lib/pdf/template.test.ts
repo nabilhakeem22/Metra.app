@@ -1,17 +1,31 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 // The PDF fonts are served as Workers static assets (public/fonts/*.ttf) and
 // fetched via the ASSETS binding at render time, then base64-inlined as
-// @font-face. If a face is missing or its base64 is empty, fontFaceCss() drops
-// it and the PDF renders with fallback glyphs (broken Arabic shaping) — so this
-// mocks the ASSETS binding with the real on-disk fonts and asserts each face is
-// present with a non-empty data URI. (Live Arabic shaping is verified at deploy
-// against the BROWSER binding.)
+// @font-face. Each case remocks `@/lib/cf/context` and re-imports ./template so
+// the per-isolate font cache doesn't bleed across cases.
 const fontsDir = fileURLToPath(new URL('../../../public/fonts/', import.meta.url));
 
-vi.mock('@/lib/cf/context', () => ({
+interface CfContextMock {
+  isCloudflareRuntime: () => boolean;
+  cfEnv: () => { ASSETS?: { fetch: (url: URL) => Promise<Response> } };
+}
+
+async function loadTemplateWith(context: CfContextMock) {
+  vi.resetModules();
+  vi.doMock('@/lib/cf/context', () => context);
+  return import('./template');
+}
+
+afterEach(() => {
+  vi.resetModules();
+  vi.doUnmock('@/lib/cf/context');
+});
+
+const onPlatformWithRealFonts: CfContextMock = {
+  isCloudflareRuntime: () => true,
   cfEnv: () => ({
     ASSETS: {
       fetch: async (url: URL) => {
@@ -21,9 +35,7 @@ vi.mock('@/lib/cf/context', () => ({
       },
     },
   }),
-}));
-
-const { fontFaceCss } = await import('./template');
+};
 
 describe('pdf font embedding', () => {
   const expectedFaces = [
@@ -33,6 +45,7 @@ describe('pdf font embedding', () => {
   ];
 
   it('emits every @font-face block with a non-empty embedded data URI', async () => {
+    const { fontFaceCss } = await loadTemplateWith(onPlatformWithRealFonts);
     const css = await fontFaceCss();
     for (const { family, weight } of expectedFaces) {
       expect(css).toContain(`font-family: '${family}'; font-weight: ${weight};`);
@@ -40,5 +53,35 @@ describe('pdf font embedding', () => {
     // One data URI per face, none empty, base64 alphabet only.
     const dataUris = css.match(/url\(data:font\/ttf;base64,[A-Za-z0-9+/]+={0,2}\)/g);
     expect(dataUris).toHaveLength(expectedFaces.length);
+  });
+
+  // A2 — a rejecting ASSETS.fetch must degrade to the fallback font, not throw.
+  it('degrades to an empty face block when ASSETS.fetch rejects (no throw)', async () => {
+    const { fontFaceCss } = await loadTemplateWith({
+      isCloudflareRuntime: () => true,
+      cfEnv: () => ({
+        ASSETS: {
+          fetch: async () => {
+            throw new Error('transient ASSETS failure');
+          },
+        },
+      }),
+    });
+    await expect(fontFaceCss()).resolves.toBe('');
+  });
+
+  // A2 — off-platform cfEnv()/getCloudflareContext() throws; the guard must skip
+  // it and degrade rather than crash the Node PDF preview.
+  it('degrades to an empty face block off-platform without calling cfEnv', async () => {
+    let cfEnvCalled = false;
+    const { fontFaceCss } = await loadTemplateWith({
+      isCloudflareRuntime: () => false,
+      cfEnv: () => {
+        cfEnvCalled = true;
+        throw new Error('getCloudflareContext() called off-platform');
+      },
+    });
+    await expect(fontFaceCss()).resolves.toBe('');
+    expect(cfEnvCalled).toBe(false);
   });
 });
