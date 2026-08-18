@@ -24,7 +24,11 @@ let cached: { db: MetraDb; sql: PostgresJs } | null = null;
 
 export function getDb(): MetraDb {
   if (!cached) {
-    cached = createDb(runtimeUrl(), { prepare: false, max: 5 });
+    // Hyperdrive terminates TLS to the origin, so the worker->Hyperdrive hop
+    // must NOT force SSL. Off-platform (Node tests/scripts/next dev) we omit the
+    // override and keep the exact host-derived behaviour.
+    const ssl = isCloudflareRuntime() ? { ssl: false as const } : {};
+    cached = createDb(runtimeUrl(), { prepare: false, max: 5, ...ssl });
   }
   return cached.db;
 }
