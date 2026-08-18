@@ -25,8 +25,8 @@
       "localConnectionString": "postgres://postgres:postgres@localhost:5432/metra_cf_spike"
     }
   ],
-  // Cloudflare Browser Rendering binding for the future PDF path
-  // (TODO(cf-migration): rewrite lib/pdf/render.ts onto @cloudflare/puppeteer).
+  // Cloudflare Browser Rendering binding used by lib/pdf/render.ts
+  // (@cloudflare/puppeteer) to render proposal PDFs.
   "browser": {
     "binding": "BROWSER"
   }
