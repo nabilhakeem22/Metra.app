@@ -1,0 +1,11 @@
+{
+  "name": "prettier",
+  "version": "3.9.6",
+  "description": "No-op stand-in for prettier. Pulled in transitively by resend -> @react-email/render for optional HTML pretty-printing, which this app never uses (emails are plain-HTML strings). Stubbing it keeps the OpenNext Cloudflare Worker under the free-tier 3 MiB size limit. Do not add a real prettier dependency without accounting for the bundle size.",
+  "type": "module",
+  "exports": {
+    ".": { "import": "./index.mjs", "require": "./index.cjs" },
+    "./standalone": { "import": "./standalone.mjs", "require": "./standalone.cjs" },
+    "./plugins/html": { "import": "./plugin.mjs", "require": "./plugin.cjs" }
+  }
+}
