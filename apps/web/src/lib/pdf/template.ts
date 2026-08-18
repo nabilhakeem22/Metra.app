@@ -1,38 +1,10 @@
-import { existsSync, readFileSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
-
-// Resolve the fonts dir across dev (cwd = apps/web) and bundled server output.
-function fontsDir(): string {
-  const candidates = [
-    (() => {
-      try {
-        return resolve(dirname(fileURLToPath(import.meta.url)), 'fonts');
-      } catch {
-        return '';
-      }
-    })(),
-    resolve(process.cwd(), 'src/lib/pdf/fonts'),
-    resolve(process.cwd(), 'apps/web/src/lib/pdf/fonts'),
-  ];
-  for (const dir of candidates) {
-    if (dir && existsSync(resolve(dir, 'IBMPlexSansArabic-Regular.ttf'))) {
-      return dir;
-    }
-  }
-  // Not found — callers degrade to fallback fonts rather than crashing the
-  // render (the in-app preview still shows; the browser has its own fonts).
-  return '';
-}
+import { FONT_B64 } from './fonts.generated';
 
 export function fontBase64(file: string): string {
-  const dir = fontsDir();
-  if (!dir) return '';
-  try {
-    return readFileSync(resolve(dir, file)).toString('base64');
-  } catch {
-    return '';
-  }
+  // Fonts are embedded at build time (see scripts/gen-fonts.mjs) because the
+  // Workers runtime has no filesystem. A missing entry degrades to the fallback
+  // family rather than throwing — same contract as the old fs-read path.
+  return FONT_B64[file] ?? '';
 }
 
 /**
