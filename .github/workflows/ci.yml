@@ -65,3 +65,11 @@ jobs:
 
       - name: Action-core DB tests (seeded DB, fabricated OrgContext)
         run: npm run test:actions -w @metra/web
+
+      # Additive Cloudflare gate: proves the OpenNext (Workers) bundle still
+      # builds. No deploy, no Cloudflare auth — build output only. Runs last so
+      # it never affects the existing lint -> unit -> migrate -> apply-rls ->
+      # seed -> isolation -> actions pipeline above.
+      - name: Cloudflare OpenNext build (no deploy)
+        run: npx opennextjs-cloudflare build
+        working-directory: apps/web
