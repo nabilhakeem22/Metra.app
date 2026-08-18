@@ -8,8 +8,7 @@
     "start": "next start",
     "lint": "eslint . --config ../../eslint.config.mjs",
     "test": "vitest run",
-    "test:actions": "vitest run --config vitest.actions.config.ts",
-    "gen:fonts": "node scripts/gen-fonts.mjs"
+    "test:actions": "vitest run --config vitest.actions.config.ts"
   },
   "dependencies": {
     "@cloudflare/puppeteer": "^1.3.0",
@@ -26,7 +25,6 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "drizzle-orm": "^0.36.4",
-    "exceljs": "^4.4.0",
     "lucide-react": "^0.468.0",
     "next": "^15.1.3",
     "next-intl": "^3.26.3",

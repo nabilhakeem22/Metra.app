@@ -1,30 +1,58 @@
-import { FONT_B64 } from './fonts.generated';
+import { cfEnv } from '@/lib/cf/context';
 
-export function fontBase64(file: string): string {
-  // Fonts are embedded at build time (see scripts/gen-fonts.mjs) because the
-  // Workers runtime has no filesystem. A missing entry degrades to the fallback
-  // family rather than throwing — same contract as the old fs-read path.
-  return FONT_B64[file] ?? '';
+// The three PDF webfonts live in `public/fonts/*.ttf`, which OpenNext copies into
+// the Workers static-assets output (served via the ASSETS binding, NOT bundled
+// into the Worker script — that keeps the base64 out of the 3 MiB script limit).
+// At render time we fetch each font through ASSETS, base64-encode it, and inline
+// it as an @font-face data URI so Arabic shaping is identical to the old bundled
+// path. The Workers runtime has no filesystem, so fetching from ASSETS is the
+// runtime-safe replacement for the previous fs read.
+const FONT_FACES: ReadonlyArray<{
+  family: string;
+  weight: string;
+  file: string;
+}> = [
+  { family: 'IBM Plex Sans Arabic', weight: '400', file: 'IBMPlexSansArabic-Regular.ttf' },
+  { family: 'IBM Plex Sans Arabic', weight: '700', file: 'IBMPlexSansArabic-Bold.ttf' },
+  { family: 'Cairo', weight: '400 900', file: 'Cairo-Variable.ttf' },
+];
+
+// Encoded @font-face CSS is fetched/encoded once per isolate and memoised, so
+// repeated PDF renders in the same Worker don't re-fetch or re-base64 the fonts.
+let cachedFontFaceCss: string | null = null;
+
+async function fontBase64(file: string): Promise<string> {
+  // ASSETS is optional in the merged CloudflareEnv type; off-platform or without
+  // the binding there's nothing to fetch, so degrade to the fallback family.
+  const assets = cfEnv().ASSETS;
+  if (!assets) return '';
+  // `assets.local` is an arbitrary same-origin base for the ASSETS fetch; only
+  // the path (/fonts/<file>) selects the served asset.
+  const response = await assets.fetch(
+    new URL(`/fonts/${file}`, 'https://assets.local'),
+  );
+  if (!response.ok) return '';
+  const bytes = new Uint8Array(await response.arrayBuffer());
+  return Buffer.from(bytes).toString('base64');
 }
 
 /**
- * Shared @font-face block (IBM Plex Sans Arabic + Cairo, base64-embedded).
- * Emits a face only when its file actually loaded, so a missing fonts dir
- * degrades to the fallback family instead of throwing / emitting a broken URI.
+ * Shared @font-face block (IBM Plex Sans Arabic + Cairo, base64-embedded from the
+ * static-asset TTFs). Emits a face only when its file actually loaded, so a
+ * missing/unreachable asset degrades to the fallback family instead of throwing
+ * or emitting a broken URI — same contract as the old bundled path.
  */
-export function fontFaceCss(): string {
-  const face = (family: string, weight: string, file: string): string => {
-    const b64 = fontBase64(file);
-    return b64
-      ? `@font-face { font-family: '${family}'; font-weight: ${weight};
+export async function fontFaceCss(): Promise<string> {
+  if (cachedFontFaceCss !== null) return cachedFontFaceCss;
+  const faces = await Promise.all(
+    FONT_FACES.map(async ({ family, weight, file }) => {
+      const b64 = await fontBase64(file);
+      return b64
+        ? `@font-face { font-family: '${family}'; font-weight: ${weight};
     src: url(data:font/ttf;base64,${b64}) format('truetype'); }`
-      : '';
-  };
-  return [
-    face('IBM Plex Sans Arabic', '400', 'IBMPlexSansArabic-Regular.ttf'),
-    face('IBM Plex Sans Arabic', '700', 'IBMPlexSansArabic-Bold.ttf'),
-    face('Cairo', '400 900', 'Cairo-Variable.ttf'),
-  ]
-    .filter(Boolean)
-    .join('\n');
+        : '';
+    }),
+  );
+  cachedFontFaceCss = faces.filter(Boolean).join('\n');
+  return cachedFontFaceCss;
 }

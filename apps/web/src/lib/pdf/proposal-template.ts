@@ -26,7 +26,7 @@ function pick(ar: string | null, en: string | null, locale: string): string {
  * Supervision is NOT a cost — the client pays it — so it shows on BOTH variants.
  * RTL, Western numerals via formatMoney. Single render source for route+preview.
  */
-export function buildProposalHtml(
+export async function buildProposalHtml(
   detail: ProposalDetail,
   opts: {
     locale: string;
@@ -34,7 +34,7 @@ export function buildProposalHtml(
     orgNameAr: string | null;
     orgNameEn: string | null;
   },
-): string {
+): Promise<string> {
   const { locale } = opts;
   const showCost = opts.variant === 'internal';
   const m = (v: string) => formatMoney(v, locale);
@@ -79,7 +79,7 @@ export function buildProposalHtml(
 <head>
 <meta charset="utf-8" />
 <style>
-  ${fontFaceCss()}
+  ${await fontFaceCss()}
   * { box-sizing: border-box; }
   body { font-family: 'IBM Plex Sans Arabic', 'Cairo', sans-serif; margin: 0; padding: 32px; color: #0f172a; font-size: 13px; }
   h1 { font-family: 'Cairo'; font-weight: 800; font-size: 20px; margin: 0 0 2px; }

@@ -66,7 +66,7 @@ export async function GET(
 
   try {
     const locale = org?.defaultLocale ?? 'ar-EG';
-    const html = buildProposalHtml(detail, {
+    const html = await buildProposalHtml(detail, {
       locale,
       variant,
       orgNameAr: org?.nameAr ?? null,

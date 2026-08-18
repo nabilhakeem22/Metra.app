@@ -171,7 +171,7 @@ export async function getProposalPreviewHtml(
     const detail = await getProposalForPdf(ctx, id, variant === 'internal');
     if (!detail) return { ok: false, error: 'invalid' };
 
-    const html = buildProposalHtml(detail, {
+    const html = await buildProposalHtml(detail, {
       locale: org?.defaultLocale ?? 'ar-EG',
       variant,
       orgNameAr: org?.nameAr ?? null,
