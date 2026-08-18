@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server';
 import { requireOrg } from '@/lib/auth/require-org';
 import { getSessionUser } from '@/lib/auth/session';
 import { withOrgContext } from '@/lib/db/context';
-import { renderPdf } from '@/lib/pdf/render';
+import { renderPdf, RendererBusyError } from '@/lib/pdf/render';
 import { buildProposalHtml } from '@/lib/pdf/proposal-template';
 import { can, canSeeMargin } from '@/lib/permissions/can';
 import { MAX_TOTAL_LINES } from '@/lib/proposals/core';
@@ -83,6 +83,15 @@ export async function GET(
       },
     });
   } catch (err) {
+    // Renderer at its concurrency cap (429) after retries: distinct, retryable
+    // 503 rather than a generic 500 so the client can back off and try again.
+    if (err instanceof RendererBusyError) {
+      console.error('Proposal PDF renderer busy:', err);
+      return NextResponse.json(
+        { error: 'Renderer busy, try again' },
+        { status: 503, headers: { 'retry-after': '5' } },
+      );
+    }
     console.error('Proposal PDF render failed:', err);
     return NextResponse.json({ error: 'PDF generation failed' }, { status: 500 });
   }
