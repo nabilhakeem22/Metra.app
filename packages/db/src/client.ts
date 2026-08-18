@@ -22,11 +22,18 @@ export interface CreateSqlOptions {
   ssl?: boolean | 'require';
 }
 
+// Cap how long a new socket may take to establish (seconds). A slow/half-open
+// origin otherwise hangs the caller until the platform kills the request. Safe
+// for every caller (migrate/seed/apply-rls/tests/runtime) — it only bounds
+// connect, not query time, and 10s is well above a healthy handshake.
+const CONNECT_TIMEOUT_SECONDS = 10;
+
 /** Raw postgres.js client. */
 export function createSql(url: string, opts: CreateSqlOptions = {}) {
   return postgres(url, {
     max: opts.max ?? 10,
     prepare: opts.prepare ?? false,
+    connect_timeout: CONNECT_TIMEOUT_SECONDS,
     // Nullish-coalesce so an explicit `ssl: false` is honoured; only undefined
     // falls through to the host-derived default.
     ssl: opts.ssl ?? (needsSsl(url) ? 'require' : false),

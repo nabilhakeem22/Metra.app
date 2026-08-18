@@ -28,6 +28,25 @@ function createRuntimeConnection(): { db: MetraDb; sql: PostgresJs } {
   return createDb(runtimeUrl(), { prepare: false, max: 5, ...ssl });
 }
 
+// Wall-clock ceiling (ms) for a single request-scoped DB operation on the
+// Cloudflare runtime. A slow/half-open Hyperdrive origin otherwise hangs the
+// request until the platform kills it; this surfaces a clean rejection instead.
+// Well above a healthy query yet below any platform request budget.
+const CF_DB_DEADLINE_MS = 15_000;
+
+/**
+ * Thrown when a Cloudflare request-scoped DB operation exceeds
+ * CF_DB_DEADLINE_MS. A distinct, coded error so a deadline reads differently
+ * from a random failure; mutateInOrg maps it to a generic ActionResult and route
+ * reads reject cleanly rather than hanging.
+ */
+export class DbDeadlineError extends Error {
+  constructor() {
+    super('db-operation-deadline');
+    this.name = 'DbDeadlineError';
+  }
+}
+
 // Off-platform (Node/Vitest/migrate/seed/next dev) the DB socket is NOT
 // request-scoped, so a single process-lived pool is correct — and stays exactly
 // as before. On the Workers runtime this singleton is never populated: a socket
@@ -75,9 +94,23 @@ export async function withRequestDb<T>(
     return fn(getDb());
   }
   const { db, sql } = createRuntimeConnection();
+  // Bound the WHOLE operation, not individual statements: the deadline races the
+  // entire fn (which owns the RLS-scoped transaction), so isolation/transaction
+  // semantics are untouched — on a deadline the transaction is simply abandoned
+  // and rolled back when sql.end() closes the socket below.
+  let deadlineTimer: ReturnType<typeof setTimeout> | undefined;
   try {
-    return await fn(db);
+    return await Promise.race([
+      fn(db),
+      new Promise<never>((_, reject) => {
+        deadlineTimer = setTimeout(
+          () => reject(new DbDeadlineError()),
+          CF_DB_DEADLINE_MS,
+        );
+      }),
+    ]);
   } finally {
+    if (deadlineTimer) clearTimeout(deadlineTimer);
     // Close AFTER the queries and defer the drain past the response. The timeout
     // bounds the drain so a half-open socket can't hang the waitUntil budget.
     cfExecutionContext().waitUntil(sql.end({ timeout: 5 }));
