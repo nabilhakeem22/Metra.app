@@ -53,6 +53,9 @@ export async function fontFaceCss(): Promise<string> {
         : '';
     }),
   );
-  cachedFontFaceCss = faces.filter(Boolean).join('\n');
-  return cachedFontFaceCss;
+  const css = faces.filter(Boolean).join('\n');
+  // Only memoise a complete result: if a face failed to load (missing asset),
+  // don't poison the isolate cache — retry the fetch on the next render.
+  if (faces.every(Boolean)) cachedFontFaceCss = css;
+  return css;
 }
