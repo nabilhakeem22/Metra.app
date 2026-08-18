@@ -1,7 +1,7 @@
 import 'server-only';
 import { memberships } from '@metra/db';
 import { and, asc, eq, inArray } from 'drizzle-orm';
-import { getDb } from '@/lib/db/client';
+import { withRequestDb } from '@/lib/db/client';
 import type { OrgContext } from '@/lib/db/context';
 
 /**
@@ -17,20 +17,22 @@ import type { OrgContext } from '@/lib/db/context';
 export async function resolveSystemContext(
   orgId: string,
 ): Promise<OrgContext | null> {
-  const rows = await getDb()
-    .select({
-      userId: memberships.userId,
-      role: memberships.role,
-      createdAt: memberships.createdAt,
-    })
-    .from(memberships)
-    .where(
-      and(
-        eq(memberships.orgId, orgId),
-        inArray(memberships.role, ['owner', 'admin']),
-      ),
-    )
-    .orderBy(asc(memberships.createdAt));
+  const rows = await withRequestDb((db) =>
+    db
+      .select({
+        userId: memberships.userId,
+        role: memberships.role,
+        createdAt: memberships.createdAt,
+      })
+      .from(memberships)
+      .where(
+        and(
+          eq(memberships.orgId, orgId),
+          inArray(memberships.role, ['owner', 'admin']),
+        ),
+      )
+      .orderBy(asc(memberships.createdAt)),
+  );
 
   const actor =
     rows.find((r) => r.role === 'owner') ?? rows.find((r) => r.role === 'admin');

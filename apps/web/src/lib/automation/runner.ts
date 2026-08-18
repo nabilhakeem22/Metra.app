@@ -11,7 +11,7 @@ import type {
   AutomationResult,
   AutomationRunSummary,
 } from './types';
-import { getDb } from '@/lib/db/client';
+import { withRequestDb } from '@/lib/db/client';
 
 const CORES: Array<{
   key: AutomationKey;
@@ -44,19 +44,23 @@ export async function runDueAutomations(
   const results: AutomationRunSummary['results'] = [];
   let orgsProcessed = 0;
 
-  const orgs = await getDb()
-    .select({ id: organizations.id, defaultLocale: organizations.defaultLocale })
-    .from(organizations);
+  const orgs = await withRequestDb((db) =>
+    db
+      .select({ id: organizations.id, defaultLocale: organizations.defaultLocale })
+      .from(organizations),
+  );
 
   for (const org of orgs) {
     const ctx = await resolveSystemContext(org.id);
     if (!ctx) continue; // no owner/admin — nothing to act as; skip.
 
-    const [settings] = await getDb()
-      .select()
-      .from(automationSettings)
-      .where(eq(automationSettings.orgId, org.id))
-      .limit(1);
+    const [settings] = await withRequestDb((db) =>
+      db
+        .select()
+        .from(automationSettings)
+        .where(eq(automationSettings.orgId, org.id))
+        .limit(1),
+    );
     if (!settings) continue; // no config row — skip (backfilled for all orgs).
 
     orgsProcessed += 1;

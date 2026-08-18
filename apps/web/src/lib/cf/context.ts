@@ -14,6 +14,21 @@ export function cfEnv(): CloudflareEnv {
   return getCloudflareContext().env;
 }
 
+/** The subset of the Workers `ExecutionContext` used to defer request-end work. */
+interface RequestExecutionContext {
+  waitUntil(promise: Promise<unknown>): void;
+}
+
+/**
+ * The Cloudflare Workers `ExecutionContext` for the current request. Its
+ * `waitUntil()` defers work — e.g. closing a request-scoped DB connection — past
+ * the response without blocking it, and keeps the isolate alive until the work
+ * settles. Only valid on the Cloudflare runtime; guard with `isCloudflareRuntime()`.
+ */
+export function cfExecutionContext(): RequestExecutionContext {
+  return getCloudflareContext().ctx;
+}
+
 /**
  * True when running inside the Cloudflare Workers runtime. Detected via the
  * global `navigator.userAgent` workerd sets ("Cloudflare-Workers"); Node leaves

@@ -4,7 +4,7 @@ import 'server-only';
 // SDF omits every cost/margin column, so nothing here can leak the firm's cost.
 import { createHash } from 'node:crypto';
 import { sql } from 'drizzle-orm';
-import { getDb } from '@/lib/db/client';
+import { withRequestDb } from '@/lib/db/client';
 
 function hashToken(raw: string): string {
   return createHash('sha256').update(raw).digest('hex');
@@ -61,8 +61,8 @@ export async function getProposalByToken(
 ): Promise<PublicProposal | null> {
   if (!rawToken || !rawToken.trim()) return null;
   const hash = hashToken(rawToken.trim());
-  const rows = (await getDb().execute(
-    sql`select public.app_proposal_by_token(${hash}) as data`,
+  const rows = (await withRequestDb((db) =>
+    db.execute(sql`select public.app_proposal_by_token(${hash}) as data`),
   )) as unknown as Array<{ data: PublicProposal | null }>;
   return rows[0]?.data ?? null;
 }
@@ -80,11 +80,11 @@ export async function respondToProposalByToken(
 ): Promise<{ ok: boolean; error?: RespondError }> {
   if (!rawToken || !rawToken.trim()) return { ok: false, error: 'token_invalid' };
   const hash = hashToken(rawToken.trim());
-  const rows = (await getDb().execute(
-    sql`select public.app_proposal_respond_by_token(
+  const rows = (await withRequestDb((db) =>
+    db.execute(sql`select public.app_proposal_respond_by_token(
       ${hash}, ${input.decision}, ${input.actorName ?? null},
       ${input.ip ?? null}, ${input.userAgent ?? null}
-    ) as code`,
+    ) as code`),
   )) as unknown as Array<{ code: string }>;
   const code = rows[0]?.code;
   switch (code) {
