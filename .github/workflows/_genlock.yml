@@ -1,0 +1,26 @@
+name: genlock
+
+# TEMPORARY helper (ci-fix branch only): regenerate package-lock.json on a real
+# Linux runner so it contains installable entries for the Linux native binaries
+# (rollup/esbuild/swc), then upload it as an artifact to commit back. Deleted
+# once the deterministic npm-ci lockfile is in place. Not present on main.
+
+on:
+  push:
+    branches: [ci-fix]
+
+jobs:
+  genlock:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Full Linux resolve
+        run: rm -f package-lock.json && npm install
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-lock
+          path: package-lock.json
+          retention-days: 1
