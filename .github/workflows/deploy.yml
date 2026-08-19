@@ -34,15 +34,14 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          # Node 22: required by the current wrangler.
+          # Node 22: required by the pinned wrangler (4.123.0).
           node-version: 22
           cache: npm
 
       - name: Install (monorepo workspaces)
-        # Regenerate the lockfile on the Linux runner then install — the committed
-        # lock is Windows-generated and trips rollup's optional-platform-dep bug
-        # (npm/cli#4828) on Linux.
-        run: rm -f package-lock.json && npm install
+        # Deterministic install from the committed lockfile (Linux binaries are
+        # recorded in it), so the deploy builds the exact tree CI validated.
+        run: npm ci
 
       - name: Build the Worker (OpenNext for Cloudflare)
         working-directory: apps/web
