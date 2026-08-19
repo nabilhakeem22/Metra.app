@@ -27,6 +27,10 @@ export default tseslint.config(
       '**/.wrangler/**',
       '**/cloudflare-env.d.ts',
       '**/worker-configuration.d.ts',
+      // No-op CommonJS/ESM stub package (stands in for prettier to keep it out
+      // of the Worker bundle) — not app source, and its .cjs files use CommonJS
+      // globals eslint's browser/ESM env doesn't define.
+      'stubs/**',
     ],
   },
   js.configs.recommended,
