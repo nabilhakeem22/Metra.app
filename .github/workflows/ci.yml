@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main, p1-contracts-vo]
+    branches: [main]
   pull_request:
     branches: [main]
 
