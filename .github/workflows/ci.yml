@@ -85,4 +85,7 @@ jobs:
           NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ vars.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
           NEXT_PUBLIC_DEFAULT_LOCALE: ${{ vars.NEXT_PUBLIC_DEFAULT_LOCALE }}
           NEXT_PUBLIC_APP_URL: ${{ vars.NEXT_PUBLIC_APP_URL }}
-        run: npx opennextjs-cloudflare build
+        # `wrangler types` generates the CloudflareEnv typings (HYPERDRIVE/
+        # BROWSER/ASSETS bindings) into a gitignored .d.ts; without it next
+        # build's type-check fails. Regenerate before building on the runner.
+        run: npx wrangler types && npx opennextjs-cloudflare build

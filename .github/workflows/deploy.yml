@@ -52,7 +52,9 @@ jobs:
           NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ vars.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
           NEXT_PUBLIC_DEFAULT_LOCALE: ${{ vars.NEXT_PUBLIC_DEFAULT_LOCALE }}
           NEXT_PUBLIC_APP_URL: ${{ vars.NEXT_PUBLIC_APP_URL }}
-        run: npx opennextjs-cloudflare build
+        # Generate CloudflareEnv typings (bindings) before building — the .d.ts
+        # is gitignored, so a fresh runner needs `wrangler types` for tsc.
+        run: npx wrangler types && npx opennextjs-cloudflare build
 
       - name: Deploy the Worker (Wrangler)
         working-directory: apps/web
