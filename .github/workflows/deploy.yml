@@ -38,7 +38,9 @@ jobs:
           cache: npm
 
       - name: Install (monorepo workspaces)
-        run: npm ci
+        # `npm install` (not `npm ci`): works around rollup's optional
+        # platform-dependency bug (npm/cli#4828) on the Linux runner.
+        run: npm install
 
       - name: Build the Worker (OpenNext for Cloudflare)
         working-directory: apps/web

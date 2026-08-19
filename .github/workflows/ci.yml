@@ -40,7 +40,10 @@ jobs:
           cache: npm
 
       - name: Install
-        run: npm ci
+        # `npm install` (not `npm ci`): works around rollup's optional
+        # platform-dependency bug (npm/cli#4828) where `npm ci` skips the Linux
+        # rollup binary on the CI runner and vitest fails to start.
+        run: npm install
 
       - name: Lint (includes physical left/right ban)
         run: npm run lint
