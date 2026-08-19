@@ -36,17 +36,17 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          # Node 22: the current wrangler (pulled fresh by the Linux lockfile
-          # regen) requires >= 22; everything else is compatible.
+          # Node 22: required by the pinned wrangler (4.123.0); everything else
+          # is compatible.
           node-version: 22
           cache: npm
 
       - name: Install
-        # Regenerate the lockfile on the Linux runner, then install. The committed
-        # lock is Windows-generated and trips rollup's optional-platform-dep bug
-        # (npm/cli#4828): npm ci/install both skip the Linux rollup binary, so
-        # vitest can't start. A fresh Linux resolve installs the correct binaries.
-        run: rm -f package-lock.json && npm install
+        # Deterministic install from the committed lockfile. The lock is generated
+        # with all Linux platform binaries recorded (`npm install --os=linux
+        # --cpu=x64`), so `npm ci` finds the Linux rollup/esbuild/swc binaries and
+        # never re-resolves — no drift, no npm/cli#4828. See docs/DEPLOY.md.
+        run: npm ci
 
       - name: Lint (includes physical left/right ban)
         run: npm run lint
@@ -87,7 +87,11 @@ jobs:
           NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ vars.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
           NEXT_PUBLIC_DEFAULT_LOCALE: ${{ vars.NEXT_PUBLIC_DEFAULT_LOCALE }}
           NEXT_PUBLIC_APP_URL: ${{ vars.NEXT_PUBLIC_APP_URL }}
-        # `wrangler types` generates the CloudflareEnv typings (HYPERDRIVE/
-        # BROWSER/ASSETS bindings) into a gitignored .d.ts; without it next
-        # build's type-check fails. Regenerate before building on the runner.
-        run: npx wrangler types && npx opennextjs-cloudflare build
+        # Generate the gitignored binding typings before the type-check. The
+        # `--env-interface=CloudflareEnv ./cloudflare-env.d.ts` flags MUST match
+        # how the file is generated locally: plain `wrangler types` emits a
+        # `Cloudflare.Env`/global `Env` shape instead of the `interface
+        # CloudflareEnv` the code (cfEnv(): CloudflareEnv) and OpenNext expect,
+        # so the build's type-check fails on `Property 'HYPERDRIVE' does not
+        # exist on type 'CloudflareEnv'`.
+        run: npx wrangler types --env-interface=CloudflareEnv ./cloudflare-env.d.ts && npx opennextjs-cloudflare build

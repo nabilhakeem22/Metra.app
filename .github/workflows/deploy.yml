@@ -34,15 +34,14 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          # Node 22: required by the current wrangler.
+          # Node 22: required by the pinned wrangler (4.123.0).
           node-version: 22
           cache: npm
 
       - name: Install (monorepo workspaces)
-        # Regenerate the lockfile on the Linux runner then install — the committed
-        # lock is Windows-generated and trips rollup's optional-platform-dep bug
-        # (npm/cli#4828) on Linux.
-        run: rm -f package-lock.json && npm install
+        # Deterministic install from the committed lockfile (Linux binaries are
+        # recorded in it), so the deploy builds the exact tree CI validated.
+        run: npm ci
 
       - name: Build the Worker (OpenNext for Cloudflare)
         working-directory: apps/web
@@ -53,9 +52,12 @@ jobs:
           NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ vars.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
           NEXT_PUBLIC_DEFAULT_LOCALE: ${{ vars.NEXT_PUBLIC_DEFAULT_LOCALE }}
           NEXT_PUBLIC_APP_URL: ${{ vars.NEXT_PUBLIC_APP_URL }}
-        # Generate CloudflareEnv typings (bindings) before building — the .d.ts
-        # is gitignored, so a fresh runner needs `wrangler types` for tsc.
-        run: npx wrangler types && npx opennextjs-cloudflare build
+        # Generate the gitignored CloudflareEnv typings before building. The
+        # --env-interface/output flags MUST match local generation: plain
+        # `wrangler types` emits a Cloudflare.Env/global Env shape, not the
+        # `interface CloudflareEnv` the code + OpenNext expect (would fail tsc on
+        # Property 'HYPERDRIVE' does not exist on type 'CloudflareEnv').
+        run: npx wrangler types --env-interface=CloudflareEnv ./cloudflare-env.d.ts && npx opennextjs-cloudflare build
 
       - name: Deploy the Worker (Wrangler)
         working-directory: apps/web
