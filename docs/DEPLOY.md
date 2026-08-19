@@ -46,6 +46,44 @@ Continue → Create Token → copy the value into the GitHub secret above.
 Once `DEPLOY_ENABLED = true`, every green push to `main` deploys. Until then the
 deploy job is skipped (no failed runs).
 
+## Known issue — CI is red on the OpenNext build step (auto-deploy paused)
+
+**Status:** the app is live and correct. Manual `wrangler deploy` (above) is the
+current source of truth. Auto-deploy is fully wired (all variables + the API token
+are set) but does **not** fire yet, because the deploy job is gated on CI passing
+and CI is currently red — so nothing bad can ship in the meantime.
+
+**What's green:** the entire product pipeline — lint, unit tests (db + web),
+migrations, RLS/roles, seed, the P0 **cross-tenant isolation** gate, and the
+action-core DB tests. All pass on a clean Linux runner.
+
+**What's red:** only the final `Cloudflare OpenNext build (no deploy)` step
+(a build-time type-check). It is not a product bug, not a data or isolation issue.
+
+**Root cause:** both CI and deploy install dependencies with
+`rm -f package-lock.json && npm install`. That line exists to dodge npm's
+optional-platform-dep bug ([npm/cli#4828](https://github.com/npm/cli/issues/4828)):
+the committed lockfile is generated on Windows and omits the Linux `rollup`/`esbuild`
+binaries, so a plain `npm ci` on the runner can't start vitest. Deleting the lock
+and re-installing fixes that — but it also lets the toolchain **re-resolve from
+scratch every run**, so `wrangler`/`@opennextjs/cloudflare` drift to versions whose
+generated binding types (`Cloudflare.Env` vs the `CloudflareEnv` the code expects)
+no longer match, and the build's type-check fails. Pinning those two tools to exact
+versions did not fully stop the drift — the non-deterministic install is the real
+problem, not any single version.
+
+**The fix (deliberate follow-up, ~30 min, not a blind patch):**
+1. Generate a genuinely Linux-correct `package-lock.json` — either run
+   `npm install` inside a Linux container/WSL, or add the needed platform binaries
+   (`@rollup/rollup-linux-x64-gnu`, matching `esbuild`) as **direct**
+   `optionalDependencies` so npm records them in the lock regardless of host OS.
+2. Commit that lockfile and switch **both** workflows from
+   `rm -f package-lock.json && npm install` back to deterministic **`npm ci`**.
+3. Validate on a throwaway branch (watch the CI run) before merging to `main`.
+
+This removes the rollup bug and the version drift in one move; once CI is green the
+existing deploy job fires automatically — no further wiring needed.
+
 ## Runtime secrets (already set on the worker, not in this repo)
 
 `SUPABASE_SERVICE_ROLE_KEY`, `RESEND_API_KEY`, `RESEND_FROM` are set as encrypted
