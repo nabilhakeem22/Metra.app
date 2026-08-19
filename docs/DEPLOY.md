@@ -1,0 +1,54 @@
+# Deployment
+
+Production runs on **Cloudflare Workers** (OpenNext adapter), worker **`metra-web`**,
+currently served at `https://metra-web.nabil-hakeem22.workers.dev` (add a custom
+domain later via the worker's **Settings → Domains**).
+
+## How deploys happen
+
+`.github/workflows/deploy.yml` builds and deploys the worker automatically **after
+CI passes on `main`**. You should not need to run `wrangler deploy` by hand.
+
+Manual deploy (fallback, from a machine with `wrangler login` done):
+
+```bash
+cd apps/web
+NEXT_PUBLIC_APP_URL=https://metra-web.nabil-hakeem22.workers.dev npx opennextjs-cloudflare build
+npx wrangler deploy
+```
+
+## One-time activation of auto-deploy
+
+In GitHub → the repo → **Settings → Secrets and variables → Actions**:
+
+### Variables tab → New repository variable (7)
+
+| Name | Value |
+|------|-------|
+| `NEXT_PUBLIC_SUPABASE_URL` | copy from your local `.env` |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | copy from your local `.env` (public key) |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | copy from your local `.env` (public key) |
+| `NEXT_PUBLIC_DEFAULT_LOCALE` | `ar-EG` |
+| `NEXT_PUBLIC_APP_URL` | `https://metra-web.nabil-hakeem22.workers.dev` |
+| `CLOUDFLARE_ACCOUNT_ID` | `0454e69f5ed32ae9b6311bc5196ef073` |
+| `DEPLOY_ENABLED` | `true`  ← set this **last**, it arms the workflow |
+
+### Secrets tab → New repository secret (1)
+
+| Name | Value |
+|------|-------|
+| `CLOUDFLARE_API_TOKEN` | create in Cloudflare (below) |
+
+**Create `CLOUDFLARE_API_TOKEN`:** Cloudflare dashboard → **My Profile → API Tokens
+→ Create Token → "Edit Cloudflare Workers"** template → Account = your account →
+Continue → Create Token → copy the value into the GitHub secret above.
+
+Once `DEPLOY_ENABLED = true`, every green push to `main` deploys. Until then the
+deploy job is skipped (no failed runs).
+
+## Runtime secrets (already set on the worker, not in this repo)
+
+`SUPABASE_SERVICE_ROLE_KEY`, `RESEND_API_KEY`, `RESEND_FROM` are set as encrypted
+worker secrets (Cloudflare dashboard → metra-web → Settings → Variables and
+secrets). `CRON_SECRET` is added when the automation cron is enabled.
+`wrangler deploy` preserves these across deploys.
