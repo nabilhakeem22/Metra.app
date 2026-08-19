@@ -1,0 +1,381 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Metra Public API",
+    "version": "1.0.0",
+    "description": "Read-only v1 of the Metra Public API. Authenticate with a Bearer API key (mtk_…). A key resolves to its creator's current membership role; cost/margin fields are present only when that role may see margin. All money values are scale-4 numeric strings; all figures use Western numerals."
+  },
+  "servers": [{ "url": "/api/v1" }],
+  "security": [{ "bearerAuth": [] }],
+  "paths": {
+    "/clients": {
+      "get": {
+        "summary": "List clients",
+        "parameters": [
+          { "$ref": "#/components/parameters/Limit" },
+          { "$ref": "#/components/parameters/Cursor" }
+        ],
+        "responses": {
+          "200": {
+            "description": "A page of clients.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": { "type": "array", "items": { "$ref": "#/components/schemas/Client" } },
+                    "next_cursor": { "type": ["string", "null"] }
+                  },
+                  "required": ["data", "next_cursor"]
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/Problem" },
+          "401": { "$ref": "#/components/responses/Problem" },
+          "429": { "$ref": "#/components/responses/Problem" }
+        }
+      }
+    },
+    "/clients/{id}": {
+      "get": {
+        "summary": "Get a client",
+        "parameters": [{ "$ref": "#/components/parameters/Id" }],
+        "responses": {
+          "200": {
+            "description": "A client.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Client" } } }
+          },
+          "401": { "$ref": "#/components/responses/Problem" },
+          "404": { "$ref": "#/components/responses/Problem" }
+        }
+      }
+    },
+    "/projects": {
+      "get": {
+        "summary": "List projects",
+        "parameters": [
+          { "$ref": "#/components/parameters/Limit" },
+          { "$ref": "#/components/parameters/Cursor" }
+        ],
+        "responses": {
+          "200": {
+            "description": "A page of projects.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": { "type": "array", "items": { "$ref": "#/components/schemas/Project" } },
+                    "next_cursor": { "type": ["string", "null"] }
+                  },
+                  "required": ["data", "next_cursor"]
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/Problem" },
+          "401": { "$ref": "#/components/responses/Problem" },
+          "429": { "$ref": "#/components/responses/Problem" }
+        }
+      }
+    },
+    "/projects/{id}": {
+      "get": {
+        "summary": "Get a project",
+        "parameters": [{ "$ref": "#/components/parameters/Id" }],
+        "responses": {
+          "200": {
+            "description": "A project.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Project" } } }
+          },
+          "401": { "$ref": "#/components/responses/Problem" },
+          "404": { "$ref": "#/components/responses/Problem" }
+        }
+      }
+    },
+    "/proposals": {
+      "get": {
+        "summary": "List proposals",
+        "parameters": [
+          { "$ref": "#/components/parameters/Limit" },
+          { "$ref": "#/components/parameters/Cursor" }
+        ],
+        "responses": {
+          "200": {
+            "description": "A page of proposal summaries.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": { "type": "array", "items": { "$ref": "#/components/schemas/ProposalSummary" } },
+                    "next_cursor": { "type": ["string", "null"] }
+                  },
+                  "required": ["data", "next_cursor"]
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/Problem" },
+          "401": { "$ref": "#/components/responses/Problem" },
+          "429": { "$ref": "#/components/responses/Problem" }
+        }
+      }
+    },
+    "/proposals/{id}": {
+      "get": {
+        "summary": "Get a proposal with its sections and lines",
+        "parameters": [{ "$ref": "#/components/parameters/Id" }],
+        "responses": {
+          "200": {
+            "description": "A full proposal. Line unit_cost / margin fields appear only for keys whose role may see margin.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Proposal" } } }
+          },
+          "401": { "$ref": "#/components/responses/Problem" },
+          "404": { "$ref": "#/components/responses/Problem" }
+        }
+      }
+    },
+    "/cost-items": {
+      "get": {
+        "summary": "List price-book cost items",
+        "parameters": [
+          { "$ref": "#/components/parameters/Limit" },
+          { "$ref": "#/components/parameters/Cursor" }
+        ],
+        "responses": {
+          "200": {
+            "description": "A page of cost items. default_unit_cost appears only for keys whose role may see margin.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": { "type": "array", "items": { "$ref": "#/components/schemas/CostItem" } },
+                    "next_cursor": { "type": ["string", "null"] }
+                  },
+                  "required": ["data", "next_cursor"]
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/Problem" },
+          "401": { "$ref": "#/components/responses/Problem" },
+          "429": { "$ref": "#/components/responses/Problem" }
+        }
+      }
+    },
+    "/cost-items/{id}": {
+      "get": {
+        "summary": "Get a cost item",
+        "parameters": [{ "$ref": "#/components/parameters/Id" }],
+        "responses": {
+          "200": {
+            "description": "A cost item.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CostItem" } } }
+          },
+          "401": { "$ref": "#/components/responses/Problem" },
+          "404": { "$ref": "#/components/responses/Problem" }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": { "type": "http", "scheme": "bearer", "description": "A Metra API key: mtk_… Shown once at mint." }
+    },
+    "parameters": {
+      "Limit": {
+        "name": "limit",
+        "in": "query",
+        "required": false,
+        "schema": { "type": "integer", "minimum": 1, "maximum": 100, "default": 25 },
+        "description": "Page size. Values above 100 are clamped to 100."
+      },
+      "Cursor": {
+        "name": "cursor",
+        "in": "query",
+        "required": false,
+        "schema": { "type": "string" },
+        "description": "Opaque cursor from a previous response's next_cursor. A malformed cursor returns 400."
+      },
+      "Id": {
+        "name": "id",
+        "in": "path",
+        "required": true,
+        "schema": { "type": "string", "format": "uuid" }
+      }
+    },
+    "responses": {
+      "Problem": {
+        "description": "An RFC 7807 problem.",
+        "content": {
+          "application/problem+json": { "schema": { "$ref": "#/components/schemas/Problem" } }
+        }
+      }
+    },
+    "schemas": {
+      "Problem": {
+        "type": "object",
+        "properties": {
+          "type": { "type": "string", "format": "uri" },
+          "title": { "type": "string" },
+          "status": { "type": "integer" },
+          "detail": { "type": "string" }
+        },
+        "required": ["type", "title", "status"]
+      },
+      "Client": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "name_ar": { "type": ["string", "null"] },
+          "name_en": { "type": ["string", "null"] },
+          "type": { "type": "string" },
+          "contact_name": { "type": ["string", "null"] },
+          "email": { "type": ["string", "null"] },
+          "phone": { "type": ["string", "null"] },
+          "city": { "type": ["string", "null"] },
+          "address": { "type": ["string", "null"] },
+          "tax_registration_number": { "type": ["string", "null"] },
+          "segment": { "type": ["string", "null"] },
+          "lead_source": { "type": ["string", "null"] },
+          "advance_pct": { "type": "string" },
+          "retention_pct": { "type": "string" },
+          "notes": { "type": ["string", "null"] },
+          "active": { "type": "boolean" },
+          "created_at": { "type": ["string", "null"], "format": "date-time" },
+          "updated_at": { "type": ["string", "null"], "format": "date-time" }
+        },
+        "required": ["id", "type", "active"]
+      },
+      "Project": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "code": { "type": "string" },
+          "name_ar": { "type": ["string", "null"] },
+          "name_en": { "type": ["string", "null"] },
+          "client_id": { "type": "string", "format": "uuid" },
+          "type_id": { "type": ["string", "null"], "format": "uuid" },
+          "type_name_ar": { "type": ["string", "null"] },
+          "type_name_en": { "type": ["string", "null"] },
+          "status": { "type": "string" },
+          "contract_ref": { "type": ["string", "null"] },
+          "description": { "type": ["string", "null"] },
+          "advance_pct": { "type": "string" },
+          "retention_pct": { "type": "string" },
+          "start_date": { "type": ["string", "null"], "format": "date" },
+          "end_date": { "type": ["string", "null"], "format": "date" },
+          "city": { "type": ["string", "null"] },
+          "address": { "type": ["string", "null"] },
+          "notes": { "type": ["string", "null"] },
+          "active": { "type": "boolean" },
+          "created_at": { "type": ["string", "null"], "format": "date-time" },
+          "updated_at": { "type": ["string", "null"], "format": "date-time" }
+        },
+        "required": ["id", "code", "client_id", "status", "active"]
+      },
+      "CostItem": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "code": { "type": "string" },
+          "name_ar": { "type": ["string", "null"] },
+          "name_en": { "type": ["string", "null"] },
+          "section_id": { "type": "string", "format": "uuid" },
+          "unit": { "type": "string" },
+          "default_unit_price": { "type": "string" },
+          "default_unit_cost": { "type": "string", "description": "Present only for keys whose role may see margin." },
+          "tax_code": { "type": ["string", "null"] },
+          "eta_item_code": { "type": ["string", "null"] },
+          "eta_code_type": { "type": ["string", "null"] },
+          "active": { "type": "boolean" },
+          "created_at": { "type": ["string", "null"], "format": "date-time" },
+          "updated_at": { "type": ["string", "null"], "format": "date-time" }
+        },
+        "required": ["id", "code", "section_id", "unit", "default_unit_price", "active"]
+      },
+      "ProposalSummary": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "number": { "type": "integer" },
+          "title_ar": { "type": ["string", "null"] },
+          "title_en": { "type": ["string", "null"] },
+          "status": { "type": "string" },
+          "currency": { "type": "string" },
+          "total": { "type": "string" },
+          "issue_date": { "type": ["string", "null"], "format": "date" },
+          "client_id": { "type": "string", "format": "uuid" },
+          "project_id": { "type": "string", "format": "uuid" },
+          "created_at": { "type": ["string", "null"], "format": "date-time" }
+        },
+        "required": ["id", "number", "status", "currency", "total"]
+      },
+      "ProposalLine": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "description_ar": { "type": ["string", "null"] },
+          "description_en": { "type": ["string", "null"] },
+          "cost_item_id": { "type": ["string", "null"], "format": "uuid" },
+          "qty": { "type": "string" },
+          "unit": { "type": "string" },
+          "unit_price": { "type": "string" },
+          "discount_pct": { "type": "string" },
+          "line_total": { "type": "string" },
+          "sort_order": { "type": "integer" },
+          "unit_cost": { "type": "string", "description": "Margin-gated." },
+          "line_cost": { "type": "string", "description": "Margin-gated." },
+          "line_margin": { "type": "string", "description": "Margin-gated." }
+        },
+        "required": ["id", "qty", "unit", "unit_price", "line_total", "sort_order"]
+      },
+      "ProposalSection": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "title_ar": { "type": ["string", "null"] },
+          "title_en": { "type": ["string", "null"] },
+          "sort_order": { "type": "integer" },
+          "section_subtotal": { "type": "string" },
+          "lines": { "type": "array", "items": { "$ref": "#/components/schemas/ProposalLine" } },
+          "section_cost": { "type": "string", "description": "Margin-gated." },
+          "section_margin": { "type": "string", "description": "Margin-gated." }
+        },
+        "required": ["id", "sort_order", "section_subtotal", "lines"]
+      },
+      "Proposal": {
+        "allOf": [
+          { "$ref": "#/components/schemas/ProposalSummary" },
+          {
+            "type": "object",
+            "properties": {
+              "expiry_date": { "type": ["string", "null"], "format": "date" },
+              "version": { "type": "integer" },
+              "supersedes_id": { "type": ["string", "null"], "format": "uuid" },
+              "discount_pct": { "type": "string" },
+              "tax_rate": { "type": "string" },
+              "supervision_pct": { "type": "string" },
+              "subtotal": { "type": "string" },
+              "discount_amount": { "type": "string" },
+              "taxable_base": { "type": "string" },
+              "tax_amount": { "type": "string" },
+              "supervision_amount": { "type": "string" },
+              "notes_ar": { "type": ["string", "null"] },
+              "notes_en": { "type": ["string", "null"] },
+              "terms_ar": { "type": ["string", "null"] },
+              "terms_en": { "type": ["string", "null"] },
+              "sections": { "type": "array", "items": { "$ref": "#/components/schemas/ProposalSection" } },
+              "total_cost": { "type": "string", "description": "Margin-gated." },
+              "total_margin": { "type": "string", "description": "Margin-gated." }
+            },
+            "required": ["sections"]
+          }
+        ]
+      }
+    }
+  }
+}

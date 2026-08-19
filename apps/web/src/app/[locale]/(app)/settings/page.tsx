@@ -1,6 +1,13 @@
 import { organizations } from '@metra/db';
 import { getTranslations } from 'next-intl/server';
+import {
+  Card,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
 import { PageHeader } from '@/components/ui/page-header';
+import { Link } from '@/i18n/routing';
 import { requireOrg } from '@/lib/auth/require-org';
 import { getAutomationSettings } from '@/lib/automation/settings-queries';
 import { withOrgContext } from '@/lib/db/context';
@@ -45,6 +52,16 @@ export default async function SettingsPage() {
           stageRemindersEnabled: automation?.stageRemindersEnabled ?? true,
         }}
       />
+      {canManage && (
+        <Link href="/settings/api-keys" className="block">
+          <Card className="transition-colors hover:bg-muted/40">
+            <CardHeader>
+              <CardTitle>{t('apiKeysCardTitle')}</CardTitle>
+              <CardDescription>{t('apiKeysCardDesc')}</CardDescription>
+            </CardHeader>
+          </Card>
+        </Link>
+      )}
     </div>
   );
 }
