@@ -1,7 +1,8 @@
 'use client';
 
-import { COST_ITEM_UNITS, type CostItemUnit } from '@metra/db';
+import type { CostItemUnit } from '@metra/db';
 import { Loader2, Plus, Trash2 } from 'lucide-react';
+import { UNIT_TOKENS } from '@/lib/price-book/import';
 import { useLocale, useTranslations } from 'next-intl';
 import { useState, useTransition } from 'react';
 import { Button } from '@/components/ui/button';
@@ -511,7 +512,7 @@ function Variations({
                       setLines((ls) => ls.map((x, j) => (j === i ? { ...x, unit: e.target.value as CostItemUnit } : x)))
                     }
                   >
-                    {COST_ITEM_UNITS.map((u) => (
+                    {UNIT_TOKENS.map((u) => (
                       <option key={u} value={u}>
                         {u}
                       </option>
