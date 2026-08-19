@@ -38,9 +38,10 @@ jobs:
           cache: npm
 
       - name: Install (monorepo workspaces)
-        # `npm install` (not `npm ci`): works around rollup's optional
-        # platform-dependency bug (npm/cli#4828) on the Linux runner.
-        run: npm install
+        # Regenerate the lockfile on the Linux runner then install — the committed
+        # lock is Windows-generated and trips rollup's optional-platform-dep bug
+        # (npm/cli#4828) on Linux.
+        run: rm -f package-lock.json && npm install
 
       - name: Build the Worker (OpenNext for Cloudflare)
         working-directory: apps/web

@@ -40,10 +40,11 @@ jobs:
           cache: npm
 
       - name: Install
-        # `npm install` (not `npm ci`): works around rollup's optional
-        # platform-dependency bug (npm/cli#4828) where `npm ci` skips the Linux
-        # rollup binary on the CI runner and vitest fails to start.
-        run: npm install
+        # Regenerate the lockfile on the Linux runner, then install. The committed
+        # lock is Windows-generated and trips rollup's optional-platform-dep bug
+        # (npm/cli#4828): npm ci/install both skip the Linux rollup binary, so
+        # vitest can't start. A fresh Linux resolve installs the correct binaries.
+        run: rm -f package-lock.json && npm install
 
       - name: Lint (includes physical left/right ban)
         run: npm run lint
