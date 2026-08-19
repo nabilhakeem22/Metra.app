@@ -75,5 +75,14 @@ jobs:
       # it never affects the existing lint -> unit -> migrate -> apply-rls ->
       # seed -> isolation -> actions pipeline above.
       - name: Cloudflare OpenNext build (no deploy)
-        run: npx opennextjs-cloudflare build
         working-directory: apps/web
+        # next build inlines NEXT_PUBLIC_* at build time; without them the
+        # Supabase browser client init throws during static generation. Values
+        # come from repo Actions variables (public client config).
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ vars.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ vars.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ vars.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
+          NEXT_PUBLIC_DEFAULT_LOCALE: ${{ vars.NEXT_PUBLIC_DEFAULT_LOCALE }}
+          NEXT_PUBLIC_APP_URL: ${{ vars.NEXT_PUBLIC_APP_URL }}
+        run: npx opennextjs-cloudflare build
