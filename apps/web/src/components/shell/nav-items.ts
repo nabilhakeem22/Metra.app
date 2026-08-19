@@ -57,6 +57,12 @@ export const NAV_GROUPS: NavGroup[] = [
         icon: FileText,
         capability: 'proposals_build',
       },
+      {
+        key: 'contracts',
+        href: '/contracts',
+        icon: FileSignature,
+        capability: 'contracts_generate',
+      },
     ],
   },
   {
@@ -75,7 +81,6 @@ export const NAV_GROUPS: NavGroup[] = [
  * the shell isn't 5 always-visible dead rows.
  */
 export const COMING_SOON_ITEMS: NavItem[] = [
-  { key: 'contracts', icon: FileSignature, disabled: true },
   { key: 'costing', icon: Calculator, disabled: true },
   { key: 'invoices', icon: ReceiptText, disabled: true },
 ];

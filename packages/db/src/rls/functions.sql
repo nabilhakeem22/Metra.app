@@ -369,3 +369,319 @@ begin
   return 'ok';
 end
 $$;
+
+-- =============================================================================
+-- P1 Slice 4 — Contracts + Variation Orders
+-- =============================================================================
+
+-- Child-draft guard: contract_sections / contract_lines may only be
+-- inserted/updated/deleted while their parent contract is still 'draft'. Both
+-- carry contract_id (lines denormalize it), so the lookup is direct. SECURITY
+-- DEFINER so the status read is not itself RLS-filtered. Raises MT100 on a frozen
+-- change. A cascade delete of a DRAFT contract still passes (parent is draft at
+-- BEFORE DELETE time).
+create or replace function public.enforce_contract_child_draft()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  j   jsonb;
+  cid uuid;
+  st  text;
+begin
+  if TG_OP = 'DELETE' then j := to_jsonb(OLD); else j := to_jsonb(NEW); end if;
+  cid := (j ->> 'contract_id')::uuid;
+  select status into st from public.contracts where id = cid;
+  if st is not null and st <> 'draft' then
+    raise exception
+      'contract children are frozen once the contract leaves draft (status=%)', st
+      using errcode = 'MT100';
+  end if;
+  if TG_OP = 'DELETE' then return OLD; end if;
+  return NEW;
+end
+$$;
+
+-- Child-draft guard: variation_order_lines may only be inserted/updated/deleted
+-- while their parent VO is still 'draft'. Once a VO is internally approved (or
+-- beyond) its lines and netDelta are frozen. Raises MT100 on a frozen change.
+create or replace function public.enforce_variation_child_draft()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  j   jsonb;
+  vid uuid;
+  st  text;
+begin
+  if TG_OP = 'DELETE' then j := to_jsonb(OLD); else j := to_jsonb(NEW); end if;
+  vid := (j ->> 'variation_order_id')::uuid;
+  select status into st from public.variation_orders where id = vid;
+  if st is not null and st <> 'draft' then
+    raise exception
+      'variation order lines are frozen once the VO leaves draft (status=%)', st
+      using errcode = 'MT100';
+  end if;
+  if TG_OP = 'DELETE' then return OLD; end if;
+  return NEW;
+end
+$$;
+
+-- Public share: fetch a contract by its token hash as a nested JSON document.
+-- SECURITY DEFINER (the token IS the authorization; no session). Only issued /
+-- signed contracts are visible. OMITS every cost/margin column (unit_cost,
+-- line_cost, line_margin, total_cost, total_margin) — a client must never see the
+-- firm's cost basis. The document total is the immutable original_value.
+create or replace function public.app_contract_by_token(p_hash text)
+returns jsonb
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select jsonb_build_object(
+    'id', c.id,
+    'number', c.number,
+    'status', c.status,
+    'title_ar', c.title_ar,
+    'title_en', c.title_en,
+    'currency', c.currency,
+    'signature_date', c.signature_date,
+    'start_date', c.start_date,
+    'end_date', c.end_date,
+    'retention_pct', c.retention_pct,
+    'retention_release_terms_ar', c.retention_release_terms_ar,
+    'retention_release_terms_en', c.retention_release_terms_en,
+    'advance_pct', c.advance_pct,
+    'advance_recovery_method', c.advance_recovery_method,
+    'payment_terms_days', c.payment_terms_days,
+    'payment_schedule_mode', c.payment_schedule_mode,
+    'penalty_ar', c.penalty_ar,
+    'penalty_en', c.penalty_en,
+    'defects_liability_days', c.defects_liability_days,
+    'scope_inclusions_ar', c.scope_inclusions_ar,
+    'scope_inclusions_en', c.scope_inclusions_en,
+    'scope_exclusions_ar', c.scope_exclusions_ar,
+    'scope_exclusions_en', c.scope_exclusions_en,
+    'terms_ar', c.terms_ar,
+    'terms_en', c.terms_en,
+    'discount_pct', c.discount_pct,
+    'tax_rate', c.tax_rate,
+    'supervision_pct', c.supervision_pct,
+    'subtotal', c.subtotal,
+    'discount_amount', c.discount_amount,
+    'taxable_base', c.taxable_base,
+    'tax_amount', c.tax_amount,
+    'supervision_amount', c.supervision_amount,
+    'original_value', c.original_value,
+    'total', c.original_value,
+    'share_expires_at', c.share_expires_at,
+    'org', jsonb_build_object(
+      'name_ar', o.name_ar,
+      'name_en', o.name_en,
+      'logo_file_id', o.logo_file_id
+    ),
+    'sections', coalesce((
+      select jsonb_agg(sec order by sec_sort)
+      from (
+        select s.sort_order as sec_sort,
+          jsonb_build_object(
+            'id', s.id,
+            'title_ar', s.title_ar,
+            'title_en', s.title_en,
+            'section_subtotal', s.section_subtotal,
+            'sort_order', s.sort_order,
+            'lines', coalesce((
+              select jsonb_agg(ln order by ln_sort)
+              from (
+                select l.sort_order as ln_sort,
+                  jsonb_build_object(
+                    'id', l.id,
+                    'description_ar', l.description_ar,
+                    'description_en', l.description_en,
+                    'qty', l.qty,
+                    'unit', l.unit,
+                    'unit_price', l.unit_price,
+                    'discount_pct', l.discount_pct,
+                    'line_total', l.line_total,
+                    'sort_order', l.sort_order
+                  ) as ln
+                from public.contract_lines l
+                where l.section_id = s.id
+              ) lx
+            ), '[]'::jsonb)
+          ) as sec
+        from public.contract_sections s
+        where s.contract_id = c.id
+      ) sx
+    ), '[]'::jsonb)
+  )
+  from public.contracts c
+  join public.organizations o on o.id = c.org_id
+  where c.token_hash = p_hash
+    and c.status in ('issued', 'signed');
+$$;
+
+-- Public share: record a client's ELECTRONIC ACKNOWLEDGEMENT of a contract (NOT
+-- a binding signature — A5). Flips issued->signed atomically, stamps the
+-- signature date, and appends an append-only event carrying the actor name, IP,
+-- user agent and the sha256 hash of the acknowledged document. Returns a status
+-- code the route maps to token_invalid / token_expired / already_responded / ok.
+create or replace function public.app_contract_ack_by_token(
+  p_hash text,
+  p_name text,
+  p_ip text,
+  p_ua text,
+  p_pdf_hash text
+)
+returns text
+language plpgsql
+volatile
+security definer
+set search_path = ''
+as $$
+declare
+  st  text;
+  exp timestamptz;
+  cid uuid;
+  oid uuid;
+  n   int;
+begin
+  select status, share_expires_at, id, org_id
+    into st, exp, cid, oid
+    from public.contracts
+    where token_hash = p_hash;
+  if not found then return 'not_found'; end if;
+  if st <> 'issued' then return 'already'; end if;
+  if exp is not null and exp <= now() then return 'expired'; end if;
+
+  -- PURE status flip: the issued row is immutable except a whitelisted status
+  -- transition (A1). The acknowledgement timestamp lives on the append-only event
+  -- (decided_at) — writing signature_date here would change a locked column and
+  -- trip the MT100 immutability trigger.
+  update public.contracts
+    set status = 'signed', updated_at = now()
+    where id = cid and status = 'issued';
+  get diagnostics n = row_count;
+  if n = 0 then return 'already'; end if;
+
+  insert into public.contract_events
+    (id, org_id, contract_id, kind, actor_name, ip, user_agent, pdf_hash, from_status, to_status)
+    values (gen_random_uuid(), oid, cid, 'acknowledged', p_name, p_ip, p_ua, p_pdf_hash, 'issued', 'signed');
+
+  return 'ok';
+end
+$$;
+
+-- Public share: fetch a variation order by its token hash as a JSON document.
+-- SECURITY DEFINER (the token IS the authorization; no session). Only issued /
+-- approved / rejected VOs are visible. OMITS every cost/margin column. Currency
+-- is inherited from the parent contract. netDelta (may be negative) is shown.
+create or replace function public.app_variation_by_token(p_hash text)
+returns jsonb
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select jsonb_build_object(
+    'id', v.id,
+    'number', v.number,
+    'status', v.status,
+    'title_ar', v.title_ar,
+    'title_en', v.title_en,
+    'reason_ar', v.reason_ar,
+    'reason_en', v.reason_en,
+    'net_delta', v.net_delta,
+    'currency', c.currency,
+    'contract_number', c.number,
+    'share_expires_at', v.share_expires_at,
+    'org', jsonb_build_object(
+      'name_ar', o.name_ar,
+      'name_en', o.name_en,
+      'logo_file_id', o.logo_file_id
+    ),
+    'lines', coalesce((
+      select jsonb_agg(ln order by ln_sort)
+      from (
+        select l.sort_order as ln_sort,
+          jsonb_build_object(
+            'id', l.id,
+            'description_ar', l.description_ar,
+            'description_en', l.description_en,
+            'qty', l.qty,
+            'unit', l.unit,
+            'unit_price', l.unit_price,
+            'discount_pct', l.discount_pct,
+            'line_total', l.line_total,
+            'sort_order', l.sort_order
+          ) as ln
+        from public.variation_order_lines l
+        where l.variation_order_id = v.id
+      ) lx
+    ), '[]'::jsonb)
+  )
+  from public.variation_orders v
+  join public.contracts c on c.id = v.contract_id
+  join public.organizations o on o.id = v.org_id
+  where v.token_hash = p_hash
+    and v.status in ('issued', 'approved', 'rejected');
+$$;
+
+-- Public share: record a client's approve/reject decision on a variation order.
+-- Flips issued->approved|rejected atomically + appends an append-only event with
+-- the actor name/IP/user agent. Returns a code the route maps to
+-- token_invalid / token_expired / already_responded / ok.
+create or replace function public.app_variation_respond_by_token(
+  p_hash text,
+  p_decision text,
+  p_name text,
+  p_ip text,
+  p_ua text
+)
+returns text
+language plpgsql
+volatile
+security definer
+set search_path = ''
+as $$
+declare
+  target text;
+  st     text;
+  exp    timestamptz;
+  vid    uuid;
+  oid    uuid;
+  n      int;
+begin
+  target := case
+    when p_decision = 'approve' then 'approved'
+    when p_decision = 'reject'  then 'rejected'
+    else null
+  end;
+  if target is null then return 'invalid'; end if;
+
+  select status, share_expires_at, id, org_id
+    into st, exp, vid, oid
+    from public.variation_orders
+    where token_hash = p_hash;
+  if not found then return 'not_found'; end if;
+  if st <> 'issued' then return 'already'; end if;
+  if exp is not null and exp <= now() then return 'expired'; end if;
+
+  update public.variation_orders
+    set status = target::public.variation_status, updated_at = now()
+    where id = vid and status = 'issued';
+  get diagnostics n = row_count;
+  if n = 0 then return 'already'; end if;
+
+  insert into public.variation_order_events
+    (id, org_id, variation_order_id, kind, actor_name, ip, user_agent, from_status, to_status)
+    values (gen_random_uuid(), oid, vid, target, p_name, p_ip, p_ua, 'issued', target);
+
+  return 'ok';
+end
+$$;

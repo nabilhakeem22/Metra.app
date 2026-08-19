@@ -86,6 +86,38 @@ export const CLIENT_TYPES = ['individual', 'company', 'consultant'] as const;
 
 export const clientType = pgEnum('client_type', CLIENT_TYPES);
 
+/**
+ * P1 Slice 4 — contract (عقد) lifecycle. Order is a contract; labels localized.
+ * OWNER-locked (A1): no `superseded` — re-generation/supersede is out of P1.
+ * draft fully editable; once issued the row is immutable except status->signed
+ * or ->terminated (enforced by enforce_immutable_when in apply-rls).
+ */
+export const CONTRACT_STATUSES = [
+  'draft',
+  'issued',
+  'signed',
+  'terminated',
+] as const;
+
+export const contractStatus = pgEnum('contract_status', CONTRACT_STATUSES);
+
+/**
+ * P1 Slice 4 — variation order (أمر تغيير) lifecycle. Order is a contract.
+ * OWNER-locked (A2): a distinct INTERNAL-APPROVAL state before the client sees
+ * it. draft (staff price the VO lines) -> internal_approved (owner/admin sign-off,
+ * freezes netDelta) -> issued (client token minted) -> approved | rejected (client
+ * via token). Frozen once it leaves draft (enforce_immutable_when in apply-rls).
+ */
+export const VARIATION_STATUSES = [
+  'draft',
+  'internal_approved',
+  'issued',
+  'approved',
+  'rejected',
+] as const;
+
+export const variationStatus = pgEnum('variation_status', VARIATION_STATUSES);
+
 /** Polymorphic activity-feed subject. `project` is provisioned now, wired later. */
 export const ACTIVITY_ENTITY_TYPES = ['client', 'project'] as const;
 
@@ -124,6 +156,8 @@ export type CostItemUnit = (typeof COST_ITEM_UNITS)[number];
 export type ProjectStatus = (typeof PROJECT_STATUSES)[number];
 export type ProposalStatus = (typeof PROPOSAL_STATUSES)[number];
 export type ClientType = (typeof CLIENT_TYPES)[number];
+export type ContractStatus = (typeof CONTRACT_STATUSES)[number];
+export type VariationStatus = (typeof VARIATION_STATUSES)[number];
 export type ActivityEntityType = (typeof ACTIVITY_ENTITY_TYPES)[number];
 export type ActivityKind = (typeof ACTIVITY_KINDS)[number];
 export type StageStatus = (typeof STAGE_STATUSES)[number];

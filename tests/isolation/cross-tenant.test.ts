@@ -8,12 +8,15 @@ import { randomUUID } from 'node:crypto';
 import {
   CLIENT_A_ID,
   CLIENT_B_ID,
+  CONTRACT_A_ID,
   COST_ITEM_A_ID,
   INVITE_A_ID,
   ORG_A_ID,
   ORG_B_ID,
   PRICE_CHANGE_A_ID,
   PROJECT_A_ID,
+  PROPOSAL_A_ID,
+  PROPOSAL_B_ID,
   USER_A_ID,
   USER_B_ID,
   createDb,
@@ -277,6 +280,22 @@ describe('projects composite same-org FK (§ clients+projects)', () => {
       ),
     ).rejects.toMatchObject({ code: '23503' });
   });
+
+  it('a contract cannot reference org B source_proposal_id (cross-org FK -> 23503)', async () => {
+    // Valid org-A client + project (seeded), org-B proposal -> composite
+    // (org_id, source_proposal_id) has no match in org A -> 23503.
+    await expect(
+      withOrgContext(db, ctxA, (tx) =>
+        tx.execute(
+          sql.raw(
+            `insert into public.contracts
+               (id, org_id, number, title_en, source_proposal_id, client_id, project_id)
+             values (gen_random_uuid(), '${ORG_A_ID}', 90003, 'x', '${PROPOSAL_B_ID}', '${CLIENT_A_ID}', '${PROJECT_A_ID}')`,
+          ),
+        ),
+      ),
+    ).rejects.toMatchObject({ code: '23503' });
+  });
 });
 
 describe('price history is append-only (§ price book, grants)', () => {
@@ -474,6 +493,29 @@ describe('membership second factor — forged context is denied', () => {
         ctxForged,
         `insert into public.proposals (id, org_id, number, title_en, client_id, project_id)
          values (gen_random_uuid(), '${ORG_A_ID}', 90001, 'Forged', '${CLIENT_A_ID}', '${PROJECT_A_ID}')`,
+      ),
+    ).rejects.toThrow();
+  });
+
+  it('forged context cannot INSERT a contract or variation order', async () => {
+    // Valid org-A source proposal + client + project (seeded) so RLS — not a FK —
+    // is the reason the write is refused.
+    await expect(
+      rowsUnder(
+        ctxForged,
+        `insert into public.contracts
+           (id, org_id, number, title_en, source_proposal_id, client_id, project_id)
+         values (gen_random_uuid(), '${ORG_A_ID}', 90004, 'Forged', '${PROPOSAL_A_ID}', '${CLIENT_A_ID}', '${PROJECT_A_ID}')`,
+      ),
+    ).rejects.toThrow();
+
+    // Valid org-A contract (seeded) so RLS — not a FK — is the reason.
+    await expect(
+      rowsUnder(
+        ctxForged,
+        `insert into public.variation_orders
+           (id, org_id, number, title_en, contract_id, project_id)
+         values (gen_random_uuid(), '${ORG_A_ID}', 90005, 'Forged', '${CONTRACT_A_ID}', '${PROJECT_A_ID}')`,
       ),
     ).rejects.toThrow();
   });

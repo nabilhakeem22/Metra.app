@@ -7,6 +7,10 @@ import { MIGRATION_DATABASE_URL } from '../env';
 import { withOrgContext } from '../org-context';
 import { auditLog } from '../schema/audit-log';
 import { clients } from '../schema/clients';
+import { contractEvents } from '../schema/contract-events';
+import { contractLines } from '../schema/contract-lines';
+import { contractSections } from '../schema/contract-sections';
+import { contracts } from '../schema/contracts';
 import { costItems } from '../schema/cost-items';
 import { files } from '../schema/files';
 import { invitations } from '../schema/invitations';
@@ -14,12 +18,20 @@ import { memberships } from '../schema/memberships';
 import { automationSettings } from '../schema/automation-settings';
 import { organizations } from '../schema/organizations';
 import { priceChangeLines, priceChanges } from '../schema/price-changes';
+import { proposalLines } from '../schema/proposal-lines';
+import { proposalSections } from '../schema/proposal-sections';
+import { proposals } from '../schema/proposals';
 import { projects } from '../schema/projects';
 import { DEFAULT_SECTIONS } from '../schema/section-defaults';
 import { sections } from '../schema/sections';
+import { variationOrderEvents } from '../schema/variation-order-events';
+import { variationOrderLines } from '../schema/variation-order-lines';
+import { variationOrders } from '../schema/variation-orders';
 import {
   CLIENT_A_ID,
   CLIENT_B_ID,
+  CONTRACT_A_ID,
+  CONTRACT_B_ID,
   COST_ITEM_A_ID,
   COST_ITEM_B_ID,
   FILE_A_ID,
@@ -34,8 +46,12 @@ import {
   PRICE_LINE_B_ID,
   PROJECT_A_ID,
   PROJECT_B_ID,
+  PROPOSAL_A_ID,
+  PROPOSAL_B_ID,
   USER_A_ID,
   USER_B_ID,
+  VARIATION_A_ID,
+  VARIATION_B_ID,
 } from './seed-constants';
 
 interface OrgSeed {
@@ -54,6 +70,9 @@ interface OrgSeed {
   clientId: string;
   projectId: string;
   projectCode: string;
+  proposalId: string;
+  contractId: string;
+  variationId: string;
 }
 
 const orgs: OrgSeed[] = [
@@ -73,6 +92,9 @@ const orgs: OrgSeed[] = [
     clientId: CLIENT_A_ID,
     projectId: PROJECT_A_ID,
     projectCode: 'PRJ-A-001',
+    proposalId: PROPOSAL_A_ID,
+    contractId: CONTRACT_A_ID,
+    variationId: VARIATION_A_ID,
   },
   {
     orgId: ORG_B_ID,
@@ -90,6 +112,9 @@ const orgs: OrgSeed[] = [
     clientId: CLIENT_B_ID,
     projectId: PROJECT_B_ID,
     projectCode: 'PRJ-B-001',
+    proposalId: PROPOSAL_B_ID,
+    contractId: CONTRACT_B_ID,
+    variationId: VARIATION_B_ID,
   },
 ];
 
@@ -262,6 +287,144 @@ async function seedOrg(db: Parameters<typeof withOrgContext>[0], org: OrgSeed) {
   );
 }
 
+/**
+ * Seed an accepted-proposal -> contract -> variation-order chain so the isolation
+ * gate has rows in every P1-Slice-4 table to prove it can't leak. Idempotent:
+ * guarded on the fixed contract id. Uses money strings the totals engine would
+ * produce (single lump-sum line of 1000 EGP; a +500 VO delta).
+ */
+async function seedContractChain(
+  db: Parameters<typeof withOrgContext>[0],
+  org: OrgSeed,
+) {
+  await withOrgContext(
+    db,
+    { orgId: org.orgId, userId: org.userId, role: 'owner' },
+    async (tx) => {
+      const exists = await tx
+        .select({ id: contracts.id })
+        .from(contracts)
+        .where(sql`${contracts.id} = ${org.contractId}`)
+        .limit(1);
+      if (exists.length) return;
+
+      // 1) An accepted proposal (draft first so the child-draft guard permits the
+      //    section/line inserts, then flip to accepted while still unlocked).
+      await tx.insert(proposals).values({
+        id: org.proposalId,
+        orgId: org.orgId,
+        number: 9001,
+        titleEn: 'Seed accepted proposal',
+        titleAr: 'عرض مقبول تجريبي',
+        clientId: org.clientId,
+        projectId: org.projectId,
+        status: 'draft',
+        subtotal: '1000.0000',
+        taxableBase: '1000.0000',
+        taxAmount: '140.0000',
+        total: '1140.0000',
+      });
+      const [pSec] = await tx
+        .insert(proposalSections)
+        .values({
+          orgId: org.orgId,
+          proposalId: org.proposalId,
+          titleEn: 'Works',
+          sectionSubtotal: '1000.0000',
+        })
+        .returning({ id: proposalSections.id });
+      await tx.insert(proposalLines).values({
+        orgId: org.orgId,
+        proposalId: org.proposalId,
+        sectionId: pSec.id,
+        descriptionEn: 'Seed line',
+        qty: '1',
+        unit: 'lump_sum',
+        unitPrice: '1000.0000',
+        lineTotal: '1000.0000',
+      });
+      await tx
+        .update(proposals)
+        .set({ status: 'accepted' })
+        .where(sql`${proposals.id} = ${org.proposalId}`);
+
+      // 2) The generated contract (draft), with a snapshot section + line + event.
+      await tx.insert(contracts).values({
+        id: org.contractId,
+        orgId: org.orgId,
+        number: 1,
+        titleEn: 'Seed contract',
+        titleAr: 'عقد تجريبي',
+        sourceProposalId: org.proposalId,
+        clientId: org.clientId,
+        projectId: org.projectId,
+        status: 'draft',
+        originalValue: '1140.0000',
+        subtotal: '1000.0000',
+        taxableBase: '1000.0000',
+        taxAmount: '140.0000',
+      });
+      const [cSec] = await tx
+        .insert(contractSections)
+        .values({
+          orgId: org.orgId,
+          contractId: org.contractId,
+          titleEn: 'Works',
+          sectionSubtotal: '1000.0000',
+        })
+        .returning({ id: contractSections.id });
+      await tx.insert(contractLines).values({
+        orgId: org.orgId,
+        contractId: org.contractId,
+        sectionId: cSec.id,
+        descriptionEn: 'Seed line',
+        qty: '1',
+        unit: 'lump_sum',
+        unitPrice: '1000.0000',
+        lineTotal: '1000.0000',
+      });
+      await tx.insert(contractEvents).values({
+        orgId: org.orgId,
+        contractId: org.contractId,
+        kind: 'generated',
+        actorUserId: org.userId,
+        fromStatus: null,
+        toStatus: 'draft',
+      });
+
+      // 3) A draft variation order with a +500 delta line + a created event.
+      await tx.insert(variationOrders).values({
+        id: org.variationId,
+        orgId: org.orgId,
+        number: 1,
+        contractId: org.contractId,
+        projectId: org.projectId,
+        status: 'draft',
+        titleEn: 'Seed variation',
+        titleAr: 'أمر تغيير تجريبي',
+        netDelta: '500.0000',
+      });
+      await tx.insert(variationOrderLines).values({
+        orgId: org.orgId,
+        variationOrderId: org.variationId,
+        descriptionEn: 'Extra scope',
+        qty: '1',
+        unit: 'lump_sum',
+        unitPrice: '500.0000',
+        lineTotal: '500.0000',
+      });
+      await tx.insert(variationOrderEvents).values({
+        orgId: org.orgId,
+        variationOrderId: org.variationId,
+        kind: 'created',
+        actorUserId: org.userId,
+        fromStatus: null,
+        toStatus: 'draft',
+      });
+    },
+  );
+}
+
 async function main() {
   const { db, sql: pg } = createDb(MIGRATION_DATABASE_URL(), {
     max: 1,
@@ -270,6 +433,7 @@ async function main() {
   try {
     for (const org of orgs) {
       await seedOrg(db, org);
+      await seedContractChain(db, org);
       console.log(`Seeded org ${org.nameEn} (${org.orgId}).`);
     }
 

@@ -1,14 +1,15 @@
 'use client';
 
-import { FileDown, Loader2 } from 'lucide-react';
+import { FileDown, FileSignature, Loader2 } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
 import { useTransition } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { toast } from '@/hooks/use-toast';
-import { useRouter } from '@/i18n/routing';
+import { Link, useRouter } from '@/i18n/routing';
 import { resolveActionError } from '@/lib/actions/error-message';
 import type { ActionCode } from '@/lib/actions/result';
+import { generateContract } from '@/lib/contracts/actions';
 import { formatMoney } from '@/lib/format/money';
 import { pickLocale } from '@/lib/i18n/pick-locale';
 import { expireProposal, supersedeProposal } from '@/lib/proposals/actions';
@@ -20,17 +21,34 @@ export function ProposalView({
   seeMargin,
   canSupersede,
   canExpire,
+  canGenerateContract,
+  existingContractId,
 }: {
   detail: ProposalDetail;
   seeMargin: boolean;
   canSupersede: boolean;
   canExpire: boolean;
+  canGenerateContract: boolean;
+  existingContractId: string | null;
 }) {
   const t = useTranslations('proposals');
+  const tc = useTranslations('contracts');
   const te = useTranslations('errors');
   const locale = useLocale();
   const router = useRouter();
   const [pending, startTransition] = useTransition();
+
+  function onGenerateContract() {
+    startTransition(async () => {
+      const res = await generateContract(detail.id);
+      if (res.ok && res.data) {
+        toast({ title: tc('generated') });
+        router.push(`/contracts/${res.data}`);
+      } else {
+        toast({ title: resolveActionError(res.error as ActionCode, te), variant: 'destructive' });
+      }
+    });
+  }
 
   const money = (v: string) => formatMoney(v, locale);
   const loc = (ar: string | null, en: string | null) =>
@@ -86,6 +104,22 @@ export function ProposalView({
               {pending && <Loader2 className="size-4 animate-spin" aria-hidden />}
               {t('actions.createV2')}
             </Button>
+          )}
+          {existingContractId ? (
+            <Link href={`/contracts/${existingContractId}`}>
+              <Button variant="outline" size="sm">
+                <FileSignature className="size-4" aria-hidden />
+                {tc('contract')}
+              </Button>
+            </Link>
+          ) : (
+            canGenerateContract && (
+              <Button size="sm" onClick={onGenerateContract} disabled={pending}>
+                {pending && <Loader2 className="size-4 animate-spin" aria-hidden />}
+                <FileSignature className="size-4" aria-hidden />
+                {tc('generate')}
+              </Button>
+            )
           )}
         </div>
       </div>
