@@ -34,7 +34,8 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          # Node 22: required by the current wrangler.
+          node-version: 22
           cache: npm
 
       - name: Install (monorepo workspaces)

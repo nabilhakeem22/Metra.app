@@ -36,7 +36,9 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          # Node 22: the current wrangler (pulled fresh by the Linux lockfile
+          # regen) requires >= 22; everything else is compatible.
+          node-version: 22
           cache: npm
 
       - name: Install
