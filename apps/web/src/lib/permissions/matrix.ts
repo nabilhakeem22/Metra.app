@@ -35,9 +35,17 @@ const ROWS: Record<Capability, string[]> = {
   // token path, which never consults this matrix.
   proposals_send: ['A', 'A', '', '', '', '', ''],
   contracts_generate: ['CRU', 'CRU', '', '', '', '', 'R'],
-  contracts_issue: ['A', 'A', '', '', '', 'A', ''],
+  // S1 landmine fixed: 'client' must NOT hold contract issue. A client-role
+  // session cannot generate/issue a contract — the ONLY client contract action is
+  // the unauthenticated e-acknowledgement token path, which never consults this
+  // matrix. Leaving client='A' was the same over-broad grant that was bug S1 for
+  // proposals.
+  contracts_issue: ['A', 'A', '', '', '', '', ''],
   variations_draft: ['CRU', 'CRU', 'CRU', 'C', '', '', 'R'],
-  variations_price: ['A', 'A', '', '', '', 'A', ''],
+  // S1 landmine fixed: 'client' must NOT hold VO pricing/internal-approval/issue.
+  // Internal approval + issue are owner/admin only; client approve/reject is the
+  // token path, which never consults this matrix.
+  variations_price: ['A', 'A', '', '', '', '', ''],
   tasks_schedule: ['CRUA', 'CRUA', 'CRUA', 'RU', 'R', 'R', 'R'],
   cost_entries: ['CRUA', 'CRUA', 'CRU', 'CRU', 'CRUA', '', ''],
   cost_entry_approval: ['A', 'A', 'A', '', 'A', '', ''],

@@ -1,6 +1,9 @@
 // PURE proposal money engine. All money is scale-4 (NUMERIC(18,4)) carried as
 // strings; arithmetic runs in BigInt at 1e-4 units so there is NO float drift.
-// Rounding is half-up (toward +infinity on an exact .5). No server-only imports.
+// Rounding is half AWAY FROM ZERO on an exact .5, so it is SIGN-SYMMETRIC:
+// round(-x) === -round(x). This makes a de-scope (negative-qty variation line)
+// the exact inverse of the add it reverses (F1); for non-negative money it is
+// identical to the previous half-up behaviour. No server-only imports.
 
 const SCALE = 10000n; // 1e4 (4 decimal places)
 
@@ -19,9 +22,14 @@ function floorDiv(a: bigint, b: bigint): bigint {
   return a % b !== 0n && a < 0n ? q - 1n : q;
 }
 
-/** Round n/d half-up (toward +inf on the exact half). d > 0. */
-function roundHalfUp(n: bigint, d: bigint): bigint {
-  return floorDiv(2n * n + d, 2n * d);
+/**
+ * Round n/d half AWAY FROM ZERO on the exact half (d > 0). Sign-symmetric:
+ * roundHalfAwayFromZero(-n, d) === -roundHalfAwayFromZero(n, d). For n >= 0 this
+ * equals the old half-up (toward +inf), so non-negative money is unchanged.
+ */
+function roundHalfAwayFromZero(n: bigint, d: bigint): bigint {
+  if (n >= 0n) return floorDiv(2n * n + d, 2n * d);
+  return -floorDiv(2n * -n + d, 2n * d);
 }
 
 /** Parse a decimal string into scale-4 BigInt units (truncates beyond 4 dp). */
@@ -49,12 +57,12 @@ export function formatMoney4(v: bigint): string {
 
 // scale-4 * scale-4 -> scale-4
 function mul(a: bigint, b: bigint): bigint {
-  return roundHalfUp(a * b, SCALE);
+  return roundHalfAwayFromZero(a * b, SCALE);
 }
 
 // value * pct% where pct is a scale-4 percentage (e.g. 14 -> 140000 units).
 function pctOf(value: bigint, pct: bigint): bigint {
-  return roundHalfUp(value * pct, SCALE * 100n);
+  return roundHalfAwayFromZero(value * pct, SCALE * 100n);
 }
 
 export interface LineInput {

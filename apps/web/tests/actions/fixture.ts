@@ -151,59 +151,63 @@ export const raw = {
   },
 };
 
+// Delete order is FK-safe on its own, but proposals/contracts/VOs are frozen once
+// they leave draft (immutability + child-draft triggers block even a BYPASSRLS
+// DELETE). We suppress those triggers SESSION-LOCALLY via
+// `SET LOCAL session_replication_role = 'replica'` inside a single transaction —
+// which disables user triggers for THIS session only and auto-resets on commit.
+// It never touches other sessions/tenants and takes no ACCESS EXCLUSIVE lock, so
+// it can't globally disable prod immutability or serialize concurrent test runs
+// (the bug of the old `ALTER TABLE ... DISABLE TRIGGER`, which is global).
+const TEARDOWN_TABLES_IN_FK_ORDER = [
+  // Contracts + VOs first: VOs reference contracts (restrict) and contracts
+  // reference proposals (restrict), so tear these down BEFORE proposals.
+  'variation_order_events',
+  'variation_order_lines',
+  'variation_orders',
+  'contract_events',
+  'contract_lines',
+  'contract_sections',
+  'contracts',
+  'proposal_events',
+  'proposal_lines',
+  'proposal_sections',
+  'proposals',
+  'price_change_lines',
+  'price_changes',
+  'project_stages',
+  // projects reference clients (restrict) -> delete projects before clients.
+  'projects',
+  'project_types',
+  'stage_templates',
+  'activities',
+  'client_contacts',
+  'clients',
+  'cost_items',
+  // sections are referenced by cost_items (restrict) -> after cost_items.
+  'sections',
+  'notifications',
+  'automation_run_log',
+  'automation_settings',
+  'audit_log',
+  'invitations',
+  'memberships',
+];
+
 export async function teardown(orgIds: string[]): Promise<void> {
-  // Proposals + their children are frozen once sent (immutable + child-draft
-  // triggers). The BYPASSRLS/owner connection drops those guards to tear down.
-  const guards = [
-    'alter table public.proposal_sections disable trigger trg_proposal_sections_parent_draft',
-    'alter table public.proposal_lines disable trigger trg_proposal_lines_parent_draft',
-    'alter table public.proposals disable trigger trg_proposals_immutable',
-  ];
-  for (const g of guards) await pg.unsafe(g);
-  try {
+  // One transaction on a single pinned connection so SET LOCAL applies to every
+  // delete and resets automatically when the transaction ends.
+  await pg.begin(async (tx) => {
+    await tx.unsafe(`set local session_replication_role = 'replica'`);
     for (const id of orgIds) {
-      await pg.unsafe(`delete from public.proposal_events where org_id='${id}'`);
-      await pg.unsafe(`delete from public.proposal_lines where org_id='${id}'`);
-      await pg.unsafe(`delete from public.proposal_sections where org_id='${id}'`);
-      await pg.unsafe(`delete from public.proposals where org_id='${id}'`);
-      await pg.unsafe(`delete from public.price_change_lines where org_id='${id}'`);
-      await pg.unsafe(`delete from public.price_changes where org_id='${id}'`);
-      // Project children first: stages cascade from projects, but be explicit;
-      // project files carry no cascade.
-      await pg.unsafe(`delete from public.project_stages where org_id='${id}'`);
-      await pg.unsafe(
-        `delete from public.files where org_id='${id}' and entity='project'`,
-      );
-      // projects reference clients (restrict) -> delete projects first.
-      await pg.unsafe(`delete from public.projects where org_id='${id}'`);
-      // project_types (referenced by projects, set null) + stage_templates.
-      await pg.unsafe(`delete from public.project_types where org_id='${id}'`);
-      await pg.unsafe(`delete from public.stage_templates where org_id='${id}'`);
-      // Client children must go before clients (contacts cascade, but be
-      // explicit; activities + client files carry no cascade to clients).
-      await pg.unsafe(`delete from public.activities where org_id='${id}'`);
-      await pg.unsafe(`delete from public.client_contacts where org_id='${id}'`);
-      await pg.unsafe(
-        `delete from public.files where org_id='${id}' and entity='client'`,
-      );
-      await pg.unsafe(`delete from public.clients where org_id='${id}'`);
-      await pg.unsafe(`delete from public.cost_items where org_id='${id}'`);
-      // sections are referenced by cost_items (restrict) -> after cost_items.
-      await pg.unsafe(`delete from public.sections where org_id='${id}'`);
-      // Automation tables (org FK restrict, no children) before organizations.
-      await pg.unsafe(`delete from public.notifications where org_id='${id}'`);
-      await pg.unsafe(`delete from public.automation_run_log where org_id='${id}'`);
-      await pg.unsafe(`delete from public.automation_settings where org_id='${id}'`);
-      await pg.unsafe(`delete from public.audit_log where org_id='${id}'`);
-      await pg.unsafe(`delete from public.invitations where org_id='${id}'`);
-      await pg.unsafe(`delete from public.memberships where org_id='${id}'`);
-      await pg.unsafe(`delete from public.organizations where id='${id}'`);
+      for (const table of TEARDOWN_TABLES_IN_FK_ORDER) {
+        await tx.unsafe(`delete from public.${table} where org_id = '${id}'`);
+      }
+      // `files` is polymorphic (project + client entities) — clear both.
+      await tx.unsafe(`delete from public.files where org_id = '${id}'`);
+      await tx.unsafe(`delete from public.organizations where id = '${id}'`);
     }
-  } finally {
-    for (const g of guards) {
-      await pg.unsafe(g.replace('disable', 'enable'));
-    }
-  }
+  });
 }
 
 export async function closeFixture(): Promise<void> {

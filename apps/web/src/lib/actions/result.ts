@@ -32,7 +32,15 @@ export type ActionCode =
   | 'too_many_lines'
   | 'invalid_date'
   | 'amount_too_large'
-  | 'last_primary_contact';
+  | 'last_primary_contact'
+  | 'contract_exists'
+  | 'proposal_not_accepted'
+  | 'contract_not_draft'
+  | 'contract_not_issued'
+  | 'contract_not_signable'
+  | 'variation_not_draft'
+  | 'variation_not_internal_approved'
+  | 'variation_not_issued';
 
 export interface ActionResult {
   ok: boolean;

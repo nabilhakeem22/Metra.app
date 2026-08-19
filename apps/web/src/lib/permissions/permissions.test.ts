@@ -209,3 +209,68 @@ describe('proposals capabilities + canSeeMargin (P1 Slice 3)', () => {
     expect(canSeeMargin('project_manager', true)).toBe(false);
   });
 });
+
+describe('contracts + variations capabilities (P1 Slice 4)', () => {
+  it('contracts_generate: owner/admin CRU, viewer read-only, others none', () => {
+    for (const role of ['owner', 'admin'] as const) {
+      expect(can(role, 'contracts_generate', 'create')).toBe(true);
+      expect(can(role, 'contracts_generate', 'update')).toBe(true);
+    }
+    expect(can('viewer', 'contracts_generate', 'read')).toBe(true);
+    expect(can('viewer', 'contracts_generate', 'create')).toBe(false);
+    for (const role of [
+      'project_manager',
+      'site_engineer',
+      'accountant',
+      'client',
+    ] as const) {
+      expect(can(role, 'contracts_generate', 'read')).toBe(false);
+    }
+  });
+
+  it('S1 FIX — contracts_issue: owner/admin only; CLIENT has NO access', () => {
+    expect(can('owner', 'contracts_issue', 'approve')).toBe(true);
+    expect(can('admin', 'contracts_issue', 'approve')).toBe(true);
+    // The landmine: client must never hold contract issue (token path only).
+    expect(can('client', 'contracts_issue', 'approve')).toBe(false);
+    for (const a of ['create', 'read', 'update', 'approve'] as const) {
+      expect(can('client', 'contracts_issue', a)).toBe(false);
+    }
+    for (const role of [
+      'project_manager',
+      'site_engineer',
+      'accountant',
+      'viewer',
+    ] as const) {
+      expect(can(role, 'contracts_issue', 'approve')).toBe(false);
+    }
+  });
+
+  it('variations_draft: owner/admin/PM CRU, site_engineer create only', () => {
+    for (const role of ['owner', 'admin', 'project_manager'] as const) {
+      expect(can(role, 'variations_draft', 'create')).toBe(true);
+      expect(can(role, 'variations_draft', 'update')).toBe(true);
+    }
+    expect(can('site_engineer', 'variations_draft', 'create')).toBe(true);
+    expect(can('site_engineer', 'variations_draft', 'update')).toBe(false);
+    expect(can('client', 'variations_draft', 'read')).toBe(false);
+  });
+
+  it('S1 FIX — variations_price: owner/admin only; CLIENT has NO access', () => {
+    expect(can('owner', 'variations_price', 'approve')).toBe(true);
+    expect(can('admin', 'variations_price', 'approve')).toBe(true);
+    // The landmine: client must never hold VO internal-approval/issue.
+    expect(can('client', 'variations_price', 'approve')).toBe(false);
+    for (const a of ['create', 'read', 'update', 'approve'] as const) {
+      expect(can('client', 'variations_price', a)).toBe(false);
+    }
+    for (const role of [
+      'project_manager',
+      'site_engineer',
+      'accountant',
+      'viewer',
+    ] as const) {
+      expect(can(role, 'variations_price', 'approve')).toBe(false);
+    }
+  });
+});

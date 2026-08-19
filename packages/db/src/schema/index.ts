@@ -23,6 +23,13 @@ export * from './proposals';
 export * from './proposal-sections';
 export * from './proposal-lines';
 export * from './proposal-events';
+export * from './contracts';
+export * from './contract-sections';
+export * from './contract-lines';
+export * from './contract-events';
+export * from './variation-orders';
+export * from './variation-order-lines';
+export * from './variation-order-events';
 export * from './notifications';
 export * from './automation-settings';
 export * from './automation-run-log';
@@ -46,6 +53,13 @@ import { proposals } from './proposals';
 import { proposalSections } from './proposal-sections';
 import { proposalLines } from './proposal-lines';
 import { proposalEvents } from './proposal-events';
+import { contracts } from './contracts';
+import { contractSections } from './contract-sections';
+import { contractLines } from './contract-lines';
+import { contractEvents } from './contract-events';
+import { variationOrders } from './variation-orders';
+import { variationOrderLines } from './variation-order-lines';
+import { variationOrderEvents } from './variation-order-events';
 import { notifications } from './notifications';
 import { automationSettings } from './automation-settings';
 import { automationRunLog } from './automation-run-log';
@@ -71,6 +85,13 @@ export const orgScopedTables = {
   proposalSections,
   proposalLines,
   proposalEvents,
+  contracts,
+  contractSections,
+  contractLines,
+  contractEvents,
+  variationOrders,
+  variationOrderLines,
+  variationOrderEvents,
   notifications,
   automationSettings,
   automationRunLog,
@@ -98,6 +119,13 @@ export const allTables = {
   proposalSections,
   proposalLines,
   proposalEvents,
+  contracts,
+  contractSections,
+  contractLines,
+  contractEvents,
+  variationOrders,
+  variationOrderLines,
+  variationOrderEvents,
   notifications,
   automationSettings,
   automationRunLog,

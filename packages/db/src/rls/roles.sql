@@ -36,6 +36,12 @@ grant select, insert, update, delete on public.proposals         to metra_app;
 grant select, insert, update, delete on public.proposal_sections to metra_app;
 grant select, insert, update, delete on public.proposal_lines    to metra_app;
 grant select, insert, update, delete on public.automation_settings to metra_app;
+-- Contracts + Variation Orders (P1 Slice 4): full DML on the mutable rows.
+grant select, insert, update, delete on public.contracts         to metra_app;
+grant select, insert, update, delete on public.contract_sections to metra_app;
+grant select, insert, update, delete on public.contract_lines    to metra_app;
+grant select, insert, update, delete on public.variation_orders      to metra_app;
+grant select, insert, update, delete on public.variation_order_lines to metra_app;
 -- notifications: recipients read + mark-read (no delete); the runner inserts.
 grant select, insert, update on public.notifications to metra_app;
 
@@ -46,6 +52,8 @@ grant select, insert on public.audit_log          to metra_app;
 grant select, insert on public.price_changes       to metra_app;
 grant select, insert on public.price_change_lines  to metra_app;
 grant select, insert on public.proposal_events     to metra_app;
+grant select, insert on public.contract_events         to metra_app;
+grant select, insert on public.variation_order_events  to metra_app;
 grant select, insert on public.automation_run_log  to metra_app;
 
 -- Future-proofing for composite-FK trigger functions.
@@ -60,6 +68,17 @@ grant execute on function public.enforce_immutable_when() to metra_app;
 grant execute on function public.enforce_proposal_child_draft() to metra_app;
 grant execute on function public.app_proposal_by_token(text) to metra_app;
 grant execute on function public.app_proposal_respond_by_token(text, text, text, text, text) to metra_app;
+
+-- Contracts + Variation Orders (P1 Slice 4): child-draft guard trigger fns + the
+-- public token SDFs. The token functions run on the PUBLIC path (no session) via
+-- the base connection role, and are grantable to metra_app for authenticated
+-- callers too.
+grant execute on function public.enforce_contract_child_draft() to metra_app;
+grant execute on function public.enforce_variation_child_draft() to metra_app;
+grant execute on function public.app_contract_by_token(text) to metra_app;
+grant execute on function public.app_contract_ack_by_token(text, text, text, text, text) to metra_app;
+grant execute on function public.app_variation_by_token(text) to metra_app;
+grant execute on function public.app_variation_respond_by_token(text, text, text, text, text) to metra_app;
 
 -- Bootstrap user->org lookup (SECURITY DEFINER, scoped to app.current_user_id).
 -- Least privilege: CREATE FUNCTION grants EXECUTE to PUBLIC by default. Revoke
