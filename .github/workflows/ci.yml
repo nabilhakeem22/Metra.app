@@ -87,7 +87,11 @@ jobs:
           NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ vars.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
           NEXT_PUBLIC_DEFAULT_LOCALE: ${{ vars.NEXT_PUBLIC_DEFAULT_LOCALE }}
           NEXT_PUBLIC_APP_URL: ${{ vars.NEXT_PUBLIC_APP_URL }}
-        # `wrangler types` generates the CloudflareEnv typings (HYPERDRIVE/
-        # BROWSER/ASSETS bindings) into a gitignored .d.ts; without it next
-        # build's type-check fails. Regenerate before building on the runner.
-        run: npx wrangler types && npx opennextjs-cloudflare build
+        # Generate the gitignored binding typings before the type-check. The
+        # `--env-interface=CloudflareEnv ./cloudflare-env.d.ts` flags MUST match
+        # how the file is generated locally: plain `wrangler types` emits a
+        # `Cloudflare.Env`/global `Env` shape instead of the `interface
+        # CloudflareEnv` the code (cfEnv(): CloudflareEnv) and OpenNext expect,
+        # so the build's type-check fails on `Property 'HYPERDRIVE' does not
+        # exist on type 'CloudflareEnv'`.
+        run: npx wrangler types --env-interface=CloudflareEnv ./cloudflare-env.d.ts && npx opennextjs-cloudflare build
