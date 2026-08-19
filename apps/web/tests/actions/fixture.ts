@@ -191,6 +191,7 @@ const TEARDOWN_TABLES_IN_FK_ORDER = [
   'automation_settings',
   'audit_log',
   'invitations',
+  'api_keys',
   'memberships',
 ];
 

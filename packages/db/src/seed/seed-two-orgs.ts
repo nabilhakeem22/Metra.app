@@ -1,10 +1,12 @@
 // Seeds two isolated orgs (A and B), each with a row in EVERY org-scoped table,
 // so the cross-tenant isolation test has something to leak (and prove it can't).
 // Idempotent for the unique-keyed rows; audit rows are append-only and may repeat.
+import { createHash } from 'node:crypto';
 import { sql } from 'drizzle-orm';
 import { createDb } from '../client';
 import { MIGRATION_DATABASE_URL } from '../env';
 import { withOrgContext } from '../org-context';
+import { apiKeys } from '../schema/api-keys';
 import { auditLog } from '../schema/audit-log';
 import { clients } from '../schema/clients';
 import { contractEvents } from '../schema/contract-events';
@@ -28,6 +30,8 @@ import { variationOrderEvents } from '../schema/variation-order-events';
 import { variationOrderLines } from '../schema/variation-order-lines';
 import { variationOrders } from '../schema/variation-orders';
 import {
+  API_KEY_A_ID,
+  API_KEY_B_ID,
   CLIENT_A_ID,
   CLIENT_B_ID,
   CONTRACT_A_ID,
@@ -73,6 +77,7 @@ interface OrgSeed {
   proposalId: string;
   contractId: string;
   variationId: string;
+  apiKeyId: string;
 }
 
 const orgs: OrgSeed[] = [
@@ -95,6 +100,7 @@ const orgs: OrgSeed[] = [
     proposalId: PROPOSAL_A_ID,
     contractId: CONTRACT_A_ID,
     variationId: VARIATION_A_ID,
+    apiKeyId: API_KEY_A_ID,
   },
   {
     orgId: ORG_B_ID,
@@ -115,6 +121,7 @@ const orgs: OrgSeed[] = [
     proposalId: PROPOSAL_B_ID,
     contractId: CONTRACT_B_ID,
     variationId: VARIATION_B_ID,
+    apiKeyId: API_KEY_B_ID,
   },
 ];
 
@@ -172,6 +179,22 @@ async function seedOrg(db: Parameters<typeof withOrgContext>[0], org: OrgSeed) {
           status: 'pending',
           invitedBy: org.userId,
           expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+        })
+        .onConflictDoNothing();
+
+      // A public API key (v1) minted by the owner — only the sha256 hash is
+      // stored. The deterministic raw source keeps the isolation-gate row stable.
+      await tx
+        .insert(apiKeys)
+        .values({
+          id: org.apiKeyId,
+          orgId: org.orgId,
+          label: 'Seed API key',
+          tokenHash: createHash('sha256')
+            .update(`mtk_seed_${org.orgId}`)
+            .digest('hex'),
+          tokenPrefix: 'mtk_seed',
+          createdBy: org.userId,
         })
         .onConflictDoNothing();
 

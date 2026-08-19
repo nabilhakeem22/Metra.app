@@ -26,6 +26,11 @@ export const CLIENT_B_ID = '00000000-0000-4000-8000-0000000000b2';
 export const PROJECT_A_ID = '00000000-0000-4000-8000-0000000000a3';
 export const PROJECT_B_ID = '00000000-0000-4000-8000-0000000000b3';
 
+// Public API keys (v1) seed ids. Deterministic token hashes so the isolation
+// gate has an org-A and an org-B api_keys row to prove it can't leak.
+export const API_KEY_A_ID = '00000000-0000-4000-8000-0000000000a7';
+export const API_KEY_B_ID = '00000000-0000-4000-8000-0000000000b7';
+
 // Contracts + Variation Orders (P1 Slice 4) seed ids.
 export const PROPOSAL_A_ID = '00000000-0000-4000-8000-0000000000a4';
 export const PROPOSAL_B_ID = '00000000-0000-4000-8000-0000000000b4';

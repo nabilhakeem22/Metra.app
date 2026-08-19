@@ -44,6 +44,9 @@ grant select, insert, update, delete on public.variation_orders      to metra_ap
 grant select, insert, update, delete on public.variation_order_lines to metra_app;
 -- notifications: recipients read + mark-read (no delete); the runner inserts.
 grant select, insert, update on public.notifications to metra_app;
+-- api_keys (Public API v1): mint (insert), list (select), revoke + last_used
+-- stamp (update). NO delete — revocation sets revoked_at, keys are never removed.
+grant select, insert, update on public.api_keys to metra_app;
 
 -- ...except audit_log and the append-only logs (price history, proposal events,
 -- the automation idempotency claim log). No UPDATE / DELETE grant, so any attempt
@@ -104,6 +107,13 @@ revoke execute on function public.app_can_bootstrap_membership() from public;
 grant execute on function public.app_claim_invitation(uuid) to metra_app;
 revoke execute on function public.app_claim_invitation(uuid) from public;
 
+-- Public API key resolver + last-used stamp (SECURITY DEFINER, live-role model);
+-- same least-privilege treatment. Only metra_app may call them; never anon/public.
+grant execute on function public.app_api_key_by_hash(text) to metra_app;
+revoke execute on function public.app_api_key_by_hash(text) from public;
+grant execute on function public.app_touch_api_key(text, timestamptz) to metra_app;
+revoke execute on function public.app_touch_api_key(text, timestamptz) from public;
+
 do $$
 declare
   r text;
@@ -132,6 +142,14 @@ begin
       );
       execute format(
         'revoke execute on function public.app_claim_invitation(uuid) from %I',
+        r
+      );
+      execute format(
+        'revoke execute on function public.app_api_key_by_hash(text) from %I',
+        r
+      );
+      execute format(
+        'revoke execute on function public.app_touch_api_key(text, timestamptz) from %I',
         r
       );
     end if;

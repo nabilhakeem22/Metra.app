@@ -33,6 +33,7 @@ export * from './variation-order-events';
 export * from './notifications';
 export * from './automation-settings';
 export * from './automation-run-log';
+export * from './api-keys';
 
 import { organizations } from './organizations';
 import { memberships } from './memberships';
@@ -63,6 +64,7 @@ import { variationOrderEvents } from './variation-order-events';
 import { notifications } from './notifications';
 import { automationSettings } from './automation-settings';
 import { automationRunLog } from './automation-run-log';
+import { apiKeys } from './api-keys';
 
 /** Every org-scoped business table (carries org_id). Drives RLS generation. */
 export const orgScopedTables = {
@@ -95,6 +97,7 @@ export const orgScopedTables = {
   notifications,
   automationSettings,
   automationRunLog,
+  apiKeys,
 } as const;
 
 /** All tables including the tenant root. */
@@ -129,4 +132,5 @@ export const allTables = {
   notifications,
   automationSettings,
   automationRunLog,
+  apiKeys,
 } as const;

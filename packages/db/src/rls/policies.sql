@@ -495,6 +495,22 @@ create policy org_isolation on public.automation_settings
     and public.app_is_current_org_member()
   );
 
+-- api_keys (Public API v1; standard org_isolation — the row is only ever read
+-- under an org context by settings; the pre-context Bearer resolution goes through
+-- the SECURITY DEFINER app_api_key_by_hash, which is not RLS-filtered)
+alter table public.api_keys enable row level security;
+alter table public.api_keys force  row level security;
+drop policy if exists org_isolation on public.api_keys;
+create policy org_isolation on public.api_keys
+  using (
+    org_id = nullif(current_setting('app.current_org_id', true), '')::uuid
+    and public.app_is_current_org_member()
+  )
+  with check (
+    org_id = nullif(current_setting('app.current_org_id', true), '')::uuid
+    and public.app_is_current_org_member()
+  );
+
 -- automation_run_log (append-only via grants; standard org_isolation)
 alter table public.automation_run_log enable row level security;
 alter table public.automation_run_log force  row level security;
