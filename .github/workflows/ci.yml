@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main, cleanup-fields-numbers]
+    branches: [main]
   pull_request:
     branches: [main]
 
