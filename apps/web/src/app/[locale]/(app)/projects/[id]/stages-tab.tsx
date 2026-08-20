@@ -12,6 +12,7 @@ import { toast } from '@/hooks/use-toast';
 import { useRouter } from '@/i18n/routing';
 import { resolveActionError } from '@/lib/actions/error-message';
 import type { ActionCode } from '@/lib/actions/result';
+import { formatPercent } from '@/lib/format/number';
 import { pickLocale } from '@/lib/i18n/pick-locale';
 import { addStage, deleteStage, updateStage } from '@/lib/project-stages/actions';
 
@@ -216,7 +217,7 @@ function StageRow({
             className="h-9 w-20"
           />
         ) : (
-          <span dir="ltr">{progress}%</span>
+          <span dir="ltr">{formatPercent(progress, locale)}</span>
         )}
       </td>
       {canManage && (

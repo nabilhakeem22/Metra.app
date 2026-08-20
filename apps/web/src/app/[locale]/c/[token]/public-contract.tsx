@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { formatMoney } from '@/lib/format/money';
+import { formatPercent, formatQuantity } from '@/lib/format/number';
 import { docYear, formatDocNumber } from '@/lib/format/doc-number';
 import type { PublicContract } from '@/lib/contracts/public';
 import { acknowledgeContract } from './actions';
@@ -81,7 +82,7 @@ export function PublicContractView({
                   <tr key={l.id} className="border-b last:border-0">
                     <td className="px-4 py-2">{pick(l.description_ar, l.description_en)}</td>
                     <td className="px-4 py-2 text-muted-foreground" dir="ltr">
-                      {l.qty} {l.unit}
+                      {formatQuantity(l.qty, locale)} {l.unit}
                     </td>
                     <td className="px-4 py-2 text-end" dir="ltr">{m(l.unit_price)}</td>
                     <td className="px-4 py-2 text-end" dir="ltr">{m(l.line_total)}</td>
@@ -96,8 +97,8 @@ export function PublicContractView({
       <Card>
         <CardContent className="ms-auto max-w-xs space-y-1 py-4 text-sm" dir="ltr">
           <Row label={t('originalValue')} value={m(contract.total)} bold />
-          <Row label={t('header.advancePct')} value={`${contract.advance_pct}%`} />
-          <Row label={t('header.retentionPct')} value={`${contract.retention_pct}%`} />
+          <Row label={t('header.advancePct')} value={formatPercent(contract.advance_pct, locale)} />
+          <Row label={t('header.retentionPct')} value={formatPercent(contract.retention_pct, locale)} />
         </CardContent>
       </Card>
 

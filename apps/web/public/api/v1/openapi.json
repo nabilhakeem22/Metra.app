@@ -3,7 +3,7 @@
   "info": {
     "title": "Metra Public API",
     "version": "1.0.0",
-    "description": "Read-only v1 of the Metra Public API. Authenticate with a Bearer API key (mtk_…). A key resolves to its creator's current membership role; cost/margin fields are present only when that role may see margin. All money values are scale-4 numeric strings; all figures use Western numerals."
+    "description": "Read-only v1 of the Metra Public API. Authenticate with a Bearer API key (mtk_…). A key resolves to its creator's current membership role; cost/margin fields are present only when that role may see margin. All money and percentage values are 2-decimal numeric strings; all figures use Western numerals."
   },
   "servers": [{ "url": "/api/v1" }],
   "security": [{ "bearerAuth": [] }],
@@ -239,8 +239,6 @@
           "city": { "type": ["string", "null"] },
           "address": { "type": ["string", "null"] },
           "tax_registration_number": { "type": ["string", "null"] },
-          "segment": { "type": ["string", "null"] },
-          "lead_source": { "type": ["string", "null"] },
           "advance_pct": { "type": "string" },
           "retention_pct": { "type": "string" },
           "notes": { "type": ["string", "null"] },
@@ -262,7 +260,6 @@
           "type_name_ar": { "type": ["string", "null"] },
           "type_name_en": { "type": ["string", "null"] },
           "status": { "type": "string" },
-          "contract_ref": { "type": ["string", "null"] },
           "description": { "type": ["string", "null"] },
           "advance_pct": { "type": "string" },
           "retention_pct": { "type": "string" },

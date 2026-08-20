@@ -1,5 +1,5 @@
 import type { Project } from '@metra/db';
-import { toIso } from './shared';
+import { toApiMoney, toIso } from './shared';
 
 /** Optional resolved type name (present on the detail query). */
 export interface ProjectWithTypeNames extends Project {
@@ -9,7 +9,7 @@ export interface ProjectWithTypeNames extends Project {
 
 /**
  * Public v1 shape for a project. Projects carry NO cost/margin columns; advance/
- * retention are percentages exposed as scale-4 money strings.
+ * retention are percentages exposed as 2-decimal strings.
  */
 export interface PublicProject {
   id: string;
@@ -21,7 +21,6 @@ export interface PublicProject {
   type_name_ar: string | null;
   type_name_en: string | null;
   status: string;
-  contract_ref: string | null;
   description: string | null;
   advance_pct: string;
   retention_pct: string;
@@ -46,10 +45,9 @@ export function serializeProject(row: ProjectWithTypeNames): PublicProject {
     type_name_ar: row.typeNameAr ?? null,
     type_name_en: row.typeNameEn ?? null,
     status: row.status,
-    contract_ref: row.contractRef,
     description: row.description,
-    advance_pct: row.advancePct,
-    retention_pct: row.retentionPct,
+    advance_pct: toApiMoney(row.advancePct),
+    retention_pct: toApiMoney(row.retentionPct),
     start_date: row.startDate,
     end_date: row.endDate,
     city: row.city,

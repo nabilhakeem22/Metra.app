@@ -4,6 +4,7 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { pickLocale } from '@/lib/i18n/pick-locale';
 import { formatDate } from '@/lib/format/date';
 import { formatMoney } from '@/lib/format/money';
+import { formatPercent } from '@/lib/format/number';
 import type { ProjectOverview } from '@/lib/projects/queries';
 
 export async function OverviewTab({ overview }: { overview: ProjectOverview }) {
@@ -38,7 +39,7 @@ export async function OverviewTab({ overview }: { overview: ProjectOverview }) {
             <p className="mt-1 text-lg font-semibold">{curName}</p>
           </CardContent>
         </Card>
-        <Stat label={t('progress')} value={`${overview.overallProgress}%`} />
+        <Stat label={t('progress')} value={formatPercent(overview.overallProgress, locale)} />
         <Stat
           label={t('contracted')}
           value={formatMoney(overview.contractedTotal, locale)}

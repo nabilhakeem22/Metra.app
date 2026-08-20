@@ -27,12 +27,6 @@ interface FormState {
   city: string;
   address: string;
   taxRegistrationNumber: string;
-  commercialRegister: string;
-  taxCardNumber: string;
-  nationalId: string;
-  segment: string;
-  leadSource: string;
-  creditTerms: string;
   advancePct: string;
   retentionPct: string;
   notes: string;
@@ -49,12 +43,6 @@ function fromClient(c: Client): FormState {
     city: c.city ?? '',
     address: c.address ?? '',
     taxRegistrationNumber: c.taxRegistrationNumber ?? '',
-    commercialRegister: c.commercialRegister ?? '',
-    taxCardNumber: c.taxCardNumber ?? '',
-    nationalId: c.nationalId ?? '',
-    segment: c.segment ?? '',
-    leadSource: c.leadSource ?? '',
-    creditTerms: c.creditTerms ?? '',
     advancePct: c.advancePct,
     retentionPct: c.retentionPct,
     notes: c.notes ?? '',
@@ -91,12 +79,6 @@ export function DetailsTab({
         city: form.city || null,
         address: form.address || null,
         taxRegistrationNumber: form.taxRegistrationNumber || null,
-        commercialRegister: form.commercialRegister || null,
-        taxCardNumber: form.taxCardNumber || null,
-        nationalId: form.nationalId || null,
-        segment: form.segment || null,
-        leadSource: form.leadSource || null,
-        creditTerms: form.creditTerms || null,
         advancePct: form.advancePct || '0',
         retentionPct: form.retentionPct || '0',
         notes: form.notes || null,
@@ -164,13 +146,9 @@ export function DetailsTab({
               ))}
             </select>
           </div>
-          {field('segment', t('form.segment'), { hint: th('segment') })}
+          {field('contactName', t('form.contactName'), { hint: th('contactName') })}
         </div>
 
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          {field('contactName', t('form.contactName'), { hint: th('contactName') })}
-          {field('leadSource', t('form.leadSource'), { hint: th('leadSource') })}
-        </div>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           {field('email', t('form.email'), { hint: th('email') })}
           {field('phone', t('form.phone'), { hint: th('phone') })}
@@ -182,18 +160,10 @@ export function DetailsTab({
 
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           {field('taxRegistrationNumber', t('form.taxCode'), { hint: th('taxRegistrationNumber') })}
-          {field('commercialRegister', t('form.commercialRegister'), { hint: th('commercialRegister') })}
-          {field('taxCardNumber', t('form.taxCardNumber'), { hint: th('taxCardNumber') })}
-        </div>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-          {field('nationalId', t('form.nationalId'), { hint: th('nationalId') })}
           {field('advancePct', t('form.advancePct'), { hint: th('advancePct'), inputMode: 'decimal' })}
           {field('retentionPct', t('form.retentionPct'), { hint: th('retentionPct'), inputMode: 'decimal' })}
         </div>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          {field('creditTerms', t('form.creditTerms'), { hint: th('creditTerms') })}
-          {field('notes', t('form.notes'))}
-        </div>
+        {field('notes', t('form.notes'))}
 
         {canManage && (
           <div className="flex justify-end">

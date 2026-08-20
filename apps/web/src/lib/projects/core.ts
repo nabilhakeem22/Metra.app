@@ -22,7 +22,6 @@ export interface ProjectInput {
   clientId: string;
   typeId?: string | null;
   status: ProjectStatus;
-  contractRef?: string | null;
   description?: string | null;
   advancePct?: string | null;
   retentionPct?: string | null;
@@ -62,7 +61,6 @@ const LIMITS = {
   city: 120,
   address: 300,
   notes: 2000,
-  contractRef: 120,
   description: 4000,
 } as const;
 
@@ -73,7 +71,6 @@ interface Validated {
   clientId: string;
   typeId: string | null;
   status: ProjectStatus;
-  contractRef: string | null;
   description: string | null;
   advancePct: string;
   retentionPct: string;
@@ -118,7 +115,6 @@ function validate(input: ProjectInput): ActionResult | Validated {
   const city = clean(input.city);
   const address = clean(input.address);
   const notes = clean(input.notes);
-  const contractRef = clean(input.contractRef);
   const description = clean(input.description);
   if (
     code.length > LIMITS.code ||
@@ -127,7 +123,6 @@ function validate(input: ProjectInput): ActionResult | Validated {
     (city?.length ?? 0) > LIMITS.city ||
     (address?.length ?? 0) > LIMITS.address ||
     (notes?.length ?? 0) > LIMITS.notes ||
-    (contractRef?.length ?? 0) > LIMITS.contractRef ||
     (description?.length ?? 0) > LIMITS.description
   ) {
     return err('invalid');
@@ -140,7 +135,6 @@ function validate(input: ProjectInput): ActionResult | Validated {
     clientId,
     typeId,
     status: input.status,
-    contractRef,
     description,
     advancePct,
     retentionPct,

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { formatDate } from './date';
 import { formatMoney } from './money';
-import { formatNumber } from './number';
+import { formatNumber, formatPercent, formatQuantity } from './number';
 
 const ARABIC_INDIC = /[٠-٩۰-۹]/;
 
@@ -61,6 +61,56 @@ describe('formatMoney', () => {
     expect(formatMoney(undefined, 'ar-EG')).toBe('');
     expect(formatMoney('not-a-number', 'en')).toBe('');
     expect(formatMoney(Number.NaN, 'en')).toBe('');
+  });
+});
+
+describe('formatPercent — exactly 2 fraction digits + %', () => {
+  it('renders a scale-4 string as 2 decimals + % (en)', () => {
+    expect(formatPercent('14.0000', 'en')).toBe('14.00%');
+  });
+  it('renders a scale-4 string as 2 decimals + %, Latin digits (ar-EG)', () => {
+    const s = formatPercent('14.0000', 'ar-EG');
+    expect(s).toBe('14.00%');
+    expect(ARABIC_INDIC.test(s)).toBe(false);
+  });
+  it('rounds a longer fraction to 2 places', () => {
+    expect(formatPercent(66.6666, 'en')).toBe('66.67%');
+    expect(formatPercent('12.3456', 'en')).toBe('12.35%');
+  });
+  it('accepts a plain number', () => {
+    expect(formatPercent(50, 'en')).toBe('50.00%');
+  });
+  it('normalizes negative zero (no "-0.00%")', () => {
+    expect(formatPercent(-0, 'en')).toBe('0.00%');
+    expect(formatPercent('-0', 'en')).toBe('0.00%');
+  });
+  it('returns "" for absent/blank/NaN input (no "NaN%")', () => {
+    expect(formatPercent('', 'en')).toBe('');
+    expect(formatPercent('   ', 'ar-EG')).toBe('');
+    expect(formatPercent(null, 'en')).toBe('');
+    expect(formatPercent(undefined, 'en')).toBe('');
+    expect(formatPercent('not-a-number', 'en')).toBe('');
+    expect(formatPercent(Number.NaN, 'en')).toBe('');
+  });
+});
+
+describe('formatQuantity — up to 2 fraction digits, no forced zeros', () => {
+  it('trims a scale-4 integer qty to a bare integer', () => {
+    expect(formatQuantity('1.0000', 'en')).toBe('1');
+  });
+  it('keeps a real fractional qty', () => {
+    expect(formatQuantity('1.5000', 'en')).toBe('1.5');
+    expect(formatQuantity('2.25', 'en')).toBe('2.25');
+  });
+  it('uses Latin digits in Arabic locale', () => {
+    const s = formatQuantity('1234.5000', 'ar-EG');
+    expect(ARABIC_INDIC.test(s)).toBe(false);
+  });
+  it('returns "" for absent/blank/NaN input', () => {
+    expect(formatQuantity('', 'en')).toBe('');
+    expect(formatQuantity(null, 'en')).toBe('');
+    expect(formatQuantity(undefined, 'en')).toBe('');
+    expect(formatQuantity(Number.NaN, 'en')).toBe('');
   });
 });
 

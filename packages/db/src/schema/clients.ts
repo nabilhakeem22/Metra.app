@@ -15,8 +15,8 @@ import { organizations } from './organizations';
 import { orgScoped } from './org-scoped';
 
 /**
- * Clients (P1 Slice 2 + Slice 4 profile). Bilingual name + a `type`, commercial
- * identifiers, and advance/retention percentages. The flat `contact_name/email/
+ * Clients (P1 Slice 2 + Slice 4 profile). Bilingual name + a `type`, a tax
+ * registration number, and advance/retention percentages. The flat `contact_name/email/
  * phone` columns are KEPT (proposal send reads `clients.email`); richer contacts
  * live in `client_contacts`. Soft-deleted via `active`. `unique(org_id, id)` is
  * the universal composite-FK target so projects reference a client in-org.
@@ -36,12 +36,6 @@ export const clients = pgTable(
     city: text('city'),
     address: text('address'),
     taxRegistrationNumber: text('tax_registration_number'),
-    commercialRegister: text('commercial_register'),
-    taxCardNumber: text('tax_card_number'),
-    nationalId: text('national_id'),
-    segment: text('segment'),
-    leadSource: text('lead_source'),
-    creditTerms: text('credit_terms'),
     advancePct: money('advance_pct').notNull().default('0'),
     retentionPct: money('retention_pct').notNull().default('0'),
     notes: text('notes'),

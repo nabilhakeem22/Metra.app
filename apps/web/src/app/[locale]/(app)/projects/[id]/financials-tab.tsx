@@ -2,6 +2,7 @@ import { Lock } from 'lucide-react';
 import { getLocale, getTranslations } from 'next-intl/server';
 import { Card, CardContent } from '@/components/ui/card';
 import { formatMoney } from '@/lib/format/money';
+import { formatPercent } from '@/lib/format/number';
 
 export async function FinancialsTab({
   contractedTotal,
@@ -42,8 +43,8 @@ export async function FinancialsTab({
     <div className="space-y-4">
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <Stat label={t('contracted')} value={formatMoney(contractedTotal, locale)} />
-        <Stat label={t('advance')} value={`${advancePct}%`} />
-        <Stat label={t('retention')} value={`${retentionPct}%`} />
+        <Stat label={t('advance')} value={formatPercent(advancePct, locale)} />
+        <Stat label={t('retention')} value={formatPercent(retentionPct, locale)} />
       </div>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <Locked label={t('jobCost')} />

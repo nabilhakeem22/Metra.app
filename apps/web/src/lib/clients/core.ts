@@ -18,12 +18,6 @@ export interface ClientInput {
   city?: string | null;
   address?: string | null;
   taxRegistrationNumber?: string | null;
-  commercialRegister?: string | null;
-  taxCardNumber?: string | null;
-  nationalId?: string | null;
-  segment?: string | null;
-  leadSource?: string | null;
-  creditTerms?: string | null;
   advancePct?: string | null;
   retentionPct?: string | null;
   notes?: string | null;
@@ -42,12 +36,6 @@ const LIMITS = {
   city: 120,
   address: 300,
   taxReg: 64,
-  commercialRegister: 64,
-  taxCardNumber: 64,
-  nationalId: 32,
-  segment: 120,
-  leadSource: 120,
-  creditTerms: 200,
   notes: 2000,
 } as const;
 
@@ -76,12 +64,6 @@ function normalized(input: ClientInput) {
     city: clean(input.city),
     address: clean(input.address),
     taxRegistrationNumber: clean(input.taxRegistrationNumber),
-    commercialRegister: clean(input.commercialRegister),
-    taxCardNumber: clean(input.taxCardNumber),
-    nationalId: clean(input.nationalId),
-    segment: clean(input.segment),
-    leadSource: clean(input.leadSource),
-    creditTerms: clean(input.creditTerms),
     notes: clean(input.notes),
   };
 }
@@ -97,12 +79,6 @@ function withinLimits(v: NormalizedClient): boolean {
     ok(v.city, LIMITS.city) &&
     ok(v.address, LIMITS.address) &&
     ok(v.taxRegistrationNumber, LIMITS.taxReg) &&
-    ok(v.commercialRegister, LIMITS.commercialRegister) &&
-    ok(v.taxCardNumber, LIMITS.taxCardNumber) &&
-    ok(v.nationalId, LIMITS.nationalId) &&
-    ok(v.segment, LIMITS.segment) &&
-    ok(v.leadSource, LIMITS.leadSource) &&
-    ok(v.creditTerms, LIMITS.creditTerms) &&
     ok(v.notes, LIMITS.notes)
   );
 }

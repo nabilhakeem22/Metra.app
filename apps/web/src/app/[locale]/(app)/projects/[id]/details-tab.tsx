@@ -32,7 +32,6 @@ interface FormState {
   clientId: string;
   typeId: string;
   status: ProjectStatus;
-  contractRef: string;
   description: string;
   advancePct: string;
   retentionPct: string;
@@ -67,7 +66,6 @@ export function DetailsTab({
     clientId: project.clientId,
     typeId: project.typeId ?? '',
     status: project.status,
-    contractRef: project.contractRef ?? '',
     description: project.description ?? '',
     advancePct: project.advancePct,
     retentionPct: project.retentionPct,
@@ -113,7 +111,6 @@ export function DetailsTab({
         clientId: form.clientId,
         typeId: form.typeId || null,
         status: form.status,
-        contractRef: form.contractRef || null,
         description: form.description || null,
         advancePct: form.advancePct || '0',
         retentionPct: form.retentionPct || '0',
@@ -259,8 +256,7 @@ export function DetailsTab({
           </div>
         </div>
 
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-          {field('contractRef', tp('contractRef'), { hint: th('contractRef') })}
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           {field('advancePct', tp('advancePct'), { hint: th('advancePct'), inputMode: 'decimal' })}
           {field('retentionPct', tp('retentionPct'), { hint: th('retentionPct'), inputMode: 'decimal' })}
         </div>
