@@ -1,27 +1,12 @@
 'use client';
 
-import { Copy, Loader2, RefreshCw, Send, Trash2 } from 'lucide-react';
-import { useLocale, useTranslations } from 'next-intl';
+import { useTranslations } from 'next-intl';
 import { useState, useTransition } from 'react';
-import { Button } from '@/components/ui/button';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
 import { useConfirm } from '@/components/ui/confirm-dialog';
-import { EmptyState } from '@/components/ui/empty-state';
-import { FieldHint } from '@/components/ui/field-hint';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { toast } from '@/hooks/use-toast';
 import { resolveActionError } from '@/lib/actions/error-message';
 import type { ActionCode } from '@/lib/actions/result';
-import { formatDate } from '@/lib/format/date';
-import { MEMBER_ROLES, type MemberRole } from '@/lib/permissions/roles';
-import { INVITABLE_ROLES } from '@/lib/team/invitable';
+import type { MemberRole } from '@/lib/permissions/roles';
 import {
   changeMemberRole,
   inviteMember,
@@ -29,24 +14,10 @@ import {
   resendInvite,
   revokeInvite,
 } from '@/lib/team/actions';
-
-interface Member {
-  membershipId: string;
-  userId: string;
-  email: string | null;
-  fullName: string | null;
-  role: MemberRole;
-  createdAt: string;
-}
-
-interface Pending {
-  id: string;
-  email: string;
-  role: MemberRole;
-  expiresAt: string;
-  createdAt: string;
-  expired: boolean;
-}
+import { TeamInviteForm } from './team-invite-form';
+import { TeamMemberList } from './team-member-list';
+import { TeamPendingList } from './team-pending-list';
+import type { Member, Pending } from './team-types';
 
 export interface TeamClientProps {
   members: Member[];
@@ -65,10 +36,7 @@ export function TeamClient({
   currentUserId,
 }: TeamClientProps) {
   const t = useTranslations('team');
-  const th = useTranslations('hints.team');
   const te = useTranslations('errors');
-  const roles = useTranslations('roles');
-  const locale = useLocale();
   const { confirm, dialog } = useConfirm();
   const [isPending, startTransition] = useTransition();
 
@@ -77,10 +45,6 @@ export function TeamClient({
   const [lastLink, setLastLink] = useState<string | null>(null);
 
   const errorMessage = (code?: ActionCode) => resolveActionError(code, te);
-
-  function roleLabel(role: MemberRole): string {
-    return roles(`${role}.label`);
-  }
 
   function copy(link: string) {
     void navigator.clipboard?.writeText(link);
@@ -166,221 +130,35 @@ export function TeamClient({
       {dialog}
 
       {canManage && (
-        <Card>
-          <CardHeader>
-            <CardTitle>{t('inviteTitle')}</CardTitle>
-            <CardDescription>{roles(`${inviteRole}.desc`)}</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
-              <div className="flex-1 space-y-2">
-                <Label htmlFor="inviteEmail" className="flex items-center">
-                  {t('emailLabel')}
-                  <FieldHint id="inviteEmail-hint" hint={th('email')} />
-                </Label>
-                <Input
-                  id="inviteEmail"
-                  type="email"
-                  dir="ltr"
-                  aria-describedby="inviteEmail-hint"
-                  placeholder={t('emailPlaceholder')}
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="inviteRole" className="flex items-center">
-                  {t('roleLabel')}
-                  <FieldHint id="inviteRole-hint" hint={th('role')} />
-                </Label>
-                <select
-                  id="inviteRole"
-                  aria-describedby="inviteRole-hint"
-                  value={inviteRole}
-                  onChange={(e) => setInviteRole(e.target.value as MemberRole)}
-                  className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm sm:w-48"
-                >
-                  {INVITABLE_ROLES.map((r) => (
-                    <option key={r} value={r}>
-                      {roleLabel(r)}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <Button
-                onClick={submitInvite}
-                disabled={isPending || email.trim() === ''}
-              >
-                {isPending ? (
-                  <Loader2 className="size-4 animate-spin" aria-hidden />
-                ) : (
-                  <Send className="size-4" aria-hidden />
-                )}
-                {t('sendInvite')}
-              </Button>
-            </div>
-
-            {lastLink && (
-              <div className="space-y-1 rounded-xl border bg-muted/40 p-3">
-                <p className="text-xs font-medium text-muted-foreground">
-                  {t('inviteLink')}
-                </p>
-                <div className="flex items-center gap-2">
-                  <Input readOnly dir="ltr" value={lastLink} className="text-xs" />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="icon"
-                    onClick={() => copy(lastLink)}
-                    aria-label={t('copyLink')}
-                  >
-                    <Copy className="size-4" aria-hidden />
-                  </Button>
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+        <TeamInviteForm
+          email={email}
+          onEmailChange={setEmail}
+          inviteRole={inviteRole}
+          onInviteRoleChange={setInviteRole}
+          lastLink={lastLink}
+          isPending={isPending}
+          onSubmit={submitInvite}
+          onCopy={copy}
+        />
       )}
 
-      <Card>
-        <CardHeader>
-          <CardTitle>{t('membersTitle')}</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2">
-          {members.length === 0 ? (
-            <EmptyState title={t('noMembers')} />
-          ) : (
-            members.map((m) => {
-              const isSelf = m.userId === currentUserId;
-              const targetIsOwner = m.role === 'owner';
-              const canEditThis = canManage && (!targetIsOwner || isOwner);
-              const label = m.fullName || m.email || m.userId;
-              return (
-                <div
-                  key={m.membershipId}
-                  className="flex flex-wrap items-center justify-between gap-3 rounded-xl border p-3"
-                >
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-medium">
-                      {m.fullName || m.email || t('unknownUser')}
-                      {isSelf && (
-                        <span className="ms-2 rounded-full bg-muted px-2 py-0.5 text-[10px] text-muted-foreground">
-                          {t('you')}
-                        </span>
-                      )}
-                    </p>
-                    {m.email && m.fullName && (
-                      <p className="truncate text-xs text-muted-foreground" dir="ltr">
-                        {m.email}
-                      </p>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {canEditThis ? (
-                      <select
-                        value={m.role}
-                        onChange={(e) =>
-                          onChangeRole(m.userId, e.target.value as MemberRole)
-                        }
-                        disabled={isPending}
-                        className="h-9 rounded-md border border-input bg-background px-2 text-sm"
-                      >
-                        {MEMBER_ROLES.filter(
-                          (r) => r !== 'owner' || isOwner || targetIsOwner,
-                        ).map((r) => (
-                          <option key={r} value={r}>
-                            {roleLabel(r)}
-                          </option>
-                        ))}
-                      </select>
-                    ) : (
-                      <span className="rounded-full bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary">
-                        {roleLabel(m.role)}
-                      </span>
-                    )}
-                    {canEditThis && !isSelf && (
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => onRemove(m.userId, label)}
-                        disabled={isPending}
-                        aria-label={t('remove')}
-                      >
-                        <Trash2 className="size-4" aria-hidden />
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              );
-            })
-          )}
-          {!canManage && (
-            <p className="pt-1 text-xs text-muted-foreground">{t('readonly')}</p>
-          )}
-        </CardContent>
-      </Card>
+      <TeamMemberList
+        members={members}
+        canManage={canManage}
+        isOwner={isOwner}
+        currentUserId={currentUserId}
+        isPending={isPending}
+        onChangeRole={onChangeRole}
+        onRemove={onRemove}
+      />
 
-      <Card>
-        <CardHeader>
-          <CardTitle>{t('pendingTitle')}</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2">
-          {pending.length === 0 ? (
-            <EmptyState title={t('noPending')} />
-          ) : (
-            pending.map((p) => (
-              <div
-                key={p.id}
-                className="flex flex-wrap items-center justify-between gap-3 rounded-xl border p-3"
-              >
-                <div className="min-w-0">
-                  <p className="flex items-center gap-2 truncate text-sm font-medium">
-                    <span dir="ltr" className="truncate">
-                      {p.email}
-                    </span>
-                    {p.expired && (
-                      <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
-                        {t('expired')}
-                      </span>
-                    )}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    {roleLabel(p.role)} · {t('expiresOn')}{' '}
-                    {formatDate(p.expiresAt, locale)}
-                  </p>
-                </div>
-                {canManage && (
-                  <div className="flex items-center gap-1">
-                    {!p.expired && (
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => onResend(p.id)}
-                        disabled={isPending}
-                      >
-                        <RefreshCw className="size-4" aria-hidden />
-                        {t('resend')}
-                      </Button>
-                    )}
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => onRevoke(p.id)}
-                      disabled={isPending}
-                    >
-                      {t('revoke')}
-                    </Button>
-                  </div>
-                )}
-              </div>
-            ))
-          )}
-        </CardContent>
-      </Card>
+      <TeamPendingList
+        pending={pending}
+        canManage={canManage}
+        isPending={isPending}
+        onResend={onResend}
+        onRevoke={onRevoke}
+      />
     </div>
   );
 }

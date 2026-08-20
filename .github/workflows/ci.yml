@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, cleanup-file-splits]
   pull_request:
     branches: [main]
 
