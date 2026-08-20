@@ -1,89 +1,34 @@
 'use client';
 
-import {
-  ArrowDown,
-  ArrowUp,
-  Loader2,
-  Plus,
-  Send,
-  Trash2,
-} from 'lucide-react';
-import { useLocale, useTranslations } from 'next-intl';
+import { Plus } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 import { useMemo, useState, useTransition } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { FieldHint } from '@/components/ui/field-hint';
 import { Input } from '@/components/ui/input';
 import { useConfirm } from '@/components/ui/confirm-dialog';
 import { toast } from '@/hooks/use-toast';
 import { useRouter } from '@/i18n/routing';
-import { PreviewModal } from './preview-modal';
-import { SectionCombobox, type SectionOption } from './section-combobox';
-import { addSection as recordSection } from '@/lib/sections/actions';
 import { resolveActionError } from '@/lib/actions/error-message';
 import type { ActionCode } from '@/lib/actions/result';
-import {
-  coerceMoneyInput,
-  computeLine,
-  computeSection,
-  computeTotals,
-} from '@/lib/aggregates/proposal-totals';
-import { formatMoney } from '@/lib/format/money';
-import { pickLocale } from '@/lib/i18n/pick-locale';
+import { computeSection, computeTotals } from '@/lib/aggregates/proposal-totals';
 import {
   deleteDraftProposal,
   saveProposalDraft,
   sendProposal,
 } from '@/lib/proposals/actions';
 import type { ProposalDetail } from '@/lib/proposals/queries';
-
-interface CostItemOption {
-  id: string;
-  code: string;
-  nameEn: string | null;
-  nameAr: string | null;
-  unit: string;
-  defaultUnitCost: string;
-  defaultUnitPrice: string;
-}
-
-interface LineState {
-  id: string | null;
-  costItemId: string | null;
-  descriptionEn: string;
-  descriptionAr: string;
-  qty: string;
-  unit: string;
-  unitCost: string;
-  unitPrice: string;
-  discountPct: string;
-}
-
-// Live preview must match persistence: input the server would reject -> 0.
-function previewLine(l: LineState) {
-  return computeLine({
-    qty: coerceMoneyInput(l.qty),
-    unitCost: coerceMoneyInput(l.unitCost),
-    unitPrice: coerceMoneyInput(l.unitPrice),
-    discountPct: coerceMoneyInput(l.discountPct),
-  });
-}
-
-interface SectionState {
-  titleEn: string;
-  titleAr: string;
-  lines: LineState[];
-}
-
-const UNITS = ['sqm', 'linear_meter', 'pcs', 'lump_sum', 'day'];
-
-function move<T>(arr: T[], i: number, dir: -1 | 1): T[] {
-  const j = i + dir;
-  if (j < 0 || j >= arr.length) return arr;
-  const copy = [...arr];
-  [copy[i], copy[j]] = [copy[j], copy[i]];
-  return copy;
-}
+import { BuilderSectionCard } from './builder-section-card';
+import { BuilderToolbar } from './builder-toolbar';
+import { BuilderTotalsPanel } from './builder-totals-panel';
+import {
+  move,
+  previewLine,
+  type CostItemOption,
+  type LineState,
+  type SectionState,
+} from './builder-model';
+import type { SectionOption } from './section-combobox';
 
 export function ProposalBuilder({
   detail,
@@ -99,10 +44,7 @@ export function ProposalBuilder({
   sectionLibrary: SectionOption[];
 }) {
   const t = useTranslations('proposals');
-  const th = useTranslations('hints.proposal');
   const te = useTranslations('errors');
-  const locale = useLocale();
-  const isAr = locale.startsWith('ar');
   const router = useRouter();
   const { confirm, dialog } = useConfirm();
   const [pending, startTransition] = useTransition();
@@ -277,8 +219,6 @@ export function ProposalBuilder({
     });
   }
 
-  const inp = 'h-9 rounded-md border border-input bg-background px-2 text-sm';
-
   return (
     <div className="space-y-4">
       {dialog}
@@ -302,166 +242,24 @@ export function ProposalBuilder({
         </Card>
       )}
 
-      {sections.map((sec, si) => {
-        const st = totals.sectionTotals[si];
-        return (
-          <Card key={si}>
-            <CardContent className="space-y-3 py-4">
-              <div className="flex flex-wrap items-center gap-2">
-                <SectionCombobox
-                  className="min-w-40 flex-1"
-                  locale={locale}
-                  valueEn={sec.titleEn}
-                  valueAr={sec.titleAr}
-                  options={sectionLibrary}
-                  placeholder={
-                    isAr ? t('builder.sectionTitleAr') : t('builder.sectionTitleEn')
-                  }
-                  onChange={(patch) => patchSection(si, patch)}
-                  onCreate={(name) => {
-                    // Fire-and-forget: recording the title never blocks the build.
-                    void recordSection(name);
-                  }}
-                  aria-describedby={`sec-hint-${si}`}
-                />
-                <Input
-                  dir={isAr ? 'ltr' : 'rtl'}
-                  placeholder={
-                    isAr ? t('builder.sectionTitleEn') : t('builder.sectionTitleAr')
-                  }
-                  value={isAr ? sec.titleEn : sec.titleAr}
-                  onChange={(e) =>
-                    patchSection(
-                      si,
-                      isAr
-                        ? { titleEn: e.target.value }
-                        : { titleAr: e.target.value },
-                    )
-                  }
-                  className="min-w-40 flex-1"
-                />
-                <FieldHint id={`sec-hint-${si}`} hint={th('sectionTitle')} />
-                <Button variant="ghost" size="icon" aria-label={t('builder.moveUp')} onClick={() => setSections(move(sections, si, -1))}>
-                  <ArrowUp className="size-4" aria-hidden />
-                </Button>
-                <Button variant="ghost" size="icon" aria-label={t('builder.moveDown')} onClick={() => setSections(move(sections, si, 1))}>
-                  <ArrowDown className="size-4" aria-hidden />
-                </Button>
-                <Button variant="ghost" size="icon" aria-label={t('builder.removeSection')} onClick={() => removeSection(si)}>
-                  <Trash2 className="size-4" aria-hidden />
-                </Button>
-              </div>
-
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="text-xs text-muted-foreground">
-                      <th className="px-1 py-1 text-start font-medium">{t('builder.description')}</th>
-                      <th className="px-1 py-1 font-medium">
-                        <span className="inline-flex items-center">
-                          {t('builder.qty')}
-                          <FieldHint hint={th('lineQty')} />
-                        </span>
-                      </th>
-                      <th className="px-1 py-1 font-medium">{t('builder.unit')}</th>
-                      {seeMargin && (
-                        <th className="px-1 py-1 font-medium">
-                          <span className="inline-flex items-center">
-                            {t('builder.unitCost')}
-                            <FieldHint hint={th('lineUnitCost')} />
-                          </span>
-                        </th>
-                      )}
-                      <th className="px-1 py-1 font-medium">
-                        <span className="inline-flex items-center">
-                          {t('builder.unitPrice')}
-                          <FieldHint hint={th('lineUnitPrice')} />
-                        </span>
-                      </th>
-                      <th className="px-1 py-1 font-medium">
-                        <span className="inline-flex items-center">
-                          {t('builder.discount')}
-                          <FieldHint hint={th('lineDiscountPct')} />
-                        </span>
-                      </th>
-                      <th className="px-1 py-1 text-end font-medium">{t('builder.sectionSubtotal')}</th>
-                      <th className="px-1 py-1" />
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {sec.lines.map((l, li) => {
-                      const lt = previewLine(l);
-                      return (
-                        <tr key={li} className="border-t">
-                          <td className="px-1 py-1">
-                            <Input dir="ltr" value={l.descriptionEn} onChange={(e) => patchLine(si, li, { descriptionEn: e.target.value })} className={inp} />
-                          </td>
-                          <td className="px-1 py-1">
-                            <Input dir="ltr" inputMode="decimal" value={l.qty} onChange={(e) => patchLine(si, li, { qty: e.target.value })} className={`${inp} w-16`} />
-                          </td>
-                          <td className="px-1 py-1">
-                            <select value={l.unit} onChange={(e) => patchLine(si, li, { unit: e.target.value })} className={inp}>
-                              {UNITS.map((u) => (
-                                <option key={u} value={u}>{u}</option>
-                              ))}
-                            </select>
-                          </td>
-                          {seeMargin && (
-                            <td className="px-1 py-1">
-                              <Input dir="ltr" inputMode="decimal" value={l.unitCost} onChange={(e) => patchLine(si, li, { unitCost: e.target.value })} className={`${inp} w-20`} />
-                            </td>
-                          )}
-                          <td className="px-1 py-1">
-                            <Input dir="ltr" inputMode="decimal" value={l.unitPrice} onChange={(e) => patchLine(si, li, { unitPrice: e.target.value })} className={`${inp} w-20`} />
-                          </td>
-                          <td className="px-1 py-1">
-                            <Input dir="ltr" inputMode="decimal" value={l.discountPct} onChange={(e) => patchLine(si, li, { discountPct: e.target.value })} className={`${inp} w-14`} />
-                          </td>
-                          <td className="px-1 py-1 text-end" dir="ltr">{formatMoney(lt.lineTotal, locale)}</td>
-                          <td className="px-1 py-1">
-                            <Button variant="ghost" size="icon" aria-label={t('builder.removeLine')} onClick={() => removeLine(si, li)}>
-                              <Trash2 className="size-4" aria-hidden />
-                            </Button>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <div className="flex flex-wrap items-center gap-2">
-                  <Button variant="outline" size="sm" onClick={() => addLine(si)}>
-                    <Plus className="size-4" aria-hidden />
-                    {t('builder.addLine')}
-                  </Button>
-                  {costItems.length > 0 && (
-                    <select
-                      className={inp}
-                      value=""
-                      onChange={(e) => {
-                        const ci = costItems.find((c) => c.id === e.target.value);
-                        if (ci) addLine(si, ci);
-                      }}
-                    >
-                      <option value="">{t('builder.fromPriceBook')}</option>
-                      {costItems.map((c) => (
-                        <option key={c.id} value={c.id}>
-                          {c.code} · {pickLocale({ nameAr: c.nameAr, nameEn: c.nameEn }, 'name', locale).value}
-                        </option>
-                      ))}
-                    </select>
-                  )}
-                </div>
-                <span className="text-sm font-medium" dir="ltr">
-                  {t('builder.sectionSubtotal')}: {formatMoney(st.sectionSubtotal, locale)}
-                </span>
-              </div>
-            </CardContent>
-          </Card>
-        );
-      })}
+      {sections.map((sec, si) => (
+        <BuilderSectionCard
+          key={si}
+          section={sec}
+          sectionIndex={si}
+          sectionTotal={totals.sectionTotals[si]}
+          seeMargin={seeMargin}
+          costItems={costItems}
+          sectionLibrary={sectionLibrary}
+          patchSection={patchSection}
+          patchLine={patchLine}
+          addLine={addLine}
+          removeLine={removeLine}
+          onMoveUp={() => setSections(move(sections, si, -1))}
+          onMoveDown={() => setSections(move(sections, si, 1))}
+          onRemoveSection={() => removeSection(si)}
+        />
+      ))}
 
       <Button variant="outline" onClick={addSection}>
         <Plus className="size-4" aria-hidden />
@@ -469,74 +267,26 @@ export function ProposalBuilder({
       </Button>
 
       {/* Totals + margin panel */}
-      <Card>
-        <CardContent className="space-y-2 py-4">
-          <div className="flex flex-wrap items-center gap-3">
-            <label className="flex items-center gap-1.5 text-sm">
-              {t('builder.discountPct')}
-              <FieldHint hint={th('discountPct')} />
-              <Input dir="ltr" inputMode="decimal" value={discountPct} onChange={(e) => setDiscountPct(e.target.value)} className={`${inp} w-20`} />
-            </label>
-            <label className="flex items-center gap-1.5 text-sm">
-              {t('builder.taxRate')}
-              <FieldHint hint={th('taxRate')} />
-              <Input dir="ltr" inputMode="decimal" value={taxRate} onChange={(e) => setTaxRate(e.target.value)} className={`${inp} w-20`} />
-            </label>
-            <label className="flex items-center gap-1.5 text-sm">
-              {t('builder.supervisionPct')}
-              <FieldHint hint={th('supervisionPct')} />
-              <Input dir="ltr" inputMode="decimal" value={supervisionPct} onChange={(e) => setSupervisionPct(e.target.value)} className={`${inp} w-20`} />
-            </label>
-          </div>
-          <div className="ms-auto max-w-xs space-y-1 text-sm" dir="ltr">
-            <Row label={t('builder.subtotal')} value={formatMoney(totals.doc.subtotal, locale)} />
-            <Row label={t('builder.docDiscount')} value={formatMoney(totals.doc.discountAmount, locale)} />
-            <Row label={t('builder.tax')} value={formatMoney(totals.doc.taxAmount, locale)} />
-            <Row label={t('builder.supervision')} value={formatMoney(totals.doc.supervisionAmount, locale)} />
-            <Row label={t('builder.total')} value={formatMoney(totals.doc.total, locale)} bold />
-            {seeMargin ? (
-              <>
-                <Row label={t('builder.cost')} value={formatMoney(totals.doc.totalCost, locale)} />
-                <Row label={t('builder.margin')} value={formatMoney(totals.doc.totalMargin, locale)} />
-              </>
-            ) : (
-              <p className="text-xs text-muted-foreground">{t('builder.marginHidden')}</p>
-            )}
-          </div>
-        </CardContent>
-      </Card>
+      <BuilderTotalsPanel
+        discountPct={discountPct}
+        onDiscountPctChange={setDiscountPct}
+        taxRate={taxRate}
+        onTaxRateChange={setTaxRate}
+        supervisionPct={supervisionPct}
+        onSupervisionPctChange={setSupervisionPct}
+        doc={totals.doc}
+        seeMargin={seeMargin}
+      />
 
-      <div className="flex flex-wrap justify-end gap-2">
-        <Button variant="ghost" onClick={onDelete} disabled={pending}>
-          <Trash2 className="size-4" aria-hidden />
-          {t('builder.delete')}
-        </Button>
-        <Button variant="outline" onClick={() => save()} disabled={pending}>
-          {pending && <Loader2 className="size-4 animate-spin" aria-hidden />}
-          {t('builder.save')}
-        </Button>
-        <PreviewModal
-          proposalId={detail.id}
-          canSeeInternal={seeMargin}
-          canSend={canSend}
-          isDraft
-        />
-        {canSend && (
-          <Button onClick={onSend} disabled={pending}>
-            <Send className="size-4" aria-hidden />
-            {t('builder.send')}
-          </Button>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function Row({ label, value, bold }: { label: string; value: string; bold?: boolean }) {
-  return (
-    <div className={`flex justify-between ${bold ? 'font-semibold' : ''}`}>
-      <span className="text-muted-foreground">{label}</span>
-      <span>{value}</span>
+      <BuilderToolbar
+        proposalId={detail.id}
+        seeMargin={seeMargin}
+        canSend={canSend}
+        pending={pending}
+        onDelete={onDelete}
+        onSave={() => save()}
+        onSend={onSend}
+      />
     </div>
   );
 }
