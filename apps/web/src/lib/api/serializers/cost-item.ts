@@ -1,5 +1,5 @@
 import type { CostItem } from '@metra/db';
-import { toIso } from './shared';
+import { toApiMoney, toIso } from './shared';
 
 /**
  * Public v1 shape for a price-book cost item. `default_unit_cost` (the firm's cost
@@ -34,7 +34,7 @@ export function serializeCostItem(
     name_en: row.nameEn,
     section_id: row.sectionId,
     unit: row.unit,
-    default_unit_price: row.defaultUnitPrice,
+    default_unit_price: toApiMoney(row.defaultUnitPrice),
     tax_code: row.taxCode,
     eta_item_code: row.etaItemCode,
     eta_code_type: row.etaCodeType,
@@ -42,6 +42,6 @@ export function serializeCostItem(
     created_at: toIso(row.createdAt),
     updated_at: toIso(row.updatedAt),
   };
-  if (costVisible) out.default_unit_cost = row.defaultUnitCost;
+  if (costVisible) out.default_unit_cost = toApiMoney(row.defaultUnitCost);
   return out;
 }

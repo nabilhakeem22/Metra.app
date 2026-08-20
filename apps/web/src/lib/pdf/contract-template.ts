@@ -1,4 +1,5 @@
 import { formatMoney } from '@/lib/format/money';
+import { formatPercent, formatQuantity } from '@/lib/format/number';
 import { docYear, formatDocNumber } from '@/lib/format/doc-number';
 import type { ContractDetail } from '@/lib/contracts/queries';
 import { fontFaceCss } from './template';
@@ -51,10 +52,10 @@ export async function buildContractHtml(
           (l) => `
         <tr>
           <td class="desc">${pick(l.descriptionAr, l.descriptionEn, locale)}</td>
-          <td class="num">${esc(l.qty)} ${esc(l.unit)}</td>
+          <td class="num">${formatQuantity(l.qty, locale)} ${esc(l.unit)}</td>
           ${showCost ? `<td class="num">${m(l.unitCost ?? '0')}</td>` : ''}
           <td class="num">${m(l.unitPrice)}</td>
-          <td class="num">${esc(l.discountPct)}%</td>
+          <td class="num">${formatPercent(l.discountPct, locale)}</td>
           <td class="num">${m(l.lineTotal)}</td>
           ${showCost ? `<td class="num">${m(l.lineMargin ?? '0')}</td>` : ''}
         </tr>`,
@@ -127,16 +128,16 @@ export async function buildContractHtml(
   <table class="totals">
     <tr><td>${pick('المجموع الفرعي', 'Subtotal', locale)}</td><td class="num">${m(detail.subtotal)}</td></tr>
     <tr><td>${pick('الخصم', 'Discount', locale)}</td><td class="num">${m(detail.discountAmount)}</td></tr>
-    <tr><td>${pick('ضريبة القيمة المضافة', 'VAT', locale)} (${esc(detail.taxRate)}%)</td><td class="num">${m(detail.taxAmount)}</td></tr>
-    <tr><td>${pick('الإشراف', 'Supervision', locale)} (${esc(detail.supervisionPct)}%)</td><td class="num">${m(detail.supervisionAmount)}</td></tr>
+    <tr><td>${pick('ضريبة القيمة المضافة', 'VAT', locale)} (${formatPercent(detail.taxRate, locale)})</td><td class="num">${m(detail.taxAmount)}</td></tr>
+    <tr><td>${pick('الإشراف', 'Supervision', locale)} (${formatPercent(detail.supervisionPct, locale)})</td><td class="num">${m(detail.supervisionAmount)}</td></tr>
     <tr class="grand"><td>${pick('قيمة العقد الأصلية', 'Original value', locale)}</td><td class="num">${m(detail.originalValue)}</td></tr>
     ${revised ? `<tr class="grand"><td>${pick('القيمة بعد التعديلات', 'Revised value', locale)}</td><td class="num">${m(detail.revisedValue)}</td></tr>` : ''}
     ${showCost && detail.totalMargin !== undefined ? `<tr><td>${pick('هامش الربح', 'Margin', locale)}</td><td class="num">${m(detail.totalMargin)}</td></tr>` : ''}
   </table>
 
   <table class="terms totals">
-    ${termRow(pick('نسبة الدفعة المقدمة', 'Advance %', locale), `${esc(detail.advancePct)}%`)}
-    ${termRow(pick('نسبة المحتجز', 'Retention %', locale), `${esc(detail.retentionPct)}%`)}
+    ${termRow(pick('نسبة الدفعة المقدمة', 'Advance %', locale), formatPercent(detail.advancePct, locale))}
+    ${termRow(pick('نسبة المحتجز', 'Retention %', locale), formatPercent(detail.retentionPct, locale))}
     ${detail.paymentTermsDays != null ? termRow(pick('مدة السداد (يوم)', 'Payment terms (days)', locale), String(detail.paymentTermsDays)) : ''}
     ${detail.startDate ? termRow(pick('تاريخ البدء', 'Start date', locale), esc(detail.startDate)) : ''}
     ${detail.endDate ? termRow(pick('تاريخ الانتهاء', 'End date', locale), esc(detail.endDate)) : ''}

@@ -21,8 +21,8 @@ import { projectTypes } from './project-types';
 /**
  * Projects (P1 Slice 2 + Slice 5 profile). User-entered `code` (unique per org),
  * bilingual name, a same-org client, a nullable `type_id` referencing editable
- * project_types (set null on type delete), advance/retention %, optional
- * contract ref + description, a lifecycle status, dates/location, soft-deleted.
+ * project_types (set null on type delete), advance/retention %, an optional
+ * description, a lifecycle status, dates/location, soft-deleted.
  */
 export const projects = pgTable(
   'projects',
@@ -36,7 +36,6 @@ export const projects = pgTable(
     clientId: uuid('client_id').notNull(),
     typeId: uuid('type_id'),
     status: projectStatus('status').notNull().default('draft'),
-    contractRef: text('contract_ref'),
     description: text('description'),
     advancePct: money('advance_pct').notNull().default('0'),
     retentionPct: money('retention_pct').notNull().default('0'),

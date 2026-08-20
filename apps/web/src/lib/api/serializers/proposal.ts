@@ -1,5 +1,5 @@
 import type { ProposalDetail } from '@/lib/proposals/queries';
-import { toIso } from './shared';
+import { toApiMoney, toApiQty, toIso } from './shared';
 
 /** Minimal row the list endpoint serializes (camelCase, from the API query). */
 export interface ProposalSummaryRow {
@@ -40,7 +40,7 @@ export function serializeProposalSummary(
     title_en: row.titleEn,
     status: row.status,
     currency: row.currency,
-    total: row.total,
+    total: toApiMoney(row.total),
     issue_date: row.issueDate,
     client_id: row.clientId,
     project_id: row.projectId,
@@ -113,7 +113,7 @@ export function serializeProposal(
     title_en: detail.titleEn,
     status: detail.status,
     currency: detail.currency,
-    total: detail.total,
+    total: toApiMoney(detail.total),
     issue_date: detail.issueDate,
     client_id: detail.clientId,
     project_id: detail.projectId,
@@ -121,14 +121,14 @@ export function serializeProposal(
     expiry_date: detail.expiryDate,
     version: detail.version,
     supersedes_id: detail.supersedesId,
-    discount_pct: detail.discountPct,
-    tax_rate: detail.taxRate,
-    supervision_pct: detail.supervisionPct,
-    subtotal: detail.subtotal,
-    discount_amount: detail.discountAmount,
-    taxable_base: detail.taxableBase,
-    tax_amount: detail.taxAmount,
-    supervision_amount: detail.supervisionAmount,
+    discount_pct: toApiMoney(detail.discountPct),
+    tax_rate: toApiMoney(detail.taxRate),
+    supervision_pct: toApiMoney(detail.supervisionPct),
+    subtotal: toApiMoney(detail.subtotal),
+    discount_amount: toApiMoney(detail.discountAmount),
+    taxable_base: toApiMoney(detail.taxableBase),
+    tax_amount: toApiMoney(detail.taxAmount),
+    supervision_amount: toApiMoney(detail.supervisionAmount),
     notes_ar: detail.notesAr,
     notes_en: detail.notesEn,
     terms_ar: detail.termsAr,
@@ -140,17 +140,17 @@ export function serializeProposal(
           description_ar: l.descriptionAr,
           description_en: l.descriptionEn,
           cost_item_id: l.costItemId,
-          qty: l.qty,
+          qty: toApiQty(l.qty),
           unit: l.unit,
-          unit_price: l.unitPrice,
-          discount_pct: l.discountPct,
-          line_total: l.lineTotal,
+          unit_price: toApiMoney(l.unitPrice),
+          discount_pct: toApiMoney(l.discountPct),
+          line_total: toApiMoney(l.lineTotal),
           sort_order: l.sortOrder,
         };
         if (costVisible) {
-          line.unit_cost = l.unitCost;
-          line.line_cost = l.lineCost;
-          line.line_margin = l.lineMargin;
+          line.unit_cost = toApiMoney(l.unitCost);
+          line.line_cost = toApiMoney(l.lineCost);
+          line.line_margin = toApiMoney(l.lineMargin);
         }
         return line;
       });
@@ -159,19 +159,19 @@ export function serializeProposal(
         title_ar: s.titleAr,
         title_en: s.titleEn,
         sort_order: s.sortOrder,
-        section_subtotal: s.sectionSubtotal,
+        section_subtotal: toApiMoney(s.sectionSubtotal),
         lines,
       };
       if (costVisible) {
-        section.section_cost = s.sectionCost;
-        section.section_margin = s.sectionMargin;
+        section.section_cost = toApiMoney(s.sectionCost);
+        section.section_margin = toApiMoney(s.sectionMargin);
       }
       return section;
     }),
   };
   if (costVisible) {
-    out.total_cost = detail.totalCost;
-    out.total_margin = detail.totalMargin;
+    out.total_cost = toApiMoney(detail.totalCost);
+    out.total_margin = toApiMoney(detail.totalMargin);
   }
   return out;
 }

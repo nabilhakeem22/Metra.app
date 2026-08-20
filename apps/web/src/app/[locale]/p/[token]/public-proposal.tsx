@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { formatMoney } from '@/lib/format/money';
+import { formatPercent, formatQuantity } from '@/lib/format/number';
 import {
   formatProposalNumber,
   proposalYear,
@@ -86,7 +87,7 @@ export function PublicProposalView({
                   <tr key={l.id} className="border-b last:border-0">
                     <td className="px-4 py-2">{pick(l.description_ar, l.description_en)}</td>
                     <td className="px-4 py-2 text-muted-foreground" dir="ltr">
-                      {l.qty} {l.unit}
+                      {formatQuantity(l.qty, locale)} {l.unit}
                     </td>
                     <td className="px-4 py-2 text-end" dir="ltr">{m(l.unit_price)}</td>
                     <td className="px-4 py-2 text-end" dir="ltr">{m(l.line_total)}</td>
@@ -102,7 +103,7 @@ export function PublicProposalView({
         <CardContent className="ms-auto max-w-xs space-y-1 py-4 text-sm" dir="ltr">
           <Row label={t('p.subtotal')} value={m(proposal.subtotal)} />
           <Row label={t('p.discount')} value={m(proposal.discount_amount)} />
-          <Row label={`${t('p.tax')} (${proposal.tax_rate}%)`} value={m(proposal.tax_amount)} />
+          <Row label={`${t('p.tax')} (${formatPercent(proposal.tax_rate, locale)})`} value={m(proposal.tax_amount)} />
           <Row label={t('p.total')} value={m(proposal.total)} bold />
         </CardContent>
       </Card>

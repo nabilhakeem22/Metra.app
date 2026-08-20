@@ -1,12 +1,11 @@
 import type { Client } from '@metra/db';
-import { toIso } from './shared';
+import { toApiMoney, toIso } from './shared';
 
 /**
  * Public v1 shape for a client. This interface is the single source of truth for
- * what the API exposes (S1): regulated/sensitive identifiers — national_id,
- * tax_card_number, commercial_register, credit_terms — are DELIBERATELY OMITTED.
- * Clients carry NO cost/margin columns; advance_pct / retention_pct are
- * percentages (not cost) exposed as scale-4 money strings.
+ * what the API exposes (S1): regulated/sensitive identifiers and non-MVP CRM
+ * metadata are DELIBERATELY OMITTED. Clients carry NO cost/margin columns;
+ * advance_pct / retention_pct are percentages exposed as 2-decimal strings.
  */
 export interface PublicClient {
   id: string;
@@ -19,8 +18,6 @@ export interface PublicClient {
   city: string | null;
   address: string | null;
   tax_registration_number: string | null;
-  segment: string | null;
-  lead_source: string | null;
   advance_pct: string;
   retention_pct: string;
   notes: string | null;
@@ -41,10 +38,8 @@ export function serializeClient(row: Client): PublicClient {
     city: row.city,
     address: row.address,
     tax_registration_number: row.taxRegistrationNumber,
-    segment: row.segment,
-    lead_source: row.leadSource,
-    advance_pct: row.advancePct,
-    retention_pct: row.retentionPct,
+    advance_pct: toApiMoney(row.advancePct),
+    retention_pct: toApiMoney(row.retentionPct),
     notes: row.notes,
     active: row.active,
     created_at: toIso(row.createdAt),
