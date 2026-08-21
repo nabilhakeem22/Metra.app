@@ -325,7 +325,10 @@
     "illegal_trigger": "This action isn't allowed from the current stage",
     "transition_not_yet_enabled": "This step isn't available yet",
     "engagement_state_conflict": "This engagement was just updated — reload and try again",
-    "guard_scope_inputs_missing": "Add a title, client, and project before continuing"
+    "guard_scope_inputs_missing": "Add a title, client, and project before continuing",
+    "design_fee_required": "Enter a design fee greater than zero",
+    "milestone_split_invalid": "The milestone schedule must include a deposit and add up correctly",
+    "milestone_kind_duplicate": "Each milestone type can appear only once"
   },
   "common": {
     "untranslated": "untranslated",

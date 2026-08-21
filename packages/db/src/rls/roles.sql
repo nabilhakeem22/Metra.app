@@ -45,6 +45,9 @@ grant select, insert, update, delete on public.variation_order_lines to metra_ap
 -- Design Engagements (Step 1): the engagement record is mutable (create + Step 2
 -- state transitions); the transition ledger is append-only (granted below).
 grant select, insert, update on public.design_engagements to metra_app;
+-- engagement_milestones (Step 3): the fee schedule is editable during setup, so
+-- full DML (unlike the append-only transition ledger).
+grant select, insert, update, delete on public.engagement_milestones to metra_app;
 -- notifications: recipients read + mark-read (no delete); the runner inserts.
 grant select, insert, update on public.notifications to metra_app;
 -- api_keys (Public API v1): mint (insert), list (select), revoke + last_used

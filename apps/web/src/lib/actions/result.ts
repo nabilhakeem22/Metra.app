@@ -48,7 +48,10 @@ export type ActionCode =
   | 'illegal_trigger'
   | 'transition_not_yet_enabled'
   | 'engagement_state_conflict'
-  | 'guard_scope_inputs_missing';
+  | 'guard_scope_inputs_missing'
+  | 'design_fee_required'
+  | 'milestone_split_invalid'
+  | 'milestone_kind_duplicate';
 
 export interface ActionResult {
   ok: boolean;

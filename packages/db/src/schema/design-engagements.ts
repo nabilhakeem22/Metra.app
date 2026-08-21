@@ -43,6 +43,9 @@ export const designEngagements = pgTable(
     clientId: uuid('client_id').notNull(),
     projectId: uuid('project_id').notNull(),
     state: designEngagementState('state').notNull().default('created'),
+    // Set when `submitDesignFee` fires (Step 3): the agreed design fee whose
+    // milestone schedule lives in engagement_milestones. Nullable until then.
+    designFee: money('design_fee'),
     offPlan: boolean('off_plan').notNull().default(false),
     asBuiltDue: boolean('as_built_due').notNull().default(false),
     freeRevisionN: integer('free_revision_n').notNull().default(3),

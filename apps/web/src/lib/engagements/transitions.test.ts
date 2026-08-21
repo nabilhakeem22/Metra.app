@@ -49,7 +49,13 @@ describe('transition registry', () => {
       expect(['engagements_design', 'engagements_finance', 'engagements_issue']).toContain(
         def.capability,
       );
-      expect(def.sideEffect).toBeNull();
+      // Only submitDesignFee carries a side-effect this step (Step 3); every other
+      // trigger still moves state only.
+      if (trigger === 'submitDesignFee') {
+        expect(def.sideEffect).toBe('generateFeeSchedule');
+      } else {
+        expect(def.sideEffect).toBeNull();
+      }
     }
   });
 
@@ -67,6 +73,7 @@ describe('transition registry', () => {
     expect(TRANSITIONS.submitDesignFee.from).toBe('created');
     expect(TRANSITIONS.submitDesignFee.to).toBe('design_proposal');
     expect(TRANSITIONS.submitDesignFee.capability).toBe('engagements_design');
+    expect(TRANSITIONS.submitDesignFee.sideEffect).toBe('generateFeeSchedule');
 
     // Every other trigger routes through pendingGuard (fail-closed).
     for (const trigger of ALL_TRIGGERS) {
