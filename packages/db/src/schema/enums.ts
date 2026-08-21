@@ -201,6 +201,24 @@ export const MILESTONE_BASES = ['percent', 'amount'] as const;
 
 export const milestoneBasis = pgEnum('milestone_basis', MILESTONE_BASES);
 
+/**
+ * Design-Engagement Machine, Step 4 — the kinds of payment recorded in the
+ * append-only payment ledger. The four milestone kinds (`deposit`/`gate_a`/
+ * `gate_b`/`balance`) plus `revision_co` for a paid revision change-order. This
+ * is a DISTINCT enum from `milestone_kind` (which has no `revision_co`): a
+ * milestone is a scheduled slice of the fee; a payment event is a cleared
+ * receipt against the engagement. Order is a contract; labels are localized.
+ */
+export const PAYMENT_EVENT_KINDS = [
+  'deposit',
+  'gate_a',
+  'gate_b',
+  'balance',
+  'revision_co',
+] as const;
+
+export const paymentEventKind = pgEnum('payment_event_kind', PAYMENT_EVENT_KINDS);
+
 export type MemberRole = (typeof MEMBER_ROLES)[number];
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];
 export type InvitationStatus = (typeof INVITATION_STATUSES)[number];
@@ -217,3 +235,4 @@ export type StageStatus = (typeof STAGE_STATUSES)[number];
 export type DesignEngagementState = (typeof DESIGN_ENGAGEMENT_STATES)[number];
 export type MilestoneKind = (typeof MILESTONE_KINDS)[number];
 export type MilestoneBasis = (typeof MILESTONE_BASES)[number];
+export type PaymentEventKind = (typeof PAYMENT_EVENT_KINDS)[number];

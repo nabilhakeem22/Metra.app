@@ -1,22 +1,36 @@
-// Design-Engagement Machine — guard engine (Step 2). PURE and CLIENT-SAFE:
-// guards are total predicates over a pre-loaded facts bundle. A guard NEVER
-// takes a `tx`, does I/O, or touches the DB — the executor gathers every fact
-// first, then guards only decide. The only runtime dependency is the type-level
-// `DesignEngagement` (erased). Later steps WIDEN `GuardFacts` (payments,
-// artifacts, revision counters) without changing this contract.
-import type { DesignEngagement } from '@metra/db';
+// Design-Engagement Machine — guard engine (Step 2, widened in Step 4). PURE and
+// CLIENT-SAFE: guards are total predicates over a pre-loaded facts bundle. A
+// guard NEVER takes a `tx`, does I/O, or touches the DB — the executor gathers
+// every fact first, then guards only decide. Its runtime dependencies are the
+// pure, client-safe scale-4 money helpers (`parseMoney4` / `pctOf`) and the
+// erased `@metra/db` types. Later steps WIDEN `GuardFacts` (artifacts, revision
+// counters) without changing this contract.
+import type {
+  DesignEngagement,
+  EngagementMilestone,
+  PaymentEvent,
+} from '@metra/db';
 import type { ActionCode } from '@/lib/actions/result';
+// Relative (not '@/'): guards.ts is exercised by a PLAIN `vitest run` unit test
+// with no path-alias plugin, so its runtime imports must resolve without '@/'.
+import { parseMoney4, pctOf } from '../aggregates/proposal-totals';
 
-/** The facts a guard may read. Slice-1 carries only the engagement row. */
+/**
+ * The facts a guard may read. Widened in Step 4: alongside the engagement row the
+ * executor now also pre-loads the fee-schedule `milestones` and the append-only
+ * `payments` ledger, so the deposit gate can decide from pure data.
+ */
 export interface GuardFacts {
   engagement: DesignEngagement;
+  milestones: EngagementMilestone[];
+  payments: PaymentEvent[];
 }
 
 /** A guard's verdict: pass, or fail with the coded reason to surface. */
 export type GuardResult = { ok: true } | { ok: false; code: ActionCode };
 
 /** Guard identifiers referenced by the transition registry. */
-export type GuardKey = 'scopeInputsPresent' | 'pendingGuard';
+export type GuardKey = 'scopeInputsPresent' | 'depositCleared' | 'pendingGuard';
 
 const pass: GuardResult = { ok: true };
 
@@ -36,9 +50,44 @@ function scopeInputsPresent(facts: GuardFacts): GuardResult {
 }
 
 /**
+ * The engagement's deposit is fully paid — the gate for `confirmAndPayDeposit`.
+ * Computes the REQUIRED deposit from the `deposit` milestone + `design_fee` in
+ * exact scale-4 BigInt (never parseFloat):
+ *   - basis `amount`  → required = the deposit milestone's `value`.
+ *   - basis `percent` → required = design_fee × (deposit% / 100), via `pctOf`
+ *     (round half away from zero — the SAME rule as the proposal money engine).
+ * PAID = Σ `amount` of the engagement's `deposit` payment events (every
+ * `payment_events` row is a cleared payment in the manual model). Passes iff
+ * paid ≥ required. FAILS CLOSED (`deposit_not_cleared`) if the deposit milestone
+ * or the design_fee is missing — which cannot happen after Step 3, but a gate on
+ * money must never open on absent facts.
+ */
+function depositCleared(facts: GuardFacts): GuardResult {
+  const deposit = facts.milestones.find((m) => m.kind === 'deposit');
+  const designFee = facts.engagement.designFee;
+  if (!deposit || !designFee) {
+    return { ok: false, code: 'deposit_not_cleared' };
+  }
+
+  const required =
+    deposit.basis === 'amount'
+      ? parseMoney4(deposit.value)
+      : pctOf(parseMoney4(designFee), parseMoney4(deposit.value));
+
+  const paid = facts.payments.reduce(
+    (sum, payment) =>
+      payment.kind === 'deposit' ? sum + parseMoney4(payment.amount) : sum,
+    0n,
+  );
+
+  if (paid < required) return { ok: false, code: 'deposit_not_cleared' };
+  return pass;
+}
+
+/**
  * Fail-closed sentinel for triggers whose real guard belongs to a later step.
  * It always denies with `transition_not_yet_enabled`, so a declared-but-unwired
- * transition can never fire early. Replaced by concrete guards in Steps 3–4.
+ * transition can never fire early. Replaced by concrete guards in later steps.
  */
 function pendingGuard(): GuardResult {
   return { ok: false, code: 'transition_not_yet_enabled' };
@@ -47,5 +96,6 @@ function pendingGuard(): GuardResult {
 /** The guard registry — the executor resolves a GuardKey to its predicate here. */
 export const GUARDS: Record<GuardKey, (facts: GuardFacts) => GuardResult> = {
   scopeInputsPresent,
+  depositCleared,
   pendingGuard,
 };

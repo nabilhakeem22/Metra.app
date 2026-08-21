@@ -49,10 +49,12 @@ describe('transition registry', () => {
       expect(['engagements_design', 'engagements_finance', 'engagements_issue']).toContain(
         def.capability,
       );
-      // Only submitDesignFee carries a side-effect this step (Step 3); every other
-      // trigger still moves state only.
+      // The two wired triggers carry side-effects (submitDesignFee -> Step 3,
+      // confirmAndPayDeposit -> Step 4); every other trigger still moves state only.
       if (trigger === 'submitDesignFee') {
         expect(def.sideEffect).toBe('generateFeeSchedule');
+      } else if (trigger === 'confirmAndPayDeposit') {
+        expect(def.sideEffect).toBe('activateOnDeposit');
       } else {
         expect(def.sideEffect).toBeNull();
       }
@@ -65,19 +67,29 @@ describe('transition registry', () => {
     expect([...reachable].sort()).toEqual([...DESIGN_STATES].sort());
   });
 
-  it('submitDesignFee is the ONLY fully-wired trigger; the rest fail closed', () => {
-    expect([...WIRED_TRIGGERS]).toEqual(['submitDesignFee']);
+  it('submitDesignFee + confirmAndPayDeposit are the wired triggers; the rest fail closed', () => {
+    expect([...WIRED_TRIGGERS].sort()).toEqual(
+      ['confirmAndPayDeposit', 'submitDesignFee'].sort(),
+    );
 
-    // The wired trigger carries a concrete guard, never the sentinel.
+    // Each wired trigger carries a concrete guard, never the sentinel.
     expect(TRANSITIONS.submitDesignFee.guards).toEqual(['scopeInputsPresent']);
     expect(TRANSITIONS.submitDesignFee.from).toBe('created');
     expect(TRANSITIONS.submitDesignFee.to).toBe('design_proposal');
     expect(TRANSITIONS.submitDesignFee.capability).toBe('engagements_design');
     expect(TRANSITIONS.submitDesignFee.sideEffect).toBe('generateFeeSchedule');
 
+    expect(TRANSITIONS.confirmAndPayDeposit.guards).toEqual(['depositCleared']);
+    expect(TRANSITIONS.confirmAndPayDeposit.from).toBe('design_proposal');
+    expect(TRANSITIONS.confirmAndPayDeposit.to).toBe('survey');
+    expect(TRANSITIONS.confirmAndPayDeposit.capability).toBe('engagements_finance');
+    expect(TRANSITIONS.confirmAndPayDeposit.sideEffect).toBe('activateOnDeposit');
+
     // Every other trigger routes through pendingGuard (fail-closed).
     for (const trigger of ALL_TRIGGERS) {
-      if (trigger === 'submitDesignFee') continue;
+      if (trigger === 'submitDesignFee' || trigger === 'confirmAndPayDeposit') {
+        continue;
+      }
       expect(TRANSITIONS[trigger].guards).toContain('pendingGuard');
     }
   });

@@ -2,10 +2,12 @@ import 'server-only';
 import {
   designEngagements,
   engagementMilestones,
+  paymentEvents,
   type MilestoneBasis,
   type MilestoneKind,
+  type PaymentEventKind,
 } from '@metra/db';
-import { asc, eq } from 'drizzle-orm';
+import { asc, desc, eq } from 'drizzle-orm';
 import { withOrgContext, type OrgContext } from '@/lib/db/context';
 
 /** A single milestone in a fee schedule (money as a scale-4 string). */
@@ -51,4 +53,42 @@ export function getEngagementFeeSchedule(
 
     return { designFee: engagement?.designFee ?? null, milestones };
   });
+}
+
+/** One row of the append-only payment ledger (money as a scale-4 string). */
+export interface EngagementPayment {
+  id: string;
+  kind: PaymentEventKind;
+  amount: string;
+  method: string | null;
+  reference: string | null;
+  clearedAt: Date;
+  note: string | null;
+}
+
+/**
+ * The cleared payments recorded against an engagement, NEWEST FIRST. All money is
+ * returned as scale-4 strings — the API/UI layer applies 2-decimal formatting,
+ * not this query. RLS scopes the read to the caller's org (a foreign engagement
+ * reads as an empty list).
+ */
+export function getEngagementPayments(
+  ctx: OrgContext,
+  engagementId: string,
+): Promise<EngagementPayment[]> {
+  return withOrgContext(ctx, (tx) =>
+    tx
+      .select({
+        id: paymentEvents.id,
+        kind: paymentEvents.kind,
+        amount: paymentEvents.amount,
+        method: paymentEvents.method,
+        reference: paymentEvents.reference,
+        clearedAt: paymentEvents.clearedAt,
+        note: paymentEvents.note,
+      })
+      .from(paymentEvents)
+      .where(eq(paymentEvents.engagementId, engagementId))
+      .orderBy(desc(paymentEvents.clearedAt), desc(paymentEvents.createdAt)),
+  );
 }

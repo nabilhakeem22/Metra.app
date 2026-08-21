@@ -5,6 +5,7 @@ import type { ActionResult } from '@/lib/actions/result';
 import { requireOrg } from '@/lib/auth/require-org';
 import { createEngagementCore, type CreateEngagementInput } from './core';
 import { executeTransition } from './executor';
+import { recordPaymentCore, type RecordPaymentInput } from './payments';
 import type { GenerateFeeSchedulePayload } from './transitions';
 
 /**
@@ -40,6 +41,22 @@ export async function submitDesignFee(
     trigger: 'submitDesignFee',
     payload,
   });
+  if (res.ok) revalidatePath('/', 'layout');
+  return res;
+}
+
+/**
+ * Server-action wrapper for {@link recordPaymentCore}: resolves the request's org
+ * context, appends one cleared payment to the append-only ledger, and revalidates
+ * the shell on success. Returns the ActionResult (with the new payment id in
+ * `data`) — never throws to the client. This is the manual finance ledger; there
+ * is no gateway.
+ */
+export async function recordPayment(
+  input: RecordPaymentInput,
+): Promise<ActionResult & { data?: string }> {
+  const ctx = await requireOrg();
+  const res = await recordPaymentCore(ctx, input);
   if (res.ok) revalidatePath('/', 'layout');
   return res;
 }
