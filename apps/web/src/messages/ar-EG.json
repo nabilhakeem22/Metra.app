@@ -320,7 +320,12 @@
     "variation_not_issued": "لم يتم إصدار أمر التغيير بعد",
     "engagement_title_required": "أدخل عنوانًا بالعربية أو الإنجليزية",
     "engagement_client_required": "اختر عميلاً",
-    "engagement_project_required": "اختر مشروعًا"
+    "engagement_project_required": "اختر مشروعًا",
+    "engagement_not_found": "تعذّر العثور على هذه المشاركة",
+    "illegal_trigger": "هذا الإجراء غير مسموح من المرحلة الحالية",
+    "transition_not_yet_enabled": "هذه الخطوة غير متاحة بعد",
+    "engagement_state_conflict": "تم تحديث هذه المشاركة للتو — أعد التحميل وحاول مجددًا",
+    "guard_scope_inputs_missing": "أضف عنوانًا وعميلًا ومشروعًا قبل المتابعة"
   },
   "common": {
     "untranslated": "غير مترجم",

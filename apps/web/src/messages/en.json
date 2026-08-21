@@ -320,7 +320,12 @@
     "variation_not_issued": "This variation order has not been issued yet",
     "engagement_title_required": "Enter a title in Arabic or English",
     "engagement_client_required": "Select a client",
-    "engagement_project_required": "Select a project"
+    "engagement_project_required": "Select a project",
+    "engagement_not_found": "This engagement could not be found",
+    "illegal_trigger": "This action isn't allowed from the current stage",
+    "transition_not_yet_enabled": "This step isn't available yet",
+    "engagement_state_conflict": "This engagement was just updated — reload and try again",
+    "guard_scope_inputs_missing": "Add a title, client, and project before continuing"
   },
   "common": {
     "untranslated": "untranslated",

@@ -43,7 +43,12 @@ export type ActionCode =
   | 'variation_not_issued'
   | 'engagement_title_required'
   | 'engagement_client_required'
-  | 'engagement_project_required';
+  | 'engagement_project_required'
+  | 'engagement_not_found'
+  | 'illegal_trigger'
+  | 'transition_not_yet_enabled'
+  | 'engagement_state_conflict'
+  | 'guard_scope_inputs_missing';
 
 export interface ActionResult {
   ok: boolean;
