@@ -115,6 +115,9 @@ export const ACTION_CODE_PROBLEM: Record<ActionCode, ApiProblemKind> = {
   transition_not_yet_enabled: 'bad-request',
   engagement_state_conflict: 'bad-request',
   guard_scope_inputs_missing: 'bad-request',
+  design_fee_required: 'bad-request',
+  milestone_split_invalid: 'bad-request',
+  milestone_kind_duplicate: 'bad-request',
 };
 
 /** A problem Response derived from an ActionResult error code. */

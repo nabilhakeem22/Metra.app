@@ -58,6 +58,9 @@ const ALL_CODES: ActionCode[] = [
   'transition_not_yet_enabled',
   'engagement_state_conflict',
   'guard_scope_inputs_missing',
+  'design_fee_required',
+  'milestone_split_invalid',
+  'milestone_kind_duplicate',
 ];
 
 describe('problem+json envelope', () => {

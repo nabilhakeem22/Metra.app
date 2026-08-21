@@ -10,6 +10,7 @@ import { fail, mutateInOrg } from '@/lib/actions/mutate';
 import { err, type ActionResult } from '@/lib/actions/result';
 import type { OrgContext } from '@/lib/db/context';
 import type { PermissionAction } from '@/lib/permissions/roles';
+import { generateFeeSchedule } from './fee-schedule';
 import { GUARDS, type GuardFacts } from './guards';
 import { TRANSITIONS, type CapabilityKey, type Trigger } from './transitions';
 
@@ -72,9 +73,9 @@ export async function executeTransition(
         if (!verdict.ok) fail(verdict.code);
       }
 
-      // Side-effect: none this step. `def.sideEffect` is always null until a
-      // later step widens SideEffectKey and adds its branch here.
-
+      // Atomic admission gate FIRST: only the writer that flips the state off the
+      // expected `from` value proceeds — so a side-effect never runs twice for one
+      // move. A losing concurrent caller gets `engagement_state_conflict` here.
       const gated = await tx
         .update(designEngagements)
         .set({ state: def.to, updatedAt: new Date() })
@@ -86,6 +87,13 @@ export async function executeTransition(
         )
         .returning({ id: designEngagements.id });
       if (!gated[0]) fail('engagement_state_conflict');
+
+      // Side-effect: runs INSIDE this tx, after the gate, so it commits atomically
+      // with the state move. A `fail()` inside it rolls the whole tx back — no
+      // state change, no side-effect rows. Each key has exactly one branch.
+      if (def.sideEffect === 'generateFeeSchedule') {
+        await generateFeeSchedule(tx, ctx, engagementId, input.payload);
+      }
 
       await tx.insert(engagementTransitions).values({
         orgId: ctx.orgId,

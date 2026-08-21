@@ -176,6 +176,31 @@ export const designEngagementState = pgEnum(
   DESIGN_ENGAGEMENT_STATES,
 );
 
+/**
+ * Design-Engagement Machine, Step 3 — the four fee-schedule milestone kinds.
+ * `deposit` is always required; `gate_a`/`gate_b` are mid-project gates; `balance`
+ * is the final payment. Order is a contract shared with the TS `MilestoneKind`
+ * union in @metra/web; labels are localized (not stored).
+ */
+export const MILESTONE_KINDS = [
+  'deposit',
+  'gate_a',
+  'gate_b',
+  'balance',
+] as const;
+
+export const milestoneKind = pgEnum('milestone_kind', MILESTONE_KINDS);
+
+/**
+ * Design-Engagement Machine, Step 3 — how a milestone's `value` is interpreted.
+ * `percent` (all milestones' percents must sum to exactly 100.0000) or `amount`
+ * (all amounts must sum to the design fee to the piastre). A single schedule may
+ * not mix the two bases. Order is a contract; labels are localized.
+ */
+export const MILESTONE_BASES = ['percent', 'amount'] as const;
+
+export const milestoneBasis = pgEnum('milestone_basis', MILESTONE_BASES);
+
 export type MemberRole = (typeof MEMBER_ROLES)[number];
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];
 export type InvitationStatus = (typeof INVITATION_STATUSES)[number];
@@ -190,3 +215,5 @@ export type ActivityEntityType = (typeof ACTIVITY_ENTITY_TYPES)[number];
 export type ActivityKind = (typeof ACTIVITY_KINDS)[number];
 export type StageStatus = (typeof STAGE_STATUSES)[number];
 export type DesignEngagementState = (typeof DESIGN_ENGAGEMENT_STATES)[number];
+export type MilestoneKind = (typeof MILESTONE_KINDS)[number];
+export type MilestoneBasis = (typeof MILESTONE_BASES)[number];

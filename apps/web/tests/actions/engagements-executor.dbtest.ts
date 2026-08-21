@@ -14,6 +14,17 @@ afterAll(async () => {
   await closeFixture();
 });
 
+// A valid fee-schedule payload — Step 3 made submitDesignFee require one. These
+// executor-mechanics tests only need it to be accepted; the split math itself is
+// exercised in engagements-fee.dbtest.ts.
+const VALID_FEE = {
+  designFee: '100000',
+  milestones: [
+    { kind: 'deposit', basis: 'percent', value: '50' },
+    { kind: 'balance', basis: 'percent', value: '50' },
+  ],
+} as const;
+
 interface Ledger {
   from_state: string | null;
   to_state: string | null;
@@ -70,6 +81,7 @@ describe('executeTransition — submitDesignFee (Design-Engagement Machine, Step
     const res = await executeTransition(ctx, {
       engagementId,
       trigger: 'submitDesignFee',
+      payload: VALID_FEE,
     });
     expect(res).toEqual({ ok: true, data: undefined });
     expect(await stateOf(engagementId)).toBe('design_proposal');
@@ -87,11 +99,12 @@ describe('executeTransition — submitDesignFee (Design-Engagement Machine, Step
   it('from a non-`created` state -> illegal_trigger, no state change, no extra ledger row', async () => {
     const { ctx, engagementId } = await setup();
     // First move lands it in design_proposal.
-    await executeTransition(ctx, { engagementId, trigger: 'submitDesignFee' });
+    await executeTransition(ctx, { engagementId, trigger: 'submitDesignFee', payload: VALID_FEE });
     // Second submit is illegal from design_proposal.
     const res = await executeTransition(ctx, {
       engagementId,
       trigger: 'submitDesignFee',
+      payload: VALID_FEE,
     });
     expect(res).toEqual({ ok: false, error: 'illegal_trigger' });
     expect(await stateOf(engagementId)).toBe('design_proposal');
@@ -102,7 +115,7 @@ describe('executeTransition — submitDesignFee (Design-Engagement Machine, Step
     const { ctx, engagementId } = await setup();
     // Reach confirmAndPayDeposit's `from` state (design_proposal) so the flow
     // gets past the from-check and actually runs its (pending) guard.
-    await executeTransition(ctx, { engagementId, trigger: 'submitDesignFee' });
+    await executeTransition(ctx, { engagementId, trigger: 'submitDesignFee', payload: VALID_FEE });
     const res = await executeTransition(ctx, {
       engagementId,
       trigger: 'confirmAndPayDeposit',
@@ -116,8 +129,8 @@ describe('executeTransition — submitDesignFee (Design-Engagement Machine, Step
   it('two concurrent submitDesignFee: exactly one wins, one ledger row (atomic gate)', async () => {
     const { ctx, engagementId } = await setup();
     const [a, b] = await Promise.all([
-      executeTransition(ctx, { engagementId, trigger: 'submitDesignFee' }),
-      executeTransition(ctx, { engagementId, trigger: 'submitDesignFee' }),
+      executeTransition(ctx, { engagementId, trigger: 'submitDesignFee', payload: VALID_FEE }),
+      executeTransition(ctx, { engagementId, trigger: 'submitDesignFee', payload: VALID_FEE }),
     ]);
 
     const results = [a, b];

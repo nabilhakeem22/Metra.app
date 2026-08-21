@@ -4,6 +4,7 @@
 // wired this step. Every later-step trigger points its guard at `pendingGuard`,
 // which fails closed with `transition_not_yet_enabled` — declared, reachable in
 // type-space, but impossible to fire until its real guard/side-effect lands.
+import type { MilestoneBasis, MilestoneKind } from '@metra/db';
 import type { Capability } from '@/lib/permissions/roles';
 import type { GuardKey } from './guards';
 import type { DesignState } from './states';
@@ -35,12 +36,30 @@ export type CapabilityKey = Extract<
 >;
 
 /**
- * Side-effect identifiers. NONE are wired this step — `submitDesignFee` moves
- * state only (its fee-proposal generation is Step 3). Kept as an explicit
- * `never` so every `sideEffect` is provably `null` until a later step widens
- * this union AND adds the matching executor branch.
+ * Side-effect identifiers. Step 3 wires the first one: `generateFeeSchedule`,
+ * fired by `submitDesignFee`. A side-effect runs INSIDE the executor's tx (atomic
+ * with the state move); its executor branch is the ONLY place it may run. Every
+ * later side-effect widens this union AND adds a matching executor branch.
  */
-export type SideEffectKey = never;
+export type SideEffectKey = 'generateFeeSchedule';
+
+/** One milestone row in a fee-schedule payload (money as a scale-4 string). */
+export interface MilestoneInput {
+  kind: MilestoneKind;
+  basis: MilestoneBasis;
+  value: string;
+}
+
+/** Payload for `generateFeeSchedule`: the design fee + its milestone split. */
+export interface GenerateFeeSchedulePayload {
+  designFee: string;
+  milestones: MilestoneInput[];
+}
+
+/** Maps each side-effect key to the payload its executor branch requires. */
+export interface TriggerPayloads {
+  generateFeeSchedule: GenerateFeeSchedulePayload;
+}
 
 export interface TransitionDef {
   from: DesignState | DesignState[];
@@ -62,7 +81,7 @@ export const TRANSITIONS: Record<Trigger, TransitionDef> = {
     from: 'created',
     to: 'design_proposal',
     guards: ['scopeInputsPresent'],
-    sideEffect: null,
+    sideEffect: 'generateFeeSchedule',
     capability: 'engagements_design',
   },
   confirmAndPayDeposit: {

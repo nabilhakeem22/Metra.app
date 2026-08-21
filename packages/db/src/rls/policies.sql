@@ -493,6 +493,21 @@ create policy org_isolation on public.engagement_transitions
     and public.app_is_current_org_member()
   );
 
+-- engagement_milestones (Step 3; full DML — the fee schedule is editable while
+-- the engagement is being set up; org-isolated + membership-gated)
+alter table public.engagement_milestones enable row level security;
+alter table public.engagement_milestones force  row level security;
+drop policy if exists org_isolation on public.engagement_milestones;
+create policy org_isolation on public.engagement_milestones
+  using (
+    org_id = nullif(current_setting('app.current_org_id', true), '')::uuid
+    and public.app_is_current_org_member()
+  )
+  with check (
+    org_id = nullif(current_setting('app.current_org_id', true), '')::uuid
+    and public.app_is_current_org_member()
+  );
+
 -- =============================================================================
 -- P1 Automation — notifications (recipient-scoped) + automation config/claim log
 -- =============================================================================
