@@ -110,6 +110,11 @@ export const ACTION_CODE_PROBLEM: Record<ActionCode, ApiProblemKind> = {
   engagement_title_required: 'bad-request',
   engagement_client_required: 'bad-request',
   engagement_project_required: 'bad-request',
+  engagement_not_found: 'bad-request',
+  illegal_trigger: 'bad-request',
+  transition_not_yet_enabled: 'bad-request',
+  engagement_state_conflict: 'bad-request',
+  guard_scope_inputs_missing: 'bad-request',
 };
 
 /** A problem Response derived from an ActionResult error code. */
