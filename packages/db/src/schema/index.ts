@@ -30,6 +30,8 @@ export * from './contract-events';
 export * from './variation-orders';
 export * from './variation-order-lines';
 export * from './variation-order-events';
+export * from './design-engagements';
+export * from './engagement-transitions';
 export * from './notifications';
 export * from './automation-settings';
 export * from './automation-run-log';
@@ -61,6 +63,8 @@ import { contractEvents } from './contract-events';
 import { variationOrders } from './variation-orders';
 import { variationOrderLines } from './variation-order-lines';
 import { variationOrderEvents } from './variation-order-events';
+import { designEngagements } from './design-engagements';
+import { engagementTransitions } from './engagement-transitions';
 import { notifications } from './notifications';
 import { automationSettings } from './automation-settings';
 import { automationRunLog } from './automation-run-log';
@@ -94,6 +98,8 @@ export const orgScopedTables = {
   variationOrders,
   variationOrderLines,
   variationOrderEvents,
+  designEngagements,
+  engagementTransitions,
   notifications,
   automationSettings,
   automationRunLog,
@@ -129,6 +135,8 @@ export const allTables = {
   variationOrders,
   variationOrderLines,
   variationOrderEvents,
+  designEngagements,
+  engagementTransitions,
   notifications,
   automationSettings,
   automationRunLog,

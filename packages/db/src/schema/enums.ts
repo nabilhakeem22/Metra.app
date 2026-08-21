@@ -148,6 +148,34 @@ export const STAGE_STATUSES = [
 
 export const stageStatus = pgEnum('stage_status', STAGE_STATUSES);
 
+/**
+ * Design-engagement lifecycle (Design-Engagement Machine, Step 1). Order is a
+ * contract; labels localized. Step 1 only ever creates rows in `created`; the
+ * transition registry / guard engine / executor land in Step 2.
+ */
+export const DESIGN_ENGAGEMENT_STATES = [
+  'created',
+  'design_proposal',
+  'survey',
+  'layout',
+  'concept_review',
+  'negotiation',
+  'design_3d',
+  'final_approval',
+  'shop_drawings',
+  'boq',
+  'execution_decision',
+  'design_only_handoff',
+  'closed_design_only',
+  'execution',
+  'abandoned',
+] as const;
+
+export const designEngagementState = pgEnum(
+  'design_engagement_state',
+  DESIGN_ENGAGEMENT_STATES,
+);
+
 export type MemberRole = (typeof MEMBER_ROLES)[number];
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];
 export type InvitationStatus = (typeof INVITATION_STATUSES)[number];
@@ -161,3 +189,4 @@ export type VariationStatus = (typeof VARIATION_STATUSES)[number];
 export type ActivityEntityType = (typeof ACTIVITY_ENTITY_TYPES)[number];
 export type ActivityKind = (typeof ACTIVITY_KINDS)[number];
 export type StageStatus = (typeof STAGE_STATUSES)[number];
+export type DesignEngagementState = (typeof DESIGN_ENGAGEMENT_STATES)[number];

@@ -317,7 +317,10 @@
     "contract_not_signable": "لا يمكن إنهاء هذا العقد في حالته الحالية",
     "variation_not_draft": "لم يعد أمر التغيير مسودة",
     "variation_not_internal_approved": "يجب اعتماد أمر التغيير داخليًا أولًا",
-    "variation_not_issued": "لم يتم إصدار أمر التغيير بعد"
+    "variation_not_issued": "لم يتم إصدار أمر التغيير بعد",
+    "engagement_title_required": "أدخل عنوانًا بالعربية أو الإنجليزية",
+    "engagement_client_required": "اختر عميلاً",
+    "engagement_project_required": "اختر مشروعًا"
   },
   "common": {
     "untranslated": "غير مترجم",

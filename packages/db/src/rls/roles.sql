@@ -42,6 +42,9 @@ grant select, insert, update, delete on public.contract_sections to metra_app;
 grant select, insert, update, delete on public.contract_lines    to metra_app;
 grant select, insert, update, delete on public.variation_orders      to metra_app;
 grant select, insert, update, delete on public.variation_order_lines to metra_app;
+-- Design Engagements (Step 1): the engagement record is mutable (create + Step 2
+-- state transitions); the transition ledger is append-only (granted below).
+grant select, insert, update on public.design_engagements to metra_app;
 -- notifications: recipients read + mark-read (no delete); the runner inserts.
 grant select, insert, update on public.notifications to metra_app;
 -- api_keys (Public API v1): mint (insert), list (select), revoke + last_used
@@ -57,6 +60,7 @@ grant select, insert on public.price_change_lines  to metra_app;
 grant select, insert on public.proposal_events     to metra_app;
 grant select, insert on public.contract_events         to metra_app;
 grant select, insert on public.variation_order_events  to metra_app;
+grant select, insert on public.engagement_transitions  to metra_app;
 grant select, insert on public.automation_run_log  to metra_app;
 
 -- Future-proofing for composite-FK trigger functions.
