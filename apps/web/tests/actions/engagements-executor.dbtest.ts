@@ -113,12 +113,14 @@ describe('executeTransition — submitDesignFee (Design-Engagement Machine, Step
 
   it('a declared-but-unwired trigger -> transition_not_yet_enabled, state + ledger untouched', async () => {
     const { ctx, engagementId } = await setup();
-    // Reach confirmAndPayDeposit's `from` state (design_proposal) so the flow
-    // gets past the from-check and actually runs its (pending) guard.
+    // Advance to design_proposal, then fire `abandon` — legal from
+    // design_proposal but still fail-closed (pendingGuard) at this point in the
+    // build, so it exercises the "declared-but-not-yet-wired" path. (Swap to
+    // another still-pending trigger when abandon itself gets wired.)
     await executeTransition(ctx, { engagementId, trigger: 'submitDesignFee', payload: VALID_FEE });
     const res = await executeTransition(ctx, {
       engagementId,
-      trigger: 'confirmAndPayDeposit',
+      trigger: 'abandon',
     });
     expect(res).toEqual({ ok: false, error: 'transition_not_yet_enabled' });
     // Guard failure rolls back: no state move, no second ledger row.
