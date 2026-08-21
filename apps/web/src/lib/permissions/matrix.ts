@@ -46,6 +46,17 @@ const ROWS: Record<Capability, string[]> = {
   // Internal approval + issue are owner/admin only; client approve/reject is the
   // token path, which never consults this matrix.
   variations_price: ['A', 'A', '', '', '', '', ''],
+  // Design-Engagement Machine (Step 1). Three trigger families gate the (Step 2)
+  // transitions; Step 1 uses only engagements_design/create to gate createEngagement.
+  // design triggers -> owner/admin/PM/site_engineer (create/progress the design
+  // work); accountant/client none; viewer read-only (mirrors contracts_generate).
+  engagements_design: ['CRUA', 'CRUA', 'CRU', 'CRU', '', '', 'R'],
+  // finance triggers -> owner/admin/accountant (ROM/price/finance moves); viewer
+  // read-only; client none.
+  engagements_finance: ['CRUA', 'CRUA', '', '', 'CRUA', '', 'R'],
+  // issue triggers (mint client share links) -> owner/admin only; client NONE
+  // (the client-facing path is the unauthenticated token, never this matrix).
+  engagements_issue: ['A', 'A', '', '', '', '', ''],
   tasks_schedule: ['CRUA', 'CRUA', 'CRUA', 'RU', 'R', 'R', 'R'],
   cost_entries: ['CRUA', 'CRUA', 'CRU', 'CRU', 'CRUA', '', ''],
   cost_entry_approval: ['A', 'A', 'A', '', 'A', '', ''],

@@ -50,6 +50,9 @@ const ALL_CODES: ActionCode[] = [
   'variation_not_draft',
   'variation_not_internal_approved',
   'variation_not_issued',
+  'engagement_title_required',
+  'engagement_client_required',
+  'engagement_project_required',
 ];
 
 describe('problem+json envelope', () => {

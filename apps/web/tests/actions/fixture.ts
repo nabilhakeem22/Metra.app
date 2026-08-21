@@ -169,6 +169,10 @@ const TEARDOWN_TABLES_IN_FK_ORDER = [
   'contract_lines',
   'contract_sections',
   'contracts',
+  // Design engagements: the transition ledger cascades from engagements; both
+  // reference clients + projects (restrict), so tear these down before those.
+  'engagement_transitions',
+  'design_engagements',
   'proposal_events',
   'proposal_lines',
   'proposal_sections',

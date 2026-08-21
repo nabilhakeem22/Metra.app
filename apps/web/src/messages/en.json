@@ -317,7 +317,10 @@
     "contract_not_signable": "This contract can't be terminated in its current state",
     "variation_not_draft": "This variation order is no longer a draft",
     "variation_not_internal_approved": "The variation order must be internally approved first",
-    "variation_not_issued": "This variation order has not been issued yet"
+    "variation_not_issued": "This variation order has not been issued yet",
+    "engagement_title_required": "Enter a title in Arabic or English",
+    "engagement_client_required": "Select a client",
+    "engagement_project_required": "Select a project"
   },
   "common": {
     "untranslated": "untranslated",

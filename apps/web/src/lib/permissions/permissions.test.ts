@@ -274,3 +274,51 @@ describe('contracts + variations capabilities (P1 Slice 4)', () => {
     }
   });
 });
+
+describe('design-engagement capabilities (Machine, Step 1)', () => {
+  it('engagements_design: create granted to owner/admin/PM/site_engineer; denied to accountant/client', () => {
+    for (const role of [
+      'owner',
+      'admin',
+      'project_manager',
+      'site_engineer',
+    ] as const) {
+      expect(can(role, 'engagements_design', 'create')).toBe(true);
+    }
+    for (const role of ['accountant', 'client'] as const) {
+      expect(can(role, 'engagements_design', 'create')).toBe(false);
+    }
+    // viewer is read-only (mirrors contracts_generate).
+    expect(can('viewer', 'engagements_design', 'read')).toBe(true);
+    expect(can('viewer', 'engagements_design', 'create')).toBe(false);
+  });
+
+  it('engagements_finance: owner/admin/accountant; PM/site_engineer/client none', () => {
+    for (const role of ['owner', 'admin', 'accountant'] as const) {
+      expect(can(role, 'engagements_finance', 'create')).toBe(true);
+    }
+    for (const role of [
+      'project_manager',
+      'site_engineer',
+      'client',
+    ] as const) {
+      expect(can(role, 'engagements_finance', 'create')).toBe(false);
+    }
+  });
+
+  it('engagements_issue: owner/admin only; client NONE', () => {
+    expect(can('owner', 'engagements_issue', 'approve')).toBe(true);
+    expect(can('admin', 'engagements_issue', 'approve')).toBe(true);
+    for (const a of ['create', 'read', 'update', 'approve'] as const) {
+      expect(can('client', 'engagements_issue', a)).toBe(false);
+    }
+    for (const role of [
+      'project_manager',
+      'site_engineer',
+      'accountant',
+      'viewer',
+    ] as const) {
+      expect(can(role, 'engagements_issue', 'approve')).toBe(false);
+    }
+  });
+});

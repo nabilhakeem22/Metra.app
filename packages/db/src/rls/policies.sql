@@ -461,6 +461,39 @@ create trigger trg_variation_order_lines_parent_draft
   execute function public.enforce_variation_child_draft();
 
 -- =============================================================================
+-- Design Engagements (Design-Engagement Machine, Step 1) — org isolation for the
+-- engagement record + its append-only transition ledger.
+-- =============================================================================
+
+-- design_engagements
+alter table public.design_engagements enable row level security;
+alter table public.design_engagements force  row level security;
+drop policy if exists org_isolation on public.design_engagements;
+create policy org_isolation on public.design_engagements
+  using (
+    org_id = nullif(current_setting('app.current_org_id', true), '')::uuid
+    and public.app_is_current_org_member()
+  )
+  with check (
+    org_id = nullif(current_setting('app.current_org_id', true), '')::uuid
+    and public.app_is_current_org_member()
+  );
+
+-- engagement_transitions (append-only via grants; org-isolated + membership-gated)
+alter table public.engagement_transitions enable row level security;
+alter table public.engagement_transitions force  row level security;
+drop policy if exists org_isolation on public.engagement_transitions;
+create policy org_isolation on public.engagement_transitions
+  using (
+    org_id = nullif(current_setting('app.current_org_id', true), '')::uuid
+    and public.app_is_current_org_member()
+  )
+  with check (
+    org_id = nullif(current_setting('app.current_org_id', true), '')::uuid
+    and public.app_is_current_org_member()
+  );
+
+-- =============================================================================
 -- P1 Automation — notifications (recipient-scoped) + automation config/claim log
 -- =============================================================================
 
