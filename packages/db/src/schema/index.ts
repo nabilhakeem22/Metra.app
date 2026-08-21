@@ -33,6 +33,7 @@ export * from './variation-order-events';
 export * from './design-engagements';
 export * from './engagement-transitions';
 export * from './engagement-milestones';
+export * from './payment-events';
 export * from './notifications';
 export * from './automation-settings';
 export * from './automation-run-log';
@@ -67,6 +68,7 @@ import { variationOrderEvents } from './variation-order-events';
 import { designEngagements } from './design-engagements';
 import { engagementTransitions } from './engagement-transitions';
 import { engagementMilestones } from './engagement-milestones';
+import { paymentEvents } from './payment-events';
 import { notifications } from './notifications';
 import { automationSettings } from './automation-settings';
 import { automationRunLog } from './automation-run-log';
@@ -103,6 +105,7 @@ export const orgScopedTables = {
   designEngagements,
   engagementTransitions,
   engagementMilestones,
+  paymentEvents,
   notifications,
   automationSettings,
   automationRunLog,
@@ -141,6 +144,7 @@ export const allTables = {
   designEngagements,
   engagementTransitions,
   engagementMilestones,
+  paymentEvents,
   notifications,
   automationSettings,
   automationRunLog,

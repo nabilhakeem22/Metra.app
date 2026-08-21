@@ -54,6 +54,7 @@ const ALL_CODES: ActionCode[] = [
   'engagement_client_required',
   'engagement_project_required',
   'engagement_not_found',
+  'engagement_not_active',
   'illegal_trigger',
   'transition_not_yet_enabled',
   'engagement_state_conflict',
@@ -61,6 +62,8 @@ const ALL_CODES: ActionCode[] = [
   'design_fee_required',
   'milestone_split_invalid',
   'milestone_kind_duplicate',
+  'payment_amount_invalid',
+  'deposit_not_cleared',
 ];
 
 describe('problem+json envelope', () => {

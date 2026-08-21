@@ -45,13 +45,16 @@ export type ActionCode =
   | 'engagement_client_required'
   | 'engagement_project_required'
   | 'engagement_not_found'
+  | 'engagement_not_active'
   | 'illegal_trigger'
   | 'transition_not_yet_enabled'
   | 'engagement_state_conflict'
   | 'guard_scope_inputs_missing'
   | 'design_fee_required'
   | 'milestone_split_invalid'
-  | 'milestone_kind_duplicate';
+  | 'milestone_kind_duplicate'
+  | 'payment_amount_invalid'
+  | 'deposit_not_cleared';
 
 export interface ActionResult {
   ok: boolean;

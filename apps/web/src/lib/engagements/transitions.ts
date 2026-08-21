@@ -36,12 +36,13 @@ export type CapabilityKey = Extract<
 >;
 
 /**
- * Side-effect identifiers. Step 3 wires the first one: `generateFeeSchedule`,
- * fired by `submitDesignFee`. A side-effect runs INSIDE the executor's tx (atomic
- * with the state move); its executor branch is the ONLY place it may run. Every
- * later side-effect widens this union AND adds a matching executor branch.
+ * Side-effect identifiers. Step 3 wired `generateFeeSchedule` (submitDesignFee);
+ * Step 4 adds `activateOnDeposit` (confirmAndPayDeposit). A side-effect runs
+ * INSIDE the executor's tx (atomic with the state move); its executor branch is
+ * the ONLY place it may run. Every later side-effect widens this union AND adds a
+ * matching executor branch.
  */
-export type SideEffectKey = 'generateFeeSchedule';
+export type SideEffectKey = 'generateFeeSchedule' | 'activateOnDeposit';
 
 /** One milestone row in a fee-schedule payload (money as a scale-4 string). */
 export interface MilestoneInput {
@@ -87,8 +88,8 @@ export const TRANSITIONS: Record<Trigger, TransitionDef> = {
   confirmAndPayDeposit: {
     from: 'design_proposal',
     to: 'survey',
-    guards: ['pendingGuard'],
-    sideEffect: null,
+    guards: ['depositCleared'],
+    sideEffect: 'activateOnDeposit',
     capability: 'engagements_finance',
   },
   spatialBaseReady: {
@@ -211,7 +212,8 @@ export const TRANSITIONS: Record<Trigger, TransitionDef> = {
   },
 };
 
-/** Triggers wired for real this step (their guards are not the fail-closed sentinel). */
+/** Triggers wired for real (their guards are not the fail-closed sentinel). */
 export const WIRED_TRIGGERS: ReadonlySet<Trigger> = new Set<Trigger>([
   'submitDesignFee',
+  'confirmAndPayDeposit',
 ]);

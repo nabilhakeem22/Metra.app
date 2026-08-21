@@ -61,7 +61,10 @@ function mul(a: bigint, b: bigint): bigint {
 }
 
 // value * pct% where pct is a scale-4 percentage (e.g. 14 -> 140000 units).
-function pctOf(value: bigint, pct: bigint): bigint {
+// Exported for reuse by the engagement deposit guard: it needs `design_fee ×
+// (deposit% / 100)` with the SAME round-half-away-from-zero rule, never a
+// re-implementation or parseFloat.
+export function pctOf(value: bigint, pct: bigint): bigint {
   return roundHalfAwayFromZero(value * pct, SCALE * 100n);
 }
 

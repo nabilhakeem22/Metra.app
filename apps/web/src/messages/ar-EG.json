@@ -322,13 +322,16 @@
     "engagement_client_required": "اختر عميلاً",
     "engagement_project_required": "اختر مشروعًا",
     "engagement_not_found": "تعذّر العثور على هذه المشاركة",
+    "engagement_not_active": "هذه المشاركة مُغلقة — لا يمكن تسجيل مدفوعات",
     "illegal_trigger": "هذا الإجراء غير مسموح من المرحلة الحالية",
     "transition_not_yet_enabled": "هذه الخطوة غير متاحة بعد",
     "engagement_state_conflict": "تم تحديث هذه المشاركة للتو — أعد التحميل وحاول مجددًا",
     "guard_scope_inputs_missing": "أضف عنوانًا وعميلًا ومشروعًا قبل المتابعة",
     "design_fee_required": "أدخل رسوم تصميم أكبر من صفر",
     "milestone_split_invalid": "يجب أن يتضمن جدول الدفعات دفعة مقدمة وأن يكون مجموعه صحيحًا",
-    "milestone_kind_duplicate": "لا يمكن أن يتكرر نوع الدفعة أكثر من مرة"
+    "milestone_kind_duplicate": "لا يمكن أن يتكرر نوع الدفعة أكثر من مرة",
+    "payment_amount_invalid": "أدخل مبلغ دفعة أكبر من صفر",
+    "deposit_not_cleared": "لم يتم سداد الدفعة المقدمة بالكامل بعد"
   },
   "common": {
     "untranslated": "غير مترجم",

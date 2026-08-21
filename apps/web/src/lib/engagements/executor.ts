@@ -4,7 +4,12 @@
 // (UPDATE ... WHERE state=<expected> RETURNING, check rowCount) — mirroring
 // issueContractCore — so two concurrent callers can never both win. Guards stay
 // PURE: this file gathers every fact, then asks the guard engine to decide.
-import { designEngagements, engagementTransitions } from '@metra/db';
+import {
+  designEngagements,
+  engagementMilestones,
+  engagementTransitions,
+  paymentEvents,
+} from '@metra/db';
 import { and, eq } from 'drizzle-orm';
 import { fail, mutateInOrg } from '@/lib/actions/mutate';
 import { err, type ActionResult } from '@/lib/actions/result';
@@ -67,7 +72,19 @@ export async function executeTransition(
       const legalFrom = Array.isArray(def.from) ? def.from : [def.from];
       if (!legalFrom.includes(engagement.state)) fail('illegal_trigger');
 
-      const facts: GuardFacts = { engagement };
+      // Guards are PURE, so the executor pre-loads every fact they read: the
+      // engagement row plus (Step 4) the fee-schedule milestones and the
+      // append-only payment ledger. Loaded inside the tx, before any guard runs.
+      const milestones = await tx
+        .select()
+        .from(engagementMilestones)
+        .where(eq(engagementMilestones.engagementId, engagementId));
+      const payments = await tx
+        .select()
+        .from(paymentEvents)
+        .where(eq(paymentEvents.engagementId, engagementId));
+
+      const facts: GuardFacts = { engagement, milestones, payments };
       for (const guardKey of def.guards) {
         const verdict = GUARDS[guardKey](facts);
         if (!verdict.ok) fail(verdict.code);
@@ -93,6 +110,16 @@ export async function executeTransition(
       // state change, no side-effect rows. Each key has exactly one branch.
       if (def.sideEffect === 'generateFeeSchedule') {
         await generateFeeSchedule(tx, ctx, engagementId, input.payload);
+      }
+      // Deposit cleared -> the engagement advances to SURVEY (the state move
+      // above). "Activate project" is interpreted minimally here: for an Off-Plan
+      // engagement, the as-built drawings become due. We deliberately do NOT
+      // reach into the projects module / bump project.status this step.
+      if (def.sideEffect === 'activateOnDeposit' && engagement.offPlan) {
+        await tx
+          .update(designEngagements)
+          .set({ asBuiltDue: true, updatedAt: new Date() })
+          .where(eq(designEngagements.id, engagementId));
       }
 
       await tx.insert(engagementTransitions).values({

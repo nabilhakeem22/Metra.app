@@ -64,6 +64,10 @@ grant select, insert on public.proposal_events     to metra_app;
 grant select, insert on public.contract_events         to metra_app;
 grant select, insert on public.variation_order_events  to metra_app;
 grant select, insert on public.engagement_transitions  to metra_app;
+-- payment_events (Step 4): the manual finance ledger is append-only — a recorded
+-- payment is a cleared payment and is never edited or removed. SELECT + INSERT
+-- only, so any UPDATE/DELETE raises a permission error at the database.
+grant select, insert on public.payment_events          to metra_app;
 grant select, insert on public.automation_run_log  to metra_app;
 
 -- Future-proofing for composite-FK trigger functions.
