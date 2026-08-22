@@ -7,6 +7,7 @@ import { recordArtifactCore, type RecordArtifactInput } from './artifacts';
 import { createEngagementCore, type CreateEngagementInput } from './core';
 import { executeTransition } from './executor';
 import { recordPaymentCore, type RecordPaymentInput } from './payments';
+import { setEngagementRomCore, type SetEngagementRomInput } from './rom';
 import type { GenerateFeeSchedulePayload } from './transitions';
 
 /**
@@ -74,6 +75,21 @@ export async function recordArtifact(
 ): Promise<ActionResult & { data?: string }> {
   const ctx = await requireOrg();
   const res = await recordArtifactCore(ctx, input);
+  if (res.ok) revalidatePath('/', 'layout');
+  return res;
+}
+
+/**
+ * Server-action wrapper for {@link setEngagementRomCore}: resolves the request's
+ * org context, writes the coarse build-cost band (ROM low/high), and revalidates
+ * the shell on success. Returns the ActionResult — never throws to the client.
+ * This is plain data entry, NOT a machine transition: it moves no state.
+ */
+export async function setEngagementRom(
+  input: SetEngagementRomInput,
+): Promise<ActionResult> {
+  const ctx = await requireOrg();
+  const res = await setEngagementRomCore(ctx, input);
   if (res.ok) revalidatePath('/', 'layout');
   return res;
 }
