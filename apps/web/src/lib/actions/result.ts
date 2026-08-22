@@ -59,7 +59,8 @@ export type ActionCode =
   | 'spatial_base_missing'
   | 'concept_options_out_of_range'
   | 'revision_co_amount_required'
-  | 'revision_cos_outstanding';
+  | 'revision_cos_outstanding'
+  | 'rom_range_invalid';
 
 export interface ActionResult {
   ok: boolean;

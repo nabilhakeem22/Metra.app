@@ -61,6 +61,38 @@ export function getEngagementFeeSchedule(
   });
 }
 
+/**
+ * The rough build-cost band (ROM) set on an engagement. Both values are scale-4
+ * strings or null (unset until `setEngagementRom` has fired). The API/UI layer
+ * applies 2-decimal formatting, not this query. RLS scopes the read to the
+ * caller's org (a foreign engagement reads as `{ romLow: null, romHigh: null }`).
+ */
+export interface EngagementRom {
+  romLow: string | null;
+  romHigh: string | null;
+}
+
+export function getEngagementRom(
+  ctx: OrgContext,
+  engagementId: string,
+): Promise<EngagementRom> {
+  return withOrgContext(ctx, async (tx) => {
+    const [engagement] = await tx
+      .select({
+        romLow: designEngagements.romLow,
+        romHigh: designEngagements.romHigh,
+      })
+      .from(designEngagements)
+      .where(eq(designEngagements.id, engagementId))
+      .limit(1);
+
+    return {
+      romLow: engagement?.romLow ?? null,
+      romHigh: engagement?.romHigh ?? null,
+    };
+  });
+}
+
 /** One row of the append-only payment ledger (money as a scale-4 string). */
 export interface EngagementPayment {
   id: string;
