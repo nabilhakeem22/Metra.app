@@ -216,10 +216,11 @@ export interface EngagementEventRecord {
 }
 
 /**
- * The approvals-ledger events recorded against an engagement, NEWEST FIRST. RLS
- * scopes the read to the caller's org (a foreign engagement reads as an empty
- * list). Omits the tokenized-client-ack columns (actor_name/ip/user_agent,
- * range_low/high) — those are reserved for later steps and not surfaced here.
+ * The approvals-ledger events recorded against an engagement, NEWEST FIRST
+ * (includes `rom_acknowledgement` rows). RLS scopes the read to the caller's org
+ * (a foreign engagement reads as an empty list). Omits the tokenized-client-ack
+ * columns (actor_name/ip/user_agent) and the `range_low/high` ROM snapshot — a
+ * range-aware read can select those when a surface needs them.
  */
 export function getEngagementEvents(
   ctx: OrgContext,

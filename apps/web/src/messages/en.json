@@ -338,7 +338,8 @@
     "revision_co_amount_required": "This revision is beyond the free allowance — enter a change-order amount greater than zero",
     "revision_cos_outstanding": "Settle the outstanding revision change orders before locking the concept",
     "renders_missing": "Add at least one approved render to continue",
-    "rom_range_invalid": "Enter a valid low–high build-cost range"
+    "rom_range_invalid": "Enter a valid low–high build-cost range",
+    "rom_not_set": "Enter the build-cost range before recording the client's acknowledgement"
   },
   "common": {
     "untranslated": "untranslated",

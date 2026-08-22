@@ -128,6 +128,7 @@ export const ACTION_CODE_PROBLEM: Record<ActionCode, ApiProblemKind> = {
   revision_cos_outstanding: 'bad-request',
   renders_missing: 'bad-request',
   rom_range_invalid: 'bad-request',
+  rom_not_set: 'bad-request',
 };
 
 /** A problem Response derived from an ActionResult error code. */

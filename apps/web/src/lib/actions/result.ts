@@ -61,7 +61,8 @@ export type ActionCode =
   | 'revision_co_amount_required'
   | 'revision_cos_outstanding'
   | 'renders_missing'
-  | 'rom_range_invalid';
+  | 'rom_range_invalid'
+  | 'rom_not_set';
 
 export interface ActionResult {
   ok: boolean;

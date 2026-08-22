@@ -3,6 +3,10 @@
 import { revalidatePath } from 'next/cache';
 import type { ActionResult } from '@/lib/actions/result';
 import { requireOrg } from '@/lib/auth/require-org';
+import {
+  recordRomAcknowledgementCore,
+  type RecordRomAcknowledgementInput,
+} from './approvals';
 import { recordArtifactCore, type RecordArtifactInput } from './artifacts';
 import { createEngagementCore, type CreateEngagementInput } from './core';
 import { executeTransition } from './executor';
@@ -90,6 +94,23 @@ export async function setEngagementRom(
 ): Promise<ActionResult> {
   const ctx = await requireOrg();
   const res = await setEngagementRomCore(ctx, input);
+  if (res.ok) revalidatePath('/', 'layout');
+  return res;
+}
+
+/**
+ * Server-action wrapper for {@link recordRomAcknowledgementCore}: resolves the
+ * request's org context, appends one client ROM-acknowledgement to the append-only
+ * approvals ledger (snapshotting the engagement's current ROM band), and
+ * revalidates the shell on success. Returns the ActionResult (with the new event id
+ * in `data`) — never throws to the client. This is manual-model data entry, NOT a
+ * machine transition; Gate B's later guard reads the event it writes.
+ */
+export async function recordRomAcknowledgement(
+  input: RecordRomAcknowledgementInput,
+): Promise<ActionResult & { data?: string }> {
+  const ctx = await requireOrg();
+  const res = await recordRomAcknowledgementCore(ctx, input);
   if (res.ok) revalidatePath('/', 'layout');
   return res;
 }
