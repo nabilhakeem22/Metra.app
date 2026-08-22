@@ -71,6 +71,7 @@ const ALL_CODES: ActionCode[] = [
   'revision_cos_outstanding',
   'renders_missing',
   'rom_range_invalid',
+  'rom_not_set',
 ];
 
 describe('problem+json envelope', () => {
