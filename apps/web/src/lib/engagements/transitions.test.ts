@@ -66,6 +66,8 @@ describe('transition registry', () => {
         expect(def.sideEffect).toBe('recordConceptApproval');
       } else if (trigger === 'requestRevision') {
         expect(def.sideEffect).toBe('applyRevision');
+      } else if (trigger === 'confirmConcept') {
+        expect(def.sideEffect).toBe('settleConceptAndLock');
       } else {
         expect(def.sideEffect).toBeNull();
       }
@@ -78,10 +80,11 @@ describe('transition registry', () => {
     expect([...reachable].sort()).toEqual([...DESIGN_STATES].sort());
   });
 
-  it('submitDesignFee + confirmAndPayDeposit + spatialBaseReady + optionsReady + selectConcept + requestRevision are wired; the rest fail closed', () => {
+  it('submitDesignFee + confirmAndPayDeposit + spatialBaseReady + optionsReady + selectConcept + requestRevision + confirmConcept are wired; the rest fail closed', () => {
     expect([...WIRED_TRIGGERS].sort()).toEqual(
       [
         'confirmAndPayDeposit',
+        'confirmConcept',
         'optionsReady',
         'requestRevision',
         'selectConcept',
@@ -136,6 +139,15 @@ describe('transition registry', () => {
     expect(TRANSITIONS.requestRevision.capability).toBe('engagements_design');
     expect(TRANSITIONS.requestRevision.sideEffect).toBe('applyRevision');
 
+    // confirmConcept (Step 9): the change-order settlement gate (negotiation ->
+    // design_3d) settles every raised change order + stamps concept_locked_at as
+    // its side-effect, once revisionCosSettled proves the outstanding total covered.
+    expect(TRANSITIONS.confirmConcept.guards).toEqual(['revisionCosSettled']);
+    expect(TRANSITIONS.confirmConcept.from).toBe('negotiation');
+    expect(TRANSITIONS.confirmConcept.to).toBe('design_3d');
+    expect(TRANSITIONS.confirmConcept.capability).toBe('engagements_design');
+    expect(TRANSITIONS.confirmConcept.sideEffect).toBe('settleConceptAndLock');
+
     // Every other trigger routes through pendingGuard (fail-closed).
     const wired = new Set<Trigger>([
       'submitDesignFee',
@@ -144,6 +156,7 @@ describe('transition registry', () => {
       'optionsReady',
       'selectConcept',
       'requestRevision',
+      'confirmConcept',
     ]);
     for (const trigger of ALL_TRIGGERS) {
       if (wired.has(trigger)) continue;

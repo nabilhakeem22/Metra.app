@@ -1,6 +1,7 @@
 import type {
   DesignEngagement,
   EngagementArtifact,
+  EngagementChangeOrder,
   EngagementMilestone,
   PaymentEvent,
 } from '@metra/db';
@@ -22,6 +23,7 @@ function engagement(over: Partial<DesignEngagement>): GuardFacts {
     milestones: [],
     payments: [],
     artifacts: [],
+    changeOrders: [],
   };
 }
 
@@ -35,6 +37,7 @@ function spatialFacts(
     milestones: [],
     payments: [],
     artifacts: kinds.map((kind) => ({ kind }) as EngagementArtifact),
+    changeOrders: [],
   };
 }
 
@@ -61,6 +64,7 @@ function depositFacts(opts: {
     milestones,
     payments,
     artifacts: [],
+    changeOrders: [],
   };
 }
 
@@ -168,6 +172,7 @@ function gateAFacts(opts: {
     milestones,
     payments,
     artifacts: [],
+    changeOrders: [],
   };
 }
 
@@ -280,6 +285,7 @@ describe('optionsReady — the 2–4 concept-options gate', () => {
       milestones: [],
       payments: [],
       artifacts: [...conceptOptions, ...extraArtifacts],
+      changeOrders: [],
     };
   }
 
@@ -316,6 +322,92 @@ describe('optionsReady — the 2–4 concept-options gate', () => {
     expect(
       GUARDS.optionsReady(optionsFacts(2, ['survey', 'autocad'])),
     ).toEqual({ ok: true });
+  });
+});
+
+describe('revisionCosSettled — the change-order settlement gate', () => {
+  /** A facts bundle: raised/settled change-order amounts + revision_co payments. */
+  function coFacts(opts: {
+    raised?: string[];
+    settled?: string[];
+    revisionCoPaid?: string[];
+    otherPaid?: { kind: PaymentEvent['kind']; amount: string }[];
+  }): GuardFacts {
+    const changeOrders: EngagementChangeOrder[] = [
+      ...(opts.raised ?? []).map(
+        (amount) => ({ status: 'raised', amount }) as EngagementChangeOrder,
+      ),
+      ...(opts.settled ?? []).map(
+        (amount) => ({ status: 'settled', amount }) as EngagementChangeOrder,
+      ),
+    ];
+    const payments: PaymentEvent[] = [
+      ...(opts.revisionCoPaid ?? []).map(
+        (amount) => ({ kind: 'revision_co', amount }) as PaymentEvent,
+      ),
+      ...(opts.otherPaid ?? []).map((p) => p as PaymentEvent),
+    ];
+    return {
+      engagement: {} as DesignEngagement,
+      milestones: [],
+      payments,
+      artifacts: [],
+      changeOrders,
+    };
+  }
+
+  it('passes trivially when there are NO raised change orders', () => {
+    expect(GUARDS.revisionCosSettled(coFacts({}))).toEqual({ ok: true });
+    // A settled CO with no matching payment still passes — only `raised` counts.
+    expect(
+      GUARDS.revisionCosSettled(coFacts({ settled: ['5000'] })),
+    ).toEqual({ ok: true });
+  });
+
+  it('a raised CO with no revision_co payment fails closed', () => {
+    expect(GUARDS.revisionCosSettled(coFacts({ raised: ['7500'] }))).toEqual({
+      ok: false,
+      code: 'revision_cos_outstanding',
+    });
+  });
+
+  it('passes iff revision_co paid >= Σ raised (exact scale-4, short/exact/over)', () => {
+    const base = { raised: ['7500.5000'] };
+    expect(
+      GUARDS.revisionCosSettled(coFacts({ ...base, revisionCoPaid: ['7500.4999'] })),
+    ).toEqual({ ok: false, code: 'revision_cos_outstanding' });
+    expect(
+      GUARDS.revisionCosSettled(coFacts({ ...base, revisionCoPaid: ['7500.5000'] })),
+    ).toEqual({ ok: true });
+    expect(
+      GUARDS.revisionCosSettled(coFacts({ ...base, revisionCoPaid: ['8000'] })),
+    ).toEqual({ ok: true });
+  });
+
+  it('aggregates: two raised COs need the SUM covered; partials that sum clear', () => {
+    const base = { raised: ['1000', '2000'] };
+    // Covering only one CO is not enough.
+    expect(
+      GUARDS.revisionCosSettled(coFacts({ ...base, revisionCoPaid: ['1000'] })),
+    ).toEqual({ ok: false, code: 'revision_cos_outstanding' });
+    // Two partial payments summing to the 3000 total clear it.
+    expect(
+      GUARDS.revisionCosSettled(coFacts({ ...base, revisionCoPaid: ['1500', '1500'] })),
+    ).toEqual({ ok: true });
+  });
+
+  it('KIND-ISOLATION: a deposit/gate_a payment of the same size does NOT settle a CO', () => {
+    expect(
+      GUARDS.revisionCosSettled(
+        coFacts({
+          raised: ['5000'],
+          otherPaid: [
+            { kind: 'deposit', amount: '5000' },
+            { kind: 'gate_a', amount: '5000' },
+          ],
+        }),
+      ),
+    ).toEqual({ ok: false, code: 'revision_cos_outstanding' });
   });
 });
 

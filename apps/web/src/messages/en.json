@@ -335,7 +335,8 @@
     "gate_a_not_cleared": "The Gate A installment has not been fully paid yet",
     "spatial_base_missing": "Record a survey (or a developer CAD set for off-plan) before continuing",
     "concept_options_out_of_range": "Add 2–4 concept options to continue",
-    "revision_co_amount_required": "This revision is beyond the free allowance — enter a change-order amount greater than zero"
+    "revision_co_amount_required": "This revision is beyond the free allowance — enter a change-order amount greater than zero",
+    "revision_cos_outstanding": "Settle the outstanding revision change orders before locking the concept"
   },
   "common": {
     "untranslated": "untranslated",
