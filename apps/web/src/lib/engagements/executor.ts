@@ -20,6 +20,7 @@ import type { PermissionAction } from '@/lib/permissions/roles';
 import { recordConceptApproval } from './approvals';
 import { settleConceptAndLock } from './concept';
 import { generateFeeSchedule } from './fee-schedule';
+import { captureRenderManifest } from './renders';
 import { applyRevision } from './revisions';
 import { GUARDS, type GuardFacts } from './guards';
 import { TRANSITIONS, type CapabilityKey, type Trigger } from './transitions';
@@ -160,6 +161,13 @@ export async function executeTransition(
       // design_3d move — a guard failure leaves COs `raised`, the lock null.
       if (def.sideEffect === 'settleConceptAndLock') {
         await settleConceptAndLock(tx, engagementId);
+      }
+      // rendersReady (Step 11): the `rendersPresent` guard proved at least one
+      // approved render exists, so capture the deterministic baseline manifest hash
+      // over those renders and stamp `renders_ready_at`. Atomic with the design_3d
+      // -> final_approval move — a guard failure leaves both columns null.
+      if (def.sideEffect === 'captureRenderManifest') {
+        await captureRenderManifest(tx, engagementId);
       }
 
       await tx.insert(engagementTransitions).values({

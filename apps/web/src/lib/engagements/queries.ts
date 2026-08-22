@@ -93,6 +93,39 @@ export function getEngagementRom(
   });
 }
 
+/**
+ * The approved-render baseline captured when `rendersReady` fired. Both are null
+ * until the design_3d -> final_approval move: `renderManifestHash` is the sha256
+ * over the sorted approved-render content-hash list, `rendersReadyAt` the moment it
+ * was captured. RLS scopes the read to the caller's org (a foreign engagement reads
+ * as `{ renderManifestHash: null, rendersReadyAt: null }`).
+ */
+export interface EngagementRenderManifest {
+  renderManifestHash: string | null;
+  rendersReadyAt: Date | null;
+}
+
+export function getEngagementRenderManifest(
+  ctx: OrgContext,
+  engagementId: string,
+): Promise<EngagementRenderManifest> {
+  return withOrgContext(ctx, async (tx) => {
+    const [engagement] = await tx
+      .select({
+        renderManifestHash: designEngagements.renderManifestHash,
+        rendersReadyAt: designEngagements.rendersReadyAt,
+      })
+      .from(designEngagements)
+      .where(eq(designEngagements.id, engagementId))
+      .limit(1);
+
+    return {
+      renderManifestHash: engagement?.renderManifestHash ?? null,
+      rendersReadyAt: engagement?.rendersReadyAt ?? null,
+    };
+  });
+}
+
 /** One row of the append-only payment ledger (money as a scale-4 string). */
 export interface EngagementPayment {
   id: string;

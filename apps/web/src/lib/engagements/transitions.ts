@@ -42,7 +42,8 @@ export type CapabilityKey = Extract<
  * Side-effect identifiers. Step 3 wired `generateFeeSchedule` (submitDesignFee);
  * Step 4 adds `activateOnDeposit` (confirmAndPayDeposit); Step 7 adds
  * `recordConceptApproval` (selectConcept); Step 8 adds `applyRevision`
- * (requestRevision self-loop); Step 9 adds `settleConceptAndLock` (confirmConcept).
+ * (requestRevision self-loop); Step 9 adds `settleConceptAndLock` (confirmConcept);
+ * Step 11 adds `captureRenderManifest` (rendersReady).
  * A side-effect runs INSIDE the executor's tx (atomic with the state move); its
  * executor branch is the ONLY place it may run. Every later side-effect widens
  * this union AND adds a matching executor branch.
@@ -52,7 +53,8 @@ export type SideEffectKey =
   | 'activateOnDeposit'
   | 'recordConceptApproval'
   | 'applyRevision'
-  | 'settleConceptAndLock';
+  | 'settleConceptAndLock'
+  | 'captureRenderManifest';
 
 /** One milestone row in a fee-schedule payload (money as a scale-4 string). */
 export interface MilestoneInput {
@@ -159,11 +161,15 @@ export const TRANSITIONS: Record<Trigger, TransitionDef> = {
     sideEffect: 'settleConceptAndLock',
     capability: 'engagements_design',
   },
+  // Step 11: the render-baseline edge. `rendersPresent` proves at least one
+  // approved render exists; the side-effect captures the deterministic baseline
+  // manifest hash over those renders and stamps `renders_ready_at`, atomically
+  // with the design_3d -> final_approval move.
   rendersReady: {
     from: 'design_3d',
     to: 'final_approval',
-    guards: ['pendingGuard'],
-    sideEffect: null,
+    guards: ['rendersPresent'],
+    sideEffect: 'captureRenderManifest',
     capability: 'engagements_design',
   },
   approveDesign: {
@@ -253,4 +259,5 @@ export const WIRED_TRIGGERS: ReadonlySet<Trigger> = new Set<Trigger>([
   'selectConcept',
   'requestRevision',
   'confirmConcept',
+  'rendersReady',
 ]);

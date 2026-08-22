@@ -69,6 +69,7 @@ const ALL_CODES: ActionCode[] = [
   'concept_options_out_of_range',
   'revision_co_amount_required',
   'revision_cos_outstanding',
+  'renders_missing',
   'rom_range_invalid',
 ];
 
