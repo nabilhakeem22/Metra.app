@@ -24,6 +24,7 @@ function engagement(over: Partial<DesignEngagement>): GuardFacts {
     payments: [],
     artifacts: [],
     changeOrders: [],
+    events: [],
   };
 }
 
@@ -38,6 +39,7 @@ function spatialFacts(
     payments: [],
     artifacts: kinds.map((kind) => ({ kind }) as EngagementArtifact),
     changeOrders: [],
+    events: [],
   };
 }
 
@@ -65,6 +67,7 @@ function depositFacts(opts: {
     payments,
     artifacts: [],
     changeOrders: [],
+    events: [],
   };
 }
 
@@ -173,6 +176,7 @@ function gateAFacts(opts: {
     payments,
     artifacts: [],
     changeOrders: [],
+    events: [],
   };
 }
 
@@ -286,6 +290,7 @@ describe('optionsReady — the 2–4 concept-options gate', () => {
       payments: [],
       artifacts: [...conceptOptions, ...extraArtifacts],
       changeOrders: [],
+      events: [],
     };
   }
 
@@ -353,6 +358,7 @@ describe('revisionCosSettled — the change-order settlement gate', () => {
       payments,
       artifacts: [],
       changeOrders,
+      events: [],
     };
   }
 
@@ -434,6 +440,35 @@ describe('rendersPresent', () => {
     expect(
       GUARDS.rendersPresent(spatialFacts(false, ['survey', 'concept_option'])),
     ).toEqual({ ok: false, code: 'renders_missing' });
+  });
+});
+
+describe('asBuiltDueOpen', () => {
+  /** A facts bundle carrying only the `asBuiltDue` flag the guard reads. */
+  function dueFacts(asBuiltDue: boolean | null): GuardFacts {
+    return {
+      engagement: { asBuiltDue } as DesignEngagement,
+      milestones: [],
+      payments: [],
+      artifacts: [],
+      changeOrders: [],
+      events: [],
+    };
+  }
+
+  it('passes when the as-built drawings are due', () => {
+    expect(GUARDS.asBuiltDueOpen(dueFacts(true))).toEqual({ ok: true });
+  });
+
+  it('fails closed with as_built_not_due when not due (false or null)', () => {
+    expect(GUARDS.asBuiltDueOpen(dueFacts(false))).toEqual({
+      ok: false,
+      code: 'as_built_not_due',
+    });
+    expect(GUARDS.asBuiltDueOpen(dueFacts(null))).toEqual({
+      ok: false,
+      code: 'as_built_not_due',
+    });
   });
 });
 

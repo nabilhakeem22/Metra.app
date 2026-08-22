@@ -7,7 +7,7 @@ import {
   type Trigger,
 } from './transitions';
 
-// The 17 triggers, spelled out independently of the registry so a dropped or
+// The 19 triggers, spelled out independently of the registry so a dropped or
 // renamed key fails here (the Record<Trigger,…> type also enforces this at
 // compile time; this is the runtime witness).
 const ALL_TRIGGERS: Trigger[] = [
@@ -19,6 +19,8 @@ const ALL_TRIGGERS: Trigger[] = [
   'requestRevision',
   'confirmConcept',
   'rendersReady',
+  'flagAsBuiltVariance',
+  'attestAsBuiltClean',
   'approveDesign',
   'draftReady',
   'finalizeBOQ',
@@ -31,10 +33,10 @@ const ALL_TRIGGERS: Trigger[] = [
 ];
 
 describe('transition registry', () => {
-  it('declares all 17 triggers, exhaustively', () => {
+  it('declares all 19 triggers, exhaustively', () => {
     const keys = Object.keys(TRANSITIONS).sort();
     expect(keys).toEqual([...ALL_TRIGGERS].sort());
-    expect(keys).toHaveLength(17);
+    expect(keys).toHaveLength(19);
   });
 
   it('every def references only known states, guards, and a capability', () => {
@@ -70,6 +72,10 @@ describe('transition registry', () => {
         expect(def.sideEffect).toBe('settleConceptAndLock');
       } else if (trigger === 'rendersReady') {
         expect(def.sideEffect).toBe('captureRenderManifest');
+      } else if (trigger === 'flagAsBuiltVariance') {
+        expect(def.sideEffect).toBe('recordAsBuiltVariance');
+      } else if (trigger === 'attestAsBuiltClean') {
+        expect(def.sideEffect).toBe('recordAsBuiltClean');
       } else {
         expect(def.sideEffect).toBeNull();
       }
@@ -82,11 +88,13 @@ describe('transition registry', () => {
     expect([...reachable].sort()).toEqual([...DESIGN_STATES].sort());
   });
 
-  it('submitDesignFee + confirmAndPayDeposit + spatialBaseReady + optionsReady + selectConcept + requestRevision + confirmConcept + rendersReady are wired; the rest fail closed', () => {
+  it('the 10 wired triggers (through Step 13) carry concrete guards; the rest fail closed', () => {
     expect([...WIRED_TRIGGERS].sort()).toEqual(
       [
+        'attestAsBuiltClean',
         'confirmAndPayDeposit',
         'confirmConcept',
+        'flagAsBuiltVariance',
         'optionsReady',
         'rendersReady',
         'requestRevision',
@@ -161,6 +169,27 @@ describe('transition registry', () => {
     expect(TRANSITIONS.rendersReady.capability).toBe('engagements_design');
     expect(TRANSITIONS.rendersReady.sideEffect).toBe('captureRenderManifest');
 
+    // flagAsBuiltVariance (Step 13): the Off-Plan as-built variance detour
+    // (final_approval -> change_triage) appends one as_built_attestation event
+    // (has_variance=true) as its side-effect, gated by asBuiltDueOpen.
+    expect(TRANSITIONS.flagAsBuiltVariance.guards).toEqual(['asBuiltDueOpen']);
+    expect(TRANSITIONS.flagAsBuiltVariance.from).toBe('final_approval');
+    expect(TRANSITIONS.flagAsBuiltVariance.to).toBe('change_triage');
+    expect(TRANSITIONS.flagAsBuiltVariance.capability).toBe('engagements_design');
+    expect(TRANSITIONS.flagAsBuiltVariance.sideEffect).toBe('recordAsBuiltVariance');
+
+    // attestAsBuiltClean (Step 13): the clean attestation targeting final_approval
+    // — the self-loop from final_approval AND the change_triage reconciliation —
+    // appends one as_built_attestation event (has_variance=false).
+    expect(TRANSITIONS.attestAsBuiltClean.guards).toEqual(['asBuiltDueOpen']);
+    expect(TRANSITIONS.attestAsBuiltClean.from).toEqual([
+      'final_approval',
+      'change_triage',
+    ]);
+    expect(TRANSITIONS.attestAsBuiltClean.to).toBe('final_approval');
+    expect(TRANSITIONS.attestAsBuiltClean.capability).toBe('engagements_design');
+    expect(TRANSITIONS.attestAsBuiltClean.sideEffect).toBe('recordAsBuiltClean');
+
     // Every other trigger routes through pendingGuard (fail-closed).
     const wired = new Set<Trigger>([
       'submitDesignFee',
@@ -171,6 +200,8 @@ describe('transition registry', () => {
       'requestRevision',
       'confirmConcept',
       'rendersReady',
+      'flagAsBuiltVariance',
+      'attestAsBuiltClean',
     ]);
     for (const trigger of ALL_TRIGGERS) {
       if (wired.has(trigger)) continue;

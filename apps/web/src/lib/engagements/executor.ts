@@ -8,6 +8,7 @@ import {
   designEngagements,
   engagementArtifacts,
   engagementChangeOrders,
+  engagementEvents,
   engagementMilestones,
   engagementTransitions,
   paymentEvents,
@@ -18,6 +19,7 @@ import { err, type ActionResult } from '@/lib/actions/result';
 import type { OrgContext } from '@/lib/db/context';
 import type { PermissionAction } from '@/lib/permissions/roles';
 import { recordConceptApproval } from './approvals';
+import { insertAsBuiltAttestation } from './attestations';
 import { settleConceptAndLock } from './concept';
 import { generateFeeSchedule } from './fee-schedule';
 import { captureRenderManifest } from './renders';
@@ -98,6 +100,10 @@ export async function executeTransition(
         .select()
         .from(engagementChangeOrders)
         .where(eq(engagementChangeOrders.engagementId, engagementId));
+      const events = await tx
+        .select()
+        .from(engagementEvents)
+        .where(eq(engagementEvents.engagementId, engagementId));
 
       const facts: GuardFacts = {
         engagement,
@@ -105,6 +111,7 @@ export async function executeTransition(
         payments,
         artifacts,
         changeOrders,
+        events,
       };
       for (const guardKey of def.guards) {
         const verdict = GUARDS[guardKey](facts);
@@ -168,6 +175,18 @@ export async function executeTransition(
       // -> final_approval move — a guard failure leaves both columns null.
       if (def.sideEffect === 'captureRenderManifest') {
         await captureRenderManifest(tx, engagementId);
+      }
+      // flagAsBuiltVariance (Step 13): the `asBuiltDueOpen` guard proved the
+      // as-built drawings are due, so append ONE `as_built_attestation` event with
+      // has_variance=true. Atomic with the final_approval -> change_triage move.
+      if (def.sideEffect === 'recordAsBuiltVariance') {
+        await insertAsBuiltAttestation(tx, ctx, engagementId, true);
+      }
+      // attestAsBuiltClean (Step 13): a clean as-built attestation — append ONE
+      // `as_built_attestation` event with has_variance=false. Atomic with the move
+      // to final_approval (the self-loop OR the change_triage reconciliation).
+      if (def.sideEffect === 'recordAsBuiltClean') {
+        await insertAsBuiltAttestation(tx, ctx, engagementId, false);
       }
 
       await tx.insert(engagementTransitions).values({

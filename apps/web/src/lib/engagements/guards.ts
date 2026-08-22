@@ -9,6 +9,7 @@ import type {
   DesignEngagement,
   EngagementArtifact,
   EngagementChangeOrder,
+  EngagementEvent,
   EngagementMilestone,
   MilestoneKind,
   PaymentEvent,
@@ -20,9 +21,10 @@ import { parseMoney4, pctOf } from '../aggregates/proposal-totals';
 
 /**
  * The facts a guard may read. Widened in Step 4 (fee-schedule `milestones` + the
- * append-only `payments` ledger), Step 5 (the recorded `artifacts`), and Step 9
- * (the `changeOrders` raised by over-allowance revisions), so each gate can decide
- * from pure data the executor pre-loaded.
+ * append-only `payments` ledger), Step 5 (the recorded `artifacts`), Step 9
+ * (the `changeOrders` raised by over-allowance revisions), and Step 13 (the
+ * append-only `events` ledger), so each gate can decide from pure data the
+ * executor pre-loaded.
  */
 export interface GuardFacts {
   engagement: DesignEngagement;
@@ -30,6 +32,7 @@ export interface GuardFacts {
   payments: PaymentEvent[];
   artifacts: EngagementArtifact[];
   changeOrders: EngagementChangeOrder[];
+  events: EngagementEvent[];
 }
 
 /** A guard's verdict: pass, or fail with the coded reason to surface. */
@@ -44,6 +47,7 @@ export type GuardKey =
   | 'optionsReady'
   | 'revisionCosSettled'
   | 'rendersPresent'
+  | 'asBuiltDueOpen'
   | 'pendingGuard';
 
 const pass: GuardResult = { ok: true };
@@ -222,6 +226,19 @@ function rendersPresent(facts: GuardFacts): GuardResult {
 }
 
 /**
+ * The as-built drawings are due — the gate for the Gate-B as-built attestations
+ * (`flagAsBuiltVariance`, `attestAsBuiltClean`). `as_built_due` is set true at
+ * `confirmAndPayDeposit` for an Off-Plan engagement; a non-Off-Plan engagement
+ * never becomes due, so it cannot flag a variance or attest a clean as-built.
+ * Fails closed with `as_built_not_due` when the drawings are not (yet) due.
+ */
+function asBuiltDueOpen(facts: GuardFacts): GuardResult {
+  return facts.engagement.asBuiltDue === true
+    ? pass
+    : { ok: false, code: 'as_built_not_due' };
+}
+
+/**
  * Fail-closed sentinel for triggers whose real guard belongs to a later step.
  * It always denies with `transition_not_yet_enabled`, so a declared-but-unwired
  * transition can never fire early. Replaced by concrete guards in later steps.
@@ -239,5 +256,6 @@ export const GUARDS: Record<GuardKey, (facts: GuardFacts) => GuardResult> = {
   optionsReady,
   revisionCosSettled,
   rendersPresent,
+  asBuiltDueOpen,
   pendingGuard,
 };

@@ -1,4 +1,5 @@
 import {
+  boolean,
   index,
   pgTable,
   text,
@@ -48,6 +49,9 @@ export const engagementEvents = pgTable(
     // Reserved for `rom_acknowledgement`: the acknowledged range (scale-4 money).
     rangeLow: money('range_low'),
     rangeHigh: money('range_high'),
+    // Step 13 — `as_built_attestation` only: true = variance flagged (opens the
+    // change_triage detour), false = clean attestation. NULL for every other kind.
+    hasVariance: boolean('has_variance'),
     docHash: text('doc_hash'),
     note: text('note'),
     decidedAt: timestamp('decided_at', { withTimezone: true })
