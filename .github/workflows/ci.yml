@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main, engagement-step-9]
+    branches: [main]
   pull_request:
     branches: [main]
 
