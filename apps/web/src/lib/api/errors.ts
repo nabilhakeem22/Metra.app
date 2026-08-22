@@ -125,6 +125,7 @@ export const ACTION_CODE_PROBLEM: Record<ActionCode, ApiProblemKind> = {
   spatial_base_missing: 'bad-request',
   concept_options_out_of_range: 'bad-request',
   revision_co_amount_required: 'bad-request',
+  revision_cos_outstanding: 'bad-request',
 };
 
 /** A problem Response derived from an ActionResult error code. */

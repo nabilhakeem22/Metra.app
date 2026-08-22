@@ -42,16 +42,17 @@ export type CapabilityKey = Extract<
  * Side-effect identifiers. Step 3 wired `generateFeeSchedule` (submitDesignFee);
  * Step 4 adds `activateOnDeposit` (confirmAndPayDeposit); Step 7 adds
  * `recordConceptApproval` (selectConcept); Step 8 adds `applyRevision`
- * (requestRevision self-loop). A side-effect runs
- * INSIDE the executor's tx (atomic with the state move); its executor branch is
- * the ONLY place it may run. Every later side-effect widens this union AND adds a
- * matching executor branch.
+ * (requestRevision self-loop); Step 9 adds `settleConceptAndLock` (confirmConcept).
+ * A side-effect runs INSIDE the executor's tx (atomic with the state move); its
+ * executor branch is the ONLY place it may run. Every later side-effect widens
+ * this union AND adds a matching executor branch.
  */
 export type SideEffectKey =
   | 'generateFeeSchedule'
   | 'activateOnDeposit'
   | 'recordConceptApproval'
-  | 'applyRevision';
+  | 'applyRevision'
+  | 'settleConceptAndLock';
 
 /** One milestone row in a fee-schedule payload (money as a scale-4 string). */
 export interface MilestoneInput {
@@ -147,11 +148,15 @@ export const TRANSITIONS: Record<Trigger, TransitionDef> = {
     sideEffect: 'applyRevision',
     capability: 'engagements_design',
   },
+  // Step 9: the change-order settlement gate. A concept can only lock and exit
+  // negotiation once every over-allowance revision change order is covered by
+  // cleared revision_co payments (`revisionCosSettled`); the side-effect settles
+  // those COs and stamps `concept_locked_at`, atomically with the state move.
   confirmConcept: {
     from: 'negotiation',
     to: 'design_3d',
-    guards: ['pendingGuard'],
-    sideEffect: null,
+    guards: ['revisionCosSettled'],
+    sideEffect: 'settleConceptAndLock',
     capability: 'engagements_design',
   },
   rendersReady: {
@@ -247,4 +252,5 @@ export const WIRED_TRIGGERS: ReadonlySet<Trigger> = new Set<Trigger>([
   'optionsReady',
   'selectConcept',
   'requestRevision',
+  'confirmConcept',
 ]);

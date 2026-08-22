@@ -68,6 +68,7 @@ const ALL_CODES: ActionCode[] = [
   'spatial_base_missing',
   'concept_options_out_of_range',
   'revision_co_amount_required',
+  'revision_cos_outstanding',
 ];
 
 describe('problem+json envelope', () => {

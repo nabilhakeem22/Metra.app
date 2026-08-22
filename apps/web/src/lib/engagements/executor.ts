@@ -7,6 +7,7 @@
 import {
   designEngagements,
   engagementArtifacts,
+  engagementChangeOrders,
   engagementMilestones,
   engagementTransitions,
   paymentEvents,
@@ -17,6 +18,7 @@ import { err, type ActionResult } from '@/lib/actions/result';
 import type { OrgContext } from '@/lib/db/context';
 import type { PermissionAction } from '@/lib/permissions/roles';
 import { recordConceptApproval } from './approvals';
+import { settleConceptAndLock } from './concept';
 import { generateFeeSchedule } from './fee-schedule';
 import { applyRevision } from './revisions';
 import { GUARDS, type GuardFacts } from './guards';
@@ -77,8 +79,8 @@ export async function executeTransition(
 
       // Guards are PURE, so the executor pre-loads every fact they read: the
       // engagement row plus (Step 4) the fee-schedule milestones and the
-      // append-only payment ledger, plus (Step 5) the recorded artifacts. Loaded
-      // inside the tx, before any guard runs.
+      // append-only payment ledger, (Step 5) the recorded artifacts, and (Step 9)
+      // the raised change orders. Loaded inside the tx, before any guard runs.
       const milestones = await tx
         .select()
         .from(engagementMilestones)
@@ -91,8 +93,18 @@ export async function executeTransition(
         .select()
         .from(engagementArtifacts)
         .where(eq(engagementArtifacts.engagementId, engagementId));
+      const changeOrders = await tx
+        .select()
+        .from(engagementChangeOrders)
+        .where(eq(engagementChangeOrders.engagementId, engagementId));
 
-      const facts: GuardFacts = { engagement, milestones, payments, artifacts };
+      const facts: GuardFacts = {
+        engagement,
+        milestones,
+        payments,
+        artifacts,
+        changeOrders,
+      };
       for (const guardKey of def.guards) {
         const verdict = GUARDS[guardKey](facts);
         if (!verdict.ok) fail(verdict.code);
@@ -141,6 +153,13 @@ export async function executeTransition(
       // missing change-order amount `fail()`s and rolls the increment back too.
       if (def.sideEffect === 'applyRevision') {
         await applyRevision(tx, ctx, engagement, input.payload);
+      }
+      // confirmConcept (Step 9): the `revisionCosSettled` guard proved every raised
+      // change order is covered, so settle them all (status -> settled, settled_at
+      // = now()) and stamp `concept_locked_at`. Atomic with the negotiation ->
+      // design_3d move — a guard failure leaves COs `raised`, the lock null.
+      if (def.sideEffect === 'settleConceptAndLock') {
+        await settleConceptAndLock(tx, engagementId);
       }
 
       await tx.insert(engagementTransitions).values({

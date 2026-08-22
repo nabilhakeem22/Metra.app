@@ -8,6 +8,7 @@
 import type {
   DesignEngagement,
   EngagementArtifact,
+  EngagementChangeOrder,
   EngagementMilestone,
   MilestoneKind,
   PaymentEvent,
@@ -19,14 +20,16 @@ import { parseMoney4, pctOf } from '../aggregates/proposal-totals';
 
 /**
  * The facts a guard may read. Widened in Step 4 (fee-schedule `milestones` + the
- * append-only `payments` ledger) and Step 5 (the recorded `artifacts`), so each
- * gate can decide from pure data the executor pre-loaded.
+ * append-only `payments` ledger), Step 5 (the recorded `artifacts`), and Step 9
+ * (the `changeOrders` raised by over-allowance revisions), so each gate can decide
+ * from pure data the executor pre-loaded.
  */
 export interface GuardFacts {
   engagement: DesignEngagement;
   milestones: EngagementMilestone[];
   payments: PaymentEvent[];
   artifacts: EngagementArtifact[];
+  changeOrders: EngagementChangeOrder[];
 }
 
 /** A guard's verdict: pass, or fail with the coded reason to surface. */
@@ -39,6 +42,7 @@ export type GuardKey =
   | 'gateAInstallmentCleared'
   | 'spatialBaseReady'
   | 'optionsReady'
+  | 'revisionCosSettled'
   | 'pendingGuard';
 
 const pass: GuardResult = { ok: true };
@@ -164,6 +168,41 @@ function optionsReady(facts: GuardFacts): GuardResult {
 }
 
 /**
+ * Every outstanding change order is fully covered by cleared revision_co payments
+ * — the money gate for `confirmConcept` (negotiation -> design_3d). Over-allowance
+ * revisions raise `raised` change orders (Step 8); the concept can only lock once
+ * those extra fees are settled. Math (exact scale-4 BigInt, never parseFloat):
+ *   - `outstanding` = Σ `amount` of the engagement's `raised` change orders.
+ *   - `paid`        = Σ `amount` of cleared `payment_events` of kind `revision_co`.
+ * Passes iff `paid >= outstanding`. KIND-ISOLATION: only `revision_co` payments
+ * settle a change order — a deposit/gate_a/gate_b/balance receipt of the same size
+ * does NOT. With NO raised change orders `outstanding` is 0 (a raised CO's amount
+ * is DB-CHECK > 0, so a zero sum means none are raised) and the gate passes
+ * trivially. Otherwise a shortfall fails closed with `revision_cos_outstanding`.
+ */
+function revisionCosSettled(facts: GuardFacts): GuardResult {
+  const outstanding = facts.changeOrders.reduce(
+    (sum, changeOrder) =>
+      changeOrder.status === 'raised'
+        ? sum + parseMoney4(changeOrder.amount)
+        : sum,
+    0n,
+  );
+  if (outstanding === 0n) return pass;
+
+  const paid = facts.payments.reduce(
+    (sum, payment) =>
+      payment.kind === 'revision_co' ? sum + parseMoney4(payment.amount) : sum,
+    0n,
+  );
+
+  if (paid < outstanding) {
+    return { ok: false, code: 'revision_cos_outstanding' };
+  }
+  return pass;
+}
+
+/**
  * Fail-closed sentinel for triggers whose real guard belongs to a later step.
  * It always denies with `transition_not_yet_enabled`, so a declared-but-unwired
  * transition can never fire early. Replaced by concrete guards in later steps.
@@ -179,5 +218,6 @@ export const GUARDS: Record<GuardKey, (facts: GuardFacts) => GuardResult> = {
   gateAInstallmentCleared,
   spatialBaseReady,
   optionsReady,
+  revisionCosSettled,
   pendingGuard,
 };
