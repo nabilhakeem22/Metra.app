@@ -219,6 +219,30 @@ export const PAYMENT_EVENT_KINDS = [
 
 export const paymentEventKind = pgEnum('payment_event_kind', PAYMENT_EVENT_KINDS);
 
+/**
+ * Design-Engagement Machine, Step 5 — the kinds of engagement artifact recorded
+ * against an engagement. The FULL set is declared now (so no later enum-add
+ * migration is needed) even though Step 5 only writes `survey` / `autocad`:
+ * `survey` (a measured site survey), `autocad` (a developer/consultant CAD set),
+ * `concept_option` (a proposed layout/concept), `approved_render` (a signed-off
+ * 3D render), `shop_drawing` (a production drawing) and `boq` (a bill of
+ * quantities). Order is a contract shared with the TS `EngagementArtifactKind`
+ * union in @metra/web; labels are localized (not stored).
+ */
+export const ENGAGEMENT_ARTIFACT_KINDS = [
+  'survey',
+  'autocad',
+  'concept_option',
+  'approved_render',
+  'shop_drawing',
+  'boq',
+] as const;
+
+export const engagementArtifactKind = pgEnum(
+  'engagement_artifact_kind',
+  ENGAGEMENT_ARTIFACT_KINDS,
+);
+
 export type MemberRole = (typeof MEMBER_ROLES)[number];
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];
 export type InvitationStatus = (typeof INVITATION_STATUSES)[number];
@@ -236,3 +260,4 @@ export type DesignEngagementState = (typeof DESIGN_ENGAGEMENT_STATES)[number];
 export type MilestoneKind = (typeof MILESTONE_KINDS)[number];
 export type MilestoneBasis = (typeof MILESTONE_BASES)[number];
 export type PaymentEventKind = (typeof PAYMENT_EVENT_KINDS)[number];
+export type EngagementArtifactKind = (typeof ENGAGEMENT_ARTIFACT_KINDS)[number];

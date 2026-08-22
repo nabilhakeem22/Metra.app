@@ -6,6 +6,7 @@
 // PURE: this file gathers every fact, then asks the guard engine to decide.
 import {
   designEngagements,
+  engagementArtifacts,
   engagementMilestones,
   engagementTransitions,
   paymentEvents,
@@ -74,7 +75,8 @@ export async function executeTransition(
 
       // Guards are PURE, so the executor pre-loads every fact they read: the
       // engagement row plus (Step 4) the fee-schedule milestones and the
-      // append-only payment ledger. Loaded inside the tx, before any guard runs.
+      // append-only payment ledger, plus (Step 5) the recorded artifacts. Loaded
+      // inside the tx, before any guard runs.
       const milestones = await tx
         .select()
         .from(engagementMilestones)
@@ -83,8 +85,12 @@ export async function executeTransition(
         .select()
         .from(paymentEvents)
         .where(eq(paymentEvents.engagementId, engagementId));
+      const artifacts = await tx
+        .select()
+        .from(engagementArtifacts)
+        .where(eq(engagementArtifacts.engagementId, engagementId));
 
-      const facts: GuardFacts = { engagement, milestones, payments };
+      const facts: GuardFacts = { engagement, milestones, payments, artifacts };
       for (const guardKey of def.guards) {
         const verdict = GUARDS[guardKey](facts);
         if (!verdict.ok) fail(verdict.code);

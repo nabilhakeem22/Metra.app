@@ -7,6 +7,7 @@
 // counters) without changing this contract.
 import type {
   DesignEngagement,
+  EngagementArtifact,
   EngagementMilestone,
   PaymentEvent,
 } from '@metra/db';
@@ -16,21 +17,26 @@ import type { ActionCode } from '@/lib/actions/result';
 import { parseMoney4, pctOf } from '../aggregates/proposal-totals';
 
 /**
- * The facts a guard may read. Widened in Step 4: alongside the engagement row the
- * executor now also pre-loads the fee-schedule `milestones` and the append-only
- * `payments` ledger, so the deposit gate can decide from pure data.
+ * The facts a guard may read. Widened in Step 4 (fee-schedule `milestones` + the
+ * append-only `payments` ledger) and Step 5 (the recorded `artifacts`), so each
+ * gate can decide from pure data the executor pre-loaded.
  */
 export interface GuardFacts {
   engagement: DesignEngagement;
   milestones: EngagementMilestone[];
   payments: PaymentEvent[];
+  artifacts: EngagementArtifact[];
 }
 
 /** A guard's verdict: pass, or fail with the coded reason to surface. */
 export type GuardResult = { ok: true } | { ok: false; code: ActionCode };
 
 /** Guard identifiers referenced by the transition registry. */
-export type GuardKey = 'scopeInputsPresent' | 'depositCleared' | 'pendingGuard';
+export type GuardKey =
+  | 'scopeInputsPresent'
+  | 'depositCleared'
+  | 'spatialBaseReady'
+  | 'pendingGuard';
 
 const pass: GuardResult = { ok: true };
 
@@ -85,6 +91,28 @@ function depositCleared(facts: GuardFacts): GuardResult {
 }
 
 /**
+ * The engagement has a stored spatial base — the gate for `spatialBaseReady`
+ * (survey -> layout). The Off-Plan rule decides which attested artifact suffices:
+ *   - Off-Plan (`offPlan === true`): a developer CAD set is accepted in lieu of a
+ *     measured survey, so pass if an `autocad` OR `survey` artifact exists.
+ *   - non-Off-Plan (`offPlan === false`): a measured `survey` is required — a CAD
+ *     alone does NOT satisfy it.
+ * Fails closed with `spatial_base_missing` when no qualifying artifact is present.
+ */
+function spatialBaseReady(facts: GuardFacts): GuardResult {
+  const hasKind = (kind: EngagementArtifact['kind']): boolean =>
+    facts.artifacts.some((artifact) => artifact.kind === kind);
+
+  if (facts.engagement.offPlan) {
+    if (hasKind('autocad') || hasKind('survey')) return pass;
+    return { ok: false, code: 'spatial_base_missing' };
+  }
+
+  if (hasKind('survey')) return pass;
+  return { ok: false, code: 'spatial_base_missing' };
+}
+
+/**
  * Fail-closed sentinel for triggers whose real guard belongs to a later step.
  * It always denies with `transition_not_yet_enabled`, so a declared-but-unwired
  * transition can never fire early. Replaced by concrete guards in later steps.
@@ -97,5 +125,6 @@ function pendingGuard(): GuardResult {
 export const GUARDS: Record<GuardKey, (facts: GuardFacts) => GuardResult> = {
   scopeInputsPresent,
   depositCleared,
+  spatialBaseReady,
   pendingGuard,
 };

@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import type { ActionResult } from '@/lib/actions/result';
 import { requireOrg } from '@/lib/auth/require-org';
+import { recordArtifactCore, type RecordArtifactInput } from './artifacts';
 import { createEngagementCore, type CreateEngagementInput } from './core';
 import { executeTransition } from './executor';
 import { recordPaymentCore, type RecordPaymentInput } from './payments';
@@ -57,6 +58,22 @@ export async function recordPayment(
 ): Promise<ActionResult & { data?: string }> {
   const ctx = await requireOrg();
   const res = await recordPaymentCore(ctx, input);
+  if (res.ok) revalidatePath('/', 'layout');
+  return res;
+}
+
+/**
+ * Server-action wrapper for {@link recordArtifactCore}: resolves the request's
+ * org context, records (and thereby attests) one engagement artifact, and
+ * revalidates the shell on success. Returns the ActionResult (with the new
+ * artifact id in `data`) — never throws to the client. The artifact is the stored
+ * spatial base that the `spatialBaseReady` guard reads to admit survey -> layout.
+ */
+export async function recordArtifact(
+  input: RecordArtifactInput,
+): Promise<ActionResult & { data?: string }> {
+  const ctx = await requireOrg();
+  const res = await recordArtifactCore(ctx, input);
   if (res.ok) revalidatePath('/', 'layout');
   return res;
 }

@@ -67,9 +67,9 @@ describe('transition registry', () => {
     expect([...reachable].sort()).toEqual([...DESIGN_STATES].sort());
   });
 
-  it('submitDesignFee + confirmAndPayDeposit are the wired triggers; the rest fail closed', () => {
+  it('submitDesignFee + confirmAndPayDeposit + spatialBaseReady are wired; the rest fail closed', () => {
     expect([...WIRED_TRIGGERS].sort()).toEqual(
-      ['confirmAndPayDeposit', 'submitDesignFee'].sort(),
+      ['confirmAndPayDeposit', 'spatialBaseReady', 'submitDesignFee'].sort(),
     );
 
     // Each wired trigger carries a concrete guard, never the sentinel.
@@ -85,11 +85,22 @@ describe('transition registry', () => {
     expect(TRANSITIONS.confirmAndPayDeposit.capability).toBe('engagements_finance');
     expect(TRANSITIONS.confirmAndPayDeposit.sideEffect).toBe('activateOnDeposit');
 
+    // spatialBaseReady (Step 5): the artifact IS the stored spatial base, so no
+    // side-effect — just the survey -> layout state move under its Off-Plan guard.
+    expect(TRANSITIONS.spatialBaseReady.guards).toEqual(['spatialBaseReady']);
+    expect(TRANSITIONS.spatialBaseReady.from).toBe('survey');
+    expect(TRANSITIONS.spatialBaseReady.to).toBe('layout');
+    expect(TRANSITIONS.spatialBaseReady.capability).toBe('engagements_design');
+    expect(TRANSITIONS.spatialBaseReady.sideEffect).toBeNull();
+
     // Every other trigger routes through pendingGuard (fail-closed).
+    const wired = new Set<Trigger>([
+      'submitDesignFee',
+      'confirmAndPayDeposit',
+      'spatialBaseReady',
+    ]);
     for (const trigger of ALL_TRIGGERS) {
-      if (trigger === 'submitDesignFee' || trigger === 'confirmAndPayDeposit') {
-        continue;
-      }
+      if (wired.has(trigger)) continue;
       expect(TRANSITIONS[trigger].guards).toContain('pendingGuard');
     }
   });

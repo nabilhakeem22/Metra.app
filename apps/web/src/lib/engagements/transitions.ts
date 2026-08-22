@@ -1,9 +1,11 @@
 // Design-Engagement Machine — transition registry (Step 2). PURE, CLIENT-SAFE
 // DATA: the whole shape of the machine declared in one place. All 17 triggers
-// are listed so the graph is complete and honest, but ONLY `submitDesignFee` is
-// wired this step. Every later-step trigger points its guard at `pendingGuard`,
-// which fails closed with `transition_not_yet_enabled` — declared, reachable in
-// type-space, but impossible to fire until its real guard/side-effect lands.
+// are listed so the graph is complete and honest; the wired edges live in
+// `WIRED_TRIGGERS` (Step 5: submitDesignFee, confirmAndPayDeposit,
+// spatialBaseReady). Every not-yet-wired trigger points its guard at
+// `pendingGuard`, which fails closed with `transition_not_yet_enabled` —
+// declared, reachable in type-space, but impossible to fire until its real
+// guard/side-effect lands.
 import type { MilestoneBasis, MilestoneKind } from '@metra/db';
 import type { Capability } from '@/lib/permissions/roles';
 import type { GuardKey } from './guards';
@@ -71,11 +73,11 @@ export interface TransitionDef {
 }
 
 /**
- * The registry. `submitDesignFee` is the one fully-wired edge:
- * `created -> design_proposal`, guarded by `scopeInputsPresent`, no side effect
- * this step, gated on `engagements_design`. Every other trigger is declared with
- * its intended from/to but guarded by `pendingGuard` (fail-closed) until its
- * step arrives.
+ * The registry. The wired edges (see `WIRED_TRIGGERS`) are `submitDesignFee`
+ * (created -> design_proposal), `confirmAndPayDeposit` (design_proposal ->
+ * survey) and `spatialBaseReady` (survey -> layout). Every other trigger is
+ * declared with its intended from/to but guarded by `pendingGuard` (fail-closed)
+ * until its step arrives.
  */
 export const TRANSITIONS: Record<Trigger, TransitionDef> = {
   submitDesignFee: {
@@ -95,7 +97,7 @@ export const TRANSITIONS: Record<Trigger, TransitionDef> = {
   spatialBaseReady: {
     from: 'survey',
     to: 'layout',
-    guards: ['pendingGuard'],
+    guards: ['spatialBaseReady'],
     sideEffect: null,
     capability: 'engagements_design',
   },
@@ -216,4 +218,5 @@ export const TRANSITIONS: Record<Trigger, TransitionDef> = {
 export const WIRED_TRIGGERS: ReadonlySet<Trigger> = new Set<Trigger>([
   'submitDesignFee',
   'confirmAndPayDeposit',
+  'spatialBaseReady',
 ]);

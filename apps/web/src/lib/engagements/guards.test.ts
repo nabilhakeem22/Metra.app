@@ -1,5 +1,6 @@
 import type {
   DesignEngagement,
+  EngagementArtifact,
   EngagementMilestone,
   PaymentEvent,
 } from '@metra/db';
@@ -20,6 +21,20 @@ function engagement(over: Partial<DesignEngagement>): GuardFacts {
     } as DesignEngagement,
     milestones: [],
     payments: [],
+    artifacts: [],
+  };
+}
+
+/** Build a facts bundle for spatialBaseReady: offPlan flag + artifact kinds. */
+function spatialFacts(
+  offPlan: boolean,
+  kinds: EngagementArtifact['kind'][],
+): GuardFacts {
+  return {
+    engagement: { offPlan } as DesignEngagement,
+    milestones: [],
+    payments: [],
+    artifacts: kinds.map((kind) => ({ kind }) as EngagementArtifact),
   };
 }
 
@@ -45,6 +60,7 @@ function depositFacts(opts: {
     engagement: { designFee: opts.designFee } as DesignEngagement,
     milestones,
     payments,
+    artifacts: [],
   };
 }
 
@@ -126,6 +142,35 @@ describe('depositCleared', () => {
         depositFacts({ designFee: null, deposit: { basis: 'percent', value: '25' }, paid: ['999999'] }),
       ),
     ).toEqual({ ok: false, code: 'deposit_not_cleared' });
+  });
+});
+
+describe('spatialBaseReady — the Off-Plan rule', () => {
+  it('non-Off-Plan: requires a measured survey (a CAD alone does NOT satisfy it)', () => {
+    expect(GUARDS.spatialBaseReady(spatialFacts(false, []))).toEqual({
+      ok: false,
+      code: 'spatial_base_missing',
+    });
+    expect(GUARDS.spatialBaseReady(spatialFacts(false, ['autocad']))).toEqual({
+      ok: false,
+      code: 'spatial_base_missing',
+    });
+    expect(GUARDS.spatialBaseReady(spatialFacts(false, ['survey']))).toEqual({
+      ok: true,
+    });
+  });
+
+  it('Off-Plan: a developer CAD OR a survey satisfies it; nothing does not', () => {
+    expect(GUARDS.spatialBaseReady(spatialFacts(true, []))).toEqual({
+      ok: false,
+      code: 'spatial_base_missing',
+    });
+    expect(GUARDS.spatialBaseReady(spatialFacts(true, ['autocad']))).toEqual({
+      ok: true,
+    });
+    expect(GUARDS.spatialBaseReady(spatialFacts(true, ['survey']))).toEqual({
+      ok: true,
+    });
   });
 });
 
