@@ -2,9 +2,11 @@ import 'server-only';
 import {
   designEngagements,
   engagementArtifacts,
+  engagementEvents,
   engagementMilestones,
   paymentEvents,
   type EngagementArtifactKind,
+  type EngagementEventKind,
   type MilestoneBasis,
   type MilestoneKind,
   type PaymentEventKind,
@@ -132,6 +134,45 @@ export function getEngagementArtifacts(
       .orderBy(
         desc(engagementArtifacts.attestedAt),
         desc(engagementArtifacts.createdAt),
+      ),
+  );
+}
+
+/** One recorded decision in the append-only engagement approvals ledger. */
+export interface EngagementEventRecord {
+  id: string;
+  kind: EngagementEventKind;
+  actorUserId: string | null;
+  docHash: string | null;
+  note: string | null;
+  decidedAt: Date;
+}
+
+/**
+ * The approvals-ledger events recorded against an engagement, NEWEST FIRST. RLS
+ * scopes the read to the caller's org (a foreign engagement reads as an empty
+ * list). Omits the tokenized-client-ack columns (actor_name/ip/user_agent,
+ * range_low/high) — those are reserved for later steps and not surfaced here.
+ */
+export function getEngagementEvents(
+  ctx: OrgContext,
+  engagementId: string,
+): Promise<EngagementEventRecord[]> {
+  return withOrgContext(ctx, (tx) =>
+    tx
+      .select({
+        id: engagementEvents.id,
+        kind: engagementEvents.kind,
+        actorUserId: engagementEvents.actorUserId,
+        docHash: engagementEvents.docHash,
+        note: engagementEvents.note,
+        decidedAt: engagementEvents.decidedAt,
+      })
+      .from(engagementEvents)
+      .where(eq(engagementEvents.engagementId, engagementId))
+      .orderBy(
+        desc(engagementEvents.decidedAt),
+        desc(engagementEvents.createdAt),
       ),
   );
 }

@@ -539,6 +539,21 @@ create policy org_isolation on public.engagement_artifacts
     and public.app_is_current_org_member()
   );
 
+-- engagement_events (Step 7; append-only via grants — SELECT + INSERT only, no
+-- UPDATE/DELETE; org-isolated + membership-gated, like contract_events)
+alter table public.engagement_events enable row level security;
+alter table public.engagement_events force  row level security;
+drop policy if exists org_isolation on public.engagement_events;
+create policy org_isolation on public.engagement_events
+  using (
+    org_id = nullif(current_setting('app.current_org_id', true), '')::uuid
+    and public.app_is_current_org_member()
+  )
+  with check (
+    org_id = nullif(current_setting('app.current_org_id', true), '')::uuid
+    and public.app_is_current_org_member()
+  );
+
 -- =============================================================================
 -- P1 Automation — notifications (recipient-scoped) + automation config/claim log
 -- =============================================================================

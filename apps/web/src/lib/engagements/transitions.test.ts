@@ -49,12 +49,15 @@ describe('transition registry', () => {
       expect(['engagements_design', 'engagements_finance', 'engagements_issue']).toContain(
         def.capability,
       );
-      // Only the deposit path carries side-effects (submitDesignFee -> Step 3,
-      // confirmAndPayDeposit -> Step 4); every other trigger still moves state only.
+      // Side-effect-carrying triggers: submitDesignFee -> Step 3,
+      // confirmAndPayDeposit -> Step 4, selectConcept -> Step 7; every other
+      // trigger still moves state only.
       if (trigger === 'submitDesignFee') {
         expect(def.sideEffect).toBe('generateFeeSchedule');
       } else if (trigger === 'confirmAndPayDeposit') {
         expect(def.sideEffect).toBe('activateOnDeposit');
+      } else if (trigger === 'selectConcept') {
+        expect(def.sideEffect).toBe('recordConceptApproval');
       } else {
         expect(def.sideEffect).toBeNull();
       }
@@ -67,11 +70,12 @@ describe('transition registry', () => {
     expect([...reachable].sort()).toEqual([...DESIGN_STATES].sort());
   });
 
-  it('submitDesignFee + confirmAndPayDeposit + spatialBaseReady + optionsReady are wired; the rest fail closed', () => {
+  it('submitDesignFee + confirmAndPayDeposit + spatialBaseReady + optionsReady + selectConcept are wired; the rest fail closed', () => {
     expect([...WIRED_TRIGGERS].sort()).toEqual(
       [
         'confirmAndPayDeposit',
         'optionsReady',
+        'selectConcept',
         'spatialBaseReady',
         'submitDesignFee',
       ].sort(),
@@ -106,12 +110,21 @@ describe('transition registry', () => {
     expect(TRANSITIONS.optionsReady.capability).toBe('engagements_design');
     expect(TRANSITIONS.optionsReady.sideEffect).toBeNull();
 
+    // selectConcept (Step 7): the Gate-A installment gate (concept_review ->
+    // negotiation) writes ONE append-only concept_approval event as its side-effect.
+    expect(TRANSITIONS.selectConcept.guards).toEqual(['gateAInstallmentCleared']);
+    expect(TRANSITIONS.selectConcept.from).toBe('concept_review');
+    expect(TRANSITIONS.selectConcept.to).toBe('negotiation');
+    expect(TRANSITIONS.selectConcept.capability).toBe('engagements_design');
+    expect(TRANSITIONS.selectConcept.sideEffect).toBe('recordConceptApproval');
+
     // Every other trigger routes through pendingGuard (fail-closed).
     const wired = new Set<Trigger>([
       'submitDesignFee',
       'confirmAndPayDeposit',
       'spatialBaseReady',
       'optionsReady',
+      'selectConcept',
     ]);
     for (const trigger of ALL_TRIGGERS) {
       if (wired.has(trigger)) continue;

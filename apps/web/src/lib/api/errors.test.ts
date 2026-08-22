@@ -64,6 +64,7 @@ const ALL_CODES: ActionCode[] = [
   'milestone_kind_duplicate',
   'payment_amount_invalid',
   'deposit_not_cleared',
+  'gate_a_not_cleared',
   'spatial_base_missing',
   'concept_options_out_of_range',
 ];

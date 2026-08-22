@@ -145,6 +145,94 @@ describe('depositCleared', () => {
   });
 });
 
+/** Build a facts bundle for gateAInstallmentCleared: fee + one gate_a milestone + paid rows. */
+function gateAFacts(opts: {
+  designFee: string | null;
+  gateA?: { basis: 'percent' | 'amount'; value: string };
+  paid: string[];
+}): GuardFacts {
+  const milestones: EngagementMilestone[] = opts.gateA
+    ? [
+        {
+          kind: 'gate_a',
+          basis: opts.gateA.basis,
+          value: opts.gateA.value,
+        } as EngagementMilestone,
+      ]
+    : [];
+  const payments: PaymentEvent[] = opts.paid.map(
+    (amount) => ({ kind: 'gate_a', amount }) as PaymentEvent,
+  );
+  return {
+    engagement: { designFee: opts.designFee } as DesignEngagement,
+    milestones,
+    payments,
+    artifacts: [],
+  };
+}
+
+describe('gateAInstallmentCleared', () => {
+  it('amount basis: passes iff paid >= the gate_a milestone value (short/exact/over)', () => {
+    const base = { designFee: '100000', gateA: { basis: 'amount' as const, value: '20000' } };
+    // Exact clears.
+    expect(GUARDS.gateAInstallmentCleared(gateAFacts({ ...base, paid: ['20000'] }))).toEqual({
+      ok: true,
+    });
+    // Over clears; two partials that sum over also clear.
+    expect(
+      GUARDS.gateAInstallmentCleared(gateAFacts({ ...base, paid: ['15000', '10000'] })),
+    ).toEqual({ ok: true });
+    // A piastre short fails closed.
+    expect(GUARDS.gateAInstallmentCleared(gateAFacts({ ...base, paid: ['19999.9999'] }))).toEqual({
+      ok: false,
+      code: 'gate_a_not_cleared',
+    });
+    expect(GUARDS.gateAInstallmentCleared(gateAFacts({ ...base, paid: [] }))).toEqual({
+      ok: false,
+      code: 'gate_a_not_cleared',
+    });
+  });
+
+  it('percent basis: required = design_fee × gate_a% / 100 (exact)', () => {
+    // 20% of 100,000 = 20,000 exactly.
+    const base = { designFee: '100000', gateA: { basis: 'percent' as const, value: '20' } };
+    expect(GUARDS.gateAInstallmentCleared(gateAFacts({ ...base, paid: ['20000'] }))).toEqual({
+      ok: true,
+    });
+    expect(GUARDS.gateAInstallmentCleared(gateAFacts({ ...base, paid: ['19999.9999'] }))).toEqual({
+      ok: false,
+      code: 'gate_a_not_cleared',
+    });
+  });
+
+  it('ignores non-gate_a payment kinds when summing PAID', () => {
+    const facts = gateAFacts({
+      designFee: '100000',
+      gateA: { basis: 'amount', value: '20000' },
+      paid: [],
+    });
+    facts.payments = [
+      { kind: 'deposit', amount: '20000' } as PaymentEvent,
+      { kind: 'balance', amount: '20000' } as PaymentEvent,
+    ];
+    expect(GUARDS.gateAInstallmentCleared(facts)).toEqual({
+      ok: false,
+      code: 'gate_a_not_cleared',
+    });
+  });
+
+  it('fails closed when the gate_a milestone or the design_fee is missing', () => {
+    expect(
+      GUARDS.gateAInstallmentCleared(gateAFacts({ designFee: '100000', paid: ['999999'] })),
+    ).toEqual({ ok: false, code: 'gate_a_not_cleared' });
+    expect(
+      GUARDS.gateAInstallmentCleared(
+        gateAFacts({ designFee: null, gateA: { basis: 'percent', value: '20' }, paid: ['999999'] }),
+      ),
+    ).toEqual({ ok: false, code: 'gate_a_not_cleared' });
+  });
+});
+
 describe('spatialBaseReady — the Off-Plan rule', () => {
   it('non-Off-Plan: requires a measured survey (a CAD alone does NOT satisfy it)', () => {
     expect(GUARDS.spatialBaseReady(spatialFacts(false, []))).toEqual({
