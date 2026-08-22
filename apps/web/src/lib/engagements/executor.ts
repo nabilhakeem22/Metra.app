@@ -16,6 +16,7 @@ import { fail, mutateInOrg } from '@/lib/actions/mutate';
 import { err, type ActionResult } from '@/lib/actions/result';
 import type { OrgContext } from '@/lib/db/context';
 import type { PermissionAction } from '@/lib/permissions/roles';
+import { recordConceptApproval } from './approvals';
 import { generateFeeSchedule } from './fee-schedule';
 import { GUARDS, type GuardFacts } from './guards';
 import { TRANSITIONS, type CapabilityKey, type Trigger } from './transitions';
@@ -126,6 +127,12 @@ export async function executeTransition(
           .update(designEngagements)
           .set({ asBuiltDue: true, updatedAt: new Date() })
           .where(eq(designEngagements.id, engagementId));
+      }
+      // selectConcept (Step 7): the Gate-A installment already cleared (guard),
+      // so the concept selection is witnessed by ONE append-only approvals row,
+      // committed atomically with the concept_review -> negotiation move.
+      if (def.sideEffect === 'recordConceptApproval') {
+        await recordConceptApproval(tx, ctx, engagementId);
       }
 
       await tx.insert(engagementTransitions).values({

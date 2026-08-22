@@ -173,6 +173,7 @@ const TEARDOWN_TABLES_IN_FK_ORDER = [
   // engagements; the engagement references clients + projects (restrict), so tear
   // the children down first, then engagements, before clients/projects.
   'payment_events',
+  'engagement_events',
   'engagement_artifacts',
   'engagement_milestones',
   'engagement_transitions',

@@ -35,6 +35,7 @@ export * from './engagement-transitions';
 export * from './engagement-milestones';
 export * from './payment-events';
 export * from './engagement-artifacts';
+export * from './engagement-events';
 export * from './notifications';
 export * from './automation-settings';
 export * from './automation-run-log';
@@ -71,6 +72,7 @@ import { engagementTransitions } from './engagement-transitions';
 import { engagementMilestones } from './engagement-milestones';
 import { paymentEvents } from './payment-events';
 import { engagementArtifacts } from './engagement-artifacts';
+import { engagementEvents } from './engagement-events';
 import { notifications } from './notifications';
 import { automationSettings } from './automation-settings';
 import { automationRunLog } from './automation-run-log';
@@ -109,6 +111,7 @@ export const orgScopedTables = {
   engagementMilestones,
   paymentEvents,
   engagementArtifacts,
+  engagementEvents,
   notifications,
   automationSettings,
   automationRunLog,
@@ -149,6 +152,7 @@ export const allTables = {
   engagementMilestones,
   paymentEvents,
   engagementArtifacts,
+  engagementEvents,
   notifications,
   automationSettings,
   automationRunLog,

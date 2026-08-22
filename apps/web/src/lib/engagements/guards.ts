@@ -9,6 +9,7 @@ import type {
   DesignEngagement,
   EngagementArtifact,
   EngagementMilestone,
+  MilestoneKind,
   PaymentEvent,
 } from '@metra/db';
 import type { ActionCode } from '@/lib/actions/result';
@@ -35,6 +36,7 @@ export type GuardResult = { ok: true } | { ok: false; code: ActionCode };
 export type GuardKey =
   | 'scopeInputsPresent'
   | 'depositCleared'
+  | 'gateAInstallmentCleared'
   | 'spatialBaseReady'
   | 'optionsReady'
   | 'pendingGuard';
@@ -57,38 +59,67 @@ function scopeInputsPresent(facts: GuardFacts): GuardResult {
 }
 
 /**
- * The engagement's deposit is fully paid — the gate for `confirmAndPayDeposit`.
- * Computes the REQUIRED deposit from the `deposit` milestone + `design_fee` in
- * exact scale-4 BigInt (never parseFloat):
- *   - basis `amount`  → required = the deposit milestone's `value`.
- *   - basis `percent` → required = design_fee × (deposit% / 100), via `pctOf`
+ * Shared installment-clearance math for a milestone-gated money guard. Computes
+ * the REQUIRED amount for the `kind` milestone from the milestone row + `design_fee`
+ * in exact scale-4 BigInt (never parseFloat):
+ *   - basis `amount`  → required = the milestone's `value`.
+ *   - basis `percent` → required = design_fee × (milestone% / 100), via `pctOf`
  *     (round half away from zero — the SAME rule as the proposal money engine).
- * PAID = Σ `amount` of the engagement's `deposit` payment events (every
+ * PAID = Σ `amount` of the engagement's payment events of the SAME `kind` (every
  * `payment_events` row is a cleared payment in the manual model). Passes iff
- * paid ≥ required. FAILS CLOSED (`deposit_not_cleared`) if the deposit milestone
- * or the design_fee is missing — which cannot happen after Step 3, but a gate on
- * money must never open on absent facts.
+ * paid ≥ required, else fails with the caller-supplied `code`. FAILS CLOSED (with
+ * `code`) if the milestone or the design_fee is missing — which cannot happen
+ * after Step 3, but a gate on money must never open on absent facts.
+ *
+ * `payment_event_kind` is a superset of `milestone_kind` (it adds `revision_co`),
+ * but the four milestone kinds share a spelling, so summing payments whose
+ * `kind === milestoneKind` matches receipts to their scheduled slice exactly.
  */
-function depositCleared(facts: GuardFacts): GuardResult {
-  const deposit = facts.milestones.find((m) => m.kind === 'deposit');
+function milestoneCleared(
+  facts: GuardFacts,
+  kind: MilestoneKind,
+  code: ActionCode,
+): GuardResult {
+  const milestone = facts.milestones.find((m) => m.kind === kind);
   const designFee = facts.engagement.designFee;
-  if (!deposit || !designFee) {
-    return { ok: false, code: 'deposit_not_cleared' };
+  if (!milestone || !designFee) {
+    return { ok: false, code };
   }
 
   const required =
-    deposit.basis === 'amount'
-      ? parseMoney4(deposit.value)
-      : pctOf(parseMoney4(designFee), parseMoney4(deposit.value));
+    milestone.basis === 'amount'
+      ? parseMoney4(milestone.value)
+      : pctOf(parseMoney4(designFee), parseMoney4(milestone.value));
 
   const paid = facts.payments.reduce(
     (sum, payment) =>
-      payment.kind === 'deposit' ? sum + parseMoney4(payment.amount) : sum,
+      payment.kind === kind ? sum + parseMoney4(payment.amount) : sum,
     0n,
   );
 
-  if (paid < required) return { ok: false, code: 'deposit_not_cleared' };
+  if (paid < required) return { ok: false, code };
   return pass;
+}
+
+/**
+ * The engagement's deposit is fully paid — the gate for `confirmAndPayDeposit`.
+ * Delegates to {@link milestoneCleared} for the `deposit` milestone, surfacing
+ * `deposit_not_cleared` on any shortfall or absent fact.
+ */
+function depositCleared(facts: GuardFacts): GuardResult {
+  return milestoneCleared(facts, 'deposit', 'deposit_not_cleared');
+}
+
+/**
+ * The engagement's Gate-A installment is fully paid — the gate for `selectConcept`
+ * (concept_review → negotiation). Delegates to {@link milestoneCleared} for the
+ * `gate_a` milestone, surfacing `gate_a_not_cleared` on any shortfall or absent
+ * fact. The client/finance record the Gate-A receipt into the payment ledger
+ * beforehand (`recordPaymentCore(kind:'gate_a')`); this guard only verifies it
+ * cleared — consistent with the deposit model. No payment is collected here.
+ */
+function gateAInstallmentCleared(facts: GuardFacts): GuardResult {
+  return milestoneCleared(facts, 'gate_a', 'gate_a_not_cleared');
 }
 
 /**
@@ -145,6 +176,7 @@ function pendingGuard(): GuardResult {
 export const GUARDS: Record<GuardKey, (facts: GuardFacts) => GuardResult> = {
   scopeInputsPresent,
   depositCleared,
+  gateAInstallmentCleared,
   spatialBaseReady,
   optionsReady,
   pendingGuard,

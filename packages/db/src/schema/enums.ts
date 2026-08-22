@@ -243,6 +243,29 @@ export const engagementArtifactKind = pgEnum(
   ENGAGEMENT_ARTIFACT_KINDS,
 );
 
+/**
+ * Design-Engagement Machine, Step 7 — the kinds of decision recorded in the
+ * append-only engagement approvals ledger (`engagement_events`). The FULL set is
+ * declared now (so no later enum-add migration is needed) even though Step 7 only
+ * writes `concept_approval`: `concept_approval` (the client/internal selection of
+ * a concept that opens negotiation), `design_approval` (final 3D sign-off),
+ * `rom_acknowledgement` (the client's acknowledgement of a rough order-of-magnitude
+ * range — uses the reserved range_low/range_high columns) and
+ * `handoff_acknowledgement` (design-only handoff receipt). Order is a contract
+ * shared with the TS `EngagementEventKind` union in @metra/web; labels localized.
+ */
+export const ENGAGEMENT_EVENT_KINDS = [
+  'concept_approval',
+  'design_approval',
+  'rom_acknowledgement',
+  'handoff_acknowledgement',
+] as const;
+
+export const engagementEventKind = pgEnum(
+  'engagement_event_kind',
+  ENGAGEMENT_EVENT_KINDS,
+);
+
 export type MemberRole = (typeof MEMBER_ROLES)[number];
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];
 export type InvitationStatus = (typeof INVITATION_STATUSES)[number];
@@ -261,3 +284,4 @@ export type MilestoneKind = (typeof MILESTONE_KINDS)[number];
 export type MilestoneBasis = (typeof MILESTONE_BASES)[number];
 export type PaymentEventKind = (typeof PAYMENT_EVENT_KINDS)[number];
 export type EngagementArtifactKind = (typeof ENGAGEMENT_ARTIFACT_KINDS)[number];
+export type EngagementEventKind = (typeof ENGAGEMENT_EVENT_KINDS)[number];

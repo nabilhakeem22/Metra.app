@@ -71,6 +71,10 @@ grant select, insert on public.engagement_transitions  to metra_app;
 -- payment is a cleared payment and is never edited or removed. SELECT + INSERT
 -- only, so any UPDATE/DELETE raises a permission error at the database.
 grant select, insert on public.payment_events          to metra_app;
+-- engagement_events (Step 7): the approvals ledger is append-only — a recorded
+-- decision (concept_approval, …) is never edited or removed. SELECT + INSERT only,
+-- so any UPDATE/DELETE raises a permission error at the database.
+grant select, insert on public.engagement_events       to metra_app;
 grant select, insert on public.automation_run_log  to metra_app;
 
 -- Future-proofing for composite-FK trigger functions.

@@ -121,6 +121,7 @@ export const ACTION_CODE_PROBLEM: Record<ActionCode, ApiProblemKind> = {
   milestone_kind_duplicate: 'bad-request',
   payment_amount_invalid: 'bad-request',
   deposit_not_cleared: 'bad-request',
+  gate_a_not_cleared: 'bad-request',
   spatial_base_missing: 'bad-request',
   concept_options_out_of_range: 'bad-request',
 };
