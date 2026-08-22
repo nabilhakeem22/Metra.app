@@ -122,6 +122,7 @@ export const ACTION_CODE_PROBLEM: Record<ActionCode, ApiProblemKind> = {
   payment_amount_invalid: 'bad-request',
   deposit_not_cleared: 'bad-request',
   spatial_base_missing: 'bad-request',
+  concept_options_out_of_range: 'bad-request',
 };
 
 /** A problem Response derived from an ActionResult error code. */

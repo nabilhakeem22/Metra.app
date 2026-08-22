@@ -174,6 +174,63 @@ describe('spatialBaseReady — the Off-Plan rule', () => {
   });
 });
 
+describe('optionsReady — the 2–4 concept-options gate', () => {
+  /** A facts bundle with `conceptCount` concept_option artifacts, plus `extras`. */
+  function optionsFacts(
+    conceptCount: number,
+    extras: EngagementArtifact['kind'][] = [],
+  ): GuardFacts {
+    const conceptOptions = Array.from(
+      { length: conceptCount },
+      () => ({ kind: 'concept_option' }) as EngagementArtifact,
+    );
+    const extraArtifacts = extras.map(
+      (kind) => ({ kind }) as EngagementArtifact,
+    );
+    return {
+      engagement: {} as DesignEngagement,
+      milestones: [],
+      payments: [],
+      artifacts: [...conceptOptions, ...extraArtifacts],
+    };
+  }
+
+  it('fails below the range: 0 and 1 concept options', () => {
+    expect(GUARDS.optionsReady(optionsFacts(0))).toEqual({
+      ok: false,
+      code: 'concept_options_out_of_range',
+    });
+    expect(GUARDS.optionsReady(optionsFacts(1))).toEqual({
+      ok: false,
+      code: 'concept_options_out_of_range',
+    });
+  });
+
+  it('passes inside the range: 2, 3, and 4 concept options', () => {
+    expect(GUARDS.optionsReady(optionsFacts(2))).toEqual({ ok: true });
+    expect(GUARDS.optionsReady(optionsFacts(3))).toEqual({ ok: true });
+    expect(GUARDS.optionsReady(optionsFacts(4))).toEqual({ ok: true });
+  });
+
+  it('fails above the range: 5 concept options', () => {
+    expect(GUARDS.optionsReady(optionsFacts(5))).toEqual({
+      ok: false,
+      code: 'concept_options_out_of_range',
+    });
+  });
+
+  it('counts only concept_option artifacts — a survey/autocad never counts', () => {
+    // One concept option + two non-concept artifacts is still below the range.
+    expect(
+      GUARDS.optionsReady(optionsFacts(1, ['survey', 'autocad'])),
+    ).toEqual({ ok: false, code: 'concept_options_out_of_range' });
+    // Two concept options pass even with extra non-concept artifacts present.
+    expect(
+      GUARDS.optionsReady(optionsFacts(2, ['survey', 'autocad'])),
+    ).toEqual({ ok: true });
+  });
+});
+
 describe('pendingGuard', () => {
   it('always fails closed with transition_not_yet_enabled', () => {
     expect(GUARDS.pendingGuard(engagement({}))).toEqual({

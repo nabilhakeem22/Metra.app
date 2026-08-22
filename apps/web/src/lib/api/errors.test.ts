@@ -65,6 +65,7 @@ const ALL_CODES: ActionCode[] = [
   'payment_amount_invalid',
   'deposit_not_cleared',
   'spatial_base_missing',
+  'concept_options_out_of_range',
 ];
 
 describe('problem+json envelope', () => {

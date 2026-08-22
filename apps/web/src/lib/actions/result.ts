@@ -55,7 +55,8 @@ export type ActionCode =
   | 'milestone_kind_duplicate'
   | 'payment_amount_invalid'
   | 'deposit_not_cleared'
-  | 'spatial_base_missing';
+  | 'spatial_base_missing'
+  | 'concept_options_out_of_range';
 
 export interface ActionResult {
   ok: boolean;

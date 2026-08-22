@@ -2,7 +2,7 @@
 // DATA: the whole shape of the machine declared in one place. All 17 triggers
 // are listed so the graph is complete and honest; the wired edges live in
 // `WIRED_TRIGGERS` (Step 5: submitDesignFee, confirmAndPayDeposit,
-// spatialBaseReady). Every not-yet-wired trigger points its guard at
+// spatialBaseReady; Step 6: optionsReady). Every not-yet-wired trigger points its guard at
 // `pendingGuard`, which fails closed with `transition_not_yet_enabled` —
 // declared, reachable in type-space, but impossible to fire until its real
 // guard/side-effect lands.
@@ -75,9 +75,9 @@ export interface TransitionDef {
 /**
  * The registry. The wired edges (see `WIRED_TRIGGERS`) are `submitDesignFee`
  * (created -> design_proposal), `confirmAndPayDeposit` (design_proposal ->
- * survey) and `spatialBaseReady` (survey -> layout). Every other trigger is
- * declared with its intended from/to but guarded by `pendingGuard` (fail-closed)
- * until its step arrives.
+ * survey), `spatialBaseReady` (survey -> layout) and `optionsReady` (layout ->
+ * concept_review). Every other trigger is declared with its intended from/to but
+ * guarded by `pendingGuard` (fail-closed) until its step arrives.
  */
 export const TRANSITIONS: Record<Trigger, TransitionDef> = {
   submitDesignFee: {
@@ -104,7 +104,7 @@ export const TRANSITIONS: Record<Trigger, TransitionDef> = {
   optionsReady: {
     from: 'layout',
     to: 'concept_review',
-    guards: ['pendingGuard'],
+    guards: ['optionsReady'],
     sideEffect: null,
     capability: 'engagements_design',
   },
@@ -219,4 +219,5 @@ export const WIRED_TRIGGERS: ReadonlySet<Trigger> = new Set<Trigger>([
   'submitDesignFee',
   'confirmAndPayDeposit',
   'spatialBaseReady',
+  'optionsReady',
 ]);

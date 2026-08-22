@@ -332,7 +332,8 @@
     "milestone_kind_duplicate": "Each milestone type can appear only once",
     "payment_amount_invalid": "Enter a payment amount greater than zero",
     "deposit_not_cleared": "The deposit has not been fully paid yet",
-    "spatial_base_missing": "Record a survey (or a developer CAD set for off-plan) before continuing"
+    "spatial_base_missing": "Record a survey (or a developer CAD set for off-plan) before continuing",
+    "concept_options_out_of_range": "Add 2–4 concept options to continue"
   },
   "common": {
     "untranslated": "untranslated",

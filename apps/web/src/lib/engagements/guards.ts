@@ -36,6 +36,7 @@ export type GuardKey =
   | 'scopeInputsPresent'
   | 'depositCleared'
   | 'spatialBaseReady'
+  | 'optionsReady'
   | 'pendingGuard';
 
 const pass: GuardResult = { ok: true };
@@ -113,6 +114,25 @@ function spatialBaseReady(facts: GuardFacts): GuardResult {
 }
 
 /**
+ * The engagement has a valid set of concept options to put in front of the client
+ * — the gate for `optionsReady` (layout -> concept_review). The spec requires
+ * "2–4 concept options exist": too few is not a real choice, too many dilutes the
+ * decision. Counts ONLY `concept_option` artifacts (a survey or CAD in the bundle
+ * never counts) and passes iff that count is between 2 and 4 inclusive. Fails
+ * closed with `concept_options_out_of_range` at 0, 1, or 5+.
+ */
+function optionsReady(facts: GuardFacts): GuardResult {
+  const conceptOptionCount = facts.artifacts.filter(
+    (artifact) => artifact.kind === 'concept_option',
+  ).length;
+
+  if (conceptOptionCount < 2 || conceptOptionCount > 4) {
+    return { ok: false, code: 'concept_options_out_of_range' };
+  }
+  return pass;
+}
+
+/**
  * Fail-closed sentinel for triggers whose real guard belongs to a later step.
  * It always denies with `transition_not_yet_enabled`, so a declared-but-unwired
  * transition can never fire early. Replaced by concrete guards in later steps.
@@ -126,5 +146,6 @@ export const GUARDS: Record<GuardKey, (facts: GuardFacts) => GuardResult> = {
   scopeInputsPresent,
   depositCleared,
   spatialBaseReady,
+  optionsReady,
   pendingGuard,
 };
