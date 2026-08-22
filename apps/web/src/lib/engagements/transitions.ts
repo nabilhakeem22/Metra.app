@@ -2,8 +2,8 @@
 // DATA: the whole shape of the machine declared in one place. All 17 triggers
 // are listed so the graph is complete and honest; the wired edges live in
 // `WIRED_TRIGGERS` (Step 5: submitDesignFee, confirmAndPayDeposit,
-// spatialBaseReady; Step 6: optionsReady; Step 7: selectConcept). Every
-// not-yet-wired trigger points its guard at
+// spatialBaseReady; Step 6: optionsReady; Step 7: selectConcept; Step 8:
+// requestRevision self-loop). Every not-yet-wired trigger points its guard at
 // `pendingGuard`, which fails closed with `transition_not_yet_enabled` —
 // declared, reachable in type-space, but impossible to fire until its real
 // guard/side-effect lands.
@@ -41,7 +41,8 @@ export type CapabilityKey = Extract<
 /**
  * Side-effect identifiers. Step 3 wired `generateFeeSchedule` (submitDesignFee);
  * Step 4 adds `activateOnDeposit` (confirmAndPayDeposit); Step 7 adds
- * `recordConceptApproval` (selectConcept). A side-effect runs
+ * `recordConceptApproval` (selectConcept); Step 8 adds `applyRevision`
+ * (requestRevision self-loop). A side-effect runs
  * INSIDE the executor's tx (atomic with the state move); its executor branch is
  * the ONLY place it may run. Every later side-effect widens this union AND adds a
  * matching executor branch.
@@ -49,7 +50,8 @@ export type CapabilityKey = Extract<
 export type SideEffectKey =
   | 'generateFeeSchedule'
   | 'activateOnDeposit'
-  | 'recordConceptApproval';
+  | 'recordConceptApproval'
+  | 'applyRevision';
 
 /** One milestone row in a fee-schedule payload (money as a scale-4 string). */
 export interface MilestoneInput {
@@ -64,9 +66,21 @@ export interface GenerateFeeSchedulePayload {
   milestones: MilestoneInput[];
 }
 
+/**
+ * Payload for `applyRevision` (requestRevision self-loop). Both fields are
+ * optional: a FREE revision needs neither; a revision that crosses the free
+ * allowance REQUIRES `changeOrderAmount` (a scale-4 money string > 0) or the whole
+ * transition rolls back with `revision_co_amount_required`.
+ */
+export interface RequestRevisionPayload {
+  changeOrderAmount?: string;
+  reason?: string;
+}
+
 /** Maps each side-effect key to the payload its executor branch requires. */
 export interface TriggerPayloads {
   generateFeeSchedule: GenerateFeeSchedulePayload;
+  applyRevision: RequestRevisionPayload;
 }
 
 export interface TransitionDef {
@@ -81,7 +95,8 @@ export interface TransitionDef {
  * The registry. The wired edges (see `WIRED_TRIGGERS`) are `submitDesignFee`
  * (created -> design_proposal), `confirmAndPayDeposit` (design_proposal ->
  * survey), `spatialBaseReady` (survey -> layout), `optionsReady` (layout ->
- * concept_review) and `selectConcept` (concept_review -> negotiation). Every other
+ * concept_review), `selectConcept` (concept_review -> negotiation) and
+ * `requestRevision` (negotiation -> negotiation, a self-loop). Every other
  * trigger is declared with its intended from/to but guarded by `pendingGuard`
  * (fail-closed) until its step arrives.
  */
@@ -121,11 +136,15 @@ export const TRANSITIONS: Record<Trigger, TransitionDef> = {
     sideEffect: 'recordConceptApproval',
     capability: 'engagements_design',
   },
+  // SELF-LOOP (Step 8): a revision is always allowed from negotiation (no guard).
+  // The side-effect increments the revision counter and — once the count crosses
+  // the free allowance — raises a design-fee change order, atomically with the
+  // self-loop transition row.
   requestRevision: {
-    from: 'concept_review',
-    to: 'layout',
-    guards: ['pendingGuard'],
-    sideEffect: null,
+    from: 'negotiation',
+    to: 'negotiation',
+    guards: [],
+    sideEffect: 'applyRevision',
     capability: 'engagements_design',
   },
   confirmConcept: {
@@ -227,4 +246,5 @@ export const WIRED_TRIGGERS: ReadonlySet<Trigger> = new Set<Trigger>([
   'spatialBaseReady',
   'optionsReady',
   'selectConcept',
+  'requestRevision',
 ]);

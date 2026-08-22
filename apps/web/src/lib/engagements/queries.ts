@@ -2,9 +2,11 @@ import 'server-only';
 import {
   designEngagements,
   engagementArtifacts,
+  engagementChangeOrders,
   engagementEvents,
   engagementMilestones,
   paymentEvents,
+  type ChangeOrderStatus,
   type EngagementArtifactKind,
   type EngagementEventKind,
   type MilestoneBasis,
@@ -173,6 +175,47 @@ export function getEngagementEvents(
       .orderBy(
         desc(engagementEvents.decidedAt),
         desc(engagementEvents.createdAt),
+      ),
+  );
+}
+
+/** One design-fee change order raised on an engagement (money as scale-4 string). */
+export interface EngagementChangeOrderRecord {
+  id: string;
+  amount: string;
+  reason: string | null;
+  status: ChangeOrderStatus;
+  raisedByUserId: string;
+  raisedAt: Date;
+  settledAt: Date | null;
+}
+
+/**
+ * The change orders raised against an engagement, NEWEST FIRST. `amount` is a
+ * scale-4 string — the API/UI layer applies 2-decimal formatting, not this query.
+ * RLS scopes the read to the caller's org (a foreign engagement reads as an empty
+ * list).
+ */
+export function getEngagementChangeOrders(
+  ctx: OrgContext,
+  engagementId: string,
+): Promise<EngagementChangeOrderRecord[]> {
+  return withOrgContext(ctx, (tx) =>
+    tx
+      .select({
+        id: engagementChangeOrders.id,
+        amount: engagementChangeOrders.amount,
+        reason: engagementChangeOrders.reason,
+        status: engagementChangeOrders.status,
+        raisedByUserId: engagementChangeOrders.raisedByUserId,
+        raisedAt: engagementChangeOrders.raisedAt,
+        settledAt: engagementChangeOrders.settledAt,
+      })
+      .from(engagementChangeOrders)
+      .where(eq(engagementChangeOrders.engagementId, engagementId))
+      .orderBy(
+        desc(engagementChangeOrders.raisedAt),
+        desc(engagementChangeOrders.createdAt),
       ),
   );
 }

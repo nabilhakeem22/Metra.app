@@ -266,6 +266,19 @@ export const engagementEventKind = pgEnum(
   ENGAGEMENT_EVENT_KINDS,
 );
 
+/**
+ * Design-Engagement Machine, Step 8 — the lifecycle of a design-fee change order
+ * raised when a revision crosses the free-revision allowance. `raised` on INSERT;
+ * `settled` once the matching revision_co payment is recorded (the raised->settled
+ * path is Step 9, not this step). Order is a contract; labels localized.
+ */
+export const CHANGE_ORDER_STATUSES = ['raised', 'settled'] as const;
+
+export const changeOrderStatus = pgEnum(
+  'change_order_status',
+  CHANGE_ORDER_STATUSES,
+);
+
 export type MemberRole = (typeof MEMBER_ROLES)[number];
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];
 export type InvitationStatus = (typeof INVITATION_STATUSES)[number];
@@ -285,3 +298,4 @@ export type MilestoneBasis = (typeof MILESTONE_BASES)[number];
 export type PaymentEventKind = (typeof PAYMENT_EVENT_KINDS)[number];
 export type EngagementArtifactKind = (typeof ENGAGEMENT_ARTIFACT_KINDS)[number];
 export type EngagementEventKind = (typeof ENGAGEMENT_EVENT_KINDS)[number];
+export type ChangeOrderStatus = (typeof CHANGE_ORDER_STATUSES)[number];

@@ -174,6 +174,7 @@ const TEARDOWN_TABLES_IN_FK_ORDER = [
   // the children down first, then engagements, before clients/projects.
   'payment_events',
   'engagement_events',
+  'engagement_change_orders',
   'engagement_artifacts',
   'engagement_milestones',
   'engagement_transitions',

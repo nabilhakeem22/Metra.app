@@ -44,20 +44,28 @@ describe('transition registry', () => {
       const froms = Array.isArray(def.from) ? def.from : [def.from];
       for (const from of froms) expect(states.has(from)).toBe(true);
       expect(states.has(def.to)).toBe(true);
-      expect(def.guards.length).toBeGreaterThan(0);
+      // requestRevision (Step 8) is the ONE guard-less edge: the spec always
+      // allows a revision from negotiation, so its guard list is empty by design.
+      if (trigger === 'requestRevision') {
+        expect(def.guards).toEqual([]);
+      } else {
+        expect(def.guards.length).toBeGreaterThan(0);
+      }
       for (const g of def.guards) expect(GUARDS[g as GuardKey]).toBeTypeOf('function');
       expect(['engagements_design', 'engagements_finance', 'engagements_issue']).toContain(
         def.capability,
       );
       // Side-effect-carrying triggers: submitDesignFee -> Step 3,
-      // confirmAndPayDeposit -> Step 4, selectConcept -> Step 7; every other
-      // trigger still moves state only.
+      // confirmAndPayDeposit -> Step 4, selectConcept -> Step 7, requestRevision ->
+      // Step 8; every other trigger still moves state only.
       if (trigger === 'submitDesignFee') {
         expect(def.sideEffect).toBe('generateFeeSchedule');
       } else if (trigger === 'confirmAndPayDeposit') {
         expect(def.sideEffect).toBe('activateOnDeposit');
       } else if (trigger === 'selectConcept') {
         expect(def.sideEffect).toBe('recordConceptApproval');
+      } else if (trigger === 'requestRevision') {
+        expect(def.sideEffect).toBe('applyRevision');
       } else {
         expect(def.sideEffect).toBeNull();
       }
@@ -70,11 +78,12 @@ describe('transition registry', () => {
     expect([...reachable].sort()).toEqual([...DESIGN_STATES].sort());
   });
 
-  it('submitDesignFee + confirmAndPayDeposit + spatialBaseReady + optionsReady + selectConcept are wired; the rest fail closed', () => {
+  it('submitDesignFee + confirmAndPayDeposit + spatialBaseReady + optionsReady + selectConcept + requestRevision are wired; the rest fail closed', () => {
     expect([...WIRED_TRIGGERS].sort()).toEqual(
       [
         'confirmAndPayDeposit',
         'optionsReady',
+        'requestRevision',
         'selectConcept',
         'spatialBaseReady',
         'submitDesignFee',
@@ -118,6 +127,15 @@ describe('transition registry', () => {
     expect(TRANSITIONS.selectConcept.capability).toBe('engagements_design');
     expect(TRANSITIONS.selectConcept.sideEffect).toBe('recordConceptApproval');
 
+    // requestRevision (Step 8): the negotiation -> negotiation self-loop is
+    // guard-less (always allowed); applyRevision increments the counter + raises
+    // a change order once the free allowance is crossed.
+    expect(TRANSITIONS.requestRevision.guards).toEqual([]);
+    expect(TRANSITIONS.requestRevision.from).toBe('negotiation');
+    expect(TRANSITIONS.requestRevision.to).toBe('negotiation');
+    expect(TRANSITIONS.requestRevision.capability).toBe('engagements_design');
+    expect(TRANSITIONS.requestRevision.sideEffect).toBe('applyRevision');
+
     // Every other trigger routes through pendingGuard (fail-closed).
     const wired = new Set<Trigger>([
       'submitDesignFee',
@@ -125,6 +143,7 @@ describe('transition registry', () => {
       'spatialBaseReady',
       'optionsReady',
       'selectConcept',
+      'requestRevision',
     ]);
     for (const trigger of ALL_TRIGGERS) {
       if (wired.has(trigger)) continue;

@@ -554,6 +554,21 @@ create policy org_isolation on public.engagement_events
     and public.app_is_current_org_member()
   );
 
+-- engagement_change_orders (Step 8; SELECT + INSERT + UPDATE grants — UPDATE is
+-- reserved for the Step-9 settle path; no DELETE; org-isolated + membership-gated)
+alter table public.engagement_change_orders enable row level security;
+alter table public.engagement_change_orders force  row level security;
+drop policy if exists org_isolation on public.engagement_change_orders;
+create policy org_isolation on public.engagement_change_orders
+  using (
+    org_id = nullif(current_setting('app.current_org_id', true), '')::uuid
+    and public.app_is_current_org_member()
+  )
+  with check (
+    org_id = nullif(current_setting('app.current_org_id', true), '')::uuid
+    and public.app_is_current_org_member()
+  );
+
 -- =============================================================================
 -- P1 Automation — notifications (recipient-scoped) + automation config/claim log
 -- =============================================================================

@@ -51,6 +51,10 @@ grant select, insert, update, delete on public.engagement_milestones to metra_ap
 -- engagement_artifacts (Step 5): artifacts may be re-attested / relabelled, so
 -- SELECT + INSERT + UPDATE (not append-only) — but never DELETE.
 grant select, insert, update on public.engagement_artifacts to metra_app;
+-- engagement_change_orders (Step 8): a change order is raised (insert) then later
+-- settled (update, reserved for the Step-9 revision_co settle path). SELECT +
+-- INSERT + UPDATE — never DELETE.
+grant select, insert, update on public.engagement_change_orders to metra_app;
 -- notifications: recipients read + mark-read (no delete); the runner inserts.
 grant select, insert, update on public.notifications to metra_app;
 -- api_keys (Public API v1): mint (insert), list (select), revoke + last_used
