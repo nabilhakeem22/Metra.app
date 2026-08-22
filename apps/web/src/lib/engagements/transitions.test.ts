@@ -49,7 +49,7 @@ describe('transition registry', () => {
       expect(['engagements_design', 'engagements_finance', 'engagements_issue']).toContain(
         def.capability,
       );
-      // The two wired triggers carry side-effects (submitDesignFee -> Step 3,
+      // Only the deposit path carries side-effects (submitDesignFee -> Step 3,
       // confirmAndPayDeposit -> Step 4); every other trigger still moves state only.
       if (trigger === 'submitDesignFee') {
         expect(def.sideEffect).toBe('generateFeeSchedule');
@@ -67,9 +67,14 @@ describe('transition registry', () => {
     expect([...reachable].sort()).toEqual([...DESIGN_STATES].sort());
   });
 
-  it('submitDesignFee + confirmAndPayDeposit + spatialBaseReady are wired; the rest fail closed', () => {
+  it('submitDesignFee + confirmAndPayDeposit + spatialBaseReady + optionsReady are wired; the rest fail closed', () => {
     expect([...WIRED_TRIGGERS].sort()).toEqual(
-      ['confirmAndPayDeposit', 'spatialBaseReady', 'submitDesignFee'].sort(),
+      [
+        'confirmAndPayDeposit',
+        'optionsReady',
+        'spatialBaseReady',
+        'submitDesignFee',
+      ].sort(),
     );
 
     // Each wired trigger carries a concrete guard, never the sentinel.
@@ -93,11 +98,20 @@ describe('transition registry', () => {
     expect(TRANSITIONS.spatialBaseReady.capability).toBe('engagements_design');
     expect(TRANSITIONS.spatialBaseReady.sideEffect).toBeNull();
 
+    // optionsReady (Step 6): the 2–4 concept-options gate is a pure state move
+    // (layout -> concept_review) — no side-effect, reuses engagement_artifacts.
+    expect(TRANSITIONS.optionsReady.guards).toEqual(['optionsReady']);
+    expect(TRANSITIONS.optionsReady.from).toBe('layout');
+    expect(TRANSITIONS.optionsReady.to).toBe('concept_review');
+    expect(TRANSITIONS.optionsReady.capability).toBe('engagements_design');
+    expect(TRANSITIONS.optionsReady.sideEffect).toBeNull();
+
     // Every other trigger routes through pendingGuard (fail-closed).
     const wired = new Set<Trigger>([
       'submitDesignFee',
       'confirmAndPayDeposit',
       'spatialBaseReady',
+      'optionsReady',
     ]);
     for (const trigger of ALL_TRIGGERS) {
       if (wired.has(trigger)) continue;
