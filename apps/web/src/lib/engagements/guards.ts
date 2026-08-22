@@ -43,6 +43,7 @@ export type GuardKey =
   | 'spatialBaseReady'
   | 'optionsReady'
   | 'revisionCosSettled'
+  | 'rendersPresent'
   | 'pendingGuard';
 
 const pass: GuardResult = { ok: true };
@@ -203,6 +204,24 @@ function revisionCosSettled(facts: GuardFacts): GuardResult {
 }
 
 /**
+ * The engagement has at least one approved render — the gate for `rendersReady`
+ * (design_3d -> final_approval). The spec table lists this edge with no guard,
+ * but declaring renders ready with ZERO approved renders is meaningless: the
+ * captured baseline manifest would hash an empty set. This light product rule
+ * ("you cannot advance with no renders") is an INTENTIONAL deviation — remove it
+ * if the owner wants zero-render advancement. Counts ONLY `approved_render`
+ * artifacts; a survey/CAD/concept option in the bundle never satisfies it. Fails
+ * closed with `renders_missing` when none is present.
+ */
+function rendersPresent(facts: GuardFacts): GuardResult {
+  const hasApprovedRender = facts.artifacts.some(
+    (artifact) => artifact.kind === 'approved_render',
+  );
+  if (!hasApprovedRender) return { ok: false, code: 'renders_missing' };
+  return pass;
+}
+
+/**
  * Fail-closed sentinel for triggers whose real guard belongs to a later step.
  * It always denies with `transition_not_yet_enabled`, so a declared-but-unwired
  * transition can never fire early. Replaced by concrete guards in later steps.
@@ -219,5 +238,6 @@ export const GUARDS: Record<GuardKey, (facts: GuardFacts) => GuardResult> = {
   spatialBaseReady,
   optionsReady,
   revisionCosSettled,
+  rendersPresent,
   pendingGuard,
 };

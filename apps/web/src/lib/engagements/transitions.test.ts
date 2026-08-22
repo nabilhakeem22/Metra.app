@@ -68,6 +68,8 @@ describe('transition registry', () => {
         expect(def.sideEffect).toBe('applyRevision');
       } else if (trigger === 'confirmConcept') {
         expect(def.sideEffect).toBe('settleConceptAndLock');
+      } else if (trigger === 'rendersReady') {
+        expect(def.sideEffect).toBe('captureRenderManifest');
       } else {
         expect(def.sideEffect).toBeNull();
       }
@@ -80,12 +82,13 @@ describe('transition registry', () => {
     expect([...reachable].sort()).toEqual([...DESIGN_STATES].sort());
   });
 
-  it('submitDesignFee + confirmAndPayDeposit + spatialBaseReady + optionsReady + selectConcept + requestRevision + confirmConcept are wired; the rest fail closed', () => {
+  it('submitDesignFee + confirmAndPayDeposit + spatialBaseReady + optionsReady + selectConcept + requestRevision + confirmConcept + rendersReady are wired; the rest fail closed', () => {
     expect([...WIRED_TRIGGERS].sort()).toEqual(
       [
         'confirmAndPayDeposit',
         'confirmConcept',
         'optionsReady',
+        'rendersReady',
         'requestRevision',
         'selectConcept',
         'spatialBaseReady',
@@ -148,6 +151,16 @@ describe('transition registry', () => {
     expect(TRANSITIONS.confirmConcept.capability).toBe('engagements_design');
     expect(TRANSITIONS.confirmConcept.sideEffect).toBe('settleConceptAndLock');
 
+    // rendersReady (Step 11): the render-baseline gate (design_3d ->
+    // final_approval) captures the approved-render manifest hash + stamps
+    // renders_ready_at as its side-effect, once rendersPresent proves at least
+    // one approved render exists.
+    expect(TRANSITIONS.rendersReady.guards).toEqual(['rendersPresent']);
+    expect(TRANSITIONS.rendersReady.from).toBe('design_3d');
+    expect(TRANSITIONS.rendersReady.to).toBe('final_approval');
+    expect(TRANSITIONS.rendersReady.capability).toBe('engagements_design');
+    expect(TRANSITIONS.rendersReady.sideEffect).toBe('captureRenderManifest');
+
     // Every other trigger routes through pendingGuard (fail-closed).
     const wired = new Set<Trigger>([
       'submitDesignFee',
@@ -157,6 +170,7 @@ describe('transition registry', () => {
       'selectConcept',
       'requestRevision',
       'confirmConcept',
+      'rendersReady',
     ]);
     for (const trigger of ALL_TRIGGERS) {
       if (wired.has(trigger)) continue;

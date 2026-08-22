@@ -411,6 +411,32 @@ describe('revisionCosSettled — the change-order settlement gate', () => {
   });
 });
 
+describe('rendersPresent', () => {
+  // Reuses spatialFacts (offPlan is irrelevant here): it builds the artifacts
+  // bundle from a list of kinds, which is all rendersPresent reads.
+  it('passes with at least one approved_render', () => {
+    expect(GUARDS.rendersPresent(spatialFacts(false, ['approved_render']))).toEqual(
+      { ok: true },
+    );
+    expect(
+      GUARDS.rendersPresent(
+        spatialFacts(false, ['survey', 'approved_render', 'concept_option']),
+      ),
+    ).toEqual({ ok: true });
+  });
+
+  it('fails closed with renders_missing when no approved_render is present', () => {
+    expect(GUARDS.rendersPresent(spatialFacts(false, []))).toEqual({
+      ok: false,
+      code: 'renders_missing',
+    });
+    // A survey / CAD / concept option in the bundle never counts as a render.
+    expect(
+      GUARDS.rendersPresent(spatialFacts(false, ['survey', 'concept_option'])),
+    ).toEqual({ ok: false, code: 'renders_missing' });
+  });
+});
+
 describe('pendingGuard', () => {
   it('always fails closed with transition_not_yet_enabled', () => {
     expect(GUARDS.pendingGuard(engagement({}))).toEqual({

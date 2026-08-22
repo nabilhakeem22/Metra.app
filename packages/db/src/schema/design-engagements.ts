@@ -53,6 +53,11 @@ export const designEngagements = pgTable(
     romLow: money('rom_low'),
     romHigh: money('rom_high'),
     conceptLockedAt: timestamp('concept_locked_at', { withTimezone: true }),
+    // Set when `rendersReady` fires (Step 11): the sha256 baseline over the
+    // approved-render content-hash list, and the moment that baseline was
+    // captured. Both nullable until the design_3d -> final_approval move.
+    renderManifestHash: text('render_manifest_hash'),
+    rendersReadyAt: timestamp('renders_ready_at', { withTimezone: true }),
     tokenHash: text('token_hash'),
     shareExpiresAt: timestamp('share_expires_at', { withTimezone: true }),
   },
