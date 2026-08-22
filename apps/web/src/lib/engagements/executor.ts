@@ -18,6 +18,7 @@ import type { OrgContext } from '@/lib/db/context';
 import type { PermissionAction } from '@/lib/permissions/roles';
 import { recordConceptApproval } from './approvals';
 import { generateFeeSchedule } from './fee-schedule';
+import { applyRevision } from './revisions';
 import { GUARDS, type GuardFacts } from './guards';
 import { TRANSITIONS, type CapabilityKey, type Trigger } from './transitions';
 
@@ -133,6 +134,13 @@ export async function executeTransition(
       // committed atomically with the concept_review -> negotiation move.
       if (def.sideEffect === 'recordConceptApproval') {
         await recordConceptApproval(tx, ctx, engagementId);
+      }
+      // requestRevision (Step 8, self-loop): increment the revision counter and —
+      // once the count crosses the free allowance — raise a design-fee change
+      // order. Atomic with the negotiation -> negotiation transition row: a
+      // missing change-order amount `fail()`s and rolls the increment back too.
+      if (def.sideEffect === 'applyRevision') {
+        await applyRevision(tx, ctx, engagement, input.payload);
       }
 
       await tx.insert(engagementTransitions).values({
