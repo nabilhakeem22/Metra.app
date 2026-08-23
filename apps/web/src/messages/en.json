@@ -26,7 +26,8 @@
     "comingSoon": "Coming soon",
     "support": "Support",
     "priceBook": "Price Book",
-    "clients": "Clients"
+    "clients": "Clients",
+    "engagements": "Engagements"
   },
   "shell": {
     "search": "Search",
@@ -1176,6 +1177,196 @@
       "already": "A decision has already been recorded for this variation order.",
       "expired": "This link has expired.",
       "invalid": "This link is not valid."
+    }
+  },
+  "engagements": {
+    "title": "Engagements",
+    "subtitle": "Design engagements from brief to sign-off.",
+    "empty": "No engagements yet. Create one to start the design flow.",
+    "new": "New engagement",
+    "engagement": "Engagement",
+    "number": "Number",
+    "client": "Client",
+    "project": "Project",
+    "stage": "Stage {n}",
+    "backToList": "Back to engagements",
+    "offPlan": "Off-plan",
+    "asBuiltDue": "As-built due",
+    "created": "Created",
+    "updated": "Updated",
+    "designFee": "Design fee",
+    "renderManifest": "Render baseline",
+    "revisions": "Revisions",
+    "revisionsUsed": "{used} of {free} free used",
+    "conceptLocked": "Concept locked",
+    "form": {
+      "newTitle": "New engagement",
+      "titleEn": "Title (English)",
+      "titleAr": "Title (Arabic)",
+      "client": "Client",
+      "project": "Project",
+      "offPlan": "Off-plan (developer-built shell)",
+      "noClients": "Add a client and a project before creating an engagement.",
+      "cancel": "Cancel",
+      "create": "Create engagement"
+    },
+    "state": {
+      "created": "Created",
+      "design_proposal": "Design proposal",
+      "survey": "Survey",
+      "layout": "Layout",
+      "concept_review": "Concept review",
+      "negotiation": "Negotiation",
+      "design_3d": "3D design",
+      "final_approval": "Final approval",
+      "shop_drawings": "Shop drawings",
+      "boq": "BOQ",
+      "execution_decision": "Execution decision",
+      "design_only_handoff": "Design-only handoff",
+      "closed_design_only": "Closed (design only)",
+      "execution": "Execution",
+      "abandoned": "Abandoned",
+      "change_triage": "Change triage"
+    },
+    "trigger": {
+      "submitDesignFee": "Submit design fee",
+      "confirmAndPayDeposit": "Confirm & pay deposit",
+      "spatialBaseReady": "Spatial base ready",
+      "optionsReady": "Concept options ready",
+      "selectConcept": "Select concept",
+      "requestRevision": "Request revision",
+      "confirmConcept": "Confirm concept",
+      "rendersReady": "Renders ready",
+      "flagAsBuiltVariance": "Flag as-built variance",
+      "attestAsBuiltClean": "Attest as-built clean",
+      "approveDesign": "Approve design",
+      "rejectDesign": "Reject design"
+    },
+    "nextActions": {
+      "title": "Next actions",
+      "none": "No actions available from this stage."
+    },
+    "feeForm": {
+      "title": "Submit design fee",
+      "designFee": "Design fee",
+      "basis": "Basis",
+      "milestones": "Milestones",
+      "addMilestone": "Add milestone",
+      "remove": "Remove",
+      "kind": "Milestone",
+      "value": "Value",
+      "submit": "Submit fee schedule"
+    },
+    "revisionForm": {
+      "title": "Request revision",
+      "reason": "Reason (optional)",
+      "changeOrderAmount": "Change-order amount (optional)",
+      "hint": "Enter an amount only when this revision is beyond the free allowance.",
+      "submit": "Request revision"
+    },
+    "panels": {
+      "fee": "Fee schedule",
+      "payments": "Payments",
+      "artifacts": "Artifacts",
+      "changeOrders": "Change orders",
+      "rom": "Build-cost range",
+      "timeline": "Timeline"
+    },
+    "fee": {
+      "designFee": "Design fee",
+      "notSet": "No fee schedule yet.",
+      "kind": "Milestone",
+      "basis": "Basis",
+      "value": "Value"
+    },
+    "payments": {
+      "empty": "No payments recorded.",
+      "kind": "Kind",
+      "amount": "Amount",
+      "method": "Method",
+      "reference": "Reference",
+      "clearedAt": "Cleared"
+    },
+    "artifacts": {
+      "empty": "No artifacts recorded.",
+      "kind": "Kind",
+      "label": "Label",
+      "contentHash": "Hash",
+      "attestedAt": "Attested"
+    },
+    "changeOrders": {
+      "empty": "No change orders raised.",
+      "amount": "Amount",
+      "reason": "Reason",
+      "status": "Status",
+      "raisedAt": "Raised",
+      "settledAt": "Settled"
+    },
+    "rom": {
+      "range": "Range",
+      "notSet": "No build-cost range set.",
+      "low": "Low",
+      "high": "High",
+      "acknowledgements": "Acknowledgements",
+      "noAcks": "No acknowledgements recorded yet."
+    },
+    "timeline": {
+      "empty": "No activity yet.",
+      "arrow": "{from} → {to}"
+    },
+    "controls": {
+      "title": "Data entry",
+      "recordPayment": "Record payment",
+      "recordArtifact": "Record artifact",
+      "setRom": "Set ROM",
+      "recordRomAck": "Record ROM acknowledgement",
+      "amount": "Amount",
+      "kind": "Kind",
+      "method": "Method",
+      "reference": "Reference",
+      "label": "Label",
+      "contentHash": "Content hash",
+      "note": "Note",
+      "low": "Low",
+      "high": "High",
+      "save": "Save",
+      "cancel": "Cancel"
+    },
+    "paymentKind": {
+      "deposit": "Deposit",
+      "gate_a": "Gate A",
+      "gate_b": "Gate B",
+      "balance": "Balance",
+      "revision_co": "Revision change order"
+    },
+    "artifactKind": {
+      "survey": "Survey",
+      "autocad": "AutoCAD set",
+      "concept_option": "Concept option",
+      "approved_render": "Approved render",
+      "shop_drawing": "Shop drawing",
+      "boq": "BOQ"
+    },
+    "eventKind": {
+      "concept_approval": "Concept approval",
+      "design_approval": "Design approval",
+      "rom_acknowledgement": "ROM acknowledgement",
+      "handoff_acknowledgement": "Handoff acknowledgement",
+      "as_built_attestation": "As-built attestation"
+    },
+    "milestoneKind": {
+      "deposit": "Deposit",
+      "gate_a": "Gate A",
+      "gate_b": "Gate B",
+      "balance": "Balance"
+    },
+    "milestoneBasis": {
+      "percent": "Percent",
+      "amount": "Amount"
+    },
+    "changeOrderStatus": {
+      "raised": "Raised",
+      "settled": "Settled"
     }
   }
 }

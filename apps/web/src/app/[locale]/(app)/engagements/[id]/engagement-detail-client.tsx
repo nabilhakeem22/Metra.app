@@ -1,0 +1,124 @@
+'use client';
+
+import { useTranslations } from 'next-intl';
+import { useState, useTransition } from 'react';
+import { Link, useRouter } from '@/i18n/routing';
+import { resolveActionError } from '@/lib/actions/error-message';
+import type { ActionCode, ActionResult } from '@/lib/actions/result';
+import type {
+  EngagementArtifactRecord,
+  EngagementChangeOrderRecord,
+  EngagementEventRecord,
+  EngagementFeeSchedule,
+  EngagementHeader,
+  EngagementPayment,
+  EngagementTransitionRecord,
+} from '@/lib/engagements/queries';
+import type { Trigger } from '@/lib/engagements/transitions';
+import {
+  EngagementControls,
+  type ControlCapabilities,
+} from './engagement-controls';
+import { EngagementHeaderCard } from './engagement-header-card';
+import { EngagementNextActions } from './engagement-next-actions';
+import { EngagementPanels } from './engagement-panels';
+import { ENGAGEMENT_TABS, type EngagementTab } from './tabs';
+
+export function EngagementDetailClient({
+  header,
+  feeSchedule,
+  payments,
+  artifacts,
+  events,
+  changeOrders,
+  transitions,
+  nextActions,
+  capabilities,
+}: {
+  header: EngagementHeader;
+  feeSchedule: EngagementFeeSchedule;
+  payments: EngagementPayment[];
+  artifacts: EngagementArtifactRecord[];
+  events: EngagementEventRecord[];
+  changeOrders: EngagementChangeOrderRecord[];
+  transitions: EngagementTransitionRecord[];
+  nextActions: Trigger[];
+  capabilities: ControlCapabilities;
+}) {
+  const t = useTranslations('engagements');
+  const te = useTranslations('errors');
+  const tp = useTranslations('engagements.panels');
+  const router = useRouter();
+  const [tab, setTab] = useState<EngagementTab>('fee');
+  const [pending, startTransition] = useTransition();
+  const [error, setError] = useState<ActionCode | null>(null);
+
+  function runAction(fn: () => Promise<ActionResult>) {
+    setError(null);
+    startTransition(async () => {
+      const res = await fn();
+      if (res.ok) router.refresh();
+      else setError((res.error as ActionCode) ?? 'generic');
+    });
+  }
+
+  return (
+    <div className="space-y-4">
+      <Link href="/engagements" className="text-sm text-primary hover:underline">
+        {t('backToList')}
+      </Link>
+
+      <EngagementHeaderCard header={header} />
+
+      {error && (
+        <p className="text-sm text-destructive" role="alert">
+          {resolveActionError(error, te)}
+        </p>
+      )}
+
+      <EngagementNextActions
+        engagementId={header.id}
+        triggers={nextActions}
+        pending={pending}
+        runAction={runAction}
+      />
+
+      <EngagementControls
+        engagementId={header.id}
+        capabilities={capabilities}
+        pending={pending}
+        runAction={runAction}
+      />
+
+      <div className="flex flex-wrap gap-2 border-b">
+        {ENGAGEMENT_TABS.map((tb) => (
+          <button
+            key={tb}
+            type="button"
+            onClick={() => setTab(tb)}
+            className={`border-b-2 px-3 py-2 text-sm ${
+              tab === tb
+                ? 'border-primary font-medium'
+                : 'border-transparent text-muted-foreground'
+            }`}
+          >
+            {tp(tb)}
+          </button>
+        ))}
+      </div>
+
+      <EngagementPanels
+        tab={tab}
+        data={{
+          header,
+          feeSchedule,
+          payments,
+          artifacts,
+          events,
+          changeOrders,
+          transitions,
+        }}
+      />
+    </div>
+  );
+}
