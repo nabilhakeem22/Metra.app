@@ -1,12 +1,16 @@
 import 'server-only';
 import {
+  clients,
   designEngagements,
   engagementArtifacts,
   engagementChangeOrders,
   engagementEvents,
   engagementMilestones,
+  engagementTransitions,
   paymentEvents,
+  projects,
   type ChangeOrderStatus,
+  type DesignEngagementState,
   type EngagementArtifactKind,
   type EngagementEventKind,
   type MilestoneBasis,
@@ -15,6 +19,175 @@ import {
 } from '@metra/db';
 import { asc, desc, eq } from 'drizzle-orm';
 import { withOrgContext, type OrgContext } from '@/lib/db/context';
+
+/**
+ * One row of the engagements list: the header fields the list surface renders
+ * plus the client/project names joined in for display. Newest first (highest
+ * per-org `number`). The CALLER gates the read on the `engagements_design` read
+ * capability; RLS scopes it to the caller's org.
+ */
+export interface EngagementListRow {
+  id: string;
+  number: number;
+  titleAr: string | null;
+  titleEn: string | null;
+  clientId: string;
+  projectId: string;
+  state: DesignEngagementState;
+  clientNameEn: string | null;
+  clientNameAr: string | null;
+  projectNameEn: string | null;
+  projectNameAr: string | null;
+  createdAt: string;
+}
+
+/** Org-scoped engagements, newest first (by per-org number descending). */
+export function listEngagements(ctx: OrgContext): Promise<EngagementListRow[]> {
+  return withOrgContext(ctx, async (tx) => {
+    const rows = await tx
+      .select({
+        id: designEngagements.id,
+        number: designEngagements.number,
+        titleAr: designEngagements.titleAr,
+        titleEn: designEngagements.titleEn,
+        clientId: designEngagements.clientId,
+        projectId: designEngagements.projectId,
+        state: designEngagements.state,
+        clientNameEn: clients.nameEn,
+        clientNameAr: clients.nameAr,
+        projectNameEn: projects.nameEn,
+        projectNameAr: projects.nameAr,
+        createdAt: designEngagements.createdAt,
+      })
+      .from(designEngagements)
+      .leftJoin(clients, eq(clients.id, designEngagements.clientId))
+      .leftJoin(projects, eq(projects.id, designEngagements.projectId))
+      .orderBy(desc(designEngagements.number));
+    return rows.map((r) => ({ ...r, createdAt: r.createdAt.toISOString() }));
+  });
+}
+
+/**
+ * The engagement header for the detail surface. All money is returned as scale-4
+ * strings (the UI applies 2-decimal formatting); timestamps as ISO strings so the
+ * value crosses the server -> client boundary cleanly. Omits the client-share
+ * token columns (`token_hash`/`share_expires_at`) — no internal surface needs
+ * them. Null when the engagement does not resolve in-org. The CALLER gates the
+ * read on the `engagements_design` read capability; RLS is the second factor.
+ */
+export interface EngagementHeader {
+  id: string;
+  number: number;
+  titleAr: string | null;
+  titleEn: string | null;
+  clientId: string;
+  projectId: string;
+  clientNameEn: string | null;
+  clientNameAr: string | null;
+  projectNameEn: string | null;
+  projectNameAr: string | null;
+  state: DesignEngagementState;
+  designFee: string | null;
+  offPlan: boolean;
+  asBuiltDue: boolean;
+  freeRevisionN: number;
+  revisionCount: number;
+  romLow: string | null;
+  romHigh: string | null;
+  conceptLockedAt: string | null;
+  renderManifestHash: string | null;
+  rendersReadyAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export function getEngagementHeader(
+  ctx: OrgContext,
+  engagementId: string,
+): Promise<EngagementHeader | null> {
+  return withOrgContext(ctx, async (tx) => {
+    const [row] = await tx
+      .select({
+        id: designEngagements.id,
+        number: designEngagements.number,
+        titleAr: designEngagements.titleAr,
+        titleEn: designEngagements.titleEn,
+        clientId: designEngagements.clientId,
+        projectId: designEngagements.projectId,
+        clientNameEn: clients.nameEn,
+        clientNameAr: clients.nameAr,
+        projectNameEn: projects.nameEn,
+        projectNameAr: projects.nameAr,
+        state: designEngagements.state,
+        designFee: designEngagements.designFee,
+        offPlan: designEngagements.offPlan,
+        asBuiltDue: designEngagements.asBuiltDue,
+        freeRevisionN: designEngagements.freeRevisionN,
+        revisionCount: designEngagements.revisionCount,
+        romLow: designEngagements.romLow,
+        romHigh: designEngagements.romHigh,
+        conceptLockedAt: designEngagements.conceptLockedAt,
+        renderManifestHash: designEngagements.renderManifestHash,
+        rendersReadyAt: designEngagements.rendersReadyAt,
+        createdAt: designEngagements.createdAt,
+        updatedAt: designEngagements.updatedAt,
+      })
+      .from(designEngagements)
+      .leftJoin(clients, eq(clients.id, designEngagements.clientId))
+      .leftJoin(projects, eq(projects.id, designEngagements.projectId))
+      .where(eq(designEngagements.id, engagementId))
+      .limit(1);
+
+    if (!row) return null;
+    return {
+      ...row,
+      conceptLockedAt: row.conceptLockedAt?.toISOString() ?? null,
+      rendersReadyAt: row.rendersReadyAt?.toISOString() ?? null,
+      createdAt: row.createdAt.toISOString(),
+      updatedAt: row.updatedAt.toISOString(),
+    };
+  });
+}
+
+/** One row of the append-only transition ledger (state moves), newest first. */
+export interface EngagementTransitionRecord {
+  id: string;
+  trigger: string | null;
+  fromState: DesignEngagementState | null;
+  toState: DesignEngagementState | null;
+  actorUserId: string | null;
+  note: string | null;
+  decidedAt: Date;
+}
+
+/**
+ * The lifecycle transition ledger for an engagement, NEWEST FIRST. RLS scopes the
+ * read to the caller's org (a foreign engagement reads as an empty list). Feeds
+ * the detail timeline alongside the approvals events.
+ */
+export function getEngagementTransitions(
+  ctx: OrgContext,
+  engagementId: string,
+): Promise<EngagementTransitionRecord[]> {
+  return withOrgContext(ctx, (tx) =>
+    tx
+      .select({
+        id: engagementTransitions.id,
+        trigger: engagementTransitions.trigger,
+        fromState: engagementTransitions.fromState,
+        toState: engagementTransitions.toState,
+        actorUserId: engagementTransitions.actorUserId,
+        note: engagementTransitions.note,
+        decidedAt: engagementTransitions.decidedAt,
+      })
+      .from(engagementTransitions)
+      .where(eq(engagementTransitions.engagementId, engagementId))
+      .orderBy(
+        desc(engagementTransitions.decidedAt),
+        desc(engagementTransitions.createdAt),
+      ),
+  );
+}
 
 /** A single milestone in a fee schedule (money as a scale-4 string). */
 export interface FeeScheduleMilestone {

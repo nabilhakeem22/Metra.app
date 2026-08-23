@@ -26,7 +26,8 @@
     "comingSoon": "قريبًا",
     "support": "الدعم",
     "priceBook": "دليل الأسعار",
-    "clients": "العملاء"
+    "clients": "العملاء",
+    "engagements": "التكليفات"
   },
   "shell": {
     "search": "بحث",
@@ -1176,6 +1177,196 @@
       "already": "تم تسجيل قرار بشأن أمر التغيير هذا بالفعل.",
       "expired": "انتهت صلاحية هذا الرابط.",
       "invalid": "هذا الرابط غير صالح."
+    }
+  },
+  "engagements": {
+    "title": "التكليفات",
+    "subtitle": "تكليفات التصميم من الموجز حتى الاعتماد.",
+    "empty": "لا توجد تكليفات بعد. أنشئ تكليفًا لبدء مسار التصميم.",
+    "new": "تكليف جديد",
+    "engagement": "تكليف",
+    "number": "الرقم",
+    "client": "العميل",
+    "project": "المشروع",
+    "stage": "المرحلة {n}",
+    "backToList": "العودة إلى التكليفات",
+    "offPlan": "على الخريطة",
+    "asBuiltDue": "المخططات التنفيذية مستحقة",
+    "created": "أُنشئ",
+    "updated": "حُدّث",
+    "designFee": "أتعاب التصميم",
+    "renderManifest": "خط أساس الرندر",
+    "revisions": "التعديلات",
+    "revisionsUsed": "{used} من {free} مجانية مستخدمة",
+    "conceptLocked": "المفهوم مقفل",
+    "form": {
+      "newTitle": "تكليف جديد",
+      "titleEn": "العنوان (بالإنجليزية)",
+      "titleAr": "العنوان (بالعربية)",
+      "client": "العميل",
+      "project": "المشروع",
+      "offPlan": "على الخريطة (هيكل من المطوّر)",
+      "noClients": "أضف عميلًا ومشروعًا قبل إنشاء تكليف.",
+      "cancel": "إلغاء",
+      "create": "إنشاء التكليف"
+    },
+    "state": {
+      "created": "أُنشئ",
+      "design_proposal": "عرض التصميم",
+      "survey": "الرفع المساحي",
+      "layout": "التوزيع",
+      "concept_review": "مراجعة المفهوم",
+      "negotiation": "التفاوض",
+      "design_3d": "تصميم ثلاثي الأبعاد",
+      "final_approval": "الاعتماد النهائي",
+      "shop_drawings": "المخططات التنفيذية",
+      "boq": "جدول الكميات",
+      "execution_decision": "قرار التنفيذ",
+      "design_only_handoff": "تسليم التصميم فقط",
+      "closed_design_only": "مغلق (تصميم فقط)",
+      "execution": "التنفيذ",
+      "abandoned": "متروك",
+      "change_triage": "فرز التغييرات"
+    },
+    "trigger": {
+      "submitDesignFee": "تقديم أتعاب التصميم",
+      "confirmAndPayDeposit": "تأكيد ودفع العربون",
+      "spatialBaseReady": "الأساس المكاني جاهز",
+      "optionsReady": "خيارات المفهوم جاهزة",
+      "selectConcept": "اختيار المفهوم",
+      "requestRevision": "طلب تعديل",
+      "confirmConcept": "تأكيد المفهوم",
+      "rendersReady": "الرندرات جاهزة",
+      "flagAsBuiltVariance": "الإبلاغ عن فرق تنفيذي",
+      "attestAsBuiltClean": "الإقرار بمطابقة التنفيذ",
+      "approveDesign": "اعتماد التصميم",
+      "rejectDesign": "رفض التصميم"
+    },
+    "nextActions": {
+      "title": "الإجراءات التالية",
+      "none": "لا توجد إجراءات متاحة من هذه المرحلة."
+    },
+    "feeForm": {
+      "title": "تقديم أتعاب التصميم",
+      "designFee": "أتعاب التصميم",
+      "basis": "الأساس",
+      "milestones": "الدفعات",
+      "addMilestone": "إضافة دفعة",
+      "remove": "إزالة",
+      "kind": "الدفعة",
+      "value": "القيمة",
+      "submit": "تقديم جدول الأتعاب"
+    },
+    "revisionForm": {
+      "title": "طلب تعديل",
+      "reason": "السبب (اختياري)",
+      "changeOrderAmount": "قيمة أمر التغيير (اختياري)",
+      "hint": "أدخل قيمة فقط عندما يتجاوز هذا التعديل الحد المجاني.",
+      "submit": "طلب التعديل"
+    },
+    "panels": {
+      "fee": "جدول الأتعاب",
+      "payments": "المدفوعات",
+      "artifacts": "المخرجات",
+      "changeOrders": "أوامر التغيير",
+      "rom": "نطاق تكلفة التنفيذ",
+      "timeline": "الجدول الزمني"
+    },
+    "fee": {
+      "designFee": "أتعاب التصميم",
+      "notSet": "لا يوجد جدول أتعاب بعد.",
+      "kind": "الدفعة",
+      "basis": "الأساس",
+      "value": "القيمة"
+    },
+    "payments": {
+      "empty": "لا توجد مدفوعات مسجلة.",
+      "kind": "النوع",
+      "amount": "المبلغ",
+      "method": "الطريقة",
+      "reference": "المرجع",
+      "clearedAt": "تم التحصيل"
+    },
+    "artifacts": {
+      "empty": "لا توجد مخرجات مسجلة.",
+      "kind": "النوع",
+      "label": "الوصف",
+      "contentHash": "البصمة",
+      "attestedAt": "تم الإقرار"
+    },
+    "changeOrders": {
+      "empty": "لا توجد أوامر تغيير.",
+      "amount": "المبلغ",
+      "reason": "السبب",
+      "status": "الحالة",
+      "raisedAt": "رُفع",
+      "settledAt": "سُوّي"
+    },
+    "rom": {
+      "range": "النطاق",
+      "notSet": "لم يُحدَّد نطاق تكلفة التنفيذ.",
+      "low": "الأدنى",
+      "high": "الأعلى",
+      "acknowledgements": "الإقرارات",
+      "noAcks": "لا توجد إقرارات مسجلة بعد."
+    },
+    "timeline": {
+      "empty": "لا يوجد نشاط بعد.",
+      "arrow": "{from} ← {to}"
+    },
+    "controls": {
+      "title": "إدخال البيانات",
+      "recordPayment": "تسجيل دفعة",
+      "recordArtifact": "تسجيل مخرَج",
+      "setRom": "تحديد النطاق",
+      "recordRomAck": "تسجيل إقرار النطاق",
+      "amount": "المبلغ",
+      "kind": "النوع",
+      "method": "الطريقة",
+      "reference": "المرجع",
+      "label": "الوصف",
+      "contentHash": "بصمة المحتوى",
+      "note": "ملاحظة",
+      "low": "الأدنى",
+      "high": "الأعلى",
+      "save": "حفظ",
+      "cancel": "إلغاء"
+    },
+    "paymentKind": {
+      "deposit": "عربون",
+      "gate_a": "بوابة أ",
+      "gate_b": "بوابة ب",
+      "balance": "الرصيد",
+      "revision_co": "أمر تغيير تعديل"
+    },
+    "artifactKind": {
+      "survey": "رفع مساحي",
+      "autocad": "مجموعة أوتوكاد",
+      "concept_option": "خيار مفهوم",
+      "approved_render": "رندر معتمد",
+      "shop_drawing": "مخطط تنفيذي",
+      "boq": "جدول كميات"
+    },
+    "eventKind": {
+      "concept_approval": "اعتماد المفهوم",
+      "design_approval": "اعتماد التصميم",
+      "rom_acknowledgement": "إقرار النطاق",
+      "handoff_acknowledgement": "إقرار التسليم",
+      "as_built_attestation": "إقرار التنفيذ"
+    },
+    "milestoneKind": {
+      "deposit": "عربون",
+      "gate_a": "بوابة أ",
+      "gate_b": "بوابة ب",
+      "balance": "الرصيد"
+    },
+    "milestoneBasis": {
+      "percent": "نسبة مئوية",
+      "amount": "مبلغ"
+    },
+    "changeOrderStatus": {
+      "raised": "مرفوع",
+      "settled": "مُسوّى"
     }
   }
 }
