@@ -47,7 +47,10 @@ export type CapabilityKey = Extract<
  * (requestRevision self-loop); Step 9 adds `settleConceptAndLock` (confirmConcept);
  * Step 11 adds `captureRenderManifest` (rendersReady); Step 13 adds
  * `recordAsBuiltVariance` (flagAsBuiltVariance) and `recordAsBuiltClean`
- * (attestAsBuiltClean), each appending one `as_built_attestation` event.
+ * (attestAsBuiltClean), each appending one `as_built_attestation` event; Step 14
+ * adds `recordDesignApproval` (approveDesign, appending one `design_approval`
+ * event) and `resetRevisionsOnReject` (rejectDesign, refilling the free-revision
+ * allowance).
  * A side-effect runs INSIDE the executor's tx (atomic with the state move); its
  * executor branch is the ONLY place it may run. Every later side-effect widens
  * this union AND adds a matching executor branch.
@@ -60,7 +63,9 @@ export type SideEffectKey =
   | 'settleConceptAndLock'
   | 'captureRenderManifest'
   | 'recordAsBuiltVariance'
-  | 'recordAsBuiltClean';
+  | 'recordAsBuiltClean'
+  | 'recordDesignApproval'
+  | 'resetRevisionsOnReject';
 
 /** One milestone row in a fee-schedule payload (money as a scale-4 string). */
 export interface MilestoneInput {
@@ -200,11 +205,15 @@ export const TRANSITIONS: Record<Trigger, TransitionDef> = {
     sideEffect: 'recordAsBuiltClean',
     capability: 'engagements_design',
   },
+  // Step 14 (Gate B): the design phase closes. The client ROM ack and (for
+  // Off-Plan) the as-built reconciliation surface BEFORE money — so the guard order
+  // is romAcknowledged -> asBuiltReconciled -> gateBInstallmentCleared. The
+  // side-effect appends ONE `design_approval` event, atomic with the state move.
   approveDesign: {
     from: 'final_approval',
     to: 'shop_drawings',
-    guards: ['pendingGuard'],
-    sideEffect: null,
+    guards: ['romAcknowledged', 'asBuiltReconciled', 'gateBInstallmentCleared'],
+    sideEffect: 'recordDesignApproval',
     capability: 'engagements_design',
   },
   draftReady: {
@@ -242,11 +251,15 @@ export const TRANSITIONS: Record<Trigger, TransitionDef> = {
     sideEffect: null,
     capability: 'engagements_design',
   },
+  // Step 14 (Gate B): bounce the design back to negotiation. No guard — a rejection
+  // is always allowed from final_approval. The side-effect RESETS revision_count to
+  // 0 (owner-locked: refill free revisions) and reopens the concept lock, atomic
+  // with the final_approval -> negotiation move.
   rejectDesign: {
     from: 'final_approval',
     to: 'negotiation',
-    guards: ['pendingGuard'],
-    sideEffect: null,
+    guards: [],
+    sideEffect: 'resetRevisionsOnReject',
     capability: 'engagements_design',
   },
   designChangeRaised: {
@@ -291,4 +304,6 @@ export const WIRED_TRIGGERS: ReadonlySet<Trigger> = new Set<Trigger>([
   'rendersReady',
   'flagAsBuiltVariance',
   'attestAsBuiltClean',
+  'approveDesign',
+  'rejectDesign',
 ]);

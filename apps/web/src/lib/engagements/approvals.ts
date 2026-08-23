@@ -35,6 +35,26 @@ export async function recordConceptApproval(
   });
 }
 
+/**
+ * Append ONE `design_approval` row to the append-only engagement approvals ledger
+ * for `engagementId` — the `approveDesign` side-effect (Step 14). Executor-only:
+ * MUST be called with the executor's `tx` so this witness commits ATOMICALLY with
+ * the final_approval -> shop_drawings state move, or not at all. `decidedAt`
+ * defaults to now() at the database; `actorUserId` is the internal actor.
+ */
+export async function recordDesignApproval(
+  tx: MetraDb,
+  ctx: OrgContext,
+  engagementId: string,
+): Promise<void> {
+  await tx.insert(engagementEvents).values({
+    orgId: ctx.orgId,
+    engagementId,
+    kind: 'design_approval',
+    actorUserId: ctx.userId,
+  });
+}
+
 /** Trim a nullable free-text field to a stored value ('' / whitespace -> null). */
 function optionalText(value: string | null | undefined): string | null {
   const trimmed = value?.trim();
