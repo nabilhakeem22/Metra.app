@@ -43,6 +43,9 @@ export type GuardKey =
   | 'scopeInputsPresent'
   | 'depositCleared'
   | 'gateAInstallmentCleared'
+  | 'gateBInstallmentCleared'
+  | 'romAcknowledged'
+  | 'asBuiltReconciled'
   | 'spatialBaseReady'
   | 'optionsReady'
   | 'revisionCosSettled'
@@ -76,9 +79,15 @@ function scopeInputsPresent(facts: GuardFacts): GuardResult {
  *     (round half away from zero — the SAME rule as the proposal money engine).
  * PAID = Σ `amount` of the engagement's payment events of the SAME `kind` (every
  * `payment_events` row is a cleared payment in the manual model). Passes iff
- * paid ≥ required, else fails with the caller-supplied `code`. FAILS CLOSED (with
- * `code`) if the milestone or the design_fee is missing — which cannot happen
- * after Step 3, but a gate on money must never open on absent facts.
+ * paid ≥ required, else fails with the caller-supplied `code`.
+ *
+ * ABSENT MILESTONE = FREE GATE (owner-locked): if the firm omitted this `kind`
+ * from the fee schedule, there is nothing to pay for it — required is 0 and the
+ * gate clears with no payment (paid 0 ≥ required 0). `deposit` is always present
+ * after Step 3, so `depositCleared` is unaffected; a deposit-only schedule now
+ * lets `gate_a`/`gate_b` clear free. Only when the milestone EXISTS is a required
+ * amount computed — and it still FAILS CLOSED (with `code`) if the design_fee is
+ * missing, since a scheduled money gate must never open on absent fee facts.
  *
  * `payment_event_kind` is a superset of `milestone_kind` (it adds `revision_co`),
  * but the four milestone kinds share a spelling, so summing payments whose
@@ -90,8 +99,11 @@ function milestoneCleared(
   code: ActionCode,
 ): GuardResult {
   const milestone = facts.milestones.find((m) => m.kind === kind);
+  // Absent milestone: the firm never scheduled this gate, so it is free.
+  if (!milestone) return pass;
+
   const designFee = facts.engagement.designFee;
-  if (!milestone || !designFee) {
+  if (!designFee) {
     return { ok: false, code };
   }
 
@@ -129,6 +141,64 @@ function depositCleared(facts: GuardFacts): GuardResult {
  */
 function gateAInstallmentCleared(facts: GuardFacts): GuardResult {
   return milestoneCleared(facts, 'gate_a', 'gate_a_not_cleared');
+}
+
+/**
+ * The engagement's Gate-B installment is fully paid — a money gate for
+ * `approveDesign` (final_approval -> shop_drawings). Delegates to
+ * {@link milestoneCleared} for the `gate_b` milestone, surfacing
+ * `gate_b_not_cleared` on any shortfall. Absent gate_b milestone = free gate: a
+ * schedule that omits gate_b clears without a gate_b payment.
+ */
+function gateBInstallmentCleared(facts: GuardFacts): GuardResult {
+  return milestoneCleared(facts, 'gate_b', 'gate_b_not_cleared');
+}
+
+/**
+ * The client has acknowledged the firm's ROM band — a gate for `approveDesign`.
+ * `recordRomAcknowledgement` (Step 12) appends one `rom_acknowledgement` event
+ * snapshotting the acknowledged range; the design cannot be approved until that
+ * witness exists. Fails closed with `rom_not_acknowledged` when none is present.
+ */
+function romAcknowledged(facts: GuardFacts): GuardResult {
+  return facts.events.some((event) => event.kind === 'rom_acknowledgement')
+    ? pass
+    : { ok: false, code: 'rom_not_acknowledged' };
+}
+
+/**
+ * Newest-first ordering for engagement events: primary `decidedAt`, tie-broken by
+ * `createdAt`, then `id` — the deterministic total order the latest-attestation
+ * gate reads. Descending, so the freshest event sorts to index 0.
+ */
+function byDecidedDescending(a: EngagementEvent, b: EngagementEvent): number {
+  const decided = b.decidedAt.getTime() - a.decidedAt.getTime();
+  if (decided !== 0) return decided;
+  const created = b.createdAt.getTime() - a.createdAt.getTime();
+  if (created !== 0) return created;
+  if (a.id === b.id) return 0;
+  return a.id < b.id ? 1 : -1;
+}
+
+/**
+ * The as-built drawings are reconciled — a gate for `approveDesign`. A non-Off-Plan
+ * engagement never has as-built drawings due (`asBuiltDue === false`), so it is
+ * trivially reconciled and passes. For an Off-Plan engagement the LATEST
+ * `as_built_attestation` event (newest by decidedAt/createdAt/id) must be a clean
+ * one (`hasVariance === false`); a variance-flagged latest attestation, or NO
+ * attestation at all, fails closed with `as_built_not_reconciled`.
+ */
+function asBuiltReconciled(facts: GuardFacts): GuardResult {
+  if (!facts.engagement.asBuiltDue) return pass;
+
+  const [latest] = facts.events
+    .filter((event) => event.kind === 'as_built_attestation')
+    .sort(byDecidedDescending);
+
+  if (!latest || latest.hasVariance !== false) {
+    return { ok: false, code: 'as_built_not_reconciled' };
+  }
+  return pass;
 }
 
 /**
@@ -252,6 +322,9 @@ export const GUARDS: Record<GuardKey, (facts: GuardFacts) => GuardResult> = {
   scopeInputsPresent,
   depositCleared,
   gateAInstallmentCleared,
+  gateBInstallmentCleared,
+  romAcknowledged,
+  asBuiltReconciled,
   spatialBaseReady,
   optionsReady,
   revisionCosSettled,

@@ -93,6 +93,46 @@ export async function attestAsBuiltClean(
 }
 
 /**
+ * Server-action wrapper for the `approveDesign` transition (Step 14, Gate B):
+ * final_approval -> shop_drawings, closing the design phase. Runs the compound
+ * guard — client ROM acknowledged, as-built reconciled (Off-Plan), Gate-B
+ * installment cleared — then fires the executor's `recordDesignApproval`
+ * side-effect (one `design_approval` event), atomically with the state move.
+ * Revalidates the shell on success. Returns the ActionResult — never throws.
+ */
+export async function approveDesign(
+  engagementId: string,
+): Promise<ActionResult> {
+  const ctx = await requireOrg();
+  const res = await executeTransition(ctx, {
+    engagementId,
+    trigger: 'approveDesign',
+  });
+  if (res.ok) revalidatePath('/', 'layout');
+  return res;
+}
+
+/**
+ * Server-action wrapper for the `rejectDesign` transition (Step 14, Gate B):
+ * final_approval -> negotiation. No guard — a rejection is always allowed. Fires
+ * the executor's `resetRevisionsOnReject` side-effect (revision_count -> 0,
+ * concept_locked_at -> null: refill free revisions + reopen the concept lock),
+ * atomically with the state move. Revalidates the shell on success. Returns the
+ * ActionResult — never throws.
+ */
+export async function rejectDesign(
+  engagementId: string,
+): Promise<ActionResult> {
+  const ctx = await requireOrg();
+  const res = await executeTransition(ctx, {
+    engagementId,
+    trigger: 'rejectDesign',
+  });
+  if (res.ok) revalidatePath('/', 'layout');
+  return res;
+}
+
+/**
  * Server-action wrapper for {@link recordPaymentCore}: resolves the request's org
  * context, appends one cleared payment to the append-only ledger, and revalidates
  * the shell on success. Returns the ActionResult (with the new payment id in

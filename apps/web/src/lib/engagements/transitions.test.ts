@@ -46,9 +46,10 @@ describe('transition registry', () => {
       const froms = Array.isArray(def.from) ? def.from : [def.from];
       for (const from of froms) expect(states.has(from)).toBe(true);
       expect(states.has(def.to)).toBe(true);
-      // requestRevision (Step 8) is the ONE guard-less edge: the spec always
-      // allows a revision from negotiation, so its guard list is empty by design.
-      if (trigger === 'requestRevision') {
+      // The two guard-less edges: requestRevision (Step 8 — a revision from
+      // negotiation is always allowed) and rejectDesign (Step 14 — a rejection
+      // from final_approval is always allowed). Every other edge carries a guard.
+      if (trigger === 'requestRevision' || trigger === 'rejectDesign') {
         expect(def.guards).toEqual([]);
       } else {
         expect(def.guards.length).toBeGreaterThan(0);
@@ -76,6 +77,10 @@ describe('transition registry', () => {
         expect(def.sideEffect).toBe('recordAsBuiltVariance');
       } else if (trigger === 'attestAsBuiltClean') {
         expect(def.sideEffect).toBe('recordAsBuiltClean');
+      } else if (trigger === 'approveDesign') {
+        expect(def.sideEffect).toBe('recordDesignApproval');
+      } else if (trigger === 'rejectDesign') {
+        expect(def.sideEffect).toBe('resetRevisionsOnReject');
       } else {
         expect(def.sideEffect).toBeNull();
       }
@@ -88,14 +93,16 @@ describe('transition registry', () => {
     expect([...reachable].sort()).toEqual([...DESIGN_STATES].sort());
   });
 
-  it('the 10 wired triggers (through Step 13) carry concrete guards; the rest fail closed', () => {
+  it('the 12 wired triggers (through Step 14) carry concrete guards; the rest fail closed', () => {
     expect([...WIRED_TRIGGERS].sort()).toEqual(
       [
+        'approveDesign',
         'attestAsBuiltClean',
         'confirmAndPayDeposit',
         'confirmConcept',
         'flagAsBuiltVariance',
         'optionsReady',
+        'rejectDesign',
         'rendersReady',
         'requestRevision',
         'selectConcept',
@@ -190,6 +197,29 @@ describe('transition registry', () => {
     expect(TRANSITIONS.attestAsBuiltClean.capability).toBe('engagements_design');
     expect(TRANSITIONS.attestAsBuiltClean.sideEffect).toBe('recordAsBuiltClean');
 
+    // approveDesign (Step 14, Gate B): the compound guard closes the design phase
+    // (final_approval -> shop_drawings) — ROM ack, then as-built reconciliation,
+    // then the Gate-B installment (ack/reconcile surface before money) — and appends
+    // one design_approval event as its side-effect.
+    expect(TRANSITIONS.approveDesign.guards).toEqual([
+      'romAcknowledged',
+      'asBuiltReconciled',
+      'gateBInstallmentCleared',
+    ]);
+    expect(TRANSITIONS.approveDesign.from).toBe('final_approval');
+    expect(TRANSITIONS.approveDesign.to).toBe('shop_drawings');
+    expect(TRANSITIONS.approveDesign.capability).toBe('engagements_design');
+    expect(TRANSITIONS.approveDesign.sideEffect).toBe('recordDesignApproval');
+
+    // rejectDesign (Step 14, Gate B): a guard-less bounce back to negotiation
+    // (final_approval -> negotiation) whose side-effect refills the free-revision
+    // allowance (revision_count -> 0) and reopens the concept lock.
+    expect(TRANSITIONS.rejectDesign.guards).toEqual([]);
+    expect(TRANSITIONS.rejectDesign.from).toBe('final_approval');
+    expect(TRANSITIONS.rejectDesign.to).toBe('negotiation');
+    expect(TRANSITIONS.rejectDesign.capability).toBe('engagements_design');
+    expect(TRANSITIONS.rejectDesign.sideEffect).toBe('resetRevisionsOnReject');
+
     // Every other trigger routes through pendingGuard (fail-closed).
     const wired = new Set<Trigger>([
       'submitDesignFee',
@@ -202,6 +232,8 @@ describe('transition registry', () => {
       'rendersReady',
       'flagAsBuiltVariance',
       'attestAsBuiltClean',
+      'approveDesign',
+      'rejectDesign',
     ]);
     for (const trigger of ALL_TRIGGERS) {
       if (wired.has(trigger)) continue;

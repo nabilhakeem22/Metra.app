@@ -45,9 +45,16 @@ grant select, insert, update, delete on public.variation_order_lines to metra_ap
 -- Design Engagements (Step 1): the engagement record is mutable (create + Step 2
 -- state transitions); the transition ledger is append-only (granted below).
 grant select, insert, update on public.design_engagements to metra_app;
--- engagement_milestones (Step 3): the fee schedule is editable during setup, so
--- full DML (unlike the append-only transition ledger).
-grant select, insert, update, delete on public.engagement_milestones to metra_app;
+-- engagement_milestones (Step 3): the schedule is written ONCE by
+-- generateFeeSchedule at submitDesignFee and never edited by any code path, so
+-- INSERT-only. This is load-bearing under the Step-14 "absent milestone = free
+-- gate" rule: leaving UPDATE/DELETE granted would let a future edit path waive a
+-- paying gate by dropping/zeroing its milestone. The revoke removes the earlier
+-- (Step 3) UPDATE/DELETE grant on already-provisioned DBs; it is a no-op on a
+-- fresh DB. If schedule editing is ever added, re-grant narrowly + gate it with an
+-- enforce_immutable_when trigger (immutable once past design_proposal).
+grant select, insert on public.engagement_milestones to metra_app;
+revoke update, delete on public.engagement_milestones from metra_app;
 -- engagement_artifacts (Step 5): artifacts may be re-attested / relabelled, so
 -- SELECT + INSERT + UPDATE (not append-only) — but never DELETE.
 grant select, insert, update on public.engagement_artifacts to metra_app;

@@ -62,7 +62,10 @@ async function conceptApprovalEventCount(engagementId: string): Promise<number> 
  * setup pattern, then the `selectConcept` (concept_review -> negotiation) Gate-A
  * gate can be exercised.
  */
-async function setupConceptReview(): Promise<{
+async function setupConceptReview(
+  fee: GenerateFeeSchedulePayload = AMOUNT_SPLIT,
+  depositAmount = '30000',
+): Promise<{
   ctx: OrgContext;
   engagementId: string;
 }> {
@@ -88,10 +91,10 @@ async function setupConceptReview(): Promise<{
   const submitted = await executeTransition(ctx, {
     engagementId,
     trigger: 'submitDesignFee',
-    payload: AMOUNT_SPLIT,
+    payload: fee,
   });
   expect(submitted.ok).toBe(true);
-  await recordPaymentCore(ctx, { engagementId, kind: 'deposit', amount: '30000' });
+  await recordPaymentCore(ctx, { engagementId, kind: 'deposit', amount: depositAmount });
   const confirmed = await executeTransition(ctx, {
     engagementId,
     trigger: 'confirmAndPayDeposit',
@@ -176,6 +179,28 @@ describe('selectConcept — gated on the Gate-A installment clearing', () => {
     expect(res).toEqual({ ok: false, error: 'gate_a_not_cleared' });
     expect(await stateOf(engagementId)).toBe('concept_review');
     expect(await conceptApprovalEventCount(engagementId)).toBe(0);
+  });
+
+  // Step-14 milestoneCleared regression: "absent milestone = free gate".
+  it('a DEPOSIT-ONLY schedule (no gate_a milestone) clears Gate A for FREE', async () => {
+    // deposit is the only milestone (fee 100,000): gate_a was never scheduled, so
+    // selectConcept advances with NO gate_a payment recorded.
+    const DEPOSIT_ONLY: GenerateFeeSchedulePayload = {
+      designFee: '100000',
+      milestones: [{ kind: 'deposit', basis: 'amount', value: '100000' }],
+    };
+    const { ctx, engagementId } = await setupConceptReview(DEPOSIT_ONLY, '100000');
+
+    const res = await selectConcept(ctx, engagementId);
+    expect(res.ok).toBe(true);
+    expect(await stateOf(engagementId)).toBe('negotiation');
+    expect(await conceptApprovalEventCount(engagementId)).toBe(1);
+    // No gate_a receipt exists — the gate opened for free.
+    const [paid] = await raw.query<{ n: number }>(
+      `select count(*)::int as n from public.payment_events
+        where engagement_id = '${engagementId}' and kind = 'gate_a'`,
+    );
+    expect(Number(paid.n)).toBe(0);
   });
 });
 

@@ -86,3 +86,21 @@ export async function applyRevision(
     raisedByUserId: ctx.userId,
   });
 }
+
+/**
+ * Reset an engagement's revision bookkeeping when a design is rejected back to
+ * negotiation — the `rejectDesign` side-effect (Step 14, owner-locked). Refills
+ * the free-revision allowance (`revision_count` -> 0) and reopens the concept lock
+ * (`concept_locked_at` -> null), so the returning engagement gets fresh free
+ * revisions. Executor-only: MUST run inside the executor's `tx` so it commits
+ * ATOMICALLY with the final_approval -> negotiation state move, or not at all.
+ */
+export async function resetRevisionsOnReject(
+  tx: MetraDb,
+  engagementId: string,
+): Promise<void> {
+  await tx
+    .update(designEngagements)
+    .set({ revisionCount: 0, conceptLockedAt: null, updatedAt: new Date() })
+    .where(eq(designEngagements.id, engagementId));
+}

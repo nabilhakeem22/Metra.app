@@ -2,6 +2,7 @@ import type {
   DesignEngagement,
   EngagementArtifact,
   EngagementChangeOrder,
+  EngagementEvent,
   EngagementMilestone,
   PaymentEvent,
 } from '@metra/db';
@@ -140,10 +141,15 @@ describe('depositCleared', () => {
     expect(GUARDS.depositCleared(facts)).toEqual({ ok: false, code: 'deposit_not_cleared' });
   });
 
-  it('fails closed when the deposit milestone or the design_fee is missing', () => {
+  it('absent deposit milestone = free gate: clears with no payment (Step 14)', () => {
+    // The firm omitted the deposit from the schedule — nothing is required.
+    // (deposit is always present after Step 3, so this is a pure-function witness.)
     expect(
-      GUARDS.depositCleared(depositFacts({ designFee: '100000', paid: ['999999'] })),
-    ).toEqual({ ok: false, code: 'deposit_not_cleared' });
+      GUARDS.depositCleared(depositFacts({ designFee: '100000', paid: [] })),
+    ).toEqual({ ok: true });
+  });
+
+  it('fails closed when the milestone EXISTS but the design_fee is missing', () => {
     expect(
       GUARDS.depositCleared(
         depositFacts({ designFee: null, deposit: { basis: 'percent', value: '25' }, paid: ['999999'] }),
@@ -230,15 +236,219 @@ describe('gateAInstallmentCleared', () => {
     });
   });
 
-  it('fails closed when the gate_a milestone or the design_fee is missing', () => {
+  it('absent gate_a milestone = free gate: a deposit-only schedule clears gate_a free (Step 14)', () => {
+    // No gate_a milestone in the schedule -> nothing required -> clears with no
+    // gate_a payment. This is the milestoneCleared "absent = free" change.
     expect(
-      GUARDS.gateAInstallmentCleared(gateAFacts({ designFee: '100000', paid: ['999999'] })),
-    ).toEqual({ ok: false, code: 'gate_a_not_cleared' });
+      GUARDS.gateAInstallmentCleared(gateAFacts({ designFee: '100000', paid: [] })),
+    ).toEqual({ ok: true });
+  });
+
+  it('fails closed when the gate_a milestone EXISTS but the design_fee is missing', () => {
     expect(
       GUARDS.gateAInstallmentCleared(
         gateAFacts({ designFee: null, gateA: { basis: 'percent', value: '20' }, paid: ['999999'] }),
       ),
     ).toEqual({ ok: false, code: 'gate_a_not_cleared' });
+  });
+});
+
+/** Build a facts bundle for gateBInstallmentCleared: fee + optional gate_b milestone + paid rows. */
+function gateBFacts(opts: {
+  designFee: string | null;
+  gateB?: { basis: 'percent' | 'amount'; value: string };
+  paid: { kind: PaymentEvent['kind']; amount: string }[];
+}): GuardFacts {
+  const milestones: EngagementMilestone[] = opts.gateB
+    ? [
+        {
+          kind: 'gate_b',
+          basis: opts.gateB.basis,
+          value: opts.gateB.value,
+        } as EngagementMilestone,
+      ]
+    : [];
+  return {
+    engagement: { designFee: opts.designFee } as DesignEngagement,
+    milestones,
+    payments: opts.paid.map((p) => p as PaymentEvent),
+    artifacts: [],
+    changeOrders: [],
+    events: [],
+  };
+}
+
+describe('gateBInstallmentCleared', () => {
+  it('amount basis: passes iff gate_b paid >= the milestone value (short/exact/over)', () => {
+    const base = { designFee: '100000', gateB: { basis: 'amount' as const, value: '20000' } };
+    expect(
+      GUARDS.gateBInstallmentCleared(gateBFacts({ ...base, paid: [{ kind: 'gate_b', amount: '20000' }] })),
+    ).toEqual({ ok: true });
+    // A piastre short fails closed.
+    expect(
+      GUARDS.gateBInstallmentCleared(
+        gateBFacts({ ...base, paid: [{ kind: 'gate_b', amount: '19999.9999' }] }),
+      ),
+    ).toEqual({ ok: false, code: 'gate_b_not_cleared' });
+    expect(
+      GUARDS.gateBInstallmentCleared(gateBFacts({ ...base, paid: [] })),
+    ).toEqual({ ok: false, code: 'gate_b_not_cleared' });
+  });
+
+  it('absent gate_b milestone = free gate: clears with no gate_b payment (Step 14)', () => {
+    expect(
+      GUARDS.gateBInstallmentCleared(gateBFacts({ designFee: '100000', paid: [] })),
+    ).toEqual({ ok: true });
+  });
+
+  it('KIND-ISOLATION: a deposit/gate_a payment does NOT satisfy gate_b', () => {
+    const base = { designFee: '100000', gateB: { basis: 'amount' as const, value: '20000' } };
+    expect(
+      GUARDS.gateBInstallmentCleared(
+        gateBFacts({
+          ...base,
+          paid: [
+            { kind: 'deposit', amount: '20000' },
+            { kind: 'gate_a', amount: '20000' },
+          ],
+        }),
+      ),
+    ).toEqual({ ok: false, code: 'gate_b_not_cleared' });
+  });
+});
+
+/** Build an as_built_attestation event fixture with an explicit decidedAt/createdAt/id. */
+function attestation(over: {
+  id: string;
+  hasVariance: boolean;
+  decidedAt: Date;
+  createdAt?: Date;
+}): EngagementEvent {
+  return {
+    id: over.id,
+    kind: 'as_built_attestation',
+    hasVariance: over.hasVariance,
+    decidedAt: over.decidedAt,
+    createdAt: over.createdAt ?? over.decidedAt,
+  } as EngagementEvent;
+}
+
+describe('romAcknowledged', () => {
+  function romFacts(kinds: EngagementEvent['kind'][]): GuardFacts {
+    return {
+      engagement: {} as DesignEngagement,
+      milestones: [],
+      payments: [],
+      artifacts: [],
+      changeOrders: [],
+      events: kinds.map((kind) => ({ kind }) as EngagementEvent),
+    };
+  }
+
+  it('passes when a rom_acknowledgement event is present', () => {
+    expect(GUARDS.romAcknowledged(romFacts(['rom_acknowledgement']))).toEqual({
+      ok: true,
+    });
+    expect(
+      GUARDS.romAcknowledged(romFacts(['concept_approval', 'rom_acknowledgement'])),
+    ).toEqual({ ok: true });
+  });
+
+  it('fails closed with rom_not_acknowledged when no such event exists', () => {
+    expect(GUARDS.romAcknowledged(romFacts([]))).toEqual({
+      ok: false,
+      code: 'rom_not_acknowledged',
+    });
+    // A different event kind does not satisfy it.
+    expect(GUARDS.romAcknowledged(romFacts(['concept_approval']))).toEqual({
+      ok: false,
+      code: 'rom_not_acknowledged',
+    });
+  });
+});
+
+describe('asBuiltReconciled', () => {
+  function reconcileFacts(
+    asBuiltDue: boolean,
+    events: EngagementEvent[],
+  ): GuardFacts {
+    return {
+      engagement: { asBuiltDue } as DesignEngagement,
+      milestones: [],
+      payments: [],
+      artifacts: [],
+      changeOrders: [],
+      events,
+    };
+  }
+
+  it('non-Off-Plan (asBuiltDue false): trivially reconciled, passes with no attestation', () => {
+    expect(GUARDS.asBuiltReconciled(reconcileFacts(false, []))).toEqual({
+      ok: true,
+    });
+  });
+
+  it('Off-Plan with NO attestation: fails closed with as_built_not_reconciled', () => {
+    expect(GUARDS.asBuiltReconciled(reconcileFacts(true, []))).toEqual({
+      ok: false,
+      code: 'as_built_not_reconciled',
+    });
+  });
+
+  it('Off-Plan: passes iff the LATEST attestation (by decidedAt) is clean', () => {
+    const older = attestation({
+      id: 'a',
+      hasVariance: true,
+      decidedAt: new Date('2026-01-01T00:00:00Z'),
+    });
+    const newerClean = attestation({
+      id: 'b',
+      hasVariance: false,
+      decidedAt: new Date('2026-02-01T00:00:00Z'),
+    });
+    // Latest is clean -> reconciled (order in the array must not matter).
+    expect(
+      GUARDS.asBuiltReconciled(reconcileFacts(true, [older, newerClean])),
+    ).toEqual({ ok: true });
+    expect(
+      GUARDS.asBuiltReconciled(reconcileFacts(true, [newerClean, older])),
+    ).toEqual({ ok: true });
+  });
+
+  it('Off-Plan: a variance-flagged LATEST attestation fails closed', () => {
+    const olderClean = attestation({
+      id: 'a',
+      hasVariance: false,
+      decidedAt: new Date('2026-01-01T00:00:00Z'),
+    });
+    const newerVariance = attestation({
+      id: 'b',
+      hasVariance: true,
+      decidedAt: new Date('2026-02-01T00:00:00Z'),
+    });
+    expect(
+      GUARDS.asBuiltReconciled(reconcileFacts(true, [olderClean, newerVariance])),
+    ).toEqual({ ok: false, code: 'as_built_not_reconciled' });
+  });
+
+  it('Off-Plan: ties on decidedAt break by createdAt then id (deterministic latest)', () => {
+    const decided = new Date('2026-03-01T00:00:00Z');
+    const variance = attestation({
+      id: 'zzz',
+      hasVariance: true,
+      decidedAt: decided,
+      createdAt: new Date('2026-03-01T00:00:05Z'),
+    });
+    const clean = attestation({
+      id: 'aaa',
+      hasVariance: false,
+      decidedAt: decided,
+      createdAt: new Date('2026-03-01T00:00:01Z'),
+    });
+    // Same-ish decidedAt: the later createdAt (variance) is the latest -> fails.
+    expect(
+      GUARDS.asBuiltReconciled(reconcileFacts(true, [clean, variance])),
+    ).toEqual({ ok: false, code: 'as_built_not_reconciled' });
   });
 });
 

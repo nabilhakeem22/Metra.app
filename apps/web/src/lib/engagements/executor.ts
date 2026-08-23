@@ -18,12 +18,12 @@ import { fail, mutateInOrg } from '@/lib/actions/mutate';
 import { err, type ActionResult } from '@/lib/actions/result';
 import type { OrgContext } from '@/lib/db/context';
 import type { PermissionAction } from '@/lib/permissions/roles';
-import { recordConceptApproval } from './approvals';
+import { recordConceptApproval, recordDesignApproval } from './approvals';
 import { insertAsBuiltAttestation } from './attestations';
 import { settleConceptAndLock } from './concept';
 import { generateFeeSchedule } from './fee-schedule';
 import { captureRenderManifest } from './renders';
-import { applyRevision } from './revisions';
+import { applyRevision, resetRevisionsOnReject } from './revisions';
 import { GUARDS, type GuardFacts } from './guards';
 import { TRANSITIONS, type CapabilityKey, type Trigger } from './transitions';
 
@@ -187,6 +187,19 @@ export async function executeTransition(
       // to final_approval (the self-loop OR the change_triage reconciliation).
       if (def.sideEffect === 'recordAsBuiltClean') {
         await insertAsBuiltAttestation(tx, ctx, engagementId, false);
+      }
+      // approveDesign (Step 14, Gate B): the ROM ack, as-built reconciliation and
+      // Gate-B installment guards have all passed, so witness the design sign-off
+      // with ONE append-only `design_approval` event. Atomic with the
+      // final_approval -> shop_drawings move.
+      if (def.sideEffect === 'recordDesignApproval') {
+        await recordDesignApproval(tx, ctx, engagementId);
+      }
+      // rejectDesign (Step 14, Gate B): bounce back to negotiation and refill the
+      // free-revision allowance (revision_count -> 0, concept_locked_at -> null).
+      // Atomic with the final_approval -> negotiation move.
+      if (def.sideEffect === 'resetRevisionsOnReject') {
+        await resetRevisionsOnReject(tx, engagementId);
       }
 
       await tx.insert(engagementTransitions).values({
