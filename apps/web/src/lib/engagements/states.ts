@@ -7,10 +7,12 @@
 import type { DesignEngagementState } from '@metra/db';
 
 /**
- * The 15 engagement states, in lifecycle order. Mirrors the Postgres
+ * The 16 engagement states, in lifecycle order. Mirrors the Postgres
  * `design_engagement_state` enum verbatim (the `assertEnumParity` guard below
  * fails the build if they diverge). `created` is the entry state; the three
- * TERMINAL states are the only off-ramps.
+ * TERMINAL states are the only off-ramps. `change_triage` (Step 13) is appended
+ * LAST to match the physical `ALTER TYPE ... ADD VALUE` order (0028) — it is a
+ * presentation detour off `final_approval`, ACTIVE and non-terminal.
  */
 export const DESIGN_STATES = [
   'created',
@@ -28,6 +30,7 @@ export const DESIGN_STATES = [
   'closed_design_only',
   'execution',
   'abandoned',
+  'change_triage',
 ] as const;
 
 export type DesignState = (typeof DESIGN_STATES)[number];
@@ -43,8 +46,10 @@ export type _DbEnumCoversStates = AssertExtends<DesignEngagementState, DesignSta
 /**
  * Funnel stage number for progress display. The happy path is monotonic
  * (created=1 … execution=14); `abandoned` is off the funnel (0). Terminal
- * outcomes `closed_design_only` (13) and `execution` (14) sit at the tail. This
- * is a presentation aid only — the executor never reads it.
+ * outcomes `closed_design_only` (13) and `execution` (14) sit at the tail.
+ * `change_triage` shares stage 8 with `final_approval` — it is a detour off that
+ * stage, not a forward step. This is a presentation aid only — the executor
+ * never reads it.
  */
 export const STAGE_NUMBER: Record<DesignState, number> = {
   created: 1,
@@ -62,6 +67,7 @@ export const STAGE_NUMBER: Record<DesignState, number> = {
   closed_design_only: 13,
   execution: 14,
   abandoned: 0,
+  change_triage: 8,
 };
 
 /** The three terminal states — no trigger leaves them. */

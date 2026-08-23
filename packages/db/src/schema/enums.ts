@@ -169,6 +169,9 @@ export const DESIGN_ENGAGEMENT_STATES = [
   'closed_design_only',
   'execution',
   'abandoned',
+  // Step 13 — Gate-B change-triage detour (as-built variance). ACTIVE/non-terminal.
+  // Appended LAST to mirror the physical `ALTER TYPE ... ADD VALUE` order (0028).
+  'change_triage',
 ] as const;
 
 export const designEngagementState = pgEnum(
@@ -259,6 +262,9 @@ export const ENGAGEMENT_EVENT_KINDS = [
   'design_approval',
   'rom_acknowledgement',
   'handoff_acknowledgement',
+  // Step 13 — the as-built attestation (off-plan): true = variance flagged (opens
+  // change_triage), false = clean. Appended LAST to mirror `ADD VALUE` (0028).
+  'as_built_attestation',
 ] as const;
 
 export const engagementEventKind = pgEnum(

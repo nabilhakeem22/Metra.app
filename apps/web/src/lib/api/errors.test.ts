@@ -70,6 +70,7 @@ const ALL_CODES: ActionCode[] = [
   'revision_co_amount_required',
   'revision_cos_outstanding',
   'renders_missing',
+  'as_built_not_due',
   'rom_range_invalid',
   'rom_not_set',
 ];

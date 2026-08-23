@@ -52,6 +52,47 @@ export async function submitDesignFee(
 }
 
 /**
+ * Server-action wrapper for the `flagAsBuiltVariance` transition (Step 13):
+ * final_approval -> change_triage. Fires the executor's `recordAsBuiltVariance`
+ * side-effect (one `as_built_attestation` event, has_variance=true), atomically
+ * with the state move. Only admissible for an Off-Plan engagement whose as-built
+ * drawings are due (`asBuiltDueOpen`); otherwise fails closed with
+ * `as_built_not_due`. Revalidates the shell on success.
+ */
+export async function flagAsBuiltVariance(
+  engagementId: string,
+): Promise<ActionResult> {
+  const ctx = await requireOrg();
+  const res = await executeTransition(ctx, {
+    engagementId,
+    trigger: 'flagAsBuiltVariance',
+  });
+  if (res.ok) revalidatePath('/', 'layout');
+  return res;
+}
+
+/**
+ * Server-action wrapper for the `attestAsBuiltClean` transition (Step 13): a clean
+ * as-built attestation targeting final_approval — the final_approval self-loop AND
+ * the change_triage -> final_approval reconciliation. Fires the executor's
+ * `recordAsBuiltClean` side-effect (one `as_built_attestation` event,
+ * has_variance=false). Only admissible for an Off-Plan engagement whose as-built
+ * drawings are due (`asBuiltDueOpen`); otherwise fails closed with
+ * `as_built_not_due`. Revalidates the shell on success.
+ */
+export async function attestAsBuiltClean(
+  engagementId: string,
+): Promise<ActionResult> {
+  const ctx = await requireOrg();
+  const res = await executeTransition(ctx, {
+    engagementId,
+    trigger: 'attestAsBuiltClean',
+  });
+  if (res.ok) revalidatePath('/', 'layout');
+  return res;
+}
+
+/**
  * Server-action wrapper for {@link recordPaymentCore}: resolves the request's org
  * context, appends one cleared payment to the append-only ledger, and revalidates
  * the shell on success. Returns the ActionResult (with the new payment id in

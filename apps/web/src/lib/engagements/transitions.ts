@@ -12,7 +12,7 @@ import type { Capability } from '@/lib/permissions/roles';
 import type { GuardKey } from './guards';
 import type { DesignState } from './states';
 
-/** The 17 lifecycle triggers. Order is documentation, not a contract. */
+/** The 19 lifecycle triggers. Order is documentation, not a contract. */
 export type Trigger =
   | 'submitDesignFee'
   | 'confirmAndPayDeposit'
@@ -22,6 +22,8 @@ export type Trigger =
   | 'requestRevision'
   | 'confirmConcept'
   | 'rendersReady'
+  | 'flagAsBuiltVariance'
+  | 'attestAsBuiltClean'
   | 'approveDesign'
   | 'draftReady'
   | 'finalizeBOQ'
@@ -43,7 +45,9 @@ export type CapabilityKey = Extract<
  * Step 4 adds `activateOnDeposit` (confirmAndPayDeposit); Step 7 adds
  * `recordConceptApproval` (selectConcept); Step 8 adds `applyRevision`
  * (requestRevision self-loop); Step 9 adds `settleConceptAndLock` (confirmConcept);
- * Step 11 adds `captureRenderManifest` (rendersReady).
+ * Step 11 adds `captureRenderManifest` (rendersReady); Step 13 adds
+ * `recordAsBuiltVariance` (flagAsBuiltVariance) and `recordAsBuiltClean`
+ * (attestAsBuiltClean), each appending one `as_built_attestation` event.
  * A side-effect runs INSIDE the executor's tx (atomic with the state move); its
  * executor branch is the ONLY place it may run. Every later side-effect widens
  * this union AND adds a matching executor branch.
@@ -54,7 +58,9 @@ export type SideEffectKey =
   | 'recordConceptApproval'
   | 'applyRevision'
   | 'settleConceptAndLock'
-  | 'captureRenderManifest';
+  | 'captureRenderManifest'
+  | 'recordAsBuiltVariance'
+  | 'recordAsBuiltClean';
 
 /** One milestone row in a fee-schedule payload (money as a scale-4 string). */
 export interface MilestoneInput {
@@ -172,6 +178,28 @@ export const TRANSITIONS: Record<Trigger, TransitionDef> = {
     sideEffect: 'captureRenderManifest',
     capability: 'engagements_design',
   },
+  // Step 13: the Gate-B as-built variance detour. Only an Off-Plan engagement whose
+  // as-built drawings are due (`asBuiltDueOpen`) can flag a variance; the side-effect
+  // appends one `as_built_attestation` event with has_variance=true, atomically with
+  // the final_approval -> change_triage move.
+  flagAsBuiltVariance: {
+    from: 'final_approval',
+    to: 'change_triage',
+    guards: ['asBuiltDueOpen'],
+    sideEffect: 'recordAsBuiltVariance',
+    capability: 'engagements_design',
+  },
+  // Step 13: the clean as-built attestation. ONE trigger serves both the
+  // final_approval self-loop AND the change_triage -> final_approval reconciliation
+  // (both target final_approval — the requestRevision self-loop precedent). The
+  // side-effect appends one `as_built_attestation` event with has_variance=false.
+  attestAsBuiltClean: {
+    from: ['final_approval', 'change_triage'],
+    to: 'final_approval',
+    guards: ['asBuiltDueOpen'],
+    sideEffect: 'recordAsBuiltClean',
+    capability: 'engagements_design',
+  },
   approveDesign: {
     from: 'final_approval',
     to: 'shop_drawings',
@@ -242,6 +270,7 @@ export const TRANSITIONS: Record<Trigger, TransitionDef> = {
       'boq',
       'execution_decision',
       'design_only_handoff',
+      'change_triage',
     ],
     to: 'abandoned',
     guards: ['pendingGuard'],
@@ -260,4 +289,6 @@ export const WIRED_TRIGGERS: ReadonlySet<Trigger> = new Set<Trigger>([
   'requestRevision',
   'confirmConcept',
   'rendersReady',
+  'flagAsBuiltVariance',
+  'attestAsBuiltClean',
 ]);
