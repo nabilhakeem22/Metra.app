@@ -34,6 +34,30 @@ create policy org_isolation on public.organizations
     id = nullif(current_setting('app.current_org_id', true), '')::uuid
   );
 
+-- accounts: the billing/ownership entity ABOVE tenancy (no org_id, so the shared
+-- org_id gate can't apply). Bespoke policy — an account is visible ONLY to a
+-- member of an org that OWNS it (organizations.account_id = accounts.id) under the
+-- CURRENT org context, joined through the same membership second factor. Under org
+-- A's context this matches exactly org A's one account; org B's account and a
+-- forged non-member context match 0 rows. WITH CHECK is false: metra_app is
+-- granted SELECT only and accounts are created EXCLUSIVELY via the SECURITY
+-- DEFINER app_bootstrap_account() (which runs as the BYPASSRLS owner, so `false`
+-- never blocks it) — a direct metra_app INSERT/UPDATE is refused by BOTH the
+-- missing grant AND this check.
+alter table public.accounts enable row level security;
+alter table public.accounts force  row level security;
+drop policy if exists account_isolation on public.accounts;
+create policy account_isolation on public.accounts
+  using (
+    exists (
+      select 1 from public.organizations o
+      where o.account_id = accounts.id
+        and o.id = nullif(current_setting('app.current_org_id', true), '')::uuid
+        and public.app_is_current_org_member()
+    )
+  )
+  with check (false);
+
 -- memberships: read/most-writes require membership; WITH CHECK additionally
 -- permits inserting the caller's OWN row during a legitimate bootstrap.
 alter table public.memberships enable row level security;

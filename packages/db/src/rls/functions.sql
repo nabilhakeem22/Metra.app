@@ -185,6 +185,29 @@ as $$
    returning id;
 $$;
 
+-- Account bootstrap (Epic A, A1). Mint ONE fresh, UNLINKED account row and return
+-- its id — this is the ONLY code path that creates an account. createOrg calls it,
+-- then stamps the new org's account_id; the 1:1 backfill migration seeded existing
+-- orgs. SECURITY DEFINER so the insert runs as the BYPASSRLS owner: the accounts
+-- policy's `with check (false)` refuses every metra_app INSERT, so accounts can be
+-- created ONLY here. Scoped to nothing but the two name args — it neither reads nor
+-- widens any tenant's data. Mirrors the app_claim_invitation shape (returns
+-- table(id)). Least-privilege grants (metra_app only) live in roles.sql.
+create or replace function public.app_bootstrap_account(
+  p_name_ar text,
+  p_name_en text
+)
+returns table (id uuid)
+language sql
+volatile
+security definer
+set search_path = ''
+as $$
+  insert into public.accounts (name_ar, name_en)
+  values (p_name_ar, p_name_en)
+  returning id;
+$$;
+
 -- =============================================================================
 -- P1 Slice 3 — Proposals
 -- =============================================================================

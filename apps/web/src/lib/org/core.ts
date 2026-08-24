@@ -12,6 +12,7 @@ import {
   sections,
   stageTemplates,
 } from '@metra/db';
+import { sql } from 'drizzle-orm';
 import { mutateInOrg } from '@/lib/actions/mutate';
 import { err, type ActionResult } from '@/lib/actions/result';
 import type { OrgContext } from '@/lib/db/context';
@@ -58,8 +59,18 @@ export async function createOrgCore(
   }
 
   return mutateInOrg(ctx, {}, async (tx, audit) => {
+    // Mint this org's owning account (above tenancy) via the bootstrap SDF — the
+    // ONLY path that creates an account row — then link it. metra_app has SELECT
+    // only on accounts; the SECURITY DEFINER function inserts as the BYPASSRLS
+    // owner. Runs inside this same bootstrap transaction, so a failure rolls back
+    // the org, membership AND the account together.
+    const accountRows = (await tx.execute(
+      sql`select id from public.app_bootstrap_account(${nameAr}, ${nameEn})`,
+    )) as unknown as Array<{ id: string }>;
+    const accountId = accountRows[0]?.id;
     await tx.insert(organizations).values({
       id: ctx.orgId,
+      accountId,
       nameEn,
       nameAr,
       city,

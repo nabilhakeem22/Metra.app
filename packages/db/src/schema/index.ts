@@ -1,6 +1,7 @@
 // Barrel. Import order matters for the organizations<->_helpers circular ref:
 // enums first, then organizations, then org-scoped tables.
 export * from './enums';
+export * from './accounts';
 export * from './organizations';
 export * from './memberships';
 export * from './audit-log';
@@ -42,6 +43,7 @@ export * from './automation-settings';
 export * from './automation-run-log';
 export * from './api-keys';
 
+import { accounts } from './accounts';
 import { organizations } from './organizations';
 import { memberships } from './memberships';
 import { auditLog } from './audit-log';
@@ -121,8 +123,9 @@ export const orgScopedTables = {
   apiKeys,
 } as const;
 
-/** All tables including the tenant root. */
+/** All tables including the tenant root and the above-tenancy account entity. */
 export const allTables = {
+  accounts,
   organizations,
   memberships,
   auditLog,

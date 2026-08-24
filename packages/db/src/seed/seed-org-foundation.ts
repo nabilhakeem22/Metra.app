@@ -2,7 +2,7 @@
 // membership, a seed file, a pending invite, a public API key, and the org-create
 // audit entry. All idempotent; audit is append-only so it self-guards.
 import { createHash } from 'node:crypto';
-import { sql } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import type { MetraDb } from '../client';
 import { apiKeys } from '../schema/api-keys';
 import { auditLog } from '../schema/audit-log';
@@ -13,10 +13,38 @@ import { organizations } from '../schema/organizations';
 import type { OrgSeed } from './seed-org-fixtures';
 
 export async function seedOrgFoundation(tx: MetraDb, org: OrgSeed): Promise<void> {
+  // Mint this org's owning account (above tenancy, A1) via the bootstrap SDF —
+  // the only path that creates an account — then link it 1:1. Idempotent by
+  // design: mint ONLY when the org has no account yet (a fresh org, or a legacy
+  // row still carrying NULL). If it already carries one, reuse it and mint
+  // nothing, so a re-run of seed adds ZERO new accounts.
+  const existingOrg = await tx
+    .select({ accountId: organizations.accountId })
+    .from(organizations)
+    .where(eq(organizations.id, org.orgId));
+  let accountId = existingOrg[0]?.accountId ?? null;
+  if (!accountId) {
+    const rows = (await tx.execute(
+      sql`select id from public.app_bootstrap_account(${org.nameAr}, ${org.nameEn})`,
+    )) as unknown as Array<{ id: string }>;
+    accountId = rows[0].id;
+  }
+
+  // First seed INSERTs the org already linked to its account (WITH CHECK is
+  // bootstrap-open: id = current_org, so this passes before any membership exists).
+  // On a re-seed the org already exists, so DO NOTHING no-ops — and because the
+  // mint above is guarded on the org's existing account_id, nothing is re-minted.
+  // NOTE: we deliberately do NOT ON CONFLICT DO UPDATE here — that would drag in the
+  // organizations UPDATE policy, whose USING requires app_is_current_org_member(),
+  // which is false during bootstrap (owner membership isn't inserted until below) →
+  // the row would be rejected by RLS. Relinking a legacy NULL-account org is both
+  // impossible under this policy pre-membership and unnecessary: migration 0029's
+  // backfill guarantees every existing org already carries an account.
   await tx
     .insert(organizations)
     .values({
       id: org.orgId,
+      accountId,
       nameAr: org.nameAr,
       nameEn: org.nameEn,
       defaultLocale: 'ar-EG',

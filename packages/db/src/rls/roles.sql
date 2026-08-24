@@ -17,6 +17,12 @@ grant metra_app to postgres;
 
 grant usage on schema public to metra_app;
 
+-- accounts (Epic A, A1): SELECT ONLY. metra_app reads its own account via the
+-- account_isolation policy; accounts are CREATED exclusively through the SECURITY
+-- DEFINER app_bootstrap_account() (granted below), never by a direct metra_app
+-- INSERT — no INSERT/UPDATE/DELETE grant, and the policy's WITH CHECK is false.
+grant select on public.accounts to metra_app;
+
 -- Full DML on business tables...
 grant select, insert, update, delete on public.organizations to metra_app;
 grant select, insert, update, delete on public.memberships   to metra_app;
@@ -136,6 +142,13 @@ revoke execute on function public.app_can_bootstrap_membership() from public;
 grant execute on function public.app_claim_invitation(uuid) to metra_app;
 revoke execute on function public.app_claim_invitation(uuid) from public;
 
+-- Account bootstrap (Epic A, A1) — the ONLY path that creates an account row
+-- (SECURITY DEFINER, BYPASSRLS owner). Same least-privilege treatment: metra_app
+-- only, revoke the default PUBLIC execute (+ the Supabase api roles in the guarded
+-- loop below), so anon/authenticated/service_role/public can never call it.
+grant execute on function public.app_bootstrap_account(text, text) to metra_app;
+revoke execute on function public.app_bootstrap_account(text, text) from public;
+
 -- Public API key resolver + last-used stamp (SECURITY DEFINER, live-role model);
 -- same least-privilege treatment. Only metra_app may call them; never anon/public.
 grant execute on function public.app_api_key_by_hash(text) to metra_app;
@@ -171,6 +184,10 @@ begin
       );
       execute format(
         'revoke execute on function public.app_claim_invitation(uuid) from %I',
+        r
+      );
+      execute format(
+        'revoke execute on function public.app_bootstrap_account(text, text) from %I',
         r
       );
       execute format(

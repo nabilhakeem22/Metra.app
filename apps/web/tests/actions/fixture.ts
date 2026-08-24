@@ -29,8 +29,15 @@ export async function seedOrg(opts: {
   members?: Array<{ role: MemberRole }>;
 }): Promise<SeededOrg> {
   const orgId = randomUUID();
+  // Every org owns exactly one account (above tenancy, A1). Seeded over the
+  // BYPASSRLS connection (bypasses the accounts WITH CHECK) then linked; teardown
+  // removes it AFTER the org (FK is on delete restrict).
+  const accountId = randomUUID();
   await pg.unsafe(
-    `insert into public.organizations (id, name_en) values ('${orgId}', 'Test Org')`,
+    `insert into public.accounts (id, name_en) values ('${accountId}', 'Test Org')`,
+  );
+  await pg.unsafe(
+    `insert into public.organizations (id, account_id, name_en) values ('${orgId}', '${accountId}', 'Test Org')`,
   );
 
   // Seed the default automation_settings row (mirrors the 0016 backfill /
@@ -216,7 +223,17 @@ export async function teardown(orgIds: string[]): Promise<void> {
       }
       // `files` is polymorphic (project + client entities) — clear both.
       await tx.unsafe(`delete from public.files where org_id = '${id}'`);
+      // Capture the owning account BEFORE dropping the org, then delete the org,
+      // then the now-unreferenced account (accounts have no org_id; the FK is on
+      // delete restrict, so the account must go AFTER its org).
+      const owned = (await tx.unsafe(
+        `select account_id from public.organizations where id = '${id}'`,
+      )) as unknown as Array<{ account_id: string | null }>;
       await tx.unsafe(`delete from public.organizations where id = '${id}'`);
+      const accountId = owned[0]?.account_id;
+      if (accountId) {
+        await tx.unsafe(`delete from public.accounts where id = '${accountId}'`);
+      }
     }
   });
 }
