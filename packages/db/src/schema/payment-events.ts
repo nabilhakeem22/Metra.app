@@ -6,6 +6,7 @@ import {
   text,
   timestamp,
   unique,
+  uniqueIndex,
   uuid,
   type AnyPgColumn,
 } from 'drizzle-orm/pg-core';
@@ -46,6 +47,10 @@ export const paymentEvents = pgTable(
       .defaultNow(),
     recordedBy: uuid('recorded_by').notNull(),
     note: text('note'),
+    // Optional client-supplied idempotency key (UUID). When present, the partial
+    // unique index below dedups a retried recording; NULL (legacy/keyless) rows
+    // never collide, so the ledger stays append-only for un-keyed payments.
+    idempotencyKey: text('idempotency_key'),
   },
   (t) => [
     unique('payment_events_org_id_id_unique').on(t.orgId, t.id),
@@ -56,6 +61,12 @@ export const paymentEvents = pgTable(
       t.engagementId,
       t.kind,
     ),
+    // Dedup arbiter for keyed payments, scoped per (org, engagement). Partial:
+    // only rows WITH a key participate (first-write-wins via ON CONFLICT DO
+    // NOTHING), so un-keyed appends are unaffected.
+    uniqueIndex('payment_events_idempotency_key_uniq')
+      .on(t.orgId, t.engagementId, t.idempotencyKey)
+      .where(sql`idempotency_key is not null`),
   ],
 );
 

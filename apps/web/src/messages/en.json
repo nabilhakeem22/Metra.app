@@ -346,7 +346,8 @@
     "as_built_not_due": "As-built drawings are not due for this engagement",
     "rom_range_invalid": "Enter a valid low–high build-cost range",
     "rom_not_set": "Enter the build-cost range before recording the client's acknowledgement",
-    "flow_not_enabled": "This flow isn't enabled for your workspace's plan."
+    "flow_not_enabled": "This flow isn't enabled for your workspace's plan.",
+    "payment_kind_mismatch": "This payment type doesn't match the step you're advancing"
   },
   "common": {
     "untranslated": "untranslated",

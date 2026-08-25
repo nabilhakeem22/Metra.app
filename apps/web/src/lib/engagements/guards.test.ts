@@ -7,7 +7,7 @@ import type {
   PaymentEvent,
 } from '@metra/db';
 import { describe, expect, it } from 'vitest';
-import { GUARDS, type GuardFacts } from './guards';
+import { GUARDS, moneyGuardOf, type GuardFacts } from './guards';
 
 // scopeInputsPresent reads only titleAr/titleEn/clientId/projectId, so a partial
 // row cast to the full type is a faithful fixture. The ledger + schedule are
@@ -691,5 +691,22 @@ describe('pendingGuard', () => {
     expect(
       GUARDS.pendingGuard(engagement({ titleAr: null, titleEn: null })),
     ).toEqual({ ok: false, code: 'transition_not_yet_enabled' });
+  });
+});
+
+describe('moneyGuardOf', () => {
+  it('maps each pay-and-advance trigger to its money-milestone guard', () => {
+    expect(moneyGuardOf('confirmAndPayDeposit')).toBe('depositCleared');
+    expect(moneyGuardOf('selectConcept')).toBe('gateAInstallmentCleared');
+    // approveDesign carries romAcknowledged + asBuiltReconciled first, but the
+    // ONLY money guard is gateBInstallmentCleared.
+    expect(moneyGuardOf('approveDesign')).toBe('gateBInstallmentCleared');
+  });
+
+  it('returns null for a trigger with no money-milestone guard', () => {
+    expect(moneyGuardOf('spatialBaseReady')).toBeNull();
+    expect(moneyGuardOf('requestRevision')).toBeNull();
+    expect(moneyGuardOf('confirmConcept')).toBeNull();
+    expect(moneyGuardOf('submitDesignFee')).toBeNull();
   });
 });

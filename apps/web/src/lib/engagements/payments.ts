@@ -11,7 +11,7 @@ import {
   paymentEvents,
   type PaymentEventKind,
 } from '@metra/db';
-import { eq } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import { fail, mutateInOrg } from '@/lib/actions/mutate';
 import type { ActionResult } from '@/lib/actions/result';
 import { MONEY_RE, formatMoney4, parseMoney4 } from '@/lib/aggregates/proposal-totals';
@@ -20,6 +20,11 @@ import { isTerminal } from './states';
 
 const KIND_SET = new Set<string>(PAYMENT_EVENT_KINDS);
 
+// Canonical UUID (mirrors lib/api/ids.ts). A present-but-malformed idempotency
+// key is a coded 'invalid' — we never store a non-UUID as the dedup arbiter.
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export interface RecordPaymentInput {
   engagementId: string;
   kind: PaymentEventKind;
@@ -27,6 +32,14 @@ export interface RecordPaymentInput {
   method?: string | null;
   reference?: string | null;
   note?: string | null;
+  /**
+   * Optional client-supplied idempotency key (UUID). Absent/empty -> a plain
+   * append. A present, well-formed key dedups a retried recording via the partial
+   * unique index: the first write wins, a replay returns the SAME payment id with
+   * `already: true` and records no second row / no second audit. A present but
+   * non-UUID key is rejected with a coded `invalid`.
+   */
+  idempotencyKey?: string | null;
 }
 
 /** Trim a nullable free-text field to a stored value ('' / whitespace -> null). */
@@ -47,7 +60,7 @@ function optionalText(value: string | null | undefined): string | null {
 export async function recordPaymentCore(
   ctx: OrgContext,
   input: RecordPaymentInput,
-): Promise<ActionResult & { data?: string }> {
+): Promise<ActionResult & { data?: string; already?: boolean }> {
   if (typeof input.kind !== 'string' || !KIND_SET.has(input.kind)) {
     return { ok: false, error: 'invalid' };
   }
@@ -63,11 +76,23 @@ export async function recordPaymentCore(
   // numeric(18,4) would otherwise round a >4-decimal input up past what we OK'd.
   const amount = formatMoney4(amount4);
 
+  // Normalise the idempotency key: trim; empty/whitespace/undefined -> null (a
+  // plain append). A present-but-malformed key is a coded 'invalid'.
+  const trimmedKey = input.idempotencyKey?.trim();
+  const idempotencyKey = trimmedKey ? trimmedKey : null;
+  if (idempotencyKey !== null && !UUID_RE.test(idempotencyKey)) {
+    return { ok: false, error: 'invalid' };
+  }
+
   const method = optionalText(input.method);
   const reference = optionalText(input.reference);
   const note = optionalText(input.note);
 
-  return mutateInOrg(
+  // Set inside the tx when a keyed insert loses the ON CONFLICT race (or replays
+  // its own earlier write): the existing row is returned, no second row/audit.
+  let already = false;
+
+  const result = await mutateInOrg(
     ctx,
     { capability: 'engagements_finance', action: 'create', flow: 'interior' },
     async (tx, audit) => {
@@ -80,6 +105,67 @@ export async function recordPaymentCore(
       // No recording a payment against a finished engagement (abandoned / closed).
       if (isTerminal(engagement.state)) fail('engagement_not_active');
 
+      // KEYED PATH — dedup via the partial unique arbiter (first-write-wins).
+      // ON CONFLICT DO NOTHING (not a raised unique violation) so the surrounding
+      // withOrgContext transaction is never aborted — the codebase's established
+      // idempotency idiom (mirrors claimPeriod). This preserves append-only:
+      // never an UPDATE, so a replay keeps the ORIGINAL amount (first-write-wins).
+      if (idempotencyKey !== null) {
+        const inserted = await tx
+          .insert(paymentEvents)
+          .values({
+            orgId: ctx.orgId,
+            engagementId: input.engagementId,
+            kind: input.kind,
+            amount,
+            method,
+            reference,
+            recordedBy: ctx.userId,
+            note,
+            idempotencyKey,
+          })
+          .onConflictDoNothing({
+            // For onConflictDoNothing, `where` is the ARBITER predicate — it
+            // renders `ON CONFLICT (org_id, engagement_id, idempotency_key)
+            // WHERE idempotency_key is not null DO NOTHING`, matching the partial
+            // unique index exactly (targetWhere is a doUpdate-only option).
+            target: [
+              paymentEvents.orgId,
+              paymentEvents.engagementId,
+              paymentEvents.idempotencyKey,
+            ],
+            where: sql`idempotency_key is not null`,
+          })
+          .returning({ id: paymentEvents.id });
+
+        if (inserted.length > 0) {
+          await audit({
+            entity: 'design_engagement',
+            entityId: input.engagementId,
+            action: 'create',
+            before: null,
+            after: { payment_id: inserted[0].id, kind: input.kind, amount },
+          });
+          return inserted[0].id;
+        }
+
+        // Lost the race / replay: return the winning row's id, no second audit.
+        const [existing] = await tx
+          .select({ id: paymentEvents.id })
+          .from(paymentEvents)
+          .where(
+            and(
+              eq(paymentEvents.orgId, ctx.orgId),
+              eq(paymentEvents.engagementId, input.engagementId),
+              eq(paymentEvents.idempotencyKey, idempotencyKey),
+            ),
+          )
+          .limit(1);
+        already = true;
+        return existing.id;
+      }
+
+      // KEYLESS PATH — byte-identical to the original plain append.
       const [row] = await tx
         .insert(paymentEvents)
         .values({
@@ -104,4 +190,6 @@ export async function recordPaymentCore(
       return row.id;
     },
   );
+
+  return result.ok ? { ...result, already } : result;
 }

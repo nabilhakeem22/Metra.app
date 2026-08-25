@@ -18,6 +18,10 @@ import type { ActionCode } from '@/lib/actions/result';
 // Relative (not '@/'): guards.ts is exercised by a PLAIN `vitest run` unit test
 // with no path-alias plugin, so its runtime imports must resolve without '@/'.
 import { parseMoney4, pctOf } from '../aggregates/proposal-totals';
+// Relative import (same client-safe guarantee as guards.ts): the transition
+// registry is pure static data; transitions.ts only type-imports guards.ts back
+// (erased), so this introduces no runtime cycle.
+import { TRANSITIONS, type Trigger } from './transitions';
 
 /**
  * The facts a guard may read. Widened in Step 4 (fee-schedule `milestones` + the
@@ -172,6 +176,25 @@ export const MONEY_GUARD_MILESTONE: Partial<Record<GuardKey, MilestoneKind>> = {
   gateAInstallmentCleared: 'gate_a',
   gateBInstallmentCleared: 'gate_b',
 };
+
+/**
+ * The money-milestone guard a trigger carries, or `null` if it is not a payment
+ * gate. Reads the trigger's declared guard list and returns the FIRST guard that
+ * is a key of {@link MONEY_GUARD_MILESTONE} — so the pay-and-advance core can
+ * verify the recorded payment kind matches the milestone the advance will clear
+ * (blocking a gate_a receipt paired with `confirmAndPayDeposit`, etc.). PURE and
+ * client-safe: reads only the static transition registry.
+ *   - `confirmAndPayDeposit` -> `depositCleared`
+ *   - `selectConcept`        -> `gateAInstallmentCleared`
+ *   - `approveDesign`        -> `gateBInstallmentCleared` (its other guards —
+ *     romAcknowledged, asBuiltReconciled — are not money gates)
+ */
+export function moneyGuardOf(trigger: Trigger): GuardKey | null {
+  for (const guard of TRANSITIONS[trigger].guards) {
+    if (guard in MONEY_GUARD_MILESTONE) return guard;
+  }
+  return null;
+}
 
 /**
  * The engagement's deposit is fully paid — the gate for `confirmAndPayDeposit`.
