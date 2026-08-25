@@ -1244,6 +1244,33 @@
       "approveDesign": "Approve design",
       "rejectDesign": "Reject design"
     },
+    "phase": {
+      "proposal_survey": "Proposal & survey",
+      "concept_layout": "Concept & layout",
+      "threed_approvals": "3D & approvals",
+      "documentation_boq": "Documentation & BOQ",
+      "handoff_execution": "Handoff & execution"
+    },
+    "phaseStatus": {
+      "done": "Done",
+      "current": "In progress",
+      "locked": "Locked",
+      "upcoming": "Upcoming",
+      "rework": "In rework"
+    },
+    "guard": {
+      "scopeInputsPresent": "Scope, client & project set",
+      "depositCleared": "Deposit cleared",
+      "gateAInstallmentCleared": "Gate A payment cleared",
+      "gateBInstallmentCleared": "Gate B payment cleared",
+      "romAcknowledged": "Budget range acknowledged",
+      "asBuiltReconciled": "As-built reconciled",
+      "spatialBaseReady": "Survey or base plan ready",
+      "optionsReady": "Concept options ready",
+      "revisionCosSettled": "Revision charges settled",
+      "rendersPresent": "Approved render ready",
+      "asBuiltDueOpen": "As-built check open"
+    },
     "nextActions": {
       "title": "Next actions",
       "none": "No actions available from this stage."

@@ -1244,6 +1244,33 @@
       "approveDesign": "اعتماد التصميم",
       "rejectDesign": "رفض التصميم"
     },
+    "phase": {
+      "proposal_survey": "العرض والرفع المساحي",
+      "concept_layout": "المفهوم والتوزيع",
+      "threed_approvals": "التصميم ثلاثي الأبعاد والاعتمادات",
+      "documentation_boq": "التوثيق وجدول الكميات",
+      "handoff_execution": "التسليم والتنفيذ"
+    },
+    "phaseStatus": {
+      "done": "مكتمل",
+      "current": "قيد التنفيذ",
+      "locked": "مقفل",
+      "upcoming": "قادم",
+      "rework": "قيد التعديل"
+    },
+    "guard": {
+      "scopeInputsPresent": "النطاق والعميل والمشروع محددة",
+      "depositCleared": "تم تحصيل العربون",
+      "gateAInstallmentCleared": "تم تحصيل دفعة البوابة A",
+      "gateBInstallmentCleared": "تم تحصيل دفعة البوابة B",
+      "romAcknowledged": "تم الإقرار بنطاق الميزانية",
+      "asBuiltReconciled": "تمت مطابقة التنفيذ الفعلي",
+      "spatialBaseReady": "الرفع المساحي أو المخطط الأساسي جاهز",
+      "optionsReady": "خيارات المفهوم جاهزة",
+      "revisionCosSettled": "تمت تسوية رسوم التعديلات",
+      "rendersPresent": "الرندر المعتمد جاهز",
+      "asBuiltDueOpen": "فحص التنفيذ الفعلي مفتوح"
+    },
     "nextActions": {
       "title": "الإجراءات التالية",
       "none": "لا توجد إجراءات متاحة من هذه المرحلة."
