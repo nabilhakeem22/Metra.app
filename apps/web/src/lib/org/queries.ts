@@ -23,12 +23,15 @@ export async function resolveSeeMargin(ctx: OrgContext): Promise<boolean> {
   return canSeeMargin(ctx.role, org?.hide ?? true);
 }
 
-/** A row from the current-user org list (for the org switcher). */
+/** A row from the current-user org list (for the workspace switcher). */
 export interface UserOrgOption {
   orgId: string;
   role: string;
   nameAr: string | null;
   nameEn: string | null;
+  accountId: string | null;
+  accountNameAr: string | null;
+  accountNameEn: string | null;
 }
 
 /** The orgs the current user belongs to (name-ordered) — org-switcher source. */
@@ -37,7 +40,10 @@ export async function listCurrentUserOrgs(
 ): Promise<UserOrgOption[]> {
   return (await withUserContext(userId, (tx) =>
     tx.execute(
-      sql`select org_id as "orgId", role, name_ar as "nameAr", name_en as "nameEn"
+      sql`select org_id as "orgId", role, name_ar as "nameAr", name_en as "nameEn",
+                 account_id as "accountId",
+                 account_name_ar as "accountNameAr",
+                 account_name_en as "accountNameEn"
           from public.app_current_user_orgs()
           order by name_en nulls last, name_ar nulls last`,
     ),
