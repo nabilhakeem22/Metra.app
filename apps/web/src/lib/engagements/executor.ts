@@ -68,7 +68,11 @@ export async function executeTransition(
 
   return mutateInOrg(
     ctx,
-    { capability: def.capability, action: CAPABILITY_ACTION[def.capability] },
+    {
+      capability: def.capability,
+      action: CAPABILITY_ACTION[def.capability],
+      flow: 'interior',
+    },
     async (tx, audit) => {
       const [engagement] = await tx
         .select()

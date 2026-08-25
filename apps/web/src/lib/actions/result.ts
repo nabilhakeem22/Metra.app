@@ -66,7 +66,8 @@ export type ActionCode =
   | 'renders_missing'
   | 'as_built_not_due'
   | 'rom_range_invalid'
-  | 'rom_not_set';
+  | 'rom_not_set'
+  | 'flow_not_enabled';
 
 export interface ActionResult {
   ok: boolean;

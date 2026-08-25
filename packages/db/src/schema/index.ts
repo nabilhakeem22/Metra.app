@@ -42,6 +42,7 @@ export * from './notifications';
 export * from './automation-settings';
 export * from './automation-run-log';
 export * from './api-keys';
+export * from './workspace-entitlements';
 
 import { accounts } from './accounts';
 import { organizations } from './organizations';
@@ -81,6 +82,7 @@ import { notifications } from './notifications';
 import { automationSettings } from './automation-settings';
 import { automationRunLog } from './automation-run-log';
 import { apiKeys } from './api-keys';
+import { workspaceEntitlements } from './workspace-entitlements';
 
 /** Every org-scoped business table (carries org_id). Drives RLS generation. */
 export const orgScopedTables = {
@@ -121,6 +123,7 @@ export const orgScopedTables = {
   automationSettings,
   automationRunLog,
   apiKeys,
+  workspaceEntitlements,
 } as const;
 
 /** All tables including the tenant root and the above-tenancy account entity. */
@@ -164,4 +167,5 @@ export const allTables = {
   automationSettings,
   automationRunLog,
   apiKeys,
+  workspaceEntitlements,
 } as const;

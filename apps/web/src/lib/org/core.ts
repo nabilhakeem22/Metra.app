@@ -11,6 +11,7 @@ import {
   projectTypes,
   sections,
   stageTemplates,
+  workspaceEntitlements,
 } from '@metra/db';
 import { sql } from 'drizzle-orm';
 import { mutateInOrg } from '@/lib/actions/mutate';
@@ -80,6 +81,13 @@ export async function createOrgCore(
     await tx
       .insert(memberships)
       .values({ orgId: ctx.orgId, userId: ctx.userId, role: 'owner' });
+    // Per-workspace entitlements (A2): `interior` enabled. MUST come AFTER the
+    // owner membership insert above — the org_isolation WITH CHECK calls
+    // app_is_current_org_member(), which is false until the membership exists.
+    // Plain INSERT (no conflict path): a brand-new org has no prior row.
+    await tx
+      .insert(workspaceEntitlements)
+      .values({ orgId: ctx.orgId, enabledFlows: ['interior'] });
     // Automation defaults (mirrors the 0016 backfill) so the cron acts on this
     // org from day one; every field is user-configurable in Settings.
     await tx.insert(automationSettings).values({ orgId: ctx.orgId });

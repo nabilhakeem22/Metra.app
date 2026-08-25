@@ -46,7 +46,7 @@ export async function setEngagementRomCore(
 ): Promise<ActionResult> {
   return mutateInOrg(
     ctx,
-    { capability: 'engagements_design', action: 'update' },
+    { capability: 'engagements_design', action: 'update', flow: 'interior' },
     async (tx, audit) => {
       const [engagement] = await tx
         .select({ id: designEngagements.id, state: designEngagements.state })
