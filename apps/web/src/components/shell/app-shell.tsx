@@ -33,7 +33,6 @@ export function AppShell({
   children,
 }: AppShellProps) {
   const shell = useTranslations('shell');
-  const [collapsed, setCollapsed] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
 
   return (
@@ -45,12 +44,12 @@ export function AppShell({
       steps={TOUR_STEPS}
       paused={drawerOpen}
     >
-      {/* Glass wash: the shell paints --bg-base, with the 3-stop radial
-          --bg-wash on an absolute inset-0 layer BEHIND a relative content
-          layer — this is what the glass surfaces refract. One wash per shell;
-          the shell/sidebar reskin itself lands in Slice 2. */}
+      {/* Glass shell: the root paints --bg-base with the 3-stop radial --bg-wash
+          on an absolute inset-0 layer BEHIND a relative content layer — that's
+          what the two floating glass slabs refract. Fixed viewport chrome; the
+          page content scrolls inside the main column. */}
       <div
-        className="relative min-h-screen"
+        className="relative h-screen overflow-hidden"
         style={{ background: 'var(--bg-base)' }}
       >
         <div
@@ -58,23 +57,28 @@ export function AppShell({
           className="pointer-events-none absolute inset-0"
           style={{ background: 'var(--bg-wash)' }}
         />
-        {/* Flex row: sidebar sits at the inline-start (right in RTL) with no absolute
-            positioning — the layout flips automatically with dir. */}
-        <div className="relative flex min-h-screen">
+
+        {/* Content layer: 14px inset + gap so every panel floats — nothing is
+            edge-to-edge. Flex row flips automatically with dir (sidebar on the
+            inline-end/right in RTL). */}
+        <div
+          className="relative flex h-full"
+          style={{ padding: '14px', gap: '14px' }}
+        >
+          {/* Fixed slab at lg+ */}
           <Sidebar
-            className="hidden md:flex"
-            collapsed={collapsed}
-            onToggleCollapse={() => setCollapsed((c) => !c)}
+            className="hidden lg:flex"
             orgs={orgs}
             activeOrgId={activeOrgId}
             role={role}
           />
 
+          {/* Slide-in drawer below lg — the glass slab lives inside a transparent
+              off-canvas sheet so it reads as the same floating panel. */}
           <Sheet open={drawerOpen} onOpenChange={setDrawerOpen}>
-            <SheetContent className="p-0">
+            <SheetContent className="w-[232px] border-0 bg-transparent p-0 shadow-none">
               <SheetTitle className="sr-only">{shell('menu')}</SheetTitle>
               <Sidebar
-                className="w-full border-e-0"
                 onNavigate={() => setDrawerOpen(false)}
                 orgs={orgs}
                 activeOrgId={activeOrgId}
@@ -83,14 +87,17 @@ export function AppShell({
             </SheetContent>
           </Sheet>
 
-          <div className="flex min-w-0 flex-1 flex-col">
+          <div
+            className="flex min-w-0 flex-1 flex-col"
+            style={{ gap: '14px' }}
+          >
             <TopBar
               email={email}
               role={role}
               unreadCount={unreadCount}
               onOpenDrawer={() => setDrawerOpen(true)}
             />
-            <main className="flex-1 p-4 md:p-6">{children}</main>
+            <main className="min-h-0 flex-1 overflow-y-auto">{children}</main>
           </div>
 
           <Toaster />

@@ -1,10 +1,9 @@
 'use client';
 
-import { Check, ChevronDown, Languages, LogOut, Monitor, Moon, Sun } from 'lucide-react';
+import { Check, Languages, LogOut, Monitor, Moon, Sun } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
 import { useTheme } from 'next-themes';
 import { useEffect, useState } from 'react';
-import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -54,18 +53,17 @@ export function UserMenu({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button
+        <button
           type="button"
-          variant="ghost"
-          size="sm"
-          className="gap-2"
           aria-label={shell('userMenu')}
+          className="inline-flex size-8 items-center justify-center rounded-full text-[12px] font-bold text-white"
+          style={{
+            background: 'var(--brand-grad)',
+            boxShadow: 'inset 0 1px 0 rgba(255,255,255,.35)',
+          }}
         >
-          <span className="flex size-7 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary">
-            {initial}
-          </span>
-          <ChevronDown className="size-4 text-muted-foreground" aria-hidden />
-        </Button>
+          {initial}
+        </button>
       </DropdownMenuTrigger>
 
       <DropdownMenuContent align="end" className="min-w-[15rem]">

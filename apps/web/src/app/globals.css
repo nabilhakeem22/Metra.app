@@ -55,7 +55,7 @@
   /* ========== Clear Light (2a) ========== */
   :root,
   [data-theme='light'] {
-    --bg-base: #ebeff5;
+    --bg-base: #eef1f6;
     /* Backdrop is a 3-stop radial wash behind all glass — do not flatten. */
     --bg-wash: radial-gradient(
         110% 85% at 8% 6%,
@@ -65,7 +65,7 @@
       radial-gradient(85% 75% at 92% 10%, #e7e0fb 0%, rgba(231, 224, 251, 0) 58%),
       radial-gradient(95% 80% at 60% 105%, #d6eef2 0%, rgba(214, 238, 242, 0) 60%);
 
-    --glass: rgba(255, 255, 255, 0.55);
+    --glass: rgba(255, 255, 255, 0.58);
     --glass-strong: rgba(255, 255, 255, 0.92); /* active segmented thumb */
     --glass-hairline: rgba(255, 255, 255, 0.8);
     --glass-shadow: 0 16px 40px rgba(23, 34, 57, 0.1);
@@ -137,7 +137,7 @@
 
     --text: #eef2f8;
     --text-body: #c3ccdb;
-    --text-muted: #9aa6ba;
+    --text-muted: #8a96a8;
     --text-faint: #7e8b9f;
 
     --brand-hi: #7ea9ff;
@@ -164,7 +164,7 @@
     --secondary: 218 17% 13%; /* --track solid */
     --secondary-foreground: 216 42% 95%;
     --muted: 218 17% 13%;
-    --muted-foreground: 218 19% 67%; /* #9AA6BA */
+    --muted-foreground: 216 15% 60%; /* #8A96A8 */
     --accent: 218 17% 13%;
     --accent-foreground: 216 42% 95%; /* = foreground */
     --destructive: 5 100% 68%; /* #FF6B5E */

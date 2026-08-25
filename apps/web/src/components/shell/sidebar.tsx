@@ -1,10 +1,9 @@
 'use client';
 
-import { ChevronRight, PanelLeft } from 'lucide-react';
+import { ChevronRight } from 'lucide-react';
 import { useTranslations } from 'next-intl';
-import { useState } from 'react';
+import { useState, type CSSProperties } from 'react';
 import { Wordmark } from '@/components/brand/wordmark';
-import { Button } from '@/components/ui/button';
 import { Link, usePathname } from '@/i18n/routing';
 import { signOut } from '@/lib/auth/actions';
 import { can } from '@/lib/permissions/can';
@@ -14,8 +13,7 @@ import { COMING_SOON_ITEMS, NAV_GROUPS } from './nav-items';
 import { OrgSwitcher, type OrgOption } from './org-switcher';
 
 export interface SidebarProps {
-  collapsed?: boolean;
-  onToggleCollapse?: () => void;
+  /** Called after a nav link is followed — used to close the mobile drawer. */
   onNavigate?: () => void;
   className?: string;
   orgs?: OrgOption[];
@@ -23,9 +21,22 @@ export interface SidebarProps {
   role?: MemberRole;
 }
 
+// The active nav pill: a brand-tinted vertical gradient with a hairline tint
+// border. The gradient is a fixed brand wash (reads correctly on both washes);
+// the border, text and icon colour track the theme via tokens.
+const ACTIVE_ITEM_STYLE: CSSProperties = {
+  background:
+    'linear-gradient(180deg, rgba(90,141,242,.20), rgba(46,107,230,.16))',
+  border: '1px solid var(--brand-tint-border)',
+  boxShadow: 'inset 0 1px 0 rgba(255,255,255,.6)',
+  color: 'var(--brand-ink)',
+};
+
+// Base geometry shared by every nav row (link, disabled, action, disclosure).
+const ITEM_CLASS =
+  'group flex items-center gap-[10px] rounded-[13px] px-[11px] py-[9px] text-sm transition-colors motion-reduce:transition-none';
+
 export function Sidebar({
-  collapsed = false,
-  onToggleCollapse,
   onNavigate,
   className,
   orgs,
@@ -33,192 +44,175 @@ export function Sidebar({
   role,
 }: SidebarProps) {
   const nav = useTranslations('nav');
-  const shell = useTranslations('shell');
   const pathname = usePathname();
   const [soonOpen, setSoonOpen] = useState(false);
 
-  const itemBase =
-    'group flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition-colors';
-
   return (
     <aside
-      className={cn(
-        'flex h-full flex-col gap-4 border-e bg-card p-3',
-        collapsed ? 'w-16' : 'w-64',
-        className,
-      )}
+      className={cn('glass flex h-full flex-col', className)}
+      style={{
+        inlineSize: 'var(--sidebar-w)',
+        flex: 'none',
+        padding: '14px',
+        gap: '16px',
+      }}
     >
-      <div className={cn('flex items-center px-2 py-1', collapsed && 'justify-center')}>
-        {collapsed ? (
-          <span aria-hidden className="size-2.5 rounded-full bg-brand" />
-        ) : (
-          <Wordmark size="sm" />
-        )}
+      {/* Wordmark row */}
+      <div className="flex items-center px-[6px] py-[2px]">
+        <Wordmark />
       </div>
 
-      {!collapsed && orgs && orgs.length > 0 && activeOrgId && (
-        <div className="px-1">
-          <OrgSwitcher orgs={orgs} activeOrgId={activeOrgId} />
-        </div>
+      {/* Org switcher — reskinned to a glass field pill (see org-switcher.tsx) */}
+      {orgs && orgs.length > 0 && activeOrgId && (
+        <OrgSwitcher orgs={orgs} activeOrgId={activeOrgId} />
       )}
 
-      <nav className="flex flex-1 flex-col gap-6 overflow-y-auto">
+      <nav className="flex flex-1 flex-col gap-4 overflow-y-auto">
         {NAV_GROUPS.map((group) => (
-          <div key={group.groupKey} className="flex flex-col gap-1">
-            {!collapsed && group.labelKey && (
-              <p className="px-3 pb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+          <div key={group.groupKey} className="flex flex-col gap-[3px]">
+            {group.labelKey && (
+              <span
+                className="px-[11px] pb-1 text-[11px] font-bold uppercase"
+                style={{ letterSpacing: '.04em', color: 'var(--text-faint)' }}
+              >
                 {nav(group.labelKey)}
-              </p>
+              </span>
             )}
 
             {group.items
               .filter(
                 (item) =>
-                  !item.capability ||
-                  (role && can(role, item.capability, 'read')),
+                  !item.capability || (role && can(role, item.capability, 'read')),
               )
               .map((item) => {
-              const Icon = item.icon;
-              const active =
-                !!item.href &&
-                (pathname === item.href || pathname.startsWith(`${item.href}/`));
+                const Icon = item.icon;
+                const active =
+                  !!item.href &&
+                  (pathname === item.href ||
+                    pathname.startsWith(`${item.href}/`));
 
-              const content = (
-                <>
-                  <Icon className="size-5 shrink-0" aria-hidden />
-                  {!collapsed && (
-                    <span className="flex-1 truncate">{nav(item.key)}</span>
-                  )}
-                  {!collapsed && item.disabled && (
-                    <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
-                      {nav('soon')}
-                    </span>
-                  )}
-                </>
-              );
+                const icon = (
+                  <Icon
+                    width={17}
+                    height={17}
+                    className="shrink-0"
+                    style={active ? { fill: 'var(--brand-ink)' } : undefined}
+                    aria-hidden
+                  />
+                );
 
-              if (item.action === 'signout') {
-                return (
-                  <form key={item.key} action={signOut}>
-                    <button
-                      type="submit"
-                      title={collapsed ? nav(item.key) : undefined}
+                if (item.action === 'signout') {
+                  return (
+                    <form key={item.key} action={signOut}>
+                      <button
+                        type="submit"
+                        className={cn(
+                          ITEM_CLASS,
+                          'w-full font-medium text-[color:var(--text-muted)] hover:bg-[color:var(--track)] hover:text-[color:var(--text)]',
+                        )}
+                      >
+                        {icon}
+                        <span className="flex-1 truncate text-start">
+                          {nav(item.key)}
+                        </span>
+                      </button>
+                    </form>
+                  );
+                }
+
+                if (item.disabled || !item.href) {
+                  return (
+                    <span
+                      key={item.key}
+                      aria-disabled
                       className={cn(
-                        itemBase,
-                        'w-full text-muted-foreground hover:bg-muted hover:text-foreground',
-                        collapsed && 'justify-center',
+                        ITEM_CLASS,
+                        'cursor-not-allowed font-medium text-[color:var(--text-faint)]',
                       )}
                     >
-                      {content}
-                    </button>
-                  </form>
-                );
-              }
+                      {icon}
+                      <span className="flex-1 truncate">{nav(item.key)}</span>
+                    </span>
+                  );
+                }
 
-              if (item.disabled || !item.href) {
                 return (
-                  <span
+                  <Link
                     key={item.key}
-                    aria-disabled
-                    title={collapsed ? nav(item.key) : undefined}
+                    href={item.href}
+                    onClick={onNavigate}
+                    aria-current={active ? 'page' : undefined}
                     className={cn(
-                      itemBase,
-                      'cursor-not-allowed text-muted-foreground/60',
-                      collapsed && 'justify-center',
+                      ITEM_CLASS,
+                      active
+                        ? 'font-semibold'
+                        : 'font-medium text-[color:var(--text-muted)] hover:bg-[color:var(--track)] hover:text-[color:var(--text)]',
                     )}
+                    style={active ? ACTIVE_ITEM_STYLE : undefined}
                   >
-                    {content}
-                  </span>
+                    {icon}
+                    <span className="flex-1 truncate">{nav(item.key)}</span>
+                  </Link>
                 );
-              }
+              })}
 
-              return (
-                <Link
-                  key={item.key}
-                  href={item.href}
-                  onClick={onNavigate}
-                  aria-current={active ? 'page' : undefined}
-                  title={collapsed ? nav(item.key) : undefined}
-                  className={cn(
-                    itemBase,
-                    'relative',
-                    active
-                      ? // copper trace bar at the inline-start marks the active item
-                        'bg-primary/10 text-primary before:absolute before:inset-y-1.5 before:start-0 before:w-[3px] before:rounded-full before:bg-brand'
-                      : 'text-muted-foreground hover:bg-muted hover:text-foreground',
-                    collapsed && 'justify-center',
-                  )}
-                >
-                  {content}
-                </Link>
-              );
-            })}
-
-            {group.groupKey === 'main' && !collapsed && (
-              <div className="mt-1">
+            {/* Coming-soon disclosure lives at the end of the main group. */}
+            {group.groupKey === 'main' && (
+              <div className="mt-[3px] flex flex-col gap-[3px]">
                 <button
                   type="button"
-                  onClick={() => setSoonOpen((o) => !o)}
+                  onClick={() => setSoonOpen((open) => !open)}
                   aria-expanded={soonOpen}
                   className={cn(
-                    itemBase,
-                    'w-full text-muted-foreground hover:bg-muted hover:text-foreground',
+                    ITEM_CLASS,
+                    'w-full font-medium text-[color:var(--text-muted)] hover:bg-[color:var(--track)] hover:text-[color:var(--text)]',
                   )}
                 >
                   <ChevronRight
+                    width={15}
+                    height={15}
                     className={cn(
-                      'size-4 shrink-0 transition-transform motion-reduce:transition-none',
-                      soonOpen && 'rotate-90 rtl:-rotate-90',
+                      'shrink-0 transition-transform motion-reduce:transition-none rtl:-scale-x-100',
+                      soonOpen && 'rotate-90',
                     )}
                     aria-hidden
                   />
-                  <span className="flex-1 text-start">{nav('comingSoon')}</span>
+                  <span className="flex-1 truncate text-start">
+                    {nav('comingSoon')}
+                  </span>
                 </button>
 
-                {soonOpen && (
-                  <div className="mt-1 flex flex-col gap-1">
-                    {COMING_SOON_ITEMS.map((item) => {
-                      const Icon = item.icon;
-                      return (
+                {soonOpen &&
+                  COMING_SOON_ITEMS.map((item) => {
+                    const Icon = item.icon;
+                    return (
+                      <span
+                        key={item.key}
+                        aria-disabled
+                        className={cn(
+                          ITEM_CLASS,
+                          'ms-4 cursor-not-allowed font-medium text-[color:var(--text-faint)]',
+                        )}
+                      >
+                        <Icon width={17} height={17} className="shrink-0" aria-hidden />
+                        <span className="flex-1 truncate">{nav(item.key)}</span>
                         <span
-                          key={item.key}
-                          aria-disabled
-                          className={cn(
-                            itemBase,
-                            'ms-4 cursor-not-allowed text-muted-foreground/50',
-                          )}
+                          className="rounded-full px-2 py-0.5 text-[10px] font-medium"
+                          style={{
+                            background: 'var(--track)',
+                            color: 'var(--text-faint)',
+                          }}
                         >
-                          <Icon className="size-5 shrink-0" aria-hidden />
-                          <span className="flex-1 truncate">
-                            {nav(item.key)}
-                          </span>
-                          <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
-                            {nav('soon')}
-                          </span>
+                          {nav('soon')}
                         </span>
-                      );
-                    })}
-                  </div>
-                )}
+                      </span>
+                    );
+                  })}
               </div>
             )}
           </div>
         ))}
       </nav>
-
-      {onToggleCollapse && (
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          onClick={onToggleCollapse}
-          aria-label={shell('collapse')}
-          className={cn('hidden md:flex', collapsed && 'justify-center')}
-        >
-          <PanelLeft className="size-4" aria-hidden />
-          {!collapsed && <span>{shell('collapse')}</span>}
-        </Button>
-      )}
     </aside>
   );
 }

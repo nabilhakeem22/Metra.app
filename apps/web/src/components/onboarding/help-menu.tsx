@@ -2,7 +2,6 @@
 
 import { HelpCircle } from 'lucide-react';
 import { useTranslations } from 'next-intl';
-import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -25,14 +24,18 @@ export function HelpMenu() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button
+        <button
           type="button"
-          variant="ghost"
-          size="icon"
           aria-label={t('menu')}
+          // Glass icon button (fill + hairline only — no nested blur).
+          className="inline-flex size-[34px] items-center justify-center rounded-[11px] border text-[color:var(--text-muted)] transition-colors hover:text-[color:var(--text)]"
+          style={{
+            background: 'var(--glass)',
+            borderColor: 'var(--glass-hairline)',
+          }}
         >
-          <HelpCircle className="size-5" aria-hidden />
-        </Button>
+          <HelpCircle width={17} height={17} aria-hidden />
+        </button>
       </DropdownMenuTrigger>
 
       <DropdownMenuContent align="end" className="min-w-[14rem]">

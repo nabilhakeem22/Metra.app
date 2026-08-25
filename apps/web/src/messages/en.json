@@ -35,7 +35,9 @@
     "userMenu": "User menu",
     "role": "Role",
     "locale": "Language",
-    "collapse": "Collapse sidebar"
+    "viewTabs": "View",
+    "overview": "Overview",
+    "activity": "Activity"
   },
   "login": {
     "title": "Sign in to Metra",

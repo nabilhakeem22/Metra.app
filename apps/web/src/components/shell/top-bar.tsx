@@ -2,13 +2,12 @@
 
 import { Menu } from 'lucide-react';
 import { useTranslations } from 'next-intl';
-import { Wordmark } from '@/components/brand/wordmark';
 import { HelpMenu } from '@/components/onboarding/help-menu';
-import { Button } from '@/components/ui/button';
 import type { MemberRole } from '@/lib/permissions/roles';
 import { cn } from '@/lib/utils';
 import { LocaleSwitch } from './locale-switch';
 import { NotificationBell } from './notification-bell';
+import { SegmentedTabs } from './segmented-tabs';
 import { UserMenu } from './user-menu';
 
 export interface TopBarProps {
@@ -30,28 +29,33 @@ export function TopBar({
 
   return (
     <header
-      className={cn(
-        'flex items-center gap-3 border-b bg-card/80 px-4 py-3 backdrop-blur',
-        className,
-      )}
+      className={cn('glass flex items-center gap-2', className)}
+      // .glass sets --r-panel; the bar uses the slightly tighter --r-bar.
+      style={{ borderRadius: 'var(--r-bar)', padding: '10px 16px' }}
     >
-      <Button
+      {/* Hamburger opens the sidebar drawer below lg; the fixed slab replaces it
+          at lg+. Glass icon button (fill + hairline only — no nested blur). */}
+      <button
         type="button"
-        variant="ghost"
-        size="icon"
-        className="md:hidden"
         onClick={onOpenDrawer}
         aria-label={shell('menu')}
+        className="inline-flex size-[34px] items-center justify-center rounded-[11px] border text-[color:var(--text-muted)] transition-colors hover:text-[color:var(--text)] lg:hidden"
+        style={{
+          background: 'var(--glass)',
+          borderColor: 'var(--glass-hairline)',
+        }}
       >
-        <Menu className="size-5" aria-hidden />
-      </Button>
+        <Menu width={17} height={17} aria-hidden />
+      </button>
 
-      {/* Brand on mobile (the sidebar is hidden there); no dead search control. */}
-      <div className="md:hidden">
-        <Wordmark size="sm" />
+      <div className="hidden sm:block">
+        <SegmentedTabs />
       </div>
 
-      <div className="ms-auto flex items-center gap-1">
+      <div
+        className="flex items-center gap-[6px]"
+        style={{ marginInlineStart: 'auto' }}
+      >
         <NotificationBell unreadCount={unreadCount} />
         <HelpMenu />
         <LocaleSwitch />
