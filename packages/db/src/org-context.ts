@@ -8,6 +8,12 @@ export interface OrgContext {
   role: MemberRole;
   /** Session user's email — used by the bootstrap-membership RLS check. */
   email?: string;
+  /**
+   * The account that owns the active org (A3). Additive/optional: it does NOT
+   * flow into a GUC and `withOrgContext` ignores it — org isolation stays keyed
+   * on org_id. Undefined when the org is not yet linked to an account.
+   */
+  accountId?: string;
 }
 
 /**

@@ -267,11 +267,12 @@
     "errorGeneric": "Something went wrong. Please try again."
   },
   "org": {
-    "unnamed": "Untitled company",
-    "switcherLabel": "Switch company",
-    "yourCompanies": "Your companies",
-    "createOrJoin": "Create or join another company",
-    "switchError": "Couldn't switch company. Please try again."
+    "account": "Account",
+    "workspaceUnnamed": "Untitled workspace",
+    "switcherLabel": "Switch workspace",
+    "yourWorkspaces": "Your workspaces",
+    "createOrJoin": "Create or join another workspace",
+    "switchError": "Couldn't switch workspace. Please try again."
   },
   "theme": {
     "label": "Theme",

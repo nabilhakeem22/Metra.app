@@ -25,9 +25,14 @@ export async function requireOrg(): Promise<OrgContext> {
 
   const orgs = (await withUserContext(user.id, (tx) =>
     tx.execute(
-      sql`select org_id as "orgId", role from public.app_current_user_orgs()`,
+      sql`select org_id as "orgId", role, account_id as "accountId"
+          from public.app_current_user_orgs()`,
     ),
-  )) as unknown as Array<{ orgId: string; role: MemberRole }>;
+  )) as unknown as Array<{
+    orgId: string;
+    role: MemberRole;
+    accountId: string | null;
+  }>;
 
   if (orgs.length === 0) {
     redirect('/onboarding');
@@ -48,5 +53,10 @@ export async function requireOrg(): Promise<OrgContext> {
     }
   }
 
-  return { orgId: active.orgId, userId: user.id, role: active.role };
+  return {
+    orgId: active.orgId,
+    userId: user.id,
+    role: active.role,
+    accountId: active.accountId ?? undefined,
+  };
 }

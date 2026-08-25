@@ -89,24 +89,34 @@ as $$
   where i.token_hash = p_token_hash
 $$;
 
--- The current user's orgs (with role + display names), for the org switcher and
--- requireOrg's active-org validation. SECURITY DEFINER, scoped to
--- app.current_user_id — returns only the caller's own memberships, no widening.
+-- The current user's orgs (with role, display names + owning account), for the
+-- org switcher and requireOrg's active-org validation. SECURITY DEFINER, scoped
+-- to app.current_user_id — returns only the caller's own memberships, no widening.
+-- Dropped first because the return type gained account columns (A3): create or
+-- replace cannot change a function's return type. The signature (name + 0 args)
+-- is unchanged, so roles.sql re-grants/re-revokes it after this file runs (DROP
+-- resets privileges). LEFT JOIN so an org not yet linked to an account still
+-- returns, with account_* NULL. No policy depends on this function.
+drop function if exists public.app_current_user_orgs();
 create or replace function public.app_current_user_orgs()
 returns table (
   org_id uuid,
   role public.member_role,
   name_ar text,
-  name_en text
+  name_en text,
+  account_id uuid,
+  account_name_ar text,
+  account_name_en text
 )
 language sql
 stable
 security definer
 set search_path = ''
 as $$
-  select m.org_id, m.role, o.name_ar, o.name_en
+  select m.org_id, m.role, o.name_ar, o.name_en, a.id, a.name_ar, a.name_en
   from public.memberships m
   join public.organizations o on o.id = m.org_id
+  left join public.accounts a on a.id = o.account_id
   where m.user_id = nullif(current_setting('app.current_user_id', true), '')::uuid
 $$;
 

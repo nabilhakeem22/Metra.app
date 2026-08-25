@@ -267,11 +267,12 @@
     "errorGeneric": "حدث خطأ ما. من فضلك حاول مرة أخرى."
   },
   "org": {
-    "unnamed": "شركة بدون اسم",
-    "switcherLabel": "تبديل الشركة",
-    "yourCompanies": "شركاتك",
-    "createOrJoin": "أنشئ أو انضم إلى شركة أخرى",
-    "switchError": "تعذّر تبديل الشركة. من فضلك حاول مرة أخرى."
+    "account": "الحساب",
+    "workspaceUnnamed": "مساحة عمل بدون اسم",
+    "switcherLabel": "تبديل مساحة العمل",
+    "yourWorkspaces": "مساحات عملك",
+    "createOrJoin": "أنشئ أو انضم إلى مساحة عمل أخرى",
+    "switchError": "تعذّر تبديل مساحة العمل. من فضلك حاول مرة أخرى."
   },
   "theme": {
     "label": "المظهر",
