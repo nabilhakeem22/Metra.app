@@ -18,10 +18,10 @@ import { pickLocale } from '@/lib/i18n/pick-locale';
 
 const STATUS_STYLE: Record<string, string> = {
   draft: 'bg-muted text-muted-foreground',
-  sent: 'bg-blue-500/10 text-blue-600',
-  accepted: 'bg-emerald-500/10 text-emerald-600',
+  sent: 'bg-[color:var(--brand-tint)] text-[color:var(--brand-ink)]',
+  accepted: 'bg-[color:var(--success-tint)] text-[color:var(--success)]',
   rejected: 'bg-destructive/10 text-destructive',
-  expired: 'bg-amber-500/10 text-amber-600',
+  expired: 'bg-[color:var(--warn-tint)] text-[color:var(--warn)]',
   superseded: 'bg-muted text-muted-foreground',
 };
 

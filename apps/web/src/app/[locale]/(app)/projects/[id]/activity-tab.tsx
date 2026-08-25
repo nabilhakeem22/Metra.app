@@ -60,7 +60,7 @@ export function ActivityTab({
               onChange={(e) => setNote(e.target.value)}
               placeholder={t('notePlaceholder')}
               rows={3}
-              className="w-full rounded-md border border-input bg-background p-2 text-sm"
+              className="w-full glass-field outline-none focus-ring-brand focus-visible:border-[color:hsl(var(--brand))] p-2 text-sm"
               aria-label={t('add')}
             />
             <div className="flex justify-end">

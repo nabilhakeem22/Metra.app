@@ -24,9 +24,9 @@ import { VariationCreateForm } from './variation-create-form';
 
 const VO_STATUS_STYLE: Record<string, string> = {
   draft: 'bg-muted text-muted-foreground',
-  internal_approved: 'bg-amber-500/10 text-amber-600',
-  issued: 'bg-blue-500/10 text-blue-600',
-  approved: 'bg-emerald-500/10 text-emerald-600',
+  internal_approved: 'bg-[color:var(--warn-tint)] text-[color:var(--warn)]',
+  issued: 'bg-[color:var(--brand-tint)] text-[color:var(--brand-ink)]',
+  approved: 'bg-[color:var(--success-tint)] text-[color:var(--success)]',
   rejected: 'bg-destructive/10 text-destructive',
 };
 
@@ -148,7 +148,7 @@ export function VariationRegister({
         </Card>
       ) : (
         <Card>
-          <CardContent className="p-0">
+          <CardContent className="overflow-x-auto p-0">
             <table className="w-full text-sm">
               <tbody>
                 {variations.map((v) => (

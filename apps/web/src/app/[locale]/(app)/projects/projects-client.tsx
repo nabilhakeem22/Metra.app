@@ -28,9 +28,9 @@ export interface ProjectsClientProps {
 
 const STATUS_STYLE: Record<string, string> = {
   draft: 'bg-muted text-muted-foreground',
-  active: 'bg-emerald-500/10 text-emerald-600',
-  on_hold: 'bg-amber-500/10 text-amber-600',
-  completed: 'bg-blue-500/10 text-blue-600',
+  active: 'bg-[color:var(--success-tint)] text-[color:var(--success)]',
+  on_hold: 'bg-[color:var(--warn-tint)] text-[color:var(--warn)]',
+  completed: 'bg-[color:var(--brand-tint)] text-[color:var(--brand-ink)]',
   cancelled: 'bg-destructive/10 text-destructive',
 };
 
@@ -155,7 +155,7 @@ export function ProjectsClient({
         <select
           value={status}
           onChange={(e) => setStatus(e.target.value)}
-          className="h-10 rounded-md border border-input bg-background px-3 text-sm"
+          className="h-10 glass-field outline-none focus-ring-brand focus-visible:border-[color:hsl(var(--brand))] px-3 text-sm"
           aria-label={t('table.status')}
         >
           <option value="all">{t('allStatuses')}</option>

@@ -35,7 +35,7 @@ export interface SectionState {
 export const UNITS = ['sqm', 'linear_meter', 'pcs', 'lump_sum', 'day'];
 
 export const INPUT_CLASS =
-  'h-9 rounded-md border border-input bg-background px-2 text-sm';
+  'h-9 glass-field outline-none focus-ring-brand focus-visible:border-[color:hsl(var(--brand))] px-2 text-sm';
 
 export function move<T>(arr: T[], i: number, dir: -1 | 1): T[] {
   const j = i + dir;

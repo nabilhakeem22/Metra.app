@@ -194,7 +194,7 @@ function StageRow({
           <select
             value={status}
             onChange={(e) => setStatus(e.target.value as StageStatus)}
-            className="h-9 rounded-md border border-input bg-background px-2 text-sm"
+            className="h-9 glass-field outline-none focus-ring-brand focus-visible:border-[color:hsl(var(--brand))] px-2 text-sm"
             aria-label={label(status)}
           >
             {STATUSES.map((st) => (

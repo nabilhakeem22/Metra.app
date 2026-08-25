@@ -63,7 +63,7 @@ export function PriceBookToolbar({
       <select
         value={sectionFilter}
         onChange={(e) => onSectionFilterChange(e.target.value)}
-        className="h-10 rounded-md border border-input bg-background px-3 text-sm"
+        className="h-10 glass-field outline-none focus-ring-brand focus-visible:border-[color:hsl(var(--brand))] px-3 text-sm"
         aria-label={t('table.section')}
       >
         <option value="all">{t('allCategories')}</option>

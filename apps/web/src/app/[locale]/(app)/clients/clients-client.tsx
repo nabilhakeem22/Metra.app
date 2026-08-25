@@ -167,7 +167,7 @@ export function ClientsClient({ items, canManage }: ClientsClientProps) {
                         <span
                           className={
                             c.active
-                              ? 'rounded-full bg-emerald-500/10 px-2 py-0.5 text-xs text-emerald-600'
+                              ? 'rounded-full bg-[color:var(--success-tint)] px-2 py-0.5 text-xs text-[color:var(--success)]'
                               : 'rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground'
                           }
                         >

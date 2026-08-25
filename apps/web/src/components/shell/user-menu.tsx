@@ -56,7 +56,7 @@ export function UserMenu({
         <button
           type="button"
           aria-label={shell('userMenu')}
-          className="inline-flex size-8 items-center justify-center rounded-full text-[12px] font-bold text-white"
+          className="inline-flex size-8 items-center justify-center rounded-full text-[12px] font-bold text-white outline-none focus-ring-brand"
           style={{
             background: 'var(--brand-grad)',
             boxShadow: 'inset 0 1px 0 rgba(255,255,255,.35)',

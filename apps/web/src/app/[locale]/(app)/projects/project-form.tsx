@@ -133,7 +133,7 @@ export function ProjectForm({
   }
 
   const selectClass =
-    'h-10 w-full rounded-md border border-input bg-background px-3 text-sm';
+    'h-10 w-full glass-field outline-none focus-ring-brand focus-visible:border-[color:hsl(var(--brand))] px-3 text-sm';
   const noClients = clientOptions.length === 0;
 
   return (

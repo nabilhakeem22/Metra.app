@@ -156,7 +156,7 @@ export function ImportWizard({
   }
 
   const selectClass =
-    'h-9 w-full rounded-md border border-input bg-background px-2 text-sm';
+    'h-9 w-full glass-field outline-none focus-ring-brand focus-visible:border-[color:hsl(var(--brand))] px-2 text-sm';
 
   return (
     <Sheet open={open} onOpenChange={(o) => (o ? onOpenChange(true) : close())}>
@@ -272,7 +272,7 @@ export function ImportWizard({
                         </td>
                         <td className="px-2 py-1.5">
                           {r.ok ? (
-                            <span className="text-emerald-600">
+                            <span className="text-[color:var(--success)]">
                               {t('import.willImport')}
                             </span>
                           ) : (
