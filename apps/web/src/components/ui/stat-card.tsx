@@ -1,5 +1,4 @@
 import type { ReactNode } from 'react';
-import { Card } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 
 export interface StatCardProps {
@@ -35,10 +34,13 @@ export function StatCard({
       ? 'bg-brand-strong text-brand-foreground'
       : 'bg-primary text-primary-foreground';
 
+  // FLAT panel (opaque bg-card, no backdrop-filter): KPI grids repeat StatCard,
+  // so keeping it flat protects the ≤6 blurred-surfaces-per-screen budget. Only
+  // Card itself is a blurred .glass panel.
   return (
-    <Card
+    <div
       className={cn(
-        'p-5',
+        'rounded-panel border border-[color:var(--glass-hairline)] bg-card p-5 shadow-glass',
         isGradient ? cn('border-transparent shadow-card', strong) : '',
         className,
       )}
@@ -55,7 +57,7 @@ export function StatCard({
         {icon && (
           <div
             className={cn(
-              'flex size-10 shrink-0 items-center justify-center rounded-xl',
+              'flex size-10 shrink-0 items-center justify-center rounded-item',
               isGradient
                 ? 'bg-white/15 text-current'
                 : 'bg-muted text-muted-foreground',
@@ -68,7 +70,7 @@ export function StatCard({
 
       <p
         className={cn(
-          'tabular mt-3 text-3xl font-bold tracking-tight',
+          'tabular mt-3 text-3xl font-bold',
           isGradient ? 'text-current' : 'text-foreground',
         )}
       >
@@ -85,6 +87,6 @@ export function StatCard({
           {hint}
         </p>
       )}
-    </Card>
+    </div>
   );
 }

@@ -33,17 +33,19 @@ export function Gauge({
         role="img"
         aria-label={centerLabel ?? emptyLabel}
       >
-        {/* Track */}
+        {/* Track — theme-aware --gauge-track (light .10 / dark .12), 14px round
+            cap. var() resolves through the CSS `stroke` PROPERTY (style/class),
+            not the SVG presentation attribute — so it's set via style. */}
         <path
           d={ARC_PATH}
           fill="none"
           strokeWidth={14}
           strokeLinecap="round"
-          className="stroke-muted"
+          style={{ stroke: 'var(--gauge-track)' }}
         />
 
-        {/* Value arc — RTL: mirror ONLY this group in place so it fills from the
-            inline-start. Legend/number text below stays un-mirrored. */}
+        {/* Value arc in --brand — RTL: mirror ONLY this group in place so it fills
+            from the inline-start. Legend/number text below stays un-mirrored. */}
         {!isEmpty && (
           <g className="origin-center [transform-box:view-box] rtl:-scale-x-100">
             <path
@@ -51,7 +53,7 @@ export function Gauge({
               fill="none"
               strokeWidth={14}
               strokeLinecap="round"
-              className="stroke-[hsl(var(--primary))]"
+              style={{ stroke: 'hsl(var(--brand))' }}
               strokeDasharray={`${filled} ${ARC_LENGTH}`}
             />
           </g>
@@ -63,7 +65,8 @@ export function Gauge({
             x="100"
             y="92"
             textAnchor="middle"
-            className="tabular fill-foreground text-2xl font-bold"
+            className="tabular text-2xl font-bold"
+            style={{ fill: 'var(--text)' }}
           >
             {Math.round(clamped)}%
           </text>

@@ -73,14 +73,9 @@ export function OrgSwitcher({
           type="button"
           disabled={isPending}
           aria-label={t('switcherLabel')}
-          // Glass FIELD (fill + hairline only — never the .glass blur recipe, to
-          // avoid nesting a blurred surface inside the sidebar).
-          className="flex w-full items-center justify-between gap-2 rounded-[13px] border px-[10px] py-[8px] transition-colors disabled:opacity-60"
-          style={{
-            background: 'var(--glass)',
-            borderColor: 'var(--glass-hairline)',
-            boxShadow: 'inset 0 1px 0 rgba(255,255,255,.8)',
-          }}
+          // Glass FIELD (shared .glass-field: fill + hairline only, never the
+          // .glass blur recipe, so it doesn't nest blur inside the sidebar).
+          className="glass-field flex w-full items-center justify-between gap-2 px-[10px] py-[8px] outline-none focus-ring-brand disabled:opacity-60"
         >
           <span className="truncate text-[13px] font-semibold text-[color:var(--text)]">
             {active ? nameOf(active) : t('workspaceUnnamed')}

@@ -86,11 +86,28 @@
     --brand-tint: rgba(46, 107, 230, 0.14);
     --brand-tint-border: rgba(46, 107, 230, 0.2);
     --brand-glow: 0 8px 20px rgba(46, 107, 230, 0.3);
+    /* Primary-button lift (hover, shadow y+2) and press (active, halved). */
+    --brand-glow-lift: 0 10px 22px rgba(46, 107, 230, 0.34);
+    --brand-glow-press: 0 4px 10px rgba(46, 107, 230, 0.3);
+    /* Secondary-button flat glass fill (no backdrop-filter) + hover (+.08). */
+    --glass-btn: rgba(255, 255, 255, 0.62);
+    --glass-btn-hover: rgba(255, 255, 255, 0.7);
 
     --rule: rgba(23, 34, 57, 0.08);
     --rule-soft: rgba(23, 34, 57, 0.06);
     --track: rgba(23, 34, 57, 0.07); /* segmented / chip background */
     --danger: #d93b34;
+
+    /* Semantic status (chips/badges) — NOT the brand accent. Ink + soft tint
+       per family so done/warn/danger read distinctly on a glass surface. */
+    --success: #128a5f;
+    --success-tint: rgba(18, 138, 95, 0.14);
+    --warn: #b4791f;
+    --warn-tint: rgba(180, 121, 31, 0.15);
+    --danger-tint: rgba(217, 59, 52, 0.13);
+
+    /* Gauge arc track (behind the --brand progress arc). */
+    --gauge-track: rgba(23, 34, 57, 0.1);
 
     /* ---- shadcn bridge (light) — every var the app's Tailwind colors read ---- */
     --background: 216 33% 94%; /* #EBEFF5 */
@@ -146,11 +163,25 @@
     --brand-tint: rgba(109, 154, 245, 0.22);
     --brand-tint-border: rgba(109, 154, 245, 0.34);
     --brand-glow: 0 6px 18px rgba(109, 154, 245, 0.28);
+    --brand-glow-lift: 0 8px 20px rgba(109, 154, 245, 0.32);
+    --brand-glow-press: 0 3px 9px rgba(109, 154, 245, 0.28);
+    --glass-btn: rgba(255, 255, 255, 0.1);
+    --glass-btn-hover: rgba(255, 255, 255, 0.18);
 
     --rule: rgba(255, 255, 255, 0.1);
     --rule-soft: rgba(255, 255, 255, 0.07);
     --track: rgba(255, 255, 255, 0.07);
     --danger: #ff6b5e;
+
+    /* Semantic status (dark). Lightened inks stay AA over the smoked glass. */
+    --success: #4fd9a0;
+    --success-tint: rgba(79, 217, 160, 0.16);
+    --warn: #e0a34f;
+    --warn-tint: rgba(224, 163, 79, 0.16);
+    --danger-tint: rgba(255, 107, 94, 0.18);
+
+    /* Gauge arc track (dark). */
+    --gauge-track: rgba(255, 255, 255, 0.12);
 
     /* ---- shadcn bridge (dark) ---- */
     --background: 220 38% 6%; /* #0A0E16 */
@@ -240,6 +271,23 @@
   }
   html[dir='rtl'] {
     --font-sans: var(--font-arabic);
+    /* Arabic (Tajawal) NEVER takes negative tracking. Zeroing the two display
+       trackings here makes every .text-display / .text-title utility RTL-safe
+       automatically; figure tracking (--tracking-num) stays — numerals are
+       Western and rendered LTR. */
+    --tracking-display: 0;
+    --tracking-title: 0;
+  }
+
+  /* Arabic runs small and tall: body one step up (16px) with generous leading;
+     headings a touch looser than the Latin 1.05. Scoped to RTL only. */
+  html[dir='rtl'] body {
+    font-size: 16px;
+    line-height: 1.8;
+  }
+  html[dir='rtl'] .text-display,
+  html[dir='rtl'] .text-title {
+    line-height: 1.3;
   }
 
   * {
@@ -284,7 +332,9 @@
 }
 
 @layer components {
-  /* The one recipe every glass surface uses. Never nest .glass in .glass. */
+  /* The one recipe every glass surface uses. Never nest .glass in .glass.
+     This is the ONLY primitive that applies backdrop-filter — every other
+     interactive primitive below layers a flat fill so we never nest blur. */
   .glass {
     background: var(--glass);
     backdrop-filter: var(--glass-blur);
@@ -293,11 +343,75 @@
     box-shadow: var(--glass-shadow), var(--glass-inner);
     border-radius: var(--r-panel);
   }
+
+  /* Flat glass FIELD — fill + hairline only, NO backdrop-filter, so it can sit
+     inside a .glass panel without nesting blur. Inputs, selects, org switcher. */
+  .glass-field {
+    background: var(--glass);
+    border: 1px solid var(--glass-hairline);
+    border-radius: var(--r-item);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5);
+    color: var(--text);
+    transition:
+      background 0.16s cubic-bezier(0.2, 0.8, 0.2, 1),
+      border-color 0.16s cubic-bezier(0.2, 0.8, 0.2, 1),
+      box-shadow 0.16s cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+  .glass-field::placeholder {
+    color: var(--text-faint);
+  }
+
+  /* Flat glass ICON BUTTON — 34px, --r-icon, fill + hairline (no nested blur). */
+  .glass-icon-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    inline-size: 34px;
+    block-size: 34px;
+    border-radius: var(--r-icon);
+    background: var(--glass);
+    border: 1px solid var(--glass-hairline);
+    color: var(--text-muted);
+    transition:
+      background 0.16s cubic-bezier(0.2, 0.8, 0.2, 1),
+      color 0.16s cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+  .glass-icon-btn:hover {
+    color: var(--text);
+    background: var(--glass-strong);
+  }
 }
 
 @layer utilities {
-  /* Tabular figures for money / metric / ledger values. */
+  /* Tabular figures for money / metric / ledger values — tightened tracking so
+     column figures align optically (numerals are Western + LTR in both locales). */
   .tabular {
     font-variant-numeric: tabular-nums;
+    letter-spacing: var(--tracking-num);
+  }
+
+  /* ---- Type scale (LTR trackings; RTL zeroes display/title trackings above) ---- */
+  .text-display {
+    font-weight: 700;
+    letter-spacing: var(--tracking-display);
+    line-height: 1.05;
+  }
+  .text-title {
+    font-weight: 700;
+    letter-spacing: var(--tracking-title);
+  }
+  .text-meta {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+  }
+
+  /* Brand focus ring, visible over glass: 2px --brand at 2px offset. Pair with
+     Tailwind `outline-none` (which sets a transparent 2px/offset-2 outline).
+     --brand is an H S% L% triplet (Tailwind bridge), so wrap it in hsl(). */
+  .focus-ring-brand:focus-visible {
+    outline-color: hsl(var(--brand));
   }
 }
