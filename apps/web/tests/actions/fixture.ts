@@ -113,6 +113,14 @@ export async function seedOrg(opts: {
     );
   }
 
+  // Per-workspace entitlements (A2): the `interior` flow enabled, so the flow-
+  // gated cores (engagements) proceed for the fixture org. Seeded over the
+  // BYPASSRLS connection (like accounts) AFTER the memberships above.
+  await pg.unsafe(
+    `insert into public.workspace_entitlements (org_id, enabled_flows)
+     values ('${orgId}', '{interior}')`,
+  );
+
   return { orgId, ownerIds, memberIds };
 }
 
@@ -209,6 +217,8 @@ const TEARDOWN_TABLES_IN_FK_ORDER = [
   'audit_log',
   'invitations',
   'api_keys',
+  // workspace_entitlements references organizations (restrict) -> before the org.
+  'workspace_entitlements',
   'memberships',
 ];
 

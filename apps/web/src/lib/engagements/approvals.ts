@@ -88,7 +88,7 @@ export async function recordRomAcknowledgementCore(
 
   return mutateInOrg(
     ctx,
-    { capability: 'engagements_design', action: 'create' },
+    { capability: 'engagements_design', action: 'create', flow: 'interior' },
     async (tx, audit) => {
       const [engagement] = await tx
         .select({

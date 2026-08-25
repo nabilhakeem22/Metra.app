@@ -69,7 +69,7 @@ export async function recordPaymentCore(
 
   return mutateInOrg(
     ctx,
-    { capability: 'engagements_finance', action: 'create' },
+    { capability: 'engagements_finance', action: 'create', flow: 'interior' },
     async (tx, audit) => {
       const [engagement] = await tx
         .select({ id: designEngagements.id, state: designEngagements.state })

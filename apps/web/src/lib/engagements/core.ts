@@ -47,7 +47,7 @@ export async function createEngagementCore(
 
   return mutateInOrg(
     ctx,
-    { capability: 'engagements_design', action: 'create' },
+    { capability: 'engagements_design', action: 'create', flow: 'interior' },
     async (tx, audit) => {
       const [client] = await tx
         .select({ id: clients.id })

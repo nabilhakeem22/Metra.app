@@ -10,6 +10,7 @@ import { files } from '../schema/files';
 import { invitations } from '../schema/invitations';
 import { memberships } from '../schema/memberships';
 import { organizations } from '../schema/organizations';
+import { workspaceEntitlements } from '../schema/workspace-entitlements';
 import type { OrgSeed } from './seed-org-fixtures';
 
 export async function seedOrgFoundation(tx: MetraDb, org: OrgSeed): Promise<void> {
@@ -54,6 +55,16 @@ export async function seedOrgFoundation(tx: MetraDb, org: OrgSeed): Promise<void
   await tx
     .insert(memberships)
     .values({ orgId: org.orgId, userId: org.userId, role: 'owner' })
+    .onConflictDoNothing();
+
+  // Per-workspace entitlements (A2): `interior` enabled. MUST come AFTER the owner
+  // membership — the org_isolation WITH CHECK calls app_is_current_org_member(),
+  // false until the membership exists. onConflictDoNothing (unique org_id) makes a
+  // re-seed a no-op; NEVER onConflictDoUpdate (the UPDATE arm pulls in the policy
+  // USING → membership → RLS rejection under this bootstrap context).
+  await tx
+    .insert(workspaceEntitlements)
+    .values({ orgId: org.orgId, enabledFlows: ['interior'] })
     .onConflictDoNothing();
 
   await tx

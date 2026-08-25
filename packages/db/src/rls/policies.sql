@@ -658,6 +658,35 @@ create policy org_isolation on public.automation_run_log
     and public.app_is_current_org_member()
   );
 
+-- workspace_entitlements (Epic A2; per-workspace flow/limit/feature grant —
+-- standard org_isolation, copied verbatim from the engagement_change_orders
+-- block). Full DML granted (a plan change edits the row); NEVER written via
+-- INSERT ... ON CONFLICT DO UPDATE during bootstrap — the UPDATE arm pulls in
+-- this policy's USING (membership second factor), which is false before the owner
+-- membership exists.
+alter table public.workspace_entitlements enable row level security;
+alter table public.workspace_entitlements force  row level security;
+drop policy if exists org_isolation on public.workspace_entitlements;
+create policy org_isolation on public.workspace_entitlements
+  using (
+    org_id = nullif(current_setting('app.current_org_id', true), '')::uuid
+    and public.app_is_current_org_member()
+  )
+  with check (
+    org_id = nullif(current_setting('app.current_org_id', true), '')::uuid
+    and public.app_is_current_org_member()
+  );
+
+-- S1 (Epic A2) — organizations.account_id is immutable once set. Fires BEFORE
+-- UPDATE (row-level) and raises MT110 if a set account_id changes. Attached here
+-- (apply-rls), NEVER in the migration.
+drop trigger if exists trg_organizations_account_immutable on public.organizations;
+create trigger trg_organizations_account_immutable
+  before update on public.organizations
+  for each row
+  when (old.account_id is distinct from new.account_id)
+  execute function public.enforce_account_id_immutable();
+
 -- Proposals are frozen once they leave 'draft': only a whitelisted status
 -- transition may change the row (nothing else), enforced by the shared factory.
 drop trigger if exists trg_proposals_immutable on public.proposals;

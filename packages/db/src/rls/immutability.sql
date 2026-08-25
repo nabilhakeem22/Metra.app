@@ -60,3 +60,27 @@ begin
     using errcode = 'MT100';
 end
 $$;
+
+-- S1 (Epic A2) — organizations.account_id is immutable ONCE SET. The A1 mapping
+-- is 1:1 and billing lands on the account, so re-pointing an org to a different
+-- account (or unlinking it) must never happen after the link exists. A NULL ->
+-- non-null link is still permitted (the additive A1 window / a legacy backfill),
+-- and a no-op UPDATE that leaves account_id unchanged passes. Raises SQLSTATE
+-- MT110 (reserved: account_id immutability) on any attempt to change a set value.
+-- SECURITY DEFINER + empty search_path (schema-qualify everything) so it runs
+-- identically regardless of the caller's role or search_path. Idempotent.
+create or replace function public.enforce_account_id_immutable()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if OLD.account_id is not null
+     and NEW.account_id is distinct from OLD.account_id then
+    raise exception 'organizations.account_id is immutable once set'
+      using errcode = 'MT110';
+  end if;
+  return NEW;
+end
+$$;

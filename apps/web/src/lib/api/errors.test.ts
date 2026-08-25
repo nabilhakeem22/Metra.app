@@ -76,6 +76,7 @@ const ALL_CODES: ActionCode[] = [
   'as_built_not_due',
   'rom_range_invalid',
   'rom_not_set',
+  'flow_not_enabled',
 ];
 
 describe('problem+json envelope', () => {

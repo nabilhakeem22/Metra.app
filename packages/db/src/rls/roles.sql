@@ -73,6 +73,17 @@ grant select, insert, update on public.notifications to metra_app;
 -- api_keys (Public API v1): mint (insert), list (select), revoke + last_used
 -- stamp (update). NO delete — revocation sets revoked_at, keys are never removed.
 grant select, insert, update on public.api_keys to metra_app;
+-- workspace_entitlements (Epic A2): the per-workspace flow/limit/feature row is
+-- written ONCE at bootstrap (createOrg / seed INSERT after the owner membership)
+-- and never edited by any v1 code path, so INSERT-only. This is load-bearing:
+-- leaving UPDATE/DELETE granted would let a member self-escalate their own plan
+-- (grant themselves a flow, raise a limit, flip a feature) directly under
+-- metra_app. The revoke removes any earlier full-DML grant on already-provisioned
+-- DBs; it is a no-op on a fresh DB. When a plan-management path is built it will
+-- add a narrow SECURITY DEFINER writer (like accounts' app_bootstrap_account),
+-- not a broad grant here.
+grant select, insert on public.workspace_entitlements to metra_app;
+revoke update, delete on public.workspace_entitlements from metra_app;
 
 -- ...except audit_log and the append-only logs (price history, proposal events,
 -- the automation idempotency claim log). No UPDATE / DELETE grant, so any attempt
@@ -99,6 +110,9 @@ grant execute on function public.enforce_same_org() to metra_app;
 
 -- Immutability trigger factory (status-locked business rows).
 grant execute on function public.enforce_immutable_when() to metra_app;
+
+-- S1 (Epic A2): organizations.account_id immutability trigger fn.
+grant execute on function public.enforce_account_id_immutable() to metra_app;
 
 -- Proposals (P1 Slice 3): child-draft guard trigger fn + public token SDFs. The
 -- token functions run on the PUBLIC accept path (no session) via the base
