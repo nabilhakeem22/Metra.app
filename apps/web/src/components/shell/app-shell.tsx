@@ -45,42 +45,56 @@ export function AppShell({
       steps={TOUR_STEPS}
       paused={drawerOpen}
     >
-      {/* Flex row: sidebar sits at the inline-start (right in RTL) with no absolute
-          positioning — the layout flips automatically with dir. */}
-      <div className="flex min-h-screen bg-background">
-        <Sidebar
-          className="hidden md:flex"
-          collapsed={collapsed}
-          onToggleCollapse={() => setCollapsed((c) => !c)}
-          orgs={orgs}
-          activeOrgId={activeOrgId}
-          role={role}
+      {/* Glass wash: the shell paints --bg-base, with the 3-stop radial
+          --bg-wash on an absolute inset-0 layer BEHIND a relative content
+          layer — this is what the glass surfaces refract. One wash per shell;
+          the shell/sidebar reskin itself lands in Slice 2. */}
+      <div
+        className="relative min-h-screen"
+        style={{ background: 'var(--bg-base)' }}
+      >
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0"
+          style={{ background: 'var(--bg-wash)' }}
         />
-
-        <Sheet open={drawerOpen} onOpenChange={setDrawerOpen}>
-          <SheetContent className="p-0">
-            <SheetTitle className="sr-only">{shell('menu')}</SheetTitle>
-            <Sidebar
-              className="w-full border-e-0"
-              onNavigate={() => setDrawerOpen(false)}
-              orgs={orgs}
-              activeOrgId={activeOrgId}
-              role={role}
-            />
-          </SheetContent>
-        </Sheet>
-
-        <div className="flex min-w-0 flex-1 flex-col">
-          <TopBar
-            email={email}
+        {/* Flex row: sidebar sits at the inline-start (right in RTL) with no absolute
+            positioning — the layout flips automatically with dir. */}
+        <div className="relative flex min-h-screen">
+          <Sidebar
+            className="hidden md:flex"
+            collapsed={collapsed}
+            onToggleCollapse={() => setCollapsed((c) => !c)}
+            orgs={orgs}
+            activeOrgId={activeOrgId}
             role={role}
-            unreadCount={unreadCount}
-            onOpenDrawer={() => setDrawerOpen(true)}
           />
-          <main className="flex-1 p-4 md:p-6">{children}</main>
-        </div>
 
-        <Toaster />
+          <Sheet open={drawerOpen} onOpenChange={setDrawerOpen}>
+            <SheetContent className="p-0">
+              <SheetTitle className="sr-only">{shell('menu')}</SheetTitle>
+              <Sidebar
+                className="w-full border-e-0"
+                onNavigate={() => setDrawerOpen(false)}
+                orgs={orgs}
+                activeOrgId={activeOrgId}
+                role={role}
+              />
+            </SheetContent>
+          </Sheet>
+
+          <div className="flex min-w-0 flex-1 flex-col">
+            <TopBar
+              email={email}
+              role={role}
+              unreadCount={unreadCount}
+              onOpenDrawer={() => setDrawerOpen(true)}
+            />
+            <main className="flex-1 p-4 md:p-6">{children}</main>
+          </div>
+
+          <Toaster />
+        </div>
       </div>
     </TourProvider>
   );

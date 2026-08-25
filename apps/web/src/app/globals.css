@@ -3,86 +3,196 @@
 @tailwind utilities;
 
 @layer base {
-  /* Light — warm paper canvas, teal ink, copper accent. */
+  /* ============================================================
+     Metra — Glass UI tokens (Clear Light + Smoked Dark).
+     Palette lifted verbatim from the design handoff
+     (metra-glass-tokens.css). Each theme block also carries the
+     shadcn "bridge": the H S% L% triplets that the app's Tailwind
+     `hsl(var(--x))` colors consume. A missing bridge var = a black
+     or transparent surface, so every semantic var the app reads is
+     defined in BOTH the light and dark blocks below.
+     ============================================================ */
+
+  /* ---- Theme-independent: type, radii, blur, spacing ---- */
   :root {
-    --background: 40 30% 97%;
-    --foreground: 198 28% 14%;
+    /* Type — Latin points at the next/font Manrope var, Arabic at the
+       Tajawal var. next/font hashes the family names, so these MUST be
+       referenced as CSS vars, never as the bare "Manrope"/"Tajawal". */
+    --font-latin: -apple-system, 'SF Pro Text', 'SF Pro Display',
+      var(--font-manrope), system-ui, sans-serif;
+    --font-latin-display: -apple-system, 'SF Pro Display',
+      var(--font-manrope), system-ui, sans-serif;
+    --font-arabic: var(--font-tajawal), -apple-system, sans-serif;
+    --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
 
-    --card: 40 33% 99%;
-    --card-foreground: 198 28% 14%;
+    --tracking-display: -0.045em; /* 28px+ Latin display */
+    --tracking-title: -0.03em; /* 20–27px Latin */
+    --tracking-num: -0.02em; /* tabular figures */
+    /* Arabic (Tajawal) never gets negative tracking. LH 1.3 head / 1.8 body. */
 
-    --popover: 40 33% 99%;
-    --popover-foreground: 198 28% 14%;
+    /* Radii (squircle scale) */
+    --r-frame: 26px; /* app viewport / window */
+    --r-panel: 20px; /* cards, sidebar slab */
+    --r-bar: 18px; /* top bar */
+    --r-item: 13px; /* nav item, input, small tile */
+    --r-icon: 11px; /* 34px icon button */
+    --r-pill: 999px; /* all buttons, chips, segmented */
 
-    --primary: 196 44% 23%;
-    --primary-foreground: 40 30% 97%;
+    /* Blur */
+    --glass-blur: blur(30px) saturate(180%);
+    --glass-blur-sm: blur(14px);
 
-    --secondary: 40 20% 93%;
-    --secondary-foreground: 198 28% 18%;
+    /* Spacing */
+    --gap-shell: 14px; /* padding + gap of the app shell grid */
+    --gap-panel: 14px;
+    --pad-panel: 16px 20px;
+    --sidebar-w: 232px;
 
-    --muted: 40 18% 92%;
-    --muted-foreground: 198 13% 36%;
-
-    --accent: 30 40% 91%;
-    --accent-foreground: 198 28% 16%;
-
-    --destructive: 4 66% 44%;
-    --destructive-foreground: 40 30% 97%;
-
-    --border: 38 16% 87%;
-    --input: 38 16% 85%;
-    --ring: 196 44% 30%;
-
-    /* Copper brand: --brand for lines/marks/active indicators/icon accents;
-       --brand-strong for any copper fill that carries text (never raw --brand). */
-    --brand: 22 68% 42%;
-    --brand-foreground: 40 30% 97%;
-    --brand-strong: 22 72% 33%;
-
+    /* shadcn radius scale anchor (kept from the prior theme). */
     --radius: 0.625rem;
   }
 
-  /* Dark — ink canvas. */
-  .dark {
-    --background: 200 28% 9%;
-    --foreground: 40 22% 92%;
+  /* ========== Clear Light (2a) ========== */
+  :root,
+  [data-theme='light'] {
+    --bg-base: #ebeff5;
+    /* Backdrop is a 3-stop radial wash behind all glass — do not flatten. */
+    --bg-wash: radial-gradient(
+        110% 85% at 8% 6%,
+        #d8e5ff 0%,
+        rgba(216, 229, 255, 0) 55%
+      ),
+      radial-gradient(85% 75% at 92% 10%, #e7e0fb 0%, rgba(231, 224, 251, 0) 58%),
+      radial-gradient(95% 80% at 60% 105%, #d6eef2 0%, rgba(214, 238, 242, 0) 60%);
 
-    --card: 200 26% 12%;
-    --card-foreground: 40 22% 92%;
+    --glass: rgba(255, 255, 255, 0.55);
+    --glass-strong: rgba(255, 255, 255, 0.92); /* active segmented thumb */
+    --glass-hairline: rgba(255, 255, 255, 0.8);
+    --glass-shadow: 0 16px 40px rgba(23, 34, 57, 0.1);
+    --glass-inner: inset 0 1px 0 rgba(255, 255, 255, 0.9);
 
-    --popover: 200 26% 12%;
-    --popover-foreground: 40 22% 92%;
+    --text: #111418;
+    --text-body: #333a44;
+    --text-muted: #5c6470;
+    --text-faint: #8a919c;
 
-    --primary: 190 48% 60%;
-    --primary-foreground: 200 30% 10%;
+    /* --brand is consumed by Tailwind as hsl(var(--brand)), so it is defined
+       as an H S% L% triplet in the bridge below (same #2E6BE6 blue), not as
+       the raw hex the handoff lists. --brand-hi/-ink/-grad/-tint/-glow stay
+       raw colors for direct use (Tailwind brand.ink / brand.tint / brand-glow). */
+    --brand-hi: #5a8df2; /* gradient top */
+    --brand-ink: #1d4fbf; /* text/icon on tint */
+    --brand-grad: linear-gradient(180deg, #5a8df2, #2e6be6);
+    --brand-tint: rgba(46, 107, 230, 0.14);
+    --brand-tint-border: rgba(46, 107, 230, 0.2);
+    --brand-glow: 0 8px 20px rgba(46, 107, 230, 0.3);
 
-    --secondary: 200 18% 18%;
-    --secondary-foreground: 40 22% 92%;
+    --rule: rgba(23, 34, 57, 0.08);
+    --rule-soft: rgba(23, 34, 57, 0.06);
+    --track: rgba(23, 34, 57, 0.07); /* segmented / chip background */
+    --danger: #d93b34;
 
-    --muted: 200 16% 18%;
-    --muted-foreground: 200 12% 66%;
+    /* ---- shadcn bridge (light) — every var the app's Tailwind colors read ---- */
+    --background: 216 33% 94%; /* #EBEFF5 */
+    --foreground: 214 17% 8%; /* #111418 */
+    --card: 216 45% 98%; /* near-white glass surface */
+    --card-foreground: 214 17% 8%;
+    --popover: 216 45% 98%;
+    --popover-foreground: 214 17% 8%;
+    --primary: 220 79% 54%; /* #2E6BE6 */
+    --primary-foreground: 0 0% 100%; /* #FFFFFF */
+    --secondary: 215 21% 89%; /* --track solid */
+    --secondary-foreground: 214 17% 8%;
+    --muted: 215 21% 89%;
+    --muted-foreground: 216 10% 40%; /* #5C6470 */
+    --accent: 215 21% 89%;
+    --accent-foreground: 214 17% 8%; /* = foreground */
+    --destructive: 3 68% 53%; /* #D93B34 */
+    --destructive-foreground: 0 0% 100%;
+    --border: 215 19% 88%; /* --rule solid */
+    --input: 215 19% 88%;
+    --ring: 220 79% 54%; /* #2E6BE6 */
+    --brand: 220 79% 54%; /* #2E6BE6 */
+    --brand-foreground: 0 0% 100%;
+    --brand-strong: 221 74% 43%; /* #1D4FBF (brand ink) */
+  }
 
-    --accent: 200 18% 20%;
-    --accent-foreground: 40 22% 92%;
+  /* ========== Smoked Dark (2b) ========== */
+  [data-theme='dark'] {
+    --bg-base: #0a0e16;
+    --bg-wash: radial-gradient(
+        105% 85% at 6% 4%,
+        #1d3168 0%,
+        rgba(29, 49, 104, 0) 55%
+      ),
+      radial-gradient(85% 75% at 94% 8%, #2b2455 0%, rgba(43, 36, 85, 0) 58%),
+      radial-gradient(95% 85% at 62% 108%, #113545 0%, rgba(17, 53, 69, 0) 60%);
 
-    --destructive: 4 60% 56%;
-    --destructive-foreground: 200 30% 10%;
+    --glass-blur: blur(30px) saturate(160%);
+    --glass: rgba(255, 255, 255, 0.06);
+    --glass-strong: rgba(255, 255, 255, 0.14);
+    --glass-hairline: rgba(255, 255, 255, 0.12);
+    --glass-shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
+    --glass-inner: inset 0 1px 0 rgba(255, 255, 255, 0.14);
 
-    --border: 200 16% 20%;
-    --input: 200 16% 22%;
-    --ring: 190 48% 55%;
+    --text: #eef2f8;
+    --text-body: #c3ccdb;
+    --text-muted: #9aa6ba;
+    --text-faint: #7e8b9f;
 
-    --brand: 24 72% 60%;
-    --brand-foreground: 200 30% 10%;
-    --brand-strong: 24 72% 52%;
+    --brand-hi: #7ea9ff;
+    --brand-ink: #8fb3ff;
+    --brand-grad: linear-gradient(180deg, #7ea9ff, #4f7deb); /* label: #0A0E16 */
+    --brand-tint: rgba(109, 154, 245, 0.22);
+    --brand-tint-border: rgba(109, 154, 245, 0.34);
+    --brand-glow: 0 6px 18px rgba(109, 154, 245, 0.28);
+
+    --rule: rgba(255, 255, 255, 0.1);
+    --rule-soft: rgba(255, 255, 255, 0.07);
+    --track: rgba(255, 255, 255, 0.07);
+    --danger: #ff6b5e;
+
+    /* ---- shadcn bridge (dark) ---- */
+    --background: 220 38% 6%; /* #0A0E16 */
+    --foreground: 216 42% 95%; /* #EEF2F8 */
+    --card: 220 31% 11%; /* ~#141A26 */
+    --card-foreground: 216 42% 95%;
+    --popover: 220 31% 11%;
+    --popover-foreground: 216 42% 95%;
+    --primary: 220 87% 69%; /* #6D9AF5 */
+    --primary-foreground: 220 38% 6%; /* #0A0E16 */
+    --secondary: 218 17% 13%; /* --track solid */
+    --secondary-foreground: 216 42% 95%;
+    --muted: 218 17% 13%;
+    --muted-foreground: 218 19% 67%; /* #9AA6BA */
+    --accent: 218 17% 13%;
+    --accent-foreground: 216 42% 95%; /* = foreground */
+    --destructive: 5 100% 68%; /* #FF6B5E */
+    --destructive-foreground: 220 38% 6%;
+    --border: 222 13% 16%; /* --rule solid */
+    --input: 222 13% 16%;
+    --ring: 220 87% 69%; /* #6D9AF5 */
+    --brand: 220 87% 69%; /* #6D9AF5 */
+    --brand-foreground: 220 38% 6%;
+    --brand-strong: 221 100% 78%; /* #8FB3FF (brand ink) */
+  }
+
+  /* No backdrop-filter support: raise opacity instead of shipping
+     transparent panels. */
+  @supports not (backdrop-filter: blur(1px)) {
+    :root {
+      --glass: rgba(255, 255, 255, 0.92);
+    }
+    [data-theme='dark'] {
+      --glass: rgba(20, 26, 38, 0.94);
+    }
   }
 
   /* Engagement cockpit palette — travertine/limestone + teal-dust/petrol.
      SCOPED to `.engagement-cockpit`: these tokens exist only inside the cockpit
-     wrapper so the rest of the app's warm-paper/copper world is untouched. Full
-     colour values (not the app's HSL triplets) so the approved mock renders
-     exactly. Semantic roles: done = sage, current = petrol, rework = ochre,
-     upcoming/off = muted. */
+     wrapper. The palette itself is migrated to the glass system in a later
+     slice; only its dark selector flips to [data-theme='dark'] now so the
+     cockpit tracks the theme once theming moves off `.dark`. */
   .engagement-cockpit {
     --ck-surface: #fcfbf9;
     --ck-surface-2: #eae8e1;
@@ -103,7 +213,7 @@
     --ck-on-accent: #ffffff;
   }
 
-  .dark .engagement-cockpit {
+  [data-theme='dark'] .engagement-cockpit {
     --ck-surface: #1e1c16;
     --ck-surface-2: #26231c;
     --ck-ink: #ece7dd;
@@ -123,14 +233,13 @@
     --ck-on-accent: #16150f;
   }
 
-  /* Direction-aware font stack: Plex Sans leads in LTR, Plex Sans Arabic in RTL. */
+  /* Direction-aware font stack: Latin leads in LTR, Arabic (Tajawal) in RTL.
+     Both stacks resolve through the next/font vars wired in :root above. */
   html[dir='ltr'] {
-    --font-sans: var(--font-plex-sans), var(--font-plex-arabic), system-ui,
-      sans-serif;
+    --font-sans: var(--font-latin);
   }
   html[dir='rtl'] {
-    --font-sans: var(--font-plex-arabic), var(--font-plex-sans), system-ui,
-      sans-serif;
+    --font-sans: var(--font-arabic);
   }
 
   * {
@@ -171,6 +280,18 @@
   ::-webkit-scrollbar-thumb:hover {
     background: hsl(var(--muted-foreground) / 0.55);
     background-clip: padding-box;
+  }
+}
+
+@layer components {
+  /* The one recipe every glass surface uses. Never nest .glass in .glass. */
+  .glass {
+    background: var(--glass);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+    border: 1px solid var(--glass-hairline);
+    box-shadow: var(--glass-shadow), var(--glass-inner);
+    border-radius: var(--r-panel);
   }
 }
 
