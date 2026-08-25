@@ -134,6 +134,7 @@ export const ACTION_CODE_PROBLEM: Record<ActionCode, ApiProblemKind> = {
   rom_range_invalid: 'bad-request',
   rom_not_set: 'bad-request',
   flow_not_enabled: 'forbidden',
+  payment_kind_mismatch: 'bad-request',
 };
 
 /** A problem Response derived from an ActionResult error code. */

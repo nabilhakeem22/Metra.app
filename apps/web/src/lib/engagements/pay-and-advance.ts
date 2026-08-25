@@ -13,6 +13,7 @@ import type { PaymentEventKind } from '@metra/db';
 import type { ActionResult } from '@/lib/actions/result';
 import type { OrgContext } from '@/lib/db/context';
 import { executeTransition } from './executor';
+import { MONEY_GUARD_MILESTONE, moneyGuardOf } from './guards';
 import { recordPaymentCore } from './payments';
 import type { Trigger } from './transitions';
 
@@ -23,6 +24,13 @@ export interface LogPaymentAndAdvanceInput {
   method?: string | null;
   reference?: string | null;
   advanceTrigger: Trigger;
+  /**
+   * Optional client-supplied idempotency key (UUID) — threaded to
+   * recordPaymentCore so a double-submit records ONE payment. A replay still
+   * re-runs `executeTransition` (the guard re-checks; the advance is a no-op if
+   * already made).
+   */
+  idempotencyKey?: string | null;
 }
 
 /**
@@ -45,15 +53,30 @@ export async function logPaymentAndAdvanceCore(
   engagementId: string,
   input: LogPaymentAndAdvanceInput,
 ): Promise<LogPaymentAndAdvanceResult> {
+  // The advance trigger must be a money gate, and the recorded payment's kind
+  // must match the milestone that gate clears — else this combined action would
+  // append a payment of the wrong kind (which never counts toward the guard) and
+  // then fail the advance, leaving an orphaned receipt. Reject BEFORE recording,
+  // with no row written.
+  const moneyGuard = moneyGuardOf(input.advanceTrigger);
+  const expectedKind = moneyGuard ? MONEY_GUARD_MILESTONE[moneyGuard] : undefined;
+  if (!expectedKind || input.paymentKind !== expectedKind) {
+    return { ok: false, error: 'payment_kind_mismatch', paymentRecorded: false };
+  }
+
   const recorded = await recordPaymentCore(ctx, {
     engagementId,
     kind: input.paymentKind,
     amount: input.amount,
     method: input.method ?? null,
     reference: input.reference ?? null,
+    idempotencyKey: input.idempotencyKey ?? null,
   });
   if (!recorded.ok) return { ...recorded, paymentRecorded: false };
 
+  // Falls through even on an idempotent hit (`recorded.already`): the guard
+  // re-checks and the advance is a no-op (or the still-valid forward move) — the
+  // machine converges on retry.
   const advanced = await executeTransition(ctx, {
     engagementId,
     trigger: input.advanceTrigger,

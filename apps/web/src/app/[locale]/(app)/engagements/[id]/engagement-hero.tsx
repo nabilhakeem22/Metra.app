@@ -238,6 +238,11 @@ function PaymentForm({
   const [amount, setAmount] = useState(defaultAmount);
   const [method, setMethod] = useState('');
   const [reference, setReference] = useState('');
+  // One idempotency key per mounted form. The `key={paymentItem.amountDue}`
+  // remount (a short-payment revalidation) mints a FRESH key for the genuinely
+  // new payment, while a double-click within one open reuses this one — so a
+  // blind re-click records the same payment once, not twice.
+  const [idempotencyKey] = useState(() => crypto.randomUUID());
 
   function submit() {
     if (!advanceTrigger) return;
@@ -248,6 +253,7 @@ function PaymentForm({
         method: method.trim() || null,
         reference: reference.trim() || null,
         advanceTrigger,
+        idempotencyKey,
       });
       if (res.ok) onDone();
       return res;

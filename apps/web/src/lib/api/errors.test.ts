@@ -77,6 +77,7 @@ const ALL_CODES: ActionCode[] = [
   'rom_range_invalid',
   'rom_not_set',
   'flow_not_enabled',
+  'payment_kind_mismatch',
 ];
 
 describe('problem+json envelope', () => {
