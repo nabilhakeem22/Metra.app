@@ -45,8 +45,10 @@ export function GettingStarted({
   // A role with no create grants gets a role-appropriate line, never prompts.
   if (result.items.length === 0) {
     return (
-      <Card data-tour="dashboard-checklist">
-        <CardHeader>
+      // Flat (opaque bg-card, no .glass) so the onboarding surface never spends
+      // blur budget on the dashboard. Header carries no divider with no content.
+      <Card flat data-tour="dashboard-checklist">
+        <CardHeader className="border-b-0">
           <CardTitle>{t('readOnlyTitle')}</CardTitle>
           <CardDescription>{t('readOnlyBody')}</CardDescription>
         </CardHeader>
@@ -55,7 +57,9 @@ export function GettingStarted({
   }
 
   return (
-    <Card data-tour="dashboard-checklist">
+    // Flat (opaque bg-card, no .glass) so the onboarding surface never spends
+    // blur budget on the dashboard.
+    <Card flat data-tour="dashboard-checklist">
       <CardHeader className="flex-row items-start justify-between gap-3 space-y-0">
         <div className="space-y-1">
           <CardTitle>{t('title')}</CardTitle>

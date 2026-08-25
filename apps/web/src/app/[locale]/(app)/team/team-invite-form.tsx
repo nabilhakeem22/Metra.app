@@ -72,7 +72,7 @@ export function TeamInviteForm({
               aria-describedby="inviteRole-hint"
               value={inviteRole}
               onChange={(e) => onInviteRoleChange(e.target.value as MemberRole)}
-              className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm sm:w-48"
+              className="h-10 w-full glass-field outline-none focus-ring-brand focus-visible:border-[color:hsl(var(--brand))] px-3 text-sm sm:w-48"
             >
               {INVITABLE_ROLES.map((r) => (
                 <option key={r} value={r}>

@@ -133,7 +133,7 @@ export function DetailsTab({
             </Label>
             <select
               id="d-type"
-              className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+              className="h-10 w-full glass-field outline-none focus-ring-brand focus-visible:border-[color:hsl(var(--brand))] px-3 text-sm"
               aria-describedby="d-type-hint"
               value={form.type}
               onChange={(e) => set('type')(e.target.value)}

@@ -4,16 +4,29 @@ import { cn } from '@/lib/utils';
 // Card = the canonical GLASS panel (.glass recipe + --r-panel). This is the one
 // primitive that carries a backdrop-filter; inner regions must use flat
 // --track/--rule fills (never another .glass) so blur is never nested.
-const Card = React.forwardRef<
-  HTMLDivElement,
-  React.HTMLAttributes<HTMLDivElement>
->(({ className, ...props }, ref) => (
-  <div
-    ref={ref}
-    className={cn('glass text-[color:var(--text)]', className)}
-    {...props}
-  />
-));
+//
+// `flat` = the same --r-panel slab but OPAQUE (bg-card) with a --rule hairline
+// and NO backdrop-filter — for a card that must not spend blur budget: a card
+// nested inside another glass Card, or a transient onboarding surface. Mirrors
+// the flat-panel treatment already used by the engagement rail/panels.
+export interface CardProps extends React.HTMLAttributes<HTMLDivElement> {
+  flat?: boolean;
+}
+
+const Card = React.forwardRef<HTMLDivElement, CardProps>(
+  ({ className, flat = false, ...props }, ref) => (
+    <div
+      ref={ref}
+      className={cn(
+        flat
+          ? 'rounded-[var(--r-panel)] border border-[color:var(--rule)] bg-card text-[color:var(--text)] shadow-sm'
+          : 'glass text-[color:var(--text)]',
+        className,
+      )}
+      {...props}
+    />
+  ),
+);
 Card.displayName = 'Card';
 
 // Header: 16px 20px pad + a --rule hairline divider under it.

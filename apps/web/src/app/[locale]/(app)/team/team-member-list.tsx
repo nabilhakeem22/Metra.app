@@ -71,7 +71,7 @@ export function TeamMemberList({
                         onChangeRole(m.userId, e.target.value as MemberRole)
                       }
                       disabled={isPending}
-                      className="h-9 rounded-md border border-input bg-background px-2 text-sm"
+                      className="h-9 glass-field outline-none focus-ring-brand focus-visible:border-[color:hsl(var(--brand))] px-2 text-sm"
                     >
                       {MEMBER_ROLES.filter(
                         (r) => r !== 'owner' || isOwner || targetIsOwner,

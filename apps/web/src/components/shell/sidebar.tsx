@@ -34,7 +34,7 @@ const ACTIVE_ITEM_STYLE: CSSProperties = {
 
 // Base geometry shared by every nav row (link, disabled, action, disclosure).
 const ITEM_CLASS =
-  'group flex items-center gap-[10px] rounded-[13px] px-[11px] py-[9px] text-sm transition-colors motion-reduce:transition-none';
+  'group flex items-center gap-[10px] rounded-[13px] px-[11px] py-[9px] text-sm outline-none focus-ring-brand transition-colors motion-reduce:transition-none';
 
 export function Sidebar({
   onNavigate,

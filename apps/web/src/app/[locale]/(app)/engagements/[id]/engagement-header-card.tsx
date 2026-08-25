@@ -59,12 +59,12 @@ export function EngagementHeaderCard({ header }: { header: EngagementHeader }) {
             </span>
           )}
           {header.asBuiltDue && (
-            <span className="rounded-full bg-amber-500/10 px-2 py-0.5 text-xs text-amber-600">
+            <span className="rounded-full bg-[color:var(--warn-tint)] px-2 py-0.5 text-xs text-[color:var(--warn)]">
               {t('asBuiltDue')}
             </span>
           )}
           {header.conceptLockedAt && (
-            <span className="rounded-full bg-blue-500/10 px-2 py-0.5 text-xs text-blue-600">
+            <span className="rounded-full bg-[color:var(--brand-tint)] px-2 py-0.5 text-xs text-[color:var(--brand-ink)]">
               {t('conceptLocked')}
             </span>
           )}

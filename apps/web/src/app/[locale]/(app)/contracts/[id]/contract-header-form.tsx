@@ -112,7 +112,7 @@ export function ContractHeaderForm({ detail }: { detail: ContractDetail }) {
             {pending && <Loader2 className="size-4 animate-spin" aria-hidden />}
             {t('saveDraft')}
           </Button>
-          {saved && <span className="text-sm text-emerald-600">{t('saved')}</span>}
+          {saved && <span className="text-sm text-[color:var(--success)]">{t('saved')}</span>}
         </div>
       </CardContent>
     </Card>

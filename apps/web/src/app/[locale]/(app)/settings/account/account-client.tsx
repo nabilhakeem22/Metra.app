@@ -81,7 +81,7 @@ export function AccountClient({
               id="locale"
               value={locale}
               onChange={(e) => setLocale(e.target.value as Locale)}
-              className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm sm:w-64"
+              className="h-10 w-full glass-field outline-none focus-ring-brand focus-visible:border-[color:hsl(var(--brand))] px-3 text-sm sm:w-64"
             >
               <option value="ar-EG">العربية</option>
               <option value="en">English</option>

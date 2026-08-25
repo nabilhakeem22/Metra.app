@@ -2,18 +2,22 @@
 
 import { useTranslations } from 'next-intl';
 import type { DesignEngagementState } from '@metra/db';
+import { Badge, type BadgeProps } from '@/components/ui/badge';
 import { STAGE_NUMBER, type DesignState } from '@/lib/engagements/states';
 
-// Colour families mirror the contracts status badge: neutral for in-flight, blue
-// for the active design push, emerald for a good terminal outcome, destructive for
-// abandoned. Any state without an explicit entry falls back to blue.
-const STATE_STYLE: Partial<Record<DesignEngagementState, string>> = {
-  created: 'bg-muted text-muted-foreground',
-  closed_design_only: 'bg-emerald-500/10 text-emerald-600',
-  execution: 'bg-emerald-500/10 text-emerald-600',
-  abandoned: 'bg-destructive/10 text-destructive',
-  change_triage: 'bg-amber-500/10 text-amber-600',
-};
+// Status families map to the glass semantic tokens via the Badge variants (NOT
+// raw emerald/amber/blue utilities): neutral for in-flight, brand for the active
+// design push, success for a good terminal outcome, danger for abandoned, warn
+// for the change-triage detour. Any state without an explicit entry falls back
+// to the brand ("active") variant. Mirrors the contracts status badge.
+const STATE_VARIANT: Partial<Record<DesignEngagementState, BadgeProps['variant']>> =
+  {
+    created: 'default',
+    closed_design_only: 'success',
+    execution: 'success',
+    abandoned: 'danger',
+    change_triage: 'warn',
+  };
 
 export function StateBadge({
   state,
@@ -26,15 +30,9 @@ export function StateBadge({
   const stage = STAGE_NUMBER[state as DesignState];
   return (
     <span className="inline-flex items-center gap-2">
-      <span
-        className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-          STATE_STYLE[state] ?? 'bg-blue-500/10 text-blue-600'
-        }`}
-      >
-        {t(`state.${state}`)}
-      </span>
+      <Badge variant={STATE_VARIANT[state] ?? 'brand'}>{t(`state.${state}`)}</Badge>
       {showStage && stage > 0 && (
-        <span className="text-xs text-muted-foreground" dir="ltr">
+        <span className="text-xs text-[color:var(--text-muted)]" dir="ltr">
           {t('stage', { n: stage })}
         </span>
       )}

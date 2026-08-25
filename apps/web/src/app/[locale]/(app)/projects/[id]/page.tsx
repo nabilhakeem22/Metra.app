@@ -69,7 +69,10 @@ export default async function ProjectProfilePage({
           <ArrowLeft className="size-3" aria-hidden />
           {t('back')}
         </Link>
-        <h1 className="text-2xl font-bold tracking-tight">{name}</h1>
+        <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight">
+          <span aria-hidden className="h-5 w-[3px] rounded-full bg-brand" />
+          {name}
+        </h1>
         <p className="text-sm text-muted-foreground">
           <span className="font-mono" dir="ltr">{project.code}</span> · {typeName}
         </p>

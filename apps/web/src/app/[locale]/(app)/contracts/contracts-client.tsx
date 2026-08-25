@@ -16,8 +16,8 @@ import type { ContractListRow } from '@/lib/contracts/queries';
 
 const STATUS_STYLE: Record<string, string> = {
   draft: 'bg-muted text-muted-foreground',
-  issued: 'bg-blue-500/10 text-blue-600',
-  signed: 'bg-emerald-500/10 text-emerald-600',
+  issued: 'bg-[color:var(--brand-tint)] text-[color:var(--brand-ink)]',
+  signed: 'bg-[color:var(--success-tint)] text-[color:var(--success)]',
   terminated: 'bg-destructive/10 text-destructive',
 };
 

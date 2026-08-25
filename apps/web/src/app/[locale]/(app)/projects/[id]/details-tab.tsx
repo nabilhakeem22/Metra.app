@@ -79,7 +79,7 @@ export function DetailsTab({
   const label = (o: DetailsOption) =>
     pickLocale({ nameAr: o.nameAr, nameEn: o.nameEn }, 'name', locale).value;
   const selectClass =
-    'h-10 w-full rounded-md border border-input bg-background px-3 text-sm';
+    'h-10 w-full glass-field outline-none focus-ring-brand focus-visible:border-[color:hsl(var(--brand))] px-3 text-sm';
 
   function onAddType() {
     const name = newType.trim();
@@ -270,7 +270,7 @@ export function DetailsTab({
             id="p-description"
             rows={3}
             aria-describedby="p-description-hint"
-            className="w-full rounded-md border border-input bg-background p-2 text-sm"
+            className="w-full glass-field outline-none focus-ring-brand focus-visible:border-[color:hsl(var(--brand))] p-2 text-sm"
             value={form.description}
             onChange={(e) => set('description')(e.target.value)}
             disabled={!canManage || pending}

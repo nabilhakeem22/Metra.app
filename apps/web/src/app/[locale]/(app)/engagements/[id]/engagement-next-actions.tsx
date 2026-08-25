@@ -111,34 +111,34 @@ function RevisionForm({
   }
 
   return (
-    <Card>
-      <CardContent className="space-y-3 py-4">
-        <p className="text-sm font-medium">{t('title')}</p>
-        <div className="space-y-2">
-          <Label htmlFor="rev-reason">{t('reason')}</Label>
-          <Input id="rev-reason" value={reason} onChange={(e) => setReason(e.target.value)} />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="rev-amount">{t('changeOrderAmount')}</Label>
-          <Input
-            id="rev-amount"
-            dir="ltr"
-            inputMode="decimal"
-            value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-          />
-          <p className="text-xs text-muted-foreground">{t('hint')}</p>
-        </div>
-        <div className="flex justify-end gap-2">
-          <Button type="button" variant="outline" onClick={onCancel} disabled={pending}>
-            {tc('cancel')}
-          </Button>
-          <Button type="button" onClick={submit} disabled={pending}>
-            {pending && <Loader2 className="size-4 animate-spin" aria-hidden />}
-            {t('submit')}
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
+    // Flat tray (opaque --track fill, no .glass) so opening the revision form
+    // inside the glass "next actions" Card never nests backdrop-filter.
+    <div className="space-y-3 rounded-[var(--r-item)] border border-[color:var(--rule)] bg-[color:var(--track)] p-4">
+      <p className="text-sm font-medium">{t('title')}</p>
+      <div className="space-y-2">
+        <Label htmlFor="rev-reason">{t('reason')}</Label>
+        <Input id="rev-reason" value={reason} onChange={(e) => setReason(e.target.value)} />
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor="rev-amount">{t('changeOrderAmount')}</Label>
+        <Input
+          id="rev-amount"
+          dir="ltr"
+          inputMode="decimal"
+          value={amount}
+          onChange={(e) => setAmount(e.target.value)}
+        />
+        <p className="text-xs text-muted-foreground">{t('hint')}</p>
+      </div>
+      <div className="flex justify-end gap-2">
+        <Button type="button" variant="outline" onClick={onCancel} disabled={pending}>
+          {tc('cancel')}
+        </Button>
+        <Button type="button" onClick={submit} disabled={pending}>
+          {pending && <Loader2 className="size-4 animate-spin" aria-hidden />}
+          {t('submit')}
+        </Button>
+      </div>
+    </div>
   );
 }

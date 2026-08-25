@@ -37,7 +37,7 @@ export function LocaleSwitch({ className }: { className?: string }) {
       aria-label={targetLabel}
       // Glass pill (fill + hairline only — no nested blur).
       className={
-        'inline-flex items-center gap-1 rounded-full border px-[12px] py-[7px] text-[12px] font-semibold text-[color:var(--text)] transition-colors' +
+        'inline-flex items-center gap-1 rounded-full border px-[12px] py-[7px] text-[12px] font-semibold text-[color:var(--text)] outline-none focus-ring-brand transition-colors' +
         (className ? ` ${className}` : '')
       }
       style={{
