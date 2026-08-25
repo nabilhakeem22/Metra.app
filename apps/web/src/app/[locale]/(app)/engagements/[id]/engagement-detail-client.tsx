@@ -22,6 +22,7 @@ import {
 import { EngagementHeaderCard } from './engagement-header-card';
 import { EngagementNextActions } from './engagement-next-actions';
 import { EngagementPanels } from './engagement-panels';
+import { EngagementPhaseRail } from './engagement-phase-rail';
 import { ENGAGEMENT_TABS, type EngagementTab } from './tabs';
 
 export function EngagementDetailClient({
@@ -67,6 +68,11 @@ export function EngagementDetailClient({
       <Link href="/engagements" className="text-sm text-primary hover:underline">
         {t('backToList')}
       </Link>
+
+      <EngagementPhaseRail
+        currentState={header.state}
+        revisionCount={header.revisionCount}
+      />
 
       <EngagementHeaderCard header={header} />
 

@@ -77,6 +77,52 @@
     --brand-strong: 24 72% 52%;
   }
 
+  /* Engagement cockpit palette — travertine/limestone + teal-dust/petrol.
+     SCOPED to `.engagement-cockpit`: these tokens exist only inside the cockpit
+     wrapper so the rest of the app's warm-paper/copper world is untouched. Full
+     colour values (not the app's HSL triplets) so the approved mock renders
+     exactly. Semantic roles: done = sage, current = petrol, rework = ochre,
+     upcoming/off = muted. */
+  .engagement-cockpit {
+    --ck-surface: #fcfbf9;
+    --ck-surface-2: #eae8e1;
+    --ck-ink: #2a2723;
+    --ck-muted: #6e685e;
+    --ck-faint: #9a948a;
+    --ck-line: #e4e1d8;
+    --ck-line-strong: #d3cfc4;
+    --ck-accent: #6d929b;
+    --ck-accent-deep: #4f7079;
+    --ck-accent-ink: #3c5960;
+    --ck-accent-soft: #e2eaec;
+    --ck-done: #5e8a6f;
+    --ck-done-soft: #e2ece4;
+    --ck-rework: #b5813c;
+    --ck-rework-soft: #f1e6d2;
+    --ck-pending: #b7b0a4;
+    --ck-on-accent: #ffffff;
+  }
+
+  .dark .engagement-cockpit {
+    --ck-surface: #1e1c16;
+    --ck-surface-2: #26231c;
+    --ck-ink: #ece7dd;
+    --ck-muted: #a39c8e;
+    --ck-faint: #746d61;
+    --ck-line: #2f2c23;
+    --ck-line-strong: #3b372d;
+    --ck-accent: #7fa9b2;
+    --ck-accent-deep: #8fbcc4;
+    --ck-accent-ink: #a6cbd1;
+    --ck-accent-soft: #1e2c2f;
+    --ck-done: #6fa683;
+    --ck-done-soft: #1f2a22;
+    --ck-rework: #ce9a54;
+    --ck-rework-soft: #33291a;
+    --ck-pending: #55503f;
+    --ck-on-accent: #16150f;
+  }
+
   /* Direction-aware font stack: Plex Sans leads in LTR, Plex Sans Arabic in RTL. */
   html[dir='ltr'] {
     --font-sans: var(--font-plex-sans), var(--font-plex-arabic), system-ui,
