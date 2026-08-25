@@ -1,10 +1,10 @@
 import { organizations } from '@metra/db';
 import { getLocale, getTranslations } from 'next-intl/server';
+import { DashboardLedgerCard } from '@/components/dashboard/dashboard-ledger-card';
+import { DashboardPortfolioCard } from '@/components/dashboard/dashboard-portfolio-card';
 import { GettingStarted } from '@/components/dashboard/getting-started';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Gauge } from '@/components/ui/gauge';
-import { PageHeader } from '@/components/ui/page-header';
 import { Link } from '@/i18n/routing';
 import { requireOrg } from '@/lib/auth/require-org';
 import { getSessionUser } from '@/lib/auth/session';
@@ -14,6 +14,8 @@ import { buildChecklist } from '@/lib/onboarding/checklist';
 import { readOnboarding } from '@/lib/onboarding/merge';
 import { getOnboardingProgress } from '@/lib/onboarding/progress';
 
+// Ledger row set + honest empty figures — unchanged data (visual reskin only).
+// Portfolio progress activates in P1 alongside real active-project counts.
 const LEDGER_ROWS = [
   { key: 'activeProjects', value: '0' },
   { key: 'revisedContractValue', value: '—' },
@@ -55,70 +57,62 @@ export default async function DashboardPage() {
       ? { label: d('ctaInviteTeam'), href: '/team' as const }
       : { label: d('ctaManageTeam'), href: '/team' as const };
 
+  const ledgerRows = LEDGER_ROWS.map((row) => ({
+    key: row.key,
+    label: d(row.key),
+    value: row.value,
+  }));
+
+  // No portfolio-progress data source until there are active projects → honest
+  // empty gauge. (0 active projects today.)
+  const activeProjectsCount = Number(
+    LEDGER_ROWS.find((row) => row.key === 'activeProjects')?.value ?? 0,
+  );
+  const portfolioProgress = activeProjectsCount > 0 ? 0 : null;
+
   return (
-    <div className="space-y-6">
-      <PageHeader
-        title={name.value}
-        description={d('welcomeBack')}
-        breadcrumb={
+    <div className="flex flex-col gap-[14px]">
+      {/* Page header — eyebrow role pill, org name, greeting; primary CTA at the
+          inline-end. Mirrors wholesale in RTL via logical flow. */}
+      <div className="flex items-start justify-between gap-4 px-1.5 py-1">
+        <div className="flex flex-col gap-1.5">
           <span className="flex flex-wrap items-center gap-2">
-            <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
+            <Badge variant="brand" className="px-2.5 py-[3px]">
               {roles(`${ctx.role}.label`)}
-            </span>
-            {name.isFallback && (
-              <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-normal text-muted-foreground">
-                {tc('untranslated')}
-              </span>
-            )}
+            </Badge>
+            {name.isFallback && <Badge>{tc('untranslated')}</Badge>}
           </span>
-        }
-        action={
-          <Button asChild>
+          <h1
+            className="text-display text-[28px] text-[color:var(--text)]"
+            style={{ lineHeight: 1.25 }}
+          >
+            {name.value}
+          </h1>
+          <p className="text-sm text-[color:var(--text-muted)]">
+            {d('welcomeBack')}
+          </p>
+        </div>
+        <div className="shrink-0">
+          <Button asChild size="lg">
             <Link href={primary.href}>{primary.label}</Link>
           </Button>
-        }
-      />
+        </div>
+      </div>
 
       <GettingStarted result={checklist} orgId={ctx.orgId} dismissed={dismissed} />
 
-      <div className="grid gap-4 lg:grid-cols-3">
-        {/* Quiet, authored "ledger" block — honest empty figures, tabular, ruled. */}
-        <Card className="lg:col-span-2">
-          <CardHeader className="flex-row items-center justify-between gap-2 space-y-0">
-            <CardTitle>{d('ledgerTitle')}</CardTitle>
-            <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
-              {d('p1Hint')}
-            </span>
-          </CardHeader>
-          <div className="divide-y border-t">
-            {LEDGER_ROWS.map((row) => (
-              <div
-                key={row.key}
-                className="flex items-center justify-between px-6 py-3"
-              >
-                <span className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <span
-                    aria-hidden
-                    className="size-1.5 rounded-full bg-brand/50"
-                  />
-                  {d(row.key)}
-                </span>
-                <span className="tabular text-sm font-semibold text-foreground">
-                  {row.value}
-                </span>
-              </div>
-            ))}
-          </div>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>{d('gaugeTitle')}</CardTitle>
-          </CardHeader>
-          <CardContent className="flex justify-center py-4">
-            <Gauge empty emptyLabel={d('gaugeEmpty')} className="max-w-xs" />
-          </CardContent>
-        </Card>
+      <div className="grid items-start gap-[14px] lg:grid-cols-3">
+        <DashboardLedgerCard
+          className="lg:col-span-2"
+          title={d('ledgerTitle')}
+          statusLabel={d('p1Hint')}
+          rows={ledgerRows}
+        />
+        <DashboardPortfolioCard
+          title={d('gaugeTitle')}
+          value={portfolioProgress}
+          emptyLabel={d('gaugeEmpty')}
+        />
       </div>
     </div>
   );
