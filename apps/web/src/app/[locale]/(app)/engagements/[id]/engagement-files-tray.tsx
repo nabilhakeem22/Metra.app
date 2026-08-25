@@ -13,9 +13,10 @@ import {
 // page already loaded (`deriveWorkingFiles`). Upload + signed-URL download are NOT
 // wired this slice, so NO row is ever a live download: a category with no artifact
 // OR an artifact with no attached file renders an honest, non-clickable
-// "not yet available" affordance — never a broken link. Palette tokens (`--ck-*`)
-// are scoped to `.engagement-cockpit`; logical CSS only (ms-auto / ps / pe) so the
-// tray mirrors in ar-EG RTL. The version number uses plain interpolation (Western
+// "not yet available" affordance — never a broken link. Reskinned to the glass
+// system as a FLAT (opaque `bg-card`, no backdrop-filter) right-rail panel with a
+// brand-tinted category tile; logical CSS only (ms-auto / ps / pe) so the tray
+// mirrors in ar-EG RTL. The version number uses plain interpolation (Western
 // numerals in both locales).
 
 /** Whether a category's file is downloaded or opened once wiring lands (cosmetic
@@ -35,12 +36,12 @@ export function EngagementFilesTray({
   const rows = deriveWorkingFiles(artifacts);
 
   return (
-    <section className="engagement-cockpit overflow-hidden rounded-[14px] border border-[var(--ck-line)] bg-[var(--ck-surface)] text-[var(--ck-ink)] shadow-sm">
-      <header className="flex items-center justify-between border-b border-[var(--ck-line)] px-4 py-3">
-        <h3 className="m-0 font-mono text-[12px] font-medium uppercase tracking-[0.06em] text-[var(--ck-muted)]">
+    <section className="overflow-hidden rounded-[var(--r-panel)] border border-[color:var(--rule)] bg-card text-[color:var(--text)] shadow-sm">
+      <header className="flex items-center justify-between border-b border-[color:var(--rule)] px-4 py-3">
+        <h3 className="m-0 font-mono text-[12px] font-medium uppercase tracking-[0.06em] text-[color:var(--text-muted)]">
           {t('title')}
         </h3>
-        <span className="text-[11px] text-[var(--ck-faint)]">
+        <span className="text-[11px] text-[color:var(--text-faint)]">
           {t('latestApproved')}
         </span>
       </header>
@@ -53,21 +54,21 @@ export function EngagementFilesTray({
           return (
             <div
               key={row.category}
-              className="flex items-center gap-[11px] rounded-[10px] border border-[var(--ck-line)] bg-[var(--ck-surface)] px-3 py-2.5"
+              className="flex items-center gap-[11px] rounded-[var(--r-item)] border border-[color:var(--rule)] bg-card px-3 py-2.5"
             >
-              <span className="grid h-[30px] w-[30px] shrink-0 place-items-center rounded-[8px] bg-[var(--ck-accent-soft)] font-mono text-[13px] font-semibold text-[var(--ck-accent-ink)]">
+              <span className="grid h-[30px] w-[30px] shrink-0 place-items-center rounded-[var(--r-icon)] bg-brand-tint font-mono text-[13px] font-semibold text-brand-ink">
                 {t(`badge.${row.category}`)}
               </span>
               <div className="min-w-0">
                 <div className="truncate text-[13px] font-semibold">{name}</div>
-                <div className="text-[11px] text-[var(--ck-faint)]">
+                <div className="text-[11px] text-[color:var(--text-faint)]">
                   {hasArtifact
                     ? t('approvedMeta', { n: row.version })
                     : t('notAvailable')}
                 </div>
               </div>
               <span
-                className="ms-auto inline-flex shrink-0 cursor-not-allowed items-center gap-1 text-[12px] font-semibold text-[var(--ck-faint)]"
+                className="ms-auto inline-flex shrink-0 cursor-not-allowed items-center gap-1 text-[12px] font-semibold text-[color:var(--text-faint)]"
                 aria-disabled="true"
                 title={t('notAvailable')}
               >

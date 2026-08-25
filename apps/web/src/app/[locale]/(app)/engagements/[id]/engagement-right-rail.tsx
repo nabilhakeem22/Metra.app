@@ -14,7 +14,8 @@ import { FeePanel, TimelinePanel } from './engagement-panels';
 // Epic D, Slice 5 — the cockpit's right rail, in the mock order: the pinned
 // "Working files" tray (top) → the collapsible fee-schedule / audit ledger →
 // recent activity. Pure composition over data the page already loaded; every card
-// wears the scoped `.engagement-cockpit` palette. Logical CSS only (RTL mirrors).
+// is a FLAT glass panel (opaque `bg-card`, no backdrop-filter) so the rail never
+// adds to the cockpit blur budget. Logical CSS only (RTL mirrors).
 
 export function EngagementRightRail({
   artifacts,
@@ -66,21 +67,21 @@ function CockpitDrawerCard({
   const [open, setOpen] = useState(defaultOpen);
 
   const titleText = (
-    <span className="font-mono text-[12px] font-medium uppercase tracking-[0.06em] text-[var(--ck-muted)]">
+    <span className="font-mono text-[12px] font-medium uppercase tracking-[0.06em] text-[color:var(--text-muted)]">
       {title}
     </span>
   );
   const drawerText = drawerLabel && (
-    <span className="text-[11px] text-[var(--ck-faint)]">
+    <span className="text-[11px] text-[color:var(--text-faint)]">
       {collapsible ? (open ? '▾ ' : '▸ ') : ''}
       {drawerLabel}
     </span>
   );
   const rowClass =
-    'flex w-full items-center justify-between border-b border-[var(--ck-line)] px-4 py-3 text-start';
+    'flex w-full items-center justify-between border-b border-[color:var(--rule)] px-4 py-3 text-start';
 
   return (
-    <section className="engagement-cockpit overflow-hidden rounded-[14px] border border-[var(--ck-line)] bg-[var(--ck-surface)] text-[var(--ck-ink)] shadow-sm">
+    <section className="overflow-hidden rounded-[var(--r-panel)] border border-[color:var(--rule)] bg-card text-[color:var(--text)] shadow-sm">
       {/* Accessible accordion markup: the heading wraps the toggle button. */}
       <h3 className="m-0">
         {collapsible ? (

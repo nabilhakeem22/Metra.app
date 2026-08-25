@@ -14,8 +14,8 @@ import { formatDate } from '@/lib/format/date';
 import { formatMoney } from '@/lib/format/money';
 import type { EngagementTab } from './tabs';
 
-// Epic D, Slice 5 — the engagement detail panels, reskinned to the cockpit's
-// right-rail look (scoped `.engagement-cockpit` palette, mono/tabular money). The
+// Epic D, Slice 5 — the engagement detail panels, reskinned to the glass system as
+// a FLAT (opaque `bg-card`, no backdrop-filter) panel with mono/tabular money. The
 // fee schedule (audit ledger) and the recent-activity timeline are now PINNED in
 // the right rail (see engagement-right-rail.tsx) — `FeePanel` and `TimelinePanel`
 // are exported for that reuse. This tabbed surface keeps the fuller detail
@@ -34,15 +34,16 @@ export interface PanelData {
 }
 
 function Empty({ text }: { text: string }) {
-  return <p className="py-3 text-sm text-[var(--ck-muted)]">{text}</p>;
+  return <p className="py-3 text-sm text-[color:var(--text-muted)]">{text}</p>;
 }
 
 const MONEY = 'text-end font-mono tabular-nums';
-const HEAD_ROW = 'border-b border-[var(--ck-line)] text-xs text-[var(--ck-faint)]';
+const HEAD_ROW =
+  'border-b border-[color:var(--rule)] text-xs text-[color:var(--text-faint)]';
 
 export function EngagementPanels({ tab, data }: { tab: EngagementTab; data: PanelData }) {
   return (
-    <section className="engagement-cockpit rounded-[14px] border border-[var(--ck-line)] bg-[var(--ck-surface)] text-[var(--ck-ink)] shadow-sm">
+    <section className="rounded-[var(--r-panel)] border border-[color:var(--rule)] bg-card text-[color:var(--text)] shadow-sm">
       <div className="p-4">
         {tab === 'payments' && <PaymentsPanel payments={data.payments} />}
         {tab === 'artifacts' && <ArtifactsPanel artifacts={data.artifacts} />}
@@ -58,8 +59,8 @@ export function FeePanel({ feeSchedule }: { feeSchedule: EngagementFeeSchedule }
   const locale = useLocale();
   return (
     <div className="text-[13px]">
-      <div className="flex items-center justify-between border-b border-dashed border-[var(--ck-line)] py-2.5">
-        <span className="text-[var(--ck-muted)]">{t('fee.designFee')}</span>
+      <div className="flex items-center justify-between border-b border-dashed border-[color:var(--rule)] py-2.5">
+        <span className="text-[color:var(--text-muted)]">{t('fee.designFee')}</span>
         <span className={MONEY} dir="ltr">
           {feeSchedule.designFee ? formatMoney(feeSchedule.designFee, locale) : '—'}
         </span>
@@ -71,10 +72,10 @@ export function FeePanel({ feeSchedule }: { feeSchedule: EngagementFeeSchedule }
           {feeSchedule.milestones.map((m) => (
             <li
               key={`${m.kind}-${m.sortOrder}`}
-              className="flex items-center gap-2 border-b border-dashed border-[var(--ck-line)] py-2.5 last:border-0"
+              className="flex items-center gap-2 border-b border-dashed border-[color:var(--rule)] py-2.5 last:border-0"
             >
               <span>{t(`milestoneKind.${m.kind}`)}</span>
-              <span className="text-[11px] text-[var(--ck-faint)]">
+              <span className="text-[11px] text-[color:var(--text-faint)]">
                 {t(`milestoneBasis.${m.basis}`)}
               </span>
               <span className={`ms-auto ${MONEY}`} dir="ltr">
@@ -104,15 +105,15 @@ function PaymentsPanel({ payments }: { payments: EngagementPayment[] }) {
       </thead>
       <tbody>
         {payments.map((p) => (
-          <tr key={p.id} className="border-b border-[var(--ck-line)] last:border-0">
+          <tr key={p.id} className="border-b border-[color:var(--rule)] last:border-0">
             <td className="py-2">{t(`paymentKind.${p.kind}`)}</td>
             <td className={`py-2 ${MONEY}`} dir="ltr">
               {formatMoney(p.amount, locale)}
             </td>
-            <td className="py-2 text-[var(--ck-muted)]" dir="ltr">
+            <td className="py-2 text-[color:var(--text-muted)]" dir="ltr">
               {p.reference || '—'}
             </td>
-            <td className="py-2 text-[var(--ck-muted)]" dir="ltr">
+            <td className="py-2 text-[color:var(--text-muted)]" dir="ltr">
               {formatDate(p.clearedAt, locale)}
             </td>
           </tr>
@@ -137,10 +138,10 @@ function ArtifactsPanel({ artifacts }: { artifacts: EngagementArtifactRecord[] }
       </thead>
       <tbody>
         {artifacts.map((a) => (
-          <tr key={a.id} className="border-b border-[var(--ck-line)] last:border-0">
+          <tr key={a.id} className="border-b border-[color:var(--rule)] last:border-0">
             <td className="py-2">{t(`artifactKind.${a.kind}`)}</td>
-            <td className="py-2 text-[var(--ck-muted)]">{a.label || '—'}</td>
-            <td className="py-2 text-[var(--ck-muted)]" dir="ltr">
+            <td className="py-2 text-[color:var(--text-muted)]">{a.label || '—'}</td>
+            <td className="py-2 text-[color:var(--text-muted)]" dir="ltr">
               {formatDate(a.attestedAt, locale)}
             </td>
           </tr>
@@ -169,12 +170,12 @@ function ChangeOrdersPanel({
       </thead>
       <tbody>
         {changeOrders.map((c) => (
-          <tr key={c.id} className="border-b border-[var(--ck-line)] last:border-0">
+          <tr key={c.id} className="border-b border-[color:var(--rule)] last:border-0">
             <td className={`py-2 ${MONEY}`} dir="ltr">
               {formatMoney(c.amount, locale)}
             </td>
             <td className="py-2">{t(`changeOrderStatus.${c.status}`)}</td>
-            <td className="py-2 text-[var(--ck-muted)]" dir="ltr">
+            <td className="py-2 text-[color:var(--text-muted)]" dir="ltr">
               {formatDate(c.raisedAt, locale)}
             </td>
           </tr>
@@ -198,17 +199,17 @@ function RomPanel({
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between text-sm">
-        <span className="text-[var(--ck-muted)]">{t('rom.range')}</span>
+        <span className="text-[color:var(--text-muted)]">{t('rom.range')}</span>
         {hasRange ? (
           <span className="font-mono tabular-nums" dir="ltr">
             {formatMoney(header.romLow, locale)} – {formatMoney(header.romHigh, locale)}
           </span>
         ) : (
-          <span className="text-[var(--ck-muted)]">{t('rom.notSet')}</span>
+          <span className="text-[color:var(--text-muted)]">{t('rom.notSet')}</span>
         )}
       </div>
       <div className="space-y-1">
-        <p className="text-xs font-medium text-[var(--ck-muted)]">
+        <p className="text-xs font-medium text-[color:var(--text-muted)]">
           {t('rom.acknowledgements')}
         </p>
         {acks.length === 0 ? (
@@ -216,7 +217,7 @@ function RomPanel({
         ) : (
           <ul className="space-y-1 text-sm">
             {acks.map((a) => (
-              <li key={a.id} className="text-[var(--ck-muted)]" dir="ltr">
+              <li key={a.id} className="text-[color:var(--text-muted)]" dir="ltr">
                 {formatDate(a.decidedAt, locale)}
               </li>
             ))}
@@ -264,19 +265,19 @@ export function TimelinePanel({
           className="relative ps-5 pb-3.5 text-[12.5px] last:pb-0"
         >
           <span
-            className="absolute top-1 inline-block h-2 w-2 rounded-full bg-[var(--ck-accent)]"
+            className="absolute top-1 inline-block h-2 w-2 rounded-full bg-brand"
             style={{ insetInlineStart: '2px' }}
             aria-hidden
           />
           {index < entries.length - 1 && (
             <span
-              className="absolute bottom-0 top-3 w-px bg-[var(--ck-line-strong)]"
+              className="absolute bottom-0 top-3 w-px bg-[color:var(--rule)]"
               style={{ insetInlineStart: '5.5px' }}
               aria-hidden
             />
           )}
           <div className="font-medium">{entry.label}</div>
-          <div className="font-mono text-[11px] text-[var(--ck-faint)]" dir="ltr">
+          <div className="font-mono text-[11px] text-[color:var(--text-faint)]" dir="ltr">
             {formatDate(entry.at, locale)}
           </div>
         </li>

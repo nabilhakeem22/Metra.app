@@ -8,9 +8,11 @@ import { formatMoney } from '@/lib/format/money';
 // rail. Purely presentational over the server-computed `CommercialPulse` read-model
 // (no money math here): contract total · collected-to-date (with %/fill) · the next
 // pending gate and the phase clearing it unlocks. Money is rendered 2-dp via the
-// shared serializer, `tabular-nums`, Western numerals in both locales. Palette
-// tokens (`--ck-*`) are scoped to `.engagement-cockpit` in globals.css; logical CSS
-// only (inline-start/end via grid + `border`) so the strip mirrors in ar-EG RTL.
+// shared serializer, `tabular-nums`, Western numerals in both locales. Reskinned to
+// the glass system as a FLAT (opaque `bg-card` cells over a `--rule` hairline grid,
+// no backdrop-filter) panel so it stays off the cockpit blur budget; the pending
+// gate cell wears the brand tint. Logical CSS only (grid + `border`) so the strip
+// mirrors in ar-EG RTL.
 
 export function EngagementPulseBar({ pulse }: { pulse: CommercialPulse }) {
   const t = useTranslations('engagements.pulse');
@@ -22,9 +24,9 @@ export function EngagementPulseBar({ pulse }: { pulse: CommercialPulse }) {
   const fillWidth = Math.min(Math.max(collectedPct, 0), 100);
 
   return (
-    <section className="engagement-cockpit grid grid-cols-1 gap-px overflow-hidden rounded-[14px] border border-[var(--ck-line)] bg-[var(--ck-line)] text-[var(--ck-ink)] shadow-sm sm:grid-cols-[1fr_1fr_1.6fr]">
-      <div className="bg-[var(--ck-surface)] px-[18px] py-[14px]">
-        <div className="mb-1.5 font-mono text-[10.5px] uppercase tracking-[0.1em] text-[var(--ck-faint)]">
+    <section className="grid grid-cols-1 gap-px overflow-hidden rounded-[var(--r-panel)] border border-[color:var(--rule)] bg-[color:var(--rule)] text-[color:var(--text)] shadow-sm sm:grid-cols-[1fr_1fr_1.6fr]">
+      <div className="bg-card px-[18px] py-[14px]">
+        <div className="mb-1.5 font-mono text-[10.5px] uppercase tracking-[0.1em] text-[color:var(--text-faint)]">
           {t('contractTotal')}
         </div>
         <div
@@ -35,37 +37,37 @@ export function EngagementPulseBar({ pulse }: { pulse: CommercialPulse }) {
         </div>
       </div>
 
-      <div className="bg-[var(--ck-surface)] px-[18px] py-[14px]">
-        <div className="mb-1.5 font-mono text-[10.5px] uppercase tracking-[0.1em] text-[var(--ck-faint)]">
+      <div className="bg-card px-[18px] py-[14px]">
+        <div className="mb-1.5 font-mono text-[10.5px] uppercase tracking-[0.1em] text-[color:var(--text-faint)]">
           {t('collected')}
         </div>
         <div className="text-[21px] font-semibold tabular-nums" dir="ltr">
           {formatMoney(collected, locale)}
-          <span className="ms-1 text-[12px] font-normal text-[var(--ck-muted)]">
+          <span className="ms-1 text-[12px] font-normal text-[color:var(--text-muted)]">
             · {collectedPct}%
           </span>
         </div>
-        <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[var(--ck-line-strong)]">
+        <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[color:var(--track)]">
           <div
-            className="h-full bg-[var(--ck-accent-deep)]"
+            className="h-full bg-brand"
             style={{ inlineSize: `${fillWidth}%` }}
           />
         </div>
       </div>
 
-      <div className="bg-[var(--ck-accent-soft)] px-[18px] py-[14px]">
-        <div className="mb-1.5 font-mono text-[10.5px] uppercase tracking-[0.1em] text-[var(--ck-accent-ink)]">
+      <div className="bg-brand-tint px-[18px] py-[14px]">
+        <div className="mb-1.5 font-mono text-[10.5px] uppercase tracking-[0.1em] text-brand-ink">
           {t('pendingGate')}
         </div>
         {pendingGate ? (
           <>
             <div className="text-[21px] font-semibold tabular-nums" dir="ltr">
               {formatMoney(pendingGate.amountDue, locale)}
-              <span className="ms-1 text-[12px] font-normal text-[var(--ck-muted)]">
+              <span className="ms-1 text-[12px] font-normal text-[color:var(--text-muted)]">
                 {t('due')}
               </span>
             </div>
-            <div className="mt-1 text-[13px] text-[var(--ck-accent-ink)]">
+            <div className="mt-1 text-[13px] text-brand-ink">
               {pendingGate.unlocksPhaseKey
                 ? t('unlocks', {
                     gate: tk(pendingGate.gate),
@@ -76,10 +78,10 @@ export function EngagementPulseBar({ pulse }: { pulse: CommercialPulse }) {
           </>
         ) : (
           <>
-            <div className="text-[21px] font-semibold text-[var(--ck-accent-ink)]">
+            <div className="text-[21px] font-semibold text-brand-ink">
               {t('noneOutstanding')}
             </div>
-            <div className="mt-1 text-[13px] text-[var(--ck-muted)]">
+            <div className="mt-1 text-[13px] text-[color:var(--text-muted)]">
               {t('allSettled')}
             </div>
           </>

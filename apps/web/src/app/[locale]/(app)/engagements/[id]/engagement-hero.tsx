@@ -19,9 +19,12 @@ import { DIRECT_TRIGGER_ACTIONS } from './trigger-actions';
 // (below the phase rail). It renders a MACHINE-TRUTHFUL guard checklist from the
 // server gate preview, the stall + revision badges, and ONE combined primary CTA:
 // a blocking payment gate opens the pay-and-advance form (amount pre-filled to the
-// shortfall); an all-clear gate advances directly. Palette tokens (`--ck-*`) are
-// scoped to `.engagement-cockpit` in globals.css. Logical CSS only (inline-start/
-// end) so it mirrors correctly in ar-EG RTL; money is `tabular-nums`, `dir=ltr`.
+// shortfall); an all-clear gate advances directly. Reskinned to the glass system:
+// this is the ONE cockpit-body surface that carries the `.glass` blur recipe (the
+// primary focal), tinted with a brand hairline; every other cockpit panel stays
+// flat so the route's blur budget holds (Hero + 3 existing glass Cards = 4, +2
+// shell = 6). Logical CSS only so it mirrors correctly in ar-EG RTL; money is
+// `tabular-nums`, `dir=ltr`.
 
 export function EngagementHero({
   engagementId,
@@ -86,11 +89,11 @@ export function EngagementHero({
   }
 
   return (
-    <section className="engagement-cockpit rounded-[14px] border-[1.5px] border-[var(--ck-accent)] bg-[var(--ck-surface)] p-5 text-[var(--ck-ink)] shadow-[0_1px_2px_rgba(42,39,35,.05),0_16px_44px_rgba(109,146,155,.18)] sm:p-6">
+    <section className="glass border-[color:var(--brand-tint-border)] p-5 text-[color:var(--text)] sm:p-6">
       {!closed && (
         <div className="mb-3.5 flex flex-wrap gap-2">
           {stallDays !== null && (
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-[var(--ck-rework-soft)] px-2.5 py-1 text-xs font-semibold text-[var(--ck-rework)]">
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-[color:var(--warn-tint)] px-2.5 py-1 text-xs font-semibold text-[color:var(--warn)]">
               <span aria-hidden>⏱</span>
               {t(`state.${state}`)}
               <span className="font-mono font-medium tabular-nums" dir="ltr">
@@ -98,7 +101,7 @@ export function EngagementHero({
               </span>
             </span>
           )}
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-[var(--ck-surface-2)] px-2.5 py-1 text-xs font-semibold text-[var(--ck-muted)]">
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-[color:var(--track)] px-2.5 py-1 text-xs font-semibold text-[color:var(--text-muted)]">
             <span className="font-mono font-medium tabular-nums" dir="ltr">
               {th('revision', { n: revisionCount, free: freeRevisionN })}
             </span>
@@ -106,13 +109,13 @@ export function EngagementHero({
         </div>
       )}
 
-      <p className="mb-2 font-mono text-[11px] uppercase tracking-[0.12em] text-[var(--ck-accent-ink)]">
+      <p className="mb-2 font-mono text-[11px] uppercase tracking-[0.12em] text-brand-ink">
         {th('whatsNext')}
       </p>
       <h2 className="mb-1 text-[22px] font-semibold leading-tight text-balance">
         {headline}
       </h2>
-      <p className="mb-4 text-[13.5px] text-[var(--ck-muted)]">{hint}</p>
+      <p className="mb-4 text-[13.5px] text-[color:var(--text-muted)]">{hint}</p>
 
       {primaryTrigger && !closed && (
         <>
@@ -123,8 +126,8 @@ export function EngagementHero({
                   <span
                     className={`grid h-5 w-5 shrink-0 place-items-center rounded-md text-xs ${
                       item.ok
-                        ? 'bg-[var(--ck-done)] text-white'
-                        : 'border-2 border-[var(--ck-line-strong)]'
+                        ? 'bg-[color:var(--success)] text-white'
+                        : 'border-2 border-[color:var(--rule)]'
                     }`}
                     aria-hidden
                   >
@@ -135,7 +138,7 @@ export function EngagementHero({
                   </span>
                   {item.amountDue && (
                     <span
-                      className="ms-auto font-mono text-[12.5px] tabular-nums text-[var(--ck-rework)]"
+                      className="ms-auto font-mono text-[12.5px] tabular-nums text-[color:var(--warn)]"
                       dir="ltr"
                     >
                       {/* Exact shortfall (told = charged): the badge must show the
@@ -157,7 +160,6 @@ export function EngagementHero({
                 type="button"
                 disabled={pending}
                 onClick={() => setPayOpen((open) => !open)}
-                className="bg-[var(--ck-accent-deep)] text-[var(--ck-on-accent)] hover:bg-[var(--ck-accent-deep)]/90"
               >
                 {th('logPaymentAdvance')}
               </Button>
@@ -167,7 +169,6 @@ export function EngagementHero({
                 type="button"
                 disabled={pending}
                 onClick={fireDirect}
-                className="bg-[var(--ck-accent-deep)] text-[var(--ck-on-accent)] hover:bg-[var(--ck-accent-deep)]/90"
               >
                 {pending && (
                   <Loader2 className="size-4 animate-spin" aria-hidden />
@@ -180,14 +181,13 @@ export function EngagementHero({
               variant="outline"
               disabled={pending}
               onClick={onRecordSomethingElse}
-              className="border-[var(--ck-line-strong)] text-[var(--ck-ink)]"
             >
               {th('recordSomethingElse')}
             </Button>
           </div>
 
           {showPayCta && (
-            <p className="mt-3.5 flex items-baseline gap-1.5 text-[12.5px] text-[var(--ck-muted)]">
+            <p className="mt-3.5 flex items-baseline gap-1.5 text-[12.5px] text-[color:var(--text-muted)]">
               <span aria-hidden>◆</span>
               <span>{th('payNote')}</span>
             </p>
@@ -261,7 +261,7 @@ function PaymentForm({
   }
 
   return (
-    <div className="mt-4 space-y-3 rounded-[10px] border border-[var(--ck-line)] bg-[var(--ck-surface-2)] p-3">
+    <div className="mt-4 space-y-3 rounded-[var(--r-item)] border border-[color:var(--rule)] bg-[color:var(--track)] p-3">
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <div className="space-y-1">
           <Label htmlFor="hero-pay-amount">{tc('amount')}</Label>

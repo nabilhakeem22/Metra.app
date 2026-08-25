@@ -6,10 +6,11 @@ import type { DesignState } from '@/lib/engagements/states';
 
 // The five phase groups (Slice 1) rendered as the cockpit's top journey band.
 // Purely presentational over the already-loaded engagement: the phase status is
-// DERIVED from `currentState`, never stored. Palette tokens (`--ck-*`) are scoped
-// to the `.engagement-cockpit` wrapper in globals.css, so nothing here leaks into
-// the rest of the app. Logical CSS only (inline-start/end) so the band mirrors
-// correctly in ar-EG RTL.
+// DERIVED from `currentState`, never stored. Reskinned to the glass system: a FLAT
+// (opaque `bg-card`, no backdrop-filter) panel so it never adds to the cockpit's
+// blur budget, with brand accents for the current phase and the semantic
+// success/warn tokens for done/rework. Logical CSS only (inline-start/end) so the
+// band mirrors correctly in ar-EG RTL.
 
 type PhaseStatus = 'done' | 'current' | 'upcoming' | 'off';
 type MicroStatus = 'done' | 'current' | 'upcoming' | 'rework';
@@ -28,44 +29,44 @@ function isReworkState(state: DesignState, revisionCount: number): boolean {
 function phaseCardClass(status: PhaseStatus): string {
   switch (status) {
     case 'done':
-      return 'border-transparent bg-[var(--ck-done-soft)]';
+      return 'border-transparent bg-[color:var(--success-tint)]';
     case 'current':
-      return 'border-[var(--ck-accent)] bg-[var(--ck-accent-soft)] shadow-[0_0_0_3px_var(--ck-accent-soft)]';
+      return 'border-brand bg-brand-tint shadow-[0_0_0_3px_var(--brand-tint)]';
     default:
-      return 'border-[var(--ck-line)] bg-[var(--ck-surface)]';
+      return 'border-[color:var(--rule)] bg-card';
   }
 }
 
 function phaseNameClass(status: PhaseStatus): string {
-  if (status === 'done') return 'text-[var(--ck-done)]';
-  if (status === 'current') return 'text-[var(--ck-accent-ink)]';
-  if (status === 'off') return 'text-[var(--ck-muted)]';
-  return 'text-[var(--ck-ink)]';
+  if (status === 'done') return 'text-[color:var(--success)]';
+  if (status === 'current') return 'text-brand-ink';
+  if (status === 'off') return 'text-[color:var(--text-muted)]';
+  return 'text-[color:var(--text)]';
 }
 
 function microPillClass(status: MicroStatus): string {
   switch (status) {
     case 'done':
-      return 'bg-[var(--ck-done-soft)] text-[var(--ck-done)]';
+      return 'bg-[color:var(--success-tint)] text-[color:var(--success)]';
     case 'current':
-      return 'bg-[var(--ck-accent-deep)] font-semibold text-[var(--ck-on-accent)]';
+      return 'bg-brand font-semibold text-brand-foreground';
     case 'rework':
-      return 'bg-[var(--ck-rework-soft)] font-semibold text-[var(--ck-rework)]';
+      return 'bg-[color:var(--warn-tint)] font-semibold text-[color:var(--warn)]';
     default:
-      return 'border border-dashed border-[var(--ck-line-strong)] bg-transparent text-[var(--ck-muted)]';
+      return 'border border-dashed border-[color:var(--rule)] bg-transparent text-[color:var(--text-muted)]';
   }
 }
 
 function microDotClass(status: MicroStatus): string {
   switch (status) {
     case 'done':
-      return 'bg-[var(--ck-done)]';
+      return 'bg-[color:var(--success)]';
     case 'current':
-      return 'bg-[var(--ck-on-accent)]';
+      return 'bg-brand-foreground';
     case 'rework':
-      return 'bg-[var(--ck-rework)]';
+      return 'bg-[color:var(--warn)]';
     default:
-      return 'bg-[var(--ck-line-strong)]';
+      return 'bg-[color:var(--rule)]';
   }
 }
 
@@ -88,12 +89,12 @@ export function EngagementPhaseRail({
     : -1;
 
   return (
-    <section className="engagement-cockpit rounded-[14px] border border-[var(--ck-line)] bg-[var(--ck-surface)] p-4 text-[var(--ck-ink)] shadow-sm">
+    <section className="rounded-[var(--r-panel)] border border-[color:var(--rule)] bg-card p-4 text-[color:var(--text)] shadow-sm">
       <header className="mb-3 flex items-baseline justify-between gap-3 px-0.5">
-        <span className="font-mono text-[11px] uppercase tracking-[0.1em] text-[var(--ck-faint)]">
+        <span className="font-mono text-[11px] uppercase tracking-[0.1em] text-[color:var(--text-faint)]">
           {t('rail.title')}
         </span>
-        <span className="text-xs text-[var(--ck-muted)]">
+        <span className="text-xs text-[color:var(--text-muted)]">
           {offFunnel
             ? t('rail.offFunnel')
             : t('rail.progress', {
@@ -115,10 +116,10 @@ export function EngagementPhaseRail({
           return (
             <li
               key={group.key}
-              className={`rounded-[11px] border p-3 ${phaseCardClass(status)}`}
+              className={`rounded-[var(--r-item)] border p-3 ${phaseCardClass(status)}`}
               aria-current={status === 'current' ? 'step' : undefined}
             >
-              <div className="font-mono text-[10.5px] tabular-nums text-[var(--ck-faint)]">
+              <div className="font-mono text-[10.5px] tabular-nums text-[color:var(--text-faint)]">
                 {String(index + 1).padStart(2, '0')}
               </div>
               <div
@@ -127,10 +128,10 @@ export function EngagementPhaseRail({
                 {t(`phase.${group.key}`)}
               </div>
               {status !== 'off' && (
-                <div className="mt-2 flex items-center gap-1.5 text-[11px] text-[var(--ck-muted)]">
+                <div className="mt-2 flex items-center gap-1.5 text-[11px] text-[color:var(--text-muted)]">
                   {status === 'done' && (
                     <span
-                      className="inline-grid h-[15px] w-[15px] place-items-center rounded-full bg-[var(--ck-done)] text-[9px] text-white"
+                      className="inline-grid h-[15px] w-[15px] place-items-center rounded-full bg-[color:var(--success)] text-[9px] text-white"
                       aria-hidden
                     >
                       ✓
@@ -138,14 +139,14 @@ export function EngagementPhaseRail({
                   )}
                   {status === 'current' && (
                     <span
-                      className="inline-grid h-[15px] w-[15px] place-items-center rounded-full bg-[var(--ck-accent-deep)] text-[9px] text-white"
+                      className="inline-grid h-[15px] w-[15px] place-items-center rounded-full bg-brand text-[9px] text-brand-foreground"
                       aria-hidden
                     >
                       •
                     </span>
                   )}
                   <span
-                    className={status === 'done' ? 'text-[var(--ck-done)]' : ''}
+                    className={status === 'done' ? 'text-[color:var(--success)]' : ''}
                   >
                     {t(`phaseStatus.${status}`)}
                   </span>
@@ -157,7 +158,7 @@ export function EngagementPhaseRail({
       </ol>
 
       {currentGroup && (
-        <ol className="mt-3 flex flex-wrap gap-1.5 border-t border-dashed border-[var(--ck-line-strong)] pt-3">
+        <ol className="mt-3 flex flex-wrap gap-1.5 border-t border-dashed border-[color:var(--rule)] pt-3">
           {currentGroup.states.map((state, microIndex) => {
             const status: MicroStatus = isReworkState(state, revisionCount)
               ? 'rework'
