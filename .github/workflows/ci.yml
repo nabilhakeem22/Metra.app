@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, validate/epic-d-s3]
   pull_request:
     branches: [main]
 
