@@ -2,6 +2,7 @@
 
 import { Bell } from 'lucide-react';
 import { useTranslations } from 'next-intl';
+import { IconButton } from '@/components/ui/icon-button';
 import { Link } from '@/i18n/routing';
 
 /**
@@ -14,31 +15,27 @@ export function NotificationBell({ unreadCount }: { unreadCount: number }) {
   const hasUnread = unreadCount > 0;
 
   return (
-    <Link
-      href="/notifications"
+    <IconButton
+      asChild
       aria-label={
         hasUnread ? t('bellWithCount', { count: unreadCount }) : t('bell')
       }
-      // Glass icon button (fill + hairline only — no nested blur).
-      className="relative inline-flex size-[34px] items-center justify-center rounded-[11px] border text-[color:var(--text-muted)] transition-colors hover:text-[color:var(--text)]"
-      style={{
-        background: 'var(--glass)',
-        borderColor: 'var(--glass-hairline)',
-      }}
     >
-      <Bell width={17} height={17} aria-hidden />
-      {hasUnread && (
-        <span
-          className="absolute size-[7px] rounded-full"
-          style={{
-            top: '5px',
-            insetInlineEnd: '5px',
-            background: 'var(--danger)',
-            border: '1.5px solid rgba(255,255,255,.9)',
-          }}
-          aria-hidden
-        />
-      )}
-    </Link>
+      <Link href="/notifications">
+        <Bell width={17} height={17} aria-hidden />
+        {hasUnread && (
+          <span
+            className="absolute size-[7px] rounded-full"
+            style={{
+              top: '5px',
+              insetInlineEnd: '5px',
+              background: 'var(--danger)',
+              border: '1.5px solid rgba(255,255,255,.9)',
+            }}
+            aria-hidden
+          />
+        )}
+      </Link>
+    </IconButton>
   );
 }

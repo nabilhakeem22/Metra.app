@@ -3,6 +3,7 @@
 import { Menu } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { HelpMenu } from '@/components/onboarding/help-menu';
+import { IconButton } from '@/components/ui/icon-button';
 import type { MemberRole } from '@/lib/permissions/roles';
 import { cn } from '@/lib/utils';
 import { LocaleSwitch } from './locale-switch';
@@ -35,18 +36,14 @@ export function TopBar({
     >
       {/* Hamburger opens the sidebar drawer below lg; the fixed slab replaces it
           at lg+. Glass icon button (fill + hairline only — no nested blur). */}
-      <button
+      <IconButton
         type="button"
         onClick={onOpenDrawer}
         aria-label={shell('menu')}
-        className="inline-flex size-[34px] items-center justify-center rounded-[11px] border text-[color:var(--text-muted)] transition-colors hover:text-[color:var(--text)] lg:hidden"
-        style={{
-          background: 'var(--glass)',
-          borderColor: 'var(--glass-hairline)',
-        }}
+        className="lg:hidden"
       >
         <Menu width={17} height={17} aria-hidden />
-      </button>
+      </IconButton>
 
       <div className="hidden sm:block">
         <SegmentedTabs />

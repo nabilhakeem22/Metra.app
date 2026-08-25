@@ -91,14 +91,20 @@ export function Sidebar({
                   (pathname === item.href ||
                     pathname.startsWith(`${item.href}/`));
 
+                // Active state reads via a subtle --brand-tint chip BEHIND the
+                // stroke icon (icon stays stroked in currentColor = --brand-ink),
+                // not by force-filling the glyph's stroke paths — which looked
+                // uneven across different Lucide icons (Slice-2 D3). Every row
+                // reserves the same 22px icon box so the label column never shifts.
                 const icon = (
-                  <Icon
-                    width={17}
-                    height={17}
-                    className="shrink-0"
-                    style={active ? { fill: 'var(--brand-ink)' } : undefined}
-                    aria-hidden
-                  />
+                  <span
+                    className={cn(
+                      'inline-flex size-[22px] shrink-0 items-center justify-center rounded-[7px]',
+                      active && 'bg-[color:var(--brand-tint)]',
+                    )}
+                  >
+                    <Icon width={17} height={17} aria-hidden />
+                  </span>
                 );
 
                 if (item.action === 'signout') {
