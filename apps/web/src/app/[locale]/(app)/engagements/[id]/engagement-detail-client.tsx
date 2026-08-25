@@ -27,6 +27,7 @@ import { EngagementNextActions } from './engagement-next-actions';
 import { EngagementPanels } from './engagement-panels';
 import { EngagementPhaseRail } from './engagement-phase-rail';
 import { EngagementPulseBar } from './engagement-pulse-bar';
+import { EngagementRightRail } from './engagement-right-rail';
 import { ENGAGEMENT_TABS, type EngagementTab } from './tabs';
 
 export function EngagementDetailClient({
@@ -62,7 +63,7 @@ export function EngagementDetailClient({
   const te = useTranslations('errors');
   const tp = useTranslations('engagements.panels');
   const router = useRouter();
-  const [tab, setTab] = useState<EngagementTab>('fee');
+  const [tab, setTab] = useState<EngagementTab>('payments');
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<ActionCode | null>(null);
   const dataEntryRef = useRef<HTMLDivElement>(null);
@@ -93,73 +94,86 @@ export function EngagementDetailClient({
         revisionCount={header.revisionCount}
       />
 
-      <EngagementHero
-        engagementId={header.id}
-        preview={gatePreview}
-        state={header.state}
-        revisionCount={header.revisionCount}
-        freeRevisionN={header.freeRevisionN}
-        stallDays={stallDays}
-        canAdvance={canAdvance}
-        canRecordPayment={capabilities.recordPayment}
-        pending={pending}
-        runAction={runAction}
-        onRecordSomethingElse={scrollToDataEntry}
-      />
+      <div className="grid gap-4 lg:grid-cols-[1.5fr_1fr] lg:items-start">
+        {/* LEFT: action-over-history — the hero + the fuller detail below it. */}
+        <div className="min-w-0 space-y-4">
+          <EngagementHero
+            engagementId={header.id}
+            preview={gatePreview}
+            state={header.state}
+            revisionCount={header.revisionCount}
+            freeRevisionN={header.freeRevisionN}
+            stallDays={stallDays}
+            canAdvance={canAdvance}
+            canRecordPayment={capabilities.recordPayment}
+            pending={pending}
+            runAction={runAction}
+            onRecordSomethingElse={scrollToDataEntry}
+          />
 
-      <EngagementHeaderCard header={header} />
+          <EngagementHeaderCard header={header} />
 
-      {error && (
-        <p className="text-sm text-destructive" role="alert">
-          {resolveActionError(error, te)}
-        </p>
-      )}
+          {error && (
+            <p className="text-sm text-destructive" role="alert">
+              {resolveActionError(error, te)}
+            </p>
+          )}
 
-      <EngagementNextActions
-        engagementId={header.id}
-        triggers={nextActions}
-        pending={pending}
-        runAction={runAction}
-      />
+          <EngagementNextActions
+            engagementId={header.id}
+            triggers={nextActions}
+            pending={pending}
+            runAction={runAction}
+          />
 
-      <div ref={dataEntryRef}>
-        <EngagementControls
-          engagementId={header.id}
-          capabilities={capabilities}
-          pending={pending}
-          runAction={runAction}
+          <div ref={dataEntryRef}>
+            <EngagementControls
+              engagementId={header.id}
+              capabilities={capabilities}
+              pending={pending}
+              runAction={runAction}
+            />
+          </div>
+
+          <div className="flex flex-wrap gap-2 border-b">
+            {ENGAGEMENT_TABS.map((tb) => (
+              <button
+                key={tb}
+                type="button"
+                onClick={() => setTab(tb)}
+                className={`border-b-2 px-3 py-2 text-sm ${
+                  tab === tb
+                    ? 'border-primary font-medium'
+                    : 'border-transparent text-muted-foreground'
+                }`}
+              >
+                {tp(tb)}
+              </button>
+            ))}
+          </div>
+
+          <EngagementPanels
+            tab={tab}
+            data={{
+              header,
+              feeSchedule,
+              payments,
+              artifacts,
+              events,
+              changeOrders,
+              transitions,
+            }}
+          />
+        </div>
+
+        {/* RIGHT RAIL: pinned working files → collapsible ledger → activity. */}
+        <EngagementRightRail
+          artifacts={artifacts}
+          feeSchedule={feeSchedule}
+          transitions={transitions}
+          events={events}
         />
       </div>
-
-      <div className="flex flex-wrap gap-2 border-b">
-        {ENGAGEMENT_TABS.map((tb) => (
-          <button
-            key={tb}
-            type="button"
-            onClick={() => setTab(tb)}
-            className={`border-b-2 px-3 py-2 text-sm ${
-              tab === tb
-                ? 'border-primary font-medium'
-                : 'border-transparent text-muted-foreground'
-            }`}
-          >
-            {tp(tb)}
-          </button>
-        ))}
-      </div>
-
-      <EngagementPanels
-        tab={tab}
-        data={{
-          header,
-          feeSchedule,
-          payments,
-          artifacts,
-          events,
-          changeOrders,
-          transitions,
-        }}
-      />
     </div>
   );
 }

@@ -1383,6 +1383,28 @@
       "rom": "Build-cost range",
       "timeline": "Timeline"
     },
+    "files": {
+      "title": "Working files",
+      "latestApproved": "latest approved",
+      "approvedMeta": "approved · v{n}",
+      "notAvailable": "Not yet available",
+      "download": "Download",
+      "open": "Open",
+      "category": {
+        "layout": "2D layout",
+        "render": "Render set",
+        "boq": "Draft BOQ"
+      },
+      "badge": {
+        "layout": "2D",
+        "render": "3D",
+        "boq": "BOQ"
+      }
+    },
+    "rail": {
+      "auditLedger": "audit ledger",
+      "recentActivity": "Recent activity"
+    },
     "fee": {
       "designFee": "Design fee",
       "notSet": "No fee schedule yet.",

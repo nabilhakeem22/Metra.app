@@ -1383,6 +1383,28 @@
       "rom": "نطاق تكلفة التنفيذ",
       "timeline": "الجدول الزمني"
     },
+    "files": {
+      "title": "ملفات العمل",
+      "latestApproved": "أحدث المعتمدة",
+      "approvedMeta": "معتمد · إصدار {n}",
+      "notAvailable": "غير متاح بعد",
+      "download": "تنزيل",
+      "open": "فتح",
+      "category": {
+        "layout": "مخطط ثنائي الأبعاد",
+        "render": "مجموعة الرندر",
+        "boq": "مسودة حصر الكميات"
+      },
+      "badge": {
+        "layout": "2D",
+        "render": "3D",
+        "boq": "BOQ"
+      }
+    },
+    "rail": {
+      "auditLedger": "سجل التدقيق",
+      "recentActivity": "النشاط الأخير"
+    },
     "fee": {
       "designFee": "أتعاب التصميم",
       "notSet": "لا يوجد جدول أتعاب بعد.",
