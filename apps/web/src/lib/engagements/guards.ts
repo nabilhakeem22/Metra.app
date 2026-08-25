@@ -11,6 +11,7 @@ import type {
   EngagementChangeOrder,
   EngagementEvent,
   EngagementMilestone,
+  MilestoneBasis,
   MilestoneKind,
   PaymentEvent,
 } from '@metra/db';
@@ -135,14 +136,35 @@ function milestoneRequiredAndPaid(
   const milestone = facts.milestones.find((m) => m.kind === kind);
   if (!milestone) return { required: 0n, paid };
 
-  const designFee = facts.engagement.designFee;
-  if (!designFee) return { required: null, paid };
+  return {
+    required: milestoneRequired4(
+      milestone.basis,
+      milestone.value,
+      facts.engagement.designFee,
+    ),
+    paid,
+  };
+}
 
-  const required =
-    milestone.basis === 'amount'
-      ? parseMoney4(milestone.value)
-      : pctOf(parseMoney4(designFee), parseMoney4(milestone.value));
-  return { required, paid };
+/**
+ * The exact scale-4 REQUIRED amount one milestone resolves to, or `null` when it
+ * cannot be computed. A `percent`-basis milestone needs the engagement's
+ * `designFee` to become money (`pctOf` — the SAME round-half-away-from-zero rule as
+ * the proposal engine); an `amount`-basis milestone carries its own value. Either
+ * way an ABSENT design fee yields `null`: a scheduled money gate must never resolve
+ * an amount on absent fee facts (fail closed). PURE, client-safe, never parseFloat —
+ * shared by {@link milestoneRequiredAndPaid} (the guard) and the commercial-pulse
+ * read-model, so a firm's "amount due" is the SAME figure the guard admits.
+ */
+export function milestoneRequired4(
+  basis: MilestoneBasis,
+  value: string,
+  designFee: string | null | undefined,
+): bigint | null {
+  if (!designFee) return null;
+  return basis === 'amount'
+    ? parseMoney4(value)
+    : pctOf(parseMoney4(designFee), parseMoney4(value));
 }
 
 /**

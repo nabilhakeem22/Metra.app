@@ -1264,6 +1264,16 @@
       "progress": "المرحلة {current} من {total}",
       "offFunnel": "خارج المسار"
     },
+    "pulse": {
+      "contractTotal": "إجمالي العقد",
+      "collected": "المُحصَّل حتى تاريخه",
+      "pendingGate": "دفعة البوابة المستحقة",
+      "due": "مستحقة",
+      "unlocks": "← تحصيل {gate} يفتح {phase}",
+      "clears": "← تحصيل {gate}",
+      "noneOutstanding": "تم التحصيل بالكامل",
+      "allSettled": "لا توجد دفعات بوابة مستحقة."
+    },
     "guard": {
       "scopeInputsPresent": "النطاق والعميل والمشروع محددة",
       "depositCleared": "تم تحصيل العربون",

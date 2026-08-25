@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 import { PageHeader } from '@/components/ui/page-header';
 import { requireOrg } from '@/lib/auth/require-org';
 import { getEngagementGatePreview } from '@/lib/engagements/gate-preview';
+import { computeCommercialPulse } from '@/lib/engagements/pulse';
 import {
   getEngagementArtifacts,
   getEngagementChangeOrders,
@@ -47,6 +48,15 @@ export default async function EngagementDetailPage({
     getEngagementTransitions(ctx, id),
     getEngagementGatePreview(ctx, id),
   ]);
+
+  // The commercial pulse: a pure read-model over the fee schedule + payments the
+  // page has ALREADY loaded (no extra DB round-trip). Serialized scale-4 strings +
+  // an integer percent cross to the client bar.
+  const pulse = computeCommercialPulse({
+    feeSchedule,
+    payments,
+    state: header.state,
+  });
 
   const nextActions = legalTriggersFrom(header.state).filter((trigger) =>
     canRunTrigger(ctx.role, trigger),
@@ -96,6 +106,7 @@ export default async function EngagementDetailPage({
         gatePreview={gatePreview}
         canAdvance={canAdvance}
         stallDays={stallDays}
+        pulse={pulse}
       />
     </div>
   );

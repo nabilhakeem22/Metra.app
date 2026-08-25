@@ -1264,6 +1264,16 @@
       "progress": "Phase {current} of {total}",
       "offFunnel": "Off funnel"
     },
+    "pulse": {
+      "contractTotal": "Contract total",
+      "collected": "Collected to date",
+      "pendingGate": "Pending gate milestone",
+      "due": "due",
+      "unlocks": "→ clears {gate} and unlocks {phase}",
+      "clears": "→ clears {gate}",
+      "noneOutstanding": "Fully collected",
+      "allSettled": "No gate milestone is outstanding."
+    },
     "guard": {
       "scopeInputsPresent": "Scope, client & project set",
       "depositCleared": "Deposit cleared",

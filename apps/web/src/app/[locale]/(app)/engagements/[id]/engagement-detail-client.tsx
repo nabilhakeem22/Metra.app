@@ -15,6 +15,7 @@ import type {
   EngagementPayment,
   EngagementTransitionRecord,
 } from '@/lib/engagements/queries';
+import type { CommercialPulse } from '@/lib/engagements/pulse';
 import type { Trigger } from '@/lib/engagements/transitions';
 import {
   EngagementControls,
@@ -25,6 +26,7 @@ import { EngagementHero } from './engagement-hero';
 import { EngagementNextActions } from './engagement-next-actions';
 import { EngagementPanels } from './engagement-panels';
 import { EngagementPhaseRail } from './engagement-phase-rail';
+import { EngagementPulseBar } from './engagement-pulse-bar';
 import { ENGAGEMENT_TABS, type EngagementTab } from './tabs';
 
 export function EngagementDetailClient({
@@ -40,6 +42,7 @@ export function EngagementDetailClient({
   gatePreview,
   canAdvance,
   stallDays,
+  pulse,
 }: {
   header: EngagementHeader;
   feeSchedule: EngagementFeeSchedule;
@@ -53,6 +56,7 @@ export function EngagementDetailClient({
   gatePreview: EngagementGatePreview;
   canAdvance: boolean;
   stallDays: number | null;
+  pulse: CommercialPulse;
 }) {
   const t = useTranslations('engagements');
   const te = useTranslations('errors');
@@ -81,6 +85,8 @@ export function EngagementDetailClient({
       <Link href="/engagements" className="text-sm text-primary hover:underline">
         {t('backToList')}
       </Link>
+
+      <EngagementPulseBar pulse={pulse} />
 
       <EngagementPhaseRail
         currentState={header.state}
