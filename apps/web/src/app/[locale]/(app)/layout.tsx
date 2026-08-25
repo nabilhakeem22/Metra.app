@@ -1,3 +1,4 @@
+import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import type { ReactNode } from 'react';
 import { AppShell } from '@/components/shell/app-shell';
@@ -6,6 +7,10 @@ import { getSessionUser } from '@/lib/auth/session';
 import { countUnread } from '@/lib/notifications/queries';
 import { readOnboarding } from '@/lib/onboarding/merge';
 import { listCurrentUserOrgs } from '@/lib/org/queries';
+import { PRIVATE_METADATA } from '@/lib/seo/private-metadata';
+
+// The authed shell and everything under it is private — never index it.
+export const metadata: Metadata = PRIVATE_METADATA;
 
 export default async function AppLayout({
   children,

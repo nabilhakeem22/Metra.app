@@ -1,9 +1,14 @@
+import type { Metadata } from 'next';
 import { getTranslations } from 'next-intl/server';
 import { AuthShell } from '@/components/auth/auth-shell';
 import { Button } from '@/components/ui/button';
 import { Link } from '@/i18n/routing';
 import { getSessionUser } from '@/lib/auth/session';
+import { PRIVATE_METADATA } from '@/lib/seo/private-metadata';
 import { AcceptInvite } from './accept-client';
+
+// Tokenized invite link — private to the invitee. Never index it.
+export const metadata: Metadata = PRIVATE_METADATA;
 
 export default async function InvitePage({
   params,

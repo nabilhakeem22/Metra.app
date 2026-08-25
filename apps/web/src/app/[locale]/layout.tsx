@@ -1,10 +1,12 @@
+import type { Metadata } from 'next';
 import { NextIntlClientProvider } from 'next-intl';
-import { getMessages } from 'next-intl/server';
+import { getMessages, getTranslations } from 'next-intl/server';
 import { Manrope, Tajawal } from 'next/font/google';
 import { notFound } from 'next/navigation';
 import type { ReactNode } from 'react';
 import { ThemeProvider } from '@/components/theme-provider';
 import { LOCALES, dirFor, type Locale } from '@/i18n/routing';
+import { getSiteUrl } from '@/lib/seo/site-url';
 import '../globals.css';
 
 const manrope = Manrope({
@@ -21,10 +23,25 @@ const tajawal = Tajawal({
   display: 'swap',
 });
 
-export const metadata = {
-  title: 'Metra — Project and cost control for fit-out contractors',
-  description: 'إدارة وتكاليف مشاريع التشطيبات',
-};
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}): Promise<Metadata> {
+  const { locale } = await params;
+  const t = await getTranslations({ locale, namespace: 'meta' });
+  const siteName = t('siteName');
+
+  return {
+    // Resolves OG/canonical/alternate relative URLs to absolute ones.
+    metadataBase: new URL(getSiteUrl()),
+    title: {
+      default: `${siteName} — ${t('title')}`,
+      template: `%s · ${siteName}`,
+    },
+    description: t('description'),
+  };
+}
 
 export default async function LocaleLayout({
   children,

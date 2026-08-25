@@ -1,6 +1,53 @@
+import type { Metadata } from 'next';
 import { useTranslations } from 'next-intl';
+import { getTranslations } from 'next-intl/server';
 import { Button } from '@/components/ui/button';
-import { Link } from '@/i18n/routing';
+import { LOCALES, Link, type Locale } from '@/i18n/routing';
+
+// Open Graph uses BCP-47-with-underscore locale codes.
+const OG_LOCALE: Record<Locale, string> = {
+  'ar-EG': 'ar_EG',
+  en: 'en_US',
+};
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}): Promise<Metadata> {
+  const { locale } = await params;
+  const t = await getTranslations({ locale, namespace: 'meta' });
+  const title = t('title');
+  const description = t('description');
+  const siteName = t('siteName');
+
+  // hreflang: one entry per locale, resolved against metadataBase.
+  const languages = Object.fromEntries(
+    LOCALES.map((code) => [code, `/${code}`]),
+  );
+
+  return {
+    title,
+    description,
+    alternates: {
+      canonical: `/${locale}`,
+      languages,
+    },
+    openGraph: {
+      type: 'website',
+      title: `${siteName} — ${title}`,
+      description,
+      siteName,
+      locale: OG_LOCALE[locale as Locale] ?? OG_LOCALE.en,
+      url: `/${locale}`,
+    },
+    twitter: {
+      card: 'summary',
+      title: `${siteName} — ${title}`,
+      description,
+    },
+  };
+}
 
 export default function HomePage() {
   const t = useTranslations('home');

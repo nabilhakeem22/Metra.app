@@ -11,6 +11,11 @@
     "signIn": "Sign in",
     "localeName": "English"
   },
+  "meta": {
+    "title": "Project and cost control for fit-out contractors",
+    "description": "Every pound of a project's value, traceable from the line you quoted to the line you invoiced.",
+    "siteName": "Metra"
+  },
   "nav": {
     "dashboard": "Dashboard",
     "projects": "Projects",
