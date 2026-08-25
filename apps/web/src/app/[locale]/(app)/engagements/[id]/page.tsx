@@ -2,6 +2,7 @@ import { getTranslations } from 'next-intl/server';
 import { notFound } from 'next/navigation';
 import { PageHeader } from '@/components/ui/page-header';
 import { requireOrg } from '@/lib/auth/require-org';
+import { getEngagementGatePreview } from '@/lib/engagements/gate-preview';
 import {
   getEngagementArtifacts,
   getEngagementChangeOrders,
@@ -29,15 +30,23 @@ export default async function EngagementDetailPage({
   if (!header) notFound();
 
   const t = await getTranslations('engagements');
-  const [feeSchedule, payments, artifacts, events, changeOrders, transitions] =
-    await Promise.all([
-      getEngagementFeeSchedule(ctx, id),
-      getEngagementPayments(ctx, id),
-      getEngagementArtifacts(ctx, id),
-      getEngagementEvents(ctx, id),
-      getEngagementChangeOrders(ctx, id),
-      getEngagementTransitions(ctx, id),
-    ]);
+  const [
+    feeSchedule,
+    payments,
+    artifacts,
+    events,
+    changeOrders,
+    transitions,
+    gatePreview,
+  ] = await Promise.all([
+    getEngagementFeeSchedule(ctx, id),
+    getEngagementPayments(ctx, id),
+    getEngagementArtifacts(ctx, id),
+    getEngagementEvents(ctx, id),
+    getEngagementChangeOrders(ctx, id),
+    getEngagementTransitions(ctx, id),
+    getEngagementGatePreview(ctx, id),
+  ]);
 
   const nextActions = legalTriggersFrom(header.state).filter((trigger) =>
     canRunTrigger(ctx.role, trigger),
@@ -48,6 +57,25 @@ export default async function EngagementDetailPage({
     setRom: can(ctx.role, 'engagements_design', 'update'),
     recordRomAck: can(ctx.role, 'engagements_design', 'create'),
   };
+
+  // May this role fire the hero's forward-advance trigger? (The server action
+  // re-checks — this only decides whether to OFFER the CTA.)
+  const canAdvance =
+    gatePreview.primaryTrigger !== null &&
+    canRunTrigger(ctx.role, gatePreview.primaryTrigger);
+
+  // Days since the newest transition (transitions are newest-first). Computed on
+  // the server so the client hero renders a stable value with no Date/hydration
+  // drift and no Arabic-Indic digits.
+  const latestTransitionAt = transitions[0]?.decidedAt ?? null;
+  const stallDays = latestTransitionAt
+    ? Math.max(
+        0,
+        Math.floor(
+          (Date.now() - new Date(latestTransitionAt).getTime()) / 86_400_000,
+        ),
+      )
+    : null;
 
   return (
     <div className="space-y-6">
@@ -65,6 +93,9 @@ export default async function EngagementDetailPage({
         transitions={transitions}
         nextActions={nextActions}
         capabilities={capabilities}
+        gatePreview={gatePreview}
+        canAdvance={canAdvance}
+        stallDays={stallDays}
       />
     </div>
   );

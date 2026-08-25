@@ -1276,6 +1276,72 @@
       "rendersPresent": "Approved render ready",
       "asBuiltDueOpen": "As-built check open"
     },
+    "hero": {
+      "whatsNext": "What's next",
+      "day": "Day {n}",
+      "revision": "Revision {n} of {free}",
+      "due": "{amount} due",
+      "logPaymentAdvance": "Log payment & advance",
+      "advance": "Advance to the next stage",
+      "recordSomethingElse": "Record something else",
+      "payNote": "Logging the payment advances the engagement automatically — the client is never shown the amount.",
+      "closed": {
+        "headline": "This engagement is closed",
+        "hint": "No further action is needed — the design lifecycle has ended."
+      },
+      "created": {
+        "headline": "Put a design fee in front of the client",
+        "hint": "Set the fee and its milestone split to open the engagement."
+      },
+      "design_proposal": {
+        "headline": "Collect the signing deposit to start work",
+        "hint": "Once the deposit clears, the survey stage unlocks."
+      },
+      "survey": {
+        "headline": "Capture the site's spatial base",
+        "hint": "Record the measured survey — or the developer CAD set for off-plan — to move to layout."
+      },
+      "layout": {
+        "headline": "Share concept options with the client",
+        "hint": "Record 2 to 4 concept options, then advance to the concept review."
+      },
+      "concept_review": {
+        "headline": "Collect the Gate A installment & lock the concept",
+        "hint": "Once the client picks a concept and the Gate A payment clears, the 3D phase opens."
+      },
+      "negotiation": {
+        "headline": "Settle any revision charges & confirm the concept",
+        "hint": "Clear outstanding revision change orders to lock the concept and start 3D design."
+      },
+      "design_3d": {
+        "headline": "Publish the approved render set",
+        "hint": "Mark at least one approved render to capture the baseline and reach final approval."
+      },
+      "final_approval": {
+        "headline": "Close Gate B & approve the design",
+        "hint": "The budget range must be acknowledged, the as-built reconciled, and the Gate B installment cleared."
+      },
+      "change_triage": {
+        "headline": "Reconcile the as-built variance",
+        "hint": "Attest a clean as-built to return the engagement to final approval."
+      },
+      "shop_drawings": {
+        "headline": "Prepare the shop drawings",
+        "hint": "Draft the construction drawings — the next stage isn't automated yet."
+      },
+      "boq": {
+        "headline": "Build the bill of quantities",
+        "hint": "Compile the BOQ — the next stage isn't automated yet."
+      },
+      "execution_decision": {
+        "headline": "Choose the handoff path",
+        "hint": "Decide between a design-only handoff and full execution — not automated yet."
+      },
+      "design_only_handoff": {
+        "headline": "Await the recipient's acknowledgement",
+        "hint": "The issued-for-construction package is out — closing awaits acknowledgement, not automated yet."
+      }
+    },
     "nextActions": {
       "title": "Next actions",
       "none": "No actions available from this stage."

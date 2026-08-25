@@ -98,29 +98,80 @@ function milestoneCleared(
   kind: MilestoneKind,
   code: ActionCode,
 ): GuardResult {
-  const milestone = facts.milestones.find((m) => m.kind === kind);
-  // Absent milestone: the firm never scheduled this gate, so it is free.
-  if (!milestone) return pass;
+  const { required, paid } = milestoneRequiredAndPaid(facts, kind);
+  // `required === null`: the milestone exists but the design fee is missing, so
+  // the amount can't be computed — a scheduled money gate must fail closed.
+  if (required === null) return { ok: false, code };
+  if (paid < required) return { ok: false, code };
+  return pass;
+}
 
-  const designFee = facts.engagement.designFee;
-  if (!designFee) {
-    return { ok: false, code };
-  }
-
-  const required =
-    milestone.basis === 'amount'
-      ? parseMoney4(milestone.value)
-      : pctOf(parseMoney4(designFee), parseMoney4(milestone.value));
-
+/**
+ * The exact scale-4 REQUIRED and PAID amounts backing a milestone-gated money
+ * guard — the single arithmetic {@link milestoneCleared} and the hero's gate
+ * preview both read, so the "amount due" a firm sees is computed by the SAME math
+ * that admits the transition (no reinvented formula):
+ *   - ABSENT milestone → `required = 0n` (free gate: nothing to pay).
+ *   - milestone present, design fee MISSING → `required = null` (cannot compute;
+ *     the guard fails closed and there is no numeric shortfall to surface).
+ *   - milestone present + design fee set → `required` = the `amount` value or
+ *     `pctOf(fee, pct)`, exactly as the guard computes it.
+ * `paid` is Σ of the engagement's payment events of the SAME `kind`.
+ */
+function milestoneRequiredAndPaid(
+  facts: GuardFacts,
+  kind: MilestoneKind,
+): { required: bigint | null; paid: bigint } {
   const paid = facts.payments.reduce(
     (sum, payment) =>
       payment.kind === kind ? sum + parseMoney4(payment.amount) : sum,
     0n,
   );
 
-  if (paid < required) return { ok: false, code };
-  return pass;
+  const milestone = facts.milestones.find((m) => m.kind === kind);
+  if (!milestone) return { required: 0n, paid };
+
+  const designFee = facts.engagement.designFee;
+  if (!designFee) return { required: null, paid };
+
+  const required =
+    milestone.basis === 'amount'
+      ? parseMoney4(milestone.value)
+      : pctOf(parseMoney4(designFee), parseMoney4(milestone.value));
+  return { required, paid };
 }
+
+/**
+ * The scale-4 BigInt SHORTFALL (`required − paid`, clamped at 0) still owed on a
+ * milestone money gate — the "amount due" the hero pre-fills into its pay-and-
+ * advance form. Reuses {@link milestoneRequiredAndPaid}, so it can never drift
+ * from what {@link milestoneCleared} admits. Returns 0n when the gate is already
+ * satisfied, the milestone is absent (free gate), or the amount is uncomputable
+ * (no design fee) — i.e. only a genuine positive shortfall is a real amount due.
+ */
+export function milestoneShortfall4(
+  facts: GuardFacts,
+  kind: MilestoneKind,
+): bigint {
+  const { required, paid } = milestoneRequiredAndPaid(facts, kind);
+  if (required === null) return 0n;
+  const shortfall = required - paid;
+  return shortfall > 0n ? shortfall : 0n;
+}
+
+/**
+ * The money guards whose shortfall the gate preview surfaces as an "amount due",
+ * mapped to the milestone (and, since the three spellings coincide, payment) kind
+ * they clear. The hero reads this to know a checklist item is a PAYMENT gate and
+ * to pre-fill/route the pay-and-advance form. `revisionCosSettled` is a money gate
+ * too but settles change orders (not a milestone), so it is deliberately absent —
+ * it has no `milestoneCleared` shortfall.
+ */
+export const MONEY_GUARD_MILESTONE: Partial<Record<GuardKey, MilestoneKind>> = {
+  depositCleared: 'deposit',
+  gateAInstallmentCleared: 'gate_a',
+  gateBInstallmentCleared: 'gate_b',
+};
 
 /**
  * The engagement's deposit is fully paid — the gate for `confirmAndPayDeposit`.

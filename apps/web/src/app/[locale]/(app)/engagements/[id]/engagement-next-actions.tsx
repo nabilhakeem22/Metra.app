@@ -8,37 +8,11 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import type { ActionResult } from '@/lib/actions/result';
-import {
-  approveDesign,
-  attestAsBuiltClean,
-  confirmAndPayDeposit,
-  confirmConcept,
-  flagAsBuiltVariance,
-  optionsReady,
-  rejectDesign,
-  rendersReady,
-  requestRevision,
-  selectConcept,
-  spatialBaseReady,
-} from '@/lib/engagements/actions';
+import { requestRevision } from '@/lib/engagements/actions';
 import { triggerNeedsForm } from '@/lib/engagements/ui';
 import type { Trigger } from '@/lib/engagements/transitions';
 import { EngagementFeeForm } from './engagement-fee-form';
-
-// Payload-free triggers -> their server action. The two payload triggers
-// (submitDesignFee, requestRevision) open a form instead and are absent here.
-const DIRECT: Partial<Record<Trigger, (id: string) => Promise<ActionResult>>> = {
-  confirmAndPayDeposit,
-  spatialBaseReady,
-  optionsReady,
-  selectConcept,
-  confirmConcept,
-  rendersReady,
-  flagAsBuiltVariance,
-  attestAsBuiltClean,
-  approveDesign,
-  rejectDesign,
-};
+import { DIRECT_TRIGGER_ACTIONS } from './trigger-actions';
 
 export function EngagementNextActions({
   engagementId,
@@ -62,7 +36,7 @@ export function EngagementNextActions({
       setOpenForm(trigger as 'submitDesignFee' | 'requestRevision');
       return;
     }
-    const fn = DIRECT[trigger];
+    const fn = DIRECT_TRIGGER_ACTIONS[trigger];
     if (fn) runAction(() => fn(engagementId));
   }
 
