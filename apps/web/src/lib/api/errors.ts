@@ -139,6 +139,7 @@ export const ACTION_CODE_PROBLEM: Record<ActionCode, ApiProblemKind> = {
   payment_kind_mismatch: 'bad-request',
   firm_type_unavailable: 'bad-request',
   project_delivery_exists: 'conflict',
+  project_delivery_limit_reached: 'conflict',
 };
 
 /** A problem Response derived from an ActionResult error code. */

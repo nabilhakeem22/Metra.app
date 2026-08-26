@@ -5,7 +5,10 @@ import { Link } from '@/i18n/routing';
 import { requireOrg } from '@/lib/auth/require-org';
 import { listActivities } from '@/lib/activities/queries';
 import { getClientOptions } from '@/lib/clients/queries';
-import { getEngagementByProject } from '@/lib/engagements/queries';
+import {
+  countProjectDeliveries,
+  getEngagementByProject,
+} from '@/lib/engagements/queries';
 import { listProjectDocuments } from '@/lib/project-documents/queries';
 import { listStages } from '@/lib/project-stages/queries';
 import { listProjectTypes } from '@/lib/project-types/queries';
@@ -95,6 +98,7 @@ export default async function ProjectProfilePage({
               can(ctx.role, 'engagements_design', 'read')
                 ? {
                     delivery: await getEngagementByProject(ctx, id),
+                    deliveryCount: await countProjectDeliveries(ctx, id),
                     clientId: project.clientId,
                     projectId: id,
                     canStart: can(ctx.role, 'engagements_design', 'create'),

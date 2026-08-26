@@ -70,7 +70,8 @@ export type ActionCode =
   | 'flow_not_enabled'
   | 'payment_kind_mismatch'
   | 'firm_type_unavailable'
-  | 'project_delivery_exists';
+  | 'project_delivery_exists'
+  | 'project_delivery_limit_reached';
 
 export interface ActionResult {
   ok: boolean;

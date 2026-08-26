@@ -17,7 +17,7 @@ import {
   type MilestoneKind,
   type PaymentEventKind,
 } from '@metra/db';
-import { asc, desc, eq } from 'drizzle-orm';
+import { and, asc, count, desc, eq, ne } from 'drizzle-orm';
 import { withOrgContext, type OrgContext } from '@/lib/db/context';
 import { TERMINAL_STATES } from './states';
 
@@ -119,6 +119,34 @@ export function getEngagementByProject(
       rows.find((row) => !TERMINAL_STATES.has(row.state)) ?? rows[0] ?? null;
     if (!current) return null;
     return { ...current, createdAt: current.createdAt.toISOString() };
+  });
+}
+
+/**
+ * How many deliveries count toward a project's lifetime cap (Slice C2-hardening):
+ * the number of NON-abandoned deliveries. Predicate is `state <> 'abandoned'`
+ * (owner decision) — abandoned deliveries never count, so a project with 1 real +
+ * N abandoned rows still reads 1 and can start its extension. The create-time cap
+ * check (`createEngagementCore`) inlines the same predicate inside its own tx to
+ * avoid a second round-trip; this query feeds the project delivery panel. RLS
+ * scopes the read to the caller's org (a foreign project reads as 0). The CALLER
+ * gates the read on the `engagements_design` read capability.
+ */
+export function countProjectDeliveries(
+  ctx: OrgContext,
+  projectId: string,
+): Promise<number> {
+  return withOrgContext(ctx, async (tx) => {
+    const [{ value }] = await tx
+      .select({ value: count() })
+      .from(designEngagements)
+      .where(
+        and(
+          eq(designEngagements.projectId, projectId),
+          ne(designEngagements.state, 'abandoned'),
+        ),
+      );
+    return value;
   });
 }
 

@@ -4,7 +4,7 @@
 // engine and executor are Step 2 — nothing here writes engagement_transitions or
 // moves state off `created`.
 import { clients, designEngagements, projects } from '@metra/db';
-import { and, eq, inArray } from 'drizzle-orm';
+import { and, count, eq, inArray, ne } from 'drizzle-orm';
 import { fail, mutateInOrg } from '@/lib/actions/mutate';
 import { err, type ActionResult } from '@/lib/actions/result';
 import { allocateNumber } from '@/lib/db/allocate-number';
@@ -18,8 +18,31 @@ import { ACTIVE_STATES } from './states';
 // and does NOT block a fresh start.
 const ACTIVE_ENGAGEMENT_STATES = [...ACTIVE_STATES];
 
+// Lifetime cap: a Project may hold at most TWO NON-abandoned deliveries over its
+// life (the original + one extension). Abandoned deliveries are ignored by the
+// count (owner decision) — a project with 1 real + N abandoned rows can still
+// start its extension.
+const PROJECT_DELIVERY_CAP = 2;
+
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+// Postgres unique-violation SQLSTATE + the one-active-delivery backstop index
+// (migration 0032). A 23505 on THIS named index means a concurrent create won the
+// race for the project's single active slot — map it to the friendly
+// `project_delivery_exists`. Any other 23505 (or a missing constraint name)
+// rethrows so it surfaces as `generic` rather than being silently misreported.
+const UNIQUE_VIOLATION = '23505';
+const ONE_ACTIVE_INDEX = 'design_engagements_one_active_per_project_uniq';
+
+function isActiveDeliveryConflict(e: unknown): boolean {
+  return (
+    typeof e === 'object' &&
+    e !== null &&
+    (e as { code?: string }).code === UNIQUE_VIOLATION &&
+    (e as { constraint_name?: string }).constraint_name === ONE_ACTIVE_INDEX
+  );
+}
 
 export interface CreateEngagementInput {
   titleAr?: string | null;
@@ -86,6 +109,24 @@ export async function createEngagementCore(
         .limit(1);
       if (existing) fail('project_delivery_exists');
 
+      // Lifetime cap (Slice C2-hardening): at most TWO NON-abandoned deliveries per
+      // project (original + one extension). Abandoned rows do NOT count toward the
+      // cap (owner decision — predicate `state <> 'abandoned'`), so a project with 1
+      // real + N abandoned deliveries can still start its extension. Checked BEFORE
+      // allocating a number so a rejected create writes nothing and spends none.
+      const [{ value: countedDeliveries }] = await tx
+        .select({ value: count() })
+        .from(designEngagements)
+        .where(
+          and(
+            eq(designEngagements.projectId, projectId),
+            ne(designEngagements.state, 'abandoned'),
+          ),
+        );
+      if (countedDeliveries >= PROJECT_DELIVERY_CAP) {
+        fail('project_delivery_limit_reached');
+      }
+
       const number = await allocateNumber(
         tx,
         ctx.orgId,
@@ -94,19 +135,30 @@ export async function createEngagementCore(
         'number',
       );
 
-      const [row] = await tx
-        .insert(designEngagements)
-        .values({
-          orgId: ctx.orgId,
-          number,
-          titleAr,
-          titleEn,
-          clientId,
-          projectId,
-          state: 'created',
-          offPlan: input.offPlan ?? false,
-        })
-        .returning({ id: designEngagements.id });
+      // The INSERT can still race the read-guard above: two concurrent creates on
+      // an empty project both pass the read, both allocate a number, then contend
+      // on the one-active-per-project unique index (0032). The loser's 23505 on
+      // THAT index maps to `project_delivery_exists`; anything else rethrows ->
+      // mutateInOrg -> generic.
+      let row: { id: string };
+      try {
+        [row] = await tx
+          .insert(designEngagements)
+          .values({
+            orgId: ctx.orgId,
+            number,
+            titleAr,
+            titleEn,
+            clientId,
+            projectId,
+            state: 'created',
+            offPlan: input.offPlan ?? false,
+          })
+          .returning({ id: designEngagements.id });
+      } catch (e) {
+        if (isActiveDeliveryConflict(e)) return fail('project_delivery_exists');
+        throw e;
+      }
 
       await audit({
         entity: 'design_engagement',

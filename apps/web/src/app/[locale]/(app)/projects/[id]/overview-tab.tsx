@@ -16,6 +16,7 @@ import { ProjectDeliveryPanel } from '../../engagements/project-delivery-panel';
  */
 export interface DeliveryPanelProps {
   delivery: ProjectDeliverySummary | null;
+  deliveryCount: number;
   clientId: string;
   projectId: string;
   canStart: boolean;
@@ -54,6 +55,7 @@ export async function OverviewTab({
       {deliveryPanel && (
         <ProjectDeliveryPanel
           delivery={deliveryPanel.delivery}
+          deliveryCount={deliveryPanel.deliveryCount}
           clientId={deliveryPanel.clientId}
           projectId={deliveryPanel.projectId}
           canStartDelivery={deliveryPanel.canStart}

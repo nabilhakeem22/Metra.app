@@ -499,7 +499,8 @@
     "flow_not_enabled": "This flow isn't enabled for your workspace's plan.",
     "payment_kind_mismatch": "This payment type doesn't match the step you're advancing",
     "firm_type_unavailable": "That firm type isn't available yet. Choose Interior fit-out to continue.",
-    "project_delivery_exists": "This project already has an active delivery. Open it to continue."
+    "project_delivery_exists": "This project already has an active delivery. Open it to continue.",
+    "project_delivery_limit_reached": "This project has already used its two deliveries. Create a new project to start another."
   },
   "common": {
     "untranslated": "untranslated",
@@ -1369,6 +1370,8 @@
       "heading": "Design delivery",
       "open": "Open delivery",
       "start": "Start delivery",
+      "extend": "Start extension",
+      "atLimit": "This project has used both of its deliveries. Create a new project to start another.",
       "none": "No delivery started for this project yet."
     },
     "breadcrumb": {

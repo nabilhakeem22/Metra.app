@@ -80,6 +80,7 @@ const ALL_CODES: ActionCode[] = [
   'payment_kind_mismatch',
   'firm_type_unavailable',
   'project_delivery_exists',
+  'project_delivery_limit_reached',
 ];
 
 describe('problem+json envelope', () => {

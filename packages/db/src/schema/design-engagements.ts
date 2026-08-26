@@ -8,6 +8,7 @@ import {
   text,
   timestamp,
   unique,
+  uniqueIndex,
   uuid,
   type AnyPgColumn,
 } from 'drizzle-orm/pg-core';
@@ -74,6 +75,18 @@ export const designEngagements = pgTable(
     ...sameOrgFk(t, 'project', projects, { onDelete: 'restrict' }),
     index('design_engagements_org_state_idx').on(t.orgId, t.state),
     index('design_engagements_org_project_idx').on(t.orgId, t.projectId),
+    // At most one ACTIVE (non-terminal) delivery per (org, project) — the atomic
+    // backstop behind createEngagementCore's read-guard (two concurrent creates
+    // can both pass the read; this index lets only one insert win). Partial:
+    // terminal deliveries (closed_design_only / execution / abandoned) are
+    // excluded, so they never block a fresh start. Mirrors migration 0032
+    // verbatim (same name + predicate) so introspection matches; the migration is
+    // hand-authored, snapshot drift is known/accepted.
+    uniqueIndex('design_engagements_one_active_per_project_uniq')
+      .on(t.orgId, t.projectId)
+      .where(
+        sql`state not in ('closed_design_only', 'execution', 'abandoned')`,
+      ),
   ],
 );
 
