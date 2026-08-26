@@ -69,6 +69,11 @@
     --glass-strong: rgba(255, 255, 255, 0.92); /* active segmented thumb */
     --glass-hairline: rgba(255, 255, 255, 0.8);
     --glass-shadow: 0 16px 40px rgba(23, 34, 57, 0.1);
+    /* Form fields: a brighter/raised fill + a real cool-gray edge so inputs read
+       as distinct wells against the softer --glass card (not the same surface). */
+    --field-bg: rgba(255, 255, 255, 0.9);
+    --field-border: rgba(23, 34, 57, 0.16);
+    --field-border-hover: rgba(23, 34, 57, 0.28);
     --glass-inner: inset 0 1px 0 rgba(255, 255, 255, 0.9);
 
     --text: #111418;
@@ -149,6 +154,10 @@
     --glass: rgba(255, 255, 255, 0.06);
     --glass-strong: rgba(255, 255, 255, 0.14);
     --glass-hairline: rgba(255, 255, 255, 0.12);
+    /* Form fields: a slightly recessed well + a clearly visible light edge. */
+    --field-bg: rgba(0, 0, 0, 0.16);
+    --field-border: rgba(255, 255, 255, 0.18);
+    --field-border-hover: rgba(255, 255, 255, 0.3);
     --glass-shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
     --glass-inner: inset 0 1px 0 rgba(255, 255, 255, 0.14);
 
@@ -302,15 +311,18 @@
   /* Flat glass FIELD — fill + hairline only, NO backdrop-filter, so it can sit
      inside a .glass panel without nesting blur. Inputs, selects, org switcher. */
   .glass-field {
-    background: var(--glass);
-    border: 1px solid var(--glass-hairline);
+    background: var(--field-bg);
+    border: 1px solid var(--field-border);
     border-radius: var(--r-item);
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25);
     color: var(--text);
     transition:
       background 0.16s cubic-bezier(0.2, 0.8, 0.2, 1),
       border-color 0.16s cubic-bezier(0.2, 0.8, 0.2, 1),
       box-shadow 0.16s cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+  .glass-field:hover:not(:focus):not(:focus-visible):not(:disabled) {
+    border-color: var(--field-border-hover);
   }
   .glass-field::placeholder {
     color: var(--text-faint);
