@@ -8,6 +8,13 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import type { ActionResult } from '@/lib/actions/result';
 import {
   recordArtifact,
@@ -33,9 +40,6 @@ const ARTIFACT_KINDS: EngagementArtifactKind[] = [
   'shop_drawing',
   'boq',
 ];
-
-const selectClass =
-  'h-10 w-full glass-field outline-none focus-ring-brand focus-visible:border-[color:hsl(var(--brand))] px-3 text-sm';
 
 type Panel = 'payment' | 'artifact' | 'rom' | 'romAck';
 
@@ -124,18 +128,21 @@ export function EngagementControls({
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
               <div className="space-y-1">
                 <Label htmlFor="art-kind">{t('kind')}</Label>
-                <select
-                  id="art-kind"
-                  className={selectClass}
+                <Select
                   value={artKind}
-                  onChange={(e) => setArtKind(e.target.value as EngagementArtifactKind)}
+                  onValueChange={(v) => setArtKind(v as EngagementArtifactKind)}
                 >
-                  {ARTIFACT_KINDS.map((k) => (
-                    <option key={k} value={k}>
-                      {ta(k)}
-                    </option>
-                  ))}
-                </select>
+                  <SelectTrigger id="art-kind">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {ARTIFACT_KINDS.map((k) => (
+                      <SelectItem key={k} value={k}>
+                        {ta(k)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <div className="space-y-1">
                 <Label htmlFor="art-label">{t('label')}</Label>
@@ -281,18 +288,21 @@ function PaymentPanel({
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
         <div className="space-y-1">
           <Label htmlFor="pay-kind">{t('kind')}</Label>
-          <select
-            id="pay-kind"
-            className={selectClass}
+          <Select
             value={payKind}
-            onChange={(e) => setPayKind(e.target.value as PaymentEventKind)}
+            onValueChange={(v) => setPayKind(v as PaymentEventKind)}
           >
-            {PAYMENT_KINDS.map((k) => (
-              <option key={k} value={k}>
-                {tk(k)}
-              </option>
-            ))}
-          </select>
+            <SelectTrigger id="pay-kind">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {PAYMENT_KINDS.map((k) => (
+                <SelectItem key={k} value={k}>
+                  {tk(k)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
         <div className="space-y-1">
           <Label htmlFor="pay-amount">{t('amount')}</Label>

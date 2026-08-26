@@ -4,6 +4,13 @@ import { Percent, Plus, Search, Upload } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { pickLocale } from '@/lib/i18n/pick-locale';
 import type { SectionOption } from './types';
 
@@ -60,19 +67,19 @@ export function PriceBookToolbar({
         />
       </div>
 
-      <select
-        value={sectionFilter}
-        onChange={(e) => onSectionFilterChange(e.target.value)}
-        className="h-10 glass-field outline-none focus-ring-brand focus-visible:border-[color:hsl(var(--brand))] px-3 text-sm"
-        aria-label={t('table.section')}
-      >
-        <option value="all">{t('allCategories')}</option>
-        {sections.map((s) => (
-          <option key={s.id} value={s.id}>
-            {sectionName(s)}
-          </option>
-        ))}
-      </select>
+      <Select value={sectionFilter} onValueChange={onSectionFilterChange}>
+        <SelectTrigger className="w-auto min-w-40" aria-label={t('table.section')}>
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="all">{t('allCategories')}</SelectItem>
+          {sections.map((s) => (
+            <SelectItem key={s.id} value={s.id}>
+              {sectionName(s)}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
 
       <label className="flex items-center gap-2 text-sm">
         <input

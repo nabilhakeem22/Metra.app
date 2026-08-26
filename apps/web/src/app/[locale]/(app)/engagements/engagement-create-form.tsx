@@ -7,6 +7,13 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
   Sheet,
   SheetContent,
   SheetDescription,
@@ -25,9 +32,6 @@ export interface ProjectOption {
   nameAr: string | null;
   clientId: string;
 }
-
-const selectClass =
-  'h-10 w-full glass-field outline-none focus-ring-brand focus-visible:border-[color:hsl(var(--brand))] px-3 text-sm';
 
 export function EngagementCreateForm({
   open,
@@ -134,36 +138,36 @@ export function EngagementCreateForm({
 
             <div className="space-y-2">
               <Label htmlFor="eng-client">{t('client')}</Label>
-              <select
-                id="eng-client"
-                className={selectClass}
-                value={clientId}
-                onChange={(e) => setClientId(e.target.value)}
-              >
-                {clientOptions.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {pickLocale({ nameAr: c.nameAr, nameEn: c.nameEn }, 'name', locale)
-                      .value || c.id.slice(0, 8)}
-                  </option>
-                ))}
-              </select>
+              <Select value={clientId} onValueChange={setClientId}>
+                <SelectTrigger id="eng-client">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {clientOptions.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {pickLocale({ nameAr: c.nameAr, nameEn: c.nameEn }, 'name', locale)
+                        .value || c.id.slice(0, 8)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="eng-project">{t('project')}</Label>
-              <select
-                id="eng-project"
-                className={selectClass}
-                value={projectId}
-                onChange={(e) => setProjectId(e.target.value)}
-              >
-                {projectsForClient.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {pickLocale({ nameAr: p.nameAr, nameEn: p.nameEn }, 'name', locale)
-                      .value || p.id.slice(0, 8)}
-                  </option>
-                ))}
-              </select>
+              <Select value={projectId} onValueChange={setProjectId}>
+                <SelectTrigger id="eng-project">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {projectsForClient.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {pickLocale({ nameAr: p.nameAr, nameEn: p.nameEn }, 'name', locale)
+                        .value || p.id.slice(0, 8)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             <label className="flex items-center gap-2 text-sm">

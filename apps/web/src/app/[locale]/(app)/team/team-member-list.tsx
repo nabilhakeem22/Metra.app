@@ -5,6 +5,13 @@ import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { MEMBER_ROLES, type MemberRole } from '@/lib/permissions/roles';
 import type { Member } from './team-types';
 
@@ -65,22 +72,24 @@ export function TeamMemberList({
                 </div>
                 <div className="flex items-center gap-2">
                   {canEditThis ? (
-                    <select
+                    <Select
                       value={m.role}
-                      onChange={(e) =>
-                        onChangeRole(m.userId, e.target.value as MemberRole)
-                      }
+                      onValueChange={(v) => onChangeRole(m.userId, v as MemberRole)}
                       disabled={isPending}
-                      className="h-9 glass-field outline-none focus-ring-brand focus-visible:border-[color:hsl(var(--brand))] px-2 text-sm"
                     >
-                      {MEMBER_ROLES.filter(
-                        (r) => r !== 'owner' || isOwner || targetIsOwner,
-                      ).map((r) => (
-                        <option key={r} value={r}>
-                          {roleLabel(r)}
-                        </option>
-                      ))}
-                    </select>
+                      <SelectTrigger className="h-9 w-auto min-w-32">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {MEMBER_ROLES.filter(
+                          (r) => r !== 'owner' || isOwner || targetIsOwner,
+                        ).map((r) => (
+                          <SelectItem key={r} value={r}>
+                            {roleLabel(r)}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   ) : (
                     <span className="rounded-full bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary">
                       {roleLabel(m.role)}

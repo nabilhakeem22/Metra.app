@@ -9,6 +9,13 @@ import { FieldHint } from '@/components/ui/field-hint';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
   Sheet,
   SheetContent,
   SheetDescription,
@@ -132,8 +139,6 @@ export function ProjectForm({
     });
   }
 
-  const selectClass =
-    'h-10 w-full glass-field outline-none focus-ring-brand focus-visible:border-[color:hsl(var(--brand))] px-3 text-sm';
   const noClients = clientOptions.length === 0;
 
   return (
@@ -198,23 +203,22 @@ export function ProjectForm({
                 {t('form.client')}
                 <FieldHint id="pr-client-hint" hint={th('client')} />
               </Label>
-              <select
-                id="pr-client"
-                className={selectClass}
-                aria-describedby="pr-client-hint"
-                value={form.clientId}
-                onChange={(e) => set('clientId')(e.target.value)}
-              >
-                {clientOptions.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {pickLocale(
-                      { nameAr: c.nameAr, nameEn: c.nameEn },
-                      'name',
-                      locale,
-                    ).value}
-                  </option>
-                ))}
-              </select>
+              <Select value={form.clientId} onValueChange={(v) => set('clientId')(v)}>
+                <SelectTrigger id="pr-client" aria-describedby="pr-client-hint">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {clientOptions.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {pickLocale(
+                        { nameAr: c.nameAr, nameEn: c.nameEn },
+                        'name',
+                        locale,
+                      ).value}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="space-y-2">
@@ -222,19 +226,18 @@ export function ProjectForm({
                 {t('form.status')}
                 <FieldHint id="pr-status-hint" hint={th('status')} />
               </Label>
-              <select
-                id="pr-status"
-                className={selectClass}
-                aria-describedby="pr-status-hint"
-                value={form.status}
-                onChange={(e) => set('status')(e.target.value)}
-              >
-                {PROJECT_STATUSES.map((s) => (
-                  <option key={s} value={s}>
-                    {t(`statuses.${s}`)}
-                  </option>
-                ))}
-              </select>
+              <Select value={form.status} onValueChange={(v) => set('status')(v)}>
+                <SelectTrigger id="pr-status" aria-describedby="pr-status-hint">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {PROJECT_STATUSES.map((s) => (
+                    <SelectItem key={s} value={s}>
+                      {t(`statuses.${s}`)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">

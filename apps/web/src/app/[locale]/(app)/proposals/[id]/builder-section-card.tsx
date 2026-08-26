@@ -6,13 +6,19 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { FieldHint } from '@/components/ui/field-hint';
 import { Input } from '@/components/ui/input';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import type { SectionTotals } from '@/lib/aggregates/proposal-totals';
 import { formatMoney } from '@/lib/format/money';
 import { pickLocale } from '@/lib/i18n/pick-locale';
 import { addSection as recordSection } from '@/lib/sections/actions';
 import { BuilderLineRow } from './builder-line-row';
 import {
-  INPUT_CLASS,
   type CostItemOption,
   type LineState,
   type SectionState,
@@ -52,7 +58,6 @@ export function BuilderSectionCard({
   const th = useTranslations('hints.proposal');
   const locale = useLocale();
   const isAr = locale.startsWith('ar');
-  const inp = INPUT_CLASS;
   const si = sectionIndex;
   const sec = section;
   const st = sectionTotal;
@@ -164,21 +169,24 @@ export function BuilderSectionCard({
               {t('builder.addLine')}
             </Button>
             {costItems.length > 0 && (
-              <select
-                className={inp}
+              <Select
                 value=""
-                onChange={(e) => {
-                  const ci = costItems.find((c) => c.id === e.target.value);
+                onValueChange={(v) => {
+                  const ci = costItems.find((c) => c.id === v);
                   if (ci) addLine(si, ci);
                 }}
               >
-                <option value="">{t('builder.fromPriceBook')}</option>
-                {costItems.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.code} · {pickLocale({ nameAr: c.nameAr, nameEn: c.nameEn }, 'name', locale).value}
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger className="w-auto min-w-48">
+                  <SelectValue placeholder={t('builder.fromPriceBook')} />
+                </SelectTrigger>
+                <SelectContent>
+                  {costItems.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.code} · {pickLocale({ nameAr: c.nameAr, nameEn: c.nameEn }, 'name', locale).value}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             )}
           </div>
           <span className="text-sm font-medium" dir="ltr">

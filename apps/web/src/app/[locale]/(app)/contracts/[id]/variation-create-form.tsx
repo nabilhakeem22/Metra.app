@@ -8,7 +8,19 @@ import { UNIT_TOKENS } from '@/lib/price-book/import';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import type { BaselineLine, DraftVoLine } from './contract-vo-types';
+
+// Radix Select forbids an empty-string item value, so the "net delta" choice
+// (stored as '' on the line) rides a sentinel that is mapped back to '' at the
+// state boundary — the persisted contractLineId stays byte-identical.
+const NET_DELTA = '__net_delta__';
 
 export function VariationCreateForm({
   title,
@@ -43,20 +55,24 @@ export function VariationCreateForm({
         <div className="space-y-2">
           {lines.map((l, i) => (
             <div key={i} className="flex flex-wrap items-center gap-2">
-              <select
-                className="h-9 rounded-md border bg-background px-2 text-sm"
-                value={l.contractLineId}
-                onChange={(e) =>
-                  setLines((ls) => ls.map((x, j) => (j === i ? { ...x, contractLineId: e.target.value } : x)))
+              <Select
+                value={l.contractLineId || NET_DELTA}
+                onValueChange={(v) =>
+                  setLines((ls) => ls.map((x, j) => (j === i ? { ...x, contractLineId: v === NET_DELTA ? '' : v } : x)))
                 }
               >
-                <option value="">{tv('netDelta')}</option>
-                {baselineLines.map((b) => (
-                  <option key={b.id} value={b.id}>
-                    {b.label}
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger className="h-9 w-auto min-w-40">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={NET_DELTA}>{tv('netDelta')}</SelectItem>
+                  {baselineLines.map((b) => (
+                    <SelectItem key={b.id} value={b.id}>
+                      {b.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               <Input
                 className="w-40"
                 placeholder="description"
@@ -73,19 +89,23 @@ export function VariationCreateForm({
                   setLines((ls) => ls.map((x, j) => (j === i ? { ...x, qty: e.target.value } : x)))
                 }
               />
-              <select
-                className="h-9 rounded-md border bg-background px-2 text-sm"
+              <Select
                 value={l.unit}
-                onChange={(e) =>
-                  setLines((ls) => ls.map((x, j) => (j === i ? { ...x, unit: e.target.value as CostItemUnit } : x)))
+                onValueChange={(v) =>
+                  setLines((ls) => ls.map((x, j) => (j === i ? { ...x, unit: v as CostItemUnit } : x)))
                 }
               >
-                {UNIT_TOKENS.map((u) => (
-                  <option key={u} value={u}>
-                    {u}
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger className="h-9 w-auto min-w-20">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {UNIT_TOKENS.map((u) => (
+                    <SelectItem key={u} value={u}>
+                      {u}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               <Input
                 className="w-24"
                 dir="ltr"

@@ -7,6 +7,13 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Input } from '@/components/ui/input';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { toast } from '@/hooks/use-toast';
 import { Link } from '@/i18n/routing';
 import { resolveActionError } from '@/lib/actions/error-message';
@@ -152,19 +159,19 @@ export function ProjectsClient({
             className="ps-9"
           />
         </div>
-        <select
-          value={status}
-          onChange={(e) => setStatus(e.target.value)}
-          className="h-10 glass-field outline-none focus-ring-brand focus-visible:border-[color:hsl(var(--brand))] px-3 text-sm"
-          aria-label={t('table.status')}
-        >
-          <option value="all">{t('allStatuses')}</option>
-          {PROJECT_STATUSES.map((s) => (
-            <option key={s} value={s}>
-              {t(`statuses.${s}`)}
-            </option>
-          ))}
-        </select>
+        <Select value={status} onValueChange={setStatus}>
+          <SelectTrigger className="w-auto min-w-40" aria-label={t('table.status')}>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">{t('allStatuses')}</SelectItem>
+            {PROJECT_STATUSES.map((s) => (
+              <SelectItem key={s} value={s}>
+                {t(`statuses.${s}`)}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
         <label className="flex items-center gap-2 text-sm">
           <input
             type="checkbox"

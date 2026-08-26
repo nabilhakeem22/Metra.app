@@ -13,6 +13,13 @@ import {
 import { FieldHint } from '@/components/ui/field-hint';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { toast } from '@/hooks/use-toast';
 import { usePathname, useRouter } from '@/i18n/routing';
 import { updateAccount } from '@/lib/account/actions';
@@ -77,15 +84,18 @@ export function AccountClient({
           </div>
           <div className="space-y-2">
             <Label htmlFor="locale">{t('languageLabel')}</Label>
-            <select
-              id="locale"
+            <Select
               value={locale}
-              onChange={(e) => setLocale(e.target.value as Locale)}
-              className="h-10 w-full glass-field outline-none focus-ring-brand focus-visible:border-[color:hsl(var(--brand))] px-3 text-sm sm:w-64"
+              onValueChange={(v) => setLocale(v as Locale)}
             >
-              <option value="ar-EG">العربية</option>
-              <option value="en">English</option>
-            </select>
+              <SelectTrigger id="locale" className="w-full sm:w-64">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ar-EG">العربية</SelectItem>
+                <SelectItem value="en">English</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
           <Button onClick={save} disabled={saving}>
             {saving && <Loader2 className="size-4 animate-spin" aria-hidden />}

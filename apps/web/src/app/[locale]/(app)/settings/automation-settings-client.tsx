@@ -13,6 +13,13 @@ import {
 } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { toast } from '@/hooks/use-toast';
 import { resolveActionError } from '@/lib/actions/error-message';
 import type { ActionCode } from '@/lib/actions/result';
@@ -168,16 +175,19 @@ export function AutomationSettingsClient({
         )}
         <div className="max-w-40 space-y-2 ps-7">
           <Label htmlFor="digestCadence">{t('cadenceLabel')}</Label>
-          <select
-            id="digestCadence"
-            className="h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm"
+          <Select
             value={digestCadence}
-            onChange={(e) => setCadence(e.target.value)}
+            onValueChange={setCadence}
             disabled={disabled || !digestEnabled}
           >
-            <option value="daily">{t('cadenceDaily')}</option>
-            <option value="weekly">{t('cadenceWeekly')}</option>
-          </select>
+            <SelectTrigger id="digestCadence" className="h-9 w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="daily">{t('cadenceDaily')}</SelectItem>
+              <SelectItem value="weekly">{t('cadenceWeekly')}</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
 
         {check(

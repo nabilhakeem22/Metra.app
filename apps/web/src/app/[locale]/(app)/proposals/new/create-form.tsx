@@ -7,6 +7,13 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { toast } from '@/hooks/use-toast';
 import { resolveActionError } from '@/lib/actions/error-message';
 import type { ActionCode } from '@/lib/actions/result';
@@ -61,8 +68,6 @@ export function ProposalCreateForm({
     o.id;
 
   const missing = clients.length === 0 || projects.length === 0;
-  const selectClass =
-    'h-10 w-full glass-field outline-none focus-ring-brand focus-visible:border-[color:hsl(var(--brand))] px-3 text-sm';
 
   function submit() {
     startTransition(async () => {
@@ -96,34 +101,34 @@ export function ProposalCreateForm({
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="np-client">{t('create.client')}</Label>
-                <select
-                  id="np-client"
-                  className={selectClass}
-                  value={clientId}
-                  onChange={(e) => setClientId(e.target.value)}
-                >
-                  {clients.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {label(c)}
-                    </option>
-                  ))}
-                </select>
+                <Select value={clientId} onValueChange={setClientId}>
+                  <SelectTrigger id="np-client">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {clients.map((c) => (
+                      <SelectItem key={c.id} value={c.id}>
+                        {label(c)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="np-project">{t('create.project')}</Label>
-                <select
-                  id="np-project"
-                  className={selectClass}
-                  value={projectId}
-                  onChange={(e) => setProjectId(e.target.value)}
-                >
-                  {projects.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.code ? `${p.code} · ` : ''}
-                      {label(p)}
-                    </option>
-                  ))}
-                </select>
+                <Select value={projectId} onValueChange={setProjectId}>
+                  <SelectTrigger id="np-project">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {projects.map((p) => (
+                      <SelectItem key={p.id} value={p.id}>
+                        {p.code ? `${p.code} · ` : ''}
+                        {label(p)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
 
