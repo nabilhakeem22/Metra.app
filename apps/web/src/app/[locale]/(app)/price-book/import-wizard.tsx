@@ -7,6 +7,13 @@ import { Button } from '@/components/ui/button';
 import { FieldHint } from '@/components/ui/field-hint';
 import { Label } from '@/components/ui/label';
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
   Sheet,
   SheetContent,
   SheetDescription,
@@ -155,9 +162,6 @@ export function ImportWizard({
     });
   }
 
-  const selectClass =
-    'h-9 w-full glass-field outline-none focus-ring-brand focus-visible:border-[color:hsl(var(--brand))] px-2 text-sm';
-
   return (
     <Sheet open={open} onOpenChange={(o) => (o ? onOpenChange(true) : close())}>
       <SheetContent className="w-full overflow-y-auto sm:max-w-lg">
@@ -213,19 +217,24 @@ export function ImportWizard({
                       <span className="text-destructive"> *</span>
                     )}
                   </Label>
-                  <select
-                    id={`map-${field}`}
-                    className={selectClass}
-                    value={mapping[field] ?? NONE}
-                    onChange={(e) => setField(field, Number(e.target.value))}
+                  <Select
+                    value={String(mapping[field] ?? NONE)}
+                    onValueChange={(v) => setField(field, Number(v))}
                   >
-                    <option value={NONE}>{t('import.none')}</option>
-                    {header.map((h, i) => (
-                      <option key={i} value={i}>
-                        {h || `#${i + 1}`}
-                      </option>
-                    ))}
-                  </select>
+                    <SelectTrigger id={`map-${field}`} className="h-9">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={String(NONE)}>
+                        {t('import.none')}
+                      </SelectItem>
+                      {header.map((h, i) => (
+                        <SelectItem key={i} value={String(i)}>
+                          {h || `#${i + 1}`}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
               ))}
 

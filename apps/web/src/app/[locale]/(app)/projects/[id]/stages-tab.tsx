@@ -8,6 +8,13 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Input } from '@/components/ui/input';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { toast } from '@/hooks/use-toast';
 import { useRouter } from '@/i18n/routing';
 import { resolveActionError } from '@/lib/actions/error-message';
@@ -191,18 +198,21 @@ function StageRow({
       <td className="px-4 py-2">{name}</td>
       <td className="px-4 py-2">
         {canManage ? (
-          <select
+          <Select
             value={status}
-            onChange={(e) => setStatus(e.target.value as StageStatus)}
-            className="h-9 glass-field outline-none focus-ring-brand focus-visible:border-[color:hsl(var(--brand))] px-2 text-sm"
-            aria-label={label(status)}
+            onValueChange={(v) => setStatus(v as StageStatus)}
           >
-            {STATUSES.map((st) => (
-              <option key={st} value={st}>
-                {label(st)}
-              </option>
-            ))}
-          </select>
+            <SelectTrigger className="h-9 w-auto min-w-32" aria-label={label(status)}>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {STATUSES.map((st) => (
+                <SelectItem key={st} value={st}>
+                  {label(st)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         ) : (
           <span className="text-muted-foreground">{label(status)}</span>
         )}

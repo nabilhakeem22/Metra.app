@@ -9,6 +9,13 @@ import { Card, CardContent } from '@/components/ui/card';
 import { FieldHint } from '@/components/ui/field-hint';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { toast } from '@/hooks/use-toast';
 import { useRouter } from '@/i18n/routing';
 import { resolveActionError } from '@/lib/actions/error-message';
@@ -78,8 +85,9 @@ export function DetailsTab({
     setForm((f) => ({ ...f, [k]: v }));
   const label = (o: DetailsOption) =>
     pickLocale({ nameAr: o.nameAr, nameEn: o.nameEn }, 'name', locale).value;
-  const selectClass =
-    'h-10 w-full glass-field outline-none focus-ring-brand focus-visible:border-[color:hsl(var(--brand))] px-3 text-sm';
+  // Radix Select forbids an empty-string item value, so "no type" (persisted as
+  // '') rides a sentinel mapped back to '' when writing form state.
+  const NO_TYPE = '__no_type__';
 
   function onAddType() {
     const name = newType.trim();
@@ -163,20 +171,22 @@ export function DetailsTab({
               {t('form.client')}
               <FieldHint id="p-client-hint" hint={th('client')} />
             </Label>
-            <select
-              id="p-client"
-              className={selectClass}
-              aria-describedby="p-client-hint"
+            <Select
               value={form.clientId}
-              onChange={(e) => set('clientId')(e.target.value)}
+              onValueChange={(v) => set('clientId')(v)}
               disabled={!canManage || pending}
             >
-              {clientOptions.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {label(c)}
-                </option>
-              ))}
-            </select>
+              <SelectTrigger id="p-client" aria-describedby="p-client-hint">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {clientOptions.map((c) => (
+                  <SelectItem key={c.id} value={c.id}>
+                    {label(c)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
         </div>
 
@@ -191,21 +201,23 @@ export function DetailsTab({
               {tp('type')}
               <FieldHint id="p-type-hint" hint={th('type')} />
             </Label>
-            <select
-              id="p-type"
-              className={selectClass}
-              aria-describedby="p-type-hint"
-              value={form.typeId}
-              onChange={(e) => set('typeId')(e.target.value)}
+            <Select
+              value={form.typeId || NO_TYPE}
+              onValueChange={(v) => set('typeId')(v === NO_TYPE ? '' : v)}
               disabled={!canManage || pending}
             >
-              <option value="">{t('profile.noType')}</option>
-              {projectTypes.map((ty) => (
-                <option key={ty.id} value={ty.id}>
-                  {label(ty)}
-                </option>
-              ))}
-            </select>
+              <SelectTrigger id="p-type" aria-describedby="p-type-hint">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={NO_TYPE}>{t('profile.noType')}</SelectItem>
+                {projectTypes.map((ty) => (
+                  <SelectItem key={ty.id} value={ty.id}>
+                    {label(ty)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             {canManage && (
               <div className="flex items-center gap-1">
                 <Input
@@ -239,20 +251,22 @@ export function DetailsTab({
               {t('form.status')}
               <FieldHint id="p-status-hint" hint={th('status')} />
             </Label>
-            <select
-              id="p-status"
-              className={selectClass}
-              aria-describedby="p-status-hint"
+            <Select
               value={form.status}
-              onChange={(e) => set('status')(e.target.value)}
+              onValueChange={(v) => set('status')(v)}
               disabled={!canManage || pending}
             >
-              {PROJECT_STATUSES.map((s) => (
-                <option key={s} value={s}>
-                  {t(`statuses.${s}`)}
-                </option>
-              ))}
-            </select>
+              <SelectTrigger id="p-status" aria-describedby="p-status-hint">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {PROJECT_STATUSES.map((s) => (
+                  <SelectItem key={s} value={s}>
+                    {t(`statuses.${s}`)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
         </div>
 

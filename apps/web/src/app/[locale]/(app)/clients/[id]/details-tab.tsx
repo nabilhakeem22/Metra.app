@@ -9,6 +9,13 @@ import { Card, CardContent } from '@/components/ui/card';
 import { FieldHint } from '@/components/ui/field-hint';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { toast } from '@/hooks/use-toast';
 import { useRouter } from '@/i18n/routing';
 import { resolveActionError } from '@/lib/actions/error-message';
@@ -131,20 +138,22 @@ export function DetailsTab({
               {t('form.type')}
               <FieldHint id="d-type-hint" hint={th('type')} />
             </Label>
-            <select
-              id="d-type"
-              className="h-10 w-full glass-field outline-none focus-ring-brand focus-visible:border-[color:hsl(var(--brand))] px-3 text-sm"
-              aria-describedby="d-type-hint"
+            <Select
               value={form.type}
-              onChange={(e) => set('type')(e.target.value)}
+              onValueChange={(v) => set('type')(v)}
               disabled={!canManage || pending}
             >
-              {TYPES.map((ty) => (
-                <option key={ty} value={ty}>
-                  {t(`types.${ty}`)}
-                </option>
-              ))}
-            </select>
+              <SelectTrigger id="d-type" aria-describedby="d-type-hint">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {TYPES.map((ty) => (
+                  <SelectItem key={ty} value={ty}>
+                    {t(`types.${ty}`)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
           {field('contactName', t('form.contactName'), { hint: th('contactName') })}
         </div>

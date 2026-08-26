@@ -4,6 +4,13 @@ import { Trash2 } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { formatMoney } from '@/lib/format/money';
 import {
   INPUT_CLASS,
@@ -43,11 +50,16 @@ export function BuilderLineRow({
         <Input dir="ltr" inputMode="decimal" value={line.qty} onChange={(e) => patchLine(si, li, { qty: e.target.value })} className={`${inp} w-16`} />
       </td>
       <td className="px-1 py-1">
-        <select value={line.unit} onChange={(e) => patchLine(si, li, { unit: e.target.value })} className={inp}>
-          {UNITS.map((u) => (
-            <option key={u} value={u}>{u}</option>
-          ))}
-        </select>
+        <Select value={line.unit} onValueChange={(v) => patchLine(si, li, { unit: v })}>
+          <SelectTrigger className="h-9 w-auto min-w-16">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {UNITS.map((u) => (
+              <SelectItem key={u} value={u}>{u}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </td>
       {seeMargin && (
         <td className="px-1 py-1">

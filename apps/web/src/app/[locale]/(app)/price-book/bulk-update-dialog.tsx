@@ -8,6 +8,13 @@ import { FieldHint } from '@/components/ui/field-hint';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
   Sheet,
   SheetContent,
   SheetDescription,
@@ -67,9 +74,6 @@ export function BulkUpdateDialog({
     });
   }
 
-  const selectClass =
-    'h-10 w-full glass-field outline-none focus-ring-brand focus-visible:border-[color:hsl(var(--brand))] px-3 text-sm';
-
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent className="w-full sm:max-w-md">
@@ -82,19 +86,18 @@ export function BulkUpdateDialog({
               {t('bulk.category')}
               <FieldHint id="bulk-category-hint" hint={th('category')} />
             </Label>
-            <select
-              id="bulk-category"
-              className={selectClass}
-              aria-describedby="bulk-category-hint"
-              value={sectionId}
-              onChange={(e) => setSectionId(e.target.value)}
-            >
-              {sections.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {pickLocale({ nameAr: s.nameAr, nameEn: s.nameEn }, 'name', locale).value}
-                </option>
-              ))}
-            </select>
+            <Select value={sectionId} onValueChange={setSectionId}>
+              <SelectTrigger id="bulk-category" aria-describedby="bulk-category-hint">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {sections.map((s) => (
+                  <SelectItem key={s.id} value={s.id}>
+                    {pickLocale({ nameAr: s.nameAr, nameEn: s.nameEn }, 'name', locale).value}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           <div className="space-y-2">

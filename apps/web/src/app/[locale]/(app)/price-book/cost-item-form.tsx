@@ -8,6 +8,13 @@ import { FieldHint } from '@/components/ui/field-hint';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
   Sheet,
   SheetContent,
   SheetDescription,
@@ -122,9 +129,6 @@ export function CostItemForm({
     });
   }
 
-  const selectClass =
-    'h-10 w-full glass-field outline-none focus-ring-brand focus-visible:border-[color:hsl(var(--brand))] px-3 text-sm';
-
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent className="w-full overflow-y-auto sm:max-w-md">
@@ -183,38 +187,36 @@ export function CostItemForm({
                 {t('form.category')}
                 <FieldHint id="ci-category-hint" hint={th('category')} />
               </Label>
-              <select
-                id="ci-category"
-                className={selectClass}
-                aria-describedby="ci-category-hint"
-                value={form.sectionId}
-                onChange={(e) => set('sectionId')(e.target.value)}
-              >
-                {sections.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {pickLocale({ nameAr: s.nameAr, nameEn: s.nameEn }, 'name', locale).value}
-                  </option>
-                ))}
-              </select>
+              <Select value={form.sectionId} onValueChange={(v) => set('sectionId')(v)}>
+                <SelectTrigger id="ci-category" aria-describedby="ci-category-hint">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {sections.map((s) => (
+                    <SelectItem key={s.id} value={s.id}>
+                      {pickLocale({ nameAr: s.nameAr, nameEn: s.nameEn }, 'name', locale).value}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-2">
               <Label htmlFor="ci-unit" className="flex items-center">
                 {t('form.unit')}
                 <FieldHint id="ci-unit-hint" hint={th('unit')} />
               </Label>
-              <select
-                id="ci-unit"
-                className={selectClass}
-                aria-describedby="ci-unit-hint"
-                value={form.unit}
-                onChange={(e) => set('unit')(e.target.value)}
-              >
-                {UNIT_TOKENS.map((u) => (
-                  <option key={u} value={u}>
-                    {t(`units.${u}`)}
-                  </option>
-                ))}
-              </select>
+              <Select value={form.unit} onValueChange={(v) => set('unit')(v)}>
+                <SelectTrigger id="ci-unit" aria-describedby="ci-unit-hint">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {UNIT_TOKENS.map((u) => (
+                    <SelectItem key={u} value={u}>
+                      {t(`units.${u}`)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
 

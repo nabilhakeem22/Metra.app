@@ -7,6 +7,13 @@ import type { MilestoneBasis, MilestoneKind } from '@metra/db';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import type { ActionResult } from '@/lib/actions/result';
 import { submitDesignFee } from '@/lib/engagements/actions';
 
@@ -14,11 +21,6 @@ import { submitDesignFee } from '@/lib/engagements/actions';
 // client component must never import a runtime @metra/db value.
 const MILESTONE_KINDS: MilestoneKind[] = ['deposit', 'gate_a', 'gate_b', 'balance'];
 const MILESTONE_BASES: MilestoneBasis[] = ['percent', 'amount'];
-
-// Native <select> reskinned to match the glass Input: flat glass-field fill +
-// hairline (no backdrop-filter, so no nested blur) + brand focus ring.
-const selectClass =
-  'glass-field outline-none focus-ring-brand focus-visible:border-[color:hsl(var(--brand))] h-10 w-full px-3 text-sm';
 
 interface Row {
   kind: MilestoneKind;
@@ -76,18 +78,21 @@ export function EngagementFeeForm({
         </div>
         <div className="space-y-2">
           <Label htmlFor="fee-basis">{t('basis')}</Label>
-          <select
-            id="fee-basis"
-            className={selectClass}
+          <Select
             value={basis}
-            onChange={(e) => setBasis(e.target.value as MilestoneBasis)}
+            onValueChange={(v) => setBasis(v as MilestoneBasis)}
           >
-            {MILESTONE_BASES.map((b) => (
-              <option key={b} value={b}>
-                {tb(b)}
-              </option>
-            ))}
-          </select>
+            <SelectTrigger id="fee-basis">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {MILESTONE_BASES.map((b) => (
+                <SelectItem key={b} value={b}>
+                  {tb(b)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
       </div>
 

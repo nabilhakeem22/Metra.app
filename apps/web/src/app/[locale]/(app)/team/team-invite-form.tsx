@@ -13,6 +13,13 @@ import {
 import { FieldHint } from '@/components/ui/field-hint';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import type { MemberRole } from '@/lib/permissions/roles';
 import { INVITABLE_ROLES } from '@/lib/team/invitable';
 
@@ -67,19 +74,25 @@ export function TeamInviteForm({
               {t('roleLabel')}
               <FieldHint id="inviteRole-hint" hint={th('role')} />
             </Label>
-            <select
-              id="inviteRole"
-              aria-describedby="inviteRole-hint"
+            <Select
               value={inviteRole}
-              onChange={(e) => onInviteRoleChange(e.target.value as MemberRole)}
-              className="h-10 w-full glass-field outline-none focus-ring-brand focus-visible:border-[color:hsl(var(--brand))] px-3 text-sm sm:w-48"
+              onValueChange={(v) => onInviteRoleChange(v as MemberRole)}
             >
-              {INVITABLE_ROLES.map((r) => (
-                <option key={r} value={r}>
-                  {roles(`${r}.label`)}
-                </option>
-              ))}
-            </select>
+              <SelectTrigger
+                id="inviteRole"
+                aria-describedby="inviteRole-hint"
+                className="w-full sm:w-48"
+              >
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {INVITABLE_ROLES.map((r) => (
+                  <SelectItem key={r} value={r}>
+                    {roles(`${r}.label`)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
           <Button onClick={onSubmit} disabled={isPending || email.trim() === ''}>
             {isPending ? (
