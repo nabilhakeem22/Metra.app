@@ -78,6 +78,7 @@ const ALL_CODES: ActionCode[] = [
   'rom_not_set',
   'flow_not_enabled',
   'payment_kind_mismatch',
+  'firm_type_unavailable',
 ];
 
 describe('problem+json envelope', () => {

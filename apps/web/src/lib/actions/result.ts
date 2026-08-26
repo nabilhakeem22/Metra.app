@@ -68,7 +68,8 @@ export type ActionCode =
   | 'rom_range_invalid'
   | 'rom_not_set'
   | 'flow_not_enabled'
-  | 'payment_kind_mismatch';
+  | 'payment_kind_mismatch'
+  | 'firm_type_unavailable';
 
 export interface ActionResult {
   ok: boolean;
