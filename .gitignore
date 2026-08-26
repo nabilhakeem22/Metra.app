@@ -34,6 +34,12 @@ coverage/
 # migrations are committed; local journal artifacts are not
 drizzle/.snapshot-tmp/
 
+# --- i18n toolchain build artifacts (scripts/i18n) ---
+# The Gemini draft and the review page are generated, not source. The reviewed
+# translation lands in ar-EG.json via `npm run i18n:apply`.
+apps/web/src/messages/ar-EG.generated.json
+scripts/i18n/review.html
+
 # --- os / editor ---
 .DS_Store
 Thumbs.db

@@ -48,6 +48,13 @@ jobs:
         # never re-resolves — no drift, no npm/cli#4828. See docs/DEPLOY.md.
         run: npm ci
 
+      # Pure-local i18n gate (no API key, never calls Gemini): enforces en/ar-EG
+      # key parity, placeholder/ICU integrity, and Western-numerals-only on every
+      # push. Non-strict, so pre-existing plural-completeness gaps stay warnings
+      # until the re-translate lands.
+      - name: i18n validate (parity + placeholders + numerals)
+        run: npm run i18n:validate
+
       - name: Lint (includes physical left/right ban)
         run: npm run lint
 

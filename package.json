@@ -20,7 +20,11 @@
     "db:generate": "npm run generate -w @metra/db",
     "db:migrate": "npm run migrate -w @metra/db",
     "db:apply-rls": "npm run apply-rls -w @metra/db",
-    "db:seed": "npm run seed -w @metra/db"
+    "db:seed": "npm run seed -w @metra/db",
+    "i18n:translate": "tsx scripts/i18n/translate.ts",
+    "i18n:validate": "tsx scripts/i18n/validate.ts",
+    "i18n:review": "tsx scripts/i18n/review.ts",
+    "i18n:apply": "tsx scripts/i18n/apply.ts"
   },
   "devDependencies": {
     "typescript": "^5.6.3"
