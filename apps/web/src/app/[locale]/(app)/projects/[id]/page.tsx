@@ -18,6 +18,7 @@ import { can } from '@/lib/permissions/can';
 import { listProposals } from '@/lib/proposals/queries';
 import { ActivityTab } from './activity-tab';
 import { DetailsTab } from './details-tab';
+import { ProjectCreatedHandoff } from './project-created-handoff';
 import { DocumentsTab } from './documents-tab';
 import { FinancialsTab } from './financials-tab';
 import { OverviewTab } from './overview-tab';
@@ -50,6 +51,24 @@ export default async function ProjectProfilePage({
   const locale = await getLocale();
   const canManage = can(ctx.role, 'projects', 'update');
   const canActivity = can(ctx.role, 'project_activity', 'create');
+  // The through-project delivery data, computed once and shared by the overview
+  // panel and the C3 create-handoff. Only wired when the viewer may read deliveries.
+  const canStartDelivery = can(ctx.role, 'engagements_design', 'create');
+  const deliveryPanel = can(ctx.role, 'engagements_design', 'read')
+    ? {
+        delivery: await getEngagementByProject(ctx, id),
+        deliveryCount: await countProjectDeliveries(ctx, id),
+        clientId: project.clientId,
+        projectId: id,
+        canStart: canStartDelivery,
+      }
+    : undefined;
+  // A freshly created project (no delivery yet) may be handed off to "Start
+  // delivery"; a project that already has one shows nothing, even if `?created=1`
+  // is pasted.
+  const canStartFreshDelivery = Boolean(
+    deliveryPanel && canStartDelivery && deliveryPanel.delivery === null,
+  );
   const name = pickLocale(
     { nameAr: project.nameAr, nameEn: project.nameEn },
     'name',
@@ -65,6 +84,12 @@ export default async function ProjectProfilePage({
 
   return (
     <div className="space-y-4">
+      <ProjectCreatedHandoff
+        clientId={project.clientId}
+        projectId={id}
+        canStartDelivery={canStartFreshDelivery}
+      />
+
       <div className="space-y-1">
         <Link
           href="/projects"
@@ -94,17 +119,7 @@ export default async function ProjectProfilePage({
         {tab === 'overview' && (
           <OverviewTab
             overview={await getProjectOverview(ctx, id)}
-            deliveryPanel={
-              can(ctx.role, 'engagements_design', 'read')
-                ? {
-                    delivery: await getEngagementByProject(ctx, id),
-                    deliveryCount: await countProjectDeliveries(ctx, id),
-                    clientId: project.clientId,
-                    projectId: id,
-                    canStart: can(ctx.role, 'engagements_design', 'create'),
-                  }
-                : undefined
-            }
+            deliveryPanel={deliveryPanel}
           />
         )}
         {tab === 'details' && (

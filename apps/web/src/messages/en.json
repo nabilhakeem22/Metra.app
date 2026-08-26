@@ -717,6 +717,13 @@
   "clients": {
     "title": "Clients",
     "subtitle": "The companies and people you build for.",
+    "handoff": {
+      "client": {
+        "title": "Create a project for {name}?",
+        "confirm": "Create project"
+      },
+      "dismiss": "Not now"
+    },
     "search": "Search by name",
     "activeOnly": "Active only",
     "itemsCount": "{count} clients",
@@ -857,6 +864,13 @@
   "projects": {
     "title": "Projects",
     "subtitle": "Your fit-out jobs, each tied to a client.",
+    "handoff": {
+      "project": {
+        "title": "Start the delivery for this project?",
+        "confirm": "Start delivery"
+      },
+      "dismiss": "Not now"
+    },
     "search": "Search code or name",
     "allStatuses": "All statuses",
     "activeOnly": "Active only",

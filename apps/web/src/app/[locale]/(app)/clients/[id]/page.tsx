@@ -11,6 +11,7 @@ import { pickLocale } from '@/lib/i18n/pick-locale';
 import { can } from '@/lib/permissions/can';
 import { listProjects } from '@/lib/projects/queries';
 import { ActivityTab } from './activity-tab';
+import { ClientCreatedHandoff } from './client-created-handoff';
 import { ContactsTab } from './contacts-tab';
 import { DetailsTab } from './details-tab';
 import { DocumentsTab } from './documents-tab';
@@ -53,6 +54,12 @@ export default async function ClientProfilePage({
 
   return (
     <div className="space-y-4">
+      <ClientCreatedHandoff
+        clientId={id}
+        clientName={name}
+        canCreateProject={can(ctx.role, 'projects', 'create')}
+      />
+
       <div className="space-y-1">
         <Link
           href="/clients"

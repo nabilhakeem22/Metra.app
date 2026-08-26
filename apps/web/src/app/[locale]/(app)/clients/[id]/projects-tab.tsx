@@ -49,7 +49,7 @@ export async function ProjectsTab({
                     </td>
                     <td className="px-4 py-2">
                       <Link
-                        href={`/projects`}
+                        href={`/projects/${p.id}`}
                         className="hover:underline"
                       >
                         {pickLocale(

@@ -28,7 +28,7 @@ export async function createClient(input: ClientInput): Promise<ActionResult> {
   } catch {
     /* default locale */
   }
-  redirect(`/${locale}/clients/${res.data}`);
+  redirect(`/${locale}/clients/${res.data}?created=1`);
 }
 
 export async function updateClient(
