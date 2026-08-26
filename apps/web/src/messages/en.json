@@ -136,7 +136,7 @@
     "support": "Support",
     "priceBook": "Price Book",
     "clients": "Clients",
-    "engagements": "Engagements"
+    "engagements": "Deliveries"
   },
   "shell": {
     "search": "Search",
@@ -474,11 +474,11 @@
     "engagement_title_required": "Enter a title in Arabic or English",
     "engagement_client_required": "Select a client",
     "engagement_project_required": "Select a project",
-    "engagement_not_found": "This engagement could not be found",
-    "engagement_not_active": "This engagement is closed — no payments can be recorded",
+    "engagement_not_found": "This delivery could not be found",
+    "engagement_not_active": "This delivery is closed — no payments can be recorded",
     "illegal_trigger": "This action isn't allowed from the current stage",
     "transition_not_yet_enabled": "This step isn't available yet",
-    "engagement_state_conflict": "This engagement was just updated — reload and try again",
+    "engagement_state_conflict": "This delivery was just updated — reload and try again",
     "guard_scope_inputs_missing": "Add a title, client, and project before continuing",
     "design_fee_required": "Enter a design fee greater than zero",
     "milestone_split_invalid": "The milestone schedule must include a deposit and add up correctly",
@@ -494,7 +494,7 @@
     "revision_co_amount_required": "This revision is beyond the free allowance — enter a change-order amount greater than zero",
     "revision_cos_outstanding": "Settle the outstanding revision change orders before locking the concept",
     "renders_missing": "Add at least one approved render to continue",
-    "as_built_not_due": "As-built drawings are not due for this engagement",
+    "as_built_not_due": "As-built drawings are not due for this delivery",
     "rom_range_invalid": "Enter a valid low–high build-cost range",
     "rom_not_set": "Enter the build-cost range before recording the client's acknowledgement",
     "flow_not_enabled": "This flow isn't enabled for your workspace's plan.",
@@ -1335,16 +1335,16 @@
     }
   },
   "engagements": {
-    "title": "Engagements",
-    "subtitle": "Design engagements from brief to sign-off.",
-    "empty": "No engagements yet. Create one to start the design flow.",
-    "new": "New engagement",
-    "engagement": "Engagement",
+    "title": "Deliveries",
+    "subtitle": "Design deliveries from brief to sign-off.",
+    "empty": "No deliveries yet. Create one to start the design flow.",
+    "new": "New delivery",
+    "engagement": "Delivery",
     "number": "Number",
     "client": "Client",
     "project": "Project",
     "stage": "Stage {n}",
-    "backToList": "Back to engagements",
+    "backToList": "Back to deliveries",
     "offPlan": "Off-plan",
     "asBuiltDue": "As-built due",
     "created": "Created",
@@ -1355,15 +1355,15 @@
     "revisionsUsed": "{used} of {free} free used",
     "conceptLocked": "Concept locked",
     "form": {
-      "newTitle": "New engagement",
+      "newTitle": "New delivery",
       "titleEn": "Title (English)",
       "titleAr": "Title (Arabic)",
       "client": "Client",
       "project": "Project",
       "offPlan": "Off-plan (developer-built shell)",
-      "noClients": "Add a client and a project before creating an engagement.",
+      "noClients": "Add a client and a project before creating a delivery.",
       "cancel": "Cancel",
-      "create": "Create engagement"
+      "create": "Create delivery"
     },
     "state": {
       "created": "Created",
@@ -1447,14 +1447,14 @@
       "logPaymentAdvance": "Log payment & advance",
       "advance": "Advance to the next stage",
       "recordSomethingElse": "Record something else",
-      "payNote": "Logging the payment advances the engagement automatically — the client is never shown the amount.",
+      "payNote": "Logging the payment advances the delivery automatically — the client is never shown the amount.",
       "closed": {
-        "headline": "This engagement is closed",
+        "headline": "This delivery is closed",
         "hint": "No further action is needed — the design lifecycle has ended."
       },
       "created": {
         "headline": "Put a design fee in front of the client",
-        "hint": "Set the fee and its milestone split to open the engagement."
+        "hint": "Set the fee and its milestone split to open the delivery."
       },
       "design_proposal": {
         "headline": "Collect the signing deposit to start work",
@@ -1486,7 +1486,7 @@
       },
       "change_triage": {
         "headline": "Reconcile the as-built variance",
-        "hint": "Attest a clean as-built to return the engagement to final approval."
+        "hint": "Attest a clean as-built to return the delivery to final approval."
       },
       "shop_drawings": {
         "headline": "Prepare the shop drawings",
