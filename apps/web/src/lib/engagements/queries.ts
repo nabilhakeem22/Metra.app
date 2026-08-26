@@ -17,7 +17,7 @@ import {
   type MilestoneKind,
   type PaymentEventKind,
 } from '@metra/db';
-import { and, asc, count, desc, eq, ne } from 'drizzle-orm';
+import { and, asc, count, desc, eq, inArray, ne } from 'drizzle-orm';
 import { withOrgContext, type OrgContext } from '@/lib/db/context';
 import { TERMINAL_STATES } from './states';
 
@@ -119,6 +119,62 @@ export function getEngagementByProject(
       rows.find((row) => !TERMINAL_STATES.has(row.state)) ?? rows[0] ?? null;
     if (!current) return null;
     return { ...current, createdAt: current.createdAt.toISOString() };
+  });
+}
+
+/**
+ * The current Delivery for EACH of many projects in ONE round-trip (Slice C4) — the
+ * batch form of `getEngagementByProject`, for the client Projects tab where a per-row
+ * read would be an N+1. One query (`where project_id in (...)`, ordered by project then
+ * `number` descending), reduced per project with the SAME rule as
+ * `getEngagementByProject`: the first NON-terminal delivery is the highest-numbered
+ * ACTIVE one; falling back to the newest overall surfaces the latest closed one when
+ * every delivery is terminal. Returns a map keyed by projectId with `null` for a
+ * project that has no delivery in-org; empty input reads `{}`. Reads via
+ * `design_engagements_org_project_idx`; RLS scopes it to the caller's org (a foreign
+ * project is absent from the map). The CALLER gates the read on the `engagements_design`
+ * read capability.
+ */
+export function getDeliveriesByProjects(
+  ctx: OrgContext,
+  projectIds: string[],
+): Promise<Record<string, ProjectDeliverySummary | null>> {
+  return withOrgContext(ctx, async (tx) => {
+    const result: Record<string, ProjectDeliverySummary | null> = {};
+    for (const projectId of projectIds) result[projectId] = null;
+    if (projectIds.length === 0) return result;
+
+    const rows = await tx
+      .select({
+        id: designEngagements.id,
+        number: designEngagements.number,
+        state: designEngagements.state,
+        titleAr: designEngagements.titleAr,
+        titleEn: designEngagements.titleEn,
+        createdAt: designEngagements.createdAt,
+        projectId: designEngagements.projectId,
+      })
+      .from(designEngagements)
+      .where(inArray(designEngagements.projectId, projectIds))
+      .orderBy(
+        asc(designEngagements.projectId),
+        desc(designEngagements.number),
+      );
+
+    // Rows are grouped by project, newest-first by per-org number within each group.
+    // For each project the first NON-terminal row is its highest-numbered ACTIVE
+    // delivery; if none is active, the first row seen for that project is the newest
+    // overall (a fully-terminal project surfaces its latest closed one). Mirrors the
+    // "active-preferred, else most-recent" logic in `getEngagementByProject`.
+    for (const row of rows) {
+      const existing = result[row.projectId];
+      if (existing && !TERMINAL_STATES.has(existing.state)) continue;
+      if (existing && TERMINAL_STATES.has(row.state)) continue;
+      const { projectId, ...summary } = row;
+      result[projectId] = { ...summary, createdAt: row.createdAt.toISOString() };
+    }
+
+    return result;
   });
 }
 

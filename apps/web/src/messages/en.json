@@ -825,7 +825,8 @@
       "projects": {
         "title": "Projects",
         "newForClient": "New project for this client",
-        "empty": "No projects for this client yet."
+        "empty": "No projects for this client yet.",
+        "noDelivery": "No delivery yet"
       },
       "financials": {
         "contracted": "Contracted value",

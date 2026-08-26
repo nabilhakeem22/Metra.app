@@ -7,6 +7,7 @@ import { listActivities } from '@/lib/activities/queries';
 import { listClientDocuments } from '@/lib/client-documents/queries';
 import { listContacts } from '@/lib/client-contacts/queries';
 import { getClientById, getClientOverview } from '@/lib/clients/queries';
+import { getDeliveriesByProjects } from '@/lib/engagements/queries';
 import { pickLocale } from '@/lib/i18n/pick-locale';
 import { can } from '@/lib/permissions/can';
 import { listProjects } from '@/lib/projects/queries';
@@ -46,6 +47,22 @@ export default async function ClientProfilePage({
   const locale = await getLocale();
   const canManage = can(ctx.role, 'clients', 'update');
   const canActivity = can(ctx.role, 'client_activity', 'create');
+  const canReadDeliveries = can(ctx.role, 'engagements_design', 'read');
+
+  // Load the client's projects once for the Projects tab and reuse the same array
+  // for the batch delivery-status read (one round-trip, no N+1). Both are computed
+  // only when that tab is active, mirroring the lazy per-tab loads below. The
+  // delivery map is read only when the role holds `engagements_design:read`; without
+  // it the tab omits the delivery column entirely.
+  const clientProjects =
+    tab === 'projects' ? await listProjects(ctx, { clientId: id }) : [];
+  const deliveries =
+    tab === 'projects' && canReadDeliveries
+      ? await getDeliveriesByProjects(
+          ctx,
+          clientProjects.map((project) => project.id),
+        )
+      : {};
   const name = pickLocale(
     { nameAr: client.nameAr, nameEn: client.nameEn },
     'name',
@@ -100,8 +117,10 @@ export default async function ClientProfilePage({
         {tab === 'projects' && (
           <ProjectsTab
             clientId={id}
-            projects={await listProjects(ctx, { clientId: id })}
+            projects={clientProjects}
             canManage={can(ctx.role, 'projects', 'create')}
+            deliveries={deliveries}
+            canReadDeliveries={canReadDeliveries}
           />
         )}
         {tab === 'financials' && (
