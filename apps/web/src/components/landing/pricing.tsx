@@ -47,7 +47,7 @@ export function Pricing() {
             </ul>
             <Link
               className="landing-btn landing-btn-primary landing-btn-lg landing-btn-block"
-              href="/login"
+              href={{ pathname: '/login', query: { mode: 'signup' } }}
             >
               {t('cta')}
             </Link>

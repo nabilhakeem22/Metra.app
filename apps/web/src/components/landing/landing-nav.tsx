@@ -22,10 +22,16 @@ export function LandingNav() {
           <a href="#pricing">{t('pricing')}</a>
         </div>
         <div className="landing-nav-cta">
-          <Link className="landing-btn landing-btn-ghost" href="/login">
+          <Link
+            className="landing-btn landing-btn-ghost"
+            href={{ pathname: '/login', query: { mode: 'signin' } }}
+          >
             {t('signIn')}
           </Link>
-          <Link className="landing-btn landing-btn-primary" href="/login">
+          <Link
+            className="landing-btn landing-btn-primary"
+            href={{ pathname: '/login', query: { mode: 'signup' } }}
+          >
             {t('getStarted')}
           </Link>
         </div>

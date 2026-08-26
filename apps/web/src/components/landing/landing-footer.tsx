@@ -19,8 +19,12 @@ export function LandingFooter() {
           <a href="#features">{nav('features')}</a>
           <a href="#how">{nav('howItWorks')}</a>
           <a href="#pricing">{nav('pricing')}</a>
-          <Link href="/login">{nav('signIn')}</Link>
-          <Link href="/login">{nav('getStarted')}</Link>
+          <Link href={{ pathname: '/login', query: { mode: 'signin' } }}>
+            {nav('signIn')}
+          </Link>
+          <Link href={{ pathname: '/login', query: { mode: 'signup' } }}>
+            {nav('getStarted')}
+          </Link>
         </nav>
         <div className="landing-foot-end">
           <LocaleSwitch />

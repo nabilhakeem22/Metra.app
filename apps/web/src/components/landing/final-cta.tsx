@@ -15,13 +15,13 @@ export function FinalCta() {
         <div className="landing-hero-cta">
           <Link
             className="landing-btn landing-btn-primary landing-btn-lg"
-            href="/login"
+            href={{ pathname: '/login', query: { mode: 'signup' } }}
           >
             {t('ctaPrimary')}
           </Link>
           <Link
             className="landing-btn landing-btn-ghost landing-btn-lg landing-btn-on-dark"
-            href="/login"
+            href={{ pathname: '/login', query: { mode: 'signin' } }}
           >
             {t('ctaSecondary')}
           </Link>

@@ -31,7 +31,7 @@ export function LandingHero() {
           <div className="landing-hero-cta">
             <Link
               className="landing-btn landing-btn-primary landing-btn-lg"
-              href="/login"
+              href={{ pathname: '/login', query: { mode: 'signup' } }}
             >
               {t('ctaPrimary')}
             </Link>

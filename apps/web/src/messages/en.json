@@ -1,11 +1,11 @@
 {
   "app": {
     "name": "Metra",
-    "descriptor": "Project and cost control for fit-out contractors"
+    "descriptor": "Project and cost control for interior-design studios"
   },
   "home": {
     "title": "Metra",
-    "tagline": "Project and cost control for fit-out contractors",
+    "tagline": "Project and cost control for interior-design studios",
     "intro": "Every pound of a project's value, traceable from the line you quoted to the line you invoiced.",
     "getStarted": "Get started",
     "signIn": "Sign in",
@@ -149,7 +149,14 @@
     "activity": "Activity"
   },
   "login": {
-    "title": "Sign in to Metra",
+    "signInTitle": "Sign in",
+    "signInSubtitle": "Welcome back — enter your email or phone and we'll send a sign-in code.",
+    "signUpTitle": "Create your account",
+    "signUpSubtitle": "Set up your studio in minutes — enter your email or phone and we'll send a code to get started.",
+    "switchToSignUpPrompt": "New to Metra?",
+    "switchToSignUpLink": "Create an account",
+    "switchToSignInPrompt": "Already have an account?",
+    "switchToSignInLink": "Sign in",
     "emailLabel": "Work email",
     "emailPlaceholder": "you@firm.com",
     "sendCode": "Send code",
@@ -159,7 +166,6 @@
     "phoneHint": "Site engineers can sign in with a phone code.",
     "checkEmail": "We sent a 6-digit code to your email.",
     "error": "Something went wrong. Please try again.",
-    "signUpHint": "New here? We'll create your account automatically.",
     "changeEmail": "Change",
     "resend": "Resend code",
     "resendIn": "Resend in {time}",
