@@ -24,9 +24,12 @@ export function readGeminiEnv(): { apiKey: string; model: string } {
         'This script is the only piece that calls Gemini.',
     );
   }
-  // gemini-2.5-pro is retired for new API users; 3.1 Pro is the current default.
-  // Override with GEMINI_MODEL (e.g. a flash tier) if you prefer cheaper/faster.
-  const model = process.env.GEMINI_MODEL?.trim() || 'gemini-3.1-pro-preview';
+  // Default to a flash tier that works on Google's FREE tier out of the box
+  // (pro/preview models have ~0 free quota and 429 immediately). Override with
+  // GEMINI_MODEL — e.g. gemini-3.1-pro-preview for top quality once billing is
+  // enabled, or gemini-flash-latest for a higher-quality flash when it's not
+  // congested. gemini-flash-lite-latest has the most generous free quota.
+  const model = process.env.GEMINI_MODEL?.trim() || 'gemini-flash-lite-latest';
   return { apiKey, model };
 }
 
