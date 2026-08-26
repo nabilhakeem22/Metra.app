@@ -135,8 +135,7 @@
     "comingSoon": "Coming soon",
     "support": "Support",
     "priceBook": "Price Book",
-    "clients": "Clients",
-    "engagements": "Deliveries"
+    "clients": "Clients"
   },
   "shell": {
     "search": "Search",
@@ -499,7 +498,8 @@
     "rom_not_set": "Enter the build-cost range before recording the client's acknowledgement",
     "flow_not_enabled": "This flow isn't enabled for your workspace's plan.",
     "payment_kind_mismatch": "This payment type doesn't match the step you're advancing",
-    "firm_type_unavailable": "That firm type isn't available yet. Choose Interior fit-out to continue."
+    "firm_type_unavailable": "That firm type isn't available yet. Choose Interior fit-out to continue.",
+    "project_delivery_exists": "This project already has an active delivery. Open it to continue."
   },
   "common": {
     "untranslated": "untranslated",
@@ -1364,6 +1364,16 @@
       "noClients": "Add a client and a project before creating a delivery.",
       "cancel": "Cancel",
       "create": "Create delivery"
+    },
+    "projectPanel": {
+      "heading": "Design delivery",
+      "open": "Open delivery",
+      "start": "Start delivery",
+      "none": "No delivery started for this project yet."
+    },
+    "breadcrumb": {
+      "clients": "Clients",
+      "delivery": "Delivery"
     },
     "state": {
       "created": "Created",

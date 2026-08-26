@@ -38,22 +38,36 @@ export function EngagementCreateForm({
   onOpenChange,
   clientOptions,
   projectOptions,
+  lockedClientId,
+  lockedProjectId,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   clientOptions: ClientOption[];
   projectOptions: ProjectOption[];
+  /**
+   * When BOTH locked ids are set (the through-project "Start delivery" entry), the
+   * client + project selects are hidden and these ids are forced — the caller need
+   * not pass `clientOptions`/`projectOptions` in that mode. The success path is
+   * unchanged (route to `/engagements/{id}`); the entitlement gate still fires via
+   * `createEngagement`.
+   */
+  lockedClientId?: string;
+  lockedProjectId?: string;
 }) {
   const t = useTranslations('engagements.form');
   const te = useTranslations('errors');
   const locale = useLocale();
   const router = useRouter();
+  const locked = Boolean(lockedClientId && lockedProjectId);
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<ActionCode | null>(null);
   const [titleEn, setTitleEn] = useState('');
   const [titleAr, setTitleAr] = useState('');
-  const [clientId, setClientId] = useState(clientOptions[0]?.id ?? '');
-  const [projectId, setProjectId] = useState('');
+  const [clientId, setClientId] = useState(
+    lockedClientId ?? clientOptions[0]?.id ?? '',
+  );
+  const [projectId, setProjectId] = useState(lockedProjectId ?? '');
   const [offPlan, setOffPlan] = useState(false);
 
   // Only projects belonging to the chosen client are selectable.
@@ -68,15 +82,21 @@ export function EngagementCreateForm({
     setTitleEn('');
     setTitleAr('');
     setOffPlan(false);
-    const firstClient = clientOptions[0]?.id ?? '';
-    setClientId(firstClient);
-  }, [open, clientOptions]);
+    setClientId(lockedClientId ?? clientOptions[0]?.id ?? '');
+    if (locked) setProjectId(lockedProjectId ?? '');
+  }, [open, clientOptions, locked, lockedClientId, lockedProjectId]);
 
   useEffect(() => {
+    // In locked mode the project is fixed to the caller's project — never reset it
+    // from the (unused) options list.
+    if (locked) return;
     setProjectId(projectsForClient[0]?.id ?? '');
-  }, [projectsForClient]);
+  }, [projectsForClient, locked]);
 
-  const noData = clientOptions.length === 0 || projectOptions.length === 0;
+  // In locked mode the caller supplies the ids directly, so an empty options list is
+  // NOT a "no data" state.
+  const noData =
+    !locked && (clientOptions.length === 0 || projectOptions.length === 0);
 
   function submit() {
     setError(null);
@@ -136,39 +156,43 @@ export function EngagementCreateForm({
               </div>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="eng-client">{t('client')}</Label>
-              <Select value={clientId} onValueChange={setClientId}>
-                <SelectTrigger id="eng-client">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {clientOptions.map((c) => (
-                    <SelectItem key={c.id} value={c.id}>
-                      {pickLocale({ nameAr: c.nameAr, nameEn: c.nameEn }, 'name', locale)
-                        .value || c.id.slice(0, 8)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            {!locked && (
+              <div className="space-y-2">
+                <Label htmlFor="eng-client">{t('client')}</Label>
+                <Select value={clientId} onValueChange={setClientId}>
+                  <SelectTrigger id="eng-client">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {clientOptions.map((c) => (
+                      <SelectItem key={c.id} value={c.id}>
+                        {pickLocale({ nameAr: c.nameAr, nameEn: c.nameEn }, 'name', locale)
+                          .value || c.id.slice(0, 8)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
 
-            <div className="space-y-2">
-              <Label htmlFor="eng-project">{t('project')}</Label>
-              <Select value={projectId} onValueChange={setProjectId}>
-                <SelectTrigger id="eng-project">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {projectsForClient.map((p) => (
-                    <SelectItem key={p.id} value={p.id}>
-                      {pickLocale({ nameAr: p.nameAr, nameEn: p.nameEn }, 'name', locale)
-                        .value || p.id.slice(0, 8)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            {!locked && (
+              <div className="space-y-2">
+                <Label htmlFor="eng-project">{t('project')}</Label>
+                <Select value={projectId} onValueChange={setProjectId}>
+                  <SelectTrigger id="eng-project">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {projectsForClient.map((p) => (
+                      <SelectItem key={p.id} value={p.id}>
+                        {pickLocale({ nameAr: p.nameAr, nameEn: p.nameEn }, 'name', locale)
+                          .value || p.id.slice(0, 8)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
 
             <label className="flex items-center gap-2 text-sm">
               <input

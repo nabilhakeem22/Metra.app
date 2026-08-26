@@ -19,6 +19,7 @@ import {
 } from '@metra/db';
 import { asc, desc, eq } from 'drizzle-orm';
 import { withOrgContext, type OrgContext } from '@/lib/db/context';
+import { TERMINAL_STATES } from './states';
 
 /**
  * One row of the engagements list: the header fields the list surface renders
@@ -64,6 +65,60 @@ export function listEngagements(ctx: OrgContext): Promise<EngagementListRow[]> {
       .leftJoin(projects, eq(projects.id, designEngagements.projectId))
       .orderBy(desc(designEngagements.number));
     return rows.map((r) => ({ ...r, createdAt: r.createdAt.toISOString() }));
+  });
+}
+
+/**
+ * The one Delivery a Project surface links to: its current DE (id + rendered-number
+ * inputs + lifecycle state + bilingual title). This is the through-project entry
+ * point (Slice C2) — a Project reaches its Delivery, so the surface can show
+ * "Open delivery" (with the stage badge) or "Start delivery". Timestamps cross the
+ * server -> client boundary as ISO strings. RLS scopes the read to the caller's org.
+ */
+export interface ProjectDeliverySummary {
+  id: string;
+  number: number;
+  state: DesignEngagementState;
+  titleAr: string | null;
+  titleEn: string | null;
+  createdAt: string;
+}
+
+/**
+ * The Project's current Delivery, or null if it has none. A Project has at most one
+ * ACTIVE (non-terminal) Delivery at a time (the one-delivery guard in
+ * `createEngagementCore` enforces it), so the ACTIVE one is preferred when present;
+ * otherwise the most-recent by per-org `number` (a project whose only Deliveries are
+ * TERMINAL surfaces the newest closed one). Reads via
+ * `design_engagements_org_project_idx`; RLS scopes it to the caller's org (a foreign
+ * project reads as null). The CALLER gates the read on the `engagements_design` read
+ * capability.
+ */
+export function getEngagementByProject(
+  ctx: OrgContext,
+  projectId: string,
+): Promise<ProjectDeliverySummary | null> {
+  return withOrgContext(ctx, async (tx) => {
+    const rows = await tx
+      .select({
+        id: designEngagements.id,
+        number: designEngagements.number,
+        state: designEngagements.state,
+        titleAr: designEngagements.titleAr,
+        titleEn: designEngagements.titleEn,
+        createdAt: designEngagements.createdAt,
+      })
+      .from(designEngagements)
+      .where(eq(designEngagements.projectId, projectId))
+      .orderBy(desc(designEngagements.number));
+
+    // Rows are newest-first by per-org number, so the first non-terminal row is the
+    // highest-numbered ACTIVE Delivery; falling back to rows[0] yields the newest
+    // Delivery overall when every one is terminal.
+    const current =
+      rows.find((row) => !TERMINAL_STATES.has(row.state)) ?? rows[0] ?? null;
+    if (!current) return null;
+    return { ...current, createdAt: current.createdAt.toISOString() };
   });
 }
 

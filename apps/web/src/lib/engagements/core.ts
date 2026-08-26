@@ -4,12 +4,19 @@
 // engine and executor are Step 2 — nothing here writes engagement_transitions or
 // moves state off `created`.
 import { clients, designEngagements, projects } from '@metra/db';
-import { eq } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 import { fail, mutateInOrg } from '@/lib/actions/mutate';
 import { err, type ActionResult } from '@/lib/actions/result';
 import { allocateNumber } from '@/lib/db/allocate-number';
 import type { OrgContext } from '@/lib/db/context';
 import { normalizeText } from '@/lib/proposals/core';
+import { ACTIVE_STATES } from './states';
+
+// The non-terminal (in-flight) states a Delivery can occupy — materialized once for
+// the one-delivery-per-project guard's `state IN (…)` probe. A Delivery in a
+// TERMINAL state (closed_design_only / execution / abandoned) has left its Project
+// and does NOT block a fresh start.
+const ACTIVE_ENGAGEMENT_STATES = [...ACTIVE_STATES];
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -61,6 +68,23 @@ export async function createEngagementCore(
         .where(eq(projects.id, projectId))
         .limit(1);
       if (!project) fail('engagement_project_required');
+
+      // One-delivery-per-project guard (Slice C2): a Project may hold at most one
+      // in-flight Delivery. If a non-terminal row already exists for this project,
+      // refuse before allocating a number so nothing is written. TERMINAL deliveries
+      // (closed_design_only / execution / abandoned) do not block a fresh start.
+      // Code-level guard, RLS-scoped — no DB constraint.
+      const [existing] = await tx
+        .select({ id: designEngagements.id })
+        .from(designEngagements)
+        .where(
+          and(
+            eq(designEngagements.projectId, projectId),
+            inArray(designEngagements.state, ACTIVE_ENGAGEMENT_STATES),
+          ),
+        )
+        .limit(1);
+      if (existing) fail('project_delivery_exists');
 
       const number = await allocateNumber(
         tx,

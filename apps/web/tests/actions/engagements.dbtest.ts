@@ -72,10 +72,20 @@ describe('createEngagementCore (Design-Engagement Machine, Step 1)', () => {
   });
 
   it('two concurrent creates get distinct sequential numbers (no unique collision)', async () => {
+    // One delivery per project, so contend on the org-level number sequence
+    // with two *different* projects rather than two deliveries on one project.
     const { ctx, clientId, projectId } = await setup();
+    const second = await createProjectCore(ctx, {
+      code: `PRJ2-${ctx.orgId.slice(0, 8)}`,
+      nameEn: 'Tower B',
+      clientId,
+      status: 'active',
+    });
+    expect(second.ok).toBe(true);
+    const projectId2 = (second as { data?: string }).data!;
     const [a, b] = await Promise.all([
       createEngagementCore(ctx, { titleEn: 'A', clientId, projectId }),
-      createEngagementCore(ctx, { titleEn: 'B', clientId, projectId }),
+      createEngagementCore(ctx, { titleEn: 'B', clientId, projectId: projectId2 }),
     ]);
     expect(a.ok).toBe(true);
     expect(b.ok).toBe(true);

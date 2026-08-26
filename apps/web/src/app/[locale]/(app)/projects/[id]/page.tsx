@@ -5,6 +5,7 @@ import { Link } from '@/i18n/routing';
 import { requireOrg } from '@/lib/auth/require-org';
 import { listActivities } from '@/lib/activities/queries';
 import { getClientOptions } from '@/lib/clients/queries';
+import { getEngagementByProject } from '@/lib/engagements/queries';
 import { listProjectDocuments } from '@/lib/project-documents/queries';
 import { listStages } from '@/lib/project-stages/queries';
 import { listProjectTypes } from '@/lib/project-types/queries';
@@ -88,7 +89,19 @@ export default async function ProjectProfilePage({
         className="focus:outline-none"
       >
         {tab === 'overview' && (
-          <OverviewTab overview={await getProjectOverview(ctx, id)} />
+          <OverviewTab
+            overview={await getProjectOverview(ctx, id)}
+            deliveryPanel={
+              can(ctx.role, 'engagements_design', 'read')
+                ? {
+                    delivery: await getEngagementByProject(ctx, id),
+                    clientId: project.clientId,
+                    projectId: id,
+                    canStart: can(ctx.role, 'engagements_design', 'create'),
+                  }
+                : undefined
+            }
+          />
         )}
         {tab === 'details' && (
           <DetailsTab

@@ -13,6 +13,7 @@ export type ApiProblemKind =
   | 'not-found'
   | 'bad-request'
   | 'invalid-cursor'
+  | 'conflict'
   | 'rate-limited'
   | 'internal';
 
@@ -27,6 +28,7 @@ const PROBLEM_META: Record<ApiProblemKind, ProblemMeta> = {
   'not-found': { status: 404, title: 'Not Found' },
   'bad-request': { status: 400, title: 'Bad Request' },
   'invalid-cursor': { status: 400, title: 'Invalid Cursor' },
+  conflict: { status: 409, title: 'Conflict' },
   'rate-limited': { status: 429, title: 'Too Many Requests' },
   internal: { status: 500, title: 'Internal Server Error' },
 };
@@ -136,6 +138,7 @@ export const ACTION_CODE_PROBLEM: Record<ActionCode, ApiProblemKind> = {
   flow_not_enabled: 'forbidden',
   payment_kind_mismatch: 'bad-request',
   firm_type_unavailable: 'bad-request',
+  project_delivery_exists: 'conflict',
 };
 
 /** A problem Response derived from an ActionResult error code. */

@@ -5,9 +5,29 @@ import { pickLocale } from '@/lib/i18n/pick-locale';
 import { formatDate } from '@/lib/format/date';
 import { formatMoney } from '@/lib/format/money';
 import { formatPercent } from '@/lib/format/number';
+import type { ProjectDeliverySummary } from '@/lib/engagements/queries';
 import type { ProjectOverview } from '@/lib/projects/queries';
+import { ProjectDeliveryPanel } from '../../engagements/project-delivery-panel';
 
-export async function OverviewTab({ overview }: { overview: ProjectOverview }) {
+/**
+ * The through-project Delivery entry point, wired only when the caller may read
+ * deliveries (`engagements_design` read). `delivery` is null when the project has
+ * none yet; `canStart` gates the "Start delivery" CTA on the create capability.
+ */
+export interface DeliveryPanelProps {
+  delivery: ProjectDeliverySummary | null;
+  clientId: string;
+  projectId: string;
+  canStart: boolean;
+}
+
+export async function OverviewTab({
+  overview,
+  deliveryPanel,
+}: {
+  overview: ProjectOverview;
+  deliveryPanel?: DeliveryPanelProps;
+}) {
   const t = await getTranslations('projects.profile.overview');
   const ts = await getTranslations('projects.statuses');
   const tk = await getTranslations('projects.profile.activity.kinds');
@@ -31,6 +51,15 @@ export async function OverviewTab({ overview }: { overview: ProjectOverview }) {
 
   return (
     <div className="space-y-4">
+      {deliveryPanel && (
+        <ProjectDeliveryPanel
+          delivery={deliveryPanel.delivery}
+          clientId={deliveryPanel.clientId}
+          projectId={deliveryPanel.projectId}
+          canStartDelivery={deliveryPanel.canStart}
+        />
+      )}
+
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <Stat label={t('status')} value={ts(overview.status)} />
         <Card>

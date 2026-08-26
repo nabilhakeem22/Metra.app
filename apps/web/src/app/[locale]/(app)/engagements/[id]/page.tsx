@@ -1,7 +1,10 @@
-import { getTranslations } from 'next-intl/server';
+import { ChevronRight } from 'lucide-react';
+import { getLocale, getTranslations } from 'next-intl/server';
 import { notFound } from 'next/navigation';
 import { PageHeader } from '@/components/ui/page-header';
+import { Link } from '@/i18n/routing';
 import { requireOrg } from '@/lib/auth/require-org';
+import { pickLocale } from '@/lib/i18n/pick-locale';
 import { getEngagementGatePreview } from '@/lib/engagements/gate-preview';
 import { computeCommercialPulse } from '@/lib/engagements/pulse';
 import {
@@ -31,6 +34,20 @@ export default async function EngagementDetailPage({
   if (!header) notFound();
 
   const t = await getTranslations('engagements');
+  const tb = await getTranslations('engagements.breadcrumb');
+  const locale = await getLocale();
+  const clientName =
+    pickLocale(
+      { nameAr: header.clientNameAr, nameEn: header.clientNameEn },
+      'name',
+      locale,
+    ).value || header.clientId.slice(0, 8);
+  const projectName =
+    pickLocale(
+      { nameAr: header.projectNameAr, nameEn: header.projectNameEn },
+      'name',
+      locale,
+    ).value || header.projectId.slice(0, 8);
   const [
     feeSchedule,
     payments,
@@ -89,6 +106,30 @@ export default async function EngagementDetailPage({
 
   return (
     <div className="space-y-6">
+      <nav
+        aria-label="breadcrumb"
+        className="flex flex-wrap items-center gap-1.5 text-sm text-muted-foreground"
+      >
+        <Link href="/clients" className="hover:text-foreground">
+          {tb('clients')}
+        </Link>
+        <ChevronRight className="size-3.5 rtl:-scale-x-100" aria-hidden />
+        <Link
+          href={`/clients/${header.clientId}`}
+          className="hover:text-foreground"
+        >
+          {clientName}
+        </Link>
+        <ChevronRight className="size-3.5 rtl:-scale-x-100" aria-hidden />
+        <Link
+          href={`/projects/${header.projectId}`}
+          className="hover:text-foreground"
+        >
+          {projectName}
+        </Link>
+        <ChevronRight className="size-3.5 rtl:-scale-x-100" aria-hidden />
+        <span className="text-foreground">{tb('delivery')}</span>
+      </nav>
       <PageHeader
         title={formatDocNumber('DE', header.number, docYear(null, header.createdAt))}
         description={t('subtitle')}
