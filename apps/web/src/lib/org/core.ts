@@ -17,12 +17,18 @@ import { sql } from 'drizzle-orm';
 import { mutateInOrg } from '@/lib/actions/mutate';
 import { err, type ActionResult } from '@/lib/actions/result';
 import type { OrgContext } from '@/lib/db/context';
+import { FLOWS } from '@/lib/entitlements/flows';
+import { firmTypeDef, type FirmTypeKey } from '@/lib/entitlements/firm-types';
 
 export interface OrgProfileInput {
   nameEn?: string | null;
   nameAr?: string | null;
   city?: string | null;
   taxRegistrationNumber?: string | null;
+  // The chosen firm-type preset (Epic B1). Resolves server-side to the
+  // workspace's enabled_flows set — the client NEVER supplies a raw flow array.
+  // Defaults to 'interior' so existing callers keep their behaviour.
+  firmType?: FirmTypeKey;
 }
 
 // Cap user-supplied text at the boundary (defense-in-depth).
@@ -59,6 +65,21 @@ export async function createOrgCore(
     return err('invalid');
   }
 
+  // Resolve + validate the firm type SERVER-SIDE (defense-in-depth: the action is
+  // directly invokable, so a hidden/disabled UI option is not a gate). We only
+  // ever accept the firmType KEY — never a raw client-supplied flow array — and
+  // map it to enabled_flows here. Runs BEFORE mutateInOrg, so a rejected type
+  // opens no transaction and writes zero rows.
+  const firmType: FirmTypeKey = input.firmType ?? 'interior';
+  const firmTypeDefinition = firmTypeDef(firmType);
+  if (!firmTypeDefinition || !firmTypeDefinition.available) {
+    return err('firm_type_unavailable');
+  }
+  const flows = firmTypeDefinition.enabledFlows;
+  if (flows.length === 0 || !flows.every((flow) => FLOWS.includes(flow))) {
+    return err('firm_type_unavailable');
+  }
+
   return mutateInOrg(ctx, {}, async (tx, audit) => {
     // Mint this org's owning account (above tenancy) via the bootstrap SDF — the
     // ONLY path that creates an account row — then link it. metra_app has SELECT
@@ -81,13 +102,14 @@ export async function createOrgCore(
     await tx
       .insert(memberships)
       .values({ orgId: ctx.orgId, userId: ctx.userId, role: 'owner' });
-    // Per-workspace entitlements (A2): `interior` enabled. MUST come AFTER the
-    // owner membership insert above — the org_isolation WITH CHECK calls
+    // Per-workspace entitlements (A2): the flows resolved from the chosen firm
+    // type (B1) — `interior` for the only selectable option today. MUST come
+    // AFTER the owner membership insert above — the org_isolation WITH CHECK calls
     // app_is_current_org_member(), which is false until the membership exists.
     // Plain INSERT (no conflict path): a brand-new org has no prior row.
     await tx
       .insert(workspaceEntitlements)
-      .values({ orgId: ctx.orgId, enabledFlows: ['interior'] });
+      .values({ orgId: ctx.orgId, enabledFlows: flows });
     // Automation defaults (mirrors the 0016 backfill) so the cron acts on this
     // org from day one; every field is user-configurable in Settings.
     await tx.insert(automationSettings).values({ orgId: ctx.orgId });

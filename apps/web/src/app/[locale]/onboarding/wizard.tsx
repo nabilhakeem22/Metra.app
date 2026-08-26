@@ -3,6 +3,7 @@
 import { Check, Loader2, Upload, X } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
 import { useState, useTransition, type ChangeEvent } from 'react';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { FieldHint } from '@/components/ui/field-hint';
 import { Input } from '@/components/ui/input';
@@ -11,6 +12,7 @@ import { toast } from '@/hooks/use-toast';
 import { useRouter } from '@/i18n/routing';
 import { resolveActionError } from '@/lib/actions/error-message';
 import type { ActionCode } from '@/lib/actions/result';
+import { FIRM_TYPES, type FirmTypeKey } from '@/lib/entitlements/firm-types';
 import {
   createLogoUpload,
   createOrg,
@@ -18,7 +20,15 @@ import {
   type OrgProfileInput,
 } from '@/lib/org/actions';
 
-const STEPS = 3;
+const STEPS = 4;
+
+// The onboarding message keys for each firm-type card. Kept beside the registry
+// so a new firm type surfaces a missing-key at build rather than silently.
+const FIRM_TYPE_COPY: Record<FirmTypeKey, { label: string; desc: string }> = {
+  interior: { label: 'firmTypeInterior', desc: 'firmTypeInteriorDesc' },
+  construction: { label: 'firmTypeConstruction', desc: 'firmTypeConstructionDesc' },
+  both: { label: 'firmTypeBoth', desc: 'firmTypeBothDesc' },
+};
 
 export function OnboardingWizard() {
   const t = useTranslations('onboarding');
@@ -32,6 +42,7 @@ export function OnboardingWizard() {
   const [step, setStep] = useState(1);
   const [nameEn, setNameEn] = useState('');
   const [nameAr, setNameAr] = useState('');
+  const [firmType, setFirmType] = useState<FirmTypeKey>('interior');
   const [city, setCity] = useState('');
   const [tax, setTax] = useState('');
   const [logo, setLogo] = useState<File | null>(null);
@@ -72,6 +83,7 @@ export function OnboardingWizard() {
         const input: OrgProfileInput = {
           nameEn: nameEn.trim() || null,
           nameAr: nameAr.trim() || null,
+          firmType,
           city: city.trim() || null,
           taxRegistrationNumber: tax.trim() || null,
         };
@@ -235,6 +247,72 @@ export function OnboardingWizard() {
             <h1 className="text-2xl font-bold tracking-tight">
               {t('step2Title')}
             </h1>
+            <p className="text-sm text-muted-foreground">{t('firmTypeHint')}</p>
+          </div>
+          <div
+            role="radiogroup"
+            aria-label={t('step2Title')}
+            className="space-y-2"
+          >
+            {FIRM_TYPES.map((def) => {
+              const selected = firmType === def.key;
+              const copy = FIRM_TYPE_COPY[def.key];
+              return (
+                <button
+                  key={def.key}
+                  type="button"
+                  role="radio"
+                  aria-checked={selected}
+                  aria-disabled={!def.available}
+                  disabled={!def.available}
+                  tabIndex={def.available ? 0 : -1}
+                  onClick={() => def.available && setFirmType(def.key)}
+                  className={`glass-field focus-ring-brand flex w-full items-start gap-3 p-4 text-start outline-none transition-colors motion-reduce:transition-none ${
+                    def.available
+                      ? 'cursor-pointer hover:bg-[color:var(--track)]'
+                      : 'cursor-not-allowed opacity-60'
+                  } ${
+                    selected
+                      ? 'border-[color:hsl(var(--brand))] bg-brand-tint'
+                      : ''
+                  }`}
+                >
+                  <span
+                    className={`mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full border ${
+                      selected
+                        ? 'border-[color:hsl(var(--brand))] bg-[color:hsl(var(--brand))] text-white'
+                        : 'border-[color:var(--glass-hairline)]'
+                    }`}
+                    aria-hidden
+                  >
+                    {selected && <Check className="size-3.5" />}
+                  </span>
+                  <span className="min-w-0 flex-1 space-y-1">
+                    <span className="flex items-center gap-2">
+                      <span className="text-sm font-semibold text-[color:var(--text)]">
+                        {t(copy.label)}
+                      </span>
+                      {!def.available && (
+                        <Badge variant="default">{t('firmTypeComingSoon')}</Badge>
+                      )}
+                    </span>
+                    <span className="block text-sm text-muted-foreground">
+                      {t(copy.desc)}
+                    </span>
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {step === 3 && (
+        <div className="space-y-4">
+          <div className="space-y-1">
+            <h1 className="text-2xl font-bold tracking-tight">
+              {t('step3Title')}
+            </h1>
             <p className="text-sm text-muted-foreground">{t('confirmHint')}</p>
           </div>
           <dl className="divide-y rounded-xl border">
@@ -255,11 +333,11 @@ export function OnboardingWizard() {
         </div>
       )}
 
-      {step === 3 && (
+      {step === 4 && (
         <div className="space-y-4">
           <div className="space-y-1">
             <h1 className="text-2xl font-bold tracking-tight">
-              {t('step3Title')}
+              {t('step4Title')}
             </h1>
             <p className="text-sm text-muted-foreground">{t('inviteHint')}</p>
           </div>
