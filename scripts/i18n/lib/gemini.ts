@@ -24,7 +24,9 @@ export function readGeminiEnv(): { apiKey: string; model: string } {
         'This script is the only piece that calls Gemini.',
     );
   }
-  const model = process.env.GEMINI_MODEL?.trim() || 'gemini-2.5-pro';
+  // gemini-2.5-pro is retired for new API users; 3.1 Pro is the current default.
+  // Override with GEMINI_MODEL (e.g. a flash tier) if you prefer cheaper/faster.
+  const model = process.env.GEMINI_MODEL?.trim() || 'gemini-3.1-pro-preview';
   return { apiKey, model };
 }
 

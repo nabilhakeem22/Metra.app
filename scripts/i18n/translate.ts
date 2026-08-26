@@ -14,6 +14,10 @@
  * It NEVER overwrites ar-EG.json (that is `i18n:apply`, post-review) and never
  * prints the API key.
  */
+import { existsSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import dotenv from 'dotenv';
 import { flatten, unflatten, type FlatMessages } from './lib/flatten';
 import {
   GeminiError,
@@ -23,6 +27,7 @@ import {
 } from './lib/gemini';
 import {
   AR_GENERATED_PATH,
+  AR_PATH,
   EN_PATH,
   GLOSSARY_PATH,
   STYLE_GUIDE_PATH,
@@ -31,8 +36,21 @@ import {
   writeCatalog,
 } from './lib/paths';
 
+// Load the root .env (where GEMINI_API_KEY lives, gitignored) before reading it,
+// mirroring packages/db/src/env.ts. tsx does not auto-load .env.
+const envDir = dirname(fileURLToPath(import.meta.url)); // scripts/i18n
+for (const candidate of [
+  resolve(envDir, '../../.env'), // repo root
+  resolve(process.cwd(), '.env'),
+]) {
+  if (existsSync(candidate)) {
+    dotenv.config({ path: candidate });
+    break;
+  }
+}
+
 const CHUNK_SIZE = 70;
-const MAX_ATTEMPTS = 3;
+const MAX_ATTEMPTS = 6;
 
 type GlossaryTerm = { en: string; ar: string; gender?: string; notes?: string };
 
@@ -91,17 +109,29 @@ async function translateChunkWithRetry(
   chunk: FlatMessages,
   chunkIndex: number,
 ): Promise<{ result: FlatMessages; retries: number }> {
+  // Send OPAQUE numeric ids, never the real dotted keys, so a weaker model can't
+  // corrupt a key (e.g. Arabize "sqm" -> "sqم") and fail the whole chunk. Map back
+  // to the real keys locally after the id set is verified.
+  const realKeys = Object.keys(chunk);
+  const idToKey = new Map<string, string>();
+  const payload: FlatMessages = {};
+  realKeys.forEach((key, i) => {
+    const id = String(i);
+    idToKey.set(id, key);
+    payload[id] = chunk[key];
+  });
+
   let lastDetail = '';
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
     try {
-      const received = await translateChunk(config, chunk);
-      const check = keySetsMatch(chunk, received);
+      const received = await translateChunk(config, payload);
+      const check = keySetsMatch(payload, received);
       if (check.ok) {
         const result: FlatMessages = {};
-        for (const key of Object.keys(chunk)) result[key] = String(received[key]);
+        for (const [id, key] of idToKey) result[key] = String(received[id]);
         return { result, retries: attempt - 1 };
       }
-      lastDetail = `key-set mismatch — ${check.detail}`;
+      lastDetail = `id-set mismatch — ${check.detail}`;
     } catch (error) {
       if (error instanceof GeminiError && !error.retryable) {
         throw new Error(
@@ -111,7 +141,8 @@ async function translateChunkWithRetry(
       lastDetail = (error as Error).message;
     }
     if (attempt < MAX_ATTEMPTS) {
-      const backoffMs = 500 * 2 ** (attempt - 1);
+      // Exponential backoff capped at 30s, with jitter, to ride out 503 spikes.
+      const backoffMs = Math.min(1000 * 2 ** (attempt - 1), 30_000) + Math.floor(Math.random() * 400);
       console.log(
         `  chunk ${chunkIndex + 1}: attempt ${attempt} failed (${lastDetail}); ` +
           `retrying in ${backoffMs}ms`,
@@ -140,35 +171,86 @@ async function main(): Promise<void> {
       `chunks=${chunks.length} (~${CHUNK_SIZE}/chunk)`,
   );
 
+  // Seed from a prior generated draft if one exists (so re-runs ACCUMULATE
+  // coverage under free-tier quota), else from the current ar-EG.json. Either
+  // way a key we cannot translate this run keeps a real Arabic value — a partial
+  // run never blanks or loses a string.
+  const seedPath = existsSync(AR_GENERATED_PATH) ? AR_GENERATED_PATH : AR_PATH;
+  const seed = flatten(readCatalog(seedPath));
   const translated: FlatMessages = {};
+  for (const key of Object.keys(enFlat)) translated[key] = seed[key] ?? '';
+
   let totalRetries = 0;
-  for (let index = 0; index < chunks.length; index++) {
-    const { result, retries } = await translateChunkWithRetry(
-      config,
-      chunks[index],
-      index,
-    );
-    Object.assign(translated, result);
-    totalRetries += retries;
-    console.log(
-      `  chunk ${index + 1}/${chunks.length} ok ` +
-        `(${Object.keys(chunks[index]).length} keys` +
-        `${retries ? `, ${retries} retr${retries === 1 ? 'y' : 'ies'}` : ''})`,
-    );
+  const failed: number[] = [];
+
+  async function runChunk(index: number): Promise<boolean> {
+    try {
+      const { result, retries } = await translateChunkWithRetry(
+        config,
+        chunks[index],
+        index,
+      );
+      Object.assign(translated, result);
+      totalRetries += retries;
+      console.log(
+        `  chunk ${index + 1}/${chunks.length} ok ` +
+          `(${Object.keys(chunks[index]).length} keys` +
+          `${retries ? `, ${retries} retr${retries === 1 ? 'y' : 'ies'}` : ''})`,
+      );
+      return true;
+    } catch (error) {
+      const head = (error as Error).message.split('. Offending')[0];
+      console.log(`  chunk ${index + 1}/${chunks.length} FAILED — ${head}`);
+      return false;
+    }
   }
 
-  // Reassemble in en's key order (translated was filled in en order).
+  // Pass 1: every chunk, continuing past a chunk that exhausts its retries.
+  for (let index = 0; index < chunks.length; index++) {
+    if (!(await runChunk(index))) failed.push(index);
+  }
+
+  // Sweep passes: retry only the stragglers, pausing between passes to let a
+  // transient 503 congestion spike clear before giving up.
+  const MAX_SWEEPS = 3;
+  for (let sweep = 1; sweep <= MAX_SWEEPS && failed.length > 0; sweep++) {
+    console.log(
+      `\nSweep ${sweep}/${MAX_SWEEPS} — retrying ${failed.length} chunk(s) after a pause...`,
+    );
+    await delay(20_000);
+    const still: number[] = [];
+    for (const index of failed) {
+      if (!(await runChunk(index))) still.push(index);
+    }
+    failed.splice(0, failed.length, ...still);
+  }
+
+  // Reassemble in en's key order and write (always — seeded, so complete).
   const ordered: FlatMessages = {};
   for (const key of Object.keys(enFlat)) ordered[key] = translated[key];
   writeCatalog(AR_GENERATED_PATH, unflatten(ordered));
 
-  console.log(
-    `\nWrote ${AR_GENERATED_PATH}\n` +
-      `Summary: ${chunks.length} chunks, ${Object.keys(ordered).length} keys, ` +
-      `${totalRetries} retries. Next: npm run i18n:validate -- --file ` +
-      `apps/web/src/messages/ar-EG.generated.json --strict, then i18n:review, ` +
-      `then i18n:apply.`,
-  );
+  const done = chunks.length - failed.length;
+  if (failed.length === 0) {
+    console.log(
+      `\nWrote ${AR_GENERATED_PATH}\n` +
+        `Summary: ${chunks.length} chunks, ${Object.keys(ordered).length} keys, ` +
+        `${totalRetries} retries. All chunks translated.\n` +
+        `Next: npm run i18n:validate -- --file ` +
+        `apps/web/src/messages/ar-EG.generated.json --strict, then i18n:review, ` +
+        `then i18n:apply.`,
+    );
+  } else {
+    const failedKeys = failed.flatMap((i) => Object.keys(chunks[i]));
+    console.log(
+      `\nWrote ${AR_GENERATED_PATH} (PARTIAL).\n` +
+        `${done}/${chunks.length} chunks translated; ${failed.length} still failing ` +
+        `after ${MAX_SWEEPS} sweeps — those ${failedKeys.length} keys keep their ` +
+        `CURRENT ar-EG value. Re-run i18n:translate to top them up.\n` +
+        `Failed keys: {${failedKeys.join(', ')}}`,
+    );
+    process.exitCode = 2;
+  }
 }
 
 main().catch((error: unknown) => {
