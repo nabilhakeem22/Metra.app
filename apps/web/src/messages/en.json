@@ -11,6 +11,110 @@
     "signIn": "Sign in",
     "localeName": "English"
   },
+  "landing": {
+    "seo": {
+      "title": "Project & cost control for interior-design studios",
+      "description": "Metra runs interior-design studios through every stage of a fit-out — proposals, approvals, payment gates, and handoff — with every pound traceable from quote to invoice. Bilingual and EGP-native."
+    },
+    "nav": {
+      "primaryLabel": "Primary",
+      "features": "Features",
+      "howItWorks": "How it works",
+      "pricing": "Pricing",
+      "signIn": "Sign in",
+      "getStarted": "Get started"
+    },
+    "hero": {
+      "eyebrow": "For interior-design studios",
+      "headline": "Every interior project, from concept to <accent>handoff</accent> — under control.",
+      "lede": "Metra runs your studio through each stage of a fit-out — proposals, design approvals, payment gates, and handoff — while keeping every pound traceable from the line you quoted to the line you invoiced.",
+      "ctaPrimary": "Get started — free",
+      "ctaSecondary": "See how it works",
+      "note": "No credit card · Arabic & English · set up in minutes",
+      "card": {
+        "stageConcept": "Concept",
+        "stageGateA": "Gate A",
+        "stage3d": "3D",
+        "stageHandoff": "Handoff",
+        "contractTotalLabel": "Contract total",
+        "depositLabel": "Signing deposit",
+        "depositStatus": "Cleared",
+        "gateLabel": "Gate A — concept",
+        "gateStatus": "Due",
+        "marginLabel": "Margin"
+      }
+    },
+    "trust": {
+      "line": "Built for interior-design and fit-out studios — bilingual, EGP-native, and made for how the region actually works."
+    },
+    "problem": {
+      "eyebrow": "The problem",
+      "title": "Great design, leaking margins.",
+      "lede": "Interior projects lose money in the gaps — between the quote and the invoice, the concept and the sign-off, the site and the schedule. Spreadsheets and chat threads can't hold a whole fit-out together.",
+      "value1Title": "One place, one flow",
+      "value1Desc": "— every project moves through the same clear stages, so nothing stalls unseen.",
+      "value2Title": "Money in view the whole way",
+      "value2Desc": "— quote-to-invoice traceability and live margin on every job.",
+      "value3Title": "Client sign-offs that gate the work",
+      "value3Desc": "— approvals and payments unlock the next phase, on the record.",
+      "cardLabel": "Every pound accounted for",
+      "cardCaption": "Revised contract value, tracked against billed-to-date — to four decimals.",
+      "cardProgressLabel": "Where each project stands",
+      "cardStages": "Proposal & survey → Concept → 3D & approvals → Handoff."
+    },
+    "features": {
+      "eyebrow": "What you get",
+      "title": "Everything a studio needs to run a fit-out.",
+      "subtitle": "From the first proposal to the final handoff — one system, built for interior work.",
+      "flowTitle": "A guided project flow",
+      "flowDesc": "Lead → concept → design approval → payment gates → handoff. Every project follows the same clear path, so you always know exactly where each one stands.",
+      "costTitle": "Cost & margin control",
+      "costDesc": "Every line is traceable from the quote you sent to the invoice you raised. See your true margin on each project in real time — no surprises at closeout.",
+      "proposalsTitle": "Proposals & approvals",
+      "proposalsDesc": "Send client-ready proposals, collect sign-offs, and tie payment gates to each stage — so the design only advances when the client and the money say go.",
+      "bilingualTitle": "Arabic & English, done right",
+      "bilingualDesc": "Full right-to-left Arabic and English, EGP-native figures, and a bilingual client experience — not an afterthought bolted on the end."
+    },
+    "how": {
+      "eyebrow": "How it works",
+      "title": "Four stages, start to finish.",
+      "subtitle": "The same rhythm on every project — so your team, and your client, always know what's next.",
+      "step1Title": "Propose",
+      "step1Desc": "Build the proposal from your price book, send it, and collect the signing deposit.",
+      "step2Title": "Design & approve",
+      "step2Desc": "Share concepts and renders; the client selects and signs off at each gate.",
+      "step3Title": "Gate & build",
+      "step3Desc": "Payment gates unlock the next phase; scope changes become priced variations.",
+      "step4Title": "Hand off",
+      "step4Desc": "Reconcile as-built against contract, settle the balance, and close the project clean."
+    },
+    "pricing": {
+      "eyebrow": "Pricing",
+      "title": "Simple, while we're early.",
+      "subtitle": "One plan, everything included. Free for pilot studios during early access — no card, no lock-in.",
+      "badge": "Early access",
+      "planName": "Studio",
+      "amount": "Free",
+      "amountNote": "· during pilot",
+      "sub": "Then simple per-studio pricing — we'll talk before anything changes.",
+      "feature1": "The full guided project flow",
+      "feature2": "Proposals, approvals & payment gates",
+      "feature3": "Cost & margin tracking to 4 decimals",
+      "feature4": "Your whole team, one workspace",
+      "feature5": "Arabic & English, RTL",
+      "cta": "Get started — free"
+    },
+    "final": {
+      "title": "Run your next fit-out on Metra.",
+      "lede": "Set up your studio in minutes and take your next project from concept to handoff — with the numbers under control.",
+      "ctaPrimary": "Get started — free",
+      "ctaSecondary": "Sign in"
+    },
+    "footer": {
+      "label": "Footer",
+      "copyright": "© Metra"
+    }
+  },
   "meta": {
     "title": "Project and cost control for fit-out contractors",
     "description": "Every pound of a project's value, traceable from the line you quoted to the line you invoiced.",

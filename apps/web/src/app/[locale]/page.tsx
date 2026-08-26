@@ -1,8 +1,17 @@
 import type { Metadata } from 'next';
-import { useTranslations } from 'next-intl';
 import { getTranslations } from 'next-intl/server';
-import { Button } from '@/components/ui/button';
-import { LOCALES, Link, type Locale } from '@/i18n/routing';
+import { FeatureCards } from '@/components/landing/feature-cards';
+import { FinalCta } from '@/components/landing/final-cta';
+import { HowItWorks } from '@/components/landing/how-it-works';
+import { LandingFooter } from '@/components/landing/landing-footer';
+import { LandingHero } from '@/components/landing/landing-hero';
+import { LandingNav } from '@/components/landing/landing-nav';
+import { Pricing } from '@/components/landing/pricing';
+import { ProblemValue } from '@/components/landing/problem-value';
+import { StructuredData } from '@/components/landing/structured-data';
+import { TrustBand } from '@/components/landing/trust-band';
+import { LOCALES, type Locale } from '@/i18n/routing';
+import './landing.css';
 
 // Open Graph uses BCP-47-with-underscore locale codes.
 const OG_LOCALE: Record<Locale, string> = {
@@ -16,16 +25,18 @@ export async function generateMetadata({
   params: Promise<{ locale: string }>;
 }): Promise<Metadata> {
   const { locale } = await params;
-  const t = await getTranslations({ locale, namespace: 'meta' });
+  const t = await getTranslations({ locale, namespace: 'landing.seo' });
+  const tMeta = await getTranslations({ locale, namespace: 'meta' });
   const title = t('title');
   const description = t('description');
-  const siteName = t('siteName');
+  const siteName = tMeta('siteName');
 
   // hreflang: one entry per locale, resolved against metadataBase.
   const languages = Object.fromEntries(
     LOCALES.map((code) => [code, `/${code}`]),
   );
 
+  // The landing is the one public, indexable surface — no `noindex` here.
   return {
     title,
     description,
@@ -49,24 +60,30 @@ export async function generateMetadata({
   };
 }
 
-export default function HomePage() {
-  const t = useTranslations('home');
+export default async function HomePage({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}) {
+  const { locale } = await params;
+  const tMeta = await getTranslations({ locale, namespace: 'landing.seo' });
 
   return (
-    <main className="container flex min-h-screen flex-col items-center justify-center gap-8 py-16 text-center">
-      <div className="space-y-3">
-        <h1 className="text-5xl font-bold tracking-tight">{t('title')}</h1>
-        <p className="text-xl text-muted-foreground">{t('tagline')}</p>
+    <>
+      <StructuredData locale={locale} description={tMeta('description')} />
+      <div className="landing">
+        <LandingNav />
+        <main>
+          <LandingHero />
+          <TrustBand />
+          <ProblemValue />
+          <FeatureCards />
+          <HowItWorks />
+          <Pricing />
+          <FinalCta />
+        </main>
+        <LandingFooter />
       </div>
-      <p className="max-w-xl text-balance text-muted-foreground">{t('intro')}</p>
-      <div className="flex flex-wrap items-center justify-center gap-3">
-        <Button asChild size="lg">
-          <Link href="/onboarding">{t('getStarted')}</Link>
-        </Button>
-        <Button asChild variant="outline" size="lg">
-          <Link href="/login">{t('signIn')}</Link>
-        </Button>
-      </div>
-    </main>
+    </>
   );
 }
