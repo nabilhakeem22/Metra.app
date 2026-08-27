@@ -5,16 +5,6 @@ import { useLocale, useTranslations } from 'next-intl';
 import { useEffect, useState, useTransition } from 'react';
 import type { ProjectStatus } from '@metra/db';
 import { Button } from '@/components/ui/button';
-import { FieldHint } from '@/components/ui/field-hint';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import {
   Sheet,
   SheetContent,
@@ -24,9 +14,8 @@ import {
 import { toast } from '@/hooks/use-toast';
 import { resolveActionError } from '@/lib/actions/error-message';
 import type { ActionCode } from '@/lib/actions/result';
-import { pickLocale } from '@/lib/i18n/pick-locale';
 import { createProject, updateProject } from '@/lib/projects/actions';
-import { PROJECT_STATUSES } from '@/lib/projects/statuses';
+import { ProjectFormFields } from './project-form-fields';
 import type { ClientOption, ProjectListItem } from './types';
 
 export interface ProjectFormProps {
@@ -38,7 +27,7 @@ export interface ProjectFormProps {
   defaultClientId?: string;
 }
 
-interface FormState {
+export interface ProjectFormState {
   code: string;
   nameEn: string;
   nameAr: string;
@@ -54,7 +43,7 @@ interface FormState {
 function emptyState(
   clientOptions: ClientOption[],
   defaultClientId?: string,
-): FormState {
+): ProjectFormState {
   const preselected =
     defaultClientId && clientOptions.some((c) => c.id === defaultClientId)
       ? defaultClientId
@@ -84,7 +73,7 @@ export function ProjectForm({
   const th = useTranslations('hints.project');
   const te = useTranslations('errors');
   const locale = useLocale();
-  const [form, setForm] = useState<FormState>(emptyState(clientOptions));
+  const [form, setForm] = useState<ProjectFormState>(emptyState(clientOptions));
   const [pending, startTransition] = useTransition();
 
   useEffect(() => {
@@ -107,7 +96,7 @@ export function ProjectForm({
     );
   }, [open, item, clientOptions, defaultClientId]);
 
-  const set = (k: keyof FormState) => (v: string) =>
+  const set = (k: keyof ProjectFormState) => (v: string) =>
     setForm((f) => ({ ...f, [k]: v }));
 
   function submit() {
@@ -155,122 +144,14 @@ export function ProjectForm({
           </p>
         ) : (
           <div className="mt-4 space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="pr-code" className="flex items-center">
-                {t('form.code')}
-                <FieldHint id="pr-code-hint" hint={th('code')} />
-              </Label>
-              <Input
-                id="pr-code"
-                dir="ltr"
-                aria-describedby="pr-code-hint"
-                value={form.code}
-                onChange={(e) => set('code')(e.target.value)}
-              />
-            </div>
-
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="pr-nameEn" className="flex items-center">
-                  {t('form.nameEn')}
-                  <FieldHint id="pr-name-hint" hint={th('name')} />
-                </Label>
-                <Input
-                  id="pr-nameEn"
-                  dir="ltr"
-                  aria-describedby="pr-name-hint"
-                  value={form.nameEn}
-                  onChange={(e) => set('nameEn')(e.target.value)}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="pr-nameAr" className="flex items-center">
-                  {t('form.nameAr')}
-                  <FieldHint id="pr-namear-hint" hint={th('name')} />
-                </Label>
-                <Input
-                  id="pr-nameAr"
-                  dir="rtl"
-                  aria-describedby="pr-namear-hint"
-                  value={form.nameAr}
-                  onChange={(e) => set('nameAr')(e.target.value)}
-                />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="pr-client" className="flex items-center">
-                {t('form.client')}
-                <FieldHint id="pr-client-hint" hint={th('client')} />
-              </Label>
-              <Select value={form.clientId} onValueChange={(v) => set('clientId')(v)}>
-                <SelectTrigger id="pr-client" aria-describedby="pr-client-hint">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {clientOptions.map((c) => (
-                    <SelectItem key={c.id} value={c.id}>
-                      {pickLocale(
-                        { nameAr: c.nameAr, nameEn: c.nameEn },
-                        'name',
-                        locale,
-                      ).value}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="pr-status" className="flex items-center">
-                {t('form.status')}
-                <FieldHint id="pr-status-hint" hint={th('status')} />
-              </Label>
-              <Select value={form.status} onValueChange={(v) => set('status')(v)}>
-                <SelectTrigger id="pr-status" aria-describedby="pr-status-hint">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {PROJECT_STATUSES.map((s) => (
-                    <SelectItem key={s} value={s}>
-                      {t(`statuses.${s}`)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="pr-start">{t('form.startDate')}</Label>
-                <Input
-                  id="pr-start"
-                  type="date"
-                  dir="ltr"
-                  value={form.startDate}
-                  onChange={(e) => set('startDate')(e.target.value)}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="pr-end">{t('form.endDate')}</Label>
-                <Input
-                  id="pr-end"
-                  type="date"
-                  dir="ltr"
-                  value={form.endDate}
-                  onChange={(e) => set('endDate')(e.target.value)}
-                />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="pr-city">{t('form.city')}</Label>
-              <Input
-                id="pr-city"
-                value={form.city}
-                onChange={(e) => set('city')(e.target.value)}
-              />
-            </div>
+            <ProjectFormFields
+              t={t}
+              th={th}
+              locale={locale}
+              form={form}
+              set={set}
+              clientOptions={clientOptions}
+            />
 
             <div className="flex justify-end gap-2 pt-2">
               <Button

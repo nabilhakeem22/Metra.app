@@ -12,6 +12,11 @@ import type {
 } from '@/lib/engagements/queries';
 import { formatDate } from '@/lib/format/date';
 import { formatMoney } from '@/lib/format/money';
+import { ArtifactsPanel } from './engagement-panels-artifacts';
+import { ChangeOrdersPanel } from './engagement-panels-change-orders';
+import { Empty, MONEY } from './engagement-panels-parts';
+import { PaymentsPanel } from './engagement-panels-payments';
+import { RomPanel } from './engagement-panels-rom';
 import type { EngagementTab } from './tabs';
 
 // Epic D, Slice 5 — the engagement detail panels, reskinned to the glass system as
@@ -32,14 +37,6 @@ export interface PanelData {
   changeOrders: EngagementChangeOrderRecord[];
   transitions: EngagementTransitionRecord[];
 }
-
-function Empty({ text }: { text: string }) {
-  return <p className="py-3 text-sm text-[color:var(--text-muted)]">{text}</p>;
-}
-
-const MONEY = 'text-end font-mono tabular-nums';
-const HEAD_ROW =
-  'border-b border-[color:var(--rule)] text-xs text-[color:var(--text-faint)]';
 
 export function EngagementPanels({ tab, data }: { tab: EngagementTab; data: PanelData }) {
   return (
@@ -85,145 +82,6 @@ export function FeePanel({ feeSchedule }: { feeSchedule: EngagementFeeSchedule }
           ))}
         </ul>
       )}
-    </div>
-  );
-}
-
-function PaymentsPanel({ payments }: { payments: EngagementPayment[] }) {
-  const t = useTranslations('engagements');
-  const locale = useLocale();
-  if (payments.length === 0) return <Empty text={t('payments.empty')} />;
-  return (
-    <table className="w-full text-sm">
-      <thead>
-        <tr className={HEAD_ROW}>
-          <th className="py-2 text-start font-medium">{t('payments.kind')}</th>
-          <th className="py-2 text-end font-medium">{t('payments.amount')}</th>
-          <th className="py-2 text-start font-medium">{t('payments.reference')}</th>
-          <th className="py-2 text-start font-medium">{t('payments.clearedAt')}</th>
-        </tr>
-      </thead>
-      <tbody>
-        {payments.map((p) => (
-          <tr key={p.id} className="border-b border-[color:var(--rule)] last:border-0">
-            <td className="py-2">{t(`paymentKind.${p.kind}`)}</td>
-            <td className={`py-2 ${MONEY}`} dir="ltr">
-              {formatMoney(p.amount, locale)}
-            </td>
-            <td className="py-2 text-[color:var(--text-muted)]" dir="ltr">
-              {p.reference || '—'}
-            </td>
-            <td className="py-2 text-[color:var(--text-muted)]" dir="ltr">
-              {formatDate(p.clearedAt, locale)}
-            </td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
-  );
-}
-
-function ArtifactsPanel({ artifacts }: { artifacts: EngagementArtifactRecord[] }) {
-  const t = useTranslations('engagements');
-  const locale = useLocale();
-  if (artifacts.length === 0) return <Empty text={t('artifacts.empty')} />;
-  return (
-    <table className="w-full text-sm">
-      <thead>
-        <tr className={HEAD_ROW}>
-          <th className="py-2 text-start font-medium">{t('artifacts.kind')}</th>
-          <th className="py-2 text-start font-medium">{t('artifacts.label')}</th>
-          <th className="py-2 text-start font-medium">{t('artifacts.attestedAt')}</th>
-        </tr>
-      </thead>
-      <tbody>
-        {artifacts.map((a) => (
-          <tr key={a.id} className="border-b border-[color:var(--rule)] last:border-0">
-            <td className="py-2">{t(`artifactKind.${a.kind}`)}</td>
-            <td className="py-2 text-[color:var(--text-muted)]">{a.label || '—'}</td>
-            <td className="py-2 text-[color:var(--text-muted)]" dir="ltr">
-              {formatDate(a.attestedAt, locale)}
-            </td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
-  );
-}
-
-function ChangeOrdersPanel({
-  changeOrders,
-}: {
-  changeOrders: EngagementChangeOrderRecord[];
-}) {
-  const t = useTranslations('engagements');
-  const locale = useLocale();
-  if (changeOrders.length === 0) return <Empty text={t('changeOrders.empty')} />;
-  return (
-    <table className="w-full text-sm">
-      <thead>
-        <tr className={HEAD_ROW}>
-          <th className="py-2 text-end font-medium">{t('changeOrders.amount')}</th>
-          <th className="py-2 text-start font-medium">{t('changeOrders.status')}</th>
-          <th className="py-2 text-start font-medium">{t('changeOrders.raisedAt')}</th>
-        </tr>
-      </thead>
-      <tbody>
-        {changeOrders.map((c) => (
-          <tr key={c.id} className="border-b border-[color:var(--rule)] last:border-0">
-            <td className={`py-2 ${MONEY}`} dir="ltr">
-              {formatMoney(c.amount, locale)}
-            </td>
-            <td className="py-2">{t(`changeOrderStatus.${c.status}`)}</td>
-            <td className="py-2 text-[color:var(--text-muted)]" dir="ltr">
-              {formatDate(c.raisedAt, locale)}
-            </td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
-  );
-}
-
-function RomPanel({
-  header,
-  events,
-}: {
-  header: EngagementHeader;
-  events: EngagementEventRecord[];
-}) {
-  const t = useTranslations('engagements');
-  const locale = useLocale();
-  const acks = events.filter((e) => e.kind === 'rom_acknowledgement');
-  const hasRange = header.romLow !== null && header.romHigh !== null;
-  return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between text-sm">
-        <span className="text-[color:var(--text-muted)]">{t('rom.range')}</span>
-        {hasRange ? (
-          <span className="font-mono tabular-nums" dir="ltr">
-            {formatMoney(header.romLow, locale)} – {formatMoney(header.romHigh, locale)}
-          </span>
-        ) : (
-          <span className="text-[color:var(--text-muted)]">{t('rom.notSet')}</span>
-        )}
-      </div>
-      <div className="space-y-1">
-        <p className="text-xs font-medium text-[color:var(--text-muted)]">
-          {t('rom.acknowledgements')}
-        </p>
-        {acks.length === 0 ? (
-          <Empty text={t('rom.noAcks')} />
-        ) : (
-          <ul className="space-y-1 text-sm">
-            {acks.map((a) => (
-              <li key={a.id} className="text-[color:var(--text-muted)]" dir="ltr">
-                {formatDate(a.decidedAt, locale)}
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
     </div>
   );
 }

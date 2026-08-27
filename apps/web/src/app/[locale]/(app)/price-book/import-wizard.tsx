@@ -1,18 +1,7 @@
 'use client';
 
-import { Loader2 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { useMemo, useState, useTransition } from 'react';
-import { Button } from '@/components/ui/button';
-import { FieldHint } from '@/components/ui/field-hint';
-import { Label } from '@/components/ui/label';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import {
   Sheet,
   SheetContent,
@@ -26,6 +15,10 @@ import {
   type ColumnMapping,
   type ValidatedRow,
 } from '@/lib/price-book/import';
+import { REQUIRED, type FieldKey } from './import-wizard-fields';
+import { ImportWizardMapStep } from './import-wizard-map-step';
+import { ImportWizardPreviewStep } from './import-wizard-preview-step';
+import { ImportWizardUploadStep } from './import-wizard-upload-step';
 import type { SectionOption } from './types';
 
 export interface ImportWizardProps {
@@ -36,18 +29,6 @@ export interface ImportWizardProps {
 }
 
 type Step = 'upload' | 'map' | 'preview';
-type FieldKey = keyof ColumnMapping;
-
-const REQUIRED: FieldKey[] = ['code', 'category', 'unit', 'cost', 'price'];
-const FIELDS: FieldKey[] = [
-  'code',
-  'nameEn',
-  'nameAr',
-  'category',
-  'unit',
-  'cost',
-  'price',
-];
 
 const GUESS: Record<FieldKey, string[]> = {
   code: ['code', 'كود', 'الكود'],
@@ -61,8 +42,6 @@ const GUESS: Record<FieldKey, string[]> = {
   etaItemCode: ['eta item', 'eta_item'],
   etaCodeType: ['eta type', 'eta_code'],
 };
-
-const NONE = -1;
 
 function guessMapping(header: string[]): ColumnMapping {
   const find = (aliases: string[]): number => {
@@ -179,144 +158,35 @@ export function ImportWizard({
 
         <div className="mt-4 space-y-4">
           {step === 'upload' && (
-            <div className="space-y-2">
-              <Label htmlFor="import-file" className="flex items-center">
-                {t('import.chooseFile')}
-                <FieldHint id="import-file-hint" hint={th('importFile')} />
-              </Label>
-              <input
-                id="import-file"
-                type="file"
-                accept=".csv"
-                aria-describedby="import-file-hint"
-                disabled={pending}
-                onChange={(e) => {
-                  const f = e.target.files?.[0];
-                  if (f) onFile(f);
-                }}
-                className="block w-full text-sm file:me-3 file:rounded-md file:border-0 file:bg-muted file:px-3 file:py-2 file:text-sm"
-              />
-              {pending && (
-                <p className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Loader2 className="size-4 animate-spin" aria-hidden />
-                </p>
-              )}
-            </div>
+            <ImportWizardUploadStep
+              t={t}
+              th={th}
+              pending={pending}
+              onFile={onFile}
+            />
           )}
 
           {step === 'map' && mapping && (
-            <div className="space-y-3">
-              {FIELDS.map((field) => (
-                <div
-                  key={field}
-                  className="grid grid-cols-2 items-center gap-2"
-                >
-                  <Label htmlFor={`map-${field}`}>
-                    {t(`import.fields.${field}`)}
-                    {REQUIRED.includes(field) && (
-                      <span className="text-destructive"> *</span>
-                    )}
-                  </Label>
-                  <Select
-                    value={String(mapping[field] ?? NONE)}
-                    onValueChange={(v) => setField(field, Number(v))}
-                  >
-                    <SelectTrigger id={`map-${field}`} className="h-9">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value={String(NONE)}>
-                        {t('import.none')}
-                      </SelectItem>
-                      {header.map((h, i) => (
-                        <SelectItem key={i} value={String(i)}>
-                          {h || `#${i + 1}`}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              ))}
-
-              <div className="flex justify-between pt-2">
-                <Button type="button" variant="outline" onClick={reset}>
-                  {t('import.back')}
-                </Button>
-                <Button
-                  type="button"
-                  onClick={() => setStep('preview')}
-                  disabled={!mappingReady}
-                >
-                  {t('import.preview')}
-                </Button>
-              </div>
-            </div>
+            <ImportWizardMapStep
+              t={t}
+              mapping={mapping}
+              header={header}
+              setField={setField}
+              reset={reset}
+              onPreview={() => setStep('preview')}
+              mappingReady={mappingReady}
+            />
           )}
 
           {step === 'preview' && (
-            <div className="space-y-3">
-              <div className="max-h-80 overflow-y-auto rounded-md border">
-                <table className="w-full text-sm">
-                  <thead className="sticky top-0 bg-muted">
-                    <tr>
-                      <th className="px-2 py-1.5 text-start">
-                        {t('import.rowColumn')}
-                      </th>
-                      <th className="px-2 py-1.5 text-start">
-                        {t('table.code')}
-                      </th>
-                      <th className="px-2 py-1.5 text-start">
-                        {t('import.statusColumn')}
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {preview.map((r) => (
-                      <tr key={r.index} className="border-t">
-                        <td className="px-2 py-1.5 text-muted-foreground">
-                          {r.index + 1}
-                        </td>
-                        <td className="px-2 py-1.5" dir="ltr">
-                          {r.code || '—'}
-                        </td>
-                        <td className="px-2 py-1.5">
-                          {r.ok ? (
-                            <span className="text-[color:var(--success)]">
-                              {t('import.willImport')}
-                            </span>
-                          ) : (
-                            <span className="text-destructive">
-                              {t(`import.errors.${r.error}`)}
-                            </span>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-
-              <div className="flex justify-between pt-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setStep('map')}
-                  disabled={pending}
-                >
-                  {t('import.back')}
-                </Button>
-                <Button
-                  type="button"
-                  onClick={runImport}
-                  disabled={pending || validCount === 0}
-                >
-                  {pending && (
-                    <Loader2 className="size-4 animate-spin" aria-hidden />
-                  )}
-                  {t('import.importNow', { count: validCount })}
-                </Button>
-              </div>
-            </div>
+            <ImportWizardPreviewStep
+              t={t}
+              preview={preview}
+              pending={pending}
+              validCount={validCount}
+              onBack={() => setStep('map')}
+              runImport={runImport}
+            />
           )}
         </div>
       </SheetContent>
