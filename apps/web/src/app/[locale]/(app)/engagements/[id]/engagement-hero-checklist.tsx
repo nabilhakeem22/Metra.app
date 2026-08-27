@@ -35,16 +35,21 @@ export function EngagementHeroChecklist({
             {tg(item.guard)}
           </span>
           {item.amountDue && (
-            <span
-              className="ms-auto font-mono text-[12.5px] tabular-nums text-[color:var(--warn)]"
-              dir="ltr"
-            >
-              {/* Exact shortfall (told = charged): the badge must show the
-                  SAME figure the form pre-fills and recordPaymentCore
-                  charges — a 2dp round could overstate it by ~0.005 EGP. */}
-              {th('due', {
-                amount: formatMoneyExact(item.amountDue, locale),
-              })}
+            <span className="ms-auto inline-flex items-baseline gap-1.5 text-[12.5px]">
+              <span className="text-[color:var(--text-muted)]">
+                {th('dueLabel')}
+              </span>
+              {/* Exact shortfall (told = charged): the figure must match what
+                  the form pre-fills and recordPaymentCore charges — a 2dp round
+                  could overstate it by ~0.005 EGP. Only the money is dir=ltr so
+                  the currency symbol always sits after the number in both locales
+                  (the label stays in the page's reading direction). */}
+              <span
+                className="font-mono tabular-nums text-[color:var(--warn)]"
+                dir="ltr"
+              >
+                {formatMoneyExact(item.amountDue, locale)}
+              </span>
             </span>
           )}
         </li>

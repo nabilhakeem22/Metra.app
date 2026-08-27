@@ -139,10 +139,10 @@ export function EngagementFilesTray({
   return (
     <section className="overflow-hidden rounded-[var(--r-panel)] border border-[color:var(--rule)] bg-card text-[color:var(--text)] shadow-sm">
       <header className="flex items-center justify-between border-b border-[color:var(--rule)] px-4 py-3">
-        <h3 className="m-0 font-mono text-[11px] font-semibold uppercase tracking-[0.1em] text-[color:var(--text-faint)]">
+        <h3 className="m-0 font-mono text-[11px] font-semibold uppercase tracking-[0.1em] text-[color:var(--text-muted)]">
           {t('title')}
         </h3>
-        <span className="text-[11px] text-[color:var(--text-faint)]">
+        <span className="text-[11px] text-[color:var(--text-muted)]">
           {t('latestApproved')}
         </span>
       </header>
@@ -163,7 +163,7 @@ export function EngagementFilesTray({
               </span>
               <div className="min-w-0">
                 <div className="truncate text-[13px] font-semibold">{name}</div>
-                <div className="text-[11px] text-[color:var(--text-faint)]">
+                <div className="text-[11px] text-[color:var(--text-muted)]">
                   {hasArtifact
                     ? t('approvedMeta', { n: row.version })
                     : t('notAvailable')}

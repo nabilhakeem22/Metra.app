@@ -95,15 +95,15 @@ export function EngagementCommandCard({
           phase: t(`state.${view.nextPhaseState ?? state}`),
         })
       : view.mode === 'blockedStudio'
-        ? tcmd('blockedStudioHeadline', {
-            action: view.primaryBlocker ? tg(view.primaryBlocker) : '',
-          })
+        ? tcmd('blockedStudioHeadline')
         : tcmd('blockedClientHeadline');
   const hint =
     view.mode === 'ready'
       ? tcmd('readyHint')
       : view.mode === 'blockedStudio'
-        ? tcmd('blockedStudioHint')
+        ? tcmd('blockedStudioHint', {
+            action: view.primaryBlocker ? tg(view.primaryBlocker) : '',
+          })
         : view.mode === 'blockedClient'
           ? tcmd('blockedClientHint')
           : null;
@@ -166,6 +166,12 @@ export function EngagementCommandCard({
             )}
             <Button
               type="button"
+              // When Advance is blocked (any non-'ready' mode) it must READ as
+              // disabled — a flat subdued glass fill, never the brand-gradient CTA
+              // that looks clickable. The enabled brand look is kept only when the
+              // gate is genuinely all-clear. Behaviour is unchanged (still gated by
+              // `disabled` below); this only makes the disabled state unmistakable.
+              variant={view.advanceEnabled ? 'default' : 'secondary'}
               disabled={!view.advanceEnabled || pending}
               onClick={fireAdvance}
             >

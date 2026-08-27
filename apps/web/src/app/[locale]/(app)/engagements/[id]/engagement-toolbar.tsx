@@ -89,7 +89,7 @@ export function EngagementToolbar({
 
   return (
     <section className="space-y-3 rounded-[var(--r-panel)] border border-[color:var(--rule)] bg-card p-4 text-[color:var(--text)] shadow-sm">
-      <p className="font-mono text-[11px] font-semibold uppercase tracking-[0.1em] text-[color:var(--text-faint)]">
+      <p className="font-mono text-[11px] font-semibold uppercase tracking-[0.1em] text-[color:var(--text-muted)]">
         {t('title')}
       </p>
 

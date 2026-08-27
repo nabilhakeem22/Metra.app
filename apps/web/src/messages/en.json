@@ -1472,7 +1472,7 @@
       "whatsNext": "What's next",
       "day": "Day {n}",
       "revision": "Revision {n} of {free}",
-      "due": "{amount} due",
+      "dueLabel": "Due",
       "logPaymentAdvance": "Log payment & advance",
       "advance": "Advance to the next stage",
       "recordSomethingElse": "Record something else",
@@ -1541,11 +1541,11 @@
     "command": {
       "readyHeadline": "Ready to advance to {phase}",
       "readyHint": "Everything checks out — advance when you're ready.",
-      "blockedStudioHeadline": "Your move: {action}",
-      "blockedStudioHint": "Finish this on your side to unlock the next stage.",
+      "blockedStudioHeadline": "The next step is yours",
+      "blockedStudioHint": "Still on your side: {action}. Finish it to unlock the next stage.",
       "blockedClientHeadline": "Waiting on the client",
       "blockedClientHint": "Everything on your side is done.",
-      "advanceBlockedNote": "Blocked on: {blocker}",
+      "advanceBlockedNote": "Advance is blocked on: {blocker}",
       "nudge": "Nudge client",
       "nudgeHint": "Reveal the client link so you can follow up.",
       "closedHeadline": "This delivery is closed"

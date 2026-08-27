@@ -26,32 +26,36 @@ export function EngagementPulseBar({ pulse }: { pulse: CommercialPulse }) {
   return (
     <section className="grid grid-cols-1 gap-px overflow-hidden rounded-[var(--r-panel)] border border-[color:var(--rule)] bg-[color:var(--rule)] text-[color:var(--text)] shadow-sm sm:grid-cols-[1fr_1fr_1.6fr]">
       <div className="bg-card px-[18px] py-[14px]">
-        <div className="mb-1.5 font-mono text-[11px] font-semibold uppercase tracking-[0.1em] text-[color:var(--text-faint)]">
+        <div className="mb-1.5 font-mono text-[11px] font-semibold uppercase tracking-[0.1em] text-[color:var(--text-muted)]">
           {t('contractTotal')}
         </div>
-        <div
-          className="text-[21px] font-semibold tabular"
-          dir="ltr"
-        >
+        <div className="text-[21px] font-semibold leading-tight tabular" dir="ltr">
           {formatMoney(contractTotal, locale)}
         </div>
       </div>
 
       <div className="bg-card px-[18px] py-[14px]">
-        <div className="mb-1.5 font-mono text-[11px] font-semibold uppercase tracking-[0.1em] text-[color:var(--text-faint)]">
+        <div className="mb-1.5 font-mono text-[11px] font-semibold uppercase tracking-[0.1em] text-[color:var(--text-muted)]">
           {t('collected')}
         </div>
-        <div className="text-[21px] font-semibold tabular" dir="ltr">
+        <div className="text-[21px] font-semibold leading-tight tabular" dir="ltr">
           {formatMoney(collected, locale)}
-          <span className="ms-1 text-[12px] font-normal text-[color:var(--text-muted)]">
-            · {collectedPct}%
-          </span>
         </div>
-        <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[color:var(--track)]">
-          <div
-            className="h-full bg-brand"
-            style={{ inlineSize: `${fillWidth}%` }}
-          />
+        {/* The percent + progress bar sit directly under the figure, on one
+            baseline, so the meter reads as a caption of the collected amount. */}
+        <div className="mt-2 flex items-center gap-2">
+          <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-[color:var(--track)]">
+            <div
+              className="h-full bg-brand"
+              style={{ inlineSize: `${fillWidth}%` }}
+            />
+          </div>
+          <span
+            className="shrink-0 font-mono text-[12px] tabular-nums text-[color:var(--text-muted)]"
+            dir="ltr"
+          >
+            {collectedPct}%
+          </span>
         </div>
       </div>
 
@@ -61,11 +65,13 @@ export function EngagementPulseBar({ pulse }: { pulse: CommercialPulse }) {
         </div>
         {pendingGate ? (
           <>
-            <div className="text-[21px] font-semibold tabular" dir="ltr">
+            {/* Amount on its own line (tabular, dir=ltr); the "due" qualifier
+                gets its own caption line so it never crowds the number. */}
+            <div className="text-[21px] font-semibold leading-tight tabular" dir="ltr">
               {formatMoney(pendingGate.amountDue, locale)}
-              <span className="ms-1 text-[12px] font-normal text-[color:var(--text-muted)]">
-                {t('due')}
-              </span>
+            </div>
+            <div className="mt-0.5 text-[12px] font-medium text-brand-ink">
+              {t('due')}
             </div>
             <div className="mt-1 text-[13px] text-brand-ink">
               {pendingGate.unlocksPhaseKey

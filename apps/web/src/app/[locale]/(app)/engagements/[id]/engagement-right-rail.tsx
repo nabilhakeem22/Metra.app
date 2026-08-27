@@ -84,12 +84,12 @@ function CockpitDrawerCard({
   const [open, setOpen] = useState(defaultOpen);
 
   const titleText = (
-    <span className="font-mono text-[11px] font-semibold uppercase tracking-[0.1em] text-[color:var(--text-faint)]">
+    <span className="font-mono text-[11px] font-semibold uppercase tracking-[0.1em] text-[color:var(--text-muted)]">
       {title}
     </span>
   );
   const drawerText = drawerLabel && (
-    <span className="text-[11px] text-[color:var(--text-faint)]">
+    <span className="text-[11px] text-[color:var(--text-muted)]">
       {collapsible ? (open ? '▾ ' : '▸ ') : ''}
       {drawerLabel}
     </span>
