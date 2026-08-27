@@ -10,6 +10,7 @@ export const ENGAGEMENT_TABS = [
   'artifacts',
   'changeOrders',
   'rom',
+  'clientActivity',
 ] as const;
 
 export type EngagementTab = (typeof ENGAGEMENT_TABS)[number];

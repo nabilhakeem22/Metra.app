@@ -1561,7 +1561,12 @@
       "artifacts": "الملفات المرفقة",
       "changeOrders": "أوامر التغيير",
       "rom": "نطاق تكلفة التنفيذ",
-      "timeline": "الجدول الزمني"
+      "timeline": "الجدول الزمني",
+      "clientActivity": "نشاط العميل"
+    },
+    "clientActivity": {
+      "empty": "لا توجد ردود من العميل بعد. تظهر هنا الموافقات وطلبات التعديل من رابط العميل.",
+      "by": "بواسطة {name}"
     },
     "files": {
       "title": "ملفات العمل",
@@ -1666,7 +1671,9 @@
       "design_approval": "اعتماد التصميم",
       "rom_acknowledgement": "إقرار التكلفة التقديرية الأولية",
       "handoff_acknowledgement": "إقرار التسليم",
-      "as_built_attestation": "توثيق الحالة الفعلية"
+      "as_built_attestation": "توثيق الحالة الفعلية",
+      "concept_change_request": "طلب تعديل الفكرة",
+      "design_change_request": "طلب تعديل التصميم"
     },
     "milestoneKind": {
       "deposit": "عربون",
@@ -1721,6 +1728,29 @@
       "paid": "مدفوعة",
       "partial": "مدفوعة جزئيًا",
       "due": "مستحقة"
+    },
+    "actions": {
+      "conceptTitle": "التصميم المبدئي",
+      "designTitle": "التصميم النهائي",
+      "romTitle": "الميزانية التقديرية",
+      "handoffTitle": "تسليم التصميم",
+      "notePlaceholder": "أضف ملاحظة (اختياري)",
+      "approveConcept": "اعتماد الفكرة",
+      "requestConceptChanges": "طلب تعديل",
+      "approveDesign": "اعتماد التصميم",
+      "requestDesignChanges": "طلب تعديل",
+      "acknowledgeRom": "إقرار الميزانية",
+      "acknowledgeHandoff": "إقرار التسليم",
+      "confirmedApproved": "تم الاعتماد — تم إبلاغ الاستوديو.",
+      "confirmedChanges": "تم طلب التعديل — تم إبلاغ الاستوديو.",
+      "confirmedAcknowledged": "تم الإقرار — تم إبلاغ الاستوديو.",
+      "error": {
+        "token_invalid": "هذا الرابط لم يعد متاحًا. برجاء التواصل مع فريق التصميم.",
+        "token_expired": "انتهت صلاحية هذا الرابط. برجاء التواصل مع فريق التصميم.",
+        "not_active": "تم إغلاق هذا التسليم. برجاء التواصل مع فريق التصميم.",
+        "wrong_state": "هذا الإجراء غير متاح الآن. برجاء تحديث الصفحة.",
+        "generic": "حدث خطأ ما. برجاء المحاولة مرة أخرى."
+      }
     },
     "poweredBy": "تمت مشاركته معك بواسطة {firm}"
   }

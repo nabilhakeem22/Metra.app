@@ -1,6 +1,9 @@
 'use client';
 
+import { Loader2 } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
+import { useState, useTransition } from 'react';
+import { Button } from '@/components/ui/button';
 import { formatMoney } from '@/lib/format/money';
 import { docYear, formatDocNumber } from '@/lib/format/doc-number';
 import { pickPortalLabel } from '@/lib/engagements/portal-labels';
@@ -8,16 +11,21 @@ import type {
   PublicDelivery,
   PublicDeliveryMilestone,
 } from '@/lib/engagements/public';
+import { recordDeliveryAction } from './actions';
 
 /**
- * The session-less, mobile-first, firm-branded client portal view. READ-ONLY in
- * P1 — no action buttons. Every figure is a client-facing amount (fee due / budget
- * band); no cost, margin, or internal state ever reaches this surface (the SDF
- * omits them physically). Bilingual, RTL-safe, Western numerals.
+ * The session-less, mobile-first, firm-branded client portal view. Phase 2 adds
+ * the client action controls (approve / request changes / acknowledge) driven by
+ * the SDF-computed `clientActions` verbs — APPEND-ONLY advisory signals that move
+ * no state. Every figure is a client-facing amount (fee due / budget band); no
+ * cost, margin, or internal state ever reaches this surface (the SDF omits them
+ * physically). Bilingual, RTL-safe, Western numerals, logical CSS only.
  */
 export function PublicDeliveryView({
+  token,
   delivery,
 }: {
+  token: string;
   delivery: PublicDelivery | null;
 }) {
   const t = useTranslations('delivery');
@@ -120,11 +128,188 @@ export function PublicDeliveryView({
           </section>
         )}
 
+        {/* Client action controls — append-only advisory signals */}
+        <ActionsPanel token={token} clientActions={delivery.clientActions} />
+
         <footer className="pt-2 text-center text-xs text-muted-foreground">
           {t('poweredBy', { firm: firmName })}
         </footer>
       </div>
     </div>
+  );
+}
+
+/** The outcome a confirmed group renders (maps to a bilingual confirmation line). */
+type ActionOutcome = 'approved' | 'changes' | 'acknowledged';
+
+interface ActionButtonSpec {
+  verb: string;
+  labelKey: string;
+  outcome: ActionOutcome;
+  variant?: 'default' | 'outline';
+}
+
+interface ActionGroupSpec {
+  id: string;
+  titleKey: string;
+  buttons: ActionButtonSpec[];
+}
+
+/**
+ * Build the action groups from the SDF-computed verbs. Approve + request-changes
+ * share one group (server-side they are mutually exclusive — recording either
+ * drops BOTH from the next `clientActions`), so confirming one hides the pair.
+ */
+function groupsFor(clientActions: string[]): ActionGroupSpec[] {
+  const has = (verb: string) => clientActions.includes(verb);
+  const groups: ActionGroupSpec[] = [];
+  if (has('approve_concept') || has('request_concept_changes')) {
+    groups.push({
+      id: 'concept',
+      titleKey: 'conceptTitle',
+      buttons: [
+        { verb: 'approve_concept', labelKey: 'approveConcept', outcome: 'approved' },
+        {
+          verb: 'request_concept_changes',
+          labelKey: 'requestConceptChanges',
+          outcome: 'changes',
+          variant: 'outline',
+        },
+      ],
+    });
+  }
+  if (has('approve_design') || has('request_design_changes')) {
+    groups.push({
+      id: 'design',
+      titleKey: 'designTitle',
+      buttons: [
+        { verb: 'approve_design', labelKey: 'approveDesign', outcome: 'approved' },
+        {
+          verb: 'request_design_changes',
+          labelKey: 'requestDesignChanges',
+          outcome: 'changes',
+          variant: 'outline',
+        },
+      ],
+    });
+  }
+  if (has('acknowledge_rom')) {
+    groups.push({
+      id: 'rom',
+      titleKey: 'romTitle',
+      buttons: [
+        { verb: 'acknowledge_rom', labelKey: 'acknowledgeRom', outcome: 'acknowledged' },
+      ],
+    });
+  }
+  if (has('acknowledge_handoff')) {
+    groups.push({
+      id: 'handoff',
+      titleKey: 'handoffTitle',
+      buttons: [
+        {
+          verb: 'acknowledge_handoff',
+          labelKey: 'acknowledgeHandoff',
+          outcome: 'acknowledged',
+        },
+      ],
+    });
+  }
+  return groups;
+}
+
+function ActionsPanel({
+  token,
+  clientActions,
+}: {
+  token: string;
+  clientActions: string[];
+}) {
+  const groups = groupsFor(clientActions);
+  if (groups.length === 0) return null;
+  return (
+    <div className="space-y-4">
+      {groups.map((group) => (
+        <ActionGroupCard key={group.id} token={token} group={group} />
+      ))}
+    </div>
+  );
+}
+
+const CONFIRMED_KEY: Record<ActionOutcome, string> = {
+  approved: 'confirmedApproved',
+  changes: 'confirmedChanges',
+  acknowledged: 'confirmedAcknowledged',
+};
+
+function ActionGroupCard({
+  token,
+  group,
+}: {
+  token: string;
+  group: ActionGroupSpec;
+}) {
+  const t = useTranslations('delivery.actions');
+  const [pending, startTransition] = useTransition();
+  const [note, setNote] = useState('');
+  const [outcome, setOutcome] = useState<ActionOutcome | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  function submit(verb: string, verbOutcome: ActionOutcome) {
+    setError(null);
+    startTransition(async () => {
+      // Wrap the await so a rejected action can never leave the spinner stuck.
+      try {
+        const res = await recordDeliveryAction(token, verb, note);
+        // `already` resolves ok:true (idempotent) — treat as a confirmed signal.
+        if (res.ok) setOutcome(verbOutcome);
+        else setError(res.error ?? 'generic');
+      } catch {
+        setError('generic');
+      }
+    });
+  }
+
+  return (
+    <section className="space-y-3 rounded-xl border bg-background p-4 shadow-sm">
+      <h2 className="text-sm font-semibold">{t(group.titleKey)}</h2>
+      {outcome ? (
+        <p className="rounded-lg bg-emerald-50 p-3 text-sm font-medium text-emerald-700">
+          {t(CONFIRMED_KEY[outcome])}
+        </p>
+      ) : (
+        <>
+          <textarea
+            value={note}
+            onChange={(event) => setNote(event.target.value)}
+            maxLength={2000}
+            rows={2}
+            placeholder={t('notePlaceholder')}
+            className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm outline-none focus-visible:ring-1 focus-visible:ring-ring"
+          />
+          <div className="flex flex-wrap gap-2">
+            {group.buttons.map((button) => (
+              <Button
+                key={button.verb}
+                variant={button.variant ?? 'default'}
+                disabled={pending}
+                onClick={() => submit(button.verb, button.outcome)}
+              >
+                {pending && (
+                  <Loader2 className="size-4 animate-spin" aria-hidden />
+                )}
+                {t(button.labelKey)}
+              </Button>
+            ))}
+          </div>
+          {error && (
+            <p className="text-sm text-destructive" role="alert">
+              {t(`error.${error}`)}
+            </p>
+          )}
+        </>
+      )}
+    </section>
   );
 }
 

@@ -265,6 +265,11 @@ export const ENGAGEMENT_EVENT_KINDS = [
   // Step 13 — the as-built attestation (off-plan): true = variance flagged (opens
   // change_triage), false = clean. Appended LAST to mirror `ADD VALUE` (0028).
   'as_built_attestation',
+  // Client Delivery Portal Phase 2 — the client's own advisory change-request
+  // signals (append-only witnesses; they move no state). Appended LAST to mirror
+  // the physical `ALTER TYPE ... ADD VALUE` order (0033).
+  'concept_change_request',
+  'design_change_request',
 ] as const;
 
 export const engagementEventKind = pgEnum(

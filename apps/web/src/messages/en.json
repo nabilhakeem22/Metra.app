@@ -1562,7 +1562,12 @@
       "artifacts": "Artifacts",
       "changeOrders": "Change orders",
       "rom": "Build-cost range",
-      "timeline": "Timeline"
+      "timeline": "Timeline",
+      "clientActivity": "Client activity"
+    },
+    "clientActivity": {
+      "empty": "No client responses yet. Approvals and change requests from the client's link appear here.",
+      "by": "By {name}"
     },
     "files": {
       "title": "Working files",
@@ -1671,7 +1676,9 @@
       "design_approval": "Design approval",
       "rom_acknowledgement": "ROM acknowledgement",
       "handoff_acknowledgement": "Handoff acknowledgement",
-      "as_built_attestation": "As-built attestation"
+      "as_built_attestation": "As-built attestation",
+      "concept_change_request": "Concept change request",
+      "design_change_request": "Design change request"
     },
     "milestoneKind": {
       "deposit": "Deposit",
@@ -1726,6 +1733,29 @@
       "paid": "Paid",
       "partial": "Partly paid",
       "due": "Due"
+    },
+    "actions": {
+      "conceptTitle": "Concept design",
+      "designTitle": "Final design",
+      "romTitle": "Estimated budget",
+      "handoffTitle": "Design handoff",
+      "notePlaceholder": "Add a note (optional)",
+      "approveConcept": "Approve concept",
+      "requestConceptChanges": "Request changes",
+      "approveDesign": "Approve design",
+      "requestDesignChanges": "Request changes",
+      "acknowledgeRom": "Acknowledge budget",
+      "acknowledgeHandoff": "Acknowledge handoff",
+      "confirmedApproved": "You approved — the studio has been notified.",
+      "confirmedChanges": "Changes requested — the studio has been notified.",
+      "confirmedAcknowledged": "Acknowledged — the studio has been notified.",
+      "error": {
+        "token_invalid": "This link is no longer available. Please contact your design team.",
+        "token_expired": "This link has expired. Please contact your design team.",
+        "not_active": "This delivery is closed. Please contact your design team.",
+        "wrong_state": "This action isn't available right now. Please refresh the page.",
+        "generic": "Something went wrong. Please try again."
+      }
     },
     "poweredBy": "Shared with you by {firm}"
   }

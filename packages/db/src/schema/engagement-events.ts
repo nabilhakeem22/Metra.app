@@ -23,12 +23,12 @@ import { sameOrgFk } from './org-ref';
  * but the FULL `engagement_event_kind` set is declared now to avoid a later
  * enum-add migration.
  *
- * `actorUserId` is the internal actor (nullable — reserved for the future
- * tokenized client-ack path, where no internal user is present). `actorName` /
- * `actorIp` / `actorUserAgent` are reserved for that same tokenized path.
- * `rangeLow` / `rangeHigh` are reserved for `rom_acknowledgement` (a rough
- * order-of-magnitude range the client acknowledges). `docHash` / `note` are
- * optional provenance. Cascade delete follows the parent engagement.
+ * `actorUserId` is the internal actor (nullable — null on the tokenized client-ack
+ * path, where no internal user is present). `actorName` / `actorIp` /
+ * `actorUserAgent` carry the session-less client's provenance on that same path
+ * (Client Delivery Portal Phase 2, `actorChannel = 'client'`). `rangeLow` /
+ * `rangeHigh` snapshot the acknowledged `rom_acknowledgement` band. `docHash` /
+ * `note` are optional provenance. Cascade delete follows the parent engagement.
  */
 export const engagementEvents = pgTable(
   'engagement_events',
@@ -39,6 +39,11 @@ export const engagementEvents = pgTable(
       .references((): AnyPgColumn => organizations.id, { onDelete: 'restrict' }),
     engagementId: uuid('engagement_id').notNull(),
     kind: engagementEventKind('kind').notNull(),
+    // Who recorded this event: 'staff' (an internal user, the default for every
+    // existing writer) or 'client' (the session-less delivery-portal token path).
+    // Client signals are append-only advisory witnesses — they move no state. A
+    // partial UNIQUE index (0033) enforces one client signal per (engagement, kind).
+    actorChannel: text('actor_channel').notNull().default('staff'),
     // The internal actor. Nullable — reserved for the future tokenized client-ack
     // path, where the decision is made by a client with no internal user row.
     actorUserId: uuid('actor_user_id'),

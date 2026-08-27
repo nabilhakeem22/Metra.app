@@ -11,6 +11,7 @@ import {
   getDeliveryShareStatus,
   getEngagementArtifacts,
   getEngagementChangeOrders,
+  getEngagementClientActivity,
   getEngagementEvents,
   getEngagementFeeSchedule,
   getEngagementHeader,
@@ -57,6 +58,7 @@ export default async function EngagementDetailPage({
     events,
     changeOrders,
     transitions,
+    clientActivity,
     gatePreview,
     shareStatus,
   ] = await Promise.all([
@@ -66,6 +68,7 @@ export default async function EngagementDetailPage({
     getEngagementEvents(ctx, id),
     getEngagementChangeOrders(ctx, id),
     getEngagementTransitions(ctx, id),
+    getEngagementClientActivity(ctx, id),
     getEngagementGatePreview(ctx, id),
     getDeliveryShareStatus(ctx, id),
   ]);
@@ -156,6 +159,7 @@ export default async function EngagementDetailPage({
         events={events}
         changeOrders={changeOrders}
         transitions={transitions}
+        clientActivity={clientActivity}
         nextActions={nextActions}
         capabilities={capabilities}
         canUpload={can(ctx.role, 'engagements_design', 'create')}

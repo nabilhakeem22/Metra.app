@@ -4,6 +4,7 @@ import { useLocale, useTranslations } from 'next-intl';
 import type {
   EngagementArtifactRecord,
   EngagementChangeOrderRecord,
+  EngagementClientActivityRecord,
   EngagementEventRecord,
   EngagementFeeSchedule,
   EngagementHeader,
@@ -14,6 +15,7 @@ import { formatDate } from '@/lib/format/date';
 import { formatMoney } from '@/lib/format/money';
 import { ArtifactsPanel } from './engagement-panels-artifacts';
 import { ChangeOrdersPanel } from './engagement-panels-change-orders';
+import { ClientActivityPanel } from './engagement-client-activity-panel';
 import { Empty, MONEY } from './engagement-panels-parts';
 import { PaymentsPanel } from './engagement-panels-payments';
 import { RomPanel } from './engagement-panels-rom';
@@ -36,6 +38,7 @@ export interface PanelData {
   events: EngagementEventRecord[];
   changeOrders: EngagementChangeOrderRecord[];
   transitions: EngagementTransitionRecord[];
+  clientActivity: EngagementClientActivityRecord[];
 }
 
 export function EngagementPanels({ tab, data }: { tab: EngagementTab; data: PanelData }) {
@@ -46,6 +49,9 @@ export function EngagementPanels({ tab, data }: { tab: EngagementTab; data: Pane
         {tab === 'artifacts' && <ArtifactsPanel artifacts={data.artifacts} />}
         {tab === 'changeOrders' && <ChangeOrdersPanel changeOrders={data.changeOrders} />}
         {tab === 'rom' && <RomPanel header={data.header} events={data.events} />}
+        {tab === 'clientActivity' && (
+          <ClientActivityPanel activity={data.clientActivity} />
+        )}
       </div>
     </section>
   );

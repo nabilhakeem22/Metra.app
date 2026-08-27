@@ -49,6 +49,11 @@ export interface PublicDelivery {
   firm: { nameAr: string | null; nameEn: string | null; logoFileId: string | null };
   client: { nameAr: string | null; nameEn: string | null };
   paymentSchedule: PublicDeliveryMilestone[];
+  /** Client-facing verb tokens the client MAY act on right now (approve_concept,
+   *  request_concept_changes, approve_design, request_design_changes,
+   *  acknowledge_rom, acknowledge_handoff). Server-computed by the SDF; NEVER a raw
+   *  machine state name. Empty when nothing is actionable / already confirmed. */
+  clientActions: string[];
 }
 
 /** The raw jsonb shape the SDF returns (snake_case, matches app_delivery_by_token). */
@@ -66,6 +71,7 @@ interface DeliverySnapshot {
   firm: { name_ar: string | null; name_en: string | null; logo_file_id: string | null };
   client: { name_ar: string | null; name_en: string | null };
   payment_schedule: PublicDeliveryMilestone[];
+  client_actions: string[];
 }
 
 const STATE_SET = new Set<string>(DESIGN_STATES);
@@ -114,5 +120,65 @@ export async function getDeliveryByToken(
       nameEn: snapshot.client.name_en,
     },
     paymentSchedule: snapshot.payment_schedule ?? [],
+    clientActions: snapshot.client_actions ?? [],
   };
+}
+
+/** Coded outcomes the portal maps to a bilingual message. `already` is NOT here —
+ *  a repeat action resolves to `{ ok: true, code: 'already' }` (idempotent). */
+export type DeliveryActionError =
+  | 'token_invalid'
+  | 'token_expired'
+  | 'not_active'
+  | 'wrong_state';
+
+export interface DeliveryActionResult {
+  ok: boolean;
+  /** Present only when the signal already existed — the action is a safe no-op. */
+  code?: 'already';
+  error?: DeliveryActionError;
+}
+
+/**
+ * Session-less: record a client's APPEND-ONLY ADVISORY signal (approve /
+ * request-changes / acknowledge) against a delivery by its RAW share token.
+ * Mirrors respondToProposalByToken — sha256-hash the token (never sent in the
+ * clear, never logged), run the SECURITY DEFINER write SDF on the base connection,
+ * and map its status code. The SDF moves no state, adds no guard, and returns only
+ * a status (no cost/margin). A repeat of an already-recorded signal maps to a
+ * SUCCESSFUL no-op (`code: 'already'`), so a double submit is idempotent.
+ */
+export async function recordDeliveryActionByToken(
+  rawToken: string,
+  input: {
+    action: string;
+    note?: string | null;
+    actorName?: string | null;
+    ip?: string | null;
+    userAgent?: string | null;
+  },
+): Promise<DeliveryActionResult> {
+  if (!rawToken || !rawToken.trim()) return { ok: false, error: 'token_invalid' };
+  const hash = hashToken(rawToken.trim());
+  const rows = (await withRequestDb((db) =>
+    db.execute(sql`select public.app_delivery_respond_by_token(
+      ${hash}, ${input.action}, ${input.note ?? null}, ${input.actorName ?? null},
+      ${input.ip ?? null}, ${input.userAgent ?? null}
+    ) as code`),
+  )) as unknown as Array<{ code: string }>;
+  const code = rows[0]?.code;
+  switch (code) {
+    case 'ok':
+      return { ok: true };
+    case 'already':
+      return { ok: true, code: 'already' };
+    case 'expired':
+      return { ok: false, error: 'token_expired' };
+    case 'not_active':
+      return { ok: false, error: 'not_active' };
+    case 'wrong_state':
+      return { ok: false, error: 'wrong_state' };
+    default:
+      return { ok: false, error: 'token_invalid' };
+  }
 }

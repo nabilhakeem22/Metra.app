@@ -17,5 +17,5 @@ export default async function PublicDeliveryPage({
 }) {
   const { token } = await params;
   const delivery = await getDeliveryByToken(token);
-  return <PublicDeliveryView delivery={delivery} />;
+  return <PublicDeliveryView token={token} delivery={delivery} />;
 }

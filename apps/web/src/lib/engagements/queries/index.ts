@@ -8,3 +8,4 @@ export * from './header';
 export * from './timeline';
 export * from './money';
 export * from './artifacts';
+export * from './client-activity';

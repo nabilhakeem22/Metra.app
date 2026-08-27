@@ -9,6 +9,7 @@ import type { EngagementGatePreview } from '@/lib/engagements/gate-preview';
 import type {
   EngagementArtifactRecord,
   EngagementChangeOrderRecord,
+  EngagementClientActivityRecord,
   EngagementEventRecord,
   EngagementFeeSchedule,
   EngagementHeader,
@@ -38,6 +39,7 @@ export function EngagementDetailClient({
   events,
   changeOrders,
   transitions,
+  clientActivity,
   nextActions,
   capabilities,
   canUpload,
@@ -53,6 +55,7 @@ export function EngagementDetailClient({
   events: EngagementEventRecord[];
   changeOrders: EngagementChangeOrderRecord[];
   transitions: EngagementTransitionRecord[];
+  clientActivity: EngagementClientActivityRecord[];
   nextActions: Trigger[];
   capabilities: ControlCapabilities;
   canUpload: boolean;
@@ -164,6 +167,7 @@ export function EngagementDetailClient({
               events,
               changeOrders,
               transitions,
+              clientActivity,
             }}
           />
         </div>

@@ -867,11 +867,195 @@ as $$
         ) cl on true
         where m.engagement_id = de.id
       ) mx
-    ), '[]'::jsonb)
+    ), '[]'::jsonb),
+    -- Client Delivery Portal Phase 2 — the verbs the client MAY act on right now.
+    -- Server-computed CLIENT-FACING tokens (approve_concept / request_concept_changes
+    -- / approve_design / request_design_changes / acknowledge_rom / acknowledge_handoff)
+    -- — NEVER a raw machine state name (S1). Each group appears only while its state
+    -- is current AND no client signal of that kind exists yet, so a confirmed action
+    -- drops off the list (the portal renders the confirmed state instead). Empty when
+    -- nothing is actionable.
+    'client_actions', (
+      select coalesce(jsonb_agg(action order by ord), '[]'::jsonb)
+      from (
+        select 'approve_concept' as action, 1 as ord
+        where de.state = 'concept_review'
+          and not exists (
+            select 1 from public.engagement_events e
+            where e.engagement_id = de.id
+              and e.actor_channel = 'client'
+              and e.kind in ('concept_approval', 'concept_change_request')
+          )
+        union all
+        select 'request_concept_changes', 2
+        where de.state = 'concept_review'
+          and not exists (
+            select 1 from public.engagement_events e
+            where e.engagement_id = de.id
+              and e.actor_channel = 'client'
+              and e.kind in ('concept_approval', 'concept_change_request')
+          )
+        union all
+        select 'approve_design', 3
+        where de.state = 'final_approval'
+          and not exists (
+            select 1 from public.engagement_events e
+            where e.engagement_id = de.id
+              and e.actor_channel = 'client'
+              and e.kind in ('design_approval', 'design_change_request')
+          )
+        union all
+        select 'request_design_changes', 4
+        where de.state = 'final_approval'
+          and not exists (
+            select 1 from public.engagement_events e
+            where e.engagement_id = de.id
+              and e.actor_channel = 'client'
+              and e.kind in ('design_approval', 'design_change_request')
+          )
+        union all
+        select 'acknowledge_rom', 5
+        where de.rom_low is not null
+          and de.rom_high is not null
+          and de.state not in ('closed_design_only', 'execution', 'abandoned')
+          and not exists (
+            select 1 from public.engagement_events e
+            where e.engagement_id = de.id
+              and e.actor_channel = 'client'
+              and e.kind = 'rom_acknowledgement'
+          )
+        union all
+        select 'acknowledge_handoff', 6
+        where de.state = 'design_only_handoff'
+          and not exists (
+            select 1 from public.engagement_events e
+            where e.engagement_id = de.id
+              and e.actor_channel = 'client'
+              and e.kind = 'handoff_acknowledgement'
+          )
+      ) acts
+    )
   )
   from public.design_engagements de
   join public.organizations o on o.id = de.org_id
   join public.clients c on c.id = de.client_id
   where de.token_hash = p_hash
     and (de.share_expires_at is null or de.share_expires_at > now());
+$$;
+
+-- Client Delivery Portal Phase 2 — record a client's APPEND-ONLY ADVISORY SIGNAL
+-- against a delivery by its share token. SECURITY DEFINER (the token IS the auth;
+-- no session). This is the WRITABLE twin of app_delivery_by_token and mirrors
+-- app_proposal_respond_by_token / app_contract_ack_by_token: it NEVER moves state,
+-- NEVER adds a blocking guard, and NEVER touches money — the firm stays in control.
+-- It appends ONE engagement_events row (actor_channel='client') witnessing the
+-- client's approval / change-request / acknowledgement. Cost/margin is never read
+-- or returned — the function yields only a status code:
+--   ok | already | expired | not_active | wrong_state | invalid
+-- Action -> (kind, required precondition):
+--   approve_concept         -> concept_approval        (state = concept_review)
+--   request_concept_changes -> concept_change_request  (state = concept_review)
+--   approve_design          -> design_approval         (state = final_approval)
+--   request_design_changes  -> design_change_request   (state = final_approval)
+--   acknowledge_rom         -> rom_acknowledgement     (rom_low AND rom_high set;
+--                              snapshots the current band into range_low/range_high)
+--   acknowledge_handoff     -> handoff_acknowledgement (state = design_only_handoff)
+-- A client rom_acknowledgement is the SAME kind the internal romAcknowledged guard
+-- reads, so a portal ROM ack satisfies Gate B exactly like the staff-recorded one —
+-- no new guard is introduced.
+create or replace function public.app_delivery_respond_by_token(
+  p_hash text,
+  p_action text,
+  p_note text,
+  p_name text,
+  p_ip text,
+  p_ua text
+)
+returns text
+language plpgsql
+volatile
+security definer
+set search_path = ''
+as $$
+declare
+  v_kind    public.engagement_event_kind;
+  st        text;
+  exp       timestamptz;
+  eid       uuid;
+  oid       uuid;
+  rl        numeric;
+  rh        numeric;
+  ok_state  boolean;
+begin
+  -- Map the client-facing verb to the ledger event kind (unknown verb -> invalid).
+  v_kind := case p_action
+    when 'approve_concept'         then 'concept_approval'
+    when 'request_concept_changes' then 'concept_change_request'
+    when 'approve_design'          then 'design_approval'
+    when 'request_design_changes'  then 'design_change_request'
+    when 'acknowledge_rom'         then 'rom_acknowledgement'
+    when 'acknowledge_handoff'     then 'handoff_acknowledgement'
+    else null
+  end::public.engagement_event_kind;
+  if v_kind is null then return 'invalid'; end if;
+
+  select state, share_expires_at, id, org_id, rom_low, rom_high
+    into st, exp, eid, oid, rl, rh
+    from public.design_engagements
+    where token_hash = p_hash;
+  if not found then return 'invalid'; end if;
+  if exp is not null and exp <= now() then return 'expired'; end if;
+  if st in ('closed_design_only', 'execution', 'abandoned') then
+    return 'not_active';
+  end if;
+
+  -- Required precondition per action. Append-only either way: a change-request is a
+  -- witness, NOT a state move — the firm decides what to do about it.
+  ok_state := case p_action
+    when 'approve_concept'         then st = 'concept_review'
+    when 'request_concept_changes' then st = 'concept_review'
+    when 'approve_design'          then st = 'final_approval'
+    when 'request_design_changes'  then st = 'final_approval'
+    when 'acknowledge_rom'         then rl is not null and rh is not null
+    when 'acknowledge_handoff'     then st = 'design_only_handoff'
+    else false
+  end;
+  if not ok_state then return 'wrong_state'; end if;
+
+  -- At most one client DECISION per group per engagement: approve vs
+  -- request-changes on the same concept (or design) are mutually exclusive — the
+  -- read model + UI treat them as one decision, so the write path must too.
+  -- ROM/handoff acks are per-kind. This pre-check + the partial UNIQUE index
+  -- (0033, keyed on the decision group) make a concurrent double-click land
+  -- exactly one row.
+  if exists (
+    select 1 from public.engagement_events ee
+    where ee.engagement_id = eid and ee.actor_channel = 'client'
+      and case
+        when v_kind in ('concept_approval', 'concept_change_request')
+          then ee.kind in ('concept_approval', 'concept_change_request')
+        when v_kind in ('design_approval', 'design_change_request')
+          then ee.kind in ('design_approval', 'design_change_request')
+        else ee.kind = v_kind
+      end
+  ) then
+    return 'already';
+  end if;
+
+  begin
+    insert into public.engagement_events
+      (id, org_id, engagement_id, kind, actor_channel, actor_name, actor_ip,
+       actor_user_agent, note, range_low, range_high)
+      values (
+        gen_random_uuid(), oid, eid, v_kind, 'client', p_name, p_ip, p_ua,
+        left(p_note, 2000),
+        case when v_kind = 'rom_acknowledgement' then rl else null end,
+        case when v_kind = 'rom_acknowledgement' then rh else null end
+      );
+  exception when unique_violation then
+    return 'already';
+  end;
+
+  return 'ok';
+end
 $$;

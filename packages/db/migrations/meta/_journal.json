@@ -232,6 +232,13 @@
       "when": 1788128357549,
       "tag": "0032_engagement_one_active_delivery",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1788214757549,
+      "tag": "0033_client_delivery_signals",
+      "breakpoints": true
     }
   ]
 }
