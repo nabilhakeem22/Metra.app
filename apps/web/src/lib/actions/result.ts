@@ -5,6 +5,7 @@ export type ActionCode =
   | 'forbidden'
   | 'invalid'
   | 'generic'
+  | 'uncertain'
   | 'name_required'
   | 'last_owner'
   | 'owner_immutable'

@@ -73,6 +73,9 @@ export const ACTION_CODE_PROBLEM: Record<ActionCode, ApiProblemKind> = {
   forbidden: 'forbidden',
   invalid: 'bad-request',
   generic: 'internal',
+  // Ambiguous write timeout: server-side and may-or-may-not have applied — a 5xx,
+  // never a clean 4xx, so a client can't assume the write failed.
+  uncertain: 'internal',
   name_required: 'bad-request',
   last_owner: 'bad-request',
   owner_immutable: 'bad-request',

@@ -1,13 +1,22 @@
 // Root ESLint flat config (ESLint v9).
-// Includes the Metra house rule `metra/no-physical-inline-direction` which bans
-// physical left/right in Tailwind class names and inline style objects. Use CSS
-// logical properties instead (margin-inline-start, text-align: start, ms-*, etc).
+// Includes the Metra house rules:
+//   • `metra/no-physical-inline-direction` — bans physical left/right in Tailwind
+//     class names and inline style objects. Use CSS logical properties instead
+//     (margin-inline-start, text-align: start, ms-*, etc).
+//   • `metra/no-bare-tenant-db` — bans Drizzle queries on the raw request/base DB
+//     connection (RLS-bypass / cross-tenant leak). Reach org-scoped data only via
+//     withOrgContext()/withUserContext(); sanctioned base-connection uses are
+//     allowlisted inside the rule module.
 import js from '@eslint/js';
 import tseslint from 'typescript-eslint';
 import { noPhysicalInlineDirection } from './eslint-rules/no-physical-inline-direction.mjs';
+import { noBareTenantDb } from './eslint-rules/no-bare-tenant-db.mjs';
 
 const metraPlugin = {
-  rules: { 'no-physical-inline-direction': noPhysicalInlineDirection },
+  rules: {
+    'no-physical-inline-direction': noPhysicalInlineDirection,
+    'no-bare-tenant-db': noBareTenantDb,
+  },
 };
 
 export default tseslint.config(
@@ -40,6 +49,7 @@ export default tseslint.config(
     plugins: { metra: metraPlugin },
     rules: {
       'metra/no-physical-inline-direction': 'error',
+      'metra/no-bare-tenant-db': 'error',
       '@typescript-eslint/no-unused-vars': [
         'warn',
         { argsIgnorePattern: '^_', varsIgnorePattern: '^_' },

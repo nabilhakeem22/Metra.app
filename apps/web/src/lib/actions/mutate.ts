@@ -1,5 +1,6 @@
 import type { MetraDb } from '@metra/db';
 import { recordAudit, type AuditEntry } from '@/lib/audit';
+import { DbWriteUncertainError } from '@/lib/db/client';
 import { withOrgContext, type OrgContext } from '@/lib/db/context';
 import {
   canUseFlow,
@@ -33,18 +34,27 @@ export async function mutateInOrg<T = void>(
   }
 
   try {
-    const data = await withOrgContext(ctx, async (tx) => {
-      if (
-        opts.flow &&
-        !canUseFlow(await loadWorkspaceEntitlements(tx, ctx.orgId), opts.flow)
-      ) {
-        throw new ActionError('flow_not_enabled');
-      }
-      return fn(tx, (e) => recordAudit(tx, e));
-    });
+    const data = await withOrgContext(
+      ctx,
+      async (tx) => {
+        if (
+          opts.flow &&
+          !canUseFlow(await loadWorkspaceEntitlements(tx, ctx.orgId), opts.flow)
+        ) {
+          throw new ActionError('flow_not_enabled');
+        }
+        return fn(tx, (e) => recordAudit(tx, e));
+      },
+      { write: true },
+    );
     return { ok: true, data };
   } catch (e) {
     if (e instanceof ActionError) return { ok: false, error: e.code };
+    // A write deadline is ambiguous, not a clean failure: the abandoned tx may
+    // still have COMMITted (see DbWriteUncertainError). Surface `uncertain` so
+    // the UI tells the user to verify rather than blind-retrying into a
+    // double-apply. NOT logged as an error — it is an expected slow-origin path.
+    if (e instanceof DbWriteUncertainError) return { ok: false, error: 'uncertain' };
     console.error('mutateInOrg failed:', e);
     return { ok: false, error: 'generic' };
   }

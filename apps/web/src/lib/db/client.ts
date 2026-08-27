@@ -1,6 +1,7 @@
 import 'server-only';
 import { createDb, type MetraDb, type PostgresJs } from '@metra/db';
-import { cfEnv, cfExecutionContext, isCloudflareRuntime } from '@/lib/cf/context';
+import { cfEnv, isCloudflareRuntime } from '@/lib/cf/context';
+import { getRequestConnection } from './request-connection';
 
 // Runtime connection string. On the Cloudflare Workers runtime, Postgres is
 // reached through the Hyperdrive binding (pooling + edge cache). Off-platform —
@@ -23,14 +24,25 @@ function runtimeUrl(): string {
 // sensible pool ceiling hold on both paths; SSL is disabled only on the
 // Cloudflare/Hyperdrive hop (Hyperdrive terminates TLS to the origin), while
 // off-platform keeps the exact host-derived default every script/test relies on.
-function createRuntimeConnection(): { db: MetraDb; sql: PostgresJs } {
+//
+// max:10 tradeoff: on CF this is now the SINGLE instance shared by every
+// withRequestDb call in a request (see request-connection.ts). The largest known
+// concurrent fan-out is the engagement cockpit's 9-way Promise.all
+// (apps/web/src/app/[locale]/(app)/engagements/[id]/page.tsx); max:10 lets that
+// run in ONE wave instead of queueing into two. Even at max:10 a single shared
+// instance is ~5x fewer sockets than the ~50 that caused the 1102 — which came
+// from ~11 SEPARATE instances × max:5, not from a high ceiling on one pool.
+export function createRuntimeConnection(): { db: MetraDb; sql: PostgresJs } {
   const ssl = isCloudflareRuntime() ? { ssl: false as const } : {};
-  return createDb(runtimeUrl(), { prepare: false, max: 5, ...ssl });
+  return createDb(runtimeUrl(), { prepare: false, max: 10, ...ssl });
 }
 
-// Wall-clock ceiling (ms) for a single request-scoped DB operation on the
-// Cloudflare runtime. A slow/half-open Hyperdrive origin otherwise hangs the
-// request until the platform kills it; this surfaces a clean rejection instead.
+// Wall-clock ceiling (ms) for a single withRequestDb call on the Cloudflare
+// runtime. The timer is armed when withRequestDb is CALLED, not when its query
+// finally reaches the socket — so for a call that queues behind siblings on the
+// shared pool this bounds the END-TO-END wait (time from fan-out until settle),
+// not per-statement execution. A slow/half-open Hyperdrive origin otherwise hangs
+// the request until the platform kills it; this surfaces a clean rejection first.
 // Well above a healthy query yet below any platform request budget.
 const CF_DB_DEADLINE_MS = 15_000;
 
@@ -44,6 +56,25 @@ export class DbDeadlineError extends Error {
   constructor() {
     super('db-operation-deadline');
     this.name = 'DbDeadlineError';
+  }
+}
+
+/**
+ * Thrown when a WRITE operation exceeds CF_DB_DEADLINE_MS. Distinct from
+ * DbDeadlineError because the outcome is genuinely ambiguous, not a clean
+ * failure: Promise.race abandons the losing promise but does NOT cancel it, and
+ * the shared request-scoped connection is deliberately never `end()`ed per call
+ * (siblings share the socket). So an abandoned `db.transaction()` from a write can
+ * still COMMIT at Postgres a moment after this rejects. Callers must therefore
+ * treat a write deadline as "may or may not have applied" and NOT blind-retry
+ * (which would double-apply); mutateInOrg maps it to the `uncertain` ActionCode.
+ * Reads keep DbDeadlineError — a timed-out SELECT commits nothing, so it is
+ * retry-safe.
+ */
+export class DbWriteUncertainError extends Error {
+  constructor() {
+    super('db-write-uncertain');
+    this.name = 'DbWriteUncertainError';
   }
 }
 
@@ -77,42 +108,53 @@ export function getDb(): MetraDb {
  *
  * On the Cloudflare Workers runtime a postgres.js socket is request-scoped: it
  * cannot be reused by a later request, and its background read loop must not
- * dangle past the request that opened it. So a fresh connection is opened inside
- * this request, handed to `fn`, and closed once `fn` settles via
- * `ctx.waitUntil(sql.end())`. end() runs only AFTER the queries — postgres.js
- * rejects any query issued after end() — and `waitUntil` drains the close past
- * the response without blocking it or letting the read loop bleed into the next
- * request. Nothing is retained at module scope on CF.
+ * dangle past the request that opened it. Every withRequestDb call in one request
+ * now SHARES a single lazily-created instance (getRequestConnection): it is
+ * created on first use and closed exactly once at request end via that module's
+ * `after()` teardown. This collapses a cockpit render's ~11 calls from ~11
+ * instances (~50 sockets) to one ≤5-socket pool — the fix for the Error 1102
+ * connection fan-out. Nothing is retained at module scope on CF (the shared
+ * instance lives in a WeakMap keyed by the request's ExecutionContext).
  *
  * Off-platform this is a straight pass-through to the process-lived singleton, so
  * Node/Vitest/migrate/seed/next-dev behaviour is unchanged.
  */
 export async function withRequestDb<T>(
   fn: (db: MetraDb) => Promise<T>,
+  opts: { write?: boolean } = {},
 ): Promise<T> {
   if (!isCloudflareRuntime()) {
     return fn(getDb());
   }
-  const { db, sql } = createRuntimeConnection();
+  // Reuse the ONE request-scoped instance; no socket is opened or closed here per
+  // call. Teardown is request-scoped (getRequestConnection registers it once), so
+  // this branch must NOT call sql.end() — doing so would kill siblings still using
+  // the shared connection, and a per-operation deadline must reject only its own
+  // call, never close the shared socket.
+  const { db } = getRequestConnection();
   // Bound the WHOLE operation, not individual statements: the deadline races the
   // entire fn (which owns the RLS-scoped transaction), so isolation/transaction
-  // semantics are untouched — on a deadline the transaction is simply abandoned
-  // and rolled back when sql.end() closes the socket below.
+  // semantics are untouched — on a deadline this call rejects while sibling ops on
+  // the shared connection keep resolving. The race abandons but does NOT cancel
+  // the losing fn, and this branch must never `end()` the shared socket, so a
+  // write's abandoned tx can still COMMIT after we reject. We therefore reject
+  // with DbWriteUncertainError for writes (ambiguous — may have applied) and
+  // DbDeadlineError for reads (clean — a timed-out SELECT commits nothing).
   let deadlineTimer: ReturnType<typeof setTimeout> | undefined;
   try {
     return await Promise.race([
       fn(db),
       new Promise<never>((_, reject) => {
         deadlineTimer = setTimeout(
-          () => reject(new DbDeadlineError()),
+          () =>
+            reject(
+              opts.write ? new DbWriteUncertainError() : new DbDeadlineError(),
+            ),
           CF_DB_DEADLINE_MS,
         );
       }),
     ]);
   } finally {
     if (deadlineTimer) clearTimeout(deadlineTimer);
-    // Close AFTER the queries and defer the drain past the response. The timeout
-    // bounds the drain so a half-open socket can't hang the waitUntil budget.
-    cfExecutionContext().waitUntil(sql.end({ timeout: 5 }));
   }
 }
