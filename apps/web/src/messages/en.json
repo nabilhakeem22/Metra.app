@@ -1548,9 +1548,13 @@
       "advanceBlockedNote": "Advance is blocked on: {blocker}",
       "nudge": "Nudge client",
       "nudgeHint": "Reveal the client link so you can follow up.",
-      "closedHeadline": "This delivery is closed"
+      "closedHeadline": "This delivery is closed",
+      "stepLabel": "Next step to advance",
+      "clientLinkActive": "Client link active",
+      "clientLinkInactive": "Not shared"
     },
     "toolbar": {
+      "title": "Log & manage",
       "payment": {
         "name": "Log a payment",
         "purpose": "Record money received against a milestone."

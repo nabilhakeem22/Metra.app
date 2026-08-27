@@ -72,6 +72,34 @@ export function EngagementCommandCard({
   });
   const closed = view.mode === 'closed';
 
+  // Mode-driven accent (mockup: amber/warn stripe+label for the blocked attention
+  // states, brand for ready, neutral for closed) — expressed through the app's
+  // semantic tokens so both themes + RTL stay correct.
+  const accent: 'neutral' | 'brand' | 'warn' = closed
+    ? 'neutral'
+    : view.mode === 'ready'
+      ? 'brand'
+      : 'warn';
+  const stripeClass =
+    accent === 'warn'
+      ? 'bg-[color:var(--warn)]'
+      : accent === 'brand'
+        ? 'bg-brand'
+        : 'bg-[color:var(--rule)]';
+  const accentTextClass =
+    accent === 'warn'
+      ? 'text-[color:var(--warn)]'
+      : accent === 'brand'
+        ? 'text-brand-ink'
+        : 'text-[color:var(--text-faint)]';
+  const borderClass =
+    accent === 'warn'
+      ? 'border-[color:var(--warn-tint)]'
+      : accent === 'brand'
+        ? 'border-[color:var(--brand-tint-border)]'
+        : 'border-[color:var(--rule)]';
+  const showNudgePill = view.showNudge && canShare;
+
   // A blocking money gate whose shortfall we can pre-fill — the pay-and-advance
   // path. `amountDue` is only set on a blocking payment gate (see gate-preview).
   const paymentItem = preview.items.find(
@@ -119,7 +147,17 @@ export function EngagementCommandCard({
   }
 
   return (
-    <section className="glass border-[color:var(--brand-tint-border)] p-5 text-[color:var(--text)] sm:p-6">
+    <section
+      className={`glass relative overflow-hidden p-5 text-[color:var(--text)] sm:p-6 ${borderClass}`}
+    >
+      {/* Left accent stripe (mockup `.command::before`) — 4px on the inline-START
+          so it mirrors to the inline-END in ar-EG RTL. Mode-driven color. */}
+      <span
+        aria-hidden
+        className={`pointer-events-none absolute inset-y-0 w-1 ${stripeClass}`}
+        style={{ insetInlineStart: 0 }}
+      />
+
       {!closed && (
         <EngagementHeroBadges
           t={t}
@@ -132,8 +170,11 @@ export function EngagementCommandCard({
       )}
 
       {!closed && (
-        <p className="mb-2 font-mono text-[11px] font-semibold uppercase tracking-[0.1em] text-brand-ink">
-          {th('whatsNext')}
+        <p
+          className={`mb-3 flex items-center gap-2 font-mono text-[11px] font-semibold uppercase tracking-[0.11em] ${accentTextClass}`}
+        >
+          <span aria-hidden>◆</span>
+          {tcmd('stepLabel')}
         </p>
       )}
       <h2 className="mb-1 text-[22px] font-semibold leading-tight tracking-[var(--tracking-title)] text-balance">
@@ -151,6 +192,9 @@ export function EngagementCommandCard({
               tg={tg}
               locale={locale}
               items={preview.items}
+              showNudgePill={showNudgePill}
+              nudgeLabel={tcmd('nudge')}
+              onNudge={onNudge}
             />
           )}
 
@@ -180,16 +224,6 @@ export function EngagementCommandCard({
               )}
               {th('advance')}
             </Button>
-            {view.showNudge && canShare && (
-              <Button
-                type="button"
-                variant="outline"
-                disabled={pending}
-                onClick={onNudge}
-              >
-                {tcmd('nudge')}
-              </Button>
-            )}
           </div>
 
           {view.mode === 'blockedStudio' && view.primaryBlocker && (

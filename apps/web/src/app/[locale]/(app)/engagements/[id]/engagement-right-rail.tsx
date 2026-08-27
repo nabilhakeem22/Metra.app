@@ -4,27 +4,25 @@ import { useTranslations } from 'next-intl';
 import { useState } from 'react';
 import type {
   EngagementArtifactRecord,
-  EngagementClientActivityRecord,
   EngagementEventRecord,
   EngagementFeeSchedule,
   EngagementTransitionRecord,
 } from '@/lib/engagements/queries';
-import { ClientActivityPanel } from './engagement-client-activity-panel';
 import { EngagementFilesTray } from './engagement-files-tray';
 import { FeePanel, TimelinePanel } from './engagement-panels';
 
-// Epic D, Slice 5 — the cockpit's right rail, in the mock order: the pinned
-// "Working files" tray (top) → the always-visible "Client activity" feed → the
-// collapsible fee-schedule / audit ledger → recent activity. Pure composition over
-// data the page already loaded; every card is a FLAT glass panel (opaque `bg-card`,
-// no backdrop-filter) so the rail never adds to the cockpit blur budget. Logical
-// CSS only (RTL mirrors).
+// Epic D, Slice 5 — the cockpit's right rail: the pinned "Working files" tray
+// (top) → the collapsible fee-schedule / audit ledger (the payment schedule) →
+// recent activity. The "Client activity" feed now lives in the mockup-matched
+// mini-rail beside the toolbar (see engagement-mini-rail.tsx). Pure composition
+// over data the page already loaded; every card is a FLAT glass panel (opaque
+// `bg-card`, no backdrop-filter) so the rail never adds to the cockpit blur budget.
+// Logical CSS only (RTL mirrors).
 
 export function EngagementRightRail({
   engagementId,
   artifacts,
   canUpload,
-  clientActivity,
   feeSchedule,
   transitions,
   events,
@@ -32,7 +30,6 @@ export function EngagementRightRail({
   engagementId: string;
   artifacts: EngagementArtifactRecord[];
   canUpload: boolean;
-  clientActivity: EngagementClientActivityRecord[];
   feeSchedule: EngagementFeeSchedule;
   transitions: EngagementTransitionRecord[];
   events: EngagementEventRecord[];
@@ -47,10 +44,6 @@ export function EngagementRightRail({
         engagementId={engagementId}
         canUpload={canUpload}
       />
-
-      <CockpitDrawerCard title={t('panels.clientActivity')}>
-        <ClientActivityPanel activity={clientActivity} />
-      </CockpitDrawerCard>
 
       <CockpitDrawerCard
         title={t('panels.fee')}

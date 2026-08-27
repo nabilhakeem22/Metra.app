@@ -90,11 +90,11 @@ export function EngagementToolbar({
   return (
     <section className="space-y-3 rounded-[var(--r-panel)] border border-[color:var(--rule)] bg-card p-4 text-[color:var(--text)] shadow-sm">
       <p className="font-mono text-[11px] font-semibold uppercase tracking-[0.1em] text-[color:var(--text-muted)]">
-        {t('title')}
+        {tt('title')}
       </p>
 
       {studioTiles.length > 0 && (
-        <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid grid-cols-[repeat(auto-fit,minmax(150px,1fr))] gap-2.5">
           {studioTiles.map((tile) => (
             <Tile
               key={tile.key}
@@ -196,14 +196,14 @@ function Tile({
       type="button"
       onClick={onClick}
       aria-pressed={active}
-      className={`flex items-center gap-2.5 rounded-[var(--r-item)] border p-3 text-start transition-colors ${
+      className={`flex items-center gap-2.5 rounded-[var(--r-item)] border p-3 text-start transition-[transform,border-color,background-color] duration-150 hover:-translate-y-px ${
         active
           ? 'border-[color:var(--brand-tint-border)] bg-[color:var(--track)]'
-          : 'border-[color:var(--rule)] hover:bg-[color:var(--track)]'
+          : 'border-[color:var(--rule)] hover:border-[color:var(--brand-tint-border)] hover:bg-[color:var(--track)]'
       } ${subordinate ? 'opacity-90' : ''}`}
     >
       <span
-        className={`grid h-8 w-8 shrink-0 place-items-center rounded-[var(--r-icon)] ${
+        className={`grid h-[34px] w-[34px] shrink-0 place-items-center rounded-[var(--r-icon)] ${
           subordinate
             ? 'bg-[color:var(--track)] text-[color:var(--text-muted)]'
             : 'bg-brand-tint text-brand-ink'

@@ -19,7 +19,7 @@ import type {
 import type { CommercialPulse } from '@/lib/engagements/pulse';
 import type { Trigger } from '@/lib/engagements/transitions';
 import { EngagementCommandCard } from './engagement-command-card';
-import { EngagementHeaderCard } from './engagement-header-card';
+import { EngagementMiniRail } from './engagement-mini-rail';
 import { EngagementPanels } from './engagement-panels';
 import { EngagementPhaseRail } from './engagement-phase-rail';
 import { EngagementPulseBar } from './engagement-pulse-bar';
@@ -127,8 +127,6 @@ export function EngagementDetailClient({
             onNudge={revealShareLink}
           />
 
-          <EngagementHeaderCard header={header} />
-
           {error && (
             <p className="text-sm text-destructive" role="alert">
               {resolveActionError(error, te)}
@@ -140,6 +138,11 @@ export function EngagementDetailClient({
             capabilities={capabilities}
             pending={pending}
             runAction={runAction}
+          />
+
+          <EngagementMiniRail
+            clientActivity={clientActivity}
+            changeOrders={changeOrders}
           />
 
           <div className="flex flex-wrap gap-2 border-b">
@@ -173,12 +176,11 @@ export function EngagementDetailClient({
           />
         </div>
 
-        {/* RIGHT RAIL: working files → client activity → ledger → recent activity. */}
+        {/* RIGHT RAIL: working files → fee/payment schedule → recent activity. */}
         <EngagementRightRail
           engagementId={header.id}
           artifacts={artifacts}
           canUpload={canUpload}
-          clientActivity={clientActivity}
           feeSchedule={feeSchedule}
           transitions={transitions}
           events={events}

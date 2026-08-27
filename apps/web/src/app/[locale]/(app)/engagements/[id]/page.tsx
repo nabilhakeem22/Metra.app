@@ -1,7 +1,6 @@
 import { ChevronRight } from 'lucide-react';
 import { getLocale, getTranslations } from 'next-intl/server';
 import { notFound } from 'next/navigation';
-import { PageHeader } from '@/components/ui/page-header';
 import { Link } from '@/i18n/routing';
 import { requireOrg } from '@/lib/auth/require-org';
 import { pickLocale } from '@/lib/i18n/pick-locale';
@@ -19,9 +18,9 @@ import {
   getEngagementTransitions,
 } from '@/lib/engagements/queries';
 import { canRunTrigger, legalTriggersFrom } from '@/lib/engagements/ui';
-import { docYear, formatDocNumber } from '@/lib/format/doc-number';
 import { can } from '@/lib/permissions/can';
 import { EngagementDetailClient } from './engagement-detail-client';
+import { EngagementHeaderCard } from './engagement-header-card';
 import { DELIVERY_SHARE_ANCHOR_ID } from './share-anchor';
 import { DeliveryShareLink } from './share-link';
 
@@ -37,7 +36,6 @@ export default async function EngagementDetailPage({
   const header = await getEngagementHeader(ctx, id);
   if (!header) notFound();
 
-  const t = await getTranslations('engagements');
   const tb = await getTranslations('engagements.breadcrumb');
   const locale = await getLocale();
   const clientName =
@@ -141,10 +139,7 @@ export default async function EngagementDetailPage({
         <ChevronRight className="size-3.5 rtl:-scale-x-100" aria-hidden />
         <span className="text-foreground">{tb('delivery')}</span>
       </nav>
-      <PageHeader
-        title={formatDocNumber('DE', header.number, docYear(null, header.createdAt))}
-        description={t('subtitle')}
-      />
+      <EngagementHeaderCard header={header} shared={shareStatus.shared} />
       {canShare && (
         <div id={DELIVERY_SHARE_ANCHOR_ID} tabIndex={-1} className="scroll-mt-4 outline-none">
           <DeliveryShareLink

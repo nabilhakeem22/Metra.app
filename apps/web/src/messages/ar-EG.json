@@ -1547,9 +1547,13 @@
       "advanceBlockedNote": "الانتقال متوقف على: {blocker}",
       "nudge": "تذكير العميل",
       "nudgeHint": "أظهر رابط العميل حتى تتمكن من المتابعة.",
-      "closedHeadline": "هذا التسليم مُغلق"
+      "closedHeadline": "هذا التسليم مُغلق",
+      "stepLabel": "الخطوة التالية للتقدّم",
+      "clientLinkActive": "رابط العميل مُفعّل",
+      "clientLinkInactive": "غير مُشارَك"
     },
     "toolbar": {
+      "title": "التسجيل والإدارة",
       "payment": {
         "name": "تسجيل دفعة",
         "purpose": "سجّل الأموال المستلمة مقابل دفعة."
