@@ -139,7 +139,7 @@ export function EngagementFilesTray({
   return (
     <section className="overflow-hidden rounded-[var(--r-panel)] border border-[color:var(--rule)] bg-card text-[color:var(--text)] shadow-sm">
       <header className="flex items-center justify-between border-b border-[color:var(--rule)] px-4 py-3">
-        <h3 className="m-0 font-mono text-[12px] font-medium uppercase tracking-[0.06em] text-[color:var(--text-muted)]">
+        <h3 className="m-0 font-mono text-[11px] font-semibold uppercase tracking-[0.1em] text-[color:var(--text-faint)]">
           {t('title')}
         </h3>
         <span className="text-[11px] text-[color:var(--text-faint)]">

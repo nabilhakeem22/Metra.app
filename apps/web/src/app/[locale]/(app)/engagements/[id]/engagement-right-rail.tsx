@@ -84,7 +84,7 @@ function CockpitDrawerCard({
   const [open, setOpen] = useState(defaultOpen);
 
   const titleText = (
-    <span className="font-mono text-[12px] font-medium uppercase tracking-[0.06em] text-[color:var(--text-muted)]">
+    <span className="font-mono text-[11px] font-semibold uppercase tracking-[0.1em] text-[color:var(--text-faint)]">
       {title}
     </span>
   );

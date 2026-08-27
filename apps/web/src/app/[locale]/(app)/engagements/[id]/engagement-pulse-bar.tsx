@@ -26,11 +26,11 @@ export function EngagementPulseBar({ pulse }: { pulse: CommercialPulse }) {
   return (
     <section className="grid grid-cols-1 gap-px overflow-hidden rounded-[var(--r-panel)] border border-[color:var(--rule)] bg-[color:var(--rule)] text-[color:var(--text)] shadow-sm sm:grid-cols-[1fr_1fr_1.6fr]">
       <div className="bg-card px-[18px] py-[14px]">
-        <div className="mb-1.5 font-mono text-[10.5px] uppercase tracking-[0.1em] text-[color:var(--text-faint)]">
+        <div className="mb-1.5 font-mono text-[11px] font-semibold uppercase tracking-[0.1em] text-[color:var(--text-faint)]">
           {t('contractTotal')}
         </div>
         <div
-          className="text-[21px] font-semibold tabular-nums"
+          className="text-[21px] font-semibold tabular"
           dir="ltr"
         >
           {formatMoney(contractTotal, locale)}
@@ -38,10 +38,10 @@ export function EngagementPulseBar({ pulse }: { pulse: CommercialPulse }) {
       </div>
 
       <div className="bg-card px-[18px] py-[14px]">
-        <div className="mb-1.5 font-mono text-[10.5px] uppercase tracking-[0.1em] text-[color:var(--text-faint)]">
+        <div className="mb-1.5 font-mono text-[11px] font-semibold uppercase tracking-[0.1em] text-[color:var(--text-faint)]">
           {t('collected')}
         </div>
-        <div className="text-[21px] font-semibold tabular-nums" dir="ltr">
+        <div className="text-[21px] font-semibold tabular" dir="ltr">
           {formatMoney(collected, locale)}
           <span className="ms-1 text-[12px] font-normal text-[color:var(--text-muted)]">
             · {collectedPct}%
@@ -56,12 +56,12 @@ export function EngagementPulseBar({ pulse }: { pulse: CommercialPulse }) {
       </div>
 
       <div className="bg-brand-tint px-[18px] py-[14px]">
-        <div className="mb-1.5 font-mono text-[10.5px] uppercase tracking-[0.1em] text-brand-ink">
+        <div className="mb-1.5 font-mono text-[11px] font-semibold uppercase tracking-[0.1em] text-brand-ink">
           {t('pendingGate')}
         </div>
         {pendingGate ? (
           <>
-            <div className="text-[21px] font-semibold tabular-nums" dir="ltr">
+            <div className="text-[21px] font-semibold tabular" dir="ltr">
               {formatMoney(pendingGate.amountDue, locale)}
               <span className="ms-1 text-[12px] font-normal text-[color:var(--text-muted)]">
                 {t('due')}

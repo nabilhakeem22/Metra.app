@@ -56,9 +56,9 @@ export function ArtifactPanel({
   onCancel: () => void;
 }) {
   return (
-    <div className="space-y-2 rounded-md border p-3">
-      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-        <div className="space-y-1">
+    <div className="space-y-3 rounded-[var(--r-item)] border border-[color:var(--rule)] bg-[color:var(--track)] p-4">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div className="space-y-1.5">
           <Label htmlFor="art-kind">{t('kind')}</Label>
           <Select
             value={artKind}
@@ -76,12 +76,12 @@ export function ArtifactPanel({
             </SelectContent>
           </Select>
         </div>
-        <div className="space-y-1">
+        <div className="space-y-1.5">
           <Label htmlFor="art-label">{t('label')}</Label>
           <Input id="art-label" value={artLabel} onChange={(e) => setArtLabel(e.target.value)} />
         </div>
       </div>
-      <div className="space-y-1">
+      <div className="space-y-1.5">
         <Label htmlFor="art-hash">{t('contentHash')}</Label>
         <Input
           id="art-hash"

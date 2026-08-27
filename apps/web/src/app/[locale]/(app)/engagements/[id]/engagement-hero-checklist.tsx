@@ -22,7 +22,7 @@ export function EngagementHeroChecklist({
       {items.map((item) => (
         <li key={item.guard} className="flex items-center gap-3 text-sm">
           <span
-            className={`grid h-5 w-5 shrink-0 place-items-center rounded-md text-xs ${
+            className={`grid h-5 w-5 shrink-0 place-items-center rounded-full text-xs ${
               item.ok
                 ? 'bg-[color:var(--success)] text-white'
                 : 'border-2 border-[color:var(--rule)]'

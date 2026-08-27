@@ -64,9 +64,9 @@ export function PaymentPanel({
   }
 
   return (
-    <div className="space-y-2 rounded-md border p-3">
-      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-        <div className="space-y-1">
+    <div className="space-y-3 rounded-[var(--r-item)] border border-[color:var(--rule)] bg-[color:var(--track)] p-4">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div className="space-y-1.5">
           <Label htmlFor="pay-kind">{t('kind')}</Label>
           <Select
             value={payKind}
@@ -84,12 +84,13 @@ export function PaymentPanel({
             </SelectContent>
           </Select>
         </div>
-        <div className="space-y-1">
+        <div className="space-y-1.5">
           <Label htmlFor="pay-amount">{t('amount')}</Label>
           <Input
             id="pay-amount"
             dir="ltr"
             inputMode="decimal"
+            className="tabular-nums"
             value={payAmount}
             onChange={(e) => setPayAmount(e.target.value)}
           />

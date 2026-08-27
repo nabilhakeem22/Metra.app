@@ -89,12 +89,12 @@ export function EngagementToolbar({
 
   return (
     <section className="space-y-3 rounded-[var(--r-panel)] border border-[color:var(--rule)] bg-card p-4 text-[color:var(--text)] shadow-sm">
-      <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-[color:var(--text-faint)]">
+      <p className="font-mono text-[11px] font-semibold uppercase tracking-[0.1em] text-[color:var(--text-faint)]">
         {t('title')}
       </p>
 
       {studioTiles.length > 0 && (
-        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
           {studioTiles.map((tile) => (
             <Tile
               key={tile.key}
@@ -196,21 +196,25 @@ function Tile({
       type="button"
       onClick={onClick}
       aria-pressed={active}
-      className={`flex items-start gap-2.5 rounded-[var(--r-item)] border p-3 text-start transition-colors ${
+      className={`flex items-center gap-2.5 rounded-[var(--r-item)] border p-3 text-start transition-colors ${
         active
           ? 'border-[color:var(--brand-tint-border)] bg-[color:var(--track)]'
           : 'border-[color:var(--rule)] hover:bg-[color:var(--track)]'
       } ${subordinate ? 'opacity-90' : ''}`}
     >
-      <Icon
-        className={`mt-0.5 size-4 shrink-0 ${
-          subordinate ? 'text-[color:var(--text-muted)]' : 'text-brand-ink'
+      <span
+        className={`grid h-8 w-8 shrink-0 place-items-center rounded-[var(--r-icon)] ${
+          subordinate
+            ? 'bg-[color:var(--track)] text-[color:var(--text-muted)]'
+            : 'bg-brand-tint text-brand-ink'
         }`}
         aria-hidden
-      />
+      >
+        <Icon className="size-4" aria-hidden />
+      </span>
       <span className="min-w-0">
-        <span className="block text-[13px] font-medium">{name}</span>
-        <span className="block text-[12px] text-[color:var(--text-muted)]">
+        <span className="block text-[13px] font-semibold leading-tight">{name}</span>
+        <span className="mt-0.5 block text-[12px] text-[color:var(--text-muted)]">
           {purpose}
         </span>
       </span>

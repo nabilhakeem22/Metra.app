@@ -56,9 +56,9 @@ export function PaymentForm({
   }
 
   return (
-    <div className="mt-4 space-y-3 rounded-[var(--r-item)] border border-[color:var(--rule)] bg-[color:var(--track)] p-3">
+    <div className="mt-4 space-y-3 rounded-[var(--r-item)] border border-[color:var(--rule)] bg-[color:var(--track)] p-4">
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <div className="space-y-1">
+        <div className="space-y-1.5">
           <Label htmlFor="hero-pay-amount">{tc('amount')}</Label>
           <Input
             id="hero-pay-amount"
@@ -69,7 +69,7 @@ export function PaymentForm({
             onChange={(event) => setAmount(event.target.value)}
           />
         </div>
-        <div className="space-y-1">
+        <div className="space-y-1.5">
           <Label htmlFor="hero-pay-method">{tc('method')}</Label>
           <Input
             id="hero-pay-method"
@@ -77,7 +77,7 @@ export function PaymentForm({
             onChange={(event) => setMethod(event.target.value)}
           />
         </div>
-        <div className="space-y-1">
+        <div className="space-y-1.5">
           <Label htmlFor="hero-pay-reference">{tc('reference')}</Label>
           <Input
             id="hero-pay-reference"

@@ -31,24 +31,26 @@ export function RomPanel({
   onCancel: () => void;
 }) {
   return (
-    <div className="space-y-2 rounded-md border p-3">
-      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-        <div className="space-y-1">
+    <div className="space-y-3 rounded-[var(--r-item)] border border-[color:var(--rule)] bg-[color:var(--track)] p-4">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div className="space-y-1.5">
           <Label htmlFor="rom-low">{t('low')}</Label>
           <Input
             id="rom-low"
             dir="ltr"
             inputMode="decimal"
+            className="tabular-nums"
             value={romLow}
             onChange={(e) => setRomLow(e.target.value)}
           />
         </div>
-        <div className="space-y-1">
+        <div className="space-y-1.5">
           <Label htmlFor="rom-high">{t('high')}</Label>
           <Input
             id="rom-high"
             dir="ltr"
             inputMode="decimal"
+            className="tabular-nums"
             value={romHigh}
             onChange={(e) => setRomHigh(e.target.value)}
           />

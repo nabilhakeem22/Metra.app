@@ -91,7 +91,7 @@ export function EngagementPhaseRail({
   return (
     <section className="rounded-[var(--r-panel)] border border-[color:var(--rule)] bg-card p-4 text-[color:var(--text)] shadow-sm">
       <header className="mb-3 flex items-baseline justify-between gap-3 px-0.5">
-        <span className="font-mono text-[11px] uppercase tracking-[0.1em] text-[color:var(--text-faint)]">
+        <span className="font-mono text-[11px] font-semibold uppercase tracking-[0.1em] text-[color:var(--text-faint)]">
           {t('rail.title')}
         </span>
         <span className="text-xs text-[color:var(--text-muted)]">

@@ -66,17 +66,18 @@ export function EngagementFeeForm({
       <p className="text-sm font-medium">{t('title')}</p>
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <div className="space-y-2">
+        <div className="space-y-1.5">
           <Label htmlFor="fee-amount">{t('designFee')}</Label>
           <Input
             id="fee-amount"
             dir="ltr"
             inputMode="decimal"
+            className="tabular-nums"
             value={designFee}
             onChange={(e) => setDesignFee(e.target.value)}
           />
         </div>
-        <div className="space-y-2">
+        <div className="space-y-1.5">
           <Label htmlFor="fee-basis">{t('basis')}</Label>
           <Select
             value={basis}
@@ -100,10 +101,11 @@ export function EngagementFeeForm({
         <p className="text-xs font-medium text-muted-foreground">{t('milestones')}</p>
         {rows.map((row, index) => (
           <div key={row.kind} className="flex items-center gap-2">
-            <span className="w-28 text-sm">{tk(row.kind)}</span>
+            <span className="w-28 shrink-0 text-sm">{tk(row.kind)}</span>
             <Input
               dir="ltr"
               inputMode="decimal"
+              className="tabular-nums"
               aria-label={`${tk(row.kind)} ${t('value')}`}
               value={row.value}
               onChange={(e) => setRow(index, e.target.value)}

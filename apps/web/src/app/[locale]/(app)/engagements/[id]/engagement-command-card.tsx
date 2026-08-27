@@ -132,11 +132,11 @@ export function EngagementCommandCard({
       )}
 
       {!closed && (
-        <p className="mb-2 font-mono text-[11px] uppercase tracking-[0.12em] text-brand-ink">
+        <p className="mb-2 font-mono text-[11px] font-semibold uppercase tracking-[0.1em] text-brand-ink">
           {th('whatsNext')}
         </p>
       )}
-      <h2 className="mb-1 text-[22px] font-semibold leading-tight text-balance">
+      <h2 className="mb-1 text-[22px] font-semibold leading-tight tracking-[var(--tracking-title)] text-balance">
         {headline}
       </h2>
       {hint && (

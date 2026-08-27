@@ -46,7 +46,7 @@ export function EngagementSecondaryActions({
 
   return (
     <div className="mt-5 space-y-3 border-t border-[color:var(--rule)] pt-4">
-      <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-[color:var(--text-faint)]">
+      <p className="font-mono text-[11px] font-semibold uppercase tracking-[0.1em] text-[color:var(--text-faint)]">
         {t('nextActions.title')}
       </p>
       <div className="flex flex-wrap gap-2">

@@ -27,8 +27,8 @@ export function RomAckPanel({
   onCancel: () => void;
 }) {
   return (
-    <div className="space-y-2 rounded-md border p-3">
-      <div className="space-y-1">
+    <div className="space-y-3 rounded-[var(--r-item)] border border-[color:var(--rule)] bg-[color:var(--track)] p-4">
+      <div className="space-y-1.5">
         <Label htmlFor="ack-note">{t('note')}</Label>
         <Input id="ack-note" value={ackNote} onChange={(e) => setAckNote(e.target.value)} />
       </div>

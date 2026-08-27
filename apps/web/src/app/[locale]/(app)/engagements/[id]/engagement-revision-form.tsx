@@ -42,16 +42,17 @@ export function EngagementRevisionForm({
   return (
     <div className="space-y-3 rounded-[var(--r-item)] border border-[color:var(--rule)] bg-[color:var(--track)] p-4">
       <p className="text-sm font-medium">{t('title')}</p>
-      <div className="space-y-2">
+      <div className="space-y-1.5">
         <Label htmlFor="rev-reason">{t('reason')}</Label>
         <Input id="rev-reason" value={reason} onChange={(e) => setReason(e.target.value)} />
       </div>
-      <div className="space-y-2">
+      <div className="space-y-1.5">
         <Label htmlFor="rev-amount">{t('changeOrderAmount')}</Label>
         <Input
           id="rev-amount"
           dir="ltr"
           inputMode="decimal"
+          className="tabular-nums"
           value={amount}
           onChange={(e) => setAmount(e.target.value)}
         />
