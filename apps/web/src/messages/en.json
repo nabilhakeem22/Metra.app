@@ -1748,6 +1748,58 @@
     },
     "forClient": "For {name}",
     "stageEyebrow": "Where we are",
+    "greeting": "Hello, {name} 👋",
+    "firmSubtitle": "Your design project",
+    "journey": {
+      "eyebrow": "Your journey",
+      "proposal": "Proposal",
+      "survey": "Survey",
+      "concept": "Concept",
+      "threeD": "3D visuals",
+      "handover": "Handover"
+    },
+    "hero": {
+      "readyTag": "Ready for you",
+      "inProgressTag": "In progress",
+      "deliveredTag": "Delivered",
+      "reassurance": "Nothing to do right now — we'll message you the moment there's an update.",
+      "concept": {
+        "headline": "Your concept design is ready",
+        "body": "Your designer shared the first layout and look for your space. Take a look and let them know what you think.",
+        "approve": "Review & approve",
+        "changes": "Request changes instead",
+        "approvedTitle": "Concept approved 🎉",
+        "approvedBody": "Your designer has been notified and is starting your 3D visuals.",
+        "changesTitle": "Changes requested",
+        "changesBody": "Your designer has been notified and will refine the concept with you."
+      },
+      "design": {
+        "headline": "Your final design is ready to sign off",
+        "body": "Everything's refined and ready. Approve to receive your full design package.",
+        "approve": "Approve final design",
+        "changes": "Request changes instead",
+        "approvedTitle": "Design approved 🎉",
+        "approvedBody": "Your designer has been notified and is preparing your design handover.",
+        "changesTitle": "Changes requested",
+        "changesBody": "Your designer has been notified and will refine the design with you."
+      },
+      "handoff": {
+        "headline": "Your design package is ready",
+        "body": "Confirm you've received your design package and we'll wrap things up.",
+        "acknowledge": "Confirm handover",
+        "acknowledgedTitle": "Handover confirmed 🎉",
+        "acknowledgedBody": "Thank you — your design project is complete."
+      }
+    },
+    "glance": {
+      "title": "Payment",
+      "depositPaid": "Deposit received",
+      "next": "Next: {amount}",
+      "allSettled": "All payments settled"
+    },
+    "whatsNext": {
+      "eyebrow": "Up next"
+    },
     "budget": {
       "title": "Estimated budget",
       "hint": "A rough range for the construction budget, shared for your planning.",
@@ -1791,6 +1843,6 @@
         "generic": "Something went wrong. Please try again."
       }
     },
-    "poweredBy": "Shared with you by {firm}"
+    "poweredBy": "Shared securely by {firm}"
   }
 }

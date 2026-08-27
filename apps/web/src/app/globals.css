@@ -382,3 +382,25 @@
     outline-color: hsl(var(--brand));
   }
 }
+
+@layer components {
+  /* ============================================================
+     Client delivery portal — one scoped, calm-premium reading
+     surface for the session-less recipient. THEME-AWARE via the
+     existing shadcn bridge tokens only (no new hex, no warm mockup
+     palette): a soft primary wash over a muted ground, tuned for a
+     quiet, guided single column. Utilities on the inner cards still
+     win (utilities layer > components layer), so nothing here fights
+     the Tailwind semantic classes the portal components use.
+     ============================================================ */
+  .client-portal {
+    background:
+      radial-gradient(
+        120% 80% at 100% 0%,
+        hsl(var(--primary) / 0.06),
+        transparent 60%
+      ),
+      hsl(var(--muted) / 0.35);
+    color: hsl(var(--foreground));
+  }
+}

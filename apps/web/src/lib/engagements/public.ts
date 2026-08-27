@@ -12,6 +12,12 @@ import {
   PORTAL_STAGE_NOTE,
   type PortalLabel,
 } from './portal-labels';
+import { stateMilestone, type MilestoneProgress } from './journey-map';
+import {
+  CLIENT_ACTION_VERBS,
+  deriveHero,
+  type HeroView,
+} from './portal-hero';
 import { DESIGN_STATES, type DesignState } from './states';
 
 function hashToken(raw: string): string {
@@ -37,10 +43,15 @@ export interface PublicDelivery {
   stageLabel: PortalLabel;
   /** Read-only "what's happening / what's next" line, bilingual. */
   stageNote: PortalLabel;
+  /** The client's position on the 5-milestone journey. Derived server-side from
+   *  the raw state so the machine state name never reaches the browser payload. */
+  milestone: MilestoneProgress;
+  /** The single "what needs you now" hero. Derived server-side (no raw state). */
+  hero: HeroView;
   offPlan: boolean;
   titleAr: string | null;
   titleEn: string | null;
-  createdAt: string;
+  createdAt: string | null;
   /** The design fee the CLIENT pays (scale-4 string), or null before it is set. */
   designFeeTotal: string | null;
   /** The client-acknowledged budget band (scale-4 strings), or null if unset. */
@@ -56,72 +67,143 @@ export interface PublicDelivery {
   clientActions: string[];
 }
 
-/** The raw jsonb shape the SDF returns (snake_case, matches app_delivery_by_token). */
+/**
+ * The raw jsonb shape the SDF returns (snake_case, matches app_delivery_by_token).
+ * Typed as UNTRUSTED: every field is optional/nullable because this is external
+ * jsonb — the read path treats a missing/wrong-typed field as absent and degrades
+ * to null rather than trusting the shape. `getDeliveryByToken` is the sole guard
+ * that turns this into the strict, client-safe `PublicDelivery`.
+ */
 interface DeliverySnapshot {
-  id: string;
-  number: number;
-  state: string;
-  off_plan: boolean;
-  title_ar: string | null;
-  title_en: string | null;
-  created_at: string;
-  design_fee_total: string | null;
-  rom: { low: string | null; high: string | null } | null;
-  share_expires_at: string | null;
-  firm: { name_ar: string | null; name_en: string | null; logo_file_id: string | null };
-  client: { name_ar: string | null; name_en: string | null };
-  payment_schedule: PublicDeliveryMilestone[];
-  client_actions: string[];
+  id?: string | null;
+  number?: number | null;
+  state?: string | null;
+  off_plan?: boolean | null;
+  title_ar?: string | null;
+  title_en?: string | null;
+  created_at?: string | null;
+  design_fee_total?: string | null;
+  rom?: { low?: string | null; high?: string | null } | null;
+  share_expires_at?: string | null;
+  firm?: { name_ar?: string | null; name_en?: string | null; logo_file_id?: string | null } | null;
+  client?: { name_ar?: string | null; name_en?: string | null } | null;
+  payment_schedule?: PublicDeliveryMilestone[] | null;
+  client_actions?: string[] | null;
 }
 
 const STATE_SET = new Set<string>(DESIGN_STATES);
+
+/** The four money statuses the portal knows how to render. */
+const MILESTONE_STATUSES = new Set<string>(['paid', 'partial', 'due']);
+
+/**
+ * A schedule row is renderable only when it carries the three fields the portal
+ * dereferences: a non-empty `milestone_kind`, a known `status`, and an
+ * `amount_due`. Anything else (a null hole, a stray shape, an unknown status) is
+ * dropped — never rendered — so a malformed row can neither crash nor mislead.
+ */
+function isRenderableMilestone(row: unknown): row is PublicDeliveryMilestone {
+  if (!row || typeof row !== 'object') return false;
+  const candidate = row as Record<string, unknown>;
+  return (
+    typeof candidate.milestone_kind === 'string' &&
+    candidate.milestone_kind.length > 0 &&
+    typeof candidate.status === 'string' &&
+    MILESTONE_STATUSES.has(candidate.status) &&
+    candidate.amount_due != null
+  );
+}
 
 /**
  * Resolve a delivery by its RAW share token, or null. The token is sha256-hashed
  * here (never sent to the DB in the clear) and the SECURITY DEFINER SDF returns
  * null for an unknown / revoked / expired link. Maps the raw `state` to its
  * client-friendly bilingual label. Server-only; never logs the raw token.
+ *
+ * HARDENED (read-path defense): the SDF execute AND the entire snapshot →
+ * PublicDelivery mapping run inside ONE try/catch. A VALID token can never 500 —
+ * any throw (or any malformed field) logs a token-free breadcrumb and returns
+ * null, which the page renders as the friendly not-found. Every dereferenced
+ * field is null-safe so a missing `firm`/`client`, a non-array schedule, an
+ * unknown verb, or a bad number degrades gracefully instead of crashing.
  */
 export async function getDeliveryByToken(
   rawToken: string,
 ): Promise<PublicDelivery | null> {
   if (!rawToken || !rawToken.trim()) return null;
   const hash = hashToken(rawToken.trim());
-  const rows = (await withRequestDb((db) =>
-    db.execute(sql`select public.app_delivery_by_token(${hash}) as data`),
-  )) as unknown as Array<{ data: DeliverySnapshot | null }>;
-  const snapshot = rows[0]?.data ?? null;
-  if (!snapshot) return null;
 
-  // Defensive: the state always comes from the DB enum, but if it is ever
-  // unrecognised we must NOT render a raw/unknown key to the client.
-  if (!STATE_SET.has(snapshot.state)) return null;
-  const state = snapshot.state as DesignState;
+  // `hasSnapshot` distinguishes "the DB/SDF call itself threw" from "the mapping
+  // of a returned snapshot threw" in the log breadcrumb — WITHOUT ever logging the
+  // token or any client data.
+  let hasSnapshot = false;
+  try {
+    const rows = (await withRequestDb((db) =>
+      db.execute(sql`select public.app_delivery_by_token(${hash}) as data`),
+    )) as unknown as Array<{ data: DeliverySnapshot | null }>;
+    const snapshot = rows[0]?.data ?? null;
+    if (!snapshot) return null;
+    hasSnapshot = true;
 
-  return {
-    id: snapshot.id,
-    number: snapshot.number,
-    stageLabel: PORTAL_STAGE_LABEL[state],
-    stageNote: PORTAL_STAGE_NOTE[state],
-    offPlan: snapshot.off_plan,
-    titleAr: snapshot.title_ar,
-    titleEn: snapshot.title_en,
-    createdAt: snapshot.created_at,
-    designFeeTotal: snapshot.design_fee_total,
-    rom: snapshot.rom,
-    shareExpiresAt: snapshot.share_expires_at,
-    firm: {
-      nameAr: snapshot.firm.name_ar,
-      nameEn: snapshot.firm.name_en,
-      logoFileId: snapshot.firm.logo_file_id,
-    },
-    client: {
-      nameAr: snapshot.client.name_ar,
-      nameEn: snapshot.client.name_en,
-    },
-    paymentSchedule: snapshot.payment_schedule ?? [],
-    clientActions: snapshot.client_actions ?? [],
-  };
+    // The state comes from the DB enum, but if it is ever missing/unrecognised we
+    // must NOT render a raw/unknown key to the client.
+    if (!snapshot.state || !STATE_SET.has(snapshot.state)) return null;
+    const state = snapshot.state as DesignState;
+
+    // Identity: a usable delivery needs at least a valid id OR a finite number.
+    // If BOTH are unusable the row is junk → not-found.
+    const hasId = typeof snapshot.id === 'string' && snapshot.id.trim().length > 0;
+    const numberIsFinite = Number.isFinite(snapshot.number);
+    if (!hasId && !numberIsFinite) return null;
+    const number = numberIsFinite ? (snapshot.number as number) : 0;
+
+    // Null-safe object dereferences: a missing firm/client is common enough in a
+    // malformed snapshot that it must degrade to null fields, not crash.
+    const firm = snapshot.firm ?? ({} as NonNullable<DeliverySnapshot['firm']>);
+    const client = snapshot.client ?? ({} as NonNullable<DeliverySnapshot['client']>);
+    const rom = snapshot.rom;
+
+    const paymentSchedule = Array.isArray(snapshot.payment_schedule)
+      ? snapshot.payment_schedule.filter(isRenderableMilestone)
+      : [];
+    const clientActions = Array.isArray(snapshot.client_actions)
+      ? snapshot.client_actions.filter(
+          (verb): verb is string =>
+            typeof verb === 'string' && CLIENT_ACTION_VERBS.has(verb),
+        )
+      : [];
+
+    return {
+      id: hasId ? (snapshot.id as string) : '',
+      number,
+      stageLabel: PORTAL_STAGE_LABEL[state],
+      stageNote: PORTAL_STAGE_NOTE[state],
+      milestone: stateMilestone(state),
+      hero: deriveHero(clientActions, state),
+      offPlan: snapshot.off_plan === true,
+      titleAr: snapshot.title_ar ?? null,
+      titleEn: snapshot.title_en ?? null,
+      createdAt: snapshot.created_at ?? null,
+      designFeeTotal: snapshot.design_fee_total ?? null,
+      rom: rom ? { low: rom.low ?? null, high: rom.high ?? null } : null,
+      shareExpiresAt: snapshot.share_expires_at ?? null,
+      firm: {
+        nameAr: firm.name_ar ?? null,
+        nameEn: firm.name_en ?? null,
+        logoFileId: firm.logo_file_id ?? null,
+      },
+      client: {
+        nameAr: client.name_ar ?? null,
+        nameEn: client.name_en ?? null,
+      },
+      paymentSchedule,
+      clientActions,
+    };
+  } catch {
+    // Token-free breadcrumb only — never the raw token or any client data.
+    console.error('delivery read failed', { hasSnapshot });
+    return null;
+  }
 }
 
 /** Coded outcomes the portal maps to a bilingual message. `already` is NOT here —
