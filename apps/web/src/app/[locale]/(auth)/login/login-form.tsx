@@ -1,16 +1,10 @@
 'use client';
 
-import { ArrowLeft, Loader2 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { useSearchParams } from 'next/navigation';
 import { useState, useTransition } from 'react';
 import { resolveActionError } from '@/lib/actions/error-message';
 import { AuthShell } from '@/components/auth/auth-shell';
-import { Button } from '@/components/ui/button';
-import { FieldHint } from '@/components/ui/field-hint';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { OtpInput } from '@/components/ui/otp-input';
 import { useCountdown } from '@/hooks/use-countdown';
 import { Link, useRouter } from '@/i18n/routing';
 import {
@@ -20,8 +14,10 @@ import {
   verifyEmailOtp,
   verifyPhoneOtp,
 } from '@/lib/auth/actions';
+import { LoginRequestStep } from './login-request-step';
+import { LoginVerifyStep } from './login-verify-step';
 
-type Channel = 'email' | 'phone';
+export type Channel = 'email' | 'phone';
 type Status = 'idle' | 'sending' | 'code-sent' | 'verifying' | 'error' | 'success';
 type Mode = 'signin' | 'signup';
 
@@ -128,118 +124,32 @@ export function LoginForm() {
         </div>
 
         {phase === 'request' ? (
-          <div className="space-y-4">
-            <div className="flex gap-2">
-              <Button
-                type="button"
-                variant={channel === 'email' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => switchChannel('email')}
-              >
-                {t('emailLabel')}
-              </Button>
-              <Button
-                type="button"
-                variant={channel === 'phone' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => switchChannel('phone')}
-              >
-                {t('phoneLabel')}
-              </Button>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="identifier" className="flex items-center">
-                {channel === 'email' ? t('emailLabel') : t('phoneLabel')}
-                <FieldHint id="identifier-hint" hint={th('email')} />
-              </Label>
-              <Input
-                id="identifier"
-                type={channel === 'email' ? 'email' : 'tel'}
-                dir="ltr"
-                aria-describedby="identifier-hint"
-                inputMode={channel === 'email' ? 'email' : 'tel'}
-                placeholder={
-                  channel === 'email' ? t('emailPlaceholder') : '+20…'
-                }
-                value={identifier}
-                onChange={(e) => setIdentifier(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') send();
-                }}
-              />
-              {channel === 'phone' && (
-                <p className="text-sm text-muted-foreground">{t('phoneHint')}</p>
-              )}
-            </div>
-
-            <Button
-              className="h-11 w-full"
-              onClick={send}
-              disabled={busy || identifier.trim().length === 0}
-            >
-              {sending && <Loader2 className="size-4 animate-spin" aria-hidden />}
-              {sending ? t('sending') : t('sendCode')}
-            </Button>
-          </div>
+          <LoginRequestStep
+            t={t}
+            th={th}
+            channel={channel}
+            switchChannel={switchChannel}
+            identifier={identifier}
+            setIdentifier={setIdentifier}
+            send={send}
+            busy={busy}
+            sending={sending}
+          />
         ) : (
-          <div className="space-y-4">
-            <div className="space-y-1">
-              <p className="inline-flex items-center font-medium">
-                {t('codeSentTitle')}
-                <FieldHint hint={th('otp')} />
-              </p>
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <span dir="ltr" className="truncate">
-                  {identifier}
-                </span>
-                <button
-                  type="button"
-                  onClick={changeIdentifier}
-                  className="inline-flex items-center gap-1 font-medium text-primary hover:underline"
-                >
-                  <ArrowLeft className="size-3" aria-hidden />
-                  {t('changeEmail')}
-                </button>
-              </div>
-            </div>
-
-            <OtpInput
-              length={OTP_LENGTH}
-              value={code}
-              onChange={setCode}
-              onComplete={(v) => verify(v)}
-              disabled={busy}
-              ariaLabel={t('codeLabel')}
-              autoFocus
-            />
-
-            <Button
-              className="h-11 w-full"
-              onClick={() => verify()}
-              disabled={busy || code.length < OTP_LENGTH}
-            >
-              {verifying && (
-                <Loader2 className="size-4 animate-spin" aria-hidden />
-              )}
-              {verifying ? t('verifying') : t('verify')}
-            </Button>
-
-            <div className="text-center text-sm text-muted-foreground">
-              {countdown.remaining > 0 ? (
-                <span>{t('resendIn', { time: countdown.formatted })}</span>
-              ) : (
-                <button
-                  type="button"
-                  onClick={send}
-                  disabled={busy}
-                  className="font-medium text-primary hover:underline disabled:opacity-50"
-                >
-                  {t('resend')}
-                </button>
-              )}
-            </div>
-          </div>
+          <LoginVerifyStep
+            t={t}
+            th={th}
+            identifier={identifier}
+            changeIdentifier={changeIdentifier}
+            code={code}
+            setCode={setCode}
+            verify={verify}
+            send={send}
+            busy={busy}
+            verifying={verifying}
+            otpLength={OTP_LENGTH}
+            countdown={countdown}
+          />
         )}
 
         <p

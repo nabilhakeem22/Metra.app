@@ -1,19 +1,7 @@
 'use client';
 
-import { Loader2, Upload } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { useState, useTransition, type ChangeEvent } from 'react';
-import { Button } from '@/components/ui/button';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
-import { FieldHint } from '@/components/ui/field-hint';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { toast } from '@/hooks/use-toast';
 import { resolveActionError } from '@/lib/actions/error-message';
 import type { ActionCode } from '@/lib/actions/result';
@@ -23,6 +11,8 @@ import {
   updateOrgProfile,
   updateOrgSettings,
 } from '@/lib/org/actions';
+import { SettingsProfileCard } from './settings-profile-card';
+import { SettingsVisibilityCard } from './settings-visibility-card';
 
 interface Initial {
   nameEn: string;
@@ -126,156 +116,38 @@ export function SettingsClient({
         </p>
       )}
 
-      <Card>
-        <CardHeader>
-          <CardTitle>{t('profileTitle')}</CardTitle>
-          <CardDescription>{t('profileSubtitle')}</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex items-center gap-3">
-            {logoPreview ? (
-              <img
-                src={logoPreview}
-                alt=""
-                className="size-12 rounded-xl border object-cover"
-              />
-            ) : (
-              <div className="flex size-12 items-center justify-center rounded-xl bg-muted text-muted-foreground">
-                <Upload className="size-5" aria-hidden />
-              </div>
-            )}
-            <input
-              id="logo"
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={onLogo}
-              disabled={disabled || uploading}
-            />
-            <Label
-              htmlFor="logo"
-              className="inline-flex h-9 cursor-pointer items-center rounded-md border border-input px-3 text-sm font-medium hover:bg-muted aria-disabled:pointer-events-none aria-disabled:opacity-50"
-              aria-disabled={disabled || uploading}
-            >
-              {uploading && <Loader2 className="me-2 size-4 animate-spin" aria-hidden />}
-              {t('changeLogo')}
-            </Label>
-          </div>
+      <SettingsProfileCard
+        t={t}
+        th={th}
+        logoPreview={logoPreview}
+        onLogo={onLogo}
+        disabled={disabled}
+        uploading={uploading}
+        nameEn={nameEn}
+        setNameEn={setNameEn}
+        nameAr={nameAr}
+        setNameAr={setNameAr}
+        city={city}
+        setCity={setCity}
+        tax={tax}
+        setTax={setTax}
+        canManage={canManage}
+        saveProfile={saveProfile}
+        savingProfile={savingProfile}
+      />
 
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="nameEn" className="flex items-center">
-                {t('nameEnLabel')}
-                <FieldHint id="org-name-hint" hint={th('name')} />
-              </Label>
-              <Input
-                id="nameEn"
-                dir="ltr"
-                aria-describedby="org-name-hint"
-                value={nameEn}
-                onChange={(e) => setNameEn(e.target.value)}
-                disabled={disabled}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="nameAr" className="flex items-center">
-                {t('nameArLabel')}
-                <FieldHint id="org-namear-hint" hint={th('name')} />
-              </Label>
-              <Input
-                id="nameAr"
-                dir="rtl"
-                aria-describedby="org-namear-hint"
-                value={nameAr}
-                onChange={(e) => setNameAr(e.target.value)}
-                disabled={disabled}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="city">{t('cityLabel')}</Label>
-              <Input
-                id="city"
-                value={city}
-                onChange={(e) => setCity(e.target.value)}
-                disabled={disabled}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="tax">{t('taxLabel')}</Label>
-              <Input
-                id="tax"
-                dir="ltr"
-                value={tax}
-                onChange={(e) => setTax(e.target.value)}
-                disabled={disabled}
-              />
-            </div>
-          </div>
-
-          {canManage && (
-            <Button onClick={saveProfile} disabled={savingProfile}>
-              {savingProfile && (
-                <Loader2 className="size-4 animate-spin" aria-hidden />
-              )}
-              {t('save')}
-            </Button>
-          )}
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>{t('visibilityTitle')}</CardTitle>
-          <CardDescription>{t('visibilitySubtitle')}</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <label className="flex items-start gap-3">
-            <input
-              type="checkbox"
-              className="mt-1 size-4"
-              checked={hideMargin}
-              onChange={(e) => setHideMargin(e.target.checked)}
-              disabled={disabled}
-            />
-            <span>
-              <span className="flex items-center text-sm font-medium">
-                {t('hideMarginLabel')}
-                <FieldHint hint={th('hideMarginFromPm')} />
-              </span>
-              <span className="block text-xs text-muted-foreground">
-                {t('hideMarginDesc')}
-              </span>
-            </span>
-          </label>
-
-          <label className="flex items-start gap-3">
-            <input
-              type="checkbox"
-              className="mt-1 size-4"
-              checked={restrictDash}
-              onChange={(e) => setRestrictDash(e.target.checked)}
-              disabled={disabled}
-            />
-            <span>
-              <span className="block text-sm font-medium">
-                {t('restrictDashLabel')}
-              </span>
-              <span className="block text-xs text-muted-foreground">
-                {t('restrictDashDesc')}
-              </span>
-            </span>
-          </label>
-
-          {canManage && (
-            <Button onClick={saveSettings} disabled={savingSettings}>
-              {savingSettings && (
-                <Loader2 className="size-4 animate-spin" aria-hidden />
-              )}
-              {t('save')}
-            </Button>
-          )}
-        </CardContent>
-      </Card>
+      <SettingsVisibilityCard
+        t={t}
+        th={th}
+        hideMargin={hideMargin}
+        setHideMargin={setHideMargin}
+        restrictDash={restrictDash}
+        setRestrictDash={setRestrictDash}
+        disabled={disabled}
+        canManage={canManage}
+        saveSettings={saveSettings}
+        savingSettings={savingSettings}
+      />
     </div>
   );
 }

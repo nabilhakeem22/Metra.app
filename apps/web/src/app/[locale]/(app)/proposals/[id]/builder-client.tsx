@@ -4,8 +4,6 @@ import { Plus } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { useMemo, useState, useTransition } from 'react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
 import { useConfirm } from '@/components/ui/confirm-dialog';
 import { toast } from '@/hooks/use-toast';
 import { useRouter } from '@/i18n/routing';
@@ -19,6 +17,7 @@ import {
 } from '@/lib/proposals/actions';
 import type { ProposalDetail } from '@/lib/proposals/queries';
 import { BuilderSectionCard } from './builder-section-card';
+import { BuilderShareLink } from './builder-share-link';
 import { BuilderToolbar } from './builder-toolbar';
 import { BuilderTotalsPanel } from './builder-totals-panel';
 import {
@@ -223,24 +222,7 @@ export function ProposalBuilder({
     <div className="space-y-4">
       {dialog}
 
-      {link && (
-        <Card>
-          <CardContent className="flex flex-wrap items-center gap-2 py-3">
-            <span className="text-sm font-medium">{t('view.shareTitle')}:</span>
-            <Input readOnly dir="ltr" value={link} className="max-w-md text-xs" />
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                void navigator.clipboard?.writeText(link);
-                toast({ title: t('toast.linkCopied') });
-              }}
-            >
-              {t('view.copyLink')}
-            </Button>
-          </CardContent>
-        </Card>
-      )}
+      {link && <BuilderShareLink t={t} link={link} />}
 
       {sections.map((sec, si) => (
         <BuilderSectionCard
