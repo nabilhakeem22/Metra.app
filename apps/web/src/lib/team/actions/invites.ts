@@ -1,100 +1,28 @@
 'use server';
 
-import { createHash, randomBytes } from 'node:crypto';
-import { invitations, organizations, type MemberRole } from '@metra/db';
-import { and, eq, sql } from 'drizzle-orm';
-import { getLocale } from 'next-intl/server';
-import { cookies, headers } from 'next/headers';
+import { invitations, type MemberRole } from '@metra/db';
+import { and, eq } from 'drizzle-orm';
 import { recordAudit } from '@/lib/audit';
-import {
-  ACTIVE_ORG_COOKIE,
-  activeOrgCookieOptions,
-} from '@/lib/auth/active-org';
 import { requireOrg } from '@/lib/auth/require-org';
-import { getSessionUser } from '@/lib/auth/session';
-import { withOrgContext, withUserContext, type OrgContext } from '@/lib/db/context';
+import { withOrgContext } from '@/lib/db/context';
 import { sendInviteEmail } from '@/lib/email/resend';
 import { canManageOrg } from '@/lib/permissions/can';
 import { type ActionResult } from '@/lib/actions/result';
+import { getOrgMemberIdentities } from '../identities';
+import { isInvitableRole } from '../invitable';
 import {
-  acceptInviteCore,
-  changeMemberRoleCore,
-  removeMemberCore,
-} from './core';
-import { getOrgMemberIdentities } from './identities';
-import { isInvitableRole } from './invitable';
+  INVITE_TTL_DAYS,
+  buildAcceptUrl,
+  currentLocale,
+  isUniqueViolation,
+  isValidEmail,
+  mintToken,
+  normalizeEmail,
+  orgDisplayName,
+} from './helpers';
 
 // One ActionResult everywhere (A4). Coded errors; the UI localizes via
-// resolveActionError. acceptInvite uses ONLY 'declined' for every failure —
-// no oracle for wrong-email vs expired etc.
-
-const INVITE_TTL_DAYS = 7;
-
-function mintToken() {
-  const raw = randomBytes(32).toString('base64url');
-  const hash = createHash('sha256').update(raw).digest('hex');
-  return { raw, hash };
-}
-
-function normalizeEmail(email: string): string {
-  return email.trim().toLowerCase();
-}
-
-function isValidEmail(email: string): boolean {
-  return /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email);
-}
-
-function isUniqueViolation(e: unknown): boolean {
-  return (
-    typeof e === 'object' &&
-    e !== null &&
-    (e as { code?: string }).code === '23505'
-  );
-}
-
-async function currentLocale(): Promise<string> {
-  try {
-    return await getLocale();
-  } catch {
-    return process.env.NEXT_PUBLIC_DEFAULT_LOCALE ?? 'ar-EG';
-  }
-}
-
-/**
- * Absolute origin for invite links. Prefers NEXT_PUBLIC_APP_URL when set,
- * otherwise derives it from the request headers. THROWS if no origin can be
- * determined — never emits a relative/empty link.
- */
-async function resolveOrigin(): Promise<string> {
-  const override = process.env.NEXT_PUBLIC_APP_URL?.trim().replace(/\/$/, '');
-  if (override) return override;
-
-  const h = await headers();
-  const host = h.get('x-forwarded-host') ?? h.get('host');
-  const proto = h.get('x-forwarded-proto') ?? 'https';
-  if (!host) {
-    throw new Error('cannot resolve request origin for invite link');
-  }
-  return `${proto}://${host}`;
-}
-
-async function buildAcceptUrl(
-  locale: string,
-  rawToken: string,
-): Promise<string> {
-  const origin = await resolveOrigin();
-  return `${origin}/${locale}/invite/${rawToken}`;
-}
-
-async function orgDisplayName(ctx: OrgContext): Promise<string> {
-  const [org] = await withOrgContext(ctx, (tx) =>
-    tx
-      .select({ nameEn: organizations.nameEn, nameAr: organizations.nameAr })
-      .from(organizations)
-      .limit(1),
-  );
-  return org?.nameEn || org?.nameAr || 'Metra';
-}
+// resolveActionError.
 
 // --- Invite ----------------------------------------------------------------
 export async function inviteMember(input: {
@@ -271,67 +199,4 @@ export async function revokeInvite(id: string): Promise<ActionResult> {
     return { ok: false, error: 'invalid' };
   }
   return { ok: true };
-}
-
-// --- Change role / remove member (delegate to pure cores) ------------------
-export async function changeMemberRole(input: {
-  userId: string;
-  role: MemberRole;
-}): Promise<ActionResult> {
-  const ctx = await requireOrg();
-  return changeMemberRoleCore(ctx, input);
-}
-
-export async function removeMember(userId: string): Promise<ActionResult> {
-  const ctx = await requireOrg();
-  return removeMemberCore(ctx, userId);
-}
-
-// --- Accept invite ---------------------------------------------------------
-// Wrapper does session + token lookup + expiry/email validation, then delegates
-// the claim/membership/F4 to acceptInviteCore. Every failure -> generic
-// 'declined' (no oracle). On success, sets the active-org cookie.
-export async function acceptInvite(rawToken: string): Promise<ActionResult> {
-  const DECLINED: ActionResult = { ok: false, error: 'declined' };
-
-  const user = await getSessionUser();
-  if (!user?.email) return DECLINED;
-
-  const tokenHash = createHash('sha256')
-    .update(String(rawToken ?? ''))
-    .digest('hex');
-
-  try {
-    const rows = (await withUserContext(user.id, (tx) =>
-      tx.execute(
-        sql`select id, org_id, email, role, status, expires_at
-            from public.app_invitation_by_token(${tokenHash})`,
-      ),
-    )) as unknown as Array<{
-      id: string;
-      org_id: string;
-      email: string;
-      role: MemberRole;
-      status: string;
-      expires_at: string;
-    }>;
-
-    const inv = rows[0];
-    if (!inv) return DECLINED;
-    if (new Date(inv.expires_at).getTime() <= Date.now()) return DECLINED;
-    if (inv.email.toLowerCase() !== user.email.toLowerCase()) return DECLINED;
-
-    const res = await acceptInviteCore(
-      { orgId: inv.org_id, userId: user.id, role: inv.role, email: user.email },
-      inv.id,
-    );
-    if (!res.ok) return DECLINED;
-
-    const cookieStore = await cookies();
-    cookieStore.set(ACTIVE_ORG_COOKIE, inv.org_id, activeOrgCookieOptions());
-    return res;
-  } catch (e) {
-    console.error('acceptInvite failed:', e);
-    return DECLINED;
-  }
 }

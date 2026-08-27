@@ -1,12 +1,9 @@
-// Variation-order core: createVariationDraftCore + saveVariationDraftCore. The
-// lifecycle transitions (internal approve / issue) live in ./lifecycle; both are
-// re-exported here so `@/lib/variations/core` is the one import surface. The
-// server recomputes EVERY line total + the netDelta from the money engine and
-// never trusts a client-supplied total (Money law). A VO line may be a NEGATIVE
-// de-scope (negative qty), so netDelta may be negative.
+// Variation-order draft edits: saveVariationDraftCore. The server recomputes EVERY
+// line total + the netDelta from the money engine and never trusts a client-supplied
+// total (Money law). A VO line may be a NEGATIVE de-scope (negative qty), so
+// netDelta may be negative.
 import {
   contractLines,
-  contracts,
   variationOrderLines,
   variationOrders,
   type CostItemUnit,
@@ -16,7 +13,6 @@ import { fail, mutateInOrg } from '@/lib/actions/mutate';
 import { err, type ActionResult } from '@/lib/actions/result';
 import { computeVariationNetDelta } from '@/lib/aggregates/contract-value';
 import { computeLine } from '@/lib/aggregates/proposal-totals';
-import { allocateNumber } from '@/lib/db/allocate-number';
 import type { OrgContext } from '@/lib/db/context';
 import {
   chunk,
@@ -28,9 +24,7 @@ import {
   withinMagnitude,
 } from '@/lib/proposals/core';
 import { MONEY_RE } from '@/lib/aggregates/proposal-totals';
-
-const UUID_RE =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+import { UUID_RE } from './shared';
 
 /** Signed money string (allows a negative de-scope qty), or null if malformed. */
 function normalizeSignedMoney(v: string | null | undefined): string | null {
@@ -38,75 +32,6 @@ function normalizeSignedMoney(v: string | null | undefined): string | null {
   if (s === undefined || s === '') return '0';
   if (!MONEY_RE.test(s)) return null;
   return s;
-}
-
-export interface CreateVariationDraftInput {
-  contractId: string;
-  titleAr?: string | null;
-  titleEn?: string | null;
-  reasonAr?: string | null;
-  reasonEn?: string | null;
-}
-
-/**
- * Create a DRAFT variation order against an ISSUED or SIGNED contract. Gate
- * variations_draft/create. Allocates the per-org VO number (VO-YYYY-NNNN).
- */
-export async function createVariationDraftCore(
-  ctx: OrgContext,
-  input: CreateVariationDraftInput,
-): Promise<ActionResult> {
-  const contractId = input.contractId?.trim();
-  if (!contractId || !UUID_RE.test(contractId)) return err('invalid');
-  const titleAr = normalizeText(input.titleAr);
-  const titleEn = normalizeText(input.titleEn);
-  if (!titleAr && !titleEn) return err('name_required');
-
-  return mutateInOrg(
-    ctx,
-    { capability: 'variations_draft', action: 'create' },
-    async (tx, audit) => {
-      const [contract] = await tx
-        .select({ status: contracts.status, projectId: contracts.projectId })
-        .from(contracts)
-        .where(eq(contracts.id, contractId))
-        .limit(1);
-      if (!contract) fail('invalid');
-      if (contract.status !== 'issued' && contract.status !== 'signed') {
-        fail('contract_not_issued');
-      }
-
-      const number = await allocateNumber(
-        tx,
-        ctx.orgId,
-        'variation_orders',
-        'variation_orders',
-        'number',
-      );
-      const [row] = await tx
-        .insert(variationOrders)
-        .values({
-          orgId: ctx.orgId,
-          number,
-          contractId,
-          projectId: contract.projectId,
-          titleAr,
-          titleEn,
-          reasonAr: normalizeText(input.reasonAr),
-          reasonEn: normalizeText(input.reasonEn),
-        })
-        .returning({ id: variationOrders.id });
-
-      await audit({
-        entity: 'variation_order',
-        entityId: row.id,
-        action: 'create',
-        before: null,
-        after: { number, contract_id: contractId },
-      });
-      return row.id;
-    },
-  );
 }
 
 export interface VariationLineInput {
@@ -305,8 +230,3 @@ export async function saveVariationDraftCore(
     },
   );
 }
-
-export {
-  internalApproveVariationCore,
-  issueVariationCore,
-} from './lifecycle';

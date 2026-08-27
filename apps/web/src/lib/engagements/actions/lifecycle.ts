@@ -1,40 +1,19 @@
 'use server';
 
-import { getLocale } from 'next-intl/server';
 import { revalidatePath } from 'next/cache';
-import { headers } from 'next/headers';
 import type { ActionResult } from '@/lib/actions/result';
 import { requireOrg } from '@/lib/auth/require-org';
-import type { SignedUpload } from '@/lib/storage';
-import {
-  mintDeliveryLinkCore,
-  revokeDeliveryLinkCore,
-  rotateDeliveryLinkCore,
-} from './share';
 import {
   recordRomAcknowledgementCore,
   type RecordRomAcknowledgementInput,
-} from './approvals';
-import { recordArtifactCore, type RecordArtifactInput } from './artifacts';
-import { createEngagementCore, type CreateEngagementInput } from './core';
-import {
-  attachDeliverableCore,
-  createDeliverableUploadCore,
-  getDeliverableUrlCore,
-  type AttachDeliverableInput,
-  type CreateDeliverableUploadInput,
-} from './deliverable-uploads';
-import { executeTransition } from './executor';
-import {
-  logPaymentAndAdvanceCore,
-  type LogPaymentAndAdvanceInput,
-} from './pay-and-advance';
-import { recordPaymentCore, type RecordPaymentInput } from './payments';
-import { setEngagementRomCore, type SetEngagementRomInput } from './rom';
+} from '../approvals';
+import { createEngagementCore, type CreateEngagementInput } from '../core';
+import { executeTransition } from '../executor';
+import { setEngagementRomCore, type SetEngagementRomInput } from '../rom';
 import type {
   GenerateFeeSchedulePayload,
   RequestRevisionPayload,
-} from './transitions';
+} from '../transitions';
 
 /**
  * Server-action wrapper for {@link createEngagementCore}: resolves the request's
@@ -283,60 +262,6 @@ export async function rejectDesign(
 }
 
 /**
- * Server-action wrapper for {@link recordPaymentCore}: resolves the request's org
- * context, appends one cleared payment to the append-only ledger, and revalidates
- * the shell on success. Returns the ActionResult (with the new payment id in
- * `data`) — never throws to the client. This is the manual finance ledger; there
- * is no gateway.
- */
-export async function recordPayment(
-  input: RecordPaymentInput,
-): Promise<ActionResult & { data?: string }> {
-  const ctx = await requireOrg();
-  const res = await recordPaymentCore(ctx, input);
-  if (res.ok) revalidatePath('/', 'layout');
-  return res;
-}
-
-/**
- * Server-action wrapper for {@link logPaymentAndAdvanceCore} — the Hero's combined
- * "Log payment & advance" (Epic D, Slice 3). Resolves the org context, runs the
- * sequential core (record payment → advance), and revalidates the shell WHENEVER
- * the payment persisted (even if the advance guard still blocks), so the ledger +
- * re-checked gate preview refresh. Returns the transition's ActionResult (or the
- * payment error) — never throws to the client.
- */
-export async function logPaymentAndAdvance(
-  engagementId: string,
-  input: LogPaymentAndAdvanceInput,
-): Promise<ActionResult> {
-  const ctx = await requireOrg();
-  const { paymentRecorded, ...result } = await logPaymentAndAdvanceCore(
-    ctx,
-    engagementId,
-    input,
-  );
-  if (paymentRecorded) revalidatePath('/', 'layout');
-  return result;
-}
-
-/**
- * Server-action wrapper for {@link recordArtifactCore}: resolves the request's
- * org context, records (and thereby attests) one engagement artifact, and
- * revalidates the shell on success. Returns the ActionResult (with the new
- * artifact id in `data`) — never throws to the client. The artifact is the stored
- * spatial base that the `spatialBaseReady` guard reads to admit survey -> layout.
- */
-export async function recordArtifact(
-  input: RecordArtifactInput,
-): Promise<ActionResult & { data?: string }> {
-  const ctx = await requireOrg();
-  const res = await recordArtifactCore(ctx, input);
-  if (res.ok) revalidatePath('/', 'layout');
-  return res;
-}
-
-/**
  * Server-action wrapper for {@link setEngagementRomCore}: resolves the request's
  * org context, writes the coarse build-cost band (ROM low/high), and revalidates
  * the shell on success. Returns the ActionResult — never throws to the client.
@@ -366,116 +291,4 @@ export async function recordRomAcknowledgement(
   const res = await recordRomAcknowledgementCore(ctx, input);
   if (res.ok) revalidatePath('/', 'layout');
   return res;
-}
-
-/**
- * Absolute origin for a client share link. Prefers the public NEXT_PUBLIC_APP_URL
- * env var (never a secret), else derives it from the request headers. Mirrors the
- * proposal/contract share-link origin resolver.
- */
-async function resolveOrigin(): Promise<string> {
-  const override = process.env.NEXT_PUBLIC_APP_URL?.trim().replace(/\/$/, '');
-  if (override) return override;
-  const h = await headers();
-  const host = h.get('x-forwarded-host') ?? h.get('host');
-  const proto = h.get('x-forwarded-proto') ?? 'https';
-  if (!host) throw new Error('cannot resolve request origin for share link');
-  return `${proto}://${host}`;
-}
-
-/** Build the durable public portal URL for a freshly-minted RAW token. */
-async function deliveryLink(rawToken: string): Promise<string> {
-  let locale = 'ar-EG';
-  try {
-    locale = await getLocale();
-  } catch {
-    /* default locale */
-  }
-  const origin = await resolveOrigin();
-  return `${origin}/${locale}/d/${rawToken}`;
-}
-
-/**
- * Server-action wrapper for {@link mintDeliveryLinkCore}: mints the FIRST client
- * share link and returns its absolute URL ONCE (`link`) — the raw token is never
- * re-retrievable. Revalidates the shell on success. Never throws to the client.
- */
-export async function shareDeliveryLink(
-  engagementId: string,
-): Promise<ActionResult & { link?: string }> {
-  const ctx = await requireOrg();
-  const res = await mintDeliveryLinkCore(ctx, engagementId);
-  if (!res.ok || !res.data) return { ok: res.ok, error: res.error };
-  const link = await deliveryLink(res.data);
-  revalidatePath('/', 'layout');
-  return { ok: true, link };
-}
-
-/**
- * Server-action wrapper for {@link rotateDeliveryLinkCore}: replaces the link
- * (the previous token stops working) and returns the fresh absolute URL ONCE.
- * Revalidates the shell on success. Never throws to the client.
- */
-export async function rotateDeliveryLink(
-  engagementId: string,
-): Promise<ActionResult & { link?: string }> {
-  const ctx = await requireOrg();
-  const res = await rotateDeliveryLinkCore(ctx, engagementId);
-  if (!res.ok || !res.data) return { ok: res.ok, error: res.error };
-  const link = await deliveryLink(res.data);
-  revalidatePath('/', 'layout');
-  return { ok: true, link };
-}
-
-/**
- * Server-action wrapper for {@link revokeDeliveryLinkCore}: turns the client link
- * off (the portal 404s). Revalidates the shell on success. Never throws.
- */
-export async function revokeDeliveryLink(
-  engagementId: string,
-): Promise<ActionResult> {
-  const ctx = await requireOrg();
-  const res = await revokeDeliveryLinkCore(ctx, engagementId);
-  if (res.ok) revalidatePath('/', 'layout');
-  return res;
-}
-
-/**
- * Server-action wrapper for {@link createDeliverableUploadCore}: resolves the
- * org context and mints a signed upload URL for a delivery deliverable (2D
- * layout / 3D render / BOQ). Returns the SignedUpload on success, or an
- * ActionResult with the rejection code — never throws to the client.
- */
-export async function createDeliverableUpload(
-  input: CreateDeliverableUploadInput,
-): Promise<SignedUpload | ActionResult> {
-  const ctx = await requireOrg();
-  return createDeliverableUploadCore(ctx, input);
-}
-
-/**
- * Server-action wrapper for {@link attachDeliverableCore}: resolves the org
- * context, attaches the uploaded file to the engagement (records the category's
- * attested artifact), and revalidates the shell on success. Returns the
- * ActionResult (new artifact id in `data`) — never throws to the client.
- */
-export async function attachDeliverable(
-  input: AttachDeliverableInput,
-): Promise<ActionResult & { data?: string }> {
-  const ctx = await requireOrg();
-  const res = await attachDeliverableCore(ctx, input);
-  if (res.ok) revalidatePath('/', 'layout');
-  return res;
-}
-
-/**
- * Server-action wrapper for {@link getDeliverableUrlCore}: resolves the org
- * context and returns a 300s signed download URL for an engagement file — never
- * throws to the client.
- */
-export async function getDeliverableUrl(
-  fileId: string,
-): Promise<ActionResult & { url?: string }> {
-  const ctx = await requireOrg();
-  return getDeliverableUrlCore(ctx, fileId);
 }
