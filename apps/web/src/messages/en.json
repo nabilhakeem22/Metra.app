@@ -1681,5 +1681,46 @@
       "raised": "Raised",
       "settled": "Settled"
     }
+  },
+  "delivery": {
+    "share": {
+      "title": "Share with client",
+      "notSharedHint": "Create a private link the client can open to follow this delivery — no login needed.",
+      "sharedHint": "A private link is active. The link isn't shown again — rotate to reveal a fresh one, or revoke to turn it off.",
+      "shareCta": "Share with client",
+      "copyLink": "Copy link",
+      "copied": "Copied",
+      "revealOnce": "Copy this link now — it won't be shown again.",
+      "rotate": "Rotate link",
+      "revoke": "Revoke",
+      "error": "Something went wrong. Please try again."
+    },
+    "notFound": {
+      "title": "This link is no longer available",
+      "body": "The link may have expired or been turned off. Please contact your design team for an up-to-date link."
+    },
+    "forClient": "For {name}",
+    "stageEyebrow": "Where we are",
+    "budget": {
+      "title": "Estimated budget",
+      "hint": "A rough range for the construction budget, shared for your planning.",
+      "range": "{low} – {high}"
+    },
+    "payments": {
+      "title": "Payment schedule",
+      "total": "Total"
+    },
+    "milestone": {
+      "deposit": "Deposit",
+      "gate_a": "First installment",
+      "gate_b": "Second installment",
+      "balance": "Final payment"
+    },
+    "status": {
+      "paid": "Paid",
+      "partial": "Partly paid",
+      "due": "Due"
+    },
+    "poweredBy": "Shared with you by {firm}"
   }
 }

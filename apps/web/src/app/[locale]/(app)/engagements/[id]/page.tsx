@@ -8,6 +8,7 @@ import { pickLocale } from '@/lib/i18n/pick-locale';
 import { getEngagementGatePreview } from '@/lib/engagements/gate-preview';
 import { computeCommercialPulse } from '@/lib/engagements/pulse';
 import {
+  getDeliveryShareStatus,
   getEngagementArtifacts,
   getEngagementChangeOrders,
   getEngagementEvents,
@@ -20,6 +21,7 @@ import { canRunTrigger, legalTriggersFrom } from '@/lib/engagements/ui';
 import { docYear, formatDocNumber } from '@/lib/format/doc-number';
 import { can } from '@/lib/permissions/can';
 import { EngagementDetailClient } from './engagement-detail-client';
+import { DeliveryShareLink } from './share-link';
 
 export default async function EngagementDetailPage({
   params,
@@ -56,6 +58,7 @@ export default async function EngagementDetailPage({
     changeOrders,
     transitions,
     gatePreview,
+    shareStatus,
   ] = await Promise.all([
     getEngagementFeeSchedule(ctx, id),
     getEngagementPayments(ctx, id),
@@ -64,7 +67,11 @@ export default async function EngagementDetailPage({
     getEngagementChangeOrders(ctx, id),
     getEngagementTransitions(ctx, id),
     getEngagementGatePreview(ctx, id),
+    getDeliveryShareStatus(ctx, id),
   ]);
+
+  // Owner/admin only — the §2.2 `engagements_issue` cell that mints client links.
+  const canShare = can(ctx.role, 'engagements_issue', 'approve');
 
   // The commercial pulse: a pure read-model over the fee schedule + payments the
   // page has ALREADY loaded (no extra DB round-trip). Serialized scale-4 strings +
@@ -134,6 +141,13 @@ export default async function EngagementDetailPage({
         title={formatDocNumber('DE', header.number, docYear(null, header.createdAt))}
         description={t('subtitle')}
       />
+      {canShare && (
+        <DeliveryShareLink
+          engagementId={id}
+          initialShared={shareStatus.shared}
+          canShare={canShare}
+        />
+      )}
       <EngagementDetailClient
         header={header}
         feeSchedule={feeSchedule}

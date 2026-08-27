@@ -33,6 +33,7 @@ export default function robots(): MetadataRoute.Robots {
         '/*/p/',
         '/*/c/',
         '/*/v/',
+        '/*/d/',
         '/*/invite/',
       ],
     },

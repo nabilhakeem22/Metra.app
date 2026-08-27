@@ -771,3 +771,107 @@ begin
   return 'ok';
 end
 $$;
+
+-- =============================================================================
+-- Client Delivery Portal (P1) — session-less read snapshot
+-- =============================================================================
+
+-- Public share: fetch ONE design delivery by its token hash as a client-safe JSON
+-- snapshot. SECURITY DEFINER — the token IS the authorization (no session, no org
+-- GUC). Resolves exactly the one delivery whose token_hash = p_hash, and only
+-- while the link is live (share_expires_at is null OR in the future). A revoked
+-- link (token_hash set to null) can never match a non-null p_hash, so revoke =>
+-- null => the portal 404s.
+--
+-- COST-SAFE BY CONSTRUCTION. This function PHYSICALLY selects ONLY the columns
+-- enumerated below — every cost/margin/build-cost/token/internal column is simply
+-- never referenced (omission, not a filter), mirroring app_proposal_by_token.
+--
+-- Columns exposed (the WHOLE surface):
+--   design_engagements: id, number, state (raw key — the TS layer maps to a
+--     client-friendly label), off_plan, title_ar, title_en, created_at,
+--     design_fee (as design_fee_total — the fee the CLIENT pays, not a cost),
+--     rom_low, rom_high (the client-acknowledged budget band), share_expires_at
+--   organizations (the firm): name_ar, name_en, logo_file_id
+--   clients (the end client): name_ar, name_en
+--   engagement_milestones: kind, basis, sort_order, value (only as an input to
+--     the client's amount_due — the raw basis value is not leaked as cost)
+--   payment_events: amount (aggregated per kind into amount_cleared)
+--
+-- PHYSICALLY OMITTED (never referenced): design_engagements.render_manifest_hash,
+--   renders_ready_at, revision_count, free_revision_n, as_built_due,
+--   concept_locked_at, token_hash, updated_at, org_id, client_id, project_id;
+--   payment_events.method/reference/note/recorded_by/idempotency_key; every
+--   proposal/contract/cost_item cost column (unit_cost/line_cost/total_cost/
+--   *_margin/supervision/BOQ build cost) — none are in this query's tables and
+--   none are joined in. No actor / internal-notes field is exposed.
+create or replace function public.app_delivery_by_token(p_hash text)
+returns jsonb
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select jsonb_build_object(
+    'id', de.id,
+    'number', de.number,
+    'state', de.state,
+    'off_plan', de.off_plan,
+    'title_ar', de.title_ar,
+    'title_en', de.title_en,
+    'created_at', de.created_at,
+    'design_fee_total', de.design_fee::text,
+    'rom', case
+      when de.rom_low is null and de.rom_high is null then null
+      else jsonb_build_object('low', de.rom_low::text, 'high', de.rom_high::text)
+    end,
+    'share_expires_at', de.share_expires_at,
+    'firm', jsonb_build_object(
+      'name_ar', o.name_ar,
+      'name_en', o.name_en,
+      'logo_file_id', o.logo_file_id
+    ),
+    'client', jsonb_build_object(
+      'name_ar', c.name_ar,
+      'name_en', c.name_en
+    ),
+    'payment_schedule', coalesce((
+      select jsonb_agg(ms order by ms_sort)
+      from (
+        select m.sort_order as ms_sort,
+          jsonb_build_object(
+            'milestone_kind', m.kind,
+            'basis', m.basis,
+            'amount_due', due.amount::text,
+            -- scale-4 for both branches (the `0` literal would otherwise render "0")
+            'amount_cleared', coalesce(cl.cleared, 0)::numeric(18, 4)::text,
+            'status', case
+              when coalesce(cl.cleared, 0) >= due.amount then 'paid'
+              when coalesce(cl.cleared, 0) > 0 then 'partial'
+              else 'due'
+            end
+          ) as ms
+        from public.engagement_milestones m
+        cross join lateral (
+          select case
+            when m.basis = 'percent'
+              then round(coalesce(de.design_fee, 0) * m.value / 100, 4)
+            else m.value
+          end as amount
+        ) due
+        left join lateral (
+          select sum(pe.amount) as cleared
+          from public.payment_events pe
+          where pe.engagement_id = de.id
+            and pe.kind::text = m.kind::text
+        ) cl on true
+        where m.engagement_id = de.id
+      ) mx
+    ), '[]'::jsonb)
+  )
+  from public.design_engagements de
+  join public.organizations o on o.id = de.org_id
+  join public.clients c on c.id = de.client_id
+  where de.token_hash = p_hash
+    and (de.share_expires_at is null or de.share_expires_at > now());
+$$;
