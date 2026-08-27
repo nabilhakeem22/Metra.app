@@ -40,6 +40,7 @@ export function EngagementDetailClient({
   transitions,
   nextActions,
   capabilities,
+  canUpload,
   gatePreview,
   canAdvance,
   stallDays,
@@ -54,6 +55,7 @@ export function EngagementDetailClient({
   transitions: EngagementTransitionRecord[];
   nextActions: Trigger[];
   capabilities: ControlCapabilities;
+  canUpload: boolean;
   gatePreview: EngagementGatePreview;
   canAdvance: boolean;
   stallDays: number | null;
@@ -168,7 +170,9 @@ export function EngagementDetailClient({
 
         {/* RIGHT RAIL: pinned working files → collapsible ledger → activity. */}
         <EngagementRightRail
+          engagementId={header.id}
           artifacts={artifacts}
+          canUpload={canUpload}
           feeSchedule={feeSchedule}
           transitions={transitions}
           events={events}

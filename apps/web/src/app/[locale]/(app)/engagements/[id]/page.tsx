@@ -158,6 +158,7 @@ export default async function EngagementDetailPage({
         transitions={transitions}
         nextActions={nextActions}
         capabilities={capabilities}
+        canUpload={can(ctx.role, 'engagements_design', 'create')}
         gatePreview={gatePreview}
         canAdvance={canAdvance}
         stallDays={stallDays}

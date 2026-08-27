@@ -71,7 +71,8 @@ export type ActionCode =
   | 'payment_kind_mismatch'
   | 'firm_type_unavailable'
   | 'project_delivery_exists'
-  | 'project_delivery_limit_reached';
+  | 'project_delivery_limit_reached'
+  | 'file_too_large';
 
 export interface ActionResult {
   ok: boolean;

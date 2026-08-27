@@ -81,6 +81,7 @@ const ALL_CODES: ActionCode[] = [
   'firm_type_unavailable',
   'project_delivery_exists',
   'project_delivery_limit_reached',
+  'file_too_large',
 ];
 
 describe('problem+json envelope', () => {

@@ -18,12 +18,16 @@ import { FeePanel, TimelinePanel } from './engagement-panels';
 // adds to the cockpit blur budget. Logical CSS only (RTL mirrors).
 
 export function EngagementRightRail({
+  engagementId,
   artifacts,
+  canUpload,
   feeSchedule,
   transitions,
   events,
 }: {
+  engagementId: string;
   artifacts: EngagementArtifactRecord[];
+  canUpload: boolean;
   feeSchedule: EngagementFeeSchedule;
   transitions: EngagementTransitionRecord[];
   events: EngagementEventRecord[];
@@ -33,7 +37,11 @@ export function EngagementRightRail({
 
   return (
     <div className="space-y-4">
-      <EngagementFilesTray artifacts={artifacts} />
+      <EngagementFilesTray
+        artifacts={artifacts}
+        engagementId={engagementId}
+        canUpload={canUpload}
+      />
 
       <CockpitDrawerCard
         title={t('panels.fee')}
