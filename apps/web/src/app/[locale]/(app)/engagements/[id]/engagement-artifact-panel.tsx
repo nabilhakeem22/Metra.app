@@ -26,7 +26,7 @@ const ARTIFACT_KINDS: EngagementArtifactKind[] = [
   'boq',
 ];
 
-// The "record an artifact" panel of EngagementControls. All state lives in the
+// The "record an artifact" panel of the cockpit toolbar. All state lives in the
 // parent and arrives via props (verbatim JSX); `after` closes the panel on success.
 export function ArtifactPanel({
   t,

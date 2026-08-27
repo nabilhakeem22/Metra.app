@@ -7,7 +7,7 @@ import type { ActionResult } from '@/lib/actions/result';
 import { setEngagementRom } from '@/lib/engagements/actions';
 import { FormActions } from './engagement-form-actions';
 
-// The "set ROM range" panel of EngagementControls. All state lives in the parent
+// The "set ROM range" panel of the cockpit toolbar. All state lives in the parent
 // and arrives via props (verbatim JSX); `after` closes the panel on success.
 export function RomPanel({
   t,

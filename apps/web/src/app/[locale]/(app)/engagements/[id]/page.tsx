@@ -22,6 +22,7 @@ import { canRunTrigger, legalTriggersFrom } from '@/lib/engagements/ui';
 import { docYear, formatDocNumber } from '@/lib/format/doc-number';
 import { can } from '@/lib/permissions/can';
 import { EngagementDetailClient } from './engagement-detail-client';
+import { DELIVERY_SHARE_ANCHOR_ID } from './share-anchor';
 import { DeliveryShareLink } from './share-link';
 
 export default async function EngagementDetailPage({
@@ -145,11 +146,13 @@ export default async function EngagementDetailPage({
         description={t('subtitle')}
       />
       {canShare && (
-        <DeliveryShareLink
-          engagementId={id}
-          initialShared={shareStatus.shared}
-          canShare={canShare}
-        />
+        <div id={DELIVERY_SHARE_ANCHOR_ID} tabIndex={-1} className="scroll-mt-4 outline-none">
+          <DeliveryShareLink
+            engagementId={id}
+            initialShared={shareStatus.shared}
+            canShare={canShare}
+          />
+        </div>
       )}
       <EngagementDetailClient
         header={header}
@@ -163,6 +166,7 @@ export default async function EngagementDetailPage({
         nextActions={nextActions}
         capabilities={capabilities}
         canUpload={can(ctx.role, 'engagements_design', 'create')}
+        canShare={canShare}
         gatePreview={gatePreview}
         canAdvance={canAdvance}
         stallDays={stallDays}

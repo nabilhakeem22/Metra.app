@@ -1538,6 +1538,36 @@
       "title": "Next actions",
       "none": "No actions available from this stage."
     },
+    "command": {
+      "readyHeadline": "Ready to advance to {phase}",
+      "readyHint": "Everything checks out — advance when you're ready.",
+      "blockedStudioHeadline": "Your move: {action}",
+      "blockedStudioHint": "Finish this on your side to unlock the next stage.",
+      "blockedClientHeadline": "Waiting on the client",
+      "blockedClientHint": "Everything on your side is done.",
+      "advanceBlockedNote": "Blocked on: {blocker}",
+      "nudge": "Nudge client",
+      "nudgeHint": "Reveal the client link so you can follow up.",
+      "closedHeadline": "This delivery is closed"
+    },
+    "toolbar": {
+      "payment": {
+        "name": "Log a payment",
+        "purpose": "Record money received against a milestone."
+      },
+      "deliverable": {
+        "name": "Add a deliverable",
+        "purpose": "Attach a survey, layout, render or drawing."
+      },
+      "budget": {
+        "name": "Set budget range",
+        "purpose": "Record the rough order-of-magnitude cost band."
+      },
+      "onBehalf": {
+        "name": "Record on client's behalf",
+        "purpose": "Log a client acknowledgement you took offline."
+      }
+    },
     "feeForm": {
       "title": "Submit design fee",
       "designFee": "Design fee",

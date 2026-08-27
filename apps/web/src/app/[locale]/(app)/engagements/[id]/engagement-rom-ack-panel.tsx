@@ -7,7 +7,7 @@ import type { ActionResult } from '@/lib/actions/result';
 import { recordRomAcknowledgement } from '@/lib/engagements/actions';
 import { FormActions } from './engagement-form-actions';
 
-// The "record ROM acknowledgement" panel of EngagementControls. All state lives
+// The "record ROM acknowledgement" panel of the cockpit toolbar. All state lives
 // in the parent and arrives via props (verbatim JSX); `after` closes on success.
 export function RomAckPanel({
   t,
