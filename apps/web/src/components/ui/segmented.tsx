@@ -52,7 +52,7 @@ export function Segmented<T extends string>({
               isActive
                 ? {
                     background: 'var(--glass-strong)',
-                    boxShadow: '0 1px 3px rgba(23,34,57,.14)',
+                    boxShadow: '0 1px 3px rgba(58,46,28,.14)',
                   }
                 : undefined
             }

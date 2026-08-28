@@ -52,103 +52,110 @@
     --radius: 0.625rem;
   }
 
-  /* ========== Clear Light (2a) ========== */
+  /* ========== Clear Light (2a) — Warm Stone + Teal + Gold ========== */
   :root,
   [data-theme='light'] {
-    --bg-base: #eef1f6;
-    /* Backdrop is a 3-stop radial wash behind all glass — do not flatten. */
+    --bg-base: #ece7dd; /* warm architectural stone */
+    /* Backdrop is a 3-stop radial wash behind all glass — do not flatten.
+       Warm stone tints + one low-alpha teal breath (no cool blue). */
     --bg-wash: radial-gradient(
         110% 85% at 8% 6%,
-        #d8e5ff 0%,
-        rgba(216, 229, 255, 0) 55%
+        #e4decf 0%,
+        rgba(228, 222, 207, 0) 55%
       ),
-      radial-gradient(85% 75% at 92% 10%, #e7e0fb 0%, rgba(231, 224, 251, 0) 58%),
-      radial-gradient(95% 80% at 60% 105%, #d6eef2 0%, rgba(214, 238, 242, 0) 60%);
+      radial-gradient(85% 75% at 92% 10%, #e0d8c4 0%, rgba(224, 216, 196, 0) 58%),
+      radial-gradient(95% 80% at 60% 105%, #d8e7e0 0%, rgba(216, 231, 224, 0) 60%);
 
     --glass: rgba(255, 255, 255, 0.58);
     --glass-strong: rgba(255, 255, 255, 0.92); /* active segmented thumb */
     --glass-hairline: rgba(255, 255, 255, 0.8);
-    --glass-shadow: 0 16px 40px rgba(23, 34, 57, 0.1);
-    /* Form fields: a brighter/raised fill + a real cool-gray edge so inputs read
+    --glass-shadow: 0 16px 40px rgba(50, 40, 25, 0.1);
+    /* Form fields: a brighter/raised fill + a real warm edge so inputs read
        as distinct wells against the softer --glass card (not the same surface). */
     --field-bg: rgba(255, 255, 255, 0.9);
-    --field-border: rgba(23, 34, 57, 0.16);
-    --field-border-hover: rgba(23, 34, 57, 0.28);
+    --field-border: rgba(58, 46, 28, 0.16);
+    --field-border-hover: rgba(58, 46, 28, 0.28);
     --glass-inner: inset 0 1px 0 rgba(255, 255, 255, 0.9);
 
-    --text: #111418;
-    --text-body: #333a44;
-    --text-muted: #5c6470;
-    --text-faint: #8a919c;
+    --text: #262219;
+    --text-body: #453f37;
+    --text-muted: #6b6457;
+    --text-faint: #9a9286;
 
     /* --brand is consumed by Tailwind as hsl(var(--brand)), so it is defined
-       as an H S% L% triplet in the bridge below (same #2E6BE6 blue), not as
+       as an H S% L% triplet in the bridge below (the teal #157A6E), not as
        the raw hex the handoff lists. --brand-hi/-ink/-grad/-tint/-glow stay
        raw colors for direct use (Tailwind brand.ink / brand.tint / brand-glow). */
-    --brand-hi: #5a8df2; /* gradient top */
-    --brand-ink: #1d4fbf; /* text/icon on tint */
-    --brand-grad: linear-gradient(180deg, #5a8df2, #2e6be6);
-    --brand-tint: rgba(46, 107, 230, 0.14);
-    --brand-tint-border: rgba(46, 107, 230, 0.2);
-    --brand-glow: 0 8px 20px rgba(46, 107, 230, 0.3);
+    --brand-hi: #2fa294; /* gradient top */
+    --brand-ink: #0e5f55; /* text/icon on tint */
+    --brand-grad: linear-gradient(180deg, #2fa294, #157a6e);
+    --brand-tint: rgba(21, 122, 110, 0.14);
+    --brand-tint-border: rgba(21, 122, 110, 0.22);
+    --brand-glow: 0 8px 20px rgba(21, 122, 110, 0.3);
     /* Primary-button lift (hover, shadow y+2) and press (active, halved). */
-    --brand-glow-lift: 0 10px 22px rgba(46, 107, 230, 0.34);
-    --brand-glow-press: 0 4px 10px rgba(46, 107, 230, 0.3);
+    --brand-glow-lift: 0 10px 22px rgba(21, 122, 110, 0.34);
+    --brand-glow-press: 0 4px 10px rgba(21, 122, 110, 0.3);
     /* Secondary-button flat glass fill (no backdrop-filter) + hover (+.08). */
     --glass-btn: rgba(255, 255, 255, 0.62);
     --glass-btn-hover: rgba(255, 255, 255, 0.7);
 
-    --rule: rgba(23, 34, 57, 0.08);
-    --rule-soft: rgba(23, 34, 57, 0.06);
-    --track: rgba(23, 34, 57, 0.07); /* segmented / chip background */
-    --danger: #d93b34;
+    --rule: rgba(58, 46, 28, 0.08);
+    --rule-soft: rgba(58, 46, 28, 0.06);
+    --track: rgba(58, 46, 28, 0.07); /* segmented / chip background */
+    --danger: #c6483a;
+
+    /* Money — gold, reserved for currency surfaces (NOT --warn, NOT --brand).
+       Darkened one notch from the #A2761E anchor so white-on-gold clears AA. */
+    --money: #986c10;
+    --money-tint: rgba(162, 118, 30, 0.15);
+    --money-ink: #7a5713;
 
     /* Semantic status (chips/badges) — NOT the brand accent. Ink + soft tint
        per family so done/warn/danger read distinctly on a glass surface. */
-    --success: #128a5f;
-    --success-tint: rgba(18, 138, 95, 0.14);
+    --success: #12836a;
+    --success-tint: rgba(18, 131, 106, 0.14);
     --warn: #b4791f;
     --warn-tint: rgba(180, 121, 31, 0.15);
-    --danger-tint: rgba(217, 59, 52, 0.13);
+    --danger-tint: rgba(198, 72, 58, 0.13);
 
     /* Gauge arc track (behind the --brand progress arc). */
-    --gauge-track: rgba(23, 34, 57, 0.1);
+    --gauge-track: rgba(58, 46, 28, 0.1);
 
     /* ---- shadcn bridge (light) — every var the app's Tailwind colors read ---- */
-    --background: 216 33% 94%; /* #EBEFF5 */
-    --foreground: 214 17% 8%; /* #111418 */
-    --card: 216 45% 98%; /* near-white glass surface */
-    --card-foreground: 214 17% 8%;
-    --popover: 216 45% 98%;
-    --popover-foreground: 214 17% 8%;
-    --primary: 220 79% 54%; /* #2E6BE6 */
+    --background: 41 26% 89%; /* #ECE7DD warm stone */
+    --foreground: 40 20% 12%; /* #262219 */
+    --card: 40 30% 99%; /* warm near-white glass surface */
+    --card-foreground: 40 20% 12%;
+    --popover: 40 30% 99%;
+    --popover-foreground: 40 20% 12%;
+    --primary: 172 70% 28%; /* #157A6E teal */
     --primary-foreground: 0 0% 100%; /* #FFFFFF */
-    --secondary: 215 21% 89%; /* --track solid */
-    --secondary-foreground: 214 17% 8%;
-    --muted: 215 21% 89%;
-    --muted-foreground: 216 10% 40%; /* #5C6470 */
-    --accent: 215 21% 89%;
-    --accent-foreground: 214 17% 8%; /* = foreground */
-    --destructive: 3 68% 53%; /* #D93B34 */
+    --secondary: 40 16% 88%; /* --track solid, warm */
+    --secondary-foreground: 40 20% 12%;
+    --muted: 40 16% 88%;
+    --muted-foreground: 38 10% 38%; /* #6B6457 */
+    --accent: 40 16% 88%;
+    --accent-foreground: 40 20% 12%; /* = foreground */
+    --destructive: 6 55% 50%; /* #C6483A */
     --destructive-foreground: 0 0% 100%;
-    --border: 215 19% 88%; /* --rule solid */
-    --input: 215 19% 88%;
-    --ring: 220 79% 54%; /* #2E6BE6 */
-    --brand: 220 79% 54%; /* #2E6BE6 */
+    --border: 40 18% 85%; /* --rule solid, warm */
+    --input: 40 18% 85%;
+    --ring: 172 70% 28%; /* #157A6E teal */
+    --brand: 172 70% 28%; /* #157A6E teal */
     --brand-foreground: 0 0% 100%;
-    --brand-strong: 221 74% 43%; /* #1D4FBF (brand ink) */
+    --brand-strong: 174 74% 21%; /* #0E5F55 (brand ink) */
   }
 
-  /* ========== Smoked Dark (2b) ========== */
+  /* ========== Smoked Dark (2b) — Warm Espresso + Teal + Gold ========== */
   [data-theme='dark'] {
-    --bg-base: #0a0e16;
+    --bg-base: #16130e; /* warm espresso-black */
     --bg-wash: radial-gradient(
         105% 85% at 6% 4%,
-        #1d3168 0%,
-        rgba(29, 49, 104, 0) 55%
+        #2a2213 0%,
+        rgba(42, 34, 19, 0) 55%
       ),
-      radial-gradient(85% 75% at 94% 8%, #2b2455 0%, rgba(43, 36, 85, 0) 58%),
-      radial-gradient(95% 85% at 62% 108%, #113545 0%, rgba(17, 53, 69, 0) 60%);
+      radial-gradient(85% 75% at 94% 8%, #23201a 0%, rgba(35, 32, 26, 0) 58%),
+      radial-gradient(95% 85% at 62% 108%, #123832 0%, rgba(18, 56, 50, 0) 60%);
 
     --glass-blur: blur(30px) saturate(160%);
     --glass: rgba(255, 255, 255, 0.06);
@@ -161,60 +168,65 @@
     --glass-shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
     --glass-inner: inset 0 1px 0 rgba(255, 255, 255, 0.14);
 
-    --text: #eef2f8;
-    --text-body: #c3ccdb;
-    --text-muted: #8a96a8;
-    --text-faint: #7e8b9f;
+    --text: #f1ede4;
+    --text-body: #cfc7b8;
+    --text-muted: #a39a88;
+    --text-faint: #8a8173;
 
-    --brand-hi: #7ea9ff;
-    --brand-ink: #8fb3ff;
-    --brand-grad: linear-gradient(180deg, #7ea9ff, #4f7deb); /* label: #0A0E16 */
-    --brand-tint: rgba(109, 154, 245, 0.22);
-    --brand-tint-border: rgba(109, 154, 245, 0.34);
-    --brand-glow: 0 6px 18px rgba(109, 154, 245, 0.28);
-    --brand-glow-lift: 0 8px 20px rgba(109, 154, 245, 0.32);
-    --brand-glow-press: 0 3px 9px rgba(109, 154, 245, 0.28);
+    --brand-hi: #4fc2b0;
+    --brand-ink: #5fd0be;
+    --brand-grad: linear-gradient(180deg, #4fc2b0, #2e9e8c); /* label: #16130E */
+    --brand-tint: rgba(79, 194, 176, 0.22);
+    --brand-tint-border: rgba(79, 194, 176, 0.34);
+    --brand-glow: 0 6px 18px rgba(79, 194, 176, 0.28);
+    --brand-glow-lift: 0 8px 20px rgba(79, 194, 176, 0.32);
+    --brand-glow-press: 0 3px 9px rgba(79, 194, 176, 0.28);
     --glass-btn: rgba(255, 255, 255, 0.1);
     --glass-btn-hover: rgba(255, 255, 255, 0.18);
 
     --rule: rgba(255, 255, 255, 0.1);
     --rule-soft: rgba(255, 255, 255, 0.07);
     --track: rgba(255, 255, 255, 0.07);
-    --danger: #ff6b5e;
+    --danger: #ff7a5e;
+
+    /* Money — gold (dark), reserved for currency surfaces. */
+    --money: #e0b35e;
+    --money-tint: rgba(224, 179, 94, 0.16);
+    --money-ink: #e9c57e;
 
     /* Semantic status (dark). Lightened inks stay AA over the smoked glass. */
-    --success: #4fd9a0;
-    --success-tint: rgba(79, 217, 160, 0.16);
+    --success: #4fd9b0;
+    --success-tint: rgba(79, 217, 176, 0.16);
     --warn: #e0a34f;
     --warn-tint: rgba(224, 163, 79, 0.16);
-    --danger-tint: rgba(255, 107, 94, 0.18);
+    --danger-tint: rgba(255, 122, 94, 0.18);
 
     /* Gauge arc track (dark). */
     --gauge-track: rgba(255, 255, 255, 0.12);
 
     /* ---- shadcn bridge (dark) ---- */
-    --background: 220 38% 6%; /* #0A0E16 */
-    --foreground: 216 42% 95%; /* #EEF2F8 */
-    --card: 220 31% 11%; /* ~#141A26 */
-    --card-foreground: 216 42% 95%;
-    --popover: 220 31% 11%;
-    --popover-foreground: 216 42% 95%;
-    --primary: 220 87% 69%; /* #6D9AF5 */
-    --primary-foreground: 220 38% 6%; /* #0A0E16 */
-    --secondary: 218 17% 13%; /* --track solid */
-    --secondary-foreground: 216 42% 95%;
-    --muted: 218 17% 13%;
-    --muted-foreground: 216 15% 60%; /* #8A96A8 */
-    --accent: 218 17% 13%;
-    --accent-foreground: 216 42% 95%; /* = foreground */
-    --destructive: 5 100% 68%; /* #FF6B5E */
-    --destructive-foreground: 220 38% 6%;
-    --border: 222 13% 16%; /* --rule solid */
-    --input: 222 13% 16%;
-    --ring: 220 87% 69%; /* #6D9AF5 */
-    --brand: 220 87% 69%; /* #6D9AF5 */
-    --brand-foreground: 220 38% 6%;
-    --brand-strong: 221 100% 78%; /* #8FB3FF (brand ink) */
+    --background: 40 20% 7%; /* #16130E warm espresso */
+    --foreground: 40 33% 92%; /* #F1EDE4 */
+    --card: 38 16% 12%; /* warm dark surface */
+    --card-foreground: 40 33% 92%;
+    --popover: 38 16% 12%;
+    --popover-foreground: 40 33% 92%;
+    --primary: 172 52% 46%; /* teal */
+    --primary-foreground: 40 20% 7%; /* #16130E */
+    --secondary: 40 10% 14%; /* --track solid, warm */
+    --secondary-foreground: 40 33% 92%;
+    --muted: 40 10% 14%;
+    --muted-foreground: 40 13% 59%; /* #A39A88 */
+    --accent: 40 10% 14%;
+    --accent-foreground: 40 33% 92%; /* = foreground */
+    --destructive: 10 100% 68%; /* #FF7A5E */
+    --destructive-foreground: 40 20% 7%;
+    --border: 40 8% 16%; /* --rule solid, warm */
+    --input: 40 8% 16%;
+    --ring: 172 52% 46%; /* teal */
+    --brand: 172 52% 46%; /* teal */
+    --brand-foreground: 40 20% 7%;
+    --brand-strong: 172 55% 56%; /* #5FD0BE (brand ink) */
   }
 
   /* No backdrop-filter support: raise opacity instead of shipping
@@ -224,7 +236,7 @@
       --glass: rgba(255, 255, 255, 0.92);
     }
     [data-theme='dark'] {
-      --glass: rgba(20, 26, 38, 0.94);
+      --glass: rgba(35, 31, 26, 0.94);
     }
   }
 

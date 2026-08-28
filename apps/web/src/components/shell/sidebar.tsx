@@ -26,7 +26,7 @@ export interface SidebarProps {
 // the border, text and icon colour track the theme via tokens.
 const ACTIVE_ITEM_STYLE: CSSProperties = {
   background:
-    'linear-gradient(180deg, rgba(90,141,242,.20), rgba(46,107,230,.16))',
+    'linear-gradient(180deg, rgba(21,122,110,.20), rgba(21,122,110,.16))',
   border: '1px solid var(--brand-tint-border)',
   boxShadow: 'inset 0 1px 0 rgba(255,255,255,.6)',
   color: 'var(--brand-ink)',

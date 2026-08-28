@@ -67,8 +67,8 @@ const config: Config = {
         'glass-sm': '14px',
       },
       boxShadow: {
-        soft: '0 1px 2px 0 hsl(198 40% 10% / 0.05), 0 2px 6px -2px hsl(198 40% 10% / 0.08)',
-        card: '0 4px 14px -4px hsl(198 40% 10% / 0.13)',
+        soft: '0 1px 2px 0 hsl(32 30% 10% / 0.05), 0 2px 6px -2px hsl(32 30% 10% / 0.08)',
+        card: '0 4px 14px -4px hsl(32 30% 10% / 0.13)',
         // Theme-aware: resolves to the light or dark glass shadow per data-theme.
         glass: 'var(--glass-shadow), var(--glass-inner)',
         'brand-glow': 'var(--brand-glow)',
