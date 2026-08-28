@@ -25,16 +25,18 @@ function runtimeUrl(): string {
 // Cloudflare/Hyperdrive hop (Hyperdrive terminates TLS to the origin), while
 // off-platform keeps the exact host-derived default every script/test relies on.
 //
-// max:10 tradeoff: on CF this is now the SINGLE instance shared by every
+// max:12 tradeoff: on CF this is now the SINGLE instance shared by every
 // withRequestDb call in a request (see request-connection.ts). The largest known
-// concurrent fan-out is the engagement cockpit's 9-way Promise.all
-// (apps/web/src/app/[locale]/(app)/engagements/[id]/page.tsx); max:10 lets that
-// run in ONE wave instead of queueing into two. Even at max:10 a single shared
-// instance is ~5x fewer sockets than the ~50 that caused the 1102 — which came
-// from ~11 SEPARATE instances × max:5, not from a high ceiling on one pool.
+// concurrent fan-out is the engagement cockpit's 10-way Promise.all
+// (apps/web/src/app/[locale]/(app)/engagements/[id]/page.tsx); max:12 lets that
+// run in ONE wave WITH a small spare, instead of exactly saturating the pool (a
+// prior max:10 matched the 10-way fan-out with ZERO headroom — any 11th
+// overlapping acquire would silently queue into a second wave). Even at max:12 a
+// single shared instance is ~4x fewer sockets than the ~50 that caused the 1102 —
+// which came from ~11 SEPARATE instances × max:5, not a high ceiling on one pool.
 export function createRuntimeConnection(): { db: MetraDb; sql: PostgresJs } {
   const ssl = isCloudflareRuntime() ? { ssl: false as const } : {};
-  return createDb(runtimeUrl(), { prepare: false, max: 10, ...ssl });
+  return createDb(runtimeUrl(), { prepare: false, max: 12, ...ssl });
 }
 
 // Wall-clock ceiling (ms) for a single withRequestDb call on the Cloudflare
