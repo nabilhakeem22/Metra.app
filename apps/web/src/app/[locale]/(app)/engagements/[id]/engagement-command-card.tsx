@@ -7,7 +7,13 @@ import { Button } from '@/components/ui/button';
 import type { ActionResult } from '@/lib/actions/result';
 import { deriveCommandCard } from '@/lib/engagements/command-card';
 import type { EngagementGatePreview } from '@/lib/engagements/gate-preview';
-import { MONEY_GUARD_MILESTONE } from '@/lib/engagements/guards';
+// Import from the LEAF (guards/money), not the guards barrel: the barrel also
+// re-exports GUARDS from ./registry, which would drag the whole guard engine
+// (registry -> readiness/money -> transitions) into THIS client chunk. That heavy,
+// cycle-prone graph can evaluate a binding as `undefined` at client module-init
+// (vitest even deadlocks importing it) and throw at render. The leaf carries only
+// the pure MONEY_GUARD_MILESTONE map + erased types — no registry, no cycle.
+import { MONEY_GUARD_MILESTONE } from '@/lib/engagements/guards/money';
 import { isTerminal, type DesignState } from '@/lib/engagements/states';
 import type { Trigger } from '@/lib/engagements/transitions';
 import { EngagementFeeForm } from './engagement-fee-form';

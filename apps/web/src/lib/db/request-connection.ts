@@ -58,12 +58,24 @@ export function getRequestConnection(): RequestConn {
   // repeat invocation a no-op. A mid-request DbDeadlineError never reaches here —
   // teardown is request-scoped, not per-operation — so a deadline can't close a
   // connection its siblings are still using.
-  after(async () => {
-    store.delete(ctx);
-    if (holder.closed) return;
-    holder.closed = true;
-    ctx.waitUntil(sql.end({ timeout: 5 }));
-  });
+  //
+  // BEST-EFFORT: `after()` must NEVER take down the request. If it is unavailable
+  // or throws in a given runtime context (some OpenNext/Workers render scopes lack
+  // a wired after-context), we swallow it and fall back to the platform reclaiming
+  // the request-scoped socket when the request's IoContext is destroyed at request
+  // end. That degrades a graceful drain to a hard reclaim — NOT a leak (peak
+  // sockets stay <= max for the request) and NOT a 1102 regression — while keeping
+  // the render alive. The graceful drain still runs wherever after() IS wired.
+  try {
+    after(async () => {
+      store.delete(ctx);
+      if (holder.closed) return;
+      holder.closed = true;
+      ctx.waitUntil(sql.end({ timeout: 5 }));
+    });
+  } catch (err) {
+    console.warn('getRequestConnection: after() teardown unavailable', err);
+  }
 
   return { db, sql };
 }

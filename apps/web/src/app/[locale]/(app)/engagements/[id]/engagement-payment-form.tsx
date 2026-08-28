@@ -9,7 +9,10 @@ import { Label } from '@/components/ui/label';
 import type { ActionResult } from '@/lib/actions/result';
 import { logPaymentAndAdvance } from '@/lib/engagements/actions';
 import type { EngagementGatePreview } from '@/lib/engagements/gate-preview';
-import { MONEY_GUARD_MILESTONE } from '@/lib/engagements/guards';
+// Leaf import (guards/money), not the barrel — the barrel also pulls GUARDS from
+// ./registry into this client chunk (heavy, cycle-prone, can init a binding as
+// undefined at render). The leaf is the pure MONEY_GUARD_MILESTONE map only.
+import { MONEY_GUARD_MILESTONE } from '@/lib/engagements/guards/money';
 
 export function PaymentForm({
   engagementId,
