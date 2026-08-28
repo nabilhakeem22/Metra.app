@@ -143,6 +143,7 @@ export const ACTION_CODE_PROBLEM: Record<ActionCode, ApiProblemKind> = {
   firm_type_unavailable: 'bad-request',
   project_delivery_exists: 'conflict',
   project_delivery_limit_reached: 'conflict',
+  claim_not_found: 'bad-request',
   file_too_large: 'bad-request',
 };
 

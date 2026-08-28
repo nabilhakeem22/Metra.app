@@ -9,3 +9,4 @@ export * from './timeline';
 export * from './money';
 export * from './artifacts';
 export * from './client-activity';
+export * from './payment-claims';

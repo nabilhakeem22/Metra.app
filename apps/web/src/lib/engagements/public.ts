@@ -60,6 +60,18 @@ export interface PublicDelivery {
   firm: { nameAr: string | null; nameEn: string | null; logoFileId: string | null };
   client: { nameAr: string | null; nameEn: string | null };
   paymentSchedule: PublicDeliveryMilestone[];
+  /** Client Delivery Portal Phase 3 — the milestones the client MAY "mark as paid"
+   *  right now (ANY unsettled milestone, remaining due > 0). `amountRemaining` is a
+   *  server-locked scale-4 string (the client never sends an amount);
+   *  `hasPendingClaim` is true when an OPEN claim already awaits studio confirmation.
+   *  Null when the snapshot carried no claim object. */
+  paymentClaim: {
+    claimableMilestones: Array<{
+      milestoneKind: string;
+      amountRemaining: string;
+      hasPendingClaim: boolean;
+    }>;
+  } | null;
   /** Client-facing verb tokens the client MAY act on right now (approve_concept,
    *  request_concept_changes, approve_design, request_design_changes,
    *  acknowledge_rom, acknowledge_handoff). Server-computed by the SDF; NEVER a raw
@@ -89,6 +101,37 @@ interface DeliverySnapshot {
   client?: { name_ar?: string | null; name_en?: string | null } | null;
   payment_schedule?: PublicDeliveryMilestone[] | null;
   client_actions?: string[] | null;
+  claim?: {
+    claimable_milestones?: Array<{
+      milestone_kind?: string | null;
+      amount_remaining?: string | null;
+      has_pending_claim?: boolean | null;
+    } | null> | null;
+  } | null;
+}
+
+/** One raw claimable-milestone row from the SDF `claim.claimable_milestones`. */
+interface ClaimableMilestoneRow {
+  milestone_kind: string;
+  amount_remaining: string;
+  has_pending_claim?: boolean | null;
+}
+
+/**
+ * A claimable-milestone row is renderable only when it carries the two fields the
+ * portal dereferences: a non-empty `milestone_kind` and a string `amount_remaining`.
+ * Anything else (a null hole, a stray shape) is dropped — never rendered — so a
+ * malformed row can neither crash nor mislead. `has_pending_claim` is read null-safe.
+ */
+function isRenderableClaim(row: unknown): row is ClaimableMilestoneRow {
+  if (!row || typeof row !== 'object') return false;
+  const candidate = row as Record<string, unknown>;
+  return (
+    typeof candidate.milestone_kind === 'string' &&
+    candidate.milestone_kind.length > 0 &&
+    typeof candidate.amount_remaining === 'string' &&
+    candidate.amount_remaining.length > 0
+  );
 }
 
 const STATE_SET = new Set<string>(DESIGN_STATES);
@@ -173,6 +216,19 @@ export async function getDeliveryByToken(
         )
       : [];
 
+    // Null-safe claim mapping: a missing/non-array claim object degrades to null
+    // (the portal renders no claim surface), never a crash.
+    const rawClaims = snapshot.claim?.claimable_milestones;
+    const paymentClaim = Array.isArray(rawClaims)
+      ? {
+          claimableMilestones: rawClaims.filter(isRenderableClaim).map((row) => ({
+            milestoneKind: row.milestone_kind,
+            amountRemaining: row.amount_remaining,
+            hasPendingClaim: row.has_pending_claim === true,
+          })),
+        }
+      : null;
+
     return {
       id: hasId ? (snapshot.id as string) : '',
       number,
@@ -197,6 +253,7 @@ export async function getDeliveryByToken(
         nameEn: client.name_en ?? null,
       },
       paymentSchedule,
+      paymentClaim,
       clientActions,
     };
   } catch {
@@ -246,6 +303,52 @@ export async function recordDeliveryActionByToken(
     db.execute(sql`select public.app_delivery_respond_by_token(
       ${hash}, ${input.action}, ${input.note ?? null}, ${input.actorName ?? null},
       ${input.ip ?? null}, ${input.userAgent ?? null}
+    ) as code`),
+  )) as unknown as Array<{ code: string }>;
+  const code = rows[0]?.code;
+  switch (code) {
+    case 'ok':
+      return { ok: true };
+    case 'already':
+      return { ok: true, code: 'already' };
+    case 'expired':
+      return { ok: false, error: 'token_expired' };
+    case 'not_active':
+      return { ok: false, error: 'not_active' };
+    case 'wrong_state':
+      return { ok: false, error: 'wrong_state' };
+    default:
+      return { ok: false, error: 'token_invalid' };
+  }
+}
+
+/**
+ * Session-less (Client Delivery Portal Phase 3): record a client's "mark as paid"
+ * against ONE milestone of a delivery by its RAW share token. Mirrors
+ * recordDeliveryActionByToken — sha256-hash the token (never sent in the clear,
+ * never logged), run the cost-blind SECURITY DEFINER write SDF on the base
+ * connection, and map its status code. The SDF locks the claimed amount to the
+ * milestone's full remaining due server-side (the client sends NO amount), moves no
+ * state, writes no money ledger, and returns only a status. A repeat while a claim
+ * is still pending maps to a SUCCESSFUL no-op (`code: 'already'`), so a double
+ * submit is idempotent.
+ */
+export async function claimPaymentByToken(
+  rawToken: string,
+  input: {
+    milestoneKind: string;
+    note?: string | null;
+    actorName?: string | null;
+    ip?: string | null;
+    userAgent?: string | null;
+  },
+): Promise<DeliveryActionResult> {
+  if (!rawToken || !rawToken.trim()) return { ok: false, error: 'token_invalid' };
+  const hash = hashToken(rawToken.trim());
+  const rows = (await withRequestDb((db) =>
+    db.execute(sql`select public.app_delivery_claim_payment_by_token(
+      ${hash}, ${input.milestoneKind}, ${input.note ?? null},
+      ${input.actorName ?? null}, ${input.ip ?? null}, ${input.userAgent ?? null}
     ) as code`),
   )) as unknown as Array<{ code: string }>;
   const code = rows[0]?.code;

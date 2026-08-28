@@ -485,6 +485,7 @@
     "milestone_split_invalid": "The milestone schedule must include a deposit and add up correctly",
     "milestone_kind_duplicate": "Each milestone type can appear only once",
     "payment_amount_invalid": "Enter a payment amount greater than zero",
+    "claim_not_found": "This payment claim is no longer available",
     "deposit_not_cleared": "The deposit has not been fully paid yet",
     "gate_a_not_cleared": "The Gate A installment has not been fully paid yet",
     "gate_b_not_cleared": "The Gate B installment has not been fully paid yet",
@@ -1698,6 +1699,13 @@
       "balance": "Balance",
       "revision_co": "Revision change order"
     },
+    "paymentClaims": {
+      "title": "Client payment claims ({count})",
+      "claimedBy": "Marked paid by {name}",
+      "amount": "Amount to record",
+      "confirm": "Confirm & record",
+      "dismiss": "Dismiss"
+    },
     "artifactKind": {
       "survey": "Survey",
       "autocad": "AutoCAD set",
@@ -1841,6 +1849,25 @@
         "token_expired": "This link has expired. Please contact your design team.",
         "not_active": "This delivery is closed. Please contact your design team.",
         "wrong_state": "This action isn't available right now. Please refresh the page.",
+        "generic": "Something went wrong. Please try again."
+      }
+    },
+    "claim": {
+      "title": "Payments",
+      "markPaid": "I've paid this",
+      "recordedPending": "Recorded — pending studio confirmation",
+      "note": "Marking a payment lets your design team know. They confirm it on their side.",
+      "kind": {
+        "deposit": "Deposit",
+        "gate_a": "Gate A",
+        "gate_b": "Gate B",
+        "balance": "Balance"
+      },
+      "error": {
+        "token_invalid": "This link is no longer available. Please contact your design team.",
+        "token_expired": "This link has expired. Please contact your design team.",
+        "not_active": "This delivery is closed. Please contact your design team.",
+        "wrong_state": "This payment isn't available to mark right now. Please refresh the page.",
         "generic": "Something went wrong. Please try again."
       }
     },

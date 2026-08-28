@@ -290,6 +290,25 @@ export const changeOrderStatus = pgEnum(
   CHANGE_ORDER_STATUSES,
 );
 
+/**
+ * Client Delivery Portal, Phase 3 — the lifecycle of a client-submitted payment
+ * claim. A session-less client "mark as paid" APPENDS a `pending` row; the studio
+ * later resolves it from the cockpit: `confirmed` (the studio recorded the real
+ * payment via recordPaymentCore) or `dismissed` (rejected, no ledger row). Unlike
+ * the append-only ledgers, a claim row has a MUTABLE status lifecycle. Order is a
+ * contract shared with the TS `ClientPaymentClaimStatus` union; labels localized.
+ */
+export const CLIENT_PAYMENT_CLAIM_STATUSES = [
+  'pending',
+  'confirmed',
+  'dismissed',
+] as const;
+
+export const clientPaymentClaimStatus = pgEnum(
+  'client_payment_claim_status',
+  CLIENT_PAYMENT_CLAIM_STATUSES,
+);
+
 export type MemberRole = (typeof MEMBER_ROLES)[number];
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];
 export type InvitationStatus = (typeof INVITATION_STATUSES)[number];
@@ -310,3 +329,5 @@ export type PaymentEventKind = (typeof PAYMENT_EVENT_KINDS)[number];
 export type EngagementArtifactKind = (typeof ENGAGEMENT_ARTIFACT_KINDS)[number];
 export type EngagementEventKind = (typeof ENGAGEMENT_EVENT_KINDS)[number];
 export type ChangeOrderStatus = (typeof CHANGE_ORDER_STATUSES)[number];
+export type ClientPaymentClaimStatus =
+  (typeof CLIENT_PAYMENT_CLAIM_STATUSES)[number];

@@ -187,6 +187,9 @@ const TEARDOWN_TABLES_IN_FK_ORDER = [
   // Design engagements: the milestone schedule + transition ledger cascade from
   // engagements; the engagement references clients + projects (restrict), so tear
   // the children down first, then engagements, before clients/projects.
+  // client_payment_claims references payment_events (set null) + design_engagements
+  // (cascade) — delete it before both so no restrict/order surprise.
+  'client_payment_claims',
   'payment_events',
   'engagement_events',
   'engagement_change_orders',

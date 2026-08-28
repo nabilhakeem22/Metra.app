@@ -7,6 +7,7 @@ import { FirmHeader } from './portal/firm-header';
 import { Greeting } from './portal/greeting';
 import { HeroCard } from './portal/hero-card';
 import { JourneyTracker } from './portal/journey-tracker';
+import { PaymentClaimCard } from './portal/payment-claim-card';
 import { PaymentGlanceCard } from './portal/payment-glance';
 import { RomAckCard } from './portal/rom-ack-card';
 import { WhatsNext } from './portal/whats-next';
@@ -63,6 +64,7 @@ export function PublicDeliveryView({
         />
         {delivery.hero.showRomAck && <RomAckCard token={token} />}
         <PaymentGlanceCard glance={glance} />
+        <PaymentClaimCard token={token} claim={delivery.paymentClaim} />
         <WhatsNext milestone={delivery.milestone} />
         <footer className="pt-2 text-center text-xs text-muted-foreground">
           {t('poweredBy', { firm: firmName })}

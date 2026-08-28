@@ -239,6 +239,13 @@
       "when": 1788214757549,
       "tag": "0033_client_delivery_signals",
       "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1788301157549,
+      "tag": "0034_client_payment_claims",
+      "breakpoints": true
     }
   ]
 }

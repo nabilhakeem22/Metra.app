@@ -593,6 +593,24 @@ create policy org_isolation on public.engagement_change_orders
     and public.app_is_current_org_member()
   );
 
+-- client_payment_claims (Client Delivery Portal Phase 3; MUTABLE lifecycle —
+-- SELECT + INSERT + UPDATE grants, the studio confirm/dismiss updates status; no
+-- DELETE; org-isolated + membership-gated). The client "mark as paid" INSERT is
+-- done by the SECURITY DEFINER token SDF (bypasses RLS as owner); this policy
+-- governs the authenticated studio's cockpit reads + confirm/dismiss updates.
+alter table public.client_payment_claims enable row level security;
+alter table public.client_payment_claims force  row level security;
+drop policy if exists org_isolation on public.client_payment_claims;
+create policy org_isolation on public.client_payment_claims
+  using (
+    org_id = nullif(current_setting('app.current_org_id', true), '')::uuid
+    and public.app_is_current_org_member()
+  )
+  with check (
+    org_id = nullif(current_setting('app.current_org_id', true), '')::uuid
+    and public.app_is_current_org_member()
+  );
+
 -- =============================================================================
 -- P1 Automation — notifications (recipient-scoped) + automation config/claim log
 -- =============================================================================

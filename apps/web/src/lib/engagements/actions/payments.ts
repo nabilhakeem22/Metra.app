@@ -7,6 +7,12 @@ import {
   logPaymentAndAdvanceCore,
   type LogPaymentAndAdvanceInput,
 } from '../pay-and-advance';
+import {
+  confirmPaymentClaimCore,
+  dismissPaymentClaimCore,
+  type ConfirmPaymentClaimInput,
+  type DismissPaymentClaimInput,
+} from '../payment-claims';
 import { recordPaymentCore, type RecordPaymentInput } from '../payments';
 
 /**
@@ -45,4 +51,34 @@ export async function logPaymentAndAdvance(
   );
   if (paymentRecorded) revalidatePath('/', 'layout');
   return result;
+}
+
+/**
+ * Server-action wrapper for {@link confirmPaymentClaimCore} — the studio confirms a
+ * pending client payment claim (records the real payment + flips the claim), in one
+ * tx. Resolves the org context and revalidates the shell on success so the cockpit
+ * claim list + payment ledger refresh. Returns the ActionResult (with the payment id
+ * in `data`) — never throws to the client.
+ */
+export async function confirmPaymentClaim(
+  input: ConfirmPaymentClaimInput,
+): Promise<ActionResult & { data?: string }> {
+  const ctx = await requireOrg();
+  const res = await confirmPaymentClaimCore(ctx, input);
+  if (res.ok) revalidatePath('/', 'layout');
+  return res;
+}
+
+/**
+ * Server-action wrapper for {@link dismissPaymentClaimCore} — the studio dismisses a
+ * pending client payment claim (no ledger row). Resolves the org context and
+ * revalidates the shell on success. Returns the ActionResult — never throws.
+ */
+export async function dismissPaymentClaim(
+  input: DismissPaymentClaimInput,
+): Promise<ActionResult> {
+  const ctx = await requireOrg();
+  const res = await dismissPaymentClaimCore(ctx, input);
+  if (res.ok) revalidatePath('/', 'layout');
+  return res;
 }

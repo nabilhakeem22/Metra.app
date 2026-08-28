@@ -73,6 +73,7 @@ export type ActionCode =
   | 'firm_type_unavailable'
   | 'project_delivery_exists'
   | 'project_delivery_limit_reached'
+  | 'claim_not_found'
   | 'file_too_large';
 
 export interface ActionResult {

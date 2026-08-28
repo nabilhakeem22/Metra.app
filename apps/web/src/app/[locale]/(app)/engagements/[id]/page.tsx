@@ -14,6 +14,7 @@ import {
   getEngagementEvents,
   getEngagementFeeSchedule,
   getEngagementHeader,
+  getEngagementPaymentClaims,
   getEngagementPayments,
   getEngagementTransitions,
 } from '@/lib/engagements/queries';
@@ -21,6 +22,7 @@ import { canRunTrigger, legalTriggersFrom } from '@/lib/engagements/ui';
 import { can } from '@/lib/permissions/can';
 import { EngagementDetailClient } from './engagement-detail-client';
 import { EngagementHeaderCard } from './engagement-header-card';
+import { PaymentClaimsPanel } from './payment-claims-panel';
 import { DELIVERY_SHARE_ANCHOR_ID } from './share-anchor';
 import { DeliveryShareLink } from './share-link';
 
@@ -58,6 +60,7 @@ export default async function EngagementDetailPage({
     changeOrders,
     transitions,
     clientActivity,
+    paymentClaims,
     gatePreview,
     shareStatus,
   ] = await Promise.all([
@@ -68,12 +71,16 @@ export default async function EngagementDetailPage({
     getEngagementChangeOrders(ctx, id),
     getEngagementTransitions(ctx, id),
     getEngagementClientActivity(ctx, id),
+    getEngagementPaymentClaims(ctx, id),
     getEngagementGatePreview(ctx, id),
     getDeliveryShareStatus(ctx, id),
   ]);
 
   // Owner/admin only — the §2.2 `engagements_issue` cell that mints client links.
   const canShare = can(ctx.role, 'engagements_issue', 'approve');
+  // The studio resolves client payment claims from the §2.2 `engagements_finance`
+  // create cell (the same cell that records a payment); the panel is hidden otherwise.
+  const canResolveClaims = can(ctx.role, 'engagements_finance', 'create');
 
   // The commercial pulse: a pure read-model over the fee schedule + payments the
   // page has ALREADY loaded (no extra DB round-trip). Serialized scale-4 strings +
@@ -140,6 +147,7 @@ export default async function EngagementDetailPage({
         <span className="text-foreground">{tb('delivery')}</span>
       </nav>
       <EngagementHeaderCard header={header} shared={shareStatus.shared} />
+      {canResolveClaims && <PaymentClaimsPanel claims={paymentClaims} />}
       {canShare && (
         <div id={DELIVERY_SHARE_ANCHOR_ID} tabIndex={-1} className="scroll-mt-4 outline-none">
           <DeliveryShareLink

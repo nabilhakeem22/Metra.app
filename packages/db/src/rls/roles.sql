@@ -68,6 +68,13 @@ grant select, insert, update on public.engagement_artifacts to metra_app;
 -- settled (update, reserved for the Step-9 revision_co settle path). SELECT +
 -- INSERT + UPDATE — never DELETE.
 grant select, insert, update on public.engagement_change_orders to metra_app;
+-- client_payment_claims (Client Delivery Portal Phase 3): the client "mark as
+-- paid" INSERT is done by the SECURITY DEFINER token SDF (owner, bypasses RLS), so
+-- the metra_app grant here governs the STUDIO cockpit paths — read the pending
+-- claims (select) and confirm/dismiss them (UPDATE the status + resolution
+-- columns). UPDATE is intentional here, unlike the append-only ledgers below. No
+-- DELETE — a resolved claim is retained.
+grant select, insert, update on public.client_payment_claims to metra_app;
 -- notifications: recipients read + mark-read (no delete); the runner inserts.
 grant select, insert, update on public.notifications to metra_app;
 -- api_keys (Public API v1): mint (insert), list (select), revoke + last_used

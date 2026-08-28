@@ -24,7 +24,12 @@ export {
   setEngagementRom,
   recordRomAcknowledgement,
 } from './lifecycle';
-export { recordPayment, logPaymentAndAdvance } from './payments';
+export {
+  recordPayment,
+  logPaymentAndAdvance,
+  confirmPaymentClaim,
+  dismissPaymentClaim,
+} from './payments';
 export {
   recordArtifact,
   createDeliverableUpload,

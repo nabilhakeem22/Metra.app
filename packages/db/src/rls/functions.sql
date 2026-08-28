@@ -934,6 +934,51 @@ as $$
               and e.kind = 'handoff_acknowledgement'
           )
       ) acts
+    ),
+    -- Client Delivery Portal Phase 3 — the milestones the client MAY "mark as paid"
+    -- right now. Computed from the SAME cost-blind milestone-due math as
+    -- payment_schedule above: a milestone is claimable while its remaining due
+    -- (amount_due − amount_cleared) is strictly positive. ANY unsettled milestone
+    -- is claimable (owner-locked; NOT just the next-due one), so this is a LIST. Each
+    -- entry carries the server-computed amount_remaining (scale-4 string — the amount
+    -- is locked, the client never sends one) and whether an OPEN (pending) client
+    -- claim already exists for it. It reads only engagement_milestones,
+    -- payment_events and client_payment_claims — none of which expose the firm's
+    -- private pricing (the AC4 test greps this function's source to enforce that).
+    'claim', jsonb_build_object(
+      'claimable_milestones', coalesce((
+        select jsonb_agg(cm order by cm_sort)
+        from (
+          select m.sort_order as cm_sort,
+            jsonb_build_object(
+              'milestone_kind', m.kind,
+              'amount_remaining',
+                (due.amount - coalesce(cl.cleared, 0))::numeric(18, 4)::text,
+              'has_pending_claim', exists (
+                select 1 from public.client_payment_claims pc
+                where pc.engagement_id = de.id
+                  and pc.milestone_kind = m.kind
+                  and pc.status = 'pending'
+              )
+            ) as cm
+          from public.engagement_milestones m
+          cross join lateral (
+            select case
+              when m.basis = 'percent'
+                then round(coalesce(de.design_fee, 0) * m.value / 100, 4)
+              else m.value
+            end as amount
+          ) due
+          left join lateral (
+            select sum(pe.amount) as cleared
+            from public.payment_events pe
+            where pe.engagement_id = de.id
+              and pe.kind::text = m.kind::text
+          ) cl on true
+          where m.engagement_id = de.id
+            and (due.amount - coalesce(cl.cleared, 0)) > 0
+        ) cmx
+      ), '[]'::jsonb)
     )
   )
   from public.design_engagements de
@@ -1051,6 +1096,114 @@ begin
         left(p_note, 2000),
         case when v_kind = 'rom_acknowledgement' then rl else null end,
         case when v_kind = 'rom_acknowledgement' then rh else null end
+      );
+  exception when unique_violation then
+    return 'already';
+  end;
+
+  return 'ok';
+end
+$$;
+
+-- Client Delivery Portal Phase 3 — a session-less client's "mark as paid" against a
+-- delivery by its share token. SECURITY DEFINER (the token IS the auth; no session).
+-- Mirrors app_delivery_respond_by_token: it NEVER moves state, NEVER adds a blocking
+-- guard, and NEVER writes the real money ledger — the firm stays in control. It
+-- APPENDS ONE `pending` row to client_payment_claims; the STUDIO later CONFIRMS it
+-- from the cockpit (recordPaymentCore), and only that confirm writes payment_events.
+--
+-- COST-BLIND: the function reads only the milestone-due math (engagement_milestones,
+-- payment_events) + the engagement's client-facing design_fee to LOCK the claimed
+-- amount to the milestone's full remaining due server-side (the client never sends
+-- an amount). It reads/returns NO cost/margin column. Yields only a status code:
+--   ok | already | expired | not_active | wrong_state | invalid
+-- ANY unsettled milestone (remaining due > 0) is claimable — this guards on "this
+-- milestone is a real, unsettled milestone with remaining due > 0", NOT on "is it
+-- the first unsettled". At most one OPEN claim per (engagement, milestone) — the
+-- exists pre-check + the partial UNIQUE index (0034) make a double-click land one row.
+create or replace function public.app_delivery_claim_payment_by_token(
+  p_hash text,
+  p_milestone_kind text,
+  p_note text,
+  p_name text,
+  p_ip text,
+  p_ua text
+)
+returns text
+language plpgsql
+volatile
+security definer
+set search_path = ''
+as $$
+declare
+  st        text;
+  exp       timestamptz;
+  eid       uuid;
+  oid       uuid;
+  v_fee     numeric;
+  v_remain  numeric;
+begin
+  select state, share_expires_at, id, org_id, design_fee
+    into st, exp, eid, oid, v_fee
+    from public.design_engagements
+    where token_hash = p_hash;
+  if not found then return 'invalid'; end if;
+  if exp is not null and exp <= now() then return 'expired'; end if;
+  if st in ('closed_design_only', 'execution', 'abandoned') then
+    return 'not_active';
+  end if;
+
+  -- Unknown milestone kind -> wrong_state (the TOKEN is valid; only the requested
+  -- milestone is unavailable). 'invalid' is reserved for a token-not-found (step 1),
+  -- so the client never sees the misleading "this link is no longer available".
+  if p_milestone_kind not in ('deposit', 'gate_a', 'gate_b', 'balance') then
+    return 'wrong_state';
+  end if;
+
+  -- Remaining due for THAT milestone = amount_due − amount_cleared, in the SAME
+  -- cost-blind math as app_delivery_by_token. NULL when the milestone doesn't exist
+  -- on this engagement (no row) — mapped to wrong_state below.
+  select
+    (case
+       when m.basis = 'percent'
+         then round(coalesce(v_fee, 0) * m.value / 100, 4)
+       else m.value
+     end)
+    - coalesce((
+        select sum(pe.amount)
+        from public.payment_events pe
+        where pe.engagement_id = eid
+          and pe.kind::text = m.kind::text
+      ), 0)
+    into v_remain
+    from public.engagement_milestones m
+    where m.engagement_id = eid
+      and m.kind = p_milestone_kind::public.milestone_kind;
+
+  -- Milestone absent for this engagement OR already settled (remaining ≤ 0).
+  if v_remain is null or v_remain <= 0 then return 'wrong_state'; end if;
+
+  -- One OPEN claim per milestone: a pending claim already exists -> idempotent no-op.
+  if exists (
+    select 1 from public.client_payment_claims pc
+    where pc.engagement_id = eid
+      and pc.milestone_kind = p_milestone_kind::public.milestone_kind
+      and pc.status = 'pending'
+  ) then
+    return 'already';
+  end if;
+
+  -- INSERT-only: append the pending claim, amount LOCKED to the remaining due. The
+  -- partial UNIQUE index (0034) is the concurrency backstop for the pre-check above.
+  begin
+    insert into public.client_payment_claims
+      (id, org_id, engagement_id, milestone_kind, claimed_amount, status,
+       actor_name, actor_ip, actor_user_agent, note)
+      values (
+        gen_random_uuid(), oid, eid,
+        p_milestone_kind::public.milestone_kind,
+        v_remain::numeric(18, 4), 'pending',
+        p_name, p_ip, p_ua, left(p_note, 2000)
       );
   exception when unique_violation then
     return 'already';
