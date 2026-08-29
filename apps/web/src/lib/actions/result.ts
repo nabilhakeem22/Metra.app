@@ -68,6 +68,7 @@ export type ActionCode =
   | 'as_built_not_due'
   | 'rom_range_invalid'
   | 'rom_not_set'
+  | 'off_plan_locked'
   | 'flow_not_enabled'
   | 'payment_kind_mismatch'
   | 'firm_type_unavailable'

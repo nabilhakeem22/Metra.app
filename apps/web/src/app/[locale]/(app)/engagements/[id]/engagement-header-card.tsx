@@ -38,7 +38,7 @@ export function EngagementHeaderCard({
   );
 
   const flags = [
-    header.offPlan && { key: 'offPlan', label: t('offPlan'), tone: 'muted' as const },
+    header.offPlan && { key: 'offPlan', label: t('offPlan.offPlan'), tone: 'muted' as const },
     header.asBuiltDue && {
       key: 'asBuiltDue',
       label: t('asBuiltDue'),

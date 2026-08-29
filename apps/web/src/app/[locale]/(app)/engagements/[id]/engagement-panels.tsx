@@ -1,9 +1,11 @@
 'use client';
 
 import { useLocale, useTranslations } from 'next-intl';
+import type { CommercialPulse } from '@/lib/engagements/pulse';
 import type {
   EngagementArtifactRecord,
   EngagementChangeOrderRecord,
+  EngagementClientActivityRecord,
   EngagementEventRecord,
   EngagementFeeSchedule,
   EngagementHeader,
@@ -11,22 +13,19 @@ import type {
   EngagementTransitionRecord,
 } from '@/lib/engagements/queries';
 import { formatDate } from '@/lib/format/date';
-import { formatMoney } from '@/lib/format/money';
-import { ArtifactsPanel } from './engagement-panels-artifacts';
 import { ChangeOrdersPanel } from './engagement-panels-change-orders';
-import { Empty, MONEY } from './engagement-panels-parts';
-import { PaymentsPanel } from './engagement-panels-payments';
-import { RomPanel } from './engagement-panels-rom';
+import { Empty } from './engagement-panels-parts';
+import { PaymentsTab } from './engagement-panels-payments-tab';
+import { FilesTab } from './engagement-panels-files';
 import type { EngagementTab } from './tabs';
 
-// Epic D, Slice 5 — the engagement detail panels, reskinned to the glass system as
-// a FLAT (opaque `bg-card`, no backdrop-filter) panel with mono/tabular money. The
-// fee schedule (audit ledger) and the recent-activity timeline are now PINNED in
-// the right rail (see engagement-right-rail.tsx) — `FeePanel` and `TimelinePanel`
-// are exported for that reuse. This tabbed surface keeps the fuller detail
-// (payments · artifacts · change orders · build-cost range). Visual reskin only —
-// no data or query change. Logical CSS only so it mirrors in ar-EG RTL; money is
-// `font-mono tabular-nums`, `dir=ltr`.
+// The engagement detail panels — the fuller record below the command card,
+// dispatched by the four detail tabs. Files (working-files tray + the full
+// artifact list), Timeline (transitions + events + the client-activity feed),
+// Payments (the commercial pulse + fee schedule + build-cost range + the payment
+// ledger) and Change orders. Visual reskin of the glass system as a FLAT (opaque
+// `bg-card`) surface; money is `font-mono tabular-nums`, `dir=ltr`. Logical CSS
+// only so it mirrors in ar-EG RTL.
 
 export interface PanelData {
   header: EngagementHeader;
@@ -36,62 +35,63 @@ export interface PanelData {
   events: EngagementEventRecord[];
   changeOrders: EngagementChangeOrderRecord[];
   transitions: EngagementTransitionRecord[];
+  clientActivity: EngagementClientActivityRecord[];
+  pulse: CommercialPulse;
 }
 
-export function EngagementPanels({ tab, data }: { tab: EngagementTab; data: PanelData }) {
+export function EngagementPanels({
+  tab,
+  data,
+  engagementId,
+  canUpload,
+}: {
+  tab: EngagementTab;
+  data: PanelData;
+  engagementId: string;
+  canUpload: boolean;
+}) {
   return (
     <section className="rounded-[var(--r-panel)] border border-[color:var(--rule)] bg-card text-[color:var(--text)] shadow-sm">
       <div className="p-4">
-        {tab === 'payments' && <PaymentsPanel payments={data.payments} />}
-        {tab === 'artifacts' && <ArtifactsPanel artifacts={data.artifacts} />}
-        {tab === 'changeOrders' && <ChangeOrdersPanel changeOrders={data.changeOrders} />}
-        {tab === 'rom' && <RomPanel header={data.header} events={data.events} />}
+        {tab === 'files' && (
+          <FilesTab
+            engagementId={engagementId}
+            artifacts={data.artifacts}
+            canUpload={canUpload}
+          />
+        )}
+        {tab === 'timeline' && (
+          <TimelinePanel
+            transitions={data.transitions}
+            events={data.events}
+            clientActivity={data.clientActivity}
+          />
+        )}
+        {tab === 'payments' && (
+          <PaymentsTab
+            header={data.header}
+            feeSchedule={data.feeSchedule}
+            payments={data.payments}
+            events={data.events}
+            pulse={data.pulse}
+          />
+        )}
+        {tab === 'changeOrders' && (
+          <ChangeOrdersPanel changeOrders={data.changeOrders} />
+        )}
       </div>
     </section>
-  );
-}
-
-export function FeePanel({ feeSchedule }: { feeSchedule: EngagementFeeSchedule }) {
-  const t = useTranslations('engagements');
-  const locale = useLocale();
-  return (
-    <div className="text-[13px]">
-      <div className="flex items-center justify-between border-b border-dashed border-[color:var(--rule)] py-2.5">
-        <span className="text-[color:var(--text-muted)]">{t('fee.designFee')}</span>
-        <span className={MONEY} dir="ltr">
-          {feeSchedule.designFee ? formatMoney(feeSchedule.designFee, locale) : '—'}
-        </span>
-      </div>
-      {feeSchedule.milestones.length === 0 ? (
-        <Empty text={t('fee.notSet')} />
-      ) : (
-        <ul className="m-0 list-none p-0">
-          {feeSchedule.milestones.map((m) => (
-            <li
-              key={`${m.kind}-${m.sortOrder}`}
-              className="flex items-center gap-2 border-b border-dashed border-[color:var(--rule)] py-2.5 last:border-0"
-            >
-              <span>{t(`milestoneKind.${m.kind}`)}</span>
-              <span className="text-[11px] text-[color:var(--text-faint)]">
-                {t(`milestoneBasis.${m.basis}`)}
-              </span>
-              <span className={`ms-auto ${MONEY}`} dir="ltr">
-                {m.basis === 'amount' ? formatMoney(m.value, locale) : `${m.value}%`}
-              </span>
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
   );
 }
 
 export function TimelinePanel({
   transitions,
   events,
+  clientActivity = [],
 }: {
   transitions: EngagementTransitionRecord[];
   events: EngagementEventRecord[];
+  clientActivity?: EngagementClientActivityRecord[];
 }) {
   const t = useTranslations('engagements');
   const locale = useLocale();
@@ -111,6 +111,15 @@ export function TimelinePanel({
       id: `e-${e.id}`,
       at: e.decidedAt,
       label: t(`eventKind.${e.kind}`),
+    })),
+    // The client-activity feed (approvals + change requests from the client's
+    // link) merges into the one timeline, newest-first with everything else.
+    ...clientActivity.map((entry, index) => ({
+      id: `c-${entry.kind}-${index}`,
+      at: entry.decidedAt,
+      label: entry.actorName
+        ? `${t(`eventKind.${entry.kind}`)} · ${t('clientActivity.by', { name: entry.actorName })}`
+        : t(`eventKind.${entry.kind}`),
     })),
   ].sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());
 

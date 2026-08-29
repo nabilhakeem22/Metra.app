@@ -174,6 +174,7 @@ export default async function EngagementDetailPage({
         canAdvance={canAdvance}
         stallDays={stallDays}
         pulse={pulse}
+        paymentClaimCount={paymentClaims.length}
       />
     </div>
   );

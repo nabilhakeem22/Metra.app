@@ -499,6 +499,7 @@
     "as_built_not_due": "As-built drawings are not due for this delivery",
     "rom_range_invalid": "Enter a valid low–high build-cost range",
     "rom_not_set": "Enter the build-cost range before recording the client's acknowledgement",
+    "off_plan_locked": "Off-plan can only be changed before the deposit is paid.",
     "flow_not_enabled": "This flow isn't enabled for your workspace's plan.",
     "payment_kind_mismatch": "This payment type doesn't match the step you're advancing",
     "firm_type_unavailable": "That firm type isn't available yet. Choose Interior fit-out to continue.",
@@ -1364,7 +1365,21 @@
     "project": "Project",
     "stage": "Stage {n}",
     "backToList": "Back to deliveries",
-    "offPlan": "Off-plan",
+    "offPlan": {
+      "existing": "Existing unit",
+      "offPlan": "Off-plan",
+      "hint": "Sets Step 2: an existing unit needs a site survey; off-plan imports the developer AutoCAD."
+    },
+    "boqLabel": "BOQ",
+    "buildRangeLabel": "Estimated build cost",
+    "paymentsBadge": "{n} due",
+    "ribbon": {
+      "proposal": "Proposal",
+      "survey": "Survey & site capture",
+      "concept": "Concept",
+      "threeD": "3D",
+      "handover": "Handover"
+    },
     "asBuiltDue": "As-built due",
     "created": "Created",
     "updated": "Updated",
@@ -1553,7 +1568,19 @@
       "closedHeadline": "This delivery is closed",
       "stepLabel": "Next step to advance",
       "clientLinkActive": "Client link active",
-      "clientLinkInactive": "Not shared"
+      "clientLinkInactive": "Not shared",
+      "moreLabel": "More actions",
+      "pill": {
+        "ready": "Ready to advance",
+        "studio": "Your move",
+        "waitingClient": "Waiting on client",
+        "paymentToConfirm": "Payment to confirm",
+        "closed": "Closed"
+      },
+      "move": {
+        "studio": "Your move",
+        "client": "Client's move"
+      }
     },
     "toolbar": {
       "title": "Log & manage",
@@ -1589,11 +1616,13 @@
       "title": "Request revision",
       "reason": "Reason (optional)",
       "changeOrderAmount": "Change-order amount (optional)",
+      "addAmount": "Change-order amount",
       "hint": "Enter an amount only when this revision is beyond the free allowance.",
       "submit": "Request revision"
     },
     "panels": {
       "fee": "Fee schedule",
+      "files": "Files",
       "payments": "Payments",
       "artifacts": "Artifacts",
       "changeOrders": "Change orders",
@@ -1689,6 +1718,8 @@
       "note": "Note",
       "low": "Low",
       "high": "High",
+      "addDetails": "Add details",
+      "addNote": "Add note",
       "save": "Save",
       "cancel": "Cancel"
     },

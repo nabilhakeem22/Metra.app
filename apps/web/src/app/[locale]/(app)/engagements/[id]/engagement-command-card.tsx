@@ -1,11 +1,11 @@
 'use client';
 
-import { Loader2 } from 'lucide-react';
+import { Link2, Loader2 } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import type { ActionResult } from '@/lib/actions/result';
-import { deriveCommandCard } from '@/lib/engagements/command-card';
+import { deriveCommandCard, type CommandCardMode } from '@/lib/engagements/command-card';
 import type { EngagementGatePreview } from '@/lib/engagements/gate-preview';
 // Import from the LEAF (guards/money), not the guards barrel: the barrel also
 // re-exports GUARDS from ./registry, which would drag the whole guard engine
@@ -14,27 +14,57 @@ import type { EngagementGatePreview } from '@/lib/engagements/gate-preview';
 // (vitest even deadlocks importing it) and throw at render. The leaf carries only
 // the pure MONEY_GUARD_MILESTONE map + erased types — no registry, no cycle.
 import { MONEY_GUARD_MILESTONE } from '@/lib/engagements/guards/money';
+import { stateMilestone } from '@/lib/engagements/journey-map';
 import { isTerminal, type DesignState } from '@/lib/engagements/states';
 import type { Trigger } from '@/lib/engagements/transitions';
 import { EngagementFeeForm } from './engagement-fee-form';
 import { EngagementHeroBadges } from './engagement-hero-badges';
 import { EngagementHeroChecklist } from './engagement-hero-checklist';
+import {
+  EngagementInlineDropzone,
+  inlineDropzoneCategory,
+} from './engagement-inline-dropzone';
+import { EngagementOffPlanToggle } from './engagement-off-plan-toggle';
 import { PaymentForm } from './engagement-payment-form';
 import { EngagementSecondaryActions } from './engagement-secondary-actions';
+import { EngagementStepRibbon } from './engagement-step-ribbon';
 import { DIRECT_TRIGGER_ACTIONS } from './trigger-actions';
 
-// The cockpit COMMAND CARD — the single "what's next" action surface (replaces the
-// old hero + next-actions). It derives a machine-truthful view from the server gate
-// preview (`deriveCommandCard`): the headline reflects what ACTUALLY blocks Advance
-// — the real unmet forward guards. The client's advisory approval NEVER gates
-// Advance. Four modes: closed / ready / blockedStudio / blockedClient.
-//   • ready        → Advance fires the forward trigger (or opens its fee form).
-//   • blockedStudio→ Advance disabled + a note naming the studio blocker.
-//   • blockedClient→ "Waiting on the client"; Advance disabled; Nudge (share roles).
-//   • a BLOCKING money gate always offers pay-and-advance (finance roles), pre-filled
-//     to the exact shortfall, with the S1 remount-on-shortfall guard preserved.
-// This is the ONE cockpit-body surface carrying the `.glass` blur recipe. Logical
+// The cockpit COMMAND CARD — the single "what's next" surface, redesigned as a
+// stacked card: (1) a 5-stage STEP RIBBON over a human STATUS PILL + a "whose
+// move" line; (2) THE ONE ACTION — headline + an inline attachment dropzone OR
+// the fee/pay fields + one highlighted primary button + a "what happens next"
+// helper; (3) a quiet FOOTER (client link + the "more actions" secondary
+// controls). It derives a machine-truthful view from the server gate preview
+// (`deriveCommandCard`): the headline reflects what ACTUALLY blocks Advance — the
+// real unmet forward guards. The client's advisory approval NEVER gates Advance.
+// The BLOCKING money gate always offers pay-and-advance (finance roles), pre-filled
+// to the exact shortfall, with the S1 remount-on-shortfall guard preserved. Logical
 // CSS only (RTL mirrors); money is `tabular-nums`, `dir=ltr` inside the checklist.
+
+/**
+ * The human status pill + "whose move" line, pure from the command view + the
+ * pending client-payment-claim count. blockedClient with a pending claim reads as
+ * "payment to confirm" (the studio's move to record it), not "waiting on client".
+ */
+function derivePill(
+  mode: CommandCardMode,
+  paymentClaimCount: number,
+): { pillKey: string; moveKey: 'studio' | 'client' | null } {
+  switch (mode) {
+    case 'closed':
+      return { pillKey: 'closed', moveKey: null };
+    case 'ready':
+      return { pillKey: 'ready', moveKey: 'studio' };
+    case 'blockedStudio':
+      return { pillKey: 'studio', moveKey: 'studio' };
+    default:
+      return paymentClaimCount > 0
+        ? { pillKey: 'paymentToConfirm', moveKey: 'studio' }
+        : { pillKey: 'waitingClient', moveKey: 'client' };
+  }
+}
+
 export function EngagementCommandCard({
   engagementId,
   preview,
@@ -45,6 +75,10 @@ export function EngagementCommandCard({
   canAdvance,
   canRecordPayment,
   canShare,
+  canUpload,
+  canSetOffPlan,
+  offPlan,
+  paymentClaimCount,
   secondaryTriggers,
   pending,
   runAction,
@@ -59,6 +93,10 @@ export function EngagementCommandCard({
   canAdvance: boolean;
   canRecordPayment: boolean;
   canShare: boolean;
+  canUpload: boolean;
+  canSetOffPlan: boolean;
+  offPlan: boolean;
+  paymentClaimCount: number;
   secondaryTriggers: Trigger[];
   pending: boolean;
   runAction: (fn: () => Promise<ActionResult>) => void;
@@ -77,10 +115,11 @@ export function EngagementCommandCard({
     isTerminal: isTerminal(state),
   });
   const closed = view.mode === 'closed';
+  const pill = derivePill(view.mode, paymentClaimCount);
 
-  // Mode-driven accent (mockup: amber/warn stripe+label for the blocked attention
-  // states, brand for ready, neutral for closed) — expressed through the app's
-  // semantic tokens so both themes + RTL stay correct.
+  // Mode-driven accent (amber/warn for the blocked attention states, brand for
+  // ready, neutral for closed) — expressed through the app's semantic tokens so
+  // both themes + RTL stay correct.
   const accent: 'neutral' | 'brand' | 'warn' = closed
     ? 'neutral'
     : view.mode === 'ready'
@@ -92,12 +131,12 @@ export function EngagementCommandCard({
       : accent === 'brand'
         ? 'bg-brand'
         : 'bg-[color:var(--rule)]';
-  const accentTextClass =
+  const pillClass =
     accent === 'warn'
-      ? 'text-[color:var(--warn)]'
+      ? 'bg-[color:var(--warn-tint)] text-[color:var(--warn)]'
       : accent === 'brand'
-        ? 'text-brand-ink'
-        : 'text-[color:var(--text-faint)]';
+        ? 'bg-brand-tint text-brand-ink'
+        : 'bg-[color:var(--track)] text-[color:var(--text-muted)]';
   const borderClass =
     accent === 'warn'
       ? 'border-[color:var(--warn-tint)]'
@@ -105,6 +144,13 @@ export function EngagementCommandCard({
         ? 'border-[color:var(--brand-tint-border)]'
         : 'border-[color:var(--rule)]';
   const showNudgePill = view.showNudge && canShare;
+
+  // The inline attachment dropzone is THE ONE ACTION when the studio's next move
+  // is to attach a deliverable at this stage (null otherwise).
+  const dropzoneCategory = inlineDropzoneCategory(state);
+  // The off-plan toggle only makes sense before the survey branch — the proposal
+  // milestone (created / design_proposal), and only for a role that may update.
+  const atProposal = !closed && stateMilestone(state).index === 0;
 
   // A blocking money gate whose shortfall we can pre-fill — the pay-and-advance
   // path. `amountDue` is only set on a blocking payment gate (see gate-preview).
@@ -156,13 +202,28 @@ export function EngagementCommandCard({
     <section
       className={`glass relative overflow-hidden p-5 text-[color:var(--text)] sm:p-6 ${borderClass}`}
     >
-      {/* Left accent stripe (mockup `.command::before`) — 4px on the inline-START
-          so it mirrors to the inline-END in ar-EG RTL. Mode-driven color. */}
+      {/* Left accent stripe — 4px on the inline-START so it mirrors to the
+          inline-END in ar-EG RTL. Mode-driven color. */}
       <span
         aria-hidden
         className={`pointer-events-none absolute inset-y-0 w-1 ${stripeClass}`}
         style={{ insetInlineStart: 0 }}
       />
+
+      {/* 1. STEP RIBBON + STATUS PILL + WHOSE-MOVE */}
+      <EngagementStepRibbon state={state} />
+      <div className="mb-3.5 mt-3 flex flex-wrap items-center gap-2.5">
+        <span
+          className={`inline-flex items-center rounded-[var(--r-pill)] px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.08em] ${pillClass}`}
+        >
+          {tcmd(`pill.${pill.pillKey}`)}
+        </span>
+        {pill.moveKey && (
+          <span className="text-[12.5px] text-[color:var(--text-muted)]">
+            {tcmd(`move.${pill.moveKey}`)}
+          </span>
+        )}
+      </div>
 
       {!closed && (
         <EngagementHeroBadges
@@ -175,14 +236,7 @@ export function EngagementCommandCard({
         />
       )}
 
-      {!closed && (
-        <p
-          className={`mb-3 flex items-center gap-2 font-mono text-[11px] font-semibold uppercase tracking-[0.11em] ${accentTextClass}`}
-        >
-          <span aria-hidden>◆</span>
-          {tcmd('stepLabel')}
-        </p>
-      )}
+      {/* 2. THE ONE ACTION */}
       <h2 className="mb-1 text-[22px] font-semibold leading-tight tracking-[var(--tracking-title)] text-balance">
         {headline}
       </h2>
@@ -192,6 +246,14 @@ export function EngagementCommandCard({
 
       {!closed && (
         <>
+          {dropzoneCategory && (
+            <EngagementInlineDropzone
+              engagementId={engagementId}
+              category={dropzoneCategory}
+              canUpload={canUpload}
+            />
+          )}
+
           {preview.items.length > 0 && (
             <EngagementHeroChecklist
               th={th}
@@ -217,10 +279,8 @@ export function EngagementCommandCard({
             <Button
               type="button"
               // When Advance is blocked (any non-'ready' mode) it must READ as
-              // disabled — a flat subdued glass fill, never the brand-gradient CTA
-              // that looks clickable. The enabled brand look is kept only when the
-              // gate is genuinely all-clear. Behaviour is unchanged (still gated by
-              // `disabled` below); this only makes the disabled state unmistakable.
+              // disabled — a flat subdued fill, never the brand CTA that looks
+              // clickable. Behaviour is unchanged (still gated by `disabled`).
               variant={view.advanceEnabled ? 'default' : 'secondary'}
               disabled={!view.advanceEnabled || pending}
               onClick={fireAdvance}
@@ -285,9 +345,36 @@ export function EngagementCommandCard({
               />
             )}
 
+          {/* Off-plan toggle — only at the proposal milestone, for update roles.
+              It drives Step 2 (survey vs AutoCAD import). */}
+          {atProposal && canSetOffPlan && (
+            <EngagementOffPlanToggle
+              engagementId={engagementId}
+              offPlan={offPlan}
+              pending={pending}
+              runAction={runAction}
+            />
+          )}
+
+          {/* 3. FOOTER — client link + the "more actions" secondary controls. */}
+          {canShare && (
+            <div className="mt-5 border-t border-[color:var(--rule)] pt-4">
+              <button
+                type="button"
+                onClick={onNudge}
+                className="inline-flex items-center gap-1.5 text-[12.5px] font-semibold text-brand-ink hover:underline"
+              >
+                <Link2 className="size-3.5" aria-hidden />
+                {tcmd('nudge')}
+              </button>
+            </div>
+          )}
+
           <EngagementSecondaryActions
             engagementId={engagementId}
             triggers={secondaryTriggers}
+            revisionCount={revisionCount}
+            freeRevisionN={freeRevisionN}
             pending={pending}
             runAction={runAction}
           />

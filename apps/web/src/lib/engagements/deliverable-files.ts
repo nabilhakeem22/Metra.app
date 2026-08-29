@@ -46,6 +46,16 @@ export const ALLOWED_EXTENSIONS: Record<
 /** Owner decision: the largest deliverable we accept is 100 MB. */
 export const MAX_DELIVERABLE_BYTES = 100 * 1024 * 1024;
 
+/**
+ * The file-picker `accept` list for a category — its allowed extensions,
+ * dot-prefixed and comma-joined (e.g. `.pdf,.dwg`). PURE and client-safe; shared
+ * by every upload affordance (the working-files tray + the command-card inline
+ * dropzone) so the picker offers exactly what the server enforces.
+ */
+export function acceptFor(category: WorkingFileCategory): string {
+  return ALLOWED_EXTENSIONS[category].map((extension) => `.${extension}`).join(',');
+}
+
 /** The lowercased extension (no dot) of a filename, or null if it has none. */
 function extensionOf(originalName: string): string | null {
   const dot = originalName.lastIndexOf('.');

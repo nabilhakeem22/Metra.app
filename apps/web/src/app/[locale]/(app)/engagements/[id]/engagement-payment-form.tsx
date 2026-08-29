@@ -36,6 +36,10 @@ export function PaymentForm({
   const [amount, setAmount] = useState(defaultAmount);
   const [method, setMethod] = useState('');
   const [reference, setReference] = useState('');
+  // Amount is the one field up front; method + reference are optional detail
+  // tucked behind a disclosure. The submit payload is IDENTICAL either way —
+  // an unopened disclosure just leaves them empty (trimmed to null below).
+  const [detailsOpen, setDetailsOpen] = useState(false);
   // One idempotency key per mounted form. The `key={paymentItem.amountDue}`
   // remount (a short-payment revalidation) mints a FRESH key for the genuinely
   // new payment, while a double-click within one open reuses this one — so a
@@ -60,36 +64,47 @@ export function PaymentForm({
 
   return (
     <div className="mt-4 space-y-3 rounded-[var(--r-item)] border border-[color:var(--rule)] bg-[color:var(--track)] p-4">
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <div className="space-y-1.5">
-          <Label htmlFor="hero-pay-amount">{tc('amount')}</Label>
-          <Input
-            id="hero-pay-amount"
-            dir="ltr"
-            inputMode="decimal"
-            className="tabular-nums"
-            value={amount}
-            onChange={(event) => setAmount(event.target.value)}
-          />
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="hero-pay-method">{tc('method')}</Label>
-          <Input
-            id="hero-pay-method"
-            value={method}
-            onChange={(event) => setMethod(event.target.value)}
-          />
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="hero-pay-reference">{tc('reference')}</Label>
-          <Input
-            id="hero-pay-reference"
-            dir="ltr"
-            value={reference}
-            onChange={(event) => setReference(event.target.value)}
-          />
-        </div>
+      <div className="space-y-1.5">
+        <Label htmlFor="hero-pay-amount">{tc('amount')}</Label>
+        <Input
+          id="hero-pay-amount"
+          dir="ltr"
+          inputMode="decimal"
+          className="tabular-nums"
+          value={amount}
+          onChange={(event) => setAmount(event.target.value)}
+        />
       </div>
+
+      {detailsOpen ? (
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div className="space-y-1.5">
+            <Label htmlFor="hero-pay-method">{tc('method')}</Label>
+            <Input
+              id="hero-pay-method"
+              value={method}
+              onChange={(event) => setMethod(event.target.value)}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="hero-pay-reference">{tc('reference')}</Label>
+            <Input
+              id="hero-pay-reference"
+              dir="ltr"
+              value={reference}
+              onChange={(event) => setReference(event.target.value)}
+            />
+          </div>
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={() => setDetailsOpen(true)}
+          className="text-[12.5px] font-semibold text-brand-ink hover:underline"
+        >
+          + {tc('addDetails')}
+        </button>
+      )}
       <div className="flex justify-end gap-2">
         <Button type="button" variant="outline" size="sm" onClick={onDone} disabled={pending}>
           {tc('cancel')}

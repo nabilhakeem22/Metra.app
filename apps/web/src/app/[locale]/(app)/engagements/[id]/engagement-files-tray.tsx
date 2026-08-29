@@ -2,30 +2,21 @@
 
 import { Download, Loader2, Upload } from 'lucide-react';
 import { useTranslations } from 'next-intl';
-import { useRef, useTransition, type ChangeEvent } from 'react';
-import { toast } from '@/hooks/use-toast';
-import { useRouter } from '@/i18n/routing';
-import { resolveActionError } from '@/lib/actions/error-message';
-import type { ActionCode } from '@/lib/actions/result';
-import {
-  attachDeliverable,
-  createDeliverableUpload,
-  getDeliverableUrl,
-} from '@/lib/engagements/actions';
-import {
-  ALLOWED_EXTENSIONS,
-  validateDeliverableFile,
-} from '@/lib/engagements/deliverable-files';
+import { useRef, type ChangeEvent } from 'react';
+import { acceptFor } from '@/lib/engagements/deliverable-files';
 import type { EngagementArtifactRecord } from '@/lib/engagements/queries';
 import {
   deriveWorkingFiles,
   type WorkingFileCategory,
 } from '@/lib/engagements/working-files';
+import { useDeliverableUpload } from './use-deliverable-upload';
 
-// Epic D, Slice 5 + Deliverable Uploads — the pinned "Working files" tray at the
-// top of the cockpit's right rail. It shows the latest approved deliverable per
+// Epic D, Slice 5 + Deliverable Uploads — the "Working files" tray, now pinned at
+// the top of the Files detail tab. It shows the latest approved deliverable per
 // category (2D layout · render set · draft BOQ), derived purely from the
-// artifacts the page already loaded (`deriveWorkingFiles`). When the caller may
+// artifacts the page already loaded (`deriveWorkingFiles`). The upload/download
+// flow is the shared `useDeliverableUpload` hook (same path as the command-card
+// inline dropzone — no behaviour change). When the caller may
 // upload (`canUpload`), each slot exposes a hidden file picker + an Upload
 // affordance; a slot with a file also exposes a Download/Open affordance that
 // mints a short-lived signed URL. When the caller cannot upload and no file
@@ -41,11 +32,6 @@ const CATEGORY_ACTION: Record<WorkingFileCategory, 'download' | 'open'> = {
   boq: 'open',
 };
 
-/** The picker's `accept` list for a category (dot-prefixed extensions). */
-function acceptFor(category: WorkingFileCategory): string {
-  return ALLOWED_EXTENSIONS[category].map((ext) => `.${ext}`).join(',');
-}
-
 export function EngagementFilesTray({
   artifacts,
   engagementId,
@@ -56,84 +42,18 @@ export function EngagementFilesTray({
   canUpload: boolean;
 }) {
   const t = useTranslations('engagements.files');
-  const te = useTranslations('errors');
-  const router = useRouter();
-  const [pending, startTransition] = useTransition();
+  const { pending, upload, download } = useDeliverableUpload(engagementId);
   const inputRefs = useRef<
     Partial<Record<WorkingFileCategory, HTMLInputElement | null>>
   >({});
   const rows = deriveWorkingFiles(artifacts);
 
-  function clearInput(category: WorkingFileCategory) {
-    const input = inputRefs.current[category];
-    if (input) input.value = '';
-  }
-
   function onPick(category: WorkingFileCategory, event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
-    if (!file) return;
-
-    // Friendly client-side pre-flight before we ever request a signed URL.
-    const localError = validateDeliverableFile(category, file.name, file.size);
-    if (localError) {
-      toast({
-        title: localError === 'file_too_large' ? t('tooLarge') : t('wrongType'),
-        variant: 'destructive',
-      });
-      clearInput(category);
-      return;
-    }
-
-    startTransition(async () => {
-      try {
-        const signed = await createDeliverableUpload({
-          engagementId,
-          category,
-          originalName: file.name,
-          contentType: file.type,
-          sizeBytes: file.size,
-        });
-        if ('ok' in signed) {
-          toast({
-            title: resolveActionError(signed.error as ActionCode, te),
-            variant: 'destructive',
-          });
-          return;
-        }
-        const put = await fetch(signed.signedUrl, {
-          method: 'PUT',
-          headers: { 'content-type': file.type, 'x-upsert': 'true' },
-          body: file,
-        });
-        if (!put.ok) throw new Error('put_failed');
-        const attached = await attachDeliverable({
-          engagementId,
-          category,
-          fileId: signed.fileId,
-          label: file.name,
-        });
-        if (!attached.ok) {
-          toast({
-            title: resolveActionError(attached.error as ActionCode, te),
-            variant: 'destructive',
-          });
-          return;
-        }
-        toast({ title: t('uploaded') });
-        router.refresh();
-      } catch {
-        toast({ title: te('generic'), variant: 'destructive' });
-      } finally {
-        clearInput(category);
-      }
-    });
-  }
-
-  function onDownload(fileId: string) {
-    startTransition(async () => {
-      const res = await getDeliverableUrl(fileId);
-      if (res.ok && res.url) window.open(res.url, '_blank', 'noopener');
-    });
+    // Clear the input immediately (the File is captured) so re-picking the same
+    // file still fires a change; the shared hook owns validation + the upload.
+    event.target.value = '';
+    if (file) upload(category, file);
   }
 
   return (
@@ -174,7 +94,7 @@ export function EngagementFilesTray({
                 {fileId && (
                   <button
                     type="button"
-                    onClick={() => onDownload(fileId)}
+                    onClick={() => download(fileId)}
                     disabled={pending}
                     className="inline-flex items-center gap-1 rounded-[var(--r-icon)] px-2 py-1 text-[12px] font-semibold text-brand-ink hover:bg-brand-tint disabled:cursor-not-allowed disabled:opacity-60"
                   >

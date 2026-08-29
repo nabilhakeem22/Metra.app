@@ -16,11 +16,18 @@ import { requestRevision } from '@/lib/engagements/actions';
 // `.glass`) so it never nests a backdrop-filter inside the glass command card.
 export function EngagementRevisionForm({
   engagementId,
+  revisionCount,
+  freeRevisionN,
   pending,
   runAction,
   onCancel,
 }: {
   engagementId: string;
+  // The revision counter + the free allowance drive whether a change-order amount
+  // is even solicited: a revision still within the free allowance never raises a
+  // charge, so the amount field is hidden AND submitted as undefined.
+  revisionCount: number;
+  freeRevisionN: number;
   pending: boolean;
   runAction: (fn: () => Promise<ActionResult>) => void;
   onCancel: () => void;
@@ -29,12 +36,15 @@ export function EngagementRevisionForm({
   const tc = useTranslations('engagements.controls');
   const [reason, setReason] = useState('');
   const [amount, setAmount] = useState('');
+  // This next revision crosses the free allowance → it will raise a change order,
+  // which requires a positive amount. Within the allowance the field is omitted.
+  const amountRequired = revisionCount >= freeRevisionN;
 
   function submit() {
     runAction(() =>
       requestRevision(engagementId, {
         reason: reason.trim() || undefined,
-        changeOrderAmount: amount.trim() || undefined,
+        changeOrderAmount: amountRequired ? amount.trim() || undefined : undefined,
       }),
     );
   }
@@ -46,18 +56,20 @@ export function EngagementRevisionForm({
         <Label htmlFor="rev-reason">{t('reason')}</Label>
         <Input id="rev-reason" value={reason} onChange={(e) => setReason(e.target.value)} />
       </div>
-      <div className="space-y-1.5">
-        <Label htmlFor="rev-amount">{t('changeOrderAmount')}</Label>
-        <Input
-          id="rev-amount"
-          dir="ltr"
-          inputMode="decimal"
-          className="tabular-nums"
-          value={amount}
-          onChange={(e) => setAmount(e.target.value)}
-        />
-        <p className="text-xs text-muted-foreground">{t('hint')}</p>
-      </div>
+      {amountRequired && (
+        <div className="space-y-1.5">
+          <Label htmlFor="rev-amount">{t('addAmount')}</Label>
+          <Input
+            id="rev-amount"
+            dir="ltr"
+            inputMode="decimal"
+            className="tabular-nums"
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+          />
+          <p className="text-xs text-muted-foreground">{t('hint')}</p>
+        </div>
+      )}
       <div className="flex justify-end gap-2">
         <Button type="button" variant="outline" onClick={onCancel} disabled={pending}>
           {tc('cancel')}

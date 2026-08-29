@@ -22,6 +22,7 @@ export {
   approveDesign,
   rejectDesign,
   setEngagementRom,
+  setEngagementOffPlan,
   recordRomAcknowledgement,
 } from './lifecycle';
 export {

@@ -9,6 +9,10 @@ import {
 } from '../approvals';
 import { createEngagementCore, type CreateEngagementInput } from '../core';
 import { executeTransition } from '../executor';
+import {
+  setEngagementOffPlanCore,
+  type SetEngagementOffPlanInput,
+} from '../off-plan';
 import { setEngagementRomCore, type SetEngagementRomInput } from '../rom';
 import type {
   GenerateFeeSchedulePayload,
@@ -272,6 +276,22 @@ export async function setEngagementRom(
 ): Promise<ActionResult> {
   const ctx = await requireOrg();
   const res = await setEngagementRomCore(ctx, input);
+  if (res.ok) revalidatePath('/', 'layout');
+  return res;
+}
+
+/**
+ * Server-action wrapper for {@link setEngagementOffPlanCore}: resolves the
+ * request's org context, flips the engagement's off-plan flag (existing unit vs
+ * off-plan / developer shell), and revalidates the shell on success. Returns the
+ * ActionResult — never throws to the client. Plain data entry, NOT a machine
+ * transition; the survey-vs-CAD branch (Step 2) reads the flag it writes.
+ */
+export async function setEngagementOffPlan(
+  input: SetEngagementOffPlanInput,
+): Promise<ActionResult> {
+  const ctx = await requireOrg();
+  const res = await setEngagementOffPlanCore(ctx, input);
   if (res.ok) revalidatePath('/', 'layout');
   return res;
 }

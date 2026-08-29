@@ -138,6 +138,7 @@ export const ACTION_CODE_PROBLEM: Record<ActionCode, ApiProblemKind> = {
   as_built_not_due: 'bad-request',
   rom_range_invalid: 'bad-request',
   rom_not_set: 'bad-request',
+  off_plan_locked: 'bad-request',
   flow_not_enabled: 'forbidden',
   payment_kind_mismatch: 'bad-request',
   firm_type_unavailable: 'bad-request',

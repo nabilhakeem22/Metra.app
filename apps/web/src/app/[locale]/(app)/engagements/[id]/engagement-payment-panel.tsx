@@ -65,6 +65,8 @@ export function PaymentPanel({
 
   return (
     <div className="space-y-3 rounded-[var(--r-item)] border border-[color:var(--rule)] bg-[color:var(--track)] p-4">
+      {/* Kind is UP FRONT alongside amount — it drives the milestone gates and the
+          ledger is append-only, so it is not optional metadata to be tucked away. */}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div className="space-y-1.5">
           <Label htmlFor="pay-kind">{t('kind')}</Label>
