@@ -113,18 +113,21 @@ describe('executeTransition — submitDesignFee (Design-Engagement Machine, Step
 
   it('a declared-but-unwired trigger -> transition_not_yet_enabled, state + ledger untouched', async () => {
     const { ctx, engagementId } = await setup();
-    // Advance to design_proposal, then fire `abandon` — legal from
-    // design_proposal but still fail-closed (pendingGuard) at this point in the
-    // build, so it exercises the "declared-but-not-yet-wired" path. (Swap to
-    // another still-pending trigger when abandon itself gets wired.)
+    // `designChangeRaised` is the LAST still-pending trigger after the tail
+    // wiring. It is only legal from final_approval / shop_drawings, so force the
+    // state (BYPASSRLS — the rom-ack test precedent) to exercise the
+    // "declared-but-not-yet-wired" path past the legal-from check.
     await executeTransition(ctx, { engagementId, trigger: 'submitDesignFee', payload: VALID_FEE });
+    await raw.query(
+      `update public.design_engagements set state = 'final_approval' where id = '${engagementId}'`,
+    );
     const res = await executeTransition(ctx, {
       engagementId,
-      trigger: 'abandon',
+      trigger: 'designChangeRaised',
     });
     expect(res).toEqual({ ok: false, error: 'transition_not_yet_enabled' });
     // Guard failure rolls back: no state move, no second ledger row.
-    expect(await stateOf(engagementId)).toBe('design_proposal');
+    expect(await stateOf(engagementId)).toBe('final_approval');
     expect(await ledgerFor(engagementId)).toHaveLength(1);
   });
 

@@ -31,7 +31,7 @@ import type { WorkingFileCategory } from './working-files';
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-/** A working-file category only if it is one of the three known slots. */
+/** A working-file category only if it is one of the known upload categories. */
 function isWorkingFileCategory(value: string): value is WorkingFileCategory {
   return Object.prototype.hasOwnProperty.call(ALLOWED_EXTENSIONS, value);
 }

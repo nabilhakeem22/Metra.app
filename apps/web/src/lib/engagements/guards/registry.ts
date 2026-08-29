@@ -3,6 +3,7 @@
 // executor resolves against. PURE and CLIENT-SAFE: static wiring only.
 import type { GuardFacts, GuardKey, GuardResult } from './facts';
 import {
+  balanceCleared,
   depositCleared,
   gateAInstallmentCleared,
   gateBInstallmentCleared,
@@ -11,11 +12,14 @@ import {
 import {
   asBuiltDueOpen,
   asBuiltReconciled,
+  boqPresent,
+  handoffAcknowledged,
   optionsReady,
   pendingGuard,
   rendersPresent,
   romAcknowledged,
   scopeInputsPresent,
+  shopDrawingsPresent,
   spatialBaseReady,
 } from './readiness';
 
@@ -25,6 +29,7 @@ export const GUARDS: Record<GuardKey, (facts: GuardFacts) => GuardResult> = {
   depositCleared,
   gateAInstallmentCleared,
   gateBInstallmentCleared,
+  balanceCleared,
   romAcknowledged,
   asBuiltReconciled,
   spatialBaseReady,
@@ -32,5 +37,8 @@ export const GUARDS: Record<GuardKey, (facts: GuardFacts) => GuardResult> = {
   revisionCosSettled,
   rendersPresent,
   asBuiltDueOpen,
+  shopDrawingsPresent,
+  boqPresent,
+  handoffAcknowledged,
   pendingGuard,
 };

@@ -14,8 +14,10 @@ import { DIRECT_TRIGGER_ACTIONS } from './trigger-actions';
 // permitted trigger that is NOT the forward-advance one (the Advance button owns
 // that). Folds in the retired `engagement-next-actions.tsx` — rejectDesign,
 // requestRevision, attest/flag as-built, etc. — as small outline buttons so no
-// legal trigger is dropped. A payload trigger opens its existing form; every other
-// fires directly through the shared `trigger-actions` map.
+// legal trigger is dropped. A payload trigger opens its existing form; `abandon`
+// is confirm-gated (first click reveals an inline title/hint + Confirm/Cancel;
+// only Confirm fires — abandoning is terminal and irreversible); every other
+// trigger fires directly through the shared `trigger-actions` map.
 export function EngagementSecondaryActions({
   engagementId,
   triggers,
@@ -36,6 +38,7 @@ export function EngagementSecondaryActions({
   const [openForm, setOpenForm] = useState<'submitDesignFee' | 'requestRevision' | null>(
     null,
   );
+  const [confirmingAbandon, setConfirmingAbandon] = useState(false);
 
   if (triggers.length === 0) return null;
 
@@ -44,8 +47,24 @@ export function EngagementSecondaryActions({
       setOpenForm(trigger as 'submitDesignFee' | 'requestRevision');
       return;
     }
+    // Abandon is terminal: the first click only reveals the inline confirm —
+    // nothing fires until the Confirm button below is pressed.
+    if (trigger === 'abandon') {
+      setConfirmingAbandon((open) => !open);
+      return;
+    }
     const fn = DIRECT_TRIGGER_ACTIONS[trigger];
     if (fn) runAction(() => fn(engagementId));
+  }
+
+  function fireAbandon() {
+    const fn = DIRECT_TRIGGER_ACTIONS.abandon;
+    if (!fn) return;
+    runAction(async () => {
+      const res = await fn(engagementId);
+      if (res.ok) setConfirmingAbandon(false);
+      return res;
+    });
   }
 
   return (
@@ -67,6 +86,39 @@ export function EngagementSecondaryActions({
           </Button>
         ))}
       </div>
+
+      {confirmingAbandon && (
+        <div
+          className="space-y-2 rounded-[var(--r-item)] border border-[color:var(--warn-tint)] bg-[color:var(--track)] p-4"
+          role="alertdialog"
+          aria-label={tcmd('abandonConfirmTitle')}
+        >
+          <p className="text-[13px] font-semibold">{tcmd('abandonConfirmTitle')}</p>
+          <p className="text-[12.5px] text-[color:var(--text-muted)]">
+            {tcmd('abandonConfirmHint')}
+          </p>
+          <div className="flex flex-wrap gap-2 pt-1">
+            <Button
+              type="button"
+              variant="destructive"
+              size="sm"
+              disabled={pending}
+              onClick={fireAbandon}
+            >
+              {tcmd('abandonConfirmCta')}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={pending}
+              onClick={() => setConfirmingAbandon(false)}
+            >
+              {tcmd('abandonConfirmCancel')}
+            </Button>
+          </div>
+        </div>
+      )}
 
       {openForm === 'submitDesignFee' && (
         <EngagementFeeForm

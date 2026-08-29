@@ -45,6 +45,10 @@ export type GuardKey =
   | 'revisionCosSettled'
   | 'rendersPresent'
   | 'asBuiltDueOpen'
+  | 'shopDrawingsPresent'
+  | 'boqPresent'
+  | 'balanceCleared'
+  | 'handoffAcknowledged'
   | 'pendingGuard';
 
 /** The shared pass verdict every guard returns on success. */

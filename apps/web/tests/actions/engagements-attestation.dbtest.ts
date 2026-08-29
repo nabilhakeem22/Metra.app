@@ -192,16 +192,16 @@ describe('as-built attestation — Off-Plan (as_built_due is true)', () => {
     expect(await transitionCount(engagementId, 'attestAsBuiltClean')).toBe(1);
   });
 
-  it('abandon from change_triage is a LEGAL from-state (fail-closed, not illegal_trigger)', async () => {
+  it('abandon from change_triage is a LEGAL from-state (guard-less off-ramp, tail wiring)', async () => {
     const { ctx, engagementId } = await setupFinalApproval(true);
     expect((await flagAsBuiltVariance(ctx, engagementId)).ok).toBe(true);
     expect(await stateOf(engagementId)).toBe('change_triage');
 
-    // abandon is still pendingGuard (Step 14), but change_triage is now in its
-    // from-set, so it returns the pending-guard code — NOT illegal_trigger.
+    // change_triage is in abandon's from-set and abandon is wired guard-less
+    // (the UI confirm-gates it), so the off-ramp fires — NOT illegal_trigger.
     const res = await executeTransition(ctx, { engagementId, trigger: 'abandon' });
-    expect(res).toEqual({ ok: false, error: 'transition_not_yet_enabled' });
-    expect(await stateOf(engagementId)).toBe('change_triage');
+    expect(res.ok).toBe(true);
+    expect(await stateOf(engagementId)).toBe('abandoned');
   });
 
   it('a direct UPDATE / DELETE on an attestation event is denied (append-only grants)', async () => {

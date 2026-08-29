@@ -19,7 +19,8 @@ import { useDeliverableUpload } from './use-deliverable-upload';
 // State → working-file category the studio uploads at that stage (owner table):
 //   layout / concept_review / negotiation → 2D layout
 //   design_3d                             → render set
-//   boq / shop_drawings                   → draft BOQ
+//   shop_drawings                         → shop drawings
+//   boq                                   → draft BOQ
 // A state absent from the map has no inline dropzone (e.g. survey uses the
 // toolbar so a non-off-plan measured survey isn't mistaken for a CAD import).
 const STATE_DROPZONE_CATEGORY: Partial<Record<DesignState, WorkingFileCategory>> = {
@@ -28,7 +29,7 @@ const STATE_DROPZONE_CATEGORY: Partial<Record<DesignState, WorkingFileCategory>>
   negotiation: 'layout',
   design_3d: 'render',
   boq: 'boq',
-  shop_drawings: 'boq',
+  shop_drawings: 'shopDrawing',
 };
 
 /** The inline-dropzone category for a state, or null when the stage has none. */

@@ -6,12 +6,18 @@
 // component may import the map without a boundary breach.
 import type { ActionResult } from '@/lib/actions/result';
 import {
+  abandonEngagement,
   approveDesign,
   attestAsBuiltClean,
+  chooseDesignOnly,
+  chooseExecution,
   confirmAndPayDeposit,
   confirmConcept,
+  draftReady,
+  finalizeBOQ,
   flagAsBuiltVariance,
   optionsReady,
+  recipientAcknowledges,
   rejectDesign,
   rendersReady,
   selectConcept,
@@ -32,4 +38,10 @@ export const DIRECT_TRIGGER_ACTIONS: Partial<
   attestAsBuiltClean,
   approveDesign,
   rejectDesign,
+  draftReady,
+  finalizeBOQ,
+  chooseDesignOnly,
+  chooseExecution,
+  recipientAcknowledges,
+  abandon: abandonEngagement,
 };

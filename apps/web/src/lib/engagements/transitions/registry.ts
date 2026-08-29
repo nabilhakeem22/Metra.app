@@ -1,22 +1,17 @@
-// Design-Engagement Machine — transition registry (Step 2). PURE, CLIENT-SAFE
-// DATA: the whole shape of the machine declared in one place. All 17 triggers
-// are listed so the graph is complete and honest; the wired edges live in
-// `WIRED_TRIGGERS` (Step 5: submitDesignFee, confirmAndPayDeposit,
-// spatialBaseReady; Step 6: optionsReady; Step 7: selectConcept; Step 8:
-// requestRevision self-loop). Every not-yet-wired trigger points its guard at
-// `pendingGuard`, which fails closed with `transition_not_yet_enabled` —
-// declared, reachable in type-space, but impossible to fire until its real
-// guard/side-effect lands.
+// Design-Engagement Machine — transition registry (Step 2, tail wired). PURE,
+// CLIENT-SAFE DATA: the whole shape of the machine declared in one place. All
+// 19 triggers are listed so the graph is complete and honest; the wired edges
+// live in `WIRED_TRIGGERS` — everything except `designChangeRaised`, which
+// still points its guard at `pendingGuard` and fails closed with
+// `transition_not_yet_enabled`: declared, reachable in type-space, but
+// impossible to fire until its real guard/side-effect lands.
 import type { TransitionDef, Trigger } from './types';
 
 /**
- * The registry. The wired edges (see `WIRED_TRIGGERS`) are `submitDesignFee`
- * (created -> design_proposal), `confirmAndPayDeposit` (design_proposal ->
- * survey), `spatialBaseReady` (survey -> layout), `optionsReady` (layout ->
- * concept_review), `selectConcept` (concept_review -> negotiation) and
- * `requestRevision` (negotiation -> negotiation, a self-loop). Every other
- * trigger is declared with its intended from/to but guarded by `pendingGuard`
- * (fail-closed) until its step arrives.
+ * The registry. Every trigger except `designChangeRaised` is wired (see
+ * `WIRED_TRIGGERS`): the happy path runs created -> … -> execution /
+ * closed_design_only, `abandon` is the guard-less off-ramp, and
+ * `designChangeRaised` stays declared-but-fail-closed until its step arrives.
  */
 export const TRANSITIONS: Record<Trigger, TransitionDef> = {
   submitDesignFee: {
@@ -120,38 +115,46 @@ export const TRANSITIONS: Record<Trigger, TransitionDef> = {
     sideEffect: 'recordDesignApproval',
     capability: 'engagements_design',
   },
+  // Tail wiring: the drafted shop drawings open the BOQ stage. Pure state move —
+  // recording a `shop_drawing` artifact IS the attested deliverable.
   draftReady: {
     from: 'shop_drawings',
     to: 'boq',
-    guards: ['pendingGuard'],
+    guards: ['shopDrawingsPresent'],
     sideEffect: null,
     capability: 'engagements_design',
   },
+  // Tail wiring: a recorded BOQ artifact closes documentation and opens the
+  // execution decision. Finance family — the BOQ is priced work.
   finalizeBOQ: {
     from: 'boq',
     to: 'execution_decision',
-    guards: ['pendingGuard'],
+    guards: ['boqPresent'],
     sideEffect: null,
     capability: 'engagements_finance',
   },
+  // Tail wiring (owner-locked): the BALANCE gates BOTH execution-decision exits —
+  // the final installment clears before either ending.
   chooseDesignOnly: {
     from: 'execution_decision',
     to: 'design_only_handoff',
-    guards: ['pendingGuard'],
+    guards: ['balanceCleared'],
     sideEffect: null,
     capability: 'engagements_design',
   },
+  // Tail wiring: the handoff acknowledgement (client token path OR the staff
+  // stand-in) closes the design-only ending. Issue family — owner/admin only.
   recipientAcknowledges: {
     from: 'design_only_handoff',
     to: 'closed_design_only',
-    guards: ['pendingGuard'],
+    guards: ['handoffAcknowledged'],
     sideEffect: null,
     capability: 'engagements_issue',
   },
   chooseExecution: {
     from: 'execution_decision',
     to: 'execution',
-    guards: ['pendingGuard'],
+    guards: ['balanceCleared'],
     sideEffect: null,
     capability: 'engagements_design',
   },
@@ -173,6 +176,9 @@ export const TRANSITIONS: Record<Trigger, TransitionDef> = {
     sideEffect: null,
     capability: 'engagements_design',
   },
+  // Tail wiring: the guard-less off-ramp from every non-terminal state (the UI
+  // gates it behind an inline confirm). requestRevision/rejectDesign precedent —
+  // abandoning is always allowed while the engagement is in flight.
   abandon: {
     from: [
       'created',
@@ -190,7 +196,7 @@ export const TRANSITIONS: Record<Trigger, TransitionDef> = {
       'change_triage',
     ],
     to: 'abandoned',
-    guards: ['pendingGuard'],
+    guards: [],
     sideEffect: null,
     capability: 'engagements_design',
   },
@@ -210,4 +216,10 @@ export const WIRED_TRIGGERS: ReadonlySet<Trigger> = new Set<Trigger>([
   'attestAsBuiltClean',
   'approveDesign',
   'rejectDesign',
+  'draftReady',
+  'finalizeBOQ',
+  'chooseDesignOnly',
+  'chooseExecution',
+  'recipientAcknowledges',
+  'abandon',
 ]);

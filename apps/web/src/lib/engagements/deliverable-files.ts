@@ -13,9 +13,10 @@ import type { WorkingFileCategory } from './working-files';
  * The artifact kind an upload WRITES for each working-file category. This must be
  * a kind the same category's tray slot READS (`CATEGORY_KINDS` in
  * working-files.ts), or an uploaded deliverable would never surface in its slot:
- *   layout -> 'autocad'          (layout reads ['concept_option', 'autocad'])
- *   render -> 'approved_render'  (render reads ['approved_render'])
- *   boq    -> 'boq'              (boq reads ['boq'])
+ *   layout      -> 'autocad'          (layout reads ['concept_option', 'autocad'])
+ *   render      -> 'approved_render'  (render reads ['approved_render'])
+ *   boq         -> 'boq'              (boq reads ['boq'])
+ *   shopDrawing -> 'shop_drawing'     (upload-only — no pinned tray slot)
  * Recording the artifact IS attesting it (see artifacts.ts), so an uploaded
  * deliverable also satisfies the category's guard — hence the stage becomes
  * advanceable (owner decision: no auto-advance).
@@ -27,6 +28,7 @@ export const CATEGORY_WRITE_KIND: Record<
   layout: 'autocad',
   render: 'approved_render',
   boq: 'boq',
+  shopDrawing: 'shop_drawing',
 };
 
 /**
@@ -41,6 +43,7 @@ export const ALLOWED_EXTENSIONS: Record<
   layout: ['pdf', 'dwg', 'dxf', 'png', 'jpg', 'jpeg'],
   render: ['png', 'jpg', 'jpeg', 'pdf'],
   boq: ['xlsx', 'pdf', 'csv'],
+  shopDrawing: ['pdf', 'dwg', 'dxf', 'png', 'jpg', 'jpeg'],
 };
 
 /** Owner decision: the largest deliverable we accept is 100 MB. */

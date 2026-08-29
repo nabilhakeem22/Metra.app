@@ -18,15 +18,19 @@ import { PAYLOAD_TRIGGERS } from './ui';
 
 /**
  * The guards a CLIENT clears by acting on their delivery link — the milestone
- * money gates. When every unmet forward guard is one of these, the studio has
- * nothing left to do and the card reads "waiting on the client" (with a nudge).
- * Any OTHER unmet guard is studio work and takes precedence.
+ * money gates plus the handoff acknowledgement (the client's own
+ * `acknowledge_handoff` token action). When every unmet forward guard is one of
+ * these, the studio has nothing left to do and the card reads "waiting on the
+ * client" (with a nudge). Any OTHER unmet guard is studio work and takes
+ * precedence.
  */
 export const CLIENT_ACTIONABLE_GUARDS: ReadonlySet<GuardKey> = new Set<GuardKey>([
   'depositCleared',
   'gateAInstallmentCleared',
   'gateBInstallmentCleared',
+  'balanceCleared',
   'revisionCosSettled',
+  'handoffAcknowledged',
 ]);
 
 /** Which of the four command-card presentations the current gate resolves to. */

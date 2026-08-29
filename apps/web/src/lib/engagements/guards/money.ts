@@ -127,7 +127,7 @@ export function milestoneShortfall4(
 
 /**
  * The money guards whose shortfall the gate preview surfaces as an "amount due",
- * mapped to the milestone (and, since the three spellings coincide, payment) kind
+ * mapped to the milestone (and, since the four spellings coincide, payment) kind
  * they clear. The hero reads this to know a checklist item is a PAYMENT gate and
  * to pre-fill/route the pay-and-advance form. `revisionCosSettled` is a money gate
  * too but settles change orders (not a milestone), so it is deliberately absent —
@@ -137,6 +137,7 @@ export const MONEY_GUARD_MILESTONE: Partial<Record<GuardKey, MilestoneKind>> = {
   depositCleared: 'deposit',
   gateAInstallmentCleared: 'gate_a',
   gateBInstallmentCleared: 'gate_b',
+  balanceCleared: 'balance',
 };
 
 /**
@@ -188,6 +189,18 @@ export function gateAInstallmentCleared(facts: GuardFacts): GuardResult {
  */
 export function gateBInstallmentCleared(facts: GuardFacts): GuardResult {
   return milestoneCleared(facts, 'gate_b', 'gate_b_not_cleared');
+}
+
+/**
+ * The engagement's balance (final installment) is fully paid — the money gate for
+ * BOTH execution-decision exits, `chooseExecution` and `chooseDesignOnly`
+ * (owner-locked: the balance clears before either ending). Delegates to
+ * {@link milestoneCleared} for the `balance` milestone, surfacing
+ * `balance_not_cleared` on any shortfall. Absent balance milestone = free gate
+ * (the existing rule): a schedule that omits it clears without a balance payment.
+ */
+export function balanceCleared(facts: GuardFacts): GuardResult {
+  return milestoneCleared(facts, 'balance', 'balance_not_cleared');
 }
 
 /**

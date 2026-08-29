@@ -99,6 +99,11 @@ export default async function EngagementDetailPage({
     recordArtifact: can(ctx.role, 'engagements_design', 'create'),
     setRom: can(ctx.role, 'engagements_design', 'update'),
     recordRomAck: can(ctx.role, 'engagements_design', 'create'),
+    // The staff handoff-ack stand-in only makes sense while the design-only
+    // package awaits its receipt — never before, never after closing.
+    recordHandoffAck:
+      header.state === 'design_only_handoff' &&
+      can(ctx.role, 'engagements_design', 'create'),
   };
 
   // May this role fire the hero's forward-advance trigger? (The server action

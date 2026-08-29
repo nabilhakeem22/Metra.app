@@ -65,6 +65,13 @@ describe('CATEGORY_WRITE_KIND', () => {
       layout: 'autocad',
       render: 'approved_render',
       boq: 'boq',
+      shopDrawing: 'shop_drawing',
     });
+  });
+
+  it('shopDrawing is an upload category WITHOUT a pinned tray slot', () => {
+    expect(WORKING_FILE_CATEGORIES).not.toContain('shopDrawing');
+    expect(validateDeliverableFile('shopDrawing', 'wall-section.dwg', 1024)).toBeNull();
+    expect(validateDeliverableFile('shopDrawing', 'boq.xlsx', 1024)).toBe('invalid');
   });
 });

@@ -10,6 +10,10 @@ import {
 import { createEngagementCore, type CreateEngagementInput } from '../core';
 import { executeTransition } from '../executor';
 import {
+  recordHandoffAcknowledgementCore,
+  type RecordHandoffAcknowledgementInput,
+} from '../handoff';
+import {
   setEngagementOffPlanCore,
   type SetEngagementOffPlanInput,
 } from '../off-plan';
@@ -266,6 +270,111 @@ export async function rejectDesign(
 }
 
 /**
+ * Server-action wrapper for the `draftReady` transition (tail wiring):
+ * shop_drawings -> boq. The `shopDrawingsPresent` guard requires at least one
+ * recorded `shop_drawing` artifact. No side-effect, no payload. Revalidates the
+ * shell on success — never throws to the client.
+ */
+export async function draftReady(engagementId: string): Promise<ActionResult> {
+  const ctx = await requireOrg();
+  const res = await executeTransition(ctx, {
+    engagementId,
+    trigger: 'draftReady',
+  });
+  if (res.ok) revalidatePath('/', 'layout');
+  return res;
+}
+
+/**
+ * Server-action wrapper for the `finalizeBOQ` transition (tail wiring):
+ * boq -> execution_decision. The `boqPresent` guard requires a recorded `boq`
+ * artifact; the trigger is finance-family (owner/admin/accountant). No
+ * side-effect, no payload. Revalidates the shell on success — never throws.
+ */
+export async function finalizeBOQ(engagementId: string): Promise<ActionResult> {
+  const ctx = await requireOrg();
+  const res = await executeTransition(ctx, {
+    engagementId,
+    trigger: 'finalizeBOQ',
+  });
+  if (res.ok) revalidatePath('/', 'layout');
+  return res;
+}
+
+/**
+ * Server-action wrapper for the `chooseDesignOnly` transition (tail wiring):
+ * execution_decision -> design_only_handoff. The `balanceCleared` guard requires
+ * the balance installment fully paid (owner-locked: the balance gates BOTH
+ * endings). No side-effect, no payload. Revalidates the shell on success.
+ */
+export async function chooseDesignOnly(
+  engagementId: string,
+): Promise<ActionResult> {
+  const ctx = await requireOrg();
+  const res = await executeTransition(ctx, {
+    engagementId,
+    trigger: 'chooseDesignOnly',
+  });
+  if (res.ok) revalidatePath('/', 'layout');
+  return res;
+}
+
+/**
+ * Server-action wrapper for the `chooseExecution` transition (tail wiring):
+ * execution_decision -> execution (terminal). The `balanceCleared` guard
+ * requires the balance installment fully paid. No side-effect, no payload.
+ * Revalidates the shell on success — never throws to the client.
+ */
+export async function chooseExecution(
+  engagementId: string,
+): Promise<ActionResult> {
+  const ctx = await requireOrg();
+  const res = await executeTransition(ctx, {
+    engagementId,
+    trigger: 'chooseExecution',
+  });
+  if (res.ok) revalidatePath('/', 'layout');
+  return res;
+}
+
+/**
+ * Server-action wrapper for the `recipientAcknowledges` transition (tail
+ * wiring): design_only_handoff -> closed_design_only (terminal). The
+ * `handoffAcknowledged` guard requires one `handoff_acknowledgement` event (the
+ * client's token ack OR the staff-recorded stand-in); the trigger is
+ * issue-family (owner/admin, approve). Revalidates the shell on success.
+ */
+export async function recipientAcknowledges(
+  engagementId: string,
+): Promise<ActionResult> {
+  const ctx = await requireOrg();
+  const res = await executeTransition(ctx, {
+    engagementId,
+    trigger: 'recipientAcknowledges',
+  });
+  if (res.ok) revalidatePath('/', 'layout');
+  return res;
+}
+
+/**
+ * Server-action wrapper for the `abandon` transition (tail wiring): any
+ * non-terminal state -> abandoned (terminal). Guard-less — the UI gates it
+ * behind an inline confirm instead. No side-effect, no payload. Revalidates the
+ * shell on success — never throws to the client.
+ */
+export async function abandonEngagement(
+  engagementId: string,
+): Promise<ActionResult> {
+  const ctx = await requireOrg();
+  const res = await executeTransition(ctx, {
+    engagementId,
+    trigger: 'abandon',
+  });
+  if (res.ok) revalidatePath('/', 'layout');
+  return res;
+}
+
+/**
  * Server-action wrapper for {@link setEngagementRomCore}: resolves the request's
  * org context, writes the coarse build-cost band (ROM low/high), and revalidates
  * the shell on success. Returns the ActionResult — never throws to the client.
@@ -309,6 +418,23 @@ export async function recordRomAcknowledgement(
 ): Promise<ActionResult & { data?: string }> {
   const ctx = await requireOrg();
   const res = await recordRomAcknowledgementCore(ctx, input);
+  if (res.ok) revalidatePath('/', 'layout');
+  return res;
+}
+
+/**
+ * Server-action wrapper for {@link recordHandoffAcknowledgementCore}: resolves
+ * the request's org context, appends one `handoff_acknowledgement` event (the
+ * staff stand-in for the client's token ack), and revalidates the shell on
+ * success. Returns the ActionResult (with the new event id in `data`) — never
+ * throws to the client. This is manual-model data entry, NOT a machine
+ * transition; the `recipientAcknowledges` guard reads the event it writes.
+ */
+export async function recordHandoffAcknowledgement(
+  input: RecordHandoffAcknowledgementInput,
+): Promise<ActionResult & { data?: string }> {
+  const ctx = await requireOrg();
+  const res = await recordHandoffAcknowledgementCore(ctx, input);
   if (res.ok) revalidatePath('/', 'layout');
   return res;
 }

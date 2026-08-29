@@ -497,6 +497,11 @@
     "revision_cos_outstanding": "Settle the outstanding revision change orders before locking the concept",
     "renders_missing": "Add at least one approved render to continue",
     "as_built_not_due": "As-built drawings are not due for this delivery",
+    "shop_drawings_missing": "Record at least one shop drawing to continue",
+    "boq_missing": "Record the bill of quantities to continue",
+    "balance_not_cleared": "The final balance has not been fully paid yet",
+    "handoff_not_acknowledged": "The recipient must acknowledge the handoff before closing",
+    "handoff_not_open": "The design-only handoff isn't open at this stage",
     "rom_range_invalid": "Enter a valid low–high build-cost range",
     "rom_not_set": "Enter the build-cost range before recording the client's acknowledgement",
     "off_plan_locked": "Off-plan can only be changed before the deposit is paid.",
@@ -1441,7 +1446,13 @@
       "flagAsBuiltVariance": "Flag as-built variance",
       "attestAsBuiltClean": "Attest as-built clean",
       "approveDesign": "Approve design",
-      "rejectDesign": "Reject design"
+      "rejectDesign": "Reject design",
+      "draftReady": "Shop drawings ready",
+      "finalizeBOQ": "Finalize BOQ",
+      "chooseDesignOnly": "Close as design-only",
+      "chooseExecution": "Proceed to execution",
+      "recipientAcknowledges": "Confirm handoff received",
+      "abandon": "Abandon delivery"
     },
     "phase": {
       "proposal_survey": "Proposal & survey",
@@ -1483,6 +1494,10 @@
       "revisionCosSettled": "Revision charges settled",
       "rendersPresent": "Approved render ready",
       "asBuiltDueOpen": "As-built check open",
+      "shopDrawingsPresent": "Shop drawings recorded",
+      "boqPresent": "BOQ recorded",
+      "balanceCleared": "Balance payment cleared",
+      "handoffAcknowledged": "Handoff acknowledged",
       "pendingGuard": "Not yet available"
     },
     "hero": {
@@ -1535,20 +1550,20 @@
         "hint": "Attest a clean as-built to return the delivery to final approval."
       },
       "shop_drawings": {
-        "headline": "Prepare the shop drawings",
-        "hint": "Draft the construction drawings — the next stage isn't automated yet."
+        "headline": "Draft the shop drawings",
+        "hint": "Upload the production drawings — once at least one is recorded, the delivery advances to the BOQ."
       },
       "boq": {
         "headline": "Build the bill of quantities",
-        "hint": "Compile the BOQ — the next stage isn't automated yet."
+        "hint": "Compile and record the BOQ to open the execution decision."
       },
       "execution_decision": {
-        "headline": "Choose the handoff path",
-        "hint": "Decide between a design-only handoff and full execution — not automated yet."
+        "headline": "Settle the balance & choose how this ends",
+        "hint": "Once the balance clears, Advance continues into full execution — or use \"Close as design-only\" below to hand the design off and close."
       },
       "design_only_handoff": {
         "headline": "Await the recipient's acknowledgement",
-        "hint": "The issued-for-construction package is out — closing awaits acknowledgement, not automated yet."
+        "hint": "The design-only package is out — once the recipient acknowledges receipt (via their link, or recorded on their behalf), close the delivery."
       }
     },
     "nextActions": {
@@ -1570,6 +1585,10 @@
       "clientLinkActive": "Client link active",
       "clientLinkInactive": "Not shared",
       "moreLabel": "More actions",
+      "abandonConfirmTitle": "Abandon this delivery?",
+      "abandonConfirmHint": "This permanently closes the delivery — no further stages, payments or files can be recorded. It cannot be undone.",
+      "abandonConfirmCta": "Abandon delivery",
+      "abandonConfirmCancel": "Keep working",
       "pill": {
         "ready": "Ready to advance",
         "studio": "Your move",
@@ -1649,12 +1668,14 @@
       "category": {
         "layout": "2D layout",
         "render": "Render set",
-        "boq": "Draft BOQ"
+        "boq": "Draft BOQ",
+        "shopDrawing": "Shop drawings"
       },
       "badge": {
         "layout": "2D",
         "render": "3D",
-        "boq": "BOQ"
+        "boq": "BOQ",
+        "shopDrawing": "Shop"
       }
     },
     "fee": {
@@ -1718,6 +1739,11 @@
       "addNote": "Add note",
       "save": "Save",
       "cancel": "Cancel"
+    },
+    "handoffAck": {
+      "title": "Record handoff receipt",
+      "hint": "Log the recipient's acknowledgement of the design-only package taken offline.",
+      "submit": "Record acknowledgement"
     },
     "paymentKind": {
       "deposit": "Deposit",

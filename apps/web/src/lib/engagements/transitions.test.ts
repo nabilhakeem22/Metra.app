@@ -46,10 +46,16 @@ describe('transition registry', () => {
       const froms = Array.isArray(def.from) ? def.from : [def.from];
       for (const from of froms) expect(states.has(from)).toBe(true);
       expect(states.has(def.to)).toBe(true);
-      // The two guard-less edges: requestRevision (Step 8 — a revision from
-      // negotiation is always allowed) and rejectDesign (Step 14 — a rejection
-      // from final_approval is always allowed). Every other edge carries a guard.
-      if (trigger === 'requestRevision' || trigger === 'rejectDesign') {
+      // The three guard-less edges: requestRevision (Step 8 — a revision from
+      // negotiation is always allowed), rejectDesign (Step 14 — a rejection from
+      // final_approval is always allowed), and abandon (tail wiring — the
+      // off-ramp is always allowed; the UI confirm-gates it instead). Every
+      // other edge carries a guard.
+      if (
+        trigger === 'requestRevision' ||
+        trigger === 'rejectDesign' ||
+        trigger === 'abandon'
+      ) {
         expect(def.guards).toEqual([]);
       } else {
         expect(def.guards.length).toBeGreaterThan(0);
@@ -93,15 +99,21 @@ describe('transition registry', () => {
     expect([...reachable].sort()).toEqual([...DESIGN_STATES].sort());
   });
 
-  it('the 12 wired triggers (through Step 14) carry concrete guards; the rest fail closed', () => {
+  it('the 18 wired triggers (tail wired) carry concrete guards; only designChangeRaised fails closed', () => {
     expect([...WIRED_TRIGGERS].sort()).toEqual(
       [
+        'abandon',
         'approveDesign',
         'attestAsBuiltClean',
+        'chooseDesignOnly',
+        'chooseExecution',
         'confirmAndPayDeposit',
         'confirmConcept',
+        'draftReady',
+        'finalizeBOQ',
         'flagAsBuiltVariance',
         'optionsReady',
+        'recipientAcknowledges',
         'rejectDesign',
         'rendersReady',
         'requestRevision',
@@ -220,7 +232,66 @@ describe('transition registry', () => {
     expect(TRANSITIONS.rejectDesign.capability).toBe('engagements_design');
     expect(TRANSITIONS.rejectDesign.sideEffect).toBe('resetRevisionsOnReject');
 
-    // Every other trigger routes through pendingGuard (fail-closed).
+    // draftReady (tail): at least one recorded shop_drawing artifact opens the
+    // BOQ stage — a pure state move (recording IS attesting).
+    expect(TRANSITIONS.draftReady.guards).toEqual(['shopDrawingsPresent']);
+    expect(TRANSITIONS.draftReady.from).toBe('shop_drawings');
+    expect(TRANSITIONS.draftReady.to).toBe('boq');
+    expect(TRANSITIONS.draftReady.capability).toBe('engagements_design');
+    expect(TRANSITIONS.draftReady.sideEffect).toBeNull();
+
+    // finalizeBOQ (tail): a recorded boq artifact closes documentation and opens
+    // the execution decision — finance family (priced work).
+    expect(TRANSITIONS.finalizeBOQ.guards).toEqual(['boqPresent']);
+    expect(TRANSITIONS.finalizeBOQ.from).toBe('boq');
+    expect(TRANSITIONS.finalizeBOQ.to).toBe('execution_decision');
+    expect(TRANSITIONS.finalizeBOQ.capability).toBe('engagements_finance');
+    expect(TRANSITIONS.finalizeBOQ.sideEffect).toBeNull();
+
+    // The execution-decision fan-out (tail, owner-locked): the BALANCE gates
+    // BOTH exits — the final installment clears before either ending.
+    expect(TRANSITIONS.chooseDesignOnly.guards).toEqual(['balanceCleared']);
+    expect(TRANSITIONS.chooseDesignOnly.from).toBe('execution_decision');
+    expect(TRANSITIONS.chooseDesignOnly.to).toBe('design_only_handoff');
+    expect(TRANSITIONS.chooseDesignOnly.capability).toBe('engagements_design');
+    expect(TRANSITIONS.chooseDesignOnly.sideEffect).toBeNull();
+
+    expect(TRANSITIONS.chooseExecution.guards).toEqual(['balanceCleared']);
+    expect(TRANSITIONS.chooseExecution.from).toBe('execution_decision');
+    expect(TRANSITIONS.chooseExecution.to).toBe('execution');
+    expect(TRANSITIONS.chooseExecution.capability).toBe('engagements_design');
+    expect(TRANSITIONS.chooseExecution.sideEffect).toBeNull();
+
+    // recipientAcknowledges (tail): one handoff_acknowledgement event (ANY actor
+    // channel) closes the design-only ending — issue family (owner/admin).
+    expect(TRANSITIONS.recipientAcknowledges.guards).toEqual([
+      'handoffAcknowledged',
+    ]);
+    expect(TRANSITIONS.recipientAcknowledges.from).toBe('design_only_handoff');
+    expect(TRANSITIONS.recipientAcknowledges.to).toBe('closed_design_only');
+    expect(TRANSITIONS.recipientAcknowledges.capability).toBe(
+      'engagements_issue',
+    );
+    expect(TRANSITIONS.recipientAcknowledges.sideEffect).toBeNull();
+
+    // abandon (tail): the guard-less off-ramp from every non-terminal state
+    // (the UI confirm-gates it); no side-effect.
+    expect(TRANSITIONS.abandon.guards).toEqual([]);
+    expect(TRANSITIONS.abandon.to).toBe('abandoned');
+    expect(TRANSITIONS.abandon.capability).toBe('engagements_design');
+    expect(TRANSITIONS.abandon.sideEffect).toBeNull();
+    // Its from-set is exactly every non-terminal state.
+    expect([...(TRANSITIONS.abandon.from as DesignState[])].sort()).toEqual(
+      DESIGN_STATES.filter(
+        (state) =>
+          state !== 'abandoned' &&
+          state !== 'execution' &&
+          state !== 'closed_design_only',
+      ).sort(),
+    );
+
+    // Every other trigger routes through pendingGuard (fail-closed) — after the
+    // tail wiring that is ONLY designChangeRaised.
     const wired = new Set<Trigger>([
       'submitDesignFee',
       'confirmAndPayDeposit',
@@ -234,9 +305,16 @@ describe('transition registry', () => {
       'attestAsBuiltClean',
       'approveDesign',
       'rejectDesign',
+      'draftReady',
+      'finalizeBOQ',
+      'chooseDesignOnly',
+      'chooseExecution',
+      'recipientAcknowledges',
+      'abandon',
     ]);
-    for (const trigger of ALL_TRIGGERS) {
-      if (wired.has(trigger)) continue;
+    const failClosed = ALL_TRIGGERS.filter((trigger) => !wired.has(trigger));
+    expect(failClosed).toEqual(['designChangeRaised']);
+    for (const trigger of failClosed) {
       expect(TRANSITIONS[trigger].guards).toContain('pendingGuard');
     }
   });

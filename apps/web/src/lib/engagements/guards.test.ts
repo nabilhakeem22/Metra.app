@@ -682,6 +682,199 @@ describe('asBuiltDueOpen', () => {
   });
 });
 
+describe('shopDrawingsPresent', () => {
+  // Reuses spatialFacts (offPlan is irrelevant): it builds the artifacts bundle
+  // from a list of kinds, which is all shopDrawingsPresent reads.
+  it('passes with at least one shop_drawing artifact', () => {
+    expect(
+      GUARDS.shopDrawingsPresent(spatialFacts(false, ['shop_drawing'])),
+    ).toEqual({ ok: true });
+    expect(
+      GUARDS.shopDrawingsPresent(
+        spatialFacts(false, ['approved_render', 'shop_drawing', 'boq']),
+      ),
+    ).toEqual({ ok: true });
+  });
+
+  it('fails closed with shop_drawings_missing when none is present', () => {
+    expect(GUARDS.shopDrawingsPresent(spatialFacts(false, []))).toEqual({
+      ok: false,
+      code: 'shop_drawings_missing',
+    });
+    // A render / BOQ / survey in the bundle never counts as a shop drawing.
+    expect(
+      GUARDS.shopDrawingsPresent(
+        spatialFacts(false, ['approved_render', 'boq', 'survey']),
+      ),
+    ).toEqual({ ok: false, code: 'shop_drawings_missing' });
+  });
+});
+
+describe('boqPresent', () => {
+  it('passes with at least one boq artifact', () => {
+    expect(GUARDS.boqPresent(spatialFacts(false, ['boq']))).toEqual({
+      ok: true,
+    });
+    expect(
+      GUARDS.boqPresent(spatialFacts(false, ['shop_drawing', 'boq'])),
+    ).toEqual({ ok: true });
+  });
+
+  it('fails closed with boq_missing when none is present', () => {
+    expect(GUARDS.boqPresent(spatialFacts(false, []))).toEqual({
+      ok: false,
+      code: 'boq_missing',
+    });
+    // A shop drawing / render in the bundle never counts as a BOQ.
+    expect(
+      GUARDS.boqPresent(spatialFacts(false, ['shop_drawing', 'approved_render'])),
+    ).toEqual({ ok: false, code: 'boq_missing' });
+  });
+});
+
+describe('handoffAcknowledged', () => {
+  function handoffFacts(kinds: EngagementEvent['kind'][]): GuardFacts {
+    return {
+      engagement: {} as DesignEngagement,
+      milestones: [],
+      payments: [],
+      artifacts: [],
+      changeOrders: [],
+      events: kinds.map((kind) => ({ kind }) as EngagementEvent),
+    };
+  }
+
+  it('passes when a handoff_acknowledgement event is present (any channel)', () => {
+    expect(
+      GUARDS.handoffAcknowledged(handoffFacts(['handoff_acknowledgement'])),
+    ).toEqual({ ok: true });
+    expect(
+      GUARDS.handoffAcknowledged(
+        handoffFacts(['design_approval', 'handoff_acknowledgement']),
+      ),
+    ).toEqual({ ok: true });
+  });
+
+  it('fails closed with handoff_not_acknowledged when no such event exists', () => {
+    expect(GUARDS.handoffAcknowledged(handoffFacts([]))).toEqual({
+      ok: false,
+      code: 'handoff_not_acknowledged',
+    });
+    // A ROM ack / design approval does not satisfy it.
+    expect(
+      GUARDS.handoffAcknowledged(
+        handoffFacts(['rom_acknowledgement', 'design_approval']),
+      ),
+    ).toEqual({ ok: false, code: 'handoff_not_acknowledged' });
+  });
+});
+
+/** Build a facts bundle for balanceCleared: fee + optional balance milestone + paid rows. */
+function balanceFacts(opts: {
+  designFee: string | null;
+  balance?: { basis: 'percent' | 'amount'; value: string };
+  paid: { kind: PaymentEvent['kind']; amount: string }[];
+}): GuardFacts {
+  const milestones: EngagementMilestone[] = opts.balance
+    ? [
+        {
+          kind: 'balance',
+          basis: opts.balance.basis,
+          value: opts.balance.value,
+        } as EngagementMilestone,
+      ]
+    : [];
+  return {
+    engagement: { designFee: opts.designFee } as DesignEngagement,
+    milestones,
+    payments: opts.paid.map((p) => p as PaymentEvent),
+    artifacts: [],
+    changeOrders: [],
+    events: [],
+  };
+}
+
+describe('balanceCleared', () => {
+  it('amount basis: passes iff balance paid >= the milestone value (short/exact)', () => {
+    const base = { designFee: '100000', balance: { basis: 'amount' as const, value: '30000' } };
+    expect(
+      GUARDS.balanceCleared(
+        balanceFacts({ ...base, paid: [{ kind: 'balance', amount: '30000' }] }),
+      ),
+    ).toEqual({ ok: true });
+    // Two partials that sum to the requirement also clear it.
+    expect(
+      GUARDS.balanceCleared(
+        balanceFacts({
+          ...base,
+          paid: [
+            { kind: 'balance', amount: '10000' },
+            { kind: 'balance', amount: '20000' },
+          ],
+        }),
+      ),
+    ).toEqual({ ok: true });
+    // A piastre short fails closed.
+    expect(
+      GUARDS.balanceCleared(
+        balanceFacts({ ...base, paid: [{ kind: 'balance', amount: '29999.9999' }] }),
+      ),
+    ).toEqual({ ok: false, code: 'balance_not_cleared' });
+    expect(GUARDS.balanceCleared(balanceFacts({ ...base, paid: [] }))).toEqual({
+      ok: false,
+      code: 'balance_not_cleared',
+    });
+  });
+
+  it('percent basis: required = design_fee × balance% / 100 (exact)', () => {
+    // 30% of 100,000 = 30,000 exactly.
+    const base = { designFee: '100000', balance: { basis: 'percent' as const, value: '30' } };
+    expect(
+      GUARDS.balanceCleared(
+        balanceFacts({ ...base, paid: [{ kind: 'balance', amount: '30000' }] }),
+      ),
+    ).toEqual({ ok: true });
+    expect(
+      GUARDS.balanceCleared(
+        balanceFacts({ ...base, paid: [{ kind: 'balance', amount: '29999.9999' }] }),
+      ),
+    ).toEqual({ ok: false, code: 'balance_not_cleared' });
+  });
+
+  it('KIND-ISOLATION: a gate_b/deposit surplus does NOT satisfy the balance', () => {
+    const base = { designFee: '100000', balance: { basis: 'amount' as const, value: '30000' } };
+    expect(
+      GUARDS.balanceCleared(
+        balanceFacts({
+          ...base,
+          paid: [
+            { kind: 'gate_b', amount: '30000' },
+            { kind: 'deposit', amount: '30000' },
+          ],
+        }),
+      ),
+    ).toEqual({ ok: false, code: 'balance_not_cleared' });
+  });
+
+  it('absent balance milestone = free gate: clears with no balance payment', () => {
+    expect(
+      GUARDS.balanceCleared(balanceFacts({ designFee: '100000', paid: [] })),
+    ).toEqual({ ok: true });
+  });
+
+  it('fails closed when the balance milestone EXISTS but the design_fee is missing', () => {
+    expect(
+      GUARDS.balanceCleared(
+        balanceFacts({
+          designFee: null,
+          balance: { basis: 'percent', value: '30' },
+          paid: [{ kind: 'balance', amount: '999999' }],
+        }),
+      ),
+    ).toEqual({ ok: false, code: 'balance_not_cleared' });
+  });
+});
+
 describe('pendingGuard', () => {
   it('always fails closed with transition_not_yet_enabled', () => {
     expect(GUARDS.pendingGuard(engagement({}))).toEqual({
@@ -701,6 +894,10 @@ describe('moneyGuardOf', () => {
     // approveDesign carries romAcknowledged + asBuiltReconciled first, but the
     // ONLY money guard is gateBInstallmentCleared.
     expect(moneyGuardOf('approveDesign')).toBe('gateBInstallmentCleared');
+    // BOTH execution-decision exits ride the balance gate (owner-locked), so
+    // pay-and-advance accepts a 'balance' receipt with either trigger.
+    expect(moneyGuardOf('chooseExecution')).toBe('balanceCleared');
+    expect(moneyGuardOf('chooseDesignOnly')).toBe('balanceCleared');
   });
 
   it('returns null for a trigger with no money-milestone guard', () => {
@@ -708,5 +905,8 @@ describe('moneyGuardOf', () => {
     expect(moneyGuardOf('requestRevision')).toBeNull();
     expect(moneyGuardOf('confirmConcept')).toBeNull();
     expect(moneyGuardOf('submitDesignFee')).toBeNull();
+    expect(moneyGuardOf('draftReady')).toBeNull();
+    expect(moneyGuardOf('recipientAcknowledges')).toBeNull();
+    expect(moneyGuardOf('abandon')).toBeNull();
   });
 });

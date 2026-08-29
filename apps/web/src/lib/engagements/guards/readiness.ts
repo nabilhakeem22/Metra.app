@@ -1,8 +1,9 @@
 // Design-Engagement Machine — readiness guard family (Step 2, widened in Steps
-// 5/12/13/14). PURE and CLIENT-SAFE: the scope, artifact (survey / CAD / concept
-// options / renders), and attestation-event (ROM ack, as-built) gates that decide
-// whether the design is ready to advance, plus the fail-closed `pendingGuard`
-// sentinel. Its only dependencies are the erased `@metra/db` types.
+// 5/12/13/14 and the tail wiring). PURE and CLIENT-SAFE: the scope, artifact
+// (survey / CAD / concept options / renders / shop drawings / BOQ), and
+// attestation-event (ROM ack, as-built, handoff ack) gates that decide whether
+// the design is ready to advance, plus the fail-closed `pendingGuard` sentinel.
+// Its only dependencies are the erased `@metra/db` types.
 import type { EngagementArtifact, EngagementEvent } from '@metra/db';
 import { pass, type GuardFacts, type GuardResult } from './facts';
 
@@ -125,6 +126,45 @@ export function rendersPresent(facts: GuardFacts): GuardResult {
   );
   if (!hasApprovedRender) return { ok: false, code: 'renders_missing' };
   return pass;
+}
+
+/**
+ * At least one shop drawing is recorded — the gate for `draftReady`
+ * (shop_drawings -> boq). Counts ONLY `shop_drawing` artifacts (a render or BOQ
+ * in the bundle never counts). Fails closed with `shop_drawings_missing` when
+ * none is present.
+ */
+export function shopDrawingsPresent(facts: GuardFacts): GuardResult {
+  const hasShopDrawing = facts.artifacts.some(
+    (artifact) => artifact.kind === 'shop_drawing',
+  );
+  if (!hasShopDrawing) return { ok: false, code: 'shop_drawings_missing' };
+  return pass;
+}
+
+/**
+ * The bill of quantities is recorded — the gate for `finalizeBOQ`
+ * (boq -> execution_decision). Counts ONLY `boq` artifacts. Fails closed with
+ * `boq_missing` when none is present.
+ */
+export function boqPresent(facts: GuardFacts): GuardResult {
+  const hasBoq = facts.artifacts.some((artifact) => artifact.kind === 'boq');
+  if (!hasBoq) return { ok: false, code: 'boq_missing' };
+  return pass;
+}
+
+/**
+ * The recipient has acknowledged the design-only handoff — the gate for
+ * `recipientAcknowledges` (design_only_handoff -> closed_design_only). ANY actor
+ * channel satisfies it (the romAcknowledged pattern): the client's own token-path
+ * ack (`acknowledge_handoff`) and the staff-recorded ack both append one
+ * `handoff_acknowledgement` event. Fails closed with `handoff_not_acknowledged`
+ * when none is present.
+ */
+export function handoffAcknowledged(facts: GuardFacts): GuardResult {
+  return facts.events.some((event) => event.kind === 'handoff_acknowledgement')
+    ? pass
+    : { ok: false, code: 'handoff_not_acknowledged' };
 }
 
 /**

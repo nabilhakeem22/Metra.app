@@ -21,9 +21,16 @@ export {
   attestAsBuiltClean,
   approveDesign,
   rejectDesign,
+  draftReady,
+  finalizeBOQ,
+  chooseDesignOnly,
+  chooseExecution,
+  recipientAcknowledges,
+  abandonEngagement,
   setEngagementRom,
   setEngagementOffPlan,
   recordRomAcknowledgement,
+  recordHandoffAcknowledgement,
 } from './lifecycle';
 export {
   recordPayment,

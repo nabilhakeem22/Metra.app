@@ -19,19 +19,23 @@ import type { EngagementFeeSchedule, EngagementPayment } from './queries';
 import { isTerminal, type DesignState } from './states';
 import { TRANSITIONS, type Trigger } from './transitions';
 
-/** The three PAYING gate milestones, in the order money is collected. */
-type GateKind = 'deposit' | 'gate_a' | 'gate_b';
-const GATE_ORDER: readonly GateKind[] = ['deposit', 'gate_a', 'gate_b'];
+/** The four PAYING gate milestones, in the order money is collected. */
+type GateKind = 'deposit' | 'gate_a' | 'gate_b' | 'balance';
+const GATE_ORDER: readonly GateKind[] = ['deposit', 'gate_a', 'gate_b', 'balance'];
 
 /**
  * Each paying gate mapped to the wired trigger whose money guard clears it. Used
  * ONLY to derive the phase the gate unlocks (see {@link gateUnlocksPhase}) — the
- * pulse never fires these triggers.
+ * pulse never fires these triggers. `balance` gates BOTH execution-decision
+ * exits; `chooseExecution` is the auto-proposed primary, so it stands for the
+ * pair here (its origin sits in the LAST phase, so the gate unlocks no further
+ * phase — `gateUnlocksPhase` yields null).
  */
 const GATE_TRIGGER: Record<GateKind, Trigger> = {
   deposit: 'confirmAndPayDeposit',
   gate_a: 'selectConcept',
   gate_b: 'approveDesign',
+  balance: 'chooseExecution',
 };
 
 /** The next un-cleared paying gate: what is still owed and what it opens. */
@@ -94,7 +98,8 @@ function paidForKind(
  *                       of the contract total, so they are excluded — keeping the
  *                       percent apples-to-apples).
  *   - `collectedPct`  = collected / contractTotal, integer, guarded at 0 total.
- *   - `pendingGate`   = the first paying gate (deposit -> gate_a -> gate_b) with a
+ *   - `pendingGate`   = the first paying gate (deposit -> gate_a -> gate_b ->
+ *                       balance) with a
  *                       positive shortfall; null when none is outstanding OR the
  *                       engagement is terminal (a closed/abandoned engagement
  *                       unlocks nothing further — the honest reading).

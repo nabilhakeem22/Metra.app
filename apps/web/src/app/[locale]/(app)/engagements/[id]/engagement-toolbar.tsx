@@ -1,22 +1,25 @@
 'use client';
 
-import { Banknote, FileUp, Ruler, UserCheck } from 'lucide-react';
+import { Banknote, FileUp, PackageCheck, Ruler, UserCheck } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { useState } from 'react';
 import type { EngagementArtifactKind } from '@metra/db';
 import type { ActionResult } from '@/lib/actions/result';
 import { ArtifactPanel } from './engagement-artifact-panel';
+import { HandoffAckPanel } from './engagement-handoff-ack-panel';
 import { PaymentPanel } from './engagement-payment-panel';
 import { RomAckPanel } from './engagement-rom-ack-panel';
 import { RomPanel } from './engagement-rom-panel';
 
-type Panel = 'payment' | 'artifact' | 'rom' | 'romAck';
+type Panel = 'payment' | 'artifact' | 'rom' | 'romAck' | 'handoffAck';
 
 export interface ToolbarCapabilities {
   recordPayment: boolean;
   recordArtifact: boolean;
   setRom: boolean;
   recordRomAck: boolean;
+  /** Offered only while the engagement sits at design_only_handoff. */
+  recordHandoffAck: boolean;
 }
 
 // The cockpit TOOLBAR (refactor of the old data-entry controls) — capability-gated
@@ -39,6 +42,7 @@ export function EngagementToolbar({
   const t = useTranslations('engagements.controls');
   const tt = useTranslations('engagements.toolbar');
   const ta = useTranslations('engagements.artifactKind');
+  const tha = useTranslations('engagements.handoffAck');
   const [panel, setPanel] = useState<Panel | null>(null);
 
   const [artKind, setArtKind] = useState<EngagementArtifactKind>('survey');
@@ -47,6 +51,7 @@ export function EngagementToolbar({
   const [romLow, setRomLow] = useState('');
   const [romHigh, setRomHigh] = useState('');
   const [ackNote, setAckNote] = useState('');
+  const [handoffAckNote, setHandoffAckNote] = useState('');
 
   function after(fn: () => Promise<ActionResult>) {
     runAction(async () => {
@@ -84,7 +89,8 @@ export function EngagementToolbar({
     capabilities.recordPayment ||
     capabilities.recordArtifact ||
     capabilities.setRom ||
-    capabilities.recordRomAck;
+    capabilities.recordRomAck ||
+    capabilities.recordHandoffAck;
   if (!anyCapability) return null;
 
   return (
@@ -108,16 +114,30 @@ export function EngagementToolbar({
         </div>
       )}
 
-      {capabilities.recordRomAck && (
-        <div className="border-t border-dashed border-[color:var(--rule)] pt-3">
-          <Tile
-            icon={UserCheck}
-            name={tt('onBehalf.name')}
-            purpose={tt('onBehalf.purpose')}
-            subordinate
-            active={panel === 'romAck'}
-            onClick={() => setPanel((p) => (p === 'romAck' ? null : 'romAck'))}
-          />
+      {(capabilities.recordRomAck || capabilities.recordHandoffAck) && (
+        <div className="grid grid-cols-[repeat(auto-fit,minmax(150px,1fr))] gap-2.5 border-t border-dashed border-[color:var(--rule)] pt-3">
+          {capabilities.recordRomAck && (
+            <Tile
+              icon={UserCheck}
+              name={tt('onBehalf.name')}
+              purpose={tt('onBehalf.purpose')}
+              subordinate
+              active={panel === 'romAck'}
+              onClick={() => setPanel((p) => (p === 'romAck' ? null : 'romAck'))}
+            />
+          )}
+          {capabilities.recordHandoffAck && (
+            <Tile
+              icon={PackageCheck}
+              name={tha('title')}
+              purpose={tha('hint')}
+              subordinate
+              active={panel === 'handoffAck'}
+              onClick={() =>
+                setPanel((p) => (p === 'handoffAck' ? null : 'handoffAck'))
+              }
+            />
+          )}
         </div>
       )}
 
@@ -168,6 +188,19 @@ export function EngagementToolbar({
           engagementId={engagementId}
           ackNote={ackNote}
           setAckNote={setAckNote}
+          after={after}
+          onCancel={() => setPanel(null)}
+        />
+      )}
+
+      {panel === 'handoffAck' && (
+        <HandoffAckPanel
+          t={t}
+          th={tha}
+          pending={pending}
+          engagementId={engagementId}
+          ackNote={handoffAckNote}
+          setAckNote={setHandoffAckNote}
           after={after}
           onCancel={() => setPanel(null)}
         />

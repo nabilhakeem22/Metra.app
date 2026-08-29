@@ -13,21 +13,26 @@
 import type { EngagementArtifactKind } from '@metra/db';
 import type { EngagementArtifactRecord } from './queries';
 
-export type WorkingFileCategory = 'layout' | 'render' | 'boq';
+export type WorkingFileCategory = 'layout' | 'render' | 'boq' | 'shopDrawing';
 
 /**
  * Which artifact kinds back each working-file category. Order within a list is a
  * preference order, but selection is by recency (attestedAt) — see below.
  * `layout` accepts either a proposed concept option or a developer/consultant CAD
- * set; `render` the signed-off 3D render; `boq` the bill of quantities.
+ * set; `render` the signed-off 3D render; `boq` the bill of quantities;
+ * `shopDrawing` the production drawings (an upload category only — it has NO
+ * pinned tray slot, see WORKING_FILE_CATEGORIES).
  */
 const CATEGORY_KINDS: Record<WorkingFileCategory, readonly EngagementArtifactKind[]> = {
   layout: ['concept_option', 'autocad'],
   render: ['approved_render'],
   boq: ['boq'],
+  shopDrawing: ['shop_drawing'],
 };
 
-/** The three categories, in the pinned tray display order (matches the mock). */
+/** The three categories, in the pinned tray display order (matches the mock).
+ *  `shopDrawing` is deliberately absent: it is an upload category for the
+ *  shop_drawings stage dropzone, not a fourth pinned tray slot. */
 export const WORKING_FILE_CATEGORIES: readonly WorkingFileCategory[] = [
   'layout',
   'render',
