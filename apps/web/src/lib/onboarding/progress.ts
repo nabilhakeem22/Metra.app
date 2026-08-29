@@ -48,16 +48,19 @@ export async function getOnboardingProgress(
           where status in ('sent','accepted','rejected','expired','superseded')
         ) as has_sent_proposal
     `),
-  )) as unknown as ProgressRow[];
-  const r = rows[0];
+  )) as unknown as ProgressRow[] | undefined;
+  // The aggregate always yields exactly one row — but an unexpected driver/pooler
+  // result shape must degrade to "nothing done yet" (an honest all-false
+  // checklist) rather than crash the whole dashboard on `r.member_count`.
+  const r = Array.isArray(rows) ? rows[0] : undefined;
 
   return {
     profileComplete: isProfileComplete(org),
-    teamInvited: Number(r.member_count) > 1 || Boolean(r.pending),
-    hasCostItem: Boolean(r.has_cost_item),
-    hasClient: Boolean(r.has_client),
-    hasProject: Boolean(r.has_project),
-    hasProposal: Boolean(r.has_proposal),
-    hasSentProposal: Boolean(r.has_sent_proposal),
+    teamInvited: Number(r?.member_count ?? 0) > 1 || Boolean(r?.pending),
+    hasCostItem: Boolean(r?.has_cost_item),
+    hasClient: Boolean(r?.has_client),
+    hasProject: Boolean(r?.has_project),
+    hasProposal: Boolean(r?.has_proposal),
+    hasSentProposal: Boolean(r?.has_sent_proposal),
   };
 }
