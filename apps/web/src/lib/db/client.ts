@@ -25,18 +25,21 @@ function runtimeUrl(): string {
 // Cloudflare/Hyperdrive hop (Hyperdrive terminates TLS to the origin), while
 // off-platform keeps the exact host-derived default every script/test relies on.
 //
-// max:12 tradeoff: on CF this is now the SINGLE instance shared by every
-// withRequestDb call in a request (see request-connection.ts). The largest known
-// concurrent fan-out is the engagement cockpit's 10-way Promise.all
-// (apps/web/src/app/[locale]/(app)/engagements/[id]/page.tsx); max:12 lets that
-// run in ONE wave WITH a small spare, instead of exactly saturating the pool (a
-// prior max:10 matched the 10-way fan-out with ZERO headroom — any 11th
-// overlapping acquire would silently queue into a second wave). Even at max:12 a
-// single shared instance is ~4x fewer sockets than the ~50 that caused the 1102 —
-// which came from ~11 SEPARATE instances × max:5, not a high ceiling on one pool.
+// max:5 — bounded HARD by the DB, not by socket cost. On CF this is the SINGLE
+// instance shared by every withRequestDb call in a request (see
+// request-connection.ts), reached through Hyperdrive → the Supabase SESSION-mode
+// pooler, which is capped at pool_size:15 clients. A single request must NOT be
+// able to hoard those 15 slots: the engagement cockpit fires a 10-way Promise.all,
+// so a high max (a prior max:12) let ONE cockpit load grab 12/15 and a second
+// concurrent request threw `EMAXCONNSESSION: max clients reached in session mode`.
+// max:5 keeps a single request to ≤5 concurrent connections (the cockpit's 10
+// queries run in ~2 waves), leaving room for other concurrent requests under the
+// 15 ceiling. THE REAL FIX is to point Hyperdrive at the TRANSACTION-mode pooler
+// (:6543), which releases a connection per transaction and lifts the session cap —
+// once that's live this can safely rise again.
 export function createRuntimeConnection(): { db: MetraDb; sql: PostgresJs } {
   const ssl = isCloudflareRuntime() ? { ssl: false as const } : {};
-  return createDb(runtimeUrl(), { prepare: false, max: 12, ...ssl });
+  return createDb(runtimeUrl(), { prepare: false, max: 5, ...ssl });
 }
 
 // Wall-clock ceiling (ms) for a single withRequestDb call on the Cloudflare
