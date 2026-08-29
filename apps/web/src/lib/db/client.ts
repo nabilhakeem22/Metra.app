@@ -25,21 +25,21 @@ function runtimeUrl(): string {
 // Cloudflare/Hyperdrive hop (Hyperdrive terminates TLS to the origin), while
 // off-platform keeps the exact host-derived default every script/test relies on.
 //
-// max:5 — bounded HARD by the DB, not by socket cost. On CF this is the SINGLE
+// max:10 — sized to the engagement cockpit's 10-way Promise.all (the largest
+// known per-request fan-out) so it runs in ONE wave. On CF this is the SINGLE
 // instance shared by every withRequestDb call in a request (see
-// request-connection.ts), reached through Hyperdrive → the Supabase SESSION-mode
-// pooler, which is capped at pool_size:15 clients. A single request must NOT be
-// able to hoard those 15 slots: the engagement cockpit fires a 10-way Promise.all,
-// so a high max (a prior max:12) let ONE cockpit load grab 12/15 and a second
-// concurrent request threw `EMAXCONNSESSION: max clients reached in session mode`.
-// max:5 keeps a single request to ≤5 concurrent connections (the cockpit's 10
-// queries run in ~2 waves), leaving room for other concurrent requests under the
-// 15 ceiling. THE REAL FIX is to point Hyperdrive at the TRANSACTION-mode pooler
-// (:6543), which releases a connection per transaction and lifts the session cap —
-// once that's live this can safely rise again.
+// request-connection.ts), reached through Hyperdrive → the Supabase
+// TRANSACTION-mode pooler (:6543, Hyperdrive origin_connection_limit 20), which
+// releases a connection per transaction — so per-request concurrency is bounded
+// by Hyperdrive's origin limit, not a session-client cap. HISTORY (do not repeat):
+// against the old SESSION-mode pooler (:5432, hard cap 15 clients) a max:12 here
+// let one request hoard 12/15 slots → `EMAXCONNSESSION` 500s across the app; the
+// pooler mode, not this number, was the real problem. If Hyperdrive ever points
+// back at :5432, drop this to ≤5. The app is transaction-pooler-safe: prepare:false,
+// SET LOCAL-only GUCs, and pg_advisory_xact_lock (never session advisory locks).
 export function createRuntimeConnection(): { db: MetraDb; sql: PostgresJs } {
   const ssl = isCloudflareRuntime() ? { ssl: false as const } : {};
-  return createDb(runtimeUrl(), { prepare: false, max: 5, ...ssl });
+  return createDb(runtimeUrl(), { prepare: false, max: 10, ...ssl });
 }
 
 // Wall-clock ceiling (ms) for a single withRequestDb call on the Cloudflare
