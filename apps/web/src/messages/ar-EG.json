@@ -1482,7 +1482,8 @@
       "optionsReady": "خيارات التصميم المبدئي جاهزة",
       "revisionCosSettled": "تمت تسوية رسوم التعديلات",
       "rendersPresent": "الرندر المعتمد جاهز",
-      "asBuiltDueOpen": "فحص التنفيذ الفعلي مفتوح"
+      "asBuiltDueOpen": "فحص التنفيذ الفعلي مفتوح",
+      "pendingGuard": "غير متاح بعد"
     },
     "hero": {
       "whatsNext": "الخطوة التالية",

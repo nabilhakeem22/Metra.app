@@ -26,7 +26,36 @@ import { PaymentClaimsPanel } from './payment-claims-panel';
 import { DELIVERY_SHARE_ANCHOR_ID } from './share-anchor';
 import { DeliveryShareLink } from './share-link';
 
-export default async function EngagementDetailPage({
+export default async function EngagementDetailPage(props: {
+  params: Promise<{ id: string }>;
+}) {
+  try {
+    return await renderEngagementDetail(props);
+  } catch (err) {
+    // TEMP DIAGNOSTIC: surface the real server-side error. Next redacts server
+    // component error messages client-side (only a digest reaches the browser),
+    // so a valid-token cockpit that throws gives no actionable signal. This
+    // catches the throw HERE and renders the real stack. Re-throws Next's own
+    // control-flow signals so notFound()/redirect() keep working.
+    const digest = (err as { digest?: string })?.digest;
+    if (
+      typeof digest === 'string' &&
+      (digest === 'NEXT_NOT_FOUND' || digest.startsWith('NEXT_REDIRECT'))
+    ) {
+      throw err;
+    }
+    console.error('[cockpit-diagnostic]', err);
+    return (
+      <pre className="m-4 overflow-auto whitespace-pre-wrap rounded-lg border border-[color:var(--warn-tint)] bg-[color:var(--warn-tint)] p-4 text-xs text-[color:var(--warn)]">
+        {`Cockpit diagnostic (temporary) — the real server error:\n\n${String(
+          (err as Error)?.stack ?? err,
+        )}`}
+      </pre>
+    );
+  }
+}
+
+async function renderEngagementDetail({
   params,
 }: {
   params: Promise<{ id: string }>;

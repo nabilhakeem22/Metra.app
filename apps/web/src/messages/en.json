@@ -1458,9 +1458,8 @@
       "rework": "In rework"
     },
     "rail": {
-      "title": "Project journey",
-      "progress": "Phase {current} of {total}",
-      "offFunnel": "Off funnel"
+      "auditLedger": "audit ledger",
+      "recentActivity": "Recent activity"
     },
     "pulse": {
       "contractTotal": "Contract total",
@@ -1483,7 +1482,8 @@
       "optionsReady": "Concept options ready",
       "revisionCosSettled": "Revision charges settled",
       "rendersPresent": "Approved render ready",
-      "asBuiltDueOpen": "As-built check open"
+      "asBuiltDueOpen": "As-built check open",
+      "pendingGuard": "Not yet available"
     },
     "hero": {
       "whatsNext": "What's next",
@@ -1656,10 +1656,6 @@
         "render": "3D",
         "boq": "BOQ"
       }
-    },
-    "rail": {
-      "auditLedger": "audit ledger",
-      "recentActivity": "Recent activity"
     },
     "fee": {
       "designFee": "Design fee",
