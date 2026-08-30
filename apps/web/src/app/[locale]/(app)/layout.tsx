@@ -17,6 +17,33 @@ export default async function AppLayout({
 }: {
   children: ReactNode;
 }) {
+  try {
+    return await renderAppLayout({ children });
+  } catch (err) {
+    // TEMP DIAGNOSTIC: this layout wraps EVERY authenticated page, so a throw
+    // here 500s the whole app area with only a digest reaching the browser
+    // (Next redacts server-component errors in production). Surface the real
+    // stack; re-throw Next's own control-flow signals so requireOrg's redirect()
+    // and the client-role notFound() keep working.
+    const digest = (err as { digest?: string })?.digest;
+    if (
+      typeof digest === 'string' &&
+      (digest === 'NEXT_NOT_FOUND' || digest.startsWith('NEXT_REDIRECT'))
+    ) {
+      throw err;
+    }
+    console.error('[app-layout-diagnostic]', err);
+    return (
+      <pre className="m-4 overflow-auto whitespace-pre-wrap rounded-lg border p-4 text-xs">
+        {`App layout diagnostic (temporary) — the real server error:\n\n${String(
+          (err as Error)?.stack ?? err,
+        )}`}
+      </pre>
+    );
+  }
+}
+
+async function renderAppLayout({ children }: { children: ReactNode }) {
   const ctx = await requireOrg();
   // The 'client' role belongs to the P4 client portal, not the internal shell —
   // deny it the whole (app) area (defense-in-depth beyond per-page read gates).

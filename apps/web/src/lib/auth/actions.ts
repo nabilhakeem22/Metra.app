@@ -18,10 +18,18 @@ export type { ActionResult };
 export async function resolvePostLoginPath(): Promise<string> {
   const user = await getSessionUser();
   if (!user) return '/login';
-  const orgs = (await withUserContext(user.id, (tx) =>
-    tx.execute(sql`select 1 from public.app_current_user_orgs() limit 1`),
-  )) as unknown as unknown[];
-  return orgs.length > 0 ? '/dashboard' : '/onboarding';
+  try {
+    const orgs = (await withUserContext(user.id, (tx) =>
+      tx.execute(sql`select 1 from public.app_current_user_orgs() limit 1`),
+    )) as unknown as unknown[];
+    return orgs.length > 0 ? '/dashboard' : '/onboarding';
+  } catch (err) {
+    // This routing hint must NEVER block a successful sign-in. If the membership
+    // probe fails, send the user to /dashboard and let requireOrg re-resolve the
+    // real destination (it redirects to /onboarding when there is no membership).
+    console.error('resolvePostLoginPath failed:', err);
+    return '/dashboard';
+  }
 }
 
 // Coded results only — the client localizes via resolveActionError. Supabase
