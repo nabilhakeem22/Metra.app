@@ -56,6 +56,29 @@ export async function createSignedUploadUrl(
 }
 
 /**
+ * Signs an ALREADY-AUTHORIZED storage object. This is the low-level primitive: it
+ * performs NO authorization of its own, so every caller must have proven the
+ * object belongs to whoever is asking BEFORE calling it — `getSignedUrl` below
+ * proves it with an RLS-scoped lookup, the client portal's download route proves it
+ * with the share-token SDF (which is why that path cannot use `getSignedUrl`: it
+ * has no session and therefore no OrgContext). `download` sets the filename the
+ * browser saves as (Content-Disposition attachment). Throws on a Storage error.
+ */
+export async function createSignedObjectUrl(
+  bucket: string,
+  objectKey: string,
+  ttlSeconds: number,
+  opts?: { download?: string },
+): Promise<string> {
+  const supabase = createSupabaseAdminClient();
+  const { data, error } = await supabase.storage
+    .from(bucket)
+    .createSignedUrl(objectKey, ttlSeconds, opts);
+  if (error) throw error;
+  return data.signedUrl;
+}
+
+/**
  * Returns a time-limited signed download URL for a file, but ONLY if the file
  * belongs to the caller's org — the lookup runs under RLS, so an org-B context
  * cannot resolve (and therefore cannot sign) an org-A file.
@@ -77,13 +100,7 @@ export async function getSignedUrl(
     throw new Error('File not found in this org');
   }
 
-  const supabase = createSupabaseAdminClient();
-  const { data, error } = await supabase.storage
-    .from(rows[0].bucket)
-    .createSignedUrl(rows[0].objectKey, ttlSeconds);
-  if (error) throw error;
-
-  return data.signedUrl;
+  return createSignedObjectUrl(rows[0].bucket, rows[0].objectKey, ttlSeconds);
 }
 
 /** Idempotently creates the private files bucket. Run once during setup. */

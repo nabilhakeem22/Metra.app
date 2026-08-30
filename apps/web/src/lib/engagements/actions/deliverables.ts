@@ -6,6 +6,10 @@ import { requireOrg } from '@/lib/auth/require-org';
 import type { SignedUpload } from '@/lib/storage';
 import { recordArtifactCore, type RecordArtifactInput } from '../artifacts';
 import {
+  setArtifactClientVisibilityCore,
+  type SetArtifactClientVisibilityInput,
+} from '../client-visibility';
+import {
   attachDeliverableCore,
   createDeliverableUploadCore,
   getDeliverableUrlCore,
@@ -67,4 +71,20 @@ export async function getDeliverableUrl(
 ): Promise<ActionResult & { url?: string }> {
   const ctx = await requireOrg();
   return getDeliverableUrlCore(ctx, fileId);
+}
+
+/**
+ * Server-action wrapper for {@link setArtifactClientVisibilityCore}: resolves the
+ * org context and shows/hides ONE artifact on the tokenized client portal — the
+ * manual override behind auto-share, and the only route by which a manual-only
+ * deliverable (a BOQ) ever reaches the client. Revalidates the shell on success.
+ * Returns the ActionResult — never throws to the client.
+ */
+export async function setArtifactClientVisibility(
+  input: SetArtifactClientVisibilityInput,
+): Promise<ActionResult> {
+  const ctx = await requireOrg();
+  const res = await setArtifactClientVisibilityCore(ctx, input);
+  if (res.ok) revalidatePath('/', 'layout');
+  return res;
 }

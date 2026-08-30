@@ -1,4 +1,6 @@
+import { sql } from 'drizzle-orm';
 import {
+  boolean,
   index,
   pgTable,
   text,
@@ -48,6 +50,11 @@ export const engagementArtifacts = pgTable(
       .notNull()
       .defaultNow(),
     note: text('note'),
+    // Client Deliverables, Step 1 — whether this artifact is released to the
+    // tokenized client portal. Defaults to false (hidden): visibility is only ever
+    // ADDED, either automatically by a release-carrying transition or by the
+    // per-file manual override. A `boq` is NEVER auto-shared (manual only).
+    clientVisible: boolean('client_visible').notNull().default(false),
   },
   (t) => [
     unique('engagement_artifacts_org_id_id_unique').on(t.orgId, t.id),
@@ -57,6 +64,11 @@ export const engagementArtifacts = pgTable(
       t.engagementId,
       t.kind,
     ),
+    // Partial index over the released rows only — the portal's document read asks
+    // exactly this question and the visible set is a small subset of all artifacts.
+    index('engagement_artifacts_client_visible_idx')
+      .on(t.orgId, t.engagementId)
+      .where(sql`${t.clientVisible}`),
   ],
 );
 

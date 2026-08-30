@@ -123,21 +123,38 @@ grant execute on function public.enforce_account_id_immutable() to metra_app;
 
 -- Proposals (P1 Slice 3): child-draft guard trigger fn + public token SDFs. The
 -- token functions run on the PUBLIC accept path (no session) via the base
--- connection role, and are also grantable to metra_app for authenticated callers.
+-- connection role (which executes them as their OWNER, so the revokes below cannot
+-- break that path), and are also grantable to metra_app for authenticated callers.
+--
+-- Least privilege (S1): CREATE FUNCTION grants EXECUTE to PUBLIC by default, which
+-- would let anyone holding the project's anon key call these SDFs directly over
+-- PostgREST and bypass the app's own read layer — a materially WIDER surface than
+-- what the app returns. `app_proposal_respond_by_token` additionally takes
+-- caller-supplied p_name/p_ip/p_ua that are written into the append-only events
+-- ledger, so direct RPC access is an audit-poisoning vector. Revoke PUBLIC here and
+-- the Supabase api roles in the guarded loop below.
 grant execute on function public.enforce_proposal_child_draft() to metra_app;
 grant execute on function public.app_proposal_by_token(text) to metra_app;
+revoke execute on function public.app_proposal_by_token(text) from public;
 grant execute on function public.app_proposal_respond_by_token(text, text, text, text, text) to metra_app;
+revoke execute on function public.app_proposal_respond_by_token(text, text, text, text, text) from public;
 
 -- Contracts + Variation Orders (P1 Slice 4): child-draft guard trigger fns + the
 -- public token SDFs. The token functions run on the PUBLIC path (no session) via
 -- the base connection role, and are grantable to metra_app for authenticated
--- callers too.
+-- callers too. Same least-privilege treatment as the proposal SDFs above —
+-- `app_contract_ack_by_token` and `app_variation_respond_by_token` also take the
+-- caller-supplied p_name/p_ip/p_ua audit parameters.
 grant execute on function public.enforce_contract_child_draft() to metra_app;
 grant execute on function public.enforce_variation_child_draft() to metra_app;
 grant execute on function public.app_contract_by_token(text) to metra_app;
+revoke execute on function public.app_contract_by_token(text) from public;
 grant execute on function public.app_contract_ack_by_token(text, text, text, text, text) to metra_app;
+revoke execute on function public.app_contract_ack_by_token(text, text, text, text, text) from public;
 grant execute on function public.app_variation_by_token(text) to metra_app;
+revoke execute on function public.app_variation_by_token(text) from public;
 grant execute on function public.app_variation_respond_by_token(text, text, text, text, text) to metra_app;
+revoke execute on function public.app_variation_respond_by_token(text, text, text, text, text) from public;
 
 -- Bootstrap user->org lookup (SECURITY DEFINER, scoped to app.current_user_id).
 -- Least privilege: CREATE FUNCTION grants EXECUTE to PUBLIC by default. Revoke
@@ -176,6 +193,27 @@ grant execute on function public.app_api_key_by_hash(text) to metra_app;
 revoke execute on function public.app_api_key_by_hash(text) from public;
 grant execute on function public.app_touch_api_key(text, timestamptz) to metra_app;
 revoke execute on function public.app_touch_api_key(text, timestamptz) from public;
+
+-- Client Delivery Portal token SDFs (S1) — same least-privilege treatment. These
+-- run on the PUBLIC, session-less path via the base connection (which executes them
+-- as their owner), so revoking PUBLIC does NOT break the portal; it only removes the
+-- default EXECUTE TO PUBLIC that would otherwise let a holder of the anon key call
+-- them directly over PostgREST and bypass the app's own read layer. That matters
+-- because the raw SDF surface is WIDER than what the app returns:
+--   app_delivery_document_by_token -> files.original_name (the studio's internal
+--     filename, which public-documents.ts deliberately replaces with a category
+--     slug) plus bucket/object_key (which carries the org uuid);
+--   app_delivery_respond_by_token / app_delivery_claim_payment_by_token -> take
+--     caller-supplied p_ip/p_ua/p_name that are written into the append-only
+--     ledgers, so direct RPC access is an audit-poisoning vector.
+grant execute on function public.app_delivery_by_token(text) to metra_app;
+revoke execute on function public.app_delivery_by_token(text) from public;
+grant execute on function public.app_delivery_document_by_token(text, uuid) to metra_app;
+revoke execute on function public.app_delivery_document_by_token(text, uuid) from public;
+grant execute on function public.app_delivery_respond_by_token(text, text, text, text, text, text) to metra_app;
+revoke execute on function public.app_delivery_respond_by_token(text, text, text, text, text, text) from public;
+grant execute on function public.app_delivery_claim_payment_by_token(text, text, text, text, text, text) to metra_app;
+revoke execute on function public.app_delivery_claim_payment_by_token(text, text, text, text, text, text) from public;
 
 do $$
 declare
@@ -217,6 +255,48 @@ begin
       );
       execute format(
         'revoke execute on function public.app_touch_api_key(text, timestamptz) from %I',
+        r
+      );
+      -- Proposal / contract / variation token SDFs (S1).
+      execute format(
+        'revoke execute on function public.app_proposal_by_token(text) from %I',
+        r
+      );
+      execute format(
+        'revoke execute on function public.app_proposal_respond_by_token(text, text, text, text, text) from %I',
+        r
+      );
+      execute format(
+        'revoke execute on function public.app_contract_by_token(text) from %I',
+        r
+      );
+      execute format(
+        'revoke execute on function public.app_contract_ack_by_token(text, text, text, text, text) from %I',
+        r
+      );
+      execute format(
+        'revoke execute on function public.app_variation_by_token(text) from %I',
+        r
+      );
+      execute format(
+        'revoke execute on function public.app_variation_respond_by_token(text, text, text, text, text) from %I',
+        r
+      );
+      -- Client Delivery Portal token SDFs (S1).
+      execute format(
+        'revoke execute on function public.app_delivery_by_token(text) from %I',
+        r
+      );
+      execute format(
+        'revoke execute on function public.app_delivery_document_by_token(text, uuid) from %I',
+        r
+      );
+      execute format(
+        'revoke execute on function public.app_delivery_respond_by_token(text, text, text, text, text, text) from %I',
+        r
+      );
+      execute format(
+        'revoke execute on function public.app_delivery_claim_payment_by_token(text, text, text, text, text, text) from %I',
         r
       );
     end if;

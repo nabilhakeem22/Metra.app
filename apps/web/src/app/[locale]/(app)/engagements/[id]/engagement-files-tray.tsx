@@ -9,6 +9,8 @@ import {
   deriveWorkingFiles,
   type WorkingFileCategory,
 } from '@/lib/engagements/working-files';
+import { ArtifactVisibilityControl } from './artifact-visibility-control';
+import { useClientVisibility } from './use-client-visibility';
 import { useDeliverableUpload } from './use-deliverable-upload';
 
 // Epic D, Slice 5 + Deliverable Uploads — the "Working files" tray, now pinned at
@@ -46,6 +48,12 @@ export function EngagementFilesTray({
 }) {
   const t = useTranslations('engagements.files');
   const { pending, upload, download } = useDeliverableUpload(engagementId);
+  // Client Deliverables, Step 1. `canUpload` is the §2.2 engagements_design/create
+  // cell; for THIS capability the create and update cells are identical for all
+  // seven roles (only `viewer` is read-only), so it is also the right gate for the
+  // visibility toggle. The server action re-checks update regardless — a hidden
+  // control is never the gate.
+  const visibility = useClientVisibility();
   const inputRefs = useRef<
     Partial<Record<WorkingFileCategory, HTMLInputElement | null>>
   >({});
@@ -93,7 +101,16 @@ export function EngagementFilesTray({
                 </div>
               </div>
 
-              <div className="ms-auto inline-flex shrink-0 items-center gap-1">
+              <div className="ms-auto inline-flex shrink-0 flex-wrap items-center justify-end gap-1">
+                {fileId && row.latest && (
+                  <ArtifactVisibilityControl
+                    artifactId={row.latest.id}
+                    clientVisible={row.latest.clientVisible}
+                    canManage={canUpload}
+                    visibility={visibility}
+                  />
+                )}
+
                 {fileId && (
                   <button
                     type="button"

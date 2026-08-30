@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { CLIENT_RELEASES } from './client-release';
 import { GUARDS, type GuardKey } from './guards';
 import { DESIGN_STATES, type DesignState } from './states';
 import {
@@ -91,6 +92,26 @@ describe('transition registry', () => {
         expect(def.sideEffect).toBeNull();
       }
     }
+  });
+
+  it('exactly 3 triggers carry a client release, and each names the right package', () => {
+    const carrying = ALL_TRIGGERS.filter(
+      (trigger) => TRANSITIONS[trigger].clientRelease !== undefined,
+    );
+    expect(carrying.sort()).toEqual(
+      ['chooseDesignOnly', 'optionsReady', 'rendersReady'].sort(),
+    );
+    expect(TRANSITIONS.optionsReady.clientRelease).toBe('conceptPackage');
+    expect(TRANSITIONS.rendersReady.clientRelease).toBe('designPackage');
+    expect(TRANSITIONS.chooseDesignOnly.clientRelease).toBe('handoverPackage');
+    // Every release key is a declared release, and rendersReady proves release and
+    // side-effect are independent fields that can coexist on one edge.
+    for (const trigger of carrying) {
+      expect(CLIENT_RELEASES[TRANSITIONS[trigger].clientRelease!]).toBeDefined();
+    }
+    expect(TRANSITIONS.rendersReady.sideEffect).toBe('captureRenderManifest');
+    // finalizeBOQ must NEVER release anything — the BOQ is manual-only.
+    expect(TRANSITIONS.finalizeBOQ.clientRelease).toBeUndefined();
   });
 
   it('every state is reachable: `created` is the entry, all others are some `to`', () => {

@@ -50,6 +50,10 @@ export interface EngagementArtifactRecord {
   attestedBy: string;
   attestedAt: Date;
   note: string | null;
+  /** Client Deliverables, Step 1 — whether this artifact is released to the
+   *  tokenized client portal (auto-shared by a release-carrying transition, or
+   *  toggled by the studio's per-file manual override). */
+  clientVisible: boolean;
 }
 
 /**
@@ -71,6 +75,7 @@ export function getEngagementArtifacts(
         attestedBy: engagementArtifacts.attestedBy,
         attestedAt: engagementArtifacts.attestedAt,
         note: engagementArtifacts.note,
+        clientVisible: engagementArtifacts.clientVisible,
       })
       .from(engagementArtifacts)
       .where(eq(engagementArtifacts.engagementId, engagementId))

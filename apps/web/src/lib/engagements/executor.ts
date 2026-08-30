@@ -13,12 +13,13 @@ import {
   engagementTransitions,
   paymentEvents,
 } from '@metra/db';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 import { fail, mutateInOrg } from '@/lib/actions/mutate';
 import { err, type ActionResult } from '@/lib/actions/result';
 import type { OrgContext } from '@/lib/db/context';
 import type { PermissionAction } from '@/lib/permissions/roles';
 import { recordConceptApproval, recordDesignApproval } from './approvals';
+import { CLIENT_RELEASES, selectReleaseArtifactIds } from './client-release';
 import { insertAsBuiltAttestation } from './attestations';
 import { settleConceptAndLock } from './concept';
 import { generateFeeSchedule } from './fee-schedule';
@@ -50,10 +51,11 @@ export interface ExecuteTransitionInput {
  * `illegal_trigger`); gate the def's capability; open the RLS tx; load the
  * engagement (`engagement_not_found` if absent/foreign); assert the current state
  * is a legal `from` (else `illegal_trigger` — no ledger write, no state change);
- * run every guard in order (first failure returns its code); apply the def's
- * side-effect (NONE this step); perform the atomic gated UPDATE (0 rows ->
- * `engagement_state_conflict`); append exactly one `engagement_transitions` row;
- * audit. Never throws to the client — coded ActionResult only.
+ * run every guard in order (first failure returns its code); perform the atomic
+ * gated UPDATE (0 rows -> `engagement_state_conflict`); apply the def's
+ * side-effect and (Client Deliverables, Step 1) its `clientRelease`; append exactly
+ * one `engagement_transitions` row; audit. Never throws to the client — coded
+ * ActionResult only.
  */
 export async function executeTransition(
   ctx: OrgContext,
@@ -204,6 +206,32 @@ export async function executeTransition(
       // Atomic with the final_approval -> negotiation move.
       if (def.sideEffect === 'resetRevisionsOnReject') {
         await resetRevisionsOnReject(tx, engagementId);
+      }
+
+      // Client Deliverables (Step 1): auto-share. A release-carrying edge publishes
+      // its deliverable package to the tokenized client portal INSIDE this tx, after
+      // the atomic gate — so a guard failure (which returns above, before the gate)
+      // flips nothing, and a losing concurrent caller shares nothing either. The
+      // selector is PURE and reads the `artifacts` already loaded as guard facts, so
+      // this costs zero extra reads. Visibility is only ever ADDED; the studio's
+      // per-file manual override is the only way to take it back.
+      if (def.clientRelease) {
+        const releaseIds = selectReleaseArtifactIds(
+          CLIENT_RELEASES[def.clientRelease],
+          artifacts,
+        );
+        if (releaseIds.length > 0) {
+          await tx
+            .update(engagementArtifacts)
+            .set({ clientVisible: true, updatedAt: new Date() })
+            .where(
+              and(
+                eq(engagementArtifacts.orgId, ctx.orgId),
+                eq(engagementArtifacts.engagementId, engagementId),
+                inArray(engagementArtifacts.id, releaseIds),
+              ),
+            );
+        }
       }
 
       await tx.insert(engagementTransitions).values({

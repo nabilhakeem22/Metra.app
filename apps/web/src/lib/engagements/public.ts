@@ -5,8 +5,14 @@ import 'server-only';
 // cost/margin/build-cost/token/internal column, so nothing here can leak the
 // firm's cost. The raw token is never logged.
 import { createHash } from 'node:crypto';
+import type { EngagementArtifactKind } from '@metra/db';
 import { sql } from 'drizzle-orm';
 import { withRequestDb } from '@/lib/db/client';
+import {
+  KIND_CATEGORY,
+  isClientDocumentKind,
+  type ClientDocumentCategory,
+} from './portal-documents';
 import {
   PORTAL_STAGE_LABEL,
   PORTAL_STAGE_NOTE,
@@ -72,6 +78,14 @@ export interface PublicDelivery {
       hasPendingClaim: boolean;
     }>;
   } | null;
+  /** Client Deliverables Step 1 — the files the studio has released to this client,
+   *  newest share first. Only the id (the download route's filter), a friendly
+   *  category, and the share date cross the wire — never a label, filename or size. */
+  documents: Array<{
+    id: string;
+    category: ClientDocumentCategory;
+    sharedAt: string | null;
+  }>;
   /** Client-facing verb tokens the client MAY act on right now (approve_concept,
    *  request_concept_changes, approve_design, request_design_changes,
    *  acknowledge_rom, acknowledge_handoff). Server-computed by the SDF; NEVER a raw
@@ -100,6 +114,7 @@ interface DeliverySnapshot {
   firm?: { name_ar?: string | null; name_en?: string | null; logo_file_id?: string | null } | null;
   client?: { name_ar?: string | null; name_en?: string | null } | null;
   payment_schedule?: PublicDeliveryMilestone[] | null;
+  documents?: Array<DeliveryDocumentRow | null> | null;
   client_actions?: string[] | null;
   claim?: {
     claimable_milestones?: Array<{
@@ -108,6 +123,31 @@ interface DeliverySnapshot {
       has_pending_claim?: boolean | null;
     } | null> | null;
   } | null;
+}
+
+/** One raw document row from the SDF `documents` array. */
+interface DeliveryDocumentRow {
+  id: string;
+  kind: EngagementArtifactKind;
+  shared_at?: string | null;
+}
+
+/**
+ * A document row is renderable only when it carries a non-empty string `id` (the
+ * download route's filter) AND a `kind` the portal has a client-facing category
+ * for. Anything else (a null hole, a stray shape, a kind added to the DB enum but
+ * not yet mapped) is dropped — never rendered — so a malformed row can neither
+ * crash nor show the client an unnamed file. Same defensive posture as
+ * isRenderableMilestone. `shared_at` is read null-safe.
+ */
+function isRenderableDocument(row: unknown): row is DeliveryDocumentRow {
+  if (!row || typeof row !== 'object') return false;
+  const candidate = row as Record<string, unknown>;
+  return (
+    typeof candidate.id === 'string' &&
+    candidate.id.length > 0 &&
+    isClientDocumentKind(candidate.kind)
+  );
 }
 
 /** One raw claimable-milestone row from the SDF `claim.claimable_milestones`. */
@@ -209,6 +249,16 @@ export async function getDeliveryByToken(
     const paymentSchedule = Array.isArray(snapshot.payment_schedule)
       ? snapshot.payment_schedule.filter(isRenderableMilestone)
       : [];
+    // Null-safe document mapping: a missing/non-array `documents` key (an older
+    // SDF, a malformed snapshot) degrades to an EMPTY list — the portal then renders
+    // its honest "nothing shared yet" empty state, never a crash.
+    const documents = Array.isArray(snapshot.documents)
+      ? snapshot.documents.filter(isRenderableDocument).map((row) => ({
+          id: row.id,
+          category: KIND_CATEGORY[row.kind],
+          sharedAt: row.shared_at ?? null,
+        }))
+      : [];
     const clientActions = Array.isArray(snapshot.client_actions)
       ? snapshot.client_actions.filter(
           (verb): verb is string =>
@@ -254,6 +304,7 @@ export async function getDeliveryByToken(
       },
       paymentSchedule,
       paymentClaim,
+      documents,
       clientActions,
     };
   } catch {

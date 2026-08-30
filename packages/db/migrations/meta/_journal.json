@@ -246,6 +246,13 @@
       "when": 1788301157549,
       "tag": "0034_client_payment_claims",
       "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "7",
+      "when": 1788387557549,
+      "tag": "0035_client_visible_documents",
+      "breakpoints": true
     }
   ]
 }

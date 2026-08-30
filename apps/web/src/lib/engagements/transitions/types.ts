@@ -4,6 +4,7 @@
 // `./registry`; these are the types it is declared against.
 import type { MilestoneBasis, MilestoneKind } from '@metra/db';
 import type { Capability } from '@/lib/permissions/roles';
+import type { ClientReleaseKey } from '../client-release';
 import type { GuardKey } from '../guards';
 import type { DesignState } from '../states';
 
@@ -98,4 +99,12 @@ export interface TransitionDef {
   guards: GuardKey[];
   sideEffect: SideEffectKey | null;
   capability: CapabilityKey;
+  /**
+   * Client Deliverables, Step 1 — the deliverable package this edge releases to
+   * the client portal. Deliberately a SEPARATE field from `sideEffect`: an edge
+   * (e.g. `rendersReady`) can carry both, and the executor applies the release in
+   * its own branch inside the same transaction, after the atomic gate. Absent on
+   * every edge that shares nothing.
+   */
+  clientRelease?: ClientReleaseKey;
 }

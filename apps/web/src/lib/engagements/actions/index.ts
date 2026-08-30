@@ -43,6 +43,7 @@ export {
   createDeliverableUpload,
   attachDeliverable,
   getDeliverableUrl,
+  setArtifactClientVisibility,
 } from './deliverables';
 export {
   shareDeliveryLink,

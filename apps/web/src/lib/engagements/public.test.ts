@@ -167,6 +167,47 @@ describe('getDeliveryByToken hardening', () => {
     expect(result?.createdAt).toBeNull();
   });
 
+  it('maps released documents to friendly categories, SDF order preserved', async () => {
+    setSnapshot({
+      ...validSnapshot(),
+      documents: [
+        { id: 'doc-1', kind: 'concept_option', shared_at: '2026-02-01T00:00:00Z' },
+        { id: 'doc-2', kind: 'autocad', shared_at: null },
+      ],
+    });
+    const result = await getDeliveryByToken('raw-token');
+    expect(result?.documents).toEqual([
+      { id: 'doc-1', category: 'concept', sharedAt: '2026-02-01T00:00:00Z' },
+      { id: 'doc-2', category: 'layout', sharedAt: null },
+    ]);
+  });
+
+  it('drops document rows with no usable id or an unmappable kind', async () => {
+    setSnapshot({
+      ...validSnapshot(),
+      documents: [
+        null,
+        'nope',
+        { kind: 'boq' },
+        { id: '', kind: 'boq' },
+        { id: 'doc-x', kind: 'not_a_kind' },
+        { id: 'doc-y', kind: 42 },
+        { id: 'doc-ok', kind: 'boq' },
+      ],
+    });
+    const result = await getDeliveryByToken('raw-token');
+    expect(result?.documents).toEqual([
+      { id: 'doc-ok', category: 'boq', sharedAt: null },
+    ]);
+  });
+
+  it('degrades a missing or non-array documents key to an empty list', async () => {
+    setSnapshot(validSnapshot());
+    expect((await getDeliveryByToken('raw-token'))?.documents).toEqual([]);
+    setSnapshot({ ...validSnapshot(), documents: 'nope' });
+    expect((await getDeliveryByToken('raw-token'))?.documents).toEqual([]);
+  });
+
   it('never throws across a battery of hostile snapshots', async () => {
     const hostile: unknown[] = [
       undefined,
@@ -176,6 +217,8 @@ describe('getDeliveryByToken hardening', () => {
       {},
       { state: 'concept_review' },
       { id: 'x', number: 1, state: 'concept_review', firm: 5, client: 'nope', rom: 3, payment_schedule: 9, client_actions: 'x' },
+      { id: 'x', number: 1, state: 'concept_review', documents: 5 },
+      { id: 'x', number: 1, state: 'concept_review', documents: [null, 7, { id: {} }] },
     ];
     for (const snapshot of hostile) {
       setSnapshot(snapshot);

@@ -1676,6 +1676,14 @@
         "render": "3D",
         "boq": "BOQ",
         "shopDrawing": "Shop"
+      },
+      "visibility": {
+        "visible": "Visible to client",
+        "hidden": "Hidden from client",
+        "show": "Show to client",
+        "hide": "Hide from client",
+        "saving": "Saving…",
+        "error": "Couldn't change visibility. Try again."
       }
     },
     "fee": {
@@ -1924,6 +1932,22 @@
         "generic": "Something went wrong. Please try again."
       }
     },
-    "poweredBy": "Shared securely by {firm}"
+    "poweredBy": "Shared securely by {firm}",
+    "documents": {
+      "title": "Your documents",
+      "subtitle": "Shared by your design team",
+      "empty": "Nothing shared yet — your designer will add your drawings and visuals here.",
+      "unavailable": "That file isn't available. Please contact your design team.",
+      "download": "Download",
+      "sharedOn": "Shared {date}",
+      "category": {
+        "concept": "Concept option",
+        "layout": "2D layout",
+        "render": "3D visual",
+        "drawing": "Shop drawing",
+        "boq": "Bill of quantities",
+        "survey": "Site survey"
+      }
+    }
   }
 }

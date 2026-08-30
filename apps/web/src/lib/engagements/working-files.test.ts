@@ -17,6 +17,7 @@ function artifact(
     attestedBy: 'user-1',
     attestedAt: new Date(attestedAt),
     note: null,
+    clientVisible: false,
     ...overrides,
   };
 }

@@ -3,6 +3,7 @@
 import { useLocale, useTranslations } from 'next-intl';
 import { paymentGlance } from '@/lib/engagements/portal-hero';
 import type { PublicDelivery } from '@/lib/engagements/public';
+import { DocumentsCard } from './portal/documents-card';
 import { FirmHeader } from './portal/firm-header';
 import { Greeting } from './portal/greeting';
 import { HeroCard } from './portal/hero-card';
@@ -15,8 +16,8 @@ import { WhatsNext } from './portal/whats-next';
 /**
  * The session-less, mobile-first, firm-branded client portal — a guided single
  * column: firm header → greeting → journey tracker → the ONE thing that needs the
- * client now (hero) → an optional subordinate budget-ack → payment glance →
- * what's-next → footer. Every derivation (journey position, hero) is computed
+ * client now (hero) → an optional subordinate budget-ack → the released documents →
+ * payment glance → what's-next → footer. Every derivation (journey position, hero) is computed
  * server-side and carries NO raw machine state; every figure is a client-DUE
  * amount (no cost/margin ever reaches this surface). Bilingual, RTL-safe, Western
  * numerals, logical CSS only. A null delivery renders the friendly not-found.
@@ -24,9 +25,13 @@ import { WhatsNext } from './portal/whats-next';
 export function PublicDeliveryView({
   token,
   delivery,
+  documentUnavailable = false,
 }: {
   token: string;
   delivery: PublicDelivery | null;
+  /** Set when the download route bounced back — the client asked for a document
+   *  that is not (or is no longer) available to them. */
+  documentUnavailable?: boolean;
 }) {
   const t = useTranslations('delivery');
   const locale = useLocale();
@@ -63,6 +68,11 @@ export function PublicDeliveryView({
           stageNote={delivery.stageNote}
         />
         {delivery.hero.showRomAck && <RomAckCard token={token} />}
+        <DocumentsCard
+          token={token}
+          documents={delivery.documents}
+          documentUnavailable={documentUnavailable}
+        />
         <PaymentGlanceCard glance={glance} />
         <PaymentClaimCard token={token} claim={delivery.paymentClaim} />
         <WhatsNext milestone={delivery.milestone} />

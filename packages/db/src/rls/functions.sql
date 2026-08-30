@@ -797,6 +797,11 @@ $$;
 --   engagement_milestones: kind, basis, sort_order, value (only as an input to
 --     the client's amount_due — the raw basis value is not leaked as cost)
 --   payment_events: amount (aggregated per kind into amount_cleared)
+--   engagement_artifacts (Client Deliverables Step 1, only where client_visible):
+--     id, kind, updated_at (as shared_at). `label`, `note`, `content_hash`,
+--     `attested_by` and files.original_name/size_bytes are NOT exposed — an
+--     internal label or filename can itself be sensitive. `files` is joined only to
+--     prove a downloadable object exists; no column of it is returned.
 --
 -- PHYSICALLY OMITTED (never referenced): design_engagements.render_manifest_hash,
 --   renders_ready_at, revision_count, free_revision_n, as_built_due,
@@ -936,7 +941,7 @@ as $$
       ) acts
     ),
     -- Client Delivery Portal Phase 3 — the milestones the client MAY "mark as paid"
-    -- right now. Computed from the SAME cost-blind milestone-due math as
+    -- right now. Computed from the SAME price-blind milestone-due math as
     -- payment_schedule above: a milestone is claimable while its remaining due
     -- (amount_due − amount_cleared) is strictly positive. ANY unsettled milestone
     -- is claimable (owner-locked; NOT just the next-due one), so this is a LIST. Each
@@ -979,7 +984,29 @@ as $$
             and (due.amount - coalesce(cl.cleared, 0)) > 0
         ) cmx
       ), '[]'::jsonb)
-    )
+    ),
+    -- Client Deliverables Step 1 — the files the studio has RELEASED to this client.
+    -- Only three fields cross the wire: the artifact id (the download route's filter
+    -- within this already-proven delivery), its kind (mapped to a friendly category
+    -- label in TS), and when it was shared. The internal label, the stored filename
+    -- and the byte size are deliberately NOT exposed — a filename can carry the
+    -- firm's internal naming. Rows without a joined file row are skipped (nothing to
+    -- download); rows the studio has not released are excluded by a.client_visible.
+    -- Newest share first, and BOUNDED to the 200 most recently attested rows so a
+    -- delivery with a runaway artifact count can never turn one portal read into an
+    -- unbounded aggregate (the whole snapshot is rebuilt on every request).
+    'documents', coalesce((
+      select jsonb_agg(d order by d_sort desc)
+      from (
+        select a.attested_at as d_sort,
+          jsonb_build_object('id', a.id, 'kind', a.kind, 'shared_at', a.updated_at) as d
+        from public.engagement_artifacts a
+        join public.files f on f.id = a.file_id and f.org_id = a.org_id
+        where a.engagement_id = de.id and a.org_id = de.org_id and a.client_visible
+        order by a.attested_at desc
+        limit 200
+      ) dx
+    ), '[]'::jsonb)
   )
   from public.design_engagements de
   join public.organizations o on o.id = de.org_id
@@ -1211,4 +1238,54 @@ begin
 
   return 'ok';
 end
+$$;
+
+-- Client Deliverables Step 1 — resolve ONE released document of a delivery by its
+-- share token, for the portal's download route. SECURITY DEFINER (the token IS the
+-- authorization; no session, no org GUC), and the delivery is resolved SOLELY by
+-- token_hash, exactly like app_delivery_by_token.
+--
+-- The client-supplied p_document_id is ONLY a FILTER inside a delivery that the
+-- token already proved. It can never widen the search: the artifact must belong to
+-- THAT delivery (a.engagement_id = de.id) and must be released (a.client_visible).
+-- The storage location returned always comes from the `files` row joined in-org
+-- (f.org_id = a.org_id) — never from anything the caller sent — so a forged or
+-- borrowed uuid cannot address another tenant's object.
+--
+-- NO ORACLE: every failure mode returns the SAME null — a forged uuid, an artifact
+-- belonging to another delivery or another org, an artifact the studio has not
+-- released, an artifact with no file, and an unknown / revoked / expired token are
+-- all indistinguishable to the caller.
+--
+-- SAFE BY CONSTRUCTION: this function selects ONLY files.bucket, files.object_key,
+-- engagement_artifacts.kind and files.original_name. Every pricing/margin/internal
+-- column of every table is simply never referenced (omission, not a filter) — the
+-- AC4 test greps this function's source to enforce that.
+create or replace function public.app_delivery_document_by_token(
+  p_hash text,
+  p_document_id uuid
+)
+returns jsonb
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select jsonb_build_object(
+    'bucket', f.bucket,
+    'object_key', f.object_key,
+    'kind', a.kind,
+    'original_name', f.original_name
+  )
+  from public.design_engagements de
+  join public.engagement_artifacts a
+    on a.engagement_id = de.id
+   and a.org_id = de.org_id
+   and a.client_visible
+  join public.files f
+    on f.id = a.file_id
+   and f.org_id = a.org_id
+  where de.token_hash = p_hash
+    and (de.share_expires_at is null or de.share_expires_at > now())
+    and a.id = p_document_id;
 $$;

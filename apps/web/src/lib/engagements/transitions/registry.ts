@@ -35,12 +35,16 @@ export const TRANSITIONS: Record<Trigger, TransitionDef> = {
     sideEffect: null,
     capability: 'engagements_design',
   },
+  // Client Deliverables (Step 1): the concept options the client is asked to choose
+  // between — plus the current 2D layout — are released to the portal as the
+  // engagement enters concept_review.
   optionsReady: {
     from: 'layout',
     to: 'concept_review',
     guards: ['optionsReady'],
     sideEffect: null,
     capability: 'engagements_design',
+    clientRelease: 'conceptPackage',
   },
   selectConcept: {
     from: 'concept_review',
@@ -75,12 +79,15 @@ export const TRANSITIONS: Record<Trigger, TransitionDef> = {
   // approved render exists; the side-effect captures the deterministic baseline
   // manifest hash over those renders and stamps `renders_ready_at`, atomically
   // with the design_3d -> final_approval move.
+  // Client Deliverables (Step 1): the approved renders are released to the portal
+  // alongside the manifest capture — a separate field, not a second side-effect.
   rendersReady: {
     from: 'design_3d',
     to: 'final_approval',
     guards: ['rendersPresent'],
     sideEffect: 'captureRenderManifest',
     capability: 'engagements_design',
+    clientRelease: 'designPackage',
   },
   // Step 13: the Gate-B as-built variance detour. Only an Off-Plan engagement whose
   // as-built drawings are due (`asBuiltDueOpen`) can flag a variance; the side-effect
@@ -135,12 +142,16 @@ export const TRANSITIONS: Record<Trigger, TransitionDef> = {
   },
   // Tail wiring (owner-locked): the BALANCE gates BOTH execution-decision exits —
   // the final installment clears before either ending.
+  // Client Deliverables (Step 1): the design-only handover releases the shop
+  // drawings to the portal. The BOQ is NOT part of this package — it stays
+  // manual-only (it can carry the firm's own rates).
   chooseDesignOnly: {
     from: 'execution_decision',
     to: 'design_only_handoff',
     guards: ['balanceCleared'],
     sideEffect: null,
     capability: 'engagements_design',
+    clientRelease: 'handoverPackage',
   },
   // Tail wiring: the handoff acknowledgement (client token path OR the staff
   // stand-in) closes the design-only ending. Issue family — owner/admin only.

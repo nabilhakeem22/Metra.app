@@ -12,10 +12,22 @@ export const metadata: Metadata = PRIVATE_METADATA;
 // renders the friendly not-found page.
 export default async function PublicDeliveryPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ token: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const { token } = await params;
+  // The download route bounces every failure back here with ?document=unavailable —
+  // one flag, no detail, so the notice can never tell the client (or a prober)
+  // WHICH failure occurred.
+  const { document } = await searchParams;
   const delivery = await getDeliveryByToken(token);
-  return <PublicDeliveryView token={token} delivery={delivery} />;
+  return (
+    <PublicDeliveryView
+      token={token}
+      delivery={delivery}
+      documentUnavailable={document === 'unavailable'}
+    />
+  );
 }
