@@ -5,8 +5,12 @@ import { useLocale, useTranslations } from 'next-intl';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import type { ActionResult } from '@/lib/actions/result';
+// A plain PURE module (no barrel, no server-only, no db runtime) — see the
+// guards/money note below for why this component only ever imports leaves.
+import { findLatestClientChangeRequestNote } from '@/lib/engagements/client-activity-note';
 import { deriveCommandCard, type CommandCardMode } from '@/lib/engagements/command-card';
 import type { EngagementGatePreview } from '@/lib/engagements/gate-preview';
+import type { EngagementClientActivityRecord } from '@/lib/engagements/queries/client-activity';
 // Import from the LEAF (guards/money), not the guards barrel: the barrel also
 // re-exports GUARDS from ./registry, which would drag the whole guard engine
 // (registry -> readiness/money -> transitions) into THIS client chunk. That heavy,
@@ -17,6 +21,7 @@ import { MONEY_GUARD_MILESTONE } from '@/lib/engagements/guards/money';
 import { stateMilestone } from '@/lib/engagements/journey-map';
 import { isTerminal, type DesignState } from '@/lib/engagements/states';
 import type { Trigger } from '@/lib/engagements/transitions';
+import { formatDate } from '@/lib/format/date';
 import { EngagementFeeForm } from './engagement-fee-form';
 import { EngagementHeroBadges } from './engagement-hero-badges';
 import { EngagementHeroChecklist } from './engagement-hero-checklist';
@@ -79,6 +84,7 @@ export function EngagementCommandCard({
   canSetOffPlan,
   offPlan,
   paymentClaimCount,
+  clientActivity,
   secondaryTriggers,
   pending,
   runAction,
@@ -97,6 +103,7 @@ export function EngagementCommandCard({
   canSetOffPlan: boolean;
   offPlan: boolean;
   paymentClaimCount: number;
+  clientActivity: EngagementClientActivityRecord[];
   secondaryTriggers: Trigger[];
   pending: boolean;
   runAction: (fn: () => Promise<ActionResult>) => void;
@@ -167,6 +174,13 @@ export function EngagementCommandCard({
       canRecordPayment &&
       canAdvance,
   );
+
+  // The client's latest change-request text — the brief for the revision the
+  // studio is about to make. It belongs next to the headline, not buried in the
+  // timeline tab. Null when the client has asked for nothing (or asked with no
+  // words), and never an approval's note.
+  const clientNote = findLatestClientChangeRequestNote(clientActivity);
+  const clientNoteDate = clientNote ? formatDate(clientNote.decidedAt, locale) : '';
 
   const headline = closed
     ? tcmd('closedHeadline')
@@ -242,6 +256,36 @@ export function EngagementCommandCard({
       </h2>
       {hint && (
         <p className="mb-4 text-[13.5px] text-[color:var(--text-muted)]">{hint}</p>
+      )}
+
+      {/* The client's own words — a QUIET callout under the headline, never a
+          second CTA. Plain text: React escapes it, so client-authored input can
+          never inject markup. Logical CSS only, so it mirrors in ar-EG. */}
+      {clientNote && (
+        <div className="mb-4 rounded-[var(--r-panel)] border border-[color:var(--rule)] bg-[color:var(--track)] px-3 py-2.5">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[color:var(--text-faint)]">
+            {tcmd('clientNote')}
+          </p>
+          {/* Clamped to 4 lines: a long client note must never push the primary
+              Advance CTA below the fold — the whole point of this card is one
+              unmissable next action. The full text is always in the Timeline. */}
+          <p className="mt-1 line-clamp-4 whitespace-pre-line break-words text-[13.5px] text-[color:var(--text)]">
+            {t('noteQuote', { note: clientNote.note })}
+          </p>
+          {(clientNote.actorName || clientNoteDate) && (
+            <p className="mt-1 text-[11.5px] text-[color:var(--text-faint)]">
+              {clientNote.actorName && (
+                <span>{t('clientActivity.by', { name: clientNote.actorName })}</span>
+              )}
+              {clientNote.actorName && clientNoteDate && <span aria-hidden> · </span>}
+              {clientNoteDate && (
+                <span className="font-mono" dir="ltr">
+                  {clientNoteDate}
+                </span>
+              )}
+            </p>
+          )}
+        </div>
       )}
 
       {!closed && (

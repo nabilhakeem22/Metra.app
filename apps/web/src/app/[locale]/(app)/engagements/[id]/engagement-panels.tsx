@@ -84,6 +84,14 @@ export function EngagementPanels({
   );
 }
 
+/**
+ * A ledger row's free-text note, blank-safe: whitespace-only (or absent) reads as
+ * "no note" so the timeline never renders an empty quoted line.
+ */
+function trimmedNote(note: string | null): string | null {
+  return note?.trim() || null;
+}
+
 export function TimelinePanel({
   transitions,
   events,
@@ -106,11 +114,13 @@ export function TimelinePanel({
               to: t(`state.${tr.toState}`),
             })
           : t(`state.${tr.toState ?? 'created'}`),
+      note: trimmedNote(tr.note),
     })),
     ...events.map((e) => ({
       id: `e-${e.id}`,
       at: e.decidedAt,
       label: t(`eventKind.${e.kind}`),
+      note: trimmedNote(e.note),
     })),
     // The client-activity feed (approvals + change requests from the client's
     // link) merges into the one timeline, newest-first with everything else.
@@ -120,6 +130,7 @@ export function TimelinePanel({
       label: entry.actorName
         ? `${t(`eventKind.${entry.kind}`)} · ${t('clientActivity.by', { name: entry.actorName })}`
         : t(`eventKind.${entry.kind}`),
+      note: trimmedNote(entry.note),
     })),
   ].sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());
 
@@ -147,6 +158,14 @@ export function TimelinePanel({
           <div className="font-mono text-[11px] text-[color:var(--text-faint)]" dir="ltr">
             {formatDate(entry.at, locale)}
           </div>
+          {/* The author's own words (the client's change-request text, a staff
+              note) — quoted, secondary, and rendered as PLAIN TEXT: React escapes
+              it, so user-authored input can never inject markup here. */}
+          {entry.note && (
+            <p className="mt-1 whitespace-pre-line break-words border-s-2 border-[color:var(--rule)] ps-2 text-[12px] text-[color:var(--text-muted)]">
+              {t('noteQuote', { note: entry.note })}
+            </p>
+          )}
         </li>
       ))}
     </ul>

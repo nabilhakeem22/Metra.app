@@ -1578,6 +1578,7 @@
       "blockedClientHeadline": "Waiting on the client",
       "blockedClientHint": "Everything on your side is done.",
       "advanceBlockedNote": "Advance is blocked on: {blocker}",
+      "clientNote": "What the client asked for",
       "nudge": "Nudge client",
       "nudgeHint": "Reveal the client link so you can follow up.",
       "closedHeadline": "This delivery is closed",
@@ -1653,6 +1654,7 @@
       "empty": "No client responses yet. Approvals and change requests from the client's link appear here.",
       "by": "By {name}"
     },
+    "noteQuote": "“{note}”",
     "files": {
       "title": "Working files",
       "latestApproved": "latest approved",

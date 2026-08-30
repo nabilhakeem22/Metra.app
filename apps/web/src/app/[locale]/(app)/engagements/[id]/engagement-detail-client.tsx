@@ -118,6 +118,7 @@ export function EngagementDetailClient({
         canSetOffPlan={capabilities.setRom}
         offPlan={header.offPlan}
         paymentClaimCount={paymentClaimCount}
+        clientActivity={clientActivity}
         secondaryTriggers={secondaryTriggers}
         pending={pending}
         runAction={runAction}

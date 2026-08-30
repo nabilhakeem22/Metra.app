@@ -1578,6 +1578,7 @@
       "blockedClientHeadline": "بانتظار العميل",
       "blockedClientHint": "أنجزتَ كل ما عليك.",
       "advanceBlockedNote": "الانتقال متوقف على: {blocker}",
+      "clientNote": "ما طلبه العميل",
       "nudge": "تذكير العميل",
       "nudgeHint": "أظهر رابط العميل حتى تتمكن من المتابعة.",
       "closedHeadline": "هذا التسليم مُغلق",
@@ -1653,6 +1654,7 @@
       "empty": "لا توجد ردود من العميل بعد. تظهر هنا الموافقات وطلبات التعديل من رابط العميل.",
       "by": "بواسطة {name}"
     },
+    "noteQuote": "«{note}»",
     "files": {
       "title": "ملفات العمل",
       "latestApproved": "الأحدث المعتمد",
