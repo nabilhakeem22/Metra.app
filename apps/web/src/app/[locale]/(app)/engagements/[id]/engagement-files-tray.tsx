@@ -27,14 +27,15 @@ import { useDeliverableUpload } from './use-deliverable-upload';
 // the tray mirrors in ar-EG RTL. Version numbers use plain interpolation
 // (Western numerals in both locales).
 
-/** Whether a category's file is downloaded or opened. `shopDrawing` is an
- *  upload-only category with no pinned tray slot, but the total Record keeps
- *  this map from drifting if it ever gains one. */
+/** Whether a category's file is downloaded or opened. `shopDrawing` and
+ *  `conceptOption` are upload-only categories with no pinned tray slot, but the
+ *  total Record keeps this map from drifting if either ever gains one. */
 const CATEGORY_ACTION: Record<WorkingFileCategory, 'download' | 'open'> = {
   layout: 'download',
   render: 'download',
   boq: 'open',
   shopDrawing: 'download',
+  conceptOption: 'download',
 };
 
 export function EngagementFilesTray({

@@ -4,7 +4,6 @@ import { Loader2, Upload } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { useRef, type ChangeEvent } from 'react';
 import { acceptFor } from '@/lib/engagements/deliverable-files';
-import type { DesignState } from '@/lib/engagements/states';
 import type { WorkingFileCategory } from '@/lib/engagements/working-files';
 import { useDeliverableUpload } from './use-deliverable-upload';
 
@@ -14,45 +13,42 @@ import { useDeliverableUpload } from './use-deliverable-upload';
 // (validate → signed URL → PUT → attach/attest → refresh), so recording the
 // deliverable is what unblocks the stage (owner decision: no auto-advance).
 // Logical CSS only (mirrors in ar-EG RTL); accept-list is the category's exact
-// server-enforced extensions.
-
-// State → working-file category the studio uploads at that stage (owner table):
-//   layout / concept_review / negotiation → 2D layout
-//   design_3d                             → render set
-//   shop_drawings                         → shop drawings
-//   boq                                   → draft BOQ
-// A state absent from the map has no inline dropzone (e.g. survey uses the
-// toolbar so a non-off-plan measured survey isn't mistaken for a CAD import).
-const STATE_DROPZONE_CATEGORY: Partial<Record<DesignState, WorkingFileCategory>> = {
-  layout: 'layout',
-  concept_review: 'layout',
-  negotiation: 'layout',
-  design_3d: 'render',
-  boq: 'boq',
-  shop_drawings: 'shopDrawing',
-};
-
-/** The inline-dropzone category for a state, or null when the stage has none. */
-export function inlineDropzoneCategory(
-  state: DesignState,
-): WorkingFileCategory | null {
-  return STATE_DROPZONE_CATEGORY[state] ?? null;
-}
+// server-enforced extensions. The state → category table itself is DATA, not UI:
+// it lives in the pure lib/engagements/inline-dropzone-category.ts leaf.
 
 export function EngagementInlineDropzone({
   engagementId,
   category,
   canUpload,
+  atCapacity = false,
 }: {
   engagementId: string;
   category: WorkingFileCategory;
   canUpload: boolean;
+  /** This category already holds every file its guard will accept. */
+  atCapacity?: boolean;
 }) {
   const t = useTranslations('engagements.files');
   const { pending, upload } = useDeliverableUpload(engagementId);
   const inputRef = useRef<HTMLInputElement>(null);
 
   if (!canUpload) return null;
+
+  // Concept options are APPEND-ONLY (recording one attests it; there is no delete
+  // path) and `optionsReady` accepts at most four, so a fifth upload would strand
+  // the engagement in a state it cannot leave. At the cap the affordance is
+  // REMOVED and replaced with copy that says why — never a dead button the studio
+  // can keep pressing into an unrecoverable state.
+  if (atCapacity) {
+    return (
+      <div
+        className="mb-4 flex w-full items-center justify-center gap-2 rounded-[var(--r-item)] border border-dashed border-[color:var(--rule)] bg-[color:var(--track)] px-4 py-5 text-[13px] font-semibold text-[color:var(--text-muted)]"
+        aria-disabled="true"
+      >
+        <span>{t('conceptOptionCap')}</span>
+      </div>
+    );
+  }
 
   function onPick(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];

@@ -492,7 +492,7 @@
     "rom_not_acknowledged": "The client must acknowledge the build-cost range before approving the design",
     "as_built_not_reconciled": "Reconcile the as-built variance before approving the design",
     "spatial_base_missing": "Record a survey (or a developer CAD set for off-plan) before continuing",
-    "concept_options_out_of_range": "Add 2–4 concept options to continue",
+    "concept_options_out_of_range": "Upload 2 to 4 concept options to continue",
     "revision_co_amount_required": "This revision is beyond the free allowance — enter a change-order amount greater than zero",
     "revision_cos_outstanding": "Settle the outstanding revision change orders before locking the concept",
     "renders_missing": "Add at least one approved render to continue",
@@ -1490,7 +1490,7 @@
       "romAcknowledged": "Budget range acknowledged",
       "asBuiltReconciled": "As-built reconciled",
       "spatialBaseReady": "Survey or base plan ready",
-      "optionsReady": "Concept options ready",
+      "optionsReady": "Concept options ready (2–4)",
       "revisionCosSettled": "Revision charges settled",
       "rendersPresent": "Approved render ready",
       "asBuiltDueOpen": "As-built check open",
@@ -1667,17 +1667,20 @@
       "uploaded": "File uploaded.",
       "wrongType": "That file type isn't allowed here.",
       "tooLarge": "That file is too large. The limit is 100 MB.",
+      "conceptOptionCap": "Maximum 4 concept options reached",
       "category": {
         "layout": "2D layout",
         "render": "Render set",
         "boq": "Draft BOQ",
-        "shopDrawing": "Shop drawings"
+        "shopDrawing": "Shop drawings",
+        "conceptOption": "Concept option"
       },
       "badge": {
         "layout": "2D",
         "render": "3D",
         "boq": "BOQ",
-        "shopDrawing": "Shop"
+        "shopDrawing": "Shop",
+        "conceptOption": "Opt"
       },
       "visibility": {
         "visible": "Visible to client",

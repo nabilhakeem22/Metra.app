@@ -9,7 +9,9 @@ import type { ActionResult } from '@/lib/actions/result';
 // guards/money note below for why this component only ever imports leaves.
 import { findLatestClientChangeRequestNote } from '@/lib/engagements/client-activity-note';
 import { deriveCommandCard, type CommandCardMode } from '@/lib/engagements/command-card';
+import { conceptOptionsAtCapacity } from '@/lib/engagements/concept-options';
 import type { EngagementGatePreview } from '@/lib/engagements/gate-preview';
+import { inlineDropzoneCategory } from '@/lib/engagements/inline-dropzone-category';
 import type { EngagementClientActivityRecord } from '@/lib/engagements/queries/client-activity';
 // Import from the LEAF (guards/money), not the guards barrel: the barrel also
 // re-exports GUARDS from ./registry, which would drag the whole guard engine
@@ -25,10 +27,7 @@ import { formatDate } from '@/lib/format/date';
 import { EngagementFeeForm } from './engagement-fee-form';
 import { EngagementHeroBadges } from './engagement-hero-badges';
 import { EngagementHeroChecklist } from './engagement-hero-checklist';
-import {
-  EngagementInlineDropzone,
-  inlineDropzoneCategory,
-} from './engagement-inline-dropzone';
+import { EngagementInlineDropzone } from './engagement-inline-dropzone';
 import { EngagementOffPlanToggle } from './engagement-off-plan-toggle';
 import { PaymentForm } from './engagement-payment-form';
 import { EngagementSecondaryActions } from './engagement-secondary-actions';
@@ -84,6 +83,7 @@ export function EngagementCommandCard({
   canSetOffPlan,
   offPlan,
   paymentClaimCount,
+  conceptOptionCount,
   clientActivity,
   secondaryTriggers,
   pending,
@@ -103,6 +103,8 @@ export function EngagementCommandCard({
   canSetOffPlan: boolean;
   offPlan: boolean;
   paymentClaimCount: number;
+  /** Concept options already recorded — drives the append-only upload cap. */
+  conceptOptionCount: number;
   clientActivity: EngagementClientActivityRecord[];
   secondaryTriggers: Trigger[];
   pending: boolean;
@@ -153,8 +155,13 @@ export function EngagementCommandCard({
   const showNudgePill = view.showNudge && canShare;
 
   // The inline attachment dropzone is THE ONE ACTION when the studio's next move
-  // is to attach a deliverable at this stage (null otherwise).
+  // is to attach a deliverable at this stage (null otherwise). Concept options are
+  // append-only and capped at four by `optionsReady`, so the dropzone stops
+  // OFFERING an upload at the cap rather than letting the studio walk into a state
+  // with no way back — the other categories have no cap and never reach this.
   const dropzoneCategory = inlineDropzoneCategory(state);
+  const dropzoneAtCapacity =
+    dropzoneCategory === 'conceptOption' && conceptOptionsAtCapacity(conceptOptionCount);
   // The off-plan toggle only makes sense before the survey branch — the proposal
   // milestone (created / design_proposal), and only for a role that may update.
   const atProposal = !closed && stateMilestone(state).index === 0;
@@ -295,6 +302,7 @@ export function EngagementCommandCard({
               engagementId={engagementId}
               category={dropzoneCategory}
               canUpload={canUpload}
+              atCapacity={dropzoneAtCapacity}
             />
           )}
 

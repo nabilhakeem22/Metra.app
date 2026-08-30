@@ -66,6 +66,7 @@ describe('CATEGORY_WRITE_KIND', () => {
       render: 'approved_render',
       boq: 'boq',
       shopDrawing: 'shop_drawing',
+      conceptOption: 'concept_option',
     });
   });
 
@@ -73,5 +74,21 @@ describe('CATEGORY_WRITE_KIND', () => {
     expect(WORKING_FILE_CATEGORIES).not.toContain('shopDrawing');
     expect(validateDeliverableFile('shopDrawing', 'wall-section.dwg', 1024)).toBeNull();
     expect(validateDeliverableFile('shopDrawing', 'boq.xlsx', 1024)).toBe('invalid');
+  });
+
+  it('conceptOption is an upload category WITHOUT a pinned tray slot', () => {
+    expect(WORKING_FILE_CATEGORIES).not.toContain('conceptOption');
+    expect(validateDeliverableFile('conceptOption', 'option-a.pdf', 1024)).toBeNull();
+    expect(validateDeliverableFile('conceptOption', 'boq.xlsx', 1024)).toBe('invalid');
+  });
+
+  // The dead-end this category exists to fix: `optionsReady` counts
+  // `concept_option` artifacts, so an upload category that writes `autocad` could
+  // never clear it. The two must stay DISTINCT kinds — collapsing them makes
+  // either optionsReady or spatialBaseReady unsatisfiable through the UI.
+  it('writes concept_option for conceptOption and autocad for layout', () => {
+    expect(CATEGORY_WRITE_KIND.conceptOption).toBe('concept_option');
+    expect(CATEGORY_WRITE_KIND.layout).toBe('autocad');
+    expect(CATEGORY_WRITE_KIND.conceptOption).not.toBe(CATEGORY_WRITE_KIND.layout);
   });
 });

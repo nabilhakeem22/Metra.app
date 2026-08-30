@@ -5,6 +5,7 @@ import { useState, useTransition } from 'react';
 import { Link, useRouter } from '@/i18n/routing';
 import { resolveActionError } from '@/lib/actions/error-message';
 import type { ActionCode, ActionResult } from '@/lib/actions/result';
+import { countConceptOptions } from '@/lib/engagements/concept-options';
 import type { EngagementGatePreview } from '@/lib/engagements/gate-preview';
 import type {
   EngagementArtifactRecord,
@@ -81,6 +82,11 @@ export function EngagementDetailClient({
     (trigger) => trigger !== gatePreview.primaryTrigger,
   );
 
+  // Pure derivation over the artifacts the page already loaded (no extra read).
+  // The command card needs it to stop offering a 5th concept-option upload —
+  // artifacts are append-only, so overshooting the guard's cap is unrecoverable.
+  const conceptOptionCount = countConceptOptions(artifacts);
+
   function runAction(fn: () => Promise<ActionResult>) {
     setError(null);
     startTransition(async () => {
@@ -118,6 +124,7 @@ export function EngagementDetailClient({
         canSetOffPlan={capabilities.setRom}
         offPlan={header.offPlan}
         paymentClaimCount={paymentClaimCount}
+        conceptOptionCount={conceptOptionCount}
         clientActivity={clientActivity}
         secondaryTriggers={secondaryTriggers}
         pending={pending}

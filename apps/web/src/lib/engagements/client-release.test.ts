@@ -98,6 +98,22 @@ describe('selectReleaseArtifactIds', () => {
     ]);
   });
 
+  // The point of the `conceptOption` upload category: a concept option recorded
+  // through the command card now CARRIES A FILE, so conceptPackage actually
+  // reaches the client. Before it, the only way to make a `concept_option` was
+  // the metadata-only artifact panel, and every such record was silently dropped
+  // by the hasFile filter — the studio advanced and the client saw nothing.
+  it('releases file-bearing concept options with no autocad in the engagement', () => {
+    const rows = [
+      artifact('option-a', 'concept_option', { fileId: 'file-a' }),
+      artifact('option-b', 'concept_option', { fileId: 'file-b' }),
+    ];
+    expect(selectReleaseArtifactIds(CLIENT_RELEASES.conceptPackage, rows)).toEqual([
+      'option-a',
+      'option-b',
+    ]);
+  });
+
   it('picks the newest FILE-BEARING autocad, not a newer fileless one', () => {
     const rows = [
       artifact('a-old', 'autocad', { attestedAt: '2026-01-01T00:00:00Z' }),
