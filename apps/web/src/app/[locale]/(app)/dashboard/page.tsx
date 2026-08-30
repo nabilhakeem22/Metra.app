@@ -27,32 +27,6 @@ const LEDGER_ROWS = [
 ] as const;
 
 export default async function DashboardPage() {
-  try {
-    return await renderDashboard();
-  } catch (err) {
-    // TEMP DIAGNOSTIC: Next redacts server-component errors in production (the
-    // browser only gets a digest), which makes an authenticated-only 500
-    // undiagnosable. Surface the real stack here; re-throw Next's own
-    // control-flow signals so redirect()/notFound() keep working.
-    const digest = (err as { digest?: string })?.digest;
-    if (
-      typeof digest === 'string' &&
-      (digest === 'NEXT_NOT_FOUND' || digest.startsWith('NEXT_REDIRECT'))
-    ) {
-      throw err;
-    }
-    console.error('[dashboard-diagnostic]', err);
-    return (
-      <pre className="m-4 overflow-auto whitespace-pre-wrap rounded-lg border border-[color:var(--warn-tint)] bg-[color:var(--warn-tint)] p-4 text-xs text-[color:var(--warn)]">
-        {`Dashboard diagnostic (temporary) — the real server error:\n\n${String(
-          (err as Error)?.stack ?? err,
-        )}`}
-      </pre>
-    );
-  }
-}
-
-async function renderDashboard() {
   const ctx = await requireOrg();
   const user = await getSessionUser();
   const locale = await getLocale();
