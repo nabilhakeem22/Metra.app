@@ -25,21 +25,26 @@ function runtimeUrl(): string {
 // Cloudflare/Hyperdrive hop (Hyperdrive terminates TLS to the origin), while
 // off-platform keeps the exact host-derived default every script/test relies on.
 //
-// max:10 — sized to the engagement cockpit's 10-way Promise.all (the largest
-// known per-request fan-out) so it runs in ONE wave. On CF this is the SINGLE
-// instance shared by every withRequestDb call in a request (see
-// request-connection.ts), reached through Hyperdrive → the Supabase
-// TRANSACTION-mode pooler (:6543, Hyperdrive origin_connection_limit 20), which
-// releases a connection per transaction — so per-request concurrency is bounded
-// by Hyperdrive's origin limit, not a session-client cap. HISTORY (do not repeat):
-// against the old SESSION-mode pooler (:5432, hard cap 15 clients) a max:12 here
-// let one request hoard 12/15 slots → `EMAXCONNSESSION` 500s across the app; the
-// pooler mode, not this number, was the real problem. If Hyperdrive ever points
-// back at :5432, drop this to ≤5. The app is transaction-pooler-safe: prepare:false,
-// SET LOCAL-only GUCs, and pg_advisory_xact_lock (never session advisory locks).
+// max:5 — the long-standing known-good value for this stack. On CF this is the
+// SINGLE instance shared by every withRequestDb call in a request (see
+// request-connection.ts), reached through Hyperdrive → the Supabase SESSION-mode
+// pooler (:5432, hard cap 15 client connections). A single request must never be
+// able to hoard that cap, so keep this well under it; the cockpit's 10-way
+// Promise.all simply runs in ~2 waves.
+//
+// HISTORY — two production incidents, do not repeat either:
+//  1. max:12 against the session pooler let ONE request take 12/15 slots, so a
+//     second concurrent request died with `EMAXCONNSESSION`.
+//  2. Repointing Hyperdrive at the TRANSACTION pooler (:6543) to dodge that cap
+//     made EVERY query hang instead — Hyperdrive is itself a pooler, and stacking
+//     it on a transaction-mode pooler stalled the wire. Symptom: every DB-touching
+//     route took exactly CF_DB_DEADLINE_MS and threw DbDeadlineError while Postgres
+//     sat idle with zero errors. Hyperdrive must point at the SESSION pooler.
+// The app is pooler-safe either way: prepare:false, SET LOCAL-only GUCs, and
+// transaction-scoped advisory locks (never session-level ones).
 export function createRuntimeConnection(): { db: MetraDb; sql: PostgresJs } {
   const ssl = isCloudflareRuntime() ? { ssl: false as const } : {};
-  return createDb(runtimeUrl(), { prepare: false, max: 10, ...ssl });
+  return createDb(runtimeUrl(), { prepare: false, max: 5, ...ssl });
 }
 
 // Wall-clock ceiling (ms) for a single withRequestDb call on the Cloudflare
