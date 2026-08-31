@@ -1,8 +1,11 @@
-// Design-Engagement Machine, Step 8 — the `applyRevision` side-effect of the
-// `requestRevision` self-loop (negotiation -> negotiation). Executor-only: MUST be
-// called with the executor's `tx` so the revision-counter increment and the
-// optional change-order insert commit ATOMICALLY with the self-loop transition
-// row, or roll back together. Two concerns kept explicitly separate:
+// Design-Engagement Machine, Step 8 — the `applyRevision` side-effect shared by
+// BOTH revision edges: the `requestRevision` concept self-loop (negotiation ->
+// negotiation) and the `designChangeRaised` 3D revision loop (final_approval /
+// shop_drawings -> design_3d). ONE mechanism, one commercial rule: N free
+// revisions, then a priced change order. Executor-only: MUST be called with the
+// executor's `tx` so the revision-counter increment and the optional change-order
+// insert commit ATOMICALLY with the transition row, or roll back together. Two
+// concerns kept explicitly separate:
 //   1) The free-vs-change-order branch is decided from the loaded engagement row
 //      (revisionCount / freeRevisionN) — pure arithmetic, no float.
 //   2) When the new count crosses the free allowance a change order is DUE: the
@@ -37,7 +40,7 @@ function isMoneyString(value: unknown): value is string {
  * `next` crosses the allowance a change order is DUE: `changeOrderAmount` must be a
  * well-formed scale-4 money string > 0, and exactly one `raised` change-order row
  * is inserted with the canonical amount + optional reason. Must run inside the
- * executor's tx so the increment + optional insert are atomic with the self-loop.
+ * executor's tx so the increment + optional insert are atomic with the state move.
  */
 export async function applyRevision(
   tx: MetraDb,

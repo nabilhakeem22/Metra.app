@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { canRunTrigger, legalTriggersFrom, triggerNeedsForm } from './ui';
+import { WIRED_TRIGGERS } from './transitions';
+import {
+  PAYLOAD_TRIGGERS,
+  canRunTrigger,
+  legalTriggersFrom,
+  triggerNeedsForm,
+} from './ui';
 
 describe('legalTriggersFrom', () => {
   it('offers the wired forward trigger plus the abandon off-ramp from each state', () => {
@@ -31,21 +37,25 @@ describe('legalTriggersFrom', () => {
     );
   });
 
-  it('offers the Gate-B fan-out from final_approval', () => {
+  it('offers the Gate-B fan-out from final_approval, including the 3D revision loop', () => {
     expect(legalTriggersFrom('final_approval').sort()).toEqual(
       [
         'approveDesign',
         'attestAsBuiltClean',
         'flagAsBuiltVariance',
         'rejectDesign',
+        'designChangeRaised',
         'abandon',
       ].sort(),
     );
   });
 
   it('offers the tail edges from shop_drawings / boq / execution_decision / design_only_handoff', () => {
+    // shop_drawings is the 3D revision loop's second entry point: the client can
+    // still ask for design changes after Gate B, so designChangeRaised is legal
+    // here alongside the forward draftReady.
     expect(legalTriggersFrom('shop_drawings').sort()).toEqual(
-      ['draftReady', 'abandon'].sort(),
+      ['draftReady', 'designChangeRaised', 'abandon'].sort(),
     );
     expect(legalTriggersFrom('boq').sort()).toEqual(
       ['finalizeBOQ', 'abandon'].sort(),
@@ -69,8 +79,22 @@ describe('triggerNeedsForm', () => {
   it('marks the payload triggers and only those', () => {
     expect(triggerNeedsForm('submitDesignFee')).toBe(true);
     expect(triggerNeedsForm('requestRevision')).toBe(true);
+    // The 3D revision loop needs the same change-order amount form as the concept
+    // revision — it shares `applyRevision`, so it shares the payload.
+    expect(triggerNeedsForm('designChangeRaised')).toBe(true);
     expect(triggerNeedsForm('confirmAndPayDeposit')).toBe(false);
     expect(triggerNeedsForm('approveDesign')).toBe(false);
+  });
+
+  it('every payload trigger is a wired trigger the UI can actually offer', () => {
+    // A form for a trigger nobody can fire is a dead affordance; conversely a
+    // payload-carrying trigger fired WITHOUT its form silently drops the input.
+    for (const trigger of PAYLOAD_TRIGGERS) {
+      expect(
+        WIRED_TRIGGERS.has(trigger),
+        `"${trigger}" opens a payload form but is not wired — the UI would render a form for an unfireable edge.`,
+      ).toBe(true);
+    }
   });
 });
 

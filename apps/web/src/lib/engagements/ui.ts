@@ -40,13 +40,16 @@ export function legalTriggersFrom(state: DesignState): Trigger[] {
 
 /**
  * Triggers that carry a payload and therefore open a form instead of firing
- * directly: `submitDesignFee` (design fee + milestone split) and `requestRevision`
- * (an optional reason, plus the change-order amount required once the revision
- * crosses the free allowance). Every other wired trigger fires with no input.
+ * directly: `submitDesignFee` (design fee + milestone split) and the two revision
+ * edges — `requestRevision` (concept) and `designChangeRaised` (3D) — which both
+ * take an optional reason plus the change-order amount that becomes required once
+ * the revision crosses the free allowance. Every other wired trigger fires with no
+ * input.
  */
 export const PAYLOAD_TRIGGERS: ReadonlySet<Trigger> = new Set<Trigger>([
   'submitDesignFee',
   'requestRevision',
+  'designChangeRaised',
 ]);
 
 /** Does firing this trigger need a payload form (vs. a direct click)? */

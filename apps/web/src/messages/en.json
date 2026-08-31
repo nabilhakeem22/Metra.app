@@ -494,7 +494,7 @@
     "spatial_base_missing": "Record a survey (or a developer CAD set for off-plan) before continuing",
     "concept_options_out_of_range": "Upload 2 to 4 concept options to continue",
     "revision_co_amount_required": "This revision is beyond the free allowance — enter a change-order amount greater than zero",
-    "revision_cos_outstanding": "Settle the outstanding revision change orders before locking the concept",
+    "revision_cos_outstanding": "Settle the outstanding revision change orders before moving on",
     "renders_missing": "Add at least one approved render to continue",
     "as_built_not_due": "As-built drawings are not due for this delivery",
     "shop_drawings_missing": "Record at least one shop drawing to continue",
@@ -1447,6 +1447,7 @@
       "attestAsBuiltClean": "Attest as-built clean",
       "approveDesign": "Approve design",
       "rejectDesign": "Reject design",
+      "designChangeRaised": "Revise the 3D",
       "draftReady": "Shop drawings ready",
       "finalizeBOQ": "Finalize BOQ",
       "chooseDesignOnly": "Close as design-only",
@@ -1634,11 +1635,13 @@
     },
     "revisionForm": {
       "title": "Request revision",
+      "designChangeTitle": "Revise the 3D",
       "reason": "Reason (optional)",
       "changeOrderAmount": "Change-order amount (optional)",
       "addAmount": "Change-order amount",
       "hint": "Enter an amount only when this revision is beyond the free allowance.",
-      "submit": "Request revision"
+      "submit": "Request revision",
+      "designChangeSubmit": "Revise & re-issue the 3D"
     },
     "panels": {
       "fee": "Fee schedule",

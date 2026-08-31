@@ -17,8 +17,13 @@ import { CATEGORY_WRITE_KIND } from './deliverable-files';
 import { resolveForwardTrigger } from './forward-trigger';
 import { GUARDS, type GuardFacts, type GuardKey } from './guards';
 import { inlineDropzoneCategory } from './inline-dropzone-category';
-import { DESIGN_STATES, isTerminal, type DesignState } from './states';
-import { TRANSITIONS } from './transitions';
+import {
+  DESIGN_STATES,
+  STAGE_NUMBER,
+  isTerminal,
+  type DesignState,
+} from './states';
+import { TRANSITIONS, WIRED_TRIGGERS } from './transitions';
 
 // THE UI WALK — "can the cockpit satisfy the gate it is showing?"
 //
@@ -49,7 +54,13 @@ type Satisfier =
   | { via: 'cardDropzone'; kind: EngagementArtifactKind; min?: number }
   /** A named non-dropzone path — a form, a toolbar panel, a portal action, money. */
   | { via: 'affordance'; what: string }
-  /** `pendingGuard` — declared but unwired, fails closed by design. */
+  /**
+   * `pendingGuard` — the fail-closed sentinel. It is still REGISTERED in
+   * `GUARDS` but, since the 3D revision loop was wired, it is referenced by NO
+   * transition. Kept declared so the sentinel stays available for the next
+   * declared-but-unbuilt edge, and so the rule below keeps forbidding it on any
+   * trigger the cockpit offers.
+   */
   | { via: 'unwired' };
 
 /**
@@ -123,7 +134,7 @@ const SATISFIED_BY: Record<GuardKey, Satisfier> = {
     what: 'off-plan toggle on the command card — as_built_due is set at confirmAndPayDeposit for an off-plan job',
   },
 
-  // --- declared but not wired.
+  // --- the fail-closed sentinel: registered, but on no edge at all.
   pendingGuard: { via: 'unwired' },
 };
 
@@ -255,6 +266,21 @@ describe('SATISFIED_BY covers the guard registry exactly', () => {
         satisfier.what.trim().length,
         `${guard} is declared 'affordance' but names no path — "how does the studio clear this?" must have an answer someone can navigate to.`,
       ).toBeGreaterThan(0);
+    }
+  });
+
+  it('no WIRED trigger is gated by a guard declared unwired', () => {
+    // Stronger than the per-state rule below (which only inspects the ONE forward
+    // trigger the cockpit resolves): a wired trigger reachable as a SECONDARY
+    // action — designChangeRaised is exactly that — must not sit behind a guard
+    // that always denies, or the studio gets a button that can never succeed.
+    for (const trigger of WIRED_TRIGGERS) {
+      for (const guard of TRANSITIONS[trigger].guards) {
+        expect(
+          SATISFIED_BY[guard].via,
+          `"${trigger}" is in WIRED_TRIGGERS but is gated by "${guard}", declared 'unwired' (always denies). Wire the guard, or take the trigger back out of WIRED_TRIGGERS.`,
+        ).not.toBe('unwired');
+      }
     }
   });
 });
@@ -431,6 +457,25 @@ describe('the whole state space is accounted for', () => {
       ).toBe(true);
     });
   }
+
+  it('never proposes a trigger that moves the engagement BACKWARD as "what is next"', () => {
+    // `NON_FORWARD_TRIGGERS` only names rejectDesign/abandon explicitly; every
+    // other backward edge is excluded by the furthest-stage rule alone. The 3D
+    // revision loop (designChangeRaised: final_approval/shop_drawings ->
+    // design_3d) is the live case — stage 7 loses to approveDesign's 9 and
+    // draftReady's 10 — so it stays a SECONDARY action and never becomes the
+    // hero's Advance. Pinned generally, so a future backward edge whose
+    // destination happens to outrank the forward one fails here instead of
+    // silently becoming the cockpit's next action.
+    for (const state of DESIGN_STATES) {
+      const trigger = resolveForwardTrigger(state);
+      if (trigger === null) continue;
+      expect(
+        STAGE_NUMBER[TRANSITIONS[trigger].to],
+        `At "${state}" (stage ${STAGE_NUMBER[state]}) the cockpit's next action is "${trigger}", which lands on "${TRANSITIONS[trigger].to}" (stage ${STAGE_NUMBER[TRANSITIONS[trigger].to]}) — a step BACKWARD. Advance would walk the engagement down the funnel.`,
+      ).toBeGreaterThanOrEqual(STAGE_NUMBER[state]);
+    }
+  });
 
   it('offers no forward trigger from a terminal state', () => {
     for (const state of DESIGN_STATES) {

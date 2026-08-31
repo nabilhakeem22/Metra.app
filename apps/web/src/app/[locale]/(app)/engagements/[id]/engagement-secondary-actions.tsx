@@ -7,17 +7,31 @@ import type { ActionResult } from '@/lib/actions/result';
 import type { Trigger } from '@/lib/engagements/transitions';
 import { triggerNeedsForm } from '@/lib/engagements/ui';
 import { EngagementFeeForm } from './engagement-fee-form';
-import { EngagementRevisionForm } from './engagement-revision-form';
+import {
+  EngagementRevisionForm,
+  type RevisionTrigger,
+} from './engagement-revision-form';
 import { DIRECT_TRIGGER_ACTIONS } from './trigger-actions';
+
+/** The three payload triggers — each opens a form here instead of firing. */
+type PayloadFormTrigger = 'submitDesignFee' | RevisionTrigger;
+
+/** Is this the trigger of one of the two revision forms (concept or 3D)? */
+function isRevisionTrigger(
+  trigger: PayloadFormTrigger,
+): trigger is RevisionTrigger {
+  return trigger === 'requestRevision' || trigger === 'designChangeRaised';
+}
 
 // The command card's LOW-EMPHASIS secondary controls: every legal, capability-
 // permitted trigger that is NOT the forward-advance one (the Advance button owns
 // that). Folds in the retired `engagement-next-actions.tsx` — rejectDesign,
-// requestRevision, attest/flag as-built, etc. — as small outline buttons so no
-// legal trigger is dropped. A payload trigger opens its existing form; `abandon`
-// is confirm-gated (first click reveals an inline title/hint + Confirm/Cancel;
-// only Confirm fires — abandoning is terminal and irreversible); every other
-// trigger fires directly through the shared `trigger-actions` map.
+// requestRevision, designChangeRaised (revise & re-issue the 3D), attest/flag
+// as-built, etc. — as small outline buttons so no legal trigger is dropped. A
+// payload trigger opens its existing form; `abandon` is confirm-gated (first click
+// reveals an inline title/hint + Confirm/Cancel; only Confirm fires — abandoning is
+// terminal and irreversible); every other trigger fires directly through the shared
+// `trigger-actions` map.
 export function EngagementSecondaryActions({
   engagementId,
   triggers,
@@ -35,16 +49,14 @@ export function EngagementSecondaryActions({
 }) {
   const tcmd = useTranslations('engagements.command');
   const tt = useTranslations('engagements.trigger');
-  const [openForm, setOpenForm] = useState<'submitDesignFee' | 'requestRevision' | null>(
-    null,
-  );
+  const [openForm, setOpenForm] = useState<PayloadFormTrigger | null>(null);
   const [confirmingAbandon, setConfirmingAbandon] = useState(false);
 
   if (triggers.length === 0) return null;
 
   function onClick(trigger: Trigger) {
     if (triggerNeedsForm(trigger)) {
-      setOpenForm(trigger as 'submitDesignFee' | 'requestRevision');
+      setOpenForm(trigger as PayloadFormTrigger);
       return;
     }
     // Abandon is terminal: the first click only reveals the inline confirm —
@@ -129,9 +141,14 @@ export function EngagementSecondaryActions({
         />
       )}
 
-      {openForm === 'requestRevision' && (
+      {/* One form for BOTH revision edges — the concept self-loop and the 3D
+          revision loop — keyed by the trigger so switching between them resets
+          the fields rather than carrying the previous reason/amount over. */}
+      {openForm !== null && isRevisionTrigger(openForm) && (
         <EngagementRevisionForm
+          key={openForm}
           engagementId={engagementId}
+          trigger={openForm}
           revisionCount={revisionCount}
           freeRevisionN={freeRevisionN}
           pending={pending}

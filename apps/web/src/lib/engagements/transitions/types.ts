@@ -46,7 +46,8 @@ export type CapabilityKey = Extract<
  * (attestAsBuiltClean), each appending one `as_built_attestation` event; Step 14
  * adds `recordDesignApproval` (approveDesign, appending one `design_approval`
  * event) and `resetRevisionsOnReject` (rejectDesign, refilling the free-revision
- * allowance).
+ * allowance). `applyRevision` is now SHARED: `designChangeRaised` (the 3D
+ * revision loop) reuses it so both revision edges price revisions by one rule.
  * A side-effect runs INSIDE the executor's tx (atomic with the state move); its
  * executor branch is the ONLY place it may run. Every later side-effect widens
  * this union AND adds a matching executor branch.
@@ -77,10 +78,12 @@ export interface GenerateFeeSchedulePayload {
 }
 
 /**
- * Payload for `applyRevision` (requestRevision self-loop). Both fields are
- * optional: a FREE revision needs neither; a revision that crosses the free
- * allowance REQUIRES `changeOrderAmount` (a scale-4 money string > 0) or the whole
- * transition rolls back with `revision_co_amount_required`.
+ * Payload for `applyRevision` — carried by BOTH revision edges: the
+ * `requestRevision` concept self-loop and the `designChangeRaised` 3D revision
+ * loop. Both fields are optional: a FREE revision needs neither; a revision that
+ * crosses the free allowance REQUIRES `changeOrderAmount` (a scale-4 money
+ * string > 0) or the whole transition rolls back with
+ * `revision_co_amount_required`.
  */
 export interface RequestRevisionPayload {
   changeOrderAmount?: string;

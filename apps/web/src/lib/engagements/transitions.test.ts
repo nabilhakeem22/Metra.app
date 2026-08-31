@@ -47,14 +47,16 @@ describe('transition registry', () => {
       const froms = Array.isArray(def.from) ? def.from : [def.from];
       for (const from of froms) expect(states.has(from)).toBe(true);
       expect(states.has(def.to)).toBe(true);
-      // The three guard-less edges: requestRevision (Step 8 — a revision from
+      // The four guard-less edges: requestRevision (Step 8 — a revision from
       // negotiation is always allowed), rejectDesign (Step 14 — a rejection from
-      // final_approval is always allowed), and abandon (tail wiring — the
-      // off-ramp is always allowed; the UI confirm-gates it instead). Every
-      // other edge carries a guard.
+      // final_approval is always allowed), designChangeRaised (the 3D revision
+      // loop — same precedent: revising the design is always allowed while it is
+      // in flight), and abandon (tail wiring — the off-ramp is always allowed; the
+      // UI confirm-gates it instead). Every other edge carries a guard.
       if (
         trigger === 'requestRevision' ||
         trigger === 'rejectDesign' ||
+        trigger === 'designChangeRaised' ||
         trigger === 'abandon'
       ) {
         expect(def.guards).toEqual([]);
@@ -67,14 +69,19 @@ describe('transition registry', () => {
       );
       // Side-effect-carrying triggers: submitDesignFee -> Step 3,
       // confirmAndPayDeposit -> Step 4, selectConcept -> Step 7, requestRevision ->
-      // Step 8; every other trigger still moves state only.
+      // Step 8; `applyRevision` is SHARED by requestRevision (concept) and
+      // designChangeRaised (3D) — one mechanism, not two; every other trigger
+      // still moves state only.
       if (trigger === 'submitDesignFee') {
         expect(def.sideEffect).toBe('generateFeeSchedule');
       } else if (trigger === 'confirmAndPayDeposit') {
         expect(def.sideEffect).toBe('activateOnDeposit');
       } else if (trigger === 'selectConcept') {
         expect(def.sideEffect).toBe('recordConceptApproval');
-      } else if (trigger === 'requestRevision') {
+      } else if (
+        trigger === 'requestRevision' ||
+        trigger === 'designChangeRaised'
+      ) {
         expect(def.sideEffect).toBe('applyRevision');
       } else if (trigger === 'confirmConcept') {
         expect(def.sideEffect).toBe('settleConceptAndLock');
@@ -120,29 +127,11 @@ describe('transition registry', () => {
     expect([...reachable].sort()).toEqual([...DESIGN_STATES].sort());
   });
 
-  it('the 18 wired triggers (tail wired) carry concrete guards; only designChangeRaised fails closed', () => {
-    expect([...WIRED_TRIGGERS].sort()).toEqual(
-      [
-        'abandon',
-        'approveDesign',
-        'attestAsBuiltClean',
-        'chooseDesignOnly',
-        'chooseExecution',
-        'confirmAndPayDeposit',
-        'confirmConcept',
-        'draftReady',
-        'finalizeBOQ',
-        'flagAsBuiltVariance',
-        'optionsReady',
-        'recipientAcknowledges',
-        'rejectDesign',
-        'rendersReady',
-        'requestRevision',
-        'selectConcept',
-        'spatialBaseReady',
-        'submitDesignFee',
-      ].sort(),
-    );
+  it('all 19 triggers are wired; nothing routes through the fail-closed sentinel', () => {
+    // The 3D revision loop wired `designChangeRaised`, so WIRED_TRIGGERS is now
+    // the COMPLETE trigger set — there is no declared-but-unfireable edge left.
+    expect([...WIRED_TRIGGERS].sort()).toEqual([...ALL_TRIGGERS].sort());
+    expect(WIRED_TRIGGERS.size).toBe(19);
 
     // Each wired trigger carries a concrete guard, never the sentinel.
     expect(TRANSITIONS.submitDesignFee.guards).toEqual(['scopeInputsPresent']);
@@ -234,10 +223,16 @@ describe('transition registry', () => {
     // (final_approval -> shop_drawings) — ROM ack, then as-built reconciliation,
     // then the Gate-B installment (ack/reconcile surface before money) — and appends
     // one design_approval event as its side-effect.
+    // revisionCosSettled is LAST: the 3D revision loop can raise a priced change
+    // order at final_approval / shop_drawings, and the return path
+    // (rendersReady -> final_approval -> approveDesign) must re-check settlement or
+    // that change order goes uncollected while the design is approved. Keeping it
+    // after gateBInstallmentCleared preserves `moneyGuardOf` -> gate_b.
     expect(TRANSITIONS.approveDesign.guards).toEqual([
       'romAcknowledged',
       'asBuiltReconciled',
       'gateBInstallmentCleared',
+      'revisionCosSettled',
     ]);
     expect(TRANSITIONS.approveDesign.from).toBe('final_approval');
     expect(TRANSITIONS.approveDesign.to).toBe('shop_drawings');
@@ -252,6 +247,20 @@ describe('transition registry', () => {
     expect(TRANSITIONS.rejectDesign.to).toBe('negotiation');
     expect(TRANSITIONS.rejectDesign.capability).toBe('engagements_design');
     expect(TRANSITIONS.rejectDesign.sideEffect).toBe('resetRevisionsOnReject');
+
+    // designChangeRaised (the 3D revision loop): guard-less, from BOTH
+    // final_approval and shop_drawings back to design_3d, so the studio can act
+    // on a client design-change request and re-issue a revised 3D. It REUSES
+    // `applyRevision` — the concept stage's mechanism — so the revision counter
+    // and the over-allowance change order are priced by one rule, not two.
+    expect(TRANSITIONS.designChangeRaised.guards).toEqual([]);
+    expect(TRANSITIONS.designChangeRaised.from).toEqual([
+      'final_approval',
+      'shop_drawings',
+    ]);
+    expect(TRANSITIONS.designChangeRaised.to).toBe('design_3d');
+    expect(TRANSITIONS.designChangeRaised.capability).toBe('engagements_design');
+    expect(TRANSITIONS.designChangeRaised.sideEffect).toBe('applyRevision');
 
     // draftReady (tail): at least one recorded shop_drawing artifact opens the
     // BOQ stage — a pure state move (recording IS attesting).
@@ -311,32 +320,13 @@ describe('transition registry', () => {
       ).sort(),
     );
 
-    // Every other trigger routes through pendingGuard (fail-closed) — after the
-    // tail wiring that is ONLY designChangeRaised.
-    const wired = new Set<Trigger>([
-      'submitDesignFee',
-      'confirmAndPayDeposit',
-      'spatialBaseReady',
-      'optionsReady',
-      'selectConcept',
-      'requestRevision',
-      'confirmConcept',
-      'rendersReady',
-      'flagAsBuiltVariance',
-      'attestAsBuiltClean',
-      'approveDesign',
-      'rejectDesign',
-      'draftReady',
-      'finalizeBOQ',
-      'chooseDesignOnly',
-      'chooseExecution',
-      'recipientAcknowledges',
-      'abandon',
-    ]);
-    const failClosed = ALL_TRIGGERS.filter((trigger) => !wired.has(trigger));
-    expect(failClosed).toEqual(['designChangeRaised']);
-    for (const trigger of failClosed) {
-      expect(TRANSITIONS[trigger].guards).toContain('pendingGuard');
-    }
+    // NO edge routes through the fail-closed `pendingGuard` sentinel any more.
+    // This is the runtime witness for "declared but unfireable is now empty": if
+    // a future step parks a new trigger on the sentinel it must ALSO be kept out
+    // of WIRED_TRIGGERS, and this assertion is what forces that pairing.
+    const onSentinel = ALL_TRIGGERS.filter((trigger) =>
+      TRANSITIONS[trigger].guards.includes('pendingGuard'),
+    );
+    expect(onSentinel).toEqual([]);
   });
 });

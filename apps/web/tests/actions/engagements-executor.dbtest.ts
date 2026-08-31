@@ -111,23 +111,27 @@ describe('executeTransition — submitDesignFee (Design-Engagement Machine, Step
     expect(await ledgerFor(engagementId)).toHaveLength(1);
   });
 
-  it('a declared-but-unwired trigger -> transition_not_yet_enabled, state + ledger untouched', async () => {
+  it('a failing guard -> its coded reason, state + ledger untouched', async () => {
+    // This replaces the old `transition_not_yet_enabled` case. That test drove
+    // `designChangeRaised`, the last trigger parked on the fail-closed
+    // `pendingGuard` sentinel — the 3D revision loop wired it, so NO edge routes
+    // through the sentinel any more and the executor can no longer reach that
+    // branch through a real trigger (`transitions.test.ts` pins that emptiness;
+    // `guards.test.ts` still pins the sentinel's own verdict). The property this
+    // case actually protects — a guard failure rolls the whole transition back —
+    // is preserved here against a REAL guard instead.
     const { ctx, engagementId } = await setup();
-    // `designChangeRaised` is the LAST still-pending trigger after the tail
-    // wiring. It is only legal from final_approval / shop_drawings, so force the
-    // state (BYPASSRLS — the rom-ack test precedent) to exercise the
-    // "declared-but-not-yet-wired" path past the legal-from check.
     await executeTransition(ctx, { engagementId, trigger: 'submitDesignFee', payload: VALID_FEE });
-    await raw.query(
-      `update public.design_engagements set state = 'final_approval' where id = '${engagementId}'`,
-    );
+    expect(await stateOf(engagementId)).toBe('design_proposal');
+
+    // Legal from design_proposal, but the deposit has not been recorded.
     const res = await executeTransition(ctx, {
       engagementId,
-      trigger: 'designChangeRaised',
+      trigger: 'confirmAndPayDeposit',
     });
-    expect(res).toEqual({ ok: false, error: 'transition_not_yet_enabled' });
+    expect(res).toEqual({ ok: false, error: 'deposit_not_cleared' });
     // Guard failure rolls back: no state move, no second ledger row.
-    expect(await stateOf(engagementId)).toBe('final_approval');
+    expect(await stateOf(engagementId)).toBe('design_proposal');
     expect(await ledgerFor(engagementId)).toHaveLength(1);
   });
 

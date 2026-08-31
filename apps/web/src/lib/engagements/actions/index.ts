@@ -21,6 +21,7 @@ export {
   attestAsBuiltClean,
   approveDesign,
   rejectDesign,
+  designChangeRaised,
   draftReady,
   finalizeBOQ,
   chooseDesignOnly,

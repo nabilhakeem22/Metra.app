@@ -1,7 +1,8 @@
 // Payload-free lifecycle triggers -> their server action. Shared by the
 // next-actions list AND the hero's direct-advance CTA so the mapping lives in one
-// place (the two payload triggers — submitDesignFee, requestRevision — open a form
-// instead and are deliberately absent). A plain module (no 'use client'): it just
+// place (the three payload triggers — submitDesignFee, requestRevision,
+// designChangeRaised — open a form instead and are deliberately absent). A plain
+// module (no 'use client'): it just
 // re-exports the 'use server' action references, so either a client or a server
 // component may import the map without a boundary breach.
 import type { ActionResult } from '@/lib/actions/result';

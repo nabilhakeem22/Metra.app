@@ -7,15 +7,25 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import type { ActionResult } from '@/lib/actions/result';
-import { requestRevision } from '@/lib/engagements/actions';
+import { designChangeRaised, requestRevision } from '@/lib/engagements/actions';
 
-// The revision-request payload form (an optional reason + the change-order amount
-// that becomes required once a revision crosses the free allowance). Extracted from
-// the retired `engagement-next-actions.tsx` so the command card's low-emphasis
+/**
+ * The two revision edges this form drives. Both carry the SAME
+ * `RequestRevisionPayload` and both run the shared `applyRevision` side-effect —
+ * `requestRevision` revises the concept in negotiation, `designChangeRaised`
+ * pulls the engagement back to design_3d so the studio can revise and RE-ISSUE
+ * the 3D after a client change request. One form, one commercial rule.
+ */
+export type RevisionTrigger = 'requestRevision' | 'designChangeRaised';
+
+// The revision payload form (an optional reason + the change-order amount that
+// becomes required once a revision crosses the free allowance). Extracted from the
+// retired `engagement-next-actions.tsx` so the command card's low-emphasis
 // secondary controls can open it unchanged. Flat tray (opaque `--track` fill, no
 // `.glass`) so it never nests a backdrop-filter inside the glass command card.
 export function EngagementRevisionForm({
   engagementId,
+  trigger,
   revisionCount,
   freeRevisionN,
   pending,
@@ -23,6 +33,8 @@ export function EngagementRevisionForm({
   onCancel,
 }: {
   engagementId: string;
+  /** Which revision edge to fire — it also picks the form's copy. */
+  trigger: RevisionTrigger;
   // The revision counter + the free allowance drive whether a change-order amount
   // is even solicited: a revision still within the free allowance never raises a
   // charge, so the amount field is hidden AND submitted as undefined.
@@ -39,19 +51,25 @@ export function EngagementRevisionForm({
   // This next revision crosses the free allowance → it will raise a change order,
   // which requires a positive amount. Within the allowance the field is omitted.
   const amountRequired = revisionCount >= freeRevisionN;
+  const isDesignChange = trigger === 'designChangeRaised';
 
   function submit() {
+    const payload = {
+      reason: reason.trim() || undefined,
+      changeOrderAmount: amountRequired ? amount.trim() || undefined : undefined,
+    };
     runAction(() =>
-      requestRevision(engagementId, {
-        reason: reason.trim() || undefined,
-        changeOrderAmount: amountRequired ? amount.trim() || undefined : undefined,
-      }),
+      isDesignChange
+        ? designChangeRaised(engagementId, payload)
+        : requestRevision(engagementId, payload),
     );
   }
 
   return (
     <div className="space-y-3 rounded-[var(--r-item)] border border-[color:var(--rule)] bg-[color:var(--track)] p-4">
-      <p className="text-sm font-medium">{t('title')}</p>
+      <p className="text-sm font-medium">
+        {isDesignChange ? t('designChangeTitle') : t('title')}
+      </p>
       <div className="space-y-1.5">
         <Label htmlFor="rev-reason">{t('reason')}</Label>
         <Input id="rev-reason" value={reason} onChange={(e) => setReason(e.target.value)} />
@@ -76,7 +94,7 @@ export function EngagementRevisionForm({
         </Button>
         <Button type="button" onClick={submit} disabled={pending}>
           {pending && <Loader2 className="size-4 animate-spin" aria-hidden />}
-          {t('submit')}
+          {isDesignChange ? t('designChangeSubmit') : t('submit')}
         </Button>
       </div>
     </div>

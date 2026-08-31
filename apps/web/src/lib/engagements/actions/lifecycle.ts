@@ -270,6 +270,30 @@ export async function rejectDesign(
 }
 
 /**
+ * Server-action wrapper for the `designChangeRaised` transition (the 3D revision
+ * loop): final_approval / shop_drawings -> design_3d, so the studio can act on a
+ * client's design-change request and RE-ISSUE a revised 3D. No guard — a revision
+ * is always allowed while the design is in flight. Reuses the concept stage's
+ * `applyRevision` side-effect: the revision counter increments, and once it crosses
+ * the free allowance a change order is raised, which REQUIRES a positive
+ * `changeOrderAmount` in the payload (else the whole transition rolls back with
+ * `revision_co_amount_required`). Revalidates the shell on success — never throws.
+ */
+export async function designChangeRaised(
+  engagementId: string,
+  payload?: RequestRevisionPayload,
+): Promise<ActionResult> {
+  const ctx = await requireOrg();
+  const res = await executeTransition(ctx, {
+    engagementId,
+    trigger: 'designChangeRaised',
+    payload,
+  });
+  if (res.ok) revalidatePath('/', 'layout');
+  return res;
+}
+
+/**
  * Server-action wrapper for the `draftReady` transition (tail wiring):
  * shop_drawings -> boq. The `shopDrawingsPresent` guard requires at least one
  * recorded `shop_drawing` artifact. No side-effect, no payload. Revalidates the

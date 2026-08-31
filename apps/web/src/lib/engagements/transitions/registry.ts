@@ -1,17 +1,15 @@
-// Design-Engagement Machine — transition registry (Step 2, tail wired). PURE,
-// CLIENT-SAFE DATA: the whole shape of the machine declared in one place. All
-// 19 triggers are listed so the graph is complete and honest; the wired edges
-// live in `WIRED_TRIGGERS` — everything except `designChangeRaised`, which
-// still points its guard at `pendingGuard` and fails closed with
-// `transition_not_yet_enabled`: declared, reachable in type-space, but
-// impossible to fire until its real guard/side-effect lands.
+// Design-Engagement Machine — transition registry (Step 2, tail wired, 3D
+// revision loop wired). PURE, CLIENT-SAFE DATA: the whole shape of the machine
+// declared in one place. All 19 triggers are listed AND all 19 are now wired
+// (`WIRED_TRIGGERS`) — the fail-closed `pendingGuard` sentinel is referenced by
+// no edge any more.
 import type { TransitionDef, Trigger } from './types';
 
 /**
- * The registry. Every trigger except `designChangeRaised` is wired (see
- * `WIRED_TRIGGERS`): the happy path runs created -> … -> execution /
- * closed_design_only, `abandon` is the guard-less off-ramp, and
- * `designChangeRaised` stays declared-but-fail-closed until its step arrives.
+ * The registry. Every trigger is wired (see `WIRED_TRIGGERS`): the happy path
+ * runs created -> … -> execution / closed_design_only, `abandon` is the
+ * guard-less off-ramp, `rejectDesign` bounces the design back to negotiation,
+ * and `designChangeRaised` sends the 3D back for a revision.
  */
 export const TRANSITIONS: Record<Trigger, TransitionDef> = {
   submitDesignFee: {
@@ -115,10 +113,21 @@ export const TRANSITIONS: Record<Trigger, TransitionDef> = {
   // Off-Plan) the as-built reconciliation surface BEFORE money — so the guard order
   // is romAcknowledged -> asBuiltReconciled -> gateBInstallmentCleared. The
   // side-effect appends ONE `design_approval` event, atomic with the state move.
+  // `revisionCosSettled` is LAST and mirrors `confirmConcept`: once
+  // `designChangeRaised` can raise a priced 3D change order at final_approval /
+  // shop_drawings, the return path (rendersReady -> final_approval -> approveDesign)
+  // must re-check settlement or that change order could go uncollected while the
+  // design is approved. It stays after gateBInstallmentCleared so `moneyGuardOf`
+  // still resolves the Gate-B milestone for pay-and-advance.
   approveDesign: {
     from: 'final_approval',
     to: 'shop_drawings',
-    guards: ['romAcknowledged', 'asBuiltReconciled', 'gateBInstallmentCleared'],
+    guards: [
+      'romAcknowledged',
+      'asBuiltReconciled',
+      'gateBInstallmentCleared',
+      'revisionCosSettled',
+    ],
     sideEffect: 'recordDesignApproval',
     capability: 'engagements_design',
   },
@@ -180,11 +189,19 @@ export const TRANSITIONS: Record<Trigger, TransitionDef> = {
     sideEffect: 'resetRevisionsOnReject',
     capability: 'engagements_design',
   },
+  // The 3D revision loop: the client asked for design changes, so the studio
+  // pulls the engagement back to design_3d to revise and RE-ISSUE the renders.
+  // Guard-less (the requestRevision/rejectDesign precedent — a revision is
+  // always allowed while the design is in flight), and it REUSES the concept
+  // stage's `applyRevision` side-effect so the commercial rule is one mechanism,
+  // not two: N free revisions, then a priced change order (the payload's
+  // `changeOrderAmount` is required past the allowance, else the whole
+  // transition rolls back with `revision_co_amount_required`).
   designChangeRaised: {
     from: ['final_approval', 'shop_drawings'],
     to: 'design_3d',
-    guards: ['pendingGuard'],
-    sideEffect: null,
+    guards: [],
+    sideEffect: 'applyRevision',
     capability: 'engagements_design',
   },
   // Tail wiring: the guard-less off-ramp from every non-terminal state (the UI
@@ -213,7 +230,10 @@ export const TRANSITIONS: Record<Trigger, TransitionDef> = {
   },
 };
 
-/** Triggers wired for real (their guards are not the fail-closed sentinel). */
+/**
+ * Triggers wired for real (their guards are not the fail-closed sentinel). Now
+ * the COMPLETE trigger set — nothing routes through `pendingGuard` any more.
+ */
 export const WIRED_TRIGGERS: ReadonlySet<Trigger> = new Set<Trigger>([
   'submitDesignFee',
   'confirmAndPayDeposit',
@@ -227,6 +247,7 @@ export const WIRED_TRIGGERS: ReadonlySet<Trigger> = new Set<Trigger>([
   'attestAsBuiltClean',
   'approveDesign',
   'rejectDesign',
+  'designChangeRaised',
   'draftReady',
   'finalizeBOQ',
   'chooseDesignOnly',
