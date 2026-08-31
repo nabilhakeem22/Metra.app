@@ -4,7 +4,10 @@
 // then re-runs each of that trigger's guards through the pure guard engine so the
 // cockpit hero can render a MACHINE-TRUTHFUL checklist (one row per guard, with the
 // milestone shortfall as the amount due). It NEVER mutates and NEVER re-implements
-// guard logic or money math — it reuses `GUARDS` + `milestoneShortfall4`.
+// guard logic or money math — it reuses `GUARDS` + `milestoneShortfall4`, and the
+// forward-trigger resolve now lives in the pure `./forward-trigger` leaf: this
+// module is server-only, which put that rule out of reach of a unit test and left
+// the cockpit's "next action" assertable only through a drift-prone copy.
 import 'server-only';
 import {
   designEngagements,
@@ -18,6 +21,7 @@ import { eq } from 'drizzle-orm';
 import type { ActionCode } from '@/lib/actions/result';
 import { formatMoney4 } from '@/lib/aggregates/proposal-totals';
 import { withOrgContext, type OrgContext } from '@/lib/db/context';
+import { resolveForwardTrigger } from './forward-trigger';
 import {
   GUARDS,
   MONEY_GUARD_MILESTONE,
@@ -25,9 +29,7 @@ import {
   type GuardFacts,
   type GuardKey,
 } from './guards';
-import { STAGE_NUMBER, type DesignState } from './states';
 import { TRANSITIONS, type Trigger } from './transitions';
-import { legalTriggersFrom } from './ui';
 
 /** One guard of the forward trigger, evaluated individually for the hero. */
 export interface GateChecklistItem {
@@ -44,37 +46,6 @@ export interface EngagementGatePreview {
   primaryTrigger: Trigger | null;
   items: GateChecklistItem[];
   allClear: boolean;
-}
-
-// rejectDesign (bounce back) and abandon (off-ramp) are legal from many states but
-// are NOT the forward advance — the hero never proposes them as "what's next".
-const NON_FORWARD_TRIGGERS = new Set<Trigger>(['rejectDesign', 'abandon']);
-
-/**
- * The single forward-advance trigger from `state`: the wired, legal trigger (via
- * `legalTriggersFrom`) — excluding the non-forward rejectDesign/abandon — whose
- * destination sits FURTHEST along the funnel (highest `STAGE_NUMBER` of its `to`).
- * Picking the furthest destination naturally selects `confirmConcept` over the
- * `requestRevision` self-loop, `approveDesign` over the `flagAsBuiltVariance`
- * detour, and the change_triage reconciliation back to final_approval — while a
- * terminal (or not-yet-wired) state yields null. Ties resolve to registry order.
- */
-export function resolveForwardTrigger(state: DesignState): Trigger | null {
-  const candidates = legalTriggersFrom(state).filter(
-    (trigger) => !NON_FORWARD_TRIGGERS.has(trigger),
-  );
-  if (candidates.length === 0) return null;
-
-  let best = candidates[0];
-  let bestStage = STAGE_NUMBER[TRANSITIONS[best].to];
-  for (const trigger of candidates) {
-    const stage = STAGE_NUMBER[TRANSITIONS[trigger].to];
-    if (stage > bestStage) {
-      best = trigger;
-      bestStage = stage;
-    }
-  }
-  return best;
 }
 
 /**
