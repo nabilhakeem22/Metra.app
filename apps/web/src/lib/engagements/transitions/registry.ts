@@ -196,7 +196,9 @@ export const TRANSITIONS: Record<Trigger, TransitionDef> = {
   // stage's `applyRevision` side-effect so the commercial rule is one mechanism,
   // not two: N free revisions, then a priced change order (the payload's
   // `changeOrderAmount` is required past the allowance, else the whole
-  // transition rolls back with `revision_co_amount_required`).
+  // transition rolls back with `revision_co_amount_required`). It spends its OWN
+  // allowance (`design_revision_count` / `free_design_revision_n`), so burning
+  // the concept revisions never costs the client a free 3D revision.
   designChangeRaised: {
     from: ['final_approval', 'shop_drawings'],
     to: 'design_3d',

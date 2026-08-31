@@ -47,7 +47,8 @@ export type CapabilityKey = Extract<
  * adds `recordDesignApproval` (approveDesign, appending one `design_approval`
  * event) and `resetRevisionsOnReject` (rejectDesign, refilling the free-revision
  * allowance). `applyRevision` is now SHARED: `designChangeRaised` (the 3D
- * revision loop) reuses it so both revision edges price revisions by one rule.
+ * revision loop) reuses it so both revision edges price revisions by one rule —
+ * against two INDEPENDENT counters (the firing trigger picks its own pair).
  * A side-effect runs INSIDE the executor's tx (atomic with the state move); its
  * executor branch is the ONLY place it may run. Every later side-effect widens
  * this union AND adds a matching executor branch.

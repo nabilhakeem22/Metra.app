@@ -8,38 +8,37 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import type { ActionResult } from '@/lib/actions/result';
 import { designChangeRaised, requestRevision } from '@/lib/engagements/actions';
-
-/**
- * The two revision edges this form drives. Both carry the SAME
- * `RequestRevisionPayload` and both run the shared `applyRevision` side-effect —
- * `requestRevision` revises the concept in negotiation, `designChangeRaised`
- * pulls the engagement back to design_3d so the studio can revise and RE-ISSUE
- * the 3D after a client change request. One form, one commercial rule.
- */
-export type RevisionTrigger = 'requestRevision' | 'designChangeRaised';
+import {
+  revisionAmountRequired,
+  type RevisionAllowances,
+  type RevisionTrigger,
+} from '@/lib/engagements/revision-allowance';
 
 // The revision payload form (an optional reason + the change-order amount that
 // becomes required once a revision crosses the free allowance). Extracted from the
 // retired `engagement-next-actions.tsx` so the command card's low-emphasis
-// secondary controls can open it unchanged. Flat tray (opaque `--track` fill, no
-// `.glass`) so it never nests a backdrop-filter inside the glass command card.
+// secondary controls can open it unchanged. It drives BOTH revision edges —
+// `requestRevision` revises the concept in negotiation, `designChangeRaised` pulls
+// the engagement back to design_3d so the studio can revise and RE-ISSUE the 3D —
+// and the `trigger` prop also selects WHICH of the two independent allowances the
+// revision is priced against. Flat tray (opaque `--track` fill, no `.glass`) so it
+// never nests a backdrop-filter inside the glass command card.
 export function EngagementRevisionForm({
   engagementId,
   trigger,
-  revisionCount,
-  freeRevisionN,
+  allowances,
   pending,
   runAction,
   onCancel,
 }: {
   engagementId: string;
-  /** Which revision edge to fire — it also picks the form's copy. */
+  /** Which revision edge to fire — it picks the copy AND the allowance pair. */
   trigger: RevisionTrigger;
-  // The revision counter + the free allowance drive whether a change-order amount
-  // is even solicited: a revision still within the free allowance never raises a
-  // charge, so the amount field is hidden AND submitted as undefined.
-  revisionCount: number;
-  freeRevisionN: number;
+  // BOTH counter/allowance pairs. Whether a change-order amount is even solicited
+  // depends on the pair THIS trigger spends: a revision still within that edge's
+  // free allowance never raises a charge, so the amount field is hidden AND
+  // submitted as undefined. The concept and 3D allowances never draw on each other.
+  allowances: RevisionAllowances;
   pending: boolean;
   runAction: (fn: () => Promise<ActionResult>) => void;
   onCancel: () => void;
@@ -48,9 +47,10 @@ export function EngagementRevisionForm({
   const tc = useTranslations('engagements.controls');
   const [reason, setReason] = useState('');
   const [amount, setAmount] = useState('');
-  // This next revision crosses the free allowance → it will raise a change order,
-  // which requires a positive amount. Within the allowance the field is omitted.
-  const amountRequired = revisionCount >= freeRevisionN;
+  // This next revision crosses ITS OWN free allowance → it will raise a change
+  // order, which requires a positive amount. Within the allowance the field is
+  // omitted. The server re-decides; this only chooses what to solicit.
+  const amountRequired = revisionAmountRequired(trigger, allowances);
   const isDesignChange = trigger === 'designChangeRaised';
 
   function submit() {

@@ -132,8 +132,9 @@ export async function selectConcept(engagementId: string): Promise<ActionResult>
 /**
  * Server-action wrapper for the `requestRevision` self-loop (Step 8): negotiation
  * -> negotiation. Always allowed (no guard). The `applyRevision` side-effect
- * increments the revision counter and — once it crosses the free allowance —
- * raises a design-fee change order, which REQUIRES a positive `changeOrderAmount`
+ * increments the CONCEPT revision counter and — once it crosses the free concept
+ * allowance — raises a design-fee change order (the 3D allowance is a separate
+ * pair and is never touched here), which REQUIRES a positive `changeOrderAmount`
  * in the payload (else the whole transition rolls back with
  * `revision_co_amount_required`). Revalidates the shell on success — never throws.
  */
@@ -274,8 +275,9 @@ export async function rejectDesign(
  * loop): final_approval / shop_drawings -> design_3d, so the studio can act on a
  * client's design-change request and RE-ISSUE a revised 3D. No guard — a revision
  * is always allowed while the design is in flight. Reuses the concept stage's
- * `applyRevision` side-effect: the revision counter increments, and once it crosses
- * the free allowance a change order is raised, which REQUIRES a positive
+ * `applyRevision` side-effect against its OWN allowance: the 3D revision counter
+ * (`design_revision_count`, independent of the concept one) increments, and once it
+ * crosses the free 3D allowance a change order is raised, which REQUIRES a positive
  * `changeOrderAmount` in the payload (else the whole transition rolls back with
  * `revision_co_amount_required`). Revalidates the shell on success — never throws.
  */

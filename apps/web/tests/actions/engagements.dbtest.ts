@@ -55,15 +55,22 @@ describe('createEngagementCore (Design-Engagement Machine, Step 1)', () => {
       off_plan: boolean;
       free_revision_n: number;
       revision_count: number;
+      free_design_revision_n: number;
+      design_revision_count: number;
       created_at: string;
     }>(
-      `select number, state, off_plan, free_revision_n, revision_count, created_at
+      `select number, state, off_plan, free_revision_n, revision_count,
+              free_design_revision_n, design_revision_count, created_at
        from public.design_engagements where id = '${id}'`,
     );
     expect(row.state).toBe('created');
     expect(row.off_plan).toBe(false);
     expect(Number(row.free_revision_n)).toBe(3);
     expect(Number(row.revision_count)).toBe(0);
+    // The 3D allowance is configured exactly like the concept one — a column
+    // DEFAULT, set by no app code and no UI. Both start full and empty.
+    expect(Number(row.free_design_revision_n)).toBe(3);
+    expect(Number(row.design_revision_count)).toBe(0);
 
     const year = new Date(row.created_at).getFullYear();
     const rendered = formatDocNumber('DE', Number(row.number), year);

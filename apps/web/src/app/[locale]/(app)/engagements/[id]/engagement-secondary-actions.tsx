@@ -4,24 +4,19 @@ import { useTranslations } from 'next-intl';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import type { ActionResult } from '@/lib/actions/result';
+import {
+  isRevisionTrigger,
+  type RevisionAllowances,
+  type RevisionTrigger,
+} from '@/lib/engagements/revision-allowance';
 import type { Trigger } from '@/lib/engagements/transitions';
 import { triggerNeedsForm } from '@/lib/engagements/ui';
 import { EngagementFeeForm } from './engagement-fee-form';
-import {
-  EngagementRevisionForm,
-  type RevisionTrigger,
-} from './engagement-revision-form';
+import { EngagementRevisionForm } from './engagement-revision-form';
 import { DIRECT_TRIGGER_ACTIONS } from './trigger-actions';
 
 /** The three payload triggers — each opens a form here instead of firing. */
 type PayloadFormTrigger = 'submitDesignFee' | RevisionTrigger;
-
-/** Is this the trigger of one of the two revision forms (concept or 3D)? */
-function isRevisionTrigger(
-  trigger: PayloadFormTrigger,
-): trigger is RevisionTrigger {
-  return trigger === 'requestRevision' || trigger === 'designChangeRaised';
-}
 
 // The command card's LOW-EMPHASIS secondary controls: every legal, capability-
 // permitted trigger that is NOT the forward-advance one (the Advance button owns
@@ -35,15 +30,14 @@ function isRevisionTrigger(
 export function EngagementSecondaryActions({
   engagementId,
   triggers,
-  revisionCount,
-  freeRevisionN,
+  allowances,
   pending,
   runAction,
 }: {
   engagementId: string;
   triggers: Trigger[];
-  revisionCount: number;
-  freeRevisionN: number;
+  /** Both revision counter/allowance pairs — the open form picks its own. */
+  allowances: RevisionAllowances;
   pending: boolean;
   runAction: (fn: () => Promise<ActionResult>) => void;
 }) {
@@ -143,14 +137,14 @@ export function EngagementSecondaryActions({
 
       {/* One form for BOTH revision edges — the concept self-loop and the 3D
           revision loop — keyed by the trigger so switching between them resets
-          the fields rather than carrying the previous reason/amount over. */}
+          the fields rather than carrying the previous reason/amount over. The
+          trigger also selects which of the two independent allowances applies. */}
       {openForm !== null && isRevisionTrigger(openForm) && (
         <EngagementRevisionForm
           key={openForm}
           engagementId={engagementId}
           trigger={openForm}
-          revisionCount={revisionCount}
-          freeRevisionN={freeRevisionN}
+          allowances={allowances}
           pending={pending}
           runAction={runAction}
           onCancel={() => setOpenForm(null)}

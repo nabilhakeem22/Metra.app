@@ -253,6 +253,13 @@
       "when": 1788387557549,
       "tag": "0035_client_visible_documents",
       "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1788473957549,
+      "tag": "0036_design_revision_allowance",
+      "breakpoints": true
     }
   ]
 }

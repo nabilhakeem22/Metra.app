@@ -114,8 +114,12 @@ export function EngagementDetailClient({
         engagementId={header.id}
         preview={gatePreview}
         state={header.state}
-        revisionCount={header.revisionCount}
-        freeRevisionN={header.freeRevisionN}
+        allowances={{
+          revisionCount: header.revisionCount,
+          freeRevisionN: header.freeRevisionN,
+          designRevisionCount: header.designRevisionCount,
+          freeDesignRevisionN: header.freeDesignRevisionN,
+        }}
         stallDays={stallDays}
         canAdvance={canAdvance}
         canRecordPayment={capabilities.recordPayment}

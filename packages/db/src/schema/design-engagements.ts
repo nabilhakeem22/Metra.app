@@ -29,7 +29,9 @@ import { projects } from './projects';
  *
  * `romLow`/`romHigh` are the rough-order-of-magnitude budget band (nullable;
  * CHECK: high >= low when both present). `freeRevisionN` (default 3) is the free
- * revision allowance; `revisionCount` tracks consumption. `tokenHash` is the
+ * CONCEPT revision allowance and `revisionCount` tracks its consumption;
+ * `freeDesignRevisionN`/`designRevisionCount` are the SEPARATE 3D revision pair
+ * (same default) — the two allowances never draw on each other. `tokenHash` is the
  * sha256 of a future client share token (Step 2+), unique when set.
  */
 export const designEngagements = pgTable(
@@ -51,6 +53,12 @@ export const designEngagements = pgTable(
     asBuiltDue: boolean('as_built_due').notNull().default(false),
     freeRevisionN: integer('free_revision_n').notNull().default(3),
     revisionCount: integer('revision_count').notNull().default(0),
+    // The 3D revision allowance, INDEPENDENT of the concept pair above: a client
+    // who burned every free concept revision still gets a full set of free 3D
+    // revisions. Same shape + same default (3) as the concept pair, spent by the
+    // `designChangeRaised` edge instead of `requestRevision`.
+    freeDesignRevisionN: integer('free_design_revision_n').notNull().default(3),
+    designRevisionCount: integer('design_revision_count').notNull().default(0),
     romLow: money('rom_low'),
     romHigh: money('rom_high'),
     conceptLockedAt: timestamp('concept_locked_at', { withTimezone: true }),

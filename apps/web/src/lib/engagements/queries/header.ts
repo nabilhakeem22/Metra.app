@@ -28,6 +28,13 @@ export interface EngagementHeader {
   asBuiltDue: boolean;
   freeRevisionN: number;
   revisionCount: number;
+  /**
+   * The 3D revision pair, INDEPENDENT of the concept pair above: the cockpit's
+   * revision form prices a `designChangeRaised` revision against these, so a
+   * fully-burned concept allowance never costs the client a free 3D revision.
+   */
+  freeDesignRevisionN: number;
+  designRevisionCount: number;
   romLow: string | null;
   romHigh: string | null;
   conceptLockedAt: string | null;
@@ -60,6 +67,8 @@ export function getEngagementHeader(
         asBuiltDue: designEngagements.asBuiltDue,
         freeRevisionN: designEngagements.freeRevisionN,
         revisionCount: designEngagements.revisionCount,
+        freeDesignRevisionN: designEngagements.freeDesignRevisionN,
+        designRevisionCount: designEngagements.designRevisionCount,
         romLow: designEngagements.romLow,
         romHigh: designEngagements.romHigh,
         conceptLockedAt: designEngagements.conceptLockedAt,

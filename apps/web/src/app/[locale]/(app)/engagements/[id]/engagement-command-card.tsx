@@ -21,6 +21,7 @@ import type { EngagementClientActivityRecord } from '@/lib/engagements/queries/c
 // the pure MONEY_GUARD_MILESTONE map + erased types — no registry, no cycle.
 import { MONEY_GUARD_MILESTONE } from '@/lib/engagements/guards/money';
 import { stateMilestone } from '@/lib/engagements/journey-map';
+import type { RevisionAllowances } from '@/lib/engagements/revision-allowance';
 import { isTerminal, type DesignState } from '@/lib/engagements/states';
 import type { Trigger } from '@/lib/engagements/transitions';
 import { formatDate } from '@/lib/format/date';
@@ -73,8 +74,7 @@ export function EngagementCommandCard({
   engagementId,
   preview,
   state,
-  revisionCount,
-  freeRevisionN,
+  allowances,
   stallDays,
   canAdvance,
   canRecordPayment,
@@ -93,8 +93,11 @@ export function EngagementCommandCard({
   engagementId: string;
   preview: EngagementGatePreview;
   state: DesignState;
-  revisionCount: number;
-  freeRevisionN: number;
+  /**
+   * BOTH revision counter/allowance pairs — the concept one the hero badge shows,
+   * and the independent 3D one the `designChangeRaised` form prices against.
+   */
+  allowances: RevisionAllowances;
   stallDays: number | null;
   canAdvance: boolean;
   canRecordPayment: boolean;
@@ -252,8 +255,8 @@ export function EngagementCommandCard({
           th={th}
           state={state}
           stallDays={stallDays}
-          revisionCount={revisionCount}
-          freeRevisionN={freeRevisionN}
+          revisionCount={allowances.revisionCount}
+          freeRevisionN={allowances.freeRevisionN}
         />
       )}
 
@@ -425,8 +428,7 @@ export function EngagementCommandCard({
           <EngagementSecondaryActions
             engagementId={engagementId}
             triggers={secondaryTriggers}
-            revisionCount={revisionCount}
-            freeRevisionN={freeRevisionN}
+            allowances={allowances}
             pending={pending}
             runAction={runAction}
           />

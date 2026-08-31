@@ -804,7 +804,8 @@ $$;
 --     prove a downloadable object exists; no column of it is returned.
 --
 -- PHYSICALLY OMITTED (never referenced): design_engagements.render_manifest_hash,
---   renders_ready_at, revision_count, free_revision_n, as_built_due,
+--   renders_ready_at, revision_count, free_revision_n, design_revision_count,
+--   free_design_revision_n, as_built_due,
 --   concept_locked_at, token_hash, updated_at, org_id, client_id, project_id;
 --   payment_events.method/reference/note/recorded_by/idempotency_key; every
 --   proposal/contract/cost_item cost column (unit_cost/line_cost/total_cost/

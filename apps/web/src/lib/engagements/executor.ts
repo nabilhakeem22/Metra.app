@@ -24,6 +24,7 @@ import { insertAsBuiltAttestation } from './attestations';
 import { settleConceptAndLock } from './concept';
 import { generateFeeSchedule } from './fee-schedule';
 import { captureRenderManifest } from './renders';
+import { isRevisionTrigger } from './revision-allowance';
 import { applyRevision, resetRevisionsOnReject } from './revisions';
 import { GUARDS, type GuardFacts } from './guards';
 import { TRANSITIONS, type CapabilityKey, type Trigger } from './transitions';
@@ -161,12 +162,18 @@ export async function executeTransition(
       if (def.sideEffect === 'recordConceptApproval') {
         await recordConceptApproval(tx, ctx, engagementId);
       }
-      // requestRevision (Step 8, self-loop): increment the revision counter and —
-      // once the count crosses the free allowance — raise a design-fee change
-      // order. Atomic with the negotiation -> negotiation transition row: a
-      // missing change-order amount `fail()`s and rolls the increment back too.
+      // requestRevision (Step 8, self-loop) / designChangeRaised (the 3D loop):
+      // increment the FIRING EDGE's revision counter — the two allowances are
+      // independent — and, once that count crosses that edge's free allowance,
+      // raise a design-fee change order. Atomic with the transition row: a missing
+      // change-order amount `fail()`s and rolls the increment back too. The trigger
+      // is re-narrowed here because only the two revision edges carry this
+      // side-effect; a future edge wired to it without a counter pair fails CLOSED
+      // rather than silently spending the concept allowance.
       if (def.sideEffect === 'applyRevision') {
-        await applyRevision(tx, ctx, engagement, input.payload);
+        const revisionTrigger = input.trigger;
+        if (!isRevisionTrigger(revisionTrigger)) fail('illegal_trigger');
+        await applyRevision(tx, ctx, engagement, revisionTrigger, input.payload);
       }
       // confirmConcept (Step 9): the `revisionCosSettled` guard proved every raised
       // change order is covered, so settle them all (status -> settled, settled_at

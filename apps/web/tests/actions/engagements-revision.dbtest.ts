@@ -46,6 +46,15 @@ async function revisionCountOf(engagementId: string): Promise<number> {
   return Number(row.n);
 }
 
+/** The 3D allowance's counter — the concept loop must never touch it. */
+async function designRevisionCountOf(engagementId: string): Promise<number> {
+  const [row] = await raw.query<{ n: number }>(
+    `select design_revision_count::int as n from public.design_engagements
+      where id = '${engagementId}'`,
+  );
+  return Number(row.n);
+}
+
 async function requestRevisionTransitionCount(
   engagementId: string,
 ): Promise<number> {
@@ -179,6 +188,9 @@ describe('requestRevision — free revisions within the allowance (N=3)', () => 
     expect(await revisionCountOf(engagementId)).toBe(2);
     expect(await requestRevisionTransitionCount(engagementId)).toBe(2);
     expect(await changeOrderCount(engagementId)).toBe(0);
+    // Both increments landed on the CONCEPT counter only — the parameterised
+    // side-effect must not spill into the independent 3D allowance.
+    expect(await designRevisionCountOf(engagementId)).toBe(0);
   });
 });
 
@@ -213,6 +225,8 @@ describe('requestRevision — crossing the free allowance raises a change order'
     expect(fourth.ok).toBe(true);
     expect(await revisionCountOf(engagementId)).toBe(4);
     expect(await requestRevisionTransitionCount(engagementId)).toBe(4);
+    // Four concept revisions later, the 3D allowance is still untouched and full.
+    expect(await designRevisionCountOf(engagementId)).toBe(0);
 
     const orders = await getEngagementChangeOrders(ctx, engagementId);
     expect(orders).toHaveLength(1);

@@ -184,6 +184,8 @@ function engagement(): DesignEngagement {
     asBuiltDue: false,
     freeRevisionN: 3,
     revisionCount: 0,
+    freeDesignRevisionN: 3,
+    designRevisionCount: 0,
     romLow: null,
     romHigh: null,
     conceptLockedAt: null,

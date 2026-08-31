@@ -252,7 +252,9 @@ describe('transition registry', () => {
     // final_approval and shop_drawings back to design_3d, so the studio can act
     // on a client design-change request and re-issue a revised 3D. It REUSES
     // `applyRevision` — the concept stage's mechanism — so the revision counter
-    // and the over-allowance change order are priced by one rule, not two.
+    // and the over-allowance change order are priced by one rule, not two. The
+    // NUMBERS are its own: that side-effect spends design_revision_count against
+    // free_design_revision_n (pinned in revision-allowance.test.ts).
     expect(TRANSITIONS.designChangeRaised.guards).toEqual([]);
     expect(TRANSITIONS.designChangeRaised.from).toEqual([
       'final_approval',
