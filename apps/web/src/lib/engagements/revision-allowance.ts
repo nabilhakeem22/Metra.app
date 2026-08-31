@@ -6,6 +6,7 @@
 // `free_design_revision_n` — and BOTH the server side-effect (`revisions.ts`) and
 // the cockpit's revision form must pick the same pair for the same trigger. One
 // declaration, imported by both, so they can never drift apart.
+import type { DesignState } from './states';
 
 /** The two revision edges. Both carry the same payload, each spends its OWN pair. */
 export type RevisionTrigger = 'requestRevision' | 'designChangeRaised';
@@ -45,6 +46,34 @@ export function revisionAllowanceFor(
         free: allowances.freeDesignRevisionN,
       }
     : { count: allowances.revisionCount, free: allowances.freeRevisionN };
+}
+
+/**
+ * The states the 3D revision loop owns: `designChangeRaised` fires FROM
+ * final_approval / shop_drawings and lands the engagement back on design_3d, so
+ * across all three the allowance in play is the DESIGN pair. Everywhere else the
+ * concept self-loop (`requestRevision`) is the live edge.
+ */
+const DESIGN_REVISION_STATES: ReadonlySet<DesignState> = new Set<DesignState>([
+  'design_3d',
+  'final_approval',
+  'shop_drawings',
+  // `change_triage` is the as-built detour OFF final_approval that returns to it.
+  // No revision edge fires from here, but omitting it made the badge FLIP to the
+  // concept pair on the way through (3D 1 of 3 -> Revision 3 of 3 -> 3D 1 of 3),
+  // which reads as a bug to the studio. The design pair is the coherent answer
+  // across the whole final-approval neighbourhood.
+  'change_triage',
+]);
+
+/**
+ * Which revision edge's allowance is actually SPENDABLE at `state`. The cockpit
+ * badge reads the counter through this so it can never report an exhausted
+ * concept allowance ("Revision 3 of 3") on a screen where the revision form is
+ * correctly offering a FREE 3D revision — one state→pair answer, shared.
+ */
+export function revisionTriggerAtState(state: DesignState): RevisionTrigger {
+  return DESIGN_REVISION_STATES.has(state) ? 'designChangeRaised' : 'requestRevision';
 }
 
 /**

@@ -1505,6 +1505,7 @@
       "whatsNext": "الخطوة التالية",
       "day": "اليوم {n}",
       "revision": "التعديل {n} من {free}",
+      "designRevision": "تعديل ثلاثي الأبعاد {n} من {free}",
       "dueLabel": "مستحق",
       "logPaymentAdvance": "تسجيل الدفعة والمقدم",
       "advance": "الانتقال إلى المرحلة التالية",
@@ -1575,10 +1576,9 @@
       "readyHeadline": "جاهزة للانتقال إلى {phase}",
       "readyHint": "كل شيء مكتمل — انتقل عندما تكون جاهزًا.",
       "blockedStudioHeadline": "الخطوة التالية عليك",
-      "blockedStudioHint": "بند متبقٍ من جانبك: {action}. أنجِزه لفتح المرحلة التالية.",
+      "blockedStudioHint": "أنجِز البند المتبقي بالأسفل لفتح المرحلة التالية.",
       "blockedClientHeadline": "بانتظار العميل",
       "blockedClientHint": "أنجزتَ كل ما عليك.",
-      "advanceBlockedNote": "الانتقال متوقف على: {blocker}",
       "clientNote": "ما طلبه العميل",
       "nudge": "تذكير العميل",
       "nudgeHint": "أظهر رابط العميل حتى تتمكن من المتابعة.",
@@ -1599,8 +1599,7 @@
         "closed": "مُغلق"
       },
       "move": {
-        "studio": "الدور عليك",
-        "client": "الدور على العميل"
+        "studio": "الدور عليك"
       }
     },
     "toolbar": {

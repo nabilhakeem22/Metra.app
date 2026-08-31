@@ -3,8 +3,10 @@ import {
   isRevisionTrigger,
   revisionAllowanceFor,
   revisionAmountRequired,
+  revisionTriggerAtState,
   type RevisionAllowances,
 } from './revision-allowance';
+import { DESIGN_STATES, type DesignState } from './states';
 import { TRANSITIONS, type Trigger } from './transitions';
 
 /** An engagement that has burned every free CONCEPT revision and no 3D one. */
@@ -72,6 +74,54 @@ describe('revisionAllowanceFor', () => {
       count: 5,
       free: 4,
     });
+  });
+});
+
+describe('revisionTriggerAtState', () => {
+  const DESIGN_LOOP_STATES: DesignState[] = [
+    'design_3d',
+    'final_approval',
+    'shop_drawings',
+    // The as-built detour off final_approval, which returns to it. No revision
+    // edge fires from here, but treating it as a concept state made the badge
+    // FLIP mid-detour (3D 1 of 3 -> Revision 3 of 3 -> 3D 1 of 3), which reads
+    // as a bug. The design pair is coherent across the whole neighbourhood.
+    'change_triage',
+  ];
+
+  it('names the DESIGN edge across the 3D loop states', () => {
+    for (const state of DESIGN_LOOP_STATES) {
+      expect(revisionTriggerAtState(state)).toBe('designChangeRaised');
+    }
+  });
+
+  it('names the CONCEPT edge at every other state', () => {
+    const designLoop = new Set<DesignState>(DESIGN_LOOP_STATES);
+    for (const state of DESIGN_STATES.filter((s) => !designLoop.has(s))) {
+      expect(revisionTriggerAtState(state)).toBe('requestRevision');
+    }
+  });
+
+  it('covers every state the 3D edge fires FROM, plus the one it lands on', () => {
+    // Anchors the state list to the registry: if `designChangeRaised` ever gains
+    // (or loses) a `from` state, the cockpit badge must follow it or it would
+    // report a concept allowance on a screen offering a 3D revision.
+    const edge = TRANSITIONS.designChangeRaised;
+    const from = Array.isArray(edge.from) ? edge.from : [edge.from];
+    for (const state of [...from, edge.to]) {
+      expect(revisionTriggerAtState(state)).toBe('designChangeRaised');
+    }
+  });
+
+  it('reads the pair a burned CONCEPT allowance must NOT contaminate', () => {
+    // The badge bug this fixes: at design_3d the concept pair says 3-of-3 while
+    // the revision form correctly offers a FREE 3D revision.
+    expect(
+      revisionAllowanceFor(revisionTriggerAtState('design_3d'), CONCEPT_BURNED),
+    ).toEqual({ count: 0, free: 3 });
+    expect(
+      revisionAllowanceFor(revisionTriggerAtState('negotiation'), CONCEPT_BURNED),
+    ).toEqual({ count: 3, free: 3 });
   });
 });
 

@@ -36,37 +36,37 @@ import { EngagementStepRibbon } from './engagement-step-ribbon';
 import { DIRECT_TRIGGER_ACTIONS } from './trigger-actions';
 
 // The cockpit COMMAND CARD — the single "what's next" surface, redesigned as a
-// stacked card: (1) a 5-stage STEP RIBBON over a human STATUS PILL + a "whose
-// move" line; (2) THE ONE ACTION — headline + an inline attachment dropzone OR
-// the fee/pay fields + one highlighted primary button + a "what happens next"
-// helper; (3) a quiet FOOTER (client link + the "more actions" secondary
-// controls). It derives a machine-truthful view from the server gate preview
+// stacked card: (1) a 5-stage STEP RIBBON over a human STATUS PILL; (2) THE ONE
+// ACTION — headline + an inline attachment dropzone OR the fee/pay fields + one
+// highlighted primary button + a "what happens next" helper; (3) a quiet FOOTER
+// (client link + the "more actions" secondary controls).
+// It derives a machine-truthful view from the server gate preview
 // (`deriveCommandCard`): the headline reflects what ACTUALLY blocks Advance — the
 // real unmet forward guards. The client's advisory approval NEVER gates Advance.
 // The BLOCKING money gate always offers pay-and-advance (finance roles), pre-filled
 // to the exact shortfall, with the S1 remount-on-shortfall guard preserved. Logical
 // CSS only (RTL mirrors); money is `tabular-nums`, `dir=ltr` inside the checklist.
+//
+// EACH FACT APPEARS ONCE. Whose move it is = the pill (never also a second line);
+// what blocks Advance = the checklist row, marked ● unmet (never also a hint
+// interpolation or a note under the button). The hint POINTS at the checklist, it
+// does not restate it. Adding a second rendering of either is a regression.
 
 /**
- * The human status pill + "whose move" line, pure from the command view + the
- * pending client-payment-claim count. blockedClient with a pending claim reads as
+ * The human status pill, pure from the command view + the pending
+ * client-payment-claim count. blockedClient with a pending claim reads as
  * "payment to confirm" (the studio's move to record it), not "waiting on client".
  */
-function derivePill(
-  mode: CommandCardMode,
-  paymentClaimCount: number,
-): { pillKey: string; moveKey: 'studio' | 'client' | null } {
+function derivePillKey(mode: CommandCardMode, paymentClaimCount: number): string {
   switch (mode) {
     case 'closed':
-      return { pillKey: 'closed', moveKey: null };
+      return 'closed';
     case 'ready':
-      return { pillKey: 'ready', moveKey: 'studio' };
+      return 'ready';
     case 'blockedStudio':
-      return { pillKey: 'studio', moveKey: 'studio' };
+      return 'studio';
     default:
-      return paymentClaimCount > 0
-        ? { pillKey: 'paymentToConfirm', moveKey: 'studio' }
-        : { pillKey: 'waitingClient', moveKey: 'client' };
+      return paymentClaimCount > 0 ? 'paymentToConfirm' : 'waitingClient';
   }
 }
 
@@ -94,8 +94,9 @@ export function EngagementCommandCard({
   preview: EngagementGatePreview;
   state: DesignState;
   /**
-   * BOTH revision counter/allowance pairs — the concept one the hero badge shows,
-   * and the independent 3D one the `designChangeRaised` form prices against.
+   * BOTH revision counter/allowance pairs — the concept one and the independent
+   * 3D one the `designChangeRaised` form prices against. The hero badge picks
+   * whichever pair the CURRENT state can spend, so it never contradicts the form.
    */
   allowances: RevisionAllowances;
   stallDays: number | null;
@@ -127,7 +128,13 @@ export function EngagementCommandCard({
     isTerminal: isTerminal(state),
   });
   const closed = view.mode === 'closed';
-  const pill = derivePill(view.mode, paymentClaimCount);
+  const pillKey = derivePillKey(view.mode, paymentClaimCount);
+  // Every pill but ONE either names whose move it is ("Your move" / "Waiting on
+  // client") or sits under a headline + live Advance button that does ("Ready to
+  // advance") — so no card repeats it as a second line. `paymentToConfirm` is the
+  // exception: it names a TASK, under the "waiting on the client" headline, so
+  // without this line the studio can't tell the next move is theirs.
+  const showStudioMove = pillKey === 'paymentToConfirm';
 
   // Mode-driven accent (amber/warn for the blocked attention states, brand for
   // ready, neutral for closed) — expressed through the app's semantic tokens so
@@ -205,9 +212,10 @@ export function EngagementCommandCard({
     view.mode === 'ready'
       ? tcmd('readyHint')
       : view.mode === 'blockedStudio'
-        ? tcmd('blockedStudioHint', {
-            action: view.primaryBlocker ? tg(view.primaryBlocker) : '',
-          })
+        ? // Deliberately does NOT name the blocking guard: the checklist below
+          // lists that exact guard verbatim, with a ● marker showing it unmet.
+          // One line, pointing at it — not a third copy of the same sentence.
+          tcmd('blockedStudioHint')
         : view.mode === 'blockedClient'
           ? tcmd('blockedClientHint')
           : null;
@@ -240,11 +248,11 @@ export function EngagementCommandCard({
         <span
           className={`inline-flex items-center rounded-[var(--r-pill)] px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.08em] ${pillClass}`}
         >
-          {tcmd(`pill.${pill.pillKey}`)}
+          {tcmd(`pill.${pillKey}`)}
         </span>
-        {pill.moveKey && (
+        {showStudioMove && (
           <span className="text-[12.5px] text-[color:var(--text-muted)]">
-            {tcmd(`move.${pill.moveKey}`)}
+            {tcmd('move.studio')}
           </span>
         )}
       </div>
@@ -255,8 +263,7 @@ export function EngagementCommandCard({
           th={th}
           state={state}
           stallDays={stallDays}
-          revisionCount={allowances.revisionCount}
-          freeRevisionN={allowances.freeRevisionN}
+          allowances={allowances}
         />
       )}
 
@@ -346,12 +353,6 @@ export function EngagementCommandCard({
               {th('advance')}
             </Button>
           </div>
-
-          {view.mode === 'blockedStudio' && view.primaryBlocker && (
-            <p className="mt-3.5 text-[12.5px] text-[color:var(--text-muted)]">
-              {tcmd('advanceBlockedNote', { blocker: tg(view.primaryBlocker) })}
-            </p>
-          )}
 
           {view.showNudge && canShare && (
             <p className="mt-3.5 flex items-baseline gap-1.5 text-[12.5px] text-[color:var(--text-muted)]">

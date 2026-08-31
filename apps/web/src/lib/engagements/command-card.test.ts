@@ -108,4 +108,32 @@ describe('deriveCommandCard', () => {
     expect(view.primaryBlocker).toBe('depositCleared');
     expect(view.blockingGuards).toEqual(['depositCleared']);
   });
+
+  it('never reports a blocked mode without an unmet item for the checklist to show', () => {
+    // The card no longer repeats the blocker in a note under Advance — it relies
+    // on the CHECKLIST (rendered only when `items.length > 0`) naming it. That is
+    // safe because a blocked mode is derived FROM unmet items: with no items the
+    // view is 'ready', never blocked. If this invariant ever breaks, a blocked
+    // card could show no blocker at all.
+    const noItems = deriveCommandCard(preview('rendersReady', []), {
+      canAdvance: true,
+      isTerminal: false,
+    });
+    expect(noItems.mode).toBe('ready');
+
+    const blocked = [
+      deriveCommandCard(preview('rendersReady', [item('rendersPresent', false)]), {
+        canAdvance: true,
+        isTerminal: false,
+      }),
+      deriveCommandCard(
+        preview('confirmAndPayDeposit', [item('depositCleared', false, '10000.0000')]),
+        { canAdvance: true, isTerminal: false },
+      ),
+    ];
+    for (const view of blocked) {
+      expect(view.mode).not.toBe('ready');
+      expect(view.blockingGuards.length).toBeGreaterThan(0);
+    }
+  });
 });
