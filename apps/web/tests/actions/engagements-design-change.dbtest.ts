@@ -373,9 +373,19 @@ describe('designChangeRaised — concurrency', () => {
       designChangeRaised(ctx, engagementId),
     ]);
     expect(results.filter((res) => res.ok)).toHaveLength(1);
-    expect(results.filter((res) => !res.ok)).toEqual([
-      { ok: false, error: 'engagement_state_conflict' },
-    ]);
+    // The LOSER's code is interleaving-dependent, and BOTH outcomes are correct:
+    // the executor pre-reads the row for its guards, so depending on whether the
+    // winner's commit lands before or after that read, the loser is rejected
+    // either by the atomic state gate (`engagement_state_conflict`) or by the
+    // legal-from-current-state check (`illegal_trigger`). Pinning one specific
+    // code makes this a coin flip — it passed on a branch and failed on main.
+    // The SAFETY invariant is what matters and is asserted below: exactly one
+    // winner, one counter increment, one transition row, no change order.
+    const losers = results.filter((res) => !res.ok);
+    expect(losers).toHaveLength(1);
+    expect(['engagement_state_conflict', 'illegal_trigger']).toContain(
+      (losers[0] as { ok: false; error: string }).error,
+    );
     expect(await stateOf(engagementId)).toBe('design_3d');
     expect(await designRevisionCountOf(engagementId)).toBe(1);
     expect(await transitionCount(engagementId, 'designChangeRaised')).toBe(1);
