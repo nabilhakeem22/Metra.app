@@ -1673,14 +1673,16 @@
         "render": "مجموعة الرندرات",
         "boq": "مسودة مقايسة الكميات",
         "shopDrawing": "لوحات التنفيذ",
-        "conceptOption": "مقترح تصميم"
+        "conceptOption": "مقترح تصميم",
+        "survey": "رفع الموقع"
       },
       "badge": {
         "layout": "2D",
         "render": "3D",
         "boq": "مقايسة الكميات",
         "shopDrawing": "تنفيذ",
-        "conceptOption": "مقترح"
+        "conceptOption": "مقترح",
+        "survey": "رفع"
       },
       "visibility": {
         "visible": "ظاهر للعميل",

@@ -5,6 +5,7 @@ import {
   type ClientReleaseKey,
   type ReleasableArtifact,
 } from './client-release';
+import { CATEGORY_WRITE_KIND } from './deliverable-files';
 import type { EngagementArtifactKind } from '@metra/db';
 
 const RELEASE_KEYS: ClientReleaseKey[] = [
@@ -41,11 +42,25 @@ describe('client release table', () => {
     }
   });
 
+  // A site survey is INTERNAL. It used to be excluded incidentally as well as by
+  // this table — the artifact panel attaches no file, so `hasFile` dropped it. The
+  // survey command-card dropzone ends that: an uploaded survey now carries a
+  // fileId and is release-eligible in every respect EXCEPT this table. So assert
+  // both the table AND the kind the survey upload category actually writes.
   it('never auto-releases a survey either (internal spatial base)', () => {
     for (const key of RELEASE_KEYS) {
       const release = CLIENT_RELEASES[key];
       expect(release.allOf).not.toContain('survey');
       expect(release.latestOf).not.toContain('survey');
+      expect(release.allOf).not.toContain(CATEGORY_WRITE_KIND.survey);
+      expect(release.latestOf).not.toContain(CATEGORY_WRITE_KIND.survey);
+    }
+  });
+
+  it('never selects a FILE-BEARING survey from any release point', () => {
+    const rows = [artifact('s-file', 'survey', { fileId: 'f-survey' })];
+    for (const key of RELEASE_KEYS) {
+      expect(selectReleaseArtifactIds(CLIENT_RELEASES[key], rows)).toEqual([]);
     }
   });
 

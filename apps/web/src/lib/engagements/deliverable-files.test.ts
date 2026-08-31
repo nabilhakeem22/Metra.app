@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { WORKING_FILE_CATEGORIES } from './working-files';
 import {
+  ALLOWED_EXTENSIONS,
   CATEGORY_WRITE_KIND,
   MAX_DELIVERABLE_BYTES,
   validateDeliverableFile,
@@ -67,6 +68,7 @@ describe('CATEGORY_WRITE_KIND', () => {
       boq: 'boq',
       shopDrawing: 'shop_drawing',
       conceptOption: 'concept_option',
+      survey: 'survey',
     });
   });
 
@@ -80,6 +82,22 @@ describe('CATEGORY_WRITE_KIND', () => {
     expect(WORKING_FILE_CATEGORIES).not.toContain('conceptOption');
     expect(validateDeliverableFile('conceptOption', 'option-a.pdf', 1024)).toBeNull();
     expect(validateDeliverableFile('conceptOption', 'boq.xlsx', 1024)).toBe('invalid');
+  });
+
+  it('survey is an upload category WITHOUT a pinned tray slot', () => {
+    expect(WORKING_FILE_CATEGORIES).not.toContain('survey');
+    expect(validateDeliverableFile('survey', 'site-measure.dwg', 1024)).toBeNull();
+    expect(validateDeliverableFile('survey', 'survey.pdf', 1024)).toBeNull();
+    expect(validateDeliverableFile('survey', 'boq.xlsx', 1024)).toBe('invalid');
+  });
+
+  // The survey category adds NO new extension, so the derived client-download
+  // allowlist in public-documents.ts (a union over ALLOWED_EXTENSIONS) is
+  // unchanged — see the union pin in public-documents.test.ts.
+  it('survey reuses the layout extension set — it widens no allowlist', () => {
+    expect([...ALLOWED_EXTENSIONS.survey].sort()).toEqual(
+      [...ALLOWED_EXTENSIONS.layout].sort(),
+    );
   });
 
   // The dead-end this category exists to fix: `optionsReady` counts

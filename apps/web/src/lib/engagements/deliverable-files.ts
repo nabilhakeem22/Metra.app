@@ -18,6 +18,7 @@ import type { WorkingFileCategory } from './working-files';
  *   boq           -> 'boq'              (boq reads ['boq'])
  *   shopDrawing   -> 'shop_drawing'     (upload-only — no pinned tray slot)
  *   conceptOption -> 'concept_option'   (upload-only — no pinned tray slot)
+ *   survey        -> 'survey'           (upload-only — no pinned tray slot)
  * Recording the artifact IS attesting it (see artifacts.ts), so an uploaded
  * deliverable also satisfies the category's guard — hence the stage becomes
  * advanceable (owner decision: no auto-advance).
@@ -27,6 +28,11 @@ import type { WorkingFileCategory } from './working-files';
  * consumes, while `conceptOption` writes the `concept_option` artifacts that
  * `optionsReady` counts (2–4 of them). Collapsing them would make one of the two
  * guards unsatisfiable through the UI.
+ *
+ * `survey` is the third file type over that same set: it writes the measured
+ * `survey` artifact, the ONLY kind `spatialBaseReady` accepts on a non-off-plan
+ * job. It is distinct from `layout` for the same reason — a measured survey must
+ * never be recorded as a developer CAD import, and vice versa.
  */
 export const CATEGORY_WRITE_KIND: Record<
   WorkingFileCategory,
@@ -37,6 +43,7 @@ export const CATEGORY_WRITE_KIND: Record<
   boq: 'boq',
   shopDrawing: 'shop_drawing',
   conceptOption: 'concept_option',
+  survey: 'survey',
 };
 
 /**
@@ -53,6 +60,7 @@ export const ALLOWED_EXTENSIONS: Record<
   boq: ['xlsx', 'pdf', 'csv'],
   shopDrawing: ['pdf', 'dwg', 'dxf', 'png', 'jpg', 'jpeg'],
   conceptOption: ['pdf', 'dwg', 'dxf', 'png', 'jpg', 'jpeg'],
+  survey: ['pdf', 'dwg', 'dxf', 'png', 'jpg', 'jpeg'],
 };
 
 /** Owner decision: the largest deliverable we accept is 100 MB. */

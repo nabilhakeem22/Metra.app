@@ -1673,14 +1673,16 @@
         "render": "Render set",
         "boq": "Draft BOQ",
         "shopDrawing": "Shop drawings",
-        "conceptOption": "Concept option"
+        "conceptOption": "Concept option",
+        "survey": "Site survey"
       },
       "badge": {
         "layout": "2D",
         "render": "3D",
         "boq": "BOQ",
         "shopDrawing": "Shop",
-        "conceptOption": "Opt"
+        "conceptOption": "Opt",
+        "survey": "Srv"
       },
       "visibility": {
         "visible": "Visible to client",

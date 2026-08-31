@@ -6,12 +6,21 @@
 // graph.
 //
 // State -> category (owner table):
+//   survey                                -> site survey
 //   layout / concept_review / negotiation -> concept option
 //   design_3d                             -> render set
 //   shop_drawings                         -> shop drawings
 //   boq                                   -> draft BOQ
-// A state absent from the map has no inline dropzone (e.g. survey uses the
-// toolbar so a non-off-plan measured survey isn't mistaken for a CAD import).
+// A state absent from the map has no inline dropzone (created / abandoned and the
+// other non-file states).
+//
+// `survey` writes the `survey` kind, which is the ONLY kind `spatialBaseReady`
+// accepts on a non-off-plan job — so the measured-survey path now has a home on
+// the card instead of only the toolbar's file-less "Add a deliverable" panel. An
+// OFF-PLAN job may instead satisfy that same gate with a developer/consultant CAD
+// set recorded through the tray's `layout` slot (kind `autocad`); both paths stay
+// valid, and the two categories stay distinct so a measured survey is never
+// mistaken for a CAD import.
 //
 // Across layout / concept_review / negotiation the studio is presenting the 2–4
 // concept options the client chooses between, so EACH file dropped there IS one
@@ -27,6 +36,7 @@ import type { DesignState } from './states';
 import type { WorkingFileCategory } from './working-files';
 
 const STATE_DROPZONE_CATEGORY: Partial<Record<DesignState, WorkingFileCategory>> = {
+  survey: 'survey',
   layout: 'conceptOption',
   concept_review: 'conceptOption',
   negotiation: 'conceptOption',

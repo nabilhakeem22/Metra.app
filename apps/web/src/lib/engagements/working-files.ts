@@ -18,16 +18,17 @@ export type WorkingFileCategory =
   | 'render'
   | 'boq'
   | 'shopDrawing'
-  | 'conceptOption';
+  | 'conceptOption'
+  | 'survey';
 
 /**
  * Which artifact kinds back each working-file category. Order within a list is a
  * preference order, but selection is by recency (attestedAt) — see below.
  * `layout` accepts either a proposed concept option or a developer/consultant CAD
  * set; `render` the signed-off 3D render; `boq` the bill of quantities;
- * `shopDrawing` the production drawings and `conceptOption` a single proposed
- * concept (both upload-only categories — they have NO pinned tray slot, see
- * WORKING_FILE_CATEGORIES).
+ * `shopDrawing` the production drawings, `conceptOption` a single proposed
+ * concept, and `survey` the measured site survey (all three upload-only
+ * categories — they have NO pinned tray slot, see WORKING_FILE_CATEGORIES).
  */
 const CATEGORY_KINDS: Record<WorkingFileCategory, readonly EngagementArtifactKind[]> = {
   layout: ['concept_option', 'autocad'],
@@ -35,13 +36,15 @@ const CATEGORY_KINDS: Record<WorkingFileCategory, readonly EngagementArtifactKin
   boq: ['boq'],
   shopDrawing: ['shop_drawing'],
   conceptOption: ['concept_option'],
+  survey: ['survey'],
 };
 
 /** The three categories, in the pinned tray display order (matches the mock).
- *  `shopDrawing` and `conceptOption` are deliberately absent: they are upload
- *  categories for their stage dropzones, not pinned tray slots. A concept option
- *  in particular is a SET of 2–4 sibling files the client chooses between, which
- *  the tray's "latest per slot" shape cannot express. */
+ *  `shopDrawing`, `conceptOption` and `survey` are deliberately absent: they are
+ *  upload categories for their stage dropzones, not pinned tray slots. A concept
+ *  option in particular is a SET of 2–4 sibling files the client chooses between,
+ *  which the tray's "latest per slot" shape cannot express; a site survey is
+ *  internal working input, not a client-facing deliverable slot. */
 export const WORKING_FILE_CATEGORIES: readonly WorkingFileCategory[] = [
   'layout',
   'render',
