@@ -1,4 +1,8 @@
 import { NextResponse, type NextRequest } from 'next/server';
+import {
+  PREVIEW_MAX_EDGE,
+  PREVIEW_QUALITY,
+} from '@/lib/engagements/document-access';
 import { getDeliveryDocumentByToken } from '@/lib/engagements/public-documents';
 import { LOCALES, routing } from '@/i18n/routing';
 import { createSignedObjectUrl } from '@/lib/storage';
@@ -58,14 +62,38 @@ export async function GET(
     const document = await getDeliveryDocumentByToken(token, documentId);
     if (!document) return unavailable(request, locale, token);
 
+    // Step 3 — a WITHHELD document (the BOQ before the money is in) is refused with
+    // the SAME response as a forged id. The route is the enforcement point, not the
+    // portal's button: hiding the button alone would leave the URL guessable by
+    // anyone who had it before the payment lapsed.
+    if (document.access === 'withheld') return unavailable(request, locale, token);
+
     // The object key comes from the `files` row the SDF resolved — never from the
-    // request. The saved filename is the client-facing category slug.
-    const signedUrl = await createSignedObjectUrl(
-      document.bucket,
-      document.objectKey,
-      SIGNED_URL_TTL_SECONDS,
-      { download: document.downloadName },
-    );
+    // request. A PREVIEW is signed WITHOUT a download name (so no attachment
+    // disposition is forced) and WITH a storage-side transform, so the bytes that
+    // leave the bucket are a downscaled rendition — the full-resolution deliverable
+    // never reaches an unpaid client. Anything else keeps the Step-1 behaviour.
+    const signedUrl =
+      document.access === 'preview'
+        ? await createSignedObjectUrl(
+            document.bucket,
+            document.objectKey,
+            SIGNED_URL_TTL_SECONDS,
+            {
+              transform: {
+                width: PREVIEW_MAX_EDGE,
+                height: PREVIEW_MAX_EDGE,
+                resize: 'contain',
+                quality: PREVIEW_QUALITY,
+              },
+            },
+          )
+        : await createSignedObjectUrl(
+            document.bucket,
+            document.objectKey,
+            SIGNED_URL_TTL_SECONDS,
+            { download: document.downloadName },
+          );
     return NextResponse.redirect(signedUrl, { status: 302, headers: SAFE_HEADERS });
   } catch {
     // Token-free breadcrumb only — never the raw token or the document id.

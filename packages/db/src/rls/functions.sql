@@ -776,6 +776,94 @@ $$;
 -- Client Delivery Portal (P1) — session-less read snapshot
 -- =============================================================================
 
+-- Client Deliverables Step 3 — is EVERY scheduled milestone on this engagement fully
+-- settled? True when no milestone has a positive remaining due, using the SAME
+-- price-blind math as `payment_schedule` / `claim` in app_delivery_by_token
+-- (percent milestones resolve against design_fee; `payment_events` of the matching
+-- kind are the receipts). One declaration, called by every surface that gates a
+-- deliverable on payment, so "settled" can never mean two different things.
+--
+-- A schedule with NO milestones is settled (nothing is owed) — the same
+-- absent-milestone-is-a-free-gate rule the money guards already apply, so a
+-- three-payment schedule that omits gate_a is unaffected.
+--
+-- SECURITY DEFINER + empty search_path, and takes an engagement id rather than a
+-- token because its callers have already proven the token. It is REVOKED from
+-- public in roles.sql like every other app_* function.
+create or replace function public.app_engagement_payments_settled(
+  p_engagement_id uuid
+)
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select not exists (
+    select 1
+    from public.engagement_milestones m
+    join public.design_engagements de on de.id = m.engagement_id
+    cross join lateral (
+      select case
+        when m.basis = 'percent'
+          then round(coalesce(de.design_fee, 0) * m.value / 100, 4)
+        else m.value
+      end as amount
+    ) due
+    left join lateral (
+      select sum(pe.amount) as cleared
+      from public.payment_events pe
+      where pe.engagement_id = de.id
+        and pe.kind::text = m.kind::text
+    ) cl on true
+    where m.engagement_id = p_engagement_id
+      and (due.amount - coalesce(cl.cleared, 0)) > 0
+  );
+$$;
+
+-- Client Deliverables Step 3 — what a client may do with ONE released document,
+-- given whether the engagement's payments are settled. The single declaration of
+-- the rule; both the portal list and the download route read it, so the button the
+-- client sees and the bytes the route serves can never disagree.
+--
+--   'withheld' — the BOQ before the money is in. It carries the firm's own rates
+--                and the execution cost; it is the thing the studio is paid for, so
+--                it is not listed as retrievable at all until settled.
+--   'preview'  — the approved 3D render before the money is in. The client SEES the
+--                design (a downscaled, non-deliverable rendition) but cannot pull
+--                the full-resolution file.
+--   'download' — everything else, and everything once settled.
+--
+-- PREVIEW REQUIRES A TRANSFORMABLE IMAGE. Storage resizes images only; it serves a
+-- PDF back untouched. A render stored as PDF therefore CANNOT be shown as a
+-- downscaled rendition, so it is WITHHELD rather than handed over in full — fail
+-- closed, because the alternative is shipping the deliverable to an unpaid client.
+-- (Practical consequence for studios: upload 3D visuals as PNG/JPG if you want the
+-- client to be able to look before paying.)
+create or replace function public.app_document_access(
+  p_kind public.engagement_artifact_kind,
+  p_settled boolean,
+  p_original_name text
+)
+returns text
+language sql
+immutable
+set search_path = ''
+as $$
+  select case
+    when p_settled then 'download'
+    when p_kind = 'boq' then 'withheld'
+    when p_kind = 'approved_render' then
+      case
+        when lower(coalesce(
+          substring(p_original_name from '\.([A-Za-z0-9]{1,5})$'), ''
+        )) in ('png', 'jpg', 'jpeg') then 'preview'
+        else 'withheld'
+      end
+    else 'download'
+  end;
+$$;
+
 -- Public share: fetch ONE design delivery by its token hash as a client-safe JSON
 -- snapshot. SECURITY DEFINER — the token IS the authorization (no session, no org
 -- GUC). Resolves exactly the one delivery whose token_hash = p_hash, and only
@@ -1013,6 +1101,12 @@ as $$
             'comment_count', (
               select count(*) from public.engagement_document_comments dc
               where dc.artifact_id = a.id and dc.org_id = a.org_id
+            ),
+            -- Step 3 — what the client may DO with this file right now. Computed
+            -- here (not in TS) so the portal's button and the download route's
+            -- enforcement read ONE rule.
+            'access', public.app_document_access(
+              a.kind, public.app_engagement_payments_settled(de.id), f.original_name
             )
           ) as d
         from public.engagement_artifacts a
@@ -1290,7 +1384,13 @@ as $$
     'bucket', f.bucket,
     'object_key', f.object_key,
     'kind', a.kind,
-    'original_name', f.original_name
+    'original_name', f.original_name,
+    -- Step 3 — the ROUTE's authorization, not a hint: 'withheld' is refused with
+    -- the same indistinguishable failure as a forged id, and 'preview' is served
+    -- as a downscaled rendition with no download filename.
+    'access', public.app_document_access(
+      a.kind, public.app_engagement_payments_settled(de.id), f.original_name
+    )
   )
   from public.design_engagements de
   join public.engagement_artifacts a

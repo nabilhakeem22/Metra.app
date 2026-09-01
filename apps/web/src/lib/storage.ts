@@ -68,7 +68,20 @@ export async function createSignedObjectUrl(
   bucket: string,
   objectKey: string,
   ttlSeconds: number,
-  opts?: { download?: string },
+  opts?: {
+    download?: string;
+    /** Storage-side image transform. Used by the client portal to serve a
+     *  DOWNSCALED rendition of an approved render while payments are outstanding,
+     *  so the full-resolution deliverable never leaves the bucket. Ignored by
+     *  Storage for non-image objects, which is why the caller must not rely on it
+     *  alone for a non-image file. */
+    transform?: {
+      width?: number;
+      height?: number;
+      resize?: 'cover' | 'contain' | 'fill';
+      quality?: number;
+    };
+  },
 ): Promise<string> {
   const supabase = createSupabaseAdminClient();
   const { data, error } = await supabase.storage

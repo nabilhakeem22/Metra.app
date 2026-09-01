@@ -38,6 +38,7 @@ function validSnapshot(): Record<string, unknown> {
     object_key: 'org-1/engagement/file-1',
     kind: 'approved_render',
     original_name: 'Villa render FINAL.PNG',
+    access: 'download',
   };
 }
 
@@ -127,7 +128,24 @@ describe('getDeliveryDocumentByToken', () => {
       bucket: 'metra-files',
       objectKey: 'org-1/engagement/file-1',
       downloadName: '3d-visual.png',
+      access: 'download',
     });
+  });
+
+  it('parses the access verdict, defaulting an unknown one to `withheld`', async () => {
+    // The route enforces on this value, so an unrecognised verdict must NEVER
+    // widen into a download — the fail-closed direction is the whole point.
+    for (const [given, expected] of [
+      ['download', 'download'],
+      ['preview', 'preview'],
+      ['withheld', 'withheld'],
+      ['anything-else', 'withheld'],
+      [undefined, 'withheld'],
+    ] as const) {
+      setSnapshot({ ...validSnapshot(), access: given });
+      const result = await getDeliveryDocumentByToken('raw-token', DOCUMENT_ID);
+      expect(result?.access).toBe(expected);
+    }
   });
 
   it('omits the extension when the stored name has none it can trust', async () => {

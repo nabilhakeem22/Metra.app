@@ -227,6 +227,15 @@ grant execute on function public.app_delivery_document_comments_by_token(text, u
 revoke execute on function public.app_delivery_document_comments_by_token(text, uuid) from public;
 grant execute on function public.app_delivery_comment_by_token(text, uuid, text, text, text, text) to metra_app;
 revoke execute on function public.app_delivery_comment_by_token(text, uuid, text, text, text, text) from public;
+-- Client Deliverables Step 3 — the payment-settled test and the document-access
+-- rule the portal list and the download route both read. Not token-resolved (their
+-- callers have already proven the token), so they are locked down here for the same
+-- reason as the rest: `app_engagement_payments_settled` takes a bare engagement id
+-- and would otherwise let an anon-key holder probe any engagement's payment state.
+grant execute on function public.app_engagement_payments_settled(uuid) to metra_app;
+revoke execute on function public.app_engagement_payments_settled(uuid) from public;
+grant execute on function public.app_document_access(public.engagement_artifact_kind, boolean, text) to metra_app;
+revoke execute on function public.app_document_access(public.engagement_artifact_kind, boolean, text) from public;
 
 do $$
 declare
@@ -318,6 +327,14 @@ begin
       );
       execute format(
         'revoke execute on function public.app_delivery_comment_by_token(text, uuid, text, text, text, text) from %I',
+        r
+      );
+      execute format(
+        'revoke execute on function public.app_engagement_payments_settled(uuid) from %I',
+        r
+      );
+      execute format(
+        'revoke execute on function public.app_document_access(public.engagement_artifact_kind, boolean, text) from %I',
         r
       );
     end if;

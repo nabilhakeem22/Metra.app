@@ -1,6 +1,6 @@
 'use client';
 
-import { Download, FileText } from 'lucide-react';
+import { Download, Eye, FileText, Lock } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
 import type { PublicDelivery } from '@/lib/engagements/public';
 import { bidiIsolate } from '@/lib/format/bidi';
@@ -19,6 +19,14 @@ import { DocumentThread } from './document-thread';
  * rather than disappearing, so the client is never left wondering where their files
  * are. `documentUnavailable` surfaces the single, indistinguishable failure the
  * download route redirects back with. Dates use Western numerals; logical CSS only.
+ *
+ * Step 3 gates what each row OFFERS on the database's access verdict: `download`
+ * (the default, and everything once the payments are settled), `view` for an
+ * approved render while money is outstanding (a downscaled rendition — the
+ * full-resolution file stays in the bucket), and a plain locked note for the BOQ,
+ * which is not retrievable at all until settled. The button is a REFLECTION of the
+ * rule, never the rule: the download route re-reads the same verdict, so an old URL
+ * is refused exactly like a forged one.
  *
  * Step 2 hangs a collapsed comment thread under each row (DocumentThread), so a
  * question about ONE drawing stays attached to that drawing. The thread is lazy —
@@ -72,14 +80,33 @@ export function DocumentsCard({
                   </p>
                 )}
               </div>
-              <a
-                href={`/${locale}/d/${encodeURIComponent(token)}/documents/${releasedDocument.id}`}
-                rel="noopener"
-                className="ms-auto inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-semibold hover:bg-muted"
-              >
-                <Download className="size-3.5" aria-hidden />
-                {t('download')}
-              </a>
+              {releasedDocument.access === 'withheld' ? (
+                // No link at all — and the route refuses this id independently, so
+                // an old URL is just as dead as the missing button.
+                <span className="ms-auto inline-flex items-center gap-1.5 rounded-lg border border-dashed px-3 py-1.5 text-xs font-medium text-muted-foreground">
+                  <Lock className="size-3.5" aria-hidden />
+                  {t('afterPayment')}
+                </span>
+              ) : (
+                <a
+                  href={`/${locale}/d/${encodeURIComponent(token)}/documents/${releasedDocument.id}`}
+                  rel="noopener"
+                  target={releasedDocument.access === 'preview' ? '_blank' : undefined}
+                  className="ms-auto inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-semibold hover:bg-muted"
+                >
+                  {releasedDocument.access === 'preview' ? (
+                    <>
+                      <Eye className="size-3.5" aria-hidden />
+                      {t('view')}
+                    </>
+                  ) : (
+                    <>
+                      <Download className="size-3.5" aria-hidden />
+                      {t('download')}
+                    </>
+                  )}
+                </a>
+              )}
               {/* Full-width, so the thread wraps onto its own line under the row. */}
               <DocumentThread
                 token={token}

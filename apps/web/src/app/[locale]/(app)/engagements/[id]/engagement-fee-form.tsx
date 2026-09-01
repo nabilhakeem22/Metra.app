@@ -16,10 +16,16 @@ import {
 } from '@/components/ui/select';
 import type { ActionResult } from '@/lib/actions/result';
 import { submitDesignFee } from '@/lib/engagements/actions';
+import {
+  DEFAULT_MILESTONE_KINDS,
+  OPTIONAL_MILESTONE_KINDS,
+  byDueOrder,
+} from '@/lib/engagements/default-fee-split';
 
 // Enum values declared locally (typed by the type-only @metra/db import) — a
-// client component must never import a runtime @metra/db value.
-const MILESTONE_KINDS: MilestoneKind[] = ['deposit', 'gate_a', 'gate_b', 'balance'];
+// client component must never import a runtime @metra/db value. The milestone
+// ordering + the three-payment default come from the pure leaf, shared with its
+// test so the form and the rule cannot drift.
 const MILESTONE_BASES: MilestoneBasis[] = ['percent', 'amount'];
 
 interface Row {
@@ -44,13 +50,31 @@ export function EngagementFeeForm({
   const tb = useTranslations('engagements.milestoneBasis');
   const [designFee, setDesignFee] = useState('');
   const [basis, setBasis] = useState<MilestoneBasis>('percent');
+  // Opens on the THREE-payment default (deposit / after the design is confirmed /
+  // final). Gate A stays addable below for a studio that also bills at concept.
   const [rows, setRows] = useState<Row[]>(
-    MILESTONE_KINDS.map((kind) => ({ kind, value: '' })),
+    DEFAULT_MILESTONE_KINDS.map((kind) => ({ kind, value: '' })),
   );
 
   function setRow(index: number, value: string) {
     setRows((prev) => prev.map((r, i) => (i === index ? { ...r, value } : r)));
   }
+
+  /** Add one optional milestone, kept in due order rather than click order. */
+  function addRow(kind: MilestoneKind) {
+    setRows((prev) =>
+      [...prev, { kind, value: '' }].sort((a, b) => byDueOrder(a.kind, b.kind)),
+    );
+  }
+
+  function removeRow(kind: MilestoneKind) {
+    setRows((prev) => prev.filter((r) => r.kind !== kind));
+  }
+
+  // Only milestones NOT already on the schedule can be added.
+  const addable = OPTIONAL_MILESTONE_KINDS.filter(
+    (kind) => !rows.some((r) => r.kind === kind),
+  );
 
   function submit() {
     const milestones = rows
@@ -101,7 +125,7 @@ export function EngagementFeeForm({
         <p className="text-xs font-medium text-muted-foreground">{t('milestones')}</p>
         {rows.map((row, index) => (
           <div key={row.kind} className="flex items-center gap-2">
-            <span className="w-28 shrink-0 text-sm">{tk(row.kind)}</span>
+            <span className="w-40 shrink-0 text-sm">{tk(row.kind)}</span>
             <Input
               dir="ltr"
               inputMode="decimal"
@@ -110,8 +134,36 @@ export function EngagementFeeForm({
               value={row.value}
               onChange={(e) => setRow(index, e.target.value)}
             />
+            {/* Only an ADDED milestone can be removed — the three defaults are the
+                schedule the product recommends, and dropping one silently would
+                turn its gate free without the studio meaning it. */}
+            {!DEFAULT_MILESTONE_KINDS.includes(row.kind) && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => removeRow(row.kind)}
+              >
+                {t('remove')}
+              </Button>
+            )}
           </div>
         ))}
+        {addable.length > 0 && (
+          <div className="flex flex-wrap gap-2 pt-1">
+            {addable.map((kind) => (
+              <Button
+                key={kind}
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => addRow(kind)}
+              >
+                {t('addNamed', { name: tk(kind) })}
+              </Button>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="flex justify-end gap-2">

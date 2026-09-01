@@ -14,6 +14,7 @@ import { createHash } from 'node:crypto';
 import { sql } from 'drizzle-orm';
 import { withRequestDb } from '@/lib/db/client';
 import { ALLOWED_EXTENSIONS } from './deliverable-files';
+import { parseDocumentAccess, type DocumentAccess } from './document-access';
 import {
   CATEGORY_FILE_SLUG,
   KIND_CATEGORY,
@@ -47,6 +48,9 @@ export interface DeliveryDocumentTarget {
   /** The name the client's browser saves the file as — a category slug plus, when
    *  one can be derived safely, the original extension. Never the stored filename. */
   downloadName: string;
+  /** Step 3 — the DATABASE's verdict on what this client may do with the file now.
+   *  The route enforces it; it is not advisory. Junk parses to `withheld`. */
+  access: DocumentAccess;
 }
 
 /** The raw jsonb the SDF returns. Typed as UNTRUSTED — every field is optional. */
@@ -55,6 +59,7 @@ interface DocumentSnapshot {
   object_key?: string | null;
   kind?: string | null;
   original_name?: string | null;
+  access?: string | null;
 }
 
 /**
@@ -109,6 +114,7 @@ export async function getDeliveryDocumentByToken(
       bucket,
       objectKey,
       downloadName: extension ? `${slug}.${extension}` : slug,
+      access: parseDocumentAccess(snapshot.access),
     };
   } catch {
     // Token-free breadcrumb only — never the raw token, the document id, or any

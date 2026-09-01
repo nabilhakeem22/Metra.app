@@ -18,6 +18,7 @@ import {
   PORTAL_STAGE_NOTE,
   type PortalLabel,
 } from './portal-labels';
+import { parseDocumentAccess, type DocumentAccess } from './document-access';
 import { stateMilestone, type MilestoneProgress } from './journey-map';
 import {
   CLIENT_ACTION_VERBS,
@@ -93,6 +94,11 @@ export interface PublicDelivery {
      *  A count only; the messages are fetched per-document when the client opens
      *  the thread, so an unopened portal never carries any comment bodies. */
     commentCount: number;
+    /** Client Deliverables Step 3 — what this client may do with the file right
+     *  now, as the DATABASE decided. The card renders from it; the download route
+     *  independently re-reads and enforces it, so hiding a button is never the
+     *  only thing standing between an unpaid client and the file. */
+    access: DocumentAccess;
   }>;
   /** Client-facing verb tokens the client MAY act on right now (approve_concept,
    *  request_concept_changes, approve_design, request_design_changes,
@@ -139,6 +145,7 @@ interface DeliveryDocumentRow {
   kind: EngagementArtifactKind;
   shared_at?: string | null;
   comment_count?: number | null;
+  access?: string | null;
 }
 
 /**
@@ -272,6 +279,8 @@ export async function getDeliveryByToken(
             typeof row.comment_count === 'number' && row.comment_count > 0
               ? Math.floor(row.comment_count)
               : 0,
+          // Junk parses to `withheld`, never to `download`.
+          access: parseDocumentAccess(row.access),
         }))
       : [];
     const clientActions = Array.isArray(snapshot.client_actions)

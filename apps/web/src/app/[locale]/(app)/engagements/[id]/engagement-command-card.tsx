@@ -134,12 +134,15 @@ export function EngagementCommandCard({
   });
   const closed = view.mode === 'closed';
   const pillKey = derivePillKey(view.mode, paymentClaimCount);
-  // Every pill but ONE either names whose move it is ("Your move" / "Waiting on
-  // client") or sits under a headline + live Advance button that does ("Ready to
-  // advance") — so no card repeats it as a second line. `paymentToConfirm` is the
-  // exception: it names a TASK, under the "waiting on the client" headline, so
-  // without this line the studio can't tell the next move is theirs.
-  const showStudioMove = pillKey === 'paymentToConfirm';
+  // ONE highlighted statement of where things stand, not two. In every mode but one
+  // the pill and the headline two lines below say the same thing — identically for
+  // blockedClient ("Waiting on the client" / "Waiting on the client"), near enough
+  // for the others — and the headline is the better of the pair because it also
+  // names the phase. So the pill renders ONLY for `paymentToConfirm`, where it
+  // names a TASK the headline does not: the headline there reads "waiting on the
+  // client" while a claim actually sits with the studio. The mode's colour is not
+  // lost with it — the accent stripe and the border still carry it.
+  const showPaymentPill = pillKey === 'paymentToConfirm';
 
   // Mode-driven accent (amber/warn for the blocked attention states, brand for
   // ready, neutral for closed) — expressed through the app's semantic tokens so
@@ -248,19 +251,23 @@ export function EngagementCommandCard({
       />
 
       {/* 1. STEP RIBBON + STATUS PILL + WHOSE-MOVE */}
-      <EngagementStepRibbon state={state} />
-      <div className="mb-3.5 mt-3 flex flex-wrap items-center gap-2.5">
-        <span
-          className={`inline-flex items-center rounded-[var(--r-pill)] px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.08em] ${pillClass}`}
-        >
-          {tcmd(`pill.${pillKey}`)}
-        </span>
-        {showStudioMove && (
+      {/* The gap under the ribbon lives HERE, not on the pill below — the pill is
+          conditional, and the spacing must not disappear with it. */}
+      <div className="mb-3">
+        <EngagementStepRibbon state={state} />
+      </div>
+      {showPaymentPill && (
+        <div className="mb-3.5 flex flex-wrap items-center gap-2.5">
+          <span
+            className={`inline-flex items-center rounded-[var(--r-pill)] px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.08em] ${pillClass}`}
+          >
+            {tcmd(`pill.${pillKey}`)}
+          </span>
           <span className="text-[12.5px] text-[color:var(--text-muted)]">
             {tcmd('move.studio')}
           </span>
-        )}
-      </div>
+        </div>
+      )}
 
       {!closed && (
         <EngagementHeroBadges

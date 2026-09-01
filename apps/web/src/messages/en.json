@@ -1631,7 +1631,8 @@
       "remove": "Remove",
       "kind": "Milestone",
       "value": "Value",
-      "submit": "Submit fee schedule"
+      "submit": "Submit fee schedule",
+      "addNamed": "Add {name}"
     },
     "revisionForm": {
       "title": "Request revision",
@@ -1796,9 +1797,9 @@
     },
     "milestoneKind": {
       "deposit": "Deposit",
-      "gate_a": "Gate A",
-      "gate_b": "Gate B",
-      "balance": "Balance"
+      "gate_a": "Concept payment",
+      "gate_b": "First payment",
+      "balance": "Final payment"
     },
     "milestoneBasis": {
       "percent": "Percent",
@@ -1948,9 +1949,9 @@
       "note": "Marking a payment lets your design team know. They confirm it on their side.",
       "kind": {
         "deposit": "Deposit",
-        "gate_a": "Gate A",
-        "gate_b": "Gate B",
-        "balance": "Balance"
+        "gate_a": "Concept payment",
+        "gate_b": "First payment",
+        "balance": "Final payment"
       },
       "error": {
         "token_invalid": "This link is no longer available. Please contact your design team.",
@@ -1975,7 +1976,9 @@
         "drawing": "Shop drawing",
         "boq": "Bill of quantities",
         "survey": "Site survey"
-      }
+      },
+      "view": "View",
+      "afterPayment": "Available after payment"
     },
     "comments": {
       "toggleEmpty": "Ask about this",

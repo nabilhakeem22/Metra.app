@@ -176,8 +176,15 @@ describe('getDeliveryByToken hardening', () => {
           kind: 'concept_option',
           shared_at: '2026-02-01T00:00:00Z',
           comment_count: 3,
+          access: 'download',
         },
-        { id: 'doc-2', kind: 'autocad', shared_at: null, comment_count: 0 },
+        {
+          id: 'doc-2',
+          kind: 'autocad',
+          shared_at: null,
+          comment_count: 0,
+          access: 'download',
+        },
       ],
     });
     const result = await getDeliveryByToken('raw-token');
@@ -187,8 +194,15 @@ describe('getDeliveryByToken hardening', () => {
         category: 'concept',
         sharedAt: '2026-02-01T00:00:00Z',
         commentCount: 3,
+        access: 'download',
       },
-      { id: 'doc-2', category: 'layout', sharedAt: null, commentCount: 0 },
+      {
+        id: 'doc-2',
+        category: 'layout',
+        sharedAt: null,
+        commentCount: 0,
+        access: 'download',
+      },
     ]);
   });
 
@@ -209,7 +223,32 @@ describe('getDeliveryByToken hardening', () => {
     expect(result?.documents).toEqual([
       // A row with no `comment_count` at all (every row before Step 2) reads as a
       // thread with nothing in it — never NaN, never undefined on the wire.
-      { id: 'doc-ok', category: 'boq', sharedAt: null, commentCount: 0 },
+      // No `access` on the row either — it parses to the SAFEST verdict, never to
+      // `download`, so a malformed row can't hand over the priced BOQ.
+      { id: 'doc-ok', category: 'boq', sharedAt: null, commentCount: 0, access: 'withheld' },
+    ]);
+  });
+
+  it('parses an unknown access verdict to `withheld`, never `download`', async () => {
+    // The fail-closed direction matters more than the happy path here: this field
+    // is what stands between an unpaid client and the firm's priced BOQ.
+    setSnapshot({
+      ...validSnapshot(),
+      documents: [
+        { id: 'a', kind: 'boq', access: 'download' },
+        { id: 'b', kind: 'boq', access: 'preview' },
+        { id: 'c', kind: 'boq', access: 'free-for-all' },
+        { id: 'd', kind: 'boq', access: null },
+        { id: 'e', kind: 'boq', access: 7 },
+      ],
+    });
+    const result = await getDeliveryByToken('raw-token');
+    expect(result?.documents.map((d) => d.access)).toEqual([
+      'download',
+      'preview',
+      'withheld',
+      'withheld',
+      'withheld',
     ]);
   });
 
