@@ -392,6 +392,15 @@ const TOKEN_SDFS: ReadonlyArray<{ name: string; args: string }> = [
     name: 'app_delivery_claim_payment_by_token',
     args: 'text, text, text, text, text, text',
   },
+  // Client Deliverables Step 2 — per-document comment threads. The reader is in
+  // this class because it returns client-authored message BODIES; the writer
+  // because it takes caller-supplied p_name/p_ip/p_ua written into an append-only
+  // ledger, the same audit-poisoning surface as the respond/claim variants.
+  { name: 'app_delivery_document_comments_by_token', args: 'text, uuid' },
+  {
+    name: 'app_delivery_comment_by_token',
+    args: 'text, uuid, text, text, text, text',
+  },
 ];
 
 function signatureOf(sdf: { name: string; args: string }): string {

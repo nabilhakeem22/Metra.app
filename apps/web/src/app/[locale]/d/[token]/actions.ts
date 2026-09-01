@@ -2,9 +2,13 @@
 
 import { headers } from 'next/headers';
 import {
+  addDeliveryCommentByToken,
   claimPaymentByToken,
+  getDeliveryDocumentCommentsByToken,
   recordDeliveryActionByToken,
   type DeliveryActionResult,
+  type DeliveryCommentResult,
+  type PublicDocumentComment,
 } from '@/lib/engagements/public';
 
 /**
@@ -68,4 +72,45 @@ export async function markDeliveryPaymentPaid(
     ip,
     userAgent: ua,
   });
+}
+
+/**
+ * Public (no-session) client delivery-portal action (Client Deliverables Step 2):
+ * APPEND one client message to ONE released document's thread. Captures the client
+ * IP + user agent (capped 45/512) for the append-only row's provenance, exactly like
+ * the two actions above; the raw token is NEVER logged here — it flows straight to
+ * addDeliveryCommentByToken, which hashes it.
+ *
+ * The message is ADVISORY: it moves no state and opens no change order. The client
+ * still approves or requests changes with the stage buttons — this only lets them
+ * say WHICH drawing and WHAT about it.
+ */
+export async function addDeliveryComment(
+  token: string,
+  documentId: string,
+  body: string,
+): Promise<DeliveryCommentResult> {
+  const h = await headers();
+  // Cap before the DB (the SDF also trims + caps at 2000 and CHECKs the length).
+  const trimmed = body?.trim().slice(0, 2000) ?? '';
+  if (!trimmed) return { ok: false, error: 'empty' };
+  return addDeliveryCommentByToken(token, {
+    documentId,
+    body: trimmed,
+    ip: clientIp(h),
+    userAgent: h.get('user-agent')?.slice(0, 512) || null,
+  });
+}
+
+/**
+ * Public (no-session) read of ONE released document's thread, called when the client
+ * OPENS that document's comments (never on the portal's first paint), so an unopened
+ * portal carries no message bodies at all. Every failure returns the same empty
+ * array — the caller cannot tell a forged id from an empty thread.
+ */
+export async function loadDeliveryDocumentComments(
+  token: string,
+  documentId: string,
+): Promise<PublicDocumentComment[]> {
+  return getDeliveryDocumentCommentsByToken(token, documentId);
 }

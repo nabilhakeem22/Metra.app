@@ -4,6 +4,7 @@ import { notFound } from 'next/navigation';
 import { Link } from '@/i18n/routing';
 import { requireOrg } from '@/lib/auth/require-org';
 import { pickLocale } from '@/lib/i18n/pick-locale';
+import { countAwaitingReplyCore } from '@/lib/engagements/document-comments';
 import { getEngagementGatePreview } from '@/lib/engagements/gate-preview';
 import { computeCommercialPulse } from '@/lib/engagements/pulse';
 import {
@@ -63,6 +64,7 @@ export default async function EngagementDetailPage({
     paymentClaims,
     gatePreview,
     shareStatus,
+    awaitingReplyCount,
   ] = await Promise.all([
     getEngagementFeeSchedule(ctx, id),
     getEngagementPayments(ctx, id),
@@ -74,6 +76,10 @@ export default async function EngagementDetailPage({
     getEngagementPaymentClaims(ctx, id),
     getEngagementGatePreview(ctx, id),
     getDeliveryShareStatus(ctx, id),
+    // Client Deliverables Step 2 — how many client questions are still unanswered.
+    // Derived from the append-only thread (a client message with no staff message
+    // after it), so it falls when the studio REPLIES, not when it opens a thread.
+    countAwaitingReplyCore(ctx, id),
   ]);
 
   // Owner/admin only — the §2.2 `engagements_issue` cell that mints client links.
@@ -180,6 +186,7 @@ export default async function EngagementDetailPage({
         stallDays={stallDays}
         pulse={pulse}
         paymentClaimCount={paymentClaims.length}
+        awaitingReplyCount={awaitingReplyCount}
       />
     </div>
   );

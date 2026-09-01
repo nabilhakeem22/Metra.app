@@ -3,7 +3,9 @@
 import { Download, FileText } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
 import type { PublicDelivery } from '@/lib/engagements/public';
+import { bidiIsolate } from '@/lib/format/bidi';
 import { formatDate } from '@/lib/format/date';
+import { DocumentThread } from './document-thread';
 
 /**
  * Client Deliverables, Step 1 — "Your documents". Lists the files the studio has
@@ -17,16 +19,12 @@ import { formatDate } from '@/lib/format/date';
  * rather than disappearing, so the client is never left wondering where their files
  * are. `documentUnavailable` surfaces the single, indistinguishable failure the
  * download route redirects back with. Dates use Western numerals; logical CSS only.
+ *
+ * Step 2 hangs a collapsed comment thread under each row (DocumentThread), so a
+ * question about ONE drawing stays attached to that drawing. The thread is lazy —
+ * only the message COUNT is in this payload — and advisory: commenting moves no
+ * stage, and the approve / request-changes buttons stay the only way to do that.
  */
-/**
- * Wrap a value in Unicode FIRST-STRONG ISOLATE … POP DIRECTIONAL ISOLATE so the
- * bidi algorithm cannot reorder it inside RTL prose. Without this, a Western
- * DD/MM/YYYY date interpolated into the Arabic sentence renders reversed.
- */
-function bidiIsolate(value: string): string {
-  return `⁨${value}⁩`;
-}
-
 export function DocumentsCard({
   token,
   documents,
@@ -82,6 +80,12 @@ export function DocumentsCard({
                 <Download className="size-3.5" aria-hidden />
                 {t('download')}
               </a>
+              {/* Full-width, so the thread wraps onto its own line under the row. */}
+              <DocumentThread
+                token={token}
+                documentId={releasedDocument.id}
+                initialCount={releasedDocument.commentCount}
+              />
             </li>
           ))}
         </ul>

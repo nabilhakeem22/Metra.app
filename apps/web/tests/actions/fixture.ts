@@ -190,6 +190,10 @@ const TEARDOWN_TABLES_IN_FK_ORDER = [
   // client_payment_claims references payment_events (set null) + design_engagements
   // (cascade) — delete it before both so no restrict/order surprise.
   'client_payment_claims',
+  // engagement_document_comments cascades from BOTH design_engagements and
+  // engagement_artifacts, so the deletes below would clear it either way — listed
+  // explicitly so a future FK change surfaces here rather than as a restrict error.
+  'engagement_document_comments',
   'payment_events',
   'engagement_events',
   'engagement_change_orders',

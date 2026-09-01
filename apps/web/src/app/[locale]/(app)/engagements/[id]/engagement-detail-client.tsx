@@ -48,6 +48,7 @@ export function EngagementDetailClient({
   stallDays,
   pulse,
   paymentClaimCount,
+  awaitingReplyCount,
 }: {
   header: EngagementHeader;
   feeSchedule: EngagementFeeSchedule;
@@ -66,6 +67,10 @@ export function EngagementDetailClient({
   stallDays: number | null;
   pulse: CommercialPulse;
   paymentClaimCount: number;
+  /** Client Deliverables Step 2 — client questions still awaiting a studio reply,
+   *  across every document on this engagement. Feeds the command card's quiet
+   *  one-line prompt and the Files tab badge. */
+  awaitingReplyCount: number;
 }) {
   const t = useTranslations('engagements');
   const te = useTranslations('errors');
@@ -128,6 +133,7 @@ export function EngagementDetailClient({
         canSetOffPlan={capabilities.setRom}
         offPlan={header.offPlan}
         paymentClaimCount={paymentClaimCount}
+        awaitingReplyCount={awaitingReplyCount}
         conceptOptionCount={conceptOptionCount}
         clientActivity={clientActivity}
         secondaryTriggers={secondaryTriggers}
@@ -151,7 +157,14 @@ export function EngagementDetailClient({
 
       <div className="flex flex-wrap gap-2 border-b">
         {ENGAGEMENT_TABS.map((tb) => {
-          const badge = tb === 'payments' && paymentClaimCount > 0;
+          // A tab wears a badge when it holds something ADDRESSED TO the studio:
+          // a client payment claim to confirm, or a client question to answer.
+          const badgeCount =
+            tb === 'payments'
+              ? paymentClaimCount
+              : tb === 'files'
+                ? awaitingReplyCount
+                : 0;
           return (
             <button
               key={tb}
@@ -164,12 +177,12 @@ export function EngagementDetailClient({
               }`}
             >
               {tp(tb)}
-              {badge && (
+              {badgeCount > 0 && (
                 <span
                   className="inline-flex items-center rounded-[var(--r-pill)] bg-[color:var(--warn-tint)] px-1.5 py-0.5 text-[10px] font-semibold text-[color:var(--warn)]"
                   dir="ltr"
                 >
-                  {t('paymentsBadge', { n: paymentClaimCount })}
+                  {t('paymentsBadge', { n: badgeCount })}
                 </span>
               )}
             </button>

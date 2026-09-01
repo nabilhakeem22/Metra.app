@@ -83,6 +83,7 @@ export function EngagementCommandCard({
   canSetOffPlan,
   offPlan,
   paymentClaimCount,
+  awaitingReplyCount,
   conceptOptionCount,
   clientActivity,
   secondaryTriggers,
@@ -107,6 +108,10 @@ export function EngagementCommandCard({
   canSetOffPlan: boolean;
   offPlan: boolean;
   paymentClaimCount: number;
+  /** Client Deliverables Step 2 — client questions on documents still awaiting a
+   *  studio reply. Rendered as ONE quiet line, never a second CTA: answering is
+   *  advisory and must not compete with the card's single next action. */
+  awaitingReplyCount: number;
   /** Concept options already recorded — drives the append-only upload cap. */
   conceptOptionCount: number;
   clientActivity: EngagementClientActivityRecord[];
@@ -303,6 +308,15 @@ export function EngagementCommandCard({
             </p>
           )}
         </div>
+      )}
+
+      {/* Client questions waiting on an answer. ONE line, no button — the reply
+          lives on the document itself, in Files. Advisory: it never blocks the
+          advance, so it must never look like it does. */}
+      {!closed && awaitingReplyCount > 0 && (
+        <p className="mb-4 text-[13px] text-[color:var(--text-muted)]">
+          {tcmd('awaitingReply', { n: awaitingReplyCount })}
+        </p>
       )}
 
       {!closed && (

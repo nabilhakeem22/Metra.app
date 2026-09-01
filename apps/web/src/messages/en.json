@@ -1600,7 +1600,8 @@
       },
       "move": {
         "studio": "Your move"
-      }
+      },
+      "awaitingReply": "{n, plural, one {# client question is waiting on your reply, in Files.} other {# client questions are waiting on your reply, in Files.}}"
     },
     "toolbar": {
       "title": "Log & manage",
@@ -1806,6 +1807,24 @@
     "changeOrderStatus": {
       "raised": "Raised",
       "settled": "Settled"
+    },
+    "comments": {
+      "open": "Comments",
+      "none": "No comments",
+      "loading": "Loading…",
+      "empty": "No messages on this file yet.",
+      "placeholder": "Reply to the client…",
+      "reply": "Reply",
+      "client": "Client",
+      "studio": "You",
+      "advisory": "A reply doesn't move the stage.",
+      "error": {
+        "generic": "That didn't send. Please try again.",
+        "invalid": "That didn't send. Please try again.",
+        "forbidden": "You don't have permission to reply.",
+        "engagement_not_found": "This project is no longer available.",
+        "engagement_not_active": "This project is closed."
+      }
     }
   },
   "delivery": {
@@ -1956,6 +1975,26 @@
         "drawing": "Shop drawing",
         "boq": "Bill of quantities",
         "survey": "Site survey"
+      }
+    },
+    "comments": {
+      "toggleEmpty": "Ask about this",
+      "toggleCount": "Messages ({count})",
+      "loading": "Loading…",
+      "empty": "No messages yet. Ask your design team anything about this file.",
+      "placeholder": "Ask about this file…",
+      "send": "Send",
+      "you": "You",
+      "studio": "Your design team",
+      "advisory": "A question here doesn't request changes — use the buttons above for that.",
+      "error": {
+        "generic": "That didn't send. Please try again.",
+        "empty": "Write a message first.",
+        "too_many": "You've sent a lot of messages just now. Please try again shortly.",
+        "token_invalid": "This link is no longer available. Please contact your design team.",
+        "token_expired": "This link has expired. Please contact your design team.",
+        "not_active": "This delivery is closed. Please contact your design team.",
+        "wrong_state": "This isn't available right now."
       }
     }
   }

@@ -10,6 +10,12 @@ import {
   type SetArtifactClientVisibilityInput,
 } from '../client-visibility';
 import {
+  listDocumentCommentsCore,
+  replyToDocumentCore,
+  type ReplyToDocumentInput,
+  type StudioDocumentComment,
+} from '../document-comments';
+import {
   attachDeliverableCore,
   createDeliverableUploadCore,
   getDeliverableUrlCore,
@@ -87,4 +93,32 @@ export async function setArtifactClientVisibility(
   const res = await setArtifactClientVisibilityCore(ctx, input);
   if (res.ok) revalidatePath('/', 'layout');
   return res;
+}
+
+/**
+ * Server-action wrapper for {@link replyToDocumentCore}: resolves the org context,
+ * appends one studio reply to a document's comment thread, and revalidates the
+ * shell so the cockpit's awaiting-reply count refreshes. Advisory — the reply moves
+ * no state. Returns the ActionResult; never throws to the client.
+ */
+export async function replyToDocument(
+  input: ReplyToDocumentInput,
+): Promise<ActionResult> {
+  const ctx = await requireOrg();
+  const res = await replyToDocumentCore(ctx, input);
+  if (res.ok) revalidatePath('/', 'layout');
+  return res;
+}
+
+/**
+ * Server-action wrapper for {@link listDocumentCommentsCore}: resolves the org
+ * context and reads ONE document's thread, oldest first. Called when the studio
+ * OPENS a thread, so the cockpit's first paint carries no message bodies. A foreign
+ * or malformed artifact id resolves to an empty thread, never an error.
+ */
+export async function listDocumentComments(
+  artifactId: string,
+): Promise<StudioDocumentComment[]> {
+  const ctx = await requireOrg();
+  return listDocumentCommentsCore(ctx, artifactId);
 }

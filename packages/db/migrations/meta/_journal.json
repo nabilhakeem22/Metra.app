@@ -260,6 +260,13 @@
       "when": 1788473957549,
       "tag": "0036_design_revision_allowance",
       "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "7",
+      "when": 1788560357549,
+      "tag": "0037_document_comments",
+      "breakpoints": true
     }
   ]
 }

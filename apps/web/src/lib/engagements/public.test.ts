@@ -171,14 +171,24 @@ describe('getDeliveryByToken hardening', () => {
     setSnapshot({
       ...validSnapshot(),
       documents: [
-        { id: 'doc-1', kind: 'concept_option', shared_at: '2026-02-01T00:00:00Z' },
-        { id: 'doc-2', kind: 'autocad', shared_at: null },
+        {
+          id: 'doc-1',
+          kind: 'concept_option',
+          shared_at: '2026-02-01T00:00:00Z',
+          comment_count: 3,
+        },
+        { id: 'doc-2', kind: 'autocad', shared_at: null, comment_count: 0 },
       ],
     });
     const result = await getDeliveryByToken('raw-token');
     expect(result?.documents).toEqual([
-      { id: 'doc-1', category: 'concept', sharedAt: '2026-02-01T00:00:00Z' },
-      { id: 'doc-2', category: 'layout', sharedAt: null },
+      {
+        id: 'doc-1',
+        category: 'concept',
+        sharedAt: '2026-02-01T00:00:00Z',
+        commentCount: 3,
+      },
+      { id: 'doc-2', category: 'layout', sharedAt: null, commentCount: 0 },
     ]);
   });
 
@@ -197,8 +207,27 @@ describe('getDeliveryByToken hardening', () => {
     });
     const result = await getDeliveryByToken('raw-token');
     expect(result?.documents).toEqual([
-      { id: 'doc-ok', category: 'boq', sharedAt: null },
+      // A row with no `comment_count` at all (every row before Step 2) reads as a
+      // thread with nothing in it — never NaN, never undefined on the wire.
+      { id: 'doc-ok', category: 'boq', sharedAt: null, commentCount: 0 },
     ]);
+  });
+
+  it('degrades a junk comment_count to 0 rather than rendering it', async () => {
+    // The count is EXTERNAL jsonb like every other field here. A string, a negative,
+    // a float or a null must all read as "no messages" — the toggle renders this
+    // number, so a junk value would show the client "-1 messages".
+    setSnapshot({
+      ...validSnapshot(),
+      documents: [
+        { id: 'a', kind: 'boq', comment_count: 'many' },
+        { id: 'b', kind: 'boq', comment_count: -4 },
+        { id: 'c', kind: 'boq', comment_count: 2.7 },
+        { id: 'd', kind: 'boq', comment_count: null },
+      ],
+    });
+    const result = await getDeliveryByToken('raw-token');
+    expect(result?.documents.map((d) => d.commentCount)).toEqual([0, 0, 2, 0]);
   });
 
   it('degrades a missing or non-array documents key to an empty list', async () => {

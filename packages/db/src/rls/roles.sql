@@ -75,6 +75,15 @@ grant select, insert, update on public.engagement_change_orders to metra_app;
 -- columns). UPDATE is intentional here, unlike the append-only ledgers below. No
 -- DELETE — a resolved claim is retained.
 grant select, insert, update on public.client_payment_claims to metra_app;
+-- engagement_document_comments (Client Deliverables Step 2): APPEND-ONLY. The
+-- client's message INSERT goes through the SECURITY DEFINER token SDF (owner,
+-- bypasses RLS); this grant governs the STUDIO cockpit — read a document's thread
+-- (select) and reply to it (insert). NO UPDATE and NO DELETE: neither side may edit
+-- or retract a message once sent, which is what makes the thread usable as the
+-- record of what the client actually asked for. The revoke removes any earlier
+-- broader grant on already-provisioned DBs; it is a no-op on a fresh DB.
+grant select, insert on public.engagement_document_comments to metra_app;
+revoke update, delete on public.engagement_document_comments from metra_app;
 -- notifications: recipients read + mark-read (no delete); the runner inserts.
 grant select, insert, update on public.notifications to metra_app;
 -- api_keys (Public API v1): mint (insert), list (select), revoke + last_used
@@ -214,6 +223,10 @@ grant execute on function public.app_delivery_respond_by_token(text, text, text,
 revoke execute on function public.app_delivery_respond_by_token(text, text, text, text, text, text) from public;
 grant execute on function public.app_delivery_claim_payment_by_token(text, text, text, text, text, text) to metra_app;
 revoke execute on function public.app_delivery_claim_payment_by_token(text, text, text, text, text, text) from public;
+grant execute on function public.app_delivery_document_comments_by_token(text, uuid) to metra_app;
+revoke execute on function public.app_delivery_document_comments_by_token(text, uuid) from public;
+grant execute on function public.app_delivery_comment_by_token(text, uuid, text, text, text, text) to metra_app;
+revoke execute on function public.app_delivery_comment_by_token(text, uuid, text, text, text, text) from public;
 
 do $$
 declare
@@ -297,6 +310,14 @@ begin
       );
       execute format(
         'revoke execute on function public.app_delivery_claim_payment_by_token(text, text, text, text, text, text) from %I',
+        r
+      );
+      execute format(
+        'revoke execute on function public.app_delivery_document_comments_by_token(text, uuid) from %I',
+        r
+      );
+      execute format(
+        'revoke execute on function public.app_delivery_comment_by_token(text, uuid, text, text, text, text) from %I',
         r
       );
     end if;
