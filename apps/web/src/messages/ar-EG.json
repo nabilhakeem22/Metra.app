@@ -231,15 +231,6 @@
   "dashboard": {
     "title": "لوحة التحكم",
     "welcomeBack": "مرحبًا بعودتك",
-    "activeProjects": "المشاريع النشطة",
-    "revisedContractValue": "قيمة العقد المعدلة",
-    "billedToDate": "المفوتر حتى تاريخه",
-    "collected": "المحصل",
-    "openAR": "حسابات العملاء المفتوحة",
-    "costVariance": "انحراف التكاليف",
-    "p1Hint": "متاح في P1",
-    "gaugeTitle": "تقدم محفظة المشاريع",
-    "gaugeEmpty": "لا توجد مشاريع نشطة بعد",
     "noData": "لا توجد بيانات بعد",
     "gettingStartedTitle": "ابدأ الآن",
     "gettingStartedSubtitle": "خطوات قليلة لإعداد شركتك لدورة العمل الكاملة من عرض السعر إلى الفاتورة.",
@@ -250,10 +241,31 @@
     "taskFirstProposal": "أنشئ عرض السعر الأول",
     "noProjectsTitle": "لا توجد مشاريع نشطة بعد",
     "noProjectsDescription": "ستظهر مشاريعك هنا بمجرد البدء في تقديم عروض الأسعار.",
-    "ledgerTitle": "دفتر المشروع",
     "ctaCompleteProfile": "استكمال ملف الشركة",
     "ctaInviteTeam": "دعوة فريقك",
-    "ctaManageTeam": "إدارة فريقك"
+    "ctaManageTeam": "إدارة فريقك",
+    "cards": {
+      "clients": "العملاء",
+      "projects": "المشاريع",
+      "team": "الفريق",
+      "active": "النشط:"
+    },
+    "range": {
+      "label": "فترة الرسم",
+      "months": "{n} شهور"
+    },
+    "charts": {
+      "projects": "المشاريع اللي بدأت",
+      "clients": "العملاء الجدد",
+      "projectsSummary": "المشاريع اللي بدأت كل شهر خلال آخر {n} شهور، مقسّمة حسب الحالة.",
+      "clientsSummary": "العملاء اللي اتضافوا كل شهر خلال آخر {n} شهور، مقسّمين نشط وغير نشط.",
+      "empty": "مفيش حاجة في الفترة دي.",
+      "statusActive": "نشط",
+      "statusCompleted": "مكتمل",
+      "statusOther": "غير كده",
+      "clientActive": "نشط",
+      "clientInactive": "غير نشط"
+    }
   },
   "team": {
     "title": "الفريق",

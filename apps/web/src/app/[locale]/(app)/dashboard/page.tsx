@@ -1,8 +1,10 @@
 import { organizations } from '@metra/db';
 import { getLocale, getTranslations } from 'next-intl/server';
 import { redirect } from 'next/navigation';
-import { DashboardLedgerCard } from '@/components/dashboard/dashboard-ledger-card';
-import { DashboardPortfolioCard } from '@/components/dashboard/dashboard-portfolio-card';
+import { FolderKanban, Users, UsersRound } from 'lucide-react';
+import { DashboardBarChart } from '@/components/dashboard/dashboard-bar-chart';
+import { DashboardRangeFilter } from '@/components/dashboard/dashboard-range-filter';
+import { DashboardStatCard } from '@/components/dashboard/dashboard-stat-card';
 import { GettingStarted } from '@/components/dashboard/getting-started';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -14,20 +16,22 @@ import { pickLocale } from '@/lib/i18n/pick-locale';
 import { buildChecklist } from '@/lib/onboarding/checklist';
 import { readOnboarding } from '@/lib/onboarding/merge';
 import { getOnboardingProgress } from '@/lib/onboarding/progress';
+import {
+  getClientsByMonth,
+  getDashboardCounts,
+  getProjectsByMonth,
+} from '@/lib/dashboard/queries';
+import { fillMonths, parseRange } from '@/lib/dashboard/range';
 
-// Ledger row set + honest empty figures — unchanged data (visual reskin only).
-// Portfolio progress activates in P1 alongside real active-project counts.
-const LEDGER_ROWS = [
-  { key: 'activeProjects', value: '0' },
-  { key: 'revisedContractValue', value: '—' },
-  { key: 'billedToDate', value: '—' },
-  { key: 'collected', value: '—' },
-  { key: 'openAR', value: '—' },
-  { key: 'costVariance', value: '—' },
-] as const;
-
-export default async function DashboardPage() {
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const ctx = await requireOrg();
+  // The chart window lives in the URL, so it is shareable and the SERVER does the
+  // querying — the charts stay server components with no client-side fetching.
+  const range = parseRange((await searchParams).range);
   const user = await getSessionUser();
   const locale = await getLocale();
   const d = await getTranslations('dashboard');
@@ -63,18 +67,46 @@ export default async function DashboardPage() {
       ? { label: d('ctaInviteTeam'), href: '/team' as const }
       : { label: d('ctaManageTeam'), href: '/team' as const };
 
-  const ledgerRows = LEDGER_ROWS.map((row) => ({
-    key: row.key,
-    label: d(row.key),
-    value: row.value,
-  }));
+  // The dashboard's real figures. Three reads in parallel — the counts, and the
+  // two monthly series behind the charts.
+  const [counts, projectMonths, clientMonths] = await Promise.all([
+    getDashboardCounts(ctx),
+    getProjectsByMonth(ctx, range),
+    getClientsByMonth(ctx, range),
+  ]);
 
-  // No portfolio-progress data source until there are active projects → honest
-  // empty gauge. (0 active projects today.)
-  const activeProjectsCount = Number(
-    LEDGER_ROWS.find((row) => row.key === 'activeProjects')?.value ?? 0,
-  );
-  const portfolioProgress = activeProjectsCount > 0 ? 0 : null;
+  // Postgres only returns months that HAVE rows, so the gaps are filled here: a
+  // chart that silently skips a quiet month misrepresents the trend.
+  const monthLabel = (month: string) =>
+    new Date(`${month}-01T00:00:00Z`).toLocaleDateString(locale, {
+      month: 'short',
+      timeZone: 'UTC',
+    });
+  const projectColumns = fillMonths(
+    projectMonths,
+    range,
+    (month) => ({ month, active: 0, completed: 0, other: 0 }),
+  ).map((m) => ({
+    month: m.month,
+    label: monthLabel(m.month),
+    segments: [
+      { key: 'active', value: m.active },
+      { key: 'completed', value: m.completed },
+      { key: 'other', value: m.other },
+    ],
+  }));
+  const clientColumns = fillMonths(
+    clientMonths,
+    range,
+    (month) => ({ month, active: 0, inactive: 0 }),
+  ).map((m) => ({
+    month: m.month,
+    label: monthLabel(m.month),
+    segments: [
+      { key: 'active', value: m.active },
+      { key: 'inactive', value: m.inactive },
+    ],
+  }));
 
   return (
     <div className="flex flex-col gap-[14px]">
@@ -107,17 +139,57 @@ export default async function DashboardPage() {
 
       <GettingStarted result={checklist} orgId={ctx.orgId} dismissed={dismissed} />
 
-      <div className="grid items-start gap-[14px] lg:grid-cols-3">
-        <DashboardLedgerCard
-          className="lg:col-span-2"
-          title={d('ledgerTitle')}
-          statusLabel={d('p1Hint')}
-          rows={ledgerRows}
+      {/* Three headline figures, each a link into the module it counts. */}
+      <div className="grid gap-[14px] sm:grid-cols-2 lg:grid-cols-3">
+        <DashboardStatCard
+          label={d('cards.clients')}
+          value={counts.clientsTotal}
+          activeLabel={d('cards.active')}
+          activeValue={counts.clientsActive}
+          icon={Users}
+          href="/clients"
         />
-        <DashboardPortfolioCard
-          title={d('gaugeTitle')}
-          value={portfolioProgress}
-          emptyLabel={d('gaugeEmpty')}
+        <DashboardStatCard
+          label={d('cards.projects')}
+          value={counts.projectsTotal}
+          activeLabel={d('cards.active')}
+          activeValue={counts.projectsActive}
+          icon={FolderKanban}
+          href="/projects"
+        />
+        <DashboardStatCard
+          label={d('cards.team')}
+          value={counts.teamMembers}
+          icon={UsersRound}
+          href="/team"
+        />
+      </div>
+
+      <div className="flex items-center justify-end">
+        <DashboardRangeFilter active={range} />
+      </div>
+
+      <div className="grid gap-[14px] lg:grid-cols-2">
+        <DashboardBarChart
+          title={d('charts.projects')}
+          summary={d('charts.projectsSummary', { n: range })}
+          emptyLabel={d('charts.empty')}
+          columns={projectColumns}
+          series={[
+            { key: 'active', label: d('charts.statusActive'), token: '--chart-1' },
+            { key: 'completed', label: d('charts.statusCompleted'), token: '--chart-2' },
+            { key: 'other', label: d('charts.statusOther'), token: '--chart-3' },
+          ]}
+        />
+        <DashboardBarChart
+          title={d('charts.clients')}
+          summary={d('charts.clientsSummary', { n: range })}
+          emptyLabel={d('charts.empty')}
+          columns={clientColumns}
+          series={[
+            { key: 'active', label: d('charts.clientActive'), token: '--chart-1' },
+            { key: 'inactive', label: d('charts.clientInactive'), token: '--chart-3' },
+          ]}
         />
       </div>
     </div>

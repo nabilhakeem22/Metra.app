@@ -116,6 +116,13 @@
     --success-tint: rgba(18, 131, 106, 0.14);
     --warn: #b4791f;
     --warn-tint: rgba(180, 121, 31, 0.15);
+
+    /* Chart series — a SEQUENCE, not the semantic status colours. Three steps of
+       the brand teal plus the money gold, so a stacked bar reads as one family and
+       never implies "red = bad" about an ordinary project status. */
+    --chart-1: #176B63;
+    --chart-2: #4E9A93;
+    --chart-3: #A8C7C3;
     --danger-tint: rgba(198, 72, 58, 0.13);
 
     /* Gauge arc track (behind the --brand progress arc). */
@@ -199,6 +206,13 @@
     --success-tint: rgba(79, 217, 176, 0.16);
     --warn: #e0a34f;
     --warn-tint: rgba(224, 163, 79, 0.16);
+
+    /* Chart series (dark) — the same teal sequence, lightened to hold on the
+       smoked ground. */
+    --chart-1: #5FB5AA;
+    --chart-2: #3E8079;
+    --chart-3: #2A544F;
+
     --danger-tint: rgba(255, 122, 94, 0.18);
 
     /* Gauge arc track (dark). */

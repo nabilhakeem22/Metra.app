@@ -231,15 +231,6 @@
   "dashboard": {
     "title": "Dashboard",
     "welcomeBack": "Welcome back",
-    "activeProjects": "Active projects",
-    "revisedContractValue": "Revised contract value",
-    "billedToDate": "Billed to date",
-    "collected": "Collected",
-    "openAR": "Open AR",
-    "costVariance": "Cost variance",
-    "p1Hint": "Available in P1",
-    "gaugeTitle": "Portfolio progress",
-    "gaugeEmpty": "No active projects yet",
     "noData": "No data yet",
     "gettingStartedTitle": "Get started",
     "gettingStartedSubtitle": "A few steps to set your firm up for the full quote-to-invoice flow.",
@@ -250,10 +241,31 @@
     "taskFirstProposal": "Create your first proposal",
     "noProjectsTitle": "No active projects yet",
     "noProjectsDescription": "Your projects will appear here once you start quoting.",
-    "ledgerTitle": "Project ledger",
     "ctaCompleteProfile": "Complete company profile",
     "ctaInviteTeam": "Invite your team",
-    "ctaManageTeam": "Manage your team"
+    "ctaManageTeam": "Manage your team",
+    "cards": {
+      "clients": "Clients",
+      "projects": "Projects",
+      "team": "Team",
+      "active": "Active:"
+    },
+    "range": {
+      "label": "Chart period",
+      "months": "{n} months"
+    },
+    "charts": {
+      "projects": "Projects started",
+      "clients": "Clients added",
+      "projectsSummary": "Projects started each month over the last {n} months, split by status.",
+      "clientsSummary": "Clients added each month over the last {n} months, split by active and inactive.",
+      "empty": "Nothing in this period yet.",
+      "statusActive": "Active",
+      "statusCompleted": "Completed",
+      "statusOther": "Other",
+      "clientActive": "Active",
+      "clientInactive": "Inactive"
+    }
   },
   "team": {
     "title": "Team",
