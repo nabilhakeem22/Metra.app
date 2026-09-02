@@ -3,7 +3,7 @@ import { getLocale, getTranslations } from 'next-intl/server';
 import { notFound } from 'next/navigation';
 import { Link } from '@/i18n/routing';
 import { requireOrg } from '@/lib/auth/require-org';
-import { listActivities } from '@/lib/activities/queries';
+import { listEntityLogs } from '@/lib/logs/queries';
 import { getClientOptions } from '@/lib/clients/queries';
 import {
   countProjectDeliveries,
@@ -170,7 +170,7 @@ export default async function ProjectProfilePage({
         {tab === 'activity' && (
           <ActivityTab
             projectId={id}
-            activities={await listActivities(ctx, 'project', id)}
+            entries={await listEntityLogs(ctx, 'project', id)}
             canActivity={canActivity}
           />
         )}

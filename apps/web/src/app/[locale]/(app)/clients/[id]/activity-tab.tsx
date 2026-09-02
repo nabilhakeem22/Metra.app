@@ -1,9 +1,8 @@
 'use client';
 
-import { Loader2 } from 'lucide-react';
+import { History, Loader2 } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
 import { useState, useTransition } from 'react';
-import type { Activity } from '@metra/db';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -12,15 +11,18 @@ import { useRouter } from '@/i18n/routing';
 import { resolveActionError } from '@/lib/actions/error-message';
 import type { ActionCode } from '@/lib/actions/result';
 import { addActivity } from '@/lib/activities/actions';
+import type { LogEntry } from '@/lib/logs/entries';
 import { formatDate } from '@/lib/format/date';
 
 export function ActivityTab({
   clientId,
-  activities,
+  entries,
   canActivity,
 }: {
   clientId: string;
-  activities: Activity[];
+  /** The MERGED feed: activity (what people said) + audit (who changed what).
+   *  Neither alone is the log a firm means when they ask for one. */
+  entries: LogEntry[];
   canActivity: boolean;
 }) {
   const t = useTranslations('clients.profile.activity');
@@ -75,25 +77,33 @@ export function ActivityTab({
 
       <Card>
         <CardContent className="p-0">
-          {activities.length === 0 ? (
+          {entries.length === 0 ? (
             <div className="py-4">
               <EmptyState title={t('empty')} />
             </div>
           ) : (
             <ul className="divide-y">
-              {activities.map((a) => (
-                <li key={a.id} className="px-4 py-3">
+              {entries.map((e) => (
+                <li key={e.id} className="px-4 py-3">
                   <div className="flex items-center justify-between gap-2">
-                    <span className="text-sm font-medium">
-                      {t(`kinds.${a.kind}`)}
+                    <span className="flex items-center gap-2 text-sm font-medium">
+                      {/* A quiet marker, not a colour: an audit row is a record of
+                          a change, an activity row is something someone said. */}
+                      {e.source === 'audit' && (
+                        <History
+                          className="size-3.5 shrink-0 text-muted-foreground"
+                          aria-hidden
+                        />
+                      )}
+                      {t(`kinds.${e.labelKey}`)}
                     </span>
                     <span className="text-xs text-muted-foreground" dir="ltr">
-                      {formatDate(a.createdAt, locale)}
+                      {formatDate(e.at, locale)}
                     </span>
                   </div>
-                  {a.note && (
+                  {e.note && (
                     <p className="mt-1 whitespace-pre-wrap text-sm text-muted-foreground">
-                      {a.note}
+                      {e.note}
                     </p>
                   )}
                 </li>

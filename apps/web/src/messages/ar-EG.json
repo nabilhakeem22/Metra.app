@@ -882,13 +882,19 @@
         "title": "النشاط",
         "add": "إضافة ملاحظة",
         "notePlaceholder": "إضافة ملاحظة…",
-        "empty": "لا توجد أنشطة بعد.",
+        "empty": "مفيش حاجة اتسجلت لسه.",
         "system": "النظام",
         "kinds": {
           "note": "ملاحظة",
           "client_created": "تم إنشاء العميل",
           "proposal_sent": "تم إرسال العرض",
-          "proposal_accepted": "تم قبول العرض"
+          "proposal_accepted": "تم قبول العرض",
+          "client": {
+            "create": "اتسجل العميل",
+            "update": "اتعدلت بيانات العميل",
+            "delete": "اتشال العميل",
+            "issue": "اتصدر العميل"
+          }
         }
       }
     },
@@ -1061,13 +1067,19 @@
         "title": "النشاط",
         "add": "إضافة ملاحظة",
         "notePlaceholder": "إضافة ملاحظة…",
-        "empty": "لا يوجد نشاط بعد.",
+        "empty": "مفيش حاجة اتسجلت لسه.",
         "kinds": {
           "note": "ملاحظة",
           "client_created": "تم إنشاء العميل",
           "proposal_sent": "تم إرسال العرض",
           "proposal_accepted": "تم قبول العرض",
-          "project_created": "تم إنشاء المشروع"
+          "project_created": "تم إنشاء المشروع",
+          "project": {
+            "create": "اتعمل المشروع",
+            "update": "اتعدلت بيانات المشروع",
+            "delete": "اتشال المشروع",
+            "issue": "اتصدر المشروع"
+          }
         }
       }
     }

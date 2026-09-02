@@ -882,13 +882,19 @@
         "title": "Activity",
         "add": "Add note",
         "notePlaceholder": "Add a note…",
-        "empty": "No activity yet.",
+        "empty": "Nothing recorded yet.",
         "system": "System",
         "kinds": {
           "note": "Note",
           "client_created": "Client created",
           "proposal_sent": "Proposal sent",
-          "proposal_accepted": "Proposal accepted"
+          "proposal_accepted": "Proposal accepted",
+          "client": {
+            "create": "Client record created",
+            "update": "Client details changed",
+            "delete": "Client record removed",
+            "issue": "Client record issued"
+          }
         }
       }
     },
@@ -1061,13 +1067,19 @@
         "title": "Activity",
         "add": "Add note",
         "notePlaceholder": "Add a note…",
-        "empty": "No activity yet.",
+        "empty": "Nothing recorded yet.",
         "kinds": {
           "note": "Note",
           "client_created": "Client created",
           "proposal_sent": "Proposal sent",
           "proposal_accepted": "Proposal accepted",
-          "project_created": "Project created"
+          "project_created": "Project created",
+          "project": {
+            "create": "Project created",
+            "update": "Project details changed",
+            "delete": "Project removed",
+            "issue": "Project issued"
+          }
         }
       }
     }

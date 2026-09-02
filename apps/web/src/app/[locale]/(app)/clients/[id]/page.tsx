@@ -3,7 +3,7 @@ import { getLocale, getTranslations } from 'next-intl/server';
 import { notFound } from 'next/navigation';
 import { Link } from '@/i18n/routing';
 import { requireOrg } from '@/lib/auth/require-org';
-import { listActivities } from '@/lib/activities/queries';
+import { listEntityLogs } from '@/lib/logs/queries';
 import { listClientDocuments } from '@/lib/client-documents/queries';
 import { listActiveDocumentCategories } from '@/lib/document-categories/queries';
 import { listContacts } from '@/lib/client-contacts/queries';
@@ -142,7 +142,7 @@ export default async function ClientProfilePage({
         {tab === 'activity' && (
           <ActivityTab
             clientId={id}
-            activities={await listActivities(ctx, 'client', id)}
+            entries={await listEntityLogs(ctx, 'client', id)}
             canActivity={canActivity}
           />
         )}
