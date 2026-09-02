@@ -5,7 +5,7 @@
 import { projects } from '@metra/db';
 import { and, eq, ne } from 'drizzle-orm';
 import { fail, mutateInOrg } from '@/lib/actions/mutate';
-import type { ActionResult } from '@/lib/actions/result';
+import { err, type ActionResult } from '@/lib/actions/result';
 import type { OrgContext } from '@/lib/db/context';
 import { assertClientUsable, isErr, validate, type ProjectInput } from './validation';
 
@@ -13,8 +13,16 @@ export async function updateProjectCore(
   ctx: OrgContext,
   input: { id: string } & ProjectInput,
 ): Promise<ActionResult> {
-  const v = validate(input);
+  const v = validate(input, { requireCode: true });
   if (isErr(v)) return v;
+  // `requireCode` already guaranteed this; restate it so the type narrows too.
+  if (!v.code) return err('code_required');
+  const code = v.code;
+  // Same partial-update guard as clients: the Details form stopped sending these
+  // when they moved to Financials, and `validate` normalizes an absent percentage to
+  // '0'. Without this, an ordinary project save would silently zero both columns.
+  const keepAdvance = input.advancePct === undefined;
+  const keepRetention = input.retentionPct === undefined;
 
   return mutateInOrg(
     ctx,
@@ -30,7 +38,7 @@ export async function updateProjectCore(
       const [dup] = await tx
         .select({ id: projects.id })
         .from(projects)
-        .where(and(eq(projects.code, v.code), ne(projects.id, input.id)))
+        .where(and(eq(projects.code, code), ne(projects.id, input.id)))
         .limit(1);
       if (dup) fail('code_taken');
       // Only require an active client when REASSIGNING to a different one.
@@ -40,16 +48,27 @@ export async function updateProjectCore(
         await assertClientUsable(tx, v.clientId);
       }
 
+      // Destructure the two percentages OUT and add them back only when the caller
+      // actually sent them. Setting a key to `undefined` is not enough — postgres.js
+      // rejects undefined values outright (UNDEFINED_VALUE), so the key must be
+      // absent from the object, not present-and-undefined.
+      const { advancePct, retentionPct, ...rest } = v;
       await tx
         .update(projects)
-        .set({ ...v, updatedAt: new Date() })
+        .set({
+          ...rest,
+          ...(keepAdvance ? {} : { advancePct }),
+          ...(keepRetention ? {} : { retentionPct }),
+          code,
+          updatedAt: new Date(),
+        })
         .where(eq(projects.id, input.id));
       await audit({
         entity: 'project',
         entityId: input.id,
         action: 'update',
         before: null,
-        after: { code: v.code, client_id: v.clientId, status: v.status },
+        after: { code, client_id: v.clientId, status: v.status },
       });
     },
   );

@@ -10,7 +10,9 @@ import { err, type ActionResult } from '@/lib/actions/result';
 import { isUuid } from '@/lib/uuid';
 
 export interface ProjectInput {
-  code: string;
+  /** Optional: CREATE allocates one (P-YYYY-NNNN). Update must supply the stored
+   *  code, which the form sends back read-only. */
+  code?: string;
   nameEn?: string | null;
   nameAr?: string | null;
   clientId: string;
@@ -22,6 +24,7 @@ export interface ProjectInput {
   startDate?: string | null;
   endDate?: string | null;
   city?: string | null;
+  country?: string | null;
   address?: string | null;
   notes?: string | null;
 }
@@ -57,7 +60,9 @@ const LIMITS = {
 } as const;
 
 export interface Validated {
-  code: string;
+  /** Null when the caller supplied none — createProjectCore then ALLOCATES one
+   *  (P-YYYY-NNNN) inside its transaction. Update never changes a stored code. */
+  code: string | null;
   nameEn: string | null;
   nameAr: string | null;
   clientId: string;
@@ -69,14 +74,21 @@ export interface Validated {
   startDate: string | null;
   endDate: string | null;
   city: string | null;
+  country: string | null;
   address: string | null;
   notes: string | null;
 }
 
 // Shared field validation -> a coded error or the normalized row.
-export function validate(input: ProjectInput): ActionResult | Validated {
-  const code = input.code?.trim();
-  if (!code) return err('code_required');
+export function validate(
+  input: ProjectInput,
+  opts: { requireCode?: boolean; requireDates?: boolean } = {},
+): ActionResult | Validated {
+  // Codes are AUTO-GENERATED on create (the form no longer offers the field), so an
+  // absent code is normal there. Update still requires one: it is editing a row that
+  // already has a code, and silently blanking it would break the org-unique index.
+  const code = input.code?.trim() || null;
+  if (!code && opts.requireCode) return err('code_required');
   const nameEn = clean(input.nameEn);
   const nameAr = clean(input.nameAr);
   if (!nameEn && !nameAr) return err('name_required');
@@ -95,6 +107,10 @@ export function validate(input: ProjectInput): ActionResult | Validated {
 
   const startDate = clean(input.startDate);
   const endDate = clean(input.endDate);
+  // Required on CREATE only. 301 of the 307 projects already in production have
+  // neither date; demanding them on update would make almost every existing project
+  // uneditable. Same forward-only shape as the client phone rule.
+  if (opts.requireDates && (!startDate || !endDate)) return err('dates_required');
   // Compare chronologically (not lexically) so non-zero-padded dates still order.
   if (startDate && endDate) {
     const s = new Date(startDate).getTime();
@@ -105,11 +121,12 @@ export function validate(input: ProjectInput): ActionResult | Validated {
   }
 
   const city = clean(input.city);
+  const country = clean(input.country);
   const address = clean(input.address);
   const notes = clean(input.notes);
   const description = clean(input.description);
   if (
-    code.length > LIMITS.code ||
+    (code?.length ?? 0) > LIMITS.code ||
     (nameEn?.length ?? 0) > LIMITS.name ||
     (nameAr?.length ?? 0) > LIMITS.name ||
     (city?.length ?? 0) > LIMITS.city ||
@@ -133,6 +150,7 @@ export function validate(input: ProjectInput): ActionResult | Validated {
     startDate,
     endDate,
     city,
+    country,
     address,
     notes,
   };

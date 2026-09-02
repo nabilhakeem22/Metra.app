@@ -24,6 +24,7 @@ async function setup() {
 
 async function makeProject(ctx: ReturnType<typeof ctxFor>, clientId: string) {
   const res = await createProjectCore(ctx, {
+    startDate: '2026-01-01', endDate: '2026-06-30',
     code: `PRJ-${Math.random().toString(36).slice(2, 7)}`,
     nameEn: 'Tower',
     clientId,
@@ -54,7 +55,7 @@ describe('createProjectCore — seeds stages + project_created activity', () => 
   it('rejects advance/retention outside [0,100]; DB CHECK rejects 150 (23514)', async () => {
     const { ctx, clientId } = await setup();
     expect(
-      await createProjectCore(ctx, { code: 'BAD-1', nameEn: 'x', clientId, status: 'active', advancePct: '150' }),
+      await createProjectCore(ctx, { startDate: '2026-01-01', endDate: '2026-06-30', code: 'BAD-1', nameEn: 'x', clientId, status: 'active', advancePct: '150' }),
     ).toEqual({ ok: false, error: 'invalid' });
 
     const id = await makeProject(ctx, clientId);

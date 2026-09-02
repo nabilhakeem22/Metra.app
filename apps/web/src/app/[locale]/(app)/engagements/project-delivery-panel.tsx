@@ -35,12 +35,17 @@ export function ProjectDeliveryPanel({
   clientId,
   projectId,
   canStartDelivery,
+  highlighted = false,
 }: {
   delivery: ProjectDeliverySummary | null;
   deliveryCount: number;
   clientId: string;
   projectId: string;
   canStartDelivery: boolean;
+  /** Spec: on the project page this panel sits above the tabs as THE entry point to
+   *  the design process, so it is given brand emphasis. Elsewhere it stays a plain
+   *  card. Emphasis only — the affordances are identical either way. */
+  highlighted?: boolean;
 }) {
   const t = useTranslations('engagements.projectPanel');
   const locale = useLocale();
@@ -64,10 +69,19 @@ export function ProjectDeliveryPanel({
   const canCreate = canStartDelivery && (!delivery || canExtend);
 
   return (
-    <Card>
+    <Card
+      className={
+        highlighted
+          ? 'border-[color:var(--brand-tint-border)] bg-[color:var(--brand-tint)]'
+          : undefined
+      }
+    >
       <CardContent className="flex flex-wrap items-center gap-3 py-4">
         <div className="flex min-w-0 flex-1 items-center gap-3">
-          <Compass className="size-5 shrink-0 text-muted-foreground" aria-hidden />
+          <Compass
+            className={`size-5 shrink-0 ${highlighted ? 'text-brand-ink' : 'text-muted-foreground'}`}
+            aria-hidden
+          />
           <div className="min-w-0">
             <p className="text-xs text-muted-foreground">{t('heading')}</p>
             {delivery ? (
@@ -89,7 +103,7 @@ export function ProjectDeliveryPanel({
 
         <div className="flex flex-wrap items-center gap-2">
           {delivery && (
-            <Button asChild variant="outline">
+            <Button asChild variant={highlighted ? 'default' : 'outline'}>
               <Link href={`/engagements/${delivery.id}`}>
                 {t('open')}
                 <ArrowRight className="size-4 rtl:-scale-x-100" aria-hidden />
@@ -99,7 +113,7 @@ export function ProjectDeliveryPanel({
           {canCreate && (
             <Button onClick={() => setCreating(true)}>
               <Plus className="size-4" aria-hidden />
-              {delivery ? t('extend') : t('start')}
+              {delivery ? t('extend') : t('startProject')}
             </Button>
           )}
         </div>

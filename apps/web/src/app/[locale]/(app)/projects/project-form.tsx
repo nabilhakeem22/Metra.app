@@ -29,6 +29,7 @@ export interface ProjectFormProps {
 
 export interface ProjectFormState {
   code: string;
+  country: string;
   nameEn: string;
   nameAr: string;
   clientId: string;
@@ -50,6 +51,7 @@ function emptyState(
       : (clientOptions[0]?.id ?? '');
   return {
     code: '',
+    country: '',
     nameEn: '',
     nameAr: '',
     clientId: preselected,
@@ -82,6 +84,7 @@ export function ProjectForm({
       item
         ? {
             code: item.code,
+            country: item.country ?? '',
             nameEn: item.nameEn ?? '',
             nameAr: item.nameAr ?? '',
             clientId: item.clientId,
@@ -102,7 +105,7 @@ export function ProjectForm({
   function submit() {
     startTransition(async () => {
       const payload = {
-        code: form.code,
+        ...(form.code ? { code: form.code } : {}),
         nameEn: form.nameEn || null,
         nameAr: form.nameAr || null,
         clientId: form.clientId,
@@ -110,6 +113,7 @@ export function ProjectForm({
         startDate: form.startDate || null,
         endDate: form.endDate || null,
         city: form.city || null,
+        country: form.country || null,
         address: form.address || null,
         notes: form.notes || null,
       };

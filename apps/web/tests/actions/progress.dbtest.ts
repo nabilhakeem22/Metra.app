@@ -37,7 +37,7 @@ describe('getOnboardingProgress — in-org rows only', () => {
 
     await createClientCore(ctx, { phone: '01000000000', nameEn: 'C' });
     const [client] = await listClients(ctx, {});
-    await createProjectCore(ctx, { code: 'P', nameEn: 'Proj', clientId: client.id, status: 'active' });
+    await createProjectCore(ctx, { startDate: '2026-01-01', endDate: '2026-06-30', code: 'P', nameEn: 'Proj', clientId: client.id, status: 'active' });
     const [project] = await listProjects(ctx, {});
     await createCostItemCore(ctx, { code: 'CI', nameEn: 'Item', sectionId: await raw.sectionId(orgId), unit: 'sqm', defaultUnitCost: '1', defaultUnitPrice: '2' });
     const propId = ((await createProposalCore(ctx, { clientId: client.id, projectId: project.id })) as { data?: string }).data!;
@@ -79,7 +79,7 @@ describe('getOnboardingProgress — in-org rows only', () => {
     void memberIds;
     await createClientCore(ctx, { phone: '01000000000', nameEn: 'C' });
     const [client] = await listClients(ctx, {});
-    await createProjectCore(ctx, { code: 'P', nameEn: 'Proj', clientId: client.id, status: 'active' });
+    await createProjectCore(ctx, { startDate: '2026-01-01', endDate: '2026-06-30', code: 'P', nameEn: 'Proj', clientId: client.id, status: 'active' });
     const [project] = await listProjects(ctx, {});
     await createProposalCore(ctx, { clientId: client.id, projectId: project.id });
 

@@ -35,6 +35,7 @@ async function addProject(
   code: string,
 ): Promise<string> {
   await createProjectCore(ctx, {
+    startDate: '2026-01-01', endDate: '2026-06-30',
     code,
     nameEn: `Project ${code}`,
     clientId,

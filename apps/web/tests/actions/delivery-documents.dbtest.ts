@@ -67,6 +67,7 @@ async function seedDelivery(suffix: string): Promise<SeededDelivery> {
   await createClientCore(ctx, { phone: '01000000000', nameEn: `Acme ${suffix}` });
   const [client] = await listClients(ctx, {});
   await createProjectCore(ctx, {
+    startDate: '2026-01-01', endDate: '2026-06-30',
     code: `PRJ-${orgId.slice(0, 8)}`,
     nameEn: 'Tower',
     clientId: client.id,
@@ -200,6 +201,7 @@ describe('portal documents — the download resolver has no oracle', () => {
     const [client] = await listClients(delivery.ctx, {});
     // A SECOND project: only one active delivery may exist per project.
     await createProjectCore(delivery.ctx, {
+      startDate: '2026-01-01', endDate: '2026-06-30',
       code: `PRJ2-${delivery.orgId.slice(0, 8)}`,
       nameEn: 'Annex',
       clientId: client.id,

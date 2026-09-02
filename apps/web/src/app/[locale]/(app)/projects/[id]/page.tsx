@@ -10,7 +10,6 @@ import {
   getEngagementByProject,
 } from '@/lib/engagements/queries';
 import { listProjectDocuments } from '@/lib/project-documents/queries';
-import { listStages } from '@/lib/project-stages/queries';
 import { listProjectTypes } from '@/lib/project-types/queries';
 import { getProjectById, getProjectOverview } from '@/lib/projects/queries';
 import { pickLocale } from '@/lib/i18n/pick-locale';
@@ -20,11 +19,12 @@ import { ActivityTab } from './activity-tab';
 import { DetailsTab } from './details-tab';
 import { ProjectCreatedHandoff } from './project-created-handoff';
 import { DocumentsTab } from './documents-tab';
+import { getProjectEffectiveRates } from '@/lib/clients/financials';
 import { FinancialsTab } from './financials-tab';
+import { ProjectDeliveryPanel } from '../../engagements/project-delivery-panel';
 import { OverviewTab } from './overview-tab';
 import { ProfileTabs } from './profile-tabs';
 import { ProposalsTab } from './proposals-tab';
-import { StagesTab } from './stages-tab';
 import { PROJECT_TABS, type ProjectTab } from './tabs';
 import { TeamTab } from './team-tab';
 
@@ -107,6 +107,19 @@ export default async function ProjectProfilePage({
         </p>
       </div>
 
+      {/* Spec: the design-delivery section sits ABOVE the tabs and is highlighted —
+          it is the entry point to the whole design process, not one tab among eight. */}
+      {deliveryPanel && (
+        <ProjectDeliveryPanel
+          delivery={deliveryPanel.delivery}
+          deliveryCount={deliveryPanel.deliveryCount}
+          clientId={deliveryPanel.clientId}
+          projectId={deliveryPanel.projectId}
+          canStartDelivery={deliveryPanel.canStart}
+          highlighted
+        />
+      )}
+
       <ProfileTabs projectId={id} active={tab} />
 
       <div
@@ -117,10 +130,7 @@ export default async function ProjectProfilePage({
         className="focus:outline-none"
       >
         {tab === 'overview' && (
-          <OverviewTab
-            overview={await getProjectOverview(ctx, id)}
-            deliveryPanel={deliveryPanel}
-          />
+          <OverviewTab overview={await getProjectOverview(ctx, id)} />
         )}
         {tab === 'details' && (
           <DetailsTab
@@ -134,18 +144,10 @@ export default async function ProjectProfilePage({
             canManage={canManage}
           />
         )}
-        {tab === 'stages' && (
-          <StagesTab
-            projectId={id}
-            stages={await listStages(ctx, id)}
-            canManage={canManage}
-          />
-        )}
         {tab === 'financials' && (
           <FinancialsTab
             contractedTotal={(await getProjectOverview(ctx, id)).contractedTotal}
-            advancePct={project.advancePct}
-            retentionPct={project.retentionPct}
+            {...(await getProjectEffectiveRates(ctx, id))}
           />
         )}
         {tab === 'team' && <TeamTab />}

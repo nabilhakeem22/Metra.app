@@ -33,6 +33,7 @@ export default async function ProjectsPage({
     startDate: p.startDate,
     endDate: p.endDate,
     city: p.city,
+    country: p.country,
     address: p.address,
     notes: p.notes,
     active: p.active,

@@ -10,6 +10,7 @@ export interface ProjectListItem {
   startDate: string | null;
   endDate: string | null;
   city: string | null;
+  country: string | null;
   address: string | null;
   notes: string | null;
   active: boolean;

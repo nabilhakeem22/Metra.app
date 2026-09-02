@@ -29,6 +29,9 @@ const baseProject = (clientId: string) => ({
   nameEn: 'Tower fit-out',
   clientId,
   status: 'draft' as const,
+  // Required on create since the projects spec ("for good tracking").
+  startDate: '2026-01-01',
+  endDate: '2026-06-30',
 });
 
 describe('createProjectCore', () => {
@@ -39,11 +42,8 @@ describe('createProjectCore', () => {
     expect(await raw.count('projects', orgId)).toBe(1);
   });
 
-  it('validates code_required / name_required / invalid status / client_required / invalid_dates', async () => {
+  it('validates name_required / invalid status / client_required / invalid_dates', async () => {
     const { ctx, clientId } = await orgWithClient();
-    expect(
-      await createProjectCore(ctx, { ...baseProject(clientId), code: ' ' }),
-    ).toEqual({ ok: false, error: 'code_required' });
     expect(
       await createProjectCore(ctx, {
         ...baseProject(clientId),
@@ -180,5 +180,132 @@ describe('date + client-id edge cases', () => {
       code: 'BADUUID',
     });
     expect(res).toEqual({ ok: false, error: 'client_required' });
+  });
+});
+
+describe('auto-generated project codes', () => {
+  it('allocates P-YYYY-NNNN when the caller supplies no code', async () => {
+    const { ctx, clientId } = await orgWithClient();
+    const { code: _code, ...noCode } = baseProject(clientId);
+    expect((await createProjectCore(ctx, noCode)).ok).toBe(true);
+
+    const [project] = await listProjects(ctx, {});
+    const year = new Date().getFullYear();
+    expect(project.code).toBe(`P-${year}-0001`);
+  });
+
+  it('increments per org, and two orgs never collide', async () => {
+    const a = await orgWithClient();
+    const b = await orgWithClient();
+    const year = new Date().getFullYear();
+
+    for (let i = 0; i < 3; i += 1) {
+      const { code: _code, ...noCode } = baseProject(a.clientId);
+      expect((await createProjectCore(a.ctx, noCode)).ok).toBe(true);
+    }
+    const { code: _bCode, ...bNoCode } = baseProject(b.clientId);
+    expect((await createProjectCore(b.ctx, bNoCode)).ok).toBe(true);
+
+    const codesA = (await listProjects(a.ctx, {})).map((p) => p.code).sort();
+    expect(codesA).toEqual([`P-${year}-0001`, `P-${year}-0002`, `P-${year}-0003`]);
+    // Org B starts its OWN sequence at 1 — the allocator is per-org.
+    expect((await listProjects(b.ctx, {}))[0].code).toBe(`P-${year}-0001`);
+  });
+
+  it('still honours a caller-supplied code (imports, the Public API)', async () => {
+    const { ctx, clientId } = await orgWithClient();
+    expect(
+      (await createProjectCore(ctx, { ...baseProject(clientId), code: 'LEGACY-7' })).ok,
+    ).toBe(true);
+    expect((await listProjects(ctx, {}))[0].code).toBe('LEGACY-7');
+  });
+});
+
+describe('dates are required forward-only', () => {
+  it('refuses to CREATE without both dates', async () => {
+    const { ctx, clientId } = await orgWithClient();
+    const { startDate: _s, endDate: _e, ...noDates } = baseProject(clientId);
+    expect(await createProjectCore(ctx, noDates)).toEqual({
+      ok: false,
+      error: 'dates_required',
+    });
+    expect(await createProjectCore(ctx, { ...noDates, startDate: '2026-01-01' })).toEqual(
+      { ok: false, error: 'dates_required' },
+    );
+  });
+
+  it('still lets a LEGACY dateless project be edited', async () => {
+    // 301 of the 307 projects in production have neither date. Demanding them on
+    // update would make almost every existing project uneditable.
+    const { ctx, clientId } = await orgWithClient();
+    expect((await createProjectCore(ctx, baseProject(clientId))).ok).toBe(true);
+    const [project] = await listProjects(ctx, {});
+    await raw.query(
+      `update public.projects set start_date = null, end_date = null where id = '${project.id}'`,
+    );
+
+    const res = await updateProjectCore(ctx, {
+      id: project.id,
+      code: project.code,
+      nameEn: 'Tower fit-out',
+      clientId,
+      status: 'active',
+    });
+    expect(res.ok).toBe(true);
+  });
+
+  it('does NOT zero advance/retention when the form omits them', async () => {
+    const { ctx, clientId } = await orgWithClient();
+    expect(
+      (await createProjectCore(ctx, {
+        ...baseProject(clientId),
+        advancePct: '20',
+        retentionPct: '5',
+      })).ok,
+    ).toBe(true);
+    const [project] = await listProjects(ctx, {});
+
+    expect(
+      (await updateProjectCore(ctx, {
+        id: project.id,
+        code: project.code,
+        nameEn: 'Tower fit-out',
+        clientId,
+        status: 'active',
+      })).ok,
+    ).toBe(true);
+
+    const [row] = await raw.query<{ advance_pct: string; retention_pct: string }>(
+      `select advance_pct, retention_pct from public.projects where id = '${project.id}'`,
+    );
+    expect(Number(row.advance_pct)).toBe(20);
+    expect(Number(row.retention_pct)).toBe(5);
+  });
+});
+
+describe('the plan project cap', () => {
+  it('is UNLIMITED when no limit is configured', async () => {
+    // The state every production workspace is in. Must not block anything.
+    const { ctx, clientId } = await orgWithClient();
+    for (let i = 0; i < 3; i += 1) {
+      const { code: _code, ...noCode } = baseProject(clientId);
+      expect((await createProjectCore(ctx, noCode)).ok).toBe(true);
+    }
+  });
+
+  it('refuses the seat past a configured limit', async () => {
+    const { orgId, ctx, clientId } = await orgWithClient();
+    await raw.query(
+      `update public.workspace_entitlements set limits = '{"projects": 2}'::jsonb
+       where org_id = '${orgId}'`,
+    );
+    const make = () => {
+      const { code: _code, ...noCode } = baseProject(clientId);
+      return createProjectCore(ctx, noCode);
+    };
+    expect((await make()).ok).toBe(true);
+    expect((await make()).ok).toBe(true);
+    expect(await make()).toEqual({ ok: false, error: 'project_limit_reached' });
+    expect(await raw.count('projects', orgId)).toBe(2);
   });
 });

@@ -510,7 +510,9 @@
     "firm_type_unavailable": "That firm type isn't available yet. Choose Interior fit-out to continue.",
     "project_delivery_exists": "This project already has an active delivery. Open it to continue.",
     "project_delivery_limit_reached": "This project has already used its two deliveries. Create a new project to start another.",
-    "phone_required": "A phone number is required."
+    "phone_required": "A phone number is required.",
+    "dates_required": "Start and end dates are required.",
+    "project_limit_reached": "Your plan has no project seats left. Contact us to add more."
   },
   "common": {
     "untranslated": "untranslated",
@@ -939,7 +941,9 @@
       "save": "Save",
       "cancel": "Cancel",
       "noClients": "You need an active client before creating a project.",
-      "selectClient": "Select a client"
+      "selectClient": "Select a client",
+      "country": "Country",
+      "endDateNote": "You can extend the end date later — these dates are for tracking."
     },
     "toast": {
       "created": "Project created",
@@ -1015,7 +1019,9 @@
         "jobCost": "Job cost",
         "margin": "Margin",
         "lockedTitle": "Job costing not enabled",
-        "lockedBody": "Job-cost and margin figures activate once job costing begins."
+        "lockedBody": "Job-cost and margin figures activate once job costing begins.",
+        "noContracts": "No contracts yet",
+        "derivedFrom": "{n, plural, one {From # committed contract} other {From # committed contracts}}"
       },
       "team": {
         "title": "Team",
@@ -1421,7 +1427,8 @@
       "start": "Start delivery",
       "extend": "Start extension",
       "atLimit": "This project has used both of its deliveries. Create a new project to start another.",
-      "none": "No delivery started for this project yet."
+      "none": "No delivery started for this project yet.",
+      "startProject": "Start the project"
     },
     "breadcrumb": {
       "clients": "Clients",

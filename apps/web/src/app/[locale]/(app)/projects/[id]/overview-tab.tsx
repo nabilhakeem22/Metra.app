@@ -7,7 +7,6 @@ import { formatMoney } from '@/lib/format/money';
 import { formatPercent } from '@/lib/format/number';
 import type { ProjectDeliverySummary } from '@/lib/engagements/queries';
 import type { ProjectOverview } from '@/lib/projects/queries';
-import { ProjectDeliveryPanel } from '../../engagements/project-delivery-panel';
 
 /**
  * The through-project Delivery entry point, wired only when the caller may read
@@ -24,10 +23,8 @@ export interface DeliveryPanelProps {
 
 export async function OverviewTab({
   overview,
-  deliveryPanel,
 }: {
   overview: ProjectOverview;
-  deliveryPanel?: DeliveryPanelProps;
 }) {
   const t = await getTranslations('projects.profile.overview');
   const ts = await getTranslations('projects.statuses');
@@ -52,16 +49,6 @@ export async function OverviewTab({
 
   return (
     <div className="space-y-4">
-      {deliveryPanel && (
-        <ProjectDeliveryPanel
-          delivery={deliveryPanel.delivery}
-          deliveryCount={deliveryPanel.deliveryCount}
-          clientId={deliveryPanel.clientId}
-          projectId={deliveryPanel.projectId}
-          canStartDelivery={deliveryPanel.canStart}
-        />
-      )}
-
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <Stat label={t('status')} value={ts(overview.status)} />
         <Card>

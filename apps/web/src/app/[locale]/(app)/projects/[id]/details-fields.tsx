@@ -151,8 +151,6 @@ export function DetailsFields({
       </div>
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        {field('advancePct', tp('advancePct'), { hint: th('advancePct'), inputMode: 'decimal' })}
-        {field('retentionPct', tp('retentionPct'), { hint: th('retentionPct'), inputMode: 'decimal' })}
       </div>
 
       <div className="space-y-2">
@@ -173,6 +171,7 @@ export function DetailsFields({
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         {field('city', t('form.city'))}
+        {field('country', t('form.country'))}
         {field('address', t('form.address'))}
       </div>
       {field('notes', t('form.notes'))}

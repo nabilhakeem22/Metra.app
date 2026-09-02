@@ -60,6 +60,7 @@ async function makeSentReadyProposal(clientEmail: string | null) {
   await createClientCore(ctx, { phone: '01000000000', nameEn: 'Acme', email: clientEmail });
   const [client] = await listClients(ctx, {});
   await createProjectCore(ctx, {
+    startDate: '2026-01-01', endDate: '2026-06-30',
     code: 'PRJ-1',
     nameEn: 'Tower',
     clientId: client.id,

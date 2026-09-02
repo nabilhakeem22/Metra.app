@@ -48,7 +48,7 @@ async function setup(members: Array<{ role: MemberRole }> = []) {
   const ctx = ctxFor(orgId, ownerIds[0], 'owner');
   await createClientCore(ctx, { phone: '01000000000', nameEn: 'Acme' });
   const [client] = await listClients(ctx, {});
-  await createProjectCore(ctx, { code: 'PRJ-1', nameEn: 'Tower', clientId: client.id, status: 'active' });
+  await createProjectCore(ctx, { startDate: '2026-01-01', endDate: '2026-06-30', code: 'PRJ-1', nameEn: 'Tower', clientId: client.id, status: 'active' });
   const [project] = await listProjects(ctx, {});
   return { orgId, ctx, clientId: client.id, projectId: project.id, memberIds };
 }

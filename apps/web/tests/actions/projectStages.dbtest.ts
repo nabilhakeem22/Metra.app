@@ -26,6 +26,7 @@ async function setup(members: Array<{ role: MemberRole }> = []) {
   const [client] = await listClients(ctx, {});
   const id = (
     (await createProjectCore(ctx, {
+      startDate: '2026-01-01', endDate: '2026-06-30',
       code: `PRJ-${Math.random().toString(36).slice(2, 7)}`,
       nameEn: 'Tower',
       clientId: client.id,

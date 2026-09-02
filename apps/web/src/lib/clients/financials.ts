@@ -56,3 +56,31 @@ export function getClientEffectiveRates(
     return weightedRates(rows);
   });
 }
+
+/**
+ * The same effective-rate calculation, scoped to ONE PROJECT's committed contracts.
+ * The projects spec asks for Financials to behave "the same as clients", and the
+ * arithmetic is identical — only the filter differs — so it shares `weightedRates`
+ * rather than growing a second copy that could drift.
+ */
+export function getProjectEffectiveRates(
+  ctx: OrgContext,
+  projectId: string,
+): Promise<ClientEffectiveRates> {
+  return withOrgContext(ctx, async (tx) => {
+    const rows = await tx
+      .select({
+        advancePct: contracts.advancePct,
+        retentionPct: contracts.retentionPct,
+        value: sql<string>`coalesce(${contracts.originalValue}, 0)::text`,
+      })
+      .from(contracts)
+      .where(
+        and(
+          eq(contracts.projectId, projectId),
+          inArray(contracts.status, [...COMMITTED_STATUSES]),
+        ),
+      );
+    return weightedRates(rows);
+  });
+}

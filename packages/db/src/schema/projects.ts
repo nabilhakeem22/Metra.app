@@ -1,5 +1,6 @@
 import { sql } from 'drizzle-orm';
 import {
+  integer,
   boolean,
   check,
   date,
@@ -32,6 +33,10 @@ export const projects = pgTable(
       .notNull()
       .references((): AnyPgColumn => organizations.id, { onDelete: 'restrict' }),
     code: text('code').notNull(),
+    // Per-org sequence behind the AUTO-GENERATED code (P-YYYY-NNNN), allocated by
+    // the same advisory-lock helper as proposals/contracts. NULLABLE: every project
+    // created before auto-codes keeps its hand-entered `code` and has no sequence.
+    number: integer('number'),
     ...bilingual('name'),
     clientId: uuid('client_id').notNull(),
     typeId: uuid('type_id'),
@@ -42,6 +47,7 @@ export const projects = pgTable(
     startDate: date('start_date'),
     endDate: date('end_date'),
     city: text('city'),
+    country: text('country'),
     address: text('address'),
     notes: text('notes'),
     active: boolean('active').notNull().default(true),

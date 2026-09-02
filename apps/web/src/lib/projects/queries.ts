@@ -32,6 +32,7 @@ export interface ProjectRow {
   startDate: string | null;
   endDate: string | null;
   city: string | null;
+  country: string | null;
   address: string | null;
   notes: string | null;
   active: boolean;
@@ -70,6 +71,7 @@ export function listProjects(
         startDate: projects.startDate,
         endDate: projects.endDate,
         city: projects.city,
+      country: projects.country,
         address: projects.address,
         notes: projects.notes,
         active: projects.active,

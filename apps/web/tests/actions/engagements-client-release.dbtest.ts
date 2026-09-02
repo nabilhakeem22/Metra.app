@@ -91,6 +91,7 @@ async function setupLayout(): Promise<{
   await createClientCore(ctx, { phone: '01000000000', nameEn: 'Acme' });
   const [client] = await listClients(ctx, {});
   await createProjectCore(ctx, {
+    startDate: '2026-01-01', endDate: '2026-06-30',
     code: `PRJ-${orgId.slice(0, 8)}`,
     nameEn: 'Tower',
     clientId: client.id,
@@ -374,6 +375,7 @@ describe('manual override — setArtifactClientVisibilityCore', () => {
     await createClientCore(owner, { phone: '01000000000', nameEn: 'Acme viewer' });
     const [client] = await listClients(owner, {});
     await createProjectCore(owner, {
+      startDate: '2026-01-01', endDate: '2026-06-30',
       code: `PRJ-${viewerOrg.slice(0, 8)}`,
       nameEn: 'Tower',
       clientId: client.id,

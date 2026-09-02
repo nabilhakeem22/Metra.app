@@ -50,6 +50,7 @@ async function seedDelivery(suffix = 'a'): Promise<{
   await createClientCore(ctx, { phone: '01000000000', nameEn: `Acme ${suffix}` });
   const [client] = await listClients(ctx, {});
   await createProjectCore(ctx, {
+    startDate: '2026-01-01', endDate: '2026-06-30',
     code: `PRJ-${orgId.slice(0, 8)}`,
     nameEn: 'Tower',
     clientId: client.id,
@@ -209,6 +210,7 @@ describe('delivery portal — cost-safe token snapshot', () => {
     await createClientCore(owner, { phone: '01000000000', nameEn: 'Acme pm' });
     const [client] = await listClients(owner, {});
     await createProjectCore(owner, {
+      startDate: '2026-01-01', endDate: '2026-06-30',
       code: `PRJ-${orgId.slice(0, 8)}`,
       nameEn: 'Tower',
       clientId: client.id,

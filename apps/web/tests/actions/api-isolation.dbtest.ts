@@ -107,6 +107,7 @@ async function buildOrg(): Promise<OrgFixture> {
   const clientId = client.data!;
 
   const project = await createProjectCore(ownerCtx, {
+    startDate: '2026-01-01', endDate: '2026-06-30',
     code: `API-${randomBytes(3).toString('hex')}`,
     nameEn: 'API Project',
     clientId,

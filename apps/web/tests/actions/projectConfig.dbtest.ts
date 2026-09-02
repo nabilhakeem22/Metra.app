@@ -77,6 +77,7 @@ describe('project_activity gate (notes on a project)', () => {
     const [client] = await listClients(ctx, {});
     const projectId = (
       (await createProjectCore(ctx, {
+        startDate: '2026-01-01', endDate: '2026-06-30',
         code: 'PRJ-CFG',
         nameEn: 'T',
         clientId: client.id,

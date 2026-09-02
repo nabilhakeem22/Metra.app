@@ -27,9 +27,8 @@ export interface FormState {
   typeId: string;
   status: ProjectStatus;
   description: string;
-  advancePct: string;
-  retentionPct: string;
   city: string;
+  country: string;
   address: string;
   notes: string;
 }
@@ -61,9 +60,8 @@ export function DetailsTab({
     typeId: project.typeId ?? '',
     status: project.status,
     description: project.description ?? '',
-    advancePct: project.advancePct,
-    retentionPct: project.retentionPct,
     city: project.city ?? '',
+    country: project.country ?? '',
     address: project.address ?? '',
     notes: project.notes ?? '',
   });
@@ -102,11 +100,13 @@ export function DetailsTab({
         typeId: form.typeId || null,
         status: form.status,
         description: form.description || null,
-        advancePct: form.advancePct || '0',
-        retentionPct: form.retentionPct || '0',
+        // advancePct / retentionPct are deliberately ABSENT: they are derived from
+        // the project's contracts and shown on Financials. updateProjectCore leaves
+        // an omitted percentage untouched.
         startDate: project.startDate,
         endDate: project.endDate,
         city: form.city || null,
+        country: form.country || null,
         address: form.address || null,
         notes: form.notes || null,
       });

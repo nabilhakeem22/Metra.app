@@ -29,6 +29,7 @@ async function setup(): Promise<{
   await createClientCore(ctx, { phone: '01000000000', nameEn: 'Acme' });
   const [client] = await listClients(ctx, {});
   await createProjectCore(ctx, {
+    startDate: '2026-01-01', endDate: '2026-06-30',
     code: `PRJ-${orgId.slice(0, 8)}`,
     nameEn: 'Tower',
     clientId: client.id,
@@ -83,6 +84,7 @@ describe('createEngagementCore (Design-Engagement Machine, Step 1)', () => {
     // with two *different* projects rather than two deliveries on one project.
     const { ctx, clientId, projectId } = await setup();
     const second = await createProjectCore(ctx, {
+      startDate: '2026-01-01', endDate: '2026-06-30',
       code: `PRJ2-${ctx.orgId.slice(0, 8)}`,
       nameEn: 'Tower B',
       clientId,

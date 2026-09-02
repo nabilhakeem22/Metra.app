@@ -78,6 +78,8 @@ export const ACTION_CODE_PROBLEM: Record<ActionCode, ApiProblemKind> = {
   uncertain: 'internal',
   name_required: 'bad-request',
   phone_required: 'bad-request',
+  dates_required: 'bad-request',
+  project_limit_reached: 'conflict',
   last_owner: 'bad-request',
   owner_immutable: 'bad-request',
   self: 'bad-request',

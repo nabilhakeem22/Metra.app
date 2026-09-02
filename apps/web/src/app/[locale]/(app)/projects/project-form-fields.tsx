@@ -36,19 +36,16 @@ export function ProjectFormFields({
 }) {
   return (
     <>
-      <div className="space-y-2">
-        <Label htmlFor="pr-code" className="flex items-center">
-          {t('form.code')}
-          <FieldHint id="pr-code-hint" hint={th('code')} />
-        </Label>
-        <Input
-          id="pr-code"
-          dir="ltr"
-          aria-describedby="pr-code-hint"
-          value={form.code}
-          onChange={(e) => set('code')(e.target.value)}
-        />
-      </div>
+      {/* The code is AUTO-GENERATED (P-YYYY-NNNN) when the project is created, so
+          there is nothing to type. On a new project it is not shown at all; on an
+          existing one it is shown read-only, because it is the reference people
+          have already quoted in emails and on drawings. */}
+      {form.code && (
+        <div className="space-y-2">
+          <Label htmlFor="pr-code">{t('form.code')}</Label>
+          <Input id="pr-code" dir="ltr" value={form.code} readOnly disabled />
+        </div>
+      )}
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div className="space-y-2">
@@ -123,34 +120,60 @@ export function ProjectFormFields({
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div className="space-y-2">
-          <Label htmlFor="pr-start">{t('form.startDate')}</Label>
+          <Label htmlFor="pr-start">
+            {t('form.startDate')}
+            <span className="ms-1 text-[color:var(--danger)]" aria-hidden>
+              *
+            </span>
+          </Label>
           <Input
             id="pr-start"
             type="date"
             dir="ltr"
+            required
+            aria-required
             value={form.startDate}
             onChange={(e) => set('startDate')(e.target.value)}
           />
         </div>
         <div className="space-y-2">
-          <Label htmlFor="pr-end">{t('form.endDate')}</Label>
+          <Label htmlFor="pr-end">
+            {t('form.endDate')}
+            <span className="ms-1 text-[color:var(--danger)]" aria-hidden>
+              *
+            </span>
+          </Label>
           <Input
             id="pr-end"
             type="date"
             dir="ltr"
+            required
+            aria-required
             value={form.endDate}
             onChange={(e) => set('endDate')(e.target.value)}
           />
         </div>
       </div>
+      {/* Spec: dates are for tracking, and the end date is not a commitment. */}
+      <p className="-mt-2 text-xs text-muted-foreground">{t('form.endDateNote')}</p>
 
-      <div className="space-y-2">
-        <Label htmlFor="pr-city">{t('form.city')}</Label>
-        <Input
-          id="pr-city"
-          value={form.city}
-          onChange={(e) => set('city')(e.target.value)}
-        />
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div className="space-y-2">
+          <Label htmlFor="pr-city">{t('form.city')}</Label>
+          <Input
+            id="pr-city"
+            value={form.city}
+            onChange={(e) => set('city')(e.target.value)}
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="pr-country">{t('form.country')}</Label>
+          <Input
+            id="pr-country"
+            value={form.country}
+            onChange={(e) => set('country')(e.target.value)}
+          />
+        </div>
       </div>
     </>
   );
