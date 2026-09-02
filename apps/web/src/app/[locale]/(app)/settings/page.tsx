@@ -13,6 +13,8 @@ import { getAutomationSettings } from '@/lib/automation/settings-queries';
 import { withOrgContext } from '@/lib/db/context';
 import { can } from '@/lib/permissions/can';
 import { AutomationSettingsClient } from './automation-settings-client';
+import { listDocumentCategories } from '@/lib/document-categories/queries';
+import { DocumentCategoriesCard } from './document-categories-card';
 import { SettingsClient } from './settings-client';
 
 export default async function SettingsPage() {
@@ -24,6 +26,11 @@ export default async function SettingsPage() {
   );
   const automation = await getAutomationSettings(ctx);
   const canManage = can(ctx.role, 'users_settings', 'update');
+  // The document-category core gates on projects/update, matching the other
+  // firm-vocabulary settings (project types, stage templates). Show the card to
+  // exactly the roles that can actually use it — a control nobody can operate is
+  // worse than an absent one.
+  const canManageVocabulary = can(ctx.role, 'projects', 'update');
 
   return (
     <div className="space-y-6">
@@ -39,6 +46,19 @@ export default async function SettingsPage() {
           restrictFirmDashboard: org?.restrictFirmDashboard ?? false,
         }}
       />
+      {/* The firm's document filing vocabulary — gated on the same capability as
+          the other firm-vocabulary settings (project types, stage templates). */}
+      {canManageVocabulary && (
+        <DocumentCategoriesCard
+          categories={(await listDocumentCategories(ctx)).map((c) => ({
+            id: c.id,
+            nameEn: c.nameEn,
+            nameAr: c.nameAr,
+            active: c.active,
+          }))}
+        />
+      )}
+
       <AutomationSettingsClient
         canManage={canManage}
         initial={{

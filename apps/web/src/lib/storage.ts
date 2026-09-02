@@ -22,7 +22,14 @@ export interface SignedUpload {
 export async function createSignedUploadUrl(
   ctx: OrgContext,
   entity: string,
-  opts?: { originalName?: string; contentType?: string; entityId?: string },
+  opts?: {
+    originalName?: string;
+    contentType?: string;
+    entityId?: string;
+    /** The firm's filing category. Null/absent files the document as uncategorised,
+     *  which is also what every document uploaded before categories existed is. */
+    categoryId?: string | null;
+  },
 ): Promise<SignedUpload> {
   const fileId = randomUUID();
   const objectKey = `${ctx.orgId}/${entity}/${fileId}`;
@@ -33,6 +40,7 @@ export async function createSignedUploadUrl(
       orgId: ctx.orgId,
       entity,
       entityId: opts?.entityId ?? null,
+      categoryId: opts?.categoryId ?? null,
       bucket: FILES_BUCKET,
       objectKey,
       originalName: opts?.originalName ?? null,

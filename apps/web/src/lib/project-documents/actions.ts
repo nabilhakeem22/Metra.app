@@ -10,6 +10,10 @@ import { withOrgContext } from '@/lib/db/context';
 import { can } from '@/lib/permissions/can';
 import { isUuid } from '@/lib/uuid';
 import {
+  INVALID_CATEGORY,
+  resolveCategoryId,
+} from '@/lib/document-categories/resolve';
+import {
   createSignedUploadUrl,
   ensureFilesBucket,
   getSignedUrl,
@@ -25,6 +29,8 @@ export async function createProjectDocumentUpload(input: {
   projectId: string;
   contentType?: string;
   originalName?: string;
+  /** The firm's filing category. Optional — a document can be filed later. */
+  categoryId?: string | null;
 }): Promise<SignedUpload | ActionResult> {
   const ctx = await requireOrg();
   if (!can(ctx.role, 'project_activity', 'create')) return err('forbidden');
@@ -39,11 +45,16 @@ export async function createProjectDocumentUpload(input: {
   );
   if (!project) return err('invalid');
 
+  // Validated in-org and active, exactly as the client upload does.
+  const categoryId = await resolveCategoryId(ctx, input.categoryId);
+  if (categoryId === INVALID_CATEGORY) return err('invalid');
+
   await ensureFilesBucket();
   return createSignedUploadUrl(ctx, 'project', {
     contentType: input.contentType,
     originalName: input.originalName,
     entityId: input.projectId,
+    categoryId,
   });
 }
 

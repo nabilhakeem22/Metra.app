@@ -46,6 +46,21 @@ export async function seedOrg(opts: {
     `insert into public.automation_settings (org_id) values ('${orgId}')`,
   );
 
+  // Seed the default document categories (mirrors createOrgCore + the 0040
+  // backfill) so document uploads have a real vocabulary to file under.
+  await pg.unsafe(
+    `insert into public.document_categories (org_id, key, name_en, name_ar, sort_order)
+     select '${orgId}', d.key, d.name_en, d.name_ar, d.sort_order
+     from (values
+       ('contract','Contracts','العقود',0),
+       ('commercial','Commercial & tax','مستندات تجارية وضريبية',1),
+       ('drawings','Drawings','الرسومات',2),
+       ('correspondence','Correspondence','المراسلات',3),
+       ('invoices','Invoices','الفواتير',4),
+       ('other','Other','أخرى',5)
+     ) as d(key, name_en, name_ar, sort_order)`,
+  );
+
   // Seed the 8 default sections (mirrors createOrgCore) so Price Book + builder
   // cores have a valid section_id to reference.
   await pg.unsafe(
@@ -190,6 +205,9 @@ const TEARDOWN_TABLES_IN_FK_ORDER = [
   // client_payment_claims references payment_events (set null) + design_engagements
   // (cascade) — delete it before both so no restrict/order surprise.
   'client_payment_claims',
+  // document_categories: files reference it (ON DELETE SET NULL) and its org_id FK
+  // is RESTRICT, so it must go after files and before organizations.
+  'document_categories',
   // engagement_document_comments cascades from BOTH design_engagements and
   // engagement_artifacts, so the deletes below would clear it either way — listed
   // explicitly so a future FK change surfaces here rather than as a restrict error.

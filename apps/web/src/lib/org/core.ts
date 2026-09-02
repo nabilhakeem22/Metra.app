@@ -2,6 +2,8 @@
 // 'use server' createOrg wrapper does the session/existing-check/redirect and
 // delegates here. Exercised directly by tests/actions/createOrg.dbtest.ts.
 import {
+  documentCategories,
+  defaultDocumentCategories,
   automationSettings,
   DEFAULT_PROJECT_TYPES,
   DEFAULT_SECTIONS,
@@ -139,6 +141,17 @@ export async function createOrgCore(
         nameEn: s.nameEn,
         nameAr: s.nameAr,
         sortOrder: s.sortOrder,
+      })),
+    );
+    // The firm's starting filing vocabulary. Same defaults the 0040 migration
+    // backfilled onto every pre-existing org, from the one shared source.
+    await tx.insert(documentCategories).values(
+      defaultDocumentCategories().map((c) => ({
+        orgId: ctx.orgId,
+        key: c.key,
+        nameEn: c.nameEn,
+        nameAr: c.nameAr,
+        sortOrder: c.sortOrder,
       })),
     );
     await audit({

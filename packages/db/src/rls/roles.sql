@@ -75,6 +75,12 @@ grant select, insert, update on public.engagement_change_orders to metra_app;
 -- columns). UPDATE is intentional here, unlike the append-only ledgers below. No
 -- DELETE — a resolved claim is retained.
 grant select, insert, update on public.client_payment_claims to metra_app;
+-- document_categories (clients + projects spec): the firm manages its own filing
+-- vocabulary, so SELECT + INSERT + UPDATE. NO DELETE, deliberately: files reference
+-- a category, and retiring one must not be able to pull it out from under them —
+-- `active = false` hides it from the picker and leaves filed documents alone.
+grant select, insert, update on public.document_categories to metra_app;
+revoke delete on public.document_categories from metra_app;
 -- engagement_document_comments (Client Deliverables Step 2): APPEND-ONLY. The
 -- client's message INSERT goes through the SECURITY DEFINER token SDF (owner,
 -- bypasses RLS); this grant governs the STUDIO cockpit — read a document's thread

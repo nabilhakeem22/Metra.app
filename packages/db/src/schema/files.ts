@@ -27,6 +27,11 @@ export const files = pgTable(
     contentType: text('content_type'),
     sizeBytes: bigint('size_bytes', { mode: 'number' }),
     originalName: text('original_name'),
+    // The firm's filing category (document_categories). NULLABLE: every file that
+    // predates categories keeps working and simply shows as uncategorised, and a
+    // category that is later removed sets this back to null rather than orphaning
+    // the file.
+    categoryId: uuid('category_id'),
     createdBy: uuid('created_by'),
   },
   (t) => [

@@ -611,6 +611,22 @@ create policy org_isolation on public.client_payment_claims
     and public.app_is_current_org_member()
   );
 
+-- document_categories (clients + projects spec): the firm's own filing vocabulary.
+-- SELECT + INSERT + UPDATE (rename / reorder / deactivate); NO DELETE — a category
+-- files already sit under is retired with `active = false`, never removed.
+alter table public.document_categories enable row level security;
+alter table public.document_categories force  row level security;
+drop policy if exists org_isolation on public.document_categories;
+create policy org_isolation on public.document_categories
+  using (
+    org_id = nullif(current_setting('app.current_org_id', true), '')::uuid
+    and public.app_is_current_org_member()
+  )
+  with check (
+    org_id = nullif(current_setting('app.current_org_id', true), '')::uuid
+    and public.app_is_current_org_member()
+  );
+
 -- engagement_document_comments (Client Deliverables Step 2; APPEND-ONLY — SELECT +
 -- INSERT grants only, no UPDATE/DELETE, so a message can never be edited or removed
 -- by either side; org-isolated + membership-gated). The session-less client's

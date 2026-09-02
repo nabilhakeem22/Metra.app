@@ -10,6 +10,10 @@ import { withOrgContext } from '@/lib/db/context';
 import { can } from '@/lib/permissions/can';
 import { isUuid } from '@/lib/uuid';
 import {
+  INVALID_CATEGORY,
+  resolveCategoryId,
+} from '@/lib/document-categories/resolve';
+import {
   createSignedUploadUrl,
   ensureFilesBucket,
   getSignedUrl,
@@ -25,6 +29,8 @@ export async function createClientDocumentUpload(input: {
   clientId: string;
   contentType?: string;
   originalName?: string;
+  /** The firm's filing category. Optional — a document can be filed later. */
+  categoryId?: string | null;
 }): Promise<SignedUpload | ActionResult> {
   const ctx = await requireOrg();
   if (!can(ctx.role, 'client_activity', 'create')) return err('forbidden');
@@ -40,11 +46,18 @@ export async function createClientDocumentUpload(input: {
   );
   if (!client) return err('invalid');
 
+  // A category id is only trusted after it resolves IN THIS ORG under RLS — the
+  // same-org FK is the DB backstop, but rejecting here returns a coded error
+  // instead of a constraint violation.
+  const categoryId = await resolveCategoryId(ctx, input.categoryId);
+  if (categoryId === INVALID_CATEGORY) return err('invalid');
+
   await ensureFilesBucket();
   return createSignedUploadUrl(ctx, 'client', {
     contentType: input.contentType,
     originalName: input.originalName,
     entityId: input.clientId,
+    categoryId,
   });
 }
 

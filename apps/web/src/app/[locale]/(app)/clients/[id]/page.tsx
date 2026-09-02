@@ -5,6 +5,7 @@ import { Link } from '@/i18n/routing';
 import { requireOrg } from '@/lib/auth/require-org';
 import { listActivities } from '@/lib/activities/queries';
 import { listClientDocuments } from '@/lib/client-documents/queries';
+import { listActiveDocumentCategories } from '@/lib/document-categories/queries';
 import { listContacts } from '@/lib/client-contacts/queries';
 import { getClientEffectiveRates } from '@/lib/clients/financials';
 import { getClientById, getClientOverview } from '@/lib/clients/queries';
@@ -134,6 +135,7 @@ export default async function ClientProfilePage({
           <DocumentsTab
             clientId={id}
             documents={await listClientDocuments(ctx, id)}
+            categories={await listActiveDocumentCategories(ctx)}
             canManage={canActivity}
           />
         )}

@@ -40,6 +40,8 @@ export * from './engagement-events';
 export * from './engagement-change-orders';
 export * from './client-payment-claims';
 export * from './engagement-document-comments';
+export * from './document-categories';
+export * from './document-category-defaults';
 export * from './notifications';
 export * from './automation-settings';
 export * from './automation-run-log';
@@ -82,6 +84,7 @@ import { engagementEvents } from './engagement-events';
 import { engagementChangeOrders } from './engagement-change-orders';
 import { clientPaymentClaims } from './client-payment-claims';
 import { engagementDocumentComments } from './engagement-document-comments';
+import { documentCategories } from './document-categories';
 import { notifications } from './notifications';
 import { automationSettings } from './automation-settings';
 import { automationRunLog } from './automation-run-log';
@@ -125,6 +128,7 @@ export const orgScopedTables = {
   engagementChangeOrders,
   clientPaymentClaims,
   engagementDocumentComments,
+  documentCategories,
   notifications,
   automationSettings,
   automationRunLog,
@@ -171,6 +175,7 @@ export const allTables = {
   engagementChangeOrders,
   clientPaymentClaims,
   engagementDocumentComments,
+  documentCategories,
   notifications,
   automationSettings,
   automationRunLog,

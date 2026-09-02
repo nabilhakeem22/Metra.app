@@ -364,7 +364,18 @@
     "errorNameRequired": "Enter at least one company name.",
     "errorGeneric": "Something went wrong. Please try again.",
     "apiKeysCardTitle": "API keys",
-    "apiKeysCardDesc": "Create and manage keys for the Metra Public API."
+    "apiKeysCardDesc": "Create and manage keys for the Metra Public API.",
+    "documentCategories": {
+      "title": "Document categories",
+      "subtitle": "How your firm files the documents it attaches to clients and projects.",
+      "nameAr": "Name (Arabic)",
+      "nameEn": "Name (English)",
+      "add": "Add",
+      "retire": "Retire",
+      "restore": "Restore",
+      "retired": "Retired",
+      "retireNote": "Retiring a category hides it from the upload list. Documents already filed under it stay where they are."
+    }
   },
   "apiKeys": {
     "title": "API keys",
@@ -863,7 +874,9 @@
         "download": "Download",
         "delete": "Delete",
         "uploaded": "Document uploaded",
-        "deleted": "Document deleted"
+        "deleted": "Document deleted",
+        "category": "Category",
+        "uncategorised": "Uncategorised"
       },
       "activity": {
         "title": "Activity",
@@ -1040,7 +1053,9 @@
         "download": "Download",
         "delete": "Delete",
         "uploaded": "Document uploaded",
-        "deleted": "Document deleted"
+        "deleted": "Document deleted",
+        "category": "Category",
+        "uncategorised": "Uncategorised"
       },
       "activity": {
         "title": "Activity",

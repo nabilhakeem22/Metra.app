@@ -2,7 +2,7 @@
 
 import { Download, FileText, Loader2, Trash2, Upload } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
-import { useRef, useTransition, type ChangeEvent } from 'react';
+import { useRef, useState, useTransition, type ChangeEvent } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -16,15 +16,20 @@ import {
   getClientDocumentUrl,
 } from '@/lib/client-documents/actions';
 import type { ClientDocument } from '@/lib/client-documents/queries';
+import { groupByCategory } from '@/components/documents/document-groups';
 import { formatDate } from '@/lib/format/date';
+import { pickLocale } from '@/lib/i18n/pick-locale';
 
 export function DocumentsTab({
   clientId,
   documents,
+  categories,
   canManage,
 }: {
   clientId: string;
   documents: ClientDocument[];
+  /** The firm's ACTIVE filing categories — what a new document may go under. */
+  categories: Array<{ id: string; nameEn: string | null; nameAr: string | null }>;
   canManage: boolean;
 }) {
   const t = useTranslations('clients.profile.documents');
@@ -33,6 +38,9 @@ export function DocumentsTab({
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const inputRef = useRef<HTMLInputElement>(null);
+  // Chosen BEFORE picking the file, so the document is filed at the moment it
+  // arrives rather than needing a second step nobody comes back to do.
+  const [categoryId, setCategoryId] = useState('');
 
   function onUpload(e: ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -43,6 +51,7 @@ export function DocumentsTab({
           clientId,
           contentType: file.type,
           originalName: file.name,
+          categoryId: categoryId || null,
         });
         if ('ok' in signed) {
           toast({
@@ -95,6 +104,22 @@ export function DocumentsTab({
             onChange={onUpload}
             disabled={pending}
           />
+          {categories.length > 0 && (
+            <select
+              value={categoryId}
+              onChange={(e) => setCategoryId(e.target.value)}
+              aria-label={t('category')}
+              disabled={pending}
+              className="h-9 rounded-md border bg-background px-2 text-sm"
+            >
+              <option value="">{t('uncategorised')}</option>
+              {categories.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {pickLocale({ nameAr: c.nameAr, nameEn: c.nameEn }, 'name', locale).value}
+                </option>
+              ))}
+            </select>
+          )}
           <Button
             type="button"
             variant="outline"
@@ -118,8 +143,20 @@ export function DocumentsTab({
               <EmptyState title={t('empty')} />
             </div>
           ) : (
-            <ul className="divide-y">
-              {documents.map((d) => (
+            <div className="divide-y">
+              {groupByCategory(documents).map((group) => (
+                <section key={group.categoryId ?? 'uncategorised'}>
+                  <p className="bg-muted/40 px-4 py-1.5 text-xs font-semibold text-muted-foreground">
+                    {group.categoryId
+                      ? pickLocale(
+                          { nameAr: group.nameAr, nameEn: group.nameEn },
+                          'name',
+                          locale,
+                        ).value
+                      : t('uncategorised')}
+                  </p>
+                  <ul className="divide-y">
+                    {group.documents.map((d) => (
                 <li key={d.id} className="flex items-center gap-3 px-4 py-3">
                   <FileText className="size-4 text-muted-foreground" aria-hidden />
                   <span className="flex-1 truncate text-sm">
@@ -150,9 +187,12 @@ export function DocumentsTab({
                       <Trash2 className="size-4" aria-hidden />
                     </Button>
                   )}
-                </li>
+                    </li>
+                    ))}
+                  </ul>
+                </section>
               ))}
-            </ul>
+            </div>
           )}
         </CardContent>
       </Card>

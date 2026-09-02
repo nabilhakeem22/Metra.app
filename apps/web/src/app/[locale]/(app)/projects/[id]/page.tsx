@@ -10,6 +10,7 @@ import {
   getEngagementByProject,
 } from '@/lib/engagements/queries';
 import { listProjectDocuments } from '@/lib/project-documents/queries';
+import { listActiveDocumentCategories } from '@/lib/document-categories/queries';
 import { listProjectTypes } from '@/lib/project-types/queries';
 import { getProjectById, getProjectOverview } from '@/lib/projects/queries';
 import { pickLocale } from '@/lib/i18n/pick-locale';
@@ -162,6 +163,7 @@ export default async function ProjectProfilePage({
           <DocumentsTab
             projectId={id}
             documents={await listProjectDocuments(ctx, id)}
+            categories={await listActiveDocumentCategories(ctx)}
             canManage={canActivity}
           />
         )}
