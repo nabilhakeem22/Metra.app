@@ -509,7 +509,8 @@
     "payment_kind_mismatch": "نوع الدفعة هذا لا يتطابق مع الخطوة التي تقوم بالتقدم إليها",
     "firm_type_unavailable": "نوع الشركة هذا غير متوفر بعد. اختر تشطيبات داخلية للمتابعة.",
     "project_delivery_exists": "هذا المشروع لديه بالفعل عملية تسليم نشطة. افتحها للمتابعة.",
-    "project_delivery_limit_reached": "استنفد هذا المشروع عمليتي التسليم الخاصتين به. أنشئ مشروعًا جديدًا لبدء مشروع آخر."
+    "project_delivery_limit_reached": "استنفد هذا المشروع عمليتي التسليم الخاصتين به. أنشئ مشروعًا جديدًا لبدء مشروع آخر.",
+    "phone_required": "لازم تدخل رقم تليفون."
   },
   "common": {
     "untranslated": "untranslated",
@@ -747,7 +748,10 @@
       "phone": "الهاتف",
       "city": "المدينة",
       "status": "الحالة",
-      "actions": "الإجراءات"
+      "actions": "الإجراءات",
+      "type": "النوع",
+      "contactDetails": "الإيميل والتليفون",
+      "projects": "المشاريع"
     },
     "empty": {
       "title": "لا يوجد عملاء بعد",
@@ -775,7 +779,8 @@
       "retentionPct": "الاحتجاز %",
       "notes": "ملاحظات",
       "save": "حفظ",
-      "cancel": "إلغاء"
+      "cancel": "إلغاء",
+      "country": "الدولة"
     },
     "types": {
       "individual": "فرد",
@@ -798,7 +803,7 @@
         "projects": "المشاريع",
         "financials": "الماليات",
         "documents": "المستندات",
-        "activity": "النشاط"
+        "activity": "السجل"
       },
       "overview": {
         "projects": "المشاريع",
@@ -844,7 +849,9 @@
         "invoiced": "المُفوتر",
         "outstanding": "المستحق",
         "lockedTitle": "الفوترة غير مفعلة",
-        "lockedBody": "تتفعّل أرقام المُفوتر والمستحق بمجرد بدء الفوترة."
+        "lockedBody": "تتفعّل أرقام المُفوتر والمستحق بمجرد بدء الفوترة.",
+        "noContracts": "مفيش عقود لسه",
+        "derivedFrom": "{n, plural, zero {} one {من عقد واحد مُبرم} two {من عقدين مُبرمين} few {من # عقود مُبرمة} many {من # عقدًا مُبرمًا} other {من # عقد مُبرم}}"
       },
       "documents": {
         "title": "المستندات",
@@ -869,6 +876,10 @@
           "proposal_accepted": "تم قبول العرض"
         }
       }
+    },
+    "filter": {
+      "allStatuses": "كل الحالات",
+      "allCities": "كل المدن"
     }
   },
   "projects": {

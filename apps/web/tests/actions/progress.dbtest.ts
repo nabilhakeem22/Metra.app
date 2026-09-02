@@ -35,7 +35,7 @@ describe('getOnboardingProgress — in-org rows only', () => {
     orgIds.push(orgId);
     const ctx = ctxFor(orgId, ownerIds[0], 'owner');
 
-    await createClientCore(ctx, { nameEn: 'C' });
+    await createClientCore(ctx, { phone: '01000000000', nameEn: 'C' });
     const [client] = await listClients(ctx, {});
     await createProjectCore(ctx, { code: 'P', nameEn: 'Proj', clientId: client.id, status: 'active' });
     const [project] = await listProjects(ctx, {});
@@ -77,7 +77,7 @@ describe('getOnboardingProgress — in-org rows only', () => {
     orgIds.push(orgId);
     const ctx = ctxFor(orgId, ownerIds[0], 'owner');
     void memberIds;
-    await createClientCore(ctx, { nameEn: 'C' });
+    await createClientCore(ctx, { phone: '01000000000', nameEn: 'C' });
     const [client] = await listClients(ctx, {});
     await createProjectCore(ctx, { code: 'P', nameEn: 'Proj', clientId: client.id, status: 'active' });
     const [project] = await listProjects(ctx, {});

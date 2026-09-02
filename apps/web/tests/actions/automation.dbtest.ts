@@ -35,7 +35,7 @@ async function setup(opts: { owners?: number; members?: Array<{ role: MemberRole
   const seeded = await seedOrg({ owners: opts.owners ?? 1, members: opts.members ?? [] });
   orgIds.push(seeded.orgId);
   const ctx = ctxFor(seeded.orgId, seeded.ownerIds[0] ?? seeded.memberIds[0], 'owner');
-  await createClientCore(ctx, { nameEn: 'Acme' });
+  await createClientCore(ctx, { phone: '01000000000', nameEn: 'Acme' });
   const [client] = await listClients(ctx, {});
   await createProjectCore(ctx, {
     code: 'PRJ-1',

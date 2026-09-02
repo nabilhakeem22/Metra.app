@@ -100,6 +100,7 @@ async function buildOrg(): Promise<OrgFixture> {
   const ownerCtx = ctxFor(seeded.orgId, ownerId, 'owner');
 
   const client = await createClientCore(ownerCtx, {
+    phone: '01000000000',
     nameEn: 'API Client',
     city: 'Cairo',
   });
@@ -348,8 +349,8 @@ describe('AC6 — limit clamp + cursor round-trip', () => {
   it('next_cursor round-trips with no dup/gap', async () => {
     const ownerCtx = ctxFor(a.orgId, a.ownerId, 'owner');
     // Ensure at least 3 clients so paging is non-trivial.
-    await createClientCore(ownerCtx, { nameEn: 'Client 2' });
-    await createClientCore(ownerCtx, { nameEn: 'Client 3' });
+    await createClientCore(ownerCtx, { phone: '01000000000', nameEn: 'Client 2' });
+    await createClientCore(ownerCtx, { phone: '01000000000', nameEn: 'Client 3' });
 
     const seen: string[] = [];
     let cursor: string | null = null;

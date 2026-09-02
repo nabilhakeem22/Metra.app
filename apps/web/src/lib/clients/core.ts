@@ -16,6 +16,7 @@ export interface ClientInput {
   email?: string | null;
   phone?: string | null;
   city?: string | null;
+  country?: string | null;
   address?: string | null;
   taxRegistrationNumber?: string | null;
   advancePct?: string | null;
@@ -34,6 +35,7 @@ const LIMITS = {
   email: 254,
   phone: 40,
   city: 120,
+  country: 120,
   address: 300,
   taxReg: 64,
   notes: 2000,
@@ -62,6 +64,7 @@ function normalized(input: ClientInput) {
     email: clean(input.email),
     phone: clean(input.phone),
     city: clean(input.city),
+    country: clean(input.country),
     address: clean(input.address),
     taxRegistrationNumber: clean(input.taxRegistrationNumber),
     notes: clean(input.notes),
@@ -77,6 +80,7 @@ function withinLimits(v: NormalizedClient): boolean {
     ok(v.email, LIMITS.email) &&
     ok(v.phone, LIMITS.phone) &&
     ok(v.city, LIMITS.city) &&
+    ok(v.country, LIMITS.country) &&
     ok(v.address, LIMITS.address) &&
     ok(v.taxRegistrationNumber, LIMITS.taxReg) &&
     ok(v.notes, LIMITS.notes)
@@ -93,6 +97,9 @@ export async function createClientCore(
 ): Promise<ActionResult & { data?: string }> {
   const v = normalized(input);
   if (!v.nameEn && !v.nameAr) return err('name_required');
+  // Phone is MANDATORY (owner decision): a client record with no way to reach them
+  // is not usable by a studio that runs on phone calls.
+  if (!v.phone) return err('phone_required');
   if (!withinLimits(v) || !validType(v.type)) return err('invalid');
   const advancePct = normPct(input.advancePct);
   const retentionPct = normPct(input.retentionPct);
@@ -129,9 +136,25 @@ export async function updateClientCore(
 ): Promise<ActionResult> {
   const v = normalized(input);
   if (!v.nameEn && !v.nameAr) return err('name_required');
+  // NOT the same blanket rule as create. 311 of the 315 clients already in
+  // production predate this requirement, and demanding a phone before an address
+  // typo can be fixed would make almost every existing record uneditable. So the
+  // rule here is narrower and only ever tightens: a phone that EXISTS may not be
+  // blanked (checked against the stored row inside the tx below); a record that
+  // never had one stays editable.
   if (!withinLimits(v) || !validType(v.type)) return err('invalid');
-  const advancePct = normPct(input.advancePct);
-  const retentionPct = normPct(input.retentionPct);
+  // PARTIAL UPDATE on the percentages: `undefined` means "not managed by this
+  // caller", not "set to zero". The client Details form stopped editing these when
+  // they moved to the Financials tab (derived from contracts), and without this an
+  // ordinary profile save would silently zero two columns that Public API v1 still
+  // serves. An explicit '' still normalizes to '0' — that is a real edit.
+  // Phone is PARTIAL for the same reason the percentages are: an update that does
+  // not mention it must not wipe it.
+  const phoneOmitted = input.phone === undefined;
+  const advancePct =
+    input.advancePct === undefined ? undefined : normPct(input.advancePct);
+  const retentionPct =
+    input.retentionPct === undefined ? undefined : normPct(input.retentionPct);
   if (advancePct === null || retentionPct === null) return err('invalid');
 
   return mutateInOrg(
@@ -139,15 +162,28 @@ export async function updateClientCore(
     { capability: 'clients', action: 'update' },
     async (tx, audit) => {
       const [before] = await tx
-        .select({ id: clients.id })
+        .select({ id: clients.id, phone: clients.phone })
         .from(clients)
         .where(eq(clients.id, input.id))
         .limit(1);
       if (!before) fail('invalid');
+      // Forward-only tightening, and it must distinguish OMITTED from CLEARED.
+      // `normalized()` maps both `undefined` and `''` to null, so checking `v.phone`
+      // alone would reject an ordinary partial save that simply did not mention the
+      // phone — which is what broke the existing update test. Only an EXPLICIT blank
+      // is refused.
+      if (!phoneOmitted && before.phone && !v.phone) fail('phone_required');
 
       await tx
         .update(clients)
-        .set({ ...v, advancePct, retentionPct, updatedAt: new Date() })
+        .set({
+          ...v,
+          // An omitted phone is left exactly as it was, rather than nulled.
+          ...(phoneOmitted ? { phone: before.phone } : {}),
+          ...(advancePct !== undefined ? { advancePct } : {}),
+          ...(retentionPct !== undefined ? { retentionPct } : {}),
+          updatedAt: new Date(),
+        })
         .where(eq(clients.id, input.id));
       await audit({
         entity: 'client',

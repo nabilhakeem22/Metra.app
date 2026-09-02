@@ -27,22 +27,38 @@ export function ClientsClient({ items, canManage }: ClientsClientProps) {
   const locale = useLocale();
 
   const [q, setQ] = useState('');
-  const [activeOnly, setActiveOnly] = useState(false);
+  // Spec: filter by STATUS and CITY. 'all' is the resting state for both, so the
+  // list opens showing everything rather than a silently narrowed subset.
+  const [status, setStatus] = useState<'all' | 'active' | 'inactive'>('all');
+  const [city, setCity] = useState('all');
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<ClientRow | null>(null);
   const [pending, startTransition] = useTransition();
 
+  // Every city present in the data, for the filter. Derived rather than configured:
+  // a firm's cities are whatever its clients are in.
+  const cities = useMemo(
+    () =>
+      [...new Set(items.map((c) => c.city?.trim()).filter((v): v is string => !!v))].sort(
+        (a, b) => a.localeCompare(b, locale),
+      ),
+    [items, locale],
+  );
+
   const filtered = useMemo(() => {
     const needle = q.trim().toLowerCase();
     return items.filter((c) => {
-      if (activeOnly && !c.active) return false;
+      if (status === 'active' && !c.active) return false;
+      if (status === 'inactive' && c.active) return false;
+      if (city !== 'all' && (c.city?.trim() ?? '') !== city) return false;
       if (needle) {
-        const hay = `${c.nameEn ?? ''} ${c.nameAr ?? ''} ${c.contactName ?? ''}`.toLowerCase();
+        // Spec: search by NAME and EMAIL.
+        const hay = `${c.nameEn ?? ''} ${c.nameAr ?? ''} ${c.email ?? ''}`.toLowerCase();
         if (!hay.includes(needle)) return false;
       }
       return true;
     });
-  }, [items, q, activeOnly]);
+  }, [items, q, status, city]);
 
   function openNew() {
     setEditing(null);
@@ -109,14 +125,29 @@ export function ClientsClient({ items, canManage }: ClientsClientProps) {
             className="ps-9"
           />
         </div>
-        <label className="flex items-center gap-2 text-sm">
-          <input
-            type="checkbox"
-            checked={activeOnly}
-            onChange={(e) => setActiveOnly(e.target.checked)}
-          />
-          {t('activeOnly')}
-        </label>
+        <select
+          value={status}
+          onChange={(e) => setStatus(e.target.value as typeof status)}
+          aria-label={t('table.status')}
+          className="h-9 rounded-md border bg-background px-2 text-sm"
+        >
+          <option value="all">{t('filter.allStatuses')}</option>
+          <option value="active">{t('status.active')}</option>
+          <option value="inactive">{t('status.inactive')}</option>
+        </select>
+        <select
+          value={city}
+          onChange={(e) => setCity(e.target.value)}
+          aria-label={t('table.city')}
+          className="h-9 rounded-md border bg-background px-2 text-sm"
+        >
+          <option value="all">{t('filter.allCities')}</option>
+          {cities.map((c) => (
+            <option key={c} value={c}>
+              {c}
+            </option>
+          ))}
+        </select>
         {canManage && (
           <Button data-tour="clients-new" className="ms-auto" onClick={openNew}>
             <Plus className="size-4" aria-hidden />
@@ -133,8 +164,10 @@ export function ClientsClient({ items, canManage }: ClientsClientProps) {
                 <tr className="border-b text-xs text-muted-foreground">
                   <th className="px-4 py-2 text-start font-medium">{t('table.name')}</th>
                   <th className="px-4 py-2 text-start font-medium">{t('table.contact')}</th>
-                  <th className="px-4 py-2 text-start font-medium">{t('table.email')}</th>
+                  <th className="px-4 py-2 text-start font-medium">{t('table.type')}</th>
+                  <th className="px-4 py-2 text-start font-medium">{t('table.contactDetails')}</th>
                   <th className="px-4 py-2 text-start font-medium">{t('table.city')}</th>
+                  <th className="px-4 py-2 text-start font-medium">{t('table.projects')}</th>
                   <th className="px-4 py-2 text-start font-medium">{t('table.status')}</th>
                   {canManage && <th className="px-4 py-2" />}
                 </tr>
@@ -159,10 +192,23 @@ export function ClientsClient({ items, canManage }: ClientsClientProps) {
                       <td className="px-4 py-2 text-muted-foreground">
                         {c.contactName || '—'}
                       </td>
-                      <td className="px-4 py-2 text-muted-foreground" dir="ltr">
-                        {c.email || '—'}
+                      <td className="px-4 py-2 text-muted-foreground">
+                        {t(`types.${c.type}`)}
+                      </td>
+                      {/* Email and phone share one column: they are the same fact
+                          (how to reach them) and two columns pushed the table wide. */}
+                      <td className="px-4 py-2 text-muted-foreground">
+                        <span dir="ltr" className="block">
+                          {c.email || '—'}
+                        </span>
+                        <span dir="ltr" className="block text-xs">
+                          {c.phone || '—'}
+                        </span>
                       </td>
                       <td className="px-4 py-2 text-muted-foreground">{c.city || '—'}</td>
+                      <td className="px-4 py-2 tabular-nums text-muted-foreground" dir="ltr">
+                        {c.projectCount}
+                      </td>
                       <td className="px-4 py-2">
                         <span
                           className={

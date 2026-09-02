@@ -88,7 +88,7 @@ async function setupLayout(): Promise<{
   const { orgId, ownerIds } = await seedOrg({ owners: 1 });
   orgIds.push(orgId);
   const ctx = ctxFor(orgId, ownerIds[0], 'owner');
-  await createClientCore(ctx, { nameEn: 'Acme' });
+  await createClientCore(ctx, { phone: '01000000000', nameEn: 'Acme' });
   const [client] = await listClients(ctx, {});
   await createProjectCore(ctx, {
     code: `PRJ-${orgId.slice(0, 8)}`,
@@ -371,7 +371,7 @@ describe('manual override — setArtifactClientVisibilityCore', () => {
     });
     orgIds.push(viewerOrg);
     const owner = ctxFor(viewerOrg, ownerIds[0], 'owner');
-    await createClientCore(owner, { nameEn: 'Acme viewer' });
+    await createClientCore(owner, { phone: '01000000000', nameEn: 'Acme viewer' });
     const [client] = await listClients(owner, {});
     await createProjectCore(owner, {
       code: `PRJ-${viewerOrg.slice(0, 8)}`,

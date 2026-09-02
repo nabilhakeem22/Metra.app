@@ -32,10 +32,9 @@ interface FormState {
   email: string;
   phone: string;
   city: string;
+  country: string;
   address: string;
   taxRegistrationNumber: string;
-  advancePct: string;
-  retentionPct: string;
   notes: string;
 }
 
@@ -48,10 +47,9 @@ function fromClient(c: Client): FormState {
     email: c.email ?? '',
     phone: c.phone ?? '',
     city: c.city ?? '',
+    country: c.country ?? '',
     address: c.address ?? '',
     taxRegistrationNumber: c.taxRegistrationNumber ?? '',
-    advancePct: c.advancePct,
-    retentionPct: c.retentionPct,
     notes: c.notes ?? '',
   };
 }
@@ -84,10 +82,12 @@ export function DetailsTab({
         email: form.email || null,
         phone: form.phone || null,
         city: form.city || null,
+        country: form.country || null,
         address: form.address || null,
         taxRegistrationNumber: form.taxRegistrationNumber || null,
-        advancePct: form.advancePct || '0',
-        retentionPct: form.retentionPct || '0',
+        // advancePct / retentionPct are deliberately ABSENT: this form no longer
+        // owns them. updateClientCore leaves an omitted percentage untouched, so
+        // the stored value (still served by Public API v1) survives an edit here.
         notes: form.notes || null,
       });
       if (res.ok) {
@@ -164,13 +164,13 @@ export function DetailsTab({
         </div>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           {field('city', t('form.city'), { hint: th('city') })}
-          {field('address', t('form.address'), { hint: th('address') })}
+          {field('country', t('form.country'))}
         </div>
-
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          {field('address', t('form.address'), { hint: th('address') })}
+          {/* Advance / retention are NOT edited here any more: they are derived from
+              the client's committed contracts and shown on the Financials tab. */}
           {field('taxRegistrationNumber', t('form.taxCode'), { hint: th('taxRegistrationNumber') })}
-          {field('advancePct', t('form.advancePct'), { hint: th('advancePct'), inputMode: 'decimal' })}
-          {field('retentionPct', t('form.retentionPct'), { hint: th('retentionPct'), inputMode: 'decimal' })}
         </div>
         {field('notes', t('form.notes'))}
 

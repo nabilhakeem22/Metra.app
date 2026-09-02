@@ -34,6 +34,7 @@ export const clients = pgTable(
     email: text('email'),
     phone: text('phone'),
     city: text('city'),
+    country: text('country'),
     address: text('address'),
     taxRegistrationNumber: text('tax_registration_number'),
     advancePct: money('advance_pct').notNull().default('0'),

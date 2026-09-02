@@ -19,6 +19,7 @@ describe('client profile — type + advance/retention validation', () => {
     orgIds.push(orgId);
     const ctx = ctxFor(orgId, ownerIds[0], 'owner');
     const res = await createClientCore(ctx, {
+      phone: '01000000000',
       nameEn: 'Acme',
       type: 'consultant',
       advancePct: '25',
@@ -35,7 +36,7 @@ describe('client profile — type + advance/retention validation', () => {
     const { orgId, ownerIds } = await seedOrg({ owners: 1 });
     orgIds.push(orgId);
     const ctx = ctxFor(orgId, ownerIds[0], 'owner');
-    await createClientCore(ctx, { nameEn: 'X' });
+    await createClientCore(ctx, { phone: '01000000000', nameEn: 'X' });
     const [c] = await listClients(ctx, {});
     expect(
       await updateClientCore(ctx, { id: c.id, nameEn: 'X', advancePct: '150' }),
@@ -49,7 +50,7 @@ describe('client profile — type + advance/retention validation', () => {
     const { orgId, ownerIds } = await seedOrg({ owners: 1 });
     orgIds.push(orgId);
     const ctx = ctxFor(orgId, ownerIds[0], 'owner');
-    await createClientCore(ctx, { nameEn: 'Y' });
+    await createClientCore(ctx, { phone: '01000000000', nameEn: 'Y' });
     const [c] = await listClients(ctx, {});
     await expect(
       raw.query(
@@ -64,7 +65,7 @@ describe('client profile — createClient appends a client_created activity', ()
     const { orgId, ownerIds } = await seedOrg({ owners: 1 });
     orgIds.push(orgId);
     const ctx = ctxFor(orgId, ownerIds[0], 'owner');
-    await createClientCore(ctx, { nameEn: 'Acme' });
+    await createClientCore(ctx, { phone: '01000000000', nameEn: 'Acme' });
     const [c] = await listClients(ctx, {});
     const feed = await listActivities(ctx, 'client', c.id);
     expect(feed).toHaveLength(1);
@@ -78,7 +79,7 @@ describe('getClientOverview — real counts + contracted total; invoicing locked
     const { orgId, ownerIds } = await seedOrg({ owners: 1 });
     orgIds.push(orgId);
     const ctx = ctxFor(orgId, ownerIds[0], 'owner');
-    await createClientCore(ctx, { nameEn: 'Acme' });
+    await createClientCore(ctx, { phone: '01000000000', nameEn: 'Acme' });
     const [client] = await listClients(ctx, {});
     await createProjectCore(ctx, {
       code: 'PRJ-1',

@@ -19,7 +19,7 @@ async function orgWithClient() {
   const { orgId, ownerIds } = await seedOrg({ owners: 1 });
   orgIds.push(orgId);
   const ctx = ctxFor(orgId, ownerIds[0], 'owner');
-  await createClientCore(ctx, { nameEn: 'Client One' });
+  await createClientCore(ctx, { phone: '01000000000', nameEn: 'Client One' });
   const [client] = await listClients(ctx, {});
   return { orgId, ctx, clientId: client.id };
 }
@@ -107,7 +107,7 @@ describe('createProjectCore', () => {
     });
     orgIds.push(orgId);
     const owner = ctxFor(orgId, ownerIds[0], 'owner');
-    await createClientCore(owner, { nameEn: 'Shared client' });
+    await createClientCore(owner, { phone: '01000000000', nameEn: 'Shared client' });
     const [client] = await listClients(owner, {});
 
     const pmCtx: OrgContext = ctxFor(orgId, (await raw.memberships(orgId)).find((m) => m.role === 'project_manager')!.user_id, 'project_manager');

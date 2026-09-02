@@ -77,6 +77,7 @@ export const ACTION_CODE_PROBLEM: Record<ActionCode, ApiProblemKind> = {
   // never a clean 4xx, so a client can't assume the write failed.
   uncertain: 'internal',
   name_required: 'bad-request',
+  phone_required: 'bad-request',
   last_owner: 'bad-request',
   owner_immutable: 'bad-request',
   self: 'bad-request',

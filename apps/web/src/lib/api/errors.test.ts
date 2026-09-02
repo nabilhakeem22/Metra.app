@@ -16,6 +16,7 @@ const ALL_CODES: ActionCode[] = [
   'generic',
   'uncertain',
   'name_required',
+  'phone_required',
   'last_owner',
   'owner_immutable',
   'self',

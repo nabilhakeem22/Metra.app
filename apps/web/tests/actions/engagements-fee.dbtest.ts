@@ -36,7 +36,7 @@ async function setup(): Promise<{ ctx: OrgContext; engagementId: string }> {
   const { orgId, ownerIds } = await seedOrg({ owners: 1 });
   orgIds.push(orgId);
   const ctx = ctxFor(orgId, ownerIds[0], 'owner');
-  await createClientCore(ctx, { nameEn: 'Acme' });
+  await createClientCore(ctx, { phone: '01000000000', nameEn: 'Acme' });
   const [client] = await listClients(ctx, {});
   await createProjectCore(ctx, {
     code: `PRJ-${orgId.slice(0, 8)}`,

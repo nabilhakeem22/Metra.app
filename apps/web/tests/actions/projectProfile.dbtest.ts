@@ -17,7 +17,7 @@ async function setup() {
   const { orgId, ownerIds } = await seedOrg({ owners: 1 });
   orgIds.push(orgId);
   const ctx = ctxFor(orgId, ownerIds[0], 'owner');
-  await createClientCore(ctx, { nameEn: 'Acme' });
+  await createClientCore(ctx, { phone: '01000000000', nameEn: 'Acme' });
   const [client] = await listClients(ctx, {});
   return { orgId, ownerId: ownerIds[0], ctx, clientId: client.id };
 }

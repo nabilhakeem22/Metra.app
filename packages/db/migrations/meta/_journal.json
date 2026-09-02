@@ -267,6 +267,13 @@
       "when": 1788560357549,
       "tag": "0037_document_comments",
       "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1788646757549,
+      "tag": "0038_client_country",
+      "breakpoints": true
     }
   ]
 }

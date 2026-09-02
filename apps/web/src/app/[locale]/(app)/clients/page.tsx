@@ -2,7 +2,7 @@ import { getTranslations } from 'next-intl/server';
 import { notFound } from 'next/navigation';
 import { PageHeader } from '@/components/ui/page-header';
 import { requireOrg } from '@/lib/auth/require-org';
-import { listClients } from '@/lib/clients/queries';
+import { listClientsWithCounts } from '@/lib/clients/queries';
 import { can } from '@/lib/permissions/can';
 import { ClientsClient } from './clients-client';
 import type { ClientRow } from './types';
@@ -13,7 +13,7 @@ export default async function ClientsPage() {
   if (!can(ctx.role, 'clients', 'read')) notFound();
 
   const t = await getTranslations('clients');
-  const rows = await listClients(ctx, {});
+  const rows = await listClientsWithCounts(ctx, {});
   const items: ClientRow[] = rows.map((c) => ({
     id: c.id,
     nameEn: c.nameEn,
@@ -22,10 +22,13 @@ export default async function ClientsPage() {
     email: c.email,
     phone: c.phone,
     city: c.city,
+    country: c.country,
     address: c.address,
     taxRegistrationNumber: c.taxRegistrationNumber,
     notes: c.notes,
     active: c.active,
+    type: c.type,
+    projectCount: c.projectCount,
   }));
   const canManage = can(ctx.role, 'clients', 'create');
 

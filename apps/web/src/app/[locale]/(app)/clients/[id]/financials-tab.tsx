@@ -8,10 +8,12 @@ export async function FinancialsTab({
   contractedTotal,
   advancePct,
   retentionPct,
+  contractCount,
 }: {
   contractedTotal: string;
-  advancePct: string;
-  retentionPct: string;
+  advancePct: string | null;
+  retentionPct: string | null;
+  contractCount: number;
 }) {
   const t = await getTranslations('clients.profile.financials');
   const locale = await getLocale();
@@ -43,13 +45,29 @@ export async function FinancialsTab({
     <div className="space-y-4">
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <Stat label={t('contracted')} value={formatMoney(contractedTotal, locale)} />
-        <Stat label={t('advance')} value={formatPercent(advancePct, locale)} />
-        <Stat label={t('retention')} value={formatPercent(retentionPct, locale)} />
+        {/* Derived from the client's committed contracts, value-weighted — not a
+            typed-in default. Null means nothing is committed yet, which is a
+            different fact from 0% and must not render as one. */}
+        <Stat
+          label={t('advance')}
+          value={advancePct === null ? t('noContracts') : formatPercent(advancePct, locale)}
+        />
+        <Stat
+          label={t('retention')}
+          value={
+            retentionPct === null ? t('noContracts') : formatPercent(retentionPct, locale)
+          }
+        />
       </div>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <Locked label={t('invoiced')} />
         <Locked label={t('outstanding')} />
       </div>
+      {contractCount > 0 && (
+        <p className="text-xs text-muted-foreground">
+          {t('derivedFrom', { n: contractCount })}
+        </p>
+      )}
       <p className="text-sm text-muted-foreground">{t('lockedBody')}</p>
     </div>
   );

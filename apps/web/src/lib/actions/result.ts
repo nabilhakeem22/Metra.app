@@ -7,6 +7,7 @@ export type ActionCode =
   | 'generic'
   | 'uncertain'
   | 'name_required'
+  | 'phone_required'
   | 'last_owner'
   | 'owner_immutable'
   | 'self'

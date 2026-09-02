@@ -509,7 +509,8 @@
     "payment_kind_mismatch": "This payment type doesn't match the step you're advancing",
     "firm_type_unavailable": "That firm type isn't available yet. Choose Interior fit-out to continue.",
     "project_delivery_exists": "This project already has an active delivery. Open it to continue.",
-    "project_delivery_limit_reached": "This project has already used its two deliveries. Create a new project to start another."
+    "project_delivery_limit_reached": "This project has already used its two deliveries. Create a new project to start another.",
+    "phone_required": "A phone number is required."
   },
   "common": {
     "untranslated": "untranslated",
@@ -747,7 +748,10 @@
       "phone": "Phone",
       "city": "City",
       "status": "Status",
-      "actions": "Actions"
+      "actions": "Actions",
+      "type": "Type",
+      "contactDetails": "Email & phone",
+      "projects": "Projects"
     },
     "empty": {
       "title": "No clients yet",
@@ -775,7 +779,8 @@
       "retentionPct": "Retention %",
       "notes": "Notes",
       "save": "Save",
-      "cancel": "Cancel"
+      "cancel": "Cancel",
+      "country": "Country"
     },
     "types": {
       "individual": "Individual",
@@ -798,7 +803,7 @@
         "projects": "Projects",
         "financials": "Financials",
         "documents": "Documents",
-        "activity": "Activity"
+        "activity": "Logs"
       },
       "overview": {
         "projects": "Projects",
@@ -844,7 +849,9 @@
         "invoiced": "Invoiced",
         "outstanding": "Outstanding",
         "lockedTitle": "Invoicing not enabled",
-        "lockedBody": "Invoiced and outstanding figures activate once invoicing begins."
+        "lockedBody": "Invoiced and outstanding figures activate once invoicing begins.",
+        "noContracts": "No contracts yet",
+        "derivedFrom": "{n, plural, one {From # committed contract} other {From # committed contracts}}"
       },
       "documents": {
         "title": "Documents",
@@ -869,6 +876,10 @@
           "proposal_accepted": "Proposal accepted"
         }
       }
+    },
+    "filter": {
+      "allStatuses": "All statuses",
+      "allCities": "All cities"
     }
   },
   "projects": {

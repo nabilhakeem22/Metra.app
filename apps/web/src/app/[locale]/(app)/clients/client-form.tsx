@@ -32,6 +32,7 @@ interface FormState {
   email: string;
   phone: string;
   city: string;
+  country: string;
   address: string;
   taxRegistrationNumber: string;
   notes: string;
@@ -44,6 +45,7 @@ const EMPTY: FormState = {
   email: '',
   phone: '',
   city: '',
+  country: '',
   address: '',
   taxRegistrationNumber: '',
   notes: '',
@@ -67,6 +69,7 @@ export function ClientForm({ open, onOpenChange, item }: ClientFormProps) {
             email: item.email ?? '',
             phone: item.phone ?? '',
             city: item.city ?? '',
+            country: item.country ?? '',
             address: item.address ?? '',
             taxRegistrationNumber: item.taxRegistrationNumber ?? '',
             notes: item.notes ?? '',
@@ -87,6 +90,7 @@ export function ClientForm({ open, onOpenChange, item }: ClientFormProps) {
         email: form.email || null,
         phone: form.phone || null,
         city: form.city || null,
+        country: form.country || null,
         address: form.address || null,
         taxRegistrationNumber: form.taxRegistrationNumber || null,
         notes: form.notes || null,
@@ -111,15 +115,23 @@ export function ClientForm({ open, onOpenChange, item }: ClientFormProps) {
     label: string,
     dir: 'ltr' | 'rtl' = 'ltr',
     hint?: string,
+    required = false,
   ) => (
     <div className="space-y-2">
       <Label htmlFor={`cl-${k}`} className="flex items-center">
         {label}
+        {required && (
+          <span className="ms-1 text-[color:var(--danger)]" aria-hidden>
+            *
+          </span>
+        )}
         {hint && <FieldHint id={`cl-${k}-hint`} hint={hint} />}
       </Label>
       <Input
         id={`cl-${k}`}
         dir={dir}
+        required={required}
+        aria-required={required || undefined}
         aria-describedby={hint ? `cl-${k}-hint` : undefined}
         value={form[k]}
         onChange={(e) => set(k)(e.target.value)}
@@ -143,10 +155,13 @@ export function ClientForm({ open, onOpenChange, item }: ClientFormProps) {
           {field('contactName', t('form.contactName'), 'ltr', th('contactName'))}
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             {field('email', t('form.email'), 'ltr', th('email'))}
-            {field('phone', t('form.phone'), 'ltr', th('phone'))}
+            {field('phone', t('form.phone'), 'ltr', th('phone'), true)}
           </div>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             {field('city', t('form.city'), 'ltr', th('city'))}
+            {field('country', t('form.country'), 'ltr')}
+          </div>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             {field('taxRegistrationNumber', t('form.taxCode'), 'ltr', th('taxRegistrationNumber'))}
           </div>
           {field('address', t('form.address'), 'ltr', th('address'))}

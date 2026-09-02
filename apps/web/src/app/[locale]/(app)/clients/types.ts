@@ -7,8 +7,13 @@ export interface ClientRow {
   email: string | null;
   phone: string | null;
   city: string | null;
+  country: string | null;
   address: string | null;
   taxRegistrationNumber: string | null;
   notes: string | null;
   active: boolean;
+  /** Client type (company / individual / government ...) — a table column. */
+  type: string;
+  /** How many projects this client has — a table column, counted in one query. */
+  projectCount: number;
 }

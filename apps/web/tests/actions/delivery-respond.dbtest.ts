@@ -34,7 +34,7 @@ async function seedDelivery(suffix = 'a'): Promise<{
   const { orgId, ownerIds } = await seedOrg({ owners: 1 });
   orgIds.push(orgId);
   const ctx = ctxFor(orgId, ownerIds[0], 'owner');
-  await createClientCore(ctx, { nameEn: `Acme ${suffix}` });
+  await createClientCore(ctx, { phone: '01000000000', nameEn: `Acme ${suffix}` });
   const [client] = await listClients(ctx, {});
   await createProjectCore(ctx, {
     code: `PRJ-${orgId.slice(0, 8)}`,
@@ -359,7 +359,7 @@ async function driveToFinalApproval(): Promise<{
   const { orgId, ownerIds } = await seedOrg({ owners: 1 });
   orgIds.push(orgId);
   const ctx = ctxFor(orgId, ownerIds[0], 'owner');
-  await createClientCore(ctx, { nameEn: 'Acme guard' });
+  await createClientCore(ctx, { phone: '01000000000', nameEn: 'Acme guard' });
   const [client] = await listClients(ctx, {});
   await createProjectCore(ctx, {
     code: `PRJ-${orgId.slice(0, 8)}`,

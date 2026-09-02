@@ -29,7 +29,7 @@ async function setupClient() {
   });
   orgIds.push(orgId);
   const ctx = ctxFor(orgId, ownerIds[0], 'owner');
-  await createClientCore(ctx, { nameEn: 'Acme' });
+  await createClientCore(ctx, { phone: '01000000000', nameEn: 'Acme' });
   const [client] = await listClients(ctx, {});
   return { orgId, ownerIds, memberIds, ctx, clientId: client.id };
 }

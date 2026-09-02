@@ -6,6 +6,7 @@ import { requireOrg } from '@/lib/auth/require-org';
 import { listActivities } from '@/lib/activities/queries';
 import { listClientDocuments } from '@/lib/client-documents/queries';
 import { listContacts } from '@/lib/client-contacts/queries';
+import { getClientEffectiveRates } from '@/lib/clients/financials';
 import { getClientById, getClientOverview } from '@/lib/clients/queries';
 import { getDeliveriesByProjects } from '@/lib/engagements/queries';
 import { pickLocale } from '@/lib/i18n/pick-locale';
@@ -126,8 +127,7 @@ export default async function ClientProfilePage({
         {tab === 'financials' && (
           <FinancialsTab
             contractedTotal={(await getClientOverview(ctx, id)).contractedTotal}
-            advancePct={client.advancePct}
-            retentionPct={client.retentionPct}
+            {...(await getClientEffectiveRates(ctx, id))}
           />
         )}
         {tab === 'documents' && (
