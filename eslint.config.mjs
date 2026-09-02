@@ -4,6 +4,8 @@
 //     class names and inline style objects. Use CSS logical properties instead
 //     (margin-inline-start, text-align: start, ms-*, etc).
 //   • `metra/no-bare-tenant-db` — bans Drizzle queries on the raw request/base DB
+//   • `metra/no-server-registry-in-client` — bans value-importing a server registry
+//     barrel from a 'use client' module (this caused a production outage once)
 //     connection (RLS-bypass / cross-tenant leak). Reach org-scoped data only via
 //     withOrgContext()/withUserContext(); sanctioned base-connection uses are
 //     allowlisted inside the rule module.
@@ -11,11 +13,13 @@ import js from '@eslint/js';
 import tseslint from 'typescript-eslint';
 import { noPhysicalInlineDirection } from './eslint-rules/no-physical-inline-direction.mjs';
 import { noBareTenantDb } from './eslint-rules/no-bare-tenant-db.mjs';
+import { noServerRegistryInClient } from './eslint-rules/no-server-registry-in-client.mjs';
 
 const metraPlugin = {
   rules: {
     'no-physical-inline-direction': noPhysicalInlineDirection,
     'no-bare-tenant-db': noBareTenantDb,
+    'no-server-registry-in-client': noServerRegistryInClient,
   },
 };
 
@@ -50,6 +54,7 @@ export default tseslint.config(
     rules: {
       'metra/no-physical-inline-direction': 'error',
       'metra/no-bare-tenant-db': 'error',
+      'metra/no-server-registry-in-client': 'error',
       '@typescript-eslint/no-unused-vars': [
         'warn',
         { argsIgnorePattern: '^_', varsIgnorePattern: '^_' },

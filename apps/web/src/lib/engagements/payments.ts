@@ -17,13 +17,9 @@ import type { ActionResult } from '@/lib/actions/result';
 import { MONEY_RE, formatMoney4, parseMoney4 } from '@/lib/aggregates/proposal-totals';
 import type { OrgContext } from '@/lib/db/context';
 import { isTerminal } from './states';
+import { isUuid } from '@/lib/uuid';
 
 const KIND_SET = new Set<string>(PAYMENT_EVENT_KINDS);
-
-// Canonical UUID (mirrors lib/api/ids.ts). A present-but-malformed idempotency
-// key is a coded 'invalid' — we never store a non-UUID as the dedup arbiter.
-const UUID_RE =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export interface RecordPaymentInput {
   engagementId: string;
@@ -80,7 +76,7 @@ export async function recordPaymentCore(
   // plain append). A present-but-malformed key is a coded 'invalid'.
   const trimmedKey = input.idempotencyKey?.trim();
   const idempotencyKey = trimmedKey ? trimmedKey : null;
-  if (idempotencyKey !== null && !UUID_RE.test(idempotencyKey)) {
+  if (idempotencyKey !== null && !isUuid(idempotencyKey)) {
     return { ok: false, error: 'invalid' };
   }
 

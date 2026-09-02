@@ -16,14 +16,13 @@ import { fail, mutateInOrg } from '@/lib/actions/mutate';
 import { err, type ActionResult } from '@/lib/actions/result';
 import { MONEY_RE } from '@/lib/aggregates/proposal-totals';
 import type { OrgContext } from '@/lib/db/context';
+import { isUuid } from '@/lib/uuid';
 import {
   formatProposalNumber,
   proposalYear,
 } from '@/lib/format/proposal-number';
 
 export const SHARE_TTL_DAYS = 30;
-const UUID_RE =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 // R2 boundary caps (named so the tests + UI can agree on them).
@@ -121,8 +120,8 @@ export async function createProposalCore(
 ): Promise<ActionResult> {
   const clientId = input.clientId?.trim();
   const projectId = input.projectId?.trim();
-  if (!clientId || !UUID_RE.test(clientId)) return err('client_required');
-  if (!projectId || !UUID_RE.test(projectId)) return err('invalid');
+  if (!clientId || !isUuid(clientId)) return err('client_required');
+  if (!projectId || !isUuid(projectId)) return err('invalid');
   const issueDate = normalizeText(input.issueDate);
   const expiryDate = normalizeText(input.expiryDate);
   if (issueDate && !validIsoDate(issueDate)) return err('invalid_date');

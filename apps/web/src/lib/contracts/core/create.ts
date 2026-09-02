@@ -19,7 +19,7 @@ import { allocateNumber } from '@/lib/db/allocate-number';
 import type { OrgContext } from '@/lib/db/context';
 import { formatDocNumber } from '@/lib/format/doc-number';
 import { chunk, LINE_INSERT_CHUNK } from '@/lib/proposals/core';
-import { UUID_RE } from './shared';
+import { isUuid } from '@/lib/uuid';
 
 /** Postgres unique-violation SQLSTATE. */
 const UNIQUE_VIOLATION = '23505';
@@ -48,7 +48,7 @@ export async function generateContractCore(
   input: GenerateContractInput,
 ): Promise<ActionResult> {
   const proposalId = input.proposalId?.trim();
-  if (!proposalId || !UUID_RE.test(proposalId)) return err('invalid');
+  if (!proposalId || !isUuid(proposalId)) return err('invalid');
 
   return mutateInOrg(
     ctx,

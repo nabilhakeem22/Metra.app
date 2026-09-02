@@ -19,6 +19,7 @@ import {
 } from './deliverable-files';
 import { isTerminal } from './states';
 import type { WorkingFileCategory } from './working-files';
+import { isUuid } from '@/lib/uuid';
 
 // Deliverable Uploads — the DB/Storage cores behind the three delivery-tray
 // upload actions. Each is a self-contained `*Core(ctx, input) -> ActionResult`
@@ -27,9 +28,6 @@ import type { WorkingFileCategory } from './working-files';
 // `revalidatePath`. Reuses lib/storage.ts (signed PUT + signed GET, object key
 // server-minted as `{org_id}/engagement/{uuid}`) and recordArtifactCore (the
 // attest-on-record artifact writer) — no parallel file plumbing.
-
-const UUID_RE =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** A working-file category only if it is one of the known upload categories. */
 function isWorkingFileCategory(value: string): value is WorkingFileCategory {
@@ -59,7 +57,7 @@ export async function createDeliverableUploadCore(
   input: CreateDeliverableUploadInput,
 ): Promise<SignedUpload | ActionResult> {
   if (!can(ctx.role, 'engagements_design', 'create')) return err('forbidden');
-  if (!UUID_RE.test(input.engagementId ?? '')) return err('invalid');
+  if (!isUuid(input.engagementId)) return err('invalid');
   if (!isWorkingFileCategory(input.category)) return err('invalid');
 
   const [engagement] = await withOrgContext(ctx, (tx) =>
@@ -107,7 +105,7 @@ export async function attachDeliverableCore(
   input: AttachDeliverableInput,
 ): Promise<ActionResult & { data?: string }> {
   if (!can(ctx.role, 'engagements_design', 'create')) return err('forbidden');
-  if (!UUID_RE.test(input.engagementId ?? '') || !UUID_RE.test(input.fileId ?? '')) {
+  if (!isUuid(input.engagementId) || !isUuid(input.fileId)) {
     return err('invalid');
   }
   if (!isWorkingFileCategory(input.category)) return err('invalid');

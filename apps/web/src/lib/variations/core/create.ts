@@ -7,7 +7,7 @@ import { err, type ActionResult } from '@/lib/actions/result';
 import { allocateNumber } from '@/lib/db/allocate-number';
 import type { OrgContext } from '@/lib/db/context';
 import { normalizeText } from '@/lib/proposals/core';
-import { UUID_RE } from './shared';
+import { isUuid } from '@/lib/uuid';
 
 export interface CreateVariationDraftInput {
   contractId: string;
@@ -26,7 +26,7 @@ export async function createVariationDraftCore(
   input: CreateVariationDraftInput,
 ): Promise<ActionResult> {
   const contractId = input.contractId?.trim();
-  if (!contractId || !UUID_RE.test(contractId)) return err('invalid');
+  if (!contractId || !isUuid(contractId)) return err('invalid');
   const titleAr = normalizeText(input.titleAr);
   const titleEn = normalizeText(input.titleEn);
   if (!titleAr && !titleEn) return err('name_required');

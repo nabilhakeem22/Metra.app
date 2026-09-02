@@ -7,6 +7,7 @@ import { clients, PROJECT_STATUSES, type MetraDb, type ProjectStatus } from '@me
 import { eq } from 'drizzle-orm';
 import { fail } from '@/lib/actions/mutate';
 import { err, type ActionResult } from '@/lib/actions/result';
+import { isUuid } from '@/lib/uuid';
 
 export interface ProjectInput {
   code: string;
@@ -29,8 +30,6 @@ function isStatus(v: unknown): v is ProjectStatus {
   return (PROJECT_STATUSES as readonly string[]).includes(v as string);
 }
 
-const UUID_RE =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const PCT_RE = /^\d+(\.\d+)?$/;
 
 function clean(v: string | null | undefined): string | null {
@@ -84,11 +83,11 @@ export function validate(input: ProjectInput): ActionResult | Validated {
   if (!isStatus(input.status)) return err('invalid');
   // A missing OR malformed client id -> client_required (no DB uuid-cast throw).
   const clientId = input.clientId?.trim();
-  if (!clientId || !UUID_RE.test(clientId)) return err('client_required');
+  if (!clientId || !isUuid(clientId)) return err('client_required');
 
   // Type is optional; if present it must be a uuid (in-org enforced by the FK).
   const typeId = clean(input.typeId);
-  if (typeId && !UUID_RE.test(typeId)) return err('invalid');
+  if (typeId && !isUuid(typeId)) return err('invalid');
 
   const advancePct = normPct(input.advancePct);
   const retentionPct = normPct(input.retentionPct);

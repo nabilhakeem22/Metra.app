@@ -1,14 +1,15 @@
 'use client';
 
 import { Loader2, MessageSquare, Send } from 'lucide-react';
+import { useCallback } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
-import { useState, useTransition } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   listDocumentComments,
   replyToDocument,
 } from '@/lib/engagements/actions/deliverables';
 import type { StudioDocumentComment } from '@/lib/engagements/document-comments';
+import { useDocumentThread } from '@/lib/engagements/use-document-thread';
 import { bidiIsolate } from '@/lib/format/bidi';
 import { formatDate } from '@/lib/format/date';
 
@@ -18,9 +19,9 @@ const BODY_MAX = 2000;
 
 /**
  * Client Deliverables Step 2 — ONE document's comment thread, on the STUDIO side.
- * The mirror of the portal's DocumentThread: collapsed by default and LAZY, so the
- * cockpit's first paint carries no message bodies however many files an engagement
- * has.
+ * Presentation only: the collapsed/lazy/re-read behaviour lives in the shared
+ * `useDocumentThread` hook that the client portal's thread uses too, so the two can
+ * never drift on behaviour while keeping their own design systems.
  *
  * ADVISORY: replying moves no stage and clears no gate. The awaiting-reply count on
  * the command card is derived from these messages, so it falls when the studio
@@ -37,64 +38,24 @@ export function DocumentThreadPanel({
 }) {
   const t = useTranslations('engagements.comments');
   const locale = useLocale();
-  const [open, setOpen] = useState(false);
-  const [loaded, setLoaded] = useState(false);
-  const [thread, setThread] = useState<StudioDocumentComment[]>([]);
-  const [draft, setDraft] = useState('');
-  const [error, setError] = useState<string | null>(null);
-  const [loading, startLoading] = useTransition();
-  const [sending, startSending] = useTransition();
 
-  function refresh(): void {
-    startLoading(async () => {
-      try {
-        setThread(await listDocumentComments(artifactId));
-        setLoaded(true);
-      } catch {
-        setError('generic');
-      }
-    });
-  }
-
-  function toggle(): void {
-    const next = !open;
-    setOpen(next);
-    setError(null);
-    // Fetch on the FIRST open only; re-opening reuses what we already have.
-    if (next && !loaded && !loading) refresh();
-  }
-
-  function send(): void {
-    const body = draft.trim();
-    if (!body) return;
-    setError(null);
-    startSending(async () => {
-      // Wrap the await so a rejected action can never leave the spinner stuck.
-      try {
-        const result = await replyToDocument({ artifactId, body });
-        if (!result.ok) {
-          setError(result.error ?? 'generic');
-          return;
-        }
-        setDraft('');
-        setThread(await listDocumentComments(artifactId));
-        setLoaded(true);
-      } catch {
-        setError('generic');
-      }
-    });
-  }
+  const load = useCallback(() => listDocumentComments(artifactId), [artifactId]);
+  const submit = useCallback(
+    (body: string) => replyToDocument({ artifactId, body }),
+    [artifactId],
+  );
+  const thread = useDocumentThread<StudioDocumentComment>({ load, send: submit });
 
   // Unanswered on THIS thread: client messages with no staff message after them.
-  // Same rule as countAwaitingReplyCore, applied to the thread already in hand.
-  const lastStaffAt = thread.reduce<number>(
+  // The same rule as countAwaitingReplyCore, applied to the thread already in hand.
+  const lastStaffAt = thread.messages.reduce<number>(
     (latest, message) =>
       message.channel === 'staff'
         ? Math.max(latest, new Date(message.createdAt).getTime())
         : latest,
     0,
   );
-  const unanswered = thread.filter(
+  const unanswered = thread.messages.filter(
     (message) =>
       message.channel === 'client' &&
       new Date(message.createdAt).getTime() > lastStaffAt,
@@ -104,31 +65,31 @@ export function DocumentThreadPanel({
     <div>
       <button
         type="button"
-        onClick={toggle}
-        aria-expanded={open}
+        onClick={thread.toggle}
+        aria-expanded={thread.open}
         className="inline-flex items-center gap-1.5 rounded-[var(--r-item)] px-2 py-1 text-xs font-medium text-[color:var(--text-muted)] hover:bg-[color:var(--track)] hover:text-[color:var(--text)]"
       >
         <MessageSquare className="size-3.5" aria-hidden />
-        {loaded && thread.length === 0 ? t('none') : t('open')}
-        {loaded && unanswered > 0 && (
+        {thread.loaded && thread.messages.length === 0 ? t('none') : t('open')}
+        {thread.loaded && unanswered > 0 && (
           <span className="rounded-full bg-[color:var(--warn-tint)] px-1.5 py-0.5 text-[10px] font-semibold text-[color:var(--warn)]">
             {unanswered}
           </span>
         )}
       </button>
 
-      {open && (
+      {thread.open && (
         <div className="mt-2 space-y-3 rounded-[var(--r-item)] border border-[color:var(--rule)] bg-[color:var(--track)] p-3">
-          {loading && !loaded ? (
+          {thread.loading && !thread.loaded ? (
             <p className="flex items-center gap-1.5 text-xs text-[color:var(--text-muted)]">
               <Loader2 className="size-3.5 animate-spin" aria-hidden />
               {t('loading')}
             </p>
-          ) : thread.length === 0 ? (
+          ) : thread.messages.length === 0 ? (
             <p className="text-xs text-[color:var(--text-muted)]">{t('empty')}</p>
           ) : (
             <ul className="space-y-2">
-              {thread.map((message) => (
+              {thread.messages.map((message) => (
                 <li
                   key={message.id}
                   className={
@@ -160,9 +121,9 @@ export function DocumentThreadPanel({
               </label>
               <textarea
                 id={`reply-${artifactId}`}
-                value={draft}
+                value={thread.draft}
                 maxLength={BODY_MAX}
-                onChange={(event) => setDraft(event.target.value)}
+                onChange={(event) => thread.setDraft(event.target.value)}
                 placeholder={t('placeholder')}
                 rows={2}
                 className="w-full resize-y rounded-[var(--r-item)] border border-[color:var(--rule)] bg-[color:var(--card)] p-2 text-xs focus:outline-none focus:ring-2 focus:ring-[color:var(--ring)]"
@@ -171,8 +132,12 @@ export function DocumentThreadPanel({
                 <p className="text-[11px] text-[color:var(--text-muted)]">
                   {t('advisory')}
                 </p>
-                <Button size="sm" disabled={sending || !draft.trim()} onClick={send}>
-                  {sending ? (
+                <Button
+                  size="sm"
+                  disabled={thread.sending || !thread.draft.trim()}
+                  onClick={thread.send}
+                >
+                  {thread.sending ? (
                     <Loader2 className="size-3.5 animate-spin" aria-hidden />
                   ) : (
                     <Send className="size-3.5" aria-hidden />
@@ -180,9 +145,9 @@ export function DocumentThreadPanel({
                   {t('reply')}
                 </Button>
               </div>
-              {error && (
+              {thread.error && (
                 <p className="text-xs text-[color:var(--danger)]" role="alert">
-                  {t(`error.${error}`)}
+                  {t(`error.${thread.error}`)}
                 </p>
               )}
             </div>

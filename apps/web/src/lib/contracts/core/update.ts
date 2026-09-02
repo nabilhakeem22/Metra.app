@@ -6,13 +6,13 @@ import { and, eq } from 'drizzle-orm';
 import { fail, mutateInOrg } from '@/lib/actions/mutate';
 import { err, type ActionResult } from '@/lib/actions/result';
 import type { OrgContext } from '@/lib/db/context';
+import { isUuid } from '@/lib/uuid';
 import {
   normalizeMoney,
   normalizeText,
   pctInRange,
   validIsoDate,
 } from '@/lib/proposals/core';
-import { UUID_RE } from './shared';
 
 export interface ContractHeaderInput {
   titleAr?: string | null;
@@ -53,7 +53,7 @@ export async function saveContractDraftCore(
   input: SaveContractDraftInput,
 ): Promise<ActionResult> {
   const id = input.id?.trim();
-  if (!id || !UUID_RE.test(id)) return err('invalid');
+  if (!id || !isUuid(id)) return err('invalid');
   const h = input.header ?? {};
 
   const retentionPct = h.retentionPct != null ? normalizeMoney(h.retentionPct) : undefined;

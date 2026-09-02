@@ -6,9 +6,7 @@ import { and, eq } from 'drizzle-orm';
 import { fail, mutateInOrg } from '@/lib/actions/mutate';
 import { err, type ActionResult } from '@/lib/actions/result';
 import type { OrgContext } from '@/lib/db/context';
-
-const UUID_RE =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+import { isUuid } from '@/lib/uuid';
 
 const LIMITS = {
   name: 200,
@@ -56,7 +54,7 @@ export async function createContactCore(
   ctx: OrgContext,
   input: { clientId: string } & ContactInput,
 ): Promise<ActionResult & { data?: string }> {
-  if (!UUID_RE.test(input.clientId ?? '')) return err('invalid');
+  if (!isUuid(input.clientId)) return err('invalid');
   const v = normalized(input);
   const name = v.name;
   if (!name) return err('name_required');

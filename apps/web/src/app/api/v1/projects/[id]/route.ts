@@ -1,7 +1,7 @@
-import { isUuid } from '@/lib/api/ids';
 import { handleApiRequest, NotFoundError } from '@/lib/api/pipeline';
 import { getProjectById } from '@/lib/api/queries';
 import { serializeProject } from '@/lib/api/serializers/project';
+import { isUuid } from '@/lib/uuid';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';

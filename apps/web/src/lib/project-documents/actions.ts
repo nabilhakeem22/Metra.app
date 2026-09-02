@@ -8,15 +8,13 @@ import { err, type ActionResult } from '@/lib/actions/result';
 import { requireOrg } from '@/lib/auth/require-org';
 import { withOrgContext } from '@/lib/db/context';
 import { can } from '@/lib/permissions/can';
+import { isUuid } from '@/lib/uuid';
 import {
   createSignedUploadUrl,
   ensureFilesBucket,
   getSignedUrl,
   type SignedUpload,
 } from '@/lib/storage';
-
-const UUID_RE =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /**
  * Signed upload for a project document. Gated by project_activity (the broad
@@ -30,7 +28,7 @@ export async function createProjectDocumentUpload(input: {
 }): Promise<SignedUpload | ActionResult> {
   const ctx = await requireOrg();
   if (!can(ctx.role, 'project_activity', 'create')) return err('forbidden');
-  if (!UUID_RE.test(input.projectId ?? '')) return err('invalid');
+  if (!isUuid(input.projectId)) return err('invalid');
 
   const [project] = await withOrgContext(ctx, (tx) =>
     tx

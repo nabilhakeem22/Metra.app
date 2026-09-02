@@ -24,7 +24,7 @@ import {
   withinMagnitude,
 } from '@/lib/proposals/core';
 import { MONEY_RE } from '@/lib/aggregates/proposal-totals';
-import { UUID_RE } from './shared';
+import { isUuid } from '@/lib/uuid';
 
 /** Signed money string (allows a negative de-scope qty), or null if malformed. */
 function normalizeSignedMoney(v: string | null | undefined): string | null {
@@ -71,7 +71,7 @@ export async function saveVariationDraftCore(
   input: SaveVariationDraftInput,
 ): Promise<ActionResult> {
   const id = input.id?.trim();
-  if (!id || !UUID_RE.test(id)) return err('invalid');
+  if (!id || !isUuid(id)) return err('invalid');
   const lines = input.lines ?? [];
   if (lines.length > MAX_TOTAL_LINES) return err('too_many_lines');
 

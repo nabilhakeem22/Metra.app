@@ -11,6 +11,7 @@ import { allocateNumber } from '@/lib/db/allocate-number';
 import type { OrgContext } from '@/lib/db/context';
 import { normalizeText } from '@/lib/proposals/core';
 import { ACTIVE_STATES } from './states';
+import { isUuid } from '@/lib/uuid';
 
 // The non-terminal (in-flight) states a Delivery can occupy — materialized once for
 // the one-delivery-per-project guard's `state IN (…)` probe. A Delivery in a
@@ -23,9 +24,6 @@ const ACTIVE_ENGAGEMENT_STATES = [...ACTIVE_STATES];
 // count (owner decision) — a project with 1 real + N abandoned rows can still
 // start its extension.
 const PROJECT_DELIVERY_CAP = 2;
-
-const UUID_RE =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 // Postgres unique-violation SQLSTATE + the one-active-delivery backstop index
 // (migration 0032). A 23505 on THIS named index means a concurrent create won the
@@ -68,10 +66,10 @@ export async function createEngagementCore(
   const titleAr = normalizeText(input.titleAr);
   const titleEn = normalizeText(input.titleEn);
   if (!titleAr && !titleEn) return err('engagement_title_required');
-  if (!clientId || !UUID_RE.test(clientId)) {
+  if (!clientId || !isUuid(clientId)) {
     return err('engagement_client_required');
   }
-  if (!projectId || !UUID_RE.test(projectId)) {
+  if (!projectId || !isUuid(projectId)) {
     return err('engagement_project_required');
   }
 

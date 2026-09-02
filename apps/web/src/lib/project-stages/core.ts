@@ -6,9 +6,8 @@ import { eq } from 'drizzle-orm';
 import { fail, mutateInOrg } from '@/lib/actions/mutate';
 import { err, type ActionResult } from '@/lib/actions/result';
 import type { OrgContext } from '@/lib/db/context';
+import { isUuid } from '@/lib/uuid';
 
-const UUID_RE =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const NAME_MAX = 200;
 const PCT_RE = /^\d+(\.\d+)?$/;
 const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -51,7 +50,7 @@ export async function addStageCore(
   ctx: OrgContext,
   input: { projectId: string } & StageInput,
 ): Promise<ActionResult & { data?: string }> {
-  if (!UUID_RE.test(input.projectId ?? '')) return err('invalid');
+  if (!isUuid(input.projectId)) return err('invalid');
   const nameEn = clean(input.nameEn);
   const nameAr = clean(input.nameAr);
   if (!nameEn && !nameAr) return err('name_required');
@@ -118,7 +117,7 @@ export async function updateStageCore(
   ctx: OrgContext,
   input: { id: string } & StageInput,
 ): Promise<ActionResult> {
-  if (!UUID_RE.test(input.id ?? '')) return err('invalid');
+  if (!isUuid(input.id)) return err('invalid');
   const nameEn = input.nameEn !== undefined ? clean(input.nameEn) : undefined;
   const nameAr = input.nameAr !== undefined ? clean(input.nameAr) : undefined;
   if (nameEn !== undefined && nameAr !== undefined && !nameEn && !nameAr) {

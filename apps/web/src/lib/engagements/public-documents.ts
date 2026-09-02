@@ -15,15 +15,12 @@ import { sql } from 'drizzle-orm';
 import { withRequestDb } from '@/lib/db/client';
 import { ALLOWED_EXTENSIONS } from './deliverable-files';
 import { parseDocumentAccess, type DocumentAccess } from './document-access';
+import { isUuid } from '@/lib/uuid';
 import {
   CATEGORY_FILE_SLUG,
   KIND_CATEGORY,
   isClientDocumentKind,
 } from './portal-documents';
-
-/** Canonical uuid shape — validated BEFORE the id ever reaches the DB. */
-const UUID_RE =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /**
  * The ONLY extensions that may appear in a client download name — the union of the
@@ -91,7 +88,7 @@ export async function getDeliveryDocumentByToken(
   documentId: string,
 ): Promise<DeliveryDocumentTarget | null> {
   if (!rawToken || !rawToken.trim()) return null;
-  if (typeof documentId !== 'string' || !UUID_RE.test(documentId)) return null;
+  if (!isUuid(documentId)) return null;
   const hash = createHash('sha256').update(rawToken.trim()).digest('hex');
 
   try {

@@ -6,6 +6,7 @@ import {
 import { getDeliveryDocumentByToken } from '@/lib/engagements/public-documents';
 import { LOCALES, routing } from '@/i18n/routing';
 import { createSignedObjectUrl } from '@/lib/storage';
+import { isUuid } from '@/lib/uuid';
 
 // Client Deliverables, Step 1 — the session-less download endpoint for ONE released
 // document of a tokenized delivery. GET only; the share token in the path IS the
@@ -16,10 +17,6 @@ import { createSignedObjectUrl } from '@/lib/storage';
 // error, any throw — produces the IDENTICAL 303 back to the portal with
 // `?document=unavailable`. Never a 404 body, never a 500, never a distinguishable
 // response, so a caller cannot probe which documents or deliveries exist.
-
-/** Canonical uuid shape — checked BEFORE any DB call. */
-const UUID_RE =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** How long the client's signed link stays valid — long enough for the browser to
  *  follow the redirect and start the download, short enough not to be shareable. */
@@ -57,7 +54,7 @@ export async function GET(
 
   try {
     // Shape check first: a malformed id never reaches the database.
-    if (!UUID_RE.test(documentId ?? '')) return unavailable(request, locale, token);
+    if (!isUuid(documentId)) return unavailable(request, locale, token);
 
     const document = await getDeliveryDocumentByToken(token, documentId);
     if (!document) return unavailable(request, locale, token);

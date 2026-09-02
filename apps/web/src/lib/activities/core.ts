@@ -14,9 +14,8 @@ import { eq } from 'drizzle-orm';
 import { fail, mutateInOrg } from '@/lib/actions/mutate';
 import { err, type ActionResult } from '@/lib/actions/result';
 import type { OrgContext } from '@/lib/db/context';
+import { isUuid } from '@/lib/uuid';
 
-const UUID_RE =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const NOTE_MAX = 4000;
 
 export interface SystemActivityInput {
@@ -69,7 +68,7 @@ export async function addActivityCore(
   ctx: OrgContext,
   input: AddActivityInput,
 ): Promise<ActionResult & { data?: string }> {
-  if (!UUID_RE.test(input.entityId ?? '')) return err('invalid');
+  if (!isUuid(input.entityId)) return err('invalid');
   const kind = input.kind ?? 'note';
   const note = input.note?.trim() || null;
   if (kind === 'note' && !note) return err('invalid');

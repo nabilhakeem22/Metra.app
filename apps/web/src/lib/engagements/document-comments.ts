@@ -21,9 +21,7 @@ import type { ActionResult } from '@/lib/actions/result';
 import type { OrgContext } from '@/lib/db/context';
 import { withOrgContext } from '@/lib/db/context';
 import { isTerminal } from './states';
-
-const UUID_RE =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+import { isUuid } from '@/lib/uuid';
 
 /** Mirrors the SDF cap and the table's CHECK. */
 const BODY_MAX = 2000;
@@ -53,7 +51,7 @@ export async function listDocumentCommentsCore(
   ctx: OrgContext,
   artifactId: string,
 ): Promise<StudioDocumentComment[]> {
-  if (!UUID_RE.test(artifactId ?? '')) return [];
+  if (!isUuid(artifactId)) return [];
   return withOrgContext(ctx, async (db) =>
     db
       .select({
@@ -94,7 +92,7 @@ export async function replyToDocumentCore(
   ctx: OrgContext,
   input: ReplyToDocumentInput,
 ): Promise<ActionResult> {
-  if (!UUID_RE.test(input.artifactId ?? '')) return { ok: false, error: 'invalid' };
+  if (!isUuid(input.artifactId)) return { ok: false, error: 'invalid' };
   const body = input.body?.trim().slice(0, BODY_MAX) ?? '';
   if (!body) return { ok: false, error: 'invalid' };
 
@@ -156,7 +154,7 @@ export async function countAwaitingReplyCore(
   ctx: OrgContext,
   engagementId: string,
 ): Promise<number> {
-  if (!UUID_RE.test(engagementId ?? '')) return 0;
+  if (!isUuid(engagementId)) return 0;
   // The same table again, aliased, so the subquery can refer to a LATER message on
   // the same document without colliding with the outer row.
   const later = alias(engagementDocumentComments, 'later');

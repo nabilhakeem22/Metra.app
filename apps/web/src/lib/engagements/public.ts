@@ -26,10 +26,7 @@ import {
   type HeroView,
 } from './portal-hero';
 import { DESIGN_STATES, type DesignState } from './states';
-
-/** Canonical uuid shape — checked BEFORE any DB call, so a malformed document id
- *  never reaches the ::uuid cast (which would raise instead of returning a code). */
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+import { isUuid } from '@/lib/uuid';
 
 function hashToken(raw: string): string {
   return createHash('sha256').update(raw).digest('hex');
@@ -496,7 +493,7 @@ export async function getDeliveryDocumentCommentsByToken(
   rawToken: string,
   documentId: string,
 ): Promise<PublicDocumentComment[]> {
-  if (!rawToken?.trim() || !UUID_RE.test(documentId)) return [];
+  if (!rawToken?.trim() || !isUuid(documentId)) return [];
   const hash = hashToken(rawToken.trim());
   try {
     const rows = (await withRequestDb((db) =>
@@ -555,7 +552,7 @@ export async function addDeliveryCommentByToken(
 ): Promise<DeliveryCommentResult> {
   if (!rawToken?.trim()) return { ok: false, error: 'token_invalid' };
   // The uuid is validated BEFORE the DB so a malformed id can never reach the cast.
-  if (!UUID_RE.test(input.documentId)) return { ok: false, error: 'token_invalid' };
+  if (!isUuid(input.documentId)) return { ok: false, error: 'token_invalid' };
   if (!input.body?.trim()) return { ok: false, error: 'empty' };
   const hash = hashToken(rawToken.trim());
   const rows = (await withRequestDb((db) =>

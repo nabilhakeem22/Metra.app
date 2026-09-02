@@ -1,3 +1,4 @@
+import { isUuid } from '@/lib/uuid';
 // Opaque cursor pagination for the Public API (v1). Pure — no server-only deps.
 // Stable total order is (created_at desc, id desc); the cursor is a base64url of
 // {ts,id}, where `ts` is a FULL-microsecond ISO timestamp string
@@ -23,8 +24,6 @@ export class InvalidCursorError extends Error {
   }
 }
 
-const UUID_RE =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 // EXACT microsecond ISO (6 fractional digits, UTC 'Z'). Strict so a cursor
 // timestamp can never be a value Postgres ::timestamptz would reject at cast
 // time (F2) — e.g. "2026", "0", "2026-08" all fail here and 400 up front.
@@ -68,7 +67,7 @@ export function decodeCursor(raw: string): Cursor {
   if (typeof t !== 'string' || typeof i !== 'string') {
     throw new InvalidCursorError();
   }
-  if (!UUID_RE.test(i)) throw new InvalidCursorError();
+  if (!isUuid(i)) throw new InvalidCursorError();
   // Strict full-microsecond format — NOT a loose Date.parse (F2). Anything the
   // DB ::timestamptz cast would choke on is rejected here as a 400, not a 500.
   if (!CURSOR_TS_RE.test(t)) throw new InvalidCursorError();

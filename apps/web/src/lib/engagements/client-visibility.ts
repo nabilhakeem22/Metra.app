@@ -13,9 +13,7 @@ import { fail, mutateInOrg } from '@/lib/actions/mutate';
 import type { ActionResult } from '@/lib/actions/result';
 import type { OrgContext } from '@/lib/db/context';
 import { isTerminal } from './states';
-
-const UUID_RE =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+import { isUuid } from '@/lib/uuid';
 
 export interface SetArtifactClientVisibilityInput {
   artifactId: string;
@@ -41,7 +39,7 @@ export async function setArtifactClientVisibilityCore(
   ctx: OrgContext,
   input: SetArtifactClientVisibilityInput,
 ): Promise<ActionResult> {
-  if (!UUID_RE.test(input.artifactId ?? '')) return { ok: false, error: 'invalid' };
+  if (!isUuid(input.artifactId)) return { ok: false, error: 'invalid' };
   if (typeof input.visible !== 'boolean') return { ok: false, error: 'invalid' };
 
   return mutateInOrg(

@@ -25,12 +25,9 @@ import { fail, mutateInOrg } from '@/lib/actions/mutate';
 import type { ActionResult } from '@/lib/actions/result';
 import type { OrgContext } from '@/lib/db/context';
 import { isTerminal } from './states';
+import { isUuid } from '@/lib/uuid';
 
 const KIND_SET = new Set<string>(ENGAGEMENT_ARTIFACT_KINDS);
-
-/** Canonical uuid shape — a malformed `fileId` is `invalid`, not a cast error. */
-const UUID_RE =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export interface RecordArtifactInput {
   engagementId: string;
@@ -66,7 +63,7 @@ export async function recordArtifactCore(
   }
 
   const fileId = input.fileId ?? null;
-  if (fileId !== null && !UUID_RE.test(fileId)) {
+  if (fileId !== null && !isUuid(fileId)) {
     return { ok: false, error: 'invalid' };
   }
   const contentHash = optionalText(input.contentHash);

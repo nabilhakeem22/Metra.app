@@ -7,6 +7,7 @@ import { fail, mutateInOrg } from '@/lib/actions/mutate';
 import { err, type ActionResult } from '@/lib/actions/result';
 import type { OrgContext } from '@/lib/db/context';
 import { UNIT_TOKENS } from './import';
+import { isUuid } from '@/lib/uuid';
 
 export interface CostItemInput {
   code: string;
@@ -20,9 +21,6 @@ export interface CostItemInput {
   etaItemCode?: string | null;
   etaCodeType?: string | null;
 }
-
-const UUID_RE =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function isUnit(v: unknown): v is CostItemUnit {
   return UNIT_TOKENS.includes(v as CostItemUnit);
@@ -59,7 +57,7 @@ export async function createCostItemCore(
   const nameEn = input.nameEn?.trim() || null;
   const nameAr = input.nameAr?.trim() || null;
   if (!nameEn && !nameAr) return err('name_required');
-  if (!UUID_RE.test(input.sectionId ?? '') || !isUnit(input.unit)) {
+  if (!isUuid(input.sectionId) || !isUnit(input.unit)) {
     return err('invalid');
   }
   const cost = normMoney(input.defaultUnitCost);
@@ -117,7 +115,7 @@ export async function updateCostItemCore(
   const nameEn = input.nameEn?.trim() || null;
   const nameAr = input.nameAr?.trim() || null;
   if (!nameEn && !nameAr) return err('name_required');
-  if (!UUID_RE.test(input.sectionId ?? '') || !isUnit(input.unit)) {
+  if (!isUuid(input.sectionId) || !isUnit(input.unit)) {
     return err('invalid');
   }
   const cost = normMoney(input.defaultUnitCost);

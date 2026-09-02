@@ -8,6 +8,7 @@ import { fail, mutateInOrg } from '@/lib/actions/mutate';
 import { err, type ActionResult } from '@/lib/actions/result';
 import type { OrgContext } from '@/lib/db/context';
 import { STARTER_CATALOGUE } from './starter-catalogue';
+import { isUuid } from '@/lib/uuid';
 
 export type PriceTarget = 'cost' | 'price' | 'both';
 
@@ -17,9 +18,6 @@ export interface BulkUpdateInput {
   target: PriceTarget;
   effectiveDate?: string; // YYYY-MM-DD; metadata only
 }
-
-const UUID_RE =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export interface BulkUpdateSummary {
   changeId: string;
@@ -58,7 +56,7 @@ export async function bulkUpdatePricesCore(
   if (input.target !== 'cost' && input.target !== 'price' && input.target !== 'both') {
     return err('invalid');
   }
-  if (!UUID_RE.test(input.sectionId ?? '')) return err('invalid');
+  if (!isUuid(input.sectionId)) return err('invalid');
   const effectiveDate =
     input.effectiveDate && ISO_DATE.test(input.effectiveDate)
       ? input.effectiveDate
