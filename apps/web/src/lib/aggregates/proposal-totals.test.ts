@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
+  clampMoney4,
+  coerceMoneyInput,
   computeLine,
   computeSection,
   computeTotals,
@@ -139,5 +141,50 @@ describe('supervision fee (after VAT, untaxed; base = taxableBase)', () => {
     });
     expect(over.supervisionAmount).toBe('150000.0000');
     expect(over.total).toBe('250000.0000');
+  });
+});
+
+describe('clampMoney4 — the app and numeric(18,4) must agree', () => {
+  it('truncates past the 4th decimal, matching parseMoney4', () => {
+    expect(clampMoney4('1.00005')).toBe('1.0000');
+    expect(clampMoney4('2.99999')).toBe('2.9999');
+    expect(clampMoney4('0.000049999')).toBe('0.0000');
+    expect(clampMoney4('123.456789')).toBe('123.4567');
+  });
+
+  it('leaves anything already within scale EXACTLY as it was', () => {
+    // Not a canonicaliser: '5' must not become '5.0000', or every existing stored
+    // value and every test pinning one would shift shape for no reason.
+    for (const value of ['5', '0', '5.1', '5.12', '5.123', '5.1234', '1000000']) {
+      expect(clampMoney4(value)).toBe(value);
+    }
+  });
+
+  it('closes the preview-vs-stored gap these exact values used to open', () => {
+    // Verified against the live database: numeric(18,4) ROUNDS these, while
+    // parseMoney4 TRUNCATES them, so an unclamped value previewed one total and
+    // came back another.
+    //   '1.00005' -> pg 1.0001, app 1.0000
+    //   '2.99999' -> pg 3.0000, app 2.9999
+    //   '0.00005' -> pg 0.0001, app 0.0000
+    // After clamping there is nothing left for Postgres to round: the clamped
+    // string round-trips through parseMoney4/formatMoney4 unchanged.
+    for (const raw of ['1.00005', '2.99999', '0.00005']) {
+      const clamped = clampMoney4(raw);
+      expect(formatMoney4(parseMoney4(clamped))).toBe(
+        formatMoney4(parseMoney4(raw)),
+      );
+      // ...and the clamped value carries no digits Postgres could round away.
+      const frac = clamped.split('.')[1] ?? '';
+      expect(frac.length).toBeLessThanOrEqual(4);
+    }
+  });
+
+  it('is applied by coerceMoneyInput, the builder’s live-preview boundary', () => {
+    expect(coerceMoneyInput('2.99999')).toBe('2.9999');
+    expect(coerceMoneyInput('  7.123456  ')).toBe('7.1234');
+    // Rejection behaviour is unchanged.
+    expect(coerceMoneyInput('-3')).toBe('0');
+    expect(coerceMoneyInput('abc')).toBe('0');
   });
 });

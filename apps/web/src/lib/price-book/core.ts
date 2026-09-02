@@ -8,6 +8,7 @@ import { err, type ActionResult } from '@/lib/actions/result';
 import type { OrgContext } from '@/lib/db/context';
 import { UNIT_TOKENS } from './import';
 import { isUuid } from '@/lib/uuid';
+import { clampMoney4 } from '@/lib/aggregates/proposal-totals';
 
 export interface CostItemInput {
   code: string;
@@ -45,7 +46,9 @@ function normMoney(v: string | null | undefined): string | null {
   const cleaned = v.trim().replace(/,/g, '');
   if (cleaned === '') return '0';
   if (!/^\d+(\.\d+)?$/.test(cleaned)) return null;
-  return cleaned;
+  // Same reason as proposals' normalizeMoney: clamp to the numeric(18,4) scale so
+  // what the app computed and what the database stores cannot diverge.
+  return clampMoney4(cleaned);
 }
 
 export async function createCostItemCore(

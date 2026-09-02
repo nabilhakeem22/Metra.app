@@ -14,7 +14,6 @@ import {
 import { eq, sql } from 'drizzle-orm';
 import { fail, mutateInOrg } from '@/lib/actions/mutate';
 import { err, type ActionResult } from '@/lib/actions/result';
-import { MONEY_RE } from '@/lib/aggregates/proposal-totals';
 import type { OrgContext } from '@/lib/db/context';
 import { isUuid } from '@/lib/uuid';
 import {
@@ -22,52 +21,24 @@ import {
   proposalYear,
 } from '@/lib/format/proposal-number';
 
-export const SHARE_TTL_DAYS = 30;
-const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+import { normalizeText, validIsoDate } from './validation';
 
-// R2 boundary caps (named so the tests + UI can agree on them).
-export const MAX_SECTIONS = 100;
-export const MAX_LINES_PER_SECTION = 500;
-export const MAX_TOTAL_LINES = 2000;
-// F4 money magnitude cap — numeric(18,4) tops out near 1e14; stay well under.
-export const MAX_AMOUNT = 1_000_000_000_000; // 1e12
-export const LINE_INSERT_CHUNK = 500;
-
-export function normalizeText(v: string | null | undefined): string | null {
-  return v?.trim() || null;
-}
-
-/** Non-negative money string or null. */
-export function normalizeMoney(
-  v: string | null | undefined,
-  fallback = '0',
-): string | null {
-  const s = v?.trim();
-  if (s === undefined || s === '') return fallback;
-  if (!MONEY_RE.test(s) || s.startsWith('-')) return null;
-  return s;
-}
-
-export function withinMagnitude(s: string): boolean {
-  return Math.abs(Number(s)) <= MAX_AMOUNT;
-}
-
-export function pctInRange(s: string): boolean {
-  const n = Number(s);
-  return Number.isFinite(n) && n >= 0 && n <= 100;
-}
-
-export function validIsoDate(s: string): boolean {
-  if (!ISO_DATE_RE.test(s)) return false;
-  const d = new Date(`${s}T00:00:00Z`);
-  return Number.isFinite(d.getTime()) && d.toISOString().slice(0, 10) === s;
-}
-
-export function chunk<T>(arr: T[], size: number): T[][] {
-  const out: T[][] = [];
-  for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
-  return out;
-}
+// The pure validators + boundary caps live in ./validation (client-safe, unit-
+// testable). Re-exported so `@/lib/proposals/core` stays the one import surface.
+export {
+  SHARE_TTL_DAYS,
+  MAX_SECTIONS,
+  MAX_LINES_PER_SECTION,
+  MAX_TOTAL_LINES,
+  MAX_AMOUNT,
+  LINE_INSERT_CHUNK,
+  normalizeText,
+  normalizeMoney,
+  withinMagnitude,
+  pctInRange,
+  validIsoDate,
+  chunk,
+} from './validation';
 
 export function mintToken(): { raw: string; hash: string } {
   const raw = randomBytes(32).toString('base64url');

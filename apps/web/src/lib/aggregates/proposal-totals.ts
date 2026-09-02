@@ -11,9 +11,32 @@ const SCALE = 10000n; // 1e4 (4 decimal places)
  * the preview matches persistence (input the server would reject -> treated as 0). */
 export const MONEY_RE = /^-?\d+(\.\d+)?$/;
 
+/**
+ * Truncate a money string to at most 4 decimal places — the scale of every money
+ * column in this schema (`numeric(18,4)`).
+ *
+ * WHY THIS EXISTS: `parseMoney4` TRUNCATES past the 4th decimal, but Postgres
+ * ROUNDS when it stores into numeric(18,4). So an unclamped `2.99999` previewed as
+ * 2.9999 in the app and came back as 3.0000 from the database — the same document
+ * showing two different totals either side of a save, compounding over as many as
+ * MAX_TOTAL_LINES rows. Clamping at every input boundary makes the two agree by
+ * construction: a value that already has 4 or fewer decimals reaches the column
+ * exactly, so there is nothing left for Postgres to round.
+ *
+ * Deliberately truncating (not rounding) and deliberately NOT canonicalising: it
+ * matches `parseMoney4`, and `'5'` stays `'5'` rather than becoming `'5.0000'`, so
+ * only the genuinely-ambiguous >4dp inputs change shape.
+ */
+export function clampMoney4(s: string): string {
+  const dot = s.indexOf('.');
+  if (dot < 0) return s;
+  const frac = s.length - dot - 1;
+  return frac > 4 ? s.slice(0, dot + 5) : s;
+}
+
 export function coerceMoneyInput(s: string): string {
   const t = s.trim();
-  return MONEY_RE.test(t) && !t.startsWith('-') ? t : '0';
+  return MONEY_RE.test(t) && !t.startsWith('-') ? clampMoney4(t) : '0';
 }
 
 /** floor(a / b) for b > 0 (BigInt / truncates toward zero). */
