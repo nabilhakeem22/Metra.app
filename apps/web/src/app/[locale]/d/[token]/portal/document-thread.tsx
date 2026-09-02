@@ -4,7 +4,7 @@ import { Loader2, MessageSquare, Send } from 'lucide-react';
 import { useCallback } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
-import type { PublicDocumentComment } from '@/lib/engagements/public';
+import type { PublicDocumentComment } from '@/lib/engagements/public-comments';
 import { useDocumentThread } from '@/lib/engagements/use-document-thread';
 import { bidiIsolate } from '@/lib/format/bidi';
 import { formatDate } from '@/lib/format/date';

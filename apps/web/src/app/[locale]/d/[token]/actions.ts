@@ -2,14 +2,16 @@
 
 import { headers } from 'next/headers';
 import {
-  addDeliveryCommentByToken,
   claimPaymentByToken,
-  getDeliveryDocumentCommentsByToken,
   recordDeliveryActionByToken,
   type DeliveryActionResult,
+} from '@/lib/engagements/public';
+import {
+  addDeliveryCommentByToken,
+  getDeliveryDocumentCommentsByToken,
   type DeliveryCommentResult,
   type PublicDocumentComment,
-} from '@/lib/engagements/public';
+} from '@/lib/engagements/public-comments';
 
 /**
  * The client IP for the advisory audit trail, capped at 45 chars. Prefers the

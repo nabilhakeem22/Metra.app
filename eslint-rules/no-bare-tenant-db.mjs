@@ -42,6 +42,11 @@
 //          it resolves ONE released document of the token's own delivery and returns
 //          only a storage bucket/key + kind; the client-supplied document id is a
 //          filter inside an already-proven delivery, never a lookup key of its own.
+//        apps/web/src/lib/engagements/public-comments.ts — the same token surface
+//          again (split out of public.ts): it reads and appends messages on ONE
+//          released document of the token's own delivery. Identity-blind on the
+//          studio side and cost-blind throughout; the document id is a filter
+//          within a delivery the token already proved.
 //        apps/web/src/lib/variations/public.ts
 //   2. The public API-key resolver, which wraps its SDF in a transaction and drops
 //      into `set local role metra_app` before the call:
@@ -93,6 +98,7 @@ const ALLOWLISTED_FILES = [
   'apps/web/src/lib/contracts/public.ts',
   'apps/web/src/lib/engagements/public.ts',
   'apps/web/src/lib/engagements/public-documents.ts',
+  'apps/web/src/lib/engagements/public-comments.ts',
   'apps/web/src/lib/variations/public.ts',
   'apps/web/src/lib/api-keys/resolve.ts',
   'apps/web/src/lib/automation/system-context.ts',

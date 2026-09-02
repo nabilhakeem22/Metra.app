@@ -10,11 +10,11 @@ import {
   listDocumentCommentsCore,
   replyToDocumentCore,
 } from '@/lib/engagements/document-comments';
+import { getDeliveryByToken } from '@/lib/engagements/public';
 import {
   addDeliveryCommentByToken,
-  getDeliveryByToken,
   getDeliveryDocumentCommentsByToken,
-} from '@/lib/engagements/public';
+} from '@/lib/engagements/public-comments';
 import { mintDeliveryLinkCore, revokeDeliveryLinkCore } from '@/lib/engagements/share';
 import { createProjectCore } from '@/lib/projects/core';
 import { listProjects } from '@/lib/projects/queries';
