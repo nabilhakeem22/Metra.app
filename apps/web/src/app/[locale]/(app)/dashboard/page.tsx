@@ -174,6 +174,7 @@ export default async function DashboardPage({
           title={d('charts.projects')}
           summary={d('charts.projectsSummary', { n: range })}
           emptyLabel={d('charts.empty')}
+          totalLabel={d('charts.total')}
           columns={projectColumns}
           series={[
             { key: 'active', label: d('charts.statusActive'), token: '--chart-1' },
@@ -185,6 +186,7 @@ export default async function DashboardPage({
           title={d('charts.clients')}
           summary={d('charts.clientsSummary', { n: range })}
           emptyLabel={d('charts.empty')}
+          totalLabel={d('charts.total')}
           columns={clientColumns}
           series={[
             { key: 'active', label: d('charts.clientActive'), token: '--chart-1' },

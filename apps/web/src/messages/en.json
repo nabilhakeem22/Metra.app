@@ -264,7 +264,8 @@
       "statusCompleted": "Completed",
       "statusOther": "Other",
       "clientActive": "Active",
-      "clientInactive": "Inactive"
+      "clientInactive": "Inactive",
+      "total": "Total"
     }
   },
   "team": {

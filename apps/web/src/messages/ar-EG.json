@@ -264,7 +264,8 @@
       "statusCompleted": "مكتمل",
       "statusOther": "غير كده",
       "clientActive": "نشط",
-      "clientInactive": "غير نشط"
+      "clientInactive": "غير نشط",
+      "total": "الإجمالي"
     }
   },
   "team": {
