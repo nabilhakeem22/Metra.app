@@ -1294,7 +1294,8 @@
       "proposal_followup": "Quotation {number} has been awaiting a response for {days} days.",
       "portfolio_digest": "{active} active projects, {awaiting} awaiting response, {expiring} expiring soon, {overdue} overdue stages.",
       "stage_reminder": "{overdue} overdue stages and {upcoming} upcoming."
-    }
+    },
+    "viewAll": "View all"
   },
   "automation": {
     "title": "Automation",

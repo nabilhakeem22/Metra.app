@@ -1,6 +1,7 @@
 'use client';
 
 import { useTranslations } from 'next-intl';
+import type { FeedItem } from '@/components/notifications/feed-item';
 import { useState, type ReactNode } from 'react';
 import { TourProvider } from '@/components/onboarding/tour/tour-provider';
 import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet';
@@ -17,6 +18,8 @@ export interface AppShellProps {
   orgs: OrgOption[];
   activeOrgId: string;
   unreadCount: number;
+  /** Recent notifications for the bell's dropdown. */
+  notifications: FeedItem[];
   tourSeen: boolean;
   tourStep: string | null;
   children: ReactNode;
@@ -28,6 +31,7 @@ export function AppShell({
   orgs,
   activeOrgId,
   unreadCount,
+  notifications,
   tourSeen,
   tourStep,
   children,
@@ -95,6 +99,7 @@ export function AppShell({
               email={email}
               role={role}
               unreadCount={unreadCount}
+              notifications={notifications}
               onOpenDrawer={() => setDrawerOpen(true)}
             />
             <main className="min-h-0 flex-1 overflow-y-auto">{children}</main>

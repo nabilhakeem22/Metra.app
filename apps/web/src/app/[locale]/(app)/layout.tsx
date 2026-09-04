@@ -4,7 +4,7 @@ import type { ReactNode } from 'react';
 import { AppShell } from '@/components/shell/app-shell';
 import { requireOrg } from '@/lib/auth/require-org';
 import { getSessionUser } from '@/lib/auth/session';
-import { countUnread } from '@/lib/notifications/queries';
+import { countUnread, listNotifications } from '@/lib/notifications/queries';
 import { readOnboarding } from '@/lib/onboarding/merge';
 import { listCurrentUserOrgs } from '@/lib/org/queries';
 import { PRIVATE_METADATA } from '@/lib/seo/private-metadata';
@@ -25,7 +25,13 @@ export default async function AppLayout({
   const onboarding = readOnboarding(user?.user_metadata);
 
   const orgs = await listCurrentUserOrgs(ctx.userId);
-  const unreadCount = await countUnread(ctx);
+  // The bell's dropdown is fed from here rather than fetching on open: this layout
+  // is a server component that was already counting unread, so the panel costs no
+  // extra request and can never be staler than the page it sits on.
+  const [unreadCount, recentNotifications] = await Promise.all([
+    countUnread(ctx),
+    listNotifications(ctx, { limit: 8 }),
+  ]);
 
   return (
     <AppShell
@@ -34,6 +40,16 @@ export default async function AppLayout({
       orgs={orgs}
       activeOrgId={ctx.orgId}
       unreadCount={unreadCount}
+      notifications={recentNotifications.map((n) => ({
+        id: n.id,
+        kind: n.kind,
+        bodyKey: n.bodyKey,
+        params: (n.params ?? {}) as Record<string, unknown>,
+        entityType: n.entityType,
+        entityId: n.entityId,
+        createdAt: n.createdAt.toISOString(),
+        read: n.readAt !== null,
+      }))}
       tourSeen={!!onboarding.tourSeen}
       tourStep={onboarding.tourStep ?? null}
     >

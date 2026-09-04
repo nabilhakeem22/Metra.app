@@ -1294,7 +1294,8 @@
       "proposal_followup": "عرض السعر {number} في انتظار الرد منذ {days} يوم.",
       "portfolio_digest": "{active} مشروع نشط، {awaiting} في انتظار الرد، {expiring} ينتهي قريباً، {overdue} مراحل متأخرة.",
       "stage_reminder": "{overdue} مراحل متأخرة و{upcoming} قادمة."
-    }
+    },
+    "viewAll": "عرض الكل"
   },
   "automation": {
     "title": "الأتمتة",

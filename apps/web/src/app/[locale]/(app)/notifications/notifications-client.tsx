@@ -8,25 +8,16 @@ import { toast } from '@/hooks/use-toast';
 import { useRouter, Link } from '@/i18n/routing';
 import { formatDate } from '@/lib/format/date';
 import {
+  notificationBody,
+  notificationHref,
+  type FeedItem,
+} from '@/components/notifications/feed-item';
+import {
   markAllNotificationsRead,
   markNotificationRead,
 } from '@/lib/notifications/actions';
 
-export interface FeedItem {
-  id: string;
-  kind: string;
-  bodyKey: string;
-  params: Record<string, unknown>;
-  entityType: string | null;
-  entityId: string | null;
-  createdAt: string;
-  read: boolean;
-}
-
-const ENTITY_HREF: Record<string, (id: string) => string> = {
-  proposal: (id) => `/proposals/${id}`,
-  project: (id) => `/projects/${id}`,
-};
+export type { FeedItem };
 
 export function NotificationsClient({ items }: { items: FeedItem[] }) {
   const t = useTranslations('notifications');
@@ -37,39 +28,6 @@ export function NotificationsClient({ items }: { items: FeedItem[] }) {
   const [pending, start] = useTransition();
 
   const hasUnread = items.some((i) => !i.read);
-
-  // Numeric params are passed as STRINGS so next-intl never applies locale number
-  // formatting (which would emit Arabic-Indic digits for ar-EG) — Western only.
-  function body(item: FeedItem): string {
-    const p = item.params;
-    const s = (v: unknown) => String(v ?? 0);
-    switch (item.bodyKey) {
-      case 'proposal_expiring':
-        return tb('proposal_expiring', {
-          number: s(p.number),
-          date: formatDate(String(p.expiryDate ?? ''), locale),
-        });
-      case 'proposal_followup':
-        return tb('proposal_followup', {
-          number: s(p.number),
-          days: s(p.days),
-        });
-      case 'portfolio_digest':
-        return tb('portfolio_digest', {
-          active: s(p.activeProjects),
-          awaiting: s(p.awaitingResponse),
-          expiring: s(p.expiringSoon),
-          overdue: s(p.overdueStages),
-        });
-      case 'stage_reminder':
-        return tb('stage_reminder', {
-          overdue: s(p.overdueCount),
-          upcoming: s(p.upcomingCount),
-        });
-      default:
-        return '';
-    }
-  }
 
   function markOne(id: string) {
     start(async () => {
@@ -108,11 +66,9 @@ export function NotificationsClient({ items }: { items: FeedItem[] }) {
 
       <ul className="divide-y rounded-xl border bg-card">
         {items.map((item) => {
-          const hrefFn = item.entityType
-            ? ENTITY_HREF[item.entityType]
-            : undefined;
-          const href = hrefFn && item.entityId ? hrefFn(item.entityId) : null;
-          const text = body(item);
+
+          const href = notificationHref(item);
+          const text = notificationBody(item, tb, (iso) => formatDate(iso, locale));
           return (
             <li
               key={item.id}

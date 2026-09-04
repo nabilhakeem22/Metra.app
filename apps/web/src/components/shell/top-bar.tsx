@@ -3,6 +3,7 @@
 import { Menu } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { HelpMenu } from '@/components/onboarding/help-menu';
+import type { FeedItem } from '@/components/notifications/feed-item';
 import { IconButton } from '@/components/ui/icon-button';
 import type { MemberRole } from '@/lib/permissions/roles';
 import { cn } from '@/lib/utils';
@@ -15,6 +16,8 @@ export interface TopBarProps {
   email?: string;
   role: MemberRole;
   unreadCount: number;
+  /** Recent notifications for the bell's dropdown. */
+  notifications: FeedItem[];
   onOpenDrawer: () => void;
   className?: string;
 }
@@ -23,6 +26,7 @@ export function TopBar({
   email,
   role,
   unreadCount,
+  notifications,
   onOpenDrawer,
   className,
 }: TopBarProps) {
@@ -53,7 +57,7 @@ export function TopBar({
         className="flex items-center gap-[6px]"
         style={{ marginInlineStart: 'auto' }}
       >
-        <NotificationBell unreadCount={unreadCount} />
+        <NotificationBell unreadCount={unreadCount} items={notifications} />
         <HelpMenu />
         <LocaleSwitch />
         <UserMenu email={email} role={role} />
