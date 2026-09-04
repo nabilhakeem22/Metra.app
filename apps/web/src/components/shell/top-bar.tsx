@@ -34,7 +34,13 @@ export function TopBar({
 
   return (
     <header
-      className={cn('glass flex items-center gap-2', className)}
+      // `relative z-30` is load-bearing for the notification dropdown. `.glass`
+      // applies backdrop-filter, which CREATES A STACKING CONTEXT — so the panel's
+      // own z-50 only ranks it inside this header, and <main> (a later sibling with
+      // no z-index) painted page content straight over it. Raising the whole header
+      // above the content fixes it for any future popover here too. Kept BELOW the
+      // z-50 dialog/sheet layer and the z-100 toasts, so overlays still win.
+      className={cn('glass relative z-30 flex items-center gap-2', className)}
       // .glass sets --r-panel; the bar uses the slightly tighter --r-bar.
       style={{ borderRadius: 'var(--r-bar)', padding: '10px 16px' }}
     >
