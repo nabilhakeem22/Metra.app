@@ -81,15 +81,22 @@
     --text: #111418;
     --text-body: #333a44;
     --text-muted: #5c6470;
-    --text-faint: #8a919c;
+    /* Darkened from the handoff's #8A919C, which scored 2.98 on glass. Section
+       labels and meta are 10-11px, so they need the full 4.5 rather than the
+       large-text 3.0. */
+    --text-faint: #68707b;
 
     /* --brand is consumed by Tailwind as hsl(var(--brand)), so it is defined as
        an H S% L% triplet in the bridge below (the cobalt #2E6BE6), not as the
-       raw hex the handoff lists. --brand-hi/-ink/-grad/-tint/-glow stay raw
+       raw hex the handoff lists. --brand-ink/-grad/-tint/-glow stay raw
        colours for direct use (Tailwind brand.ink / brand.tint / brand-glow). */
-    --brand-hi: #5a8df2; /* gradient top */
     --brand-ink: #1d4fbf; /* text/icon on tint */
-    --brand-grad: linear-gradient(180deg, #5a8df2, #2e6be6);
+    /* Both stops carry a WHITE label (primary button, avatar), so both must
+       clear 4.5. The identity's cobalt-light #5A8DF2 scores only 3.22, which made
+       the most-used control in the app legible at its base and not its cap — so
+       the gradient runs cobalt -> cobalt-deep instead. Both are identity colours
+       (4.81 and 7.39) and it stays a real gradient rather than a flat fill. */
+    --brand-grad: linear-gradient(180deg, #2e6be6, #1b4dbd);
     --brand-tint: rgba(46, 107, 230, 0.14);
     --brand-tint-border: rgba(46, 107, 230, 0.2);
     --brand-glow: 0 8px 20px rgba(46, 107, 230, 0.3);
@@ -103,16 +110,19 @@
     --rule: rgba(23, 34, 57, 0.08);
     --rule-soft: rgba(23, 34, 57, 0.06);
     --track: rgba(23, 34, 57, 0.07); /* segmented / chip background */
-    --danger: #d93b34;
+    --danger: #bc2a23;
     --danger-tint: rgba(217, 59, 52, 0.13);
 
     /* Semantic status (chips/badges) — NOT the brand accent. Jade is retired
        from the IDENTITY but stays here as the positive state; now that the
        brand is cobalt it no longer collides with the accent, which is what made
        the old teal-brand / teal-success pairing ambiguous. */
-    --success: #0e8f6f;
+    /* Inks are darkened one step from the identity hues so each clears 4.5 on
+       its own tint; the TINTS keep the identity colour, so the chips still read
+       as jade/amber/red. Light theme only — dark already passes (6.81/5.73/4.66). */
+    --success: #0b7158;
     --success-tint: rgba(14, 143, 111, 0.14);
-    --warn: #b4791f;
+    --warn: #885b17;
     --warn-tint: rgba(180, 121, 31, 0.15);
 
     /* Chart series — a SEQUENCE, not the semantic status colours. Three steps of
@@ -189,7 +199,6 @@
        does not — it keeps the identity's #5A8DF2 -> #2E6BE6 gradient in both
        themes, because a logo that changes colour between themes stops reading
        as one logo. See components/brand/wordmark.tsx. */
-    --brand-hi: #7ea9ff;
     --brand-ink: #8fb3ff;
     --brand-grad: linear-gradient(180deg, #7ea9ff, #4f7deb); /* label: #0A0E16 */
     --brand-tint: rgba(109, 154, 245, 0.22);

@@ -22,7 +22,6 @@
   --l-line: var(--rule);
   --l-line-2: hsl(var(--border));
   --l-brand: hsl(var(--brand));
-  --l-brand-hi: var(--brand-hi);
   --l-brand-ink: var(--brand-ink);
   --l-brand-grad: var(--brand-grad);
   --l-brand-soft: var(--brand-tint);
