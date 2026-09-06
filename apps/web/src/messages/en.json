@@ -1,7 +1,8 @@
 {
   "app": {
     "name": "Metra",
-    "descriptor": "Project and cost control for interior-design studios"
+    "descriptor": "Project and cost control for interior-design studios",
+    "loading": "Loading…"
   },
   "home": {
     "title": "Metra",

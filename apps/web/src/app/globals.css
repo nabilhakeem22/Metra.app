@@ -129,6 +129,9 @@
        identity drops it on dark so the tile edge doesn't glow; the gradient
        itself is fixed in both themes. */
     --mark-hairline: rgba(255, 255, 255, 0.55);
+    /* Loader halo. Deliberately stronger than --brand-tint, which is a chip
+       fill: this one has to read as light coming off the mark. */
+    --halo: rgba(46, 107, 230, 0.34);
 
     /* ---- shadcn bridge (light) — every var the app's Tailwind colors read ---- */
     --background: 216 33% 94%; /* #EBEFF5 */
@@ -220,6 +223,7 @@
 
     /* Dropped from .55 so the tile edge doesn't glow on the navy ground. */
     --mark-hairline: rgba(255, 255, 255, 0.28);
+    --halo: rgba(90, 141, 242, 0.4);
 
     /* ---- shadcn bridge (dark) ---- */
     --background: 220 38% 6%; /* #0A0E16 */
@@ -363,6 +367,121 @@
 @media (prefers-reduced-motion: reduce) {
   .metra-trace [data-trace] {
     animation: none;
+  }
+}
+
+/* ============================================================
+   Trace, loop variant — the loading screen only. The mark becomes the wait
+   itself: it draws over the first ~1.9s of a 3s cycle then HOLDS, so it reads
+   as breathing rather than spinning. The halo runs in phase with it; the
+   progress bar deliberately does not (1.6s), because locking them would make
+   the whole screen feel like one metronome.
+   ============================================================ */
+@keyframes metra-trace-roof-loop {
+  0% {
+    stroke-dashoffset: 29;
+  }
+  30%,
+  100% {
+    stroke-dashoffset: 0;
+  }
+}
+@keyframes metra-trace-walls-loop {
+  0%,
+  24% {
+    stroke-dashoffset: 35;
+  }
+  56%,
+  100% {
+    stroke-dashoffset: 0;
+  }
+}
+@keyframes metra-trace-window-loop {
+  0%,
+  56% {
+    opacity: 0;
+  }
+  68%,
+  100% {
+    opacity: 1;
+  }
+}
+@keyframes metra-halo {
+  0%,
+  100% {
+    opacity: 0.32;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.6;
+    transform: scale(1.12);
+  }
+}
+@keyframes metra-bar {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(320%);
+  }
+}
+
+.metra-trace-loop [data-trace='roof'] {
+  stroke-dasharray: 29;
+  animation: metra-trace-roof-loop 3s ease-in-out infinite;
+}
+.metra-trace-loop [data-trace='walls'] {
+  stroke-dasharray: 35;
+  animation: metra-trace-walls-loop 3s ease-in-out infinite;
+}
+.metra-trace-loop [data-trace='window'] {
+  animation: metra-trace-window-loop 3s ease-in-out infinite;
+}
+.metra-halo {
+  animation: metra-halo 3s ease-in-out infinite;
+}
+.metra-bar {
+  animation: metra-bar 1.6s cubic-bezier(0.5, 0, 0.5, 1) infinite;
+}
+
+/* Skeleton shimmer — a sweep across a --track block, 1.4s, deliberately off
+   the loader's periods since the two never appear together. */
+@keyframes metra-shimmer {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(100%);
+  }
+}
+.metra-shimmer::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    var(--glass-strong),
+    transparent
+  );
+  animation: metra-shimmer 1.4s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .metra-trace-loop [data-trace],
+  .metra-halo,
+  .metra-bar,
+  .metra-shimmer::after {
+    animation: none;
+  }
+  /* The bar's job is to say "working". Frozen mid-sweep it says nothing, so it
+     becomes a static segment instead. */
+  .metra-bar {
+    transform: translateX(0);
+  }
+  .metra-shimmer::after {
+    display: none;
   }
 }
 
