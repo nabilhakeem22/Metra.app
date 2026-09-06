@@ -59,7 +59,7 @@ export function Sidebar({
     >
       {/* Wordmark row */}
       <div className="flex items-center px-[6px] py-[2px]">
-        <Wordmark />
+        <Wordmark animate />
       </div>
 
       {/* Org switcher — reskinned to a glass field pill (see org-switcher.tsx) */}

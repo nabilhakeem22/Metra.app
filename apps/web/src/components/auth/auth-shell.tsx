@@ -26,7 +26,7 @@ export function AuthShell({ children, showValueProp, className }: AuthShellProps
       >
         {showValueProp && (
           <div className="hidden flex-col justify-between gap-8 bg-primary p-10 text-primary-foreground lg:flex">
-            <Wordmark size="lg" className="text-primary-foreground" />
+            <Wordmark size="lg" animate className="text-primary-foreground" />
             <div className="space-y-2">
               <p className="text-2xl font-semibold leading-snug">
                 {home('tagline')}

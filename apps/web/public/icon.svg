@@ -1,10 +1,10 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 32 32" role="img" aria-label="Metra">
-  <defs>
-    <linearGradient id="metra-mark" x1="0" y1="0" x2="0" y2="1">
-      <stop stop-color="#2fa294" />
-      <stop offset="1" stop-color="#157a6e" />
-    </linearGradient>
-  </defs>
-  <rect x="1.2" y="1.2" width="29.6" height="29.6" rx="9.6" fill="url(#metra-mark)" stroke="rgba(255,255,255,.30)" />
-  <path d="M9 21.5 L14 21.5 L14 15.5 L19 15.5 L19 10 L23 10" stroke="#ffffff" stroke-width="2.2" stroke-linecap="round" fill="none" />
+  <!-- Small build: FLAT fill, 2.6 stroke, no hairline. A gradient and a 2.3
+       stroke both disappear at favicon size. -->
+  <rect x="1.2" y="1.2" width="29.6" height="29.6" rx="9.6" fill="#2E6BE6" />
+  <g stroke="#FFFFFF" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" fill="none">
+    <path d="M5.8 16.2 L16 7.2 L26.2 16.2" />
+    <path d="M8.9 15.2 V25.2 H23.1 V15.2" />
+  </g>
+  <rect x="13.6" y="17.8" width="4.8" height="4.8" rx="1.3" fill="#FFFFFF" />
 </svg>

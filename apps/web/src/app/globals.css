@@ -125,6 +125,11 @@
     /* Gauge arc track (behind the --brand progress arc). */
     --gauge-track: rgba(23, 34, 57, 0.1);
 
+    /* The mark's tile hairline — the ONE theme-aware part of the logo. The
+       identity drops it on dark so the tile edge doesn't glow; the gradient
+       itself is fixed in both themes. */
+    --mark-hairline: rgba(255, 255, 255, 0.55);
+
     /* ---- shadcn bridge (light) — every var the app's Tailwind colors read ---- */
     --background: 216 33% 94%; /* #EBEFF5 */
     --foreground: 214 17% 8%; /* #111418 */
@@ -212,6 +217,9 @@
 
     /* Gauge arc track (dark). */
     --gauge-track: rgba(255, 255, 255, 0.12);
+
+    /* Dropped from .55 so the tile edge doesn't glow on the navy ground. */
+    --mark-hairline: rgba(255, 255, 255, 0.28);
 
     /* ---- shadcn bridge (dark) ---- */
     --background: 220 38% 6%; /* #0A0E16 */
@@ -313,6 +321,48 @@
   ::-webkit-scrollbar-thumb:hover {
     background: hsl(var(--muted-foreground) / 0.55);
     background-clip: padding-box;
+  }
+}
+
+/* ============================================================
+   Trace — the identity's mount animation for the mark. Roofline draws, walls
+   follow from the same corner, the window fades on last. Fires ONCE per mount
+   (app launch, auth, sidebar), never on persistent chrome like nav or table
+   rows. The strokes REST in their final state and each keyframe only declares
+   `from`, so a mark that never animates — reduced motion, a failed stylesheet,
+   an <img> that page CSS cannot reach — is still the correct mark.
+   ============================================================ */
+@keyframes metra-trace-roof {
+  from {
+    stroke-dashoffset: 29;
+  }
+}
+@keyframes metra-trace-walls {
+  from {
+    stroke-dashoffset: 35;
+  }
+}
+@keyframes metra-trace-window {
+  from {
+    opacity: 0;
+  }
+}
+
+.metra-trace [data-trace='roof'] {
+  stroke-dasharray: 29;
+  animation: metra-trace-roof 900ms cubic-bezier(0.22, 0.9, 0.2, 1) both;
+}
+.metra-trace [data-trace='walls'] {
+  stroke-dasharray: 35;
+  animation: metra-trace-walls 900ms cubic-bezier(0.22, 0.9, 0.2, 1) 180ms both;
+}
+.metra-trace [data-trace='window'] {
+  animation: metra-trace-window 900ms ease-out 520ms both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .metra-trace [data-trace] {
+    animation: none;
   }
 }
 
