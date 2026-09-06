@@ -4,6 +4,7 @@ import { formatMoney } from '@/lib/format/money';
 import { formatPercent, formatQuantity } from '@/lib/format/number';
 import { docYear, formatDocNumber } from '@/lib/format/doc-number';
 import type { ContractDetail } from '@/lib/contracts/queries';
+import { dirFor } from '@/i18n/routing';
 import { fontFaceCss } from './template';
 
 function esc(s: string | null | undefined): string {
@@ -26,7 +27,8 @@ function pick(ar: string | null, en: string | null, locale: string): string {
  * plus the contract header terms (dates, retention/advance, payment) and the
  * revised value when VOs have moved it. Cost + margin appear ONLY on the
  * 'internal' variant; the 'client' variant keeps prices but strips every cost
- * figure (and the query never even loads cost for it). RTL, Western numerals.
+ * figure (and the query never even loads cost for it). Direction follows the
+ * locale (Arabic RTL, English LTR); Western numerals.
  */
 export async function buildContractHtml(
   detail: ContractDetail,
@@ -38,6 +40,7 @@ export async function buildContractHtml(
   },
 ): Promise<string> {
   const { locale } = opts;
+  const dir = dirFor(locale);
   const showCost = opts.variant === 'internal';
   const m = (v: string) => formatMoney(v, locale);
   const num = formatDocNumber('C', detail.number, docYear(null, detail.createdAt));
@@ -78,7 +81,7 @@ export async function buildContractHtml(
     `<tr><td>${esc(label)}</td><td class="num">${esc(value)}</td></tr>`;
 
   return `<!doctype html>
-<html lang="${locale}" dir="rtl">
+<html lang="${locale}" dir="${dir}">
 <head>
 <meta charset="utf-8" />
 <style>
@@ -110,7 +113,7 @@ export async function buildContractHtml(
     <div>${clientName}</div>
   </div>
 
-  <table dir="rtl">
+  <table dir="${dir}">
     <thead>
       <tr>
         <th>${pick('الوصف', 'Description', locale)}</th>

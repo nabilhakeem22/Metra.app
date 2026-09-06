@@ -4,6 +4,7 @@ import { formatMoney } from '@/lib/format/money';
 import { formatPercent, formatQuantity } from '@/lib/format/number';
 import { formatProposalNumber, proposalYear } from '@/lib/format/proposal-number';
 import type { ProposalDetail } from '@/lib/proposals/queries';
+import { dirFor } from '@/i18n/routing';
 import { fontFaceCss } from './template';
 
 function esc(s: string | null | undefined): string {
@@ -27,7 +28,8 @@ function pick(ar: string | null, en: string | null, locale: string): string {
  * margin (per-line cost + document cost/margin) appear ONLY on the 'internal'
  * variant; the 'client' variant keeps prices but strips every cost figure.
  * Supervision is NOT a cost — the client pays it — so it shows on BOTH variants.
- * RTL, Western numerals via formatMoney. Single render source for route+preview.
+ * Direction follows the locale (Arabic RTL, English LTR); Western numerals via
+ * formatMoney. Single render source for route+preview.
  */
 export async function buildProposalHtml(
   detail: ProposalDetail,
@@ -39,6 +41,7 @@ export async function buildProposalHtml(
   },
 ): Promise<string> {
   const { locale } = opts;
+  const dir = dirFor(locale);
   const showCost = opts.variant === 'internal';
   const m = (v: string) => formatMoney(v, locale);
   const num = formatProposalNumber(
@@ -78,7 +81,7 @@ export async function buildProposalHtml(
     .join('');
 
   return `<!doctype html>
-<html lang="${locale}" dir="rtl">
+<html lang="${locale}" dir="${dir}">
 <head>
 <meta charset="utf-8" />
 <style>
@@ -109,7 +112,7 @@ export async function buildProposalHtml(
     <div>${clientName}</div>
   </div>
 
-  <table dir="rtl">
+  <table dir="${dir}">
     <thead>
       <tr>
         <th>${pick('الوصف', 'Description', locale)}</th>
