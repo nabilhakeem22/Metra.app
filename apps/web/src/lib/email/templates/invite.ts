@@ -1,4 +1,6 @@
 // Bilingual invite email. Server-side (no next-intl context), so copy is inlined.
+import { EMAIL_BRAND, emailWordmark } from '@/lib/email/brand';
+
 export interface InviteEmailContent {
   subject: string;
   html: string;
@@ -50,14 +52,14 @@ export function inviteEmailTemplate(input: {
     ? 'إذا لم يعمل الزر، انسخ هذا الرابط في متصفحك:'
     : "If the button doesn't work, copy this link into your browser:";
 
-  const html = `<!doctype html><html dir="${dir}"><body style="font-family:system-ui,-apple-system,sans-serif;background:#f4f6fb;padding:24px;">
-  <div style="max-width:480px;margin:0 auto;background:#fff;border-radius:16px;padding:32px;">
-    <h1 style="font-size:20px;margin:0 0 8px;">Metra</h1>
-    <p style="color:#334155;">${intro}</p>
+  const html = `<!doctype html><html dir="${dir}"><body style="font-family:system-ui,-apple-system,sans-serif;background:${EMAIL_BRAND.page};padding:24px;">
+  <div style="max-width:480px;margin:0 auto;background:${EMAIL_BRAND.card};border-radius:16px;padding:32px;">
+    <h1 style="font-size:20px;margin:0 0 8px;">${emailWordmark(dir)}</h1>
+    <p style="color:${EMAIL_BRAND.body};">${intro}</p>
     <p style="margin:24px 0;">
-      <a href="${url}" style="display:inline-block;background:#2563eb;color:#fff;text-decoration:none;padding:12px 20px;border-radius:10px;font-weight:600;">${cta}</a>
+      <a href="${url}" style="display:inline-block;background:${EMAIL_BRAND.brand};color:${EMAIL_BRAND.onBrand};text-decoration:none;padding:12px 20px;border-radius:10px;font-weight:600;">${cta}</a>
     </p>
-    <p style="color:#64748b;font-size:13px;">${fallback}</p>
+    <p style="color:${EMAIL_BRAND.muted};font-size:13px;">${fallback}</p>
     <p style="word-break:break-all;font-size:13px;"><a href="${url}">${url}</a></p>
   </div></body></html>`;
 

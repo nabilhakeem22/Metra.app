@@ -1,3 +1,5 @@
+import { PDF_BRAND } from '@/lib/pdf/brand';
+
 import { formatMoney } from '@/lib/format/money';
 import { formatPercent, formatQuantity } from '@/lib/format/number';
 import { formatProposalNumber, proposalYear } from '@/lib/format/proposal-number';
@@ -82,22 +84,22 @@ export async function buildProposalHtml(
 <style>
   ${await fontFaceCss()}
   * { box-sizing: border-box; }
-  body { font-family: 'IBM Plex Sans Arabic', 'Cairo', sans-serif; margin: 0; padding: 32px; color: #0f172a; font-size: 13px; }
+  body { font-family: 'IBM Plex Sans Arabic', 'Cairo', sans-serif; margin: 0; padding: 32px; color: ${PDF_BRAND.text}; font-size: 13px; }
   h1 { font-family: 'Cairo'; font-weight: 800; font-size: 20px; margin: 0 0 2px; }
-  .meta { color: #475569; margin-block-end: 16px; font-size: 12px; }
-  .meta strong { color: #0f172a; }
+  .meta { color: ${PDF_BRAND.muted}; margin-block-end: 16px; font-size: 12px; }
+  .meta strong { color: ${PDF_BRAND.text}; }
   table { width: 100%; border-collapse: collapse; margin-block-end: 16px; }
-  th, td { border: 1px solid #cbd5e1; padding: 6px 10px; }
-  th { background: #0f766e; color: #fff; text-align: start; font-size: 12px; }
+  th, td { border: 1px solid ${PDF_BRAND.rule}; padding: 6px 10px; }
+  th { background: ${PDF_BRAND.brand}; color: ${PDF_BRAND.onBrand}; text-align: start; font-size: 12px; }
   td.desc { text-align: start; }
   td.num, th.num { text-align: end; font-variant-numeric: tabular-nums; }
-  tr.section td { background: #e2e8f0; font-weight: 700; text-align: start; }
-  tr.subtotal td { background: #f8fafc; font-weight: 600; }
+  tr.section td { background: ${PDF_BRAND.sectionRow}; font-weight: 700; text-align: start; }
+  tr.subtotal td { background: ${PDF_BRAND.subtotalRow}; font-weight: 600; }
   .totals { width: 320px; margin-inline-start: auto; }
   .totals td { border: none; padding: 4px 8px; }
   .totals td.num { text-align: end; font-variant-numeric: tabular-nums; }
-  .totals tr.grand td { font-weight: 800; border-top: 2px solid #0f172a; }
-  .footer { margin-block-start: 24px; color: #64748b; font-size: 11px; text-align: center; }
+  .totals tr.grand td { font-weight: 800; border-top: 2px solid ${PDF_BRAND.text}; }
+  .footer { margin-block-start: 24px; color: ${PDF_BRAND.faint}; font-size: 11px; text-align: center; }
 </style>
 </head>
 <body>

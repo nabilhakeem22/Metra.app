@@ -87,7 +87,7 @@ function ProductHintCard() {
         </div>
         <div className="landing-mrow">
           <span>{t('marginLabel')}</span>
-          <b className="landing-num" style={{ color: '#7fd8b0' }}>
+          <b className="landing-num" style={{ color: '#4FD9B0' }}>
             32%
           </b>
         </div>

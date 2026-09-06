@@ -304,7 +304,7 @@
   border: 1px solid rgba(143, 179, 255, 0.4);
 }
 .landing-rail .landing-st.done {
-  color: #7fd8b0;
+  color: #4fd9b0;
 }
 .landing-mrow {
   display: flex;
@@ -329,12 +329,12 @@
   font-size: 10px;
   padding: 2px 8px;
   border-radius: 999px;
-  background: rgba(127, 216, 176, 0.16);
-  color: #7fd8b0;
+  background: rgba(79, 217, 176, 0.16);
+  color: #4fd9b0;
 }
 .landing-mrow .landing-pill.due {
   background: rgba(224, 163, 79, 0.18);
-  color: #e6b774;
+  color: #e0a34f;
 }
 
 /* ---------- trust band ---------- */

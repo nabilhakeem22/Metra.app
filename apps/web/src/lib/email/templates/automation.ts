@@ -1,6 +1,8 @@
 // Bilingual internal automation emails (follow-up / digest / stage reminders).
 // Server-side (no next-intl context), so copy is inlined. NEVER contains cost or
 // margin, never a client address. Western numerals (§4.1).
+import { EMAIL_BRAND, emailWordmark } from '@/lib/email/brand';
+
 export interface EmailContent {
   subject: string;
   html: string;
@@ -25,15 +27,15 @@ function shell(
   const dir = locale.startsWith('ar') ? 'rtl' : 'ltr';
   const body = lines
     .filter(Boolean)
-    .map((l) => `<p style="color:#334155;margin:6px 0;">${escapeHtml(l)}</p>`)
+    .map((l) => `<p style="color:${EMAIL_BRAND.body};margin:6px 0;">${escapeHtml(l)}</p>`)
     .join('');
-  const html = `<!doctype html><html dir="${dir}"><body style="font-family:system-ui,-apple-system,sans-serif;background:#f4f6fb;padding:24px;">
-  <div style="max-width:480px;margin:0 auto;background:#fff;border-radius:16px;padding:32px;">
-    <h1 style="font-size:20px;margin:0 0 8px;">Metra</h1>
-    <p style="color:#0f172a;font-weight:600;">${escapeHtml(heading)}</p>
+  const html = `<!doctype html><html dir="${dir}"><body style="font-family:system-ui,-apple-system,sans-serif;background:${EMAIL_BRAND.page};padding:24px;">
+  <div style="max-width:480px;margin:0 auto;background:${EMAIL_BRAND.card};border-radius:16px;padding:32px;">
+    <h1 style="font-size:20px;margin:0 0 8px;">${emailWordmark(dir)}</h1>
+    <p style="color:${EMAIL_BRAND.text};font-weight:600;">${escapeHtml(heading)}</p>
     ${body}
     <p style="margin:24px 0;">
-      <a href="${cta.url}" style="display:inline-block;background:#2563eb;color:#fff;text-decoration:none;padding:12px 20px;border-radius:10px;font-weight:600;">${escapeHtml(cta.label)}</a>
+      <a href="${cta.url}" style="display:inline-block;background:${EMAIL_BRAND.brand};color:${EMAIL_BRAND.onBrand};text-decoration:none;padding:12px 20px;border-radius:10px;font-weight:600;">${escapeHtml(cta.label)}</a>
     </p>
   </div></body></html>`;
   const text = `${heading}\n${lines.filter(Boolean).join('\n')}\n\n${cta.label}: ${cta.url}\n`;

@@ -28,7 +28,7 @@ export function BlueprintGrid({ patternId, width, height }: BlueprintGridProps) 
           <path
             d="M46 0H0V46"
             fill="none"
-            stroke="#2c60c0"
+            stroke="#2E6BE6"
             strokeWidth="1"
             opacity="0.28"
           />
