@@ -116,3 +116,71 @@ describe('templateFilename', () => {
     expect(templateFilename('a/b:c*d')).toBe('boq-template-a-b-c-d.csv');
   });
 });
+
+describe('the price-book template', () => {
+  const items = [
+    {
+      code: 'GYP-001',
+      description: '12mm gypsum ceiling',
+      unit: 'sqm',
+      unitPrice: '1500',
+      unitCost: '900',
+    },
+    {
+      code: 'PNT-004',
+      description: 'دهان بلاستيك',
+      unit: 'sqm',
+      unitPrice: '85',
+      unitCost: '40',
+    },
+  ];
+
+  it('lists every price-book item with the quantity column blank', () => {
+    // The studio prices a project by typing quantities against rates already
+    // agreed, rather than retyping their own catalogue.
+    const { grid } = decodeCsv(buildTemplateCsv({ items }));
+    const mapping = autoDetectMapping(grid.rows[0] as string[]);
+    expect(grid.rows).toHaveLength(3); // header + 2 items, no example
+    const first = grid.rows[1] as string[];
+    expect(first[mapping.costItemCode]).toBe('GYP-001');
+    expect(first[mapping.unitPrice]).toBe('1500');
+    expect(first[mapping.qty]).toBe('');
+  });
+
+  it('drops the worked example once there are real items to show', () => {
+    // A fake row among real priced items is a row somebody imports by accident.
+    expect(buildTemplateCsv({ items })).not.toContain('EXAMPLE');
+    expect(buildTemplateCsv({ items: [] })).toContain('EXAMPLE');
+  });
+
+  it('skips untaken rows instead of reporting them as errors', () => {
+    // This is what makes a catalogue-sized template usable: a studio fills the
+    // handful of items this project needs and leaves the rest blank.
+    const csv = buildTemplateCsv({ items });
+    const filled = csv.replace(',,1500,900,no,GYP-001', ',120,1500,900,no,GYP-001');
+    const { grid } = decodeCsv(filled);
+    const res = mapRows(grid, autoDetectMapping(grid.rows[0] as string[]));
+    expect(res.errorCount).toBe(0);
+    expect(res.skippedCount).toBe(1);
+    expect(res.ok).toHaveLength(1);
+    expect(res.ok[0]?.costItemCode).toBe('GYP-001');
+    expect(res.ok[0]?.qty).toBe('120');
+  });
+
+  it('still reports a row that has a quantity but is otherwise wrong', () => {
+    // Skipping must not become a way for real problems to disappear.
+    const { grid } = decodeCsv(
+      `${buildTemplateCsv({ items: [] , includeExample: false })}` +
+        ',,Walls,tonne,10,50,0,no,\r\n',
+    );
+    const res = mapRows(grid, autoDetectMapping(grid.rows[0] as string[]));
+    expect(res.skippedCount).toBe(0);
+    expect(res.errorCount).toBe(1);
+  });
+
+  it('keeps Arabic descriptions intact through the round trip', () => {
+    const { grid } = decodeCsv(buildTemplateCsv({ items }));
+    const mapping = autoDetectMapping(grid.rows[0] as string[]);
+    expect((grid.rows[2] as string[])[mapping.description]).toBe('دهان بلاستيك');
+  });
+});

@@ -138,12 +138,21 @@ export interface RowVerdict {
   rowNumber: number;
   line: ImportedLine | null;
   errors: string[];
+  /**
+   * Deliberately left out of this BOQ rather than faulty. The template is
+   * generated from the studio's whole price book, so most rows come back with an
+   * empty quantity — those are items this project does not use, and calling that
+   * an error would bury the real problems under hundreds of false ones.
+   */
+  skipped?: boolean;
 }
 
 export interface MapResult {
   rows: RowVerdict[];
   ok: ImportedLine[];
   errorCount: number;
+  /** Rows with no quantity: priced items the studio did not take up. */
+  skippedCount: number;
 }
 
 /** The section a line falls under when the sheet has no section column. */
@@ -178,6 +187,12 @@ export function mapRows(
       };
     }
 
+    // An EMPTY quantity means "not in this BOQ" — check it before anything
+    // else, so a price-book row the studio skipped is never also reported as
+    // missing a description or carrying an odd unit.
+    const rawQty = cell(row, mapping.qty).trim();
+    if (rawQty === '') return { rowNumber, line: null, errors: [], skipped: true };
+
     const description = cell(row, mapping.description).trim();
     if (description === '') errors.push('Description is empty');
 
@@ -191,7 +206,7 @@ export function mapRows(
       );
     }
 
-    const qty = parseNumericCell(cell(row, mapping.qty));
+    const qty = parseNumericCell(rawQty);
     if (qty === null) errors.push('Quantity is not a number');
     else if (qty.startsWith('-')) errors.push('Quantity cannot be negative');
 
@@ -229,5 +244,6 @@ export function mapRows(
   });
 
   const ok = rows.flatMap((r) => (r.line ? [r.line] : []));
-  return { rows, ok, errorCount: rows.length - ok.length };
+  const skippedCount = rows.filter((r) => r.skipped).length;
+  return { rows, ok, errorCount: rows.length - ok.length - skippedCount, skippedCount };
 }

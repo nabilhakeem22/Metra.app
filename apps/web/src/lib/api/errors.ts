@@ -109,6 +109,8 @@ export const ACTION_CODE_PROBLEM: Record<ActionCode, ApiProblemKind> = {
   last_primary_contact: 'bad-request',
   contract_exists: 'bad-request',
   proposal_not_accepted: 'bad-request',
+  boq_not_found: 'not-found',
+  boq_not_draft: 'bad-request',
   contract_not_draft: 'bad-request',
   contract_not_issued: 'bad-request',
   contract_not_signable: 'bad-request',

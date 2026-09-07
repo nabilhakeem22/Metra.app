@@ -1007,7 +1007,8 @@
         "team": "الفريق",
         "proposals": "العروض",
         "documents": "المستندات",
-        "activity": "النشاط"
+        "activity": "النشاط",
+        "boq": "المقايسة"
       },
       "overview": {
         "status": "الحالة",
@@ -1094,6 +1095,39 @@
             "delete": "اتشال المشروع",
             "issue": "اتصدر المشروع"
           }
+        }
+      },
+      "boq": {
+        "emptyTitle": "لا توجد مقايسة بعد",
+        "emptyBody": "المقايسة هي جدول الأعمال المسعّر الذي يُنفَّذ المشروع ويُقاس عليه.",
+        "startTitle": "ابدأ المقايسة",
+        "startBody": "نزّل القالب — يحتوي بالفعل على دليل الأسعار، فتكتب الكميات فقط — ثم ارفعه مرة أخرى. الصفوف التي تتركها بدون كمية يتم تخطيها.",
+        "downloadTemplate": "تنزيل القالب",
+        "uploadSheet": "رفع الملف المعبّأ",
+        "previewTitle": "{count} بند جاهز للاستيراد",
+        "previewProblems": "{count} صف لا يمكن استيراده",
+        "rowLabel": "صف {row}",
+        "commitImport": "استيراد البنود",
+        "cancel": "إلغاء",
+        "imported": "تم استيراد {count} بند",
+        "importFailed": "تعذّرت قراءة هذا الملف",
+        "documentLabel": "مقايسة {number}",
+        "lineCount": "{count} بند",
+        "total": "الإجمالي",
+        "provisional": "تقديري",
+        "col": {
+          "description": "الوصف",
+          "unit": "الوحدة",
+          "qty": "الكمية",
+          "rate": "سعر الوحدة",
+          "total": "الإجمالي"
+        },
+        "unit": {
+          "sqm": "م²",
+          "linear_meter": "م.ط",
+          "pcs": "عدد",
+          "lump_sum": "مقطوعية",
+          "day": "يوم"
         }
       }
     }

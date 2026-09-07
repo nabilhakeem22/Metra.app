@@ -48,6 +48,8 @@ const ALL_CODES: ActionCode[] = [
   'last_primary_contact',
   'contract_exists',
   'proposal_not_accepted',
+  'boq_not_found',
+  'boq_not_draft',
   'contract_not_draft',
   'contract_not_issued',
   'contract_not_signable',

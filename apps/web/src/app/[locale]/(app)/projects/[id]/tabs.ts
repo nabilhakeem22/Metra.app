@@ -11,6 +11,7 @@ export const PROJECT_TABS = [
   'financials',
   'team',
   'proposals',
+  'boq',
   'documents',
   'activity',
 ] as const;

@@ -73,16 +73,58 @@ function csvCell(value: string): string {
   return /[",\r\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
 }
 
+/** One price-book item, as the template lists it. */
+export interface TemplateItem {
+  code: string;
+  description: string;
+  unit: string;
+  unitPrice: string;
+  unitCost: string;
+  section?: string | null;
+}
+
 export interface TemplateOptions {
-  /** Include the example row. Off for a studio that has done this before. */
+  /**
+   * The studio's price book. Each item becomes a row with everything filled in
+   * EXCEPT the quantity — so a project is priced by typing quantities against
+   * rates already agreed, rather than by retyping the firm's own catalogue.
+   *
+   * A row left without a quantity is an item this project does not use; the
+   * importer SKIPS it rather than reporting it, which is the whole reason a
+   * catalogue-sized template is usable at all.
+   */
+  items?: TemplateItem[];
+  /**
+   * Include the worked example. Defaults to on only when there is no price book
+   * to demonstrate the format — a fake row sitting among real priced items is a
+   * row somebody imports by accident.
+   */
   includeExample?: boolean;
 }
 
 /** Build the template as CSV text. */
 export function buildTemplateCsv(opts: TemplateOptions = {}): string {
+  const items = opts.items ?? [];
   const rows = [IMPORT_FIELDS.map((f) => HEADERS[f])];
-  if (opts.includeExample !== false) {
+
+  if (opts.includeExample ?? items.length === 0) {
     rows.push(IMPORT_FIELDS.map((f) => EXAMPLE[f]));
+  }
+
+  for (const item of items) {
+    const cells: Record<ImportField, string> = {
+      itemCode: '',
+      section: item.section ?? '',
+      description: item.description,
+      unit: item.unit,
+      // Blank ON PURPOSE — this is the one column the studio fills.
+      qty: '',
+      unitPrice: item.unitPrice,
+      unitCost: item.unitCost,
+      provisional: 'no',
+      costItemCode: item.code,
+    };
+    rows.push(IMPORT_FIELDS.map((f) => cells[f]));
   }
   // CRLF: Excel's own dialect, and harmless everywhere else.
   const body = rows.map((r) => r.map(csvCell).join(',')).join('\r\n');

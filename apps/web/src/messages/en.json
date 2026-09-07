@@ -1007,7 +1007,8 @@
         "team": "Team",
         "proposals": "Proposals",
         "documents": "Documents",
-        "activity": "Activity"
+        "activity": "Activity",
+        "boq": "BOQ"
       },
       "overview": {
         "status": "Status",
@@ -1094,6 +1095,39 @@
             "delete": "Project removed",
             "issue": "Project issued"
           }
+        }
+      },
+      "boq": {
+        "emptyTitle": "No bill of quantities yet",
+        "emptyBody": "The BOQ is the priced schedule of works this project is built and measured against.",
+        "startTitle": "Start the BOQ",
+        "startBody": "Download the template — it already carries your price book, so you only type quantities — then upload it back. Rows you leave without a quantity are skipped.",
+        "downloadTemplate": "Download template",
+        "uploadSheet": "Upload filled sheet",
+        "previewTitle": "{count} lines ready to import",
+        "previewProblems": "{count} rows cannot be imported",
+        "rowLabel": "Row {row}",
+        "commitImport": "Import lines",
+        "cancel": "Cancel",
+        "imported": "Imported {count} lines",
+        "importFailed": "Could not read that sheet",
+        "documentLabel": "BOQ {number}",
+        "lineCount": "{count} lines",
+        "total": "Total",
+        "provisional": "Provisional",
+        "col": {
+          "description": "Description",
+          "unit": "Unit",
+          "qty": "Qty",
+          "rate": "Rate",
+          "total": "Total"
+        },
+        "unit": {
+          "sqm": "m²",
+          "linear_meter": "m.l",
+          "pcs": "pcs",
+          "lump_sum": "lump sum",
+          "day": "day"
         }
       }
     }

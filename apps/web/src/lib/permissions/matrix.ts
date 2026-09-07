@@ -29,6 +29,11 @@ const ROWS: Record<Capability, string[]> = {
   // (owner/admin/PM/site_engineer/accountant) may create; viewer + client cannot.
   project_activity: ['CR', 'CR', 'CR', 'CR', 'CR', '', ''],
   price_book: ['CRUA', 'CRUA', 'R', '', 'R', '', ''],
+  // A BOQ is priced construction work, built by the same people who price a
+  // proposal — so it mirrors proposals_build rather than inventing a shape.
+  // site_engineer gets READ: they measure against these lines on site, and
+  // will need to see them long before they are allowed to change one.
+  boq_build: ['CRU', 'CRU', 'CRU', 'R', '', '', 'R'],
   proposals_build: ['CRU', 'CRU', 'CRU', '', '', '', 'R'],
   // 'client' send removed (S1): a client-role session must not mint share links /
   // expire proposals it cannot read. Client acceptance is the unauthenticated

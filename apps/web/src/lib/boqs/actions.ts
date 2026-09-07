@@ -1,0 +1,74 @@
+'use server';
+
+import { revalidatePath } from 'next/cache';
+import type { ActionResult } from '@/lib/actions/result';
+import { requireOrg } from '@/lib/auth/require-org';
+import {
+  commitImportCore,
+  createBoqCore,
+  type CreateBoqInput,
+} from './core';
+import { decodeCsv } from './import/decode';
+import { autoDetectMapping, mapRows, type ImportedLine } from './import/map';
+
+function refreshApp(): void {
+  revalidatePath('/', 'layout');
+}
+
+export async function createBoq(
+  input: CreateBoqInput,
+): Promise<ActionResult & { data?: string }> {
+  const ctx = await requireOrg();
+  const res = await createBoqCore(ctx, input);
+  if (res.ok) refreshApp();
+  return res;
+}
+
+export interface ImportPreview {
+  ok: boolean;
+  error?: string;
+  /** Lines that would be created. */
+  lines?: ImportedLine[];
+  /** Row number + reason for everything that would not. */
+  problems?: { rowNumber: number; errors: string[] }[];
+  notes?: string[];
+}
+
+/**
+ * Decode and validate an uploaded sheet WITHOUT writing anything.
+ *
+ * The preview is the safety net for the whole import: it is where the studio
+ * sees the template's own example row still sitting in their file, spots a
+ * column that mapped to the wrong field, and finds the eight rows with a unit
+ * Metra does not have — all before a single line exists.
+ */
+export async function previewBoqImport(csvText: string): Promise<ImportPreview> {
+  await requireOrg();
+  if (typeof csvText !== 'string' || csvText.trim() === '') {
+    return { ok: false, error: 'invalid' };
+  }
+  const { grid, notes } = decodeCsv(csvText);
+  const header = grid.rows[0];
+  if (!header) return { ok: false, error: 'invalid' };
+
+  const result = mapRows(grid, autoDetectMapping(header));
+  return {
+    ok: true,
+    lines: result.ok,
+    problems: result.rows
+      .filter((r) => r.errors.length > 0)
+      .map((r) => ({ rowNumber: r.rowNumber, errors: r.errors })),
+    notes,
+  };
+}
+
+export async function commitBoqImport(input: {
+  boqId: string;
+  lines: ImportedLine[];
+  replace?: boolean;
+}): Promise<ActionResult & { data?: number }> {
+  const ctx = await requireOrg();
+  const res = await commitImportCore(ctx, input);
+  if (res.ok) refreshApp();
+  return res;
+}

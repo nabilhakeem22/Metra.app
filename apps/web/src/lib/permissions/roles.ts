@@ -14,6 +14,7 @@ export type Capability =
   | 'projects'
   | 'project_activity'
   | 'price_book'
+  | 'boq_build'
   | 'proposals_build'
   | 'proposals_send'
   | 'contracts_generate'
