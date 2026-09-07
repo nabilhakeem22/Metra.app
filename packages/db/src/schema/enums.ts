@@ -102,6 +102,25 @@ export const CONTRACT_STATUSES = [
 export const contractStatus = pgEnum('contract_status', CONTRACT_STATUSES);
 
 /**
+ * BOQ lifecycle. Deliberately shorter than a proposal's: a BOQ is priced work,
+ * not an offer, so there is no sent/accepted/rejected — it is drafted, issued to
+ * the client, and superseded by a revision. Frozen once it leaves `draft`.
+ */
+export const BOQ_STATUSES = ['draft', 'issued', 'superseded'] as const;
+
+export const boqStatus = pgEnum('boq_status', BOQ_STATUSES);
+
+/**
+ * How a BOQ's lines got in. PROVENANCE ONLY — every BOQ has lines either way,
+ * and nothing downstream is allowed to branch on this. It exists so the UI can
+ * say "imported from site-survey.xlsx" and so a re-import can be offered against
+ * the same source, not to gate a capability.
+ */
+export const BOQ_SOURCES = ['built', 'imported'] as const;
+
+export const boqSource = pgEnum('boq_source', BOQ_SOURCES);
+
+/**
  * P1 Slice 4 — variation order (أمر تغيير) lifecycle. Order is a contract.
  * OWNER-locked (A2): a distinct INTERNAL-APPROVAL state before the client sees
  * it. draft (staff price the VO lines) -> internal_approved (owner/admin sign-off,
@@ -318,6 +337,8 @@ export type ProjectStatus = (typeof PROJECT_STATUSES)[number];
 export type ProposalStatus = (typeof PROPOSAL_STATUSES)[number];
 export type ClientType = (typeof CLIENT_TYPES)[number];
 export type ContractStatus = (typeof CONTRACT_STATUSES)[number];
+export type BoqStatus = (typeof BOQ_STATUSES)[number];
+export type BoqSource = (typeof BOQ_SOURCES)[number];
 export type VariationStatus = (typeof VARIATION_STATUSES)[number];
 export type ActivityEntityType = (typeof ACTIVITY_ENTITY_TYPES)[number];
 export type ActivityKind = (typeof ACTIVITY_KINDS)[number];

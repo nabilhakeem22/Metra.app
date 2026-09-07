@@ -28,6 +28,9 @@ export * from './contracts';
 export * from './contract-sections';
 export * from './contract-lines';
 export * from './contract-events';
+export * from './boqs';
+export * from './boq-sections';
+export * from './boq-lines';
 export * from './variation-orders';
 export * from './variation-order-lines';
 export * from './variation-order-events';
@@ -72,6 +75,9 @@ import { contracts } from './contracts';
 import { contractSections } from './contract-sections';
 import { contractLines } from './contract-lines';
 import { contractEvents } from './contract-events';
+import { boqs } from './boqs';
+import { boqSections } from './boq-sections';
+import { boqLines } from './boq-lines';
 import { variationOrders } from './variation-orders';
 import { variationOrderLines } from './variation-order-lines';
 import { variationOrderEvents } from './variation-order-events';
@@ -116,6 +122,9 @@ export const orgScopedTables = {
   contractSections,
   contractLines,
   contractEvents,
+  boqs,
+  boqSections,
+  boqLines,
   variationOrders,
   variationOrderLines,
   variationOrderEvents,
@@ -163,6 +172,9 @@ export const allTables = {
   contractSections,
   contractLines,
   contractEvents,
+  boqs,
+  boqSections,
+  boqLines,
   variationOrders,
   variationOrderLines,
   variationOrderEvents,

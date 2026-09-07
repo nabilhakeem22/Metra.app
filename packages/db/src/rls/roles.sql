@@ -46,6 +46,9 @@ grant select, insert, update, delete on public.automation_settings to metra_app;
 grant select, insert, update, delete on public.contracts         to metra_app;
 grant select, insert, update, delete on public.contract_sections to metra_app;
 grant select, insert, update, delete on public.contract_lines    to metra_app;
+grant select, insert, update, delete on public.boqs              to metra_app;
+grant select, insert, update, delete on public.boq_sections      to metra_app;
+grant select, insert, update, delete on public.boq_lines         to metra_app;
 grant select, insert, update, delete on public.variation_orders      to metra_app;
 grant select, insert, update, delete on public.variation_order_lines to metra_app;
 -- Design Engagements (Step 1): the engagement record is mutable (create + Step 2

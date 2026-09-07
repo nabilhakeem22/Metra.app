@@ -288,6 +288,13 @@
       "when": 1788819557549,
       "tag": "0040_document_categories",
       "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1788905957549,
+      "tag": "0041_boq",
+      "breakpoints": true
     }
   ]
 }

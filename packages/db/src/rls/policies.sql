@@ -384,6 +384,48 @@ create policy org_isolation on public.contract_lines
     and public.app_is_current_org_member()
   );
 
+-- boqs
+alter table public.boqs enable row level security;
+alter table public.boqs force  row level security;
+drop policy if exists org_isolation on public.boqs;
+create policy org_isolation on public.boqs
+  using (
+    org_id = nullif(current_setting('app.current_org_id', true), '')::uuid
+    and public.app_is_current_org_member()
+  )
+  with check (
+    org_id = nullif(current_setting('app.current_org_id', true), '')::uuid
+    and public.app_is_current_org_member()
+  );
+
+-- boq_sections
+alter table public.boq_sections enable row level security;
+alter table public.boq_sections force  row level security;
+drop policy if exists org_isolation on public.boq_sections;
+create policy org_isolation on public.boq_sections
+  using (
+    org_id = nullif(current_setting('app.current_org_id', true), '')::uuid
+    and public.app_is_current_org_member()
+  )
+  with check (
+    org_id = nullif(current_setting('app.current_org_id', true), '')::uuid
+    and public.app_is_current_org_member()
+  );
+
+-- boq_lines
+alter table public.boq_lines enable row level security;
+alter table public.boq_lines force  row level security;
+drop policy if exists org_isolation on public.boq_lines;
+create policy org_isolation on public.boq_lines
+  using (
+    org_id = nullif(current_setting('app.current_org_id', true), '')::uuid
+    and public.app_is_current_org_member()
+  )
+  with check (
+    org_id = nullif(current_setting('app.current_org_id', true), '')::uuid
+    and public.app_is_current_org_member()
+  );
+
 -- contract_events (append-only via grants; org-isolated + membership-gated)
 alter table public.contract_events enable row level security;
 alter table public.contract_events force  row level security;
