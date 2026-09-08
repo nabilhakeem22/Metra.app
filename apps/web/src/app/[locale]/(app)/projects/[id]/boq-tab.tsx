@@ -4,6 +4,7 @@ import { formatMoney } from '@/lib/format/money';
 import { formatQuantity } from '@/lib/format/number';
 import type { BoqDetail } from '@/lib/boqs/queries';
 import { BoqStart } from './boq-start';
+import { BoqIssue } from './boq-issue';
 
 /**
  * The project's Bill of Quantities — the priced schedule of works that the
@@ -49,9 +50,21 @@ export function BoqTab({
           </p>
           <p className="text-sm text-[color:var(--text-muted)]">
             {t('lineCount', { count: String(boq.lineCount) })}
+            {boq.status === 'issued' && (
+              <span
+                className="ms-2 rounded-pill px-2 py-0.5 text-[11px] font-semibold"
+                style={{ background: 'var(--success-tint)', color: 'var(--success)' }}
+              >
+                {t('statusIssued')}
+              </span>
+            )}
           </p>
         </div>
-        <div className="text-end">
+        <div className="flex items-center gap-4">
+          {canBuild && boq.status === 'draft' && (
+            <BoqIssue boqId={boq.id} disabled={boq.lineCount === 0} />
+          )}
+          <div className="text-end">
           <p className="text-xs uppercase tracking-widest text-[color:var(--text-faint)]">
             {t('total')}
           </p>
@@ -63,6 +76,7 @@ export function BoqTab({
                 here printed "212,900.00 EGP EGP". */}
             {money(boq.total)}
           </p>
+          </div>
         </div>
       </div>
 

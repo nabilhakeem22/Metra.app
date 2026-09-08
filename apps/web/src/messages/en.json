@@ -1128,7 +1128,15 @@
           "pcs": "pcs",
           "lump_sum": "lump sum",
           "day": "day"
-        }
+        },
+        "issue": "Issue BOQ",
+        "issueConfirmTitle": "Issue this BOQ?",
+        "issueConfirmBody": "It will be frozen and sent to the engagement as the client's BOQ document. The client cannot retrieve it until the balance is settled. Changing it afterwards means issuing a new version.",
+        "issueConfirm": "Issue",
+        "issued": "BOQ issued",
+        "issueFailed": "Could not issue the BOQ",
+        "issueNoEngagement": "This project has no single active engagement to deliver through",
+        "statusIssued": "Issued"
       }
     }
   },

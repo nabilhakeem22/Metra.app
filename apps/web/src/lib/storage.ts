@@ -64,6 +64,65 @@ export async function createSignedUploadUrl(
 }
 
 /**
+ * Store bytes the SERVER generated, as a file row plus an uploaded object.
+ *
+ * The signed-upload path above exists for a browser PUT; a document Metra renders
+ * itself never leaves the server, so it uploads directly with the admin client
+ * instead of handing out a URL for its own bytes.
+ *
+ * The files row is written FIRST and under org RLS, so an upload can never leave
+ * an object in the bucket that nothing in the database points at. If the upload
+ * then fails the row is removed, because a files row with no object behind it is
+ * a download that 404s later rather than an error now.
+ */
+export async function storeGeneratedFile(
+  ctx: OrgContext,
+  entity: string,
+  bytes: Uint8Array,
+  opts: {
+    originalName: string;
+    contentType: string;
+    entityId?: string | null;
+    categoryId?: string | null;
+  },
+): Promise<{ fileId: string; objectKey: string }> {
+  const fileId = randomUUID();
+  const objectKey = `${ctx.orgId}/${entity}/${fileId}`;
+
+  await withOrgContext(ctx, (tx) =>
+    tx.insert(files).values({
+      id: fileId,
+      orgId: ctx.orgId,
+      entity,
+      entityId: opts.entityId ?? null,
+      categoryId: opts.categoryId ?? null,
+      bucket: FILES_BUCKET,
+      objectKey,
+      originalName: opts.originalName,
+      contentType: opts.contentType,
+      createdBy: ctx.userId,
+    }),
+  );
+
+  const supabase = createSupabaseAdminClient();
+  const { error } = await supabase.storage
+    .from(FILES_BUCKET)
+    .upload(objectKey, bytes, {
+      contentType: opts.contentType,
+      upsert: false,
+    });
+
+  if (error) {
+    await withOrgContext(ctx, (tx) =>
+      tx.delete(files).where(eq(files.id, fileId)),
+    );
+    throw error;
+  }
+
+  return { fileId, objectKey };
+}
+
+/**
  * Signs an ALREADY-AUTHORIZED storage object. This is the low-level primitive: it
  * performs NO authorization of its own, so every caller must have proven the
  * object belongs to whoever is asking BEFORE calling it — `getSignedUrl` below

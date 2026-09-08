@@ -1,5 +1,6 @@
 'use server';
 
+import { getLocale } from 'next-intl/server';
 import { revalidatePath } from 'next/cache';
 import type { ActionResult } from '@/lib/actions/result';
 import { requireOrg } from '@/lib/auth/require-org';
@@ -8,6 +9,7 @@ import {
   createBoqCore,
   type CreateBoqInput,
 } from './core';
+import { issueBoqCore } from './issue';
 import { decodeCsv } from './import/decode';
 import { autoDetectMapping, mapRows, type ImportedLine } from './import/map';
 
@@ -69,6 +71,26 @@ export async function commitBoqImport(input: {
 }): Promise<ActionResult & { data?: number }> {
   const ctx = await requireOrg();
   const res = await commitImportCore(ctx, input);
+  if (res.ok) refreshApp();
+  return res;
+}
+
+/**
+ * Freeze the BOQ, render its PDF, and record it as the engagement's `boq`
+ * artifact — which is what satisfies `boqPresent` and puts the document behind
+ * the portal's payment gate.
+ */
+export async function issueBoq(
+  boqId: string,
+): Promise<ActionResult & { data?: string }> {
+  const ctx = await requireOrg();
+  let locale = 'ar-EG';
+  try {
+    locale = await getLocale();
+  } catch {
+    /* default locale */
+  }
+  const res = await issueBoqCore(ctx, { boqId, locale });
   if (res.ok) refreshApp();
   return res;
 }
