@@ -224,7 +224,10 @@ export function EngagementCommandCard({
   // never render a blank hero. `ready` and `closed` already name their own act
   // (one interpolates the phase, one has nothing to name), so the registry
   // returns null there and the existing copy stands.
-  const stageAction = resolveStageAction(state, view.mode);
+  // The BLOCKER, not just the state: `final_approval` can be held by either the
+  // cost-range acknowledgement or the as-built reconciliation, and naming the
+  // wrong one is worse than naming neither.
+  const stageAction = resolveStageAction(state, view.mode, view.primaryBlocker);
   // Order matters and encodes the invariant: `closed` is checked first because
   // the registry returns null there too, then the two BLOCKED modes (where a row
   // is guaranteed), and `ready` last. No optional chaining — a null here would be

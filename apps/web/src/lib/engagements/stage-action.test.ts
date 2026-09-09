@@ -67,6 +67,27 @@ describe('resolveStageAction', () => {
     }
   });
 
+  it('names the act that clears the BLOCKER when a state has more than one', () => {
+    // `approveDesign` carries two studio guards, ordered romAcknowledged before
+    // asBuiltReconciled. Keying final_approval on the state alone named the
+    // as-builts — the rarer of the two, and wrong for every on-plan job. This is
+    // the regression test for that exact mistake.
+    expect(
+      resolveStageAction('final_approval', 'blockedStudio', 'romAcknowledged')?.key,
+    ).toBe('romAcknowledged');
+    expect(
+      resolveStageAction('final_approval', 'blockedStudio', 'asBuiltReconciled')?.key,
+    ).toBe('asBuiltReconciled');
+  });
+
+  it('lets the state row stand for a guard with no act of its own', () => {
+    // Only a guard whose act differs from its stage's gets a row; everything else
+    // keeps the state's copy rather than needing one entry per guard.
+    expect(resolveStageAction('survey', 'blockedStudio', 'spatialBaseReady')?.key).toBe(
+      'survey',
+    );
+  });
+
   it('falls back for a state gated only by client money, in studio voice', () => {
     // concept_review's sole forward guard is the Gate-A instalment. A studio
     // blocker there is off the happy path, so it gets the fallback rather than

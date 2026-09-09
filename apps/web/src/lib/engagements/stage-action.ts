@@ -29,6 +29,7 @@
 // written FIRST here for the same reason it should be built first: it is the only
 // row guaranteed to be reachable in production.
 import type { CommandCardMode } from './command-card';
+import type { GuardKey } from './guards';
 import type { DesignState } from './states';
 
 export type StageActor = 'studio' | 'client';
@@ -59,11 +60,26 @@ const STUDIO_ACT_STATES: ReadonlySet<DesignState> = new Set<DesignState>([
   'survey',
   'layout',
   'design_3d',
-  'final_approval',
   'shop_drawings',
   'boq',
   'change_triage',
 ]);
+
+/**
+ * States are the wrong key when one state can be blocked by more than one piece
+ * of studio work — then the act is whatever clears the BLOCKER, and the machine
+ * has already computed which that is.
+ *
+ * `final_approval` is the case: `approveDesign` carries four guards, two of them
+ * studio-side, and they are ordered `romAcknowledged` before `asBuiltReconciled`.
+ * Keying that state on the state alone named the as-builts, which is the RARER of
+ * the two and wrong for every on-plan job — the first version of this file did
+ * exactly that. A guard row wins over a state row for that reason.
+ */
+const GUARD_ACT_KEYS: Partial<Record<GuardKey, string>> = {
+  romAcknowledged: 'romAcknowledged',
+  asBuiltReconciled: 'asBuiltReconciled',
+};
 
 /**
  * States where waiting on the client is the normal, healthy condition — the
@@ -91,11 +107,14 @@ const FALLBACK_KEY = 'fallback';
 export function resolveStageAction(
   state: DesignState,
   mode: CommandCardMode,
+  /** The guard the card is naming — `CommandCardView.primaryBlocker`. */
+  primaryBlocker: GuardKey | null = null,
 ): StageAction | null {
   if (mode === 'blockedStudio') {
+    const guardKey = primaryBlocker ? GUARD_ACT_KEYS[primaryBlocker] : undefined;
     return {
       actor: 'studio',
-      key: STUDIO_ACT_STATES.has(state) ? state : FALLBACK_KEY,
+      key: guardKey ?? (STUDIO_ACT_STATES.has(state) ? state : FALLBACK_KEY),
     };
   }
   if (mode === 'blockedClient') {
@@ -113,7 +132,11 @@ export function resolveStageAction(
  * the suite instead of rendering a raw key at a studio in Cairo.
  */
 export function stageActionKeys(): string[] {
-  const studio = [...STUDIO_ACT_STATES, FALLBACK_KEY].map((k) => `studio.${k}`);
+  const studio = [
+    ...STUDIO_ACT_STATES,
+    ...Object.values(GUARD_ACT_KEYS),
+    FALLBACK_KEY,
+  ].map((k) => `studio.${k}`);
   const client = [...CLIENT_WAIT_STATES, FALLBACK_KEY].map((k) => `client.${k}`);
   return [...studio, ...client];
 }

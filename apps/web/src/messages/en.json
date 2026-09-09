@@ -1735,7 +1735,11 @@
           "headline": "Upload the 3D renders",
           "sub": "The approved renders become the baseline the final design is checked against."
         },
-        "final_approval": {
+        "romAcknowledged": {
+          "headline": "Get the cost range acknowledged",
+          "sub": "Share the indicative build cost with the client, or record the acknowledgement they gave you. Shop drawings open after it."
+        },
+        "asBuiltReconciled": {
           "headline": "Reconcile the as-built drawings",
           "sub": "An off-plan job needs its as-builts attested before the design can be approved."
         },
