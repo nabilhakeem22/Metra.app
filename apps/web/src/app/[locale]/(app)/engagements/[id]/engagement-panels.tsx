@@ -1,6 +1,7 @@
 'use client';
 
-import { useLocale, useTranslations } from 'next-intl';
+import { useTranslations } from 'next-intl';
+import type { ActionResult } from '@/lib/actions/result';
 import type { CommercialPulse } from '@/lib/engagements/pulse';
 import type {
   EngagementArtifactRecord,
@@ -12,20 +13,25 @@ import type {
   EngagementPayment,
   EngagementTransitionRecord,
 } from '@/lib/engagements/queries';
-import { formatDate } from '@/lib/format/date';
+import { PanelHeader } from './engagement-panel-header';
 import { ChangeOrdersPanel } from './engagement-panels-change-orders';
-import { Empty } from './engagement-panels-parts';
-import { PaymentsTab } from './engagement-panels-payments-tab';
 import { FilesTab } from './engagement-panels-files';
+import { PaymentsTab } from './engagement-panels-payments-tab';
+import { TimelineTab } from './engagement-panels-timeline';
 import type { EngagementTab } from './tabs';
 
 // The engagement detail panels — the fuller record below the command card,
 // dispatched by the four detail tabs. Files (working-files tray + the full
 // artifact list), Timeline (transitions + events + the client-activity feed),
 // Payments (the commercial pulse + fee schedule + build-cost range + the payment
-// ledger) and Change orders. Visual reskin of the glass system as a FLAT (opaque
-// `bg-card`) surface; money is `font-mono tabular-nums`, `dir=ltr`. Logical CSS
-// only so it mirrors in ar-EG RTL.
+// ledger) and Change orders.
+//
+// EACH TAB OWNS ITS OWN HEADER, and with it the actions that write into the
+// record it displays. That is why the padding moved out of here and into the tab
+// bodies: the header band runs edge to edge and carries the rule under it, which
+// a shared `p-4` on this wrapper could not do. Visual reskin of the glass system
+// as a FLAT (opaque `bg-card`) surface; money is `font-mono tabular-nums`,
+// `dir=ltr`. Logical CSS only so it mirrors in ar-EG RTL.
 
 export interface PanelData {
   header: EngagementHeader;
@@ -39,135 +45,94 @@ export interface PanelData {
   pulse: CommercialPulse;
 }
 
+/** What the signed-in role may write into these records. */
+export interface PanelCapabilities {
+  recordPayment: boolean;
+  recordArtifact: boolean;
+  setRom: boolean;
+  recordRomAck: boolean;
+  /** Offered only while the engagement sits at design_only_handoff. */
+  recordHandoffAck: boolean;
+}
+
 export function EngagementPanels({
   tab,
   data,
   engagementId,
   canUpload,
+  capabilities,
+  pending,
+  runAction,
 }: {
   tab: EngagementTab;
   data: PanelData;
   engagementId: string;
   canUpload: boolean;
+  capabilities: PanelCapabilities;
+  pending: boolean;
+  runAction: (fn: () => Promise<ActionResult>) => void;
 }) {
   return (
-    <section className="rounded-[var(--r-panel)] border border-[color:var(--rule)] bg-card text-[color:var(--text)] shadow-sm">
-      <div className="p-4">
-        {tab === 'files' && (
-          <FilesTab
-            engagementId={engagementId}
-            artifacts={data.artifacts}
-            canUpload={canUpload}
-          />
-        )}
-        {tab === 'timeline' && (
-          <TimelinePanel
-            transitions={data.transitions}
-            events={data.events}
-            clientActivity={data.clientActivity}
-          />
-        )}
-        {tab === 'payments' && (
-          <PaymentsTab
-            header={data.header}
-            feeSchedule={data.feeSchedule}
-            payments={data.payments}
-            events={data.events}
-            pulse={data.pulse}
-          />
-        )}
-        {tab === 'changeOrders' && (
-          <ChangeOrdersPanel changeOrders={data.changeOrders} />
-        )}
-      </div>
+    <section className="overflow-hidden rounded-[var(--r-panel)] border border-[color:var(--rule)] bg-card text-[color:var(--text)] shadow-sm">
+      {tab === 'files' && (
+        <FilesTab
+          engagementId={engagementId}
+          artifacts={data.artifacts}
+          canUpload={canUpload}
+          canRecordArtifact={capabilities.recordArtifact}
+          pending={pending}
+          runAction={runAction}
+        />
+      )}
+      {tab === 'timeline' && (
+        <TimelineTab
+          engagementId={engagementId}
+          transitions={data.transitions}
+          events={data.events}
+          clientActivity={data.clientActivity}
+          canRecordRomAck={capabilities.recordRomAck}
+          canRecordHandoffAck={capabilities.recordHandoffAck}
+          pending={pending}
+          runAction={runAction}
+        />
+      )}
+      {tab === 'payments' && (
+        <PaymentsTab
+          engagementId={engagementId}
+          header={data.header}
+          feeSchedule={data.feeSchedule}
+          payments={data.payments}
+          events={data.events}
+          pulse={data.pulse}
+          canRecordPayment={capabilities.recordPayment}
+          canSetRom={capabilities.setRom}
+          pending={pending}
+          runAction={runAction}
+        />
+      )}
+      {tab === 'changeOrders' && <ChangeOrdersTab changeOrders={data.changeOrders} />}
     </section>
   );
 }
 
 /**
- * A ledger row's free-text note, blank-safe: whitespace-only (or absent) reads as
- * "no note" so the timeline never renders an empty quoted line.
+ * Change orders — the one tab with no action of its own. A change order is
+ * RAISED by a transition (a revision past its allowance, a flagged as-built
+ * variance), never typed in here, so a header with no button is the honest one.
  */
-function trimmedNote(note: string | null): string | null {
-  return note?.trim() || null;
-}
-
-export function TimelinePanel({
-  transitions,
-  events,
-  clientActivity = [],
+function ChangeOrdersTab({
+  changeOrders,
 }: {
-  transitions: EngagementTransitionRecord[];
-  events: EngagementEventRecord[];
-  clientActivity?: EngagementClientActivityRecord[];
+  changeOrders: EngagementChangeOrderRecord[];
 }) {
-  const t = useTranslations('engagements');
-  const locale = useLocale();
-  const entries = [
-    ...transitions.map((tr) => ({
-      id: `t-${tr.id}`,
-      at: tr.decidedAt,
-      label:
-        tr.fromState && tr.toState
-          ? t('timeline.arrow', {
-              from: t(`state.${tr.fromState}`),
-              to: t(`state.${tr.toState}`),
-            })
-          : t(`state.${tr.toState ?? 'created'}`),
-      note: trimmedNote(tr.note),
-    })),
-    ...events.map((e) => ({
-      id: `e-${e.id}`,
-      at: e.decidedAt,
-      label: t(`eventKind.${e.kind}`),
-      note: trimmedNote(e.note),
-    })),
-    // The client-activity feed (approvals + change requests from the client's
-    // link) merges into the one timeline, newest-first with everything else.
-    ...clientActivity.map((entry, index) => ({
-      id: `c-${entry.kind}-${index}`,
-      at: entry.decidedAt,
-      label: entry.actorName
-        ? `${t(`eventKind.${entry.kind}`)} · ${t('clientActivity.by', { name: entry.actorName })}`
-        : t(`eventKind.${entry.kind}`),
-      note: trimmedNote(entry.note),
-    })),
-  ].sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());
-
-  if (entries.length === 0) return <Empty text={t('timeline.empty')} />;
+  const tp = useTranslations('engagements.panels');
+  const tpa = useTranslations('engagements.panelActions');
   return (
-    <ul className="m-0 list-none p-0">
-      {entries.map((entry, index) => (
-        <li
-          key={entry.id}
-          className="relative ps-5 pb-3.5 text-[12.5px] last:pb-0"
-        >
-          <span
-            className="absolute top-1 inline-block h-2 w-2 rounded-full bg-brand"
-            style={{ insetInlineStart: '2px' }}
-            aria-hidden
-          />
-          {index < entries.length - 1 && (
-            <span
-              className="absolute bottom-0 top-3 w-px bg-[color:var(--rule)]"
-              style={{ insetInlineStart: '5.5px' }}
-              aria-hidden
-            />
-          )}
-          <div className="font-medium">{entry.label}</div>
-          <div className="font-mono text-[11px] text-[color:var(--text-faint)]" dir="ltr">
-            {formatDate(entry.at, locale)}
-          </div>
-          {/* The author's own words (the client's change-request text, a staff
-              note) — quoted, secondary, and rendered as PLAIN TEXT: React escapes
-              it, so user-authored input can never inject markup here. */}
-          {entry.note && (
-            <p className="mt-1 whitespace-pre-line break-words border-s-2 border-[color:var(--rule)] ps-2 text-[12px] text-[color:var(--text-muted)]">
-              {t('noteQuote', { note: entry.note })}
-            </p>
-          )}
-        </li>
-      ))}
-    </ul>
+    <div>
+      <PanelHeader title={tp('changeOrders')} sub={tpa('changeOrdersSub')} />
+      <div className="p-4">
+        <ChangeOrdersPanel changeOrders={changeOrders} />
+      </div>
+    </div>
   );
 }

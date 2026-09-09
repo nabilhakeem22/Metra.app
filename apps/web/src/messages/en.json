@@ -1704,24 +1704,18 @@
       "advanceLeadsTo": "This moves the job to {phase}.",
       "reshare": "Reveal & re-share the client link"
     },
-    "toolbar": {
-      "title": "Log & manage",
-      "payment": {
-        "name": "Log a payment",
-        "purpose": "Record money received against a milestone."
-      },
-      "deliverable": {
-        "name": "Add a deliverable",
-        "purpose": "Attach a survey, layout, render or drawing."
-      },
-      "budget": {
-        "name": "Set budget range",
-        "purpose": "Record the rough order-of-magnitude cost band."
-      },
-      "onBehalf": {
-        "name": "Record on client's behalf",
-        "purpose": "Log a client acknowledgement you took offline."
-      }
+    "panelActions": {
+      "filesSub": "Working files, and the deliverables attested against each stage",
+      "paymentsSub": "The design fee, and the milestones it is collected against",
+      "timelineSub": "Everything that has happened, and who did it",
+      "changeOrdersSub": "Scope changes priced against the bill of quantities",
+      "addDeliverable": "Add a deliverable",
+      "logPayment": "Log a payment",
+      "onBehalf": "Record on the client's behalf",
+      "onBehalfNote": "Logs an acknowledgement as the client, in this timeline. Use it only for one they gave you directly — a call, a message, a signature on paper.",
+      "setRange": "Set the range",
+      "reviseRange": "Revise the range",
+      "rangeNote": "An indicative build cost — not a quote, and not the design fee."
     },
     "stageAction": {
       "studio": {

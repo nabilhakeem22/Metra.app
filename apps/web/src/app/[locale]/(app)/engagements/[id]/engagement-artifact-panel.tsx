@@ -1,6 +1,7 @@
 'use client';
 
-import type { useTranslations } from 'next-intl';
+import { useTranslations } from 'next-intl';
+import { useState } from 'react';
 import type { EngagementArtifactKind } from '@metra/db';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -26,43 +27,53 @@ const ARTIFACT_KINDS: EngagementArtifactKind[] = [
   'boq',
 ];
 
-// The "record an artifact" panel of the cockpit toolbar. All state lives in the
-// parent and arrives via props (verbatim JSX); `after` closes the panel on success.
+/**
+ * The "record an attested deliverable" form, opened from the Files tab header.
+ *
+ * It OWNS its fields now. They used to be lifted into the cockpit toolbar, which
+ * made sense while one parent multiplexed four panels; with each action filed
+ * beside the record it produces there is no shared parent left to lift into, and
+ * a form that owns its own draft is the simpler object. Closing and reopening
+ * therefore clears the draft — correct for an append-only record.
+ */
 export function ArtifactPanel({
-  t,
-  ta,
-  pending,
   engagementId,
-  artKind,
-  setArtKind,
-  artLabel,
-  setArtLabel,
-  artHash,
-  setArtHash,
-  after,
-  onCancel,
+  pending,
+  runAction,
+  onDone,
 }: {
-  t: ReturnType<typeof useTranslations<'engagements.controls'>>;
-  ta: ReturnType<typeof useTranslations<'engagements.artifactKind'>>;
-  pending: boolean;
   engagementId: string;
-  artKind: EngagementArtifactKind;
-  setArtKind: (kind: EngagementArtifactKind) => void;
-  artLabel: string;
-  setArtLabel: (value: string) => void;
-  artHash: string;
-  setArtHash: (value: string) => void;
-  after: (fn: () => Promise<ActionResult>) => void;
-  onCancel: () => void;
+  pending: boolean;
+  runAction: (fn: () => Promise<ActionResult>) => void;
+  onDone: () => void;
 }) {
+  const t = useTranslations('engagements.controls');
+  const ta = useTranslations('engagements.artifactKind');
+  const [kind, setKind] = useState<EngagementArtifactKind>('survey');
+  const [label, setLabel] = useState('');
+  const [hash, setHash] = useState('');
+
+  function save() {
+    runAction(async () => {
+      const res = await recordArtifact({
+        engagementId,
+        kind,
+        label: label.trim() || null,
+        contentHash: hash.trim() || null,
+      });
+      if (res.ok) onDone();
+      return res;
+    });
+  }
+
   return (
     <div className="space-y-3 rounded-[var(--r-item)] border border-[color:var(--rule)] bg-[color:var(--track)] p-4">
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div className="space-y-1.5">
           <Label htmlFor="art-kind">{t('kind')}</Label>
           <Select
-            value={artKind}
-            onValueChange={(v) => setArtKind(v as EngagementArtifactKind)}
+            value={kind}
+            onValueChange={(v) => setKind(v as EngagementArtifactKind)}
           >
             <SelectTrigger id="art-kind">
               <SelectValue />
@@ -78,7 +89,11 @@ export function ArtifactPanel({
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="art-label">{t('label')}</Label>
-          <Input id="art-label" value={artLabel} onChange={(e) => setArtLabel(e.target.value)} />
+          <Input
+            id="art-label"
+            value={label}
+            onChange={(e) => setLabel(e.target.value)}
+          />
         </div>
       </div>
       <div className="space-y-1.5">
@@ -86,23 +101,14 @@ export function ArtifactPanel({
         <Input
           id="art-hash"
           dir="ltr"
-          value={artHash}
-          onChange={(e) => setArtHash(e.target.value)}
+          value={hash}
+          onChange={(e) => setHash(e.target.value)}
         />
       </div>
       <FormActions
         pending={pending}
-        onCancel={onCancel}
-        onSave={() =>
-          after(() =>
-            recordArtifact({
-              engagementId,
-              kind: artKind,
-              label: artLabel.trim() || null,
-              contentHash: artHash.trim() || null,
-            }),
-          )
-        }
+        onCancel={onDone}
+        onSave={save}
         saveLabel={t('save')}
         cancelLabel={t('cancel')}
       />

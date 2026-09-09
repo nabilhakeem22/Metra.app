@@ -20,16 +20,21 @@ import type {
 import type { CommercialPulse } from '@/lib/engagements/pulse';
 import type { Trigger } from '@/lib/engagements/transitions';
 import { EngagementCommandCard } from './engagement-command-card';
-import { EngagementPanels } from './engagement-panels';
-import { EngagementToolbar, type ToolbarCapabilities } from './engagement-toolbar';
+import {
+  EngagementPanels,
+  type PanelCapabilities,
+} from './engagement-panels';
 import { ENGAGEMENT_TABS, type EngagementTab } from './tabs';
 import { DELIVERY_SHARE_ANCHOR_ID } from './share-anchor';
 import type { BoqStepSummary } from '@/lib/boqs/step';
 
-// The cockpit's single-column body: the COMMAND CARD (what's next) on top, the
-// studio's data-entry TOOLBAR, then the tabbed DETAIL region (Files · Timeline ·
-// Payments · Change orders — Files default). The old right rail is dissolved: its
-// working files, fee ledger and activity now live inside those tabs. Pure
+// The cockpit's single-column body: the COMMAND CARD (what's next) on top, then
+// the tabbed DETAIL region (Files · Timeline · Payments · Change orders — Files
+// default). The old right rail is dissolved: its working files, fee ledger and
+// activity now live inside those tabs, and so does every action that writes into
+// them — the 'Log & manage' strip that used to sit here offered four equal
+// choices an inch under a card whose whole premise is naming ONE next move. Each
+// of those four now lives in the header of the tab holding its record. Pure
 // composition over data the page already loaded; logical CSS only (RTL mirrors).
 export function EngagementDetailClient({
   header,
@@ -62,7 +67,7 @@ export function EngagementDetailClient({
   clientActivity: EngagementClientActivityRecord[];
   boqSummary: BoqStepSummary | null;
   nextActions: Trigger[];
-  capabilities: ToolbarCapabilities;
+  capabilities: PanelCapabilities;
   canUpload: boolean;
   canShare: boolean;
   gatePreview: EngagementGatePreview;
@@ -153,13 +158,6 @@ export function EngagementDetailClient({
         </p>
       )}
 
-      <EngagementToolbar
-        engagementId={header.id}
-        capabilities={capabilities}
-        pending={pending}
-        runAction={runAction}
-      />
-
       <div className="flex flex-wrap gap-2 border-b">
         {ENGAGEMENT_TABS.map((tb) => {
           // A tab wears a badge when it holds something ADDRESSED TO the studio:
@@ -199,6 +197,9 @@ export function EngagementDetailClient({
         tab={tab}
         engagementId={header.id}
         canUpload={canUpload}
+        capabilities={capabilities}
+        pending={pending}
+        runAction={runAction}
         data={{
           header,
           feeSchedule,

@@ -1,6 +1,6 @@
 'use client';
 
-import type { useTranslations } from 'next-intl';
+import { useTranslations } from 'next-intl';
 import { useState } from 'react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -8,34 +8,48 @@ import type { ActionResult } from '@/lib/actions/result';
 import { recordRomAcknowledgement } from '@/lib/engagements/actions';
 import { FormActions } from './engagement-form-actions';
 
-// The "record ROM acknowledgement" panel of the cockpit toolbar. The note is
-// optional detail tucked behind a disclosure (the acknowledgement itself needs no
-// text); its value still lives in the parent (ackNote/setAckNote) and submits as
-// `note.trim() || null` unchanged. `after` closes on success.
+/**
+ * Record the client's cost-range acknowledgement ON THEIR BEHALF — for one they
+ * gave on a call, in a message, or on paper.
+ *
+ * This is the only action in the cockpit that asserts SOMEBODY ELSE acted, which
+ * is why it lives in the Timeline header rather than beside "attach a drawing",
+ * and why its trigger is drawn as a warning rather than a button like any other.
+ * It owns its own note (see the artifact panel for why the lifted-state era
+ * ended).
+ */
 export function RomAckPanel({
-  t,
-  pending,
   engagementId,
-  ackNote,
-  setAckNote,
-  after,
-  onCancel,
+  pending,
+  runAction,
+  onDone,
 }: {
-  t: ReturnType<typeof useTranslations<'engagements.controls'>>;
-  pending: boolean;
   engagementId: string;
-  ackNote: string;
-  setAckNote: (value: string) => void;
-  after: (fn: () => Promise<ActionResult>) => void;
-  onCancel: () => void;
+  pending: boolean;
+  runAction: (fn: () => Promise<ActionResult>) => void;
+  onDone: () => void;
 }) {
+  const t = useTranslations('engagements.controls');
+  const [note, setNote] = useState('');
   const [noteOpen, setNoteOpen] = useState(false);
+
+  function save() {
+    runAction(async () => {
+      const res = await recordRomAcknowledgement({
+        engagementId,
+        note: note.trim() || null,
+      });
+      if (res.ok) onDone();
+      return res;
+    });
+  }
+
   return (
     <div className="space-y-3 rounded-[var(--r-item)] border border-[color:var(--rule)] bg-[color:var(--track)] p-4">
       {noteOpen ? (
         <div className="space-y-1.5">
           <Label htmlFor="ack-note">{t('note')}</Label>
-          <Input id="ack-note" value={ackNote} onChange={(e) => setAckNote(e.target.value)} />
+          <Input id="ack-note" value={note} onChange={(e) => setNote(e.target.value)} />
         </div>
       ) : (
         <button
@@ -48,15 +62,8 @@ export function RomAckPanel({
       )}
       <FormActions
         pending={pending}
-        onCancel={onCancel}
-        onSave={() =>
-          after(() =>
-            recordRomAcknowledgement({
-              engagementId,
-              note: ackNote.trim() || null,
-            }),
-          )
-        }
+        onCancel={onDone}
+        onSave={save}
         saveLabel={t('save')}
         cancelLabel={t('cancel')}
       />
