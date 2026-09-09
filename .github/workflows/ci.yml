@@ -1,10 +1,31 @@
 name: CI
 
+# `validate/**` is a DELIBERATE part of this trigger, not a leftover.
+#
+# It used to be added by hand before pushing a validation branch and stripped
+# again on merge. That ritual had two silent failure modes, and the dangerous one
+# was forgetting to ADD it: the branch pushed, CI never ran, and the change went
+# to main unvalidated with nothing to notice. Forgetting to STRIP it — which is
+# how this became permanent — was harmless by comparison.
+#
+# A control enforced by memory, whose failure is silent, is not a control. The
+# prefix is reserved for pre-merge validation, so running CI on it is always the
+# intent. Do not "clean this up".
 on:
   push:
     branches: [main]
   pull_request:
     branches: [main]
+
+# One run per ref. Pushing again to a validation branch cancels the run that the
+# new commit just made obsolete, so a work-in-progress branch cannot stack up
+# pipelines nobody reads — which is the real cost of the permanent trigger, and
+# is fixed here rather than by asking a human to remember something.
+# `main` is deliberately included: a superseded main run gates a deploy that a
+# newer commit is about to supersede anyway.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   test:
