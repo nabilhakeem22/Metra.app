@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main, 'validate/**']
+    branches: [main]
   pull_request:
     branches: [main]
 
