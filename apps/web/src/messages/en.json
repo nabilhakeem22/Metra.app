@@ -1477,7 +1477,6 @@
       "hint": "Sets Step 2: an existing unit needs a site survey; off-plan imports the developer AutoCAD."
     },
     "boqLabel": "BOQ",
-    "buildRangeLabel": "Estimated build cost",
     "paymentsBadge": "{n} due",
     "ribbon": {
       "proposal": "Proposal",
@@ -1821,7 +1820,9 @@
       "changeOrders": "Change orders",
       "rom": "Build-cost range",
       "timeline": "Timeline",
-      "clientActivity": "Client activity"
+      "clientActivity": "Client activity",
+      "budget": "Budget",
+      "budgetHistory": "What we have quoted"
     },
     "clientActivity": {
       "empty": "No client responses yet. Approvals and change requests from the client's link appear here.",
@@ -1901,8 +1902,7 @@
       "notSet": "No build-cost range set.",
       "low": "Low",
       "high": "High",
-      "acknowledgements": "Acknowledgements",
-      "noAcks": "No acknowledgements recorded yet."
+      "noHistory": "No range has been recorded yet."
     },
     "timeline": {
       "empty": "No activity yet.",
@@ -1962,7 +1962,8 @@
       "handoff_acknowledgement": "Handoff acknowledgement",
       "as_built_attestation": "As-built attestation",
       "concept_change_request": "Concept change request",
-      "design_change_request": "Design change request"
+      "design_change_request": "Design change request",
+      "rom_range_set": "Build-cost range issued"
     },
     "milestoneKind": {
       "deposit": "Deposit",

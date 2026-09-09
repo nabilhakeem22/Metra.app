@@ -1,0 +1,38 @@
+-- 0042 — the build-cost range becomes a LEDGER. SCHEMA ONLY: one enum ADD VALUE.
+--
+-- `rom_low`/`rom_high` on design_engagements are the CURRENT band, and a revision
+-- overwrites them. That is fine for a guard, which only ever asks "what is it
+-- now", and wrong for the studio, whose whole exposure on a non-binding range is
+-- the question "what did we tell them in August". The acknowledged bands already
+-- survive: `rom_acknowledgement` snapshots range_low/range_high at ack time. What
+-- vanished was every band ISSUED and later revised without an acknowledgement in
+-- between — which is most of them, since the range is revised as the design firms
+-- up and acknowledged once at the gate.
+--
+-- So a set becomes an event too, in the SAME append-only ledger, reusing the
+-- reserved range_low/range_high columns. The two kinds interleave by decided_at
+-- into one readable history: set, revised, revised, acknowledged.
+--
+-- WHY NOT A NEW `rom_brackets` TABLE. It would need its own org-scoped FKs, RLS
+-- policy, grants and an SDF, and it would move the acknowledgement rows out of
+-- the ledger they already live in — a migration of live evidentiary data, for a
+-- history that engagement_events can already hold. Nothing is gained that this
+-- enum value does not give, and the guards keep reading exactly what they read
+-- today. If a bracket ever grows fields the ledger cannot carry (a basis note per
+-- version, a supersedes pointer), THAT is when it earns a table.
+--
+-- The ADD VALUE is TOP-LEVEL (never inside a DO $$ block): PG forbids
+-- ALTER TYPE ... ADD VALUE inside a PL/pgSQL block, and only permits it in the
+-- migrator's per-file transaction while the new label stays UNUSED in that same
+-- transaction. This file therefore never references 'rom_range_set' again — no
+-- CHECK, no default, no backfill. The first use is application code. Same shape
+-- as 0028 and 0033.
+--
+-- NO BACKFILL, deliberately. Ranges set before this migration have no issue date
+-- to invent, and a fabricated one on an evidentiary record is worse than a gap.
+-- The history starts here; anything acknowledged before it is still on file as
+-- its acknowledgement event.
+--
+-- RLS/grants unchanged — the existing engagement_events append-only policy and
+-- grants already cover this kind. References NO apply-rls object.
+ALTER TYPE public.engagement_event_kind ADD VALUE IF NOT EXISTS 'rom_range_set';

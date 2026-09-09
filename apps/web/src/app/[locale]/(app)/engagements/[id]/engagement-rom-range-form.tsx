@@ -12,9 +12,10 @@ import { FormActions } from './engagement-form-actions';
  * Set the indicative build-cost range — the non-binding bracket the client must
  * acknowledge before shop drawings unlock.
  *
- * RENAMED from `RomPanel`, which collided with the DISPLAY panel of the same name
- * in `engagement-panels-rom.tsx`: one showed the range, one edited it, and only
- * the import path told you which. This is the form.
+ * RENAMED from `RomPanel`, which collided with a DISPLAY panel of the same name:
+ * one showed the range, one edited it, and only the import path told you which.
+ * The display half has since been absorbed into the Budget tab, which shows the
+ * current band over the history of every band before it.
  *
  * It sits with the range it writes, NOT in the Payments header. Build cost is not
  * the design fee — the schema keeps `romLow`/`romHigh` apart from `designFee`

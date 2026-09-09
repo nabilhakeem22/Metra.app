@@ -289,6 +289,13 @@ export const ENGAGEMENT_EVENT_KINDS = [
   // the physical `ALTER TYPE ... ADD VALUE` order (0033).
   'concept_change_request',
   'design_change_request',
+  // The firm ISSUING or revising the build-cost band. Its ACKNOWLEDGEMENT was
+  // always an event; the setting of it was not, so a band that was revised and
+  // never acknowledged left no trace at all. Reuses the reserved
+  // range_low/range_high columns, and the two kinds interleave by decided_at into
+  // one readable history. Appended LAST to mirror the physical
+  // `ALTER TYPE ... ADD VALUE` order (0042).
+  'rom_range_set',
 ] as const;
 
 export const engagementEventKind = pgEnum(

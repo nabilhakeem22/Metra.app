@@ -55,6 +55,15 @@ export interface EngagementEventRecord {
   actorUserId: string | null;
   docHash: string | null;
   note: string | null;
+  /**
+   * The band carried by the two ROM kinds — `rom_range_set` (the firm issuing or
+   * revising it) and `rom_acknowledgement` (the client confirming it). NULL on
+   * every other kind. Selected here rather than through a second range-aware read
+   * because the Budget tab reads this same array: two more columns on a query
+   * already made beats another round trip.
+   */
+  rangeLow: string | null;
+  rangeHigh: string | null;
   decidedAt: Date;
 }
 
@@ -62,8 +71,7 @@ export interface EngagementEventRecord {
  * The approvals-ledger events recorded against an engagement, NEWEST FIRST
  * (includes `rom_acknowledgement` rows). RLS scopes the read to the caller's org
  * (a foreign engagement reads as an empty list). Omits the tokenized-client-ack
- * columns (actor_name/ip/user_agent) and the `range_low/high` ROM snapshot — a
- * range-aware read can select those when a surface needs them.
+ * columns (actor_name/ip/user_agent), which no surface reads yet.
  */
 export function getEngagementEvents(
   ctx: OrgContext,
@@ -77,6 +85,8 @@ export function getEngagementEvents(
         actorUserId: engagementEvents.actorUserId,
         docHash: engagementEvents.docHash,
         note: engagementEvents.note,
+        rangeLow: engagementEvents.rangeLow,
+        rangeHigh: engagementEvents.rangeHigh,
         decidedAt: engagementEvents.decidedAt,
       })
       .from(engagementEvents)

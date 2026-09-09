@@ -14,6 +14,7 @@ import type {
   EngagementTransitionRecord,
 } from '@/lib/engagements/queries';
 import { PanelHeader } from './engagement-panel-header';
+import { BudgetTab } from './engagement-panels-budget';
 import { ChangeOrdersPanel } from './engagement-panels-change-orders';
 import { FilesTab } from './engagement-panels-files';
 import { PaymentsTab } from './engagement-panels-payments-tab';
@@ -21,10 +22,10 @@ import { TimelineTab } from './engagement-panels-timeline';
 import type { EngagementTab } from './tabs';
 
 // The engagement detail panels — the fuller record below the command card,
-// dispatched by the four detail tabs. Files (working-files tray + the full
+// dispatched by the five detail tabs. Files (working-files tray + the full
 // artifact list), Timeline (transitions + events + the client-activity feed),
-// Payments (the commercial pulse + fee schedule + build-cost range + the payment
-// ledger) and Change orders.
+// Payments (the commercial pulse + fee schedule + the payment ledger), Budget
+// (the build-cost range and every band recorded before it) and Change orders.
 //
 // EACH TAB OWNS ITS OWN HEADER, and with it the actions that write into the
 // record it displays. That is why the padding moved out of here and into the tab
@@ -99,12 +100,19 @@ export function EngagementPanels({
       {tab === 'payments' && (
         <PaymentsTab
           engagementId={engagementId}
-          header={data.header}
           feeSchedule={data.feeSchedule}
           payments={data.payments}
-          events={data.events}
           pulse={data.pulse}
           canRecordPayment={capabilities.recordPayment}
+          pending={pending}
+          runAction={runAction}
+        />
+      )}
+      {tab === 'budget' && (
+        <BudgetTab
+          engagementId={engagementId}
+          header={data.header}
+          events={data.events}
           canSetRom={capabilities.setRom}
           pending={pending}
           runAction={runAction}

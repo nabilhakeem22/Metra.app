@@ -1477,7 +1477,6 @@
       "hint": "يحدد الخطوة 2: الوحدة القائمة تحتاج معاينة ورفعًا؛ على الخارطة تستورد ملف الأوتوكاد من المطور."
     },
     "boqLabel": "مقايسة",
-    "buildRangeLabel": "التكلفة التقديرية للتنفيذ",
     "paymentsBadge": "{n} مستحقة",
     "ribbon": {
       "proposal": "عرض السعر",
@@ -1821,7 +1820,9 @@
       "changeOrders": "أوامر التغيير",
       "rom": "نطاق تكلفة التنفيذ",
       "timeline": "الجدول الزمني",
-      "clientActivity": "نشاط العميل"
+      "clientActivity": "نشاط العميل",
+      "budget": "الميزانية",
+      "budgetHistory": "اللي قلناه للعميل"
     },
     "clientActivity": {
       "empty": "لا توجد ردود من العميل بعد. تظهر هنا الموافقات وطلبات التعديل من رابط العميل.",
@@ -1901,8 +1902,7 @@
       "notSet": "لم يتم تحديد مدى لتكلفة البناء.",
       "low": "أدنى",
       "high": "أقصى",
-      "acknowledgements": "الإقرارات",
-      "noAcks": "لم تُسجَّل أي إقرارات بعد."
+      "noHistory": "لم يُسجَّل أي مدى بعد."
     },
     "timeline": {
       "empty": "لا توجد أنشطة بعد.",
@@ -1962,7 +1962,8 @@
       "handoff_acknowledgement": "إقرار التسليم",
       "as_built_attestation": "توثيق الحالة الفعلية",
       "concept_change_request": "طلب تعديل الفكرة",
-      "design_change_request": "طلب تعديل التصميم"
+      "design_change_request": "طلب تعديل التصميم",
+      "rom_range_set": "إصدار مدى تكلفة البناء"
     },
     "milestoneKind": {
       "deposit": "المقدم",
