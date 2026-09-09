@@ -100,12 +100,26 @@ export function EngagementDetailClient({
   // artifacts are append-only, so overshooting the guard's cap is unrecoverable.
   const conceptOptionCount = countConceptOptions(artifacts);
 
+  /**
+   * Run one server action and refresh on success.
+   *
+   * THE try/catch IS LOAD-BEARING. `pending` gates the command card, all five tab
+   * headers and every panel form; if `fn()` REJECTS -- offline, a Worker rolling
+   * mid-request, a half-open origin -- an unguarded transition never settles and
+   * every one of those controls stays disabled with no way back but a reload.
+   * A rejection is a transport failure, not a coded refusal, so it surfaces as
+   * `generic`: the action's own failures already come back as `{ok:false, error}`.
+   */
   function runAction(fn: () => Promise<ActionResult>) {
     setError(null);
     startTransition(async () => {
-      const res = await fn();
-      if (res.ok) router.refresh();
-      else setError((res.error as ActionCode) ?? 'generic');
+      try {
+        const res = await fn();
+        if (res.ok) router.refresh();
+        else setError((res.error as ActionCode) ?? 'generic');
+      } catch {
+        setError('generic');
+      }
     });
   }
 

@@ -65,6 +65,13 @@ export interface EngagementEventRecord {
   rangeLow: string | null;
   rangeHigh: string | null;
   decidedAt: Date;
+  /**
+   * Insert order, for breaking a `decidedAt` tie. Two events written in the same
+   * millisecond are indistinguishable on `decidedAt` alone once postgres.js has
+   * truncated the timestamp to JS precision, and the guard readers already define
+   * `decidedAt -> createdAt -> id` as this table's total order.
+   */
+  createdAt: Date;
 }
 
 /**
@@ -88,6 +95,7 @@ export function getEngagementEvents(
         rangeLow: engagementEvents.rangeLow,
         rangeHigh: engagementEvents.rangeHigh,
         decidedAt: engagementEvents.decidedAt,
+        createdAt: engagementEvents.createdAt,
       })
       .from(engagementEvents)
       .where(eq(engagementEvents.engagementId, engagementId))

@@ -109,8 +109,15 @@ export interface SpinePosition {
  */
 const STATE_GATE: Partial<Record<DesignState, SpineGateKey>> = {
   concept_review: 'gateA',
-  negotiation: 'gateA',
+  // `negotiation` is NOT at Gate A, and marking it there was a real bug: the only
+  // edge into it from before the gate is `selectConcept`, whose sole guard IS
+  // `gateAInstallmentCleared`. Being in this state therefore PROVES the instalment
+  // cleared, and payments are append-only so it stays cleared. The spine was
+  // flagging the money as outstanding in warn colour while the checklist an inch
+  // below correctly showed the only unmet guard was `revisionCosSettled`.
   final_approval: 'gateB',
+  // `change_triage` DOES still owe Gate B — it is a detour off `final_approval`
+  // and rejoins it, so `approveDesign`'s guards are still ahead of it.
   change_triage: 'gateB',
 };
 

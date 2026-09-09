@@ -12,6 +12,7 @@ function event(over: Partial<EngagementEventRecord>): EngagementEventRecord {
     rangeLow: '1500000.0000',
     rangeHigh: '2500000.0000',
     decidedAt: new Date('2026-08-14T10:00:00Z'),
+    createdAt: new Date('2026-08-14T10:00:00Z'),
     ...over,
   };
 }
@@ -65,6 +66,31 @@ describe('romHistory', () => {
       event({ id: 'whole' }),
     ]);
     expect(entries.map((e) => e.id)).toEqual(['whole']);
+  });
+
+  it('breaks a same-millisecond tie by insert order, then by id', () => {
+    // postgres.js truncates timestamptz to JS millisecond precision, so two events
+    // CAN tie on decidedAt. Resolving that by sort stability alone would be a
+    // claim about the caller's ordering, which is exactly what this module exists
+    // not to make. Same order the guard readers already use for this table.
+    const tied = new Date('2026-09-06T10:00:00Z');
+    const entries = romHistory([
+      event({ id: 'a', decidedAt: tied, createdAt: new Date('2026-09-06T10:00:00.000Z') }),
+      event({ id: 'c', decidedAt: tied, createdAt: new Date('2026-09-06T10:00:02.000Z') }),
+      event({ id: 'b', decidedAt: tied, createdAt: new Date('2026-09-06T10:00:01.000Z') }),
+    ]);
+    expect(entries.map((e) => e.id)).toEqual(['c', 'b', 'a']);
+
+    // Tied on BOTH: id decides, so the order is stable across processes rather
+    // than dependent on the order rows happened to arrive in. Descending, like
+    // every other leg of this comparator and like `guards/readiness.ts` — the
+    // direction carries no meaning, only determinism, so matching the one the
+    // codebase already uses is the whole point.
+    const both = romHistory([
+      event({ id: 'aa', decidedAt: tied, createdAt: tied }),
+      event({ id: 'zz', decidedAt: tied, createdAt: tied }),
+    ]);
+    expect(both.map((e) => e.id)).toEqual(['zz', 'aa']);
   });
 
   it('is empty for an engagement that has never had a range', () => {

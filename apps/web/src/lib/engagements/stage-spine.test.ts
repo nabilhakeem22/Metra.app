@@ -1,6 +1,37 @@
 import { describe, expect, it } from 'vitest';
 import { DESIGN_STATES, type DesignState } from './states';
 import { SPINE_NODES, SPINE_STAGES, spinePosition } from './stage-spine';
+import { TRANSITIONS } from './transitions';
+import type { GuardKey } from './guards';
+
+/** The money guard that each spine gate is, in the machine's own vocabulary. */
+const GATE_GUARD = {
+  gateA: 'gateAInstallmentCleared',
+  gateB: 'gateBInstallmentCleared',
+} as const satisfies Record<string, GuardKey>;
+
+/**
+ * Can a transition guarded by `guard` still be reached from `state`? Walks the
+ * registry forward, cycles included (`rejectDesign` and the revision self-loops
+ * are real edges), so "reachable" means what it says rather than "on the happy
+ * path".
+ */
+function guardStillAhead(state: DesignState, guard: GuardKey): boolean {
+  const seen = new Set<DesignState>();
+  const queue: DesignState[] = [state];
+  while (queue.length > 0) {
+    const at = queue.shift() as DesignState;
+    if (seen.has(at)) continue;
+    seen.add(at);
+    for (const t of Object.values(TRANSITIONS)) {
+      const from = Array.isArray(t.from) ? t.from : [t.from];
+      if (!from.includes(at)) continue;
+      if (t.guards.includes(guard)) return true;
+      queue.push(t.to);
+    }
+  }
+  return false;
+}
 
 describe('the spine itself', () => {
   it('puts each gate between the two stages it separates', () => {
@@ -60,10 +91,35 @@ describe('spinePosition', () => {
 
   it('marks the gate the engagement is actually waiting at', () => {
     expect(spinePosition('concept_review').atGate).toBe('gateA');
-    expect(spinePosition('negotiation').atGate).toBe('gateA');
+    // NOT negotiation: reaching it required clearing the Gate-A instalment. This
+    // line asserted 'gateA' when the file was written, which is how a green suite
+    // shipped the bug — see the reachability test below.
+    expect(spinePosition('negotiation').atGate).toBeNull();
     expect(spinePosition('final_approval').atGate).toBe('gateB');
     // The as-built detour hangs off final_approval, so it waits at the same gate.
     expect(spinePosition('change_triage').atGate).toBe('gateB');
+  });
+
+  it('never marks a gate the engagement has already cleared', () => {
+    // THE TEST THAT SHOULD HAVE EXISTED FIRST. Every other assertion in this file
+    // checks the spine map against ITSELF, which validates spelling and not truth
+    // — and a whole suite of them passed while `negotiation` was marked at Gate A.
+    // It cannot be: the only edge into `negotiation` from before the gate is
+    // `selectConcept`, whose sole guard IS `gateAInstallmentCleared`, and payments
+    // are append-only, so being in that state proves the money cleared.
+    //
+    // The rule is REACHABILITY, not the immediate out-edge: `change_triage` is
+    // legitimately at Gate B even though its own forward trigger carries no money
+    // guard, because it rejoins `final_approval` and `approveDesign` is still
+    // ahead of it. Only a gate that is genuinely still in front may be marked.
+    for (const state of DESIGN_STATES) {
+      const at = spinePosition(state as DesignState);
+      if (at.atGate === null) continue;
+      expect(
+        guardStillAhead(state as DesignState, GATE_GUARD[at.atGate]),
+        `${state} is marked at ${at.atGate}, but ${GATE_GUARD[at.atGate]} is not reachable from it`,
+      ).toBe(true);
+    }
   });
 
   it('is at no gate while the studio is doing its own work', () => {

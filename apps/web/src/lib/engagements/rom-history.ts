@@ -21,14 +21,34 @@ export interface RomHistoryEntry {
   at: Date;
   low: string;
   high: string;
+  /** Insert order — the tie-break, never rendered. */
+  seq: Date;
 }
 
 const ROM_KINDS = new Set(['rom_range_set', 'rom_acknowledgement']);
 
 /**
- * Every recorded band, newest first. Sorted on `decidedAt` rather than trusting
- * the caller's ordering: the Budget tab reads the same event array the Timeline
- * does, and the two want different orders.
+ * A TOTAL order, newest first: `decidedAt`, then `createdAt`, then `id`.
+ *
+ * `decidedAt` alone is not enough. postgres.js truncates `timestamptz` to
+ * millisecond precision, so two events can tie, and a tie resolved by nothing but
+ * sort stability is a claim about the caller's ordering that this module's whole
+ * point is not to make. `guards/readiness.ts` already settled this exact order for
+ * this exact table.
+ */
+function newestFirst(a: RomHistoryEntry, b: RomHistoryEntry): number {
+  const decided = b.at.getTime() - a.at.getTime();
+  if (decided !== 0) return decided;
+  const created = b.seq.getTime() - a.seq.getTime();
+  if (created !== 0) return created;
+  if (a.id === b.id) return 0;
+  return a.id < b.id ? 1 : -1;
+}
+
+/**
+ * Every recorded band, newest first. Sorted here rather than trusting the
+ * caller's ordering: the Budget tab reads the same event array the Timeline does,
+ * and the two want different orders.
  */
 export function romHistory(events: EngagementEventRecord[]): RomHistoryEntry[] {
   return events
@@ -42,6 +62,7 @@ export function romHistory(events: EngagementEventRecord[]): RomHistoryEntry[] {
       at: e.decidedAt,
       low: e.rangeLow,
       high: e.rangeHigh,
+      seq: e.createdAt,
     }))
-    .sort((a, b) => b.at.getTime() - a.at.getTime());
+    .sort(newestFirst);
 }
