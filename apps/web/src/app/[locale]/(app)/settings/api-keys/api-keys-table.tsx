@@ -39,7 +39,7 @@ export function ApiKeysTable({
 }: {
   t: ReturnType<typeof useTranslations<'apiKeys'>>;
   keys: ApiKeyListRow[];
-  revoke: (key: ApiKeyListRow) => void;
+  revoke: (key: ApiKeyListRow) => Promise<void>;
   revoking: boolean;
 }) {
   return (
@@ -100,7 +100,9 @@ export function ApiKeysTable({
                             variant="outline"
                             size="sm"
                             disabled={revoking}
-                            onClick={() => revoke(key)}
+                            onClick={() => {
+                              void revoke(key);
+                            }}
                           >
                             {t('revoke')}
                           </Button>

@@ -54,16 +54,22 @@ export function ApiKeysClient({
     });
   }
 
-  function revoke(key: ApiKeyListRow) {
+  // The confirm is awaited OUTSIDE the transition, and only the server action is
+  // wrapped. Asking inside one deadlocks: React holds a pending transition’s
+  // updates back, so the dialog never paints — and the transition cannot finish
+  // because it is waiting on that dialog. Waiting for a person is not a
+  // transition; the work that follows is.
+  async function revoke(key: ApiKeyListRow) {
+    const confirmed = await confirm({
+      title: t('revokeConfirmTitle'),
+      description: t('revokeConfirmBody', { label: key.label }),
+      confirmLabel: t('revoke'),
+      cancelLabel: t('cancel'),
+      variant: 'destructive',
+    });
+    if (!confirmed) return;
+
     startRevoke(async () => {
-      const confirmed = await confirm({
-        title: t('revokeConfirmTitle'),
-        description: t('revokeConfirmBody', { label: key.label }),
-        confirmLabel: t('revoke'),
-        cancelLabel: t('cancel'),
-        variant: 'destructive',
-      });
-      if (!confirmed) return;
       const res = await revokeApiKey(key.id);
       if (res.ok) {
         setKeys((prev) =>
