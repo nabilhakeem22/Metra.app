@@ -8,7 +8,8 @@ import type { WorkingFileCategory } from '@/lib/engagements/working-files';
 import { useDeliverableUpload } from './use-deliverable-upload';
 
 // The command card's inline attachment dropzone — "THE ONE ACTION" when the
-// studio's next move is to attach a deliverable. A single tap opens the picker;
+// studio's next move is to attach a deliverable, and it says so in the stage's
+// own words when the card passes a `label`. A single tap opens the picker;
 // the file runs through the SAME shared upload hook the working-files tray uses
 // (validate → signed URL → PUT → attach/attest → refresh), so recording the
 // deliverable is what unblocks the stage (owner decision: no auto-advance).
@@ -21,12 +22,21 @@ export function EngagementInlineDropzone({
   category,
   canUpload,
   atCapacity = false,
+  label,
 }: {
   engagementId: string;
   category: WorkingFileCategory;
   canUpload: boolean;
   /** This category already holds every file its guard will accept. */
   atCapacity?: boolean;
+  /**
+   * The stage's act, in its own words -- "Attach the concept layouts". When the
+   * card knows what this upload IS, the button says that instead of naming a file
+   * category, and the headline above it and the control below it become one
+   * sentence rather than two descriptions of the same move. Falls back to the
+   * generic "Upload - <category>" when no act is known.
+   */
+  label?: string;
 }) {
   const t = useTranslations('engagements.files');
   const { pending, upload } = useDeliverableUpload(engagementId);
@@ -78,7 +88,9 @@ export function EngagementInlineDropzone({
           <Upload className="size-4" aria-hidden />
         )}
         <span>
-          {pending ? t('uploading') : t('upload')} · {t(`category.${category}`)}
+          {pending
+            ? t('uploading')
+            : (label ?? `${t('upload')} · ${t(`category.${category}`)}`)}
         </span>
       </button>
     </div>

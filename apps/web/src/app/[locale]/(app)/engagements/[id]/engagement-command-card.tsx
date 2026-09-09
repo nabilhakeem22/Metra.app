@@ -35,11 +35,12 @@ import { EngagementInlineDropzone } from './engagement-inline-dropzone';
 import { EngagementOffPlanToggle } from './engagement-off-plan-toggle';
 import { PaymentForm } from './engagement-payment-form';
 import { EngagementSecondaryActions } from './engagement-secondary-actions';
-import { EngagementStepRibbon } from './engagement-step-ribbon';
+import { EngagementStageSpine } from './engagement-stage-spine';
 import { DIRECT_TRIGGER_ACTIONS } from './trigger-actions';
 
 // The cockpit COMMAND CARD — the single "what's next" surface, redesigned as a
-// stacked card: (1) a 5-stage STEP RIBBON over a human STATUS PILL; (2) THE ONE
+// stacked card: (1) the STUDIO's STAGE SPINE, gates and all, over a human
+// STATUS PILL; (2) THE ONE
 // ACTION — headline + an inline attachment dropzone OR the fee/pay fields + one
 // highlighted primary button + a "what happens next" helper; (3) a quiet FOOTER
 // (client link + the "more actions" secondary controls).
@@ -183,6 +184,16 @@ export function EngagementCommandCard({
   // Every unmet guard is one the CLIENT clears, so there is no studio action.
   const waitingOnClient = view.mode === 'blockedClient';
 
+  // Is the stage's literal act ALREADY a control on this card? When the studio is
+  // blocked and the inline dropzone is the thing that clears it, the dropzone IS
+  // the act -- worded from the same registry row as the headline -- and the
+  // disabled Advance underneath is a second, dead, differently-worded button for
+  // the same move. That is the duplication Option D exists to remove, so it goes.
+  //
+  // It STAYS in the blocked states with no dropzone (created, the Gate-B holds):
+  // there nothing else on the card names the forward move, and a disabled button
+  // that says what you are working toward is better than no button at all.
+
   // The inline attachment dropzone is THE ONE ACTION when the studio's next move
   // is to attach a deliverable at this stage (null otherwise). Concept options are
   // append-only and capped at four by `optionsReady`, so the dropzone stops
@@ -191,6 +202,11 @@ export function EngagementCommandCard({
   const dropzoneCategory = inlineDropzoneCategory(state);
   const dropzoneAtCapacity =
     dropzoneCategory === 'conceptOption' && conceptOptionsAtCapacity(conceptOptionCount);
+  const actOnCard =
+    view.mode === 'blockedStudio' &&
+    dropzoneCategory !== null &&
+    canUpload &&
+    !dropzoneAtCapacity;
   // The off-plan toggle only makes sense before the survey branch — the proposal
   // milestone (created / design_proposal), and only for a role that may update.
   const atProposal = !closed && stateMilestone(state).index === 0;
@@ -278,7 +294,7 @@ export function EngagementCommandCard({
         className="border-b border-[color:var(--rule)] px-5 pb-4 pt-5 sm:px-6"
         style={{ background: 'var(--track)' }}
       >
-        <EngagementStepRibbon state={state} />
+        <EngagementStageSpine state={state} />
         {showPaymentPill && (
           <div className="mt-3.5 flex flex-wrap items-center gap-2.5">
             <span
@@ -373,6 +389,9 @@ export function EngagementCommandCard({
               category={dropzoneCategory}
               canUpload={canUpload}
               atCapacity={dropzoneAtCapacity}
+              // The headline and the control say the SAME sentence. If they ever
+              // disagree, the registry row is wrong -- that is the check.
+              label={stageAction?.actor === 'studio' ? headline : undefined}
             />
           )}
 
@@ -388,15 +407,6 @@ export function EngagementCommandCard({
             />
           )}
 
-          {/* WAITING ON THE CLIENT — the studio's own CTA is dead machinery here:
-              nothing they do enables it, only the client acting does. So the
-              disabled Advance is replaced by the one thing they CAN do, and the
-              card stops presenting a control that cannot move.
-
-              This is the ONE mode where Advance is hidden rather than shown
-              disabled. In blockedStudio it stays visible on purpose — there it is
-              what the studio is working toward, and the checklist above says what
-              would unlock it. */}
           {/* THE one action, full width. An inline row of equal buttons makes the
               reader choose; a single wide CTA with the secondary beneath it does
               not. Payment comes FIRST when it is due, because clearing the money
@@ -423,10 +433,16 @@ export function EngagementCommandCard({
                 that button would have removed a real action, which the first cut
                 of this did.
 
-                This is the ONE mode where Advance is hidden rather than disabled.
-                In blockedStudio it stays on purpose: there it is what the studio
-                is working toward, and the checklist says what would unlock it. */}
-            {waitingOnClient ? (
+                Advance is hidden in TWO situations, for the same reason: it cannot
+                move and something better already occupies its place. Here that is the
+                re-share button. The other is `actOnCard` -- the studio is blocked and
+                the dropzone above IS the act, worded from the same registry row as the
+                headline, so a second dead button for the same move is exactly the
+                duplication Option D removes.
+
+                It STAYS, disabled, in the blocked states with no dropzone: there
+                nothing else on the card names the forward move. */}
+            {actOnCard ? null : waitingOnClient ? (
               canShare && (
                 <Button
                   type="button"

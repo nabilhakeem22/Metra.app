@@ -1478,13 +1478,6 @@
     },
     "boqLabel": "مقايسة",
     "paymentsBadge": "{n} مستحقة",
-    "ribbon": {
-      "proposal": "عرض السعر",
-      "survey": "المعاينة والرفع",
-      "concept": "التصور المبدئي",
-      "threeD": "ثلاثي الأبعاد",
-      "handover": "تسليم اللوحات"
-    },
     "asBuiltDue": "موعد استحقاق الرسومات التنفيذية As-built",
     "created": "تم الإنشاء",
     "updated": "تم التحديث",
@@ -1702,6 +1695,18 @@
       "nextAction": "الخطوة التالية",
       "advanceLeadsTo": "هذا ينقل العمل إلى {phase}.",
       "reshare": "إظهار رابط العميل وإعادة إرساله"
+    },
+    "spine": {
+      "proposal": "العرض",
+      "survey": "الرفع",
+      "layout": "التوزيعات",
+      "concept": "الكونسبت",
+      "gateA": "بوابة أ",
+      "threeD": "3D",
+      "gateB": "بوابة ب",
+      "shopDrawings": "الرسومات",
+      "boq": "المقايسة",
+      "handover": "التسليم"
     },
     "panelActions": {
       "filesSub": "ملفات الشغل، والتسليمات المعتمدة لكل مرحلة",

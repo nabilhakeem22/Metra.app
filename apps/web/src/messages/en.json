@@ -1478,13 +1478,6 @@
     },
     "boqLabel": "BOQ",
     "paymentsBadge": "{n} due",
-    "ribbon": {
-      "proposal": "Proposal",
-      "survey": "Survey & site capture",
-      "concept": "Concept",
-      "threeD": "3D",
-      "handover": "Handover"
-    },
     "asBuiltDue": "As-built due",
     "created": "Created",
     "updated": "Updated",
@@ -1702,6 +1695,18 @@
       "nextAction": "Next action",
       "advanceLeadsTo": "This moves the job to {phase}.",
       "reshare": "Reveal & re-share the client link"
+    },
+    "spine": {
+      "proposal": "Proposal",
+      "survey": "Survey",
+      "layout": "2D layouts",
+      "concept": "Concept",
+      "gateA": "Gate A",
+      "threeD": "3D",
+      "gateB": "Gate B",
+      "shopDrawings": "Shop dwgs",
+      "boq": "BOQ",
+      "handover": "Handover"
     },
     "panelActions": {
       "filesSub": "Working files, and the deliverables attested against each stage",
