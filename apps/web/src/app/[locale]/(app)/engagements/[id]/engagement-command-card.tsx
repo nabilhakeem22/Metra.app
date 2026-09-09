@@ -178,6 +178,8 @@ export function EngagementCommandCard({
         ? 'border-[color:var(--brand-tint-border)]'
         : 'border-[color:var(--rule)]';
   const showNudgePill = view.showNudge && canShare;
+  // Every unmet guard is one the CLIENT clears, so there is no studio action.
+  const waitingOnClient = view.mode === 'blockedClient';
 
   // The inline attachment dropzone is THE ONE ACTION when the studio's next move
   // is to attach a deliverable at this stage (null otherwise). Concept options are
@@ -291,7 +293,7 @@ export function EngagementCommandCard({
       )}
 
       {/* 2. THE ONE ACTION */}
-      {!closed && (
+      {!closed && view.mode !== 'blockedClient' && (
         <p className="mb-1.5 font-mono text-[10.5px] font-bold uppercase tracking-[0.14em] text-[color:var(--text-faint)]">
           {tcmd('nextAction')}
         </p>
@@ -369,6 +371,15 @@ export function EngagementCommandCard({
             />
           )}
 
+          {/* WAITING ON THE CLIENT — the studio's own CTA is dead machinery here:
+              nothing they do enables it, only the client acting does. So the
+              disabled Advance is replaced by the one thing they CAN do, and the
+              card stops presenting a control that cannot move.
+
+              This is the ONE mode where Advance is hidden rather than shown
+              disabled. In blockedStudio it stays visible on purpose — there it is
+              what the studio is working toward, and the checklist above says what
+              would unlock it. */}
           {/* THE one action, full width. An inline row of equal buttons makes the
               reader choose; a single wide CTA with the secondary beneath it does
               not. Payment comes FIRST when it is due, because clearing the money
@@ -384,23 +395,51 @@ export function EngagementCommandCard({
                 {th('logPaymentAdvance')}
               </Button>
             )}
-            <Button
-              type="button"
-              // When Advance is blocked (any non-'ready' mode) it must READ as
-              // disabled — a flat subdued fill, never the brand CTA that looks
-              // clickable. Behaviour is unchanged (still gated by `disabled`).
-              variant={
-                view.advanceEnabled && !showPayCta ? 'default' : 'secondary'
-              }
-              className="w-full"
-              disabled={!view.advanceEnabled || pending}
-              onClick={fireAdvance}
-            >
-              {pending && view.advanceEnabled && (
-                <Loader2 className="size-4 animate-spin" aria-hidden />
-              )}
-              {th('advance')}
-            </Button>
+
+            {/* WAITING ON THE CLIENT: the ADVANCE is dead machinery — nothing the
+                studio does enables it, only the client acting does — so it is
+                replaced by the one move they can still make on this card.
+
+                Note what is NOT hidden: logging a payment. A money guard is
+                client-actionable AND studio-recordable, so a studio that took the
+                transfer offline can settle it themselves and carry on. Hiding
+                that button would have removed a real action, which the first cut
+                of this did.
+
+                This is the ONE mode where Advance is hidden rather than disabled.
+                In blockedStudio it stays on purpose: there it is what the studio
+                is working toward, and the checklist says what would unlock it. */}
+            {waitingOnClient ? (
+              canShare && (
+                <Button
+                  type="button"
+                  variant="secondary"
+                  className="w-full"
+                  disabled={pending}
+                  onClick={onNudge}
+                >
+                  <Link2 className="size-4" aria-hidden />
+                  {tcmd('reshare')}
+                </Button>
+              )
+            ) : (
+              <Button
+                type="button"
+                // When Advance is blocked it must READ as disabled — a flat
+                // subdued fill, never the brand CTA that looks clickable.
+                variant={
+                  view.advanceEnabled && !showPayCta ? 'default' : 'secondary'
+                }
+                className="w-full"
+                disabled={!view.advanceEnabled || pending}
+                onClick={fireAdvance}
+              >
+                {pending && view.advanceEnabled && (
+                  <Loader2 className="size-4 animate-spin" aria-hidden />
+                )}
+                {th('advance')}
+              </Button>
+            )}
           </div>
 
           {/* WHAT HAPPENS NEXT — one line under the action so it never reads as
@@ -414,7 +453,10 @@ export function EngagementCommandCard({
             </p>
           )}
 
-          {view.showNudge && canShare && (
+          {/* The hint explains the nudge affordance. In wait mode the button IS
+              that affordance and sits right above, so the line would just be the
+              same sentence twice. */}
+          {view.showNudge && canShare && !waitingOnClient && (
             <p className="mt-3.5 flex items-baseline gap-1.5 text-[12.5px] text-[color:var(--text-muted)]">
               <span aria-hidden>◆</span>
               <span>{tcmd('nudgeHint')}</span>

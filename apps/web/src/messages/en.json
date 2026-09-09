@@ -1705,7 +1705,8 @@
       },
       "awaitingReply": "{n, plural, one {# client question is waiting on your reply, in Files.} other {# client questions are waiting on your reply, in Files.}}",
       "nextAction": "Next action",
-      "advanceLeadsTo": "This moves the job to {phase}."
+      "advanceLeadsTo": "This moves the job to {phase}.",
+      "reshare": "Reveal & re-share the client link"
     },
     "toolbar": {
       "title": "Log & manage",
