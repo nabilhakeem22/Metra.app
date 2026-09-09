@@ -11,7 +11,7 @@
 // transition) that appends the client's acknowledgement of the firm's ROM band,
 // snapshotting the current ROM into the event so the acknowledged range is frozen.
 import { designEngagements, engagementEvents, type MetraDb } from '@metra/db';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { fail, mutateInOrg } from '@/lib/actions/mutate';
 import type { ActionResult } from '@/lib/actions/result';
 import type { OrgContext } from '@/lib/db/context';
@@ -120,6 +120,13 @@ export async function recordRomAcknowledgementCore(
           rangeLow: engagement.romLow,
           rangeHigh: engagement.romHigh,
           note,
+          // Stamped AFTER the reads, not at BEGIN. The column default is `now()`,
+          // which is `transaction_timestamp()` — so two overlapping writers could
+          // commit in one order and be stamped in the other, and the Budget tab
+          // reads this table as a chronology. `setEngagementRomCore` sets the same
+          // way; a ledger whose order is only trustworthy for one of its two
+          // writers is not a trustworthy ledger.
+          decidedAt: sql`clock_timestamp()`,
         })
         .returning({ id: engagementEvents.id });
 

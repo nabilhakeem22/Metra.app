@@ -1,7 +1,7 @@
 'use client';
 
 import { useTranslations } from 'next-intl';
-import { useState, useTransition } from 'react';
+import { useRef, useState, useTransition } from 'react';
 import { Link, useRouter } from '@/i18n/routing';
 import { resolveActionError } from '@/lib/actions/error-message';
 import type { ActionCode, ActionResult } from '@/lib/actions/result';
@@ -87,6 +87,8 @@ export function EngagementDetailClient({
   const [tab, setTab] = useState<EngagementTab>('files');
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<ActionCode | null>(null);
+  // Guards the frame-sized window `pending` cannot -- see runAction below.
+  const inFlight = useRef(false);
 
   // The Advance button owns the forward-advance trigger; every OTHER legal,
   // permitted trigger becomes a low-emphasis secondary control (no legal trigger
@@ -101,24 +103,51 @@ export function EngagementDetailClient({
   const conceptOptionCount = countConceptOptions(artifacts);
 
   /**
-   * Run one server action and refresh on success.
+   * Run one server action and refresh on success. THE single entry point for
+   * every write on this page -- all thirteen call sites reach the server through
+   * here -- which is why both guards below belong here and not in a form.
    *
-   * THE try/catch IS LOAD-BEARING. `pending` gates the command card, all five tab
-   * headers and every panel form; if `fn()` REJECTS -- offline, a Worker rolling
-   * mid-request, a half-open origin -- an unguarded transition never settles and
-   * every one of those controls stays disabled with no way back but a reload.
-   * A rejection is a transport failure, not a coded refusal, so it surfaces as
-   * `generic`: the action's own failures already come back as `{ok:false, error}`.
+   * THE IN-FLIGHT REF CLOSES THE DOUBLE-SUBMIT WINDOW. `pending` comes from
+   * `useTransition` and only flips on a SUBSEQUENT render, so two clicks inside
+   * one frame both see `pending === false` and both dispatch. That was harmless
+   * while these actions were idempotent column writes; it stopped being harmless
+   * when they began appending to a ledger whose grants are INSERT and SELECT
+   * only, so a duplicated row cannot be taken back. A ref is read and written
+   * synchronously, so the second click in the same frame sees the first.
+   *
+   * It is HERE rather than in `FormActions` because only five of the thirteen
+   * call sites are forms. The other eight -- Advance, the off-plan toggle, the
+   * revision form, the payment form, every secondary trigger including the
+   * terminal `abandon` -- would have been left open by a latch inside the form
+   * component.
+   *
+   * THE try/catch IS LOAD-BEARING for the same controls. `pending` gates the
+   * command card, all five tab headers and every panel form; if `fn()` REJECTS --
+   * offline, a Worker rolling mid-request, a half-open origin -- an unguarded
+   * transition never settles and all of them stay disabled with no way back but a
+   * reload. A rejection is a transport failure rather than a coded refusal, so it
+   * surfaces as `generic`; the action's own failures already return
+   * `{ok:false, error}`. It is logged because otherwise it leaves no trace
+   * anywhere: `mutateInOrg` never saw it, so the server has nothing either.
+   *
+   * `finally` releases the ref unconditionally. Tying the release to `pending`
+   * instead would strand the page forever on any path where a transition never
+   * starts.
    */
   function runAction(fn: () => Promise<ActionResult>) {
+    if (inFlight.current) return;
+    inFlight.current = true;
     setError(null);
     startTransition(async () => {
       try {
         const res = await fn();
         if (res.ok) router.refresh();
         else setError((res.error as ActionCode) ?? 'generic');
-      } catch {
+      } catch (cause) {
+        console.error('engagement action failed before returning a result', cause);
         setError('generic');
+      } finally {
+        inFlight.current = false;
       }
     });
   }
