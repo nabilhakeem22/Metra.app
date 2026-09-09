@@ -12,7 +12,14 @@ import {
  * position, so the process feels like it carries them forward. Renders nothing
  * once the journey is complete, closed, or already on the final milestone.
  */
-export function WhatsNext({ milestone }: { milestone: MilestoneProgress }) {
+export function WhatsNext({
+  milestone,
+  bare = false,
+}: {
+  milestone: MilestoneProgress;
+  /** One quiet line under the action, rather than its own card. */
+  bare?: boolean;
+}) {
   const t = useTranslations('delivery');
   const tJourney = useTranslations('delivery.journey');
 
@@ -20,6 +27,20 @@ export function WhatsNext({ milestone }: { milestone: MilestoneProgress }) {
   const nextIndex = milestone.index + 1;
   const nextMilestone = JOURNEY_MILESTONES[nextIndex];
   if (!nextMilestone) return null;
+
+  if (bare) {
+    // Directly under the button: the mockup's rule is that the action never
+    // reads as a dead end, and a "what happens next" card five sections down the
+    // page does not do that job.
+    return (
+      <p className="flex items-baseline gap-1.5 text-[12.5px] text-muted-foreground">
+        <ArrowRight className="size-3.5 shrink-0 translate-y-0.5 rtl:rotate-180" aria-hidden />
+        <span>
+          {t('whatsNext.eyebrow')} · <span className="font-semibold text-foreground">{tJourney(nextMilestone.key)}</span>
+        </span>
+      </p>
+    );
+  }
 
   return (
     <section className="flex items-center gap-3 rounded-2xl border bg-muted/40 p-4">

@@ -6,12 +6,10 @@ import type { PublicDelivery } from '@/lib/engagements/public';
 import { DocumentsCard } from './portal/documents-card';
 import { FirmHeader } from './portal/firm-header';
 import { Greeting } from './portal/greeting';
-import { HeroCard } from './portal/hero-card';
-import { JourneyTracker } from './portal/journey-tracker';
 import { PaymentClaimCard } from './portal/payment-claim-card';
 import { PaymentGlanceCard } from './portal/payment-glance';
 import { RomAckCard } from './portal/rom-ack-card';
-import { WhatsNext } from './portal/whats-next';
+import { PortalCommandCard } from './portal/command-card';
 
 /**
  * The session-less, mobile-first, firm-branded client portal — a guided single
@@ -60,10 +58,10 @@ export function PublicDeliveryView({
       <div className="mx-auto flex max-w-md flex-col gap-4 p-4 md:py-8">
         <FirmHeader firmName={firmName} />
         <Greeting clientName={clientName} title={title} />
-        <JourneyTracker milestone={delivery.milestone} />
-        <HeroCard
+        <PortalCommandCard
           token={token}
           hero={delivery.hero}
+          milestone={delivery.milestone}
           stageLabel={delivery.stageLabel}
           stageNote={delivery.stageNote}
         />
@@ -75,7 +73,6 @@ export function PublicDeliveryView({
         />
         <PaymentGlanceCard glance={glance} />
         <PaymentClaimCard token={token} claim={delivery.paymentClaim} />
-        <WhatsNext milestone={delivery.milestone} />
         <footer className="pt-2 text-center text-xs text-muted-foreground">
           {t('poweredBy', { firm: firmName })}
         </footer>

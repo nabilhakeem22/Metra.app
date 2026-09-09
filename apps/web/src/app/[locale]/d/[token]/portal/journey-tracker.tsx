@@ -30,12 +30,19 @@ function stepStates(milestone: MilestoneProgress): StepState[] {
  * the connector line mirrors correctly in RTL (inset-inline-start). Never shows a
  * raw machine state — it renders only the derived MilestoneProgress.
  */
-export function JourneyTracker({ milestone }: { milestone: MilestoneProgress }) {
+export function JourneyTracker({
+  milestone,
+  bare = false,
+}: {
+  milestone: MilestoneProgress;
+  /** Render without card chrome, for use INSIDE the command card. */
+  bare?: boolean;
+}) {
   const t = useTranslations('delivery.journey');
   const states = stepStates(milestone);
 
   return (
-    <section className="rounded-2xl border bg-muted/40 p-4">
+    <section className={bare ? "" : "rounded-2xl border bg-muted/40 p-4"}>
       <p className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
         {t('eyebrow')}
       </p>
