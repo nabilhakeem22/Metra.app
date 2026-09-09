@@ -247,35 +247,39 @@ export function EngagementCommandCard({
 
   return (
     <section
-      className={`glass relative overflow-hidden p-5 text-[color:var(--text)] sm:p-6 ${borderClass}`}
+      className={`glass relative overflow-hidden p-0 text-[color:var(--text)] ${borderClass}`}
     >
       {/* Left accent stripe — 4px on the inline-START so it mirrors to the
           inline-END in ar-EG RTL. Mode-driven color. */}
       <span
         aria-hidden
-        className={`pointer-events-none absolute inset-y-0 w-1 ${stripeClass}`}
+        className={`pointer-events-none absolute inset-y-0 z-10 w-1 ${stripeClass}`}
         style={{ insetInlineStart: 0 }}
       />
 
-      {/* 1. STEP RIBBON + STATUS PILL + WHOSE-MOVE */}
-      {/* The gap under the ribbon lives HERE, not on the pill below — the pill is
-          conditional, and the spacing must not disappear with it. */}
-      <div className="mb-3">
+      {/* 1. WHERE WE ARE — ribbon, status and whose-move in ONE tinted band.
+          Grouping them is the point: two stacked strips read as two separate
+          facts, when they are one answer to "where is this". */}
+      <div
+        className="border-b border-[color:var(--rule)] px-5 pb-4 pt-5 sm:px-6"
+        style={{ background: 'var(--track)' }}
+      >
         <EngagementStepRibbon state={state} />
+        {showPaymentPill && (
+          <div className="mt-3.5 flex flex-wrap items-center gap-2.5">
+            <span
+              className={`inline-flex items-center rounded-[var(--r-pill)] px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.08em] ${pillClass}`}
+            >
+              {tcmd(`pill.${pillKey}`)}
+            </span>
+            <span className="text-[12.5px] text-[color:var(--text-muted)]">
+              {tcmd('move.studio')}
+            </span>
+          </div>
+        )}
       </div>
-      {showPaymentPill && (
-        <div className="mb-3.5 flex flex-wrap items-center gap-2.5">
-          <span
-            className={`inline-flex items-center rounded-[var(--r-pill)] px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.08em] ${pillClass}`}
-          >
-            {tcmd(`pill.${pillKey}`)}
-          </span>
-          <span className="text-[12.5px] text-[color:var(--text-muted)]">
-            {tcmd('move.studio')}
-          </span>
-        </div>
-      )}
 
+      <div className="px-5 pb-5 pt-5 sm:px-6">
       {!closed && (
         <EngagementHeroBadges
           t={t}
@@ -287,6 +291,11 @@ export function EngagementCommandCard({
       )}
 
       {/* 2. THE ONE ACTION */}
+      {!closed && (
+        <p className="mb-1.5 font-mono text-[10.5px] font-bold uppercase tracking-[0.14em] text-[color:var(--text-faint)]">
+          {tcmd('nextAction')}
+        </p>
+      )}
       <h2 className="mb-1 text-[22px] font-semibold leading-tight tracking-[var(--tracking-title)] text-balance">
         {headline}
       </h2>
@@ -360,10 +369,15 @@ export function EngagementCommandCard({
             />
           )}
 
-          <div className="flex flex-wrap items-center gap-2.5">
+          {/* THE one action, full width. An inline row of equal buttons makes the
+              reader choose; a single wide CTA with the secondary beneath it does
+              not. Payment comes FIRST when it is due, because clearing the money
+              is what unblocks the advance underneath it. */}
+          <div className="flex flex-col gap-2.5">
             {showPayCta && (
               <Button
                 type="button"
+                className="w-full"
                 disabled={pending}
                 onClick={() => setPayOpen((open) => !open)}
               >
@@ -375,7 +389,10 @@ export function EngagementCommandCard({
               // When Advance is blocked (any non-'ready' mode) it must READ as
               // disabled — a flat subdued fill, never the brand CTA that looks
               // clickable. Behaviour is unchanged (still gated by `disabled`).
-              variant={view.advanceEnabled ? 'default' : 'secondary'}
+              variant={
+                view.advanceEnabled && !showPayCta ? 'default' : 'secondary'
+              }
+              className="w-full"
               disabled={!view.advanceEnabled || pending}
               onClick={fireAdvance}
             >
@@ -385,6 +402,17 @@ export function EngagementCommandCard({
               {th('advance')}
             </Button>
           </div>
+
+          {/* WHAT HAPPENS NEXT — one line under the action so it never reads as
+              a dead end. Only in 'ready': naming the next phase while the move is
+              still blocked would promise something the button cannot do. */}
+          {view.mode === 'ready' && view.nextPhaseState && (
+            <p className="mt-2.5 text-center text-[12.5px] text-[color:var(--text-muted)]">
+              {tcmd('advanceLeadsTo', {
+                phase: t(`state.${view.nextPhaseState}`),
+              })}
+            </p>
+          )}
 
           {view.showNudge && canShare && (
             <p className="mt-3.5 flex items-baseline gap-1.5 text-[12.5px] text-[color:var(--text-muted)]">
@@ -445,19 +473,6 @@ export function EngagementCommandCard({
           )}
 
           {/* 3. FOOTER — client link + the "more actions" secondary controls. */}
-          {canShare && (
-            <div className="mt-5 border-t border-[color:var(--rule)] pt-4">
-              <button
-                type="button"
-                onClick={onNudge}
-                className="inline-flex items-center gap-1.5 text-[12.5px] font-semibold text-brand-ink hover:underline"
-              >
-                <Link2 className="size-3.5" aria-hidden />
-                {tcmd('nudge')}
-              </button>
-            </div>
-          )}
-
           <EngagementSecondaryActions
             engagementId={engagementId}
             triggers={secondaryTriggers}
@@ -466,6 +481,26 @@ export function EngagementCommandCard({
             runAction={runAction}
           />
         </>
+      )}
+      </div>
+
+      {/* 4. QUIET FOOTER — present, never shouting. Its own band rather than a
+          rule inside the body, so the card reads as three regions: where we are,
+          the one action, and everything reachable from here. */}
+      {canShare && (
+        <div
+          className="flex items-center gap-4 border-t border-[color:var(--rule)] px-5 py-3 sm:px-6"
+          style={{ background: 'var(--track)' }}
+        >
+          <button
+            type="button"
+            onClick={onNudge}
+            className="inline-flex items-center gap-1.5 text-[12.5px] font-semibold text-brand-ink hover:underline"
+          >
+            <Link2 className="size-3.5" aria-hidden />
+            {tcmd('nudge')}
+          </button>
+        </div>
       )}
     </section>
   );
