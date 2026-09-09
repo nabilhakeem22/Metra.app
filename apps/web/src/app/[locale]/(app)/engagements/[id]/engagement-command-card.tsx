@@ -24,6 +24,7 @@ import type { BoqStepSummary } from '@/lib/boqs/step';
 import { EngagementBoqStep } from './engagement-boq-step';
 import { stateMilestone } from '@/lib/engagements/journey-map';
 import type { RevisionAllowances } from '@/lib/engagements/revision-allowance';
+import { resolveStageAction } from '@/lib/engagements/stage-action';
 import { isTerminal, type DesignState } from '@/lib/engagements/states';
 import type { Trigger } from '@/lib/engagements/transitions';
 import { formatDate } from '@/lib/format/date';
@@ -131,6 +132,7 @@ export function EngagementCommandCard({
   const th = useTranslations('engagements.hero');
   const tg = useTranslations('engagements.guard');
   const tcmd = useTranslations('engagements.command');
+  const tsa = useTranslations('engagements.stageAction');
   const locale = useLocale();
   const [feeOpen, setFeeOpen] = useState(false);
   const [payOpen, setPayOpen] = useState(false);
@@ -216,26 +218,33 @@ export function EngagementCommandCard({
   const clientNote = findLatestClientChangeRequestNote(clientActivity);
   const clientNoteDate = clientNote ? formatDate(clientNote.decidedAt, locale) : '';
 
+  // The card names the LITERAL ACT of this stage rather than announcing that a
+  // step exists — the registry is the one place that mapping lives, and it
+  // guarantees a row for every state, so a rescue entry into an unusual stage can
+  // never render a blank hero. `ready` and `closed` already name their own act
+  // (one interpolates the phase, one has nothing to name), so the registry
+  // returns null there and the existing copy stands.
+  const stageAction = resolveStageAction(state, view.mode);
+  // Order matters and encodes the invariant: `closed` is checked first because
+  // the registry returns null there too, then the two BLOCKED modes (where a row
+  // is guaranteed), and `ready` last. No optional chaining — a null here would be
+  // a bug in the registry, not a case to render around.
   const headline = closed
     ? tcmd('closedHeadline')
-    : view.mode === 'ready'
-      ? tcmd('readyHeadline', {
+    : stageAction
+      ? tsa(`${stageAction.actor}.${stageAction.key}.headline`)
+      : tcmd('readyHeadline', {
           phase: t(`state.${view.nextPhaseState ?? state}`),
-        })
-      : view.mode === 'blockedStudio'
-        ? tcmd('blockedStudioHeadline')
-        : tcmd('blockedClientHeadline');
-  const hint =
-    view.mode === 'ready'
+        });
+  const hint = stageAction
+    ? // Names who is waiting and what unlocks, one clause each. It still does NOT
+      // name the blocking guard: the checklist below lists that exact guard
+      // verbatim with an unmet marker, and a third copy of the same sentence is
+      // precisely what the old generic hint was.
+      tsa(`${stageAction.actor}.${stageAction.key}.sub`)
+    : view.mode === 'ready'
       ? tcmd('readyHint')
-      : view.mode === 'blockedStudio'
-        ? // Deliberately does NOT name the blocking guard: the checklist below
-          // lists that exact guard verbatim, with a ● marker showing it unmet.
-          // One line, pointing at it — not a third copy of the same sentence.
-          tcmd('blockedStudioHint')
-        : view.mode === 'blockedClient'
-          ? tcmd('blockedClientHint')
-          : null;
+      : null;
 
   function fireAdvance() {
     if (view.advanceNeedsForm) {
@@ -293,9 +302,14 @@ export function EngagementCommandCard({
       )}
 
       {/* 2. THE ONE ACTION */}
-      {!closed && view.mode !== 'blockedClient' && (
+      {/* The eyebrow carries the ACTOR. A client-actor stage is not a MISSING
+          next action — it is a different, healthy one — so it gets its own label
+          rather than no label at all, which left the headline floating. */}
+      {!closed && (
         <p className="mb-1.5 font-mono text-[10.5px] font-bold uppercase tracking-[0.14em] text-[color:var(--text-faint)]">
-          {tcmd('nextAction')}
+          {stageAction?.actor === 'client'
+            ? tcmd('pill.waitingClient')
+            : tcmd('nextAction')}
         </p>
       )}
       <h2 className="mb-1 text-[22px] font-semibold leading-tight tracking-[var(--tracking-title)] text-balance">

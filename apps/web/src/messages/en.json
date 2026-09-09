@@ -1677,10 +1677,6 @@
     "command": {
       "readyHeadline": "Ready to advance to {phase}",
       "readyHint": "Everything checks out — advance when you're ready.",
-      "blockedStudioHeadline": "The next step is yours",
-      "blockedStudioHint": "Finish the item below to open the next stage.",
-      "blockedClientHeadline": "Waiting on the client",
-      "blockedClientHint": "Everything on your side is done.",
       "clientNote": "What the client asked for",
       "nudge": "Nudge client",
       "nudgeHint": "Reveal the client link so you can follow up.",
@@ -1725,6 +1721,76 @@
       "onBehalf": {
         "name": "Record on client's behalf",
         "purpose": "Log a client acknowledgement you took offline."
+      }
+    },
+    "stageAction": {
+      "studio": {
+        "created": {
+          "headline": "Submit the design fee schedule",
+          "sub": "Nothing reaches the client until the fee and its milestones exist."
+        },
+        "survey": {
+          "headline": "Upload the site survey",
+          "sub": "Every drawing after this is measured against it. Uploading it opens the layout stage."
+        },
+        "layout": {
+          "headline": "Attach the concept options",
+          "sub": "Two to four options for the client to choose between. Attaching them sends the concept package."
+        },
+        "design_3d": {
+          "headline": "Upload the 3D renders",
+          "sub": "The approved renders become the baseline the final design is checked against."
+        },
+        "final_approval": {
+          "headline": "Reconcile the as-built drawings",
+          "sub": "An off-plan job needs its as-builts attested before the design can be approved."
+        },
+        "shop_drawings": {
+          "headline": "Issue the shop drawings",
+          "sub": "Issuing them closes the drawing set and opens the bill of quantities."
+        },
+        "boq": {
+          "headline": "Publish the bill of quantities",
+          "sub": "The priced schedule the client is handed, and the basis for anything built from it."
+        },
+        "change_triage": {
+          "headline": "Settle the as-built variance",
+          "sub": "Attest the corrected drawings to bring the design back for approval."
+        },
+        "fallback": {
+          "headline": "There is a step waiting on you",
+          "sub": "The checklist below shows what is still open at this stage."
+        }
+      },
+      "client": {
+        "design_proposal": {
+          "headline": "Waiting on the deposit",
+          "sub": "The proposal is with the client. The survey opens once the deposit clears."
+        },
+        "concept_review": {
+          "headline": "The client has the concept",
+          "sub": "Nothing is blocked on you. The next stage opens when they choose an option and the instalment clears."
+        },
+        "negotiation": {
+          "headline": "The client is reviewing the revisions",
+          "sub": "Nothing is blocked on you. Any priced change orders clear before the concept locks."
+        },
+        "final_approval": {
+          "headline": "The client is reviewing the design",
+          "sub": "Nothing is blocked on you. Shop drawings open once they acknowledge the cost range and the instalment clears."
+        },
+        "execution_decision": {
+          "headline": "The client is choosing how to build",
+          "sub": "Nothing is blocked on you. The balance clears, then they pick design-only or execution."
+        },
+        "design_only_handoff": {
+          "headline": "The client has the handover pack",
+          "sub": "Nothing is blocked on you. The engagement closes when they confirm receipt."
+        },
+        "fallback": {
+          "headline": "Waiting on the client",
+          "sub": "Nothing is blocked on you here — the checklist below shows what they still owe."
+        }
       }
     },
     "feeForm": {
