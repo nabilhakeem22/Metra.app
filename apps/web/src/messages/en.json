@@ -1928,6 +1928,16 @@
         "engagement_not_found": "This project is no longer available.",
         "engagement_not_active": "This project is closed."
       }
+    },
+    "boqStep": {
+      "startTitle": "Price the works in Metra",
+      "startBody": "Build the BOQ from your price book, or fill the template and upload it. A priced schedule can be measured against on site and turned into the execution contract; a file cannot.",
+      "startCta": "Open the BOQ",
+      "issueTitle": "The BOQ is ready to issue",
+      "issueBody": "{count} lines priced. Issuing freezes it and delivers it to the client, withheld until the balance settles.",
+      "issueCta": "Review and issue",
+      "doneTitle": "BOQ issued · {count} lines",
+      "view": "View"
     }
   },
   "delivery": {

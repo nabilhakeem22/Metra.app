@@ -24,6 +24,7 @@ import { EngagementPanels } from './engagement-panels';
 import { EngagementToolbar, type ToolbarCapabilities } from './engagement-toolbar';
 import { ENGAGEMENT_TABS, type EngagementTab } from './tabs';
 import { DELIVERY_SHARE_ANCHOR_ID } from './share-anchor';
+import type { BoqStepSummary } from '@/lib/boqs/step';
 
 // The cockpit's single-column body: the COMMAND CARD (what's next) on top, the
 // studio's data-entry TOOLBAR, then the tabbed DETAIL region (Files · Timeline ·
@@ -32,6 +33,7 @@ import { DELIVERY_SHARE_ANCHOR_ID } from './share-anchor';
 // composition over data the page already loaded; logical CSS only (RTL mirrors).
 export function EngagementDetailClient({
   header,
+  boqSummary,
   feeSchedule,
   payments,
   artifacts,
@@ -58,6 +60,7 @@ export function EngagementDetailClient({
   changeOrders: EngagementChangeOrderRecord[];
   transitions: EngagementTransitionRecord[];
   clientActivity: EngagementClientActivityRecord[];
+  boqSummary: BoqStepSummary | null;
   nextActions: Trigger[];
   capabilities: ToolbarCapabilities;
   canUpload: boolean;
@@ -117,6 +120,8 @@ export function EngagementDetailClient({
 
       <EngagementCommandCard
         engagementId={header.id}
+        projectId={header.projectId}
+        boqSummary={boqSummary}
         preview={gatePreview}
         state={header.state}
         allowances={{

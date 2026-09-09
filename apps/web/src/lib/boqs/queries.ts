@@ -1,6 +1,6 @@
 import 'server-only';
 import { boqLines, boqSections, boqs } from '@metra/db';
-import { asc, eq } from 'drizzle-orm';
+import { asc, eq, sql } from 'drizzle-orm';
 import type { OrgContext } from '@/lib/db/context';
 import { withOrgContext } from '@/lib/db/context';
 
@@ -121,5 +121,34 @@ export async function getProjectBoq(
         ? { totalCost: boq.totalCost, totalMargin: boq.totalMargin }
         : {}),
     };
+  });
+}
+
+/**
+ * Just enough about a project's BOQ for the cockpit to decide what to offer.
+ *
+ * Deliberately NOT `getProjectBoq`: the command card needs a status and a count,
+ * and pulling every section and line of a 2000-line document to render one
+ * button would be a real cost on a page that already does a lot.
+ */
+export async function getProjectBoqSummary(
+  ctx: OrgContext,
+  projectId: string,
+): Promise<{ id: string; status: string; lineCount: number } | null> {
+  return withOrgContext(ctx, async (db) => {
+    const [boq] = await db
+      .select({ id: boqs.id, status: boqs.status })
+      .from(boqs)
+      .where(eq(boqs.projectId, projectId))
+      .orderBy(asc(boqs.createdAt))
+      .limit(1);
+    if (!boq) return null;
+
+    const [counted] = await db
+      .select({ n: sql<number>`count(*)::int` })
+      .from(boqLines)
+      .where(eq(boqLines.boqId, boq.id));
+
+    return { id: boq.id, status: boq.status, lineCount: counted?.n ?? 0 };
   });
 }

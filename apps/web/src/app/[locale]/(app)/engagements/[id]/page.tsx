@@ -26,6 +26,7 @@ import { EngagementHeaderCard } from './engagement-header-card';
 import { PaymentClaimsPanel } from './payment-claims-panel';
 import { DELIVERY_SHARE_ANCHOR_ID } from './share-anchor';
 import { DeliveryShareLink } from './share-link';
+import { getProjectBoqSummary } from '@/lib/boqs/queries';
 
 export default async function EngagementDetailPage({
   params,
@@ -170,6 +171,7 @@ export default async function EngagementDetailPage({
       )}
       <EngagementDetailClient
         header={header}
+      boqSummary={await getProjectBoqSummary(ctx, header.projectId)}
         feeSchedule={feeSchedule}
         payments={payments}
         artifacts={artifacts}

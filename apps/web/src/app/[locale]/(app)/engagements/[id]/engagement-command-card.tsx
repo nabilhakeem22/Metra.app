@@ -20,6 +20,8 @@ import type { EngagementClientActivityRecord } from '@/lib/engagements/queries/c
 // (vitest even deadlocks importing it) and throw at render. The leaf carries only
 // the pure MONEY_GUARD_MILESTONE map + erased types — no registry, no cycle.
 import { MONEY_GUARD_MILESTONE } from '@/lib/engagements/guards/money';
+import type { BoqStepSummary } from '@/lib/boqs/step';
+import { EngagementBoqStep } from './engagement-boq-step';
 import { stateMilestone } from '@/lib/engagements/journey-map';
 import type { RevisionAllowances } from '@/lib/engagements/revision-allowance';
 import { isTerminal, type DesignState } from '@/lib/engagements/states';
@@ -72,6 +74,8 @@ function derivePillKey(mode: CommandCardMode, paymentClaimCount: number): string
 
 export function EngagementCommandCard({
   engagementId,
+  projectId,
+  boqSummary,
   preview,
   state,
   allowances,
@@ -92,6 +96,9 @@ export function EngagementCommandCard({
   onNudge,
 }: {
   engagementId: string;
+  projectId: string;
+  /** The project's BOQ, for the `boq` step's lead action. Null when none exists. */
+  boqSummary: BoqStepSummary | null;
   preview: EngagementGatePreview;
   state: DesignState;
   /**
@@ -328,6 +335,10 @@ export function EngagementCommandCard({
 
       {!closed && (
         <>
+          {state === 'boq' && (
+            <EngagementBoqStep projectId={projectId} summary={boqSummary} />
+          )}
+
           {dropzoneCategory && (
             <EngagementInlineDropzone
               engagementId={engagementId}
