@@ -46,8 +46,17 @@ async function setup(): Promise<{ ctx: OrgContext; engagementId: string }> {
   return { ctx, engagementId };
 }
 
-/** The append-only event rows for an engagement, over the BYPASSRLS connection. */
-async function eventRows(engagementId: string) {
+/**
+ * The append-only event rows for an engagement, over the BYPASSRLS connection,
+ * optionally narrowed to one kind.
+ *
+ * THE FILTER IS THE POINT. These assertions were written as counts over EVERY
+ * event, which was only ever right by accident: setting a ROM wrote nothing to
+ * the ledger, so the ack was the only row that could be there. Setting a range is
+ * now an event too (0042), and a bare count would read a `rom_range_set` as a
+ * second acknowledgement. Saying which kind is what these tests always meant.
+ */
+async function eventRows(engagementId: string, kind?: string) {
   return raw.query<{
     id: string;
     kind: string;
@@ -58,9 +67,15 @@ async function eventRows(engagementId: string) {
   }>(
     `select id, kind, actor_user_id, range_low, range_high, note
        from public.engagement_events
-      where engagement_id = '${engagementId}'`,
+      where engagement_id = '${engagementId}'
+        ${kind ? `and kind = '${kind}'` : ''}
+      order by decided_at`,
   );
 }
+
+/** Just the acknowledgements — what every assertion in this file is about. */
+const ackRows = (engagementId: string) =>
+  eventRows(engagementId, 'rom_acknowledgement');
 
 describe('recordRomAcknowledgement — client ROM ack (append-only)', () => {
   it('appends one rom_acknowledgement snapshotting the current ROM + actor', async () => {
@@ -75,7 +90,7 @@ describe('recordRomAcknowledgement — client ROM ack (append-only)', () => {
     expect(res.ok).toBe(true);
     expect(typeof res.data).toBe('string');
 
-    const rows = await eventRows(engagementId);
+    const rows = await ackRows(engagementId);
     expect(rows).toHaveLength(1);
     expect(rows[0].kind).toBe('rom_acknowledgement');
     // Snapshot: the event's range columns equal the engagement's ROM at ack time.
@@ -83,10 +98,13 @@ describe('recordRomAcknowledgement — client ROM ack (append-only)', () => {
     expect(rows[0].range_high).toBe('2400000.0000');
     expect(rows[0].actor_user_id).toBe(ctx.userId);
 
-    // The row surfaces in the approvals-ledger read.
+    // The row surfaces in the approvals-ledger read — alongside the
+    // `rom_range_set` the setup wrote, newest first.
     const events = await getEngagementEvents(ctx, engagementId);
-    expect(events).toHaveLength(1);
-    expect(events[0].kind).toBe('rom_acknowledgement');
+    expect(events.map((e) => e.kind)).toEqual([
+      'rom_acknowledgement',
+      'rom_range_set',
+    ]);
     expect(events[0].actorUserId).toBe(ctx.userId);
   });
 
@@ -102,7 +120,7 @@ describe('recordRomAcknowledgement — client ROM ack (append-only)', () => {
       engagementId,
       note: '  client agreed by phone  ',
     });
-    const [row] = await eventRows(engagementId);
+    const [row] = await ackRows(engagementId);
     expect(row.note).toBe('client agreed by phone');
   });
 
@@ -124,10 +142,18 @@ describe('recordRomAcknowledgement — client ROM ack (append-only)', () => {
     });
 
     // The existing acknowledgement still shows band A — frozen, not rewritten.
-    const rows = await eventRows(engagementId);
+    const rows = await ackRows(engagementId);
     expect(rows).toHaveLength(1);
     expect(rows[0].range_low).toBe('1000000.0000');
     expect(rows[0].range_high).toBe('2000000.0000');
+
+    // And band B is on the ledger in its own right, so the history reads
+    // A-issued, A-acknowledged, B-issued rather than losing A entirely.
+    const issued = await eventRows(engagementId, 'rom_range_set');
+    expect(issued.map((r) => [r.range_low, r.range_high])).toEqual([
+      ['1000000.0000', '2000000.0000'],
+      ['3000000.0000', '4000000.0000'],
+    ]);
   });
 
   it('rejects acknowledgement when ROM was never set (rom_not_set), writing nothing', async () => {
@@ -150,7 +176,7 @@ describe('recordRomAcknowledgement — client ROM ack (append-only)', () => {
     );
     const res = await recordRomAcknowledgementCore(ctx, { engagementId });
     expect(res).toEqual({ ok: false, error: 'engagement_not_active' });
-    expect(await eventRows(engagementId)).toHaveLength(0);
+    expect(await ackRows(engagementId)).toHaveLength(0);
   });
 
   it('a direct UPDATE / DELETE under org context is denied (append-only grants)', async () => {
@@ -183,7 +209,7 @@ describe('recordRomAcknowledgement — client ROM ack (append-only)', () => {
     ).rejects.toThrow();
 
     // The row survives both attempts, unchanged.
-    const rows = await eventRows(engagementId);
+    const rows = await ackRows(engagementId);
     expect(rows).toHaveLength(1);
     expect(rows[0].note).toBeNull();
   });
@@ -215,7 +241,7 @@ describe('recordRomAcknowledgement — cross-org isolation', () => {
     expect(await getEngagementEvents(ctxB, aEngagement)).toEqual([]);
     // A still reads its own acknowledgement.
     const eventsA = await getEngagementEvents(ctxA, aEngagement);
-    expect(eventsA).toHaveLength(1);
+    expect(eventsA.filter((e) => e.kind === 'rom_acknowledgement')).toHaveLength(1);
     expect(eventsA[0].kind).toBe('rom_acknowledgement');
   });
 });

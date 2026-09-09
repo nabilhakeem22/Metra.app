@@ -43,6 +43,16 @@ async function setup(): Promise<{ ctx: OrgContext; engagementId: string }> {
   return { ctx, engagementId };
 }
 
+/** The `rom_range_set` rows for an engagement, oldest first (BYPASSRLS). */
+async function issuedRows(engagementId: string) {
+  return raw.query<{ kind: string; range_low: string; range_high: string; actor_user_id: string | null }>(
+    `select kind, range_low, range_high, actor_user_id
+       from public.engagement_events
+      where engagement_id = '${engagementId}' and kind = 'rom_range_set'
+      order by decided_at`,
+  );
+}
+
 async function stateOf(engagementId: string): Promise<string> {
   const [row] = await raw.query<{ state: string }>(
     `select state from public.design_engagements where id = '${engagementId}'`,
@@ -64,6 +74,50 @@ describe('setEngagementRom — coarse build-cost band entry', () => {
     expect(rom).toEqual({ romLow: '1800000.0000', romHigh: '2400000.0000' });
     // Pure data entry: state never moves.
     expect(await stateOf(engagementId)).toBe('created');
+  });
+
+  it('appends the band to the append-only ledger, so a revision cannot erase it', async () => {
+    // The columns hold the CURRENT band and a revision overwrites them, which is
+    // fine for a guard and useless to a studio asked "what did we quote in
+    // August". Every band issued gets a row of its own (0042).
+    const { ctx, engagementId } = await setup();
+    await setEngagementRomCore(ctx, {
+      engagementId,
+      romLow: '1500000',
+      romHigh: '2500000',
+    });
+    await setEngagementRomCore(ctx, {
+      engagementId,
+      romLow: '1800000',
+      romHigh: '2200000',
+    });
+
+    // The columns carry only the latest...
+    expect(await getEngagementRom(ctx, engagementId)).toEqual({
+      romLow: '1800000.0000',
+      romHigh: '2200000.0000',
+    });
+    // ...and the ledger carries both, in the order they were offered.
+    const issued = await issuedRows(engagementId);
+    expect(issued.map((r) => [r.range_low, r.range_high])).toEqual([
+      ['1500000.0000', '2500000.0000'],
+      ['1800000.0000', '2200000.0000'],
+    ]);
+    expect(issued[0].actor_user_id).toBe(ctx.userId);
+  });
+
+  it('writes NO ledger row when the range is rejected', async () => {
+    // The event insert shares the action's transaction, so a rejected band must
+    // leave no trace at all — a history of ranges that were never offered would
+    // be worse than no history.
+    const { ctx, engagementId } = await setup();
+    const res = await setEngagementRomCore(ctx, {
+      engagementId,
+      romLow: '2400000',
+      romHigh: '1800000',
+    });
+    expect(res.ok).toBe(false);
+    expect(await issuedRows(engagementId)).toHaveLength(0);
   });
 
   it('accepts an equal low and high (a single-point band)', async () => {
