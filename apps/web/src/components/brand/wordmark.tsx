@@ -8,9 +8,26 @@ import {
 } from '@/components/brand/wordmark-paths';
 import { cn } from '@/lib/utils';
 
+/**
+ * How the mark meets its ground.
+ *
+ * `tile` is the mark as specified: a cobalt gradient squircle with white
+ * strokes, for any NEUTRAL ground, light or dark.
+ *
+ * `reverse` is for a BRAND-COLOURED ground, where the tile has nothing to sit
+ * against. Measured on the auth panel: the tile's lower stop is #2E6BE6 on a
+ * #2E6BE6 panel in light — contrast 1.00, the same colour — and 1.16 against the
+ * lighter cobalt in dark. A shape needs about 3:1 to read at all, so the tile was
+ * simply invisible and the aperture appeared to float. Reversed, the tile is
+ * dropped and the drawing takes `currentColor`, so the lockup inherits
+ * `--primary-foreground` and reads as one object with the wordmark beside it.
+ */
+export type WordmarkTone = 'tile' | 'reverse';
+
 export interface WordmarkProps {
   className?: string;
   size?: 'sm' | 'md' | 'lg';
+  tone?: WordmarkTone;
   /**
    * Play the Trace draw-on once when this mounts. Reserve it for moments the
    * user actually arrives somewhere — app launch, auth, sidebar mount. Never on
@@ -59,16 +76,21 @@ const WALLS = 'M8.9 15.2 V25.2 H23.1 V15.2';
 export function MetraMark({
   size = 24,
   animate = false,
+  tone = 'tile',
   className,
 }: {
   size?: number;
   animate?: boolean;
+  tone?: WordmarkTone;
   className?: string;
 }) {
   // Gradient ids are DOCUMENT-GLOBAL: without a unique id every mark on the
   // page would inherit whichever definition rendered first.
   const gradientId = useId();
   const { stroke, hairline, flat } = markBuild(size);
+  const reversed = tone === 'reverse';
+  // Reversed, the drawing IS the mark, so it carries the weight the tile used to.
+  const ink = reversed ? 'currentColor' : '#FFFFFF';
 
   return (
     <svg
@@ -83,15 +105,17 @@ export function MetraMark({
           colour between light and dark stops reading as one mark. Only the
           hairline is theme-aware (--mark-hairline), because that is about the
           tile's edge against the ground, not about the brand. */}
-      <rect
-        x={1.2}
-        y={1.2}
-        width={29.6}
-        height={29.6}
-        rx={9.6}
-        fill={flat ? '#2E6BE6' : `url(#${gradientId})`}
-      />
-      {hairline && (
+      {!reversed && (
+        <rect
+          x={1.2}
+          y={1.2}
+          width={29.6}
+          height={29.6}
+          rx={9.6}
+          fill={flat ? '#2E6BE6' : `url(#${gradientId})`}
+        />
+      )}
+      {hairline && !reversed && (
         <rect
           x={1.2}
           y={1.2}
@@ -104,7 +128,7 @@ export function MetraMark({
         />
       )}
       <g
-        stroke="#FFFFFF"
+        stroke={ink}
         strokeWidth={stroke}
         strokeLinecap="round"
         strokeLinejoin="round"
@@ -119,10 +143,10 @@ export function MetraMark({
         width={4.8}
         height={4.8}
         rx={1.3}
-        fill="#FFFFFF"
+        fill={ink}
         data-trace="window"
       />
-      {!flat && (
+      {!flat && !reversed && (
         <defs>
           <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
             <stop stopColor="#5A8DF2" />
@@ -144,7 +168,12 @@ export function MetraMark({
  *
  * Gap is 0.35x the mark size, per the identity's clear-space rule.
  */
-export function Wordmark({ className, size = 'md', animate }: WordmarkProps) {
+export function Wordmark({
+  className,
+  size = 'md',
+  animate,
+  tone = 'tile',
+}: WordmarkProps) {
   const t = useTranslations('app');
   const locale = useLocale();
   const isRtl = locale === 'ar-EG';
@@ -170,7 +199,7 @@ export function Wordmark({ className, size = 'md', animate }: WordmarkProps) {
       role="img"
       aria-label={t('name')}
     >
-      <MetraMark size={scale.mark} animate={animate} />
+      <MetraMark size={scale.mark} animate={animate} tone={tone} />
       <svg
         viewBox={glyphs.viewBox}
         width={width}

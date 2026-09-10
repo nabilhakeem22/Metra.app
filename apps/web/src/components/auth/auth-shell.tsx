@@ -39,7 +39,18 @@ export function AuthShell({ children, showValueProp, className }: AuthShellProps
       >
         {showValueProp && (
           <div className="hidden flex-col justify-between gap-10 bg-primary p-10 text-primary-foreground lg:flex">
-            <Wordmark size="lg" animate className="text-primary-foreground" />
+            {/* REVERSED, because this ground is the brand colour itself. The
+                tiled mark measured 1.00 contrast against this panel in light
+                (the tile's lower stop IS --primary) and 1.16 in dark, so the
+                squircle was invisible and the aperture appeared to float loose.
+                Reversed, the whole lockup takes --primary-foreground and reads
+                as one object. */}
+            <Wordmark
+              size="lg"
+              animate
+              tone="reverse"
+              className="text-primary-foreground"
+            />
             <p className="text-balance text-[26px] font-semibold leading-snug tracking-[-0.02em]">
               {home('tagline')}
             </p>
