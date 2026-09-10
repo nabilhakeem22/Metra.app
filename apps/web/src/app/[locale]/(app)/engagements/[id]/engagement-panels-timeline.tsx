@@ -18,6 +18,7 @@ import { formatDate } from '@/lib/format/date';
 import { HandoffAckPanel } from './engagement-handoff-ack-panel';
 import { PanelHeader } from './engagement-panel-header';
 import { Empty } from './engagement-panels-parts';
+import { RetractButton } from './engagement-retract-button';
 import { RomAckPanel } from './engagement-rom-ack-panel';
 
 type OnBehalfPanel = 'rom' | 'handoff';
@@ -45,6 +46,7 @@ export function TimelineTab({
   clientActivity,
   canRecordRomAck,
   canRecordHandoffAck,
+  canRetract,
   pending,
   runAction,
 }: {
@@ -54,6 +56,8 @@ export function TimelineTab({
   clientActivity: EngagementClientActivityRecord[];
   canRecordRomAck: boolean;
   canRecordHandoffAck: boolean;
+  /** Owner/admin only — retracting a ledger row is not routine studio work. */
+  canRetract: boolean;
   pending: boolean;
   runAction: (fn: () => Promise<ActionResult>) => void;
 }) {
@@ -135,9 +139,13 @@ export function TimelineTab({
           </div>
         )}
         <TimelineFeed
+          engagementId={engagementId}
           transitions={transitions}
           events={events}
           clientActivity={clientActivity}
+          canRetract={canRetract}
+          pending={pending}
+          runAction={runAction}
         />
       </div>
     </div>
@@ -153,16 +161,34 @@ function trimmedNote(note: string | null): string | null {
 }
 
 function TimelineFeed({
+  engagementId,
   transitions,
   events,
   clientActivity = [],
+  canRetract,
+  pending,
+  runAction,
 }: {
+  engagementId: string;
   transitions: EngagementTransitionRecord[];
   events: EngagementEventRecord[];
   clientActivity?: EngagementClientActivityRecord[];
+  canRetract: boolean;
+  pending: boolean;
+  runAction: (fn: () => Promise<ActionResult>) => void;
 }) {
   const t = useTranslations('engagements');
   const locale = useLocale();
+
+  // Which rows a correction has retracted, and why. Read from the SAME array the
+  // guards filter with `liveEvents` -- this view deliberately keeps the retracted
+  // row visible (that history IS the protection) and marks it, rather than
+  // hiding it as the guards do.
+  const retractedBy = new Map(
+    events
+      .filter((e) => e.supersedesEventId !== null)
+      .map((e) => [e.supersedesEventId as string, e]),
+  );
   const entries = [
     ...transitions.map((tr) => ({
       id: `t-${tr.id}`,
@@ -178,6 +204,9 @@ function TimelineFeed({
       note: trimmedNote(tr.note),
       occurredOn: null,
       evidence: null,
+      isCorrection: false,
+      eventId: null as string | null,
+      retraction: null as EngagementEventRecord | null,
     })),
     // CLIENT-CHANNEL ROWS ARE SKIPPED HERE, not filtered in the query: they
     // arrive again through `clientActivity` below, which carries the actor's
@@ -196,6 +225,11 @@ function TimelineFeed({
         onBehalf: isRecordedOnBehalf(e.kind, e.actorChannel),
         occurredOn: e.occurredOn,
         evidence: e.evidence,
+        // The correction rows themselves are not entries -- they are rendered ON
+        // the row they retract, below.
+        isCorrection: e.supersedesEventId !== null,
+        eventId: e.id,
+        retraction: retractedBy.get(e.id) ?? null,
       })),
     // The client-activity feed (approvals + change requests from the client's
     // link) merges into the one timeline, newest-first with everything else.
@@ -209,8 +243,14 @@ function TimelineFeed({
       onBehalf: false,
       occurredOn: null,
       evidence: null,
+      isCorrection: false,
+      eventId: null as string | null,
+      retraction: null as EngagementEventRecord | null,
     })),
-  ].sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());
+  ]
+    // A correction is drawn ON the row it retracts, never as an entry of its own.
+    .filter((e) => !e.isCorrection)
+    .sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());
 
   if (entries.length === 0) return <Empty text={t('timeline.empty')} />;
   return (
@@ -230,7 +270,17 @@ function TimelineFeed({
             />
           )}
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-            <span className="font-medium">{entry.label}</span>
+            {/* A retracted row stays, struck through. Hiding it would defeat the
+                point: the ledger is append-only precisely so a mistake and its
+                withdrawal are BOTH on the record. The guards, unlike this view,
+                stop counting it (`liveEvents`). */}
+            <span
+              className={`font-medium ${
+                entry.retraction ? 'text-[color:var(--text-faint)] line-through' : ''
+              }`}
+            >
+              {entry.label}
+            </span>
             {/* PERMANENT, not a warning shown before the fact. A reader six
                 months from now has to be able to tell this apart from something
                 the client typed themselves -- the data layer always could, and
@@ -250,6 +300,30 @@ function TimelineFeed({
               later has the whole claim in front of them rather than a colour.
               Rendered as PLAIN TEXT — React escapes it, so the free-text
               evidence field can never inject markup. */}
+          {entry.retraction && (
+            <div className="mt-1.5 border-s-2 border-[color:var(--danger)] ps-2 font-mono text-[11px] leading-relaxed">
+              <span className="font-bold text-[color:var(--danger)]">
+                {t('timeline.retracted')}
+              </span>
+              {entry.retraction.note && (
+                <span className="ms-1.5 whitespace-pre-line break-words text-[color:var(--text-muted)]">
+                  {entry.retraction.note}
+                </span>
+              )}
+            </div>
+          )}
+
+          {canRetract && entry.eventId && !entry.retraction && (
+            <div className="mt-1.5">
+              <RetractButton
+                engagementId={engagementId}
+                eventId={entry.eventId}
+                pending={pending}
+                runAction={runAction}
+              />
+            </div>
+          )}
+
           {entry.onBehalf && (
             <div className="mt-1.5 border-s-2 border-[color:var(--danger)] ps-2 font-mono text-[11px] leading-relaxed text-[color:var(--text-muted)]">
               <div className="font-bold text-[color:var(--danger)]">

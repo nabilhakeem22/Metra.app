@@ -30,6 +30,7 @@ export {
   abandonEngagement,
   setEngagementRom,
   setEngagementOffPlan,
+  recordEventCorrection,
   recordRomAcknowledgement,
   recordHandoffAcknowledgement,
 } from './lifecycle';

@@ -111,6 +111,11 @@ export default async function EngagementDetailPage({
     recordHandoffAck:
       header.state === 'design_only_handoff' &&
       can(ctx.role, 'engagements_design', 'create'),
+    // Retracting a ledger row is OWNER/ADMIN only, deliberately narrower than the
+    // create gate on the acknowledgements themselves: recording what a client
+    // said is routine studio work, unsaying it afterwards is not. The action
+    // re-checks; this only decides whether to offer the control.
+    retract: can(ctx.role, 'engagements_issue', 'approve'),
   };
 
   // May this role fire the hero's forward-advance trigger? (The server action

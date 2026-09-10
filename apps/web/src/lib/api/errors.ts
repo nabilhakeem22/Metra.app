@@ -148,6 +148,12 @@ export const ACTION_CODE_PROBLEM: Record<ActionCode, ApiProblemKind> = {
   handoff_not_open: 'bad-request',
   rom_range_invalid: 'bad-request',
   rom_not_set: 'bad-request',
+  // A ledger row that is not on this engagement reads as a bad request, matching
+  // `engagement_not_found` above: the id may be perfectly real elsewhere, and
+  // saying `not-found` would confirm that it exists.
+  event_not_found: 'bad-request',
+  // Retracting the same row twice is a state conflict, not malformed input.
+  already_corrected: 'conflict',
   off_plan_locked: 'bad-request',
   flow_not_enabled: 'forbidden',
   payment_kind_mismatch: 'bad-request',

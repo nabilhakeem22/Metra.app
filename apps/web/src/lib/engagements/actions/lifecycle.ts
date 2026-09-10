@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import type { ActionResult } from '@/lib/actions/result';
 import { requireOrg } from '@/lib/auth/require-org';
+import { recordEventCorrectionCore, type RecordEventCorrectionInput } from '../corrections';
 import {
   recordRomAcknowledgementCore,
   type RecordRomAcknowledgementInput,
@@ -461,6 +462,25 @@ export async function recordHandoffAcknowledgement(
 ): Promise<ActionResult & { data?: string }> {
   const ctx = await requireOrg();
   const res = await recordHandoffAcknowledgementCore(ctx, input);
+  if (res.ok) revalidatePath('/', 'layout');
+  return res;
+}
+
+/**
+ * Server-action wrapper for {@link recordEventCorrectionCore}: retracts one row
+ * from the append-only approvals ledger by appending an `event_correction` that
+ * points at it.
+ *
+ * Nothing is deleted or edited -- the grants forbid both, and that is the point.
+ * The retracted row stays visible beside its retraction, and `liveEvents` stops
+ * the guards counting it, so a withdrawn acknowledgement stops opening its gate.
+ * Owner and admin only. Never throws to the client.
+ */
+export async function recordEventCorrection(
+  input: RecordEventCorrectionInput,
+): Promise<ActionResult & { data?: string }> {
+  const ctx = await requireOrg();
+  const res = await recordEventCorrectionCore(ctx, input);
   if (res.ok) revalidatePath('/', 'layout');
   return res;
 }

@@ -537,7 +537,9 @@
     "project_delivery_limit_reached": "This project has already used its two deliveries. Create a new project to start another.",
     "phone_required": "A phone number is required.",
     "dates_required": "Start and end dates are required.",
-    "project_limit_reached": "Your plan has no project seats left. Contact us to add more."
+    "project_limit_reached": "Your plan has no project seats left. Contact us to add more.",
+    "event_not_found": "That record is not on this engagement.",
+    "already_corrected": "That record has already been retracted."
   },
   "common": {
     "untranslated": "untranslated",
@@ -1919,7 +1921,13 @@
       "arrow": "{from} → {to}",
       "onBehalfChip": "On behalf",
       "recordedBy": "Recorded by the studio",
-      "confirmedOn": "Confirmed {date}"
+      "confirmedOn": "Confirmed {date}",
+      "retract": "Retract",
+      "retractTitle": "Retract this record",
+      "retractHint": "This cannot be undone. The record stays on the ledger, struck through, with your reason beside it — and stops counting toward any gate it opened.",
+      "retractReason": "Why",
+      "retractConfirm": "Retract it",
+      "retracted": "Retracted"
     },
     "controls": {
       "title": "Data entry",

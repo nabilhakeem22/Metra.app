@@ -537,7 +537,9 @@
     "project_delivery_limit_reached": "استنفد هذا المشروع عمليتي التسليم الخاصتين به. أنشئ مشروعًا جديدًا لبدء مشروع آخر.",
     "phone_required": "لازم تدخل رقم تليفون.",
     "dates_required": "لازم تحدد تاريخ البداية والنهاية.",
-    "project_limit_reached": "خلصت مشاريع باقتك. كلّمنا عشان تزوّدها."
+    "project_limit_reached": "خلصت مشاريع باقتك. كلّمنا عشان تزوّدها.",
+    "event_not_found": "السجل ده مش على المشروع ده.",
+    "already_corrected": "السجل ده اتراجعنا عنه قبل كده."
   },
   "common": {
     "untranslated": "untranslated",
@@ -1919,7 +1921,13 @@
       "arrow": "{from} ← {to}",
       "onBehalfChip": "نيابةً عنه",
       "recordedBy": "الاستوديو هو اللي سجّله",
-      "confirmedOn": "اتأكد يوم {date}"
+      "confirmedOn": "اتأكد يوم {date}",
+      "retract": "تراجُع",
+      "retractTitle": "تراجع عن السجل ده",
+      "retractHint": "مفيش رجوع في ده. السجل بيفضل في الدفتر مشطوب، والسبب اللي كتبته جنبه — وبيبطل يتحسب لأي بوابة كان فاتحها.",
+      "retractReason": "ليه",
+      "retractConfirm": "اتراجع",
+      "retracted": "اتراجعنا عنه"
     },
     "controls": {
       "title": "إدخال البيانات",

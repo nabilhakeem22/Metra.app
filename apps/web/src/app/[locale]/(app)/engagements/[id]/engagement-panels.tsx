@@ -54,6 +54,8 @@ export interface PanelCapabilities {
   recordRomAck: boolean;
   /** Offered only while the engagement sits at design_only_handoff. */
   recordHandoffAck: boolean;
+  /** Retracting a ledger row — owner/admin only. */
+  retract: boolean;
 }
 
 export function EngagementPanels({
@@ -93,6 +95,7 @@ export function EngagementPanels({
           clientActivity={data.clientActivity}
           canRecordRomAck={capabilities.recordRomAck}
           canRecordHandoffAck={capabilities.recordHandoffAck}
+          canRetract={capabilities.retract}
           pending={pending}
           runAction={runAction}
         />
