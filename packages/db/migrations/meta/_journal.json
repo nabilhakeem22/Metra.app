@@ -302,6 +302,13 @@
       "when": 1788992357549,
       "tag": "0042_rom_range_event",
       "breakpoints": true
+    },
+    {
+      "idx": 43,
+      "version": "7",
+      "when": 1789078757549,
+      "tag": "0043_event_correction_kind",
+      "breakpoints": true
     }
   ]
 }

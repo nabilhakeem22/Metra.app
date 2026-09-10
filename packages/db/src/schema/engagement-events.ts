@@ -1,5 +1,6 @@
 import {
   boolean,
+  date,
   index,
   pgTable,
   text,
@@ -59,6 +60,31 @@ export const engagementEvents = pgTable(
     hasVariance: boolean('has_variance'),
     docHash: text('doc_hash'),
     note: text('note'),
+    /**
+     * The date the recorded thing ACTUALLY happened, when that differs from when
+     * it was written down. NULL means the two coincide — which is every
+     * client-channel row, so no existing record is wrong by omission.
+     *
+     * A DATE, not a timestamp: a studio recording "she confirmed on the 6th"
+     * knows a day, not an instant. It also sidesteps a real trap — an instant
+     * would invite an ordering CHECK against `decidedAt`, and a studio recording
+     * at 01:00 in Cairo is at 22:00 UTC the previous day, so an honest "today"
+     * would be stamped after `decidedAt` and rejected.
+     */
+    occurredOn: date('occurred_on'),
+    /**
+     * HOW it was confirmed — a phone call, a WhatsApp message, a signature on
+     * paper. Separate from `note` so a reader sees the basis as a basis rather
+     * than as a comment that might be anything. Never parsed.
+     */
+    evidence: text('evidence'),
+    /**
+     * The row this one retracts. Only an `event_correction` may carry it and every
+     * correction must (two CHECKs, 0043), and the composite FK is same-org, so
+     * correcting across tenants is impossible at the database rather than in a
+     * query someone might forget to write.
+     */
+    supersedesEventId: uuid('supersedes_event_id'),
     decidedAt: timestamp('decided_at', { withTimezone: true })
       .notNull()
       .defaultNow(),

@@ -296,6 +296,12 @@ export const ENGAGEMENT_EVENT_KINDS = [
   // one readable history. Appended LAST to mirror the physical
   // `ALTER TYPE ... ADD VALUE` order (0042).
   'rom_range_set',
+  // A correction: a NEW row pointing at the row it retracts, because the ledger
+  // grants INSERT and SELECT and nothing else. The mistake stays visible beside
+  // its retraction, which is what a reader six months later needs. Carries
+  // `supersedesEventId`; two CHECKs make that pointer exclusive to this kind and
+  // mandatory for it. Appended LAST to mirror `ALTER TYPE ... ADD VALUE` (0043).
+  'event_correction',
 ] as const;
 
 export const engagementEventKind = pgEnum(
