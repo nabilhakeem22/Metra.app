@@ -10,6 +10,10 @@ import type {
   EngagementEventRecord,
   EngagementTransitionRecord,
 } from '@/lib/engagements/queries';
+import {
+  isClientGenerated,
+  isRecordedOnBehalf,
+} from '@/lib/engagements/event-provenance';
 import { formatDate } from '@/lib/format/date';
 import { HandoffAckPanel } from './engagement-handoff-ack-panel';
 import { PanelHeader } from './engagement-panel-header';
@@ -28,9 +32,11 @@ type OnBehalfPanel = 'rom' | 'handoff';
  * warning rather than as a peer of "attach a drawing" — which is exactly what it
  * looked like in the old strip, one identical tile among four.
  *
- * The consequence is stated at the point of entry. Making it stick to the RECORD
- * afterwards — who acknowledged, who typed it, on what evidence, and on which of
- * the two relevant dates — is a schema change and is not in this slice.
+ * The consequence is stated at the point of entry AND on the record afterwards:
+ * a staff-recorded acknowledgement now carries a permanent marker, so nobody
+ * reading this ledger later mistakes it for something the client typed. The two
+ * dates and the evidence note have columns waiting for them (0043) and are not
+ * captured yet — the form that writes them is the next piece.
  */
 export function TimelineTab({
   engagementId,
@@ -161,6 +167,7 @@ function TimelineFeed({
     ...transitions.map((tr) => ({
       id: `t-${tr.id}`,
       at: tr.decidedAt,
+      onBehalf: false,
       label:
         tr.fromState && tr.toState
           ? t('timeline.arrow', {
@@ -170,12 +177,22 @@ function TimelineFeed({
           : t(`state.${tr.toState ?? 'created'}`),
       note: trimmedNote(tr.note),
     })),
-    ...events.map((e) => ({
-      id: `e-${e.id}`,
-      at: e.decidedAt,
-      label: t(`eventKind.${e.kind}`),
-      note: trimmedNote(e.note),
-    })),
+    // CLIENT-CHANNEL ROWS ARE SKIPPED HERE, not filtered in the query: they
+    // arrive again through `clientActivity` below, which carries the actor's
+    // name. Rendering both drew every genuine client acknowledgement TWICE and
+    // made this ledger unreliable to count -- which matters, because counting it
+    // is what somebody does in a dispute.
+    ...events
+      .filter((e) => !isClientGenerated(e.actorChannel))
+      .map((e) => ({
+        id: `e-${e.id}`,
+        at: e.decidedAt,
+        label: t(`eventKind.${e.kind}`),
+        note: trimmedNote(e.note),
+        // The studio asserting somebody ELSE acted. The only row on this page
+        // that needs saying out loud.
+        onBehalf: isRecordedOnBehalf(e.kind, e.actorChannel),
+      })),
     // The client-activity feed (approvals + change requests from the client's
     // link) merges into the one timeline, newest-first with everything else.
     ...clientActivity.map((entry, index) => ({
@@ -185,6 +202,7 @@ function TimelineFeed({
         ? `${t(`eventKind.${entry.kind}`)} · ${t('clientActivity.by', { name: entry.actorName })}`
         : t(`eventKind.${entry.kind}`),
       note: trimmedNote(entry.note),
+      onBehalf: false,
     })),
   ].sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());
 
@@ -205,7 +223,18 @@ function TimelineFeed({
               aria-hidden
             />
           )}
-          <div className="font-medium">{entry.label}</div>
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+            <span className="font-medium">{entry.label}</span>
+            {/* PERMANENT, not a warning shown before the fact. A reader six
+                months from now has to be able to tell this apart from something
+                the client typed themselves -- the data layer always could, and
+                until now this page could not. */}
+            {entry.onBehalf && (
+              <span className="inline-flex items-center rounded-[var(--r-pill)] border border-[color:var(--danger)] px-2 py-0.5 font-mono text-[9.5px] font-bold uppercase tracking-[0.06em] text-[color:var(--danger)]">
+                {t('timeline.onBehalfChip')}
+              </span>
+            )}
+          </div>
           <div className="font-mono text-[11px] text-[color:var(--text-faint)]" dir="ltr">
             {formatDate(entry.at, locale)}
           </div>

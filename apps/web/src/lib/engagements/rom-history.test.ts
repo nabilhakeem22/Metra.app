@@ -7,6 +7,7 @@ function event(over: Partial<EngagementEventRecord>): EngagementEventRecord {
     id: 'e1',
     kind: 'rom_range_set',
     actorUserId: 'u1',
+    actorChannel: 'staff',
     docHash: null,
     note: null,
     rangeLow: '1500000.0000',

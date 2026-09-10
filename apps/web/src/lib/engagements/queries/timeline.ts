@@ -53,6 +53,13 @@ export interface EngagementEventRecord {
   id: string;
   kind: EngagementEventKind;
   actorUserId: string | null;
+  /**
+   * 'client' when the recipient generated this through their delivery link,
+   * 'staff' when somebody in the studio typed it. The column has separated the
+   * two since 0033 and nothing selected it, so the Timeline drew both as the
+   * same line -- see `event-provenance.ts`.
+   */
+  actorChannel: string;
   docHash: string | null;
   note: string | null;
   /**
@@ -90,6 +97,7 @@ export function getEngagementEvents(
         id: engagementEvents.id,
         kind: engagementEvents.kind,
         actorUserId: engagementEvents.actorUserId,
+        actorChannel: engagementEvents.actorChannel,
         docHash: engagementEvents.docHash,
         note: engagementEvents.note,
         rangeLow: engagementEvents.rangeLow,
