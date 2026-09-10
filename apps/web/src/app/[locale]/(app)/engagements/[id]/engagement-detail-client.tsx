@@ -236,8 +236,16 @@ export function EngagementDetailClient({
               type="button"
               role="tab"
               aria-selected={active}
+              // LOCKED WHILE A WRITE IS IN FLIGHT. Navigating away unmounts the
+              // open panel -- and with it `PaymentPanel`'s per-mount idempotency
+              // key, so a submit whose response was lost would come back on a
+              // FRESH key and land as a genuine duplicate against an append-only
+              // ledger. Safe to do only because `runAction` can no longer leave
+              // `pending` stuck; before that this would have locked navigation
+              // permanently on one failed action.
+              disabled={pending}
               onClick={() => setTab(tb)}
-              className={`inline-flex items-center gap-1.5 rounded-[10px] px-3.5 py-1.5 text-[13px] transition-colors ${
+              className={`inline-flex items-center gap-1.5 rounded-[10px] px-3.5 py-1.5 text-[13px] transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
                 active
                   ? 'bg-card font-bold text-[color:var(--text)] shadow-sm'
                   : 'font-medium text-[color:var(--text-muted)] hover:text-[color:var(--text)]'

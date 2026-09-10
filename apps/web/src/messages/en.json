@@ -1784,7 +1784,7 @@
         },
         "final_approval": {
           "headline": "The client is reviewing the design",
-          "sub": "Nothing is blocked on you. Shop drawings open once they acknowledge the cost range and the instalment clears."
+          "sub": "Nothing is blocked on you. Shop drawings open once the instalment clears."
         },
         "execution_decision": {
           "headline": "The client is choosing how to build",

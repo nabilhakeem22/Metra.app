@@ -11,9 +11,10 @@
 import { designEngagements, engagementEvents } from '@metra/db';
 import { and, eq, notInArray, sql } from 'drizzle-orm';
 import { fail, mutateInOrg } from '@/lib/actions/mutate';
-import type { ActionResult } from '@/lib/actions/result';
+import { err, type ActionResult } from '@/lib/actions/result';
 import { MONEY_RE, formatMoney4, parseMoney4 } from '@/lib/aggregates/proposal-totals';
 import type { OrgContext } from '@/lib/db/context';
+import { isUuid } from '@/lib/uuid';
 import { TERMINAL_STATES } from './states';
 
 /** The terminal states as a list, for the admission gate's SQL predicate. */
@@ -25,12 +26,24 @@ export interface SetEngagementRomInput {
   romHigh: string;
 }
 
+/**
+ * The longest money string this system can mean: `numeric(18,4)` is 14 integer
+ * digits and 4 decimals, so 19 characters plus a point.
+ *
+ * `MONEY_RE` bounds the SHAPE and not the LENGTH, so without this a megabyte of
+ * digits -- the server-action body limit, not the field's -- reaches `BigInt`
+ * before `numeric(18,4)` rejects it downstream. Cheap to send, not free to parse.
+ */
+const MAX_MONEY_CHARS = 20;
+
 /** A well-formed scale-4 money string whose parsed value is strictly positive. */
 function isPositiveMoneyString(value: unknown): value is string {
+  if (typeof value !== 'string') return false;
+  const trimmed = value.trim();
   return (
-    typeof value === 'string' &&
-    MONEY_RE.test(value.trim()) &&
-    parseMoney4(value) > 0n
+    trimmed.length <= MAX_MONEY_CHARS &&
+    MONEY_RE.test(trimmed) &&
+    parseMoney4(trimmed) > 0n
   );
 }
 
@@ -51,6 +64,12 @@ export async function setEngagementRomCore(
   ctx: OrgContext,
   input: SetEngagementRomInput,
 ): Promise<ActionResult> {
+  // Shape-check the id BEFORE opening a transaction. A malformed one otherwise
+  // reaches Postgres, raises on the `::uuid` cast, and is swallowed as `generic`
+  // after a console.error -- so the caller learns nothing and the log fills up.
+  // The same guard `recordArtifactCore` already applies.
+  if (!isUuid(input.engagementId)) return Promise.resolve(err('invalid'));
+
   return mutateInOrg(
     ctx,
     { capability: 'engagements_design', action: 'update', flow: 'interior' },
