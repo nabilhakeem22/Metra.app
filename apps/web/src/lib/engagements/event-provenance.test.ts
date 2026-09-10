@@ -1,10 +1,72 @@
 import { describe, expect, it } from 'vitest';
-import { ENGAGEMENT_EVENT_KINDS } from '@metra/db';
+import { ENGAGEMENT_EVENT_KINDS, type EngagementEventKind } from '@metra/db';
 import {
   isClientGenerated,
   isRecordedOnBehalf,
+  liveEvents,
   ON_BEHALF_KINDS,
 } from './event-provenance';
+
+type Row = { id: string; kind: EngagementEventKind; supersedesEventId: string | null };
+const row = (id: string, kind: EngagementEventKind, supersedes: string | null = null): Row => ({
+  id,
+  kind,
+  supersedesEventId: supersedes,
+});
+
+describe('liveEvents', () => {
+  it('drops the row a correction retracts', () => {
+    // THE CONSEQUENCE THIS EXISTS FOR. `engagement_events` is INSERT-only by
+    // grant, so a wrong acknowledgement cannot be deleted -- it is retracted by
+    // a new row pointing at it. If the guards still counted the retracted row,
+    // a mistake the studio has formally withdrawn would go on unlocking shop
+    // drawings, which is the exact failure the correction was meant to fix.
+    const live = liveEvents([
+      row('ack', 'rom_acknowledgement'),
+      row('fix', 'event_correction', 'ack'),
+    ]);
+    expect(live).toEqual([]);
+  });
+
+  it('drops the correction rows themselves', () => {
+    // They are bookkeeping ABOUT the ledger, not events in it. A guard counting
+    // one would be counting the retraction as though it were the act.
+    const live = liveEvents([
+      row('good', 'rom_acknowledgement'),
+      row('bad', 'handoff_acknowledgement'),
+      row('fix', 'event_correction', 'bad'),
+    ]);
+    expect(live.map((e) => e.id)).toEqual(['good']);
+  });
+
+  it('leaves an uncorrected ledger completely alone', () => {
+    const rows = [
+      row('a', 'rom_acknowledgement'),
+      row('b', 'design_approval'),
+      row('c', 'rom_range_set'),
+    ];
+    expect(liveEvents(rows)).toEqual(rows);
+  });
+
+  it('does not care what order the correction arrives in', () => {
+    // Nothing guarantees the correction sorts after its target -- `decided_at`
+    // is clock_timestamp and the query has no ORDER BY.
+    const live = liveEvents([
+      row('fix', 'event_correction', 'ack'),
+      row('ack', 'rom_acknowledgement'),
+    ]);
+    expect(live).toEqual([]);
+  });
+
+  it('retracts each target independently', () => {
+    const live = liveEvents([
+      row('ack1', 'rom_acknowledgement'),
+      row('ack2', 'rom_acknowledgement'),
+      row('fix', 'event_correction', 'ack1'),
+    ]);
+    expect(live.map((e) => e.id)).toEqual(['ack2']);
+  });
+});
 
 describe('isRecordedOnBehalf', () => {
   it('marks a staff-recorded acknowledgement', () => {

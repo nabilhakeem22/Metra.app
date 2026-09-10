@@ -21,6 +21,7 @@ import { eq } from 'drizzle-orm';
 import type { ActionCode } from '@/lib/actions/result';
 import { formatMoney4 } from '@/lib/aggregates/proposal-totals';
 import { withOrgContext, type OrgContext } from '@/lib/db/context';
+import { liveEvents } from './event-provenance';
 import { resolveForwardTrigger } from './forward-trigger';
 import {
   GUARDS,
@@ -94,10 +95,16 @@ export function getEngagementGatePreview(
       .select()
       .from(engagementChangeOrders)
       .where(eq(engagementChangeOrders.engagementId, engagementId));
-    const events = await tx
-      .select()
-      .from(engagementEvents)
-      .where(eq(engagementEvents.engagementId, engagementId));
+    // LIVE events only. A correction cannot delete the row it retracts --
+    // the ledger is INSERT-only by grant -- so the retracted row is still
+    // here, and a guard counting it would let a mistake the studio has
+    // formally withdrawn go on unlocking the gate it opened.
+    const events = liveEvents(
+      await tx
+        .select()
+        .from(engagementEvents)
+        .where(eq(engagementEvents.engagementId, engagementId)),
+    );
 
     const facts: GuardFacts = {
       engagement,

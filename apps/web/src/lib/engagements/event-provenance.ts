@@ -27,6 +27,38 @@ export const CLIENT_CHANNEL = 'client';
 export const ON_BEHALF_KINDS: ReadonlySet<EngagementEventKind> =
   new Set<EngagementEventKind>(['rom_acknowledgement', 'handoff_acknowledgement']);
 
+/**
+ * Drop every event a correction has retracted, and the corrections themselves.
+ *
+ * THIS IS WHAT MAKES A CORRECTION MEAN ANYTHING. `engagement_events` grants
+ * INSERT and SELECT and nothing else, so a wrong row cannot be deleted -- 0043's
+ * answer is the accounting one, a NEW row pointing at the row it retracts. But a
+ * pointer nothing reads is decoration: until the guards skip the retracted row,
+ * a mistake you have formally withdrawn still unlocks shop drawings.
+ *
+ * `event_correction` rows are dropped too. They are bookkeeping about the ledger,
+ * not events in it, and no guard should ever count one.
+ *
+ * Generic over the row shape so the guard facts (full db rows) and any narrower
+ * read can share one rule rather than each growing their own.
+ */
+export function liveEvents<
+  T extends {
+    id: string;
+    kind: EngagementEventKind;
+    supersedesEventId: string | null;
+  },
+>(events: T[]): T[] {
+  const retracted = new Set(
+    events
+      .map((e) => e.supersedesEventId)
+      .filter((id): id is string => id !== null),
+  );
+  return events.filter(
+    (e) => e.kind !== 'event_correction' && !retracted.has(e.id),
+  );
+}
+
 /** The client generated this themselves, through their delivery link. */
 export function isClientGenerated(actorChannel: string): boolean {
   return actorChannel === CLIENT_CHANNEL;

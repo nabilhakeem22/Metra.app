@@ -22,6 +22,7 @@ import { recordConceptApproval, recordDesignApproval } from './approvals';
 import { CLIENT_RELEASES, selectReleaseArtifactIds } from './client-release';
 import { insertAsBuiltAttestation } from './attestations';
 import { settleConceptAndLock } from './concept';
+import { liveEvents } from './event-provenance';
 import { generateFeeSchedule } from './fee-schedule';
 import { captureRenderManifest } from './renders';
 import { isRevisionTrigger } from './revision-allowance';
@@ -107,10 +108,16 @@ export async function executeTransition(
         .select()
         .from(engagementChangeOrders)
         .where(eq(engagementChangeOrders.engagementId, engagementId));
-      const events = await tx
-        .select()
-        .from(engagementEvents)
-        .where(eq(engagementEvents.engagementId, engagementId));
+      // LIVE events only. A correction cannot delete the row it retracts --
+      // the ledger is INSERT-only by grant -- so the retracted row is still
+      // here, and a guard counting it would let a mistake the studio has
+      // formally withdrawn go on unlocking the gate it opened.
+      const events = liveEvents(
+        await tx
+          .select()
+          .from(engagementEvents)
+          .where(eq(engagementEvents.engagementId, engagementId)),
+      );
 
       const facts: GuardFacts = {
         engagement,
