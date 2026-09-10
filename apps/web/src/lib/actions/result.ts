@@ -88,7 +88,17 @@ export type ActionCode =
   | 'project_delivery_exists'
   | 'project_delivery_limit_reached'
   | 'claim_not_found'
-  | 'file_too_large';
+  | 'file_too_large'
+  // Editing a draft BOQ line by line (boqs/edit.ts + boqs/edit-input.ts).
+  | 'line_not_found'
+  | 'section_not_found'
+  | 'description_required'
+  | 'description_too_long'
+  | 'item_code_too_long'
+  | 'invalid_unit'
+  | 'invalid_qty'
+  | 'invalid_price'
+  | 'invalid_discount';
 
 export interface ActionResult {
   ok: boolean;

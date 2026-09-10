@@ -168,7 +168,7 @@ export default async function ProjectProfilePage({
               showCost: can(ctx.role, 'margin_pnl', 'read'),
             })}
             canBuild={can(ctx.role, 'boq_build', 'create')}
-            locale={locale}
+            canSeeCost={can(ctx.role, 'margin_pnl', 'read')}
           />
         )}
         {tab === 'documents' && (

@@ -1115,7 +1115,7 @@
         "imported": "Imported {count} lines",
         "importFailed": "Could not read that sheet",
         "documentLabel": "BOQ {number}",
-        "lineCount": "{count} lines",
+        "lineCount": "{count, plural, =0 {No lines} one {# line} other {# lines}}",
         "total": "Total",
         "provisional": "Provisional",
         "col": {
@@ -1123,7 +1123,9 @@
           "unit": "Unit",
           "qty": "Qty",
           "rate": "Rate",
-          "total": "Total"
+          "total": "Total",
+          "code": "Code",
+          "provisionalShort": "P"
         },
         "unit": {
           "sqm": "m²",
@@ -1139,7 +1141,31 @@
         "issued": "BOQ issued",
         "issueFailed": "Could not issue the BOQ",
         "issueNoEngagement": "This project has no single active engagement to deliver through",
-        "statusIssued": "Issued"
+        "statusIssued": "Issued",
+        "statusDraft": "Draft",
+        "find": "Find a line",
+        "addLine": "Add a line",
+        "addSection": "Add a section",
+        "newLine": "New line",
+        "newSection": "New section",
+        "deleteLine": "Remove this line",
+        "saving": "Saving",
+        "allSaved": "All changes saved",
+        "saveFailed": "That change was not saved",
+        "subtotal": "Subtotal",
+        "discount": "Discount",
+        "discountPct": "Discount percentage",
+        "keyboardHint": "Tab moves across · Enter moves down the column · Esc reverts the cell",
+        "costedCopy": "Costed copy",
+        "costedCopyFor": "Costed copy of BOQ {number}",
+        "errQty": "That quantity is not a number",
+        "errPrice": "That rate is not a number",
+        "errDescription": "A line needs a description",
+        "errFrozen": "This BOQ is issued and can no longer be changed",
+        "errTooMany": "This BOQ has reached its line limit",
+        "errForbidden": "You do not have permission to change this BOQ",
+        "errDiscount": "The discount must be between 0 and 100",
+        "errSectionName": "A section needs a name"
       }
     }
   },
@@ -1478,7 +1504,7 @@
       "existing": "Existing unit",
       "offPlan": "Off-plan",
       "hint": "Sets Step 2: an existing unit needs a site survey; off-plan imports the developer AutoCAD.",
-    "budgetDraftBadge": "draft"
+      "budgetDraftBadge": "draft"
     },
     "boqLabel": "BOQ",
     "paymentsBadge": "{n} due",
@@ -1691,9 +1717,9 @@
         "waitingClient": "Waiting on client",
         "paymentToConfirm": "Payment to confirm",
         "closed": "Closed",
-      "crumb": "Engagements",
-      "feeChip": "Design fee {amount}",
-      "startedOn": "Started {date}"
+        "crumb": "Engagements",
+        "feeChip": "Design fee {amount}",
+        "startedOn": "Started {date}"
       },
       "move": {
         "studio": "Your move"

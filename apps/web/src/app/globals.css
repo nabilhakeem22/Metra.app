@@ -114,6 +114,20 @@
     --rule: rgba(23, 34, 57, 0.08);
     --rule-soft: rgba(23, 34, 57, 0.06);
     --track: rgba(23, 34, 57, 0.07); /* segmented / chip background */
+
+    /* DATA-TABLE HEADER BAND. --track is a 7% tint: on --card it measures 1.1:1,
+       which is not a band, it is a rumour — a column header set on it disappears
+       the moment the table is more than a few rows. So the band is its own
+       token, dark enough to read as a band in its own right: 14.5:1 against
+       --card here, with --thead-ink at 9.5:1 on the band.
+
+       Dark mode cannot do the same thing. There is no room BELOW --card for a
+       band to stand on, so the dark band goes lighter than its panel and tops
+       out near 1.4:1 — there the separation comes from --thead-rule under it,
+       not from the fill. Same idea, inverted, because the physics differ. */
+    --thead: #1c2740;
+    --thead-ink: #c3d0e4;
+    --thead-rule: rgba(255, 255, 255, 0.14);
     --danger: #bc2a23;
     --danger-tint: rgba(217, 59, 52, 0.13);
 
@@ -227,6 +241,12 @@
     --rule: rgba(255, 255, 255, 0.1);
     --rule-soft: rgba(255, 255, 255, 0.07);
     --track: rgba(255, 255, 255, 0.07);
+
+    /* See the light block: lighter than --card, because dark has no room below
+       it. 1.4:1 on the fill, so --thead-rule is doing the real separating. */
+    --thead: #2c3752;
+    --thead-ink: #c3d0e4;
+    --thead-rule: rgba(255, 255, 255, 0.16);
     --danger: #ff6b5e;
     --danger-tint: rgba(255, 107, 94, 0.18);
 

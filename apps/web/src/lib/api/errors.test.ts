@@ -97,6 +97,15 @@ const ALL_CODES: ActionCode[] = [
   'project_delivery_limit_reached',
   'claim_not_found',
   'file_too_large',
+  'line_not_found',
+  'section_not_found',
+  'description_required',
+  'description_too_long',
+  'item_code_too_long',
+  'invalid_unit',
+  'invalid_qty',
+  'invalid_price',
+  'invalid_discount',
 ];
 
 describe('problem+json envelope', () => {
