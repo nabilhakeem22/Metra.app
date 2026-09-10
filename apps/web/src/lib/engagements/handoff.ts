@@ -7,13 +7,21 @@
 import { designEngagements, engagementEvents } from '@metra/db';
 import { eq } from 'drizzle-orm';
 import { fail, mutateInOrg } from '@/lib/actions/mutate';
-import type { ActionResult } from '@/lib/actions/result';
+import { err, type ActionResult } from '@/lib/actions/result';
 import type { OrgContext } from '@/lib/db/context';
+import { isValidOccurredOn } from './event-provenance';
 import { isTerminal } from './states';
 
 export interface RecordHandoffAcknowledgementInput {
   engagementId: string;
   note?: string | null;
+  /**
+   * The date the RECIPIENT actually confirmed receipt, when that is not today.
+   * `decided_at` only records when the studio typed it.
+   */
+  occurredOn?: string | null;
+  /** HOW they confirmed: a call, a message, a signature on paper. */
+  evidence?: string | null;
 }
 
 /** Trim a nullable free-text field to a stored value ('' / whitespace -> null). */
@@ -38,6 +46,16 @@ export async function recordHandoffAcknowledgementCore(
   input: RecordHandoffAcknowledgementInput,
 ): Promise<ActionResult & { data?: string }> {
   const note = optionalText(input.note);
+  // Same provenance rule as the ROM acknowledgement, validated before the
+  // transaction opens: a future date is a typo or a fabrication.
+  const occurredOn = optionalText(input.occurredOn);
+  if (
+    occurredOn !== null &&
+    !isValidOccurredOn(occurredOn, new Date().toISOString().slice(0, 10))
+  ) {
+    return err('invalid');
+  }
+  const evidence = optionalText(input.evidence);
 
   return mutateInOrg(
     ctx,
@@ -63,6 +81,8 @@ export async function recordHandoffAcknowledgementCore(
           kind: 'handoff_acknowledgement',
           actorUserId: ctx.userId,
           note,
+          occurredOn,
+          evidence,
         })
         .returning({ id: engagementEvents.id });
 

@@ -32,12 +32,19 @@ export function RomAckPanel({
   const t = useTranslations('engagements.controls');
   const [note, setNote] = useState('');
   const [noteOpen, setNoteOpen] = useState(false);
+  // Today in UTC, which is the calendar day the date input offers and the day the
+  // server validates against.
+  const today = new Date().toISOString().slice(0, 10);
+  const [occurredOn, setOccurredOn] = useState('');
+  const [evidence, setEvidence] = useState('');
 
   function save() {
     runAction(async () => {
       const res = await recordRomAcknowledgement({
         engagementId,
         note: note.trim() || null,
+        occurredOn: occurredOn || null,
+        evidence: evidence.trim() || null,
       });
       if (res.ok) onDone();
       return res;
@@ -46,6 +53,34 @@ export function RomAckPanel({
 
   return (
     <div className="space-y-3 rounded-[var(--r-item)] border border-[color:var(--rule)] bg-[color:var(--track)] p-4">
+      {/* THE TWO DATES, and how. `decidedAt` records when this was typed; this
+          records when the client actually said it. A record dated today for a
+          call last Thursday is the weakest possible evidence, and a reader six
+          months from now cannot tell the difference without both. Optional --
+          leaving the date blank means it happened today. */}
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div className="space-y-1.5">
+          <Label htmlFor="rom-ack-occurred">{t('occurredOn')}</Label>
+          <Input
+            id="rom-ack-occurred"
+            type="date"
+            dir="ltr"
+            // Nothing can have been confirmed after today; the server re-checks.
+            max={today}
+            value={occurredOn}
+            onChange={(e) => setOccurredOn(e.target.value)}
+          />
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="rom-ack-evidence">{t('evidence')}</Label>
+          <Input
+            id="rom-ack-evidence"
+            placeholder={t('evidencePlaceholder')}
+            value={evidence}
+            onChange={(e) => setEvidence(e.target.value)}
+          />
+        </div>
+      </div>
       {noteOpen ? (
         <div className="space-y-1.5">
           <Label htmlFor="ack-note">{t('note')}</Label>

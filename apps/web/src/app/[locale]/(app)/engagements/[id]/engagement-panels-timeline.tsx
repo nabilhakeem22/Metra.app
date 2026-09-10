@@ -176,6 +176,8 @@ function TimelineFeed({
             })
           : t(`state.${tr.toState ?? 'created'}`),
       note: trimmedNote(tr.note),
+      occurredOn: null,
+      evidence: null,
     })),
     // CLIENT-CHANNEL ROWS ARE SKIPPED HERE, not filtered in the query: they
     // arrive again through `clientActivity` below, which carries the actor's
@@ -192,6 +194,8 @@ function TimelineFeed({
         // The studio asserting somebody ELSE acted. The only row on this page
         // that needs saying out loud.
         onBehalf: isRecordedOnBehalf(e.kind, e.actorChannel),
+        occurredOn: e.occurredOn,
+        evidence: e.evidence,
       })),
     // The client-activity feed (approvals + change requests from the client's
     // link) merges into the one timeline, newest-first with everything else.
@@ -203,6 +207,8 @@ function TimelineFeed({
         : t(`eventKind.${entry.kind}`),
       note: trimmedNote(entry.note),
       onBehalf: false,
+      occurredOn: null,
+      evidence: null,
     })),
   ].sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());
 
@@ -238,6 +244,32 @@ function TimelineFeed({
           <div className="font-mono text-[11px] text-[color:var(--text-faint)]" dir="ltr">
             {formatDate(entry.at, locale)}
           </div>
+          {/* THE PROVENANCE BLOCK. What the chip asserts, spelled out: that the
+              studio wrote this, when the client actually confirmed, and on what
+              basis. It travels with the record, so somebody reading this months
+              later has the whole claim in front of them rather than a colour.
+              Rendered as PLAIN TEXT — React escapes it, so the free-text
+              evidence field can never inject markup. */}
+          {entry.onBehalf && (
+            <div className="mt-1.5 border-s-2 border-[color:var(--danger)] ps-2 font-mono text-[11px] leading-relaxed text-[color:var(--text-muted)]">
+              <div className="font-bold text-[color:var(--danger)]">
+                {t('timeline.recordedBy')}
+              </div>
+              {entry.occurredOn && (
+                <div dir="ltr">
+                  {t('timeline.confirmedOn', {
+                    date: formatDate(entry.occurredOn, locale),
+                  })}
+                </div>
+              )}
+              {entry.evidence && (
+                <div className="whitespace-pre-line break-words">
+                  {entry.evidence}
+                </div>
+              )}
+            </div>
+          )}
+
           {/* The author's own words (the client's change-request text, a staff
               note) — quoted, secondary, and rendered as PLAIN TEXT: React escapes
               it, so user-authored input can never inject markup here. */}

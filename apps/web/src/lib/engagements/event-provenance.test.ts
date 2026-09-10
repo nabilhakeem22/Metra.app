@@ -3,9 +3,41 @@ import { ENGAGEMENT_EVENT_KINDS, type EngagementEventKind } from '@metra/db';
 import {
   isClientGenerated,
   isRecordedOnBehalf,
+  isValidOccurredOn,
   liveEvents,
   ON_BEHALF_KINDS,
 } from './event-provenance';
+
+describe('isValidOccurredOn', () => {
+  const TODAY = '2026-09-10';
+
+  it('accepts a real past day and today', () => {
+    expect(isValidOccurredOn('2026-09-06', TODAY)).toBe(true);
+    expect(isValidOccurredOn(TODAY, TODAY)).toBe(true);
+  });
+
+  it('rejects the future', () => {
+    // A future date on an evidentiary record is a typo or a fabrication; you
+    // cannot already have been told something that has not happened.
+    expect(isValidOccurredOn('2026-09-11', TODAY)).toBe(false);
+    expect(isValidOccurredOn('2027-01-01', TODAY)).toBe(false);
+  });
+
+  it('rejects a day the calendar does not have', () => {
+    // `new Date('2026-02-31')` silently rolls to 2026-03-03. Round-tripping is
+    // what catches it -- a plain regex would let it through and store the wrong
+    // day without complaint.
+    expect(isValidOccurredOn('2026-02-31', TODAY)).toBe(false);
+    expect(isValidOccurredOn('2026-13-01', TODAY)).toBe(false);
+    expect(isValidOccurredOn('2026-00-10', TODAY)).toBe(false);
+  });
+
+  it('rejects anything that is not a bare YYYY-MM-DD', () => {
+    for (const bad of ['', '2026-9-6', '06/09/2026', '2026-09-06T10:00:00Z', 'today']) {
+      expect(isValidOccurredOn(bad, TODAY), bad).toBe(false);
+    }
+  });
+});
 
 type Row = { id: string; kind: EngagementEventKind; supersedesEventId: string | null };
 const row = (id: string, kind: EngagementEventKind, supersedes: string | null = null): Row => ({

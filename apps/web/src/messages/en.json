@@ -1917,7 +1917,9 @@
     "timeline": {
       "empty": "No activity yet.",
       "arrow": "{from} → {to}",
-      "onBehalfChip": "On behalf"
+      "onBehalfChip": "On behalf",
+      "recordedBy": "Recorded by the studio",
+      "confirmedOn": "Confirmed {date}"
     },
     "controls": {
       "title": "Data entry",
@@ -1937,7 +1939,10 @@
       "addDetails": "Add details",
       "addNote": "Add note",
       "save": "Save",
-      "cancel": "Cancel"
+      "cancel": "Cancel",
+      "occurredOn": "When they confirmed",
+      "evidence": "How",
+      "evidencePlaceholder": "Phone call, WhatsApp, signed on paper…"
     },
     "handoffAck": {
       "title": "Record handoff receipt",

@@ -1917,7 +1917,9 @@
     "timeline": {
       "empty": "لا توجد أنشطة بعد.",
       "arrow": "{from} ← {to}",
-      "onBehalfChip": "نيابةً عنه"
+      "onBehalfChip": "نيابةً عنه",
+      "recordedBy": "الاستوديو هو اللي سجّله",
+      "confirmedOn": "اتأكد يوم {date}"
     },
     "controls": {
       "title": "إدخال البيانات",
@@ -1937,7 +1939,10 @@
       "addDetails": "إضافة تفاصيل",
       "addNote": "إضافة ملاحظة",
       "save": "حفظ",
-      "cancel": "إلغاء"
+      "cancel": "إلغاء",
+      "occurredOn": "تاريخ التأكيد",
+      "evidence": "إزاي",
+      "evidencePlaceholder": "مكالمة، واتساب، توقيع على ورق…"
     },
     "handoffAck": {
       "title": "تسجيل استلام التسليم",

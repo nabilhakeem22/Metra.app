@@ -59,6 +59,32 @@ export function liveEvents<
   );
 }
 
+/** `YYYY-MM-DD`, the shape a `date` column and an `<input type="date">` agree on. */
+const OCCURRED_ON_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * Is this a usable "when it actually happened" date?
+ *
+ * Well-formed, a REAL calendar day (so 2026-02-31 is rejected rather than
+ * silently rolled into March), and not in the future — you cannot have already
+ * been told something that has not happened yet, and a future date on an
+ * evidentiary record is either a typo or a fabrication.
+ *
+ * It is a DATE and not an instant on purpose: a studio recording "she confirmed
+ * on the 6th" knows a day. Comparing days also sidesteps the trap an instant
+ * would create in Egypt, where a studio recording at 01:00 local is at 22:00 UTC
+ * the previous day — an honest "today" would look like the future.
+ */
+export function isValidOccurredOn(value: string, todayIso: string): boolean {
+  if (!OCCURRED_ON_RE.test(value)) return false;
+  // `new Date('2026-02-31')` yields 2026-03-03, so round-trip it to catch a day
+  // the calendar does not have.
+  const parsed = new Date(`${value}T00:00:00Z`);
+  if (Number.isNaN(parsed.getTime())) return false;
+  if (parsed.toISOString().slice(0, 10) !== value) return false;
+  return value <= todayIso;
+}
+
 /** The client generated this themselves, through their delivery link. */
 export function isClientGenerated(actorChannel: string): boolean {
   return actorChannel === CLIENT_CHANNEL;

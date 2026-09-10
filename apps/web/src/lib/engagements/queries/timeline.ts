@@ -60,6 +60,12 @@ export interface EngagementEventRecord {
    * same line -- see `event-provenance.ts`.
    */
   actorChannel: string;
+  /** When the recorded thing actually happened, if not the day it was written. */
+  occurredOn: string | null;
+  /** How it was confirmed -- a call, a message, paper. Never parsed. */
+  evidence: string | null;
+  /** The row this one retracts (`event_correction` only). */
+  supersedesEventId: string | null;
   docHash: string | null;
   note: string | null;
   /**
@@ -98,6 +104,9 @@ export function getEngagementEvents(
         kind: engagementEvents.kind,
         actorUserId: engagementEvents.actorUserId,
         actorChannel: engagementEvents.actorChannel,
+        occurredOn: engagementEvents.occurredOn,
+        evidence: engagementEvents.evidence,
+        supersedesEventId: engagementEvents.supersedesEventId,
         docHash: engagementEvents.docHash,
         note: engagementEvents.note,
         rangeLow: engagementEvents.rangeLow,

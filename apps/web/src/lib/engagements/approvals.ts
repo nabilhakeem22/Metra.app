@@ -13,7 +13,8 @@
 import { designEngagements, engagementEvents, type MetraDb } from '@metra/db';
 import { eq, sql } from 'drizzle-orm';
 import { fail, mutateInOrg } from '@/lib/actions/mutate';
-import type { ActionResult } from '@/lib/actions/result';
+import { err, type ActionResult } from '@/lib/actions/result';
+import { isValidOccurredOn } from './event-provenance';
 import type { OrgContext } from '@/lib/db/context';
 import { isTerminal } from './states';
 
@@ -64,6 +65,15 @@ function optionalText(value: string | null | undefined): string | null {
 export interface RecordRomAcknowledgementInput {
   engagementId: string;
   note?: string | null;
+  /**
+   * The date the CLIENT actually confirmed, when that is not today. `decided_at`
+   * only ever records when the studio typed it, and a record dated "today" for a
+   * call last Thursday is the weakest possible evidence. Omitted means the two
+   * coincide.
+   */
+  occurredOn?: string | null;
+  /** HOW they confirmed: a phone call, a WhatsApp message, a signature on paper. */
+  evidence?: string | null;
 }
 
 /**
@@ -85,6 +95,18 @@ export async function recordRomAcknowledgementCore(
   input: RecordRomAcknowledgementInput,
 ): Promise<ActionResult & { data?: string }> {
   const note = optionalText(input.note);
+  // Provenance, validated before the transaction opens. A future date is either
+  // a typo or a fabrication, and either way has no business on an evidentiary
+  // record. `toISOString` gives today in UTC, which is the same calendar day the
+  // `<input type="date">` offered.
+  const occurredOn = optionalText(input.occurredOn);
+  if (
+    occurredOn !== null &&
+    !isValidOccurredOn(occurredOn, new Date().toISOString().slice(0, 10))
+  ) {
+    return err('invalid');
+  }
+  const evidence = optionalText(input.evidence);
 
   return mutateInOrg(
     ctx,
@@ -120,6 +142,8 @@ export async function recordRomAcknowledgementCore(
           rangeLow: engagement.romLow,
           rangeHigh: engagement.romHigh,
           note,
+          occurredOn,
+          evidence,
           // Stamped AFTER the reads, not at BEGIN. The column default is `now()`,
           // which is `transaction_timestamp()` — so two overlapping writers could
           // commit in one order and be stamped in the other, and the Budget tab
@@ -140,6 +164,8 @@ export async function recordRomAcknowledgementCore(
           kind: 'rom_acknowledgement',
           range_low: engagement.romLow,
           range_high: engagement.romHigh,
+          occurred_on: occurredOn,
+          evidence,
         },
       });
       return row.id;
