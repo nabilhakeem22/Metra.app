@@ -81,10 +81,14 @@
     --text: #111418;
     --text-body: #333a44;
     --text-muted: #5c6470;
-    /* Darkened from the handoff's #8A919C, which scored 2.98 on glass. Section
-       labels and meta are 10-11px, so they need the full 4.5 rather than the
-       large-text 3.0. */
-    --text-faint: #68707b;
+    /* AA against the WORST surface it lands on, not the best. The previous
+       #68707b scored 4.92 on --card and was signed off on that basis -- but it
+       also renders on --track (the card's tinted header band, chips, the
+       segmented strip), where the same value scored 4.31 and failed. Section
+       labels and meta are 10-11px, nowhere near the 18.66px+ that would let the
+       large-text 3.0 apply, so 4.5 is the real floor. This value clears it on
+       both: 5.28 on --card, 4.62 on --track. */
+    --text-faint: #646b76;
 
     /* --brand is consumed by Tailwind as hsl(var(--brand)), so it is defined as
        an H S% L% triplet in the bridge below (the cobalt #2E6BE6), not as the
@@ -193,7 +197,9 @@
     --text: #eef2f8;
     --text-body: #c3ccdb;
     --text-muted: #9aa6ba;
-    --text-faint: #7e8b9f;
+    /* Same correction as light: #7e8b9f scored 5.04 on --card but 4.16 on
+       --track. Now 5.59 / 4.62. */
+    --text-faint: #8793a5;
 
     /* The UI brand LIGHTENS on dark for contrast over the navy ground. The MARK
        does not — it keeps the identity's #5A8DF2 -> #2E6BE6 gradient in both

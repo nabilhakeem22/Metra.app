@@ -36,14 +36,18 @@ function barClass(status: SegmentStatus): string {
   }
 }
 
+// HIERARCHY BY WEIGHT, NOT BY FADING. Pushing `--text-faint` down until it was
+// legible on --track brought it close to --text-muted, which flattens a
+// colour-only hierarchy. Weight carries the difference instead -- and unlike
+// lightness it costs nothing in contrast, which is the whole point.
 function labelClass(status: SegmentStatus): string {
   switch (status) {
     case 'current':
-      return 'font-semibold text-brand-ink';
+      return 'font-bold text-brand-ink';
     case 'done':
       return 'font-medium text-[color:var(--text-muted)]';
     default:
-      return 'text-[color:var(--text-faint)]';
+      return 'font-normal text-[color:var(--text-faint)]';
   }
 }
 
@@ -72,7 +76,7 @@ export function EngagementStageSpine({ state }: { state: DesignState }) {
                 }`}
               />
               <span
-                className={`whitespace-nowrap font-mono text-[9px] font-bold uppercase leading-tight tracking-[0.06em] ${
+                className={`whitespace-nowrap font-mono text-[10px] font-bold uppercase leading-tight tracking-[0.06em] ${
                   here ? 'text-[color:var(--warn)]' : 'text-[color:var(--text-faint)]'
                 }`}
               >
@@ -99,7 +103,7 @@ export function EngagementStageSpine({ state }: { state: DesignState }) {
           >
             <span className={`h-1 rounded-full ${barClass(status)}`} aria-hidden />
             <span
-              className={`truncate text-[10.5px] leading-tight ${labelClass(status)}`}
+              className={`truncate text-[11px] font-medium leading-tight ${labelClass(status)}`}
             >
               {t(node.key)}
             </span>
