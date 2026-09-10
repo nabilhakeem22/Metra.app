@@ -25,7 +25,10 @@ import {
   type PanelCapabilities,
 } from './engagement-panels';
 import { ENGAGEMENT_TABS, type EngagementTab } from './tabs';
-import { DELIVERY_SHARE_ANCHOR_ID } from './share-anchor';
+import {
+  DELIVERY_SHARE_ANCHOR_ID,
+  DELIVERY_SHARE_OPEN_EVENT,
+} from './share-anchor';
 import type { BoqStepSummary } from '@/lib/boqs/step';
 
 // The cockpit's single-column body: the COMMAND CARD (what's next) on top, then
@@ -159,10 +162,12 @@ export function EngagementDetailClient({
     });
   }
 
-  // Nudge = reveal the EXISTING client link. Scroll to (and focus) the delivery
-  // share control rendered by the page above — no new server action, no notify.
+  // Nudge = go to the client-link control on the page above — no new server
+  // action, no notify. It is a COLLAPSED disclosure now, so scrolling alone
+  // would land the studio on a closed row: ask it to open as well.
   function revealShareLink() {
     const el = document.getElementById(DELIVERY_SHARE_ANCHOR_ID);
+    el?.dispatchEvent(new CustomEvent(DELIVERY_SHARE_OPEN_EVENT));
     el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     el?.focus?.();
   }
