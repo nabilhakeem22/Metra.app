@@ -1726,7 +1726,8 @@
       "onBehalfNote": "Logs an acknowledgement as the client, in this timeline. Use it only for one they gave you directly — a call, a message, a signature on paper.",
       "setRange": "Set the range",
       "reviseRange": "Revise the range",
-      "rangeNote": "An indicative build cost — not a quote, and not the design fee."
+      "rangeNote": "An indicative build cost — not a quote, and not the design fee.",
+      "onBehalfBlocked": "Set a build-cost range first — there is nothing for the client to acknowledge yet."
     },
     "stageAction": {
       "studio": {

@@ -47,6 +47,7 @@ export function TimelineTab({
   canRecordRomAck,
   canRecordHandoffAck,
   canRetract,
+  romSet,
   pending,
   runAction,
 }: {
@@ -58,6 +59,8 @@ export function TimelineTab({
   canRecordHandoffAck: boolean;
   /** Owner/admin only — retracting a ledger row is not routine studio work. */
   canRetract: boolean;
+  /** A build-cost band exists. Without one there is nothing to acknowledge. */
+  romSet: boolean;
   pending: boolean;
   runAction: (fn: () => Promise<ActionResult>) => void;
 }) {
@@ -72,11 +75,19 @@ export function TimelineTab({
 
   const anyOnBehalf = canRecordRomAck || canRecordHandoffAck;
 
+  // THE ONE GENUINE ELIGIBILITY CASE ON THIS PAGE. `recordRomAcknowledgementCore`
+  // refuses with `rom_not_set` when no band exists -- you cannot acknowledge a
+  // range nobody has entered. So the control stays on the page and says why,
+  // rather than firing into a coded error the studio has to interpret. The
+  // blocked state is the teaching moment: it names the act that unblocks it.
+  const romAckBlocked = canRecordRomAck && !romSet;
+
   return (
     <div>
       <PanelHeader
         title={tp('timeline')}
         sub={tpa('timelineSub')}
+        reason={romAckBlocked ? tpa('onBehalfBlocked') : undefined}
         actions={
           anyOnBehalf && (
             <>
@@ -85,8 +96,8 @@ export function TimelineTab({
                   type="button"
                   size="sm"
                   variant="outline"
-                  className="border-[color:var(--danger)] text-[color:var(--danger)]"
-                  disabled={pending}
+                  className="border-[color:var(--danger)] text-[color:var(--danger)] disabled:border-[color:var(--rule)] disabled:text-[color:var(--text-faint)]"
+                  disabled={pending || romAckBlocked}
                   onClick={() => toggle('rom')}
                   aria-expanded={panel === 'rom'}
                 >

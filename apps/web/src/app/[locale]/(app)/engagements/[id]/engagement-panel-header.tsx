@@ -15,10 +15,19 @@ import type { ReactNode } from 'react';
  *
  * `reason` is the other half of the pattern. An action the studio cannot legally
  * take here stays on the page and EXPLAINS ITSELF rather than disappearing —
- * for a studio in its first week the blocked state is the teaching moment, the
- * one that says the gate is what releases the instalment. Only two situations
- * hide an action instead: it belongs to a branch this engagement is not on, or
- * the signed-in role may not perform it at all.
+ * for a studio in its first week the blocked state is the teaching moment.
+ *
+ * IT HAS EXACTLY ONE CALLER, and that is not an oversight. The design this came
+ * from listed six eligibility predicates; auditing the actual write paths, only
+ * ONE is a real precondition on a header action — `rom_not_set`, which stops an
+ * acknowledgement being recorded against a band nobody has entered. Payments and
+ * deliverables have no stage or due-ness gate at all, and `handoff_not_open`
+ * belongs to a single one of sixteen states, where a permanently disabled button
+ * on the other fifteen would be noise rather than teaching. Building the other
+ * five would have meant inventing blocks this product does not have.
+ *
+ * Two situations still HIDE rather than explain: the role may not perform the
+ * action at all, or it belongs to a phase this engagement is not in.
  *
  * Logical CSS throughout, so the actions sit inline-end in English and
  * inline-start in ar-EG.
