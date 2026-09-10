@@ -28,7 +28,13 @@ export function AuthShell({ children, showValueProp, className }: AuthShellProps
   const home = useTranslations('home');
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-background p-4">
+    <main
+      // `--auth-chrome` is whatever sits ABOVE this shell in the route. The
+      // sign-in route sets it to the nav's height so the card still centres in
+      // what is left rather than pushing a scrollbar onto a one-screen page;
+      // onboarding and invite set nothing and get the full viewport, as before.
+      className="flex min-h-[calc(100svh-var(--auth-chrome,0px))] items-center justify-center bg-background p-4"
+    >
       <div
         className={cn(
           // Commit to elevation (shadow), not a border + wide shadow together.
