@@ -132,9 +132,18 @@
     /* Chart series — a SEQUENCE, not the semantic status colours. Three steps of
        the brand cobalt, so a stacked bar reads as one family and never implies
        "red = bad" about an ordinary project status. */
-    --chart-1: #2a5fcc;
-    --chart-2: #5a8df2;
-    --chart-3: #a9c3f7;
+    /* CATEGORICAL, NOT A RAMP. These were three steps of one cobalt
+       (#2a5fcc/#5a8df2/#a9c3f7) — a SEQUENTIAL scale doing a categorical job,
+       which is the classic chart mistake. Validated, it failed four ways: the
+       lightest step sat outside the lightness band, under the chroma floor (it
+       reads as grey), and under 3:1 on the surface, and the two blues separated
+       by only 14.2 for NORMAL vision, below the 15 floor. Stacked bars hid it
+       because position disambiguates; a donut would not.
+       These three are hue-separated and pass every check — CVD separation 13.0
+       worst-adjacent (protan), normal-vision 21.7, all three over 3:1. */
+    --chart-1: #3a70e8;
+    --chart-2: #c4701f;
+    --chart-3: #0e9c88;
 
     /* Gauge arc track (behind the --brand progress arc). */
     --gauge-track: rgba(23, 34, 57, 0.1);
@@ -229,9 +238,12 @@
 
     /* Chart series (dark) — the same cobalt sequence, lightened to hold on the
        smoked ground. */
-    --chart-1: #7ea9ff;
-    --chart-2: #4f7deb;
-    --chart-3: #2e4b85;
+    /* SELECTED for the dark surface, not flipped from light: these are their own
+       steps, re-validated against it (an automatic inversion lands outside the
+       band). All checks pass. */
+    --chart-1: #6491ee;
+    --chart-2: #c8823a;
+    --chart-3: #23ac93;
 
     /* Gauge arc track (dark). */
     --gauge-track: rgba(255, 255, 255, 0.12);

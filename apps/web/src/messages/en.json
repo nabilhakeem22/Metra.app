@@ -258,8 +258,8 @@
     "charts": {
       "projects": "Projects started",
       "clients": "Clients added",
-      "projectsSummary": "Projects started each month over the last {n} months, split by status.",
-      "clientsSummary": "Clients added each month over the last {n} months, split by active and inactive.",
+      "projectsSummary": "Projects started in the last {n} months, split by status.",
+      "clientsSummary": "Clients added in the last {n} months, split by active and inactive.",
       "empty": "Nothing in this period yet.",
       "statusActive": "Active",
       "statusCompleted": "Completed",

@@ -2,7 +2,7 @@ import { organizations } from '@metra/db';
 import { getLocale, getTranslations } from 'next-intl/server';
 import { redirect } from 'next/navigation';
 import { FolderKanban, Users, UsersRound } from 'lucide-react';
-import { DashboardBarChart } from '@/components/dashboard/dashboard-bar-chart';
+import { DashboardDonut } from '@/components/dashboard/dashboard-donut';
 import { DashboardRangeFilter } from '@/components/dashboard/dashboard-range-filter';
 import { DashboardStatCard } from '@/components/dashboard/dashboard-stat-card';
 import { GettingStarted } from '@/components/dashboard/getting-started';
@@ -108,6 +108,30 @@ export default async function DashboardPage({
     ],
   }));
 
+  // COMPOSITION over the SAME window the bars covered. Summing the monthly
+  // buckets keeps the range filter meaningful and needs no new query -- the
+  // donut answers "what is the split" over exactly the period the bars used to
+  // trend across. The month-by-month shape is what the form gives up.
+  const sumBy = (
+    columns: { segments: Array<{ key: string; value: number }> }[],
+    key: string,
+  ) =>
+    columns.reduce(
+      (total, column) =>
+        total + (column.segments.find((s) => s.key === key)?.value ?? 0),
+      0,
+    );
+  const projectSlices = ['active', 'completed', 'other'].map((key) => ({
+    key,
+    value: sumBy(projectColumns, key),
+  }));
+  const clientSlices = ['active', 'inactive'].map((key) => ({
+    key,
+    value: sumBy(clientColumns, key),
+  }));
+  // The arc starts at the reading edge, so ar-EG sweeps from the other end.
+  const rtl = locale.startsWith('ar');
+
   return (
     <div className="flex flex-col gap-[14px]">
       {/* Page header — eyebrow role pill, org name, greeting; primary CTA at the
@@ -170,24 +194,26 @@ export default async function DashboardPage({
       </div>
 
       <div className="grid gap-[14px] lg:grid-cols-2">
-        <DashboardBarChart
+        <DashboardDonut
           title={d('charts.projects')}
           summary={d('charts.projectsSummary', { n: range })}
           emptyLabel={d('charts.empty')}
           totalLabel={d('charts.total')}
-          columns={projectColumns}
+          slices={projectSlices}
+          rtl={rtl}
           series={[
             { key: 'active', label: d('charts.statusActive'), token: '--chart-1' },
             { key: 'completed', label: d('charts.statusCompleted'), token: '--chart-2' },
             { key: 'other', label: d('charts.statusOther'), token: '--chart-3' },
           ]}
         />
-        <DashboardBarChart
+        <DashboardDonut
           title={d('charts.clients')}
           summary={d('charts.clientsSummary', { n: range })}
           emptyLabel={d('charts.empty')}
           totalLabel={d('charts.total')}
-          columns={clientColumns}
+          slices={clientSlices}
+          rtl={rtl}
           series={[
             { key: 'active', label: d('charts.clientActive'), token: '--chart-1' },
             { key: 'inactive', label: d('charts.clientInactive'), token: '--chart-3' },
