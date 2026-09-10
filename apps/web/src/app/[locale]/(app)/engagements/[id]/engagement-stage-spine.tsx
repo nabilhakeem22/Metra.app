@@ -1,12 +1,42 @@
 'use client';
 
+import {
+  Box,
+  FileText,
+  LayoutGrid,
+  PackageCheck,
+  Palette,
+  PenTool,
+  Ruler,
+  Table2,
+} from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import {
   SPINE_NODES,
   SPINE_STAGES,
+  type SpineStageKey,
   spinePosition,
 } from '@/lib/engagements/stage-spine';
 import type { DesignState } from '@/lib/engagements/states';
+
+/**
+ * One glyph per stage, in the app's existing Lucide vocabulary.
+ *
+ * It is DECORATION, never information: every icon sits beside its own text label
+ * and is `aria-hidden`, so nothing here is conveyed by shape alone. What it buys
+ * is recognition — a glyph reads identically in Arabic and English, which makes
+ * it the one label on this band that needs no translation.
+ */
+const STAGE_ICON: Record<SpineStageKey, typeof FileText> = {
+  proposal: FileText,
+  survey: Ruler,
+  layout: LayoutGrid,
+  concept: Palette,
+  threeD: Box,
+  shopDrawings: PenTool,
+  boq: Table2,
+  handover: PackageCheck,
+};
 
 // The cockpit's STAGE SPINE — the studio's own stages, with the two gates drawn
 // where they actually sit. It replaces the five-milestone ribbon, which is the
@@ -87,6 +117,7 @@ export function EngagementStageSpine({ state }: { state: DesignState }) {
         }
 
         const position = SPINE_STAGES.indexOf(node.key);
+        const Icon = STAGE_ICON[node.key];
         const status: SegmentStatus = closed
           ? 'muted'
           : allComplete || position < index
@@ -102,10 +133,26 @@ export function EngagementStageSpine({ state }: { state: DesignState }) {
             aria-current={status === 'current' ? 'step' : undefined}
           >
             <span className={`h-1 rounded-full ${barClass(status)}`} aria-hidden />
+            {/* ICONS WHERE THEY MEAN SOMETHING. A stage you have finished and the
+                one you are on carry their glyph; a stage you have not reached
+                carries a dot. The spine stops being a decorated list and becomes a
+                POSITION — the eye lands on where the icons stop, which is legible
+                without reading a single word. A muted (abandoned) engagement takes
+                dots throughout: none of it is "reached" any more. */}
             <span
-              className={`truncate text-[11px] font-medium leading-tight ${labelClass(status)}`}
+              className={`flex min-w-0 items-center gap-1.5 ${labelClass(status)}`}
             >
-              {t(node.key)}
+              {status === 'done' || status === 'current' ? (
+                <Icon className="size-[13px] shrink-0" aria-hidden />
+              ) : (
+                <span
+                  className="size-[5px] shrink-0 rounded-full bg-current opacity-45"
+                  aria-hidden
+                />
+              )}
+              <span className="truncate text-[11px] leading-tight">
+                {t(node.key)}
+              </span>
             </span>
           </li>
         );
