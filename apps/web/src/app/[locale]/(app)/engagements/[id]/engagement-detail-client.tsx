@@ -97,6 +97,13 @@ export function EngagementDetailClient({
     (trigger) => trigger !== gatePreview.primaryTrigger,
   );
 
+  // A band is set but nobody has acknowledged it yet -- unissued work sitting in
+  // the Budget tab. Derived from data the page already holds; no extra read.
+  const budgetDraft =
+    header.romLow !== null &&
+    header.romHigh !== null &&
+    !events.some((e) => e.kind === 'rom_acknowledgement');
+
   // Pure derivation over the artifacts the page already loaded (no extra read).
   // The command card needs it to stop offering a 5th concept-option upload —
   // artifacts are append-only, so overshooting the guard's cap is unrecoverable.
@@ -201,7 +208,14 @@ export function EngagementDetailClient({
         </p>
       )}
 
-      <div className="flex flex-wrap gap-2 border-b">
+      {/* A SEGMENTED control on a track, not an underline row: the active tab is a
+          raised panel of the same material as the surface it reveals below, which
+          is what makes the tab and its body read as one object. */}
+      <div
+        className="flex flex-wrap gap-1 rounded-[var(--r-item)] p-1"
+        style={{ background: 'var(--track)' }}
+        role="tablist"
+      >
         {ENGAGEMENT_TABS.map((tb) => {
           // A tab wears a badge when it holds something ADDRESSED TO the studio:
           // a client payment claim to confirm, or a client question to answer.
@@ -211,18 +225,30 @@ export function EngagementDetailClient({
               : tb === 'files'
                 ? awaitingReplyCount
                 : 0;
+          // Budget's badge is a STATE, not a count -- a range the studio has set
+          // and the client has not yet acknowledged is unissued work sitting in
+          // that tab, and saying so is worth more than saying "1".
+          const draft = tb === 'budget' && budgetDraft;
+          const active = tab === tb;
           return (
             <button
               key={tb}
               type="button"
+              role="tab"
+              aria-selected={active}
               onClick={() => setTab(tb)}
-              className={`inline-flex items-center gap-1.5 border-b-2 px-3 py-2 text-sm ${
-                tab === tb
-                  ? 'border-primary font-medium'
-                  : 'border-transparent text-muted-foreground'
+              className={`inline-flex items-center gap-1.5 rounded-[10px] px-3.5 py-1.5 text-[13px] transition-colors ${
+                active
+                  ? 'bg-card font-bold text-[color:var(--text)] shadow-sm'
+                  : 'font-medium text-[color:var(--text-muted)] hover:text-[color:var(--text)]'
               }`}
             >
               {tp(tb)}
+              {draft && (
+                <span className="font-mono text-[9.5px] font-bold uppercase tracking-[0.06em] text-[color:var(--warn)]">
+                  {t('budgetDraftBadge')}
+                </span>
+              )}
               {badgeCount > 0 && (
                 <span
                   className="inline-flex items-center rounded-[var(--r-pill)] bg-[color:var(--warn-tint)] px-1.5 py-0.5 text-[10px] font-semibold text-[color:var(--warn)]"

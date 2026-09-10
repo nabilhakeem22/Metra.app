@@ -1474,7 +1474,8 @@
     "offPlan": {
       "existing": "Existing unit",
       "offPlan": "Off-plan",
-      "hint": "Sets Step 2: an existing unit needs a site survey; off-plan imports the developer AutoCAD."
+      "hint": "Sets Step 2: an existing unit needs a site survey; off-plan imports the developer AutoCAD.",
+    "budgetDraftBadge": "draft"
     },
     "boqLabel": "BOQ",
     "paymentsBadge": "{n} due",
@@ -1686,7 +1687,10 @@
         "studio": "Your move",
         "waitingClient": "Waiting on client",
         "paymentToConfirm": "Payment to confirm",
-        "closed": "Closed"
+        "closed": "Closed",
+      "crumb": "Engagements",
+      "feeChip": "Design fee {amount}",
+      "startedOn": "Started {date}"
       },
       "move": {
         "studio": "Your move"
