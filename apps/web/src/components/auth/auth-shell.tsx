@@ -9,10 +9,23 @@ export interface AuthShellProps {
   className?: string;
 }
 
+/**
+ * The signed-out shell: a brand panel beside the form.
+ *
+ * IT SAID EVERYTHING TWICE. The wordmark rendered in BOTH panels, and
+ * `app.descriptor` is byte-identical to `home.tagline` -- so the same sentence
+ * appeared on both halves of one screen. Below it, `home.intro` and
+ * `onboarding.valueProp` made the same promise again in different words. Four
+ * near-identical pieces of copy competing on a screen whose entire job is to
+ * collect one email address.
+ *
+ * The brand is now stated ONCE. The panel carries the wordmark and one line; the
+ * form side leads straight with "Sign in". The wordmark reappears on the form
+ * side only below `lg`, where the panel is hidden and the page would otherwise
+ * carry no brand at all.
+ */
 export function AuthShell({ children, showValueProp, className }: AuthShellProps) {
-  const app = useTranslations('app');
   const home = useTranslations('home');
-  const onboarding = useTranslations('onboarding');
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-background p-4">
@@ -25,24 +38,24 @@ export function AuthShell({ children, showValueProp, className }: AuthShellProps
         )}
       >
         {showValueProp && (
-          <div className="hidden flex-col justify-between gap-8 bg-primary p-10 text-primary-foreground lg:flex">
+          <div className="hidden flex-col justify-between gap-10 bg-primary p-10 text-primary-foreground lg:flex">
             <Wordmark size="lg" animate className="text-primary-foreground" />
-            <div className="space-y-2">
-              <p className="text-2xl font-semibold leading-snug">
-                {home('tagline')}
-              </p>
-              <p className="text-primary-foreground/90">{home('intro')}</p>
-            </div>
-            <p className="text-sm text-primary-foreground/90">
-              {onboarding('valueProp')}
+            <p className="text-balance text-[26px] font-semibold leading-snug tracking-[-0.02em]">
+              {home('tagline')}
+            </p>
+            {/* ONE supporting line, not two. The concrete promise earns the
+                space; the abstract restatement of it does not. */}
+            <p className="text-[15px] leading-relaxed text-primary-foreground/85">
+              {home('intro')}
             </p>
           </div>
         )}
 
-        <div className="p-8">
-          <div className="mb-6 space-y-1">
+        <div className="p-8 sm:p-10">
+          {/* Only where the brand panel is not: below `lg` this is the one place
+              the product names itself. */}
+          <div className="mb-7 lg:hidden">
             <Wordmark size="md" />
-            <p className="text-sm text-muted-foreground">{app('descriptor')}</p>
           </div>
           {children}
         </div>

@@ -34,29 +34,43 @@ export function LoginRequestStep({
 }) {
   return (
     <div className="space-y-4">
-      <div className="flex gap-2">
-        <Button
-          type="button"
-          variant={channel === 'email' ? 'default' : 'outline'}
-          size="sm"
-          onClick={() => switchChannel('email')}
-        >
-          {t('emailLabel')}
-        </Button>
-        <Button
-          type="button"
-          variant={channel === 'phone' ? 'default' : 'outline'}
-          size="sm"
-          onClick={() => switchChannel('phone')}
-        >
-          {t('phoneLabel')}
-        </Button>
+      {/* A CHOICE, announced as one. Two buttons whose only difference was a
+          `variant` told a screen reader nothing about which was selected -- or
+          that they were alternatives at all. `radiogroup` plus `aria-checked`
+          says both. */}
+      <div
+        role="radiogroup"
+        aria-label={t('channelLabel')}
+        className="inline-flex gap-1 rounded-[var(--r-pill)] bg-[color:var(--track)] p-1"
+      >
+        {(['email', 'phone'] as const).map((option) => (
+          <button
+            key={option}
+            type="button"
+            role="radio"
+            aria-checked={channel === option}
+            onClick={() => switchChannel(option)}
+            className={`rounded-[var(--r-pill)] px-3.5 py-1.5 text-[13px] transition-colors ${
+              channel === option
+                ? 'bg-card font-bold text-[color:var(--text)] shadow-sm'
+                : 'font-medium text-[color:var(--text-muted)] hover:text-[color:var(--text)]'
+            }`}
+          >
+            {option === 'email' ? t('emailLabel') : t('phoneLabel')}
+          </button>
+        ))}
       </div>
 
       <div className="space-y-2">
         <Label htmlFor="identifier" className="flex items-center">
           {channel === 'email' ? t('emailLabel') : t('phoneLabel')}
-          <FieldHint id="identifier-hint" hint={th('email')} />
+          {/* The hint FOLLOWS the channel. It was hardcoded to the email one, so
+              choosing "Phone number" still promised an email -- to the site
+              engineers the phone path exists for. */}
+          <FieldHint
+            id="identifier-hint"
+            hint={channel === 'email' ? th('email') : th('phone')}
+          />
         </Label>
         <Input
           id="identifier"

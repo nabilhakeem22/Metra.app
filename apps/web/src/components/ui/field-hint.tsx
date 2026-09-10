@@ -12,10 +12,15 @@ import { cn } from '@/lib/utils';
 
 /**
  * A small "?" affordance next to a form field. The hint text is reachable by
- * hover, keyboard focus (Tab), AND tap (the trigger toggles open state). The
- * button carries an aria-label so screen readers announce it; when `id` is
- * given the tooltip content adopts it so the caller can point the field's
- * `aria-describedby` at the same id. Logical CSS only (ms-1, no left/right).
+ * hover, keyboard focus (Tab), AND tap (the trigger toggles open state).
+ *
+ * `id` RENDERS A PERMANENT COPY, and it has to. The id used to live only on
+ * `TooltipContent` -- which Radix mounts only while the tooltip is OPEN. So a
+ * field pointing `aria-describedby` at that id was pointing at nothing in the
+ * one state that matters: closed, which is how a screen-reader user meets the
+ * field. The visually-hidden span below is always in the tree, so the
+ * description always resolves; the tooltip stays exactly as it was for sighted
+ * hover and tap. Logical CSS only (ms-1, no left/right).
  */
 export function FieldHint({
   hint,
@@ -43,8 +48,13 @@ export function FieldHint({
         >
           ?
         </TooltipTrigger>
-        <TooltipContent id={id}>{hint}</TooltipContent>
+        <TooltipContent>{hint}</TooltipContent>
       </Tooltip>
+      {id && (
+        <span id={id} className="sr-only">
+          {hint}
+        </span>
+      )}
     </TooltipProvider>
   );
 }

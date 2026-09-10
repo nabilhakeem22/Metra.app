@@ -164,7 +164,6 @@
     "verify": "Verify",
     "phoneLabel": "Phone number",
     "phoneHint": "Site engineers can sign in with a phone code.",
-    "checkEmail": "We sent a 6-digit code to your email.",
     "error": "Something went wrong. Please try again.",
     "changeEmail": "Change",
     "resend": "Resend code",
@@ -172,7 +171,8 @@
     "verifying": "Verifying…",
     "sending": "Sending…",
     "codeSentTitle": "Enter the 6-digit code",
-    "back": "Back"
+    "back": "Back",
+    "channelLabel": "How should we send your code?"
   },
   "onboarding": {
     "stepOf": "Step {current} of {total}",
@@ -560,7 +560,8 @@
     },
     "auth": {
       "email": "We email you a one-time code to sign in. No password needed.",
-      "otp": "The six-character code we just emailed you. It expires shortly."
+      "otp": "The 6-digit code we just sent you. It expires shortly.",
+      "phone": "We text you a one-time code to sign in. No password needed."
     },
     "onboarding": {
       "orgName": "Your company name, shown on quotes and to your team."
