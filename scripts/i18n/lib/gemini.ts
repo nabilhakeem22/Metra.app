@@ -24,11 +24,18 @@ export function readGeminiEnv(): { apiKey: string; model: string } {
         'This script is the only piece that calls Gemini.',
     );
   }
-  // Default to a flash tier that works on Google's FREE tier out of the box
-  // (pro/preview models have ~0 free quota and 429 immediately). Override with
-  // GEMINI_MODEL — e.g. gemini-3.1-pro-preview for top quality once billing is
-  // enabled, or gemini-flash-latest for a higher-quality flash when it's not
-  // congested. gemini-flash-lite-latest has the most generous free quota.
+  // Default to a flash tier that works on Google's FREE tier out of the box.
+  // Probed against this project's key on 2026-09-11 (one real generateContent
+  // call each) — do not guess from the ListModels response, which advertises
+  // models the key cannot actually call:
+  //   200  gemini-flash-lite-latest   most generous free quota (this default)
+  //   200  gemini-flash-latest        higher quality, but 503s under congestion
+  //   200  gemini-3.5-flash           best free-tier quality found
+  //   200  gemini-3-flash-preview, gemini-3.1-flash-lite
+  //   404  gemini-2.5-flash, gemini-2.5-pro   RETIRED ("no longer available")
+  //   429  gemini-pro-latest          pro tiers have ~0 free quota
+  // Override with GEMINI_MODEL. Voice-sensitive work (the Egyptian register)
+  // wants the best model available; a pro tier needs billing enabled first.
   const model = process.env.GEMINI_MODEL?.trim() || 'gemini-flash-lite-latest';
   return { apiKey, model };
 }

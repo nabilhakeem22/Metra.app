@@ -13,29 +13,63 @@ and then reviewed by a native speaker — structural mistakes will be rejected.
 - The audience is Egyptian interior-design and fit-out professionals: studio
   owners, project managers, site engineers, accountants, and their clients.
 
-## Register — pick by surface
+## Register — decided for you, per chunk
 
-Metra has two kinds of surface. Choose register by which one you are translating.
+Metra is written in TWO Arabic registers, and which one applies is **not your
+judgement call**. `registers.json` classifies every key, and the chunk you are
+given carries an explicit register directive at the end of this prompt. Follow
+that directive. This section explains why the line sits where it does.
 
-1. **MSA (فصحى) — UI chrome.** Navigation, buttons, table headers, form
-   labels, settings, and system/error messages use clean, standard Modern
-   Standard Arabic. Terse, neutral, professional. No slang, no first-person
-   chattiness.
-   - `Dashboard` → `لوحة التحكم`
-   - `Save` → `حفظ`
-   - `Cancel` → `إلغاء`
-   - `Settings` → `الإعدادات`
-   - `Delete` → `حذف`
+| Surface | Register | Who reads it |
+|---|---|---|
+| Onboarding, hints, empty states, tooltips | **Egyptian** | The studio's own team |
+| Toasts, confirmations, error messages | **Egyptian** | The studio's own team |
+| Dashboard, cockpit, lists, settings, the tour | **Egyptian** | The studio's own team |
+| Landing and marketing copy | **Egyptian** | Egyptian studio owners |
+| The client delivery portal (`delivery.*`) | **فصحى** | The studio's CLIENT |
+| Contract acknowledgement (`contracts.ack.*`) | **فصحى** | The client — a legal instrument |
+| Variation decision (`variations.client.*`) | **فصحى** | The client — a legal instrument |
+| The client quotation (`proposals.p.*`) | **فصحى** | The client |
+| Every PDF: proposal, contract, BOQ, invoice | **فصحى** | The client |
 
-2. **Professional Egyptian warmth — conversational surfaces.** Onboarding,
-   empty states, the create hand-off prompts, notifications, and
-   landing/marketing copy may carry light, professional Egyptian warmth — the
-   tone of a competent colleague, not a call-center script. Stay respectful and
-   business-appropriate; warmth means natural phrasing and directness, **not**
-   added jokes, emoji, exclamation, or filler. When in doubt, lean formal.
+The line is drawn by **who is reading**, not by page. `delivery.share.*` is the
+studio's own "share with client" control and is therefore Egyptian even though
+everything else under `delivery.` is فصحى.
 
-Never mix registers inside a single string. A button is always chrome even on a
-marketing page.
+Why not عامية everywhere: a client signing an electronic acknowledgement written
+in slang does not read as friendly, it reads as unserious. Money and legal copy
+carry weight, and the register is part of that weight.
+
+Why not فصحى everywhere: the studio's own team opens these screens dozens of
+times a day. `يمكنك تفعيل المزيد لاحقًا` is correct فصحى that nobody in a Cairo
+studio would ever say out loud, and a whole product written that way reads like
+a government portal rather than a tool.
+
+### The failure mode: فصحى مقنّعة
+
+The way machine-written عامية gives itself away is **Egyptian vocabulary bolted
+onto an MSA sentence skeleton**. Swapping the words is not the job; rebuilding
+the sentence is.
+
+- Source: `You can change these later in settings.`
+- فصحى: `يمكنك تغيير هذه الإعدادات لاحقًا من الإعدادات.`
+- ✗ word-swapped: `يمكنك تغيير الإعدادات دي بعدين من الإعدادات.`
+- ✓ rebuilt: `تقدر تغيّرها بعدين من الإعدادات.`
+
+Read every Egyptian string back in your head. If an Egyptian colleague would not
+say it in that shape, it is wrong even when every individual word is Egyptian.
+
+### Egyptian does NOT mean casual
+
+Still forbidden in the Egyptian register: jokes, emoji, exclamation marks,
+over-familiar address, and any greeting, apology or filler the English source
+does not contain. Warmth here means natural phrasing and directness, not added
+words. When a string is a single-word button or a table header, it is the same
+short word in both registers — `حفظ`, `إلغاء`, `حذف` need no dialect at all.
+
+The locked glossary outranks the register. Domain nouns stay exactly as the
+glossary states them (`العقد`، `الفاتورة`، `المقايسة`، `البند`، `الدفعة`) inside an
+Egyptian sentence too, because those are the words the trade actually uses.
 
 ## Hard rules (the automated gate enforces these — violating them fails CI)
 
@@ -62,10 +96,28 @@ marketing page.
    **unchanged** and translate only the values.
 5. **No added filler.** Do not add words, greetings, or explanations that are
    not in the source. Translate the meaning, not more.
-6. **Output strictly valid JSON.** Return only a JSON object mapping each input
+6. **No em dash.** `—` and `–` are not Arabic punctuation, and their presence is
+   the clearest single signal that a string was written in English first. Use a
+   comma, a colon, or brackets. (65 strings in the shipped catalogue had one.)
+7. **Output strictly valid JSON.** Return only a JSON object mapping each input
    key to its Arabic string value. No markdown fences, no commentary, no extra
    keys, no missing keys — the returned key set must equal the sent key set
    exactly.
+
+## Style rules the gate does NOT check
+
+These are real rules, but they need judgement, so no machine rejects them. A
+native reviewer reads for them.
+
+- **`يتم` / `تم` + مصدر is translated English,** not Arabic ("is skipped"
+  → `يتم تخطيها`). Prefer an active verb with a stated subject, or the true
+  Arabic passive (`تُخطّى`). The genuine passive is correct where the actor
+  really is unknown — which is why this cannot be a CI check. 135 strings in the
+  shipped catalogue use it.
+- **No `برجاء` / `يُرجى` / `الرجاء` as a literal "Please"** and no `قم بـ`
+  padding before an imperative. Arabic carries politeness in the verb form.
+- **`من خلال` for "through" and `حول` for "about"** are literal preposition
+  translations. Usually `بـ` / `عن طريق` and `عن` / `في`.
 
 ## Gender agreement
 

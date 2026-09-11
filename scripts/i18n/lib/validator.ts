@@ -22,6 +22,12 @@ export type Report = {
 
 const ARABIC_INDIC_DIGITS = /[٠-٩۰-۹]/;
 
+// The em/en dash is not Arabic punctuation. Its presence is the clearest
+// single signal that a string was written in English and carried across
+// unchanged; Arabic uses a comma, a colon, or brackets. 65 strings shipped
+// with one before this check existed.
+const EM_DASH = /[—–]/;
+
 function addFinding(
   bucket: Record<string, Finding[]>,
   category: string,
@@ -109,7 +115,15 @@ export function validate(targetPath: string, strict: boolean): Report {
       });
     }
 
-    // 4. ICU parse of both sides.
+    // 4. Em/en dash — English punctuation that does not exist in Arabic.
+    if (EM_DASH.test(arValue)) {
+      addFinding(report.fatal, 'em dash', {
+        key,
+        detail: `ar value contains — or –: "${arValue}"`,
+      });
+    }
+
+    // 5. ICU parse of both sides.
     let enAst;
     let arAst;
     try {
@@ -131,7 +145,7 @@ export function validate(targetPath: string, strict: boolean): Report {
       continue;
     }
 
-    // 5. Placeholder + rich-tag parity.
+    // 6. Placeholder + rich-tag parity.
     const enArgs = collectArgumentNames(enAst);
     const arArgs = collectArgumentNames(arAst);
     if (!setEquals(enArgs, arArgs)) {
@@ -149,7 +163,7 @@ export function validate(targetPath: string, strict: boolean): Report {
       });
     }
 
-    // 6. Plural completeness (WARNING, or FATAL under --strict). Only messages
+    // 7. Plural completeness (WARNING, or FATAL under --strict). Only messages
     // whose EN source uses a plural/selectordinal are held to the full CLDR set.
     const enPlurals = collectPluralNodes(enAst);
     if (enPlurals.length === 0) continue;
