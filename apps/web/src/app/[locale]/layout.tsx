@@ -36,7 +36,10 @@ export async function generateMetadata({
     // Resolves OG/canonical/alternate relative URLs to absolute ones.
     metadataBase: new URL(getSiteUrl()),
     title: {
-      default: `${siteName} — ${t('title')}`,
+      // `·` rather than an em dash: — is not Arabic punctuation, and this
+      // title renders in ar-EG too (see scripts/i18n/style-guide.md rule 6).
+      // It also matches the `%s · siteName` template just below.
+      default: `${siteName} · ${t('title')}`,
       template: `%s · ${siteName}`,
     },
     description: t('description'),
