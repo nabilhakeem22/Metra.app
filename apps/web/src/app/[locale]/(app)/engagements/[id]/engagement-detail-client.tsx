@@ -259,7 +259,7 @@ export function EngagementDetailClient({
               {tp(tb)}
               {draft && (
                 <span className="font-mono text-[9.5px] font-bold uppercase tracking-[0.06em] text-[color:var(--warn)]">
-                  {t('budgetDraftBadge')}
+                  {t('offPlan.budgetDraftBadge')}
                 </span>
               )}
               {badgeCount > 0 && (
