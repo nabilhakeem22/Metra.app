@@ -1,7 +1,8 @@
 import { organizations } from '@metra/db';
 import { getLocale, getTranslations } from 'next-intl/server';
 import { redirect } from 'next/navigation';
-import { FolderKanban, Users, UsersRound } from 'lucide-react';
+import { Compass, FolderKanban, Users, UsersRound } from 'lucide-react';
+import { DeliveriesPanel } from '@/components/dashboard/deliveries-panel';
 import { DashboardDonut } from '@/components/dashboard/dashboard-donut';
 import { DashboardRangeFilter } from '@/components/dashboard/dashboard-range-filter';
 import { DashboardStatCard } from '@/components/dashboard/dashboard-stat-card';
@@ -14,14 +15,19 @@ import { getSessionUser } from '@/lib/auth/session';
 import { withOrgContext } from '@/lib/db/context';
 import { pickLocale } from '@/lib/i18n/pick-locale';
 import { buildChecklist } from '@/lib/onboarding/checklist';
+import { can } from '@/lib/permissions/can';
 import { readOnboarding } from '@/lib/onboarding/merge';
 import { getOnboardingProgress } from '@/lib/onboarding/progress';
 import {
   getClientsByMonth,
   getDashboardCounts,
   getProjectsByMonth,
+  listDashboardDeliveries,
 } from '@/lib/dashboard/queries';
 import { fillMonths, parseRange } from '@/lib/dashboard/range';
+
+/** How many in-flight deliveries the panel shows before deferring to the list. */
+const DELIVERY_ROWS = 6;
 
 export default async function DashboardPage({
   searchParams,
@@ -69,10 +75,16 @@ export default async function DashboardPage({
 
   // The dashboard's real figures. Three reads in parallel — the counts, and the
   // two monthly series behind the charts.
-  const [counts, projectMonths, clientMonths] = await Promise.all([
+  // The panel is hidden entirely from roles that cannot read engagements, so the
+  // query is not even issued for them.
+  const canSeeDeliveries = can(ctx.role, 'engagements_design', 'read');
+  const [counts, projectMonths, clientMonths, deliveries] = await Promise.all([
     getDashboardCounts(ctx),
     getProjectsByMonth(ctx, range),
     getClientsByMonth(ctx, range),
+    canSeeDeliveries
+      ? listDashboardDeliveries(ctx, DELIVERY_ROWS)
+      : Promise.resolve([]),
   ]);
 
   // Postgres only returns months that HAVE rows, so the gaps are filled here: a
@@ -163,8 +175,8 @@ export default async function DashboardPage({
 
       <GettingStarted result={checklist} orgId={ctx.orgId} dismissed={dismissed} />
 
-      {/* Three headline figures, each a link into the module it counts. */}
-      <div className="grid gap-[14px] sm:grid-cols-2 lg:grid-cols-3">
+      {/* The headline figures, each a link into the module it counts. */}
+      <div className="grid gap-[14px] sm:grid-cols-2 lg:grid-cols-4">
         <DashboardStatCard
           label={d('cards.clients')}
           value={counts.clientsTotal}
@@ -181,6 +193,16 @@ export default async function DashboardPage({
           icon={FolderKanban}
           href="/projects"
         />
+        {canSeeDeliveries && (
+          <DashboardStatCard
+            label={d('cards.deliveries')}
+            value={counts.deliveriesTotal}
+            activeLabel={d('cards.inFlight')}
+            activeValue={counts.deliveriesActive}
+            icon={Compass}
+            href="/engagements"
+          />
+        )}
         <DashboardStatCard
           label={d('cards.team')}
           value={counts.teamMembers}
@@ -188,6 +210,15 @@ export default async function DashboardPage({
           href="/team"
         />
       </div>
+
+      {canSeeDeliveries && (
+        <DeliveriesPanel
+          deliveries={deliveries}
+          totalActive={counts.deliveriesActive}
+          locale={locale}
+          now={new Date()}
+        />
+      )}
 
       <div className="flex items-center justify-end">
         <DashboardRangeFilter active={range} />

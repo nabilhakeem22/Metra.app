@@ -249,7 +249,9 @@
       "clients": "Clients",
       "projects": "Projects",
       "team": "Team",
-      "active": "Active:"
+      "active": "Active:",
+      "deliveries": "Deliveries",
+      "inFlight": "In flight"
     },
     "range": {
       "label": "Chart period",
@@ -267,6 +269,15 @@
       "clientActive": "Active",
       "clientInactive": "Inactive",
       "total": "Total"
+    },
+    "deliveries": {
+      "title": "Deliveries in flight",
+      "viewAll": "View all",
+      "empty": "Nothing in flight. Every delivery is either finished or not started yet.",
+      "waitingClient": "Waiting on the client",
+      "waitingStudio": "Yours to move",
+      "today": "today",
+      "sinceDays": "{count, plural, one {{n} day} other {{n} days}}"
     }
   },
   "team": {
@@ -1478,7 +1489,7 @@
       "existing": "Existing unit",
       "offPlan": "Off-plan",
       "hint": "Sets Step 2: an existing unit needs a site survey; off-plan imports the developer AutoCAD.",
-    "budgetDraftBadge": "draft"
+      "budgetDraftBadge": "draft"
     },
     "boqLabel": "BOQ",
     "paymentsBadge": "{n} due",
@@ -1691,9 +1702,9 @@
         "waitingClient": "Waiting on client",
         "paymentToConfirm": "Payment to confirm",
         "closed": "Closed",
-      "crumb": "Engagements",
-      "feeChip": "Design fee {amount}",
-      "startedOn": "Started {date}"
+        "crumb": "Engagements",
+        "feeChip": "Design fee {amount}",
+        "startedOn": "Started {date}"
       },
       "move": {
         "studio": "Your move"
