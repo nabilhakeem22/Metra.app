@@ -1,0 +1,61 @@
+{
+  "_doc": [
+    "Which Arabic REGISTER each surface is written in. This file is the policy",
+    "made executable: style-guide.md explains the reasoning, this decides.",
+    "",
+    "  eg  = Egyptian Arabic (عامية مصرية). What the STUDIO reads while working.",
+    "  msa = Modern Standard Arabic (فصحى). What the CLIENT reads, and every",
+    "        document — contracts, quotations, the delivery portal, PDFs.",
+    "",
+    "LONGEST MATCHING PREFIX WINS, so order here is presentational only and a",
+    "narrow rule can sit anywhere relative to the broad one it carves out of.",
+    "Anything unmatched takes `default`.",
+    "",
+    "A client signing an acknowledgement written in عامية does not read as",
+    "friendly, it reads as unserious — which is why the line is drawn by WHO IS",
+    "READING rather than by page."
+  ],
+  "default": "eg",
+  "rules": [
+    {
+      "prefix": "delivery.",
+      "register": "msa",
+      "why": "The end-client delivery portal. The client opens this, not the studio."
+    },
+    {
+      "prefix": "delivery.share.",
+      "register": "eg",
+      "why": "The exception inside it: the studio's own 'Share with client' control, which no client ever sees."
+    },
+    {
+      "prefix": "contracts.ack.",
+      "register": "msa",
+      "why": "The client's electronic acknowledgement page. A legal instrument."
+    },
+    {
+      "prefix": "variations.client.",
+      "register": "msa",
+      "why": "The client's decision page on a change to their contract. A legal instrument."
+    },
+    {
+      "prefix": "proposals.p.",
+      "register": "msa",
+      "why": "The client-facing quotation: accept, reject, VAT, totals."
+    },
+    {
+      "prefix": "errors.token_invalid",
+      "register": "msa",
+      "why": "Rendered on the client token pages, so it must match their register."
+    },
+    {
+      "prefix": "errors.token_expired",
+      "register": "msa",
+      "why": "Rendered on the client token pages, so it must match their register."
+    },
+    {
+      "prefix": "errors.already_responded",
+      "register": "msa",
+      "why": "Rendered on the client token pages, so it must match their register."
+    }
+  ]
+}

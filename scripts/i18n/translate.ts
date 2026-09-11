@@ -26,6 +26,12 @@ import {
   type GeminiConfig,
 } from './lib/gemini';
 import {
+  loadPolicy,
+  registerDirective,
+  registerFor,
+  type Register,
+} from './lib/registers';
+import {
   AR_GENERATED_PATH,
   AR_PATH,
   EN_PATH,
@@ -64,18 +70,37 @@ function renderGlossary(): string {
   return `## Locked glossary (EN = AR [gender] — notes)\n\n${lines.join('\n')}`;
 }
 
-function buildSystemInstruction(): string {
-  return `${readText(STYLE_GUIDE_PATH)}\n\n---\n\n${renderGlossary()}`;
+function buildSystemInstruction(register: Register): string {
+  // The register directive goes LAST so it is the final thing the model reads
+  // before the payload: the style guide is the constitution, this is the brief
+  // for this particular chunk.
+  return [
+    readText(STYLE_GUIDE_PATH),
+    '---',
+    renderGlossary(),
+    '---',
+    registerDirective(register),
+  ].join('\n\n');
 }
 
-function chunkEntries(flat: FlatMessages): FlatMessages[] {
+interface Chunk {
+  entries: FlatMessages;
+  register: Register;
+}
+
+/**
+ * Chunk WITHIN a register, never across one. A chunk carries a single register
+ * directive, so mixing the two in one request would ask the model to write a
+ * contract page and a tooltip in the same voice.
+ */
+function chunkEntries(flat: FlatMessages, register: Register): Chunk[] {
   const keys = Object.keys(flat);
-  const chunks: FlatMessages[] = [];
+  const chunks: Chunk[] = [];
   for (let index = 0; index < keys.length; index += CHUNK_SIZE) {
     const slice = keys.slice(index, index + CHUNK_SIZE);
-    const chunk: FlatMessages = {};
-    for (const key of slice) chunk[key] = flat[key];
-    chunks.push(chunk);
+    const entries: FlatMessages = {};
+    for (const key of slice) entries[key] = flat[key];
+    chunks.push({ entries, register });
   }
   return chunks;
 }
@@ -105,20 +130,24 @@ const delay = (ms: number): Promise<void> =>
   new Promise((resolve) => setTimeout(resolve, ms));
 
 async function translateChunkWithRetry(
-  config: GeminiConfig,
-  chunk: FlatMessages,
+  base: Omit<GeminiConfig, 'systemInstruction'>,
+  chunk: Chunk,
   chunkIndex: number,
 ): Promise<{ result: FlatMessages; retries: number }> {
+  const config: GeminiConfig = {
+    ...base,
+    systemInstruction: buildSystemInstruction(chunk.register),
+  };
   // Send OPAQUE numeric ids, never the real dotted keys, so a weaker model can't
   // corrupt a key (e.g. Arabize "sqm" -> "sqم") and fail the whole chunk. Map back
   // to the real keys locally after the id set is verified.
-  const realKeys = Object.keys(chunk);
+  const realKeys = Object.keys(chunk.entries);
   const idToKey = new Map<string, string>();
   const payload: FlatMessages = {};
   realKeys.forEach((key, i) => {
     const id = String(i);
     idToKey.set(id, key);
-    payload[id] = chunk[key];
+    payload[id] = chunk.entries[key];
   });
 
   let lastDetail = '';
@@ -152,22 +181,68 @@ async function translateChunkWithRetry(
   }
   throw new Error(
     `Chunk ${chunkIndex + 1} failed after ${MAX_ATTEMPTS} attempts: ` +
-      `${lastDetail}. Offending keys: {${Object.keys(chunk).join(', ')}}`,
+      `${lastDetail}. Offending keys: {${Object.keys(chunk.entries).join(', ')}}`,
   );
 }
 
 async function main(): Promise<void> {
   const { apiKey, model } = readGeminiEnv();
-  const config: GeminiConfig = {
-    apiKey,
-    model,
-    systemInstruction: buildSystemInstruction(),
-  };
+  const base = { apiKey, model };
 
   const enFlat = flatten(readCatalog(EN_PATH));
-  const chunks = chunkEntries(enFlat);
+  const policy = loadPolicy();
+
+  // I18N_REGISTER=eg|msa retranslates only that half. The other half keeps its
+  // CURRENT Arabic through the seed below, so a register-scoped run cannot
+  // churn copy that has already been reviewed.
+  const only = process.env.I18N_REGISTER?.trim().toLowerCase();
+  if (only && only !== 'eg' && only !== 'msa') {
+    throw new Error(`I18N_REGISTER must be "eg" or "msa" (got "${only}")`);
+  }
+
+  // I18N_TOPUP=1 translates ONLY the keys a previous run did not get to.
+  //
+  // Without it a re-run re-sends every chunk: it would spend the quota the
+  // stragglers need on chunks that already succeeded, and it would churn
+  // translations that have already been read and approved. A key still carrying
+  // its pre-run Arabic is one the model never produced output for, so that
+  // comparison is the top-up set. (A short label the model happened to
+  // reproduce verbatim is retried too — a negligible handful.)
+  const topUp = process.env.I18N_TOPUP === '1';
+  let pending: FlatMessages = enFlat;
+  if (topUp) {
+    if (!existsSync(AR_GENERATED_PATH)) {
+      throw new Error(
+        'I18N_TOPUP=1 needs a previous ar-EG.generated.json to top up. ' +
+          'Run i18n:translate without it first.',
+      );
+    }
+    const current = flatten(readCatalog(AR_PATH));
+    const generated = flatten(readCatalog(AR_GENERATED_PATH));
+    pending = {};
+    for (const [key, value] of Object.entries(enFlat)) {
+      if (generated[key] === undefined || generated[key] === current[key]) {
+        pending[key] = value;
+      }
+    }
+  }
+
+  const buckets: Record<Register, FlatMessages> = { eg: {}, msa: {} };
+  for (const [key, value] of Object.entries(pending)) {
+    buckets[registerFor(key, policy)][key] = value;
+  }
+
+  const chunks: Chunk[] = [];
+  for (const register of ['eg', 'msa'] as const) {
+    if (only && only !== register) continue;
+    chunks.push(...chunkEntries(buckets[register], register));
+  }
+
   console.log(
-    `i18n:translate — model=${model}, keys=${Object.keys(enFlat).length}, ` +
+    `i18n:translate — model=${model}${topUp ? ' TOP-UP' : ''}, ` +
+      `keys=${Object.keys(pending).length}/${Object.keys(enFlat).length} ` +
+      `(eg=${Object.keys(buckets.eg).length}, msa=${Object.keys(buckets.msa).length})` +
+      `${only ? `, translating ${only.toUpperCase()} only` : ''}, ` +
       `chunks=${chunks.length} (~${CHUNK_SIZE}/chunk)`,
   );
 
@@ -186,15 +261,15 @@ async function main(): Promise<void> {
   async function runChunk(index: number): Promise<boolean> {
     try {
       const { result, retries } = await translateChunkWithRetry(
-        config,
+        base,
         chunks[index],
         index,
       );
       Object.assign(translated, result);
       totalRetries += retries;
       console.log(
-        `  chunk ${index + 1}/${chunks.length} ok ` +
-          `(${Object.keys(chunks[index]).length} keys` +
+        `  chunk ${index + 1}/${chunks.length} [${chunks[index].register}] ok ` +
+          `(${Object.keys(chunks[index].entries).length} keys` +
           `${retries ? `, ${retries} retr${retries === 1 ? 'y' : 'ies'}` : ''})`,
       );
       return true;
@@ -241,7 +316,7 @@ async function main(): Promise<void> {
         `then i18n:apply.`,
     );
   } else {
-    const failedKeys = failed.flatMap((i) => Object.keys(chunks[i]));
+    const failedKeys = failed.flatMap((i) => Object.keys(chunks[i].entries));
     console.log(
       `\nWrote ${AR_GENERATED_PATH} (PARTIAL).\n` +
         `${done}/${chunks.length} chunks translated; ${failed.length} still failing ` +
