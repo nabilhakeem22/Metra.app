@@ -33,7 +33,7 @@ export function DashboardStatCard({
   return (
     <Link
       href={href}
-      className="group block rounded-panel focus:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--ring)]"
+      className="group block rounded-panel focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
     >
       <StatCard
         label={label}

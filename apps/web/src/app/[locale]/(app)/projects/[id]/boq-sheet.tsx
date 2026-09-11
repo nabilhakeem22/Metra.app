@@ -310,7 +310,7 @@ export function BoqSheet({
         </div>
 
         <div className="ms-auto flex flex-wrap items-center gap-2">
-          <label className="flex min-w-[180px] items-center gap-2 rounded-pill border border-[color:var(--field-line,var(--rule))] bg-[color:var(--surface,transparent)] px-3 py-2">
+          <label className="flex min-w-[180px] items-center gap-2 rounded-pill border border-[color:var(--field-border)] bg-[color:var(--field-bg)] px-3 py-2">
             <Search className="size-4 shrink-0 text-[color:var(--text-faint)]" aria-hidden />
             <input
               type="search"
@@ -449,7 +449,7 @@ export function BoqSheet({
                               setCell(line.id, 'unit', e.target.value);
                               saveLine(line, { unit: e.target.value }, ['unit']);
                             }}
-                            className="w-full cursor-pointer rounded-[8px] border border-transparent bg-transparent p-3 text-sm text-[color:var(--text)] hover:bg-[color:var(--track)] focus:border-[color:var(--brand)] focus:outline-none"
+                            className="w-full cursor-pointer rounded-[8px] border border-transparent bg-transparent p-3 text-sm text-[color:var(--text)] hover:bg-[color:var(--track)] focus:border-[color:hsl(var(--brand))] focus:outline-none"
                           >
                             {BOQ_UNITS.map((u) => (
                               <option key={u} value={u}>
@@ -589,7 +589,7 @@ export function BoqSheet({
                         type="button"
                         onClick={() => onAddLine(section.id)}
                         disabled={pending}
-                        className="inline-flex items-center gap-2 rounded-pill border border-dashed border-[color:var(--rule)] px-4 py-2 text-[13px] font-semibold text-[color:var(--brand-ink)] hover:border-[color:var(--brand)] hover:bg-[color:var(--brand-tint)]"
+                        className="inline-flex items-center gap-2 rounded-pill border border-dashed border-[color:var(--rule)] px-4 py-2 text-[13px] font-semibold text-[color:var(--brand-ink)] hover:border-[color:hsl(var(--brand))] hover:bg-[color:var(--brand-tint)]"
                       >
                         <Plus className="size-3.5" aria-hidden />
                         {t('addLine')}
@@ -625,7 +625,7 @@ export function BoqSheet({
                       aria-label={t('discountPct')}
                       dir="ltr"
                       inputMode="decimal"
-                      className="w-12 rounded-[8px] border border-transparent bg-transparent p-1 text-end font-mono text-sm tabular-nums text-[color:var(--text)] outline-none hover:bg-[color:var(--track)] focus:border-[color:var(--brand)]"
+                      className="w-12 rounded-[8px] border border-transparent bg-transparent p-1 text-end font-mono text-sm tabular-nums text-[color:var(--text)] outline-none hover:bg-[color:var(--track)] focus:border-[color:hsl(var(--brand))]"
                     />
                     <span aria-hidden="true">%</span>
                   </>
@@ -658,7 +658,7 @@ export function BoqSheet({
             type="button"
             onClick={onAddSection}
             disabled={pending}
-            className="inline-flex items-center gap-2 rounded-pill border border-dashed border-[color:var(--rule)] px-4 py-2 text-[13px] font-semibold text-[color:var(--brand-ink)] hover:border-[color:var(--brand)] hover:bg-[color:var(--brand-tint)]"
+            className="inline-flex items-center gap-2 rounded-pill border border-dashed border-[color:var(--rule)] px-4 py-2 text-[13px] font-semibold text-[color:var(--brand-ink)] hover:border-[color:hsl(var(--brand))] hover:bg-[color:var(--brand-tint)]"
           >
             <Plus className="size-3.5" aria-hidden />
             {t('addSection')}
@@ -787,7 +787,7 @@ function Cell({
       onChange={(e) => onChange(e.target.value)}
       onBlur={onBlur}
       onKeyDown={onKeyDown}
-      className={`w-full rounded-[8px] border border-transparent bg-transparent p-3 text-sm text-[color:var(--text)] outline-none hover:bg-[color:var(--track)] focus:border-[color:var(--brand)] focus:bg-[color:var(--surface,transparent)] ${mono ? 'font-mono tabular-nums' : ''} ${numeric ? 'text-end' : ''}`}
+      className={`w-full rounded-[8px] border border-transparent bg-transparent p-3 text-sm text-[color:var(--text)] outline-none hover:bg-[color:var(--track)] focus:border-[color:hsl(var(--brand))] focus:bg-[color:var(--field-bg)] ${mono ? 'font-mono tabular-nums' : ''} ${numeric ? 'text-end' : ''}`}
     />
   );
 }
