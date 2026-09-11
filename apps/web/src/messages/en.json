@@ -1738,7 +1738,10 @@
       "awaitingReply": "{n, plural, one {# client question is waiting on your reply, in Files.} other {# client questions are waiting on your reply, in Files.}}",
       "nextAction": "Next action",
       "advanceLeadsTo": "This moves the job to {phase}.",
-      "reshare": "Reveal & re-share the client link"
+      "reshare": "Reveal & re-share the client link",
+      "crumb": "Delivery",
+      "startedOn": "Started {date}",
+      "feeChip": "Design fee {amount}"
     },
     "spine": {
       "proposal": "Proposal",

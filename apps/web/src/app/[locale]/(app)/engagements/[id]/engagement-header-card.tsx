@@ -90,7 +90,9 @@ export function EngagementHeaderCard({
         </p>
         <h1 className="mt-1 text-[20px] font-extrabold leading-tight tracking-[var(--tracking-title)] text-[color:var(--text)] text-balance">
           {client}
-          <span aria-hidden> — </span>
+          {/* `·` not an em dash: — is not Arabic punctuation, and this line
+              renders in ar-EG (scripts/i18n/style-guide.md rule 6). */}
+          <span aria-hidden> · </span>
           <span className="font-bold">{project}</span>
         </h1>
         {chips.length > 0 && (
