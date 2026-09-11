@@ -46,7 +46,8 @@ export async function generateMetadata({
     },
     openGraph: {
       type: 'website',
-      title: `${siteName} — ${title}`,
+      // `·` not an em dash — this string renders in ar-EG (style-guide rule 6).
+      title: `${siteName} · ${title}`,
       description,
       siteName,
       locale: OG_LOCALE[locale as Locale] ?? OG_LOCALE.en,
@@ -54,7 +55,8 @@ export async function generateMetadata({
     },
     twitter: {
       card: 'summary',
-      title: `${siteName} — ${title}`,
+      // `·` not an em dash — this string renders in ar-EG (style-guide rule 6).
+      title: `${siteName} · ${title}`,
       description,
     },
   };
