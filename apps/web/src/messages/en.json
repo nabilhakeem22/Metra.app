@@ -2063,14 +2063,18 @@
     "share": {
       "title": "Share with client",
       "notSharedHint": "Create a private link the client can open to follow this delivery — no login needed.",
-      "sharedHint": "A private link is active. The link isn't shown again — rotate to reveal a fresh one, or revoke to turn it off.",
+      "sharedHint": "A private link is active. The link itself is never stored, so it cannot be shown again — reveal a new one to get a fresh link you can send.",
       "shareCta": "Share with client",
       "copyLink": "Copy link",
       "copied": "Copied",
       "revealOnce": "Copy this link now — it won't be shown again.",
-      "rotate": "Rotate link",
+      "rotate": "Reveal a new link",
       "revoke": "Revoke",
-      "error": "Something went wrong. Please try again."
+      "error": "Something went wrong. Please try again.",
+      "statusActive": "Link active",
+      "statusNotShared": "Not shared yet",
+      "unreadBadge": "New link — copy it",
+      "rotateHint": "Revealing a new link stops the current one working."
     },
     "notFound": {
       "title": "This link is no longer available",
