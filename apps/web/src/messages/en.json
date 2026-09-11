@@ -249,7 +249,9 @@
       "clients": "Clients",
       "projects": "Projects",
       "team": "Team",
-      "active": "Active:"
+      "active": "Active:",
+      "deliveries": "Deliveries",
+      "inFlight": "In flight"
     },
     "range": {
       "label": "Chart period",
@@ -267,6 +269,15 @@
       "clientActive": "Active",
       "clientInactive": "Inactive",
       "total": "Total"
+    },
+    "deliveries": {
+      "title": "Deliveries in flight",
+      "viewAll": "View all",
+      "empty": "Nothing in flight. Every delivery is either finished or not started yet.",
+      "waitingClient": "Waiting on the client",
+      "waitingStudio": "Yours to move",
+      "today": "today",
+      "sinceDays": "{count, plural, one {{n} day} other {{n} days}}"
     }
   },
   "team": {

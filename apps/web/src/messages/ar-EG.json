@@ -249,7 +249,9 @@
       "clients": "العملاء",
       "projects": "المشاريع",
       "team": "الفريق",
-      "active": "النشط:"
+      "active": "النشط:",
+      "deliveries": "التسليمات",
+      "inFlight": "جارية"
     },
     "range": {
       "label": "فترة الرسم",
@@ -267,6 +269,15 @@
       "clientActive": "نشط",
       "clientInactive": "غير نشط",
       "total": "الإجمالي"
+    },
+    "deliveries": {
+      "title": "التسليمات الجارية",
+      "viewAll": "عرض الكل",
+      "empty": "لا يوجد تسليم جارٍ. كل التسليمات إما انتهت أو لم تبدأ بعد.",
+      "waitingClient": "في انتظار العميل",
+      "waitingStudio": "عليك التحرك",
+      "today": "اليوم",
+      "sinceDays": "{count, plural, zero {منذ {n} يوم} one {منذ يوم} two {منذ يومين} few {منذ {n} أيام} many {منذ {n} يومًا} other {منذ {n} يوم}}"
     }
   },
   "team": {

@@ -28,7 +28,7 @@ export function DashboardStatCard({
   activeLabel?: string;
   activeValue?: number;
   icon: LucideIcon;
-  href: '/clients' | '/projects' | '/team';
+  href: '/clients' | '/projects' | '/team' | '/engagements';
 }) {
   return (
     <Link
