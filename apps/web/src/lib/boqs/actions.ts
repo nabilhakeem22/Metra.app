@@ -9,6 +9,14 @@ import {
   createBoqCore,
   type CreateBoqInput,
 } from './core';
+import {
+  addBoqLineCore,
+  addBoqSectionCore,
+  deleteBoqLineCore,
+  setBoqDiscountCore,
+  updateBoqLineCore,
+} from './edit';
+import type { BoqLinePatch } from './edit-input';
 import { issueBoqCore } from './issue';
 import { decodeCsv } from './import/decode';
 import { autoDetectMapping, mapRows, type ImportedLine } from './import/map';
@@ -91,6 +99,62 @@ export async function issueBoq(
     /* default locale */
   }
   const res = await issueBoqCore(ctx, { boqId, locale });
+  if (res.ok) refreshApp();
+  return res;
+}
+
+// ---------------------------------------------------------------------------
+// Editing a draft BOQ. Each wrapper does the session work and delegates; every
+// rule that matters (the draft-only freeze, the capability, the arithmetic)
+// lives in the core, so a caller that reaches the core another way still meets
+// it.
+// ---------------------------------------------------------------------------
+
+export async function updateBoqLine(input: {
+  lineId: string;
+  patch: BoqLinePatch;
+}): Promise<ActionResult> {
+  const ctx = await requireOrg();
+  const res = await updateBoqLineCore(ctx, input);
+  if (res.ok) refreshApp();
+  return res;
+}
+
+export async function addBoqLine(input: {
+  sectionId: string;
+  description: string;
+}): Promise<ActionResult & { data?: string }> {
+  const ctx = await requireOrg();
+  const res = await addBoqLineCore(ctx, input);
+  if (res.ok) refreshApp();
+  return res;
+}
+
+export async function deleteBoqLine(input: {
+  lineId: string;
+}): Promise<ActionResult> {
+  const ctx = await requireOrg();
+  const res = await deleteBoqLineCore(ctx, input);
+  if (res.ok) refreshApp();
+  return res;
+}
+
+export async function addBoqSection(input: {
+  boqId: string;
+  title: string;
+}): Promise<ActionResult & { data?: string }> {
+  const ctx = await requireOrg();
+  const res = await addBoqSectionCore(ctx, input);
+  if (res.ok) refreshApp();
+  return res;
+}
+
+export async function setBoqDiscount(input: {
+  boqId: string;
+  discountPct: string;
+}): Promise<ActionResult> {
+  const ctx = await requireOrg();
+  const res = await setBoqDiscountCore(ctx, input);
   if (res.ok) refreshApp();
   return res;
 }

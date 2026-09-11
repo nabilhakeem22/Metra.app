@@ -162,6 +162,16 @@ export const ACTION_CODE_PROBLEM: Record<ActionCode, ApiProblemKind> = {
   project_delivery_limit_reached: 'conflict',
   claim_not_found: 'bad-request',
   file_too_large: 'bad-request',
+  // Editing a draft BOQ line by line.
+  line_not_found: 'not-found',
+  section_not_found: 'not-found',
+  description_required: 'bad-request',
+  description_too_long: 'bad-request',
+  item_code_too_long: 'bad-request',
+  invalid_unit: 'bad-request',
+  invalid_qty: 'bad-request',
+  invalid_price: 'bad-request',
+  invalid_discount: 'bad-request',
 };
 
 /** A problem Response derived from an ActionResult error code. */

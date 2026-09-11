@@ -1115,7 +1115,7 @@
         "imported": "تم استيراد {count} بند",
         "importFailed": "تعذّرت قراءة هذا الملف",
         "documentLabel": "مقايسة {number}",
-        "lineCount": "{count} بند",
+        "lineCount": "{count, plural, zero {لا توجد بنود} one {بند واحد} two {بندان} few {# بنود} many {# بندًا} other {# بند}}",
         "total": "الإجمالي",
         "provisional": "تقديري",
         "col": {
@@ -1123,7 +1123,9 @@
           "unit": "الوحدة",
           "qty": "الكمية",
           "rate": "سعر الوحدة",
-          "total": "الإجمالي"
+          "total": "الإجمالي",
+          "code": "الكود",
+          "provisionalShort": "ت"
         },
         "unit": {
           "sqm": "م²",
@@ -1139,7 +1141,31 @@
         "issued": "تم إصدار المقايسة",
         "issueFailed": "تعذّر إصدار المقايسة",
         "issueNoEngagement": "لا يوجد تعاقد نشط واحد لهذا المشروع للتسليم من خلاله",
-        "statusIssued": "صادرة"
+        "statusIssued": "صادرة",
+        "statusDraft": "مسودة",
+        "find": "ابحث عن بند",
+        "addLine": "أضف بند",
+        "addSection": "أضف قسم",
+        "newLine": "بند جديد",
+        "newSection": "قسم جديد",
+        "deleteLine": "حذف هذا البند",
+        "saving": "جارٍ الحفظ",
+        "allSaved": "تم حفظ كل التعديلات",
+        "saveFailed": "لم يتم حفظ هذا التعديل",
+        "subtotal": "الإجمالي قبل الخصم",
+        "discount": "الخصم",
+        "discountPct": "نسبة الخصم",
+        "keyboardHint": "Tab للتنقل أفقيًا · Enter للنزول في نفس العمود · Esc للتراجع عن الخلية",
+        "costedCopy": "نسخة بالتكلفة",
+        "costedCopyFor": "نسخة بالتكلفة للمقايسة {number}",
+        "errQty": "هذه الكمية ليست رقمًا",
+        "errPrice": "سعر الوحدة ليس رقمًا",
+        "errDescription": "البند يحتاج وصفًا",
+        "errFrozen": "هذه المقايسة صادرة ولا يمكن تعديلها",
+        "errTooMany": "وصلت المقايسة إلى الحد الأقصى للبنود",
+        "errForbidden": "لا تملك صلاحية تعديل هذه المقايسة",
+        "errDiscount": "الخصم يجب أن يكون بين 0 و 100",
+        "errSectionName": "القسم يحتاج اسمًا"
       }
     }
   },
@@ -1478,7 +1504,7 @@
       "existing": "وحدة قائمة",
       "offPlan": "على الخارطة",
       "hint": "يحدد الخطوة 2: الوحدة القائمة تحتاج معاينة ورفعًا؛ على الخارطة تستورد ملف الأوتوكاد من المطور.",
-    "budgetDraftBadge": "مسودة"
+      "budgetDraftBadge": "مسودة"
     },
     "boqLabel": "مقايسة",
     "paymentsBadge": "{n} مستحقة",
@@ -1691,9 +1717,9 @@
         "waitingClient": "بانتظار العميل",
         "paymentToConfirm": "دفعة بانتظار التأكيد",
         "closed": "مُغلق",
-      "crumb": "المشاريع",
-      "feeChip": "أتعاب التصميم {amount}",
-      "startedOn": "بدأ {date}"
+        "crumb": "المشاريع",
+        "feeChip": "أتعاب التصميم {amount}",
+        "startedOn": "بدأ {date}"
       },
       "move": {
         "studio": "الدور عليك"

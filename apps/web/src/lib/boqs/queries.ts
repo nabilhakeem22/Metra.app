@@ -11,6 +11,10 @@ export interface BoqLineRow {
   unit: string;
   qty: string;
   unitPrice: string;
+  /** Per-line discount. Not margin data — it is a reduction off a price the
+   *  client already sees, and the sheet needs it to preview a line total that
+   *  matches what the server will store. */
+  discountPct: string;
   lineTotal: string;
   provisional: boolean;
   /** Margin-gated: present only when the caller may see cost. */
@@ -88,6 +92,7 @@ export async function getProjectBoq(
         unit: l.unit,
         qty: l.qty,
         unitPrice: l.unitPrice,
+        discountPct: l.discountPct,
         lineTotal: l.lineTotal,
         provisional: l.provisional,
         ...(opts.showCost

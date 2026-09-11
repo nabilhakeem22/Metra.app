@@ -94,7 +94,7 @@ export function DocumentThreadPanel({
                   key={message.id}
                   className={
                     message.channel === 'client'
-                      ? 'rounded-[var(--r-item)] border border-[color:var(--rule)] bg-[color:var(--card)] p-2.5'
+                      ? 'rounded-[var(--r-item)] border border-[color:var(--rule)] bg-card p-2.5'
                       : 'rounded-[var(--r-item)] border border-[color:var(--brand-tint-border)] bg-[color:var(--brand-tint)] p-2.5'
                   }
                 >
@@ -126,7 +126,7 @@ export function DocumentThreadPanel({
                 onChange={(event) => thread.setDraft(event.target.value)}
                 placeholder={t('placeholder')}
                 rows={2}
-                className="w-full resize-y rounded-[var(--r-item)] border border-[color:var(--rule)] bg-[color:var(--card)] p-2 text-xs focus:outline-none focus:ring-2 focus:ring-[color:var(--ring)]"
+                className="w-full resize-y rounded-[var(--r-item)] border border-[color:var(--rule)] bg-card p-2 text-xs focus:outline-none focus:ring-2 focus:ring-ring"
               />
               <div className="flex items-center justify-between gap-2">
                 <p className="text-[11px] text-[color:var(--text-muted)]">
