@@ -1,6 +1,6 @@
 'use server';
 
-import { revalidatePath } from 'next/cache';
+import { refreshApp } from '@/lib/actions/refresh';
 import type { ActionResult } from '@/lib/actions/result';
 import { requireOrg } from '@/lib/auth/require-org';
 import {
@@ -9,10 +9,6 @@ import {
   upsertProjectTypeCore,
   type ProjectTypeInput,
 } from './core';
-
-function refreshApp(): void {
-  revalidatePath('/', 'layout');
-}
 
 /** Create-on-use project type (idempotent). Called from the Details combobox. */
 export async function addProjectType(

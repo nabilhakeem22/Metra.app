@@ -1,6 +1,6 @@
 'use server';
 
-import { revalidatePath } from 'next/cache';
+import { refreshApp } from '@/lib/actions/refresh';
 import type { ActionResult } from '@/lib/actions/result';
 import { requireOrg } from '@/lib/auth/require-org';
 import {
@@ -9,10 +9,6 @@ import {
   updateStageCore,
   type StageInput,
 } from './core';
-
-function refreshApp(): void {
-  revalidatePath('/', 'layout');
-}
 
 export async function addStage(
   input: { projectId: string } & StageInput,

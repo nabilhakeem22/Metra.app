@@ -1,7 +1,7 @@
 'use server';
 
 import { getLocale } from 'next-intl/server';
-import { revalidatePath } from 'next/cache';
+import { refreshApp } from '@/lib/actions/refresh';
 import type { ActionResult } from '@/lib/actions/result';
 import { requireOrg } from '@/lib/auth/require-org';
 import { resolveRequestOrigin } from '@/lib/http/request-origin';
@@ -39,7 +39,7 @@ export async function shareDeliveryLink(
   const res = await mintDeliveryLinkCore(ctx, engagementId);
   if (!res.ok || !res.data) return { ok: res.ok, error: res.error };
   const link = await deliveryLink(origin, res.data);
-  revalidatePath('/', 'layout');
+  refreshApp();
   return { ok: true, link };
 }
 
@@ -60,7 +60,7 @@ export async function rotateDeliveryLink(
   const res = await rotateDeliveryLinkCore(ctx, engagementId);
   if (!res.ok || !res.data) return { ok: res.ok, error: res.error };
   const link = await deliveryLink(origin, res.data);
-  revalidatePath('/', 'layout');
+  refreshApp();
   return { ok: true, link };
 }
 
@@ -73,6 +73,6 @@ export async function revokeDeliveryLink(
 ): Promise<ActionResult> {
   const ctx = await requireOrg();
   const res = await revokeDeliveryLinkCore(ctx, engagementId);
-  if (res.ok) revalidatePath('/', 'layout');
+  if (res.ok) refreshApp();
   return res;
 }

@@ -2,7 +2,7 @@
 
 import { organizations } from '@metra/db';
 import { getLocale } from 'next-intl/server';
-import { revalidatePath } from 'next/cache';
+import { refreshApp } from '@/lib/actions/refresh';
 import type { ActionResult } from '@/lib/actions/result';
 import { requireOrg } from '@/lib/auth/require-org';
 import { withOrgContext } from '@/lib/db/context';
@@ -27,10 +27,6 @@ import {
   type SaveDraftInput,
 } from './core';
 import { getProposalForPdf, getProposalSendMeta } from './queries';
-
-function refreshApp(): void {
-  revalidatePath('/', 'layout');
-}
 
 export async function createProposal(
   input: CreateProposalInput,
