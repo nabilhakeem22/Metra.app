@@ -275,6 +275,23 @@ describe('contracts + variations capabilities (P1 Slice 4)', () => {
   });
 });
 
+describe('users_settings read (the /team read gate)', () => {
+  it('is granted to owner and admin only', () => {
+    for (const role of ['owner', 'admin'] as const) {
+      expect(can(role, 'users_settings', 'read')).toBe(true);
+    }
+    for (const role of [
+      'project_manager',
+      'site_engineer',
+      'accountant',
+      'client',
+      'viewer',
+    ] as const) {
+      expect(can(role, 'users_settings', 'read')).toBe(false);
+    }
+  });
+});
+
 describe('design-engagement capabilities (Machine, Step 1)', () => {
   it('engagements_design: create granted to owner/admin/PM/site_engineer; denied to accountant/client', () => {
     for (const role of [
