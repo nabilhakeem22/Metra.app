@@ -51,8 +51,6 @@ export * from './automation-run-log';
 export * from './api-keys';
 export * from './workspace-entitlements';
 
-import { accounts } from './accounts';
-import { organizations } from './organizations';
 import { memberships } from './memberships';
 import { auditLog } from './audit-log';
 import { files } from './files';
@@ -99,56 +97,6 @@ import { workspaceEntitlements } from './workspace-entitlements';
 
 /** Every org-scoped business table (carries org_id). Drives RLS generation. */
 export const orgScopedTables = {
-  memberships,
-  auditLog,
-  files,
-  invitations,
-  sections,
-  costItems,
-  priceChanges,
-  priceChangeLines,
-  clients,
-  clientContacts,
-  activities,
-  projectTypes,
-  stageTemplates,
-  projects,
-  projectStages,
-  proposals,
-  proposalSections,
-  proposalLines,
-  proposalEvents,
-  contracts,
-  contractSections,
-  contractLines,
-  contractEvents,
-  boqs,
-  boqSections,
-  boqLines,
-  variationOrders,
-  variationOrderLines,
-  variationOrderEvents,
-  designEngagements,
-  engagementTransitions,
-  engagementMilestones,
-  paymentEvents,
-  engagementArtifacts,
-  engagementEvents,
-  engagementChangeOrders,
-  clientPaymentClaims,
-  engagementDocumentComments,
-  documentCategories,
-  notifications,
-  automationSettings,
-  automationRunLog,
-  apiKeys,
-  workspaceEntitlements,
-} as const;
-
-/** All tables including the tenant root and the above-tenancy account entity. */
-export const allTables = {
-  accounts,
-  organizations,
   memberships,
   auditLog,
   files,

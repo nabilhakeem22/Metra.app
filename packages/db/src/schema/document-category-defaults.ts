@@ -21,7 +21,7 @@ export type DefaultDocumentCategoryKey =
 
 /** Bilingual labels. Arabic is the primary locale, so it is written the way an
  *  Egyptian fit-out office actually files paper, not translated from the English. */
-export const DEFAULT_DOCUMENT_CATEGORY_LABELS: Record<
+const DEFAULT_DOCUMENT_CATEGORY_LABELS: Record<
   DefaultDocumentCategoryKey,
   { en: string; ar: string }
 > = {

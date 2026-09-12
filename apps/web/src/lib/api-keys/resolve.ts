@@ -16,7 +16,7 @@ export const API_KEY_PREFIX_LEN = 12;
  * resolver query against the shared DB. (An IP-keyed pre-auth throttle is a
  * tracked fast-follow — intentionally not added here.)
  */
-export const API_KEY_RE = /^mtk_[A-Za-z0-9_-]{43}$/;
+const API_KEY_RE = /^mtk_[A-Za-z0-9_-]{43}$/;
 /** Throttle window: last_used_at is only stamped when older than this. */
 const LAST_USED_THROTTLE_MS = 5 * 60 * 1000;
 
@@ -35,7 +35,7 @@ export interface ApiPrincipal {
   toOrgContext(): OrgContext;
 }
 
-export function sha256Hex(raw: string): string {
+function sha256Hex(raw: string): string {
   return createHash('sha256').update(raw).digest('hex');
 }
 

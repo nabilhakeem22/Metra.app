@@ -17,7 +17,7 @@ export const DEFAULT_STAGE_KEYS = [
 
 export type DefaultStageKey = (typeof DEFAULT_STAGE_KEYS)[number];
 
-export const DEFAULT_STAGE_LABELS: Record<
+const DEFAULT_STAGE_LABELS: Record<
   DefaultStageKey,
   { en: string; ar: string }
 > = {

@@ -4,7 +4,7 @@
 // the P4 client portal and has no internal use yet.
 import { MEMBER_ROLES, type MemberRole } from '../permissions/roles';
 
-export const NON_INVITABLE_ROLES: readonly MemberRole[] = ['owner', 'client'];
+const NON_INVITABLE_ROLES: readonly MemberRole[] = ['owner', 'client'];
 
 export function isInvitableRole(role: string): role is MemberRole {
   return (

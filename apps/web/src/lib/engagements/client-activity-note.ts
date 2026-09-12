@@ -13,7 +13,7 @@ import type { EngagementClientActivityRecord } from './queries/client-activity';
  * The client-channel event kinds that carry a revision brief. Approvals and the
  * ROM/handoff acknowledgements are deliberately excluded — see the module note.
  */
-export const CLIENT_CHANGE_REQUEST_KINDS: ReadonlySet<EngagementEventKind> =
+const CLIENT_CHANGE_REQUEST_KINDS: ReadonlySet<EngagementEventKind> =
   new Set<EngagementEventKind>(['concept_change_request', 'design_change_request']);
 
 /** The one client change-request note the command card surfaces. */
