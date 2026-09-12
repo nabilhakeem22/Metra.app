@@ -5,9 +5,6 @@ integration. It is a **staging/preview** deploy — auth, the bilingual shell, a
 the PDF spike — not a production launch. Data lives in Supabase **eu-west-1
 (Ireland)**; the PDPL production-residency decision (PRD §10 #1) is still open.
 
-Region is pinned to `dub1` (Dublin) in `apps/web/vercel.json` to sit next to the
-Supabase project.
-
 ---
 
 ## 1. Import the repo into Vercel
