@@ -7,7 +7,6 @@ import { Button } from '@/components/ui/button';
 import { toast } from '@/hooks/use-toast';
 import { useRouter } from '@/i18n/routing';
 import { resolveActionError } from '@/lib/actions/error-message';
-import type { ActionCode } from '@/lib/actions/result';
 import { type FirmTypeKey } from '@/lib/entitlements/firm-types';
 import {
   createLogoUpload,
@@ -68,6 +67,34 @@ export function OnboardingWizard() {
     setStep((s) => Math.max(1, s - 1));
   }
 
+  /**
+   * Best-effort logo upload for the org just created. Never rethrows: the org
+   * exists either way, so a failed logo is a toast, not a failed onboarding.
+   */
+  async function uploadLogo(file: File): Promise<void> {
+    try {
+      const signed = await createLogoUpload({
+        contentType: file.type,
+        originalName: file.name,
+      });
+      // A viewer (or a demoted user) is refused here — the catch below
+      // surfaces the same logo-upload-failed toast.
+      if ('ok' in signed) throw new Error('logo_forbidden');
+      const uploaded = await fetch(signed.signedUrl, {
+        method: 'PUT',
+        headers: { 'content-type': file.type, 'x-upsert': 'true' },
+        body: file,
+      });
+      if (!uploaded.ok) {
+        toast({ title: t('logoUploadFailed'), variant: 'destructive' });
+        return;
+      }
+      await setOrgLogo(signed.fileId);
+    } catch {
+      toast({ title: t('logoUploadFailed'), variant: 'destructive' });
+    }
+  }
+
   function finish() {
     setError(null);
     startTransition(async () => {
@@ -79,42 +106,20 @@ export function OnboardingWizard() {
           city: city.trim() || null,
           taxRegistrationNumber: tax.trim() || null,
         };
-        await createOrg(input);
-
-        if (logo) {
-          try {
-            const signed = await createLogoUpload({
-              contentType: logo.type,
-              originalName: logo.name,
-            });
-            // A viewer (or a demoted user) is refused here — the inner catch
-            // surfaces the same logo-upload-failed toast.
-            if ('ok' in signed) throw new Error('logo_forbidden');
-            const res = await fetch(signed.signedUrl, {
-              method: 'PUT',
-              headers: { 'content-type': logo.type, 'x-upsert': 'true' },
-              body: logo,
-            });
-            if (res.ok) {
-              await setOrgLogo(signed.fileId);
-            } else {
-              toast({ title: t('logoUploadFailed'), variant: 'destructive' });
-            }
-          } catch {
-            toast({ title: t('logoUploadFailed'), variant: 'destructive' });
-          }
+        const res = await createOrg(input);
+        if (!res.ok) {
+          setError(resolveActionError(res.error, te));
+          return;
         }
+
+        if (logo) await uploadLogo(logo);
 
         toast({ title: t('createdTitle') });
         router.push('/dashboard');
-      } catch (e) {
-        // createOrg throws an ActionCode; localize it (fallback generic).
-        setError(
-          resolveActionError(
-            e instanceof Error ? (e.message as ActionCode) : undefined,
-            te,
-          ),
-        );
+      } catch {
+        // Only an unexpected failure (network, a thrown logo step) lands here —
+        // createOrg's own rejections are coded in res.error above.
+        setError(resolveActionError(undefined, te));
       }
     });
   }
