@@ -2,12 +2,14 @@ import { getTableConfig, pgTable, unique } from 'drizzle-orm/pg-core';
 import { describe, expect, it } from 'vitest';
 import { money } from './_helpers';
 import { auditLog } from './audit-log';
+import { contracts } from './contracts';
 import { MEMBER_ROLES } from './enums';
 import { files } from './files';
 import { memberships } from './memberships';
 import { orgScoped } from './org-scoped';
 import { sameOrgFk, sameOrgRef } from './org-ref';
 import { organizations } from './organizations';
+import { proposals } from './proposals';
 
 describe('bilingual helper', () => {
   it('emits _ar and _en columns', () => {
@@ -104,5 +106,17 @@ describe('member_role enum', () => {
       'client',
       'viewer',
     ]);
+  });
+});
+
+// tax_rate multiplies the whole taxable base, and until 0044 it was the only
+// percentage column in the schema with no [0,100] CHECK.
+describe('tax_rate range checks (0044)', () => {
+  it.each([
+    ['proposals', proposals, 'proposals_tax_rate_range'],
+    ['contracts', contracts, 'contracts_tax_rate_range'],
+  ])('%s carries %s', (_name, table, constraint) => {
+    const cfg = getTableConfig(table as typeof proposals);
+    expect(cfg.checks.map((c) => c.name)).toContain(constraint);
   });
 });

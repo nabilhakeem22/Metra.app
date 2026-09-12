@@ -80,6 +80,7 @@ export const proposals = pgTable(
       'proposals_supervision_pct_range',
       sql`supervision_pct >= 0 and supervision_pct <= 100`,
     ),
+    check('proposals_tax_rate_range', sql`tax_rate >= 0 and tax_rate <= 100`),
     ...sameOrgFk(t, 'client', clients, { onDelete: 'restrict' }),
     ...sameOrgFk(t, 'project', projects, { onDelete: 'restrict' }),
     // Self-reference: a superseding draft points at the proposal it replaced.

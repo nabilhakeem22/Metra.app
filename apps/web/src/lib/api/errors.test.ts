@@ -42,6 +42,7 @@ const ALL_CODES: ActionCode[] = [
   'already_responded',
   'discount_out_of_range',
   'supervision_out_of_range',
+  'tax_out_of_range',
   'too_many_lines',
   'invalid_date',
   'amount_too_large',

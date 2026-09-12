@@ -366,6 +366,26 @@ describe('supervision fee (after VAT, untaxed; persisted + guarded)', () => {
     ).rejects.toMatchObject({ code: '23514' });
   });
 
+  it('rejects taxRate out of range; nothing persists', async () => {
+    const { ctx, clientId, projectId } = await setup();
+    const id = ((await createProposalCore(ctx, { clientId, projectId })) as { data?: string }).data!;
+    expect(
+      await saveProposalDraftCore(ctx, { id, header: { taxRate: '150' }, sections: [] }),
+    ).toEqual({ ok: false, error: 'tax_out_of_range' });
+    const d = await getProposalWithLines(ctx, id, true);
+    expect(d!.taxRate).toBe('14.0000');
+  });
+
+  it('DB CHECK rejects a direct tax_rate = 150 write (23514)', async () => {
+    const { ctx, clientId, projectId } = await setup();
+    const id = ((await createProposalCore(ctx, { clientId, projectId })) as { data?: string }).data!;
+    await expect(
+      raw.query(
+        `update public.proposals set tax_rate = 150 where id = '${id}'`,
+      ),
+    ).rejects.toMatchObject({ code: '23514' });
+  });
+
   it('supersede deep-copies supervision into the new draft', async () => {
     const { ctx, clientId, projectId } = await setup();
     const id = ((await createProposalCore(ctx, { clientId, projectId })) as { data?: string }).data!;

@@ -309,6 +309,13 @@
       "when": 1789078757549,
       "tag": "0043_event_correction_kind",
       "breakpoints": true
+    },
+    {
+      "idx": 44,
+      "version": "7",
+      "when": 1789165157549,
+      "tag": "0044_tax_rate_range",
+      "breakpoints": true
     }
   ]
 }

@@ -496,6 +496,7 @@
     "already_responded": "تم تسجيل رد مسبقاً لهذا العرض",
     "discount_out_of_range": "الخصم لازم يكون بين 0 و100",
     "supervision_out_of_range": "الإشراف لازم يكون بين 0 و100",
+    "tax_out_of_range": "نسبة الضريبة لازم تكون بين 0 و100",
     "too_many_lines": "العرض ده فيه بنود كتيرة زيادة عن اللزوم.",
     "invalid_date": "اكتب تاريخ صح",
     "amount_too_large": "المبلغ ده كبير أوي",
