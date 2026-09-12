@@ -120,3 +120,25 @@ describe('tax_rate range checks (0044)', () => {
     expect(cfg.checks.map((c) => c.name)).toContain(constraint);
   });
 });
+
+// Both tables are addressed by (org_id, entity, entity_id) and by nothing else;
+// before 0045 neither had an index on it.
+describe('polymorphic entity indexes (0045)', () => {
+  it.each([
+    ['files', files, 'files_org_entity_idx', ['org_id', 'entity', 'entity_id']],
+    [
+      'audit_log',
+      auditLog,
+      'audit_log_org_entity_at_idx',
+      ['org_id', 'entity', 'entity_id', 'at'],
+    ],
+  ])('%s carries %s', (_name, table, indexName, columns) => {
+    const idx = getTableConfig(table as typeof files).indexes.find(
+      (i) => i.config.name === indexName,
+    );
+    expect(idx).toBeDefined();
+    expect(
+      idx!.config.columns.map((c) => (c as { name?: string }).name),
+    ).toEqual(columns);
+  });
+});

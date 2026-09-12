@@ -1,5 +1,6 @@
 import {
   bigint,
+  index,
   pgTable,
   text,
   unique,
@@ -37,6 +38,10 @@ export const files = pgTable(
   (t) => [
     unique('files_org_id_id_unique').on(t.orgId, t.id),
     unique('files_object_key_unique').on(t.objectKey),
+    // The ONLY way this table is ever read: "the documents on this client /
+    // project / engagement". Without it that is a full scan of every file in
+    // the database, filtered afterwards.
+    index('files_org_entity_idx').on(t.orgId, t.entity, t.entityId),
   ],
 );
 

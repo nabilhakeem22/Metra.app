@@ -316,6 +316,13 @@
       "when": 1789165157549,
       "tag": "0044_tax_rate_range",
       "breakpoints": true
+    },
+    {
+      "idx": 45,
+      "version": "7",
+      "when": 1789251557549,
+      "tag": "0045_files_audit_entity_indexes",
+      "breakpoints": true
     }
   ]
 }
