@@ -35,9 +35,3 @@ export function firmTypeDef(
 ): (typeof FIRM_TYPES)[number] | undefined {
   return FIRM_TYPES.find((def) => def.key === key);
 }
-
-/** The `enabled_flows` set a firm type resolves to (empty for an unknown key). */
-export function flowsForFirmType(key: FirmTypeKey): Flow[] {
-  const def = firmTypeDef(key);
-  return def ? [...def.enabledFlows] : [];
-}

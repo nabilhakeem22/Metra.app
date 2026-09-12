@@ -3,12 +3,7 @@
 import { refreshApp } from '@/lib/actions/refresh';
 import type { ActionResult } from '@/lib/actions/result';
 import { requireOrg } from '@/lib/auth/require-org';
-import {
-  addStageCore,
-  deleteStageCore,
-  updateStageCore,
-  type StageInput,
-} from './core';
+import { addStageCore, updateStageCore, type StageInput } from './core';
 
 export async function addStage(
   input: { projectId: string } & StageInput,
@@ -24,13 +19,6 @@ export async function updateStage(
 ): Promise<ActionResult> {
   const ctx = await requireOrg();
   const res = await updateStageCore(ctx, input);
-  if (res.ok) refreshApp();
-  return res;
-}
-
-export async function deleteStage(id: string): Promise<ActionResult> {
-  const ctx = await requireOrg();
-  const res = await deleteStageCore(ctx, { id });
   if (res.ok) refreshApp();
   return res;
 }

@@ -1,37 +1,7 @@
 import 'server-only';
-import { clients, contracts } from '@metra/db';
+import { contracts } from '@metra/db';
 import { eq, inArray } from 'drizzle-orm';
 import { withOrgContext, type OrgContext } from '@/lib/db/context';
-
-export interface ContractSendMeta {
-  number: number;
-  titleAr: string | null;
-  titleEn: string | null;
-  originalValue: string;
-  clientEmail: string | null;
-}
-
-/** Non-cost fields the issue path needs for the client email (never cost). */
-export async function getContractSendMeta(
-  ctx: OrgContext,
-  id: string,
-): Promise<ContractSendMeta | null> {
-  return withOrgContext(ctx, async (tx) => {
-    const [row] = await tx
-      .select({
-        number: contracts.number,
-        titleAr: contracts.titleAr,
-        titleEn: contracts.titleEn,
-        originalValue: contracts.originalValue,
-        clientEmail: clients.email,
-      })
-      .from(contracts)
-      .leftJoin(clients, eq(clients.id, contracts.clientId))
-      .where(eq(contracts.id, id))
-      .limit(1);
-    return row ?? null;
-  });
-}
 
 /** The contract generated from a given proposal, if any (for the proposal view). */
 export async function getContractIdForProposal(

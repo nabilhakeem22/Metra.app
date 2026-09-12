@@ -3,11 +3,7 @@ import { createClientCore } from '@/lib/clients/core';
 import { listClients } from '@/lib/clients/queries';
 import { createProjectCore } from '@/lib/projects/core';
 import { getProjectOverview } from '@/lib/projects/queries';
-import {
-  addStageCore,
-  deleteStageCore,
-  updateStageCore,
-} from '@/lib/project-stages/core';
+import { addStageCore, updateStageCore } from '@/lib/project-stages/core';
 import { listStages } from '@/lib/project-stages/queries';
 import type { MemberRole } from '@metra/db';
 import { closeFixture, ctxFor, raw, seedOrg, teardown } from './fixture';
@@ -86,13 +82,11 @@ describe('project stages — progress bounds', () => {
     ).rejects.toMatchObject({ code: '23514' });
   });
 
-  it('add + delete a stage', async () => {
+  it('add a stage', async () => {
     const { orgId, ctx, projectId } = await setup();
     const res = await addStageCore(ctx, { projectId, nameEn: 'Custom', status: 'in_progress', progressPct: '10' });
     expect(res.ok).toBe(true);
     expect(await raw.count('project_stages', orgId)).toBe(11);
-    expect((await deleteStageCore(ctx, { id: res.data! })).ok).toBe(true);
-    expect(await raw.count('project_stages', orgId)).toBe(10);
   });
 });
 
