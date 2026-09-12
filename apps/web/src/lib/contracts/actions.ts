@@ -3,10 +3,10 @@
 import { organizations } from '@metra/db';
 import { getLocale } from 'next-intl/server';
 import { revalidatePath } from 'next/cache';
-import { headers } from 'next/headers';
 import type { ActionResult } from '@/lib/actions/result';
 import { requireOrg } from '@/lib/auth/require-org';
 import { withOrgContext } from '@/lib/db/context';
+import { resolveRequestOrigin } from '@/lib/http/request-origin';
 import { buildContractHtml } from '@/lib/pdf/contract-template';
 import { can, canSeeMargin } from '@/lib/permissions/can';
 import { eq } from 'drizzle-orm';
@@ -21,16 +21,6 @@ import { getContractForPdf } from './queries';
 
 function refreshApp(): void {
   revalidatePath('/', 'layout');
-}
-
-async function resolveOrigin(): Promise<string> {
-  const override = process.env.NEXT_PUBLIC_APP_URL?.trim().replace(/\/$/, '');
-  if (override) return override;
-  const h = await headers();
-  const host = h.get('x-forwarded-host') ?? h.get('host');
-  const proto = h.get('x-forwarded-proto') ?? 'https';
-  if (!host) throw new Error('cannot resolve request origin for share link');
-  return `${proto}://${host}`;
 }
 
 export async function generateContract(
@@ -55,6 +45,11 @@ export async function issueContract(
   id: string,
 ): Promise<ActionResult & { link?: string }> {
   const ctx = await requireOrg();
+  // Resolve the link origin BEFORE the state change: an origin we cannot
+  // resolve must not leave behind a committed transition whose link the caller
+  // never receives.
+  const origin = await resolveRequestOrigin();
+  if (!origin) return { ok: false, error: 'generic' };
   const res = await issueContractCore(ctx, { id });
   if (!res.ok || !res.data) return { ok: res.ok, error: res.error };
   let locale = 'ar-EG';
@@ -63,7 +58,6 @@ export async function issueContract(
   } catch {
     /* default locale */
   }
-  const origin = await resolveOrigin();
   const link = `${origin}/${locale}/c/${res.data}`;
   refreshApp();
   return { ok: true, link };

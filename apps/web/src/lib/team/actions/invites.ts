@@ -51,10 +51,11 @@ export async function inviteMember(input: {
   const { raw, hash } = mintToken();
   const expiresAt = new Date(Date.now() + INVITE_TTL_DAYS * 86400_000);
 
-  // Resolve the absolute link BEFORE creating the invite — if the origin can't
-  // be determined we throw here and never persist a half-usable invite.
+  // Resolve the absolute link BEFORE creating the invite — an unresolvable
+  // origin must not persist an invitation whose link nobody ever receives.
   const locale = await currentLocale();
   const link = await buildAcceptUrl(locale, raw);
+  if (!link) return { ok: false, error: 'generic' };
 
   try {
     await withOrgContext(ctx, async (tx) => {
@@ -121,6 +122,7 @@ export async function resendInvite(id: string): Promise<ActionResult> {
   const expiresAt = new Date(Date.now() + INVITE_TTL_DAYS * 86400_000);
   const locale = await currentLocale();
   const link = await buildAcceptUrl(locale, raw);
+  if (!link) return { ok: false, error: 'generic' };
 
   let email = '';
   let role: MemberRole = 'viewer';

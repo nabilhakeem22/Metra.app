@@ -8,8 +8,8 @@ import 'server-only';
 import { createHash, randomBytes } from 'node:crypto';
 import { organizations } from '@metra/db';
 import { getLocale } from 'next-intl/server';
-import { headers } from 'next/headers';
 import { withOrgContext, type OrgContext } from '@/lib/db/context';
+import { resolveRequestOrigin } from '@/lib/http/request-origin';
 
 export const INVITE_TTL_DAYS = 7;
 
@@ -44,28 +44,16 @@ export async function currentLocale(): Promise<string> {
 }
 
 /**
- * Absolute origin for invite links. Prefers NEXT_PUBLIC_APP_URL when set,
- * otherwise derives it from the request headers. THROWS if no origin can be
- * determined — never emits a relative/empty link.
+ * Absolute accept URL for an invite, or null when no origin can be resolved —
+ * never a relative or empty link. Callers must branch on the null BEFORE they
+ * persist an invitation.
  */
-async function resolveOrigin(): Promise<string> {
-  const override = process.env.NEXT_PUBLIC_APP_URL?.trim().replace(/\/$/, '');
-  if (override) return override;
-
-  const h = await headers();
-  const host = h.get('x-forwarded-host') ?? h.get('host');
-  const proto = h.get('x-forwarded-proto') ?? 'https';
-  if (!host) {
-    throw new Error('cannot resolve request origin for invite link');
-  }
-  return `${proto}://${host}`;
-}
-
 export async function buildAcceptUrl(
   locale: string,
   rawToken: string,
-): Promise<string> {
-  const origin = await resolveOrigin();
+): Promise<string | null> {
+  const origin = await resolveRequestOrigin();
+  if (!origin) return null;
   return `${origin}/${locale}/invite/${rawToken}`;
 }
 
