@@ -1,11 +1,5 @@
-import type { Project } from '@metra/db';
+import type { ProjectWithType } from '@/lib/projects/queries';
 import { toApiMoney, toIso } from './shared';
-
-/** Optional resolved type name (present on the detail query). */
-export interface ProjectWithTypeNames extends Project {
-  typeNameEn?: string | null;
-  typeNameAr?: string | null;
-}
 
 /**
  * Public v1 shape for a project. Projects carry NO cost/margin columns; advance/
@@ -34,7 +28,7 @@ export interface PublicProject {
   updated_at: string | null;
 }
 
-export function serializeProject(row: ProjectWithTypeNames): PublicProject {
+export function serializeProject(row: ProjectWithType): PublicProject {
   return {
     id: row.id,
     code: row.code,
@@ -42,8 +36,8 @@ export function serializeProject(row: ProjectWithTypeNames): PublicProject {
     name_en: row.nameEn,
     client_id: row.clientId,
     type_id: row.typeId,
-    type_name_ar: row.typeNameAr ?? null,
-    type_name_en: row.typeNameEn ?? null,
+    type_name_ar: row.typeNameAr,
+    type_name_en: row.typeNameEn,
     status: row.status,
     description: row.description,
     advance_pct: toApiMoney(row.advancePct),

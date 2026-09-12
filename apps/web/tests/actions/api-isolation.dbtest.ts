@@ -4,6 +4,7 @@ import { GET as clientsList } from '@/app/api/v1/clients/route';
 import { GET as clientDetail } from '@/app/api/v1/clients/[id]/route';
 import { GET as costItemsList } from '@/app/api/v1/cost-items/route';
 import { GET as costItemDetail } from '@/app/api/v1/cost-items/[id]/route';
+import { GET as projectDetail } from '@/app/api/v1/projects/[id]/route';
 import { GET as projectsList } from '@/app/api/v1/projects/route';
 import { GET as proposalsList } from '@/app/api/v1/proposals/route';
 import { GET as proposalDetail } from '@/app/api/v1/proposals/[id]/route';
@@ -11,6 +12,7 @@ import { mintApiKeyCore, revokeApiKeyCore } from '@/lib/api-keys/core';
 import { handleApiRequest } from '@/lib/api/pipeline';
 import { createClientCore } from '@/lib/clients/core';
 import { createCostItemCore } from '@/lib/price-book/core';
+import { upsertProjectTypeCore } from '@/lib/project-types/core';
 import { createProjectCore } from '@/lib/projects/core';
 import { createProposalCore, saveProposalDraftCore } from '@/lib/proposals/core';
 import { closeFixture, ctxFor, raw, seedOrg, teardown } from './fixture';
@@ -37,6 +39,10 @@ interface ListBody {
 }
 interface ProblemBody {
   type: string;
+}
+interface ProjectBody {
+  id: string;
+  type_name_en: string | null;
 }
 
 async function insertRawKey(
@@ -106,11 +112,16 @@ async function buildOrg(): Promise<OrgFixture> {
   });
   const clientId = client.data!;
 
+  // A real project type, so the API's type_name_* fields have something to
+  // resolve — they were always null before the join was restored.
+  const typeId = (await upsertProjectTypeCore(ownerCtx, { nameEn: 'Fit-out' }))
+    .data!;
   const project = await createProjectCore(ownerCtx, {
     startDate: '2026-01-01', endDate: '2026-06-30',
     code: `API-${randomBytes(3).toString('hex')}`,
     nameEn: 'API Project',
     clientId,
+    typeId,
     status: 'active',
   });
   const projectId = project.data!;
@@ -196,6 +207,23 @@ describe('AC1 — org isolation across all 4 resources', () => {
     const ids = body.data.map((r) => r.id);
     expect(ids).toContain(a.projectId);
     expect(ids).not.toContain(b.projectId);
+  });
+
+  it('projects list and detail both resolve the project type name', async () => {
+    // The list query had no project_types join at all and the detail query was
+    // a second copy of the domain query that had lost it, so type_name_en was
+    // unconditionally null on both endpoints.
+    const list = await projectsList(bearer(`${BASE}/projects`, a.ownerKey));
+    const listBody = await asJson<{ data: ProjectBody[] }>(list);
+    const listed = listBody.data.find((r) => r.id === a.projectId);
+    expect(listed?.type_name_en).toBe('Fit-out');
+
+    const detail = await projectDetail(
+      bearer(`${BASE}/projects/${a.projectId}`, a.ownerKey),
+      { params: Promise.resolve({ id: a.projectId }) },
+    );
+    expect(detail.status).toBe(200);
+    expect((await asJson<ProjectBody>(detail)).type_name_en).toBe('Fit-out');
   });
 
   it('proposals list under org-A key never returns an org-B row', async () => {
