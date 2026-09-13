@@ -10,6 +10,12 @@ import { cfEnv, isCloudflareRuntime } from '@/lib/cf/context';
 // hammer the database, and the per-key limiter can never see it because there is
 // no key. Off-platform (Node/Vitest, `next dev` on Node) the bindings are absent,
 // so this degrades to ALLOW — tests and local dev are never rate-limited.
+//
+// BOTH BUDGETS ARE PER DATA CENTRE, NOT GLOBAL. A Workers Rate Limiting binding
+// counts within the colo that served the request, so a caller spread across k
+// colos gets k x the configured ceiling: the pre-auth cap is k x 300/min, not
+// 300/min. That is still a bound on database work per colo, which is what this
+// exists for, but it is NOT a global quota and must not be quoted as one.
 
 export const RATE_LIMIT_WINDOW_SECONDS = 60;
 

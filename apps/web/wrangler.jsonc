@@ -40,6 +40,9 @@
   //     bearer tokens cannot hammer the database for free. Its ceiling is higher
   //     than the per-key one because one caller IP can legitimately carry several
   //     keys.
+  // Both counters are PER DATA CENTRE, not global: a caller spread across k colos
+  // gets k x the limit below. The numbers bound the database work one colo can
+  // cause; they are not a global quota.
   "ratelimits": [
     {
       "name": "API_RATE_LIMITER",
