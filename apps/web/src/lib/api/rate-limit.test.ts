@@ -94,16 +94,58 @@ describe('bucket selection', () => {
       request({ 'cf-connecting-ip': '2001:0DB8:1234:5678:1111:2222:3333:4444' }),
     );
     expect(limit.mock.calls.map((call) => call[0].key)).toEqual([
-      '2001:0db8:1234:5678',
-      '2001:0db8:1234:5678',
+      '2001:db8:1234:5678',
+      '2001:db8:1234:5678',
     ]);
   });
 
-  it('keeps a compressed IPv6 address as its own prefix', async () => {
+  // RFC 5952: `::` elides all-zero groups, so the same /64 has many spellings.
+  // Keying on the text as sent gave one subscriber a fresh budget per spelling.
+  it('expands a compressed address, so one /64 is one bucket however it is written', async () => {
+    const { limit, env } = bindings(true);
+    cfEnv.mockReturnValue(env);
+    for (const ip of [
+      '2001:db8::1',
+      '2001:db8::2',
+      '2001:0db8:0000:0000:0000:0000:0000:0003',
+      '2001:DB8::ffff:4',
+    ]) {
+      await cloudflarePreAuthRateLimiter(request({ 'cf-connecting-ip': ip }));
+    }
+    expect(limit.mock.calls.map((call) => call[0].key)).toEqual([
+      '2001:db8:0:0',
+      '2001:db8:0:0',
+      '2001:db8:0:0',
+      '2001:db8:0:0',
+    ]);
+  });
+
+  it('keeps distinct /64s in distinct buckets', async () => {
     const { limit, env } = bindings(true);
     cfEnv.mockReturnValue(env);
     await cloudflarePreAuthRateLimiter(request({ 'cf-connecting-ip': '2001:db8::1' }));
-    expect(limit).toHaveBeenCalledWith({ key: '2001:db8::1' });
+    await cloudflarePreAuthRateLimiter(
+      request({ 'cf-connecting-ip': '2001:db8:0:1::1' }),
+    );
+    expect(limit.mock.calls.map((call) => call[0].key)).toEqual([
+      '2001:db8:0:0',
+      '2001:db8:0:1',
+    ]);
+  });
+
+  it('keys an address it cannot expand whole rather than guessing a prefix', async () => {
+    const { limit, env } = bindings(true);
+    cfEnv.mockReturnValue(env);
+    // An IPv4-mapped address carries a dotted quad, which is not a hextet; a
+    // loopback expands normally and must still reduce to its own /64.
+    await cloudflarePreAuthRateLimiter(
+      request({ 'cf-connecting-ip': '::FFFF:1.2.3.4' }),
+    );
+    await cloudflarePreAuthRateLimiter(request({ 'cf-connecting-ip': '::1' }));
+    expect(limit.mock.calls.map((call) => call[0].key)).toEqual([
+      '::ffff:1.2.3.4',
+      '0:0:0:0',
+    ]);
   });
 
   it('charges the resolved key id on the per-key bucket', async () => {
