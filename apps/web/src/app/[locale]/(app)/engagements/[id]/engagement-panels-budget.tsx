@@ -14,26 +14,26 @@ import { formatDate } from '@/lib/format/date';
 import { formatMoney } from '@/lib/format/money';
 import { PanelHeader } from './engagement-panel-header';
 import { Empty } from './engagement-panels-parts';
+import { RomIssueButton } from './engagement-rom-issue-button';
 import { RomRangeForm } from './engagement-rom-range-form';
 
 /**
  * The Budget tab — the indicative build cost, as a ledger rather than a number.
- *
- * It exists because the range is not one value. It is coarse first, tighter as
- * the design firms up, acknowledged at the gate that unlocks shop drawings, and
- * eventually superseded by the priced BOQ. A studio's entire exposure on a
- * non-binding figure is the question "what did we tell them, and when" — and a
- * single overwritable pair of columns cannot answer it. So superseded ranges stay
- * on the page: that history IS the protection.
- *
- * "Not a quote" sits in the header, not in a tooltip. The whole non-binding
- * posture rests on the client having demonstrably been shown it.
+ * The range is coarse first, tighter as the design firms up, acknowledged at the
+ * gate that unlocks shop drawings, and eventually superseded by the priced BOQ.
+ * A studio's whole exposure on a non-binding figure is "what did we tell them,
+ * and when", which one overwritable pair of columns cannot answer, so superseded
+ * ranges stay on the page: that history IS the protection. A band only reaches
+ * the client once ISSUED; until then it is working state, which is why the send
+ * control is separate. "Not a quote" sits in the header, not a tooltip — the
+ * non-binding posture rests on the client demonstrably having been shown it.
  */
 export function BudgetTab({
   engagementId,
   header,
   events,
   canSetRom,
+  canIssueRom,
   pending,
   runAction,
 }: {
@@ -41,6 +41,7 @@ export function BudgetTab({
   header: EngagementHeader;
   events: EngagementEventRecord[];
   canSetRom: boolean;
+  canIssueRom: boolean;
   pending: boolean;
   runAction: (fn: () => Promise<ActionResult>) => void;
 }) {
@@ -51,6 +52,7 @@ export function BudgetTab({
   const [formOpen, setFormOpen] = useState(false);
 
   const hasRange = header.romLow !== null && header.romHigh !== null;
+  const canSendRange = canIssueRom && hasRange && header.romIssuedAt === null;
   const entries = romHistory(events);
 
   return (
@@ -83,6 +85,14 @@ export function BudgetTab({
           />
         )}
 
+        {canSendRange && (
+          <RomIssueButton
+            engagementId={engagementId}
+            pending={pending}
+            runAction={runAction}
+          />
+        )}
+
         {/* The CURRENT band, stated once and large. Everything below it is what
             it used to be. */}
         <div className="flex flex-wrap items-baseline gap-3 rounded-[var(--r-item)] border border-[color:var(--rule)] bg-[color:var(--track)] px-4 py-3.5">
@@ -92,16 +102,11 @@ export function BudgetTab({
           {hasRange ? (
             // A range is ONE value, formatted as one unit — never two numbers with
             // a hyphen glued between them, which mirrors wrong in RTL.
-            <span
-              className="ms-auto font-mono text-[16px] tabular-nums"
-              dir="ltr"
-            >
+            <span className="ms-auto font-mono text-[16px] tabular-nums" dir="ltr">
               {`${formatMoney(header.romLow, locale)} – ${formatMoney(header.romHigh, locale)}`}
             </span>
           ) : (
-            <span className="ms-auto text-[13px] text-[color:var(--text-muted)]">
-              {t('rom.notSet')}
-            </span>
+            <span className="ms-auto text-[13px] text-[color:var(--text-muted)]">{t('rom.notSet')}</span>
           )}
         </div>
 

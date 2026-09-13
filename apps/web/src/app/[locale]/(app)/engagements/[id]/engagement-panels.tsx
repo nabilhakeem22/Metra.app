@@ -51,6 +51,8 @@ export interface PanelCapabilities {
   recordPayment: boolean;
   recordArtifact: boolean;
   setRom: boolean;
+  /** Issuing the band to the client — owner/admin only. */
+  issueRom: boolean;
   recordRomAck: boolean;
   /** Offered only while the engagement sits at design_only_handoff. */
   recordHandoffAck: boolean;
@@ -118,6 +120,7 @@ export function EngagementPanels({
           header={data.header}
           events={data.events}
           canSetRom={capabilities.setRom}
+          canIssueRom={capabilities.issueRom}
           pending={pending}
           runAction={runAction}
         />

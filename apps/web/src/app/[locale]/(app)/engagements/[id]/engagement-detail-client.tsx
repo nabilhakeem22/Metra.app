@@ -100,11 +100,13 @@ export function EngagementDetailClient({
     (trigger) => trigger !== gatePreview.primaryTrigger,
   );
 
-  // A band is set but nobody has acknowledged it yet -- unissued work sitting in
-  // the Budget tab. Derived from data the page already holds; no extra read.
-  const budgetDraft =
-    header.romLow !== null &&
-    header.romHigh !== null &&
+  // TWO states, not one. A band the studio has typed but not sent is a DRAFT and
+  // the client cannot see it; a band that has been sent and not yet acknowledged
+  // is AWAITING the client. Conflating them told the studio to chase a client who
+  // had never been shown anything. Derived from data the page already holds.
+  const budgetDraft = header.romIssuedAt === null;
+  const budgetAwaitingAck =
+    header.romIssuedAt !== null &&
     !events.some((e) => e.kind === 'rom_acknowledgement');
 
   // Pure derivation over the artifacts the page already loaded (no extra read).
@@ -233,7 +235,14 @@ export function EngagementDetailClient({
           // Budget's badge is a STATE, not a count -- a range the studio has set
           // and the client has not yet acknowledged is unissued work sitting in
           // that tab, and saying so is worth more than saying "1".
-          const draft = tb === 'budget' && budgetDraft;
+          const budgetState =
+            tb !== 'budget'
+              ? null
+              : budgetDraft
+                ? t('offPlan.budgetDraftBadge')
+                : budgetAwaitingAck
+                  ? t('offPlan.budgetAwaitingAckBadge')
+                  : null;
           const active = tab === tb;
           return (
             <button
@@ -257,9 +266,9 @@ export function EngagementDetailClient({
               }`}
             >
               {tp(tb)}
-              {draft && (
+              {budgetState && (
                 <span className="font-mono text-[9.5px] font-bold uppercase tracking-[0.06em] text-[color:var(--warn)]">
-                  {t('offPlan.budgetDraftBadge')}
+                  {budgetState}
                 </span>
               )}
               {badgeCount > 0 && (
