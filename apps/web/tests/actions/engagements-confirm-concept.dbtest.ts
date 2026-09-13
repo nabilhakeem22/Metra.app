@@ -46,6 +46,14 @@ async function conceptLockedAt(engagementId: string): Promise<string | null> {
   return row.concept_locked_at;
 }
 
+/** Change orders oldest first with the payment each one links to. */
+async function settlementLinks(engagementId: string) {
+  return raw.query<{ amount: string; settled_by_payment_event_id: string | null }>(
+    `select amount, settled_by_payment_event_id from public.engagement_change_orders
+     where engagement_id = '${engagementId}' order by raised_at, id`,
+  );
+}
+
 async function confirmConceptTransitionCount(
   engagementId: string,
 ): Promise<number> {
@@ -221,11 +229,13 @@ describe('confirmConcept — settlement on a covered change order', () => {
     const { ctx, engagementId } = await setupNegotiation();
     await raiseChangeOrders(ctx, engagementId, ['7500.50']);
     // A revision_co payment covering the change order.
-    await recordPaymentCore(ctx, {
-      engagementId,
-      kind: 'revision_co',
-      amount: '7500.50',
-    });
+    const paymentId = (
+      await recordPaymentCore(ctx, {
+        engagementId,
+        kind: 'revision_co',
+        amount: '7500.50',
+      })
+    ).data;
 
     const res = await confirmConcept(ctx, engagementId);
     expect(res.ok).toBe(true);
@@ -236,6 +246,9 @@ describe('confirmConcept — settlement on a covered change order', () => {
     expect(co.status).toBe('settled');
     expect(co.settledAt).not.toBeNull();
     expect(await conceptLockedAt(engagementId)).not.toBeNull();
+    // The settlement records WHICH payment covered it, not just that it was paid.
+    const [link] = await settlementLinks(engagementId);
+    expect(link.settled_by_payment_event_id).toBe(paymentId);
   });
 
   it('partial revision_co payments summing to the CO total clear the gate', async () => {
@@ -247,7 +260,11 @@ describe('confirmConcept — settlement on a covered change order', () => {
     expect((await confirmConcept(ctx, engagementId)).error).toBe(
       'revision_cos_outstanding',
     );
-    await recordPaymentCore(ctx, { engagementId, kind: 'revision_co', amount: '3500' });
+    const second = await recordPaymentCore(ctx, {
+      engagementId,
+      kind: 'revision_co',
+      amount: '3500',
+    });
 
     const res = await confirmConcept(ctx, engagementId);
     expect(res.ok).toBe(true);
@@ -255,6 +272,10 @@ describe('confirmConcept — settlement on a covered change order', () => {
     const [co] = await getEngagementChangeOrders(ctx, engagementId);
     expect(co.status).toBe('settled');
     expect(co.settledAt).not.toBeNull();
+    // A change order spanning two partial payments links to the one that
+    // COMPLETED its cover, which is the second.
+    const [link] = await settlementLinks(engagementId);
+    expect(link.settled_by_payment_event_id).toBe(second.data);
   });
 });
 

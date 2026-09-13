@@ -144,9 +144,17 @@ async function acknowledgeRom(
  * test can start either inside a free allowance (default 3 each) or exactly at its
  * edge — INDEPENDENTLY, which is the whole point of the two counters. Either way
  * the engagement ends at `final_approval`.
+ *
+ * `conceptChangeOrderAmount` drives ONE over-allowance concept revision and pays
+ * it in full, so the engagement arrives at `final_approval` carrying a SETTLED
+ * change order (requires `revisions` to have burned the free allowance).
  */
 async function setupFinalApproval(
-  opts: { revisions?: number; designRevisions?: number } = {},
+  opts: {
+    revisions?: number;
+    designRevisions?: number;
+    conceptChangeOrderAmount?: string;
+  } = {},
 ): Promise<{ ctx: OrgContext; engagementId: string }> {
   const revisions = opts.revisions ?? 0;
   const designRevisions = opts.designRevisions ?? 0;
@@ -202,6 +210,22 @@ async function setupFinalApproval(
     expect(
       (await executeTransition(ctx, { engagementId, trigger: 'requestRevision' })).ok,
     ).toBe(true);
+  }
+  if (opts.conceptChangeOrderAmount) {
+    expect(
+      (
+        await executeTransition(ctx, {
+          engagementId,
+          trigger: 'requestRevision',
+          payload: { changeOrderAmount: opts.conceptChangeOrderAmount },
+        })
+      ).ok,
+    ).toBe(true);
+    await recordPaymentCore(ctx, {
+      engagementId,
+      kind: 'revision_co',
+      amount: opts.conceptChangeOrderAmount,
+    });
   }
   expect(
     (await executeTransition(ctx, { engagementId, trigger: 'confirmConcept' })).ok,
@@ -561,5 +585,73 @@ describe('designChangeRaised — cross-org isolation', () => {
     expect(await stateOf(aEngagement)).toBe('design_3d');
     expect(await changeOrderCount(aEngagement)).toBe(1);
     expect(await getEngagementChangeOrders(ctxB, aEngagement)).toHaveLength(0);
+  });
+});
+
+describe('revision credit is spent once (H1)', () => {
+  /** Change orders oldest first, with status and settlement link. */
+  async function changeOrderRows(engagementId: string) {
+    return raw.query<{
+      amount: string;
+      status: string;
+      settled_by_payment_event_id: string | null;
+    }>(
+      `select amount, status, settled_by_payment_event_id
+         from public.engagement_change_orders
+         where engagement_id = '${engagementId}' order by raised_at, id`,
+    );
+  }
+
+  it('a settled concept change order does NOT pay for a later 3D one', async () => {
+    // THE BUG: the payment row stays in the ledger forever, so the 5000 the
+    // client paid for the concept change order kept reading as free credit and
+    // silently cleared the next 3D change order.
+    const { ctx, engagementId } = await setupFinalApproval({
+      revisions: 3,
+      conceptChangeOrderAmount: '5000',
+      designRevisions: 3,
+    });
+    const [settledConceptCo] = await changeOrderRows(engagementId);
+    expect(settledConceptCo.status).toBe('settled');
+    expect(settledConceptCo.settled_by_payment_event_id).not.toBeNull();
+
+    // The 4th 3D revision is priced: a second change order, 3000, unpaid.
+    expect(
+      (await designChangeRaised(ctx, engagementId, { changeOrderAmount: '3000' })).ok,
+    ).toBe(true);
+    expect(
+      (await executeTransition(ctx, { engagementId, trigger: 'rendersReady' })).ok,
+    ).toBe(true);
+    await acknowledgeRom(ctx, engagementId);
+    await recordPaymentCore(ctx, { engagementId, kind: 'gate_b', amount: '20000' });
+
+    expect(await approveDesign(ctx, engagementId)).toEqual({
+      ok: false,
+      error: 'revision_cos_outstanding',
+    });
+    expect(await stateOf(engagementId)).toBe('final_approval');
+
+    // Paying the new change order for real closes the design phase.
+    await recordPaymentCore(ctx, { engagementId, kind: 'revision_co', amount: '3000' });
+    expect((await approveDesign(ctx, engagementId)).ok).toBe(true);
+    expect(await stateOf(engagementId)).toBe('shop_drawings');
+  });
+
+  it('rejecting the design leaves settled change orders and their links alone', async () => {
+    const { ctx, engagementId } = await setupFinalApproval({
+      revisions: 3,
+      conceptChangeOrderAmount: '5000',
+    });
+    const before = await changeOrderRows(engagementId);
+    expect(before).toHaveLength(1);
+    expect(before[0].status).toBe('settled');
+
+    expect(
+      (await executeTransition(ctx, { engagementId, trigger: 'rejectDesign' })).ok,
+    ).toBe(true);
+    expect(await stateOf(engagementId)).toBe('negotiation');
+    // Settled change orders are money that changed hands: a rejection refills the
+    // free-revision allowance, it does not unspend the fee.
+    expect(await changeOrderRows(engagementId)).toEqual(before);
   });
 });
