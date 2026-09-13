@@ -17,7 +17,15 @@ export interface OrgContext {
 }
 
 /**
- * Bound what this transaction may do to the server, INSIDE the transaction.
+ * Open the transaction: identity GUCs, the non-bypass role and the server-side
+ * bounds, in ONE round trip.
+ *
+ * `SET LOCAL` scopes every setting to this transaction, which is why the :6543
+ * transaction pooler is safe here; `set_config(name, value, true)` is the
+ * function form of the same thing, which is what lets the whole preamble be a
+ * single statement instead of six sequential ones — including the role switch,
+ * for which `set_config('role', ...)` is the documented equivalent of
+ * `SET LOCAL ROLE`.
  *
  * A role's `rolconfig` defaults do not apply to a `SET ROLE` switch, so metra_app
  * inherits the login role's settings: lock_timeout 0 (wait forever) and a
@@ -26,13 +34,20 @@ export interface OrgContext {
  * which was measured still alive, and still holding its row locks, 10.9 s after
  * the caller had given up. So the server has to bound itself: a writer that
  * cannot take its lock in 5 s fails instead of queueing behind an abandoned one,
- * and no statement outlives its request by more than 20 s.
+ * no statement outlives its request by more than 20 s, and — because only the
+ * server can reap a transaction the client has stopped waiting for — an idle
+ * abandoned transaction is rolled back after 30 s instead of holding its locks
+ * until the socket closes.
  */
-async function boundTransaction(tx: {
-  execute: (query: SQL) => Promise<unknown>;
-}): Promise<void> {
-  await tx.execute(sql`set local lock_timeout = '5s'`);
-  await tx.execute(sql`set local statement_timeout = '20s'`);
+async function openBoundTransaction(
+  tx: { execute: (query: SQL) => Promise<unknown> },
+  identity: SQL,
+): Promise<void> {
+  await tx.execute(sql`select ${identity},
+    set_config('lock_timeout', '5s', true),
+    set_config('statement_timeout', '20s', true),
+    set_config('idle_in_transaction_session_timeout', '30s', true),
+    set_config('role', 'metra_app', true)`);
 }
 
 /**
@@ -49,18 +64,12 @@ export async function withOrgContext<T>(
   fn: (tx: MetraDb) => Promise<T>,
 ): Promise<T> {
   return db.transaction(async (tx) => {
-    // GUCs first, then drop into the non-bypass role for the rest of the tx.
-    await tx.execute(
-      sql`select set_config('app.current_org_id', ${ctx.orgId}, true)`,
+    await openBoundTransaction(
+      tx,
+      sql`set_config('app.current_org_id', ${ctx.orgId}, true),
+    set_config('app.current_user_id', ${ctx.userId}, true),
+    set_config('app.current_user_email', ${ctx.email ?? ''}, true)`,
     );
-    await tx.execute(
-      sql`select set_config('app.current_user_id', ${ctx.userId}, true)`,
-    );
-    await tx.execute(
-      sql`select set_config('app.current_user_email', ${ctx.email ?? ''}, true)`,
-    );
-    await tx.execute(sql`set local role metra_app`);
-    await boundTransaction(tx);
     return fn(tx as unknown as MetraDb);
   });
 }
@@ -79,11 +88,10 @@ export async function withUserContext<T>(
   fn: (tx: MetraDb) => Promise<T>,
 ): Promise<T> {
   return db.transaction(async (tx) => {
-    await tx.execute(
-      sql`select set_config('app.current_user_id', ${userId}, true)`,
+    await openBoundTransaction(
+      tx,
+      sql`set_config('app.current_user_id', ${userId}, true)`,
     );
-    await tx.execute(sql`set local role metra_app`);
-    await boundTransaction(tx);
     return fn(tx as unknown as MetraDb);
   });
 }
