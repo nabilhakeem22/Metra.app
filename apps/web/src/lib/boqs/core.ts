@@ -14,6 +14,7 @@ import { err, type ActionResult } from '@/lib/actions/result';
 import { allocateNumber } from '@/lib/db/allocate-number';
 import type { OrgContext } from '@/lib/db/context';
 import { computeLine, computeSection } from '@/lib/aggregates/proposal-totals';
+import { withinMagnitude } from '@/lib/proposals/validation';
 import { computeBoqTotals } from './totals';
 import type { ImportedLine } from './import/map';
 import { bilingualFor } from './bilingual';
@@ -198,6 +199,10 @@ export async function commitImportCore(
             unitCost,
             discountPct: '0',
           });
+          // The FACTORS were each inside the cap; their PRODUCT need not be. An
+          // imported sheet is the likeliest source of an absurd qty x price, and
+          // a line total past the cap overflows numeric(18,4) at the database.
+          if (!withinMagnitude(totals.lineTotal)) fail('amount_too_large');
           pendingLines.push({
             orgId: ctx.orgId,
             boqId: input.boqId,

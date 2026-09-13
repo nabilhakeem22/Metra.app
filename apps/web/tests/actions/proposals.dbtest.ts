@@ -485,4 +485,30 @@ describe('F4 — date + amount bounds', () => {
       await saveProposalDraftCore(ctx, { id, sections: [{ titleEn: 'S', lines: [{ descriptionEn: 'x', qty: '1', unit: 'sqm', unitCost: '0', unitPrice: '9999999999999', discountPct: '0' }] }] }),
     ).toEqual({ ok: false, error: 'amount_too_large' });
   });
+
+  // Each FACTOR passes the cap; their PRODUCT does not. Before the line-total
+  // check this reached numeric(18,4) and came back as an unlocalizable 'generic'.
+  it('a line whose qty x price overflows is coded, not generic', async () => {
+    const { ctx, clientId, projectId } = await setup();
+    const id = ((await createProposalCore(ctx, { clientId, projectId })) as { data?: string }).data!;
+    expect(
+      await saveProposalDraftCore(ctx, {
+        id,
+        sections: [{ titleEn: 'S', lines: [{ descriptionEn: 'x', qty: '1000000000000', unit: 'sqm', unitCost: '0', unitPrice: '1000000000000', discountPct: '0' }] }],
+      }),
+    ).toEqual({ ok: false, error: 'amount_too_large' });
+  });
+
+  // …and each LINE passes while the document SUM does not.
+  it('a section sum past the cap is coded, not generic', async () => {
+    const { ctx, clientId, projectId } = await setup();
+    const id = ((await createProposalCore(ctx, { clientId, projectId })) as { data?: string }).data!;
+    const lines = Array.from({ length: 200 }, () => ({
+      descriptionEn: 'x', qty: '1', unit: 'sqm' as const,
+      unitCost: '0', unitPrice: '900000000000', discountPct: '0',
+    }));
+    expect(
+      await saveProposalDraftCore(ctx, { id, sections: [{ titleEn: 'S', lines }] }),
+    ).toEqual({ ok: false, error: 'amount_too_large' });
+  });
 });

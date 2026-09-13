@@ -18,6 +18,7 @@ import { canSeeMargin } from '@/lib/permissions/can';
 import type { SaveDraftInput } from './core';
 import { enforceLineCaps, validateDraftHeader } from './draft-save-validate';
 import { loadCostItemMap, resolveDraftLines } from './draft-save-resolve';
+import { withinMagnitude } from './validation';
 import { persistDraftSectionsAndLines } from './draft-save-persist';
 
 export async function saveProposalDraftCore(
@@ -82,6 +83,12 @@ export async function saveProposalDraftCore(
         taxRate: header.taxRate,
         supervisionPct: header.supervisionPct,
       });
+      // Each line was inside the cap; the SUM of a few hundred of them need not
+      // be. A document total past the cap overflows numeric(18,4) at the database
+      // and aborts the save with an unlocalizable error instead of a coded one.
+      if (!withinMagnitude(totals.total) || !withinMagnitude(totals.totalCost)) {
+        fail('amount_too_large');
+      }
 
       await tx
         .update(proposals)

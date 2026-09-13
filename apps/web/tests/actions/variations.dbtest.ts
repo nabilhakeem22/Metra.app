@@ -295,6 +295,33 @@ describe('F1: a de-scope reverses an add to the piastre', () => {
   });
 });
 
+describe('M10: a variation total past the money cap is coded, not generic', () => {
+  it('refuses a line whose qty x price overflows, and a netDelta that does', async () => {
+    const { ctx, clientId, projectId } = await setup();
+    const { contractId } = await issuedContract(ctx, clientId, projectId);
+    const voId = ((await createVariationDraftCore(ctx, { contractId, titleEn: 'Huge' })) as { data?: string }).data!;
+
+    // Each factor is inside the cap; the product is not.
+    expect(
+      await saveVariationDraftCore(ctx, {
+        id: voId,
+        lines: [{ descriptionEn: 'x', qty: '1000000000000', unit: 'lump_sum', unitCost: '0', unitPrice: '1000000000000', discountPct: '0' }],
+      }),
+    ).toEqual({ ok: false, error: 'amount_too_large' });
+
+    // Each line is inside the cap; their sum is not.
+    expect(
+      await saveVariationDraftCore(ctx, {
+        id: voId,
+        lines: Array.from({ length: 3 }, () => ({
+          descriptionEn: 'x', qty: '1', unit: 'lump_sum' as const,
+          unitCost: '0', unitPrice: '900000000000', discountPct: '0',
+        })),
+      }),
+    ).toEqual({ ok: false, error: 'amount_too_large' });
+  });
+});
+
 describe('B2: a terminated contract carries no commercial change', () => {
   /** A draft VO with one 100 EGP line on a fresh issued contract. */
   async function draftVariation(ctx: OrgContext, contractId: string, title: string) {

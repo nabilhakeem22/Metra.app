@@ -102,6 +102,9 @@ export async function saveVariationDraftCore(
     if (!l.unit) return err('invalid');
 
     const totals = computeLine({ qty, unitCost, unitPrice, discountPct });
+    // The FACTORS were each inside the cap; their PRODUCT need not be. A
+    // line total past the cap overflows numeric(18,4) at the database.
+    if (!withinMagnitude(totals.lineTotal)) return err('amount_too_large');
     prepared.push({
       contractLineId: l.contractLineId?.trim() || null,
       costItemId: l.costItemId?.trim() || null,
@@ -125,6 +128,8 @@ export async function saveVariationDraftCore(
       lineMargin: p.lineMargin,
     })),
   );
+  // …and the SUM of the lines need not be inside the cap either.
+  if (!withinMagnitude(netDelta)) return err('amount_too_large');
 
   return mutateInOrg(
     ctx,

@@ -157,6 +157,11 @@ export function resolveDraftLines(
         unitPrice: unitPrice!,
         discountPct: discountPct!,
       });
+      // The FACTORS were each inside the cap; their PRODUCT need not be. qty and
+      // unit_price of 1e12 each pass the checks above and multiply to 1e24, which
+      // overflows numeric(18,4) at the database and aborts the whole save with an
+      // unlocalizable error instead of a coded one.
+      if (!withinMagnitude(totals.lineTotal)) fail('amount_too_large');
       lineTotals.push(totals);
       lines.push({
         costItemId,
