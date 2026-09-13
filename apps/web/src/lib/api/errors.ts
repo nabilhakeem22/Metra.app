@@ -149,6 +149,8 @@ export const ACTION_CODE_PROBLEM: Record<ActionCode, ApiProblemKind> = {
   handoff_not_open: 'bad-request',
   rom_range_invalid: 'bad-request',
   rom_not_set: 'bad-request',
+  // Issuing a band that is already issued is a state conflict, not bad input.
+  rom_already_issued: 'conflict',
   // A ledger row that is not on this engagement reads as a bad request, matching
   // `engagement_not_found` above: the id may be perfectly real elsewhere, and
   // saying `not-found` would confirm that it exists.

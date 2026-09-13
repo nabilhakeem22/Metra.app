@@ -1,0 +1,34 @@
+-- 0048 — a build-cost range becomes ISSUED, not merely set. SCHEMA ONLY: one
+-- nullable timestamp and one enum ADD VALUE. Additive, idempotent, no backfill,
+-- no apply-rls object referenced.
+--
+-- THE PROBLEM. `rom_low`/`rom_high` were the whole story: the moment a studio
+-- typed a working band into the cockpit, the delivery portal showed it to the
+-- end client as the cost of their project. There was no draft. A designer
+-- sketching "somewhere between 500k and 800k" to think out loud had already told
+-- the client, and the only way to un-tell them was to type something else, which
+-- the client also saw. The portal's acknowledge_rom verb was likewise offered
+-- against whatever numbers happened to be in the columns.
+--
+-- `rom_issued_at` splits the two acts. Setting the band is private working
+-- state; issuing it is the deliberate, dated act of telling the client, and only
+-- an issued band reaches the portal or can be acknowledged. NULL means not yet
+-- issued, which is the correct reading of every pre-existing row: no backfill,
+-- because a band set before this migration was never deliberately issued and
+-- stamping a date on it would be inventing evidence on an evidentiary record.
+-- Existing rows therefore go quiet in the portal until the studio issues them,
+-- which is the safe direction for a number the client may act on.
+--
+-- The ADD VALUE is TOP-LEVEL (never inside a DO $$ block): PG forbids
+-- ALTER TYPE ... ADD VALUE inside a PL/pgSQL block, and only permits it in the
+-- migrator's per-file transaction while the new label stays UNUSED in that same
+-- transaction. This file therefore never references 'rom_issued' again — no
+-- CHECK, no default, no backfill. The first use is application code. Same shape
+-- as 0042 and 0043.
+--
+-- RLS/grants unchanged: the org_isolation policy and the existing grants cover a
+-- new column without amendment, and the engagement_events append-only grants
+-- already cover a new kind.
+ALTER TABLE public.design_engagements ADD COLUMN IF NOT EXISTS rom_issued_at timestamptz;
+--> statement-breakpoint
+ALTER TYPE public.engagement_event_kind ADD VALUE IF NOT EXISTS 'rom_issued';

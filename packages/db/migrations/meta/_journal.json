@@ -337,6 +337,13 @@
       "when": 1789424357549,
       "tag": "0047_payment_claim_resolution_check",
       "breakpoints": true
+    },
+    {
+      "idx": 48,
+      "version": "7",
+      "when": 1789510757549,
+      "tag": "0048_rom_issuance",
+      "breakpoints": true
     }
   ]
 }

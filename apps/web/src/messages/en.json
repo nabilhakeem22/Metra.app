@@ -531,7 +531,8 @@
     "dates_required": "Start and end dates are required.",
     "project_limit_reached": "Your plan has no project seats left. Contact us to add more.",
     "event_not_found": "That record is not on this engagement.",
-    "already_corrected": "That record has already been retracted."
+    "already_corrected": "That record has already been retracted.",
+    "rom_already_issued": "This range has already been issued to the client"
   },
   "common": {
     "untranslated": "untranslated",
@@ -1462,7 +1463,8 @@
       "existing": "Existing unit",
       "offPlan": "Off-plan",
       "hint": "Sets Step 2: an existing unit needs a site survey; off-plan imports the developer AutoCAD.",
-      "budgetDraftBadge": "draft"
+      "budgetDraftBadge": "draft",
+      "budgetAwaitingAckBadge": "awaiting acknowledgement"
     },
     "paymentsBadge": "{n} due",
     "asBuiltDue": "As-built due",
@@ -1704,7 +1706,9 @@
       "setRange": "Set the range",
       "reviseRange": "Revise the range",
       "rangeNote": "An indicative build cost — not a quote, and not the design fee.",
-      "onBehalfBlocked": "Set a build-cost range first — there is nothing for the client to acknowledge yet."
+      "onBehalfBlocked": "Set a build-cost range first — there is nothing for the client to acknowledge yet.",
+      "issueRom": "Issue to client",
+      "issueRomHint": "The client sees the range only after you issue it."
     },
     "stageAction": {
       "studio": {
@@ -1960,7 +1964,8 @@
       "as_built_attestation": "As-built attestation",
       "concept_change_request": "Concept change request",
       "design_change_request": "Design change request",
-      "rom_range_set": "Build-cost range issued"
+      "rom_range_set": "Build-cost range set",
+      "rom_issued": "Build-cost range issued to client"
     },
     "milestoneKind": {
       "deposit": "Deposit",

@@ -188,6 +188,7 @@ function engagement(): DesignEngagement {
     designRevisionCount: 0,
     romLow: null,
     romHigh: null,
+    romIssuedAt: null,
     conceptLockedAt: null,
     renderManifestHash: null,
     rendersReadyAt: null,

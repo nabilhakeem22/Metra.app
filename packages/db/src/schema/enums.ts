@@ -302,6 +302,11 @@ export const ENGAGEMENT_EVENT_KINDS = [
   // `supersedesEventId`; two CHECKs make that pointer exclusive to this kind and
   // mandatory for it. Appended LAST to mirror `ALTER TYPE ... ADD VALUE` (0043).
   'event_correction',
+  // The firm ISSUING the band to the client — the deliberate, dated act that
+  // `rom_range_set` is not. Setting a band is private working state; this is the
+  // moment it reached the client and became acknowledgeable. Appended LAST to
+  // mirror `ALTER TYPE ... ADD VALUE` (0048).
+  'rom_issued',
 ] as const;
 
 export const engagementEventKind = pgEnum(
