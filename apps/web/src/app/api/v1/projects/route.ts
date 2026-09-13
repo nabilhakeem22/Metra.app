@@ -12,5 +12,5 @@ export function GET(req: Request): Promise<Response> {
     const rows = await listProjectsPage(ctx, page);
     const { items, nextCursor } = buildPage(rows, page.limit);
     return { data: items.map(serializeProject), next_cursor: nextCursor };
-  });
+  }, { capability: 'projects', action: 'read' });
 }

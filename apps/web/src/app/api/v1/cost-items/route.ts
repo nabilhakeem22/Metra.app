@@ -15,5 +15,5 @@ export function GET(req: Request): Promise<Response> {
       data: items.map((row) => serializeCostItem(row, costVisible)),
       next_cursor: nextCursor,
     };
-  });
+  }, { capability: 'price_book', action: 'read' });
 }

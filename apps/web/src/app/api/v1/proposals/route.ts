@@ -15,5 +15,5 @@ export function GET(req: Request): Promise<Response> {
       data: items.map(serializeProposalSummary),
       next_cursor: nextCursor,
     };
-  });
+  }, { capability: 'proposals_build', action: 'read' });
 }

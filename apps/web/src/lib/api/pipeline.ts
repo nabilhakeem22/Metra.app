@@ -2,7 +2,8 @@ import 'server-only';
 import { organizations } from '@metra/db';
 import { isCloudflareRuntime, cfExecutionContext } from '@/lib/cf/context';
 import { withOrgContext, type OrgContext } from '@/lib/db/context';
-import { canSeeMargin } from '@/lib/permissions/can';
+import { can, canSeeMargin } from '@/lib/permissions/can';
+import type { Capability, PermissionAction } from '@/lib/permissions/roles';
 import {
   resolveApiKey,
   touchApiKey,
@@ -12,9 +13,12 @@ import {
 import { problemResponse } from './errors';
 import { InvalidCursorError } from './pagination';
 import {
+  cloudflarePreAuthRateLimiter,
   cloudflareRateLimiter,
   RATE_LIMIT_WINDOW_SECONDS,
+  type PreAuthRateLimiter,
   type RateLimiter,
+  type RateLimitResult,
 } from './rate-limit';
 
 /** Thrown by a handler when a requested resource is absent/foreign. -> 404. */
@@ -38,8 +42,26 @@ export interface ApiContext {
 export type ApiHandler = (c: ApiContext) => Promise<unknown>;
 
 export interface PipelineOptions {
-  /** Injectable for tests; defaults to the Cloudflare Rate Limiting binding. */
+  /**
+   * The §2.2 capability this route reads, and the action to check it with.
+   * REQUIRED and deliberately not defaulted: a route that forgets to declare
+   * one is a route with no authorization, so it must not compile.
+   */
+  capability: Capability;
+  action: PermissionAction;
+  /** Injectable for tests; default to the Cloudflare Rate Limiting bindings. */
   rateLimiter?: RateLimiter;
+  preAuthRateLimiter?: PreAuthRateLimiter;
+}
+
+/** 429 + Retry-After, built identically for both buckets. */
+function rateLimitedResponse(rate: RateLimitResult): Response {
+  return problemResponse('rate-limited', {
+    detail: 'API rate limit exceeded.',
+    headers: {
+      'retry-after': String(rate.retryAfterSeconds || RATE_LIMIT_WINDOW_SECONDS),
+    },
+  });
 }
 
 // Belt-and-suspenders (F2): the only user-supplied timestamp/uuid that reaches a
@@ -66,19 +88,32 @@ function bearerToken(req: Request): string | null {
 
 /**
  * The Public API (v1) request pipeline:
- *   auth (Bearer mtk_… -> resolve; 401 on any failure)
- *   -> rate-limit (CF binding keyed by keyId; 429 + Retry-After; no DB/handler work)
+ *   pre-auth rate-limit (per caller; 429 BEFORE the key lookup touches the DB)
+ *   -> auth (Bearer mtk_… -> resolve; 401 on any failure)
+ *   -> per-key rate-limit (429 + Retry-After; no DB/handler work)
+ *   -> authorize (can(role, capability, action); 403 BEFORE any org read)
  *   -> derive costVisible (canSeeMargin, live-role)
  *   -> handler (all reads inside withOrgContext -> RLS + membership factor)
  *   -> serialize (application/json)
  *   -> RFC 7807 catch-all (NotFound=404, InvalidCursor=400, else 500).
  * last_used_at is stamped best-effort, deferred past the response (CF only).
+ *
+ * The capability check is the reason `options` is required: v1 previously let
+ * ANY valid key read ANY route, so a viewer-scoped or client-scoped key reached
+ * the price book. `can()` runs before the organization row is read, so a refused
+ * role costs no database work either.
  */
 export async function handleApiRequest(
   req: Request,
   handler: ApiHandler,
-  options: PipelineOptions = {},
+  options: PipelineOptions,
 ): Promise<Response> {
+  // --- pre-auth rate limit (BEFORE the key lookup hits the database) -------
+  const preAuth = await (options.preAuthRateLimiter ?? cloudflarePreAuthRateLimiter)(
+    req,
+  );
+  if (!preAuth.allowed) return rateLimitedResponse(preAuth);
+
   const raw = bearerToken(req);
 
   // --- auth ---------------------------------------------------------------
@@ -89,15 +124,15 @@ export async function handleApiRequest(
     });
   }
 
-  // --- rate limit (BEFORE any data/handler work) --------------------------
+  // --- per-key rate limit (BEFORE any data/handler work) ------------------
   const limiter = options.rateLimiter ?? cloudflareRateLimiter;
   const rate = await limiter(principal.keyId);
-  if (!rate.allowed) {
-    return problemResponse('rate-limited', {
-      detail: 'API rate limit exceeded.',
-      headers: {
-        'retry-after': String(rate.retryAfterSeconds || RATE_LIMIT_WINDOW_SECONDS),
-      },
+  if (!rate.allowed) return rateLimitedResponse(rate);
+
+  // --- authorize (BEFORE any org read) ------------------------------------
+  if (!can(principal.role, options.capability, options.action)) {
+    return problemResponse('forbidden', {
+      detail: 'The role behind this API key may not read this resource.',
     });
   }
 
