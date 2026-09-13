@@ -1,4 +1,4 @@
-import { sql } from 'drizzle-orm';
+import { sql, type SQL } from 'drizzle-orm';
 import type { MetraDb } from './client';
 import type { MemberRole } from './schema/enums';
 
@@ -14,6 +14,25 @@ export interface OrgContext {
    * on org_id. Undefined when the org is not yet linked to an account.
    */
   accountId?: string;
+}
+
+/**
+ * Bound what this transaction may do to the server, INSIDE the transaction.
+ *
+ * A role's `rolconfig` defaults do not apply to a `SET ROLE` switch, so metra_app
+ * inherits the login role's settings: lock_timeout 0 (wait forever) and a
+ * statement_timeout measured in minutes. The app's own 15 s write deadline is a
+ * `Promise.race` — it abandons the JS promise but NOT the Postgres transaction,
+ * which was measured still alive, and still holding its row locks, 10.9 s after
+ * the caller had given up. So the server has to bound itself: a writer that
+ * cannot take its lock in 5 s fails instead of queueing behind an abandoned one,
+ * and no statement outlives its request by more than 20 s.
+ */
+async function boundTransaction(tx: {
+  execute: (query: SQL) => Promise<unknown>;
+}): Promise<void> {
+  await tx.execute(sql`set local lock_timeout = '5s'`);
+  await tx.execute(sql`set local statement_timeout = '20s'`);
 }
 
 /**
@@ -41,6 +60,7 @@ export async function withOrgContext<T>(
       sql`select set_config('app.current_user_email', ${ctx.email ?? ''}, true)`,
     );
     await tx.execute(sql`set local role metra_app`);
+    await boundTransaction(tx);
     return fn(tx as unknown as MetraDb);
   });
 }
@@ -63,6 +83,7 @@ export async function withUserContext<T>(
       sql`select set_config('app.current_user_id', ${userId}, true)`,
     );
     await tx.execute(sql`set local role metra_app`);
+    await boundTransaction(tx);
     return fn(tx as unknown as MetraDb);
   });
 }
