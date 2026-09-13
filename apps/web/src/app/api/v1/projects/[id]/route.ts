@@ -16,5 +16,5 @@ export function GET(
     const row = await getProjectById(ctx, id);
     if (!row) throw new NotFoundError();
     return serializeProject(row);
-  });
+  }, { capability: 'projects', action: 'read' });
 }

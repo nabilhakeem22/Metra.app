@@ -1,13 +1,14 @@
-// Variation-order lifecycle transitions. Each state change is an ATOMIC admission
-// gate (UPDATE ... WHERE status=... RETURNING, check rowCount). Internal approval
-// + issue are owner/admin only (variations_price). Client approve/reject is the
-// unauthenticated token path (app_variation_respond_by_token), never the matrix.
-import { variationOrderEvents, variationOrders } from '@metra/db';
+// Internal approval of a variation order: draft->internal_approved. An ATOMIC
+// admission gate (UPDATE ... WHERE status=... RETURNING, check rowCount), owner/
+// admin only (variations_price). Client approve/reject is the unauthenticated
+// token path (app_variation_respond_by_token), never the matrix.
+import { contracts, variationOrderEvents, variationOrders } from '@metra/db';
 import { and, eq, sql } from 'drizzle-orm';
 import { fail, mutateInOrg } from '@/lib/actions/mutate';
 import type { ActionResult } from '@/lib/actions/result';
 import type { OrgContext } from '@/lib/db/context';
 import { mintToken, SHARE_TTL_DAYS } from '@/lib/proposals/core';
+import { canInternalApproveVariation } from '../lifecycle-rules';
 
 /**
  * Internal approval: draft->internal_approved (owner/admin, variations_price).
@@ -36,13 +37,28 @@ export async function internalApproveVariationCore(
       // Serialization point: hold the VO row lock across the freeze so a
       // concurrent line rewrite (which also locks this row) can't slip in.
       const [locked] = await tx
-        .select({ status: variationOrders.status })
+        .select({
+          status: variationOrders.status,
+          contractId: variationOrders.contractId,
+        })
         .from(variationOrders)
         .where(eq(variationOrders.id, input.id))
         .for('update')
         .limit(1);
       if (!locked) fail('invalid');
       if (locked.status !== 'draft') fail('variation_not_draft');
+
+      // A contract that is no longer live carries no commercial change: a VO
+      // drafted before termination must not be approvable afterwards.
+      const [contract] = await tx
+        .select({ status: contracts.status })
+        .from(contracts)
+        .where(eq(contracts.id, locked.contractId))
+        .limit(1);
+      if (!contract) fail('invalid');
+      if (!canInternalApproveVariation(locked.status, contract.status)) {
+        fail('contract_not_issued');
+      }
 
       const { raw, hash } = mintToken();
       const shareExpiresAt = new Date(Date.now() + SHARE_TTL_DAYS * 86400_000);
@@ -91,54 +107,6 @@ export async function internalApproveVariationCore(
       // this is the client decision link. Returned here because internal approval
       // is the last write allowed to set a non-status column (A2 immutability).
       return raw;
-    },
-  );
-}
-
-/**
- * Issue to the client: internal_approved->issued (owner/admin, variations_price).
- * A PURE status flip — the token was already minted at internal approval (the
- * last write A2 immutability permits on a non-status column), so this activates it
- * (the SDF exposes only issued/approved/rejected VOs) and writes the event. The
- * transition IS the admission gate — a concurrent 2nd issue finds
- * status<>'internal_approved' -> variation_not_internal_approved.
- */
-export async function issueVariationCore(
-  ctx: OrgContext,
-  input: { id: string },
-): Promise<ActionResult> {
-  return mutateInOrg(
-    ctx,
-    { capability: 'variations_price', action: 'approve' },
-    async (tx, audit) => {
-      const gated = await tx
-        .update(variationOrders)
-        .set({ status: 'issued', updatedAt: new Date() })
-        .where(
-          and(
-            eq(variationOrders.id, input.id),
-            eq(variationOrders.status, 'internal_approved'),
-          ),
-        )
-        .returning({ id: variationOrders.id });
-      if (!gated[0]) fail('variation_not_internal_approved');
-
-      await tx.insert(variationOrderEvents).values({
-        orgId: ctx.orgId,
-        variationOrderId: input.id,
-        kind: 'issued',
-        actorUserId: ctx.userId,
-        fromStatus: 'internal_approved',
-        toStatus: 'issued',
-      });
-
-      await audit({
-        entity: 'variation_order',
-        entityId: input.id,
-        action: 'issue',
-        before: { status: 'internal_approved' },
-        after: { status: 'issued' },
-      });
     },
   );
 }

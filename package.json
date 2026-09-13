@@ -21,6 +21,8 @@
     "db:migrate": "npm run migrate -w @metra/db",
     "db:apply-rls": "npm run apply-rls -w @metra/db",
     "db:seed": "npm run seed -w @metra/db",
+    "db:purge-fixture-orgs": "npm run purge-fixture-orgs -w @metra/db",
+    "db:reindex-after-purge": "npm run reindex-after-purge -w @metra/db",
     "i18n:translate": "tsx scripts/i18n/translate.ts",
     "i18n:validate": "tsx scripts/i18n/validate.ts",
     "i18n:registers": "tsx scripts/i18n/registers-report.ts",

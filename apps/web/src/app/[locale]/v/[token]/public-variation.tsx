@@ -22,7 +22,13 @@ export function PublicVariationView({
   const locale = useLocale();
   const [pending, startTransition] = useTransition();
   const [outcome, setOutcome] = useState<
-    'approved' | 'rejected' | 'already' | 'expired' | 'invalid' | null
+    | 'approved'
+    | 'rejected'
+    | 'already'
+    | 'expired'
+    | 'invalid'
+    | 'contractInactive'
+    | null
   >(null);
   const [name, setName] = useState('');
 
@@ -42,21 +48,27 @@ export function PublicVariationView({
       if (res.ok) setOutcome(decision === 'approve' ? 'approved' : 'rejected');
       else if (res.error === 'token_expired') setOutcome('expired');
       else if (res.error === 'already_responded') setOutcome('already');
+      else if (res.error === 'contract_inactive') setOutcome('contractInactive');
       else setOutcome('invalid');
     });
   }
 
-  const decided = variation.status !== 'issued' || outcome !== null;
+  // A terminated contract auto-rejects its open variation orders, so the row's
+  // own status would otherwise tell the client they rejected it themselves.
+  const contractInactive = !variation.contractActive;
+  const decided = contractInactive || variation.status !== 'issued' || outcome !== null;
   const decidedMessage =
-    outcome === 'approved' || variation.status === 'approved'
-      ? t('client.approved')
-      : outcome === 'rejected' || variation.status === 'rejected'
-        ? t('client.rejected')
-        : outcome === 'expired'
-          ? t('client.expired')
-          : outcome === 'invalid'
-            ? t('client.invalid')
-            : t('client.already');
+    contractInactive || outcome === 'contractInactive'
+      ? t('client.contractInactive')
+      : outcome === 'approved' || variation.status === 'approved'
+        ? t('client.approved')
+        : outcome === 'rejected' || variation.status === 'rejected'
+          ? t('client.rejected')
+          : outcome === 'expired'
+            ? t('client.expired')
+            : outcome === 'invalid'
+              ? t('client.invalid')
+              : t('client.already');
 
   return (
     <div className="mx-auto max-w-3xl space-y-4 p-4 md:p-8">

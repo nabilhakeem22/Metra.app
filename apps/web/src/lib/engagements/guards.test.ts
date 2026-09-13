@@ -334,23 +334,61 @@ function attestation(over: {
 }
 
 describe('romAcknowledged', () => {
-  function romFacts(kinds: EngagementEvent['kind'][]): GuardFacts {
+  const BAND = { romLow: '1800000.0000', romHigh: '2400000.0000' };
+
+  /** Facts for a band that IS issued, with the given acknowledgement events. */
+  function romFacts(
+    events: Array<{
+      kind: EngagementEvent['kind'];
+      rangeLow?: string;
+      rangeHigh?: string;
+      decidedAt?: Date;
+    }>,
+    engagement: Partial<DesignEngagement> = {},
+  ): GuardFacts {
     return {
-      engagement: {} as DesignEngagement,
+      engagement: {
+        ...BAND,
+        romIssuedAt: new Date('2026-01-01T00:00:00Z'),
+        ...engagement,
+      } as DesignEngagement,
       milestones: [],
       payments: [],
       artifacts: [],
       changeOrders: [],
-      events: kinds.map((kind) => ({ kind }) as EngagementEvent),
+      events: events.map(
+        (event) =>
+          ({
+            id: `${event.kind}-${event.rangeLow ?? 'x'}`,
+            rangeLow: event.rangeLow ?? null,
+            rangeHigh: event.rangeHigh ?? null,
+            decidedAt: event.decidedAt ?? new Date('2026-01-02T00:00:00Z'),
+            createdAt: event.decidedAt ?? new Date('2026-01-02T00:00:00Z'),
+            ...event,
+          }) as EngagementEvent,
+      ),
     };
   }
 
-  it('passes when a rom_acknowledgement event is present', () => {
-    expect(GUARDS.romAcknowledged(romFacts(['rom_acknowledgement']))).toEqual({
-      ok: true,
-    });
+  const acknowledgementOf = (rangeLow: string, rangeHigh: string, decidedAt?: Date) => ({
+    kind: 'rom_acknowledgement' as const,
+    rangeLow,
+    rangeHigh,
+    decidedAt,
+  });
+
+  it('passes when the acknowledged range is the band on the engagement now', () => {
     expect(
-      GUARDS.romAcknowledged(romFacts(['concept_approval', 'rom_acknowledgement'])),
+      GUARDS.romAcknowledged(romFacts([acknowledgementOf('1800000.0000', '2400000.0000')])),
+    ).toEqual({ ok: true });
+    // Scale is immaterial: the same amount written with fewer decimals still matches.
+    expect(
+      GUARDS.romAcknowledged(
+        romFacts([
+          { kind: 'concept_approval' },
+          acknowledgementOf('1800000', '2400000.00'),
+        ]),
+      ),
     ).toEqual({ ok: true });
   });
 
@@ -360,10 +398,51 @@ describe('romAcknowledged', () => {
       code: 'rom_not_acknowledged',
     });
     // A different event kind does not satisfy it.
-    expect(GUARDS.romAcknowledged(romFacts(['concept_approval']))).toEqual({
+    expect(GUARDS.romAcknowledged(romFacts([{ kind: 'concept_approval' }]))).toEqual({
       ok: false,
       code: 'rom_not_acknowledged',
     });
+  });
+
+  // THE STALE CONSENT. The client agreed to 500k-800k; the studio then re-set the
+  // band to 1.8M-2.4M, which clears rom_issued_at. The old witness must not sign
+  // off figures the client has never been shown.
+  it('fails when the band was re-set after the acknowledgement', () => {
+    expect(
+      GUARDS.romAcknowledged(
+        romFacts([acknowledgementOf('500000.0000', '800000.0000')], {
+          romIssuedAt: null,
+        }),
+      ),
+    ).toEqual({ ok: false, code: 'rom_not_acknowledged' });
+
+    // And even once the NEW band is issued, the old acknowledgement is not consent
+    // to it.
+    expect(
+      GUARDS.romAcknowledged(romFacts([acknowledgementOf('500000.0000', '800000.0000')])),
+    ).toEqual({ ok: false, code: 'rom_not_acknowledged' });
+  });
+
+  it('reads the NEWEST acknowledgement, not any acknowledgement', () => {
+    const facts = romFacts([
+      acknowledgementOf('1800000.0000', '2400000.0000', new Date('2026-01-02T00:00:00Z')),
+      acknowledgementOf('500000.0000', '800000.0000', new Date('2026-01-09T00:00:00Z')),
+    ]);
+    // The newest witness is for a band that is no longer the engagement's.
+    expect(GUARDS.romAcknowledged(facts)).toEqual({
+      ok: false,
+      code: 'rom_not_acknowledged',
+    });
+  });
+
+  it('fails while the band is unissued, however many acknowledgements exist', () => {
+    expect(
+      GUARDS.romAcknowledged(
+        romFacts([acknowledgementOf('1800000.0000', '2400000.0000')], {
+          romIssuedAt: null,
+        }),
+      ),
+    ).toEqual({ ok: false, code: 'rom_not_acknowledged' });
   });
 });
 
@@ -624,6 +703,31 @@ describe('revisionCosSettled — the change-order settlement gate', () => {
         }),
       ),
     ).toEqual({ ok: false, code: 'revision_cos_outstanding' });
+  });
+
+  it('does NOT let credit already spent on a settled CO clear a new one', () => {
+    // The client paid 5000, which settled the first change order. The payment
+    // row lives in the ledger forever, so the raw paid total still says 5000 —
+    // but that money is spent and cannot also cover the new 3000.
+    expect(
+      GUARDS.revisionCosSettled(
+        coFacts({
+          settled: ['5000'],
+          raised: ['3000'],
+          revisionCoPaid: ['5000'],
+        }),
+      ),
+    ).toEqual({ ok: false, code: 'revision_cos_outstanding' });
+    // Paying the new one too clears it.
+    expect(
+      GUARDS.revisionCosSettled(
+        coFacts({
+          settled: ['5000'],
+          raised: ['3000'],
+          revisionCoPaid: ['5000', '3000'],
+        }),
+      ),
+    ).toEqual({ ok: true });
   });
 });
 

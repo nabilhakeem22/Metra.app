@@ -53,3 +53,8 @@ npm-debug.log*
 
 # local design tooling (impeccable skill)
 .claude/skills/
+
+# Ad-hoc DB probe scripts (scratch investigations, never part of the build).
+packages/db/_*.mts
+_probe*
+purge-fixture-orgs-*.json

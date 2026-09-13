@@ -89,6 +89,7 @@ interface OrgFixture {
   costItemId: string;
   ownerKey: string;
   viewerKey: string;
+  pmKey: string;
 }
 
 async function buildOrg(): Promise<OrgFixture> {
@@ -165,6 +166,9 @@ async function buildOrg(): Promise<OrgFixture> {
   // A key whose creator is a viewer (canSeeMargin false) — the mint gate is
   // owner/admin, so seed this one directly to exercise the live-role resolver.
   const viewerKey = await insertRawKey(seeded.orgId, viewerId, 'Viewer key');
+  // A key whose creator is a project_manager — the only role that can read the
+  // price book AND be made margin-blind by hide_margin_from_pm.
+  const pmKey = await insertRawKey(seeded.orgId, pmId, 'PM key');
 
   return {
     orgId: seeded.orgId,
@@ -178,6 +182,7 @@ async function buildOrg(): Promise<OrgFixture> {
     costItemId: ci.id,
     ownerKey,
     viewerKey,
+    pmKey,
   };
 }
 
@@ -341,11 +346,12 @@ describe('AC5 — live-role cost/margin gating', () => {
     );
   });
 
-  it('viewer key strips every cost/margin key', async () => {
+  it('viewer key strips every cost/margin key from a proposal it MAY read', async () => {
     const proposal = await proposalDetail(
       bearer(`${BASE}/proposals/${a.proposalId}`, a.viewerKey),
       { params: Promise.resolve({ id: a.proposalId }) },
     );
+    expect(proposal.status).toBe(200);
     const pBody = await asJson<{
       total_cost?: string;
       total_margin?: string;
@@ -357,14 +363,59 @@ describe('AC5 — live-role cost/margin gating', () => {
     expect(line).not.toHaveProperty('line_margin');
     expect(pBody).not.toHaveProperty('total_cost');
     expect(pBody).not.toHaveProperty('total_margin');
+  });
 
-    const costItem = await costItemDetail(
-      bearer(`${BASE}/cost-items/${a.costItemId}`, a.viewerKey),
-      { params: Promise.resolve({ id: a.costItemId }) },
+  // THE HOLE THIS CLOSED: the price book was reachable by any valid key. A
+  // viewer has NO price_book grant at all, so the answer is 403 with no body,
+  // not a 200 with the cost columns quietly removed.
+  it('viewer key is REFUSED the price book outright, list and detail', async () => {
+    for (const res of [
+      await costItemsList(bearer(`${BASE}/cost-items`, a.viewerKey)),
+      await costItemDetail(bearer(`${BASE}/cost-items/${a.costItemId}`, a.viewerKey), {
+        params: Promise.resolve({ id: a.costItemId }),
+      }),
+    ]) {
+      expect(res.status).toBe(403);
+      expect(res.headers.get('content-type')).toBe('application/problem+json');
+      const body = await asJson<ProblemBody & { data?: unknown }>(res);
+      expect(body.type).toContain('/problems/forbidden');
+      expect(body).not.toHaveProperty('data');
+    }
+  });
+
+  it('a margin-blind PM key reads the price book WITHOUT the cost columns', async () => {
+    // hide_margin_from_pm defaults false, so flip it for this assertion only —
+    // project_manager is the one role that can read the price book and still be
+    // made margin-blind.
+    await raw.query(
+      `update public.organizations set hide_margin_from_pm = true where id = '${a.orgId}'`,
     );
-    expect(await asJson<Record<string, unknown>>(costItem)).not.toHaveProperty(
-      'default_unit_cost',
-    );
+    try {
+      const costItem = await costItemDetail(
+        bearer(`${BASE}/cost-items/${a.costItemId}`, a.pmKey),
+        { params: Promise.resolve({ id: a.costItemId }) },
+      );
+      expect(costItem.status).toBe(200);
+      expect(await asJson<Record<string, unknown>>(costItem)).not.toHaveProperty(
+        'default_unit_cost',
+      );
+
+      const proposal = await proposalDetail(
+        bearer(`${BASE}/proposals/${a.proposalId}`, a.pmKey),
+        { params: Promise.resolve({ id: a.proposalId }) },
+      );
+      expect(proposal.status).toBe(200);
+      const pBody = await asJson<{
+        total_cost?: string;
+        sections: { lines: Record<string, unknown>[] }[];
+      }>(proposal);
+      expect(pBody.sections[0].lines[0]).not.toHaveProperty('unit_cost');
+      expect(pBody).not.toHaveProperty('total_cost');
+    } finally {
+      await raw.query(
+        `update public.organizations set hide_margin_from_pm = false where id = '${a.orgId}'`,
+      );
+    }
   });
 });
 
@@ -412,6 +463,9 @@ describe('AC6 — limit clamp + cursor round-trip', () => {
 });
 
 describe('AC7 — over-rate -> 429 + Retry-After, no handler/data work', () => {
+  const READ_CLIENTS = { capability: 'clients', action: 'read' } as const;
+  const allow = async () => ({ allowed: true, retryAfterSeconds: 0 });
+
   it('rejects with 429 before the handler runs', async () => {
     let handlerCalls = 0;
     const res = await handleApiRequest(
@@ -420,12 +474,39 @@ describe('AC7 — over-rate -> 429 + Retry-After, no handler/data work', () => {
         handlerCalls += 1;
         return { data: [] };
       },
-      { rateLimiter: async () => ({ allowed: false, retryAfterSeconds: 60 }) },
+      {
+        ...READ_CLIENTS,
+        preAuthRateLimiter: allow,
+        rateLimiter: async () => ({ allowed: false, retryAfterSeconds: 60 }),
+      },
     );
     expect(res.status).toBe(429);
     expect(res.headers.get('retry-after')).toBe('60');
     expect(res.headers.get('content-type')).toBe('application/problem+json');
     // The handler (the only path that touches business data) never ran.
+    expect(handlerCalls).toBe(0);
+  });
+
+  // An unauthenticated flood must be answered by the cheap bucket, not by the
+  // key lookup: 429 BEFORE the 401, with no bearer token at all.
+  it('an over-rate request with NO key is 429, not 401', async () => {
+    let handlerCalls = 0;
+    const res = await handleApiRequest(
+      bearer(`${BASE}/clients`),
+      async () => {
+        handlerCalls += 1;
+        return { data: [] };
+      },
+      {
+        ...READ_CLIENTS,
+        preAuthRateLimiter: async () => ({ allowed: false, retryAfterSeconds: 60 }),
+        rateLimiter: async () => {
+          throw new Error('the per-key bucket must never be reached');
+        },
+      },
+    );
+    expect(res.status).toBe(429);
+    expect(res.headers.get('retry-after')).toBe('60');
     expect(handlerCalls).toBe(0);
   });
 });

@@ -17,5 +17,5 @@ export function GET(
     const detail = await getProposalWithLines(ctx, id, costVisible);
     if (!detail) throw new NotFoundError();
     return serializeProposal(detail, costVisible);
-  });
+  }, { capability: 'proposals_build', action: 'read' });
 }

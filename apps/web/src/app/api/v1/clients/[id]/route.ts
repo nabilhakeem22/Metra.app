@@ -16,5 +16,5 @@ export function GET(
     const row = await getClientById(ctx, id);
     if (!row) throw new NotFoundError();
     return serializeClient(row);
-  });
+  }, { capability: 'clients', action: 'read' });
 }

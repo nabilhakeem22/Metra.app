@@ -1,5 +1,7 @@
-// ESLint rule: forbid a Drizzle query (`.select`/`.insert`/`.update`/`.delete`/
-// `.execute`) on the RAW request/base DB connection.
+// ESLint rule: forbid a query on the RAW request/base DB connection — either a
+// Drizzle builder (`.select`/`.insert`/`.update`/`.delete`/`.execute`) or the
+// underlying postgres.js handle (a `` sql`…` `` tagged template, or
+// `.unsafe(…)`).
 //
 // WHY: `apps/web/src/lib/db/{client,request-connection}.ts` concentrate ONE
 // privileged postgres.js handle that every caller borrows via `withRequestDb`.
@@ -22,6 +24,21 @@
 //     through `.transaction`;
 //   • by the pervasive convention of this codebase, any identifier literally
 //     named `db` (the raw handle is `db` everywhere; the RLS-scoped handle is `tx`).
+// THE postgres.js HANDLE COUNTS TOO. `getRequestConnection()` /
+// `createRuntimeConnection()` return `{ db, sql, pg }`: `db` is the Drizzle
+// wrapper and `sql`/`pg` are the SAME privileged socket underneath it. Reaching
+// for `sql` instead of `db` was therefore a complete bypass of this rule while
+// being exactly as dangerous, so a destructured `sql`/`pg` from those factories is
+// raw, and both `` sql`select …` `` and `sql.unsafe(…)` on it are reported.
+// NEITHER RENAMING NOR DOTTING HIDES IT: the handle is known by the PROPERTY it
+// came from, not the local name, and the connection object is tracked too — so
+// `{ sql: raw }`, `conn.sql`, `conn['sql']` and `getRequestConnection().sql` count.
+// KNOWN LIMITS (deliberate): raw-ness survives neither a return from a local helper
+// nor an assignment into an outer `let`; the isolation gate backstops both.
+// Deliberately NOT extended by name convention: drizzle's own `sql` tag is
+// imported in roughly two hundred files and is not a connection, so only a `sql`
+// that RESOLVES to a raw factory is flagged. `db` keeps its name convention.
+//
 // A handle bound by `withOrgContext` / `withUserContext` (conventionally `tx`) is
 // SAFE and never flagged. A free `tx: MetraDb` helper parameter (the dozens of
 // `core.ts`/`queries.ts` helpers that receive an already-scoped tx) is treated as
@@ -66,9 +83,17 @@
 // If you are adding a genuinely-new sanctioned base-connection use, add its file
 // here WITH a comment justifying why it is safe — do not disable the rule inline.
 
-/** Drizzle query builders that actually touch data. `transaction` is deliberately
- * excluded — it only opens a tx; the risk is the read/write/exec inside it. */
-const QUERY_METHODS = new Set(['select', 'insert', 'update', 'delete', 'execute']);
+/** Query methods that actually touch data — Drizzle builders plus postgres.js's
+ * `.unsafe`. `transaction` is deliberately excluded: it only opens a tx; the risk
+ * is the read/write/exec inside it. */
+const QUERY_METHODS = new Set([
+  'select',
+  'insert',
+  'update',
+  'delete',
+  'execute',
+  'unsafe',
+]);
 
 /** Callback wrappers that hand back the RAW (un-scoped) connection. */
 const RAW_WRAPPERS = new Set(['withRequestDb']);
@@ -84,12 +109,38 @@ const SAFE_WRAPPERS = new Set([
 ]);
 
 /** Functions that mint the raw connection. `getDb()` returns the handle directly;
- * the other two return `{ db, sql }`, so only their `.db` is the handle. */
+ * the other two return `{ db, sql, pg }`, so their handle KEYS are the handles. */
 const RAW_FACTORIES = new Set([
   'getDb',
   'getRequestConnection',
   'createRuntimeConnection',
 ]);
+
+/** The keys of a `{ db, sql, pg }` connection — all three are the SAME socket. */
+const RAW_HANDLE_KEYS = new Set(['db', 'sql', 'pg']);
+
+/** `await getRequestConnection()` classifies exactly like `getRequestConnection()`. */
+function unwrapAwait(node) {
+  return node && node.type === 'AwaitExpression' ? node.argument : node;
+}
+
+/** The factory name this expression calls, or null. */
+function rawFactoryName(node) {
+  const call = unwrapAwait(node);
+  if (!call || call.type !== 'CallExpression') return null;
+  if (call.callee.type !== 'Identifier') return null;
+  return RAW_FACTORIES.has(call.callee.name) ? call.callee.name : null;
+}
+
+/** The key a member access or a pattern property names — dotted, or computed with
+ * a string literal so `conn['sql']` is not a hiding place. Null when not static. */
+function staticKeyName(computed, key) {
+  if (computed) {
+    return key.type === 'Literal' && typeof key.value === 'string' ? key.value : null;
+  }
+  if (key.type === 'Identifier') return key.name;
+  return key.type === 'Literal' ? String(key.value) : null;
+}
 
 // Allowlisted files (path suffixes) — the sanctioned base-connection exceptions
 // documented above. Matched against the normalised (forward-slash) filename.
@@ -104,6 +155,10 @@ const ALLOWLISTED_FILES = [
   'apps/web/src/lib/automation/system-context.ts',
   'apps/web/src/lib/automation/runner.ts',
   'packages/db/src/org-context.ts',
+  // The RLS/roles/functions applier itself: it runs the .sql files that CREATE
+  // the metra_app role and the policies, so by definition it must execute as the
+  // owning login BEFORE any scoped role exists. It reads no business table.
+  'packages/db/src/scripts/apply-rls.ts',
 ];
 
 // Allowlisted directories (path fragments) — isolation tests deliberately read on
@@ -159,31 +214,26 @@ export const noBareTenantDb = {
     }
 
     // Is this expression node the raw connection? (Identifier resolved to a raw
-    // binding, a `getDb()` call, or a `getRequestConnection()/createRuntimeConnection().db`.)
+    // binding, a `getDb()` call, or ANY handle key read off a connection object —
+    // `getRequestConnection().sql`, `conn.pg`, `conn['sql']`.)
     function isRawExpr(node) {
       if (!node) return false;
       if (node.type === 'Identifier') {
         return classifyIdentifier(node) === 'raw';
       }
-      if (
-        node.type === 'CallExpression' &&
-        node.callee.type === 'Identifier' &&
-        RAW_FACTORIES.has(node.callee.name)
-      ) {
-        // Only getDb() returns the handle itself; the others return `{ db, sql }`.
-        return node.callee.name === 'getDb';
-      }
-      if (
-        node.type === 'MemberExpression' &&
-        !node.computed &&
-        node.property.type === 'Identifier' &&
-        node.property.name === 'db' &&
-        node.object.type === 'CallExpression' &&
-        node.object.callee.type === 'Identifier' &&
-        RAW_FACTORIES.has(node.object.callee.name)
-      ) {
-        // getRequestConnection().db / createRuntimeConnection().db
-        return true;
+      const factory = rawFactoryName(node);
+      // Only getDb() returns the handle itself; the others return `{ db, sql, pg }`.
+      if (factory) return factory === 'getDb';
+      if (node.type === 'MemberExpression') {
+        // `.sql`/`.pg` are the SAME socket as `.db`: dotting the connection object
+        // instead of destructuring it changes nothing.
+        const key = staticKeyName(node.computed, node.property);
+        if (key === null || !RAW_HANDLE_KEYS.has(key)) return false;
+        const object = unwrapAwait(node.object);
+        if (rawFactoryName(object)) return true;
+        return (
+          object.type === 'Identifier' && classifyIdentifier(object) === 'connection'
+        );
       }
       return false;
     }
@@ -217,38 +267,45 @@ export const noBareTenantDb = {
         return 'unknown';
       }
       if (def.type === 'Variable') {
-        const decl = def.node; // VariableDeclarator
-        const init = decl && decl.init;
-        if (isRawFactoryValue(init, def.name)) return 'raw';
-        return 'unknown';
+        return classifyDeclarator(def.node, def.name);
       }
       return 'unknown';
     }
 
-    // `const db = getDb()` | `const { db } = getRequestConnection()` |
-    // `const x = createRuntimeConnection().db`
-    function isRawFactoryValue(init, nameNode) {
-      if (!init) return false;
-      if (init.type === 'CallExpression' && init.callee.type === 'Identifier') {
-        const name = init.callee.name;
-        if (name === 'getDb') return true;
-        if (name === 'getRequestConnection' || name === 'createRuntimeConnection') {
-          // Only the destructured `db` property is the handle (not `sql`).
-          return !!nameNode && nameNode.name === 'db';
+    /**
+     * `const db = getDb()` (a handle) | `const { sql: raw } = getRequestConnection()`
+     * (a handle under ANY local name — the PROPERTY decides, not the alias) |
+     * `const conn = getRequestConnection()` (the connection OBJECT, whose handle
+     * keys are raw) | `const x = createRuntimeConnection().sql`.
+     */
+    function classifyDeclarator(decl, nameNode) {
+      const init = decl && unwrapAwait(decl.init);
+      if (!init) return 'unknown';
+      const factory = rawFactoryName(init);
+      if (factory === 'getDb') return 'raw';
+      if (factory) {
+        if (decl.id && decl.id.type === 'ObjectPattern') {
+          return bindsHandleKey(decl.id, nameNode) ? 'raw' : 'unknown';
         }
+        return 'connection';
       }
-      if (
-        init.type === 'MemberExpression' &&
-        !init.computed &&
-        init.property.type === 'Identifier' &&
-        init.property.name === 'db' &&
-        init.object.type === 'CallExpression' &&
-        init.object.callee.type === 'Identifier' &&
-        RAW_FACTORIES.has(init.object.callee.name)
-      ) {
-        return true;
-      }
-      return false;
+      if (init.type === 'MemberExpression' && isRawExpr(init)) return 'raw';
+      return 'unknown';
+    }
+
+    /** Did this object pattern bind `nameNode` to a `db`/`sql`/`pg` property? */
+    function bindsHandleKey(pattern, nameNode) {
+      if (!nameNode) return false;
+      return pattern.properties.some((property) => {
+        if (property.type !== 'Property') return false;
+        const key = staticKeyName(property.computed, property.key);
+        if (key === null || !RAW_HANDLE_KEYS.has(key)) return false;
+        const value = property.value;
+        return (
+          value === nameNode ||
+          (value.type === 'AssignmentPattern' && value.left === nameNode)
+        );
+      });
     }
 
     function classifyIdentifier(idNode) {
@@ -277,6 +334,16 @@ export const noBareTenantDb = {
     }
 
     return {
+      // `` sql`select …` `` on the raw postgres.js handle — no method call to
+      // catch, so the tagged template is its own visitor.
+      TaggedTemplateExpression(node) {
+        if (!isRawExpr(node.tag)) return;
+        context.report({
+          node: node.tag,
+          messageId: 'bareQuery',
+          data: { method: 'sql``' },
+        });
+      },
       CallExpression(node) {
         const callee = node.callee;
         if (

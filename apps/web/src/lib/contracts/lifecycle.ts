@@ -9,6 +9,7 @@ import { fail, mutateInOrg } from '@/lib/actions/mutate';
 import type { ActionResult } from '@/lib/actions/result';
 import type { OrgContext } from '@/lib/db/context';
 import { mintToken, SHARE_TTL_DAYS } from '@/lib/proposals/core';
+import { rejectVariationsOnContractTermination } from '@/lib/variations/lifecycle';
 
 /**
  * Issue a draft contract: draft->issued, mint the client acknowledgement token,
@@ -65,6 +66,9 @@ export async function issueContractCore(
  * Terminate an issued or signed contract: (issued|signed)->terminated. Owner/admin
  * only. The transition IS the admission gate — a concurrent 2nd call finds the
  * status no longer in (issued,signed) -> 0 rows -> contract_not_signable.
+ *
+ * Cascades: every variation order still awaiting a decision is rejected in the
+ * same transaction, so no VO can be approved against a contract that is gone.
  */
 export async function terminateContractCore(
   ctx: OrgContext,
@@ -102,6 +106,23 @@ export async function terminateContractCore(
         before: null,
         after: { status: 'terminated' },
       });
+
+      // A dead contract carries no commercial change: close out every VO that
+      // was still awaiting a decision, in this same transaction.
+      const rejected = await rejectVariationsOnContractTermination(
+        tx,
+        ctx,
+        input.id,
+      );
+      for (const variation of rejected) {
+        await audit({
+          entity: 'variation_order',
+          entityId: variation.id,
+          action: 'update',
+          before: { status: variation.fromStatus },
+          after: { status: 'rejected' },
+        });
+      }
     },
   );
 }

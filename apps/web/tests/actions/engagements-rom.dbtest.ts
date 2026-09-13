@@ -4,6 +4,7 @@ import { listClients } from '@/lib/clients/queries';
 import { createEngagementCore } from '@/lib/engagements/core';
 import { getEngagementRom } from '@/lib/engagements/queries';
 import { setEngagementRomCore } from '@/lib/engagements/rom';
+import { issueRomCore } from '@/lib/engagements/rom-issue';
 import { createProjectCore } from '@/lib/projects/core';
 import { listProjects } from '@/lib/projects/queries';
 import { closeFixture, ctxFor, raw, seedOrg, teardown } from './fixture';
@@ -216,6 +217,139 @@ describe('setEngagementRom — cross-org isolation', () => {
     expect(await getEngagementRom(ctxA, aEngagement)).toEqual({
       romLow: '1800000.0000',
       romHigh: '2400000.0000',
+    });
+  });
+});
+
+describe('issueRom — the band reaches the client only when it is sent (M31)', () => {
+  async function romIssuedAt(engagementId: string): Promise<string | null> {
+    const [row] = await raw.query<{ rom_issued_at: string | null }>(
+      `select rom_issued_at from public.design_engagements where id = '${engagementId}'`,
+    );
+    return row.rom_issued_at;
+  }
+
+  async function issuedEventCount(engagementId: string): Promise<number> {
+    const [row] = await raw.query<{ n: number }>(
+      `select count(*)::int as n from public.engagement_events
+        where engagement_id = '${engagementId}' and kind = 'rom_issued'`,
+    );
+    return Number(row.n);
+  }
+
+  it('stamps the band, appends ONE rom_issued event carrying it', async () => {
+    const { ctx, engagementId } = await setup();
+    await setEngagementRomCore(ctx, {
+      engagementId,
+      romLow: '1800000',
+      romHigh: '2400000',
+    });
+    expect(await romIssuedAt(engagementId)).toBeNull();
+
+    expect((await issueRomCore(ctx, { engagementId })).ok).toBe(true);
+    expect(await romIssuedAt(engagementId)).not.toBeNull();
+
+    const [event] = await raw.query<{ range_low: string; range_high: string }>(
+      `select range_low, range_high from public.engagement_events
+        where engagement_id = '${engagementId}' and kind = 'rom_issued'`,
+    );
+    expect(event.range_low).toBe('1800000.0000');
+    expect(event.range_high).toBe('2400000.0000');
+    expect(await issuedEventCount(engagementId)).toBe(1);
+  });
+
+  it('refuses a second issue and writes no second event', async () => {
+    const { ctx, engagementId } = await setup();
+    await setEngagementRomCore(ctx, { engagementId, romLow: '1', romHigh: '2' });
+    expect((await issueRomCore(ctx, { engagementId })).ok).toBe(true);
+
+    expect(await issueRomCore(ctx, { engagementId })).toEqual({
+      ok: false,
+      error: 'rom_already_issued',
+    });
+    expect(await issuedEventCount(engagementId)).toBe(1);
+  });
+
+  it('refuses to issue a band that was never set', async () => {
+    const { ctx, engagementId } = await setup();
+    expect(await issueRomCore(ctx, { engagementId })).toEqual({
+      ok: false,
+      error: 'rom_not_set',
+    });
+    expect(await issuedEventCount(engagementId)).toBe(0);
+  });
+
+  it('refuses to issue on a finished engagement', async () => {
+    const { ctx, engagementId } = await setup();
+    await setEngagementRomCore(ctx, { engagementId, romLow: '1', romHigh: '2' });
+    await raw.query(
+      `update public.design_engagements set state = 'abandoned' where id = '${engagementId}'`,
+    );
+    expect(await issueRomCore(ctx, { engagementId })).toEqual({
+      ok: false,
+      error: 'engagement_not_active',
+    });
+    expect(await issuedEventCount(engagementId)).toBe(0);
+  });
+
+  it('un-issues the band when it is revised, so it must be sent again', async () => {
+    const { ctx, engagementId } = await setup();
+    await setEngagementRomCore(ctx, { engagementId, romLow: '1', romHigh: '2' });
+    await issueRomCore(ctx, { engagementId });
+    expect(await romIssuedAt(engagementId)).not.toBeNull();
+
+    await setEngagementRomCore(ctx, { engagementId, romLow: '3', romHigh: '4' });
+    expect(await romIssuedAt(engagementId)).toBeNull();
+    // …and the revised band can be issued again, a second recorded send.
+    expect((await issueRomCore(ctx, { engagementId })).ok).toBe(true);
+    expect(await issuedEventCount(engagementId)).toBe(2);
+  });
+
+  it('org B cannot issue org A’s band', async () => {
+    const { ctx: ctxA, engagementId } = await setup();
+    await setEngagementRomCore(ctxA, { engagementId, romLow: '1', romHigh: '2' });
+
+    const { orgId: orgB, ownerIds } = await seedOrg({ owners: 1 });
+    orgIds.push(orgB);
+    expect(
+      await issueRomCore(ctxFor(orgB, ownerIds[0], 'owner'), { engagementId }),
+    ).toEqual({ ok: false, error: 'engagement_not_found' });
+    expect(await romIssuedAt(engagementId)).toBeNull();
+  });
+
+  it('a project_manager may set a band but not issue it', async () => {
+    const { orgId, ownerIds, memberIds } = await seedOrg({
+      owners: 1,
+      members: [{ role: 'project_manager' }],
+    });
+    orgIds.push(orgId);
+    const ownerCtx = ctxFor(orgId, ownerIds[0], 'owner');
+    await createClientCore(ownerCtx, { phone: '01000000000', nameEn: 'Acme' });
+    const [client] = await listClients(ownerCtx, {});
+    await createProjectCore(ownerCtx, {
+      startDate: '2026-01-01', endDate: '2026-06-30',
+      code: `PRJ-${orgId.slice(0, 8)}`,
+      nameEn: 'Tower',
+      clientId: client.id,
+      status: 'active',
+    });
+    const [project] = await listProjects(ownerCtx, {});
+    const engagementId = (
+      (await createEngagementCore(ownerCtx, {
+        titleEn: 'Villa fit-out',
+        clientId: client.id,
+        projectId: project.id,
+      })) as { data?: string }
+    ).data!;
+
+    const pmCtx = ctxFor(orgId, memberIds[0], 'project_manager');
+    expect(
+      (await setEngagementRomCore(pmCtx, { engagementId, romLow: '1', romHigh: '2' })).ok,
+    ).toBe(true);
+    // Putting a cost figure in front of the end client is owner/admin only.
+    expect(await issueRomCore(pmCtx, { engagementId })).toEqual({
+      ok: false,
+      error: 'forbidden',
     });
   });
 });

@@ -82,3 +82,78 @@ Manual `wrangler deploy` (above) still works as a fallback.
 worker secrets (Cloudflare dashboard → metra-web → Settings → Variables and
 secrets). `CRON_SECRET` is added when the automation cron is enabled.
 `wrangler deploy` preserves these across deploys.
+
+## Migrations
+
+Run `npm run db:migrate`, then `npm run db:apply-rls` (RLS, roles and functions
+live there, never in a migration).
+
+### After 0048: acknowledged build-cost bands must be re-issued
+
+0048 added `design_engagements.rom_issued_at` and does **not** backfill it. Every
+band that a client acknowledged before the migration therefore sits against a
+NULL `rom_issued_at`, and the engagement fails `rom_not_acknowledged` at the next
+gate until the band is issued and acknowledged again. This is deliberate — an
+acknowledgement whose issue date is unknown is not evidence the client saw the
+band that is on the record now — but it needs an operator to clear it.
+
+Count the affected engagements (read-only):
+
+```sql
+select count(*) from design_engagements de
+where exists (
+  select 1 from engagement_events e
+  where e.engagement_id = de.id and e.kind = 'rom_acknowledgement'
+) and de.rom_issued_at is null;
+```
+
+For each one: open the engagement, **Issue to client** on the build-cost band,
+and ask the client to acknowledge it. Nothing else clears the flag; there is no
+backfill script by design.
+
+## Testing against a database
+
+The two DB suites (`npm run test:actions -w @metra/web`, `npm run test:isolation
+-w @metra/db`) resolve `DATABASE_URL` from the repo-root `.env`, which holds the
+**hosted Supabase** connection string. They are destructive: the action suite
+creates and deletes whole organisations, the isolation suite creates and DROPS
+scratch tables in `public`. Run as-is, they did that to the shared database —
+and because teardown only ran from a suite's `afterAll`, every interrupted run
+leaked its orgs. The shared project accumulated 480 of them.
+
+So both vitest DB configs now call `assertLocalDatabase` (from
+`packages/db/src/testing/local-database-guard.ts`) at config load, before a
+single connection is opened. It **refuses to run unless `DATABASE_URL`'s host is
+provably local** (`localhost`, `127.0.0.1`, `::1`, `0.0.0.0` — exact matches, so
+`localhost.attacker.example` does not count). A missing or unparseable URL is
+refused too: it fails closed.
+
+```
+docker run --name metra-test-db -e POSTGRES_PASSWORD=postgres -p 5432:5432 -d postgres:17
+export DATABASE_URL=postgresql://postgres:postgres@localhost:5432/postgres
+npm run db:migrate && npm run db:apply-rls && npm run db:seed
+```
+
+**CI is unaffected:** `ci.yml` exports `DATABASE_URL` pointing at its own
+`postgres:17` service container, and `dotenv` never overrides an already-set
+variable, so the guard sees `localhost` and passes.
+
+**The opt-out** is `METRA_ALLOW_SHARED_DB=1`. Set it only when you mean to run a
+destructive suite against a non-local database and you accept that it will
+delete data there.
+
+### Cleaning up fixture debris
+
+Two one-off maintenance scripts, for the debris that leaked before the guard
+existed. **Neither is part of CI and neither should be run casually.**
+
+| Command | What it does |
+|---|---|
+| `npm run db:purge-fixture-orgs` | **Dry run by default.** Prints how many orgs are real, how many are fixture debris, how many are doomed, and the per-table row counts it would delete. |
+| `npm run db:purge-fixture-orgs -- --execute --expect-real-orgs=<n>` | Performs the purge. `<n>` is the real-org count the dry run printed; if the database has changed underneath you, it refuses. It writes a `purge-fixture-orgs-<ts>.json` manifest (gitignored) before deleting anything, and re-checks the real-org count inside every transaction. |
+| `npm run db:reindex-after-purge` | Rebuilds the indexes the debris bloated (`REINDEX ... CONCURRENTLY`, then `ANALYZE`). Run it after a purge. |
+
+An org is doomed **only** if it and its account both carry a fixture name, the
+account is not shared with another org, no member of it belongs to a real org or
+to `auth.users`, and it is more than 24 hours old, so a run still in flight is
+never touched.

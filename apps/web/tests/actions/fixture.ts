@@ -9,6 +9,30 @@ const pg = createSql(process.env.DATABASE_URL as string, {
   prepare: false,
 });
 
+/**
+ * Every org this process has seeded and not yet torn down.
+ *
+ * THE LEAK THIS CLOSES: teardown only ran from a suite's `afterAll`, so an
+ * interrupted run — Ctrl-C, a killed stream, a crashed worker — left its orgs
+ * behind forever. The shared database accumulated 480 of them. The set below is
+ * the process-wide record of what is outstanding, and `closeFixture` (which every
+ * suite already calls) and the signal handlers sweep whatever is still in it, so
+ * cleanup no longer depends on a hook that may never fire.
+ */
+const OUTSTANDING_ORG_IDS = new Set<string>();
+
+/**
+ * A fixture org's name. The marker makes debris identifiable at a glance and the
+ * ISO timestamp says WHEN it leaked, so a future purge can tell a run from
+ * yesterday apart from one still in flight.
+ */
+export function fixtureOrgName(): string {
+  return `${FIXTURE_ORG_MARKER} ${new Date().toISOString()}`;
+}
+
+/** The prefix every fixture-created org and account name starts with. */
+export const FIXTURE_ORG_MARKER = 'Test Org';
+
 export function ctxFor(
   orgId: string,
   userId: string,
@@ -29,15 +53,17 @@ export async function seedOrg(opts: {
   members?: Array<{ role: MemberRole }>;
 }): Promise<SeededOrg> {
   const orgId = randomUUID();
+  const name = fixtureOrgName();
+  OUTSTANDING_ORG_IDS.add(orgId);
   // Every org owns exactly one account (above tenancy, A1). Seeded over the
   // BYPASSRLS connection (bypasses the accounts WITH CHECK) then linked; teardown
   // removes it AFTER the org (FK is on delete restrict).
   const accountId = randomUUID();
   await pg.unsafe(
-    `insert into public.accounts (id, name_en) values ('${accountId}', 'Test Org')`,
+    `insert into public.accounts (id, name_en) values ('${accountId}', '${name}')`,
   );
   await pg.unsafe(
-    `insert into public.organizations (id, account_id, name_en) values ('${orgId}', '${accountId}', 'Test Org')`,
+    `insert into public.organizations (id, account_id, name_en) values ('${orgId}', '${accountId}', '${name}')`,
   );
 
   // Seed the default automation_settings row (mirrors the 0016 backfill /
@@ -219,6 +245,13 @@ const TEARDOWN_TABLES_IN_FK_ORDER = [
   'engagement_milestones',
   'engagement_transitions',
   'design_engagements',
+  // BOQs reference clients AND projects with RESTRICT, so the whole BOQ tree has
+  // to go before either of those. Lines and sections cascade from the BOQ, but
+  // they are listed explicitly so a future FK change surfaces here as a missing
+  // entry rather than as a restrict error halfway through a teardown.
+  'boq_lines',
+  'boq_sections',
+  'boqs',
   'proposal_events',
   'proposal_lines',
   'proposal_sections',
@@ -248,6 +281,7 @@ const TEARDOWN_TABLES_IN_FK_ORDER = [
 ];
 
 export async function teardown(orgIds: string[]): Promise<void> {
+  if (orgIds.length === 0) return;
   // One transaction on a single pinned connection so SET LOCAL applies to every
   // delete and resets automatically when the transaction ends.
   await pg.begin(async (tx) => {
@@ -269,10 +303,43 @@ export async function teardown(orgIds: string[]): Promise<void> {
       if (accountId) {
         await tx.unsafe(`delete from public.accounts where id = '${accountId}'`);
       }
+      OUTSTANDING_ORG_IDS.delete(id);
     }
   });
 }
 
+/**
+ * Tear down every org this process seeded and has not yet removed. Safe to call
+ * repeatedly: teardown clears each id from the set as it goes, so a suite that
+ * already ran its own afterAll leaves nothing here to do.
+ */
+export async function teardownOutstanding(): Promise<void> {
+  await teardown([...OUTSTANDING_ORG_IDS]);
+}
+
 export async function closeFixture(): Promise<void> {
-  await pg.end();
+  // The LAST line of defence, and the one that always runs: every suite calls
+  // this, so even a file whose afterAll teardown threw part-way still leaves
+  // nothing behind.
+  try {
+    await teardownOutstanding();
+  } finally {
+    await pg.end();
+  }
+}
+
+// AND the interrupted-run case, which is what actually filled the shared
+// database: Ctrl-C and a killed process never reach any vitest hook. These
+// handlers get one attempt at a sweep before the process leaves. `once`, so a
+// second interrupt during the sweep exits immediately rather than hanging.
+for (const signal of ['SIGINT', 'SIGTERM'] as const) {
+  process.once(signal, () => {
+    void teardownOutstanding()
+      .catch((error) => {
+        console.error('fixture sweep on', signal, 'failed:', error);
+      })
+      .finally(() => {
+        void pg.end().finally(() => process.exit(1));
+      });
+  });
 }

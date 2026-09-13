@@ -12,6 +12,7 @@ import {
   recordDeliveryActionByToken,
 } from '@/lib/engagements/public';
 import { setEngagementRomCore } from '@/lib/engagements/rom';
+import { issueRomCore } from '@/lib/engagements/rom-issue';
 import { mintDeliveryLinkCore } from '@/lib/engagements/share';
 import { createProjectCore } from '@/lib/projects/core';
 import { listProjects } from '@/lib/projects/queries';
@@ -169,6 +170,11 @@ describe('app_delivery_respond_by_token — each action at its legal state', () 
       romLow: '1800000',
       romHigh: '2400000',
     });
+    // A band the client has not been SENT is not acknowledgeable.
+    expect(
+      await recordDeliveryActionByToken(token, { action: 'acknowledge_rom' }),
+    ).toEqual({ ok: false, error: 'wrong_state' });
+    expect((await issueRomCore(ctx, { engagementId })).ok).toBe(true);
 
     const res = await recordDeliveryActionByToken(token, { action: 'acknowledge_rom' });
     expect(res).toEqual({ ok: true });
@@ -416,6 +422,7 @@ describe('client ROM ack satisfies the existing romAcknowledged guard (no new gu
       romLow: '500000',
       romHigh: '800000',
     });
+    expect((await issueRomCore(ctx, { engagementId })).ok).toBe(true);
 
     // The CLIENT acknowledges the ROM via the token path (not the staff core).
     const ack = await recordDeliveryActionByToken(token, { action: 'acknowledge_rom' });
@@ -445,6 +452,7 @@ describe('client ROM ack satisfies the existing romAcknowledged guard (no new gu
       romLow: '100000',
       romHigh: '200000',
     });
+    expect((await issueRomCore(ctx, { engagementId })).ok).toBe(true);
     // The staff path is unchanged (backward-compat) — it writes a 'staff' channel row.
     const res = await recordRomAcknowledgementCore(ctx, { engagementId });
     expect(res.ok).toBe(true);

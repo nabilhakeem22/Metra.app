@@ -13,5 +13,5 @@ export function GET(req: Request): Promise<Response> {
     const rows = await listClientsPage(ctx, page);
     const { items, nextCursor } = buildPage(rows, page.limit);
     return { data: items.map(serializeClient), next_cursor: nextCursor };
-  });
+  }, { capability: 'clients', action: 'read' });
 }

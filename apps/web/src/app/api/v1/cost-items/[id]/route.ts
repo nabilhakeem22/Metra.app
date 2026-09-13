@@ -16,5 +16,5 @@ export function GET(
     const row = await getCostItemById(ctx, id);
     if (!row) throw new NotFoundError();
     return serializeCostItem(row, costVisible);
-  });
+  }, { capability: 'price_book', action: 'read' });
 }

@@ -1,10 +1,14 @@
 // Design-Engagement Machine — transition executor (Step 2). This is the ONE and
 // ONLY path that moves an engagement's state or appends to the transition ledger.
-// No other function may. The state move is an ATOMIC admission gate
+// No other function may. ADVANCING edges serialise on the state gate
 // (UPDATE ... WHERE state=<expected> RETURNING, check rowCount) — mirroring
-// issueContractCore — so two concurrent callers can never both win. Guards stay
-// PURE: this file gathers every fact, then asks the guard engine to decide.
+// issueContractCore — so two concurrent callers can never both win. SELF-LOOPS
+// cannot: their expected state IS their target, so the gate matches for both
+// racers and they must serialise on an explicit row lock instead (lockSelfLoop).
+// Guards stay PURE: this file gathers every fact, then asks the guard engine to
+// decide.
 import {
+  type MetraDb,
   designEngagements,
   engagementArtifacts,
   engagementChangeOrders,
@@ -28,7 +32,12 @@ import { captureRenderManifest } from './renders';
 import { isRevisionTrigger } from './revision-allowance';
 import { applyRevision, resetRevisionsOnReject } from './revisions';
 import { GUARDS, type GuardFacts } from './guards';
-import { TRANSITIONS, type CapabilityKey, type Trigger } from './transitions';
+import {
+  TRANSITIONS,
+  type CapabilityKey,
+  type TransitionDef,
+  type Trigger,
+} from './transitions';
 
 /**
  * The permission action each capability family gates on. Design/finance triggers
@@ -49,10 +58,78 @@ export interface ExecuteTransitionInput {
 }
 
 /**
+ * Serialise the racers on a SELF-LOOP edge, BEFORE any fact is read. The state
+ * gate cannot: a self-loop's target IS its expected state, so
+ * `UPDATE ... WHERE state = <expected>` matches for every concurrent caller and
+ * they all proceed to run the side-effect. Two simultaneous requestRevision calls
+ * therefore both incremented the revision count from the same stale read and one
+ * free revision was spent twice — or, at the allowance edge, two change orders
+ * were raised for one revision.
+ *
+ * THE ORDER IS THE POINT: this takes the row lock by id and the caller loads the
+ * engagement and every guard fact AFTERWARDS, so the second caller waits for the
+ * first to commit and then reads the COMMITTED revision count, as-built flag and
+ * ledger — not the snapshot it took before queuing. Locking after the load would
+ * serialise the writers while leaving both reading the same stale row. No-op on
+ * advancing edges, which the gate already serialises.
+ */
+async function lockSelfLoop(tx: MetraDb, def: TransitionDef, id: string) {
+  const from = Array.isArray(def.from) ? def.from : [def.from];
+  if (!from.includes(def.to)) return;
+  await tx
+    .select({ id: designEngagements.id })
+    .from(designEngagements)
+    .where(eq(designEngagements.id, id))
+    .for('update');
+}
+
+/**
+ * Every fact the guards read, loaded inside the transaction and AFTER the
+ * self-loop lock. Guards are PURE, so the executor pre-loads for them: the
+ * engagement row plus (Step 4) the fee-schedule milestones and the append-only
+ * payment ledger, (Step 5) the recorded artifacts, and (Step 9) the raised
+ * change orders.
+ */
+async function loadGuardFacts(
+  tx: MetraDb,
+  engagementId: string,
+  engagement: GuardFacts['engagement'],
+): Promise<GuardFacts> {
+  const milestones = await tx
+    .select()
+    .from(engagementMilestones)
+    .where(eq(engagementMilestones.engagementId, engagementId));
+  const payments = await tx
+    .select()
+    .from(paymentEvents)
+    .where(eq(paymentEvents.engagementId, engagementId));
+  const artifacts = await tx
+    .select()
+    .from(engagementArtifacts)
+    .where(eq(engagementArtifacts.engagementId, engagementId));
+  const changeOrders = await tx
+    .select()
+    .from(engagementChangeOrders)
+    .where(eq(engagementChangeOrders.engagementId, engagementId));
+  // LIVE events only. A correction cannot delete the row it retracts -- the
+  // ledger is INSERT-only by grant -- so the retracted row is still here, and a
+  // guard counting it would let a mistake the studio has formally withdrawn go on
+  // unlocking the gate it opened.
+  const events = liveEvents(
+    await tx
+      .select()
+      .from(engagementEvents)
+      .where(eq(engagementEvents.engagementId, engagementId)),
+  );
+  return { engagement, milestones, payments, artifacts, changeOrders, events };
+}
+
+/**
  * Execute one lifecycle transition. Flow: resolve the trigger's def (unknown ->
- * `illegal_trigger`); gate the def's capability; open the RLS tx; load the
- * engagement (`engagement_not_found` if absent/foreign); assert the current state
- * is a legal `from` (else `illegal_trigger` — no ledger write, no state change);
+ * `illegal_trigger`); gate the def's capability; open the RLS tx; take the
+ * self-loop row lock; load the engagement (`engagement_not_found` if
+ * absent/foreign); assert the current state is a legal `from` (else
+ * `illegal_trigger` — no ledger write, no state change);
  * run every guard in order (first failure returns its code); perform the atomic
  * gated UPDATE (0 rows -> `engagement_state_conflict`); apply the def's
  * side-effect and (Client Deliverables, Step 1) its `clientRelease`; append exactly
@@ -78,6 +155,10 @@ export async function executeTransition(
       flow: 'interior',
     },
     async (tx, audit) => {
+      // LOCK FIRST on a self-loop, THEN read: every fact below must be the
+      // committed one, not a snapshot taken while the winner was still running.
+      await lockSelfLoop(tx, def, engagementId);
+
       const [engagement] = await tx
         .select()
         .from(designEngagements)
@@ -88,53 +169,19 @@ export async function executeTransition(
       const legalFrom = Array.isArray(def.from) ? def.from : [def.from];
       if (!legalFrom.includes(engagement.state)) fail('illegal_trigger');
 
-      // Guards are PURE, so the executor pre-loads every fact they read: the
-      // engagement row plus (Step 4) the fee-schedule milestones and the
-      // append-only payment ledger, (Step 5) the recorded artifacts, and (Step 9)
-      // the raised change orders. Loaded inside the tx, before any guard runs.
-      const milestones = await tx
-        .select()
-        .from(engagementMilestones)
-        .where(eq(engagementMilestones.engagementId, engagementId));
-      const payments = await tx
-        .select()
-        .from(paymentEvents)
-        .where(eq(paymentEvents.engagementId, engagementId));
-      const artifacts = await tx
-        .select()
-        .from(engagementArtifacts)
-        .where(eq(engagementArtifacts.engagementId, engagementId));
-      const changeOrders = await tx
-        .select()
-        .from(engagementChangeOrders)
-        .where(eq(engagementChangeOrders.engagementId, engagementId));
-      // LIVE events only. A correction cannot delete the row it retracts --
-      // the ledger is INSERT-only by grant -- so the retracted row is still
-      // here, and a guard counting it would let a mistake the studio has
-      // formally withdrawn go on unlocking the gate it opened.
-      const events = liveEvents(
-        await tx
-          .select()
-          .from(engagementEvents)
-          .where(eq(engagementEvents.engagementId, engagementId)),
-      );
-
-      const facts: GuardFacts = {
-        engagement,
-        milestones,
-        payments,
-        artifacts,
-        changeOrders,
-        events,
-      };
+      const facts = await loadGuardFacts(tx, engagementId, engagement);
+      const { artifacts } = facts;
       for (const guardKey of def.guards) {
         const verdict = GUARDS[guardKey](facts);
         if (!verdict.ok) fail(verdict.code);
       }
 
-      // Atomic admission gate FIRST: only the writer that flips the state off the
-      // expected `from` value proceeds — so a side-effect never runs twice for one
-      // move. A losing concurrent caller gets `engagement_state_conflict` here.
+      // Admission gate: only the writer that flips the state off the expected
+      // `from` value proceeds — so a side-effect never runs twice for one move. A
+      // losing concurrent caller gets `engagement_state_conflict` here. This gate
+      // admits ONE racer only on an ADVANCING edge; on a self-loop `def.to` equals
+      // the expected state, so both racers match it and the row lock taken above
+      // is what serialises them.
       const gated = await tx
         .update(designEngagements)
         .set({ state: def.to, updatedAt: new Date() })

@@ -28,7 +28,8 @@ import { projects } from './projects';
  * is Step 2 — this slice only ever writes rows in `created`.
  *
  * `romLow`/`romHigh` are the rough-order-of-magnitude budget band (nullable;
- * CHECK: high >= low when both present). `freeRevisionN` (default 3) is the free
+ * CHECK: high >= low when both present), and `romIssuedAt` is when it was shown
+ * to the client. `freeRevisionN` (default 3) is the free
  * CONCEPT revision allowance and `revisionCount` tracks its consumption;
  * `freeDesignRevisionN`/`designRevisionCount` are the SEPARATE 3D revision pair
  * (same default) — the two allowances never draw on each other. `tokenHash` is the
@@ -61,6 +62,11 @@ export const designEngagements = pgTable(
     designRevisionCount: integer('design_revision_count').notNull().default(0),
     romLow: money('rom_low'),
     romHigh: money('rom_high'),
+    // When the band was ISSUED to the client. Setting rom_low/rom_high is
+    // private working state; only an issued band reaches the delivery portal or
+    // can be acknowledged. NULL until issueRomCore stamps it, and reset to NULL
+    // whenever the band is changed, so a revision is re-issued deliberately.
+    romIssuedAt: timestamp('rom_issued_at', { withTimezone: true }),
     conceptLockedAt: timestamp('concept_locked_at', { withTimezone: true }),
     // Set when `rendersReady` fires (Step 11): the sha256 baseline over the
     // approved-render content-hash list, and the moment that baseline was

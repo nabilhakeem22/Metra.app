@@ -667,6 +667,9 @@ $$;
 -- SECURITY DEFINER (the token IS the authorization; no session). Only issued /
 -- approved / rejected VOs are visible. OMITS every cost/margin column. Currency
 -- is inherited from the parent contract. netDelta (may be negative) is shown.
+-- contract_active tells the reader whether the parent contract still carries
+-- commercial change: termination rejects open VOs, so without it the portal
+-- would read status='rejected' and tell the client THEY rejected the order.
 create or replace function public.app_variation_by_token(p_hash text)
 returns jsonb
 language sql
@@ -686,6 +689,7 @@ as $$
     'currency', c.currency,
     'contract_number', c.number,
     'share_expires_at', v.share_expires_at,
+    'contract_active', (c.status in ('issued', 'signed')),
     'org', jsonb_build_object(
       'name_ar', o.name_ar,
       'name_en', o.name_en,
@@ -712,7 +716,7 @@ as $$
     ), '[]'::jsonb)
   )
   from public.variation_orders v
-  join public.contracts c on c.id = v.contract_id
+  join public.contracts c on c.id = v.contract_id and c.org_id = v.org_id
   join public.organizations o on o.id = v.org_id
   where v.token_hash = p_hash
     and v.status in ('issued', 'approved', 'rejected');
@@ -741,6 +745,7 @@ declare
   exp    timestamptz;
   vid    uuid;
   oid    uuid;
+  cst    text;
   n      int;
 begin
   target := case
@@ -750,11 +755,16 @@ begin
   end;
   if target is null then return 'invalid'; end if;
 
-  select status, share_expires_at, id, org_id
-    into st, exp, vid, oid
-    from public.variation_orders
-    where token_hash = p_hash;
+  select v.status, v.share_expires_at, v.id, v.org_id, c.status::text
+    into st, exp, vid, oid, cst
+    from public.variation_orders v
+    join public.contracts c on c.id = v.contract_id and c.org_id = v.org_id
+    where v.token_hash = p_hash;
   if not found then return 'not_found'; end if;
+  -- A terminated contract carries no commercial change. Checked BEFORE the VO
+  -- status: termination rejects open VOs, so the VO status alone would report
+  -- 'already' and hide the real reason from the client.
+  if cst not in ('issued', 'signed') then return 'contract_inactive'; end if;
   if st <> 'issued' then return 'already'; end if;
   if exp is not null and exp <= now() then return 'expired'; end if;
 
@@ -879,7 +889,9 @@ $$;
 --   design_engagements: id, number, state (raw key — the TS layer maps to a
 --     client-friendly label), off_plan, title_ar, title_en, created_at,
 --     design_fee (as design_fee_total — the fee the CLIENT pays, not a cost),
---     rom_low, rom_high (the client-acknowledged budget band), share_expires_at
+--     rom_low, rom_high (the budget band, and ONLY once rom_issued_at is
+--     stamped — an unissued band is the studio's private working state),
+--     share_expires_at
 --   organizations (the firm): name_ar, name_en, logo_file_id
 --   clients (the end client): name_ar, name_en
 --   engagement_milestones: kind, basis, sort_order, value (only as an input to
@@ -915,7 +927,12 @@ as $$
     'title_en', de.title_en,
     'created_at', de.created_at,
     'design_fee_total', de.design_fee::text,
+    -- ONLY an ISSUED band reaches the client. rom_low/rom_high are the studio's
+    -- private working numbers until issueRomCore stamps rom_issued_at, and any
+    -- edit clears that stamp, so a revised band goes quiet again until it is
+    -- deliberately re-issued.
     'rom', case
+      when de.rom_issued_at is null then null
       when de.rom_low is null and de.rom_high is null then null
       else jsonb_build_object('low', de.rom_low::text, 'high', de.rom_high::text)
     end,
@@ -1011,6 +1028,8 @@ as $$
         select 'acknowledge_rom', 5
         where de.rom_low is not null
           and de.rom_high is not null
+          -- Never offer the verb for a band the client cannot even see.
+          and de.rom_issued_at is not null
           and de.state not in ('closed_design_only', 'execution', 'abandoned')
           and not exists (
             select 1 from public.engagement_events e
@@ -1138,8 +1157,9 @@ $$;
 --   request_concept_changes -> concept_change_request  (state = concept_review)
 --   approve_design          -> design_approval         (state = final_approval)
 --   request_design_changes  -> design_change_request   (state = final_approval)
---   acknowledge_rom         -> rom_acknowledgement     (rom_low AND rom_high set;
---                              snapshots the current band into range_low/range_high)
+--   acknowledge_rom         -> rom_acknowledgement     (rom_low AND rom_high set
+--                              AND rom_issued_at stamped; snapshots the current
+--                              band into range_low/range_high)
 --   acknowledge_handoff     -> handoff_acknowledgement (state = design_only_handoff)
 -- A client rom_acknowledgement is the SAME kind the internal romAcknowledged guard
 -- reads, so a portal ROM ack satisfies Gate B exactly like the staff-recorded one —
@@ -1166,6 +1186,7 @@ declare
   oid       uuid;
   rl        numeric;
   rh        numeric;
+  ri        timestamptz;
   ok_state  boolean;
 begin
   -- Map the client-facing verb to the ledger event kind (unknown verb -> invalid).
@@ -1180,8 +1201,17 @@ begin
   end::public.engagement_event_kind;
   if v_kind is null then return 'invalid'; end if;
 
-  select state, share_expires_at, id, org_id, rom_low, rom_high
-    into st, exp, eid, oid, rl, rh
+  -- acknowledge_rom ALONE takes the row lock, and takes it BEFORE the read: its
+  -- precondition is that the band is issued, and a concurrent setEngagementRom
+  -- clears rom_issued_at, so an unlocked read could witness the client's consent
+  -- to a band that stopped existing between the check and the INSERT. The other
+  -- verbs gate on `state`, which the engagement's own transitions serialise.
+  if p_action = 'acknowledge_rom' then
+    perform 1 from public.design_engagements where token_hash = p_hash for update;
+  end if;
+
+  select state, share_expires_at, id, org_id, rom_low, rom_high, rom_issued_at
+    into st, exp, eid, oid, rl, rh, ri
     from public.design_engagements
     where token_hash = p_hash;
   if not found then return 'invalid'; end if;
@@ -1197,7 +1227,10 @@ begin
     when 'request_concept_changes' then st = 'concept_review'
     when 'approve_design'          then st = 'final_approval'
     when 'request_design_changes'  then st = 'final_approval'
+    -- An unissued band is not acknowledgeable: falls through to 'wrong_state',
+    -- the same answer the client already gets for any verb offered too early.
     when 'acknowledge_rom'         then rl is not null and rh is not null
+                                        and ri is not null
     when 'acknowledge_handoff'     then st = 'design_only_handoff'
     else false
   end;

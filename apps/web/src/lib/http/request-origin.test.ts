@@ -11,6 +11,7 @@ vi.mock('next/headers', () => ({
 const { resolveRequestOrigin } = await import('./request-origin');
 
 const originalAppUrl = process.env.NEXT_PUBLIC_APP_URL;
+const originalNodeEnv = process.env.NODE_ENV;
 
 beforeEach(() => {
   headerMap.clear();
@@ -20,6 +21,8 @@ beforeEach(() => {
 afterEach(() => {
   if (originalAppUrl === undefined) delete process.env.NEXT_PUBLIC_APP_URL;
   else process.env.NEXT_PUBLIC_APP_URL = originalAppUrl;
+  vi.stubEnv('NODE_ENV', originalNodeEnv ?? 'test');
+  vi.unstubAllEnvs();
 });
 
 describe('resolveRequestOrigin', () => {
@@ -54,6 +57,22 @@ describe('resolveRequestOrigin', () => {
 
   it('defaults the scheme to https', async () => {
     headerMap.set('host', 'metra.example');
+    await expect(resolveRequestOrigin()).resolves.toBe('https://metra.example');
+  });
+
+  // The scheme is ALLOWLISTED, not echoed. Anything that is not exactly `http`
+  // becomes https, so a forged header cannot mint a `javascript:` or `data:`
+  // link, nor smuggle a path segment past the `://`.
+  it.each([
+    'javascript',
+    'data',
+    'HTTP',
+    'http:',
+    'https://evil.example/?x=',
+    'http://evil.example',
+  ])('rewrites the forged scheme %s to https', async (forged) => {
+    headerMap.set('host', 'metra.example');
+    headerMap.set('x-forwarded-proto', forged);
     await expect(resolveRequestOrigin()).resolves.toBe('https://metra.example');
   });
 
@@ -94,5 +113,22 @@ describe('resolveRequestOrigin', () => {
     headerMap.set('x-forwarded-host', 'a.example, b.example');
     headerMap.set('x-forwarded-proto', 'http, https');
     await expect(resolveRequestOrigin()).resolves.toBe('http://a.example');
+  });
+
+  // The Host header is attacker-controlled. In production an unset
+  // NEXT_PUBLIC_APP_URL is a deployment defect, not a reason to email a link to
+  // whatever host the request claimed.
+  it('in PRODUCTION with no override, returns null even with a valid Host', async () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    headerMap.set('host', 'attacker.example');
+    headerMap.set('x-forwarded-host', 'attacker.example');
+    await expect(resolveRequestOrigin()).resolves.toBeNull();
+  });
+
+  it('in PRODUCTION the override still wins', async () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    process.env.NEXT_PUBLIC_APP_URL = 'https://metra.app';
+    headerMap.set('host', 'attacker.example');
+    await expect(resolveRequestOrigin()).resolves.toBe('https://metra.app');
   });
 });

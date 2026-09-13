@@ -18,7 +18,6 @@ import {
   setEngagementOffPlanCore,
   type SetEngagementOffPlanInput,
 } from '../off-plan';
-import { setEngagementRomCore, type SetEngagementRomInput } from '../rom';
 import type {
   GenerateFeeSchedulePayload,
   RequestRevisionPayload,
@@ -397,21 +396,6 @@ export async function abandonEngagement(
     engagementId,
     trigger: 'abandon',
   });
-  if (res.ok) revalidatePath('/', 'layout');
-  return res;
-}
-
-/**
- * Server-action wrapper for {@link setEngagementRomCore}: resolves the request's
- * org context, writes the coarse build-cost band (ROM low/high), and revalidates
- * the shell on success. Returns the ActionResult — never throws to the client.
- * This is plain data entry, NOT a machine transition: it moves no state.
- */
-export async function setEngagementRom(
-  input: SetEngagementRomInput,
-): Promise<ActionResult> {
-  const ctx = await requireOrg();
-  const res = await setEngagementRomCore(ctx, input);
   if (res.ok) revalidatePath('/', 'layout');
   return res;
 }

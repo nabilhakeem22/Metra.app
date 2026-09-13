@@ -10,7 +10,11 @@ import {
   type SaveDraftInput,
 } from '@/lib/proposals/core';
 import { respondToProposalByToken } from '@/lib/proposals/public';
-import { generateContractCore, issueContractCore } from '@/lib/contracts/core';
+import {
+  generateContractCore,
+  issueContractCore,
+  terminateContractCore,
+} from '@/lib/contracts/core';
 import { getContractWithLines } from '@/lib/contracts/queries';
 import {
   createVariationDraftCore,
@@ -18,7 +22,7 @@ import {
   issueVariationCore,
   saveVariationDraftCore,
 } from '@/lib/variations/core';
-import { respondToVariationByToken } from '@/lib/variations/public';
+import { getVariationByToken, respondToVariationByToken } from '@/lib/variations/public';
 import {
   getProjectApprovedVariationTotal,
   getVariationWithLines,
@@ -288,5 +292,177 @@ describe('F1: a de-scope reverses an add to the piastre', () => {
     const detail = await getContractWithLines(ctx, contractId, true);
     expect(detail!.revisedValue).toBe(detail!.originalValue);
     expect(await getProjectApprovedVariationTotal(ctx, projectId)).toBe('0.0000');
+  });
+});
+
+describe('M10: a variation total past the money cap is coded, not generic', () => {
+  it('refuses a line whose qty x price overflows, and a netDelta that does', async () => {
+    const { ctx, clientId, projectId } = await setup();
+    const { contractId } = await issuedContract(ctx, clientId, projectId);
+    const voId = ((await createVariationDraftCore(ctx, { contractId, titleEn: 'Huge' })) as { data?: string }).data!;
+
+    // Each factor is inside the cap; the product is not.
+    expect(
+      await saveVariationDraftCore(ctx, {
+        id: voId,
+        lines: [{ descriptionEn: 'x', qty: '1000000000000', unit: 'lump_sum', unitCost: '0', unitPrice: '1000000000000', discountPct: '0' }],
+      }),
+    ).toEqual({ ok: false, error: 'amount_too_large' });
+
+    // The cost side alone: the price is nominal, the cost is not.
+    expect(
+      await saveVariationDraftCore(ctx, {
+        id: voId,
+        lines: [{ descriptionEn: 'x', qty: '1000000000000', unit: 'lump_sum', unitCost: '1000000000000', unitPrice: '0.0001', discountPct: '0' }],
+      }),
+    ).toEqual({ ok: false, error: 'amount_too_large' });
+
+    // Each line is inside the cap; their sum is not.
+    expect(
+      await saveVariationDraftCore(ctx, {
+        id: voId,
+        lines: Array.from({ length: 3 }, () => ({
+          descriptionEn: 'x', qty: '1', unit: 'lump_sum' as const,
+          unitCost: '0', unitPrice: '900000000000', discountPct: '0',
+        })),
+      }),
+    ).toEqual({ ok: false, error: 'amount_too_large' });
+  });
+});
+
+describe('B2: a terminated contract carries no commercial change', () => {
+  /** A draft VO with one 100 EGP line on a fresh issued contract. */
+  async function draftVariation(ctx: OrgContext, contractId: string, title: string) {
+    const voId = ((await createVariationDraftCore(ctx, { contractId, titleEn: title })) as { data?: string }).data!;
+    await saveVariationDraftCore(ctx, {
+      id: voId,
+      lines: [{ descriptionEn: 'x', qty: '1', unit: 'lump_sum', unitCost: '0', unitPrice: '100', discountPct: '0' }],
+    });
+    return voId;
+  }
+
+  async function statusOf(voId: string): Promise<string> {
+    const [row] = await raw.query<{ status: string }>(
+      `select status from public.variation_orders where id = '${voId}'`,
+    );
+    return row.status;
+  }
+
+  it('refuses internal approval of a draft VO and mints no token', async () => {
+    const { ctx, clientId, projectId } = await setup();
+    const { contractId } = await issuedContract(ctx, clientId, projectId);
+    const voId = await draftVariation(ctx, contractId, 'Late approval');
+    // Terminate WITHOUT the cascade so the VO is still draft: this asserts the
+    // internal-approval guard itself, not the auto-rejection (covered below).
+    await raw.query(
+      `update public.contracts set status = 'terminated' where id = '${contractId}'`,
+    );
+
+    expect(await internalApproveVariationCore(ctx, { id: voId })).toEqual({
+      ok: false,
+      error: 'contract_not_issued',
+    });
+    const [vo] = await raw.query<{ status: string; token_hash: string | null }>(
+      `select status, token_hash from public.variation_orders where id = '${voId}'`,
+    );
+    expect(vo.status).toBe('draft');
+    expect(vo.token_hash).toBeNull();
+  });
+
+  it('refuses to issue an internally approved VO and writes no event', async () => {
+    const { ctx, clientId, projectId } = await setup();
+    const { contractId } = await issuedContract(ctx, clientId, projectId);
+    const voId = await draftVariation(ctx, contractId, 'Late issue');
+    await internalApproveVariationCore(ctx, { id: voId });
+    // Terminate WITHOUT the cascade so the VO is still internal_approved: this
+    // asserts the issue guard itself, not the auto-rejection.
+    await raw.query(
+      `update public.contracts set status = 'terminated' where id = '${contractId}'`,
+    );
+
+    expect(await issueVariationCore(ctx, { id: voId })).toEqual({
+      ok: false,
+      error: 'contract_not_issued',
+    });
+    expect(await statusOf(voId)).toBe('internal_approved');
+    const [events] = await raw.query<{ n: number }>(
+      `select count(*)::int as n from public.variation_order_events
+         where variation_order_id = '${voId}' and kind = 'issued'`,
+    );
+    expect(events.n).toBe(0);
+  });
+
+  it('refuses the client token decision with contract_inactive', async () => {
+    const { ctx, clientId, projectId } = await setup();
+    const { contractId } = await issuedContract(ctx, clientId, projectId);
+    const voId = await draftVariation(ctx, contractId, 'Token decision');
+    const token = ((await internalApproveVariationCore(ctx, { id: voId })) as { data?: string }).data!;
+    await issueVariationCore(ctx, { id: voId });
+    // Again without the cascade, so the SDF is proved to be a second line of
+    // defence for any VO left issued under a dead contract.
+    await raw.query(
+      `update public.contracts set status = 'terminated' where id = '${contractId}'`,
+    );
+
+    expect(await respondToVariationByToken(token, { decision: 'approve' })).toEqual({
+      ok: false,
+      error: 'contract_inactive',
+    });
+    expect(await statusOf(voId)).toBe('issued');
+  });
+
+  it('tells the token reader the contract died rather than that the client rejected', async () => {
+    const { ctx, clientId, projectId } = await setup();
+    const { contractId } = await issuedContract(ctx, clientId, projectId);
+    const voId = await draftVariation(ctx, contractId, 'Terminated read');
+    const token = ((await internalApproveVariationCore(ctx, { id: voId })) as { data?: string }).data!;
+    await issueVariationCore(ctx, { id: voId });
+
+    const live = await getVariationByToken(token);
+    expect(live?.status).toBe('issued');
+    expect(live?.contractActive).toBe(true);
+
+    expect((await terminateContractCore(ctx, { id: contractId })).ok).toBe(true);
+
+    // The cascade rejected the VO, but the client never did: the portal picks its
+    // copy from contractActive, so the read must carry the parent's real state.
+    const afterTermination = await getVariationByToken(token);
+    expect(afterTermination?.status).toBe('rejected');
+    expect(afterTermination?.contractActive).toBe(false);
+  });
+
+  it('rejects every undecided VO on termination and leaves an approved one alone', async () => {
+    const { ctx, clientId, projectId } = await setup();
+    const { contractId } = await issuedContract(ctx, clientId, projectId);
+
+    const draftVo = await draftVariation(ctx, contractId, 'Still draft');
+    const approvedInternallyVo = await draftVariation(ctx, contractId, 'Internally approved');
+    await internalApproveVariationCore(ctx, { id: approvedInternallyVo });
+    const issuedVo = await draftVariation(ctx, contractId, 'Issued');
+    await internalApproveVariationCore(ctx, { id: issuedVo });
+    await issueVariationCore(ctx, { id: issuedVo });
+    const decidedVo = await draftVariation(ctx, contractId, 'Client approved');
+    const decidedToken = ((await internalApproveVariationCore(ctx, { id: decidedVo })) as { data?: string }).data!;
+    await issueVariationCore(ctx, { id: decidedVo });
+    await respondToVariationByToken(decidedToken, { decision: 'approve' });
+
+    // No MT100: the cascade sets status + updated_at only.
+    expect((await terminateContractCore(ctx, { id: contractId })).ok).toBe(true);
+
+    expect(await statusOf(draftVo)).toBe('rejected');
+    expect(await statusOf(approvedInternallyVo)).toBe('rejected');
+    expect(await statusOf(issuedVo)).toBe('rejected');
+    expect(await statusOf(decidedVo)).toBe('approved');
+
+    const events = await raw.query<{ variation_order_id: string; from_status: string }>(
+      `select variation_order_id, from_status from public.variation_order_events
+         where variation_order_id in ('${draftVo}', '${approvedInternallyVo}', '${issuedVo}', '${decidedVo}')
+           and kind = 'rejected' order by from_status`,
+    );
+    expect(events).toEqual([
+      { variation_order_id: draftVo, from_status: 'draft' },
+      { variation_order_id: approvedInternallyVo, from_status: 'internal_approved' },
+      { variation_order_id: issuedVo, from_status: 'issued' },
+    ]);
   });
 });

@@ -521,6 +521,7 @@
     "handoff_not_open": "The design-only handoff isn't open at this stage",
     "rom_range_invalid": "Enter a valid low–high build-cost range",
     "rom_not_set": "Enter the build-cost range before recording the client's acknowledgement",
+    "rom_not_issued": "The range must be issued to the client before an acknowledgement can be recorded",
     "off_plan_locked": "Off-plan can only be changed before the deposit is paid.",
     "flow_not_enabled": "This flow isn't enabled for your workspace's plan.",
     "payment_kind_mismatch": "This payment type doesn't match the step you're advancing",
@@ -531,7 +532,8 @@
     "dates_required": "Start and end dates are required.",
     "project_limit_reached": "Your plan has no project seats left. Contact us to add more.",
     "event_not_found": "That record is not on this engagement.",
-    "already_corrected": "That record has already been retracted."
+    "already_corrected": "That record has already been retracted.",
+    "rom_already_issued": "This range has already been issued to the client"
   },
   "common": {
     "untranslated": "untranslated",
@@ -1443,7 +1445,8 @@
       "rejected": "You rejected this variation order.",
       "already": "A decision has already been recorded for this variation order.",
       "expired": "This link has expired.",
-      "invalid": "This link is not valid."
+      "invalid": "This link is not valid.",
+      "contractInactive": "This contract is no longer active, so this variation order can no longer be decided."
     }
   },
   "engagements": {
@@ -1461,7 +1464,8 @@
       "existing": "Existing unit",
       "offPlan": "Off-plan",
       "hint": "Sets Step 2: an existing unit needs a site survey; off-plan imports the developer AutoCAD.",
-      "budgetDraftBadge": "draft"
+      "budgetDraftBadge": "draft",
+      "budgetAwaitingAckBadge": "awaiting acknowledgement"
     },
     "paymentsBadge": "{n} due",
     "asBuiltDue": "As-built due",
@@ -1703,7 +1707,10 @@
       "setRange": "Set the range",
       "reviseRange": "Revise the range",
       "rangeNote": "An indicative build cost — not a quote, and not the design fee.",
-      "onBehalfBlocked": "Set a build-cost range first — there is nothing for the client to acknowledge yet."
+      "onBehalfBlocked": "Set a build-cost range first — there is nothing for the client to acknowledge yet.",
+      "onBehalfBlockedUnissued": "Issue the range to the client first. They cannot acknowledge a band they have not seen.",
+      "issueRom": "Issue to client",
+      "issueRomHint": "The client sees the range only after you issue it."
     },
     "stageAction": {
       "studio": {
@@ -1959,7 +1966,9 @@
       "as_built_attestation": "As-built attestation",
       "concept_change_request": "Concept change request",
       "design_change_request": "Design change request",
-      "rom_range_set": "Build-cost range issued"
+      "event_correction": "Correction of an earlier entry",
+      "rom_range_set": "Build-cost range set",
+      "rom_issued": "Build-cost range issued to client"
     },
     "milestoneKind": {
       "deposit": "Deposit",

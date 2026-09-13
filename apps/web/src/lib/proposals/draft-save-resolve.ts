@@ -157,6 +157,21 @@ export function resolveDraftLines(
         unitPrice: unitPrice!,
         discountPct: discountPct!,
       });
+      // The FACTORS were each inside the cap; their PRODUCT need not be. qty and
+      // unit_price of 1e12 each pass the checks above and multiply to 1e24, which
+      // overflows numeric(18,4) at the database and aborts the whole save with an
+      // unlocalizable error instead of a coded one.
+      // ALL THREE products are persisted, so all three are checked: a cheap price
+      // with an absurd cost overflows line_cost (and line_margin with it) exactly
+      // the same way, and only the document total was catching that — after the
+      // lines had already been written.
+      if (
+        !withinMagnitude(totals.lineTotal) ||
+        !withinMagnitude(totals.lineCost) ||
+        !withinMagnitude(totals.lineMargin)
+      ) {
+        fail('amount_too_large');
+      }
       lineTotals.push(totals);
       lines.push({
         costItemId,
@@ -174,6 +189,17 @@ export function resolveDraftLines(
       });
     }
     const sectionSubtotals = computeSection(lineTotals);
+    // …and the SECTION sum need not be inside the cap either. This runs here,
+    // not beside the document total, because the section subtotal is PERSISTED
+    // before the document total is computed — a sum past the cap would reach
+    // numeric(18,4) first and come back as an unlocalizable 'generic'.
+    if (
+      !withinMagnitude(sectionSubtotals.sectionSubtotal) ||
+      !withinMagnitude(sectionSubtotals.sectionCost) ||
+      !withinMagnitude(sectionSubtotals.sectionMargin)
+    ) {
+      fail('amount_too_large');
+    }
     sectionTotals.push(sectionSubtotals);
     resolvedSections.push({
       titleAr: sectionTitleAr,

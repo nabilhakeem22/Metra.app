@@ -37,6 +37,8 @@ export interface EngagementHeader {
   designRevisionCount: number;
   romLow: string | null;
   romHigh: string | null;
+  /** When the band was issued to the client; null while it is a draft. */
+  romIssuedAt: Date | null;
   conceptLockedAt: string | null;
   renderManifestHash: string | null;
   rendersReadyAt: string | null;
@@ -71,6 +73,7 @@ export function getEngagementHeader(
         designRevisionCount: designEngagements.designRevisionCount,
         romLow: designEngagements.romLow,
         romHigh: designEngagements.romHigh,
+        romIssuedAt: designEngagements.romIssuedAt,
         conceptLockedAt: designEngagements.conceptLockedAt,
         renderManifestHash: designEngagements.renderManifestHash,
         rendersReadyAt: designEngagements.rendersReadyAt,

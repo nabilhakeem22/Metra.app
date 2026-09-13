@@ -4,6 +4,7 @@ import { eq, sql } from 'drizzle-orm';
 import { fail, mutateInOrg } from '@/lib/actions/mutate';
 import { err, type ActionResult } from '@/lib/actions/result';
 import { computeLine } from '@/lib/aggregates/proposal-totals';
+import { withinMagnitude } from '@/lib/proposals/validation';
 import type { OrgContext } from '@/lib/db/context';
 import { bilingualFor } from './bilingual';
 import { MAX_BOQ_LINES, recomputeBoqTotals } from './core';
@@ -111,6 +112,16 @@ export async function updateBoqLineCore(
         unitCost: current.unitCost,
         discountPct: current.discountPct,
       });
+      // The FACTORS are each inside the cap; their PRODUCT need not be. Same
+      // check the import makes on every line it writes — the cost side included,
+      // because unitCost is not editable here and the sheet never showed it.
+      if (
+        !withinMagnitude(totals.lineTotal) ||
+        !withinMagnitude(totals.lineCost) ||
+        !withinMagnitude(totals.lineMargin)
+      ) {
+        fail('amount_too_large');
+      }
 
       await tx
         .update(boqLines)

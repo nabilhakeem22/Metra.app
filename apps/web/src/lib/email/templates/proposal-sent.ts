@@ -2,19 +2,12 @@
 // so copy is inlined. Contains NO cost or margin — only the client-facing total,
 // number, and the accept link. Western numerals (§4.1).
 import { EMAIL_BRAND, emailWordmark } from '@/lib/email/brand';
+import { escapeHtml } from './escape-html';
 
 export interface ProposalSentEmailContent {
   subject: string;
   html: string;
   text: string;
-}
-
-function escapeHtml(s: string): string {
-  return s
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
 }
 
 export function proposalSentEmailTemplate(input: {
@@ -72,10 +65,10 @@ export function proposalSentEmailTemplate(input: {
     <p style="color:${EMAIL_BRAND.body};">${intro}</p>
     ${meta}
     <p style="margin:24px 0;">
-      <a href="${url}" style="display:inline-block;background:${EMAIL_BRAND.brand};color:${EMAIL_BRAND.onBrand};text-decoration:none;padding:12px 20px;border-radius:10px;font-weight:600;">${cta}</a>
+      <a href="${escapeHtml(url)}" style="display:inline-block;background:${EMAIL_BRAND.brand};color:${EMAIL_BRAND.onBrand};text-decoration:none;padding:12px 20px;border-radius:10px;font-weight:600;">${cta}</a>
     </p>
     <p style="color:${EMAIL_BRAND.muted};font-size:13px;">${fallback}</p>
-    <p style="word-break:break-all;font-size:13px;"><a href="${url}">${url}</a></p>
+    <p style="word-break:break-all;font-size:13px;"><a href="${escapeHtml(url)}">${escapeHtml(url)}</a></p>
   </div></body></html>`;
 
   const textLines = [

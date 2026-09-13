@@ -105,6 +105,11 @@ export default async function EngagementDetailPage({
     recordPayment: can(ctx.role, 'engagements_finance', 'create'),
     recordArtifact: can(ctx.role, 'engagements_design', 'create'),
     setRom: can(ctx.role, 'engagements_design', 'update'),
+    // Issuing the band is OWNER/ADMIN only, deliberately narrower than setting
+    // it: typing a working range is routine studio work, putting a cost figure
+    // in front of the end client is not. The action re-checks; this only decides
+    // whether to offer the control.
+    issueRom: can(ctx.role, 'engagements_issue', 'approve'),
     recordRomAck: can(ctx.role, 'engagements_design', 'create'),
     // The staff handoff-ack stand-in only makes sense while the design-only
     // package awaits its receipt — never before, never after closing.

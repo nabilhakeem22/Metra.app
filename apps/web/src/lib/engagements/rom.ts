@@ -57,8 +57,9 @@ function isPositiveMoneyString(value: unknown): value is string {
  * values so the STORED band is exactly the one the app validated (the DB
  * numeric(18,4) would otherwise round a >4-decimal input); append ONE
  * `rom_range_set` event carrying that same band, so what the firm quoted
- * survives the next revision. Returns ok. Never throws to the client — coded
- * ActionResult only.
+ * survives the next revision; and CLEAR `rom_issued_at`, so a revised band is
+ * hidden from the client until it is deliberately re-issued. Returns ok. Never
+ * throws to the client — coded ActionResult only.
  */
 export async function setEngagementRomCore(
   ctx: OrgContext,
@@ -94,7 +95,13 @@ export async function setEngagementRomCore(
       // the rule `executor.ts` already follows for every machine transition.
       const updated = await tx
         .update(designEngagements)
-        .set({ romLow, romHigh, updatedAt: new Date() })
+        // rom_issued_at is reset UNCONDITIONALLY. A band the client has seen is
+        // a number they may be budgeting against, so changing it un-tells them:
+        // the portal goes quiet and the studio has to issue the new band
+        // deliberately. Setting the same numbers again still resets it, because
+        // "same numbers" is not something this core can assert about what the
+        // client actually received.
+        .set({ romLow, romHigh, romIssuedAt: null, updatedAt: new Date() })
         .where(
           and(
             eq(designEngagements.id, input.engagementId),
