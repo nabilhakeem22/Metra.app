@@ -321,7 +321,7 @@ describe('confirmPaymentClaimCore (AC7)', () => {
     expect((await claimRows(engagementId))[0].status).toBe('pending');
   });
 
-  it('writes ONE payment row keyed by the claim id, flips claim to confirmed; second confirm is already', async () => {
+  it('writes ONE payment row keyed by the namespaced claim key, flips claim to confirmed; second confirm is already', async () => {
     const { ctx, engagementId, token } = await seedClaimDelivery('confirm');
     await claimPaymentByToken(token, { milestoneKind: 'deposit' });
     const [claim] = await claimRows(engagementId);
@@ -338,7 +338,9 @@ describe('confirmPaymentClaimCore (AC7)', () => {
     expect(payments[0].id).toBe(paymentId);
     expect(payments[0].kind).toBe('deposit');
     expect(payments[0].recorded_by).toBe(ctx.userId);
-    expect(payments[0].idempotency_key).toBe(claim.id);
+    // NAMESPACED, not the bare claim id: recordPaymentCore only accepts a UUID
+    // key, so nothing outside this core can mint a row in this namespace.
+    expect(payments[0].idempotency_key).toBe(`claim:${claim.id}`);
 
     const [confirmed] = await claimRows(engagementId);
     expect(confirmed.status).toBe('confirmed');
@@ -353,6 +355,59 @@ describe('confirmPaymentClaimCore (AC7)', () => {
     expect(second.ok).toBe(true);
     expect((second as { already?: boolean }).already).toBe(true);
     expect(await paymentRows(engagementId)).toHaveLength(1);
+  });
+
+  // THE FORGERY THIS CLOSES: the key used to be the bare claim id, which is a
+  // UUID and therefore mintable through recordPaymentCore by anyone who knew the
+  // id. A 1 EGP pre-insert would have been adopted as the claim's payment.
+  it('a payment pre-inserted under the bare claim id cannot hijack the confirmation', async () => {
+    const { ctx, engagementId, token } = await seedClaimDelivery('confirm-forge');
+    await claimPaymentByToken(token, { milestoneKind: 'deposit' });
+    const [claim] = await claimRows(engagementId);
+
+    const decoy = await recordPaymentCore(ctx, {
+      engagementId,
+      kind: 'gate_a',
+      amount: '1',
+      idempotencyKey: claim.id,
+    });
+    expect(decoy.ok).toBe(true);
+
+    const res = await confirmPaymentClaimCore(ctx, {
+      claimId: claim.id,
+      amount: '30000',
+    });
+    expect(res.ok).toBe(true);
+
+    const payments = await paymentRows(engagementId);
+    expect(payments).toHaveLength(2);
+    const decoyRow = payments.find((p) => p.idempotency_key === claim.id);
+    const claimRow = payments.find(
+      (p) => p.idempotency_key === `claim:${claim.id}`,
+    );
+    // The decoy is untouched and separate; the claim points at the real 30000.
+    expect(decoyRow?.amount).toBe('1.0000');
+    expect(decoyRow?.kind).toBe('gate_a');
+    expect(claimRow?.amount).toBe('30000.0000');
+    expect(claimRow?.kind).toBe('deposit');
+    const [confirmed] = await claimRows(engagementId);
+    expect(confirmed.confirmed_payment_event_id).toBe(claimRow?.id);
+  });
+
+  it('recordPaymentCore REFUSES a key in the claim namespace', async () => {
+    const { ctx, engagementId, token } = await seedClaimDelivery('confirm-ns');
+    await claimPaymentByToken(token, { milestoneKind: 'deposit' });
+    const [claim] = await claimRows(engagementId);
+
+    expect(
+      await recordPaymentCore(ctx, {
+        engagementId,
+        kind: 'deposit',
+        amount: '30000',
+        idempotencyKey: `claim:${claim.id}`,
+      }),
+    ).toEqual({ ok: false, error: 'invalid' });
+    expect(await paymentRows(engagementId)).toHaveLength(0);
   });
 
   it('the studio may edit the amount at confirm time', async () => {

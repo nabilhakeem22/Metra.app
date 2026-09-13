@@ -101,8 +101,17 @@ export async function confirmPaymentClaimCore(
       if (!engagement) fail('engagement_not_found');
       if (isTerminal(engagement.state)) fail('engagement_not_active');
 
-      // Record the real payment. The claim id is the idempotency key, so a raced /
-      // replayed confirm dedups to the first-written payment (no second ledger row).
+      // Record the real payment, keyed so a raced / replayed confirm dedups to
+      // the first-written payment (no second ledger row).
+      //
+      // The key is NAMESPACED, not the bare claim id: recordPaymentCore accepts a
+      // caller-supplied idempotency key but requires it to be a UUID, so a bare
+      // claim id was forgeable. Anyone who knew a pending claim's id could
+      // pre-insert a 1.00 EGP payment under that key, and this insert would then
+      // conflict and adopt it — confirming the client's claim against a payment of
+      // the attacker's choosing. `claim:<uuid>` is not a UUID, so recordPaymentCore
+      // can never mint a row in this namespace.
+      const claimKey = `claim:${claim.id}`;
       const inserted = await tx
         .insert(paymentEvents)
         .values({
@@ -111,7 +120,7 @@ export async function confirmPaymentClaimCore(
           kind: claim.milestoneKind,
           amount,
           recordedBy: ctx.userId,
-          idempotencyKey: claim.id,
+          idempotencyKey: claimKey,
         })
         .onConflictDoNothing({
           target: [
@@ -140,18 +149,32 @@ export async function confirmPaymentClaimCore(
         });
       } else {
         // Lost the idempotency race / replay: return the winning row's id (mirrors
-        // recordPaymentCore — `already: true`, no second audit).
+        // recordPaymentCore — `already: true`, no second audit). The winner is
+        // re-read and CHECKED: adopting a row whose kind or amount differs from
+        // what this confirmation is for would resolve the claim against the wrong
+        // money, so a mismatch aborts the whole transaction instead.
         const [existing] = await tx
-          .select({ id: paymentEvents.id })
+          .select({
+            id: paymentEvents.id,
+            kind: paymentEvents.kind,
+            amount: paymentEvents.amount,
+          })
           .from(paymentEvents)
           .where(
             and(
               eq(paymentEvents.orgId, ctx.orgId),
               eq(paymentEvents.engagementId, claim.engagementId),
-              eq(paymentEvents.idempotencyKey, claim.id),
+              eq(paymentEvents.idempotencyKey, claimKey),
             ),
           )
           .limit(1);
+        if (
+          !existing ||
+          existing.kind !== claim.milestoneKind ||
+          parseMoney4(existing.amount) !== amount4
+        ) {
+          fail('generic');
+        }
         paymentId = existing.id;
         already = true;
       }
