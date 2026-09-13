@@ -1443,7 +1443,8 @@
       "rejected": "You rejected this variation order.",
       "already": "A decision has already been recorded for this variation order.",
       "expired": "This link has expired.",
-      "invalid": "This link is not valid."
+      "invalid": "This link is not valid.",
+      "contractInactive": "This contract is no longer active, so this variation order can no longer be decided."
     }
   },
   "engagements": {

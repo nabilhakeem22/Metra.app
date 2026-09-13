@@ -49,7 +49,11 @@ export async function getVariationByToken(
   return rows[0]?.data ?? null;
 }
 
-export type RespondError = 'token_invalid' | 'token_expired' | 'already_responded';
+export type RespondError =
+  | 'token_invalid'
+  | 'token_expired'
+  | 'already_responded'
+  | 'contract_inactive';
 
 export async function respondToVariationByToken(
   rawToken: string,
@@ -76,6 +80,8 @@ export async function respondToVariationByToken(
       return { ok: false, error: 'token_expired' };
     case 'already':
       return { ok: false, error: 'already_responded' };
+    case 'contract_inactive':
+      return { ok: false, error: 'contract_inactive' };
     default:
       return { ok: false, error: 'token_invalid' };
   }

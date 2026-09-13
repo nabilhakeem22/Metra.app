@@ -741,6 +741,7 @@ declare
   exp    timestamptz;
   vid    uuid;
   oid    uuid;
+  cst    text;
   n      int;
 begin
   target := case
@@ -750,11 +751,16 @@ begin
   end;
   if target is null then return 'invalid'; end if;
 
-  select status, share_expires_at, id, org_id
-    into st, exp, vid, oid
-    from public.variation_orders
-    where token_hash = p_hash;
+  select v.status, v.share_expires_at, v.id, v.org_id, c.status::text
+    into st, exp, vid, oid, cst
+    from public.variation_orders v
+    join public.contracts c on c.id = v.contract_id and c.org_id = v.org_id
+    where v.token_hash = p_hash;
   if not found then return 'not_found'; end if;
+  -- A terminated contract carries no commercial change. Checked BEFORE the VO
+  -- status: termination rejects open VOs, so the VO status alone would report
+  -- 'already' and hide the real reason from the client.
+  if cst not in ('issued', 'signed') then return 'contract_inactive'; end if;
   if st <> 'issued' then return 'already'; end if;
   if exp is not null and exp <= now() then return 'expired'; end if;
 
