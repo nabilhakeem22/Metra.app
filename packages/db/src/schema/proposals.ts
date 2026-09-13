@@ -92,6 +92,13 @@ export const proposals = pgTable(
     ),
     index('proposals_org_status_idx').on(t.orgId, t.status),
     index('proposals_org_project_idx').on(t.orgId, t.projectId),
+    // Live since 0019 — the keyset covering index the list endpoints read in
+    // order (created_at DESC, id DESC) within an org.
+    index('proposals_org_created_id_idx').on(
+      t.orgId,
+      t.createdAt.desc().nullsFirst(),
+      t.id.desc().nullsFirst(),
+    ),
   ],
 );
 

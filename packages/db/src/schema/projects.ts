@@ -8,6 +8,7 @@ import {
   pgTable,
   text,
   unique,
+  uniqueIndex,
   uuid,
   type AnyPgColumn,
 } from 'drizzle-orm/pg-core';
@@ -76,9 +77,14 @@ export const projects = pgTable(
     // emitting a DROP INDEX for it.
     index('projects_org_created_id_idx').on(
       t.orgId,
-      t.createdAt.desc(),
-      t.id.desc(),
+      t.createdAt.desc().nullsFirst(),
+      t.id.desc().nullsFirst(),
     ),
+    // Live since 0039 — one project number per org, and only where a number was
+    // actually assigned (PARTIAL, so unnumbered projects don't collide on NULL).
+    uniqueIndex('projects_org_number_unique')
+      .on(t.orgId, t.number)
+      .where(sql`number is not null`),
   ],
 );
 
