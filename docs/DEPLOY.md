@@ -82,3 +82,34 @@ Manual `wrangler deploy` (above) still works as a fallback.
 worker secrets (Cloudflare dashboard → metra-web → Settings → Variables and
 secrets). `CRON_SECRET` is added when the automation cron is enabled.
 `wrangler deploy` preserves these across deploys.
+
+## Testing against a database
+
+The two DB suites (`npm run test:actions -w @metra/web`, `npm run test:isolation
+-w @metra/db`) resolve `DATABASE_URL` from the repo-root `.env`, which holds the
+**hosted Supabase** connection string. They are destructive: the action suite
+creates and deletes whole organisations, the isolation suite creates and DROPS
+scratch tables in `public`. Run as-is, they did that to the shared database —
+and because teardown only ran from a suite's `afterAll`, every interrupted run
+leaked its orgs. The shared project accumulated 480 of them.
+
+So both vitest DB configs now call `assertLocalDatabase` (from
+`packages/db/src/testing/local-database-guard.ts`) at config load, before a
+single connection is opened. It **refuses to run unless `DATABASE_URL`'s host is
+provably local** (`localhost`, `127.0.0.1`, `::1`, `0.0.0.0` — exact matches, so
+`localhost.attacker.example` does not count). A missing or unparseable URL is
+refused too: it fails closed.
+
+```
+docker run --name metra-test-db -e POSTGRES_PASSWORD=postgres -p 5432:5432 -d postgres:17
+export DATABASE_URL=postgresql://postgres:postgres@localhost:5432/postgres
+npm run db:migrate && npm run db:apply-rls && npm run db:seed
+```
+
+**CI is unaffected:** `ci.yml` exports `DATABASE_URL` pointing at its own
+`postgres:17` service container, and `dotenv` never overrides an already-set
+variable, so the guard sees `localhost` and passes.
+
+**The opt-out** is `METRA_ALLOW_SHARED_DB=1`. Set it only when you mean to run a
+destructive suite against a non-local database and you accept that it will
+delete data there.
