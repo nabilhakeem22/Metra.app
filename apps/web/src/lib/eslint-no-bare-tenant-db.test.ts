@@ -35,6 +35,14 @@ it('no-bare-tenant-db: flags raw-connection queries, allows scoped ones', () => 
       { code: 'map.update(key);' },
       // `.transaction` itself is not a query method.
       { code: 'withRequestDb((db) => db.transaction(async (tx) => run(tx)));' },
+      // Drizzle's own `sql` tag is imported in ~200 files and is NOT a
+      // connection: only a `sql` that resolves to a raw factory is flagged.
+      {
+        code: "import { sql } from 'drizzle-orm'; withOrgContext(ctx, (tx) => tx.execute(sql`select 1`));",
+      },
+      {
+        code: "import { sql } from 'drizzle-orm'; function f(tx) { return tx.select().from(c).where(sql`a = 1`); }",
+      },
       // Allowlisted sanctioned exception — raw db.execute permitted.
       {
         filename: 'apps/web/src/lib/proposals/public.ts',
@@ -52,6 +60,23 @@ it('no-bare-tenant-db: flags raw-connection queries, allows scoped ones', () => 
       },
     ],
     invalid: [
+      // The postgres.js handle IS the same privileged socket as `db`: reaching
+      // for `sql`/`pg` instead of `db` used to bypass this rule entirely.
+      {
+        filename: 'apps/web/src/lib/clients/queries.ts',
+        code: 'const { sql } = getRequestConnection(); await sql`select * from public.clients`;',
+        errors: [{ messageId: 'bareQuery' }],
+      },
+      {
+        filename: 'apps/web/src/lib/clients/queries.ts',
+        code: "const { sql } = createRuntimeConnection(); await sql.unsafe('select 1');",
+        errors: [{ messageId: 'bareQuery' }],
+      },
+      {
+        filename: 'apps/web/src/lib/clients/queries.ts',
+        code: 'const { pg } = getRequestConnection(); await pg`select 1`;',
+        errors: [{ messageId: 'bareQuery' }],
+      },
       // Bare read on the withRequestDb callback param, non-allowlisted file.
       {
         filename: 'apps/web/src/lib/clients/queries.ts',

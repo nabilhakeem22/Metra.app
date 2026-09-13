@@ -1,5 +1,7 @@
-// ESLint rule: forbid a Drizzle query (`.select`/`.insert`/`.update`/`.delete`/
-// `.execute`) on the RAW request/base DB connection.
+// ESLint rule: forbid a query on the RAW request/base DB connection — either a
+// Drizzle builder (`.select`/`.insert`/`.update`/`.delete`/`.execute`) or the
+// underlying postgres.js handle (a `` sql`…` `` tagged template, or
+// `.unsafe(…)`).
 //
 // WHY: `apps/web/src/lib/db/{client,request-connection}.ts` concentrate ONE
 // privileged postgres.js handle that every caller borrows via `withRequestDb`.
@@ -22,6 +24,16 @@
 //     through `.transaction`;
 //   • by the pervasive convention of this codebase, any identifier literally
 //     named `db` (the raw handle is `db` everywhere; the RLS-scoped handle is `tx`).
+// THE postgres.js HANDLE COUNTS TOO. `getRequestConnection()` /
+// `createRuntimeConnection()` return `{ db, sql, pg }`: `db` is the Drizzle
+// wrapper and `sql`/`pg` are the SAME privileged socket underneath it. Reaching
+// for `sql` instead of `db` was therefore a complete bypass of this rule while
+// being exactly as dangerous, so a destructured `sql`/`pg` from those factories is
+// raw, and both `` sql`select …` `` and `sql.unsafe(…)` on it are reported.
+// Deliberately NOT extended by name convention: drizzle's own `sql` tag is
+// imported in roughly two hundred files and is not a connection, so only a `sql`
+// that RESOLVES to a raw factory is flagged. `db` keeps its name convention.
+//
 // A handle bound by `withOrgContext` / `withUserContext` (conventionally `tx`) is
 // SAFE and never flagged. A free `tx: MetraDb` helper parameter (the dozens of
 // `core.ts`/`queries.ts` helpers that receive an already-scoped tx) is treated as
@@ -66,9 +78,17 @@
 // If you are adding a genuinely-new sanctioned base-connection use, add its file
 // here WITH a comment justifying why it is safe — do not disable the rule inline.
 
-/** Drizzle query builders that actually touch data. `transaction` is deliberately
- * excluded — it only opens a tx; the risk is the read/write/exec inside it. */
-const QUERY_METHODS = new Set(['select', 'insert', 'update', 'delete', 'execute']);
+/** Query methods that actually touch data — Drizzle builders plus postgres.js's
+ * `.unsafe`. `transaction` is deliberately excluded: it only opens a tx; the risk
+ * is the read/write/exec inside it. */
+const QUERY_METHODS = new Set([
+  'select',
+  'insert',
+  'update',
+  'delete',
+  'execute',
+  'unsafe',
+]);
 
 /** Callback wrappers that hand back the RAW (un-scoped) connection. */
 const RAW_WRAPPERS = new Set(['withRequestDb']);
@@ -104,6 +124,10 @@ const ALLOWLISTED_FILES = [
   'apps/web/src/lib/automation/system-context.ts',
   'apps/web/src/lib/automation/runner.ts',
   'packages/db/src/org-context.ts',
+  // The RLS/roles/functions applier itself: it runs the .sql files that CREATE
+  // the metra_app role and the policies, so by definition it must execute as the
+  // owning login BEFORE any scoped role exists. It reads no business table.
+  'packages/db/src/scripts/apply-rls.ts',
 ];
 
 // Allowlisted directories (path fragments) — isolation tests deliberately read on
@@ -233,8 +257,11 @@ export const noBareTenantDb = {
         const name = init.callee.name;
         if (name === 'getDb') return true;
         if (name === 'getRequestConnection' || name === 'createRuntimeConnection') {
-          // Only the destructured `db` property is the handle (not `sql`).
-          return !!nameNode && nameNode.name === 'db';
+          // `db` is the Drizzle wrapper; `sql`/`pg` are the same privileged
+          // socket underneath it. All three are the raw connection.
+          return (
+            !!nameNode && ['db', 'sql', 'pg'].includes(nameNode.name)
+          );
         }
       }
       if (
@@ -277,6 +304,16 @@ export const noBareTenantDb = {
     }
 
     return {
+      // `` sql`select …` `` on the raw postgres.js handle — no method call to
+      // catch, so the tagged template is its own visitor.
+      TaggedTemplateExpression(node) {
+        if (!isRawExpr(node.tag)) return;
+        context.report({
+          node: node.tag,
+          messageId: 'bareQuery',
+          data: { method: 'sql``' },
+        });
+      },
       CallExpression(node) {
         const callee = node.callee;
         if (
