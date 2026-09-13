@@ -1,5 +1,7 @@
-import { getTableConfig, pgTable, unique } from 'drizzle-orm/pg-core';
+import { is } from 'drizzle-orm';
+import { getTableConfig, PgTable, pgTable, unique } from 'drizzle-orm/pg-core';
 import { describe, expect, it } from 'vitest';
+import * as schema from './index';
 import { money } from './_helpers';
 import { auditLog } from './audit-log';
 import { clients } from './clients';
@@ -225,4 +227,30 @@ describe('indexes declared for what the database already has', () => {
     // ones would reject rows the database accepts today.
     expect(idx.config.where).toBeDefined();
   });
+});
+
+describe('every column in the schema is snake_case', () => {
+  // THE TRAP THIS CATCHES: the column helpers derive a name from whatever string
+  // they are handed, verbatim. sameOrgRef('settledByPaymentEvent') therefore
+  // emits the column "settledByPaymentEvent_id", which tsc, lint and the schema
+  // barrel all accept while every query against the real table fails at runtime
+  // with `column ... does not exist`. This is a cheap, total check: it reads the
+  // whole schema barrel, so a new table is covered the day it is added.
+  const tables = Object.values(schema as Record<string, unknown>).filter(
+    (value): value is IndexedTable => is(value, PgTable),
+  );
+
+  it('reads every table in the barrel', () => {
+    expect(tables.length).toBeGreaterThan(30);
+  });
+
+  it.each(tables.map((table) => ({ name: getTableConfig(table).name, table })))(
+    '$name',
+    ({ table }) => {
+      const offenders = getTableConfig(table)
+        .columns.map((column) => column.name)
+        .filter((name) => !/^[a-z][a-z0-9_]*$/.test(name));
+      expect(offenders).toEqual([]);
+    },
+  );
 });

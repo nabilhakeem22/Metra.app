@@ -14,7 +14,7 @@ import { changeOrderStatus } from './enums';
 import { money } from './_helpers';
 import { organizations } from './organizations';
 import { orgScoped } from './org-scoped';
-import { sameOrgFk, sameOrgRef } from './org-ref';
+import { sameOrgFk } from './org-ref';
 import { paymentEvents } from './payment-events';
 
 /**
@@ -49,7 +49,12 @@ export const engagementChangeOrders = pgTable(
     // completed this change order's cover. Nullable, and NULL on change orders
     // settled before 0046 added the link (that mapping was amount-based and is
     // not recoverable), so `settled` does NOT imply a link.
-    ...sameOrgRef('settledByPaymentEvent'),
+    // Declared explicitly rather than via sameOrgRef: that helper derives the
+    // column name verbatim from the ref name, which would emit
+    // "settledByPaymentEvent_id" for a multi-word ref. sameOrgFk still keys off
+    // the `settledByPaymentEventId` property, so the composite FK and its index
+    // are named exactly as migration 0046 creates them.
+    settledByPaymentEventId: uuid('settled_by_payment_event_id'),
   },
   (t) => [
     unique('engagement_change_orders_org_id_id_unique').on(t.orgId, t.id),
