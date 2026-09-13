@@ -5,3 +5,4 @@
 // `@/lib/variations/lifecycle` stays the one import surface.
 export * from './internal-approve';
 export * from './issue';
+export * from './terminate-rejection';
