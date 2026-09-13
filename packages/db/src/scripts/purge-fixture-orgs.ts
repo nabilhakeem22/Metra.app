@@ -51,6 +51,13 @@ async function deleteOrgScopedRows(tx: Executor, orgIds: string[]) {
   await tx.unsafe(
     `update public.engagement_events set supersedes_event_id = null
      where org_id = any($1::uuid[]) and supersedes_event_id is not null`, [orgIds]);
+  // organizations.logo_file_id -> files is NO ACTION and sits outside
+  // DELETE_ORDER, but the org's files are deleted before the org itself: a
+  // doomed org that ever uploaded a logo would raise 23503 and roll back the
+  // whole 50-org chunk. Nullable, so null it first for the same cheap reason.
+  await tx.unsafe(
+    `update public.organizations set logo_file_id = null
+     where id = any($1::uuid[]) and logo_file_id is not null`, [orgIds]);
   await tx.unsafe(`set local session_replication_role = 'replica'`);
   for (const t of TRIGGER_GUARDED_TABLES) {
     await tx.unsafe(`delete from public.${t} where org_id = any($1::uuid[])`, [orgIds]);
