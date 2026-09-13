@@ -314,6 +314,16 @@ export async function recomputeBoqTotals(
   const doc = computeBoqTotals(await sectionAggregates(tx, boqId), {
     discountPct,
   });
+  // Every line was capped on the way in, but a document is the SUM of them: 2000
+  // capped lines can still roll up past what numeric(18,4) holds, and the roll-up
+  // is the last place to say so with a coded error instead of a raw 22003.
+  if (
+    !withinMagnitude(doc.total) ||
+    !withinMagnitude(doc.totalCost) ||
+    !withinMagnitude(doc.totalMargin)
+  ) {
+    fail('amount_too_large');
+  }
   await tx
     .update(boqs)
     .set({

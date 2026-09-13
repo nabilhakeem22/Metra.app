@@ -137,6 +137,25 @@ describe('editing a draft BOQ', () => {
     expect(Number(after!.total)).toBe(159900);
   });
 
+  it('refuses an edit whose product overflows, leaving the line untouched', async () => {
+    const { ctx, projectId } = await setup();
+    const line = (await read(ctx, projectId))!.sections[0].lines[0];
+
+    // Each factor is inside the 1e12 cap; 1e9 x 1e9 = 1e18 is not, and
+    // numeric(18,4) would have raised a raw 22003 instead of a coded refusal.
+    expect(
+      await updateBoqLineCore(ctx, {
+        lineId: line.id,
+        patch: { qty: '1000000000', unitPrice: '1000000000' },
+      }),
+    ).toEqual({ ok: false, error: 'amount_too_large' });
+
+    const after = await read(ctx, projectId);
+    expect(Number(after!.sections[0].lines[0].qty)).toBe(100);
+    expect(Number(after!.sections[0].lines[0].unitPrice)).toBe(1500);
+    expect(Number(after!.total)).toBe(159900);
+  });
+
   it('refuses a negative quantity', async () => {
     const { ctx, projectId } = await setup();
     const line = (await read(ctx, projectId))!.sections[0].lines[0];

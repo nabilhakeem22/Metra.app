@@ -11,6 +11,7 @@
 
 import type { ActionCode } from '@/lib/actions/result';
 import { MONEY_RE, clampMoney4 } from '@/lib/aggregates/proposal-totals';
+import { withinMagnitude } from '@/lib/proposals/validation';
 
 /**
  * Metra's units, in the order the picker offers them. Mirrors the
@@ -83,6 +84,24 @@ export function readNumericField(raw: string): string | null {
   return clampMoney4(t);
 }
 
+type FieldResult = { value: string } | { error: ActionCode };
+
+/**
+ * A quantity or a rate: readable, non-negative, and inside the magnitude cap.
+ *
+ * The cap is the one the import and the proposal builder already enforce
+ * (MAX_AMOUNT, 1e12). Without it the sheet was the one money surface where a
+ * pasted 1e17 reached the arithmetic: the factors are each storable, but their
+ * product overflows numeric(18,4) and the write fails as a raw 22003 instead of
+ * a coded refusal the studio can read.
+ */
+function readAmountField(raw: string, ifUnreadable: ActionCode): FieldResult {
+  const value = readNumericField(raw);
+  if (value === null) return { error: ifUnreadable };
+  if (!withinMagnitude(value)) return { error: 'amount_too_large' };
+  return { value };
+}
+
 function isBoqUnit(value: string): value is BoqUnit {
   return (BOQ_UNITS as readonly string[]).includes(value);
 }
@@ -96,39 +115,10 @@ function isBoqUnit(value: string): value is BoqUnit {
  */
 export function normalizeLinePatch(patch: BoqLinePatch): PatchResult {
   const value: CleanLinePatch = {};
-
-  if (patch.itemCode !== undefined) {
-    const code = (patch.itemCode ?? '').trim();
-    if (code.length > MAX_ITEM_CODE) return { ok: false, error: 'item_code_too_long' };
-    // An emptied code is a real edit — the line simply stops carrying one.
-    value.itemCode = code === '' ? null : code;
-  }
-
-  if (patch.description !== undefined) {
-    const text = patch.description.trim();
-    // The bilingual CHECK demands one side be present, so a blank description is
-    // not a value this table can hold.
-    if (text === '') return { ok: false, error: 'description_required' };
-    if (text.length > MAX_DESCRIPTION) return { ok: false, error: 'description_too_long' };
-    value.description = text;
-  }
-
-  if (patch.unit !== undefined) {
-    if (!isBoqUnit(patch.unit)) return { ok: false, error: 'invalid_unit' };
-    value.unit = patch.unit;
-  }
-
-  if (patch.qty !== undefined) {
-    const qty = readNumericField(patch.qty);
-    if (qty === null) return { ok: false, error: 'invalid_qty' };
-    value.qty = qty;
-  }
-
-  if (patch.unitPrice !== undefined) {
-    const price = readNumericField(patch.unitPrice);
-    if (price === null) return { ok: false, error: 'invalid_price' };
-    value.unitPrice = price;
-  }
+  const textError = readTextFields(patch, value);
+  if (textError) return { ok: false, error: textError };
+  const amountError = readAmountFields(patch, value);
+  if (amountError) return { ok: false, error: amountError };
 
   if (patch.provisional !== undefined) {
     if (typeof patch.provisional !== 'boolean') return { ok: false, error: 'invalid' };
@@ -137,4 +127,51 @@ export function normalizeLinePatch(patch: BoqLinePatch): PatchResult {
 
   if (Object.keys(value).length === 0) return { ok: false, error: 'invalid' };
   return { ok: true, value };
+}
+
+/** The columns that hold text: code, description, unit. Null = all accepted. */
+function readTextFields(
+  patch: BoqLinePatch,
+  value: CleanLinePatch,
+): ActionCode | null {
+  if (patch.itemCode !== undefined) {
+    const code = (patch.itemCode ?? '').trim();
+    if (code.length > MAX_ITEM_CODE) return 'item_code_too_long';
+    // An emptied code is a real edit — the line simply stops carrying one.
+    value.itemCode = code === '' ? null : code;
+  }
+
+  if (patch.description !== undefined) {
+    const text = patch.description.trim();
+    // The bilingual CHECK demands one side be present, so a blank description is
+    // not a value this table can hold.
+    if (text === '') return 'description_required';
+    if (text.length > MAX_DESCRIPTION) return 'description_too_long';
+    value.description = text;
+  }
+
+  if (patch.unit !== undefined) {
+    if (!isBoqUnit(patch.unit)) return 'invalid_unit';
+    value.unit = patch.unit;
+  }
+  return null;
+}
+
+/** The columns that hold money: quantity and rate. Null = both accepted. */
+function readAmountFields(
+  patch: BoqLinePatch,
+  value: CleanLinePatch,
+): ActionCode | null {
+  if (patch.qty !== undefined) {
+    const qty = readAmountField(patch.qty, 'invalid_qty');
+    if ('error' in qty) return qty.error;
+    value.qty = qty.value;
+  }
+
+  if (patch.unitPrice !== undefined) {
+    const price = readAmountField(patch.unitPrice, 'invalid_price');
+    if ('error' in price) return price.error;
+    value.unitPrice = price.value;
+  }
+  return null;
 }

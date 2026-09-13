@@ -1,5 +1,6 @@
 import { COST_ITEM_UNITS } from '@metra/db';
 import { describe, expect, it } from 'vitest';
+import { MAX_AMOUNT } from '@/lib/proposals/validation';
 import {
   BOQ_UNITS,
   MAX_DESCRIPTION,
@@ -115,6 +116,21 @@ describe('normalizeLinePatch', () => {
     expect(
       normalizeLinePatch({ description: 'x'.repeat(MAX_DESCRIPTION + 1) }),
     ).toEqual({ ok: false, error: 'description_too_long' });
+  });
+
+  it('refuses an amount past the magnitude cap the import already enforces', () => {
+    // 1e17: storable as a factor, but its product with any rate overflows
+    // numeric(18,4) — the sheet was the one money surface that let it through.
+    expect(normalizeLinePatch({ qty: '100000000000000000' })).toEqual({
+      ok: false,
+      error: 'amount_too_large',
+    });
+    expect(normalizeLinePatch({ unitPrice: String(MAX_AMOUNT + 1) })).toEqual({
+      ok: false,
+      error: 'amount_too_large',
+    });
+    // The cap itself is still acceptable.
+    expect(normalizeLinePatch({ qty: String(MAX_AMOUNT) }).ok).toBe(true);
   });
 
   it('refuses an empty patch instead of answering ok to a no-op', () => {
