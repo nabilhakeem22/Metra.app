@@ -6,11 +6,13 @@
 -- (org_id, entity, entity_id) — "the documents filed on this client", "the
 -- history of this contract". That is the shape of essentially every query
 -- either table receives. Neither had an index on it. `files` had
--- unique(org_id,id) and unique(object_key); `audit_log` had only
--- unique(org_id,id). So opening a client's Documents tab, or a record's
--- activity timeline, meant a sequential scan of every file or every audit row
--- in the database, with RLS filtering afterwards — and audit_log is
--- append-only and never pruned, so it is the fastest-growing table here and
+-- unique(org_id,id), unique(object_key), and the partial
+-- files_org_category_idx (org_id, category_id) from 0040 — which serves
+-- filtering by filing category, not this (entity, entity_id) lookup;
+-- `audit_log` had only unique(org_id,id). So opening a client's Documents tab,
+-- or a record's activity timeline, meant a sequential scan of every file or
+-- every audit row in the database, with RLS filtering afterwards — and
+-- audit_log is append-only and never pruned, so it is the fastest-growing here and
 -- the scan gets worse every day the product is used.
 --
 -- audit_log's index carries `at` as a fourth column, after the three equality

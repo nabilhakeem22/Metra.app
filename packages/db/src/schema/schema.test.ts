@@ -9,6 +9,7 @@ import { memberships } from './memberships';
 import { orgScoped } from './org-scoped';
 import { sameOrgFk, sameOrgRef } from './org-ref';
 import { organizations } from './organizations';
+import { projects } from './projects';
 import { proposals } from './proposals';
 
 describe('bilingual helper', () => {
@@ -140,5 +141,36 @@ describe('polymorphic entity indexes (0045)', () => {
     expect(
       idx!.config.columns.map((c) => (c as { name?: string }).name),
     ).toEqual(columns);
+  });
+});
+
+// These two exist in the database (0019, 0040) but were missing from the schema
+// files, so the next `drizzle-kit generate` would have emitted a DROP INDEX for
+// each. Column ORDER is asserted, not just the name: a keyset index only serves
+// the scan while org_id leads it.
+describe('indexes declared for what the database already has', () => {
+  it.each([
+    [
+      'projects',
+      projects,
+      'projects_org_created_id_idx',
+      ['org_id', 'created_at', 'id'],
+    ],
+    ['files', files, 'files_org_category_idx', ['org_id', 'category_id']],
+  ])('%s carries %s', (_name, table, indexName, columns) => {
+    const idx = getTableConfig(table as typeof files).indexes.find(
+      (i) => i.config.name === indexName,
+    );
+    expect(idx).toBeDefined();
+    expect(
+      idx!.config.columns.map((c) => (c as { name?: string }).name),
+    ).toEqual(columns);
+  });
+
+  it('files_org_category_idx stays PARTIAL, as 0040 created it', () => {
+    const idx = getTableConfig(files).indexes.find(
+      (i) => i.config.name === 'files_org_category_idx',
+    );
+    expect(idx!.config.where).toBeDefined();
   });
 });

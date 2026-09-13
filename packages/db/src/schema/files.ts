@@ -1,3 +1,4 @@
+import { sql } from 'drizzle-orm';
 import {
   bigint,
   index,
@@ -42,6 +43,13 @@ export const files = pgTable(
     // project / engagement". Without it that is a full scan of every file in
     // the database, filtered afterwards.
     index('files_org_entity_idx').on(t.orgId, t.entity, t.entityId),
+    // Live in the database since 0040 (filing by document category). PARTIAL:
+    // category_id is null for every uncategorised file, and those are never the
+    // rows this index is asked for. Declared here so a future `drizzle-kit
+    // generate` sees it instead of emitting a DROP INDEX for it.
+    index('files_org_category_idx')
+      .on(t.orgId, t.categoryId)
+      .where(sql`category_id is not null`),
   ],
 );
 
