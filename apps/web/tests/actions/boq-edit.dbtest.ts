@@ -9,6 +9,7 @@ import {
 } from '@/lib/boqs/edit';
 import { getProjectBoq } from '@/lib/boqs/queries';
 import { createClientCore } from '@/lib/clients/core';
+import { createCostItemCore } from '@/lib/price-book/core';
 import { listClients } from '@/lib/clients/queries';
 import type { OrgContext } from '@/lib/db/context';
 import { createProjectCore } from '@/lib/projects/core';
@@ -288,5 +289,77 @@ describe('the capability', () => {
       ok: false,
       error: 'forbidden',
     });
+  });
+});
+
+describe('M12: a zero cost on the sheet takes the catalogue rate', () => {
+  it("treats '0.0000' exactly like '0' and fills from the price book", async () => {
+    const { orgId, ownerIds } = await seedOrg({ owners: 1 });
+    orgIds.push(orgId);
+    const ctx = ctxFor(orgId, ownerIds[0], 'owner');
+    await createClientCore(ctx, { phone: '01000000000', nameEn: 'Acme' });
+    const [client] = await listClients(ctx, {});
+    await createProjectCore(ctx, {
+      startDate: '2026-01-01',
+      endDate: '2026-06-30',
+      code: `PRJ-${orgId.slice(0, 8)}`,
+      nameEn: 'Tower',
+      clientId: client.id,
+      status: 'active',
+    });
+    const [project] = await listProjects(ctx, {});
+
+    const code = `CI-${orgId.slice(0, 8)}`;
+    await createCostItemCore(ctx, {
+      code,
+      nameEn: 'Gypsum board',
+      sectionId: await raw.sectionId(orgId),
+      unit: 'sqm',
+      defaultUnitCost: '900',
+      defaultUnitPrice: '1500',
+    });
+
+    const boqId = (
+      (await createBoqCore(ctx, {
+        projectId: project.id,
+        titleEn: 'Bill of Quantities',
+      })) as { data?: string }
+    ).data!;
+    // A template round-trip writes the cost column back as a scale-4 zero, which
+    // is the same "no cost" as an empty cell but is not the string '0'.
+    await commitImportCore(ctx, {
+      boqId,
+      lines: [
+        {
+          itemCode: '1.01',
+          section: 'Gypsum works',
+          description: '12mm gypsum ceiling',
+          unit: 'sqm',
+          qty: '10',
+          unitPrice: '1500',
+          unitCost: '0.0000',
+          costItemCode: code,
+          provisional: false,
+        },
+        {
+          itemCode: '1.02',
+          section: 'Gypsum works',
+          description: 'Overridden line',
+          unit: 'sqm',
+          qty: '10',
+          unitPrice: '1500',
+          unitCost: '750',
+          costItemCode: code,
+          provisional: false,
+        },
+      ],
+    });
+
+    const boq = await getProjectBoq(ctx, project.id, { showCost: true });
+    const lines = boq!.sections[0].lines;
+    // Zero on the sheet -> the catalogue rate, so the line is not margin-blind.
+    expect(lines[0].unitCost).toBe('900.0000');
+    // A real override on the sheet still wins.
+    expect(lines[1].unitCost).toBe('750.0000');
   });
 });

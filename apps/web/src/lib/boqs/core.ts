@@ -13,7 +13,11 @@ import { fail, mutateInOrg } from '@/lib/actions/mutate';
 import { err, type ActionResult } from '@/lib/actions/result';
 import { allocateNumber } from '@/lib/db/allocate-number';
 import type { OrgContext } from '@/lib/db/context';
-import { computeLine, computeSection } from '@/lib/aggregates/proposal-totals';
+import {
+  computeLine,
+  computeSection,
+  parseMoney4,
+} from '@/lib/aggregates/proposal-totals';
 import { withinMagnitude } from '@/lib/proposals/validation';
 import { computeBoqTotals } from './totals';
 import type { ImportedLine } from './import/map';
@@ -189,9 +193,15 @@ export async function commitImportCore(
             : undefined;
           // The sheet wins when it carries a cost: a studio that overrode the
           // catalogue rate for this project meant it. The price book only fills
-          // the gap.
+          // the gap. Compared as a NUMBER, not as the string '0': a cell reading
+          // 0.00 or 0.0000 is the same "no cost" as an empty one, but as a string
+          // it is not equal to '0', so it used to count as an override and
+          // silently suppress the catalogue rate — a margin-blind line that
+          // looked priced.
           const unitCost =
-            line.unitCost !== '0' ? line.unitCost : (matched?.defaultUnitCost ?? '0');
+            parseMoney4(line.unitCost) !== 0n
+              ? line.unitCost
+              : (matched?.defaultUnitCost ?? '0');
 
           const totals = computeLine({
             qty: line.qty,
