@@ -113,3 +113,19 @@ variable, so the guard sees `localhost` and passes.
 **The opt-out** is `METRA_ALLOW_SHARED_DB=1`. Set it only when you mean to run a
 destructive suite against a non-local database and you accept that it will
 delete data there.
+
+### Cleaning up fixture debris
+
+Two one-off maintenance scripts, for the debris that leaked before the guard
+existed. **Neither is part of CI and neither should be run casually.**
+
+| Command | What it does |
+|---|---|
+| `npm run db:purge-fixture-orgs` | **Dry run by default.** Prints how many orgs are real, how many are fixture debris, how many are doomed, and the per-table row counts it would delete. |
+| `npm run db:purge-fixture-orgs -- --execute --expect-real-orgs=<n>` | Performs the purge. `<n>` is the real-org count the dry run printed; if the database has changed underneath you, it refuses. It writes a `purge-fixture-orgs-<ts>.json` manifest (gitignored) before deleting anything, and re-checks the real-org count inside every transaction. |
+| `npm run db:reindex-after-purge` | Rebuilds the indexes the debris bloated (`REINDEX ... CONCURRENTLY`, then `ANALYZE`). Run it after a purge. |
+
+An org is doomed **only** if it and its account both carry a fixture name, the
+account is not shared with another org, no member of it belongs to a real org or
+to `auth.users`, and it is more than 24 hours old, so a run still in flight is
+never touched.
