@@ -104,7 +104,10 @@ export function EngagementDetailClient({
   // the client cannot see it; a band that has been sent and not yet acknowledged
   // is AWAITING the client. Conflating them told the studio to chase a client who
   // had never been shown anything. Derived from data the page already holds.
-  const budgetDraft = header.romIssuedAt === null;
+  // A band must EXIST to be a draft: without one there is nothing drafted, and a
+  // permanent "draft" badge on every young engagement says nothing at all.
+  const budgetDraft =
+    header.romLow !== null && header.romHigh !== null && header.romIssuedAt === null;
   const budgetAwaitingAck =
     header.romIssuedAt !== null &&
     !events.some((e) => e.kind === 'rom_acknowledgement');
