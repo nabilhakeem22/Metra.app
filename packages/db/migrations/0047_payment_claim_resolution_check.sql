@@ -23,11 +23,16 @@
 -- this would reject was run READ-ONLY against the shared database before this
 -- migration was written and returned 0 of 19 claim rows, so the VALIDATE is
 -- safe to keep in the chain and a fresh CI database validates an empty table.
+-- The 'dismissed' branch names all three columns: a dismissal is a refusal, so
+-- it must carry WHO refused and must NOT point at a payment event — a dismissed
+-- claim holding a confirmed_payment_event_id is a receipt for a rejected claim.
+-- The pre-flight was re-run READ-ONLY with the tightened predicate: 0 offending
+-- of 19 rows (1 pending, 18 confirmed, 0 dismissed).
 DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'client_payment_claims_resolution') THEN
   ALTER TABLE public.client_payment_claims ADD CONSTRAINT client_payment_claims_resolution CHECK (
     CASE status::text
       WHEN 'pending'   THEN resolved_at IS NULL AND resolved_by IS NULL AND confirmed_payment_event_id IS NULL
-      WHEN 'dismissed' THEN resolved_at IS NOT NULL
+      WHEN 'dismissed' THEN resolved_at IS NOT NULL AND resolved_by IS NOT NULL AND confirmed_payment_event_id IS NULL
       WHEN 'confirmed' THEN resolved_at IS NOT NULL AND confirmed_payment_event_id IS NOT NULL
       ELSE true END) NOT VALID;
 END IF; END $$;

@@ -72,12 +72,14 @@ export const clientPaymentClaims = pgTable(
     check('client_payment_claims_amount_positive', sql`claimed_amount > 0`),
     // A claim's status and its resolution columns must agree (0047). CASE over
     // status::text, not ORed predicates, so a status added to the enum later is
-    // unconstrained rather than silently rejected.
+    // unconstrained rather than silently rejected. A dismissal must name who
+    // refused it and must carry NO payment reference: a dismissed claim pointing
+    // at a payment event is a receipt for money the studio said it never took.
     check(
       'client_payment_claims_resolution',
       sql`case status::text
       when 'pending'   then resolved_at is null and resolved_by is null and confirmed_payment_event_id is null
-      when 'dismissed' then resolved_at is not null
+      when 'dismissed' then resolved_at is not null and resolved_by is not null and confirmed_payment_event_id is null
       when 'confirmed' then resolved_at is not null and confirmed_payment_event_id is not null
       else true end`,
     ),
