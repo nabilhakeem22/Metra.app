@@ -143,9 +143,11 @@ export async function applyRevision(
  * concept lock (`concept_locked_at` -> null), so the returning engagement gets
  * fresh free concept revisions. The 3D allowance (`design_revision_count`) is
  * deliberately NOT refilled: the engagement is going back to concept negotiation,
- * and the 3D revisions already spent stay spent. Executor-only: MUST run inside the
- * executor's `tx` so it commits ATOMICALLY with the final_approval -> negotiation
- * state move, or not at all.
+ * and the 3D revisions already spent stay spent. Settled change orders and their
+ * payment links are deliberately left alone too: they are money that changed
+ * hands, and a design rejection does not unspend it. Executor-only: MUST run
+ * inside the executor's `tx` so it commits ATOMICALLY with the final_approval ->
+ * negotiation state move, or not at all.
  */
 export async function resetRevisionsOnReject(
   tx: MetraDb,

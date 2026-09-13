@@ -625,6 +625,31 @@ describe('revisionCosSettled — the change-order settlement gate', () => {
       ),
     ).toEqual({ ok: false, code: 'revision_cos_outstanding' });
   });
+
+  it('does NOT let credit already spent on a settled CO clear a new one', () => {
+    // The client paid 5000, which settled the first change order. The payment
+    // row lives in the ledger forever, so the raw paid total still says 5000 —
+    // but that money is spent and cannot also cover the new 3000.
+    expect(
+      GUARDS.revisionCosSettled(
+        coFacts({
+          settled: ['5000'],
+          raised: ['3000'],
+          revisionCoPaid: ['5000'],
+        }),
+      ),
+    ).toEqual({ ok: false, code: 'revision_cos_outstanding' });
+    // Paying the new one too clears it.
+    expect(
+      GUARDS.revisionCosSettled(
+        coFacts({
+          settled: ['5000'],
+          raised: ['3000'],
+          revisionCoPaid: ['5000', '3000'],
+        }),
+      ),
+    ).toEqual({ ok: true });
+  });
 });
 
 describe('rendersPresent', () => {
