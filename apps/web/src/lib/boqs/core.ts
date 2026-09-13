@@ -6,19 +6,22 @@ import {
   boqs,
   costItems,
   projects,
-  type BoqLine,
 } from '@metra/db';
-import { and, asc, eq, inArray, sql } from 'drizzle-orm';
+import { eq, inArray, sql } from 'drizzle-orm';
 import { fail, mutateInOrg } from '@/lib/actions/mutate';
 import { err, type ActionResult } from '@/lib/actions/result';
 import { allocateNumber } from '@/lib/db/allocate-number';
 import type { OrgContext } from '@/lib/db/context';
 import {
   computeLine,
-  computeSection,
   parseMoney4,
+  type SectionTotals,
 } from '@/lib/aggregates/proposal-totals';
-import { withinMagnitude } from '@/lib/proposals/validation';
+import {
+  chunk,
+  LINE_INSERT_CHUNK,
+  withinMagnitude,
+} from '@/lib/proposals/validation';
 import { computeBoqTotals } from './totals';
 import type { ImportedLine } from './import/map';
 import { bilingualFor } from './bilingual';
@@ -239,8 +242,12 @@ export async function commitImportCore(
         });
       }
 
-      // Batched: one insert per import, not one per line.
-      if (pendingLines.length > 0) await tx.insert(boqLines).values(pendingLines);
+      // Batched: one insert per import, not one per line — and chunked, because
+      // a full 2000-line sheet is ~34,000 bind parameters, over half of what a
+      // single statement can carry before it fails outright.
+      for (const part of chunk(pendingLines, LINE_INSERT_CHUNK)) {
+        await tx.insert(boqLines).values(part);
+      }
 
       await recomputeBoqTotals(tx, input.boqId, boq.discountPct);
 
@@ -261,6 +268,40 @@ export async function commitImportCore(
 type Tx = Parameters<Parameters<typeof mutateInOrg>[2]>[0];
 
 /**
+ * Re-sum every section of the BOQ from its lines and write the subtotals back,
+ * in ONE statement — this used to be two queries per section.
+ *
+ * LEFT JOIN so a section whose lines have all been deleted is zeroed rather than
+ * left carrying a stale subtotal. The database sums numeric(18,4), which is
+ * exact addition — the same arithmetic `computeSection` does in BigInt piastres,
+ * and a dbtest asserts the two agree.
+ */
+async function sectionAggregates(
+  tx: Tx,
+  boqId: string,
+): Promise<SectionTotals[]> {
+  return (await tx.execute(sql`
+    update public.boq_sections s
+    set section_subtotal = agg.section_subtotal
+    from (
+      select sec.id as section_id,
+             coalesce(sum(l.line_total), 0)::numeric(18,4) as section_subtotal,
+             coalesce(sum(l.line_cost), 0)::numeric(18,4) as section_cost,
+             coalesce(sum(l.line_margin), 0)::numeric(18,4) as section_margin
+      from public.boq_sections sec
+      left join public.boq_lines l
+        on l.section_id = sec.id and l.boq_id = ${boqId}
+      where sec.boq_id = ${boqId}
+      group by sec.id
+    ) agg
+    where s.id = agg.section_id
+    returning agg.section_subtotal as "sectionSubtotal",
+              agg.section_cost as "sectionCost",
+              agg.section_margin as "sectionMargin"
+  `)) as unknown as SectionTotals[];
+}
+
+/**
  * Recompute every section subtotal and the document total from the lines as they
  * now stand. Called inside the same transaction as any line change, so a total
  * can never be stale with respect to the lines it sums.
@@ -270,41 +311,9 @@ export async function recomputeBoqTotals(
   boqId: string,
   discountPct: string,
 ): Promise<void> {
-  const sections = await tx
-    .select({ id: boqSections.id })
-    .from(boqSections)
-    .where(eq(boqSections.boqId, boqId))
-    .orderBy(asc(boqSections.sortOrder));
-
-  const sectionTotals = [];
-  for (const section of sections) {
-    const lines = await tx
-      .select({
-        lineCost: boqLines.lineCost,
-        lineTotal: boqLines.lineTotal,
-        lineMargin: boqLines.lineMargin,
-      })
-      .from(boqLines)
-      .where(
-        and(eq(boqLines.boqId, boqId), eq(boqLines.sectionId, section.id)),
-      );
-
-    const totals = computeSection(
-      lines.map((l: Pick<BoqLine, 'lineCost' | 'lineTotal' | 'lineMargin'>) => ({
-        lineCost: l.lineCost,
-        lineTotal: l.lineTotal,
-        lineMargin: l.lineMargin,
-      })),
-    );
-    sectionTotals.push(totals);
-
-    await tx
-      .update(boqSections)
-      .set({ sectionSubtotal: totals.sectionSubtotal })
-      .where(eq(boqSections.id, section.id));
-  }
-
-  const doc = computeBoqTotals(sectionTotals, { discountPct });
+  const doc = computeBoqTotals(await sectionAggregates(tx, boqId), {
+    discountPct,
+  });
   await tx
     .update(boqs)
     .set({
