@@ -46,19 +46,66 @@ async function explainIssueFailure(
   return 'engagement_not_active';
 }
 
+/** The band an issue admitted, or null when the gate matched no row. */
+type IssuedBand = { romLow: string | null; romHigh: string | null } | null;
+
 /**
- * Issue the engagement's build-cost band to the client. Gated on the
- * `engagements_issue` capability (approve) and the interior flow.
- *
  * AN ATOMIC ADMISSION GATE, not a read-then-write, for the same reason every
  * other write in this module is one: the predicate carries "not already issued",
  * "a band exists" and "not finished", so a second click racing the first finds
  * zero rows instead of stamping twice and appending a second ledger row that the
  * INSERT-only grants on `engagement_events` mean nobody can take back.
- *
- * `decided_at` is set explicitly to clock_timestamp(): the column default is
- * now(), which is fixed at BEGIN, so two overlapping writes could commit in lock
- * order and be stamped in the opposite one.
+ */
+async function admitRomIssue(tx: MetraDb, engagementId: string): Promise<IssuedBand> {
+  const [issued] = await tx
+    .update(designEngagements)
+    .set({ romIssuedAt: new Date(), updatedAt: new Date() })
+    .where(
+      and(
+        eq(designEngagements.id, engagementId),
+        isNull(designEngagements.romIssuedAt),
+        isNotNull(designEngagements.romLow),
+        isNotNull(designEngagements.romHigh),
+        notInArray(designEngagements.state, TERMINAL_STATE_LIST),
+      ),
+    )
+    .returning({
+      romLow: designEngagements.romLow,
+      romHigh: designEngagements.romHigh,
+    });
+  return issued ?? null;
+}
+
+/**
+ * Witness the issue on the append-only ledger. `decided_at` is set explicitly to
+ * clock_timestamp(): the column default is now(), which is fixed at BEGIN, so two
+ * overlapping writes could commit in lock order and be stamped in the opposite one.
+ */
+async function appendRomIssuedEvent(
+  tx: MetraDb,
+  ctx: OrgContext,
+  engagementId: string,
+  band: NonNullable<IssuedBand>,
+): Promise<string | null> {
+  const [event] = await tx
+    .insert(engagementEvents)
+    .values({
+      orgId: ctx.orgId,
+      engagementId,
+      kind: 'rom_issued',
+      actorUserId: ctx.userId,
+      rangeLow: band.romLow,
+      rangeHigh: band.romHigh,
+      decidedAt: sql`clock_timestamp()`,
+    })
+    .returning({ id: engagementEvents.id });
+  return event?.id ?? null;
+}
+
+/**
+ * Issue the engagement's build-cost band to the client. Gated on the
+ * `engagements_issue` capability (approve) and the interior flow: the atomic
+ * gate admits one caller, the ledger witnesses it, the audit records it.
  */
 export async function issueRomCore(
   ctx: OrgContext,
@@ -72,49 +119,16 @@ export async function issueRomCore(
     ctx,
     { capability: 'engagements_issue', action: 'approve', flow: 'interior' },
     async (tx, audit) => {
-      const issued = await tx
-        .update(designEngagements)
-        .set({ romIssuedAt: new Date(), updatedAt: new Date() })
-        .where(
-          and(
-            eq(designEngagements.id, input.engagementId),
-            isNull(designEngagements.romIssuedAt),
-            isNotNull(designEngagements.romLow),
-            isNotNull(designEngagements.romHigh),
-            notInArray(designEngagements.state, TERMINAL_STATE_LIST),
-          ),
-        )
-        .returning({
-          id: designEngagements.id,
-          romLow: designEngagements.romLow,
-          romHigh: designEngagements.romHigh,
-        });
-      if (!issued[0]) fail(await explainIssueFailure(tx, input.engagementId));
+      const band = await admitRomIssue(tx, input.engagementId);
+      if (!band) fail(await explainIssueFailure(tx, input.engagementId));
 
-      const { romLow, romHigh } = issued[0];
-      const [event] = await tx
-        .insert(engagementEvents)
-        .values({
-          orgId: ctx.orgId,
-          engagementId: input.engagementId,
-          kind: 'rom_issued',
-          actorUserId: ctx.userId,
-          rangeLow: romLow,
-          rangeHigh: romHigh,
-          decidedAt: sql`clock_timestamp()`,
-        })
-        .returning({ id: engagementEvents.id });
-
+      const eventId = await appendRomIssuedEvent(tx, ctx, input.engagementId, band);
       await audit({
         entity: 'design_engagement',
         entityId: input.engagementId,
         action: 'issue',
         before: null,
-        after: {
-          rom_low: romLow,
-          rom_high: romHigh,
-          event_id: event?.id ?? null,
-        },
+        after: { rom_low: band.romLow, rom_high: band.romHigh, event_id: eventId },
       });
     },
   );

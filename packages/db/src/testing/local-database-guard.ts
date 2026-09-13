@@ -19,8 +19,15 @@
 // rather than assumed safe. Proving a host is local is the only thing that lets
 // a suite run; the documented opt-out is the only other way through.
 
-/** Set to 1/true/yes to run a DB suite against the shared database anyway. */
-export const ALLOW_SHARED_DB_ENV = 'METRA_ALLOW_SHARED_DB';
+import {
+  ALLOW_SHARED_DB_ENV,
+  missingUrlRefusal,
+  nonLocalHostRefusal,
+  unparsableUrlRefusal,
+} from './local-database-guard-message';
+
+// Re-exported so this file stays the single import surface for the guard.
+export { ALLOW_SHARED_DB_ENV };
 
 // EXACT hosts only, never a suffix match: `localhost.attacker.example` is a
 // perfectly resolvable public host and must not read as local.
@@ -67,23 +74,6 @@ export interface LocalDatabaseGuardInput {
   damage: string;
 }
 
-const SETUP_HELP = [
-  'Point it at a local Postgres:',
-  '',
-  '  docker run --name metra-test-db -e POSTGRES_PASSWORD=postgres -p 5432:5432 -d postgres:17',
-  '  export DATABASE_URL=postgresql://postgres:postgres@localhost:5432/postgres',
-  '  npm run db:migrate && npm run db:apply-rls && npm run db:seed',
-  '',
-  'Full setup, and the opt-out, are documented in docs/DEPLOY.md.',
-].join('\n');
-
-function optOutHelp(host: string): string {
-  return [
-    `If you really do mean to run against ${host}, and you accept that it will`,
-    `delete data there, set ${ALLOW_SHARED_DB_ENV}=1.`,
-  ].join('\n');
-}
-
 /**
  * The refusal message for these inputs, or null when the suite may run. PURE —
  * this is the unit-tested part, so the guard never has to be proven by pointing
@@ -94,12 +84,7 @@ export function localDatabaseGuardFailure(
 ): string | null {
   const { databaseUrl, allowShared, command, damage } = input;
   if (databaseUrl === undefined || databaseUrl.trim() === '') {
-    return [
-      `Refusing to run \`${command}\`: DATABASE_URL is not set.`,
-      `This suite ${damage}, so it needs its own local Postgres.`,
-      '',
-      SETUP_HELP,
-    ].join('\n');
+    return missingUrlRefusal(command, damage);
   }
 
   const host = databaseHostFrom(databaseUrl);
@@ -108,31 +93,9 @@ export function localDatabaseGuardFailure(
   if (host !== null && isLocalDatabaseHost(host)) return null;
   if (isSharedDatabaseAllowed(allowShared)) return null;
 
-  if (host === null) {
-    return [
-      `Refusing to run \`${command}\`: DATABASE_URL could not be parsed, so it`,
-      'cannot be proven to point at a local database.',
-      `This suite ${damage}. Rather than guess, it stops here.`,
-      '',
-      SETUP_HELP,
-      '',
-      optOutHelp('that connection string'),
-    ].join('\n');
-  }
-
-  return [
-    `Refusing to run \`${command}\` against a non-local database.`,
-    '',
-    `  DATABASE_URL host: ${host}`,
-    '',
-    `This suite ${damage}. The repo-root .env holds the HOSTED Supabase`,
-    'connection string, so running this suite as-is would do that to the shared',
-    'database every environment reads.',
-    '',
-    SETUP_HELP,
-    '',
-    optOutHelp(host),
-  ].join('\n');
+  return host === null
+    ? unparsableUrlRefusal(command, damage)
+    : nonLocalHostRefusal(command, damage, host);
 }
 
 /**

@@ -16,6 +16,25 @@ export interface RejectedVariation {
   fromStatus: VariationStatus;
 }
 
+/** One append-only `rejected` event per variation order, carrying the status it
+ *  was rejected FROM so the audit reads as a history, not a final state. */
+async function appendRejectionEvents(
+  tx: MetraDb,
+  ctx: OrgContext,
+  rejected: RejectedVariation[],
+): Promise<void> {
+  await tx.insert(variationOrderEvents).values(
+    rejected.map((vo) => ({
+      orgId: ctx.orgId,
+      variationOrderId: vo.id,
+      kind: 'rejected' as const,
+      actorUserId: ctx.userId,
+      fromStatus: vo.fromStatus,
+      toStatus: 'rejected' as const,
+    })),
+  );
+}
+
 /**
  * Reject every still-undecided (draft / internal_approved / issued) variation
  * order on a terminated contract, and append one event per rejection. Already
@@ -37,7 +56,9 @@ export async function rejectVariationsOnContractTermination(
     .from(variationOrders)
     .where(eq(variationOrders.contractId, contractId))
     .for('update');
-  const open = locked.filter((vo) => variationsToRejectOnTermination(vo.status));
+  const open = locked
+    .filter((vo) => variationsToRejectOnTermination(vo.status))
+    .map((vo) => ({ id: vo.id, fromStatus: vo.status }));
   if (open.length === 0) return [];
 
   await tx
@@ -50,16 +71,6 @@ export async function rejectVariationsOnContractTermination(
       ),
     );
 
-  await tx.insert(variationOrderEvents).values(
-    open.map((vo) => ({
-      orgId: ctx.orgId,
-      variationOrderId: vo.id,
-      kind: 'rejected',
-      actorUserId: ctx.userId,
-      fromStatus: vo.status,
-      toStatus: 'rejected',
-    })),
-  );
-
-  return open.map((vo) => ({ id: vo.id, fromStatus: vo.status }));
+  await appendRejectionEvents(tx, ctx, open);
+  return open;
 }

@@ -19,17 +19,10 @@ interface SettlementInputs {
   alreadyConsumed4: bigint;
 }
 
-/**
- * The three facts the allocation needs, scoped to one engagement and read in the
- * queue order the allocator assumes: raised change orders oldest first, cleared
- * revision_co payments oldest first, and the total of the change orders this
- * engagement has ALREADY settled (credit that is spent).
- */
-async function loadSettlementInputs(
-  tx: MetraDb,
-  engagementId: string,
-): Promise<SettlementInputs> {
-  const changeOrders = await tx
+/** Every change order on the engagement, oldest first — the queue order the
+ *  allocator assumes. Both statuses: the settled ones are spent credit. */
+async function loadChangeOrderQueue(tx: MetraDb, engagementId: string) {
+  return tx
     .select({
       id: engagementChangeOrders.id,
       amount: engagementChangeOrders.amount,
@@ -41,8 +34,11 @@ async function loadSettlementInputs(
       asc(engagementChangeOrders.raisedAt),
       asc(engagementChangeOrders.id),
     );
+}
 
-  const payments = await tx
+/** The cleared revision_co payments on the engagement, oldest first. */
+async function loadRevisionPayments(tx: MetraDb, engagementId: string) {
+  return tx
     .select({ id: paymentEvents.id, amount: paymentEvents.amount })
     .from(paymentEvents)
     .where(
@@ -52,16 +48,53 @@ async function loadSettlementInputs(
       ),
     )
     .orderBy(asc(paymentEvents.clearedAt), asc(paymentEvents.id));
+}
 
+/**
+ * The three facts the allocation needs, scoped to one engagement: raised change
+ * orders, cleared revision_co payments, and the total of the change orders this
+ * engagement has ALREADY settled (credit that is spent).
+ */
+async function loadSettlementInputs(
+  tx: MetraDb,
+  engagementId: string,
+): Promise<SettlementInputs> {
+  const changeOrders = await loadChangeOrderQueue(tx, engagementId);
   return {
     raised: changeOrders.filter((row) => row.status === 'raised'),
-    payments,
+    payments: await loadRevisionPayments(tx, engagementId),
     alreadyConsumed4: changeOrders.reduce(
       (sum, row) =>
         row.status === 'settled' ? sum + parseMoney4(row.amount) : sum,
       0n,
     ),
   };
+}
+
+/**
+ * Stamp each allocated change order as settled. Each UPDATE is gated on
+ * `status = 'raised'` so a concurrent settle cannot relink one already settled.
+ */
+async function linkSettlements(
+  tx: MetraDb,
+  links: ReturnType<typeof allocateSettlements>,
+  now: Date,
+): Promise<void> {
+  for (const link of links) {
+    await tx
+      .update(engagementChangeOrders)
+      .set({
+        status: 'settled',
+        settledAt: now,
+        settledByPaymentEventId: link.paymentEventId,
+      })
+      .where(
+        and(
+          eq(engagementChangeOrders.id, link.changeOrderId),
+          eq(engagementChangeOrders.status, 'raised'),
+        ),
+      );
+  }
 }
 
 /**
@@ -93,21 +126,7 @@ export async function settleConceptAndLock(
   }
 
   const now = new Date();
-  for (const link of links) {
-    await tx
-      .update(engagementChangeOrders)
-      .set({
-        status: 'settled',
-        settledAt: now,
-        settledByPaymentEventId: link.paymentEventId,
-      })
-      .where(
-        and(
-          eq(engagementChangeOrders.id, link.changeOrderId),
-          eq(engagementChangeOrders.status, 'raised'),
-        ),
-      );
-  }
+  await linkSettlements(tx, links, now);
 
   await tx
     .update(designEngagements)

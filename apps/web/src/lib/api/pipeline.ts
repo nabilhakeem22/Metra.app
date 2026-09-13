@@ -2,24 +2,11 @@ import 'server-only';
 import { organizations } from '@metra/db';
 import { isCloudflareRuntime, cfExecutionContext } from '@/lib/cf/context';
 import { withOrgContext, type OrgContext } from '@/lib/db/context';
-import { can, canSeeMargin } from '@/lib/permissions/can';
-import type { Capability, PermissionAction } from '@/lib/permissions/roles';
-import {
-  resolveApiKey,
-  touchApiKey,
-  API_KEY_PREFIX,
-  type ApiPrincipal,
-} from '@/lib/api-keys/resolve';
+import { canSeeMargin } from '@/lib/permissions/can';
+import { touchApiKey, API_KEY_PREFIX, type ApiPrincipal } from '@/lib/api-keys/resolve';
+import { admitApiCaller, bearerToken, type AdmissionOptions } from './admit';
 import { problemResponse } from './errors';
 import { InvalidCursorError } from './pagination';
-import {
-  cloudflarePreAuthRateLimiter,
-  cloudflareRateLimiter,
-  RATE_LIMIT_WINDOW_SECONDS,
-  type PreAuthRateLimiter,
-  type RateLimiter,
-  type RateLimitResult,
-} from './rate-limit';
 
 /** Thrown by a handler when a requested resource is absent/foreign. -> 404. */
 export class NotFoundError extends Error {
@@ -41,28 +28,8 @@ export interface ApiContext {
 /** A handler returns a JSON-serializable value (200) or throws NotFound/Invalid. */
 export type ApiHandler = (c: ApiContext) => Promise<unknown>;
 
-export interface PipelineOptions {
-  /**
-   * The §2.2 capability this route reads, and the action to check it with.
-   * REQUIRED and deliberately not defaulted: a route that forgets to declare
-   * one is a route with no authorization, so it must not compile.
-   */
-  capability: Capability;
-  action: PermissionAction;
-  /** Injectable for tests; default to the Cloudflare Rate Limiting bindings. */
-  rateLimiter?: RateLimiter;
-  preAuthRateLimiter?: PreAuthRateLimiter;
-}
-
-/** 429 + Retry-After, built identically for both buckets. */
-function rateLimitedResponse(rate: RateLimitResult): Response {
-  return problemResponse('rate-limited', {
-    detail: 'API rate limit exceeded.',
-    headers: {
-      'retry-after': String(rate.retryAfterSeconds || RATE_LIMIT_WINDOW_SECONDS),
-    },
-  });
-}
+/** What a route declares. Admission owns the shape: it is what reads every field. */
+export type PipelineOptions = AdmissionOptions;
 
 // Belt-and-suspenders (F2): the only user-supplied timestamp/uuid that reaches a
 // ::timestamptz / ::uuid cast is the pagination cursor (detail routes pre-validate
@@ -79,11 +46,30 @@ function isCursorCastError(error: unknown): boolean {
   return typeof code === 'string' && CURSOR_CAST_SQLSTATES.has(code);
 }
 
-function bearerToken(req: Request): string | null {
-  const header = req.headers.get('authorization');
-  if (!header) return null;
-  const match = /^Bearer\s+(.+)$/i.exec(header.trim());
-  return match ? match[1].trim() : null;
+/** Best-effort, throttled last_used stamp — deferred past the response (CF only). */
+function deferUsageStamp(raw: string | null): void {
+  if (!raw || !raw.startsWith(API_KEY_PREFIX) || !isCloudflareRuntime()) return;
+  cfExecutionContext().waitUntil(
+    touchApiKey(raw).catch(() => {
+      /* best-effort — never fail a request on the usage stamp */
+    }),
+  );
+}
+
+/** The RFC 7807 catch-all: NotFound -> 404, a bad cursor -> 400, else 500. */
+function problemForThrown(error: unknown): Response {
+  if (error instanceof NotFoundError) {
+    return problemResponse('not-found', {
+      detail: 'The requested resource does not exist.',
+    });
+  }
+  if (error instanceof InvalidCursorError || isCursorCastError(error)) {
+    return problemResponse('invalid-cursor', {
+      detail: 'The provided cursor is malformed.',
+    });
+  }
+  console.error('Public API request failed:', error);
+  return problemResponse('internal');
 }
 
 /**
@@ -108,33 +94,11 @@ export async function handleApiRequest(
   handler: ApiHandler,
   options: PipelineOptions,
 ): Promise<Response> {
-  // --- pre-auth rate limit (BEFORE the key lookup hits the database) -------
-  const preAuth = await (options.preAuthRateLimiter ?? cloudflarePreAuthRateLimiter)(
-    req,
-  );
-  if (!preAuth.allowed) return rateLimitedResponse(preAuth);
-
+  // --- admission: budgets, key, capability (no row is read until it passes) -
+  const admitted = await admitApiCaller(req, options);
+  if (admitted instanceof Response) return admitted;
+  const principal = admitted;
   const raw = bearerToken(req);
-
-  // --- auth ---------------------------------------------------------------
-  const principal = await resolveApiKey(raw);
-  if (!principal) {
-    return problemResponse('unauthorized', {
-      detail: 'A valid Bearer API key is required.',
-    });
-  }
-
-  // --- per-key rate limit (BEFORE any data/handler work) ------------------
-  const limiter = options.rateLimiter ?? cloudflareRateLimiter;
-  const rate = await limiter(principal.keyId);
-  if (!rate.allowed) return rateLimitedResponse(rate);
-
-  // --- authorize (BEFORE any org read) ------------------------------------
-  if (!can(principal.role, options.capability, options.action)) {
-    return problemResponse('forbidden', {
-      detail: 'The role behind this API key may not read this resource.',
-    });
-  }
 
   // --- derive live cost/margin visibility ---------------------------------
   const orgCtx = principal.toOrgContext();
@@ -155,31 +119,12 @@ export async function handleApiRequest(
       url: new URL(req.url),
     });
 
-    // Best-effort, throttled last_used stamp — deferred past the response (CF).
-    if (raw && raw.startsWith(API_KEY_PREFIX) && isCloudflareRuntime()) {
-      cfExecutionContext().waitUntil(
-        touchApiKey(raw).catch(() => {
-          /* best-effort — never fail a request on the usage stamp */
-        }),
-      );
-    }
-
+    deferUsageStamp(raw);
     return new Response(JSON.stringify(value), {
       status: 200,
       headers: { 'content-type': 'application/json' },
     });
   } catch (error) {
-    if (error instanceof NotFoundError) {
-      return problemResponse('not-found', {
-        detail: 'The requested resource does not exist.',
-      });
-    }
-    if (error instanceof InvalidCursorError || isCursorCastError(error)) {
-      return problemResponse('invalid-cursor', {
-        detail: 'The provided cursor is malformed.',
-      });
-    }
-    console.error('Public API request failed:', error);
-    return problemResponse('internal');
+    return problemForThrown(error);
   }
 }
