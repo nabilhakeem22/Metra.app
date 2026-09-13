@@ -25,9 +25,12 @@
 --   select count(*) from public.contracts where tax_rate < 0 or tax_rate > 100;  -- 0
 --
 -- Zero on both, so the constraint is added NOT VALID and then VALIDATEd in the
--- same block. NOT VALID first is deliberate even with a clean table: it takes
--- the ACCESS EXCLUSIVE lock only long enough to record the constraint, and the
--- VALIDATE pass that follows scans under a weaker SHARE UPDATE EXCLUSIVE lock.
+-- same block. To be clear about what that split does NOT buy here: this whole
+-- file runs inside the migrator's single transaction, so the ACCESS EXCLUSIVE
+-- lock the ADD CONSTRAINT takes is held until that transaction commits — the
+-- later VALIDATE's weaker SHARE UPDATE EXCLUSIVE lock cannot downgrade a lock
+-- already held. The split is LOCK-NEUTRAL here; it is kept only because it
+-- reads as the two distinct steps it is and stays idempotent on a re-run.
 -- Had either count been non-zero the VALIDATE would have been dropped and the
 -- offending rows reported rather than silently left un-covered.
 DO $$
