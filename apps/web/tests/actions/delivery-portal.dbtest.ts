@@ -16,7 +16,14 @@ import {
 import { createProjectCore } from '@/lib/projects/core';
 import { listProjects } from '@/lib/projects/queries';
 import type { OrgContext } from '@/lib/db/context';
-import { closeFixture, ctxFor, raw, seedOrg, teardown } from './fixture';
+import {
+  FIXTURE_ORG_MARKER,
+  closeFixture,
+  ctxFor,
+  raw,
+  seedOrg,
+  teardown,
+} from './fixture';
 
 const orgIds: string[] = [];
 afterAll(async () => {
@@ -115,7 +122,9 @@ describe('delivery portal — cost-safe token snapshot', () => {
     // friendly label is what the portal renders.
     expect((delivery as unknown as { state?: unknown }).state).toBeUndefined();
     expect(delivery!.stageLabel.en).toBeTruthy();
-    expect(delivery!.firm.nameEn).toBe('Test Org');
+    // The fixture timestamps its org names so leaked debris is identifiable, so
+    // assert the marker rather than the whole string.
+    expect(delivery!.firm.nameEn).toContain(FIXTURE_ORG_MARKER);
     expect(delivery!.designFeeTotal).toBe('100000.0000');
     expect(delivery!.paymentSchedule.length).toBe(4);
 
