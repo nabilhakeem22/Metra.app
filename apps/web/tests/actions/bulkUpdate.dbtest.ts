@@ -38,7 +38,7 @@ describe('bulkUpdatePricesCore — piastre-exact', () => {
 
     const res = await bulkUpdatePricesCore(ctx, {
       sectionId: civil,
-      pct: 15,
+      pct: '15',
       target: 'both',
     });
     expect(res.ok).toBe(true);
@@ -67,11 +67,33 @@ describe('bulkUpdatePricesCore — piastre-exact', () => {
     const ctx = ctxFor(orgId, ownerIds[0], 'owner');
     const civil = await raw.sectionId(orgId, 'civil');
     expect(
-      await bulkUpdatePricesCore(ctx, { sectionId: civil, pct: 2000, target: 'both' }),
+      await bulkUpdatePricesCore(ctx, { sectionId: civil, pct: '2000', target: 'both' }),
     ).toEqual({ ok: false, error: 'invalid_percentage' });
     expect(
-      await bulkUpdatePricesCore(ctx, { sectionId: civil, pct: -150, target: 'cost' }),
+      await bulkUpdatePricesCore(ctx, { sectionId: civil, pct: '-150', target: 'cost' }),
     ).toEqual({ ok: false, error: 'invalid_percentage' });
+  });
+
+  // Number() read these as 100, 26 and 5, so a string that never looked like a
+  // percentage became one and was interpolated into the SQL numeric literal.
+  it('rejects a percentage that is not a plain decimal, writing no history', async () => {
+    const { orgId, ownerIds } = await seedOrg({ owners: 1 });
+    orgIds.push(orgId);
+    const ctx = ctxFor(orgId, ownerIds[0], 'owner');
+    const civil = await raw.sectionId(orgId, 'civil');
+    await createCostItemCore(ctx, {
+      code: 'PCT-1', nameEn: 'P', sectionId: civil, unit: 'sqm',
+      defaultUnitCost: '100', defaultUnitPrice: '200',
+    });
+    for (const pct of ['1e2', '0x1A', ' 5 ', '', '1001', '-100.1']) {
+      expect(
+        await bulkUpdatePricesCore(ctx, { sectionId: civil, pct, target: 'both' }),
+      ).toEqual({ ok: false, error: 'invalid_percentage' });
+    }
+    expect(await raw.count('price_changes', orgId)).toBe(0);
+    expect(await raw.count('price_change_lines', orgId)).toBe(0);
+    const [item] = await listCostItems(ctx, {});
+    expect(item.defaultUnitCost).toBe('100.0000');
   });
 
   it('forbids a project_manager (read-only) from bulk updating', async () => {
@@ -83,7 +105,7 @@ describe('bulkUpdatePricesCore — piastre-exact', () => {
     const civil = await raw.sectionId(orgId, 'civil');
     const res = await bulkUpdatePricesCore(
       ctxFor(orgId, memberIds[0], 'project_manager'),
-      { sectionId: civil, pct: 10, target: 'both' },
+      { sectionId: civil, pct: '10', target: 'both' },
     );
     expect(res).toEqual({ ok: false, error: 'forbidden' });
   });
@@ -99,7 +121,7 @@ describe('price history is append-only', () => {
       code: 'H-1', nameEn: 'H', sectionId: civil, unit: 'sqm',
       defaultUnitCost: '10', defaultUnitPrice: '20',
     });
-    await bulkUpdatePricesCore(ctx, { sectionId: civil, pct: 5, target: 'both' });
+    await bulkUpdatePricesCore(ctx, { sectionId: civil, pct: '5', target: 'both' });
 
     await expect(
       withOrgContext(ctx, (tx) =>

@@ -7,6 +7,7 @@ import { eq, sql } from 'drizzle-orm';
 import { fail, mutateInOrg } from '@/lib/actions/mutate';
 import { err, type ActionResult } from '@/lib/actions/result';
 import type { OrgContext } from '@/lib/db/context';
+import { isBulkPercent } from './percent';
 import { STARTER_CATALOGUE } from './starter-catalogue';
 import { isUuid } from '@/lib/uuid';
 
@@ -14,7 +15,8 @@ export type PriceTarget = 'cost' | 'price' | 'both';
 
 export interface BulkUpdateInput {
   sectionId: string;
-  pct: number | string;
+  /** The decimal STRING the user typed. Never a number: see isBulkPercent. */
+  pct: string;
   target: PriceTarget;
   effectiveDate?: string; // YYYY-MM-DD; metadata only
 }
@@ -44,15 +46,10 @@ export async function bulkUpdatePricesCore(
   ctx: OrgContext,
   input: BulkUpdateInput,
 ): Promise<ActionResult & { data?: BulkUpdateSummary }> {
-  // Reject a blank/whitespace pct BEFORE coercion — Number('') is 0, which would
-  // otherwise pass the guard and write a no-op 0% history event.
-  if (typeof input.pct === 'string' && input.pct.trim() === '') {
-    return err('invalid_percentage');
-  }
-  const pct = typeof input.pct === 'string' ? Number(input.pct) : input.pct;
-  if (!Number.isFinite(pct) || pct < -100 || pct > 1000) {
-    return err('invalid_percentage');
-  }
+  // Shape AND range in one gate. Number() alone read '1e2' as 100, '0x1A' as 26
+  // and ' 5 ' as 5, so a value that never looked like a percentage was coerced
+  // into one and then interpolated into the SQL numeric literal below.
+  if (!isBulkPercent(input.pct)) return err('invalid_percentage');
   if (input.target !== 'cost' && input.target !== 'price' && input.target !== 'both') {
     return err('invalid');
   }
@@ -62,7 +59,9 @@ export async function bulkUpdatePricesCore(
       ? input.effectiveDate
       : new Date().toISOString().slice(0, 10);
 
-  const pctExpr = sql`(1 + ${pct.toString()}::numeric / 100)`;
+  // The validated STRING goes to Postgres, not a JS number round-tripped
+  // through toString(): what was checked is exactly what is applied.
+  const pctExpr = sql`(1 + ${input.pct}::numeric / 100)`;
   const touchCost = input.target === 'cost' || input.target === 'both';
   const touchPrice = input.target === 'price' || input.target === 'both';
 
@@ -120,7 +119,7 @@ export async function bulkUpdatePricesCore(
         .values({
           orgId: ctx.orgId,
           category: categorySnapshot,
-          pctChange: pct.toString(),
+          pctChange: input.pct,
           target: input.target,
           effectiveDate,
           appliedBy: ctx.userId,
@@ -150,7 +149,7 @@ export async function bulkUpdatePricesCore(
         after: {
           section_id: input.sectionId,
           category: categorySnapshot,
-          pct_change: pct.toString(),
+          pct_change: input.pct,
           target: input.target,
           item_count: updated.length,
         },
