@@ -309,6 +309,14 @@ describe('M10: a variation total past the money cap is coded, not generic', () =
       }),
     ).toEqual({ ok: false, error: 'amount_too_large' });
 
+    // The cost side alone: the price is nominal, the cost is not.
+    expect(
+      await saveVariationDraftCore(ctx, {
+        id: voId,
+        lines: [{ descriptionEn: 'x', qty: '1000000000000', unit: 'lump_sum', unitCost: '1000000000000', unitPrice: '0.0001', discountPct: '0' }],
+      }),
+    ).toEqual({ ok: false, error: 'amount_too_large' });
+
     // Each line is inside the cap; their sum is not.
     expect(
       await saveVariationDraftCore(ctx, {

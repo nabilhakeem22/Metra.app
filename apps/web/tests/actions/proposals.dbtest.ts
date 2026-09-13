@@ -499,6 +499,20 @@ describe('F4 — date + amount bounds', () => {
     ).toEqual({ ok: false, error: 'amount_too_large' });
   });
 
+  // The COST side overflows on its own: a nominal price keeps line_total tiny
+  // while qty x unit_cost blows past numeric(18,4) on the same row, which used
+  // to be caught only by the document total — after the lines were inserted.
+  it('a line whose qty x cost overflows is coded, not generic', async () => {
+    const { ctx, clientId, projectId } = await setup();
+    const id = ((await createProposalCore(ctx, { clientId, projectId })) as { data?: string }).data!;
+    expect(
+      await saveProposalDraftCore(ctx, {
+        id,
+        sections: [{ titleEn: 'S', lines: [{ descriptionEn: 'x', qty: '1000000000000', unit: 'sqm', unitCost: '1000000000000', unitPrice: '0.0001', discountPct: '0' }] }],
+      }),
+    ).toEqual({ ok: false, error: 'amount_too_large' });
+  });
+
   // …and each LINE passes while the document SUM does not.
   it('a section sum past the cap is coded, not generic', async () => {
     const { ctx, clientId, projectId } = await setup();

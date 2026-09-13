@@ -103,8 +103,17 @@ export async function saveVariationDraftCore(
 
     const totals = computeLine({ qty, unitCost, unitPrice, discountPct });
     // The FACTORS were each inside the cap; their PRODUCT need not be. A
-    // line total past the cap overflows numeric(18,4) at the database.
-    if (!withinMagnitude(totals.lineTotal)) return err('amount_too_large');
+    // line total past the cap overflows numeric(18,4) at the database — and so
+    // does a line cost or margin, which are persisted on the same row. A signed
+    // qty makes the margin the widest of the three, so none of them is implied
+    // by the others.
+    if (
+      !withinMagnitude(totals.lineTotal) ||
+      !withinMagnitude(totals.lineCost) ||
+      !withinMagnitude(totals.lineMargin)
+    ) {
+      return err('amount_too_large');
+    }
     prepared.push({
       contractLineId: l.contractLineId?.trim() || null,
       costItemId: l.costItemId?.trim() || null,

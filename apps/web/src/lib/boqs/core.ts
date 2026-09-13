@@ -212,7 +212,15 @@ export async function commitImportCore(
           // The FACTORS were each inside the cap; their PRODUCT need not be. An
           // imported sheet is the likeliest source of an absurd qty x price, and
           // a line total past the cap overflows numeric(18,4) at the database.
-          if (!withinMagnitude(totals.lineTotal)) fail('amount_too_large');
+          // The cost side is checked too: the catalogue rate behind unitCost is
+          // not something the importing sheet showed the user at all.
+          if (
+            !withinMagnitude(totals.lineTotal) ||
+            !withinMagnitude(totals.lineCost) ||
+            !withinMagnitude(totals.lineMargin)
+          ) {
+            fail('amount_too_large');
+          }
           pendingLines.push({
             orgId: ctx.orgId,
             boqId: input.boqId,
