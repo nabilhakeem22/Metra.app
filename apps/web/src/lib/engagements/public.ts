@@ -61,7 +61,8 @@ export interface PublicDelivery {
   createdAt: string | null;
   /** The design fee the CLIENT pays (scale-4 string), or null before it is set. */
   designFeeTotal: string | null;
-  /** The client-acknowledged budget band (scale-4 strings), or null if unset. */
+  /** The budget band (scale-4 strings), or null when unset OR not yet ISSUED —
+   *  an unissued band is the studio's private working state. */
   rom: { low: string | null; high: string | null } | null;
   shareExpiresAt: string | null;
   firm: { nameAr: string | null; nameEn: string | null; logoFileId: string | null };
