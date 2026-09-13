@@ -60,4 +60,27 @@ describe('resolveRequestOrigin', () => {
   it('returns null rather than throwing when there is no host at all', async () => {
     await expect(resolveRequestOrigin()).resolves.toBeNull();
   });
+
+  it('treats an empty x-forwarded-proto as absent and uses https', async () => {
+    headerMap.set('host', 'metra.example');
+    headerMap.set('x-forwarded-proto', '');
+    await expect(resolveRequestOrigin()).resolves.toBe('https://metra.example');
+  });
+
+  it('an empty x-forwarded-host does not shadow a valid host', async () => {
+    headerMap.set('host', 'metra.example');
+    headerMap.set('x-forwarded-host', '');
+    await expect(resolveRequestOrigin()).resolves.toBe('https://metra.example');
+  });
+
+  it('returns null when the only host is whitespace', async () => {
+    headerMap.set('host', '   ');
+    await expect(resolveRequestOrigin()).resolves.toBeNull();
+  });
+
+  it('takes the leftmost entry of a forwarded list', async () => {
+    headerMap.set('x-forwarded-host', 'a.example, b.example');
+    headerMap.set('x-forwarded-proto', 'http, https');
+    await expect(resolveRequestOrigin()).resolves.toBe('http://a.example');
+  });
 });

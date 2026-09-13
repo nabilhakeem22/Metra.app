@@ -18,10 +18,19 @@ export async function resolveRequestOrigin(): Promise<string | null> {
   if (override) return override;
 
   const requestHeaders = await headers();
-  const host =
-    requestHeaders.get('x-forwarded-host') ?? requestHeaders.get('host');
+  // Each proxy in a chain APPENDS to these headers, so the value can be a list
+  // (`a.example, b.example`). The LEFTMOST entry is the host/scheme the client
+  // actually asked for, which is what an emailed link must point at; the rest
+  // are the internal hops. Trimmed, because the list separator is `, `.
+  const firstValue = (name: string) =>
+    (requestHeaders.get(name) ?? '').split(',')[0]?.trim() ?? '';
+
+  // `||`, not `??`: a present-but-empty header is absent, not an override. With
+  // `??` an empty `x-forwarded-host` shadowed a valid `host`, and an empty
+  // `x-forwarded-proto` produced the unusable `://host`.
+  const host = firstValue('x-forwarded-host') || firstValue('host');
   if (!host) return null;
 
-  const proto = requestHeaders.get('x-forwarded-proto') ?? 'https';
+  const proto = firstValue('x-forwarded-proto') || 'https';
   return `${proto}://${host}`;
 }
