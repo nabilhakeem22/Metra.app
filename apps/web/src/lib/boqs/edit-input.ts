@@ -83,7 +83,7 @@ export function readNumericField(raw: string): string | null {
   return clampMoney4(t);
 }
 
-export function isBoqUnit(value: string): value is BoqUnit {
+function isBoqUnit(value: string): value is BoqUnit {
   return (BOQ_UNITS as readonly string[]).includes(value);
 }
 

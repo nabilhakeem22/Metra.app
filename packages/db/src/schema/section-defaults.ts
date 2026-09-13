@@ -17,7 +17,7 @@ export const DEFAULT_SECTION_KEYS = [
 export type DefaultSectionKey = (typeof DEFAULT_SECTION_KEYS)[number];
 
 /** Bilingual display labels for each seeded default (en + ar). */
-export const DEFAULT_SECTION_LABELS: Record<
+const DEFAULT_SECTION_LABELS: Record<
   DefaultSectionKey,
   { en: string; ar: string }
 > = {

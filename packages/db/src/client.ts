@@ -20,6 +20,12 @@ export interface CreateSqlOptions {
    * origin, so the worker->Hyperdrive hop must not force SSL.
    */
   ssl?: boolean | 'require';
+  /**
+   * postgres.js `connection` — session parameters sent in the startup packet, so
+   * they apply to every statement on the connection (e.g. `lock_timeout`).
+   * Undefined keeps postgres.js's own defaults.
+   */
+  connection?: Record<string, string>;
 }
 
 // Cap how long a new socket may take to establish (seconds). A slow/half-open
@@ -37,6 +43,7 @@ export function createSql(url: string, opts: CreateSqlOptions = {}) {
     // Nullish-coalesce so an explicit `ssl: false` is honoured; only undefined
     // falls through to the host-derived default.
     ssl: opts.ssl ?? (needsSsl(url) ? 'require' : false),
+    connection: opts.connection,
   });
 }
 

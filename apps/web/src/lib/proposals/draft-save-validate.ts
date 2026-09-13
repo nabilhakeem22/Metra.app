@@ -49,6 +49,7 @@ export function validateDraftHeader(
   }
   if (!pctInRange(discountPct!)) fail('discount_out_of_range');
   if (!pctInRange(supervisionPct!)) fail('supervision_out_of_range');
+  if (!pctInRange(taxRate!)) fail('tax_out_of_range');
   const titleEn =
     header.titleEn !== undefined ? normalizeText(header.titleEn) : proposal.titleEn;
   const titleAr =

@@ -1,7 +1,7 @@
 'use server';
 
 import { getLocale } from 'next-intl/server';
-import { revalidatePath } from 'next/cache';
+import { refreshApp } from '@/lib/actions/refresh';
 import type { ActionResult } from '@/lib/actions/result';
 import { requireOrg } from '@/lib/auth/require-org';
 import {
@@ -20,10 +20,6 @@ import type { BoqLinePatch } from './edit-input';
 import { issueBoqCore } from './issue';
 import { decodeCsv } from './import/decode';
 import { autoDetectMapping, mapRows, type ImportedLine } from './import/map';
-
-function refreshApp(): void {
-  revalidatePath('/', 'layout');
-}
 
 export async function createBoq(
   input: CreateBoqInput,

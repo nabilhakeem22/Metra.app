@@ -80,6 +80,7 @@ export const proposals = pgTable(
       'proposals_supervision_pct_range',
       sql`supervision_pct >= 0 and supervision_pct <= 100`,
     ),
+    check('proposals_tax_rate_range', sql`tax_rate >= 0 and tax_rate <= 100`),
     ...sameOrgFk(t, 'client', clients, { onDelete: 'restrict' }),
     ...sameOrgFk(t, 'project', projects, { onDelete: 'restrict' }),
     // Self-reference: a superseding draft points at the proposal it replaced.
@@ -91,6 +92,13 @@ export const proposals = pgTable(
     ),
     index('proposals_org_status_idx').on(t.orgId, t.status),
     index('proposals_org_project_idx').on(t.orgId, t.projectId),
+    // Live since 0019 — the keyset covering index the list endpoints read in
+    // order (created_at DESC, id DESC) within an org.
+    index('proposals_org_created_id_idx').on(
+      t.orgId,
+      t.createdAt.desc().nullsFirst(),
+      t.id.desc().nullsFirst(),
+    ),
   ],
 );
 

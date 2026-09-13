@@ -171,29 +171,3 @@ export async function updateStageCore(
     },
   );
 }
-
-export async function deleteStageCore(
-  ctx: OrgContext,
-  input: { id: string },
-): Promise<ActionResult> {
-  return mutateInOrg(
-    ctx,
-    { capability: 'projects', action: 'update' },
-    async (tx, audit) => {
-      const [before] = await tx
-        .select({ id: projectStages.id })
-        .from(projectStages)
-        .where(eq(projectStages.id, input.id))
-        .limit(1);
-      if (!before) fail('invalid');
-      await tx.delete(projectStages).where(eq(projectStages.id, input.id));
-      await audit({
-        entity: 'project_stage',
-        entityId: input.id,
-        action: 'delete',
-        before: null,
-        after: null,
-      });
-    },
-  );
-}

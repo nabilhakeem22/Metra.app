@@ -113,6 +113,17 @@ describe('generateContractCore (AC1, AC2, AC3)', () => {
     await saveProposalDraftCore(ctx, { id, sections: twoSections });
     expect(await generateContractCore(ctx, { proposalId: id })).toEqual({ ok: false, error: 'proposal_not_accepted' });
   });
+
+  it('DB CHECK rejects a direct tax_rate = 150 write on the contract (23514)', async () => {
+    const { ctx, clientId, projectId } = await setup();
+    const { id: proposalId } = await acceptedProposal(ctx, clientId, projectId);
+    const contractId = ((await generateContractCore(ctx, { proposalId })) as { data?: string }).data!;
+    await expect(
+      raw.query(
+        `update public.contracts set tax_rate = 150 where id = '${contractId}'`,
+      ),
+    ).rejects.toMatchObject({ code: '23514' });
+  });
 });
 
 describe('contract immutability + lifecycle (AC4, AC5, AC6)', () => {

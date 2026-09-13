@@ -1,6 +1,6 @@
 'use server';
 
-import { revalidatePath } from 'next/cache';
+import { refreshApp } from '@/lib/actions/refresh';
 import { err, type ActionResult } from '@/lib/actions/result';
 import { requireOrg } from '@/lib/auth/require-org';
 import {
@@ -23,11 +23,6 @@ import {
   type ImportSummary,
 } from './import-core';
 import { MAX_IMPORT_BYTES, type ParsedSheet } from './parse';
-
-function refreshApp(): void {
-  // Server components re-run; the list/table re-fetch. Matches org-settings.
-  revalidatePath('/', 'layout');
-}
 
 export async function createCostItem(
   input: CostItemInput,

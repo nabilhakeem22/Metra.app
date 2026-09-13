@@ -25,7 +25,7 @@ export type ImportField = (typeof IMPORT_FIELDS)[number];
 /** Column index per field; -1 means "not present in this sheet". */
 export type ColumnMapping = Record<ImportField, number>;
 
-export const EMPTY_MAPPING: ColumnMapping = {
+const EMPTY_MAPPING: ColumnMapping = {
   itemCode: -1,
   section: -1,
   description: -1,

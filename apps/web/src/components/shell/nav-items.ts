@@ -69,7 +69,7 @@ export const NAV_GROUPS: NavGroup[] = [
     groupKey: 'support',
     labelKey: 'support',
     items: [
-      { key: 'team', href: '/team', icon: Users },
+      { key: 'team', href: '/team', icon: Users, capability: 'users_settings' },
       { key: 'settings', href: '/settings', icon: Settings },
       { key: 'signOut', icon: LogOut, action: 'signout' },
     ],

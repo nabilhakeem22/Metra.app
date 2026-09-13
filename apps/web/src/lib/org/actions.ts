@@ -33,9 +33,14 @@ export type { OrgProfileInput };
  * Creates the org + owner membership + audit atomically, persisting the profile
  * columns. Does NOT redirect on success — the onboarding wizard may still upload
  * a logo afterwards, then navigates itself. Already-onboarded users are sent to
- * /dashboard (no second org). Throws on invalid input.
+ * /dashboard (no second org), and a signed-out caller to /login.
+ *
+ * Returns the core's coded ActionResult so the wizard can localize the failure;
+ * it never throws its own error. (The two redirect() calls still throw the
+ * framework's NEXT_REDIRECT signal — that is how redirect works, and React
+ * must be allowed to see it.)
  */
-export async function createOrg(input: OrgProfileInput): Promise<void> {
+export async function createOrg(input: OrgProfileInput): Promise<ActionResult> {
   const user = await getSessionUser();
   if (!user) {
     redirect('/login');
@@ -50,12 +55,10 @@ export async function createOrg(input: OrgProfileInput): Promise<void> {
     redirect('/dashboard');
   }
 
-  const res = await createOrgCore(
+  return createOrgCore(
     { orgId: randomUUID(), userId: user.id, role: 'owner' },
     input,
   );
-  // Throw the code so the wizard can localize it (contract preserved).
-  if (!res.ok) throw new Error(res.error ?? 'invalid');
 }
 
 /** Signed upload URL for the org logo (org must already exist). Manage-only. */

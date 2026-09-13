@@ -11,7 +11,7 @@ export const DEFAULT_PROJECT_TYPE_KEYS = [
 
 export type DefaultProjectTypeKey = (typeof DEFAULT_PROJECT_TYPE_KEYS)[number];
 
-export const DEFAULT_PROJECT_TYPE_LABELS: Record<
+const DEFAULT_PROJECT_TYPE_LABELS: Record<
   DefaultProjectTypeKey,
   { en: string; ar: string }
 > = {

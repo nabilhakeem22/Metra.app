@@ -23,16 +23,8 @@ import {
   pctInRange,
   withinMagnitude,
 } from '@/lib/proposals/core';
-import { MONEY_RE } from '@/lib/aggregates/proposal-totals';
 import { isUuid } from '@/lib/uuid';
-
-/** Signed money string (allows a negative de-scope qty), or null if malformed. */
-function normalizeSignedMoney(v: string | null | undefined): string | null {
-  const s = v?.trim();
-  if (s === undefined || s === '') return '0';
-  if (!MONEY_RE.test(s)) return null;
-  return s;
-}
+import { normalizeSignedMoney } from '../validation';
 
 export interface VariationLineInput {
   /** Baseline contract line this changes; null/absent = brand-new scope. */

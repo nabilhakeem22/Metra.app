@@ -24,6 +24,7 @@ import {
   getProjectsByMonth,
   listDashboardDeliveries,
 } from '@/lib/dashboard/queries';
+import { pickPrimaryCta } from '@/lib/dashboard/primary-cta';
 import { fillMonths, parseRange } from '@/lib/dashboard/range';
 
 /** How many in-flight deliveries the panel shows before deferring to the list. */
@@ -65,21 +66,17 @@ export default async function DashboardPage({
     ctx.orgId,
   );
 
-  // A real primary action, never a dead disabled control. Once an invite is
-  // pending we stop pushing "Invite your team".
-  const primary = !profileComplete
-    ? { label: d('ctaCompleteProfile'), href: '/settings' as const }
-    : !teamInvited
-      ? { label: d('ctaInviteTeam'), href: '/team' as const }
-      : { label: d('ctaManageTeam'), href: '/team' as const };
+  const primary = pickPrimaryCta(ctx.role, { profileComplete, teamInvited });
 
   // The dashboard's real figures. Three reads in parallel — the counts, and the
   // two monthly series behind the charts.
   // The panel is hidden entirely from roles that cannot read engagements, so the
-  // query is not even issued for them.
+  // query is not even issued for them; the team card is gated the same way, on
+  // the capability that guards /team itself.
   const canSeeDeliveries = can(ctx.role, 'engagements_design', 'read');
+  const canSeeTeam = can(ctx.role, 'users_settings', 'read');
   const [counts, projectMonths, clientMonths, deliveries] = await Promise.all([
-    getDashboardCounts(ctx),
+    getDashboardCounts(ctx, { includeTeamMembers: canSeeTeam }),
     getProjectsByMonth(ctx, range),
     getClientsByMonth(ctx, range),
     canSeeDeliveries
@@ -168,7 +165,7 @@ export default async function DashboardPage({
         </div>
         <div className="shrink-0">
           <Button asChild size="lg">
-            <Link href={primary.href}>{primary.label}</Link>
+            <Link href={primary.href}>{d(primary.messageKey)}</Link>
           </Button>
         </div>
       </div>
@@ -203,12 +200,14 @@ export default async function DashboardPage({
             href="/engagements"
           />
         )}
-        <DashboardStatCard
-          label={d('cards.team')}
-          value={counts.teamMembers}
-          icon={UsersRound}
-          href="/team"
-        />
+        {canSeeTeam && (
+          <DashboardStatCard
+            label={d('cards.team')}
+            value={counts.teamMembers ?? 0}
+            icon={UsersRound}
+            href="/team"
+          />
+        )}
       </div>
 
       {canSeeDeliveries && (

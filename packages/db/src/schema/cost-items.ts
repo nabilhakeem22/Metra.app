@@ -52,6 +52,13 @@ export const costItems = pgTable(
     ),
     ...sameOrgFk(t, 'section', sections, { onDelete: 'restrict' }),
     index('cost_items_org_active_idx').on(t.orgId, t.active),
+    // Live since 0019 — the keyset covering index the list endpoints read in
+    // order (created_at DESC, id DESC) within an org.
+    index('cost_items_org_created_id_idx').on(
+      t.orgId,
+      t.createdAt.desc().nullsFirst(),
+      t.id.desc().nullsFirst(),
+    ),
   ],
 );
 

@@ -216,8 +216,6 @@
     "progress": "اكتمل بنسبة {percent}%",
     "launch": "وريني",
     "open": "افتح",
-    "allDoneTitle": "كله تمام",
-    "allDoneBody": "شركتك اتجهّزت خلاص. الكارت ده مش هيضايقك تاني.",
     "readOnlyTitle": "كله تمام",
     "readOnlyBody": "صلاحيات حسابك للمشاهدة بس، مفيش حاجة تجهّزها هنا.",
     "items": {
@@ -232,16 +230,7 @@
   "dashboard": {
     "title": "لوحة التحكم",
     "welcomeBack": "أهلاً بيك من تاني",
-    "noData": "مفيش بيانات لسه",
-    "gettingStartedTitle": "ابدأ دلوقتي",
-    "gettingStartedSubtitle": "خطوات بسيطة وتجهّز شركتك لدورة العمل الكاملة من أول عرض السعر لحد الفاتورة.",
     "dismiss": "إخفاء",
-    "taskCompleteProfile": "كمّل ملف الشركة",
-    "taskInviteTeammate": "ابعت دعوة لزميلك في الفريق",
-    "taskImportPriceBook": "استورد دليل الأسعار بتاعك",
-    "taskFirstProposal": "اعمل أول عرض سعر ليك",
-    "noProjectsTitle": "مفيش مشاريع شغالة لسه",
-    "noProjectsDescription": "مشاريعك هتظهر هنا أول ما تبدأ تعمل عروض أسعار.",
     "ctaCompleteProfile": "كمّل ملف الشركة",
     "ctaInviteTeam": "ابعت دعوة لفريقك",
     "ctaManageTeam": "إدارة الفريق",
@@ -313,13 +302,6 @@
     "confirmRevokeDesc": "لينك الدعوة ده مش هيشتغل تاني.",
     "confirmRemoveTitle": "عايز تشيل العضو ده؟",
     "confirmRemoveDesc": "{name} هيفقد صلاحية الدخول للشركة دي.",
-    "errorForbidden": "معندكش صلاحية تعمل كده.",
-    "errorInvalid": "العملية منجحتش. جرب تاني.",
-    "errorAlreadyMember": "الشخص ده عضو بالفعل في الفريق.",
-    "errorPendingExists": "فيه بالفعل دعوة معلقة مبعوتة للإيميل ده.",
-    "errorLastOwner": "ماينفعش تشيل أو تقلل رتبة آخر مالك.",
-    "errorOwnerImmutable": "المالك بس هو اللي يقدر يغير مالك تاني.",
-    "errorSelf": "ماينفعش تغير دورك أو تشيل نفسك من هنا.",
     "errorGeneric": "حصلت مشكلة. جرب تاني."
   },
   "roles": {
@@ -385,8 +367,6 @@
     "hideMarginDesc": "مديري المشاريع مش هيشوفوا أرقام التكاليف أو هامش الربح.",
     "restrictDashLabel": "تقييد لوحة التحكم على مستوى الشركة",
     "restrictDashDesc": "قصر أرقام الشركة كلها على الملاك والمسؤولين بس.",
-    "errorForbidden": "معندكش صلاحية تعدل الإعدادات.",
-    "errorNameRequired": "اكتب اسم واحد للشركة على الأقل.",
     "errorGeneric": "حصلت مشكلة. جرب تاني.",
     "apiKeysCardTitle": "مفاتيح الـ API",
     "apiKeysCardDesc": "تقدر تعمل وتدير مفاتيح الـ API العام لميترا.",
@@ -496,6 +476,7 @@
     "already_responded": "تم تسجيل رد مسبقاً لهذا العرض",
     "discount_out_of_range": "الخصم لازم يكون بين 0 و100",
     "supervision_out_of_range": "الإشراف لازم يكون بين 0 و100",
+    "tax_out_of_range": "نسبة الضريبة لازم تكون بين 0 و100",
     "too_many_lines": "العرض ده فيه بنود كتيرة زيادة عن اللزوم.",
     "invalid_date": "اكتب تاريخ صح",
     "amount_too_large": "المبلغ ده كبير أوي",
@@ -559,12 +540,9 @@
   "hints": {
     "proposal": {
       "title": "عنوان العرض الرئيسي اللي بيظهر للعميل. سيبه فاضي عشان تستخدم رقم عرض السعر.",
-      "issueDate": "تاريخ إصدار عرض السعر. بيستخدم في رقم عرض السعر وفترة الصلاحية.",
-      "expiryDate": "آخر يوم لصلاحية عرض السعر ده. لازم يكون في نفس يوم الإصدار أو بعده.",
       "discountPct": "خصم على مستوى المستند كله بيتطبق على المجموع الفرعي قبل ضريبة القيمة المضافة.",
       "taxRate": "نسبة ضريبة القيمة المضافة المطبقة على الوعاء الضريبي (المجموع الفرعي ناقص الخصم).",
       "supervisionPct": "رسوم الإشراف بتتحسب بعد ضريبة القيمة المضافة، كنسبة مئوية من الوعاء الضريبي. العميل هو اللي بيدفعها.",
-      "currency": "العملة اللي بتظهر في عرض السعر ده. الافتراضي هو الجنيه المصري.",
       "sectionTitle": "اسم القسم ده. اختار عنوان متسيف أو اكتب عنوان جديد عشان تضيفه لمكتبتك.",
       "lineQty": "الكمية بوحدة البند.",
       "lineUnitPrice": "السعر للعميل لكل وحدة، قبل أي خصم على البند.",
@@ -636,7 +614,6 @@
     "addSection": "إضافة قسم",
     "addSectionPlaceholder": "اسم القسم الجديد",
     "activeOnly": "النشط بس",
-    "showAll": "عرض الكل",
     "itemsCount": "{count} بند",
     "categories": {
       "civil": "مدني",
@@ -667,8 +644,7 @@
       "unit": "الوحدة",
       "cost": "تكلفة الوحدة",
       "price": "سعر الوحدة",
-      "status": "الحالة",
-      "actions": "الإجراءات"
+      "status": "الحالة"
     },
     "empty": {
       "title": "دليل الأسعار بتاعك فاضي",
@@ -682,8 +658,7 @@
       "activate": "تفعيل",
       "deactivate": "إيقاف التفعيل",
       "bulkUpdate": "تحديث الأسعار دفعة واحدة",
-      "import": "استيراد من ملف CSV",
-      "loadStarter": "تحميل الكتالوج المبدئي"
+      "import": "استيراد من ملف CSV"
     },
     "form": {
       "newTitle": "بند تكلفة جديد",
@@ -737,7 +712,6 @@
       "rowColumn": "الصف",
       "statusColumn": "الحالة",
       "willImport": "هيتم استيراده",
-      "willSkip": "تخطي",
       "importNow": "استيراد {count} بند",
       "back": "رجوع",
       "cancel": "إلغاء",
@@ -789,7 +763,6 @@
       "phone": "التليفون",
       "city": "المدينة",
       "status": "الحالة",
-      "actions": "إجراءات",
       "type": "النوع",
       "contactDetails": "البريد والتليفون",
       "projects": "المشاريع"
@@ -867,7 +840,6 @@
         "email": "البريد الإلكتروني",
         "whatsapp": "واتساب",
         "primary": "أساسي",
-        "makePrimary": "خليه أساسي",
         "setAsPrimary": "خليه جهة الاتصال الأساسية",
         "delete": "حذف",
         "empty": "مفيش جهات اتصال لغاية دلوقتي.",
@@ -958,8 +930,7 @@
       "name": "الاسم",
       "client": "العميل",
       "status": "الحالة",
-      "dates": "التواريخ",
-      "actions": "إجراءات"
+      "dates": "التواريخ"
     },
     "empty": {
       "title": "لسه مفيش مشاريع",
@@ -988,7 +959,6 @@
       "save": "حفظ",
       "cancel": "إلغاء",
       "noClients": "لازم تضيف عميل نشط الأول قبل ما تعمل مشروع.",
-      "selectClient": "اختار عميل",
       "country": "البلد",
       "endDateNote": "تقدر تمد تاريخ النهاية بعدين، التواريخ دي للمتابعة بس."
     },
@@ -997,15 +967,11 @@
       "updated": "المشروع اتحدث",
       "activated": "المشروع اتفعل",
       "deactivated": "المشروع اتلغى تفعيله",
-      "typeAdded": "النوع اتضاف",
-      "stageAdded": "المرحلة اتضافت",
-      "stageSaved": "المرحلة اتحفظت",
-      "stageDeleted": "المرحلة اتحذفت"
+      "typeAdded": "النوع اتضاف"
     },
     "stageStatuses": {
       "not_started": "مبدأش",
       "in_progress": "شغال",
-      "blocked": "واقف",
       "done": "خلص",
       "skipped": "اتخطى"
     },
@@ -1056,7 +1022,6 @@
         "endDate": "النهاية",
         "delete": "حذف",
         "empty": "مفيش مراحل لسه.",
-        "newName": "اسم المرحلة الجديدة",
         "save": "حفظ",
         "cancel": "إلغاء"
       },
@@ -1200,8 +1165,7 @@
       "client": "العميل",
       "project": "المشروع",
       "status": "الحالة",
-      "total": "الإجمالي",
-      "actions": "إجراءات"
+      "total": "الإجمالي"
     },
     "empty": {
       "title": "مفيش أي عروض لسه",
@@ -1229,8 +1193,6 @@
       "expiryDate": "تاريخ الانتهاء",
       "submit": "إنشاء",
       "cancel": "إلغاء",
-      "selectClient": "اختار عميل",
-      "selectProject": "اختار مشروع",
       "needFirst": "لازم يكون عندك عميل ومشروع نشطين قبل ما تعمل عرض."
     },
     "builder": {
@@ -1241,7 +1203,6 @@
       "removeSection": "حذف القسم",
       "addLine": "إضافة بند",
       "fromPriceBook": "من دليل الأسعار",
-      "selectItem": "اختار بند تكلفة",
       "description": "الوصف",
       "qty": "الكمية",
       "unit": "الوحدة",
@@ -1262,14 +1223,11 @@
       "taxRate": "نسبة ضريبة القيمة المضافة %",
       "supervisionPct": "نسبة الإشراف %",
       "margin": "هامش الربح",
-      "marginPct": "نسبة هامش الربح %",
       "cost": "التكاليف",
       "marginHidden": "هامش الربح مش ظاهر لدورك",
       "empty": "مفيش أي أقسام لسه، ضيف قسم عشان تبدأ.",
       "moveUp": "نقل لفوق",
       "moveDown": "نقل لتحت",
-      "notesEn": "ملاحظات (بالإنجليزي)",
-      "notesAr": "ملاحظات (بالعربي)",
       "termsEn": "الشروط (بالإنجليزي)",
       "termsAr": "الشروط (بالعربي)"
     },
@@ -1288,7 +1246,6 @@
       "title": "العرض",
       "shareTitle": "مشاركة اللينك",
       "copyLink": "نسخ اللينك",
-      "sentReadonly": "العرض ده اتبعت ومفتوح للقراءة بس.",
       "version": "النسخة {n}"
     },
     "toast": {
@@ -1304,7 +1261,6 @@
     "p": {
       "quotation": "عرض سعر",
       "from": "من",
-      "validUntil": "ساري حتى",
       "subtotal": "المجموع الفرعي",
       "discount": "الخصم",
       "tax": "الضريبة",
@@ -1317,8 +1273,6 @@
       "alreadyResponded": "تم تسجيل رد مسبقاً.",
       "expired": "رابط العرض هذا منتهي الصلاحية.",
       "invalid": "هذا الرابط غير صالح.",
-      "confirmAccept": "هل تريد قبول عرض السعر هذا؟",
-      "confirmReject": "هل تريد رفض عرض السعر هذا؟",
       "notes": "ملاحظات",
       "terms": "الشروط والأحكام"
     }
@@ -1423,8 +1377,6 @@
     "copyLink": "نسخ الرابط",
     "copied": "تم النسخ",
     "backToList": "الرجوع للعقود",
-    "viewClientPdf": "عرض ملف العميل (PDF)",
-    "viewInternalPdf": "عرض الملف الداخلي (PDF)",
     "status": {
       "draft": "مسودة",
       "issued": "صادر",
@@ -1440,9 +1392,6 @@
       "retentionPct": "الاحتجاز %",
       "paymentTermsDays": "شروط الدفع (بالأيام)",
       "defectsLiabilityDays": "فترة ضمان العيوب (بالأيام)",
-      "penalty": "الغرامة",
-      "scopeInclusions": "بنود داخل النطاق",
-      "scopeExclusions": "بنود خارج النطاق",
       "terms": "الشروط والأحكام"
     },
     "ack": {
@@ -1469,17 +1418,14 @@
     "title_": "العنوان",
     "reason": "السبب",
     "netDelta": "التغيير الصافي",
-    "approvedTotal": "إجمالي التغييرات الموافق عليها",
     "saveDraft": "حفظ مسودة",
     "saved": "تم الحفظ",
     "internalApprove": "الموافقة الداخلية",
-    "internalApproved": "معتمد داخليًا",
     "issue": "إرسال للعميل",
     "issued": "تم الإرسال للعميل",
     "shareLink": "رابط قرار العميل",
     "copyLink": "نسخ الرابط",
     "copied": "تم النسخ",
-    "backToContract": "الرجوع للعقد",
     "status": {
       "draft": "مسودة",
       "internal_approved": "معتمد داخليًا",
@@ -1517,15 +1463,11 @@
       "hint": "بتحدد الخطوة التانية: الوحدة القائمة محتاجة رفع مساحي، وعلى الخريطة بتستورد ملف الأوتوكاد من المطور.",
       "budgetDraftBadge": "مسودة"
     },
-    "boqLabel": "المقايسة",
     "paymentsBadge": "مستحق {n}",
     "asBuiltDue": "التصميم النهائي مستحق",
     "created": "تم الإنشاء",
-    "updated": "تم التحديث",
     "designFee": "أتعاب التصميم",
     "renderManifest": "أساس الرندرة",
-    "revisions": "التعديلات",
-    "revisionsUsed": "تم استخدام {used} من مجاني {free}",
     "conceptLocked": "تم اعتماد الفكرة",
     "form": {
       "newTitle": "تسليم جديد",
@@ -1600,12 +1542,9 @@
     "phaseStatus": {
       "done": "خلصان",
       "current": "شغال",
-      "locked": "مقفول",
-      "upcoming": "الجاي",
-      "rework": "بيتعدل"
+      "upcoming": "الجاي"
     },
     "rail": {
-      "auditLedger": "سجل المراجعة",
       "recentActivity": "النشاط الأخير"
     },
     "pulse": {
@@ -1637,14 +1576,12 @@
       "pendingGuard": "مش متاح دلوقتي"
     },
     "hero": {
-      "whatsNext": "إيه الخطوة الجاية",
       "day": "اليوم {n}",
       "revision": "التعديل {n} من {free}",
       "designRevision": "تعديل الـ 3D رقم {n} من {free}",
       "dueLabel": "مستحق",
       "logPaymentAdvance": "سجّل الدفعة والمقدم",
       "advance": "انقل للمرحلة اللي بعدها",
-      "recordSomethingElse": "سجّل حاجة تاني",
       "payNote": "تسجيل الدفعة بيقدّم التسليم لوحده، والعميل ما بيشوفش المبلغ أبدًا.",
       "closed": {
         "headline": "التسليم ده مُغلق",
@@ -1714,7 +1651,6 @@
       "nudge": "فكّر العميل",
       "nudgeHint": "أظهر لينك العميل عشان تقدر تتابع معاه.",
       "closedHeadline": "التسليم ده مُغلق",
-      "stepLabel": "الخطوة الجاية للتقدم",
       "clientLinkActive": "رابط العميل شغال",
       "clientLinkInactive": "مش متشارك",
       "moreLabel": "إجراءات أكتر",
@@ -1848,7 +1784,6 @@
       "designFee": "مقايسة التصميم",
       "basis": "الأساس",
       "milestones": "الدفعة",
-      "addMilestone": "إضافة دفعة",
       "remove": "حذف",
       "kind": "دفعة",
       "value": "القيمة",
@@ -1947,8 +1882,7 @@
       "amount": "المبلغ",
       "reason": "السبب",
       "status": "الحالة",
-      "raisedAt": "تاريخ الطلب",
-      "settledAt": "تمت التسوية"
+      "raisedAt": "تاريخ الطلب"
     },
     "rom": {
       "range": "المدى",
@@ -1973,9 +1907,6 @@
     "controls": {
       "title": "إدخال بيانات",
       "recordPayment": "تسجيل دفعة",
-      "recordArtifact": "تسجيل مخرج",
-      "setRom": "تحديد التكلفة المبدئية",
-      "recordRomAck": "تسجيل اعتماد التكلفة المبدئية",
       "amount": "المبلغ",
       "kind": "النوع",
       "method": "الطريقة",
@@ -2094,8 +2025,6 @@
       "title": "هذا الرابط لم يعد متاحًا",
       "body": "قد يكون الرابط منتهيًا أو تم إيقافه. من فضلك تواصل مع فريق التصميم للحصول على رابط محدَّث."
     },
-    "forClient": "لـ {name}",
-    "stageEyebrow": "أين وصلنا",
     "greeting": "أهلًا، {name} 👋",
     "firmSubtitle": "مشروع التصميم الخاص بك",
     "journey": {
@@ -2169,19 +2098,10 @@
       "due": "مستحقة"
     },
     "actions": {
-      "conceptTitle": "التصميم المبدئي",
-      "designTitle": "التصميم النهائي",
       "romTitle": "الميزانية التقديرية",
-      "handoffTitle": "تسليم التصميم",
       "notePlaceholder": "أضف ملاحظة (اختياري)",
-      "approveConcept": "اعتماد الفكرة",
-      "requestConceptChanges": "طلب تعديل",
       "approveDesign": "اعتماد التصميم",
-      "requestDesignChanges": "طلب تعديل",
       "acknowledgeRom": "إقرار الميزانية",
-      "acknowledgeHandoff": "إقرار التسليم",
-      "confirmedApproved": "تم الاعتماد، وتم إبلاغ الاستوديو.",
-      "confirmedChanges": "تم طلب التعديل، وتم إبلاغ الاستوديو.",
       "confirmedAcknowledged": "تم الإقرار، وتم إبلاغ الاستوديو.",
       "error": {
         "token_invalid": "هذا الرابط لم يعد متاحًا. برجاء التواصل مع فريق التصميم.",

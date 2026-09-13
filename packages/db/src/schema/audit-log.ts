@@ -1,4 +1,5 @@
 import {
+  index,
   jsonb,
   pgTable,
   text,
@@ -30,7 +31,12 @@ export const auditLog = pgTable(
     before: jsonb('before'),
     after: jsonb('after'),
   },
-  (t) => [unique('audit_log_org_id_id_unique').on(t.orgId, t.id)],
+  (t) => [
+    unique('audit_log_org_id_id_unique').on(t.orgId, t.id),
+    // Every audit read is "this record's history, newest first". `at` trails
+    // the equality columns so the index also supplies the ordering.
+    index('audit_log_org_entity_at_idx').on(t.orgId, t.entity, t.entityId, t.at),
+  ],
 );
 
 export type AuditLogRow = typeof auditLog.$inferSelect;

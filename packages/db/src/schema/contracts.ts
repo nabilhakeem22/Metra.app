@@ -110,6 +110,7 @@ export const contracts = pgTable(
       'contracts_advance_pct_range',
       sql`advance_pct >= 0 and advance_pct <= 100`,
     ),
+    check('contracts_tax_rate_range', sql`tax_rate >= 0 and tax_rate <= 100`),
     ...sameOrgFk(t, 'sourceProposal', proposals, { onDelete: 'restrict' }),
     ...sameOrgFk(t, 'client', clients, { onDelete: 'restrict' }),
     ...sameOrgFk(t, 'project', projects, { onDelete: 'restrict' }),

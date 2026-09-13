@@ -8,6 +8,7 @@ import {
   pgTable,
   text,
   unique,
+  uniqueIndex,
   uuid,
   type AnyPgColumn,
 } from 'drizzle-orm/pg-core';
@@ -70,6 +71,20 @@ export const projects = pgTable(
     ...sameOrgFk(t, 'type', projectTypes, { onDelete: 'set null' }),
     index('projects_org_status_idx').on(t.orgId, t.status),
     index('projects_org_active_idx').on(t.orgId, t.active),
+    // Live in the database since 0019 — the keyset-pagination covering index the
+    // list endpoints read in order (created_at DESC, id DESC) within an org.
+    // Declared here so a future `drizzle-kit generate` sees it instead of
+    // emitting a DROP INDEX for it.
+    index('projects_org_created_id_idx').on(
+      t.orgId,
+      t.createdAt.desc().nullsFirst(),
+      t.id.desc().nullsFirst(),
+    ),
+    // Live since 0039 — one project number per org, and only where a number was
+    // actually assigned (PARTIAL, so unnumbered projects don't collide on NULL).
+    uniqueIndex('projects_org_number_unique')
+      .on(t.orgId, t.number)
+      .where(sql`number is not null`),
   ],
 );
 

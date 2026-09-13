@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { migrate } from 'drizzle-orm/postgres-js/migrator';
 import { createDb } from '../client';
 import { MIGRATION_DATABASE_URL } from '../env';
+import { MIGRATION_LOCK_TIMEOUT, applyLockTimeout } from './lock-timeout';
 
 const here = dirname(fileURLToPath(import.meta.url)); // packages/db/src/scripts
 const migrationsFolder = resolve(here, '../../migrations');
@@ -12,8 +13,10 @@ async function main() {
   const { db, sql } = createDb(MIGRATION_DATABASE_URL(), {
     max: 1,
     prepare: true,
+    connection: { lock_timeout: MIGRATION_LOCK_TIMEOUT },
   });
   try {
+    await applyLockTimeout(sql);
     console.log(`Applying migrations from ${migrationsFolder} ...`);
     await migrate(db, { migrationsFolder });
     console.log('Migrations applied.');

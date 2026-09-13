@@ -1,3 +1,4 @@
+import { sql } from 'drizzle-orm';
 import {
   boolean,
   date,
@@ -6,6 +7,7 @@ import {
   text,
   timestamp,
   unique,
+  uniqueIndex,
   uuid,
   type AnyPgColumn,
 } from 'drizzle-orm/pg-core';
@@ -97,6 +99,16 @@ export const engagementEvents = pgTable(
       t.engagementId,
       t.kind,
     ),
+    // Live since 0033 — a client may raise each signal kind once per engagement.
+    // PARTIAL on the channel, so staff events of the same kind stay unrestricted.
+    uniqueIndex('engagement_events_client_signal_unique')
+      .on(t.engagementId, t.kind)
+      .where(sql`actor_channel = 'client'`),
+    // Live since 0043 — readers that must exclude corrected rows ask whether a
+    // correction points at this id; PARTIAL, the answer is NULL for almost every row.
+    index('engagement_events_supersedes_idx')
+      .on(t.orgId, t.supersedesEventId)
+      .where(sql`supersedes_event_id is not null`),
   ],
 );
 

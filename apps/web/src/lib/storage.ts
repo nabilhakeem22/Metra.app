@@ -5,7 +5,7 @@ import { eq } from 'drizzle-orm';
 import { withOrgContext, type OrgContext } from '@/lib/db/context';
 import { createSupabaseAdminClient } from '@/lib/supabase/admin';
 
-export const FILES_BUCKET = 'metra-files';
+const FILES_BUCKET = 'metra-files';
 
 export interface SignedUpload {
   fileId: string;

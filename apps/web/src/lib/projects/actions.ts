@@ -1,8 +1,8 @@
 'use server';
 
 import { getLocale } from 'next-intl/server';
-import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
+import { refreshApp } from '@/lib/actions/refresh';
 import type { ActionResult } from '@/lib/actions/result';
 import { requireOrg } from '@/lib/auth/require-org';
 import {
@@ -11,10 +11,6 @@ import {
   updateProjectCore,
   type ProjectInput,
 } from './core';
-
-function refreshApp(): void {
-  revalidatePath('/', 'layout');
-}
 
 export async function createProject(input: ProjectInput): Promise<ActionResult> {
   const ctx = await requireOrg();

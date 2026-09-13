@@ -6,7 +6,6 @@ import { cfEnv, isCloudflareRuntime } from '@/lib/cf/context';
 // Off-platform (Node/Vitest, `next dev` on Node) the binding is absent, so this
 // degrades to ALLOW — tests and local dev are never rate-limited.
 
-export const RATE_LIMIT_MAX = 100;
 export const RATE_LIMIT_WINDOW_SECONDS = 60;
 
 export interface RateLimitResult {

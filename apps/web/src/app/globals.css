@@ -159,9 +159,6 @@
     --chart-2: #c4701f;
     --chart-3: #0e9c88;
 
-    /* Gauge arc track (behind the --brand progress arc). */
-    --gauge-track: rgba(23, 34, 57, 0.1);
-
     /* The mark's tile hairline — the ONE theme-aware part of the logo. The
        identity drops it on dark so the tile edge doesn't glow; the gradient
        itself is fixed in both themes. */
@@ -264,9 +261,6 @@
     --chart-1: #6491ee;
     --chart-2: #c8823a;
     --chart-3: #23ac93;
-
-    /* Gauge arc track (dark). */
-    --gauge-track: rgba(255, 255, 255, 0.12);
 
     /* Dropped from .55 so the tile edge doesn't glow on the navy ground. */
     --mark-hairline: rgba(255, 255, 255, 0.28);

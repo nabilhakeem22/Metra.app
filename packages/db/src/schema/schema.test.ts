@@ -2,12 +2,44 @@ import { getTableConfig, pgTable, unique } from 'drizzle-orm/pg-core';
 import { describe, expect, it } from 'vitest';
 import { money } from './_helpers';
 import { auditLog } from './audit-log';
+import { clients } from './clients';
+import { contracts } from './contracts';
+import { costItems } from './cost-items';
+import { engagementEvents } from './engagement-events';
 import { MEMBER_ROLES } from './enums';
 import { files } from './files';
 import { memberships } from './memberships';
 import { orgScoped } from './org-scoped';
 import { sameOrgFk, sameOrgRef } from './org-ref';
 import { organizations } from './organizations';
+import { projects } from './projects';
+import { proposals } from './proposals';
+
+// drizzle 0.36 does not export the shape of an index column; this is the slice
+// the assertions read — .desc() lands in indexConfig.order.
+interface IndexColumn {
+  name?: string;
+  indexConfig?: { order?: 'asc' | 'desc' };
+}
+
+type IndexedTable = Parameters<typeof getTableConfig>[0];
+
+function findIndex(table: IndexedTable, indexName: string) {
+  const idx = getTableConfig(table).indexes.find(
+    (i) => i.config.name === indexName,
+  );
+  if (!idx) {
+    throw new Error(`index ${indexName} is not declared in the schema`);
+  }
+  return idx;
+}
+
+const indexColumnsOf = (idx: ReturnType<typeof findIndex>) =>
+  idx.config.columns as IndexColumn[];
+const columnNamesOf = (idx: ReturnType<typeof findIndex>) =>
+  indexColumnsOf(idx).map((c) => c.name);
+const directionsOf = (idx: ReturnType<typeof findIndex>) =>
+  indexColumnsOf(idx).map((c) => c.indexConfig?.order);
 
 describe('bilingual helper', () => {
   it('emits _ar and _en columns', () => {
@@ -104,5 +136,93 @@ describe('member_role enum', () => {
       'client',
       'viewer',
     ]);
+  });
+});
+
+// tax_rate multiplies the whole taxable base, and until 0044 it was the only
+// percentage column in the schema with no [0,100] CHECK.
+describe('tax_rate range checks (0044)', () => {
+  it.each([
+    ['proposals', proposals, 'proposals_tax_rate_range'],
+    ['contracts', contracts, 'contracts_tax_rate_range'],
+  ])('%s carries %s', (_name, table, constraint) => {
+    const cfg = getTableConfig(table as typeof proposals);
+    expect(cfg.checks.map((c) => c.name)).toContain(constraint);
+  });
+});
+
+// Both tables are addressed by (org_id, entity, entity_id) and by nothing else;
+// before 0045 neither had an index on it.
+describe('polymorphic entity indexes (0045)', () => {
+  it.each([
+    ['files', files, 'files_org_entity_idx', ['org_id', 'entity', 'entity_id']],
+    [
+      'audit_log',
+      auditLog,
+      'audit_log_org_entity_at_idx',
+      ['org_id', 'entity', 'entity_id', 'at'],
+    ],
+  ])('%s carries %s', (_name, table, indexName, columns) => {
+    expect(columnNamesOf(findIndex(table as typeof files, indexName))).toEqual(
+      columns,
+    );
+  });
+});
+
+// Each of these lives in the database (0019, 0033, 0039, 0040, 0043) but was
+// missing from the schema files, so the next `drizzle-kit generate` would have
+// emitted a DROP INDEX for it. Column ORDER, SORT DIRECTION, uniqueness and the
+// partial predicate are all pinned, not just the name: a keyset index only
+// serves the scan while org_id leads it and the trailing columns descend the way
+// the list endpoints page, and a partial UNIQUE stops being the same invariant
+// the moment its WHERE clause moves.
+const KEYSET_COLUMNS = ['org_id', 'created_at', 'id'];
+const KEYSET_DIRECTIONS = ['asc', 'desc', 'desc'];
+
+describe('indexes declared for what the database already has', () => {
+  it.each([
+    { table: clients, name: 'clients_org_created_id_idx' },
+    { table: costItems, name: 'cost_items_org_created_id_idx' },
+    { table: projects, name: 'projects_org_created_id_idx' },
+    { table: proposals, name: 'proposals_org_created_id_idx' },
+  ])('$name is the (org_id, created_at DESC, id DESC) keyset index', (spec) => {
+    const idx = findIndex(spec.table, spec.name);
+    expect(columnNamesOf(idx)).toEqual(KEYSET_COLUMNS);
+    expect(directionsOf(idx)).toEqual(KEYSET_DIRECTIONS);
+    expect(idx.config.unique).toBe(false);
+  });
+
+  it.each([
+    {
+      table: files,
+      name: 'files_org_category_idx',
+      columns: ['org_id', 'category_id'],
+      unique: false,
+    },
+    {
+      table: projects,
+      name: 'projects_org_number_unique',
+      columns: ['org_id', 'number'],
+      unique: true,
+    },
+    {
+      table: engagementEvents,
+      name: 'engagement_events_client_signal_unique',
+      columns: ['engagement_id', 'kind'],
+      unique: true,
+    },
+    {
+      table: engagementEvents,
+      name: 'engagement_events_supersedes_idx',
+      columns: ['org_id', 'supersedes_event_id'],
+      unique: false,
+    },
+  ])('$name stays PARTIAL over $columns', (spec) => {
+    const idx = findIndex(spec.table, spec.name);
+    expect(columnNamesOf(idx)).toEqual(spec.columns);
+    expect(idx.config.unique).toBe(spec.unique);
+    // Every one of these was created with a WHERE clause; without it the UNIQUE
+    // ones would reject rows the database accepts today.
+    expect(idx.config.where).toBeDefined();
   });
 });

@@ -4,15 +4,22 @@ import {
   type CostItem,
   clients,
   costItems,
+  projectTypes,
   projects,
   proposals,
 } from '@metra/db';
 import { desc, eq, getTableColumns, sql, type SQL } from 'drizzle-orm';
 import type { AnyPgColumn } from 'drizzle-orm/pg-core';
 import { withOrgContext, type OrgContext } from '@/lib/db/context';
-import type { ProjectWithTypeNames } from './serializers/project';
+import type { ProjectWithType } from '@/lib/projects/queries';
 import type { ProposalSummaryRow } from './serializers/proposal';
 import type { Cursor } from './pagination';
+
+// Single-row reads are the DOMAIN queries, re-exported so the route files keep
+// importing everything from one module. They used to be duplicated here, and
+// getProjectById's copy had silently lost the project_types join.
+export { getClientById } from '@/lib/clients/queries';
+export { getProjectById } from '@/lib/projects/queries';
 
 // Keyset (cursor) pagination for the Public API (v1). Stable total order is
 // (created_at desc, id desc); every list fetches `limit + 1` rows so the route can
@@ -63,49 +70,24 @@ export function listClientsPage(
   );
 }
 
-export function getClientById(
-  ctx: OrgContext,
-  id: string,
-): Promise<Client | null> {
-  return withOrgContext(ctx, async (tx) => {
-    const [row] = await tx
-      .select()
-      .from(clients)
-      .where(eq(clients.id, id))
-      .limit(1);
-    return row ?? null;
-  });
-}
-
 export function listProjectsPage(
   ctx: OrgContext,
   { limit, cursor }: PageQuery,
-): Promise<WithCursorTs<ProjectWithTypeNames>[]> {
+): Promise<WithCursorTs<ProjectWithType>[]> {
   return withOrgContext(ctx, (tx) =>
     tx
       .select({
         ...getTableColumns(projects),
+        typeNameEn: projectTypes.nameEn,
+        typeNameAr: projectTypes.nameAr,
         cursorTs: cursorTsExpr(projects.createdAt),
       })
       .from(projects)
+      .leftJoin(projectTypes, eq(projectTypes.id, projects.typeId))
       .where(keysetAfter(projects.createdAt, projects.id, cursor))
       .orderBy(desc(projects.createdAt), desc(projects.id))
       .limit(limit + 1),
   );
-}
-
-export function getProjectById(
-  ctx: OrgContext,
-  id: string,
-): Promise<ProjectWithTypeNames | null> {
-  return withOrgContext(ctx, async (tx) => {
-    const [row] = await tx
-      .select()
-      .from(projects)
-      .where(eq(projects.id, id))
-      .limit(1);
-    return row ?? null;
-  });
 }
 
 export function listCostItemsPage(

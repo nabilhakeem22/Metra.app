@@ -5,6 +5,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createSql } from '../client';
 import { MIGRATION_DATABASE_URL } from '../env';
+import { MIGRATION_LOCK_TIMEOUT, applyLockTimeout } from './lock-timeout';
 
 const here = dirname(fileURLToPath(import.meta.url)); // packages/db/src/scripts
 const rlsDir = resolve(here, '../rls');
@@ -18,8 +19,17 @@ const files = [
 ];
 
 async function main() {
-  const sql = createSql(MIGRATION_DATABASE_URL(), { max: 1, prepare: false });
+  const sql = createSql(MIGRATION_DATABASE_URL(), {
+    max: 1,
+    prepare: false,
+    connection: { lock_timeout: MIGRATION_LOCK_TIMEOUT },
+  });
   try {
+    // Before the first `sql.unsafe`: each file goes over the simple protocol as
+    // ONE implicit transaction, so a single `alter table ... enable row level
+    // security` that blocks would hold ACCESS EXCLUSIVE on every table the file
+    // already touched until the whole file finished.
+    await applyLockTimeout(sql);
     for (const file of files) {
       const path = resolve(rlsDir, file);
       const content = readFileSync(path, 'utf8');

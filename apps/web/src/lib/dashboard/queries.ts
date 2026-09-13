@@ -24,14 +24,22 @@ export interface DashboardCounts {
   clientsActive: number;
   projectsTotal: number;
   projectsActive: number;
-  teamMembers: number;
+  /** null when the caller may not read team settings — then it is never counted. */
+  teamMembers: number | null;
   deliveriesTotal: number;
   /** Non-terminal — the work actually in flight. */
   deliveriesActive: number;
 }
 
-/** The four headline cards. One round trip, seven counts. */
-export function getDashboardCounts(ctx: OrgContext): Promise<DashboardCounts> {
+/**
+ * The headline cards. One round trip. The team headcount is only counted when
+ * the caller asks for it — the card that shows it is gated on `users_settings`,
+ * so a role that cannot open /team does not get the firm's headcount either.
+ */
+export function getDashboardCounts(
+  ctx: OrgContext,
+  options: { includeTeamMembers: boolean },
+): Promise<DashboardCounts> {
   return withOrgContext(ctx, async (tx) => {
     const [clientRow] = await tx
       .select({
@@ -47,7 +55,9 @@ export function getDashboardCounts(ctx: OrgContext): Promise<DashboardCounts> {
         active: sql<number>`count(*) filter (where ${projects.status} = 'active')::int`,
       })
       .from(projects);
-    const [teamRow] = await tx.select({ n: count() }).from(memberships);
+    const teamMembers = options.includeTeamMembers
+      ? ((await tx.select({ n: count() }).from(memberships))[0]?.n ?? 0)
+      : null;
     // Counted here rather than by pulling rows: a firm with 300 deliveries
     // should cost one grouped query, same as the other three figures. The
     // `(org_id, state)` index covers the filter.
@@ -63,7 +73,7 @@ export function getDashboardCounts(ctx: OrgContext): Promise<DashboardCounts> {
       clientsActive: clientRow?.active ?? 0,
       projectsTotal: projectRow?.total ?? 0,
       projectsActive: projectRow?.active ?? 0,
-      teamMembers: teamRow?.n ?? 0,
+      teamMembers,
       deliveriesTotal: deliveryRow?.total ?? 0,
       deliveriesActive: deliveryRow?.active ?? 0,
     };

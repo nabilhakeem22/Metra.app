@@ -20,8 +20,13 @@ export default {
     const response = await fetch(url, {
       headers: { Authorization: `Bearer ${env.CRON_SECRET}` },
     });
-    // A wrong/absent bearer makes the route answer 401; surface the status so a
-    // misconfigured secret is visible in the worker's tail logs.
+    // A wrong/absent bearer makes the route answer 401 and a bad tick 500.
+    // Throwing marks the scheduled invocation as FAILED, which is what puts it
+    // on the worker's error rate / Cron Triggers dashboard — a console.log of
+    // "401" is invisible unless someone happens to be tailing.
+    if (!response.ok) {
+      throw new Error(`automation cron ${response.status} from ${url}`);
+    }
     console.log(`automation cron -> ${url} : ${response.status}`);
   },
 } satisfies ExportedHandler<Env>;

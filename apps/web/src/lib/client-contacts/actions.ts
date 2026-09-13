@@ -1,6 +1,6 @@
 'use server';
 
-import { revalidatePath } from 'next/cache';
+import { refreshApp } from '@/lib/actions/refresh';
 import type { ActionResult } from '@/lib/actions/result';
 import { requireOrg } from '@/lib/auth/require-org';
 import {
@@ -10,10 +10,6 @@ import {
   updateContactCore,
   type ContactInput,
 } from './core';
-
-function refreshApp(): void {
-  revalidatePath('/', 'layout');
-}
 
 export async function createContact(
   input: { clientId: string } & ContactInput,

@@ -11,7 +11,7 @@
 import type { EngagementEventKind } from '@metra/db';
 
 /** The channel column's two values. Anything not `client` was typed by staff. */
-export const CLIENT_CHANNEL = 'client';
+const CLIENT_CHANNEL = 'client';
 
 /**
  * The acts that are the CLIENT'S to perform, and which the studio can therefore

@@ -21,7 +21,7 @@ for (const path of candidates) {
   }
 }
 
-export function requireEnv(name: string): string {
+function requireEnv(name: string): string {
   const value = process.env[name];
   if (!value || value.trim() === '') {
     throw new Error(
@@ -31,13 +31,5 @@ export function requireEnv(name: string): string {
   return value;
 }
 
-export function optionalEnv(name: string): string | undefined {
-  const value = process.env[name];
-  return value && value.trim() !== '' ? value : undefined;
-}
-
 /** Session pooler (:5432) — migrations + isolation test. */
 export const MIGRATION_DATABASE_URL = () => requireEnv('DATABASE_URL');
-/** Transaction pooler (:6543) — runtime client, prepare:false. */
-export const RUNTIME_DATABASE_URL = () =>
-  optionalEnv('DATABASE_POOL_URL') ?? requireEnv('DATABASE_URL');

@@ -1,4 +1,5 @@
 import { getTranslations } from 'next-intl/server';
+import { notFound } from 'next/navigation';
 import { PageHeader } from '@/components/ui/page-header';
 import { requireOrg } from '@/lib/auth/require-org';
 import { can } from '@/lib/permissions/can';
@@ -8,10 +9,15 @@ import { TeamClient } from './team-client';
 
 export default async function TeamPage() {
   const ctx = await requireOrg();
-  const t = await getTranslations('team');
+  // Read gate: roles without users_settings read (project_manager/site_engineer/
+  // accountant/viewer/client) 404 — the members list carries every colleague's email.
+  if (!can(ctx.role, 'users_settings', 'read')) notFound();
 
-  const members = await getOrgMemberIdentities(ctx);
-  const pending = await listPendingInvitations(ctx);
+  const t = await getTranslations('team');
+  const [members, pending] = await Promise.all([
+    getOrgMemberIdentities(ctx),
+    listPendingInvitations(ctx),
+  ]);
 
   const now = Date.now();
   const pendingSerialized = pending.map((p) => ({

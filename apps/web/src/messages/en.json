@@ -216,8 +216,6 @@
     "progress": "{percent}% complete",
     "launch": "Show me",
     "open": "Open",
-    "allDoneTitle": "You're all set",
-    "allDoneBody": "Your firm is set up. This card will stay out of your way.",
     "readOnlyTitle": "You're all set",
     "readOnlyBody": "Your role has read-only access — nothing to set up here.",
     "items": {
@@ -232,16 +230,7 @@
   "dashboard": {
     "title": "Dashboard",
     "welcomeBack": "Welcome back",
-    "noData": "No data yet",
-    "gettingStartedTitle": "Get started",
-    "gettingStartedSubtitle": "A few steps to set your firm up for the full quote-to-invoice flow.",
     "dismiss": "Dismiss",
-    "taskCompleteProfile": "Complete company profile",
-    "taskInviteTeammate": "Invite a teammate",
-    "taskImportPriceBook": "Import your price book",
-    "taskFirstProposal": "Create your first proposal",
-    "noProjectsTitle": "No active projects yet",
-    "noProjectsDescription": "Your projects will appear here once you start quoting.",
     "ctaCompleteProfile": "Complete company profile",
     "ctaInviteTeam": "Invite your team",
     "ctaManageTeam": "Manage your team",
@@ -313,13 +302,6 @@
     "confirmRevokeDesc": "This invitation link will stop working.",
     "confirmRemoveTitle": "Remove member?",
     "confirmRemoveDesc": "{name} will lose access to this firm.",
-    "errorForbidden": "You don't have permission to do that.",
-    "errorInvalid": "That didn't work. Please try again.",
-    "errorAlreadyMember": "That person is already a member.",
-    "errorPendingExists": "There's already a pending invite for that email.",
-    "errorLastOwner": "You can't remove or demote the last owner.",
-    "errorOwnerImmutable": "Only an owner can change an owner.",
-    "errorSelf": "You can't change your own role or remove yourself here.",
     "errorGeneric": "Something went wrong. Please try again."
   },
   "roles": {
@@ -385,8 +367,6 @@
     "hideMarginDesc": "PMs won't see cost or margin figures.",
     "restrictDashLabel": "Restrict the firm-level dashboard",
     "restrictDashDesc": "Limit firm-wide figures to owners and admins.",
-    "errorForbidden": "You don't have permission to change settings.",
-    "errorNameRequired": "Enter at least one company name.",
     "errorGeneric": "Something went wrong. Please try again.",
     "apiKeysCardTitle": "API keys",
     "apiKeysCardDesc": "Create and manage keys for the Metra Public API.",
@@ -496,6 +476,7 @@
     "already_responded": "A response was already recorded for this proposal",
     "discount_out_of_range": "Discount must be between 0 and 100",
     "supervision_out_of_range": "Supervision must be between 0 and 100",
+    "tax_out_of_range": "VAT rate must be between 0 and 100",
     "too_many_lines": "This proposal has too many lines",
     "invalid_date": "Enter a valid date",
     "amount_too_large": "That amount is too large",
@@ -559,12 +540,9 @@
   "hints": {
     "proposal": {
       "title": "The proposal's headline, shown to the client. Leave blank to use the quote number.",
-      "issueDate": "The date the quote is issued. Used in the quote number and validity window.",
-      "expiryDate": "The last day this quote is valid. Must be on or after the issue date.",
       "discountPct": "A document-wide discount applied to the subtotal before VAT.",
       "taxRate": "VAT rate applied to the taxable base (subtotal minus discount).",
       "supervisionPct": "Supervision fee charged after VAT, as a percentage of the taxable base. The client pays it.",
-      "currency": "The currency shown on this quote. Defaults to EGP.",
       "sectionTitle": "Name of this section. Pick a saved title or type a new one to add it to your library.",
       "lineQty": "Quantity in the line's unit.",
       "lineUnitPrice": "Price charged to the client per unit, before any line discount.",
@@ -636,7 +614,6 @@
     "addSection": "Add section",
     "addSectionPlaceholder": "New section name",
     "activeOnly": "Active only",
-    "showAll": "Show all",
     "itemsCount": "{count} items",
     "categories": {
       "civil": "Civil",
@@ -667,8 +644,7 @@
       "unit": "Unit",
       "cost": "Unit cost",
       "price": "Unit price",
-      "status": "Status",
-      "actions": "Actions"
+      "status": "Status"
     },
     "empty": {
       "title": "Your price book is empty",
@@ -682,8 +658,7 @@
       "activate": "Activate",
       "deactivate": "Deactivate",
       "bulkUpdate": "Bulk price update",
-      "import": "Import from CSV",
-      "loadStarter": "Load starter catalogue"
+      "import": "Import from CSV"
     },
     "form": {
       "newTitle": "New cost item",
@@ -737,7 +712,6 @@
       "rowColumn": "Row",
       "statusColumn": "Status",
       "willImport": "Will import",
-      "willSkip": "Skip",
       "importNow": "Import {count} items",
       "back": "Back",
       "cancel": "Cancel",
@@ -789,7 +763,6 @@
       "phone": "Phone",
       "city": "City",
       "status": "Status",
-      "actions": "Actions",
       "type": "Type",
       "contactDetails": "Email & phone",
       "projects": "Projects"
@@ -867,7 +840,6 @@
         "email": "Email",
         "whatsapp": "WhatsApp",
         "primary": "Primary",
-        "makePrimary": "Make primary",
         "setAsPrimary": "Set as primary contact",
         "delete": "Delete",
         "empty": "No contacts yet.",
@@ -958,8 +930,7 @@
       "name": "Name",
       "client": "Client",
       "status": "Status",
-      "dates": "Dates",
-      "actions": "Actions"
+      "dates": "Dates"
     },
     "empty": {
       "title": "No projects yet",
@@ -988,7 +959,6 @@
       "save": "Save",
       "cancel": "Cancel",
       "noClients": "You need an active client before creating a project.",
-      "selectClient": "Select a client",
       "country": "Country",
       "endDateNote": "You can extend the end date later — these dates are for tracking."
     },
@@ -997,15 +967,11 @@
       "updated": "Project updated",
       "activated": "Project activated",
       "deactivated": "Project deactivated",
-      "typeAdded": "Type added",
-      "stageAdded": "Stage added",
-      "stageSaved": "Stage saved",
-      "stageDeleted": "Stage removed"
+      "typeAdded": "Type added"
     },
     "stageStatuses": {
       "not_started": "Not started",
       "in_progress": "In progress",
-      "blocked": "Blocked",
       "done": "Done",
       "skipped": "Skipped"
     },
@@ -1056,7 +1022,6 @@
         "endDate": "End",
         "delete": "Delete",
         "empty": "No stages yet.",
-        "newName": "New stage name",
         "save": "Save",
         "cancel": "Cancel"
       },
@@ -1200,8 +1165,7 @@
       "client": "Client",
       "project": "Project",
       "status": "Status",
-      "total": "Total",
-      "actions": "Actions"
+      "total": "Total"
     },
     "empty": {
       "title": "No proposals yet",
@@ -1229,8 +1193,6 @@
       "expiryDate": "Expiry date",
       "submit": "Create",
       "cancel": "Cancel",
-      "selectClient": "Select a client",
-      "selectProject": "Select a project",
       "needFirst": "You need an active client and project before creating a proposal."
     },
     "builder": {
@@ -1241,7 +1203,6 @@
       "removeSection": "Remove section",
       "addLine": "Add line",
       "fromPriceBook": "From price book",
-      "selectItem": "Pick a cost item",
       "description": "Description",
       "qty": "Qty",
       "unit": "Unit",
@@ -1262,14 +1223,11 @@
       "taxRate": "VAT rate %",
       "supervisionPct": "Supervision %",
       "margin": "Margin",
-      "marginPct": "Margin %",
       "cost": "Cost",
       "marginHidden": "Margin is hidden for your role",
       "empty": "No sections yet — add one to start.",
       "moveUp": "Move up",
       "moveDown": "Move down",
-      "notesEn": "Notes (EN)",
-      "notesAr": "Notes (AR)",
       "termsEn": "Terms (EN)",
       "termsAr": "Terms (AR)"
     },
@@ -1288,7 +1246,6 @@
       "title": "Proposal",
       "shareTitle": "Share link",
       "copyLink": "Copy link",
-      "sentReadonly": "This proposal has been sent and is read-only.",
       "version": "Version {n}"
     },
     "toast": {
@@ -1304,7 +1261,6 @@
     "p": {
       "quotation": "Quotation",
       "from": "From",
-      "validUntil": "Valid until",
       "subtotal": "Subtotal",
       "discount": "Discount",
       "tax": "VAT",
@@ -1317,8 +1273,6 @@
       "alreadyResponded": "A response has already been recorded.",
       "expired": "This proposal link has expired.",
       "invalid": "This link is not valid.",
-      "confirmAccept": "Accept this quotation?",
-      "confirmReject": "Reject this quotation?",
       "notes": "Notes",
       "terms": "Terms"
     }
@@ -1423,8 +1377,6 @@
     "copyLink": "Copy link",
     "copied": "Copied",
     "backToList": "Back to contracts",
-    "viewClientPdf": "View client PDF",
-    "viewInternalPdf": "View internal PDF",
     "status": {
       "draft": "Draft",
       "issued": "Issued",
@@ -1440,9 +1392,6 @@
       "retentionPct": "Retention %",
       "paymentTermsDays": "Payment terms (days)",
       "defectsLiabilityDays": "Defects liability (days)",
-      "penalty": "Penalty",
-      "scopeInclusions": "Scope inclusions",
-      "scopeExclusions": "Scope exclusions",
       "terms": "Terms"
     },
     "ack": {
@@ -1469,17 +1418,14 @@
     "title_": "Title",
     "reason": "Reason",
     "netDelta": "Net change",
-    "approvedTotal": "Approved changes total",
     "saveDraft": "Save draft",
     "saved": "Saved",
     "internalApprove": "Internal approval",
-    "internalApproved": "Internally approved",
     "issue": "Issue to client",
     "issued": "Issued to client",
     "shareLink": "Client decision link",
     "copyLink": "Copy link",
     "copied": "Copied",
-    "backToContract": "Back to contract",
     "status": {
       "draft": "Draft",
       "internal_approved": "Internally approved",
@@ -1517,15 +1463,11 @@
       "hint": "Sets Step 2: an existing unit needs a site survey; off-plan imports the developer AutoCAD.",
       "budgetDraftBadge": "draft"
     },
-    "boqLabel": "BOQ",
     "paymentsBadge": "{n} due",
     "asBuiltDue": "As-built due",
     "created": "Created",
-    "updated": "Updated",
     "designFee": "Design fee",
     "renderManifest": "Render baseline",
-    "revisions": "Revisions",
-    "revisionsUsed": "{used} of {free} free used",
     "conceptLocked": "Concept locked",
     "form": {
       "newTitle": "New delivery",
@@ -1600,12 +1542,9 @@
     "phaseStatus": {
       "done": "Done",
       "current": "In progress",
-      "locked": "Locked",
-      "upcoming": "Upcoming",
-      "rework": "In rework"
+      "upcoming": "Upcoming"
     },
     "rail": {
-      "auditLedger": "audit ledger",
       "recentActivity": "Recent activity"
     },
     "pulse": {
@@ -1637,14 +1576,12 @@
       "pendingGuard": "Not yet available"
     },
     "hero": {
-      "whatsNext": "What's next",
       "day": "Day {n}",
       "revision": "Revision {n} of {free}",
       "designRevision": "3D revision {n} of {free}",
       "dueLabel": "Due",
       "logPaymentAdvance": "Log payment & advance",
       "advance": "Advance to the next stage",
-      "recordSomethingElse": "Record something else",
       "payNote": "Logging the payment advances the delivery automatically — the client is never shown the amount.",
       "closed": {
         "headline": "This delivery is closed",
@@ -1714,7 +1651,6 @@
       "nudge": "Nudge client",
       "nudgeHint": "Reveal the client link so you can follow up.",
       "closedHeadline": "This delivery is closed",
-      "stepLabel": "Next step to advance",
       "clientLinkActive": "Client link active",
       "clientLinkInactive": "Not shared",
       "moreLabel": "More actions",
@@ -1848,7 +1784,6 @@
       "designFee": "Design fee",
       "basis": "Basis",
       "milestones": "Milestones",
-      "addMilestone": "Add milestone",
       "remove": "Remove",
       "kind": "Milestone",
       "value": "Value",
@@ -1947,8 +1882,7 @@
       "amount": "Amount",
       "reason": "Reason",
       "status": "Status",
-      "raisedAt": "Raised",
-      "settledAt": "Settled"
+      "raisedAt": "Raised"
     },
     "rom": {
       "range": "Range",
@@ -1973,9 +1907,6 @@
     "controls": {
       "title": "Data entry",
       "recordPayment": "Record payment",
-      "recordArtifact": "Record artifact",
-      "setRom": "Set ROM",
-      "recordRomAck": "Record ROM acknowledgement",
       "amount": "Amount",
       "kind": "Kind",
       "method": "Method",
@@ -2094,8 +2025,6 @@
       "title": "This link is no longer available",
       "body": "The link may have expired or been turned off. Please contact your design team for an up-to-date link."
     },
-    "forClient": "For {name}",
-    "stageEyebrow": "Where we are",
     "greeting": "Hello, {name} 👋",
     "firmSubtitle": "Your design project",
     "journey": {
@@ -2169,19 +2098,10 @@
       "due": "Due"
     },
     "actions": {
-      "conceptTitle": "Concept design",
-      "designTitle": "Final design",
       "romTitle": "Estimated budget",
-      "handoffTitle": "Design handoff",
       "notePlaceholder": "Add a note (optional)",
-      "approveConcept": "Approve concept",
-      "requestConceptChanges": "Request changes",
       "approveDesign": "Approve design",
-      "requestDesignChanges": "Request changes",
       "acknowledgeRom": "Acknowledge budget",
-      "acknowledgeHandoff": "Acknowledge handoff",
-      "confirmedApproved": "You approved — the studio has been notified.",
-      "confirmedChanges": "Changes requested — the studio has been notified.",
       "confirmedAcknowledged": "Acknowledged — the studio has been notified.",
       "error": {
         "token_invalid": "This link is no longer available. Please contact your design team.",
