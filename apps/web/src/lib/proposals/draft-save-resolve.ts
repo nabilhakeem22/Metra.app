@@ -179,6 +179,13 @@ export function resolveDraftLines(
       });
     }
     const sectionSubtotals = computeSection(lineTotals);
+    // …and the SECTION sum need not be inside the cap either. This runs here,
+    // not beside the document total, because the section subtotal is PERSISTED
+    // before the document total is computed — a sum past the cap would reach
+    // numeric(18,4) first and come back as an unlocalizable 'generic'.
+    if (!withinMagnitude(sectionSubtotals.sectionSubtotal)) {
+      fail('amount_too_large');
+    }
     sectionTotals.push(sectionSubtotals);
     resolvedSections.push({
       titleAr: sectionTitleAr,
