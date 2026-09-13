@@ -12,6 +12,13 @@ import { organizations } from './organizations';
 import { projects } from './projects';
 import { proposals } from './proposals';
 
+// drizzle 0.36 does not export the shape of an index column; this is the slice
+// the assertions read — .desc() lands in indexConfig.order.
+interface IndexColumn {
+  name?: string;
+  indexConfig?: { order?: 'asc' | 'desc' };
+}
+
 describe('bilingual helper', () => {
   it('emits _ar and _en columns', () => {
     const cfg = getTableConfig(organizations);
@@ -146,8 +153,9 @@ describe('polymorphic entity indexes (0045)', () => {
 
 // These two exist in the database (0019, 0040) but were missing from the schema
 // files, so the next `drizzle-kit generate` would have emitted a DROP INDEX for
-// each. Column ORDER is asserted, not just the name: a keyset index only serves
-// the scan while org_id leads it.
+// each. Column ORDER and SORT DIRECTION are both asserted, not just the name: a
+// keyset index only serves the scan while org_id leads it AND the trailing
+// columns descend the way the list endpoints page.
 describe('indexes declared for what the database already has', () => {
   it.each([
     [
@@ -155,16 +163,23 @@ describe('indexes declared for what the database already has', () => {
       projects,
       'projects_org_created_id_idx',
       ['org_id', 'created_at', 'id'],
+      ['asc', 'desc', 'desc'],
     ],
-    ['files', files, 'files_org_category_idx', ['org_id', 'category_id']],
-  ])('%s carries %s', (_name, table, indexName, columns) => {
+    [
+      'files',
+      files,
+      'files_org_category_idx',
+      ['org_id', 'category_id'],
+      ['asc', 'asc'],
+    ],
+  ])('%s carries %s', (_name, table, indexName, columns, directions) => {
     const idx = getTableConfig(table as typeof files).indexes.find(
       (i) => i.config.name === indexName,
     );
     expect(idx).toBeDefined();
-    expect(
-      idx!.config.columns.map((c) => (c as { name?: string }).name),
-    ).toEqual(columns);
+    const indexColumns = idx!.config.columns as IndexColumn[];
+    expect(indexColumns.map((c) => c.name)).toEqual(columns);
+    expect(indexColumns.map((c) => c.indexConfig?.order)).toEqual(directions);
   });
 
   it('files_org_category_idx stays PARTIAL, as 0040 created it', () => {
