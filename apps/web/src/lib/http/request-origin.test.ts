@@ -60,6 +60,22 @@ describe('resolveRequestOrigin', () => {
     await expect(resolveRequestOrigin()).resolves.toBe('https://metra.example');
   });
 
+  // The scheme is ALLOWLISTED, not echoed. Anything that is not exactly `http`
+  // becomes https, so a forged header cannot mint a `javascript:` or `data:`
+  // link, nor smuggle a path segment past the `://`.
+  it.each([
+    'javascript',
+    'data',
+    'HTTP',
+    'http:',
+    'https://evil.example/?x=',
+    'http://evil.example',
+  ])('rewrites the forged scheme %s to https', async (forged) => {
+    headerMap.set('host', 'metra.example');
+    headerMap.set('x-forwarded-proto', forged);
+    await expect(resolveRequestOrigin()).resolves.toBe('https://metra.example');
+  });
+
   it('returns null rather than throwing when there is no host at all', async () => {
     await expect(resolveRequestOrigin()).resolves.toBeNull();
   });

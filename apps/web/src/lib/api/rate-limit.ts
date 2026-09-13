@@ -73,15 +73,29 @@ async function consume(
 }
 
 /**
+ * The /64 an IPv6 address sits in: its first four hextets, lower-cased. A
+ * compressed address (`2001:db8::1`) yields fewer than four groups and is used
+ * as given — it already names its own prefix.
+ */
+function ipv6Prefix(address: string): string {
+  return address.toLowerCase().split(':').slice(0, 4).join(':');
+}
+
+/**
  * The pre-auth bucket key. Cloudflare's cf-connecting-ip is the real caller and
  * cannot be spoofed at the edge. Without it we fall back to a hash of the raw
  * Authorization header (hashed so no token material is ever used as a key), and
  * finally to a shared 'anon' bucket — deliberately shared, because an
  * unidentifiable caller getting a private budget is the hole we are closing.
+ *
+ * An IPv6 caller is bucketed by its /64, not its address: the smallest block
+ * routinely handed to a single subscriber is a /64, so keying on the full
+ * address gives one holder 2^64 fresh budgets. IPv4 has no such spare room and
+ * is keyed whole.
  */
 function preAuthBucket(req: Request): string {
   const ip = req.headers.get('cf-connecting-ip');
-  if (ip) return ip;
+  if (ip) return ip.includes(':') ? ipv6Prefix(ip) : ip;
   const authorization = req.headers.get('authorization');
   if (authorization) {
     return createHash('sha256').update(authorization).digest('hex').slice(0, 16);

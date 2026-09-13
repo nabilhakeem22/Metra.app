@@ -34,6 +34,7 @@ export async function resolveRequestOrigin(): Promise<string | null> {
     firstPresentValue('x-forwarded-host') || firstPresentValue('host');
   if (!host) return null;
 
-  const proto = firstPresentValue('x-forwarded-proto') || 'https';
-  return `${proto}://${host}`;
+  // ALLOWLISTED, never echoed: a forged scheme lands in a live link.
+  const forwarded = firstPresentValue('x-forwarded-proto');
+  return `${forwarded === 'http' ? 'http' : 'https'}://${host}`;
 }

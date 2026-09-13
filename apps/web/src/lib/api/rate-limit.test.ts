@@ -81,6 +81,31 @@ describe('bucket selection', () => {
     expect(limit).toHaveBeenCalledWith({ key: 'anon' });
   });
 
+  // A /64 is the smallest block a subscriber is routinely given, so two
+  // addresses inside one must land in the SAME bucket or the cap is free to
+  // anyone with IPv6.
+  it('buckets an IPv6 caller by its /64, not its address', async () => {
+    const { limit, env } = bindings(true);
+    cfEnv.mockReturnValue(env);
+    await cloudflarePreAuthRateLimiter(
+      request({ 'cf-connecting-ip': '2001:0db8:1234:5678:aaaa:bbbb:cccc:dddd' }),
+    );
+    await cloudflarePreAuthRateLimiter(
+      request({ 'cf-connecting-ip': '2001:0DB8:1234:5678:1111:2222:3333:4444' }),
+    );
+    expect(limit.mock.calls.map((call) => call[0].key)).toEqual([
+      '2001:0db8:1234:5678',
+      '2001:0db8:1234:5678',
+    ]);
+  });
+
+  it('keeps a compressed IPv6 address as its own prefix', async () => {
+    const { limit, env } = bindings(true);
+    cfEnv.mockReturnValue(env);
+    await cloudflarePreAuthRateLimiter(request({ 'cf-connecting-ip': '2001:db8::1' }));
+    expect(limit).toHaveBeenCalledWith({ key: '2001:db8::1' });
+  });
+
   it('charges the resolved key id on the per-key bucket', async () => {
     const { limit, env } = bindings(true);
     cfEnv.mockReturnValue(env);
