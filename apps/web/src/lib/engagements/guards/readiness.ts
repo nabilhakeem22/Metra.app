@@ -22,16 +22,49 @@ export function scopeInputsPresent(facts: GuardFacts): GuardResult {
   return pass;
 }
 
+/** A numeric(18,4) string in a comparable form: no leading zeros, no trailing
+ *  fractional zeros, so '1800000' and '1800000.0000' are the same amount. */
+function normalizedAmount(value: string): string {
+  const [whole, fraction = ''] = value.trim().split('.');
+  return `${whole.replace(/^\+?0+(?=\d)/, '')}.${fraction.replace(/0+$/, '')}`;
+}
+
+/** Do both bounds of a snapshotted range equal the engagement's current band? */
+function matchesCurrentBand(
+  event: EngagementEvent,
+  romLow: string | null,
+  romHigh: string | null,
+): boolean {
+  if (romLow === null || romHigh === null) return false;
+  if (event.rangeLow === null || event.rangeHigh === null) return false;
+  return (
+    normalizedAmount(event.rangeLow) === normalizedAmount(romLow) &&
+    normalizedAmount(event.rangeHigh) === normalizedAmount(romHigh)
+  );
+}
+
 /**
- * The client has acknowledged the firm's ROM band — a gate for `approveDesign`.
- * `recordRomAcknowledgement` (Step 12) appends one `rom_acknowledgement` event
- * snapshotting the acknowledged range; the design cannot be approved until that
- * witness exists. Fails closed with `rom_not_acknowledged` when none is present.
+ * The client has acknowledged THE BAND THAT IS ON THE ENGAGEMENT NOW — a gate for
+ * `approveDesign`. `recordRomAcknowledgement` (Step 12) appends one
+ * `rom_acknowledgement` event snapshotting the acknowledged range.
+ *
+ * EXISTENCE IS NOT ENOUGH. Re-setting the band clears `rom_issued_at`, so an
+ * engagement whose figures have moved since the client agreed to them would
+ * otherwise still pass this gate on the old consent — the design would be signed
+ * off against numbers the client never saw. Three conditions, all fail-closed
+ * with `rom_not_acknowledged`: the band must be issued, the newest
+ * acknowledgement must exist, and its snapshotted range must equal the current
+ * band.
  */
 export function romAcknowledged(facts: GuardFacts): GuardResult {
-  return facts.events.some((event) => event.kind === 'rom_acknowledgement')
-    ? pass
-    : { ok: false, code: 'rom_not_acknowledged' };
+  const { romLow, romHigh, romIssuedAt } = facts.engagement;
+  const stale: GuardResult = { ok: false, code: 'rom_not_acknowledged' };
+  if (!romIssuedAt) return stale;
+  const [latestAcknowledgement] = facts.events
+    .filter((event) => event.kind === 'rom_acknowledgement')
+    .sort(byDecidedDescending);
+  if (!latestAcknowledgement) return stale;
+  return matchesCurrentBand(latestAcknowledgement, romLow, romHigh) ? pass : stale;
 }
 
 /**

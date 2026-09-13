@@ -1201,6 +1201,15 @@ begin
   end::public.engagement_event_kind;
   if v_kind is null then return 'invalid'; end if;
 
+  -- acknowledge_rom ALONE takes the row lock, and takes it BEFORE the read: its
+  -- precondition is that the band is issued, and a concurrent setEngagementRom
+  -- clears rom_issued_at, so an unlocked read could witness the client's consent
+  -- to a band that stopped existing between the check and the INSERT. The other
+  -- verbs gate on `state`, which the engagement's own transitions serialise.
+  if p_action = 'acknowledge_rom' then
+    perform 1 from public.design_engagements where token_hash = p_hash for update;
+  end if;
+
   select state, share_expires_at, id, org_id, rom_low, rom_high, rom_issued_at
     into st, exp, eid, oid, rl, rh, ri
     from public.design_engagements
