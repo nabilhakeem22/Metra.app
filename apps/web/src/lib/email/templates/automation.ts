@@ -2,19 +2,12 @@
 // Server-side (no next-intl context), so copy is inlined. NEVER contains cost or
 // margin, never a client address. Western numerals (§4.1).
 import { EMAIL_BRAND, emailWordmark } from '@/lib/email/brand';
+import { escapeHtml } from './escape-html';
 
 export interface EmailContent {
   subject: string;
   html: string;
   text: string;
-}
-
-function escapeHtml(s: string): string {
-  return s
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
 }
 
 /** Shared shell: heading + lines + a single CTA link. */
@@ -35,7 +28,7 @@ function shell(
     <p style="color:${EMAIL_BRAND.text};font-weight:600;">${escapeHtml(heading)}</p>
     ${body}
     <p style="margin:24px 0;">
-      <a href="${cta.url}" style="display:inline-block;background:${EMAIL_BRAND.brand};color:${EMAIL_BRAND.onBrand};text-decoration:none;padding:12px 20px;border-radius:10px;font-weight:600;">${escapeHtml(cta.label)}</a>
+      <a href="${escapeHtml(cta.url)}" style="display:inline-block;background:${EMAIL_BRAND.brand};color:${EMAIL_BRAND.onBrand};text-decoration:none;padding:12px 20px;border-radius:10px;font-weight:600;">${escapeHtml(cta.label)}</a>
     </p>
   </div></body></html>`;
   const text = `${heading}\n${lines.filter(Boolean).join('\n')}\n\n${cta.label}: ${cta.url}\n`;

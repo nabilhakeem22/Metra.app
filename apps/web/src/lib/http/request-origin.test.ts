@@ -11,6 +11,7 @@ vi.mock('next/headers', () => ({
 const { resolveRequestOrigin } = await import('./request-origin');
 
 const originalAppUrl = process.env.NEXT_PUBLIC_APP_URL;
+const originalNodeEnv = process.env.NODE_ENV;
 
 beforeEach(() => {
   headerMap.clear();
@@ -20,6 +21,8 @@ beforeEach(() => {
 afterEach(() => {
   if (originalAppUrl === undefined) delete process.env.NEXT_PUBLIC_APP_URL;
   else process.env.NEXT_PUBLIC_APP_URL = originalAppUrl;
+  vi.stubEnv('NODE_ENV', originalNodeEnv ?? 'test');
+  vi.unstubAllEnvs();
 });
 
 describe('resolveRequestOrigin', () => {
@@ -94,5 +97,22 @@ describe('resolveRequestOrigin', () => {
     headerMap.set('x-forwarded-host', 'a.example, b.example');
     headerMap.set('x-forwarded-proto', 'http, https');
     await expect(resolveRequestOrigin()).resolves.toBe('http://a.example');
+  });
+
+  // The Host header is attacker-controlled. In production an unset
+  // NEXT_PUBLIC_APP_URL is a deployment defect, not a reason to email a link to
+  // whatever host the request claimed.
+  it('in PRODUCTION with no override, returns null even with a valid Host', async () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    headerMap.set('host', 'attacker.example');
+    headerMap.set('x-forwarded-host', 'attacker.example');
+    await expect(resolveRequestOrigin()).resolves.toBeNull();
+  });
+
+  it('in PRODUCTION the override still wins', async () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    process.env.NEXT_PUBLIC_APP_URL = 'https://metra.app';
+    headerMap.set('host', 'attacker.example');
+    await expect(resolveRequestOrigin()).resolves.toBe('https://metra.app');
   });
 });

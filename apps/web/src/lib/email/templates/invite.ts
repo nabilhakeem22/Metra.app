@@ -1,5 +1,6 @@
 // Bilingual invite email. Server-side (no next-intl context), so copy is inlined.
 import { EMAIL_BRAND, emailWordmark } from '@/lib/email/brand';
+import { escapeHtml } from './escape-html';
 
 export interface InviteEmailContent {
   subject: string;
@@ -16,14 +17,6 @@ const ROLE_LABEL: Record<string, { en: string; ar: string }> = {
   client: { en: 'Client', ar: 'عميل' },
   viewer: { en: 'Viewer', ar: 'مشاهد' },
 };
-
-function escapeHtml(s: string): string {
-  return s
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
-}
 
 export function inviteEmailTemplate(input: {
   orgName: string;
@@ -57,10 +50,10 @@ export function inviteEmailTemplate(input: {
     <h1 style="font-size:20px;margin:0 0 8px;">${emailWordmark(dir)}</h1>
     <p style="color:${EMAIL_BRAND.body};">${intro}</p>
     <p style="margin:24px 0;">
-      <a href="${url}" style="display:inline-block;background:${EMAIL_BRAND.brand};color:${EMAIL_BRAND.onBrand};text-decoration:none;padding:12px 20px;border-radius:10px;font-weight:600;">${cta}</a>
+      <a href="${escapeHtml(url)}" style="display:inline-block;background:${EMAIL_BRAND.brand};color:${EMAIL_BRAND.onBrand};text-decoration:none;padding:12px 20px;border-radius:10px;font-weight:600;">${cta}</a>
     </p>
     <p style="color:${EMAIL_BRAND.muted};font-size:13px;">${fallback}</p>
-    <p style="word-break:break-all;font-size:13px;"><a href="${url}">${url}</a></p>
+    <p style="word-break:break-all;font-size:13px;"><a href="${escapeHtml(url)}">${escapeHtml(url)}</a></p>
   </div></body></html>`;
 
   const text = `${intro}\n\n${cta}: ${url}\n`;
