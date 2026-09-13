@@ -22,7 +22,7 @@ import {
   issueVariationCore,
   saveVariationDraftCore,
 } from '@/lib/variations/core';
-import { respondToVariationByToken } from '@/lib/variations/public';
+import { getVariationByToken, respondToVariationByToken } from '@/lib/variations/public';
 import {
   getProjectApprovedVariationTotal,
   getVariationWithLines,
@@ -401,6 +401,26 @@ describe('B2: a terminated contract carries no commercial change', () => {
       error: 'contract_inactive',
     });
     expect(await statusOf(voId)).toBe('issued');
+  });
+
+  it('tells the token reader the contract died rather than that the client rejected', async () => {
+    const { ctx, clientId, projectId } = await setup();
+    const { contractId } = await issuedContract(ctx, clientId, projectId);
+    const voId = await draftVariation(ctx, contractId, 'Terminated read');
+    const token = ((await internalApproveVariationCore(ctx, { id: voId })) as { data?: string }).data!;
+    await issueVariationCore(ctx, { id: voId });
+
+    const live = await getVariationByToken(token);
+    expect(live?.status).toBe('issued');
+    expect(live?.contractActive).toBe(true);
+
+    expect((await terminateContractCore(ctx, { id: contractId })).ok).toBe(true);
+
+    // The cascade rejected the VO, but the client never did: the portal picks its
+    // copy from contractActive, so the read must carry the parent's real state.
+    const afterTermination = await getVariationByToken(token);
+    expect(afterTermination?.status).toBe('rejected');
+    expect(afterTermination?.contractActive).toBe(false);
   });
 
   it('rejects every undecided VO on termination and leaves an approved one alone', async () => {

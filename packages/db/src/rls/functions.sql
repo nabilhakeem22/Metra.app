@@ -667,6 +667,9 @@ $$;
 -- SECURITY DEFINER (the token IS the authorization; no session). Only issued /
 -- approved / rejected VOs are visible. OMITS every cost/margin column. Currency
 -- is inherited from the parent contract. netDelta (may be negative) is shown.
+-- contract_active tells the reader whether the parent contract still carries
+-- commercial change: termination rejects open VOs, so without it the portal
+-- would read status='rejected' and tell the client THEY rejected the order.
 create or replace function public.app_variation_by_token(p_hash text)
 returns jsonb
 language sql
@@ -686,6 +689,7 @@ as $$
     'currency', c.currency,
     'contract_number', c.number,
     'share_expires_at', v.share_expires_at,
+    'contract_active', (c.status in ('issued', 'signed')),
     'org', jsonb_build_object(
       'name_ar', o.name_ar,
       'name_en', o.name_en,
@@ -712,7 +716,7 @@ as $$
     ), '[]'::jsonb)
   )
   from public.variation_orders v
-  join public.contracts c on c.id = v.contract_id
+  join public.contracts c on c.id = v.contract_id and c.org_id = v.org_id
   join public.organizations o on o.id = v.org_id
   where v.token_hash = p_hash
     and v.status in ('issued', 'approved', 'rejected');

@@ -53,11 +53,12 @@ export function PublicVariationView({
     });
   }
 
-  const decided = variation.status !== 'issued' || outcome !== null;
-  // contractInactive is checked first: the server has just told us the parent
-  // contract died, which outranks the status on the snapshot we loaded earlier.
+  // A terminated contract auto-rejects its open variation orders, so the row's
+  // own status would otherwise tell the client they rejected it themselves.
+  const contractInactive = !variation.contractActive;
+  const decided = contractInactive || variation.status !== 'issued' || outcome !== null;
   const decidedMessage =
-    outcome === 'contractInactive'
+    contractInactive || outcome === 'contractInactive'
       ? t('client.contractInactive')
       : outcome === 'approved' || variation.status === 'approved'
         ? t('client.approved')

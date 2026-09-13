@@ -34,9 +34,16 @@ export interface PublicVariation {
   currency: string;
   contract_number: number;
   share_expires_at: string | null;
+  /** Is the parent contract still commercially live (issued or signed)? */
+  contractActive: boolean;
   org: { name_ar: string | null; name_en: string | null; logo_file_id: string | null };
   lines: PublicVariationLine[];
 }
+
+/** The SDF's snake_case document, before it is mapped onto PublicVariation. */
+type VariationTokenDocument = Omit<PublicVariation, 'contractActive'> & {
+  contract_active: boolean | null;
+};
 
 export async function getVariationByToken(
   rawToken: string,
@@ -45,8 +52,13 @@ export async function getVariationByToken(
   const hash = hashToken(rawToken.trim());
   const rows = (await withRequestDb((db) =>
     db.execute(sql`select public.app_variation_by_token(${hash}) as data`),
-  )) as unknown as Array<{ data: PublicVariation | null }>;
-  return rows[0]?.data ?? null;
+  )) as unknown as Array<{ data: VariationTokenDocument | null }>;
+  const document = rows[0]?.data ?? null;
+  if (!document) return null;
+  const { contract_active: contractActive, ...rest } = document;
+  // Only an explicit false marks the contract dead. The respond SDF is the real
+  // gate, so a document from an un-applied function must not black out the portal.
+  return { ...rest, contractActive: contractActive !== false };
 }
 
 export type RespondError =
