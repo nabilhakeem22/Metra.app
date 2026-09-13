@@ -7,13 +7,36 @@ import {
   variationOrderEvents,
   variationOrders,
 } from '@metra/db';
-import { eq, inArray } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 import type { OrgContext } from '@/lib/db/context';
 import { variationsToRejectOnTermination } from '../lifecycle-rules';
 
 export interface RejectedVariation {
   id: string;
   fromStatus: VariationStatus;
+}
+
+/**
+ * Every variation order on the contract, locked FOR UPDATE. org_id is stated
+ * rather than left to RLS alone: this runs inside the contracts transaction, and
+ * the predicate costs nothing while the matching (org_id, contract_id) index
+ * makes it the cheaper plan anyway.
+ */
+async function lockContractVariations(
+  tx: MetraDb,
+  ctx: OrgContext,
+  contractId: string,
+) {
+  return tx
+    .select({ id: variationOrders.id, status: variationOrders.status })
+    .from(variationOrders)
+    .where(
+      and(
+        eq(variationOrders.orgId, ctx.orgId),
+        eq(variationOrders.contractId, contractId),
+      ),
+    )
+    .for('update');
 }
 
 /** One append-only `rejected` event per variation order, carrying the status it
@@ -51,11 +74,7 @@ export async function rejectVariationsOnContractTermination(
   ctx: OrgContext,
   contractId: string,
 ): Promise<RejectedVariation[]> {
-  const locked = await tx
-    .select({ id: variationOrders.id, status: variationOrders.status })
-    .from(variationOrders)
-    .where(eq(variationOrders.contractId, contractId))
-    .for('update');
+  const locked = await lockContractVariations(tx, ctx, contractId);
   const open = locked
     .filter((vo) => variationsToRejectOnTermination(vo.status))
     .map((vo) => ({ id: vo.id, fromStatus: vo.status }));

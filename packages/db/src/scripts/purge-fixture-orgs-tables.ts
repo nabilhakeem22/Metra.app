@@ -19,8 +19,12 @@ export const TRIGGER_GUARDED_TABLES = [
 /** Deleted with referential integrity ON, so a missing table fails loudly. */
 export const REMAINING_TABLES = [
   'boq_lines', 'boq_sections', 'boqs',
-  'client_payment_claims', 'engagement_document_comments', 'payment_events',
-  'engagement_events', 'engagement_change_orders', 'engagement_artifacts',
+  'client_payment_claims', 'engagement_document_comments',
+  // Change orders BEFORE payment_events: 0046 gave them a SET NULL FK edge to
+  // it, so deleting the payments first fires a pointless UPDATE over rows this
+  // very statement list is about to delete.
+  'engagement_change_orders', 'payment_events',
+  'engagement_events', 'engagement_artifacts',
   'engagement_milestones', 'engagement_transitions', 'design_engagements',
   'price_change_lines', 'price_changes', 'project_stages', 'projects',
   'project_types', 'stage_templates', 'activities', 'client_contacts',
@@ -35,6 +39,11 @@ export const DELETE_ORDER = [...TRIGGER_GUARDED_TABLES, ...REMAINING_TABLES];
  * The fixture's own teardown list silently lost the BOQ tables when 0041 landed.
  * Under replica mode a missing table orphans rows instead of erroring, so the
  * CATALOG, not this file, is the source of truth for completeness.
+ *
+ * COMPLETENESS ONLY — this asserts that every org-scoped table is IN the list,
+ * never that the list is in a workable ORDER. Order is FK-driven and is proven
+ * by running the purge (a wrong one raises a foreign-key violation outside the
+ * replica-mode window), so a new table must be placed by hand, child first.
  */
 export async function assertDeleteOrderCoversEveryOrgScopedTable(
   sql: PostgresJs,
