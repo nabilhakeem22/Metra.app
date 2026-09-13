@@ -103,6 +103,34 @@ it('no-bare-tenant-db: flags raw-connection queries, allows scoped ones', () => 
         code: 'withRequestDb((db) => db.transaction((tx) => tx.update(clients).set(x)));',
         errors: [{ messageId: 'bareQuery' }],
       },
+      // THE FIVE EVASIONS the security re-test proved: renaming the handle or
+      // reaching it through the connection object used to silence the rule
+      // completely, while running exactly the same BYPASSRLS query.
+      {
+        filename: 'apps/web/src/lib/clients/queries.ts',
+        code: 'const { sql: raw } = getRequestConnection(); await raw`select * from public.clients`;',
+        errors: [{ messageId: 'bareQuery' }],
+      },
+      {
+        filename: 'apps/web/src/lib/clients/queries.ts',
+        code: 'await (getRequestConnection().sql)`select * from public.clients`;',
+        errors: [{ messageId: 'bareQuery' }],
+      },
+      {
+        filename: 'apps/web/src/lib/clients/queries.ts',
+        code: 'const conn = getRequestConnection(); await conn.sql`select 1`;',
+        errors: [{ messageId: 'bareQuery' }],
+      },
+      {
+        filename: 'apps/web/src/lib/clients/queries.ts',
+        code: "const c = getRequestConnection(); await c['sql']`select 1`;",
+        errors: [{ messageId: 'bareQuery' }],
+      },
+      {
+        filename: 'apps/web/src/lib/clients/queries.ts',
+        code: "const { sql: raw } = createRuntimeConnection(); await raw.unsafe('select 1');",
+        errors: [{ messageId: 'bareQuery' }],
+      },
       // Multiline shape (the real automation code shape) — AST-based, not regex.
       {
         filename: 'apps/web/src/lib/anything/leak.ts',
