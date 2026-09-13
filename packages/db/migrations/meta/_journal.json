@@ -330,6 +330,13 @@
       "when": 1789337957549,
       "tag": "0046_change_order_settlement_link",
       "breakpoints": true
+    },
+    {
+      "idx": 47,
+      "version": "7",
+      "when": 1789424357549,
+      "tag": "0047_payment_claim_resolution_check",
+      "breakpoints": true
     }
   ]
 }

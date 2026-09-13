@@ -70,6 +70,17 @@ export const clientPaymentClaims = pgTable(
   (t) => [
     unique('client_payment_claims_org_id_id_unique').on(t.orgId, t.id),
     check('client_payment_claims_amount_positive', sql`claimed_amount > 0`),
+    // A claim's status and its resolution columns must agree (0047). CASE over
+    // status::text, not ORed predicates, so a status added to the enum later is
+    // unconstrained rather than silently rejected.
+    check(
+      'client_payment_claims_resolution',
+      sql`case status::text
+      when 'pending'   then resolved_at is null and resolved_by is null and confirmed_payment_event_id is null
+      when 'dismissed' then resolved_at is not null
+      when 'confirmed' then resolved_at is not null and confirmed_payment_event_id is not null
+      else true end`,
+    ),
     ...sameOrgFk(t, 'engagement', designEngagements, { onDelete: 'cascade' }),
     ...sameOrgFk(t, 'confirmedPaymentEvent', paymentEvents, {
       onDelete: 'set null',

@@ -454,3 +454,62 @@ describe('dismissPaymentClaimCore (AC8)', () => {
     expect(confirmDismissed).toEqual({ ok: false, error: 'claim_not_found' });
   });
 });
+
+describe('client_payment_claims_resolution — status and resolution agree (M5)', () => {
+  /** Insert a claim row directly, returning the SQLSTATE the database raised. */
+  async function insertClaim(
+    orgId: string,
+    engagementId: string,
+    columns: Record<string, string>,
+  ): Promise<string | null> {
+    const base: Record<string, string> = {
+      org_id: `'${orgId}'`,
+      engagement_id: `'${engagementId}'`,
+      milestone_kind: `'balance'`,
+      claimed_amount: `'1000'`,
+      ...columns,
+    };
+    try {
+      await raw.query(
+        `insert into public.client_payment_claims (${Object.keys(base).join(', ')})
+         values (${Object.values(base).join(', ')})`,
+      );
+      return null;
+    } catch (error) {
+      return (error as { code?: string }).code ?? 'unknown';
+    }
+  }
+
+  it('refuses a pending claim that already carries a resolution', async () => {
+    const { ctx, engagementId } = await seedClaimDelivery('check-pending');
+    expect(
+      await insertClaim(ctx.orgId, engagementId, {
+        status: `'pending'`,
+        resolved_at: 'now()',
+      }),
+    ).toBe('23514');
+  });
+
+  it('refuses a confirmed claim with no payment event behind it', async () => {
+    const { ctx, engagementId } = await seedClaimDelivery('check-confirmed');
+    expect(
+      await insertClaim(ctx.orgId, engagementId, {
+        status: `'confirmed'`,
+        resolved_at: 'now()',
+        resolved_by: `'${ctx.userId}'`,
+      }),
+    ).toBe('23514');
+  });
+
+  it('refuses a dismissed claim with no resolved_at', async () => {
+    const { ctx, engagementId } = await seedClaimDelivery('check-dismissed');
+    expect(
+      await insertClaim(ctx.orgId, engagementId, { status: `'dismissed'` }),
+    ).toBe('23514');
+  });
+
+  it('accepts an ordinary pending claim', async () => {
+    const { ctx, engagementId } = await seedClaimDelivery('check-ok');
+    expect(await insertClaim(ctx.orgId, engagementId, {})).toBeNull();
+  });
+});
