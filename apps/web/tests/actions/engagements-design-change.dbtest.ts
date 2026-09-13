@@ -8,6 +8,7 @@ import { executeTransition } from '@/lib/engagements/executor';
 import { recordPaymentCore } from '@/lib/engagements/payments';
 import { getEngagementChangeOrders } from '@/lib/engagements/queries';
 import { setEngagementRomCore } from '@/lib/engagements/rom';
+import { issueRomCore } from '@/lib/engagements/rom-issue';
 import type {
   GenerateFeeSchedulePayload,
   RequestRevisionPayload,
@@ -128,6 +129,8 @@ async function acknowledgeRom(
       })
     ).ok,
   ).toBe(true);
+  // The client must have been sent the band before an acknowledgement exists.
+  expect((await issueRomCore(ctx, { engagementId })).ok).toBe(true);
   expect((await recordRomAcknowledgementCore(ctx, { engagementId })).ok).toBe(true);
 }
 

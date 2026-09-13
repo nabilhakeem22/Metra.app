@@ -84,7 +84,9 @@ export interface RecordRomAcknowledgementInput {
  * `engagements_design` capability (create). Flow: open the RLS tx; assert the
  * engagement resolves in-org (`engagement_not_found` if absent/foreign) and is NOT
  * terminal (`engagement_not_active`); require BOTH `rom_low` and `rom_high` are set
- * (else `rom_not_set` — you can't acknowledge a range never entered); append ONE
+ * (else `rom_not_set` — you can't acknowledge a range never entered) and that the
+ * band was ISSUED to the client (else `rom_not_issued` — a band the client never
+ * saw cannot have been acknowledged, and Gate B reads this event as consent); append ONE
  * `rom_acknowledgement` row that SNAPSHOTS the engagement's current ROM into the
  * event's `range_low`/`range_high` columns, so the acknowledged band is frozen at
  * ack time even if ROM is later edited. Returns the new event id. Never throws to
@@ -118,6 +120,7 @@ export async function recordRomAcknowledgementCore(
           state: designEngagements.state,
           romLow: designEngagements.romLow,
           romHigh: designEngagements.romHigh,
+          romIssuedAt: designEngagements.romIssuedAt,
         })
         .from(designEngagements)
         .where(eq(designEngagements.id, input.engagementId))
@@ -128,6 +131,12 @@ export async function recordRomAcknowledgementCore(
       // Can't acknowledge a range that was never entered (Step 10's setEngagementRom).
       if (engagement.romLow === null || engagement.romHigh === null) {
         fail('rom_not_set');
+      }
+      // And no acknowledging a band the client was never shown. Gate B reads this
+      // event as the client's consent, so recording one against an unissued band
+      // would let the studio unlock the gate on a range it kept to itself.
+      if (engagement.romIssuedAt === null) {
+        fail('rom_not_issued');
       }
 
       // Snapshot the CURRENT canonical ROM into the event so the acknowledged band

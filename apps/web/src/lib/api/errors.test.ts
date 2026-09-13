@@ -88,6 +88,7 @@ const ALL_CODES: ActionCode[] = [
   'handoff_not_open',
   'rom_range_invalid',
   'rom_not_set',
+  'rom_not_issued',
   'rom_already_issued',
   'event_not_found',
   'already_corrected',

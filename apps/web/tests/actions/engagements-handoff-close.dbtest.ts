@@ -9,6 +9,7 @@ import { recordHandoffAcknowledgementCore } from '@/lib/engagements/handoff';
 import { recordPaymentCore } from '@/lib/engagements/payments';
 import { recordDeliveryActionByToken } from '@/lib/engagements/public';
 import { setEngagementRomCore } from '@/lib/engagements/rom';
+import { issueRomCore } from '@/lib/engagements/rom-issue';
 import { mintDeliveryLinkCore } from '@/lib/engagements/share';
 import {
   TRANSITIONS,
@@ -112,6 +113,8 @@ async function setupExecutionDecision(): Promise<{
     romLow: '500000',
     romHigh: '800000',
   });
+  // The client must have been sent the band before an acknowledgement exists.
+  expect((await issueRomCore(ctx, { engagementId })).ok).toBe(true);
   await recordRomAcknowledgementCore(ctx, { engagementId });
   await recordPaymentCore(ctx, { engagementId, kind: 'gate_b', amount: '20000' });
   await executeTransition(ctx, { engagementId, trigger: 'approveDesign' });

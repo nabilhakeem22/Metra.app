@@ -5,6 +5,7 @@ import { createClientCore } from '@/lib/clients/core';
 import { listClients } from '@/lib/clients/queries';
 import { createEngagementCore } from '@/lib/engagements/core';
 import { getEngagementEvents } from '@/lib/engagements/queries';
+import { issueRomCore } from '@/lib/engagements/rom-issue';
 import { setEngagementRomCore } from '@/lib/engagements/rom';
 import { createProjectCore } from '@/lib/projects/core';
 import { listProjects } from '@/lib/projects/queries';
@@ -73,6 +74,22 @@ async function eventRows(engagementId: string, kind?: string) {
   );
 }
 
+/**
+ * Set a band AND issue it to the client. An acknowledgement is only recordable
+ * once the client has actually been sent the range, so every test that wants a
+ * successful ack goes through both steps.
+ */
+async function setAndIssueRom(
+  ctx: OrgContext,
+  engagementId: string,
+  romLow: string,
+  romHigh: string,
+): Promise<void> {
+  await setEngagementRomCore(ctx, { engagementId, romLow, romHigh });
+  const issued = await issueRomCore(ctx, { engagementId });
+  expect(issued.ok).toBe(true);
+}
+
 /** Just the acknowledgements — what every assertion in this file is about. */
 const ackRows = (engagementId: string) =>
   eventRows(engagementId, 'rom_acknowledgement');
@@ -80,11 +97,7 @@ const ackRows = (engagementId: string) =>
 describe('recordRomAcknowledgement — client ROM ack (append-only)', () => {
   it('appends one rom_acknowledgement snapshotting the current ROM + actor', async () => {
     const { ctx, engagementId } = await setup();
-    await setEngagementRomCore(ctx, {
-      engagementId,
-      romLow: '1800000',
-      romHigh: '2400000',
-    });
+    await setAndIssueRom(ctx, engagementId, '1800000', '2400000');
 
     const res = await recordRomAcknowledgementCore(ctx, { engagementId });
     expect(res.ok).toBe(true);
@@ -99,10 +112,11 @@ describe('recordRomAcknowledgement — client ROM ack (append-only)', () => {
     expect(rows[0].actor_user_id).toBe(ctx.userId);
 
     // The row surfaces in the approvals-ledger read — alongside the
-    // `rom_range_set` the setup wrote, newest first.
+    // `rom_range_set` and `rom_issued` the setup wrote, newest first.
     const events = await getEngagementEvents(ctx, engagementId);
     expect(events.map((e) => e.kind)).toEqual([
       'rom_acknowledgement',
+      'rom_issued',
       'rom_range_set',
     ]);
     expect(events[0].actorUserId).toBe(ctx.userId);
@@ -110,11 +124,7 @@ describe('recordRomAcknowledgement — client ROM ack (append-only)', () => {
 
   it('stores a trimmed note, or null when blank', async () => {
     const { ctx, engagementId } = await setup();
-    await setEngagementRomCore(ctx, {
-      engagementId,
-      romLow: '1000000',
-      romHigh: '1500000',
-    });
+    await setAndIssueRom(ctx, engagementId, '1000000', '1500000');
 
     await recordRomAcknowledgementCore(ctx, {
       engagementId,
@@ -126,12 +136,8 @@ describe('recordRomAcknowledgement — client ROM ack (append-only)', () => {
 
   it('FREEZES the acknowledged range even if ROM is later edited (snapshot proof)', async () => {
     const { ctx, engagementId } = await setup();
-    // Set ROM to band A, acknowledge it.
-    await setEngagementRomCore(ctx, {
-      engagementId,
-      romLow: '1000000',
-      romHigh: '2000000',
-    });
+    // Set ROM to band A, issue it, acknowledge it.
+    await setAndIssueRom(ctx, engagementId, '1000000', '2000000');
     await recordRomAcknowledgementCore(ctx, { engagementId });
 
     // Later, the firm re-enters ROM to band B.
@@ -163,13 +169,24 @@ describe('recordRomAcknowledgement — client ROM ack (append-only)', () => {
     expect(await eventRows(engagementId)).toHaveLength(0);
   });
 
-  it('rejects acknowledgement on a terminal engagement with engagement_not_active', async () => {
+  it('rejects acknowledgement of a band the client was never sent (rom_not_issued)', async () => {
     const { ctx, engagementId } = await setup();
+    // A band exists, but it is still the studio's private working figure.
     await setEngagementRomCore(ctx, {
       engagementId,
       romLow: '1800000',
       romHigh: '2400000',
     });
+
+    const res = await recordRomAcknowledgementCore(ctx, { engagementId });
+    expect(res).toEqual({ ok: false, error: 'rom_not_issued' });
+    // Nothing was appended: Gate B must not find a consent the client never gave.
+    expect(await ackRows(engagementId)).toHaveLength(0);
+  });
+
+  it('rejects acknowledgement on a terminal engagement with engagement_not_active', async () => {
+    const { ctx, engagementId } = await setup();
+    await setAndIssueRom(ctx, engagementId, '1800000', '2400000');
     // Force a terminal state (abandon isn't wired here — a later step).
     await raw.query(
       `update public.design_engagements set state = 'abandoned' where id = '${engagementId}'`,
@@ -181,11 +198,7 @@ describe('recordRomAcknowledgement — client ROM ack (append-only)', () => {
 
   it('a direct UPDATE / DELETE under org context is denied (append-only grants)', async () => {
     const { ctx, engagementId } = await setup();
-    await setEngagementRomCore(ctx, {
-      engagementId,
-      romLow: '1800000',
-      romHigh: '2400000',
-    });
+    await setAndIssueRom(ctx, engagementId, '1800000', '2400000');
     await recordRomAcknowledgementCore(ctx, { engagementId });
 
     await expect(
@@ -218,11 +231,7 @@ describe('recordRomAcknowledgement — client ROM ack (append-only)', () => {
 describe('recordRomAcknowledgement — cross-org isolation', () => {
   it('org B cannot record or read a rom_acknowledgement on org A’s engagement', async () => {
     const { ctx: ctxA, engagementId: aEngagement } = await setup();
-    await setEngagementRomCore(ctxA, {
-      engagementId: aEngagement,
-      romLow: '1800000',
-      romHigh: '2400000',
-    });
+    await setAndIssueRom(ctxA, aEngagement, '1800000', '2400000');
 
     const { orgId: orgB, ownerIds } = await seedOrg({ owners: 1 });
     orgIds.push(orgB);

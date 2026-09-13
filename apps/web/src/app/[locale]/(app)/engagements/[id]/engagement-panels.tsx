@@ -99,6 +99,7 @@ export function EngagementPanels({
           canRecordHandoffAck={capabilities.recordHandoffAck}
           canRetract={capabilities.retract}
           romSet={data.header.romLow !== null && data.header.romHigh !== null}
+          romIssued={data.header.romIssuedAt !== null}
           pending={pending}
           runAction={runAction}
         />

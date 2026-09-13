@@ -48,6 +48,7 @@ export function TimelineTab({
   canRecordHandoffAck,
   canRetract,
   romSet,
+  romIssued,
   pending,
   runAction,
 }: {
@@ -61,6 +62,8 @@ export function TimelineTab({
   canRetract: boolean;
   /** A build-cost band exists. Without one there is nothing to acknowledge. */
   romSet: boolean;
+  /** The band has been issued to the client. Until then they have seen nothing. */
+  romIssued: boolean;
   pending: boolean;
   runAction: (fn: () => Promise<ActionResult>) => void;
 }) {
@@ -76,18 +79,20 @@ export function TimelineTab({
   const anyOnBehalf = canRecordRomAck || canRecordHandoffAck;
 
   // THE ONE GENUINE ELIGIBILITY CASE ON THIS PAGE. `recordRomAcknowledgementCore`
-  // refuses with `rom_not_set` when no band exists -- you cannot acknowledge a
-  // range nobody has entered. So the control stays on the page and says why,
-  // rather than firing into a coded error the studio has to interpret. The
-  // blocked state is the teaching moment: it names the act that unblocks it.
-  const romAckBlocked = canRecordRomAck && !romSet;
+  // refuses with `rom_not_set` when no band exists and `rom_not_issued` while the
+  // client has not been shown it -- you cannot acknowledge a range nobody entered,
+  // nor one nobody sent. So the control stays on the page and says why, rather than
+  // firing into a coded error the studio has to interpret. The blocked state is the
+  // teaching moment: it names the act that unblocks it.
+  const romAckBlocked = canRecordRomAck && (!romSet || !romIssued);
+  const romAckBlockedReason = !romSet ? 'onBehalfBlocked' : 'onBehalfBlockedUnissued';
 
   return (
     <div>
       <PanelHeader
         title={tp('timeline')}
         sub={tpa('timelineSub')}
-        reason={romAckBlocked ? tpa('onBehalfBlocked') : undefined}
+        reason={romAckBlocked ? tpa(romAckBlockedReason) : undefined}
         actions={
           anyOnBehalf && (
             <>

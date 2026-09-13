@@ -7,6 +7,7 @@ import { createEngagementCore } from '@/lib/engagements/core';
 import { executeTransition } from '@/lib/engagements/executor';
 import { recordPaymentCore } from '@/lib/engagements/payments';
 import { setEngagementRomCore } from '@/lib/engagements/rom';
+import { issueRomCore } from '@/lib/engagements/rom-issue';
 import type { GenerateFeeSchedulePayload } from '@/lib/engagements/transitions';
 import { createProjectCore } from '@/lib/projects/core';
 import { listProjects } from '@/lib/projects/queries';
@@ -110,6 +111,8 @@ async function setupBoq(): Promise<{
     romLow: '500000',
     romHigh: '800000',
   });
+  // The client must have been sent the band before an acknowledgement exists.
+  expect((await issueRomCore(ctx, { engagementId })).ok).toBe(true);
   await recordRomAcknowledgementCore(ctx, { engagementId });
   await recordPaymentCore(ctx, { engagementId, kind: 'gate_b', amount: '20000' });
   await executeTransition(ctx, { engagementId, trigger: 'approveDesign' });

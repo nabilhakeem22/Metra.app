@@ -521,6 +521,7 @@
     "handoff_not_open": "The design-only handoff isn't open at this stage",
     "rom_range_invalid": "Enter a valid low–high build-cost range",
     "rom_not_set": "Enter the build-cost range before recording the client's acknowledgement",
+    "rom_not_issued": "The range must be issued to the client before an acknowledgement can be recorded",
     "off_plan_locked": "Off-plan can only be changed before the deposit is paid.",
     "flow_not_enabled": "This flow isn't enabled for your workspace's plan.",
     "payment_kind_mismatch": "This payment type doesn't match the step you're advancing",
@@ -1707,6 +1708,7 @@
       "reviseRange": "Revise the range",
       "rangeNote": "An indicative build cost — not a quote, and not the design fee.",
       "onBehalfBlocked": "Set a build-cost range first — there is nothing for the client to acknowledge yet.",
+      "onBehalfBlockedUnissued": "Issue the range to the client first. They cannot acknowledge a band they have not seen.",
       "issueRom": "Issue to client",
       "issueRomHint": "The client sees the range only after you issue it."
     },
