@@ -28,12 +28,12 @@ export {
   chooseExecution,
   recipientAcknowledges,
   abandonEngagement,
-  setEngagementRom,
   setEngagementOffPlan,
   recordEventCorrection,
   recordRomAcknowledgement,
   recordHandoffAcknowledgement,
 } from './lifecycle';
+export { setEngagementRom, issueRom } from './rom';
 export {
   recordPayment,
   logPaymentAndAdvance,
