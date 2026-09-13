@@ -27,6 +27,14 @@ export interface SettlementLink {
  * because those payments are spent: without that, credit that paid for an
  * earlier change order would be counted again here.
  *
+ * THE ORDER IS ONLY AS DETERMINISTIC AS THE TIMESTAMPS. raised_at and cleared_at
+ * default to now(), which is fixed at BEGIN, so two change orders (or two
+ * revision_co payments) written in ONE transaction share a timestamp and fall
+ * back to the id tie-break — a random UUID, i.e. a coin flip. Today nothing
+ * writes two of either in one transaction, so the queues are strictly ordered;
+ * a future bulk path that does would make the LINK non-deterministic (the total
+ * settled is unaffected: the allocation is exact either way).
+ *
  * A change order links to the payment that COMPLETED its cover, which is why a
  * change order spanning two partial payments points at the second. When the
  * credit runs out `paymentEventId` is null for the remaining change orders —

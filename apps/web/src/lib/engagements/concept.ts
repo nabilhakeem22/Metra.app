@@ -2,74 +2,11 @@
 // `confirmConcept` (negotiation -> design_3d). Executor-only: MUST be called with
 // the executor's `tx` so the change-order settlement and the concept lock commit
 // ATOMICALLY with the negotiation -> design_3d state move, or roll back together.
-import {
-  designEngagements,
-  engagementChangeOrders,
-  paymentEvents,
-  type MetraDb,
-} from '@metra/db';
-import { and, asc, eq } from 'drizzle-orm';
+import { designEngagements, engagementChangeOrders, type MetraDb } from '@metra/db';
+import { and, eq } from 'drizzle-orm';
 import { fail } from '@/lib/actions/mutate';
-import { parseMoney4 } from '@/lib/aggregates/proposal-totals';
-import { allocateSettlements, type SettlementRow } from './co-settlement';
-
-interface SettlementInputs {
-  raised: SettlementRow[];
-  payments: SettlementRow[];
-  alreadyConsumed4: bigint;
-}
-
-/** Every change order on the engagement, oldest first — the queue order the
- *  allocator assumes. Both statuses: the settled ones are spent credit. */
-async function loadChangeOrderQueue(tx: MetraDb, engagementId: string) {
-  return tx
-    .select({
-      id: engagementChangeOrders.id,
-      amount: engagementChangeOrders.amount,
-      status: engagementChangeOrders.status,
-    })
-    .from(engagementChangeOrders)
-    .where(eq(engagementChangeOrders.engagementId, engagementId))
-    .orderBy(
-      asc(engagementChangeOrders.raisedAt),
-      asc(engagementChangeOrders.id),
-    );
-}
-
-/** The cleared revision_co payments on the engagement, oldest first. */
-async function loadRevisionPayments(tx: MetraDb, engagementId: string) {
-  return tx
-    .select({ id: paymentEvents.id, amount: paymentEvents.amount })
-    .from(paymentEvents)
-    .where(
-      and(
-        eq(paymentEvents.engagementId, engagementId),
-        eq(paymentEvents.kind, 'revision_co'),
-      ),
-    )
-    .orderBy(asc(paymentEvents.clearedAt), asc(paymentEvents.id));
-}
-
-/**
- * The three facts the allocation needs, scoped to one engagement: raised change
- * orders, cleared revision_co payments, and the total of the change orders this
- * engagement has ALREADY settled (credit that is spent).
- */
-async function loadSettlementInputs(
-  tx: MetraDb,
-  engagementId: string,
-): Promise<SettlementInputs> {
-  const changeOrders = await loadChangeOrderQueue(tx, engagementId);
-  return {
-    raised: changeOrders.filter((row) => row.status === 'raised'),
-    payments: await loadRevisionPayments(tx, engagementId),
-    alreadyConsumed4: changeOrders.reduce(
-      (sum, row) =>
-        row.status === 'settled' ? sum + parseMoney4(row.amount) : sum,
-      0n,
-    ),
-  };
-}
+import { allocateSettlements, type SettlementLink } from './co-settlement';
+import { loadSettlementInputs } from './concept-settlement-inputs';
 
 /**
  * Stamp each allocated change order as settled. Each UPDATE is gated on
@@ -98,6 +35,26 @@ async function linkSettlements(
 }
 
 /**
+ * UNREACHABLE IF THE GUARD IS RIGHT. `revisionCosSettled` ran moments ago on this
+ * transaction's facts and said the credit was there, so a shortfall here means
+ * the guard and the allocator disagree. Without this line the transaction rolls
+ * back silently and reads to the studio as a random failure. Ids only, no amounts.
+ */
+function reportImpossibleShortfall(
+  engagementId: string,
+  raisedCount: number,
+  paymentCount: number,
+  uncovered: SettlementLink[],
+): void {
+  console.error('[engagements] settlement failed after guard passed', {
+    engagementId,
+    raised: raisedCount,
+    payments: paymentCount,
+    uncovered: uncovered.map((link) => link.changeOrderId),
+  });
+}
+
+/**
  * Settle every `raised` change order on `engagementId` (status -> `settled`,
  * `settled_at` = now(), `settled_by_payment_event_id` = the revision_co payment
  * that completed its cover) and stamp the engagement's `concept_locked_at`.
@@ -121,7 +78,9 @@ export async function settleConceptAndLock(
     engagementId,
   );
   const links = allocateSettlements(raised, payments, alreadyConsumed4);
-  if (links.some((link) => link.paymentEventId === null)) {
+  const uncovered = links.filter((link) => link.paymentEventId === null);
+  if (uncovered.length > 0) {
+    reportImpossibleShortfall(engagementId, raised.length, payments.length, uncovered);
     fail('revision_cos_outstanding');
   }
 
