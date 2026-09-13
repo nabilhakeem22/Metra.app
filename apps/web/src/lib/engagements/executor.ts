@@ -1,10 +1,14 @@
 // Design-Engagement Machine — transition executor (Step 2). This is the ONE and
 // ONLY path that moves an engagement's state or appends to the transition ledger.
-// No other function may. The state move is an ATOMIC admission gate
+// No other function may. ADVANCING edges serialise on the state gate
 // (UPDATE ... WHERE state=<expected> RETURNING, check rowCount) — mirroring
-// issueContractCore — so two concurrent callers can never both win. Guards stay
-// PURE: this file gathers every fact, then asks the guard engine to decide.
+// issueContractCore — so two concurrent callers can never both win. SELF-LOOPS
+// cannot: their expected state IS their target, so the gate matches for both
+// racers and they must serialise on an explicit row lock instead (lockSelfLoop).
+// Guards stay PURE: this file gathers every fact, then asks the guard engine to
+// decide.
 import {
+  type MetraDb,
   designEngagements,
   engagementArtifacts,
   engagementChangeOrders,
@@ -28,7 +32,12 @@ import { captureRenderManifest } from './renders';
 import { isRevisionTrigger } from './revision-allowance';
 import { applyRevision, resetRevisionsOnReject } from './revisions';
 import { GUARDS, type GuardFacts } from './guards';
-import { TRANSITIONS, type CapabilityKey, type Trigger } from './transitions';
+import {
+  TRANSITIONS,
+  type CapabilityKey,
+  type TransitionDef,
+  type Trigger,
+} from './transitions';
 
 /**
  * The permission action each capability family gates on. Design/finance triggers
@@ -46,6 +55,27 @@ export interface ExecuteTransitionInput {
   engagementId: string;
   trigger: Trigger;
   payload?: unknown;
+}
+
+/**
+ * Serialise the racers on a SELF-LOOP edge. The state gate cannot: a self-loop's
+ * target IS its expected state, so `UPDATE ... WHERE state = <expected>` matches
+ * for every concurrent caller and they all proceed to run the side-effect. Two
+ * simultaneous requestRevision calls therefore both incremented the revision
+ * count from the same stale read and one free revision was spent twice — or, at
+ * the allowance edge, two change orders were raised for one revision. A plain
+ * row lock makes the second caller wait for the first to commit and then read
+ * the committed count. No-op on advancing edges, which the gate already
+ * serialises.
+ */
+async function lockSelfLoop(tx: MetraDb, def: TransitionDef, id: string) {
+  const from = Array.isArray(def.from) ? def.from : [def.from];
+  if (!from.includes(def.to)) return;
+  await tx
+    .select({ id: designEngagements.id })
+    .from(designEngagements)
+    .where(eq(designEngagements.id, id))
+    .for('update');
 }
 
 /**
@@ -87,6 +117,7 @@ export async function executeTransition(
 
       const legalFrom = Array.isArray(def.from) ? def.from : [def.from];
       if (!legalFrom.includes(engagement.state)) fail('illegal_trigger');
+      await lockSelfLoop(tx, def, engagementId);
 
       // Guards are PURE, so the executor pre-loads every fact they read: the
       // engagement row plus (Step 4) the fee-schedule milestones and the
@@ -132,9 +163,12 @@ export async function executeTransition(
         if (!verdict.ok) fail(verdict.code);
       }
 
-      // Atomic admission gate FIRST: only the writer that flips the state off the
-      // expected `from` value proceeds — so a side-effect never runs twice for one
-      // move. A losing concurrent caller gets `engagement_state_conflict` here.
+      // Admission gate: only the writer that flips the state off the expected
+      // `from` value proceeds — so a side-effect never runs twice for one move. A
+      // losing concurrent caller gets `engagement_state_conflict` here. This gate
+      // admits ONE racer only on an ADVANCING edge; on a self-loop `def.to` equals
+      // the expected state, so both racers match it and the row lock taken above
+      // is what serialises them.
       const gated = await tx
         .update(designEngagements)
         .set({ state: def.to, updatedAt: new Date() })
