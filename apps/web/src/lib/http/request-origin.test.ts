@@ -78,6 +78,18 @@ describe('resolveRequestOrigin', () => {
     await expect(resolveRequestOrigin()).resolves.toBeNull();
   });
 
+  it('strips every trailing slash from the override', async () => {
+    process.env.NEXT_PUBLIC_APP_URL = 'https://metra.app//';
+    await expect(resolveRequestOrigin()).resolves.toBe('https://metra.app');
+  });
+
+  it('skips an empty leading entry in a forwarded list', async () => {
+    headerMap.set('host', 'internal.local');
+    headerMap.set('x-forwarded-host', ', real.example');
+    headerMap.set('x-forwarded-proto', ', https');
+    await expect(resolveRequestOrigin()).resolves.toBe('https://real.example');
+  });
+
   it('takes the leftmost entry of a forwarded list', async () => {
     headerMap.set('x-forwarded-host', 'a.example, b.example');
     headerMap.set('x-forwarded-proto', 'http, https');

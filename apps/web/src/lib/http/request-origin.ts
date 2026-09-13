@@ -14,23 +14,27 @@ import { headers } from 'next/headers';
  * digest. A null lets them return a coded ActionResult.
  */
 export async function resolveRequestOrigin(): Promise<string | null> {
-  const override = process.env.NEXT_PUBLIC_APP_URL?.trim().replace(/\/$/, '');
+  const override = process.env.NEXT_PUBLIC_APP_URL?.trim().replace(/\/+$/, '');
   if (override) return override;
 
   const requestHeaders = await headers();
   // Each proxy in a chain APPENDS to these headers, so the value can be a list
-  // (`a.example, b.example`). The LEFTMOST entry is the host/scheme the client
-  // actually asked for, which is what an emailed link must point at; the rest
-  // are the internal hops. Trimmed, because the list separator is `, `.
-  const firstValue = (name: string) =>
-    (requestHeaders.get(name) ?? '').split(',')[0]?.trim() ?? '';
+  // (`a.example, b.example`). Take the leftmost NON-EMPTY entry: that is the
+  // host/scheme the client actually asked for, and a hop that appended nothing
+  // leaves an empty leading element (`, real.example`) that must not win.
+  const firstPresentValue = (name: string) =>
+    (requestHeaders.get(name) ?? '')
+      .split(',')
+      .map((entry) => entry.trim())
+      .find((entry) => entry !== '') ?? '';
 
   // `||`, not `??`: a present-but-empty header is absent, not an override. With
   // `??` an empty `x-forwarded-host` shadowed a valid `host`, and an empty
   // `x-forwarded-proto` produced the unusable `://host`.
-  const host = firstValue('x-forwarded-host') || firstValue('host');
+  const host =
+    firstPresentValue('x-forwarded-host') || firstPresentValue('host');
   if (!host) return null;
 
-  const proto = firstValue('x-forwarded-proto') || 'https';
+  const proto = firstPresentValue('x-forwarded-proto') || 'https';
   return `${proto}://${host}`;
 }
