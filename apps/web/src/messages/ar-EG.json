@@ -1966,6 +1966,7 @@
       "as_built_attestation": "شهادة المطابقة للواقع",
       "concept_change_request": "طلب تعديل الفكرة",
       "design_change_request": "طلب تعديل التصميم",
+      "event_correction": "تصحيح لبند سابق",
       "rom_range_set": "تحديد نطاق تكلفة التنفيذ",
       "rom_issued": "إرسال نطاق تكلفة التنفيذ للعميل"
     },

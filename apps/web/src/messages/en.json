@@ -1966,6 +1966,7 @@
       "as_built_attestation": "As-built attestation",
       "concept_change_request": "Concept change request",
       "design_change_request": "Design change request",
+      "event_correction": "Correction of an earlier entry",
       "rom_range_set": "Build-cost range set",
       "rom_issued": "Build-cost range issued to client"
     },
