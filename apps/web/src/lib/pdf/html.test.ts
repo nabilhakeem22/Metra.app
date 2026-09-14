@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { esc, pickEscaped } from './html';
+import { esc, pickBilingual, pickEscaped } from './html';
 
 describe('esc', () => {
   it('escapes all five characters, including the single quote', () => {
@@ -43,5 +43,22 @@ describe('pickEscaped', () => {
     const once = pickEscaped(null, 'Hassan & Sons', 'en');
     expect(once).toBe('Hassan &amp; Sons');
     expect(esc(once)).toBe('Hassan &amp;amp; Sons'); // what the bug produced
+  });
+});
+
+describe('pickBilingual', () => {
+  it('makes the same choice as pickEscaped, without escaping it', () => {
+    // The unescaped twin, for the one caller that hands the value to a template
+    // which escapes where it interpolates. Escaping here too is the F6 bug.
+    expect(pickBilingual(null, 'Hassan & Sons', 'en')).toBe('Hassan & Sons');
+    expect(pickEscaped(null, 'Hassan & Sons', 'en')).toBe('Hassan &amp; Sons');
+  });
+
+  it('falls back the same way, in both directions', () => {
+    expect(pickBilingual('\u0645\u0643\u062a\u0628', 'Office', 'ar-EG')).toBe('\u0645\u0643\u062a\u0628');
+    expect(pickBilingual('\u0645\u0643\u062a\u0628', 'Office', 'en')).toBe('Office');
+    expect(pickBilingual(null, 'Office', 'ar-EG')).toBe('Office');
+    expect(pickBilingual('   ', 'Office', 'ar-EG')).toBe('Office');
+    expect(pickBilingual(null, null, 'en')).toBe('');
   });
 });

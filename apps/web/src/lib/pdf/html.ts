@@ -34,8 +34,22 @@ export function pickEscaped(
   english: string | null,
   locale: string,
 ): string {
+  return esc(pickBilingual(arabic, english, locale));
+}
+
+/**
+ * The same choice, NOT escaped — for the one caller that hands the value to a
+ * template which escapes at the point it interpolates. Escaping here as well
+ * would be the F6 double-escape all over again, so the two are named for what
+ * they do rather than left to be told apart by where they are imported from.
+ */
+export function pickBilingual(
+  arabic: string | null,
+  english: string | null,
+  locale: string,
+): string {
   const wantsArabic = locale.startsWith('ar');
   const preferred = wantsArabic ? arabic : english;
   const fallback = wantsArabic ? english : arabic;
-  return esc((preferred && preferred.trim() ? preferred : fallback) ?? '');
+  return (preferred && preferred.trim() ? preferred : fallback) ?? '';
 }
