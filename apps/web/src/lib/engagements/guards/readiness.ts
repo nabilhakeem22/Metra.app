@@ -5,6 +5,7 @@
 // the design is ready to advance, plus the fail-closed `pendingGuard` sentinel.
 // Its only dependencies are the erased `@metra/db` types.
 import type { EngagementArtifact, EngagementEvent } from '@metra/db';
+import { acknowledgesIssuance } from '../rom-ack';
 import { pass, type GuardFacts, type GuardResult } from './facts';
 
 /**
@@ -51,10 +52,16 @@ function matchesCurrentBand(
  * EXISTENCE IS NOT ENOUGH. Re-setting the band clears `rom_issued_at`, so an
  * engagement whose figures have moved since the client agreed to them would
  * otherwise still pass this gate on the old consent — the design would be signed
- * off against numbers the client never saw. Three conditions, all fail-closed
+ * off against numbers the client never saw. FOUR conditions now, all fail-closed
  * with `rom_not_acknowledged`: the band must be issued, the newest
- * acknowledgement must exist, and its snapshotted range must equal the current
- * band.
+ * acknowledgement must exist, it must answer THE CURRENT ISSUANCE (0049), and
+ * its snapshotted range must equal the current band.
+ *
+ * The issuance check and the band check are both kept, deliberately. The issuance
+ * check is the strong one — it catches a re-issue of the SAME numbers, which the
+ * band comparison cannot see. The band comparison stays because it also covers
+ * the rows that carry no issuance stamp at all, and because two independent
+ * reasons to refuse are the right posture for a gate that signs off money.
  */
 export function romAcknowledged(facts: GuardFacts): GuardResult {
   const { romLow, romHigh, romIssuedAt } = facts.engagement;
@@ -64,6 +71,7 @@ export function romAcknowledged(facts: GuardFacts): GuardResult {
     .filter((event) => event.kind === 'rom_acknowledgement')
     .sort(byDecidedDescending);
   if (!latestAcknowledgement) return stale;
+  if (!acknowledgesIssuance(latestAcknowledgement, romIssuedAt)) return stale;
   return matchesCurrentBand(latestAcknowledgement, romLow, romHigh) ? pass : stale;
 }
 

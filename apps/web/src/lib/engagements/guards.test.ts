@@ -335,6 +335,9 @@ function attestation(over: {
 
 describe('romAcknowledged', () => {
   const BAND = { romLow: '1800000.0000', romHigh: '2400000.0000' };
+  /** The issuance the client was shown. 0049: an acknowledgement answers ONE. */
+  const ISSUED_AT = new Date('2026-01-01T00:00:00Z');
+  const RE_ISSUED_AT = new Date('2026-02-01T00:00:00Z');
 
   /** Facts for a band that IS issued, with the given acknowledgement events. */
   function romFacts(
@@ -343,13 +346,14 @@ describe('romAcknowledged', () => {
       rangeLow?: string;
       rangeHigh?: string;
       decidedAt?: Date;
+      acknowledgedIssueAt?: Date | null;
     }>,
     engagement: Partial<DesignEngagement> = {},
   ): GuardFacts {
     return {
       engagement: {
         ...BAND,
-        romIssuedAt: new Date('2026-01-01T00:00:00Z'),
+        romIssuedAt: ISSUED_AT,
         ...engagement,
       } as DesignEngagement,
       milestones: [],
@@ -364,17 +368,25 @@ describe('romAcknowledged', () => {
             rangeHigh: event.rangeHigh ?? null,
             decidedAt: event.decidedAt ?? new Date('2026-01-02T00:00:00Z'),
             createdAt: event.decidedAt ?? new Date('2026-01-02T00:00:00Z'),
+            acknowledgedIssueAt: null,
             ...event,
           }) as EngagementEvent,
       ),
     };
   }
 
-  const acknowledgementOf = (rangeLow: string, rangeHigh: string, decidedAt?: Date) => ({
+  /** An acknowledgement of the CURRENT issuance unless told otherwise. */
+  const acknowledgementOf = (
+    rangeLow: string,
+    rangeHigh: string,
+    decidedAt?: Date,
+    acknowledgedIssueAt: Date | null = ISSUED_AT,
+  ) => ({
     kind: 'rom_acknowledgement' as const,
     rangeLow,
     rangeHigh,
     decidedAt,
+    acknowledgedIssueAt,
   });
 
   it('passes when the acknowledged range is the band on the engagement now', () => {
@@ -443,6 +455,44 @@ describe('romAcknowledged', () => {
         }),
       ),
     ).toEqual({ ok: false, code: 'rom_not_acknowledged' });
+  });
+
+  // 0049 — WHICH ISSUANCE. The band comparison alone cannot see a re-issue of the
+  // SAME numbers, and that is the case a studio hits when it fixes a typo in a
+  // covering note and re-sends: identical figures, a new act of telling the client.
+  it('fails when the acknowledgement answers an EARLIER issuance', () => {
+    const facts = romFacts(
+      [acknowledgementOf('1800000.0000', '2400000.0000', undefined, ISSUED_AT)],
+      { romIssuedAt: RE_ISSUED_AT },
+    );
+    expect(GUARDS.romAcknowledged(facts)).toEqual({
+      ok: false,
+      code: 'rom_not_acknowledged',
+    });
+  });
+
+  it('passes once the client acknowledges the CURRENT issuance', () => {
+    const facts = romFacts(
+      [
+        acknowledgementOf('1800000.0000', '2400000.0000', new Date('2026-01-02T00:00:00Z'), ISSUED_AT),
+        acknowledgementOf('1800000.0000', '2400000.0000', new Date('2026-02-02T00:00:00Z'), RE_ISSUED_AT),
+      ],
+      { romIssuedAt: RE_ISSUED_AT },
+    );
+    expect(GUARDS.romAcknowledged(facts)).toEqual({ ok: true });
+  });
+
+  // A row written before 0049 carries NULL: we do not know which figures the
+  // client saw. Unknown must read as "no" — advancing on evidence nobody can read
+  // is exactly what this gate exists to prevent. No backfill, by design.
+  it('fails for a legacy acknowledgement with no issuance stamp', () => {
+    const facts = romFacts([
+      acknowledgementOf('1800000.0000', '2400000.0000', undefined, null),
+    ]);
+    expect(GUARDS.romAcknowledged(facts)).toEqual({
+      ok: false,
+      code: 'rom_not_acknowledged',
+    });
   });
 });
 

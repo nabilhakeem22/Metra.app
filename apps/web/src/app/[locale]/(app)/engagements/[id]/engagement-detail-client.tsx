@@ -18,6 +18,7 @@ import type {
   EngagementTransitionRecord,
 } from '@/lib/engagements/queries';
 import type { CommercialPulse } from '@/lib/engagements/pulse';
+import { acknowledgesIssuance } from '@/lib/engagements/rom-ack';
 import type { Trigger } from '@/lib/engagements/transitions';
 import { EngagementCommandCard } from './engagement-command-card';
 import {
@@ -108,9 +109,13 @@ export function EngagementDetailClient({
   // permanent "draft" badge on every young engagement says nothing at all.
   const budgetDraft =
     header.romLow !== null && header.romHigh !== null && header.romIssuedAt === null;
+  // 0049: the acknowledgement must answer THIS issuance. A stale one against a
+  // superseded band leaves the studio still awaiting the client, which is what
+  // the server-side romAcknowledged guard already decides — both call
+  // acknowledgesIssuance so the badge and the gate cannot disagree.
   const budgetAwaitingAck =
     header.romIssuedAt !== null &&
-    !events.some((e) => e.kind === 'rom_acknowledgement');
+    !events.some((e) => acknowledgesIssuance(e, header.romIssuedAt));
 
   // Pure derivation over the artifacts the page already loaded (no extra read).
   // The command card needs it to stop offering a 5th concept-option upload —

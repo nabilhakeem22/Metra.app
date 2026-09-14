@@ -150,6 +150,11 @@ export async function recordRomAcknowledgementCore(
           actorUserId: ctx.userId,
           rangeLow: engagement.romLow,
           rangeHigh: engagement.romHigh,
+          // WHICH issuance the client answered (0049), read in the same tx as the
+          // rom_not_issued check above, so the stamp and the precondition cannot
+          // disagree. Without it a re-issue of the SAME numbers would leave this
+          // row looking current forever — the band comparison cannot see that.
+          acknowledgedIssueAt: engagement.romIssuedAt,
           note,
           occurredOn,
           evidence,
