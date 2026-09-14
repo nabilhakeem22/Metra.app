@@ -1,6 +1,6 @@
 // Bilingual invite email. Server-side (no next-intl context), so copy is inlined.
 import { EMAIL_BRAND, emailWordmark } from '@/lib/email/brand';
-import { escapeHtml } from './escape-html';
+import { escapeHtml } from '@/lib/html/escape';
 
 export interface InviteEmailContent {
   subject: string;

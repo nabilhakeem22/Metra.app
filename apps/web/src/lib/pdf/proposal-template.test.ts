@@ -109,3 +109,28 @@ describe('buildProposalHtml — direction follows the locale', () => {
     }
   });
 });
+
+describe('buildProposalHtml — F6: the org name is escaped exactly once', () => {
+  // pickEscaped already escapes, and the footer escaped its result a SECOND
+  // time. "Hassan & Sons" therefore reached the page as "Hassan &amp; Sons" —
+  // a firm's own name misspelt on the document it sends its client.
+  const ampersandOrg = { ...opts, orgNameAr: null, orgNameEn: 'Hassan & Sons' };
+
+  it('renders the ampersand once in the header and once in the footer', async () => {
+    const html = await buildProposalHtml(detail(), { ...ampersandOrg, locale: 'en' });
+    expect(html).toContain('Hassan &amp; Sons');
+    expect(html).not.toContain('&amp;amp;');
+    expect([...html.matchAll(/Hassan &amp; Sons/g)]).toHaveLength(2);
+  });
+
+  it('still escapes markup in an org name', async () => {
+    const html = await buildProposalHtml(detail(), {
+      ...opts,
+      orgNameAr: null,
+      orgNameEn: '<script>x</script>',
+      locale: 'en',
+    });
+    expect(html).not.toContain('<script>x</script>');
+    expect(html).toContain('&lt;script&gt;');
+  });
+});

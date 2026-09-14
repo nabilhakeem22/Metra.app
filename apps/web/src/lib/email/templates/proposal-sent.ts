@@ -2,7 +2,7 @@
 // so copy is inlined. Contains NO cost or margin — only the client-facing total,
 // number, and the accept link. Western numerals (§4.1).
 import { EMAIL_BRAND, emailWordmark } from '@/lib/email/brand';
-import { escapeHtml } from './escape-html';
+import { escapeHtml } from '@/lib/html/escape';
 
 export interface ProposalSentEmailContent {
   subject: string;

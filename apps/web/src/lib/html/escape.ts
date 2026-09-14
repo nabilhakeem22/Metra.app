@@ -1,5 +1,6 @@
-// The ONE HTML escaper for the email templates. It was copied into three of them,
-// which is how two of the copies came to be applied to the body text but not to
+// The ONE HTML escaper in the app. It began as the email templates' escaper and
+// had been copied into three of them, which is how two of the copies came to be
+// applied to the body text but not to
 // the URL interpolated into href="…" — a URL containing a double quote closed the
 // attribute and let the rest of it become markup.
 //
@@ -9,6 +10,11 @@
 // same function is safe for a single-quoted attribute too. Plain-text email
 // bodies are NOT escaped: there is no markup there and an escaped ampersand in a
 // plain-text link is a broken link.
+//
+// The PDF templates carried a SEPARATE four-character copy that did not escape
+// the single quote. They now share this one (via lib/pdf/html.ts), so the studio
+// cannot be shown an org name that renders one way in an email and another in a
+// PDF, and no future single-quoted attribute in a template is a hole.
 export function escapeHtml(value: string): string {
   return value
     .replace(/&/g, '&amp;')

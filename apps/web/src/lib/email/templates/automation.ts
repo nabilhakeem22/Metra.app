@@ -2,7 +2,7 @@
 // Server-side (no next-intl context), so copy is inlined. NEVER contains cost or
 // margin, never a client address. Western numerals (§4.1).
 import { EMAIL_BRAND, emailWordmark } from '@/lib/email/brand';
-import { escapeHtml } from './escape-html';
+import { escapeHtml } from '@/lib/html/escape';
 
 export interface EmailContent {
   subject: string;
