@@ -1,4 +1,4 @@
-import { boqs, clients, projects } from '@metra/db';
+import { boqs, clients, organizations, projects } from '@metra/db';
 import { eq } from 'drizzle-orm';
 import { MAX_BOQ_LINES } from '@/lib/boqs/core';
 import { getProjectBoq } from '@/lib/boqs/queries';
@@ -6,7 +6,7 @@ import type { BoqDetail } from '@/lib/boqs/queries';
 import { withOrgContext, type OrgContext } from '@/lib/db/context';
 import { buildBoqHtml } from '@/lib/pdf/boq-template';
 import { pickBilingual } from '@/lib/pdf/html';
-import { servePdfDocument } from '@/lib/pdf/route-handler';
+import { servePdfDocument, type PdfHeader } from '@/lib/pdf/route-handler';
 
 // Chromium is Node-only; this API endpoint gates itself (the i18n matcher skips /api).
 export const runtime = 'nodejs';
@@ -28,50 +28,75 @@ export const maxDuration = 30;
  * whatever the template chooses to render. The 403 in servePdfDocument, which
  * runs BEFORE this load, is the second lock, not the only one.
  */
-interface BoqPdfDocument {
-  detail: BoqDetail;
-  number: number;
+interface BoqPdfHeader {
+  boqId: string;
+  projectId: string;
   createdAt: Date | string;
   clientName: (locale: string) => string;
   projectName: (locale: string) => string;
 }
 
-/** The BOQ's header carries the client and project names, which no other PDF
- *  needs, so they are loaded here rather than widened into PdfOrg. */
-async function loadBoqDocument(
+/**
+ * The header, in ONE transaction: the org row every PDF needs joined to the
+ * client and project names only this one needs.
+ *
+ * The org row is joined here rather than read by the handler on its own, because
+ * a separate read is a separate RLS transaction — BEGIN, the three SET LOCALs,
+ * the SELECT, COMMIT — on a route whose budget is a five-second render. No cost
+ * column is selected: this runs before the margin gate.
+ */
+async function loadBoqHeader(
   ctx: OrgContext,
   id: string,
-  showCost: boolean,
-): Promise<BoqPdfDocument | null> {
+): Promise<PdfHeader<BoqPdfHeader> | null> {
   const [row] = await withOrgContext(ctx, (tx) =>
     tx
       .select({
         boqId: boqs.id,
-        number: boqs.number,
         projectId: boqs.projectId,
         createdAt: boqs.createdAt,
         clientAr: clients.nameAr,
         clientEn: clients.nameEn,
         projectAr: projects.nameAr,
         projectEn: projects.nameEn,
+        orgAr: organizations.nameAr,
+        orgEn: organizations.nameEn,
+        defaultLocale: organizations.defaultLocale,
+        hideMarginFromPm: organizations.hideMarginFromPm,
       })
       .from(boqs)
       .innerJoin(clients, eq(clients.id, boqs.clientId))
       .innerJoin(projects, eq(projects.id, boqs.projectId))
+      .innerJoin(organizations, eq(organizations.id, boqs.orgId))
       .where(eq(boqs.id, id))
       .limit(1),
   );
   if (!row) return null;
-
-  const detail = await getProjectBoq(ctx, row.projectId, { showCost });
-  if (!detail || detail.id !== row.boqId) return null;
   return {
-    detail,
-    number: row.number,
-    createdAt: row.createdAt,
-    clientName: (locale) => pickBilingual(row.clientAr, row.clientEn, locale),
-    projectName: (locale) => pickBilingual(row.projectAr, row.projectEn, locale),
+    org: {
+      nameAr: row.orgAr,
+      nameEn: row.orgEn,
+      defaultLocale: row.defaultLocale,
+      hideMarginFromPm: row.hideMarginFromPm,
+    },
+    header: {
+      boqId: row.boqId,
+      projectId: row.projectId,
+      createdAt: row.createdAt,
+      clientName: (locale) => pickBilingual(row.clientAr, row.clientEn, locale),
+      projectName: (locale) => pickBilingual(row.projectAr, row.projectEn, locale),
+    },
   };
+}
+
+/** The priced body, after the margin gate. `showCost` decides what is FETCHED. */
+async function loadBoqDetail(
+  ctx: OrgContext,
+  header: BoqPdfHeader,
+  showCost: boolean,
+): Promise<BoqDetail | null> {
+  const detail = await getProjectBoq(ctx, header.projectId, { showCost });
+  return detail && detail.id === header.boqId ? detail : null;
 }
 
 export async function GET(
@@ -83,18 +108,19 @@ export async function GET(
     capability: 'boq_build',
     logLabel: 'BOQ',
     maxLines: MAX_BOQ_LINES,
-    load: loadBoqDocument,
-    lineCount: (document) => document.detail.lineCount,
-    buildHtml: (document, { locale, variant, org }) =>
-      buildBoqHtml(document.detail, {
+    loadHeader: loadBoqHeader,
+    load: (ctx, _boqId, showCost, header) => loadBoqDetail(ctx, header, showCost),
+    lineCount: (detail) => detail.lineCount,
+    buildHtml: (detail, { locale, variant, org, header }) =>
+      buildBoqHtml(detail, {
         locale,
         variant,
         orgName: pickBilingual(org.nameAr, org.nameEn, locale),
-        clientName: document.clientName(locale),
-        projectName: document.projectName(locale),
-        year: new Date(document.createdAt).getUTCFullYear(),
+        clientName: header.clientName(locale),
+        projectName: header.projectName(locale),
+        year: new Date(header.createdAt).getUTCFullYear(),
       }),
-    fileName: (document, variant) =>
-      `boq-${document.number}${variant === 'internal' ? '-internal' : ''}.pdf`,
+    fileName: (detail, variant) =>
+      `boq-${detail.number}${variant === 'internal' ? '-internal' : ''}.pdf`,
   });
 }

@@ -10,39 +10,55 @@ import 'server-only';
 // every response, because the internal copy carries the firm's margin and must
 // not be readable back off a shared machine's disk. A route that reordered two
 // of those would still look right and still compile.
-import { organizations } from '@metra/db';
-import { eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { requireOrg } from '@/lib/auth/require-org';
 import { getSessionUser } from '@/lib/auth/session';
-import { withOrgContext, type OrgContext } from '@/lib/db/context';
+import type { OrgContext } from '@/lib/db/context';
+import { loadPdfOrg, MARGIN_HIDING_ORG, type PdfOrg } from '@/lib/pdf/org';
 import { renderPdf, RendererBusyError } from '@/lib/pdf/render';
 import { can, canSeeMargin } from '@/lib/permissions/can';
 import type { Capability } from '@/lib/permissions/roles';
 
+export type { PdfOrg };
+
 export type PdfVariant = 'client' | 'internal';
 
-/** The org fields every document header needs. */
-export interface PdfOrg {
-  nameAr: string | null;
-  nameEn: string | null;
-  defaultLocale: string;
-  hideMarginFromPm: boolean;
+/** The org row plus whatever else THIS document's header needs. */
+export interface PdfHeader<THeader> {
+  org: PdfOrg;
+  header: THeader;
 }
 
-export interface PdfDocumentSpec<TDetail> {
+export interface PdfDocumentSpec<TDetail, THeader = undefined> {
   /** Read capability for this document family. */
   capability: Capability;
   /** Prefix for the two server-side error logs. Never contains client data. */
   logLabel: string;
   /** DOM size ceiling — refuse rather than time out mid-render. */
   maxLines: number;
+  /**
+   * OPTIONAL: this document's header read, in ONE transaction, carrying the org
+   * row alongside whatever else the header needs (the BOQ's client and project
+   * names) instead of paying for a second transaction to fetch it. It must NOT
+   * fetch cost — it runs BEFORE the margin gate. `null` = a 404.
+   */
+  loadHeader?(ctx: OrgContext, id: string): Promise<PdfHeader<THeader> | null>;
   /** `showCost` is false for the client copy, which must never FETCH cost. */
-  load(ctx: OrgContext, id: string, showCost: boolean): Promise<TDetail | null>;
+  load(
+    ctx: OrgContext,
+    id: string,
+    showCost: boolean,
+    header: THeader,
+  ): Promise<TDetail | null>;
   lineCount(detail: TDetail): number;
   buildHtml(
     detail: TDetail,
-    context: { locale: string; variant: PdfVariant; org: PdfOrg },
+    context: {
+      locale: string;
+      variant: PdfVariant;
+      org: PdfOrg;
+      header: THeader;
+    },
   ): Promise<string>;
   fileName(detail: TDetail, variant: PdfVariant): string;
 }
@@ -54,40 +70,26 @@ function resolveVariant(req: Request): PdfVariant {
     : 'client';
 }
 
-/**
- * The caller's own org row. Explicitly `where id = ctx.orgId` rather than
- * `limit 1` inside the RLS transaction: the policy already scopes it, but a bare
- * `limit 1` is a query whose correctness depends entirely on something a reader
- * cannot see here, and it would silently pick an arbitrary row if the policy
- * ever widened. Falls back to a margin-HIDING default, so a missing row loses
- * branding rather than leaking cost.
- */
-async function loadPdfOrg(ctx: OrgContext): Promise<PdfOrg> {
-  const [row] = await withOrgContext(ctx, (tx) =>
-    tx
-      .select({
-        nameAr: organizations.nameAr,
-        nameEn: organizations.nameEn,
-        defaultLocale: organizations.defaultLocale,
-        hideMarginFromPm: organizations.hideMarginFromPm,
-      })
-      .from(organizations)
-      .where(eq(organizations.id, ctx.orgId))
-      .limit(1),
-  );
-  return (
-    row ?? { nameAr: null, nameEn: null, defaultLocale: 'ar-EG', hideMarginFromPm: true }
-  );
+/** The spec's own header read, or the plain org read every document falls back to. */
+async function loadHeaderFor<TDetail, THeader>(
+  ctx: OrgContext,
+  id: string,
+  spec: PdfDocumentSpec<TDetail, THeader>,
+): Promise<PdfHeader<THeader> | null> {
+  if (spec.loadHeader) return spec.loadHeader(ctx, id);
+  // No loadHeader means the spec named no header type, so `undefined` IS its
+  // THeader: the org row on its own, which is what two of the three routes need.
+  return { org: await loadPdfOrg(ctx), header: undefined as THeader };
 }
 
 const json = (error: string, status: number, headers?: HeadersInit) =>
   NextResponse.json({ error }, { status, headers });
 
 /** Serve one document as a PDF, in the one order all three routes must follow. */
-export async function servePdfDocument<TDetail>(
+export async function servePdfDocument<TDetail, THeader = undefined>(
   req: Request,
   id: string,
-  spec: PdfDocumentSpec<TDetail>,
+  spec: PdfDocumentSpec<TDetail, THeader>,
 ): Promise<Response> {
   const variant = resolveVariant(req);
 
@@ -95,22 +97,37 @@ export async function servePdfDocument<TDetail>(
   const ctx = await requireOrg();
   if (!can(ctx.role, spec.capability, 'read')) return json('Forbidden', 403);
 
-  const org = await loadPdfOrg(ctx);
-  // Margin-gated BEFORE the load, so a blind role never even fetches cost.
+  const loaded = await loadHeaderFor(ctx, id, spec);
+  // Margin-gated BEFORE the load, so a blind role never even fetches cost — and
+  // gated margin-HIDING when the header did not resolve, so the 403 cannot be
+  // skipped by naming an id that does not exist.
+  const org = loaded?.org ?? MARGIN_HIDING_ORG;
   if (variant === 'internal' && !canSeeMargin(ctx.role, org.hideMarginFromPm)) {
     return json('Forbidden', 403);
   }
+  if (!loaded) return json('Not found', 404);
 
-  const detail = await spec.load(ctx, id, variant === 'internal');
+  const detail = await spec.load(ctx, id, variant === 'internal', loaded.header);
   if (!detail) return json('Not found', 404);
   // Refuse a DOM the renderer cannot finish inside maxDuration.
   if (spec.lineCount(detail) > spec.maxLines) return json('Too large to render', 413);
 
+  return renderDocument(spec, detail, variant, { org, header: loaded.header });
+}
+
+/** Build the DOM, render it, and turn a renderer failure into its own status. */
+async function renderDocument<TDetail, THeader>(
+  spec: PdfDocumentSpec<TDetail, THeader>,
+  detail: TDetail,
+  variant: PdfVariant,
+  { org, header }: PdfHeader<THeader>,
+): Promise<Response> {
   try {
     const html = await spec.buildHtml(detail, {
       locale: org.defaultLocale,
       variant,
       org,
+      header,
     });
     return pdfResponse(await renderPdf(html), spec.fileName(detail, variant));
   } catch (cause) {

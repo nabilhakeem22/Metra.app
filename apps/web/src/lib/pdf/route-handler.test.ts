@@ -24,7 +24,9 @@ interface StubDetail {
   lines: number;
 }
 
-function spec(overrides: Partial<Parameters<typeof servePdfDocument<StubDetail>>[2]> = {}) {
+function spec<THeader = undefined>(
+  overrides: Partial<Parameters<typeof servePdfDocument<StubDetail, THeader>>[2]> = {},
+) {
   return {
     capability: 'proposals_build' as const,
     logLabel: 'Stub',
@@ -123,7 +125,9 @@ describe('servePdfDocument — the variant', () => {
   it('defaults to the client copy and loads it WITHOUT cost', async () => {
     const stub = spec();
     await servePdfDocument(request('https://app.metra.test/api/pdf/x/1?variant=bogus'), '1', stub);
-    expect(stub.load).toHaveBeenCalledWith(expect.anything(), '1', false);
+    // The fourth argument is the spec's own header row: `undefined` here,
+    // because this spec defines no loadHeader.
+    expect(stub.load).toHaveBeenCalledWith(expect.anything(), '1', false, undefined);
   });
 
   it('loads cost only for ?variant=internal', async () => {
@@ -133,7 +137,7 @@ describe('servePdfDocument — the variant', () => {
       '1',
       stub,
     );
-    expect(stub.load).toHaveBeenCalledWith(expect.anything(), '1', true);
+    expect(stub.load).toHaveBeenCalledWith(expect.anything(), '1', true, undefined);
   });
 });
 
@@ -146,6 +150,52 @@ describe('servePdfDocument — the org lookup', () => {
       request('https://app.metra.test/api/pdf/x/1?variant=internal'),
       '1',
       spec(),
+    );
+    expect(res.status).toBe(403);
+  });
+
+  it('takes the org from the spec\'s OWN header read when it has one', async () => {
+    // The BOQ route joins organizations into the header query it was already
+    // running. The handler must then NOT open a second transaction for the org
+    // row — that extra round trip is what this hook exists to remove.
+    const loadHeader = vi.fn(async () => ({
+      org: {
+        nameAr: null,
+        nameEn: 'Joined',
+        defaultLocale: 'ar-EG',
+        hideMarginFromPm: false,
+      },
+      header: { projectId: 'p1' },
+    }));
+    const stub = spec<{ projectId: string }>({ loadHeader });
+    await servePdfDocument(request(), '1', stub);
+    expect(loadHeader).toHaveBeenCalledWith(expect.anything(), '1');
+    expect(orgRow).not.toHaveBeenCalled();
+    // ...and the header reaches both the load and the template.
+    expect(stub.load).toHaveBeenCalledWith(expect.anything(), '1', false, {
+      projectId: 'p1',
+    });
+    expect(stub.buildHtml).toHaveBeenCalledWith(
+      { lines: 1 },
+      expect.objectContaining({ locale: 'ar-EG', header: { projectId: 'p1' } }),
+    );
+  });
+
+  it('404s when the spec\'s header read does not resolve, without loading a detail', async () => {
+    const stub = spec({ loadHeader: vi.fn(async () => null) });
+    expect((await servePdfDocument(request(), '1', stub)).status).toBe(404);
+    expect(stub.load).not.toHaveBeenCalled();
+  });
+
+  it('403s a margin-blind internal request even when the header is missing', async () => {
+    // The gate reads a margin-HIDING default, so it cannot be skipped by asking
+    // for an id that does not exist.
+    org.mockResolvedValue({ orgId: 'o1', userId: 'u1', role: 'project_manager' });
+    const stub = spec({ loadHeader: vi.fn(async () => null) });
+    const res = await servePdfDocument(
+      request('https://app.metra.test/api/pdf/x/1?variant=internal'),
+      '1',
+      stub,
     );
     expect(res.status).toBe(403);
   });
