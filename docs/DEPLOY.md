@@ -76,12 +76,59 @@ reverted):
 
 Manual `wrangler deploy` (above) still works as a fallback.
 
-## Runtime secrets (already set on the worker, not in this repo)
+## Runtime secrets (set on the Worker, never in this repo)
 
-`SUPABASE_SERVICE_ROLE_KEY`, `RESEND_API_KEY`, `RESEND_FROM` are set as encrypted
-worker secrets (Cloudflare dashboard → metra-web → Settings → Variables and
-secrets). `CRON_SECRET` is added when the automation cron is enabled.
-`wrangler deploy` preserves these across deploys.
+`SUPABASE_SERVICE_ROLE_KEY`, `RESEND_API_KEY`, `RESEND_FROM` and `CRON_SECRET`
+are encrypted Worker secrets. `wrangler deploy` preserves them across deploys.
+
+They are read at **request time** through `runtimeSecret()`
+(`apps/web/src/lib/cf/secrets.ts`), off the Worker's per-request `env` — NOT
+through `process.env`, which OpenNext resolves at BUILD time and writes into
+`.open-next/cloudflare/next-env.mjs`, a file that ships inside the deployed
+artifact. `apps/web/scripts/assert-no-baked-secrets.mjs` runs right after the
+build in both `ci.yml` and `deploy.yml` and fails if any non-`NEXT_PUBLIC_` key
+turns up there.
+
+Two consequences worth knowing:
+
+- **Rotation does not need a rebuild.** `wrangler secret put` and the next
+  request picks up the new value.
+- **A new secret must be added as a Worker secret, not as a build env var.**
+  A build var would be inlined, and the assert script would fail the build —
+  which is the intended outcome, not a bug to work around.
+
+### Rotating a secret (owner only)
+
+Owner action: these values are not in the repo and not in CI. From
+`apps/web`, one at a time:
+
+```bash
+npx wrangler secret put SUPABASE_SERVICE_ROLE_KEY   # paste at the prompt
+npx wrangler secret put RESEND_API_KEY
+npx wrangler secret put RESEND_FROM
+npx wrangler secret put CRON_SECRET
+```
+
+Never pass a value as a command argument (it lands in shell history) and never
+echo one into a log. After rotating, hit any authenticated page to confirm the
+app still reaches Postgres and storage; a bad service-role key surfaces as a
+failure to mint signed file URLs, not as a login failure.
+
+`CRON_SECRET` is shared with the scheduled Worker and must be rotated in BOTH
+places or the cron stops being authorised — see below.
+
+### The cron Worker is a separate deployment
+
+`workers/cron` is **not** an npm workspace and is **not** deployed by
+`deploy.yml`. It has its own `wrangler.jsonc` and is deployed on its own.
+
+It calls the app over HTTP, so it needs to know where the app IS: its
+**`APP_ORIGIN`** var must point at the live app origin, and its `CRON_SECRET`
+must match the one on `metra-web`. Those are two separate Worker configurations
+holding one shared value and one pointer between them — if the app moves to a
+new domain, or `CRON_SECRET` is rotated on `metra-web` alone, the cron keeps
+running and every call it makes is rejected. Nothing in the app surfaces that:
+the symptom is automations silently not firing.
 
 ## Migrations
 

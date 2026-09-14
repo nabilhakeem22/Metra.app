@@ -36,8 +36,8 @@ contractors (quote → contract → مستخلص invoicing; project & cost contr
 | Database | PostgreSQL 17 (Supabase, region eu-west-1) · Drizzle ORM |
 | Storage / files | Supabase Storage — private `metra-files` bucket, signed URLs |
 | Cache / queue | — (none) |
-| Hosting | Vercel (project `metra-app-web`, fn region `dub1`); GitHub `nabilhakeem22/Metra.app`, auto-deploy from `main` |
-| Package manager | npm **workspaces** monorepo: `apps/web` (`@metra/web`), `packages/db` (`@metra/db`) |
+| Hosting | **Cloudflare Workers** — Worker `metra-web`, built by OpenNext (`@opennextjs/cloudflare`), Postgres via the **Hyperdrive** binding to the Supabase **session pooler :5432**. GitHub `nabilhakeem22/Metra.app`; `deploy.yml` runs on `main` but is **gated on the `DEPLOY_ENABLED` flag**, so a merge does not deploy by itself. |
+| Package manager | npm **workspaces** monorepo: `apps/web` (`@metra/web`), `packages/db` (`@metra/db`). **`workers/cron` is a SEPARATE wrangler project, outside the workspace globs** — it has its own `wrangler.jsonc` and is not installed, linted or tested by the root scripts. Changing it means deploying it on its own. |
 
 ## Commands
 
@@ -63,7 +63,7 @@ Agents run these literally. These are exactly what `.github/workflows/ci.yml` ru
 - **Test framework:** Vitest.
 - **Test file location/naming:** action-core DB tests `apps/web/tests/actions/*.dbtest.ts` (pure `*Core(ctx,input)` against a seeded DB via fabricated `OrgContext`); the auto-discovering isolation gate `tests/isolation/*.test.ts`; unit `*.test.ts` colocated.
 - **Error handling:** unified `ActionResult` + `ActionCode` union + `resolveActionError(code,t)` (localized, never raw English). `mutateInOrg` catches and returns coded errors. Server actions RETURN `ActionResult` — never throw to the client. Modal/form callers MUST wrap awaits so a rejected action can't leave a spinner stuck.
-- **Logging:** `console.error` on the server (surfaces in Vercel runtime logs — use `get_runtime_errors`/`get_runtime_logs` to debug prod). Never log PII, secrets, tokens, or raw share tokens (store only the sha256 hash).
+- **Logging:** `console.error` on the server. Read it with **`npx wrangler tail`** (live) or the Workers Logs view in the Cloudflare dashboard. Never log PII, secrets, tokens, or raw share tokens (store only the sha256 hash).
 - **Naming:** intent-revealing, no abbreviations (Rulebook #4).
 - **Folder structure:** per-domain `apps/web/src/lib/{module}/{core,queries,actions}.ts`; schema `packages/db/src/schema/*.ts`; RLS `packages/db/src/rls/{policies,roles,functions,immutability}.sql`; UI `apps/web/src/app/[locale]/(app)/{module}/`.
 - **Anything the coder must mirror (exemplars):**
@@ -114,8 +114,8 @@ Estimates (pilot phase — the 5 pilot firms are an open PRD §10 decision):
 |---|---|---|
 | Supabase | Auth + Postgres + Storage | App auth/data down; the SHARED DB is dev+CI-adjacent+prod — a pause makes the whole app unreachable |
 | Resend | Transactional email (OTP, invites, proposal-sent) | No emails; proposal-send email is **best-effort/non-blocking**. ⚠️ Sending domain NOT yet verified — email only reaches the account owner until then (owner action) |
-| Vercel | Hosting + auto-deploy from `main` | No deploys; app already-deployed keeps serving |
-| Puppeteer + `@sparticuz/chromium` | PDF generation | No PDF. Fonts are bundled via `outputFileTracingIncludes` (fs-read assets need this or they 500 on Vercel) |
+| Cloudflare | Hosting (Workers), Hyperdrive to Postgres, Browser Rendering, the API rate-limit binding | No deploys; a Hyperdrive outage takes the DB path down. A rate-limiter blip fails OPEN by design (docs/API.md) |
+| `@cloudflare/puppeteer` + the `BROWSER` binding | PDF generation | No PDF. At the renderer's concurrency cap the routes return a retryable **503 + `retry-after: 5`**, not a 500 |
 | Paymob / ETA e-invoicing | Payments (subscription) + Egyptian e-invoicing | Not built — future Subscription + Public-API slices |
 
 ## Compliance / regulatory
@@ -143,7 +143,7 @@ The architect may not design around these:
 - **Server-safe constants:** never export a value/const from a `'use client'` module and import it into a server component — it becomes a client-reference proxy → runtime 500 (passes tsc/build). Shared constants live in a plain non-client module (see `tabs.ts`).
 - Every new org-scoped table → isolation gate coverage + `fixture.ts` teardown (FK-safe order) + RLS in `apply-rls`.
 - Message-key parity + Western numerals; logical CSS only; no demo data.
-- **The CI from-scratch replay (`.github/workflows/ci.yml`: lint→unit→migrate→apply-rls→seed→isolation→test:actions on a fresh Postgres) is the REAL gate.** Local/Vercel checks use the already-migrated warm DB and miss clean-room failures. Verify CI green after every push.
+- **The CI from-scratch replay (`.github/workflows/ci.yml`: lint→unit→migrate→apply-rls→seed→isolation→test:actions→OpenNext build→assert-no-baked-secrets on a fresh Postgres) is the REAL gate.** Local checks use the already-migrated warm DB and miss clean-room failures. Verify CI green after every push.
 - **Workflow:** plan & confirm (architect → owner sign-off) before the coder writes code. Keep every mutation a self-contained `*Core(ctx,input)→ActionResult` (API-ready — a future Public API slice wraps them).
 
 ## Out of bounds
