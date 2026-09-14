@@ -1,4 +1,8 @@
 import 'server-only';
+// Both values are read at REQUEST time (lib/cf/secrets): on Cloudflare they are
+// Worker secrets rather than build-time vars, so rotating the Resend key is a
+// `wrangler secret put` and not a redeploy.
+import { runtimeSecret } from '@/lib/cf/secrets';
 import {
   digestEmailTemplate,
   followupReminderEmailTemplate,
@@ -24,8 +28,8 @@ export interface SendInviteEmailInput {
 export async function sendInviteEmail(
   input: SendInviteEmailInput,
 ): Promise<{ sent: boolean }> {
-  const apiKey = process.env.RESEND_API_KEY;
-  const from = process.env.RESEND_FROM;
+  const apiKey = runtimeSecret('RESEND_API_KEY');
+  const from = runtimeSecret('RESEND_FROM');
   if (!apiKey || !from) {
     return { sent: false };
   }
@@ -67,8 +71,8 @@ export interface SendProposalEmailInput {
 export async function sendProposalEmail(
   input: SendProposalEmailInput,
 ): Promise<{ sent: boolean }> {
-  const apiKey = process.env.RESEND_API_KEY;
-  const from = process.env.RESEND_FROM;
+  const apiKey = runtimeSecret('RESEND_API_KEY');
+  const from = runtimeSecret('RESEND_FROM');
   if (!apiKey || !from) {
     return { sent: false };
   }
@@ -97,8 +101,8 @@ async function sendAutomationEmail(
   content: EmailContent,
   label: string,
 ): Promise<{ sent: boolean }> {
-  const apiKey = process.env.RESEND_API_KEY;
-  const from = process.env.RESEND_FROM;
+  const apiKey = runtimeSecret('RESEND_API_KEY');
+  const from = runtimeSecret('RESEND_FROM');
   if (!apiKey || !from) return { sent: false };
   try {
     const { Resend } = await import('resend');
