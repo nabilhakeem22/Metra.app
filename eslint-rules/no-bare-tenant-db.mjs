@@ -34,7 +34,11 @@
 // came from, not the local name, and the connection object is tracked too — so
 // `{ sql: raw }`, `conn.sql`, `conn['sql']` and `getRequestConnection().sql` count.
 // KNOWN LIMITS (deliberate): raw-ness survives neither a return from a local helper
-// nor an assignment into an outer `let`; the isolation gate backstops both.
+// nor an assignment into an outer `let`; a COMPUTED key that is not a literal or
+// an interpolation-free template (`conn[key]`, `getDb()[method]()`) cannot be
+// resolved statically at all. The isolation gate backstops all three — and each
+// of them takes deliberate effort to write, which is not the shape of the
+// mistake this rule exists to catch.
 // Deliberately NOT extended by name convention: drizzle's own `sql` tag is
 // imported in roughly two hundred files and is not a connection, so only a `sql`
 // that RESOLVES to a raw factory is flagged. `db` keeps its name convention.
@@ -136,7 +140,13 @@ function rawFactoryName(node) {
  * a string literal so `conn['sql']` is not a hiding place. Null when not static. */
 function staticKeyName(computed, key) {
   if (computed) {
-    return key.type === 'Literal' && typeof key.value === 'string' ? key.value : null;
+    if (key.type === 'Literal' && typeof key.value === 'string') return key.value;
+    // `conn[`sql`]` is the same read as `conn.sql`; a template literal with no
+    // interpolations is a string constant wearing different punctuation.
+    if (key.type === 'TemplateLiteral' && key.expressions.length === 0) {
+      return key.quasis.map((quasi) => quasi.value.cooked).join('');
+    }
+    return null;
   }
   if (key.type === 'Identifier') return key.name;
   return key.type === 'Literal' ? String(key.value) : null;
@@ -285,12 +295,28 @@ export const noBareTenantDb = {
       if (factory === 'getDb') return 'raw';
       if (factory) {
         if (decl.id && decl.id.type === 'ObjectPattern') {
-          return bindsHandleKey(decl.id, nameNode) ? 'raw' : 'unknown';
+          if (bindsHandleKey(decl.id, nameNode)) return 'raw';
+          // `const { ...rest } = getRequestConnection()`: the rest binding holds
+          // EVERY key the factory returned, handles included, so it is the
+          // connection object under another name.
+          return bindsRest(decl.id, nameNode) ? 'connection' : 'unknown';
         }
         return 'connection';
       }
       if (init.type === 'MemberExpression' && isRawExpr(init)) return 'raw';
       return 'unknown';
+    }
+
+    /** Did this object pattern bind `nameNode` as its REST element? */
+    function bindsRest(pattern, nameNode) {
+      if (!nameNode) return false;
+      return pattern.properties.some(
+        (property) =>
+          property.type === 'RestElement' &&
+          property.argument &&
+          property.argument.type === 'Identifier' &&
+          property.argument.name === nameNode.name,
+      );
     }
 
     /** Did this object pattern bind `nameNode` to a `db`/`sql`/`pg` property? */
@@ -346,15 +372,13 @@ export const noBareTenantDb = {
       },
       CallExpression(node) {
         const callee = node.callee;
-        if (
-          callee.type !== 'MemberExpression' ||
-          callee.computed ||
-          callee.property.type !== 'Identifier'
-        ) {
-          return;
-        }
-        const method = callee.property.name;
-        if (!QUERY_METHODS.has(method)) return;
+        if (callee.type !== 'MemberExpression') return;
+        // Computed too: `getDb()['select']()` and getDb()[`select`]() run the
+        // same BYPASSRLS query as `getDb().select()`, and only the punctuation
+        // differs. staticKeyName resolves both forms, or null for a genuinely
+        // dynamic key, which this rule cannot follow and does not pretend to.
+        const method = staticKeyName(callee.computed, callee.property);
+        if (method === null || !QUERY_METHODS.has(method)) return;
         if (!isRawExpr(callee.object)) return;
         context.report({
           node: callee.property,

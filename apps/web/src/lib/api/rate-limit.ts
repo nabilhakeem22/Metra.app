@@ -59,10 +59,23 @@ function binding(name: string): CloudflareRateLimit | null {
 }
 
 /**
- * Runs one bucket. A binding ERROR fails OPEN: an availability blip in the
- * limiter must not take the whole API down. A MISSING binding does not reach
- * here — `binding()` throws, and that throw is a 500, which is correct for a
- * misdeployed Worker.
+ * Runs one bucket.
+ *
+ * OWNER DECISION, recorded so it is not silently reversed by whoever next reads
+ * this and thinks it looks like a bug. The two failures are DIFFERENT and are
+ * handled differently ON PURPOSE:
+ *
+ *  - A binding ERROR fails OPEN. An availability blip in Cloudflare's limiter
+ *    would otherwise take the entire Public API down for every caller, and a
+ *    few seconds of unmetered traffic is a smaller harm than a total outage.
+ *    The blip is logged, so it is visible rather than merely survived.
+ *  - A MISSING binding fails CLOSED, and never reaches this function at all:
+ *    `binding()` throws and the request 500s. That is not an availability
+ *    problem, it is a misdeployed Worker, and serving the API unlimited because
+ *    somebody forgot a line in wrangler.jsonc is not a trade worth making.
+ *
+ * The same sentence is in docs/API.md, for the reader who is looking at the
+ * behaviour rather than at the code.
  */
 async function consume(
   limiter: CloudflareRateLimit | null,

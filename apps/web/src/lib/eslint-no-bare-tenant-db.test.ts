@@ -58,8 +58,43 @@ it('no-bare-tenant-db: flags raw-connection queries, allows scoped ones', () => 
         filename: 'tests/isolation/shared-pool.test.ts',
         code: 'const rows = await db.execute(sql`select current_user`);',
       },
+      // A GENUINELY DYNAMIC key is a stated KNOWN LIMIT, not an oversight: a
+      // syntax rule cannot resolve `conn[key]`, and pretending otherwise would
+      // mean guessing. It also takes deliberate effort to write, which is not
+      // the shape of the mistake this rule exists to catch; the cross-tenant
+      // isolation gate is the backstop.
+      {
+        filename: 'apps/web/src/lib/clients/queries.ts',
+        code: 'const conn = getRequestConnection(); await conn[key]`select 1`;',
+      },
+      {
+        filename: 'apps/web/src/lib/clients/queries.ts',
+        code: 'getDb()[method]();',
+      },
     ],
     invalid: [
+      // THREE MORE EVASIONS, closed in wave 2. Each runs exactly the same
+      // BYPASSRLS query as a form the rule already caught, and differs only in
+      // punctuation — which is precisely what a rule reading syntax must not be
+      // fooled by.
+      {
+        // A computed key written as an interpolation-free template literal.
+        filename: 'apps/web/src/lib/clients/queries.ts',
+        code: 'const conn = getRequestConnection(); await conn[`sql`]`select 1`;',
+        errors: [{ messageId: 'bareQuery' }],
+      },
+      {
+        // A rest binding holds every key the factory returned, handles included.
+        filename: 'apps/web/src/lib/clients/queries.ts',
+        code: 'const { ...rest } = getRequestConnection(); await rest.sql`select 1`;',
+        errors: [{ messageId: 'bareQuery' }],
+      },
+      {
+        // A query method reached by computed string.
+        filename: 'apps/web/src/lib/clients/queries.ts',
+        code: "getDb()['select']();",
+        errors: [{ messageId: 'bareQuery' }],
+      },
       // The postgres.js handle IS the same privileged socket as `db`: reaching
       // for `sql`/`pg` instead of `db` used to bypass this rule entirely.
       {

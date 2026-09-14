@@ -128,6 +128,14 @@ Over the limit returns `429 rate-limited` with a `Retry-After` header (seconds).
 Back off and retry after that interval. Design integrations to page with a
 reasonable `limit` and cache where possible rather than polling tightly.
 
+**If the limiter itself is unavailable, requests are ALLOWED through.** An
+availability blip in the limiter must not take the whole API down, so an error
+from it fails open (and is logged). This is a deliberate trade: a few seconds of
+unmetered traffic is a smaller harm than a total outage. It is not a way to get
+more throughput — the limiter is healthy essentially all of the time, and a
+missing limiter is treated as the opposite case: the Worker is misdeployed and
+every request 500s rather than being served unlimited.
+
 ---
 
 ## Resources
