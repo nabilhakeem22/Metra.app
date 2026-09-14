@@ -1,8 +1,10 @@
+import { sql } from 'drizzle-orm';
 import {
   pgTable,
   text,
   timestamp,
   unique,
+  uniqueIndex,
   uuid,
   type AnyPgColumn,
 } from 'drizzle-orm/pg-core';
@@ -33,6 +35,18 @@ export const engagementTransitions = pgTable(
     toState: designEngagementState('to_state'),
     actorUserId: uuid('actor_user_id'),
     note: text('note'),
+    /**
+     * The caller's name for ONE ATTEMPT at a self-loop transition (0050).
+     *
+     * A self-loop has no admission gate: an advancing edge is protected by its
+     * own from-state, so a second attempt finds the engagement already moved and
+     * does nothing, but a self-loop leaves the state exactly where it was and
+     * every retry is a fresh, valid request. This column lets the server tell a
+     * retry of ONE act — a request that committed and whose response was lost on
+     * the way back — from a genuine second act, so one tap cannot burn two free
+     * revisions. NULL on every advancing edge and on every pre-0050 row.
+     */
+    idempotencyKey: text('idempotency_key'),
     decidedAt: timestamp('decided_at', { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -40,6 +54,12 @@ export const engagementTransitions = pgTable(
   (t) => [
     unique('engagement_transitions_org_id_id_unique').on(t.orgId, t.id),
     ...sameOrgFk(t, 'engagement', designEngagements, { onDelete: 'cascade' }),
+    // Live since 0050 — one ledger row per (org, engagement, key). PARTIAL on
+    // IS NOT NULL: NULLs never collide in a unique index anyway, and stating it
+    // keeps the index to the rows that actually carry a key.
+    uniqueIndex('engagement_transitions_idempotency_key_uniq')
+      .on(t.orgId, t.engagementId, t.idempotencyKey)
+      .where(sql`idempotency_key is not null`),
   ],
 );
 

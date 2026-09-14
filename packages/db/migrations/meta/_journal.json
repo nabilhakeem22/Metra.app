@@ -351,6 +351,13 @@
       "when": 1789597157549,
       "tag": "0049_rom_acknowledgement_issuance",
       "breakpoints": true
+    },
+    {
+      "idx": 50,
+      "version": "7",
+      "when": 1789683557549,
+      "tag": "0050_transition_idempotency",
+      "breakpoints": true
     }
   ]
 }
