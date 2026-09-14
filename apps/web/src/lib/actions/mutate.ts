@@ -1,4 +1,6 @@
 import type { MetraDb } from '@metra/db';
+import { eq } from 'drizzle-orm';
+import type { PgColumn, PgTable } from 'drizzle-orm/pg-core';
 import { recordAudit, type AuditEntry } from '@/lib/audit';
 import { DbWriteUncertainError } from '@/lib/db/client';
 import { withOrgContext, type OrgContext } from '@/lib/db/context';
@@ -9,7 +11,9 @@ import {
 import type { Flow } from '@/lib/entitlements/flows';
 import { can } from '@/lib/permissions/can';
 import type { Capability, PermissionAction } from '@/lib/permissions/roles';
-import { ActionError, type ActionResult } from './result';
+import { ActionError, type ActionCode, type ActionResult } from './result';
+
+import { fail } from './result';
 
 export { ActionError, fail } from './result';
 
@@ -59,3 +63,65 @@ export async function mutateInOrg<T = void>(
     return { ok: false, error: 'generic' };
   }
 }
+
+/**
+ * The single row `id` names in THIS org, or a coded failure.
+ *
+ * THE SHAPE THIS REPLACES, written out thirty-six times:
+ *
+ * ```ts
+ * const [row] = await tx.select({ ... }).from(table)
+ *   .where(eq(table.id, id)).limit(1);
+ * if (!row) fail('engagement_not_found');
+ * ```
+ *
+ * It looks like boilerplate and it is not. The `where` clause carries NO org
+ * predicate on purpose: the RLS transaction is the tenancy boundary, and a row
+ * belonging to another org is simply invisible to this SELECT. That means the
+ * `if (!row)` line is the ONLY thing standing between a forged id from another
+ * tenant and a coded "not found" — and it is also what stops the caller reading
+ * `row.state` off `undefined` and turning a refusal into a 500. Thirty-six
+ * hand-written copies of a check with that job is thirty-six chances to omit it.
+ *
+ * `columns` is the caller's own select shape, so the return type is exactly what
+ * it asked for, with each column's nullability preserved: a `notNull` column
+ * comes back as `T`, everything else as `T | null`. No `!` at the call site, and
+ * selecting a column you did not ask for is a compile error rather than an
+ * `undefined` at runtime.
+ *
+ * DELIBERATELY NOT FOR:
+ *  - `.for('update')` — a row lock is a concurrency decision that must stay
+ *    visible at the site that needs it, and hiding it behind a helper is how one
+ *    quietly gets dropped;
+ *  - extra predicates (a status gate, a parent id) — those belong in the
+ *    caller's own query, where a reader can see what is being asserted;
+ *  - a runtime-chosen table (activities' polymorphic entity lookup) — the type
+ *    parameter cannot follow a value, and forcing it to would erase exactly the
+ *    checking this exists to provide.
+ */
+export async function requireInOrg<TColumns extends Record<string, PgColumn>>(
+  tx: MetraDb,
+  table: PgTable & { id: PgColumn },
+  id: string,
+  columns: TColumns,
+  code: ActionCode,
+): Promise<SelectedRow<TColumns>> {
+  // The cast is where the generic lands: drizzle types a dynamic select shape as
+  // a union that includes `any[]`, so TS cannot destructure it on its own. The
+  // shape is still checked — SelectedRow is derived from the caller's `columns`.
+  const rows = (await tx
+    .select(columns)
+    .from(table)
+    .where(eq(table.id, id))
+    .limit(1)) as SelectedRow<TColumns>[];
+  const row = rows[0];
+  if (!row) fail(code);
+  return row;
+}
+
+/** The caller's select shape, with each column's nullability carried through. */
+type SelectedRow<TColumns extends Record<string, PgColumn>> = {
+  [K in keyof TColumns]: TColumns[K]['_']['notNull'] extends true
+    ? TColumns[K]['_']['data']
+    : TColumns[K]['_']['data'] | null;
+};
