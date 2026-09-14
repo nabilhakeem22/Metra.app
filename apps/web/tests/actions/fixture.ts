@@ -205,6 +205,28 @@ export const raw = {
   async query<T = Record<string, unknown>>(text: string): Promise<T[]> {
     return (await pg.unsafe(text)) as unknown as T[];
   },
+  /**
+   * The plan Postgres chooses for `text`, with sequential scans turned OFF.
+   *
+   * A fixture table holds a handful of rows, so an honest EXPLAIN answers "Seq
+   * Scan" whatever indexes exist and could never tell a present index from a
+   * missing one. Disabling seq scans makes the question the one that matters —
+   * IS there an index that answers this shape — and the caller must then assert
+   * WHICH index, because with seq scans off the planner will happily read an
+   * unrelated index end to end rather than the table.
+   *
+   * One transaction, so `set local` is pinned to a single connection and resets
+   * itself when the transaction ends.
+   */
+  async explain(text: string): Promise<string> {
+    const rows = await pg.begin(async (tx) => {
+      await tx.unsafe('set local enable_seqscan = off');
+      return tx.unsafe(`explain ${text}`);
+    });
+    return (rows as unknown as Array<Record<string, string>>)
+      .map((row) => row['QUERY PLAN'])
+      .join('\n');
+  },
 };
 
 // Delete order is FK-safe on its own, but proposals/contracts/VOs are frozen once

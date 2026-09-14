@@ -30,6 +30,19 @@
 -- The guard therefore fails for those rows and the portal re-offers the verb,
 -- which is the safe direction. See docs/DEPLOY.md for the count query.
 --
+-- AND ONE PLAIN INDEX, because narrowing the unique index took the portal's index
+-- away. Both halves above are PARTIAL on acknowledged_issue_at, and a partial
+-- index is only usable when its predicate is IMPLIED by the query. The delivery
+-- portal's signal lookups (app_delivery_by_token, app_delivery_respond_by_token)
+-- ask `engagement_id = $1 and actor_channel = 'client' and kind = $2` and say
+-- nothing about acknowledged_issue_at, so after 0049 neither half answers them and
+-- the ONLY engagement_id-leading index was gone — those SDFs run as postgres with
+-- rolbypassrls, so there is no org_id qual to fall back on the org-leading index
+-- either, and every portal load turned into four sequential scans of the whole
+-- ledger. engagement_events_engagement_channel_kind_idx is exactly that lookup's
+-- shape, NOT partial and NOT unique, so nothing about it depends on a predicate
+-- the caller happens to write.
+--
 -- lock_timeout: the DROP/CREATE INDEX pair needs a brief ACCESS EXCLUSIVE lock on
 -- engagement_events. Behind a long reader it would queue and block every writer
 -- behind it; 3s makes it fail fast with 55P03 instead, and the migration can be
@@ -48,4 +61,6 @@ BEGIN
   CREATE UNIQUE INDEX IF NOT EXISTS engagement_events_client_issuance_unique
     ON public.engagement_events (engagement_id, kind, acknowledged_issue_at)
     WHERE actor_channel = 'client' AND acknowledged_issue_at IS NOT NULL;
+  CREATE INDEX IF NOT EXISTS engagement_events_engagement_channel_kind_idx
+    ON public.engagement_events (engagement_id, actor_channel, kind);
 END $$;

@@ -550,6 +550,26 @@ describe('delivery respond — an acknowledgement answers ONE issuance (0049)', 
     ).not.toContain('acknowledge_rom');
   });
 
+  it('leaves the portal client-signal lookup on an index', async () => {
+    // 0049 narrowed 0033's unique index with a second predicate conjunct, and
+    // both halves are now PARTIAL on acknowledged_issue_at. A partial index only
+    // answers a query that IMPLIES its predicate, and the portal's SDFs ask
+    // `engagement_id = $1 and actor_channel = 'client' and kind = $2` — which
+    // implies neither. Those functions run as postgres with rolbypassrls, so
+    // there is no org_id qual to reach the org-leading index either: without the
+    // plain index 0049 adds, every portal load scans the whole ledger four times.
+    const plan = await raw.explain(
+      `select 1 from public.engagement_events
+        where engagement_id = '00000000-0000-0000-0000-000000000001'
+          and actor_channel = 'client' and kind = 'rom_acknowledgement'`,
+    );
+    expect(plan).toContain('Index');
+    // WHICH index is the assertion. Seq scans are disabled in raw.explain, so
+    // "an index was used" alone would also be satisfied by an end-to-end read of
+    // the org-leading index — the very scan this is here to prevent.
+    expect(plan).toContain('engagement_events_engagement_channel_kind_idx');
+  });
+
   it('a legacy acknowledgement with no issuance stamp does not suppress the verb', async () => {
     // The no-backfill decision: rows written before 0049 carry NULL, which means
     // "we do not know which figures they saw". `is not distinct from` keeps that

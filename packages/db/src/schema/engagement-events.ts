@@ -125,6 +125,19 @@ export const engagementEvents = pgTable(
     uniqueIndex('engagement_events_client_issuance_unique')
       .on(t.engagementId, t.kind, t.acknowledgedIssueAt)
       .where(sql`actor_channel = 'client' and acknowledged_issue_at is not null`),
+    // Live since 0049 — the portal's signal lookup, in its own shape. The two
+    // unique indexes above are PARTIAL on acknowledged_issue_at, and the
+    // SECURITY DEFINER portal readers (app_delivery_by_token) ask only
+    // `engagement_id = $1 and actor_channel = 'client' and kind = $2`, which does
+    // not imply either predicate — and, running as postgres with rolbypassrls,
+    // they carry no org_id qual to reach the org-leading index either. Without
+    // this one, narrowing 0033 would have left every portal load scanning the
+    // whole ledger four times.
+    index('engagement_events_engagement_channel_kind_idx').on(
+      t.engagementId,
+      t.actorChannel,
+      t.kind,
+    ),
     // Live since 0043 — readers that must exclude corrected rows ask whether a
     // correction points at this id; PARTIAL, the answer is NULL for almost every row.
     index('engagement_events_supersedes_idx')
