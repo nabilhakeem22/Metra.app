@@ -16,9 +16,13 @@ const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 export const MAX_SECTIONS = 100;
 export const MAX_LINES_PER_SECTION = 500;
 export const MAX_TOTAL_LINES = 2000;
-// F4 money magnitude cap — numeric(18,4) tops out near 1e14; stay well under.
-export const MAX_AMOUNT = 1_000_000_000_000; // 1e12
 export const LINE_INSERT_CHUNK = 500;
+
+// The money magnitude cap and its guard are not proposal-specific — BOQs,
+// variations and the price book enforce them too — so they live in the money
+// kernel. Re-exported here so the ~12 sites that import them from this module
+// keep resolving unchanged.
+export { MAX_AMOUNT, withinMagnitude } from '@/lib/money/read';
 
 export function normalizeText(v: string | null | undefined): string | null {
   return v?.trim() || null;
@@ -37,21 +41,9 @@ export function normalizeMoney(
   return clampMoney4(s);
 }
 
-/**
- * Within the money magnitude cap. Shape-checked FIRST: `Number()` alone happily
- * reads '0x10' as 16, '1e2' as 100 and '' as 0, so a caller that reached here
- * without normalizeMoney would silently accept a hex or exponent literal as an
- * amount. Every current call site does normalize first, which is why this has
- * never bitten — the check is here so that stays true by construction rather than
- * by convention.
- */
-export function withinMagnitude(s: string): boolean {
-  if (!MONEY_RE.test(s.trim())) return false;
-  return Math.abs(Number(s)) <= MAX_AMOUNT;
-}
-
 /** A percentage between 0 and 100 inclusive. Shape-checked first, for the same
- *  reason as {@link withinMagnitude} — and because '' must not read as 0%. */
+ *  reason as {@link withinMagnitude} — `Number()` reads '0x10' as 16, '1e2' as
+ *  100 and '' as 0, and '' must not read as 0%. */
 export function pctInRange(s: string): boolean {
   const t = s.trim();
   if (!MONEY_RE.test(t) || t.startsWith('-')) return false;
