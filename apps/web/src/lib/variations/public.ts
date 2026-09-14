@@ -2,13 +2,10 @@ import 'server-only';
 // Public (no-session) variation-order share. Runs the SECURITY DEFINER token SDFs
 // on the base connection — NO withOrgContext, NO org GUCs. The token IS the auth.
 // The SDF omits every cost/margin column, so nothing here can leak the firm's cost.
-import { createHash } from 'node:crypto';
 import { sql } from 'drizzle-orm';
 import { withRequestDb } from '@/lib/db/client';
-
-function hashToken(raw: string): string {
-  return createHash('sha256').update(raw).digest('hex');
-}
+import { mapDocumentSdfCode, type TokenResponseError } from '@/lib/share/sdf-result';
+import { hashShareToken } from '@/lib/share/token';
 
 export interface PublicVariationLine {
   id: string;
@@ -49,7 +46,7 @@ export async function getVariationByToken(
   rawToken: string,
 ): Promise<PublicVariation | null> {
   if (!rawToken || !rawToken.trim()) return null;
-  const hash = hashToken(rawToken.trim());
+  const hash = hashShareToken(rawToken);
   const rows = (await withRequestDb((db) =>
     db.execute(sql`select public.app_variation_by_token(${hash}) as data`),
   )) as unknown as Array<{ data: VariationTokenDocument | null }>;
@@ -61,11 +58,9 @@ export async function getVariationByToken(
   return { ...rest, contractActive: contractActive !== false };
 }
 
-export type RespondError =
-  | 'token_invalid'
-  | 'token_expired'
-  | 'already_responded'
-  | 'contract_inactive';
+/** The variation approve/reject surface, which additionally reaches
+ *  contract_inactive. An alias, not a narrower union. */
+export type RespondError = TokenResponseError;
 
 export async function respondToVariationByToken(
   rawToken: string,
@@ -77,24 +72,12 @@ export async function respondToVariationByToken(
   },
 ): Promise<{ ok: boolean; error?: RespondError }> {
   if (!rawToken || !rawToken.trim()) return { ok: false, error: 'token_invalid' };
-  const hash = hashToken(rawToken.trim());
+  const hash = hashShareToken(rawToken);
   const rows = (await withRequestDb((db) =>
     db.execute(sql`select public.app_variation_respond_by_token(
       ${hash}, ${input.decision}, ${input.actorName ?? null},
       ${input.ip ?? null}, ${input.userAgent ?? null}
     ) as code`),
   )) as unknown as Array<{ code: string }>;
-  const code = rows[0]?.code;
-  switch (code) {
-    case 'ok':
-      return { ok: true };
-    case 'expired':
-      return { ok: false, error: 'token_expired' };
-    case 'already':
-      return { ok: false, error: 'already_responded' };
-    case 'contract_inactive':
-      return { ok: false, error: 'contract_inactive' };
-    default:
-      return { ok: false, error: 'token_invalid' };
-  }
+  return mapDocumentSdfCode(rows[0]?.code);
 }

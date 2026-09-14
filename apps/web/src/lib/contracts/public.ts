@@ -5,10 +5,8 @@ import 'server-only';
 import { createHash } from 'node:crypto';
 import { sql } from 'drizzle-orm';
 import { withRequestDb } from '@/lib/db/client';
-
-function hashToken(raw: string): string {
-  return createHash('sha256').update(raw).digest('hex');
-}
+import { mapDocumentSdfCode, type TokenResponseError } from '@/lib/share/sdf-result';
+import { hashShareToken } from '@/lib/share/token';
 
 export interface PublicContractLine {
   id: string;
@@ -76,7 +74,7 @@ export async function getContractByToken(
   rawToken: string,
 ): Promise<PublicContract | null> {
   if (!rawToken || !rawToken.trim()) return null;
-  const hash = hashToken(rawToken.trim());
+  const hash = hashShareToken(rawToken);
   const rows = (await withRequestDb((db) =>
     db.execute(sql`select public.app_contract_by_token(${hash}) as data`),
   )) as unknown as Array<{ data: PublicContract | null }>;
@@ -90,7 +88,9 @@ export function contractPayloadHash(contract: PublicContract): string {
     .digest('hex');
 }
 
-export type AckError = 'token_invalid' | 'token_expired' | 'already_responded';
+/** The contract acknowledgement surface. An alias, not a narrower union: a code
+ *  a newer SDF starts returning must still be a value the portal can hold. */
+export type AckError = TokenResponseError;
 
 export async function acknowledgeContractByToken(
   rawToken: string,
@@ -102,22 +102,12 @@ export async function acknowledgeContractByToken(
   },
 ): Promise<{ ok: boolean; error?: AckError }> {
   if (!rawToken || !rawToken.trim()) return { ok: false, error: 'token_invalid' };
-  const hash = hashToken(rawToken.trim());
+  const hash = hashShareToken(rawToken);
   const rows = (await withRequestDb((db) =>
     db.execute(sql`select public.app_contract_ack_by_token(
       ${hash}, ${input.actorName ?? null}, ${input.ip ?? null},
       ${input.userAgent ?? null}, ${input.pdfHash ?? null}
     ) as code`),
   )) as unknown as Array<{ code: string }>;
-  const code = rows[0]?.code;
-  switch (code) {
-    case 'ok':
-      return { ok: true };
-    case 'expired':
-      return { ok: false, error: 'token_expired' };
-    case 'already':
-      return { ok: false, error: 'already_responded' };
-    default:
-      return { ok: false, error: 'token_invalid' };
-  }
+  return mapDocumentSdfCode(rows[0]?.code);
 }

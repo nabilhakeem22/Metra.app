@@ -8,7 +8,7 @@ import { and, eq, inArray } from 'drizzle-orm';
 import { fail, mutateInOrg } from '@/lib/actions/mutate';
 import type { ActionResult } from '@/lib/actions/result';
 import type { OrgContext } from '@/lib/db/context';
-import { mintToken, SHARE_TTL_DAYS } from '@/lib/proposals/core';
+import { mintShareToken, shareExpiryFromNow } from '@/lib/share/token';
 import { rejectVariationsOnContractTermination } from '@/lib/variations/lifecycle';
 
 /**
@@ -26,8 +26,8 @@ export async function issueContractCore(
     ctx,
     { capability: 'contracts_issue', action: 'approve' },
     async (tx, audit) => {
-      const { raw, hash } = mintToken();
-      const shareExpiresAt = new Date(Date.now() + SHARE_TTL_DAYS * 86400_000);
+      const { raw, hash } = mintShareToken();
+      const shareExpiresAt = shareExpiryFromNow();
 
       const gated = await tx
         .update(contracts)

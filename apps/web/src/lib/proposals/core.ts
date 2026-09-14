@@ -3,7 +3,6 @@
 // ./lifecycle; both are re-exported here so `@/lib/proposals/core` stays the one
 // import surface for callers/tests. The server recomputes EVERY total from the
 // money engine and never trusts a client-supplied subtotal/total.
-import { createHash, randomBytes } from 'node:crypto';
 import {
   clients,
   projects,
@@ -26,7 +25,7 @@ import { normalizeText, validIsoDate } from './validation';
 // The share token, its hash and its lifetime live in the share kernel, which
 // reaches for node:crypto and so may NOT be re-exported from the client-safe
 // ./validation module. Re-exported here so callers keep one import surface.
-export { SHARE_TTL_DAYS } from '@/lib/share/token';
+export { SHARE_TTL_DAYS, mintShareToken } from '@/lib/share/token';
 
 // The pure validators + boundary caps live in ./validation (client-safe, unit-
 // testable). Re-exported so `@/lib/proposals/core` stays the one import surface.
@@ -42,12 +41,6 @@ export {
   validIsoDate,
   chunk,
 } from './validation';
-
-export function mintToken(): { raw: string; hash: string } {
-  const raw = randomBytes(32).toString('base64url');
-  const hash = createHash('sha256').update(raw).digest('hex');
-  return { raw, hash };
-}
 
 /** Per-org advisory lock so concurrent creates never collide on `number`. */
 export async function nextNumber(tx: MetraDb, orgId: string): Promise<number> {

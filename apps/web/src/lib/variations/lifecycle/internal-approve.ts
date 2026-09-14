@@ -7,7 +7,7 @@ import { and, eq, sql } from 'drizzle-orm';
 import { fail, mutateInOrg } from '@/lib/actions/mutate';
 import type { ActionResult } from '@/lib/actions/result';
 import type { OrgContext } from '@/lib/db/context';
-import { mintToken, SHARE_TTL_DAYS } from '@/lib/proposals/core';
+import { mintShareToken, shareExpiryFromNow } from '@/lib/share/token';
 import { canInternalApproveVariation } from '../lifecycle-rules';
 
 /**
@@ -60,8 +60,8 @@ export async function internalApproveVariationCore(
         fail('contract_not_issued');
       }
 
-      const { raw, hash } = mintToken();
-      const shareExpiresAt = new Date(Date.now() + SHARE_TTL_DAYS * 86400_000);
+      const { raw, hash } = mintShareToken();
+      const shareExpiresAt = shareExpiryFromNow();
 
       // net_delta = Σ line_total, computed IN the UPDATE (atomic with the freeze).
       // Equivalent to computeVariationNetDelta (both sum line_total), exact in SQL.
