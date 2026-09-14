@@ -19,9 +19,13 @@
 --
 -- The index is PARTIAL on IS NOT NULL: NULLs do not collide in a unique index
 -- anyway, but stating it makes the intent explicit and keeps the index to the
--- rows that actually carry a key. It is keyed on (org_id, engagement_id, key) —
--- org_id first because every read is tenant-scoped, and the engagement because a
--- key is only ever meaningful within one.
+-- rows that actually carry a key. It is keyed on (org_id, engagement_id, trigger,
+-- key) — org_id first because every read is tenant-scoped, the engagement because
+-- a key is only ever meaningful within one, and THE TRIGGER because a key names
+-- one attempt at ONE act. Without the trigger, a client that reused a key across
+-- two different verbs — requestRevision then attestAsBuiltClean — would have the
+-- second silently swallowed as a replay of the first: plain `ok`, no ledger row,
+-- no attestation, on a record whose whole purpose is evidentiary.
 --
 -- lock_timeout: ADD COLUMN of a nullable text is a catalogue-only change in PG11+
 -- (no table rewrite), but it still needs a brief ACCESS EXCLUSIVE lock. 3s makes
@@ -34,5 +38,5 @@ DO $$ BEGIN
   PERFORM set_config('lock_timeout', '3s', true);
   ALTER TABLE public.engagement_transitions ADD COLUMN IF NOT EXISTS idempotency_key text;
   CREATE UNIQUE INDEX IF NOT EXISTS engagement_transitions_idempotency_key_uniq
-    ON public.engagement_transitions (org_id, engagement_id, idempotency_key) WHERE idempotency_key IS NOT NULL;
+    ON public.engagement_transitions (org_id, engagement_id, trigger, idempotency_key) WHERE idempotency_key IS NOT NULL;
 END $$;

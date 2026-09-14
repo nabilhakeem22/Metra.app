@@ -68,6 +68,12 @@ function isSelfLoop(def: TransitionDef): boolean {
  * a replay runs no guard, flips no state, fires no side-effect and writes no
  * ledger row. Runs after lockSelfLoop, so a retry that overlaps the original
  * waits for it to commit and then sees it.
+ *
+ * THE TRIGGER IS PART OF THE QUESTION. This short-circuit precedes the legal-from
+ * check and every guard, so without it a caller that reused one key across two
+ * verbs would get plain `ok` for the second with no ledger row, no side-effect
+ * and no attestation — a false success on an evidentiary path. A key names one
+ * attempt at ONE act; the same key on a different act is a different act.
  */
 async function replayedSelfLoop(
   tx: MetraDb,
@@ -83,6 +89,7 @@ async function replayedSelfLoop(
       and(
         eq(engagementTransitions.orgId, ctx.orgId),
         eq(engagementTransitions.engagementId, input.engagementId),
+        eq(engagementTransitions.trigger, input.trigger),
         eq(engagementTransitions.idempotencyKey, input.idempotencyKey),
       ),
     )
@@ -366,12 +373,13 @@ export async function executeTransition(
         })
         .onConflictDoNothing({
           // For onConflictDoNothing, `where` is the ARBITER predicate: it renders
-          // ON CONFLICT (org_id, engagement_id, idempotency_key) WHERE
+          // ON CONFLICT (org_id, engagement_id, trigger, idempotency_key) WHERE
           // idempotency_key is not null DO NOTHING, matching 0050's partial
           // unique index exactly (targetWhere is a doUpdate-only option).
           target: [
             engagementTransitions.orgId,
             engagementTransitions.engagementId,
+            engagementTransitions.trigger,
             engagementTransitions.idempotencyKey,
           ],
           where: sql`idempotency_key is not null`,

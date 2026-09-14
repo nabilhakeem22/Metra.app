@@ -368,6 +368,39 @@ describe('executeTransition — an idempotency key names ONE attempt (0050)', ()
     expect(await requestRevisionTransitionCount(engagementId)).toBe(0);
   });
 
+  it('scopes the key to its TRIGGER — the same key on another verb is another act', async () => {
+    // S6: the replay short-circuit runs BEFORE the legal-from check and every
+    // guard, so a key shared across two verbs would have returned plain `ok` for
+    // the second with no ledger row, no side-effect and no attestation — a false
+    // success on an evidentiary record. The index carries the trigger for the
+    // same reason, and these two inserts are its contract: no executor path can
+    // reach two self-loop verbs from one state, so they are asserted directly.
+    const { ctx, engagementId } = await setupNegotiation();
+    const insertKeyed = (trigger: string) =>
+      raw.query(
+        `insert into public.engagement_transitions
+           (org_id, engagement_id, trigger, from_state, to_state, idempotency_key)
+         values ('${ctx.orgId}', '${engagementId}', '${trigger}',
+                 'negotiation', 'negotiation', '${KEY_A}')`,
+      );
+
+    await insertKeyed('requestRevision');
+    // The SAME key under a different verb is admitted — it is a different act.
+    await insertKeyed('attestAsBuiltClean');
+    const keyed = await raw.query<{ trigger: string }>(
+      `select trigger from public.engagement_transitions
+        where engagement_id = '${engagementId}' and idempotency_key = '${KEY_A}'`,
+    );
+    expect(keyed).toHaveLength(2);
+
+    // ...and the key still names ONE attempt at ONE verb: the duplicate is refused
+    // by the partial unique index (23505), which is what the executor's
+    // onConflictDoNothing arbiter matches.
+    await expect(insertKeyed('requestRevision')).rejects.toMatchObject({
+      code: '23505',
+    });
+  });
+
   it('stores the key ONLY on the self-loop row, never on an advancing edge', async () => {
     // An advancing edge has its state gate; storing a key there would let one key
     // block a later, legitimately different transition on the same engagement.

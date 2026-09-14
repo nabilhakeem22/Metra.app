@@ -203,10 +203,6 @@ export async function rendersReady(engagementId: string): Promise<ActionResult> 
  * with the state move. Only admissible for an Off-Plan engagement whose as-built
  * drawings are due (`asBuiltDueOpen`); otherwise fails closed with
  * `as_built_not_due`. Revalidates the shell on success.
- *
- * The final_approval -> final_approval edge is a SELF-LOOP, so it carries an
- * `idempotencyKey` (0050): a retry after a lost response would otherwise append
- * a second attestation to an INSERT-only ledger, which cannot be taken back.
  */
 export async function flagAsBuiltVariance(
   engagementId: string,
@@ -228,6 +224,12 @@ export async function flagAsBuiltVariance(
  * has_variance=false). Only admissible for an Off-Plan engagement whose as-built
  * drawings are due (`asBuiltDueOpen`); otherwise fails closed with
  * `as_built_not_due`. Revalidates the shell on success.
+ *
+ * The final_approval -> final_approval edge is a SELF-LOOP, so THIS is the one
+ * that carries an `idempotencyKey` (0050): a retry after a lost response would
+ * otherwise append a second attestation to an INSERT-only ledger, which cannot
+ * be taken back. flagAsBuiltVariance advances to change_triage and is protected
+ * by its own from-state, which is why it takes no key.
  */
 export async function attestAsBuiltClean(
   engagementId: string,

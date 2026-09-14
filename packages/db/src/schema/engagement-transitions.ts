@@ -44,7 +44,9 @@ export const engagementTransitions = pgTable(
      * every retry is a fresh, valid request. This column lets the server tell a
      * retry of ONE act — a request that committed and whose response was lost on
      * the way back — from a genuine second act, so one tap cannot burn two free
-     * revisions. NULL on every advancing edge and on every pre-0050 row.
+     * revisions. Scoped to the TRIGGER as well as the engagement: the same key on
+     * a different verb is a different act. NULL on every advancing edge and on
+     * every pre-0050 row.
      */
     idempotencyKey: text('idempotency_key'),
     decidedAt: timestamp('decided_at', { withTimezone: true })
@@ -54,11 +56,14 @@ export const engagementTransitions = pgTable(
   (t) => [
     unique('engagement_transitions_org_id_id_unique').on(t.orgId, t.id),
     ...sameOrgFk(t, 'engagement', designEngagements, { onDelete: 'cascade' }),
-    // Live since 0050 — one ledger row per (org, engagement, key). PARTIAL on
-    // IS NOT NULL: NULLs never collide in a unique index anyway, and stating it
-    // keeps the index to the rows that actually carry a key.
+    // Live since 0050 — one ledger row per (org, engagement, TRIGGER, key). The
+    // trigger is part of the key's identity: a key names one attempt at one act,
+    // so reusing it on a different verb must write a second row rather than be
+    // swallowed as a replay of the first. PARTIAL on IS NOT NULL: NULLs never
+    // collide in a unique index anyway, and stating it keeps the index to the
+    // rows that actually carry a key.
     uniqueIndex('engagement_transitions_idempotency_key_uniq')
-      .on(t.orgId, t.engagementId, t.idempotencyKey)
+      .on(t.orgId, t.engagementId, t.trigger, t.idempotencyKey)
       .where(sql`idempotency_key is not null`),
   ],
 );
