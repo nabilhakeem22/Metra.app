@@ -88,6 +88,60 @@ describe('assert-no-baked-secrets', () => {
     expect(output).toContain('SUPABASE_SERVICE_ROLE_KEY');
   });
 
+  it('reads the BRACKET form as well as the dotted one', () => {
+    // `process.env["X"] = …` is the same assignment wearing different
+    // punctuation, and it used to sail past the key pattern entirely.
+    const { code, output } = run(
+      'process.env["NEXT_PUBLIC_APP_URL"] = "x";\nprocess.env["RESEND_FROM"] = "y";\n',
+    );
+    expect(code).not.toBe(0);
+    expect(output).toContain('RESEND_FROM');
+  });
+
+  it('FAILS when it matches NOTHING, instead of reporting a clean build', () => {
+    // The failure mode that would have killed this check quietly: a shape it
+    // cannot parse reads exactly like a build with no secrets in it.
+    const { code, output } = run('export default freshShape(someOtherThing);\n');
+    expect(code).not.toBe(0);
+    expect(output).toContain('emitted shape changed');
+  });
+
+  it('catches a secret VALUE even under a public-looking key', () => {
+    // The second pass. A service-role JWT is told apart from the anon JWT by its
+    // own payload, so the legitimate anon key does not trip it.
+    const serviceRole = `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.${Buffer.from(
+      '{"iss":"supabase","role":"service_role","exp":2000000000}',
+    ).toString('base64url')}.c2ln`;
+    const { code, output } = run(
+      `${CI_SHAPED}process.env.NEXT_PUBLIC_DECOY = "${serviceRole}";\n`,
+    );
+    expect(code).not.toBe(0);
+    expect(output).toContain('service-role JWT');
+    expect(output).toContain('next-env.mjs');
+    // The PATH is what it prints. The value is what it exists to keep out of logs.
+    expect(output).not.toContain(serviceRole);
+  });
+
+  it('leaves the anon JWT alone — it belongs in the bundle', () => {
+    const anon = `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.${Buffer.from(
+      '{"iss":"supabase","role":"anon","exp":2000000000}',
+    ).toString('base64url')}.c2ln`;
+    const { code } = run(`${CI_SHAPED}process.env.NEXT_PUBLIC_ANON = "${anon}";\n`);
+    expect(code).toBe(0);
+  });
+
+  it('catches a Resend key and a Postgres URL by shape', () => {
+    const resend = run(`${CI_SHAPED}const k = "re_abcdefghij0123456789";\n`);
+    expect(resend.code).not.toBe(0);
+    expect(resend.output).toContain('Resend API key');
+    expect(resend.output).not.toContain('re_abcdefghij0123456789');
+
+    const dsn = run(`${CI_SHAPED}const u = "postgresql://metra:hunter2@db.host:5432/x";\n`);
+    expect(dsn.code).not.toBe(0);
+    expect(dsn.output).toContain('Postgres URL');
+    expect(dsn.output).not.toContain('hunter2');
+  });
+
   it('FAILS LOUDLY when the file is missing, rather than passing', () => {
     // If OpenNext moves or renames the file, a check that quietly passes would
     // let the guarantee lapse with nothing to notice it.
