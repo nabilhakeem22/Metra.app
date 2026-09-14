@@ -21,12 +21,13 @@ export interface ReadMoneyOptions {
   /** Accept a leading '-'. Off by default: only de-scopes and variation deltas
    *  may be negative, and every other column has a non-negative CHECK. */
   allowNegative?: boolean;
-  /** Accept separators inside the number. Whitespace, NBSP (U+00A0), narrow NBSP
-   *  (U+202F) and the Arabic thousands mark (U+066C) are stripped unconditionally
-   *  — a paste out of Excel carries them and they cannot mean anything else.
-   *  ASCII commas are different: they are accepted ONLY in strict grouped form
-   *  (`1,200` / `12,345,678.90`) and then stripped. `'1,5'`, `'1,2,3'` and
-   *  `'1.234,56'` are REFUSED rather than silently re-read. */
+  /** Accept a thousands separator inside the number. EVERY separator obeys the
+   *  same strict rule — the ASCII comma, the Arabic thousands mark (U+066C) and
+   *  the three spaces a paste out of Excel carries (space, NBSP U+00A0, narrow
+   *  NBSP U+202F): accepted ONLY in grouped form (`1,200`, `12 345 678.90`) with
+   *  ONE consistent separator, then stripped. `'1,5'`, `'1 5'`, `'1 2 3'`,
+   *  `'1.234,56'` and `'1 234,567'` are REFUSED rather than silently re-read.
+   *  Outer whitespace is trimmed, not parsed. */
   allowGroupSeparators?: boolean;
   /** Map Arabic-Indic (U+0660–U+0669) and Persian (U+06F0–U+06F9) digits to Latin,
    *  and read U+066B as the decimal point. For spreadsheet cells typed on an
@@ -77,7 +78,8 @@ export function withinMagnitude(value: string): boolean {
 const ARABIC_NUMERALS_RE = /[\u0660-\u0669\u06F0-\u06F9]/g;
 
 /** Arabic-Indic + Persian digits to Latin, U+066B (Arabic decimal separator) to
- *  '.', U+066C (Arabic thousands separator) dropped. */
+ *  '.'. U+066C (Arabic thousands separator) is LEFT IN PLACE — it is a grouping
+ *  separator and goes through the same strict check as the comma. */
 function toLatinNumerals(value: string): string {
   return value
     .replace(ARABIC_NUMERALS_RE, (digit) => {
@@ -85,20 +87,40 @@ function toLatinNumerals(value: string): string {
       const base = code >= 0x06f0 ? 0x06f0 : 0x0660;
       return String(code - base);
     })
-    .replace(/\u066B/g, '.')
-    .replace(/\u066C/g, '');
+    .replace(/\u066B/g, '.');
 }
 
-/** Characters that can only ever be noise inside a number. The class holds three
- *  INVISIBLE ones: U+00A0, U+202F and U+066C. */
-const SEPARATOR_NOISE_RE = /[\s\u00A0\u202F\u066C]/g;
+/**
+ * Everything a human or a spreadsheet uses to group thousands.
+ *
+ * A SPACE IS NOT NOISE. Stripping whitespace unconditionally read `'1 5'` as
+ * `15` and `'1 2 3'` as `123` — the same ten-fold money error the comma rule
+ * exists to prevent, wearing an invisible character. Two of these are invisible
+ * (U+00A0, U+202F) and one more is easy to miss (U+066C), which is exactly why
+ * each must prove it is in a thousands POSITION before it is removed.
+ */
+const GROUPING_SEPARATORS = [',', '\u066C', ' ', '\u00A0', '\u202F'];
 
-/** Strict thousands grouping: 1–3 leading digits then groups of exactly 3. */
-const GROUPED_DECIMAL_RE = /^-?\d{1,3}(,\d{3})+(\.\d+)?$/;
+/** Strict grouping with ONE separator: 1–3 leading digits, then groups of 3. */
+function groupedWith(separator: string): RegExp {
+  const escaped = separator === ',' ? ',' : `\\u${separator.charCodeAt(0).toString(16).padStart(4, '0')}`;
+  return new RegExp(`^-?\\d{1,3}(${escaped}\\d{3})+(\\.\\d+)?$`);
+}
 
-/** Strip the unambiguous noise, then decide about commas. `null` = refuse. */
+/**
+ * Strip grouping separators, or refuse. `null` = refuse.
+ *
+ * Outer whitespace is trimmed first — leading and trailing space is formatting,
+ * not grouping. What is left may use ONE separator, in thousands positions only:
+ * a second kind ('1 234,567') is a sheet whose own convention is unclear, and
+ * guessing at that is how a rate becomes a thousand times itself.
+ */
 function withoutSeparators(value: string): string | null {
-  const compact = value.replace(SEPARATOR_NOISE_RE, '');
-  if (!compact.includes(',')) return compact;
-  return GROUPED_DECIMAL_RE.test(compact) ? compact.replace(/,/g, '') : null;
+  const trimmed = value.trim();
+  const used = GROUPING_SEPARATORS.filter((separator) => trimmed.includes(separator));
+  if (used.length === 0) return trimmed;
+  if (used.length > 1) return null;
+  const [separator] = used;
+  if (!groupedWith(separator).test(trimmed)) return null;
+  return trimmed.split(separator).join('');
 }

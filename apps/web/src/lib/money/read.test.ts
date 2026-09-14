@@ -90,6 +90,29 @@ describe('readMoneyString — separators', () => {
     }
   });
 
+  it('REFUSES a space that is not in a thousands position', () => {
+    // THE REGRESSION THIS CLOSES. Whitespace used to be stripped
+    // unconditionally, so '1 5' read as 15 and '1 2 3' as 123 — the same
+    // ten-fold error as '1,5', wearing a character nobody looks at. A space now
+    // proves it is grouping, exactly as the comma must.
+    const options = { allowGroupSeparators: true };
+    for (const raw of ['1 5', '1 2 3', '12 00', '1 2345', '1 5', '1 5']) {
+      expect(readMoneyString(raw, options)).toBeNull();
+    }
+    // ...and a real grouped figure still reads, outer whitespace and all.
+    expect(readMoneyString('12 000', options)).toBe('12000');
+    expect(readMoneyString('  38 000  ', options)).toBe('38000');
+    expect(readMoneyString('1 234 567.89', options)).toBe('1234567.89');
+  });
+
+  it('refuses TWO different separators in one number', () => {
+    // '1 234,567' is a sheet whose own convention is unclear. Guessing is how a
+    // rate becomes a thousand times itself.
+    const options = { allowGroupSeparators: true };
+    expect(readMoneyString('1 234,567', options)).toBeNull();
+    expect(readMoneyString('1,234 567', options)).toBeNull();
+  });
+
   it('refuses a comma outright when separators are not allowed', () => {
     expect(readMoneyString('1,200')).toBeNull();
   });
