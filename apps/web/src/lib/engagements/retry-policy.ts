@@ -1,4 +1,5 @@
-import type { ActionCode } from '@/lib/actions/result';
+import type { ActionCode, ActionResult } from '@/lib/actions/result';
+import type { Trigger } from './transitions';
 
 /**
  * Which coded failures let the cockpit DROP a held idempotency key.
@@ -74,4 +75,44 @@ export const DEFINITE_REFUSALS: ReadonlySet<ActionCode> = new Set<ActionCode>([
 /** True only when the server is KNOWN to have committed nothing. */
 export function isDefiniteRefusal(code: ActionCode | undefined): boolean {
   return code !== undefined && DEFINITE_REFUSALS.has(code);
+}
+
+/**
+ * The keys the cockpit is still holding, by the TRIGGER each one names.
+ *
+ * One ref per page was wrong: fifteen call sites shared it, so uploading a file
+ * or logging a payment cleared the key a half-finished `requestRevision` was
+ * holding, and the retry minted a fresh one — a second ledger row and a second
+ * allowance decrement, from a success that had nothing to do with it. A key
+ * names one attempt at ONE act, on the client exactly as in 0050's index.
+ */
+export type HeldKeys = ReadonlyMap<Trigger, string>;
+
+/**
+ * The key the next attempt at `trigger` must carry: the one being retried if we
+ * are still holding it, otherwise a fresh one.
+ *
+ * `trigger` is undefined for the edges that ignore the argument entirely — an
+ * upload, a note, the off-plan toggle. Those mint a key nobody reads rather than
+ * reaching into the map, so they can neither take nor release another act's key.
+ */
+export function keyForAttempt(
+  held: HeldKeys,
+  trigger: Trigger | undefined,
+  mintKey: () => string,
+): string {
+  if (trigger === undefined) return mintKey();
+  return held.get(trigger) ?? mintKey();
+}
+
+/**
+ * May this result release the key it was sent with?
+ *
+ * Only two answers do: it worked, or the server definitely refused it. A
+ * rejection ('rejected' — the request never came back) and every ambiguous code
+ * HOLD, because the write may have landed and only the answer was lost.
+ */
+export function releasesKey(result: ActionResult | 'rejected'): boolean {
+  if (result === 'rejected') return false;
+  return result.ok || isDefiniteRefusal(result.error);
 }

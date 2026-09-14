@@ -18,7 +18,7 @@ import type {
   EngagementTransitionRecord,
 } from '@/lib/engagements/queries';
 import type { CommercialPulse } from '@/lib/engagements/pulse';
-import { isDefiniteRefusal } from '@/lib/engagements/retry-policy';
+import { keyForAttempt, releasesKey } from '@/lib/engagements/retry-policy';
 import { acknowledgesIssuance } from '@/lib/engagements/rom-ack';
 import type { Trigger } from '@/lib/engagements/transitions';
 import { EngagementCommandCard } from './engagement-command-card';
@@ -95,17 +95,22 @@ export function EngagementDetailClient({
   // Guards the frame-sized window `pending` cannot -- see runAction below.
   const inFlight = useRef(false);
   /**
-   * The idempotency key of the attempt currently in doubt (0050), or null when
-   * nothing is in doubt.
+   * The idempotency key of each attempt currently in doubt (0050), BY TRIGGER.
    *
-   * It is NOT cleared when an action fails: it is cleared when we KNOW what
-   * happened. A coded refusal means the transaction rolled back, so the next
-   * click is a new attempt and gets a new key. 'uncertain' and a thrown
-   * rejection mean the opposite — the write may have committed and only the
-   * answer was lost — so the key survives and the retry is recognised as the
-   * same act rather than spending a second free revision.
+   * Per trigger, not per page. One shared key meant that any of the fifteen
+   * actions on this screen — an upload, a payment, the off-plan toggle —
+   * released the key a half-finished `requestRevision` was holding, and its
+   * retry then minted a fresh one: a second ledger row and a second allowance
+   * spent, caused by a success that had nothing to do with it.
+   *
+   * A key is NOT released when its action fails: it is released when we KNOW
+   * what happened. A definite refusal means the transaction rolled back, so the
+   * next click is a new attempt and gets a new key. 'uncertain', 'generic' and a
+   * thrown rejection mean the opposite — the write may have committed and only
+   * the answer was lost — so the key survives and the retry is recognised as the
+   * same act. See lib/engagements/retry-policy.ts for both rules.
    */
-  const pendingKey = useRef<string | null>(null);
+  const pendingKeys = useRef(new Map<Trigger, string>());
 
   // The Advance button owns the forward-advance trigger; every OTHER legal,
   // permitted trigger becomes a low-emphasis secondary control (no legal trigger
@@ -167,31 +172,34 @@ export function EngagementDetailClient({
    * instead would strand the page forever on any path where a transition never
    * starts.
    */
-  function runAction(fn: (idempotencyKey: string) => Promise<ActionResult>) {
+  function runAction(
+    fn: (idempotencyKey: string) => Promise<ActionResult>,
+    trigger?: Trigger,
+  ) {
     if (inFlight.current) return;
     inFlight.current = true;
     setError(null);
-    // ONE key per ATTEMPT, HELD across a retry the user makes because they were
-    // not told what happened. It is minted here rather than per click, because
-    // the whole point is that the RETRY carries the SAME key as the attempt it
-    // is retrying — a fresh key would be a fresh act and would spend a second
-    // free revision. See the ref's declaration for when it is released.
-    const idempotencyKey = pendingKey.current ?? crypto.randomUUID();
-    pendingKey.current = idempotencyKey;
+    // ONE key per ATTEMPT AT ONE TRIGGER, HELD across a retry the user makes
+    // because they were not told what happened. It is minted here rather than
+    // per click, because the whole point is that the RETRY carries the SAME key
+    // as the attempt it is retrying — a fresh key would be a fresh act and would
+    // spend a second free revision. See the ref's declaration for the rest.
+    const idempotencyKey = keyForAttempt(pendingKeys.current, trigger, () =>
+      crypto.randomUUID(),
+    );
+    if (trigger) pendingKeys.current.set(trigger, idempotencyKey);
     startTransition(async () => {
       try {
         const res = await fn(idempotencyKey);
+        // Only THIS trigger's key is ever touched, and only when the answer is
+        // "it worked" or a DEFINITE refusal — a guard verdict, a forbidden
+        // capability, a state conflict, all of which rolled their transaction
+        // back. `generic`, `uncertain` and any code this build has not heard of
+        // may all mean the write landed and the answer was lost, so they hold.
+        if (trigger && releasesKey(res)) pendingKeys.current.delete(trigger);
         if (res.ok) {
-          pendingKey.current = null;
           router.refresh();
         } else {
-          // HOLD the key unless the server is KNOWN to have committed nothing.
-          // Only a DEFINITE refusal — a guard verdict, a forbidden capability, a
-          // state conflict — proves the transaction rolled back. `generic`,
-          // `uncertain` and any code this build has not heard of may all mean the
-          // write landed and the answer was lost, and the studio's next click
-          // must then be the SAME attempt, not a fresh one.
-          if (isDefiniteRefusal(res.error)) pendingKey.current = null;
           setError((res.error as ActionCode) ?? 'generic');
         }
       } catch (cause) {

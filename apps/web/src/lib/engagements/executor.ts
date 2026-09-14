@@ -57,7 +57,17 @@ export interface ExecuteTransitionInput {
   idempotencyKey?: string | null;
 }
 
-/** A self-loop edge: its target IS one of its legal from-states. */
+/**
+ * A self-loop edge: its target IS one of its legal from-states.
+ *
+ * PER DEFINITION, not per firing. attestAsBuiltClean declares
+ * `from: ['final_approval', 'change_triage']` and `to: 'final_approval'`, so
+ * this is true even when the edge actually being fired is the ADVANCING
+ * change_triage -> final_approval one, and that firing stores a key too.
+ * Deliberately harmless: the advancing edge has its own state gate as well, and
+ * since 0050 the key is scoped to the trigger, so the only thing an extra stored
+ * key can ever collapse is a retry of THIS verb — which is what it is for.
+ */
 function isSelfLoop(def: TransitionDef): boolean {
   const from = Array.isArray(def.from) ? def.from : [def.from];
   return from.includes(def.to);

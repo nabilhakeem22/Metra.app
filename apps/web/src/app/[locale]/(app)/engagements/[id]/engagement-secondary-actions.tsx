@@ -41,7 +41,10 @@ export function EngagementSecondaryActions({
   pending: boolean;
   /** Runs one server action with the page's per-attempt idempotency key
    *  (0050). Ignore the argument on an edge that does not need one. */
-  runAction: (fn: (idempotencyKey: string) => Promise<ActionResult>) => void;
+  runAction: (
+    fn: (idempotencyKey: string) => Promise<ActionResult>,
+    trigger?: Trigger,
+  ) => void;
 }) {
   const tcmd = useTranslations('engagements.command');
   const tt = useTranslations('engagements.trigger');
@@ -62,7 +65,7 @@ export function EngagementSecondaryActions({
       return;
     }
     const fn = DIRECT_TRIGGER_ACTIONS[trigger];
-    if (fn) runAction((idempotencyKey) => fn(engagementId, idempotencyKey));
+    if (fn) runAction((idempotencyKey) => fn(engagementId, idempotencyKey), trigger);
   }
 
   function fireAbandon() {
