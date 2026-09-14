@@ -36,9 +36,12 @@
 // KNOWN LIMITS (deliberate): raw-ness survives neither a return from a local helper
 // nor an assignment into an outer `let`; a COMPUTED key that is not a literal or
 // an interpolation-free template (`conn[key]`, `getDb()[method]()`) cannot be
-// resolved statically at all. The isolation gate backstops all three — and each
-// of them takes deliberate effort to write, which is not the shape of the
-// mistake this rule exists to catch.
+// resolved statically at all. Four more are RuleTester-proven and left open on
+// purpose — `Reflect.get(conn, 'sql')`, `Object.values(getRequestConnection())[1]`,
+// a class FIELD holding the handle, an array destructure of a connection: this
+// rule reads syntax, and a value that has been through a reflective read or an
+// index is no longer syntax. Each takes deliberate effort to write — not the
+// shape of the mistake this exists to catch — and the isolation gate backstops them.
 // Deliberately NOT extended by name convention: drizzle's own `sql` tag is
 // imported in roughly two hundred files and is not a connection, so only a `sql`
 // that RESOLVES to a raw factory is flagged. `db` keeps its name convention.
@@ -49,7 +52,12 @@
 // unknown — the caller is responsible for passing a scoped tx — and is not flagged.
 // `.transaction()` itself is NOT a query method: opening a transaction is not a
 // cross-tenant read, so the receiver of `.transaction` is never reported; only the
-// `.select/.insert/.update/.delete/.execute` that follows is.
+// `.select/.insert/.update/.delete/.execute` that follows is. `.with()`/`.$with()`
+// hand back the SAME un-scoped connection, so raw-ness PROPAGATES through them.
+// A HELPER THAT TAKES THE HANDLE IS THE OTHER HALF: `requireInOrg(tx, …)` filters
+// on the id ALONE — the RLS transaction is its whole tenancy boundary — so the
+// raw handle is reported wherever it is passed as the first argument of a
+// RAW_SENSITIVE_HELPERS name, not only where a query method is called on it.
 //
 // SANCTIONED EXCEPTIONS — allowlisted files that deliberately use the base
 // connection and have each been individually reviewed as safe:
@@ -92,12 +100,27 @@
  * is the read/write/exec inside it. */
 const QUERY_METHODS = new Set([
   'select',
+  // The rest of drizzle's read surface. Unused today, which is why they were
+  // missing: a rule listing only what is already written catches only what was reviewed.
+  'selectDistinct',
+  'selectDistinctOn',
+  '$count',
+  'refreshMaterializedView',
   'insert',
   'update',
   'delete',
   'execute',
   'unsafe',
 ]);
+
+/** Builder methods that return the SAME un-scoped connection: `db.with(cte)
+ * .select()` is a bare `db.select()` wearing a CTE. (`.transaction` propagates
+ * too, via its callback parameter — classifyDef handles that shape.) */
+const RAW_PROPAGATING_METHODS = new Set(['with', '$with']);
+
+/** Helpers whose FIRST argument must already be an RLS-scoped transaction: on the raw
+ * handle, requireInOrg's id-only where reads the row named `id` in ANY org. */
+const RAW_SENSITIVE_HELPERS = new Set(['requireInOrg']);
 
 /** Callback wrappers that hand back the RAW (un-scoped) connection. */
 const RAW_WRAPPERS = new Set(['withRequestDb']);
@@ -194,6 +217,8 @@ export const noBareTenantDb = {
     messages: {
       bareQuery:
         'Drizzle `.{{method}}()` on the raw request/base connection runs as the BYPASSRLS login role and can read/write across every tenant. Wrap org-scoped access in withOrgContext()/withUserContext(). If this is a sanctioned base-connection use (public token SDF, api-key resolver, automation system read), allowlist the file in eslint-rules/no-bare-tenant-db.mjs.',
+      rawHandleArgument:
+        '`{{helper}}()` is given the raw request/base connection. Its where clause carries no org predicate on purpose — the RLS transaction is the tenancy boundary — so on the BYPASSRLS handle it resolves an id belonging to ANY tenant. Pass the `tx` from withOrgContext()/withUserContext().',
     },
   },
   create(context) {
@@ -244,6 +269,12 @@ export const noBareTenantDb = {
         return (
           object.type === 'Identifier' && classifyIdentifier(object) === 'connection'
         );
+      }
+      // `<raw>.with(cte)` returns the raw connection's own builder, so whatever
+      // is queried on the result is queried on the raw connection.
+      if (node.type === 'CallExpression' && node.callee.type === 'MemberExpression') {
+        const key = staticKeyName(node.callee.computed, node.callee.property);
+        if (key !== null && RAW_PROPAGATING_METHODS.has(key)) return isRawExpr(node.callee.object);
       }
       return false;
     }
@@ -372,6 +403,15 @@ export const noBareTenantDb = {
       },
       CallExpression(node) {
         const callee = node.callee;
+        if (callee.type === 'Identifier') {
+          // A plain call: the hazard is handing the raw handle to a helper that
+          // trusts its caller to have scoped it.
+          const helper = callee.name;
+          if (RAW_SENSITIVE_HELPERS.has(helper) && isRawExpr(node.arguments[0])) {
+            context.report({ node: callee, messageId: 'rawHandleArgument', data: { helper } });
+          }
+          return;
+        }
         if (callee.type !== 'MemberExpression') return;
         // Computed too: `getDb()['select']()` and getDb()[`select`]() run the
         // same BYPASSRLS query as `getDb().select()`, and only the punctuation
