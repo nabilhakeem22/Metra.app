@@ -22,75 +22,123 @@ export interface ParseCsvOptions {
 }
 
 /**
- * RFC-4180-shaped rows. Quoted fields may contain the delimiter, newlines and
- * doubled quotes; CRLF, LF and a lone CR all terminate a row; every field is
- * trimmed.
+ * A parse in progress: the rows closed so far, the row and field being built,
+ * and whether we are inside a quoted field.
+ *
+ * Mutable and passed by reference on purpose — this is a character loop, and the
+ * alternative (a new state object per character) allocates once per byte of a
+ * five-megabyte upload. It is one object, in one module, read by three functions.
+ */
+interface ParseState {
+  rows: string[][];
+  row: string[];
+  field: string;
+  inQuotes: boolean;
+  /** True once THIS field has opened a quote, so a later `"` (after the close)
+   *  is a literal rather than a re-open. */
+  fieldWasQuoted: boolean;
+  /** Fields closed so far, across every row — the width half of the ceiling. */
+  cells: number;
+  maxRows: number;
+}
+
+/** Close the current field. Counted per FIELD, because the row cap bounds height
+ *  only: 1 MiB of commas is ONE row of a million fields. */
+function closeField(state: ParseState): void {
+  state.row.push(state.field.trim());
+  state.field = '';
+  state.fieldWasQuoted = false;
+  state.cells += 1;
+  if (state.cells > MAX_IMPORT_CELLS) throw new ImportParseError('too_many_cells');
+}
+
+/** Close the current row, which closes its last field. */
+function closeRow(state: ParseState): void {
+  closeField(state);
+  state.rows.push(state.row);
+  state.row = [];
+  if (state.rows.length > state.maxRows) throw new ImportParseError('too_many_rows');
+}
+
+/**
+ * One character INSIDE a quoted field. Returns how many EXTRA characters it
+ * consumed, so the driver can skip the second half of an escaped `""`.
+ *
+ * `""` is an escaped quote; a lone `"` closes the field. Everything else,
+ * including a newline, is content — which is the whole reason quoting exists.
+ */
+function readQuoted(
+  state: ParseState,
+  character: string,
+  next: string | undefined,
+): number {
+  if (character !== '"') {
+    state.field += character;
+    return 0;
+  }
+  if (next === '"') {
+    state.field += '"';
+    return 1;
+  }
+  state.inQuotes = false;
+  return 0;
+}
+
+/**
+ * One character OUTSIDE quotes. Returns how many EXTRA characters it consumed,
+ * so the driver can swallow the LF of a CRLF pair.
  *
  * THE QUOTE RULE, stated once: a `"` opens a quoted field ONLY as that field's
  * first character. Anywhere else it is a literal — so `3" pipe` stays `3" pipe`.
- * Inside a quoted field `""` is an escaped quote and a lone `"` closes it;
- * characters between a closing quote and the delimiter are appended literally,
- * which is lenient on purpose, because a studio's sheet is not a spec document.
+ */
+function readUnquoted(
+  state: ParseState,
+  character: string,
+  next: string | undefined,
+  delimiter: string,
+): number {
+  if (character === '"' && state.field === '' && !state.fieldWasQuoted) {
+    state.inQuotes = true;
+    state.fieldWasQuoted = true;
+  } else if (character === delimiter) {
+    closeField(state);
+  } else if (character === '\n') {
+    closeRow(state);
+  } else if (character === '\r') {
+    closeRow(state);
+    return next === '\n' ? 1 : 0; // swallow the LF of a CRLF pair
+  } else {
+    state.field += character; // including a mid-field `"`
+  }
+  return 0;
+}
+
+/**
+ * RFC-4180-shaped rows. Quoted fields may contain the delimiter, newlines and
+ * doubled quotes; CRLF, LF and a lone CR all terminate a row; every field is
+ * trimmed. Characters between a closing quote and the delimiter are appended
+ * literally, which is lenient on purpose, because a studio's sheet is not a spec
+ * document.
  */
 export function parseCsvRows(text: string, options: ParseCsvOptions = {}): string[][] {
   const delimiter = options.delimiter ?? ',';
-  const maxRows = options.maxRows ?? MAX_RAW_ROWS;
-
-  const rows: string[][] = [];
-  let row: string[] = [];
-  let field = '';
-  let inQuotes = false;
-  // True once THIS field has opened a quote, so a later `"` (after the close) is
-  // a literal rather than a re-open.
-  let fieldWasQuoted = false;
-
-  // Counted per FIELD, because the row cap bounds height only: 1 MiB of commas
-  // is ONE row of a million fields and never reaches maxRows.
-  let cells = 0;
-
-  const pushField = () => {
-    row.push(field.trim());
-    field = '';
-    fieldWasQuoted = false;
-    cells += 1;
-    if (cells > MAX_IMPORT_CELLS) throw new ImportParseError('too_many_cells');
-  };
-  const pushRow = () => {
-    pushField();
-    rows.push(row);
-    row = [];
-    if (rows.length > maxRows) throw new ImportParseError('too_many_rows');
+  const state: ParseState = {
+    rows: [],
+    row: [],
+    field: '',
+    inQuotes: false,
+    fieldWasQuoted: false,
+    cells: 0,
+    maxRows: options.maxRows ?? MAX_RAW_ROWS,
   };
 
   for (let i = 0; i < text.length; i += 1) {
-    const character = text[i];
-    if (inQuotes) {
-      if (character !== '"') {
-        field += character;
-      } else if (text[i + 1] === '"') {
-        field += '"';
-        i += 1;
-      } else {
-        inQuotes = false;
-      }
-      continue;
-    }
-    if (character === '"' && field === '' && !fieldWasQuoted) {
-      inQuotes = true;
-      fieldWasQuoted = true;
-    } else if (character === delimiter) {
-      pushField();
-    } else if (character === '\n') {
-      pushRow();
-    } else if (character === '\r') {
-      pushRow();
-      if (text[i + 1] === '\n') i += 1; // swallow the LF of a CRLF pair
-    } else {
-      field += character; // including a mid-field `"`
-    }
+    i += state.inQuotes
+      ? readQuoted(state, text[i], text[i + 1])
+      : readUnquoted(state, text[i], text[i + 1], delimiter);
   }
   // A file that does not end in a newline still has a final row.
-  if (field !== '' || row.length > 0) pushRow();
+  if (state.field !== '' || state.row.length > 0) closeRow(state);
 
-  return rows;
+  return state.rows;
 }

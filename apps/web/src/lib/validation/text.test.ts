@@ -45,6 +45,21 @@ describe('optionalText', () => {
     expect(optionalText('x'.repeat(MAX_NOTE_CHARS + 1), MAX_NOTE_CHARS)).toBe(TOO_LONG);
   });
 
+  it('counts CODE POINTS, because left(p_note, 2000) counts characters', () => {
+    // An emoji is one character to Postgres and two UTF-16 units to `.length`,
+    // so 1,001 of them were refused here while the database would have accepted
+    // them. The direction was always safe; the two numbers now mean the same.
+    const emoji = String.fromCodePoint(0x1f44d);
+    expect(optionalText(emoji.repeat(MAX_LABEL_CHARS), MAX_LABEL_CHARS)).toBe(
+      emoji.repeat(MAX_LABEL_CHARS),
+    );
+    expect(optionalText(emoji.repeat(MAX_LABEL_CHARS + 1), MAX_LABEL_CHARS)).toBe(TOO_LONG);
+    // Arabic is one unit per character either way — unaffected, and pinned so.
+    expect(optionalText('م'.repeat(MAX_LABEL_CHARS), MAX_LABEL_CHARS)).toHaveLength(
+      MAX_LABEL_CHARS,
+    );
+  });
+
   it('keeps the note cap aligned with left(p_note, 2000) in the SDFs', () => {
     expect(MAX_NOTE_CHARS).toBe(2000);
     expect(MAX_LABEL_CHARS).toBe(200);

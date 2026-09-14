@@ -10,12 +10,12 @@ import 'server-only';
 // every response, because the internal copy carries the firm's margin and must
 // not be readable back off a shared machine's disk. A route that reordered two
 // of those would still look right and still compile.
-import { NextResponse } from 'next/server';
 import { requireOrg } from '@/lib/auth/require-org';
 import { getSessionUser } from '@/lib/auth/session';
 import type { OrgContext } from '@/lib/db/context';
 import { loadPdfOrg, MARGIN_HIDING_ORG, type PdfOrg } from '@/lib/pdf/org';
-import { renderPdf, RendererBusyError } from '@/lib/pdf/render';
+import { renderPdf } from '@/lib/pdf/render';
+import { json, pdfResponse, renderFailure } from '@/lib/pdf/responses';
 import { can, canSeeMargin } from '@/lib/permissions/can';
 import type { Capability } from '@/lib/permissions/roles';
 
@@ -82,9 +82,6 @@ async function loadHeaderFor<TDetail, THeader>(
   return { org: await loadPdfOrg(ctx), header: undefined as THeader };
 }
 
-const json = (error: string, status: number, headers?: HeadersInit) =>
-  NextResponse.json({ error }, { status, headers });
-
 /** Serve one document as a PDF, in the one order all three routes must follow. */
 export async function servePdfDocument<TDetail, THeader = undefined>(
   req: Request,
@@ -109,8 +106,12 @@ export async function servePdfDocument<TDetail, THeader = undefined>(
 
   const detail = await spec.load(ctx, id, variant === 'internal', loaded.header);
   if (!detail) return json('Not found', 404);
-  // Refuse a DOM the renderer cannot finish inside maxDuration.
-  if (spec.lineCount(detail) > spec.maxLines) return json('Too large to render', 413);
+  // Refuse a DOM the renderer cannot finish inside maxDuration. The label is in
+  // the body because three routes share it: "Too large to render" alone leaves
+  // the caller to guess whether it was the proposal or the BOQ behind it.
+  if (spec.lineCount(detail) > spec.maxLines) {
+    return json(`${spec.logLabel} too large to render`, 413);
+  }
 
   return renderDocument(spec, detail, variant, { org, header: loaded.header });
 }
@@ -133,28 +134,4 @@ async function renderDocument<TDetail, THeader>(
   } catch (cause) {
     return renderFailure(cause, spec.logLabel);
   }
-}
-
-function pdfResponse(pdf: Uint8Array, fileName: string): Response {
-  return new NextResponse(pdf as BodyInit, {
-    status: 200,
-    headers: {
-      'content-type': 'application/pdf',
-      'content-disposition': `inline; filename="${fileName}"`,
-      // The internal copy carries the firm's margin: never cached, not even
-      // privately, so it cannot be read back off a shared machine's disk.
-      'cache-control': 'no-store',
-    },
-  });
-}
-
-function renderFailure(cause: unknown, logLabel: string): Response {
-  if (cause instanceof RendererBusyError) {
-    // The renderer is at its concurrency cap after retries. A retryable 503 with
-    // retry-after, not a 500 — the caller should back off, not give up.
-    console.error(`${logLabel} PDF renderer busy:`, cause);
-    return json('Renderer busy, try again', 503, { 'retry-after': '5' });
-  }
-  console.error(`${logLabel} PDF render failed:`, cause);
-  return json('PDF generation failed', 500);
 }

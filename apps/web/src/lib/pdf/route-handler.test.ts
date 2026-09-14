@@ -96,6 +96,9 @@ describe('servePdfDocument — the order the three routes must follow', () => {
     expect(res.status).toBe(413);
     expect(render).not.toHaveBeenCalled();
     expect(stub.buildHtml).not.toHaveBeenCalled();
+    // WHICH document. Three routes share this body, so a bare "Too large to
+    // render" leaves the caller guessing which one it was.
+    expect(await res.json()).toEqual({ error: 'Stub too large to render' });
   });
 
   it('200s with the pdf headers, including no-store', async () => {
