@@ -82,20 +82,35 @@ Manual `wrangler deploy` (above) still works as a fallback.
 are encrypted Worker secrets. `wrangler deploy` preserves them across deploys.
 
 They are read at **request time** through `runtimeSecret()`
-(`apps/web/src/lib/cf/secrets.ts`), off the Worker's per-request `env` — NOT
-through `process.env`, which OpenNext resolves at BUILD time and writes into
-`.open-next/cloudflare/next-env.mjs`, a file that ships inside the deployed
-artifact. `apps/web/scripts/assert-no-baked-secrets.mjs` runs right after the
-build in both `ci.yml` and `deploy.yml` and fails if any non-`NEXT_PUBLIC_` key
-turns up there.
+(`apps/web/src/lib/cf/secrets.ts`), off the Worker's per-request `env`.
 
-Two consequences worth knowing:
+**What actually bakes a secret in is a `.env*` FILE present when the build
+runs.** OpenNext compiles those files (`compile-env-files`) into
+`.open-next/cloudflare/next-env.mjs`, and that module ships inside the deployed
+artifact. It is not "`process.env` in server code" that does it: at runtime
+OpenNext's `populateProcessEnv` copies every Worker var and secret into
+`process.env` at the start of each request, so `process.env.X` works on the
+Worker too. The rule is therefore simple and mechanical:
+
+> **No `.env*` file in a CI or deploy build.**
+
+`apps/web/scripts/assert-no-baked-secrets.mjs` enforces it right after the build
+in both `ci.yml` and `deploy.yml`: it fails if any non-`NEXT_PUBLIC_` key was
+assigned in that module, if it can no longer parse the module at all, or if a
+secret-SHAPED value (a service-role JWT, a `re_…` Resend key, a Postgres URL
+with a password) turns up anywhere under `.open-next`. Neither workflow supplies
+anything but `NEXT_PUBLIC_*`, and `.env` is gitignored, so a green build is the
+evidence.
+
+Three consequences worth knowing:
 
 - **Rotation does not need a rebuild.** `wrangler secret put` and the next
   request picks up the new value.
 - **A new secret must be added as a Worker secret, not as a build env var.**
   A build var would be inlined, and the assert script would fail the build —
   which is the intended outcome, not a bug to work around.
+- **A local `opennextjs-cloudflare deploy` with a `.env` present bypasses all of
+  this.** Deploy through `deploy.yml`; that is why it exists.
 
 ### Rotating a secret (owner only)
 

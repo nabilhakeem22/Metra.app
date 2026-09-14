@@ -1,18 +1,23 @@
 import 'server-only';
 // Runtime secrets, read at REQUEST TIME rather than built in.
 //
-// THE PROBLEM THIS SOLVES. On Cloudflare, `process.env.X` written in server code
-// is resolved by the bundler at BUILD time: OpenNext emits the value it saw into
-// `.open-next/cloudflare/next-env.mjs`, and it ships inside the Worker artifact.
-// For a public var that is intended. For SUPABASE_SERVICE_ROLE_KEY — a full RLS
-// bypass — it means the secret lives in a build output, in CI logs if anything
-// prints it, and in every deploy artifact, and rotating it needs a rebuild
-// rather than a `wrangler secret put`.
+// THE MECHANISM, STATED ACCURATELY. What bakes a value in is not `process.env`
+// appearing in server code — it is a `.env*` FILE being present when the build
+// runs. OpenNext's compile-env-files step reads those files and emits what it
+// found into `.open-next/cloudflare/next-env.mjs`, which ships inside the Worker
+// artifact. So the rule is "no .env* file in a CI/deploy build", and
+// `scripts/assert-no-baked-secrets.mjs` is what enforces it on every build.
 //
-// A Worker's real secrets are not in process.env at all: they arrive on the
-// per-request `env`. Reading them from there keeps them out of the bundle
-// entirely, which is what `scripts/assert-no-baked-secrets.mjs` then enforces
-// on every build.
+// A baked SUPABASE_SERVICE_ROLE_KEY — a full RLS bypass — would live in a build
+// output, in CI logs if anything printed it, and in every deploy artifact, and
+// rotating it would need a rebuild rather than a `wrangler secret put`.
+//
+// AT RUNTIME both readings work: a Worker's vars and secrets arrive on the
+// per-request `env`, AND OpenNext's populateProcessEnv copies them into
+// process.env at the start of each request. This helper reads the request env
+// directly on Cloudflare because that is the source of truth rather than a copy
+// of it — and because the name is a VARIABLE either way, which is the property
+// that keeps a bundler from folding it into a literal.
 import { cfEnv, isCloudflareRuntime } from './context';
 
 /**

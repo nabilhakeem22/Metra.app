@@ -126,9 +126,13 @@ jobs:
 
       - name: Assert no secret was baked into the Worker bundle
         working-directory: apps/web
-        # OpenNext resolves process.env from server code at BUILD time and writes
-        # what it saw into .open-next/cloudflare/next-env.mjs, which ships inside
-        # the deployed artifact. Public vars belong there; a service-role key
-        # does not. Runs immediately after the build, because that file is the
-        # only place the mistake is visible — it compiles and lints perfectly.
+        # OpenNext COMPILES the project's .env* FILES into
+        # .open-next/cloudflare/next-env.mjs at build time, and that module ships
+        # inside the deployed artifact. So the rule is: no .env* file in a CI or
+        # deploy build. This job has only NEXT_PUBLIC_* in its env and checks out
+        # no .env (it is gitignored), which is exactly what this step proves —
+        # loudly, because the mistake compiles and lints perfectly and is visible
+        # nowhere else. At RUNTIME the Worker's own vars and secrets are copied
+        # into process.env per request by OpenNext's populateProcessEnv, so a
+        # secret read through runtimeSecret() never needs to be in the bundle.
         run: node scripts/assert-no-baked-secrets.mjs
