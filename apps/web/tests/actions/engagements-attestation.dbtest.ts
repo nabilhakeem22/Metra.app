@@ -276,3 +276,30 @@ describe('as-built attestation — cross-org isolation', () => {
     expect(await transitionCount(aEngagement, 'flagAsBuiltVariance')).toBe(0);
   });
 });
+
+describe('as-built attestation — a replayed attempt appends nothing (0050)', () => {
+  const KEY = '33333333-3333-4333-8333-333333333333';
+
+  it('attestAsBuiltClean with the same key twice leaves ONE attestation', async () => {
+    // The ledger is INSERT-only by grant, so a second attestation for one act
+    // cannot be taken back. This is the reason the self-loop needed a key at all.
+    const { ctx, engagementId } = await setupFinalApproval(true);
+
+    const first = await executeTransition(ctx, {
+      engagementId,
+      trigger: 'attestAsBuiltClean',
+      idempotencyKey: KEY,
+    });
+    const replay = await executeTransition(ctx, {
+      engagementId,
+      trigger: 'attestAsBuiltClean',
+      idempotencyKey: KEY,
+    });
+    expect(first.ok).toBe(true);
+    expect(replay.ok).toBe(true);
+
+    expect(await attestationRows(engagementId)).toHaveLength(1);
+    expect(await transitionCount(engagementId, 'attestAsBuiltClean')).toBe(1);
+    expect(await stateOf(engagementId)).toBe('final_approval');
+  });
+});

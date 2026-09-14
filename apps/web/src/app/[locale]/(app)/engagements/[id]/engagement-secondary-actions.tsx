@@ -39,7 +39,9 @@ export function EngagementSecondaryActions({
   /** Both revision counter/allowance pairs — the open form picks its own. */
   allowances: RevisionAllowances;
   pending: boolean;
-  runAction: (fn: () => Promise<ActionResult>) => void;
+  /** Runs one server action with the page's per-attempt idempotency key
+   *  (0050). Ignore the argument on an edge that does not need one. */
+  runAction: (fn: (idempotencyKey: string) => Promise<ActionResult>) => void;
 }) {
   const tcmd = useTranslations('engagements.command');
   const tt = useTranslations('engagements.trigger');
@@ -60,7 +62,7 @@ export function EngagementSecondaryActions({
       return;
     }
     const fn = DIRECT_TRIGGER_ACTIONS[trigger];
-    if (fn) runAction(() => fn(engagementId));
+    if (fn) runAction((idempotencyKey) => fn(engagementId, idempotencyKey));
   }
 
   function fireAbandon() {

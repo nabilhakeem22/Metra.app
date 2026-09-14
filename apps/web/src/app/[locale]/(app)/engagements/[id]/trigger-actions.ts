@@ -26,8 +26,17 @@ import {
 } from '@/lib/engagements/actions';
 import type { Trigger } from '@/lib/engagements/transitions';
 
+/**
+ * Every entry takes an optional `idempotencyKey` (0050) even though only the
+ * self-loop triggers read one, so the single caller can pass its per-attempt key
+ * without knowing which edges are self-loops. An advancing action simply ignores
+ * the extra argument — its state gate is already the protection.
+ */
 export const DIRECT_TRIGGER_ACTIONS: Partial<
-  Record<Trigger, (engagementId: string) => Promise<ActionResult>>
+  Record<
+    Trigger,
+    (engagementId: string, idempotencyKey?: string) => Promise<ActionResult>
+  >
 > = {
   confirmAndPayDeposit,
   spatialBaseReady,

@@ -40,7 +40,9 @@ export function EngagementRevisionForm({
   // submitted as undefined. The concept and 3D allowances never draw on each other.
   allowances: RevisionAllowances;
   pending: boolean;
-  runAction: (fn: () => Promise<ActionResult>) => void;
+  /** Runs one server action with the page's per-attempt idempotency key
+   *  (0050). Ignore the argument on an edge that does not need one. */
+  runAction: (fn: (idempotencyKey: string) => Promise<ActionResult>) => void;
   onCancel: () => void;
 }) {
   const t = useTranslations('engagements.revisionForm');
@@ -58,10 +60,10 @@ export function EngagementRevisionForm({
       reason: reason.trim() || undefined,
       changeOrderAmount: amountRequired ? amount.trim() || undefined : undefined,
     };
-    runAction(() =>
+    runAction((idempotencyKey) =>
       isDesignChange
         ? designChangeRaised(engagementId, payload)
-        : requestRevision(engagementId, payload),
+        : requestRevision(engagementId, payload, idempotencyKey),
     );
   }
 

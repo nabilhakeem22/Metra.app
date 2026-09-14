@@ -307,3 +307,79 @@ describe('requestRevision — cross-org isolation', () => {
     expect(await getEngagementChangeOrders(ctxB, aEngagement)).toHaveLength(0);
   });
 });
+
+describe('executeTransition — an idempotency key names ONE attempt (0050)', () => {
+  const KEY_A = '11111111-1111-4111-8111-111111111111';
+  const KEY_B = '22222222-2222-4222-8222-222222222222';
+
+  function revise(ctx: OrgContext, engagementId: string, idempotencyKey?: string) {
+    return executeTransition(ctx, {
+      engagementId,
+      trigger: 'requestRevision',
+      idempotencyKey,
+    });
+  }
+
+  it('the SAME key twice is one row and one increment, and BOTH calls return ok', async () => {
+    // THE CASE THIS EXISTS FOR: the write committed and the response was lost on
+    // the way back, so the studio taps again. It must not spend a second free
+    // revision — and it must not be told something went wrong either, because
+    // the act it asked for did happen.
+    const { ctx, engagementId } = await setupNegotiation();
+    expect(await revisionCountOf(engagementId)).toBe(0);
+
+    const first = await revise(ctx, engagementId, KEY_A);
+    const replay = await revise(ctx, engagementId, KEY_A);
+    expect(first).toEqual({ ok: true, data: undefined });
+    expect(replay).toEqual({ ok: true, data: undefined });
+
+    expect(await revisionCountOf(engagementId)).toBe(1);
+    expect(await requestRevisionTransitionCount(engagementId)).toBe(1);
+    expect(await stateOf(engagementId)).toBe('negotiation');
+  });
+
+  it('DIFFERENT keys are two acts — two rows, two increments', async () => {
+    const { ctx, engagementId } = await setupNegotiation();
+    expect((await revise(ctx, engagementId, KEY_A)).ok).toBe(true);
+    expect((await revise(ctx, engagementId, KEY_B)).ok).toBe(true);
+    expect(await revisionCountOf(engagementId)).toBe(2);
+    expect(await requestRevisionTransitionCount(engagementId)).toBe(2);
+  });
+
+  it('no key at all is the old behaviour — every call is its own act', async () => {
+    const { ctx, engagementId } = await setupNegotiation();
+    expect((await revise(ctx, engagementId)).ok).toBe(true);
+    expect((await revise(ctx, engagementId)).ok).toBe(true);
+    expect(await revisionCountOf(engagementId)).toBe(2);
+    expect(await requestRevisionTransitionCount(engagementId)).toBe(2);
+  });
+
+  it('a malformed key is refused before any DB work', async () => {
+    // Silently dropping a key the caller believed in would be worse than
+    // refusing it: the caller would think it was protected and it would not be.
+    const { ctx, engagementId } = await setupNegotiation();
+    for (const bad of ['not-a-uuid', '123', 'select 1']) {
+      expect(await revise(ctx, engagementId, bad)).toEqual({
+        ok: false,
+        error: 'invalid',
+      });
+    }
+    expect(await revisionCountOf(engagementId)).toBe(0);
+    expect(await requestRevisionTransitionCount(engagementId)).toBe(0);
+  });
+
+  it('stores the key ONLY on the self-loop row, never on an advancing edge', async () => {
+    // An advancing edge has its state gate; storing a key there would let one key
+    // block a later, legitimately different transition on the same engagement.
+    const { ctx, engagementId } = await setupNegotiation();
+    expect((await revise(ctx, engagementId, KEY_A)).ok).toBe(true);
+    const rows = await raw.query<{ trigger: string; idempotency_key: string | null }>(
+      `select trigger, idempotency_key from public.engagement_transitions
+        where engagement_id = '${engagementId}' order by decided_at`,
+    );
+    const keyed = rows.filter((row) => row.idempotency_key !== null);
+    expect(keyed).toHaveLength(1);
+    expect(keyed[0]).toMatchObject({ trigger: 'requestRevision', idempotency_key: KEY_A });
+    expect(rows.length).toBeGreaterThan(1); // the advancing edges that got here
+  });
+});
