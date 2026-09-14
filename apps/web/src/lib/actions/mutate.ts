@@ -11,6 +11,7 @@ import {
 import type { Flow } from '@/lib/entitlements/flows';
 import { can } from '@/lib/permissions/can';
 import type { Capability, PermissionAction } from '@/lib/permissions/roles';
+import { isAmbiguousDbOutcome } from './db-failure';
 import { ActionError, type ActionCode, type ActionResult } from './result';
 
 import { fail } from './result';
@@ -53,15 +54,28 @@ export async function mutateInOrg<T = void>(
     );
     return { ok: true, data };
   } catch (e) {
-    if (e instanceof ActionError) return { ok: false, error: e.code };
-    // A write deadline is ambiguous, not a clean failure: the abandoned tx may
-    // still have COMMITted (see DbWriteUncertainError). Surface `uncertain` so
-    // the UI tells the user to verify rather than blind-retrying into a
-    // double-apply. NOT logged as an error — it is an expected slow-origin path.
-    if (e instanceof DbWriteUncertainError) return { ok: false, error: 'uncertain' };
-    console.error('mutateInOrg failed:', e);
-    return { ok: false, error: 'generic' };
+    return { ok: false, error: mutationFailureCode(e) };
   }
+}
+
+/**
+ * The code a caught mutation failure answers with.
+ *
+ * Two families are AMBIGUOUS rather than failed, and both must surface as
+ * `uncertain` so the cockpit HOLDS the attempt's idempotency key instead of
+ * retrying under a fresh one: a write deadline (the abandoned tx may still
+ * COMMIT — see DbWriteUncertainError) and a lock timeout / cancelled statement /
+ * dropped connection (see isAmbiguousDbOutcome — the attempt being retried may
+ * be the very thing holding that lock, and it is still free to commit). Neither
+ * is logged as an error: they are expected slow-origin paths, not defects.
+ */
+function mutationFailureCode(e: unknown): ActionCode {
+  if (e instanceof ActionError) return e.code;
+  if (e instanceof DbWriteUncertainError || isAmbiguousDbOutcome(e)) {
+    return 'uncertain';
+  }
+  console.error('mutateInOrg failed:', e);
+  return 'generic';
 }
 
 /**

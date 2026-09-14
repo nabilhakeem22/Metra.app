@@ -18,6 +18,7 @@ import type {
   EngagementTransitionRecord,
 } from '@/lib/engagements/queries';
 import type { CommercialPulse } from '@/lib/engagements/pulse';
+import { isDefiniteRefusal } from '@/lib/engagements/retry-policy';
 import { acknowledgesIssuance } from '@/lib/engagements/rom-ack';
 import type { Trigger } from '@/lib/engagements/transitions';
 import { EngagementCommandCard } from './engagement-command-card';
@@ -184,9 +185,13 @@ export function EngagementDetailClient({
           pendingKey.current = null;
           router.refresh();
         } else {
-          // 'uncertain' means the write may have committed and the answer was
-          // lost. HOLD the key: the studio's next click must be the same attempt.
-          if (res.error !== 'uncertain') pendingKey.current = null;
+          // HOLD the key unless the server is KNOWN to have committed nothing.
+          // Only a DEFINITE refusal — a guard verdict, a forbidden capability, a
+          // state conflict — proves the transaction rolled back. `generic`,
+          // `uncertain` and any code this build has not heard of may all mean the
+          // write landed and the answer was lost, and the studio's next click
+          // must then be the SAME attempt, not a fresh one.
+          if (isDefiniteRefusal(res.error)) pendingKey.current = null;
           setError((res.error as ActionCode) ?? 'generic');
         }
       } catch (cause) {
