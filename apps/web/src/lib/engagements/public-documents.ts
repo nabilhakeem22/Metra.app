@@ -10,9 +10,9 @@ import 'server-only';
 // another delivery's artifact, an unreleased or fileless artifact, an unknown /
 // revoked / expired token, a DB throw — resolves to the SAME null, so the endpoint
 // has no oracle to probe.
-import { createHash } from 'node:crypto';
 import { sql } from 'drizzle-orm';
 import { withRequestDb } from '@/lib/db/client';
+import { hashShareToken } from '@/lib/share/token';
 import { ALLOWED_EXTENSIONS } from './deliverable-files';
 import { parseDocumentAccess, type DocumentAccess } from './document-access';
 import { isUuid } from '@/lib/uuid';
@@ -89,7 +89,7 @@ export async function getDeliveryDocumentByToken(
 ): Promise<DeliveryDocumentTarget | null> {
   if (!rawToken || !rawToken.trim()) return null;
   if (!isUuid(documentId)) return null;
-  const hash = createHash('sha256').update(rawToken.trim()).digest('hex');
+  const hash = hashShareToken(rawToken);
 
   try {
     const rows = (await withRequestDb((db) =>

@@ -62,6 +62,27 @@ async function forceState(engagementId: string, state: string): Promise<void> {
   );
 }
 
+/**
+ * The client-channel ROM acknowledgements, with the issuance each one answers.
+ *
+ * The instant comes back as ::text on purpose. timestamptz carries MICROSECONDS
+ * and a JS Date only carries milliseconds, so two issuances a few hundred
+ * microseconds apart — which is what a test does — revive as the same Date and
+ * the assertion that they differ would fail against correct data.
+ */
+async function romAckRows(engagementId: string) {
+  return raw.query<{
+    range_low: string | null;
+    acknowledged_issue_at: string | null;
+  }>(
+    `select range_low, acknowledged_issue_at::text as acknowledged_issue_at
+       from public.engagement_events
+      where engagement_id = '${engagementId}'
+        and actor_channel = 'client' and kind = 'rom_acknowledgement'
+      order by decided_at`,
+  );
+}
+
 /** The CLIENT-CHANNEL event rows for an engagement, over the BYPASSRLS connection. */
 async function clientRows(engagementId: string) {
   return raw.query<{
@@ -467,5 +488,116 @@ describe('client ROM ack satisfies the existing romAcknowledged guard (no new gu
     });
     expect(clientAck).toEqual({ ok: true });
     expect(await clientRows(engagementId)).toHaveLength(1);
+  });
+});
+
+describe('delivery respond — an acknowledgement answers ONE issuance (0049)', () => {
+  it('re-offers the verb after a re-issue, and the second ack inserts', async () => {
+    const { ctx, engagementId, token } = await seedDelivery('ack-reissue');
+    await setEngagementRomCore(ctx, {
+      engagementId,
+      romLow: '500000',
+      romHigh: '800000',
+    });
+    expect((await issueRomCore(ctx, { engagementId })).ok).toBe(true);
+
+    // 1. The client acknowledges what they were shown.
+    expect(
+      await recordDeliveryActionByToken(token, { action: 'acknowledge_rom' }),
+    ).toEqual({ ok: true });
+    // A repeat of the SAME issuance is still a no-op — one row, not two.
+    expect(
+      await recordDeliveryActionByToken(token, { action: 'acknowledge_rom' }),
+    ).toEqual({ ok: true, code: 'already' });
+    expect(await romAckRows(engagementId)).toHaveLength(1);
+    expect(
+      (await getDeliveryByToken(token))!.clientActions,
+    ).not.toContain('acknowledge_rom');
+
+    // 2. The studio revises the band. Different numbers, never shown yet.
+    await setEngagementRomCore(ctx, {
+      engagementId,
+      romLow: '900000',
+      romHigh: '1400000',
+    });
+    expect((await issueRomCore(ctx, { engagementId })).ok).toBe(true);
+
+    // 3. THE POINT: the client has not agreed to these figures, so the portal
+    // asks again. Before 0049 the stale acknowledgement suppressed the verb and
+    // the record said the client had agreed to a band they never saw.
+    const reOffered = await getDeliveryByToken(token);
+    expect(reOffered!.rom).toEqual({ low: '900000.0000', high: '1400000.0000' });
+    expect(reOffered!.clientActions).toContain('acknowledge_rom');
+
+    // 4. And the second acknowledgement actually writes, against the new instant.
+    expect(
+      await recordDeliveryActionByToken(token, { action: 'acknowledge_rom' }),
+    ).toEqual({ ok: true });
+
+    const rows = await romAckRows(engagementId);
+    expect(rows).toHaveLength(2);
+    expect(rows.map((row) => row.range_low).sort()).toEqual([
+      '500000.0000',
+      '900000.0000',
+    ]);
+    // Each row names the issuance it answered, and they are different instants.
+    expect(rows.every((row) => row.acknowledged_issue_at !== null)).toBe(true);
+    expect(new Set(rows.map((row) => row.acknowledged_issue_at)).size).toBe(2);
+
+    // The verb closes again, now against the CURRENT issuance.
+    expect(
+      (await getDeliveryByToken(token))!.clientActions,
+    ).not.toContain('acknowledge_rom');
+  });
+
+  it('leaves the portal client-signal lookup on an index', async () => {
+    // 0049 narrowed 0033's unique index with a second predicate conjunct, and
+    // both halves are now PARTIAL on acknowledged_issue_at. A partial index only
+    // answers a query that IMPLIES its predicate, and the portal's SDFs ask
+    // `engagement_id = $1 and actor_channel = 'client' and kind = $2` — which
+    // implies neither. Those functions run as postgres with rolbypassrls, so
+    // there is no org_id qual to reach the org-leading index either: without the
+    // plain index 0049 adds, every portal load scans the whole ledger four times.
+    const plan = await raw.explain(
+      `select 1 from public.engagement_events
+        where engagement_id = '00000000-0000-0000-0000-000000000001'
+          and actor_channel = 'client' and kind = 'rom_acknowledgement'`,
+    );
+    expect(plan).toContain('Index');
+    // WHICH index is the assertion. Seq scans are disabled in raw.explain, so
+    // "an index was used" alone would also be satisfied by an end-to-end read of
+    // the org-leading index — the very scan this is here to prevent.
+    expect(plan).toContain('engagement_events_engagement_channel_kind_idx');
+  });
+
+  it('a legacy acknowledgement with no issuance stamp does not suppress the verb', async () => {
+    // The no-backfill decision: rows written before 0049 carry NULL, which means
+    // "we do not know which figures they saw". `is not distinct from` keeps that
+    // NULL from matching a real instant, so the portal asks the client again
+    // rather than resting on evidence it cannot read.
+    const { ctx, engagementId, token } = await seedDelivery('ack-legacy');
+    await setEngagementRomCore(ctx, {
+      engagementId,
+      romLow: '500000',
+      romHigh: '800000',
+    });
+    expect((await issueRomCore(ctx, { engagementId })).ok).toBe(true);
+    expect(
+      await recordDeliveryActionByToken(token, { action: 'acknowledge_rom' }),
+    ).toEqual({ ok: true });
+
+    // Age the row into a pre-0049 shape (BYPASSRLS, as the fixture does elsewhere).
+    await raw.query(
+      `update public.engagement_events set acknowledged_issue_at = null
+        where engagement_id = '${engagementId}' and kind = 'rom_acknowledgement'`,
+    );
+
+    expect(
+      (await getDeliveryByToken(token))!.clientActions,
+    ).toContain('acknowledge_rom');
+    expect(
+      await recordDeliveryActionByToken(token, { action: 'acknowledge_rom' }),
+    ).toEqual({ ok: true });
+    expect(await romAckRows(engagementId)).toHaveLength(2);
   });
 });

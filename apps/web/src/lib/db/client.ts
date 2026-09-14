@@ -9,6 +9,9 @@ import { getRequestConnection } from './request-connection';
 // existing process.env path (transaction pooler :6543) so nothing there changes.
 function runtimeUrl(): string {
   if (isCloudflareRuntime()) {
+    // Already correct for the secret-inlining problem lib/cf/secrets.ts solves:
+    // the connection string is read off the per-request `env` binding, so it is
+    // never folded into the Worker bundle at build time. Nothing to change here.
     const connectionString = cfEnv().HYPERDRIVE?.connectionString;
     if (connectionString) return connectionString;
     // On CF the binding is mandatory — fail loud rather than silently reaching

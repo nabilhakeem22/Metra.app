@@ -76,28 +76,148 @@ reverted):
 
 Manual `wrangler deploy` (above) still works as a fallback.
 
-## Runtime secrets (already set on the worker, not in this repo)
+## Runtime secrets (set on the Worker, never in this repo)
 
-`SUPABASE_SERVICE_ROLE_KEY`, `RESEND_API_KEY`, `RESEND_FROM` are set as encrypted
-worker secrets (Cloudflare dashboard → metra-web → Settings → Variables and
-secrets). `CRON_SECRET` is added when the automation cron is enabled.
-`wrangler deploy` preserves these across deploys.
+`SUPABASE_SERVICE_ROLE_KEY`, `RESEND_API_KEY`, `RESEND_FROM` and `CRON_SECRET`
+are encrypted Worker secrets. `wrangler deploy` preserves them across deploys.
+
+They are read at **request time** through `runtimeSecret()`
+(`apps/web/src/lib/cf/secrets.ts`), off the Worker's per-request `env`.
+
+**What actually bakes a secret in is a `.env*` FILE present when the build
+runs.** OpenNext compiles those files (`compile-env-files`) into
+`.open-next/cloudflare/next-env.mjs`, and that module ships inside the deployed
+artifact. It is not "`process.env` in server code" that does it: at runtime
+OpenNext's `populateProcessEnv` copies every Worker var and secret into
+`process.env` at the start of each request, so `process.env.X` works on the
+Worker too. The rule is therefore simple and mechanical:
+
+> **No `.env*` file in a CI or deploy build.**
+
+`apps/web/scripts/assert-no-baked-secrets.mjs` enforces it right after the build
+in both `ci.yml` and `deploy.yml`: it fails if any non-`NEXT_PUBLIC_` key was
+assigned in that module, if it can no longer parse the module at all, or if a
+secret-SHAPED value (a service-role JWT, a `re_…` Resend key, a Postgres URL
+with a password) turns up anywhere under `.open-next`. Neither workflow supplies
+anything but `NEXT_PUBLIC_*`, and `.env` is gitignored, so a green build is the
+evidence.
+
+Three consequences worth knowing:
+
+- **Rotation does not need a rebuild.** `wrangler secret put` and the next
+  request picks up the new value.
+- **A new secret must be added as a Worker secret, not as a build env var.**
+  A build var would be inlined, and the assert script would fail the build —
+  which is the intended outcome, not a bug to work around.
+- **A local `opennextjs-cloudflare deploy` with a `.env` present bypasses all of
+  this.** Deploy through `deploy.yml`; that is why it exists.
+
+### Rotating a secret (owner only)
+
+Owner action: these values are not in the repo and not in CI. From
+`apps/web`, one at a time:
+
+```bash
+npx wrangler secret put SUPABASE_SERVICE_ROLE_KEY   # paste at the prompt
+npx wrangler secret put RESEND_API_KEY
+npx wrangler secret put RESEND_FROM
+npx wrangler secret put CRON_SECRET
+```
+
+Never pass a value as a command argument (it lands in shell history) and never
+echo one into a log. After rotating, hit any authenticated page to confirm the
+app still reaches Postgres and storage; a bad service-role key surfaces as a
+failure to mint signed file URLs, not as a login failure.
+
+`CRON_SECRET` is shared with the scheduled Worker and must be rotated in BOTH
+places or the cron stops being authorised — see below.
+
+### The cron Worker is a separate deployment
+
+`workers/cron` is **not** an npm workspace and is **not** deployed by
+`deploy.yml`. It has its own `wrangler.jsonc` and is deployed on its own.
+
+It calls the app over HTTP, so it needs to know where the app IS: its
+**`APP_ORIGIN`** var must point at the live app origin, and its `CRON_SECRET`
+must match the one on `metra-web`. Those are two separate Worker configurations
+holding one shared value and one pointer between them — if the app moves to a
+new domain, or `CRON_SECRET` is rotated on `metra-web` alone, the cron keeps
+running and every call it makes is rejected. Nothing in the app surfaces that:
+the symptom is automations silently not firing.
 
 ## Migrations
 
 Run `npm run db:migrate`, then `npm run db:apply-rls` (RLS, roles and functions
 live there, never in a migration).
 
-### After 0048: acknowledged build-cost bands must be re-issued
+### Migrate BEFORE you deploy — and prove it
 
-0048 added `design_engagements.rom_issued_at` and does **not** backfill it. Every
-band that a client acknowledged before the migration therefore sits against a
-NULL `rom_issued_at`, and the engagement fails `rom_not_acknowledged` at the next
-gate until the band is issued and acknowledged again. This is deliberate — an
-acknowledgement whose issue date is unknown is not evidence the client saw the
-band that is on the record now — but it needs an operator to clear it.
+**Owner pre-merge step, every time a migration is in the diff.** With the
+production `DATABASE_URL` in the repo-root `.env`:
 
-Count the affected engagements (read-only):
+```bash
+npm run assert-schema-applied -w @metra/db
+```
+
+It reads `information_schema` (one connection, writes nothing) and compares it
+against every column the drizzle schema declares. Exit 0 means the database is
+ready for this code; exit 1 lists exactly what is missing.
+
+`deploy.yml` cannot do this for you: it holds `CLOUDFLARE_API_TOKEN` and no
+database credential at all, which is deliberate — a deploy workflow that can
+reach production Postgres is a larger blast radius than the check is worth.
+
+**Deploying before migrating is not a degraded state for the engagement module,
+it is a TOTAL one.** Drizzle builds an explicit column list from the schema file,
+so a single missing column fails the WHOLE query with 42703
+(`undefined_column`). Measured against the live database at 0048: `select()` on
+`engagement_events` raises 42703 for `acknowledged_issue_at`, and on
+`engagement_transitions` for `idempotency_key`. `loadGuardFacts` full-row-selects
+both, so every transition fails, and with them the timeline, the ROM badge and
+the corrections path — eight call sites. There is no partial symptom to notice
+first; the module stops.
+
+### The migrator's lock window grows with every appended migration
+
+`npm run db:migrate` runs the pending files as ONE transaction. 0049 and 0050
+together hold ACCESS EXCLUSIVE on `engagement_events` and
+`engagement_transitions` for about five round trips (~630 ms from a workstation;
+the app's own `lock_timeout` is 5 s, so roughly 8× headroom). That headroom is
+not a constant: each migration appended to the same pending batch adds its
+statements to the same lock window. Two DDL migrations are comfortable, ten are
+not. If a batch ever grows past a handful of table-rewriting statements, run it
+in smaller batches or in a maintenance window rather than trusting the margin.
+Atomicity is the compensation: a 55P03 rolls the whole batch back, so a failed
+migrate leaves the previous indexes intact.
+
+### After 0048/0049: acknowledged build-cost bands must be re-issued AND re-acknowledged
+
+Two migrations, one operator task, and neither backfills — by design.
+
+0048 added `design_engagements.rom_issued_at`, so a band acknowledged before it
+sits against a NULL issue date. 0049 added
+`engagement_events.acknowledged_issue_at`, so an acknowledgement recorded before
+it does not say WHICH issuance it answered. Both read the same way: an
+acknowledgement whose issuance is unknown is not evidence that the client saw
+the band on the record now. The engagement therefore fails
+`rom_not_acknowledged` at the next gate until the band is issued and
+acknowledged again.
+
+The portal handles its own half automatically. Because the SDFs compare
+`acknowledged_issue_at IS NOT DISTINCT FROM rom_issued_at`, a NULL never matches
+a real instant, so the delivery link **re-offers the acknowledge verb** as soon
+as the band is issued — the client does not need a new link and the studio does
+not need to do anything to make the verb reappear.
+
+Count the acknowledgements that carry no issuance (read-only):
+
+```sql
+select count(*) from engagement_events e
+where e.acknowledged_issue_at is null
+  and e.kind = 'rom_acknowledgement';
+```
+
+And the engagements still waiting on an issuance at all (read-only):
 
 ```sql
 select count(*) from design_engagements de
@@ -107,9 +227,43 @@ where exists (
 ) and de.rom_issued_at is null;
 ```
 
-For each one: open the engagement, **Issue to client** on the build-cost band,
-and ask the client to acknowledge it. Nothing else clears the flag; there is no
-backfill script by design.
+And the acknowledgements recorded BETWEEN the 0048 and 0049 deploys — the band
+was issued, so `rom_issued_at` is set, but the acknowledgement does not say which
+issuance it answered (read-only):
+
+```sql
+select count(*) from engagement_events e
+join design_engagements de on de.id = e.engagement_id
+where e.kind = 'rom_acknowledgement'
+  and e.acknowledged_issue_at is null
+  and de.rom_issued_at is not null;
+```
+
+**That population needs THREE steps, not two, and the order matters.** `Issue to
+client` refuses an engagement that already has a `rom_issued_at` — it answers
+`rom_already_issued`, by design: issuing twice would stamp a second instant on a
+band nobody re-sent. So for each engagement in that count:
+
+1. **Re-set the band** (Set build-cost range — the same numbers are fine).
+   Setting it clears `rom_issued_at` unconditionally, because a band the client
+   has seen is a figure they may be budgeting against and changing it un-tells
+   them.
+2. **Issue to client.** Now it is admitted, and stamps a fresh issuance instant.
+3. **The client acknowledges** from their existing delivery link — the portal
+   re-offers the verb by itself, because a NULL never matches a real instant.
+
+An engagement with no `rom_issued_at` at all (the first count above) skips step 1
+— it has nothing to clear.
+
+Nothing else clears the flag; there is no backfill script, because stamping a
+date onto an old acknowledgement would be inventing evidence on an evidentiary
+record.
+
+### After 0050: nothing to do
+
+0050 added `engagement_transitions.idempotency_key` and its partial unique
+index. Additive and nullable: every existing row keeps a NULL key, and code
+deployed before it simply never sends one.
 
 ## Testing against a database
 

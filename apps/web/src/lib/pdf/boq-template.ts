@@ -3,15 +3,8 @@ import { dirFor } from '@/i18n/routing';
 import { formatMoney } from '@/lib/format/money';
 import { formatQuantity } from '@/lib/format/number';
 import type { BoqDetail } from '@/lib/boqs/queries';
+import { esc } from '@/lib/pdf/html';
 import { fontFaceCss } from './template';
-
-function esc(s: string | null | undefined): string {
-  return (s ?? '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
-}
 
 const t = (locale: string, ar: string, en: string) =>
   esc(locale.startsWith('ar') ? ar : en);

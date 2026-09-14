@@ -1,8 +1,9 @@
 // Bilingual internal automation emails (follow-up / digest / stage reminders).
 // Server-side (no next-intl context), so copy is inlined. NEVER contains cost or
 // margin, never a client address. Western numerals (§4.1).
-import { EMAIL_BRAND, emailWordmark } from '@/lib/email/brand';
-import { escapeHtml } from './escape-html';
+import { EMAIL_BRAND } from '@/lib/email/brand';
+import { escapeHtml } from '@/lib/html/escape';
+import { emailShell } from './shell';
 
 export interface EmailContent {
   subject: string;
@@ -10,28 +11,30 @@ export interface EmailContent {
   text: string;
 }
 
-/** Shared shell: heading + lines + a single CTA link. */
-function shell(
+/**
+ * An internal automation email: a heading, some plain lines, one CTA. No
+ * fallback link block — these go to the studio's own inbox, not a client's, and
+ * the button has never been the only way in.
+ */
+function automationEmail(
   locale: string,
   heading: string,
   lines: string[],
   cta: { label: string; url: string },
 ): { html: string; text: string } {
-  const dir = locale.startsWith('ar') ? 'rtl' : 'ltr';
-  const body = lines
-    .filter(Boolean)
+  const shown = lines.filter(Boolean);
+  const body = shown
     .map((l) => `<p style="color:${EMAIL_BRAND.body};margin:6px 0;">${escapeHtml(l)}</p>`)
     .join('');
-  const html = `<!doctype html><html dir="${dir}"><body style="font-family:system-ui,-apple-system,sans-serif;background:${EMAIL_BRAND.page};padding:24px;">
-  <div style="max-width:480px;margin:0 auto;background:${EMAIL_BRAND.card};border-radius:16px;padding:32px;">
-    <h1 style="font-size:20px;margin:0 0 8px;">${emailWordmark(dir)}</h1>
-    <p style="color:${EMAIL_BRAND.text};font-weight:600;">${escapeHtml(heading)}</p>
-    ${body}
-    <p style="margin:24px 0;">
-      <a href="${escapeHtml(cta.url)}" style="display:inline-block;background:${EMAIL_BRAND.brand};color:${EMAIL_BRAND.onBrand};text-decoration:none;padding:12px 20px;border-radius:10px;font-weight:600;">${escapeHtml(cta.label)}</a>
-    </p>
-  </div></body></html>`;
-  const text = `${heading}\n${lines.filter(Boolean).join('\n')}\n\n${cta.label}: ${cta.url}\n`;
+  const html = emailShell({
+    dir: locale.startsWith('ar') ? 'rtl' : 'ltr',
+    heading,
+    bodyHtml: `    ${body}`,
+    // These labels are fixed literals, but they are escaped here because this
+    // family always did, and the shell deliberately does not escape for anyone.
+    cta: { label: escapeHtml(cta.label), url: cta.url },
+  });
+  const text = `${heading}\n${shown.join('\n')}\n\n${cta.label}: ${cta.url}\n`;
   return { html, text };
 }
 
@@ -57,7 +60,7 @@ export function followupReminderEmailTemplate(input: {
     label: ar ? 'عرض العرض' : 'View the quotation',
     url: input.reviewUrl,
   };
-  return { subject, ...shell(input.locale, heading, lines, cta) };
+  return { subject, ...automationEmail(input.locale, heading, lines, cta) };
 }
 
 export function digestEmailTemplate(input: {
@@ -88,7 +91,7 @@ export function digestEmailTemplate(input: {
     label: ar ? 'فتح لوحة التحكم' : 'Open dashboard',
     url: input.dashboardUrl,
   };
-  return { subject, ...shell(input.locale, heading, lines, cta) };
+  return { subject, ...automationEmail(input.locale, heading, lines, cta) };
 }
 
 export function stageReminderEmailTemplate(input: {
@@ -113,5 +116,5 @@ export function stageReminderEmailTemplate(input: {
     label: ar ? 'فتح المشاريع' : 'Open projects',
     url: input.projectsUrl,
   };
-  return { subject, ...shell(input.locale, heading, lines, cta) };
+  return { subject, ...automationEmail(input.locale, heading, lines, cta) };
 }

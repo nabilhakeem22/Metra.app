@@ -1,5 +1,10 @@
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
+// The route reads its secret through runtimeSecret(), which lives behind
+// `server-only`; off the Cloudflare runtime that helper reads process.env, so
+// these cases still drive it by setting CRON_SECRET below.
+vi.mock('server-only', () => ({}));
+
 // The route's only real logic is the bearer gate; stub the runner so the auth
 // test never touches the DB or enumerates orgs.
 vi.mock('@/lib/automation/runner', () => ({

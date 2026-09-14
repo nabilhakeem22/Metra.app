@@ -33,7 +33,11 @@ export async function parseCostImportCore(
   } catch (e) {
     if (e instanceof SpreadsheetError) {
       if (e.reason === 'empty') return err('import_empty');
-      if (e.reason === 'too_many_rows') return err('import_too_large');
+      // Both parser ceilings — too many rows, too many cells — are the same
+      // sentence to the studio: the sheet is bigger than the importer takes.
+      if (e.reason === 'too_many_rows' || e.reason === 'too_many_cells') {
+        return err('import_too_large');
+      }
       return err('invalid');
     }
     console.error('parseCostImportCore failed:', e);

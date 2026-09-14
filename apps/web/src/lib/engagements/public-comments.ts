@@ -9,16 +9,11 @@ import 'server-only';
 //
 // ADVISORY: a comment moves no state, opens no change order and clears no guard.
 // The stage approve / request-changes buttons remain the only way to move anything.
-import { createHash } from 'node:crypto';
 import { sql } from 'drizzle-orm';
 import { withRequestDb } from '@/lib/db/client';
+import { hashShareToken } from '@/lib/share/token';
 import { isUuid } from '@/lib/uuid';
 import type { DeliveryActionError } from './public';
-
-/** sha256 of the raw share token — the DB only ever sees the hash. */
-function hashToken(raw: string): string {
-  return createHash('sha256').update(raw.trim()).digest('hex');
-}
 
 /** One message in a document thread, as the CLIENT sees it. A staff reply carries
  *  no author name — the client sees "the studio", never which member wrote it. */
@@ -74,7 +69,7 @@ export async function getDeliveryDocumentCommentsByToken(
   documentId: string,
 ): Promise<PublicDocumentComment[]> {
   if (!rawToken?.trim() || !isUuid(documentId)) return [];
-  const hash = hashToken(rawToken.trim());
+  const hash = hashShareToken(rawToken);
   try {
     const rows = (await withRequestDb((db) =>
       db.execute(
@@ -134,7 +129,7 @@ export async function addDeliveryCommentByToken(
   // The uuid is validated BEFORE the DB so a malformed id can never reach the cast.
   if (!isUuid(input.documentId)) return { ok: false, error: 'token_invalid' };
   if (!input.body?.trim()) return { ok: false, error: 'empty' };
-  const hash = hashToken(rawToken.trim());
+  const hash = hashShareToken(rawToken);
   const rows = (await withRequestDb((db) =>
     db.execute(sql`select public.app_delivery_comment_by_token(
       ${hash}, ${input.documentId}::uuid, ${input.body}, ${input.actorName ?? null},

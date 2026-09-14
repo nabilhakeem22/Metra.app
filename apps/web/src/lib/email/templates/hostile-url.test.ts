@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { escapeHtml } from './escape-html';
 import { followupReminderEmailTemplate } from './automation';
 import { inviteEmailTemplate } from './invite';
 import { proposalSentEmailTemplate } from './proposal-sent';
 
+// The three templates interpolate a caller-supplied URL into href="...". The
+// escaper itself is proved in lib/html/escape.test.ts; what is proved HERE is
+// that every template actually applies it to the URL — two of them once did not.
 // A URL carrying the one character that ends a double-quoted attribute, plus
 // markup that would run if it ever reached the document unescaped.
 const HOSTILE_URL =
@@ -13,22 +15,6 @@ const HOSTILE_URL =
 function hrefValues(html: string): string[] {
   return [...html.matchAll(/href="([^"]*)"/g)].map((match) => match[1]);
 }
-
-describe('escapeHtml', () => {
-  it('escapes the five characters that matter in markup and attributes', () => {
-    expect(escapeHtml('<a href="x">&</a>')).toBe(
-      '&lt;a href=&quot;x&quot;&gt;&amp;&lt;/a&gt;',
-    );
-  });
-
-  it('escapes the single quote as the numeric entity', () => {
-    expect(escapeHtml("it's")).toBe('it&#39;s');
-  });
-
-  it('escapes the ampersand FIRST, so entities are not double-encoded wrongly', () => {
-    expect(escapeHtml('a&lt;b')).toBe('a&amp;lt;b');
-  });
-});
 
 describe('a hostile URL never ends the href attribute', () => {
   const cases = [

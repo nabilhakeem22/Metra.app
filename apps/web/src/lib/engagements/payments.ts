@@ -12,12 +12,18 @@ import {
   type PaymentEventKind,
 } from '@metra/db';
 import { and, eq, sql } from 'drizzle-orm';
-import { fail, mutateInOrg } from '@/lib/actions/mutate';
+import { fail, mutateInOrg, requireInOrg } from '@/lib/actions/mutate';
 import type { ActionResult } from '@/lib/actions/result';
 import { MONEY_RE, formatMoney4, parseMoney4 } from '@/lib/aggregates/proposal-totals';
 import type { OrgContext } from '@/lib/db/context';
 import { isTerminal } from './states';
 import { isUuid } from '@/lib/uuid';
+import {
+  MAX_LABEL_CHARS,
+  MAX_NOTE_CHARS,
+  TOO_LONG,
+  optionalText,
+} from '@/lib/validation/text';
 
 const KIND_SET = new Set<string>(PAYMENT_EVENT_KINDS);
 
@@ -36,12 +42,6 @@ export interface RecordPaymentInput {
    * non-UUID key is rejected with a coded `invalid`.
    */
   idempotencyKey?: string | null;
-}
-
-/** Trim a nullable free-text field to a stored value ('' / whitespace -> null). */
-function optionalText(value: string | null | undefined): string | null {
-  const trimmed = value?.trim();
-  return trimmed ? trimmed : null;
 }
 
 /**
@@ -80,9 +80,14 @@ export async function recordPaymentCore(
     return { ok: false, error: 'invalid' };
   }
 
-  const method = optionalText(input.method);
-  const reference = optionalText(input.reference);
-  const note = optionalText(input.note);
+  const method = optionalText(input.method, MAX_LABEL_CHARS);
+  const reference = optionalText(input.reference, MAX_LABEL_CHARS);
+  const note = optionalText(input.note, MAX_NOTE_CHARS);
+  // An over-long field is a REFUSAL, not a truncation: a payment reference cut
+  // at 200 characters is a reference that reconciles against nothing.
+  if (method === TOO_LONG || reference === TOO_LONG || note === TOO_LONG) {
+    return { ok: false, error: 'invalid' };
+  }
 
   // Set inside the tx when a keyed insert loses the ON CONFLICT race (or replays
   // its own earlier write): the existing row is returned, no second row/audit.
@@ -92,12 +97,13 @@ export async function recordPaymentCore(
     ctx,
     { capability: 'engagements_finance', action: 'create', flow: 'interior' },
     async (tx, audit) => {
-      const [engagement] = await tx
-        .select({ id: designEngagements.id, state: designEngagements.state })
-        .from(designEngagements)
-        .where(eq(designEngagements.id, input.engagementId))
-        .limit(1);
-      if (!engagement) fail('engagement_not_found');
+      const engagement = await requireInOrg(
+        tx,
+        designEngagements,
+        input.engagementId,
+        { id: designEngagements.id, state: designEngagements.state },
+        'engagement_not_found',
+      );
       // No recording a payment against a finished engagement (abandoned / closed).
       if (isTerminal(engagement.state)) fail('engagement_not_active');
 

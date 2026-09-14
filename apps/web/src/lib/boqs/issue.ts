@@ -8,7 +8,7 @@ import {
   projects,
 } from '@metra/db';
 import { and, eq, ne } from 'drizzle-orm';
-import { fail, mutateInOrg } from '@/lib/actions/mutate';
+import { fail, mutateInOrg, requireInOrg } from '@/lib/actions/mutate';
 import { err, type ActionResult } from '@/lib/actions/result';
 import type { OrgContext } from '@/lib/db/context';
 import { withOrgContext } from '@/lib/db/context';
@@ -124,12 +124,13 @@ export async function issueBoqCore(
     { capability: 'boq_build', action: 'update' },
     async (tx) => {
       // Re-check under the write lock: two clicks must not produce two artifacts.
-      const [fresh] = await tx
-        .select({ status: boqs.status })
-        .from(boqs)
-        .where(eq(boqs.id, input.boqId))
-        .limit(1);
-      if (!fresh) fail('boq_not_found');
+      const fresh = await requireInOrg(
+        tx,
+        boqs,
+        input.boqId,
+        { status: boqs.status },
+        'boq_not_found',
+      );
       if (fresh.status !== 'draft') fail('boq_not_draft');
 
       await tx

@@ -26,18 +26,14 @@ import {
 import { eq, sql } from 'drizzle-orm';
 import type { PgUpdateSetSource } from 'drizzle-orm/pg-core';
 import { fail } from '@/lib/actions/mutate';
-import { MONEY_RE, formatMoney4, parseMoney4 } from '@/lib/aggregates/proposal-totals';
+import {
+  formatMoney4,
+  isMoneyString,
+  parseMoney4,
+} from '@/lib/aggregates/proposal-totals';
 import type { OrgContext } from '@/lib/db/context';
+import { isRecord } from '@/lib/guards/is-record';
 import type { RevisionTrigger } from './revision-allowance';
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null;
-}
-
-/** A well-formed scale-4 money string (rejects comma-decimals, Arabic digits, …). */
-function isMoneyString(value: unknown): value is string {
-  return typeof value === 'string' && MONEY_RE.test(value.trim());
-}
 
 /** Either revision counter column — both are `integer not null`. */
 type RevisionCountColumn =

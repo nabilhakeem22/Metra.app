@@ -5,22 +5,8 @@ import { formatPercent, formatQuantity } from '@/lib/format/number';
 import { formatProposalNumber, proposalYear } from '@/lib/format/proposal-number';
 import type { ProposalDetail } from '@/lib/proposals/queries';
 import { dirFor } from '@/i18n/routing';
+import { esc, pickEscaped } from '@/lib/pdf/html';
 import { fontFaceCss } from './template';
-
-function esc(s: string | null | undefined): string {
-  return (s ?? '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
-}
-
-function pick(ar: string | null, en: string | null, locale: string): string {
-  const wantAr = locale.startsWith('ar');
-  const primary = wantAr ? ar : en;
-  const other = wantAr ? en : ar;
-  return esc((primary && primary.trim() ? primary : other) ?? '');
-}
 
 /**
  * Proposal PDF. Groups lines under section headings, each with a subtotal row,
@@ -48,9 +34,9 @@ export async function buildProposalHtml(
     detail.number,
     proposalYear(detail.issueDate, detail.createdAt),
   );
-  const orgName = pick(opts.orgNameAr, opts.orgNameEn, locale);
-  const clientName = pick(detail.clientNameAr, detail.clientNameEn, locale);
-  const title = pick(detail.titleAr, detail.titleEn, locale);
+  const orgName = pickEscaped(opts.orgNameAr, opts.orgNameEn, locale);
+  const clientName = pickEscaped(detail.clientNameAr, detail.clientNameEn, locale);
+  const title = pickEscaped(detail.titleAr, detail.titleEn, locale);
   const extraCols = showCost ? 2 : 0;
 
   const sectionsHtml = detail.sections
@@ -59,7 +45,7 @@ export async function buildProposalHtml(
         .map(
           (l) => `
         <tr>
-          <td class="desc">${pick(l.descriptionAr, l.descriptionEn, locale)}</td>
+          <td class="desc">${pickEscaped(l.descriptionAr, l.descriptionEn, locale)}</td>
           <td class="num">${formatQuantity(l.qty, locale)} ${esc(l.unit)}</td>
           ${showCost ? `<td class="num">${m(l.unitCost ?? '0')}</td>` : ''}
           <td class="num">${m(l.unitPrice)}</td>
@@ -70,7 +56,7 @@ export async function buildProposalHtml(
         )
         .join('');
       return `
-      <tr class="section"><td colspan="${5 + extraCols}">${pick(s.titleAr, s.titleEn, locale)}</td></tr>
+      <tr class="section"><td colspan="${5 + extraCols}">${pickEscaped(s.titleAr, s.titleEn, locale)}</td></tr>
       ${rows}
       <tr class="subtotal">
         <td colspan="${4 + extraCols}">${'—'}</td>
@@ -115,13 +101,13 @@ export async function buildProposalHtml(
   <table dir="${dir}">
     <thead>
       <tr>
-        <th>${pick('الوصف', 'Description', locale)}</th>
-        <th class="num">${pick('الكمية', 'Qty', locale)}</th>
-        ${showCost ? `<th class="num">${pick('التكلفة', 'Cost', locale)}</th>` : ''}
-        <th class="num">${pick('سعر الوحدة', 'Unit price', locale)}</th>
-        <th class="num">${pick('خصم', 'Disc', locale)}</th>
-        <th class="num">${pick('الإجمالي', 'Total', locale)}</th>
-        ${showCost ? `<th class="num">${pick('الهامش', 'Margin', locale)}</th>` : ''}
+        <th>${pickEscaped('الوصف', 'Description', locale)}</th>
+        <th class="num">${pickEscaped('الكمية', 'Qty', locale)}</th>
+        ${showCost ? `<th class="num">${pickEscaped('التكلفة', 'Cost', locale)}</th>` : ''}
+        <th class="num">${pickEscaped('سعر الوحدة', 'Unit price', locale)}</th>
+        <th class="num">${pickEscaped('خصم', 'Disc', locale)}</th>
+        <th class="num">${pickEscaped('الإجمالي', 'Total', locale)}</th>
+        ${showCost ? `<th class="num">${pickEscaped('الهامش', 'Margin', locale)}</th>` : ''}
       </tr>
     </thead>
     <tbody>
@@ -130,15 +116,15 @@ export async function buildProposalHtml(
   </table>
 
   <table class="totals">
-    <tr><td>${pick('المجموع الفرعي', 'Subtotal', locale)}</td><td class="num">${m(detail.subtotal)}</td></tr>
-    <tr><td>${pick('الخصم', 'Discount', locale)}</td><td class="num">${m(detail.discountAmount)}</td></tr>
-    <tr><td>${pick('ضريبة القيمة المضافة', 'VAT', locale)} (${formatPercent(detail.taxRate, locale)})</td><td class="num">${m(detail.taxAmount)}</td></tr>
-    <tr><td>${pick('الإشراف', 'Supervision', locale)} (${formatPercent(detail.supervisionPct, locale)})</td><td class="num">${m(detail.supervisionAmount)}</td></tr>
-    <tr class="grand"><td>${pick('الإجمالي', 'Total', locale)}</td><td class="num">${m(detail.total)}</td></tr>
-    ${showCost && detail.totalMargin !== undefined ? `<tr><td>${pick('هامش الربح', 'Margin', locale)}</td><td class="num">${m(detail.totalMargin)}</td></tr>` : ''}
+    <tr><td>${pickEscaped('المجموع الفرعي', 'Subtotal', locale)}</td><td class="num">${m(detail.subtotal)}</td></tr>
+    <tr><td>${pickEscaped('الخصم', 'Discount', locale)}</td><td class="num">${m(detail.discountAmount)}</td></tr>
+    <tr><td>${pickEscaped('ضريبة القيمة المضافة', 'VAT', locale)} (${formatPercent(detail.taxRate, locale)})</td><td class="num">${m(detail.taxAmount)}</td></tr>
+    <tr><td>${pickEscaped('الإشراف', 'Supervision', locale)} (${formatPercent(detail.supervisionPct, locale)})</td><td class="num">${m(detail.supervisionAmount)}</td></tr>
+    <tr class="grand"><td>${pickEscaped('الإجمالي', 'Total', locale)}</td><td class="num">${m(detail.total)}</td></tr>
+    ${showCost && detail.totalMargin !== undefined ? `<tr><td>${pickEscaped('هامش الربح', 'Margin', locale)}</td><td class="num">${m(detail.totalMargin)}</td></tr>` : ''}
   </table>
 
-  <div class="footer">${esc(orgName)} · ${num}</div>
+  <div class="footer">${orgName} · ${num}</div>
 </body>
 </html>`;
 }

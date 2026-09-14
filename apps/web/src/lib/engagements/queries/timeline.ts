@@ -77,6 +77,15 @@ export interface EngagementEventRecord {
    */
   rangeLow: string | null;
   rangeHigh: string | null;
+  /**
+   * WHICH issuance a `rom_acknowledgement` answers (0049). NULL on every other
+   * kind, and on any acknowledgement recorded before 0049. Selected because the
+   * cockpit's "awaiting acknowledgement" badge decides from this array and MUST
+   * reach the same verdict as the server-side romAcknowledged guard — see
+   * lib/engagements/rom-ack.ts. A badge that disagrees with the guard is a
+   * studio staring at a button that will not work.
+   */
+  acknowledgedIssueAt: Date | null;
   decidedAt: Date;
   /**
    * Insert order, for breaking a `decidedAt` tie. Two events written in the same
@@ -111,6 +120,7 @@ export function getEngagementEvents(
         note: engagementEvents.note,
         rangeLow: engagementEvents.rangeLow,
         rangeHigh: engagementEvents.rangeHigh,
+        acknowledgedIssueAt: engagementEvents.acknowledgedIssueAt,
         decidedAt: engagementEvents.decidedAt,
         createdAt: engagementEvents.createdAt,
       })

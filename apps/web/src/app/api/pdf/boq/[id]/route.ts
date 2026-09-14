@@ -1,14 +1,12 @@
 import { boqs, clients, organizations, projects } from '@metra/db';
 import { eq } from 'drizzle-orm';
-import { NextResponse } from 'next/server';
-import { requireOrg } from '@/lib/auth/require-org';
-import { getSessionUser } from '@/lib/auth/session';
 import { MAX_BOQ_LINES } from '@/lib/boqs/core';
 import { getProjectBoq } from '@/lib/boqs/queries';
-import { withOrgContext } from '@/lib/db/context';
+import type { BoqDetail } from '@/lib/boqs/queries';
+import { withOrgContext, type OrgContext } from '@/lib/db/context';
 import { buildBoqHtml } from '@/lib/pdf/boq-template';
-import { renderPdf, RendererBusyError } from '@/lib/pdf/render';
-import { can, canSeeMargin } from '@/lib/permissions/can';
+import { pickBilingual } from '@/lib/pdf/html';
+import { servePdfDocument, type PdfHeader } from '@/lib/pdf/route-handler';
 
 // Chromium is Node-only; this API endpoint gates itself (the i18n matcher skips /api).
 export const runtime = 'nodejs';
@@ -27,107 +25,102 @@ export const maxDuration = 30;
  * THE GATE IS AT THE QUERY, NOT THE VIEW. `getProjectBoq({ showCost })` decides
  * whether cost fields are fetched at all, so a margin-blind role never receives
  * the numbers in the first place — anything sent to a browser is readable
- * whatever the template chooses to render. The 403 above it is the second lock,
- * not the only one.
+ * whatever the template chooses to render. The 403 in servePdfDocument, which
+ * runs BEFORE this load, is the second lock, not the only one.
  */
+interface BoqPdfHeader {
+  boqId: string;
+  projectId: string;
+  createdAt: Date | string;
+  clientName: (locale: string) => string;
+  projectName: (locale: string) => string;
+}
+
+/**
+ * The header, in ONE transaction: the org row every PDF needs joined to the
+ * client and project names only this one needs.
+ *
+ * The org row is joined here rather than read by the handler on its own, because
+ * a separate read is a separate RLS transaction — BEGIN, the three SET LOCALs,
+ * the SELECT, COMMIT — on a route whose budget is a five-second render. No cost
+ * column is selected: this runs before the margin gate.
+ */
+async function loadBoqHeader(
+  ctx: OrgContext,
+  id: string,
+): Promise<PdfHeader<BoqPdfHeader> | null> {
+  const [row] = await withOrgContext(ctx, (tx) =>
+    tx
+      .select({
+        boqId: boqs.id,
+        projectId: boqs.projectId,
+        createdAt: boqs.createdAt,
+        clientAr: clients.nameAr,
+        clientEn: clients.nameEn,
+        projectAr: projects.nameAr,
+        projectEn: projects.nameEn,
+        orgAr: organizations.nameAr,
+        orgEn: organizations.nameEn,
+        defaultLocale: organizations.defaultLocale,
+        hideMarginFromPm: organizations.hideMarginFromPm,
+      })
+      .from(boqs)
+      .innerJoin(clients, eq(clients.id, boqs.clientId))
+      .innerJoin(projects, eq(projects.id, boqs.projectId))
+      .innerJoin(organizations, eq(organizations.id, boqs.orgId))
+      .where(eq(boqs.id, id))
+      .limit(1),
+  );
+  if (!row) return null;
+  return {
+    org: {
+      nameAr: row.orgAr,
+      nameEn: row.orgEn,
+      defaultLocale: row.defaultLocale,
+      hideMarginFromPm: row.hideMarginFromPm,
+    },
+    header: {
+      boqId: row.boqId,
+      projectId: row.projectId,
+      createdAt: row.createdAt,
+      clientName: (locale) => pickBilingual(row.clientAr, row.clientEn, locale),
+      projectName: (locale) => pickBilingual(row.projectAr, row.projectEn, locale),
+    },
+  };
+}
+
+/** The priced body, after the margin gate. `showCost` decides what is FETCHED. */
+async function loadBoqDetail(
+  ctx: OrgContext,
+  header: BoqPdfHeader,
+  showCost: boolean,
+): Promise<BoqDetail | null> {
+  const detail = await getProjectBoq(ctx, header.projectId, { showCost });
+  return detail && detail.id === header.boqId ? detail : null;
+}
+
 export async function GET(
   req: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
   const { id } = await params;
-  // Client is the default; only ?variant=internal opts into the cost copy.
-  const variant =
-    new URL(req.url).searchParams.get('variant') === 'internal'
-      ? 'internal'
-      : 'client';
-
-  const user = await getSessionUser();
-  if (!user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-  const ctx = await requireOrg();
-  if (!can(ctx.role, 'boq_build', 'read')) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-  }
-
-  const [row] = await withOrgContext(ctx, (tx) =>
-    tx
-      .select({
-        boqId: boqs.id,
-        number: boqs.number,
-        projectId: boqs.projectId,
-        createdAt: boqs.createdAt,
-        orgAr: organizations.nameAr,
-        orgEn: organizations.nameEn,
-        clientAr: clients.nameAr,
-        clientEn: clients.nameEn,
-        projectAr: projects.nameAr,
-        projectEn: projects.nameEn,
-        hide: organizations.hideMarginFromPm,
-        defaultLocale: organizations.defaultLocale,
-      })
-      .from(boqs)
-      .innerJoin(organizations, eq(organizations.id, boqs.orgId))
-      .innerJoin(clients, eq(clients.id, boqs.clientId))
-      .innerJoin(projects, eq(projects.id, boqs.projectId))
-      .where(eq(boqs.id, id))
-      .limit(1),
-  );
-  if (!row) {
-    return NextResponse.json({ error: 'Not found' }, { status: 404 });
-  }
-
-  const seeMargin = canSeeMargin(ctx.role, row.hide ?? true);
-  if (variant === 'internal' && !seeMargin) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-  }
-
-  const detail = await getProjectBoq(ctx, row.projectId, {
-    showCost: variant === 'internal',
+  return servePdfDocument(req, id, {
+    capability: 'boq_build',
+    logLabel: 'BOQ',
+    maxLines: MAX_BOQ_LINES,
+    loadHeader: loadBoqHeader,
+    load: (ctx, _boqId, showCost, header) => loadBoqDetail(ctx, header, showCost),
+    lineCount: (detail) => detail.lineCount,
+    buildHtml: (detail, { locale, variant, org, header }) =>
+      buildBoqHtml(detail, {
+        locale,
+        variant,
+        orgName: pickBilingual(org.nameAr, org.nameEn, locale),
+        clientName: header.clientName(locale),
+        projectName: header.projectName(locale),
+        year: new Date(header.createdAt).getUTCFullYear(),
+      }),
+    fileName: (detail, variant) =>
+      `boq-${detail.number}${variant === 'internal' ? '-internal' : ''}.pdf`,
   });
-  if (!detail || detail.id !== row.boqId) {
-    return NextResponse.json({ error: 'Not found' }, { status: 404 });
-  }
-
-  // Refuse to render a DOM larger than the line cap the importer enforces —
-  // the same protection the proposal route applies to maxDuration.
-  if (detail.lineCount > MAX_BOQ_LINES) {
-    return NextResponse.json({ error: 'BOQ too large to render' }, { status: 413 });
-  }
-
-  const locale = row.defaultLocale;
-  const ar = locale.startsWith('ar');
-  const pick = (a: string | null, e: string | null) => (ar ? (a ?? e) : (e ?? a)) ?? '';
-  try {
-    const html = await buildBoqHtml(detail, {
-      locale,
-      variant,
-      orgName: pick(row.orgAr, row.orgEn),
-      clientName: pick(row.clientAr, row.clientEn),
-      projectName: pick(row.projectAr, row.projectEn),
-      year: new Date(row.createdAt).getUTCFullYear(),
-    });
-    const pdf = await renderPdf(html);
-    const suffix = variant === 'internal' ? '-internal' : '';
-    return new NextResponse(pdf as BodyInit, {
-      status: 200,
-      headers: {
-        'content-type': 'application/pdf',
-        'content-disposition': `inline; filename="boq-${row.number}${suffix}.pdf"`,
-        // The costed copy carries the firm's margin: never cached, not even
-        // privately, so it cannot be read back out of a shared machine's disk.
-        'cache-control': 'no-store',
-      },
-    });
-  } catch (err) {
-    if (err instanceof RendererBusyError) {
-      console.error('BOQ PDF renderer busy:', err);
-      return NextResponse.json(
-        { error: 'Renderer busy, try again' },
-        { status: 503, headers: { 'retry-after': '5' } },
-      );
-    }
-    console.error('BOQ PDF render failed:', err);
-    return NextResponse.json({ error: 'PDF generation failed' }, { status: 500 });
-  }
 }

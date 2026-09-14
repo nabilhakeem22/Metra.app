@@ -9,7 +9,7 @@
 // cannot flip off-plan on a foreign or finished engagement.
 import { designEngagements } from '@metra/db';
 import { eq } from 'drizzle-orm';
-import { fail, mutateInOrg } from '@/lib/actions/mutate';
+import { fail, mutateInOrg, requireInOrg } from '@/lib/actions/mutate';
 import type { ActionResult } from '@/lib/actions/result';
 import type { OrgContext } from '@/lib/db/context';
 import { isTerminal } from './states';
@@ -39,12 +39,13 @@ export async function setEngagementOffPlanCore(
     async (tx, audit) => {
       if (typeof input.offPlan !== 'boolean') fail('invalid');
 
-      const [engagement] = await tx
-        .select({ id: designEngagements.id, state: designEngagements.state })
-        .from(designEngagements)
-        .where(eq(designEngagements.id, input.engagementId))
-        .limit(1);
-      if (!engagement) fail('engagement_not_found');
+      const engagement = await requireInOrg(
+        tx,
+        designEngagements,
+        input.engagementId,
+        { id: designEngagements.id, state: designEngagements.state },
+        'engagement_not_found',
+      );
       if (isTerminal(engagement.state)) fail('engagement_not_active');
       // Freeze off_plan once it has fed the machine: `as_built_due` is snapshotted
       // from off_plan at `confirmAndPayDeposit`, and off_plan drives

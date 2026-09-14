@@ -57,6 +57,19 @@ export const engagementEvents = pgTable(
     // Reserved for `rom_acknowledgement`: the acknowledged range (scale-4 money).
     rangeLow: money('range_low'),
     rangeHigh: money('range_high'),
+    /**
+     * WHICH ISSUANCE this client acknowledgement answers: a copy of the
+     * engagement's `rom_issued_at` at the moment the client acknowledged (0049).
+     *
+     * A SNAPSHOT, not an FK to the issuing event — the band may be re-issued any
+     * number of times and this row must keep saying which instant it answered,
+     * without depending on another row surviving. NULL on every other kind, and
+     * on any acknowledgement recorded before 0049, which reads as "we do not know
+     * which figures they saw" — the truth, and the reason there is no backfill.
+     */
+    acknowledgedIssueAt: timestamp('acknowledged_issue_at', {
+      withTimezone: true,
+    }),
     // Step 13 — `as_built_attestation` only: true = variance flagged (opens the
     // change_triage detour), false = clean attestation. NULL for every other kind.
     hasVariance: boolean('has_variance'),
@@ -99,11 +112,32 @@ export const engagementEvents = pgTable(
       t.engagementId,
       t.kind,
     ),
-    // Live since 0033 — a client may raise each signal kind once per engagement.
-    // PARTIAL on the channel, so staff events of the same kind stay unrestricted.
+    // Live since 0033, narrowed by 0049 — a client may raise each signal kind
+    // once per engagement. PARTIAL on the channel, so staff events of the same
+    // kind stay unrestricted, and now also partial on acknowledged_issue_at IS
+    // NULL, so this covers every signal that is not tied to an issuance.
     uniqueIndex('engagement_events_client_signal_unique')
       .on(t.engagementId, t.kind)
-      .where(sql`actor_channel = 'client'`),
+      .where(sql`actor_channel = 'client' and acknowledged_issue_at is null`),
+    // Live since 0049 — the other half: one client acknowledgement PER ISSUANCE
+    // INSTANT. A re-issued band can be acknowledged again; a double submit of the
+    // SAME issuance still cannot write twice.
+    uniqueIndex('engagement_events_client_issuance_unique')
+      .on(t.engagementId, t.kind, t.acknowledgedIssueAt)
+      .where(sql`actor_channel = 'client' and acknowledged_issue_at is not null`),
+    // Live since 0049 — the portal's signal lookup, in its own shape. The two
+    // unique indexes above are PARTIAL on acknowledged_issue_at, and the
+    // SECURITY DEFINER portal readers (app_delivery_by_token) ask only
+    // `engagement_id = $1 and actor_channel = 'client' and kind = $2`, which does
+    // not imply either predicate — and, running as postgres with rolbypassrls,
+    // they carry no org_id qual to reach the org-leading index either. Without
+    // this one, narrowing 0033 would have left every portal load scanning the
+    // whole ledger four times.
+    index('engagement_events_engagement_channel_kind_idx').on(
+      t.engagementId,
+      t.actorChannel,
+      t.kind,
+    ),
     // Live since 0043 — readers that must exclude corrected rows ask whether a
     // correction points at this id; PARTIAL, the answer is NULL for almost every row.
     index('engagement_events_supersedes_idx')

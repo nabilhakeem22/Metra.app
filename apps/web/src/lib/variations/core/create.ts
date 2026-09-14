@@ -1,8 +1,7 @@
 // Variation-order creation: createVariationDraftCore. Opens a DRAFT VO against an
 // ISSUED or SIGNED contract and allocates the per-org VO number (VO-YYYY-NNNN).
 import { contracts, variationOrders } from '@metra/db';
-import { eq } from 'drizzle-orm';
-import { fail, mutateInOrg } from '@/lib/actions/mutate';
+import { fail, mutateInOrg, requireInOrg } from '@/lib/actions/mutate';
 import { err, type ActionResult } from '@/lib/actions/result';
 import { allocateNumber } from '@/lib/db/allocate-number';
 import type { OrgContext } from '@/lib/db/context';
@@ -35,12 +34,13 @@ export async function createVariationDraftCore(
     ctx,
     { capability: 'variations_draft', action: 'create' },
     async (tx, audit) => {
-      const [contract] = await tx
-        .select({ status: contracts.status, projectId: contracts.projectId })
-        .from(contracts)
-        .where(eq(contracts.id, contractId))
-        .limit(1);
-      if (!contract) fail('invalid');
+      const contract = await requireInOrg(
+        tx,
+        contracts,
+        contractId,
+        { status: contracts.status, projectId: contracts.projectId },
+        'invalid',
+      );
       if (contract.status !== 'issued' && contract.status !== 'signed') {
         fail('contract_not_issued');
       }

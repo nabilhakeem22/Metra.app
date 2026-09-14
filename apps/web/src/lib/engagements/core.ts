@@ -5,7 +5,7 @@
 // moves state off `created`.
 import { clients, designEngagements, projects } from '@metra/db';
 import { and, count, eq, inArray, ne } from 'drizzle-orm';
-import { fail, mutateInOrg } from '@/lib/actions/mutate';
+import { fail, mutateInOrg, requireInOrg } from '@/lib/actions/mutate';
 import { err, type ActionResult } from '@/lib/actions/result';
 import { allocateNumber } from '@/lib/db/allocate-number';
 import type { OrgContext } from '@/lib/db/context';
@@ -77,18 +77,16 @@ export async function createEngagementCore(
     ctx,
     { capability: 'engagements_design', action: 'create', flow: 'interior' },
     async (tx, audit) => {
-      const [client] = await tx
-        .select({ id: clients.id })
-        .from(clients)
-        .where(eq(clients.id, clientId))
-        .limit(1);
-      if (!client) fail('engagement_client_required');
-      const [project] = await tx
-        .select({ id: projects.id })
-        .from(projects)
-        .where(eq(projects.id, projectId))
-        .limit(1);
-      if (!project) fail('engagement_project_required');
+      // Existence assertions, not reads: the call IS the check, and it fails with
+      // a coded error if the id belongs to another tenant or to nothing.
+      await requireInOrg(tx, clients, clientId, { id: clients.id }, 'engagement_client_required');
+      await requireInOrg(
+        tx,
+        projects,
+        projectId,
+        { id: projects.id },
+        'engagement_project_required',
+      );
 
       // One-delivery-per-project guard (Slice C2): a Project may hold at most one
       // in-flight Delivery. If a non-terminal row already exists for this project,

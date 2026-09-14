@@ -481,9 +481,17 @@ describe('F4 — date + amount bounds', () => {
     const { ctx, clientId, projectId } = await setup();
     expect(await createProposalCore(ctx, { clientId, projectId, issueDate: '2026-13-40' })).toEqual({ ok: false, error: 'invalid_date' });
     const id = ((await createProposalCore(ctx, { clientId, projectId })) as { data?: string }).data!;
+    // A single FACTOR above 1e12 says so. For one wave it answered
+    // 'line_required' — "this line is missing something" for a line whose
+    // problem was a price of 1e13 — because the reader returned one undifferentiated
+    // null. readMoney now reports `too_large` and the draft save passes it on.
     expect(
       await saveProposalDraftCore(ctx, { id, sections: [{ titleEn: 'S', lines: [{ descriptionEn: 'x', qty: '1', unit: 'sqm', unitCost: '0', unitPrice: '9999999999999', discountPct: '0' }] }] }),
     ).toEqual({ ok: false, error: 'amount_too_large' });
+    // A line that is genuinely incomplete still says line_required.
+    expect(
+      await saveProposalDraftCore(ctx, { id, sections: [{ titleEn: 'S', lines: [{ descriptionEn: 'x', qty: 'twelve', unit: 'sqm', unitCost: '0', unitPrice: '10', discountPct: '0' }] }] }),
+    ).toEqual({ ok: false, error: 'line_required' });
   });
 
   // Each FACTOR passes the cap; their PRODUCT does not. Before the line-total

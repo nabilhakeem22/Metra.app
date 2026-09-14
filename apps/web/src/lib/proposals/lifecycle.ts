@@ -9,11 +9,12 @@ import {
   proposals,
 } from '@metra/db';
 import { and, eq } from 'drizzle-orm';
-import { fail, mutateInOrg } from '@/lib/actions/mutate';
+import { fail, mutateInOrg, requireInOrg } from '@/lib/actions/mutate';
 import type { ActionResult } from '@/lib/actions/result';
 import { appendSystemActivity } from '@/lib/activities/core';
 import type { OrgContext } from '@/lib/db/context';
-import { chunk, LINE_INSERT_CHUNK, mintToken, nextNumber, SHARE_TTL_DAYS } from './core';
+import { mintShareToken, shareExpiryFromNow } from '@/lib/share/token';
+import { chunk, LINE_INSERT_CHUNK, nextNumber } from './core';
 
 export async function sendProposalCore(
   ctx: OrgContext,
@@ -23,8 +24,8 @@ export async function sendProposalCore(
     ctx,
     { capability: 'proposals_send', action: 'approve' },
     async (tx, audit) => {
-      const { raw, hash } = mintToken();
-      const shareExpiresAt = new Date(Date.now() + SHARE_TTL_DAYS * 86400_000);
+      const { raw, hash } = mintShareToken();
+      const shareExpiresAt = shareExpiryFromNow();
 
       // R3: the draft->sent transition IS the admission gate. A concurrent 2nd
       // send finds status<>'draft' -> 0 rows -> proposal_not_draft, no event, no
@@ -227,12 +228,13 @@ export async function deleteDraftProposalCore(
     ctx,
     { capability: 'proposals_build', action: 'update' },
     async (tx, audit) => {
-      const [proposal] = await tx
-        .select({ status: proposals.status })
-        .from(proposals)
-        .where(eq(proposals.id, input.id))
-        .limit(1);
-      if (!proposal) fail('invalid');
+      const proposal = await requireInOrg(
+        tx,
+        proposals,
+        input.id,
+        { status: proposals.status },
+        'invalid',
+      );
       if (proposal.status !== 'draft') fail('proposal_not_draft');
 
       await tx.delete(proposals).where(eq(proposals.id, input.id));

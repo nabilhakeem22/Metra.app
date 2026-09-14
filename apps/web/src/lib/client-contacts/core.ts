@@ -3,9 +3,10 @@
 // create->clients/create, edits->clients/update (manager-only, §2.2).
 import { clientContacts, clients } from '@metra/db';
 import { and, eq } from 'drizzle-orm';
-import { fail, mutateInOrg } from '@/lib/actions/mutate';
+import { fail, mutateInOrg, requireInOrg } from '@/lib/actions/mutate';
 import { err, type ActionResult } from '@/lib/actions/result';
 import type { OrgContext } from '@/lib/db/context';
+import { clean } from '@/lib/validation/text';
 import { isUuid } from '@/lib/uuid';
 
 const LIMITS = {
@@ -15,10 +16,6 @@ const LIMITS = {
   email: 254,
   whatsapp: 40,
 } as const;
-
-function clean(v: string | null | undefined): string | null {
-  return v?.trim() || null;
-}
 
 export interface ContactInput {
   name?: string | null;
@@ -65,12 +62,9 @@ export async function createContactCore(
     ctx,
     { capability: 'clients', action: 'create' },
     async (tx, audit) => {
-      const [client] = await tx
-        .select({ id: clients.id })
-        .from(clients)
-        .where(eq(clients.id, input.clientId))
-        .limit(1);
-      if (!client) fail('invalid');
+      // An existence assertion, not a read: the call IS the check, and it
+      // fails with a coded error for an id that is absent or another tenant's.
+      await requireInOrg(tx, clients, input.clientId, { id: clients.id }, 'invalid');
 
       // A new primary demotes any existing primary first (avoids two-primary).
       if (makePrimary) {
@@ -123,12 +117,9 @@ export async function updateContactCore(
     ctx,
     { capability: 'clients', action: 'update' },
     async (tx, audit) => {
-      const [before] = await tx
-        .select({ id: clientContacts.id })
-        .from(clientContacts)
-        .where(eq(clientContacts.id, input.id))
-        .limit(1);
-      if (!before) fail('invalid');
+      // An existence assertion, not a read: the call IS the check, and it
+      // fails with a coded error for an id that is absent or another tenant's.
+      await requireInOrg(tx, clientContacts, input.id, { id: clientContacts.id }, 'invalid');
 
       // is_primary is NOT touched here — use setPrimaryContactCore for that.
       await tx
@@ -162,12 +153,13 @@ export async function setPrimaryContactCore(
     ctx,
     { capability: 'clients', action: 'update' },
     async (tx, audit) => {
-      const [c] = await tx
-        .select({ id: clientContacts.id, clientId: clientContacts.clientId })
-        .from(clientContacts)
-        .where(eq(clientContacts.id, input.id))
-        .limit(1);
-      if (!c) fail('invalid');
+      const c = await requireInOrg(
+        tx,
+        clientContacts,
+        input.id,
+        { id: clientContacts.id, clientId: clientContacts.clientId },
+        'invalid',
+      );
 
       // Clear every primary for this client first, then set the target — so the
       // partial unique (one primary per client) is never violated mid-swap.
@@ -203,12 +195,13 @@ export async function deleteContactCore(
     ctx,
     { capability: 'clients', action: 'update' },
     async (tx, audit) => {
-      const [c] = await tx
-        .select({ id: clientContacts.id, isPrimary: clientContacts.isPrimary })
-        .from(clientContacts)
-        .where(eq(clientContacts.id, input.id))
-        .limit(1);
-      if (!c) fail('invalid');
+      const c = await requireInOrg(
+        tx,
+        clientContacts,
+        input.id,
+        { id: clientContacts.id, isPrimary: clientContacts.isPrimary },
+        'invalid',
+      );
       // The primary can't be deleted out from under a client — promote another
       // contact first. Deletes nothing.
       if (c.isPrimary) fail('last_primary_contact');

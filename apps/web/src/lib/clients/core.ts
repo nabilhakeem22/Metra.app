@@ -3,10 +3,11 @@
 // Exercised directly by tests/actions/clients.dbtest.ts.
 import { CLIENT_TYPES, clients, type ClientType } from '@metra/db';
 import { eq } from 'drizzle-orm';
-import { fail, mutateInOrg } from '@/lib/actions/mutate';
+import { fail, mutateInOrg, requireInOrg } from '@/lib/actions/mutate';
 import { err, type ActionResult } from '@/lib/actions/result';
 import { appendSystemActivity } from '@/lib/activities/core';
 import type { OrgContext } from '@/lib/db/context';
+import { clean, normalizePercent } from '@/lib/validation/text';
 
 export interface ClientInput {
   nameEn?: string | null;
@@ -24,10 +25,6 @@ export interface ClientInput {
   notes?: string | null;
 }
 
-function clean(v: string | null | undefined): string | null {
-  return v?.trim() || null;
-}
-
 // Boundary length caps (defense-in-depth), mirroring org/core profileWithinLimits.
 const LIMITS = {
   name: 200,
@@ -40,18 +37,6 @@ const LIMITS = {
   taxReg: 64,
   notes: 2000,
 } as const;
-
-const PCT_RE = /^\d+(\.\d+)?$/;
-
-/** Non-negative percentage in [0,100], normalized to a decimal string, or null. */
-function normPct(v: string | null | undefined): string | null {
-  const s = v?.trim();
-  if (s === undefined || s === '') return '0';
-  if (!PCT_RE.test(s)) return null;
-  const n = Number(s);
-  if (!Number.isFinite(n) || n < 0 || n > 100) return null;
-  return s;
-}
 
 type NormalizedClient = ReturnType<typeof normalized>;
 
@@ -101,8 +86,8 @@ export async function createClientCore(
   // is not usable by a studio that runs on phone calls.
   if (!v.phone) return err('phone_required');
   if (!withinLimits(v) || !validType(v.type)) return err('invalid');
-  const advancePct = normPct(input.advancePct);
-  const retentionPct = normPct(input.retentionPct);
+  const advancePct = normalizePercent(input.advancePct);
+  const retentionPct = normalizePercent(input.retentionPct);
   if (advancePct === null || retentionPct === null) return err('invalid');
 
   return mutateInOrg(
@@ -152,21 +137,22 @@ export async function updateClientCore(
   // not mention it must not wipe it.
   const phoneOmitted = input.phone === undefined;
   const advancePct =
-    input.advancePct === undefined ? undefined : normPct(input.advancePct);
+    input.advancePct === undefined ? undefined : normalizePercent(input.advancePct);
   const retentionPct =
-    input.retentionPct === undefined ? undefined : normPct(input.retentionPct);
+    input.retentionPct === undefined ? undefined : normalizePercent(input.retentionPct);
   if (advancePct === null || retentionPct === null) return err('invalid');
 
   return mutateInOrg(
     ctx,
     { capability: 'clients', action: 'update' },
     async (tx, audit) => {
-      const [before] = await tx
-        .select({ id: clients.id, phone: clients.phone })
-        .from(clients)
-        .where(eq(clients.id, input.id))
-        .limit(1);
-      if (!before) fail('invalid');
+      const before = await requireInOrg(
+        tx,
+        clients,
+        input.id,
+        { id: clients.id, phone: clients.phone },
+        'invalid',
+      );
       // Forward-only tightening, and it must distinguish OMITTED from CLEARED.
       // `normalized()` maps both `undefined` and `''` to null, so checking `v.phone`
       // alone would reject an ordinary partial save that simply did not mention the
@@ -204,12 +190,13 @@ export async function setClientActiveCore(
     ctx,
     { capability: 'clients', action: 'update' },
     async (tx, audit) => {
-      const [before] = await tx
-        .select({ id: clients.id, active: clients.active })
-        .from(clients)
-        .where(eq(clients.id, input.id))
-        .limit(1);
-      if (!before) fail('invalid');
+      const before = await requireInOrg(
+        tx,
+        clients,
+        input.id,
+        { id: clients.id, active: clients.active },
+        'invalid',
+      );
 
       await tx
         .update(clients)

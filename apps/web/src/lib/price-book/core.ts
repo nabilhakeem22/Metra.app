@@ -3,12 +3,16 @@
 // session/requireOrg work and delegate. Exercised directly by *.dbtest.ts.
 import { costItems, sections, type CostItemUnit, type MetraDb } from '@metra/db';
 import { and, eq, ne } from 'drizzle-orm';
-import { fail, mutateInOrg } from '@/lib/actions/mutate';
+import { fail, mutateInOrg, requireInOrg } from '@/lib/actions/mutate';
 import { err, type ActionResult } from '@/lib/actions/result';
 import type { OrgContext } from '@/lib/db/context';
 import { UNIT_TOKENS } from './import';
 import { isUuid } from '@/lib/uuid';
-import { clampMoney4 } from '@/lib/aggregates/proposal-totals';
+import { readMoneyString } from '@/lib/money/read';
+
+/** A price-book cost/price field: the studio may type '1,500', and a cleared
+ *  field is a zero rather than a refusal (the column is NOT NULL). */
+const MONEY_FIELD = { allowGroupSeparators: true, blank: '0' } as const;
 
 export interface CostItemInput {
   code: string;
@@ -40,17 +44,6 @@ async function sectionUsable(
   return !!row;
 }
 
-/** Normalize a money input to a non-negative decimal string, or null if bad. */
-function normMoney(v: string | null | undefined): string | null {
-  if (v === null || v === undefined) return '0';
-  const cleaned = v.trim().replace(/,/g, '');
-  if (cleaned === '') return '0';
-  if (!/^\d+(\.\d+)?$/.test(cleaned)) return null;
-  // Same reason as proposals' normalizeMoney: clamp to the numeric(18,4) scale so
-  // what the app computed and what the database stores cannot diverge.
-  return clampMoney4(cleaned);
-}
-
 export async function createCostItemCore(
   ctx: OrgContext,
   input: CostItemInput,
@@ -63,8 +56,8 @@ export async function createCostItemCore(
   if (!isUuid(input.sectionId) || !isUnit(input.unit)) {
     return err('invalid');
   }
-  const cost = normMoney(input.defaultUnitCost);
-  const price = normMoney(input.defaultUnitPrice);
+  const cost = readMoneyString(input.defaultUnitCost, MONEY_FIELD);
+  const price = readMoneyString(input.defaultUnitPrice, MONEY_FIELD);
   if (cost === null || price === null) return err('invalid');
 
   return mutateInOrg(
@@ -121,8 +114,8 @@ export async function updateCostItemCore(
   if (!isUuid(input.sectionId) || !isUnit(input.unit)) {
     return err('invalid');
   }
-  const cost = normMoney(input.defaultUnitCost);
-  const price = normMoney(input.defaultUnitPrice);
+  const cost = readMoneyString(input.defaultUnitCost, MONEY_FIELD);
+  const price = readMoneyString(input.defaultUnitPrice, MONEY_FIELD);
   if (cost === null || price === null) return err('invalid');
 
   return mutateInOrg(
@@ -185,12 +178,13 @@ export async function setCostItemActiveCore(
     ctx,
     { capability: 'price_book', action: 'update' },
     async (tx, audit) => {
-      const [before] = await tx
-        .select({ id: costItems.id, active: costItems.active })
-        .from(costItems)
-        .where(eq(costItems.id, input.id))
-        .limit(1);
-      if (!before) fail('invalid');
+      const before = await requireInOrg(
+        tx,
+        costItems,
+        input.id,
+        { id: costItems.id, active: costItems.active },
+        'invalid',
+      );
 
       await tx
         .update(costItems)

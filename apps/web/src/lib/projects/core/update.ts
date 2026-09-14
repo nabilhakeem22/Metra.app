@@ -4,7 +4,7 @@
 // client_id.
 import { projects } from '@metra/db';
 import { and, eq, ne } from 'drizzle-orm';
-import { fail, mutateInOrg } from '@/lib/actions/mutate';
+import { fail, mutateInOrg, requireInOrg } from '@/lib/actions/mutate';
 import { err, type ActionResult } from '@/lib/actions/result';
 import type { OrgContext } from '@/lib/db/context';
 import { assertClientUsable, isErr, validate, type ProjectInput } from './validation';
@@ -28,12 +28,13 @@ export async function updateProjectCore(
     ctx,
     { capability: 'projects', action: 'update' },
     async (tx, audit) => {
-      const [before] = await tx
-        .select({ id: projects.id, clientId: projects.clientId })
-        .from(projects)
-        .where(eq(projects.id, input.id))
-        .limit(1);
-      if (!before) fail('invalid');
+      const before = await requireInOrg(
+        tx,
+        projects,
+        input.id,
+        { id: projects.id, clientId: projects.clientId },
+        'invalid',
+      );
 
       const [dup] = await tx
         .select({ id: projects.id })
@@ -82,12 +83,13 @@ export async function setProjectActiveCore(
     ctx,
     { capability: 'projects', action: 'update' },
     async (tx, audit) => {
-      const [before] = await tx
-        .select({ id: projects.id, active: projects.active })
-        .from(projects)
-        .where(eq(projects.id, input.id))
-        .limit(1);
-      if (!before) fail('invalid');
+      const before = await requireInOrg(
+        tx,
+        projects,
+        input.id,
+        { id: projects.id, active: projects.active },
+        'invalid',
+      );
 
       await tx
         .update(projects)

@@ -1,6 +1,7 @@
 import { timingSafeEqual } from 'node:crypto';
 import { NextResponse } from 'next/server';
 import { runDueAutomations } from '@/lib/automation/runner';
+import { runtimeSecret } from '@/lib/cf/secrets';
 
 // Session-less cron. Node-only (crypto + privileged DB); the i18n matcher skips
 // /api. The `metra-cron` Cloudflare Worker (workers/cron) is the only caller and
@@ -15,9 +16,18 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
 
-/** Constant-time bearer check against CRON_SECRET. False if secret unset. */
+/**
+ * Constant-time bearer check against CRON_SECRET. False if the secret is unset —
+ * an unconfigured cron is UNAUTHORISED, never open.
+ *
+ * Read through runtimeSecret() like every other Worker secret. `process.env`
+ * would in fact work here (populateProcessEnv copies the Worker's secrets into
+ * it per request), but it is the one form a bundler can fold into a literal if a
+ * `.env` file is ever present at build time, and it is the form the deploy
+ * runbook says this codebase does not use.
+ */
 function authorized(req: Request): boolean {
-  const secret = process.env.CRON_SECRET;
+  const secret = runtimeSecret('CRON_SECRET');
   if (!secret) return false;
   const header = req.headers.get('authorization') ?? '';
   const prefix = 'Bearer ';

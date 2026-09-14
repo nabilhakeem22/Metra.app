@@ -4,10 +4,15 @@ import 'server-only';
 // the auth (mirrors lib/proposals/public.ts). The SDF physically omits every
 // cost/margin/build-cost/token/internal column, so nothing here can leak the
 // firm's cost. The raw token is never logged.
-import { createHash } from 'node:crypto';
 import type { EngagementArtifactKind } from '@metra/db';
 import { sql } from 'drizzle-orm';
 import { withRequestDb } from '@/lib/db/client';
+import {
+  mapSignalSdfCode,
+  type SignalSdfResult,
+  type TokenResponseError,
+} from '@/lib/share/sdf-result';
+import { hashShareToken } from '@/lib/share/token';
 import {
   KIND_CATEGORY,
   isClientDocumentKind,
@@ -26,10 +31,6 @@ import {
   type HeroView,
 } from './portal-hero';
 import { DESIGN_STATES, type DesignState } from './states';
-
-function hashToken(raw: string): string {
-  return createHash('sha256').update(raw).digest('hex');
-}
 
 /** One milestone in the client's payment schedule — DUE amounts only, no cost. */
 export interface PublicDeliveryMilestone {
@@ -227,7 +228,7 @@ export async function getDeliveryByToken(
   rawToken: string,
 ): Promise<PublicDelivery | null> {
   if (!rawToken || !rawToken.trim()) return null;
-  const hash = hashToken(rawToken.trim());
+  const hash = hashShareToken(rawToken);
 
   // `hasSnapshot` distinguishes "the DB/SDF call itself threw" from "the mapping
   // of a returned snapshot threw" in the log breadcrumb — WITHOUT ever logging the
@@ -335,20 +336,15 @@ export async function getDeliveryByToken(
   }
 }
 
-/** Coded outcomes the portal maps to a bilingual message. `already` is NOT here —
- *  a repeat action resolves to `{ ok: true, code: 'already' }` (idempotent). */
-export type DeliveryActionError =
-  | 'token_invalid'
-  | 'token_expired'
-  | 'not_active'
-  | 'wrong_state';
+/** Coded outcomes the portal maps to a bilingual message. `already` is NOT an
+ *  error — a repeat signal resolves to `{ ok: true, code: 'already' }`, which is
+ *  what mapSignalSdfCode does and is the whole difference between a SIGNAL and a
+ *  document response. An alias of the shared union, not a narrower one: a code a
+ *  newer SDF starts returning must still be a value this portal can hold, and
+ *  every message chain here ends in a fall-through. */
+export type DeliveryActionError = TokenResponseError;
 
-export interface DeliveryActionResult {
-  ok: boolean;
-  /** Present only when the signal already existed — the action is a safe no-op. */
-  code?: 'already';
-  error?: DeliveryActionError;
-}
+export type DeliveryActionResult = SignalSdfResult;
 
 /**
  * Session-less: record a client's APPEND-ONLY ADVISORY signal (approve /
@@ -370,28 +366,14 @@ export async function recordDeliveryActionByToken(
   },
 ): Promise<DeliveryActionResult> {
   if (!rawToken || !rawToken.trim()) return { ok: false, error: 'token_invalid' };
-  const hash = hashToken(rawToken.trim());
+  const hash = hashShareToken(rawToken);
   const rows = (await withRequestDb((db) =>
     db.execute(sql`select public.app_delivery_respond_by_token(
       ${hash}, ${input.action}, ${input.note ?? null}, ${input.actorName ?? null},
       ${input.ip ?? null}, ${input.userAgent ?? null}
     ) as code`),
   )) as unknown as Array<{ code: string }>;
-  const code = rows[0]?.code;
-  switch (code) {
-    case 'ok':
-      return { ok: true };
-    case 'already':
-      return { ok: true, code: 'already' };
-    case 'expired':
-      return { ok: false, error: 'token_expired' };
-    case 'not_active':
-      return { ok: false, error: 'not_active' };
-    case 'wrong_state':
-      return { ok: false, error: 'wrong_state' };
-    default:
-      return { ok: false, error: 'token_invalid' };
-  }
+  return mapSignalSdfCode(rows[0]?.code);
 }
 
 /**
@@ -416,26 +398,12 @@ export async function claimPaymentByToken(
   },
 ): Promise<DeliveryActionResult> {
   if (!rawToken || !rawToken.trim()) return { ok: false, error: 'token_invalid' };
-  const hash = hashToken(rawToken.trim());
+  const hash = hashShareToken(rawToken);
   const rows = (await withRequestDb((db) =>
     db.execute(sql`select public.app_delivery_claim_payment_by_token(
       ${hash}, ${input.milestoneKind}, ${input.note ?? null},
       ${input.actorName ?? null}, ${input.ip ?? null}, ${input.userAgent ?? null}
     ) as code`),
   )) as unknown as Array<{ code: string }>;
-  const code = rows[0]?.code;
-  switch (code) {
-    case 'ok':
-      return { ok: true };
-    case 'already':
-      return { ok: true, code: 'already' };
-    case 'expired':
-      return { ok: false, error: 'token_expired' };
-    case 'not_active':
-      return { ok: false, error: 'not_active' };
-    case 'wrong_state':
-      return { ok: false, error: 'wrong_state' };
-    default:
-      return { ok: false, error: 'token_invalid' };
-  }
+  return mapSignalSdfCode(rows[0]?.code);
 }

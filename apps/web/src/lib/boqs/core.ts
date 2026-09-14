@@ -8,7 +8,7 @@ import {
   projects,
 } from '@metra/db';
 import { eq, inArray, sql } from 'drizzle-orm';
-import { fail, mutateInOrg } from '@/lib/actions/mutate';
+import { fail, mutateInOrg, requireInOrg } from '@/lib/actions/mutate';
 import { err, type ActionResult } from '@/lib/actions/result';
 import { allocateNumber } from '@/lib/db/allocate-number';
 import type { OrgContext } from '@/lib/db/context';
@@ -54,12 +54,13 @@ export async function createBoqCore(
     ctx,
     { capability: 'boq_build', action: 'create' },
     async (tx) => {
-      const [project] = await tx
-        .select({ id: projects.id, clientId: projects.clientId })
-        .from(projects)
-        .where(eq(projects.id, input.projectId))
-        .limit(1);
-      if (!project) fail('boq_not_found');
+      const project = await requireInOrg(
+        tx,
+        projects,
+        input.projectId,
+        { id: projects.id, clientId: projects.clientId },
+        'boq_not_found',
+      );
 
       const number = await allocateNumber(tx, ctx.orgId, 'boq', 'boqs', 'number');
 
@@ -118,12 +119,13 @@ export async function commitImportCore(
     ctx,
     { capability: 'boq_build', action: 'update' },
     async (tx) => {
-      const [boq] = await tx
-        .select({ id: boqs.id, status: boqs.status, discountPct: boqs.discountPct })
-        .from(boqs)
-        .where(eq(boqs.id, input.boqId))
-        .limit(1);
-      if (!boq) fail('boq_not_found');
+      const boq = await requireInOrg(
+        tx,
+        boqs,
+        input.boqId,
+        { id: boqs.id, status: boqs.status, discountPct: boqs.discountPct },
+        'boq_not_found',
+      );
       // An issued BOQ is frozen; a revision supersedes it rather than editing it.
       if (boq.status !== 'draft') fail('boq_not_draft');
 

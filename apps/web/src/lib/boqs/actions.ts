@@ -18,8 +18,12 @@ import {
 } from './edit';
 import type { BoqLinePatch } from './edit-input';
 import { issueBoqCore } from './issue';
-import { decodeCsv } from './import/decode';
-import { autoDetectMapping, mapRows, type ImportedLine } from './import/map';
+import type { ImportedLine } from './import/map';
+import { previewBoqImportText, type ImportPreview } from './import/preview';
+
+// Type-only re-export: the upload page has always imported this name from here,
+// and a type is erased before the 'use server' export check ever sees it.
+export type { ImportPreview };
 
 export async function createBoq(
   input: CreateBoqInput,
@@ -30,42 +34,10 @@ export async function createBoq(
   return res;
 }
 
-export interface ImportPreview {
-  ok: boolean;
-  error?: string;
-  /** Lines that would be created. */
-  lines?: ImportedLine[];
-  /** Row number + reason for everything that would not. */
-  problems?: { rowNumber: number; errors: string[] }[];
-  notes?: string[];
-}
-
-/**
- * Decode and validate an uploaded sheet WITHOUT writing anything.
- *
- * The preview is the safety net for the whole import: it is where the studio
- * sees the template's own example row still sitting in their file, spots a
- * column that mapped to the wrong field, and finds the eight rows with a unit
- * Metra does not have — all before a single line exists.
- */
+/** The session gate, then the pure preview (which owns the caps and the mapping). */
 export async function previewBoqImport(csvText: string): Promise<ImportPreview> {
   await requireOrg();
-  if (typeof csvText !== 'string' || csvText.trim() === '') {
-    return { ok: false, error: 'invalid' };
-  }
-  const { grid, notes } = decodeCsv(csvText);
-  const header = grid.rows[0];
-  if (!header) return { ok: false, error: 'invalid' };
-
-  const result = mapRows(grid, autoDetectMapping(header));
-  return {
-    ok: true,
-    lines: result.ok,
-    problems: result.rows
-      .filter((r) => r.errors.length > 0)
-      .map((r) => ({ rowNumber: r.rowNumber, errors: r.errors })),
-    notes,
-  };
+  return previewBoqImportText(csvText);
 }
 
 export async function commitBoqImport(input: {

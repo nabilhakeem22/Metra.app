@@ -1,45 +1,50 @@
 import { describe, expect, it } from 'vitest';
+import { readMoneyString } from '@/lib/money/read';
 import {
   MAX_AMOUNT,
   chunk,
-  normalizeMoney,
   normalizeText,
   pctInRange,
   validIsoDate,
   withinMagnitude,
 } from './validation';
 
+// The EXACT option set the proposal header and line validators use: an omitted
+// field falls back to a caller-supplied value rather than being refused.
+const readAmount = (value: string | null | undefined, blank = '0') =>
+  readMoneyString(value, { blank });
+
 // Audit finding 02: `proposals` had 12 source files and ZERO unit tests, leaning
 // entirely on database suites that only run in CI. These are the pure validators
 // that stand between a pasted string and a money column, so they are the part that
 // most deserved proving in milliseconds rather than minutes.
 
-describe('normalizeMoney', () => {
+describe('a proposal money field', () => {
   it('falls back for absent input and rejects a malformed one', () => {
-    expect(normalizeMoney(null)).toBe('0');
-    expect(normalizeMoney(undefined)).toBe('0');
-    expect(normalizeMoney('')).toBe('0');
-    expect(normalizeMoney('   ')).toBe('0');
-    expect(normalizeMoney(null, '7')).toBe('7');
-    expect(normalizeMoney('abc')).toBeNull();
-    expect(normalizeMoney('1,000')).toBeNull();
-    expect(normalizeMoney('1e3')).toBeNull();
-    expect(normalizeMoney('0x10')).toBeNull();
+    expect(readAmount(null)).toBe('0');
+    expect(readAmount(undefined)).toBe('0');
+    expect(readAmount('')).toBe('0');
+    expect(readAmount('   ')).toBe('0');
+    expect(readAmount(null, '7')).toBe('7');
+    expect(readAmount('abc')).toBeNull();
+    expect(readAmount('1,000')).toBeNull();
+    expect(readAmount('1e3')).toBeNull();
+    expect(readAmount('0x10')).toBeNull();
   });
 
   it('rejects negatives — money here is never signed', () => {
-    expect(normalizeMoney('-1')).toBeNull();
-    expect(normalizeMoney('-0.5')).toBeNull();
+    expect(readAmount('-1')).toBeNull();
+    expect(readAmount('-0.5')).toBeNull();
   });
 
   it('clamps past the 4th decimal so the stored value cannot differ', () => {
     // The bug this closes: the app truncates past 4dp but numeric(18,4) ROUNDS, so
     // '2.99999' previewed as 2.9999 and came back from the database as 3.0000.
-    expect(normalizeMoney('2.99999')).toBe('2.9999');
-    expect(normalizeMoney('1.00005')).toBe('1.0000');
+    expect(readAmount('2.99999')).toBe('2.9999');
+    expect(readAmount('1.00005')).toBe('1.0000');
     // Anything already within scale is returned untouched.
-    expect(normalizeMoney('5')).toBe('5');
-    expect(normalizeMoney('5.1234')).toBe('5.1234');
+    expect(readAmount('5')).toBe('5');
+    expect(readAmount('5.1234')).toBe('5.1234');
   });
 });
 

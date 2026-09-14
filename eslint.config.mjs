@@ -62,4 +62,14 @@ export default tseslint.config(
       '@typescript-eslint/no-explicit-any': 'off',
     },
   },
+  {
+    // Node CLI scripts: plain ESM run by `node`, so they legitimately use the
+    // Node globals eslint's default (browser/ESM) environment does not define.
+    // The .ts scripts don't need this — typescript-eslint turns `no-undef` off
+    // for TypeScript, where tsc is already the authority on what exists.
+    files: ['**/scripts/**/*.mjs'],
+    languageOptions: {
+      globals: { console: 'readonly', process: 'readonly' },
+    },
+  },
 );

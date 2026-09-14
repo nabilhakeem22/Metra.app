@@ -21,6 +21,7 @@ import { err, type ActionResult } from '@/lib/actions/result';
 import type { OrgContext } from '@/lib/db/context';
 import { FLOWS } from '@/lib/entitlements/flows';
 import { firmTypeDef, type FirmTypeKey } from '@/lib/entitlements/firm-types';
+import { clean } from '@/lib/validation/text';
 
 export interface OrgProfileInput {
   nameEn?: string | null;
@@ -58,11 +59,11 @@ export async function createOrgCore(
   ctx: OrgContext,
   input: OrgProfileInput,
 ): Promise<ActionResult> {
-  const nameEn = input.nameEn?.trim() || null;
-  const nameAr = input.nameAr?.trim() || null;
+  const nameEn = clean(input.nameEn);
+  const nameAr = clean(input.nameAr);
   if (!nameEn && !nameAr) return err('name_required');
-  const city = input.city?.trim() || null;
-  const taxRegistrationNumber = input.taxRegistrationNumber?.trim() || null;
+  const city = clean(input.city);
+  const taxRegistrationNumber = clean(input.taxRegistrationNumber);
   if (!profileWithinLimits(nameEn, nameAr, city, taxRegistrationNumber)) {
     return err('invalid');
   }

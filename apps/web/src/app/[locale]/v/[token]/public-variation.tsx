@@ -8,6 +8,11 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { formatMoney } from '@/lib/format/money';
 import { formatDocNumber } from '@/lib/format/doc-number';
+import {
+  variationDecidedKey,
+  variationIsDecided,
+  type VariationOutcome,
+} from '@/lib/variations/decided-message';
 import type { PublicVariation } from '@/lib/variations/public';
 import { respondToVariation } from './actions';
 
@@ -21,15 +26,7 @@ export function PublicVariationView({
   const t = useTranslations('variations');
   const locale = useLocale();
   const [pending, startTransition] = useTransition();
-  const [outcome, setOutcome] = useState<
-    | 'approved'
-    | 'rejected'
-    | 'already'
-    | 'expired'
-    | 'invalid'
-    | 'contractInactive'
-    | null
-  >(null);
+  const [outcome, setOutcome] = useState<VariationOutcome>(null);
   const [name, setName] = useState('');
 
   if (!variation) {
@@ -53,22 +50,16 @@ export function PublicVariationView({
     });
   }
 
-  // A terminated contract auto-rejects its open variation orders, so the row's
-  // own status would otherwise tell the client they rejected it themselves.
-  const contractInactive = !variation.contractActive;
-  const decided = contractInactive || variation.status !== 'issued' || outcome !== null;
-  const decidedMessage =
-    contractInactive || outcome === 'contractInactive'
-      ? t('client.contractInactive')
-      : outcome === 'approved' || variation.status === 'approved'
-        ? t('client.approved')
-        : outcome === 'rejected' || variation.status === 'rejected'
-          ? t('client.rejected')
-          : outcome === 'expired'
-            ? t('client.expired')
-            : outcome === 'invalid'
-              ? t('client.invalid')
-              : t('client.already');
+  // The ladder lives in lib/variations/decided-message.ts: its ORDER is a
+  // product decision about what a client is told, and an order spelled out
+  // inline in JSX is one nobody can test and everybody edits.
+  const decisionState = {
+    status: variation.status,
+    contractActive: variation.contractActive,
+    outcome,
+  };
+  const decided = variationIsDecided(decisionState);
+  const decidedMessage = t(`client.${variationDecidedKey(decisionState)}`);
 
   return (
     <div className="mx-auto max-w-3xl space-y-4 p-4 md:p-8">

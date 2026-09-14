@@ -30,11 +30,17 @@ proven by an automated test.
 
 ```
 merta/
-  apps/web        @metra/web  — Next.js app
+  apps/web        @metra/web  — Next.js app (deployed as the `metra-web` Worker)
   packages/db     @metra/db   — Drizzle schema, RLS SQL, migrations, seed, isolation test
+  workers/cron    (separate)  — scheduled Worker; NOT an npm workspace
 ```
 
-Managed with **npm workspaces** (no pnpm).
+Managed with **npm workspaces** (no pnpm) — but only the first two.
+
+`workers/cron` is **outside the workspace globs on purpose**: it is its own
+wrangler project with its own `wrangler.jsonc`, and a root `npm ci`, `npm run
+lint` or `npm test` does not see it. Changing it means installing, checking and
+deploying it on its own. Deployment: [docs/DEPLOY.md](docs/DEPLOY.md).
 
 ## Prerequisites
 

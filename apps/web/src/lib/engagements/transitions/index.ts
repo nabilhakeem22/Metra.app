@@ -7,3 +7,4 @@
 // edge, or behaviour changed.
 export * from './types';
 export * from './registry';
+export * from './capability-action';

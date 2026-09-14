@@ -3,6 +3,7 @@
 // spreadsheet token to one of the org's `sections` (passed in); unknown tokens
 // are REJECTED per-row (category_invalid) — import never auto-creates a section.
 import type { CostItemUnit } from '@metra/db';
+import { readMoneyString } from '@/lib/money/read';
 
 export const UNIT_TOKENS: readonly CostItemUnit[] = [
   'sqm',
@@ -150,22 +151,12 @@ function cell(row: string[], i: number | undefined): string {
   return typeof v === 'string' ? v.trim() : '';
 }
 
-// STRICT money parse. Accepts ONLY: (a) a plain non-negative decimal, or
-// (b) comma-as-thousands grouping (then strips the grouping commas). Everything
-// else -> null (the row becomes cost_invalid/price_invalid). This deliberately
-// rejects ambiguous separators like "1,5" / "1.234,56" / "1,2,3", as well as
-// negatives, ".5", "1.", "1e3", currency prefixes, and Arabic-Indic digits
-// (\d is ASCII-only). Blank -> "0".
-const PLAIN_DECIMAL = /^\d+(\.\d+)?$/;
-const GROUPED_DECIMAL = /^\d{1,3}(,\d{3})+(\.\d+)?$/;
-
-function parseMoney(raw: string): string | null {
-  const s = raw.trim();
-  if (s === '') return '0';
-  if (PLAIN_DECIMAL.test(s)) return s;
-  if (GROUPED_DECIMAL.test(s)) return s.replace(/,/g, '');
-  return null;
-}
+// A cost/price cell in an imported price-book sheet. Comma-as-thousands is
+// accepted and stripped; an ambiguous separator ("1,5", "1.234,56", "1,2,3") is
+// REFUSED and the row becomes cost_invalid/price_invalid rather than silently
+// becoming a different number. Negatives, ".5", "1.", "1e3", currency prefixes
+// and Arabic-Indic digits are refused too. A blank cell is a zero.
+const MONEY_CELL = { allowGroupSeparators: true, blank: '0' } as const;
 
 /**
  * Validates parsed spreadsheet rows against a column mapping, the org's existing
@@ -212,9 +203,9 @@ export function validateImportRows(
     const unit = resolveUnit(unitRaw);
     if (!unit) return fail('unit_invalid');
 
-    const defaultUnitCost = parseMoney(costRaw);
+    const defaultUnitCost = readMoneyString(costRaw, MONEY_CELL);
     if (defaultUnitCost === null) return fail('cost_invalid');
-    const defaultUnitPrice = parseMoney(priceRaw);
+    const defaultUnitPrice = readMoneyString(priceRaw, MONEY_CELL);
     if (defaultUnitPrice === null) return fail('price_invalid');
 
     seen.add(code);

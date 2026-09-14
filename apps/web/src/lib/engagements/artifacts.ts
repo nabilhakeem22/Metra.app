@@ -21,11 +21,17 @@ import {
   type EngagementArtifactKind,
 } from '@metra/db';
 import { and, eq } from 'drizzle-orm';
-import { fail, mutateInOrg } from '@/lib/actions/mutate';
+import { fail, mutateInOrg, requireInOrg } from '@/lib/actions/mutate';
 import type { ActionResult } from '@/lib/actions/result';
 import type { OrgContext } from '@/lib/db/context';
 import { isTerminal } from './states';
 import { isUuid } from '@/lib/uuid';
+import {
+  MAX_LABEL_CHARS,
+  MAX_NOTE_CHARS,
+  TOO_LONG,
+  optionalText,
+} from '@/lib/validation/text';
 
 const KIND_SET = new Set<string>(ENGAGEMENT_ARTIFACT_KINDS);
 
@@ -36,12 +42,6 @@ export interface RecordArtifactInput {
   contentHash?: string | null;
   label?: string | null;
   note?: string | null;
-}
-
-/** Trim a nullable free-text field to a stored value ('' / whitespace -> null). */
-function optionalText(value: string | null | undefined): string | null {
-  const trimmed = value?.trim();
-  return trimmed ? trimmed : null;
 }
 
 /**
@@ -66,20 +66,26 @@ export async function recordArtifactCore(
   if (fileId !== null && !isUuid(fileId)) {
     return { ok: false, error: 'invalid' };
   }
-  const contentHash = optionalText(input.contentHash);
-  const label = optionalText(input.label);
-  const note = optionalText(input.note);
+  const contentHash = optionalText(input.contentHash, MAX_LABEL_CHARS);
+  const label = optionalText(input.label, MAX_LABEL_CHARS);
+  const note = optionalText(input.note, MAX_NOTE_CHARS);
+  // An over-long field is a REFUSAL, not a truncation: storing the first 200
+  // characters of a label would quietly rename the studio's artifact.
+  if (contentHash === TOO_LONG || label === TOO_LONG || note === TOO_LONG) {
+    return { ok: false, error: 'invalid' };
+  }
 
   return mutateInOrg(
     ctx,
     { capability: 'engagements_design', action: 'create', flow: 'interior' },
     async (tx, audit) => {
-      const [engagement] = await tx
-        .select({ id: designEngagements.id, state: designEngagements.state })
-        .from(designEngagements)
-        .where(eq(designEngagements.id, input.engagementId))
-        .limit(1);
-      if (!engagement) fail('engagement_not_found');
+      const engagement = await requireInOrg(
+        tx,
+        designEngagements,
+        input.engagementId,
+        { id: designEngagements.id, state: designEngagements.state },
+        'engagement_not_found',
+      );
       // No recording an artifact against a finished engagement (abandoned / closed).
       if (isTerminal(engagement.state)) fail('engagement_not_active');
 

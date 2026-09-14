@@ -1,13 +1,19 @@
 import { COST_ITEM_UNITS } from '@metra/db';
 import { describe, expect, it } from 'vitest';
 import { MAX_AMOUNT } from '@/lib/proposals/validation';
+import { readMoneyString } from '@/lib/money/read';
 import {
   BOQ_UNITS,
   MAX_DESCRIPTION,
   MAX_ITEM_CODE,
   normalizeLinePatch,
-  readNumericField,
 } from './edit-input';
+
+// The EXACT option set boqs/edit-input.ts uses for a field the studio types into
+// the sheet. Named here so these cases keep testing that call site's rule rather
+// than the kernel's defaults.
+const readTypedField = (raw: string) =>
+  readMoneyString(raw, { allowGroupSeparators: true });
 
 describe('BOQ_UNITS', () => {
   // The list lives in a client-safe module rather than being imported from the
@@ -17,36 +23,46 @@ describe('BOQ_UNITS', () => {
   });
 });
 
-describe('readNumericField', () => {
+describe('a typed sheet field', () => {
   it('accepts a plain number', () => {
     // clampMoney4 deliberately does not canonicalise -- '5' stays '5' rather
     // than becoming '5.0000', so only genuinely ambiguous >4dp input changes.
-    expect(readNumericField('1500')).toBe('1500');
-    expect(readNumericField('8.5')).toBe('8.5');
-    expect(readNumericField('0')).toBe('0');
+    expect(readTypedField('1500')).toBe('1500');
+    expect(readTypedField('8.5')).toBe('8.5');
+    expect(readTypedField('0')).toBe('0');
   });
 
   it('strips the separators people actually type', () => {
-    expect(readNumericField('1,500.00')).toBe('1500.00');
-    expect(readNumericField(' 38 000 ')).toBe('38000');
-    expect(readNumericField('1٬270')).toBe('1270');
+    expect(readTypedField('1,500.00')).toBe('1500.00');
+    expect(readTypedField(' 38 000 ')).toBe('38000');
+    expect(readTypedField('1٬270')).toBe('1270');
+  });
+
+  it('REFUSES an ambiguous comma that this field used to read as grouping', () => {
+    // BEHAVIOUR CHANGE (wave 2). readNumericField stripped every comma, so '1,5'
+    // — one and a half, as a great many people write it — became 15 and was
+    // saved as the rate on a document the client signs. It is now an invalid
+    // field the studio can see, not a ten-fold error nobody can.
+    for (const ambiguous of ['1,5', '1,2,3', '1.234,56', '1,23']) {
+      expect(readTypedField(ambiguous)).toBeNull();
+    }
   });
 
   it('REFUSES rather than reading a typo as zero', () => {
     // The whole point of not reusing coerceMoneyInput here: each of these would
     // silently become '0' and change the money on a document a client signs.
     for (const bad of ['abc', '1.5.0', '12x', '--3', '1e5', '', '   ']) {
-      expect(readNumericField(bad)).toBeNull();
+      expect(readTypedField(bad)).toBeNull();
     }
   });
 
   it('refuses a negative — that is a variation order, not a BOQ line', () => {
-    expect(readNumericField('-1')).toBeNull();
-    expect(readNumericField('-0.5')).toBeNull();
+    expect(readTypedField('-1')).toBeNull();
+    expect(readTypedField('-0.5')).toBeNull();
   });
 
   it('clamps to the stored scale of 4', () => {
-    expect(readNumericField('1.23456')).toBe('1.2345');
+    expect(readTypedField('1.23456')).toBe('1.2345');
   });
 });
 
@@ -121,6 +137,14 @@ describe('normalizeLinePatch', () => {
   it('refuses an amount past the magnitude cap the import already enforces', () => {
     // 1e17: storable as a factor, but its product with any rate overflows
     // numeric(18,4) — the sheet was the one money surface that let it through.
+    //
+    // THE EXPECTATION MOVED BACK. For one wave this asserted 'invalid_qty',
+    // because the reader answered a single `null` for every failure and the
+    // field could only report its own code — so a studio pasting 1e17 was told
+    // its number was not a number. readMoney now says WHICH failure it was, and
+    // 'amount_too_large' is both the truth and what main said. The same code
+    // still covers the case it always covered: a computed line TOTAL that
+    // overflows from factors which each fit.
     expect(normalizeLinePatch({ qty: '100000000000000000' })).toEqual({
       ok: false,
       error: 'amount_too_large',
@@ -128,6 +152,11 @@ describe('normalizeLinePatch', () => {
     expect(normalizeLinePatch({ unitPrice: String(MAX_AMOUNT + 1) })).toEqual({
       ok: false,
       error: 'amount_too_large',
+    });
+    // A cell that genuinely is not a number still gets the field's own code.
+    expect(normalizeLinePatch({ qty: 'twelve' })).toEqual({
+      ok: false,
+      error: 'invalid_qty',
     });
     // The cap itself is still acceptable.
     expect(normalizeLinePatch({ qty: String(MAX_AMOUNT) }).ok).toBe(true);

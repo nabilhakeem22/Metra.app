@@ -3,11 +3,11 @@
 // via `fail`.
 import { proposals } from '@metra/db';
 import { fail } from '@/lib/actions/mutate';
+import { readMoneyString } from '@/lib/money/read';
 import {
   MAX_LINES_PER_SECTION,
   MAX_SECTIONS,
   MAX_TOTAL_LINES,
-  normalizeMoney,
   normalizeText,
   pctInRange,
   validIsoDate,
@@ -38,12 +38,15 @@ export function validateDraftHeader(
   proposal: ProposalRow,
   header: DraftHeader,
 ): ResolvedHeader {
-  const discountPct = normalizeMoney(header.discountPct, proposal.discountPct);
-  const taxRate = normalizeMoney(header.taxRate, proposal.taxRate);
-  const supervisionPct = normalizeMoney(
-    header.supervisionPct,
-    proposal.supervisionPct,
-  );
+  // The proposal's CURRENT value is the blank: an omitted header field means
+  // "leave it alone", not "set it to zero".
+  const discountPct = readMoneyString(header.discountPct, {
+    blank: proposal.discountPct,
+  });
+  const taxRate = readMoneyString(header.taxRate, { blank: proposal.taxRate });
+  const supervisionPct = readMoneyString(header.supervisionPct, {
+    blank: proposal.supervisionPct,
+  });
   if (discountPct === null || taxRate === null || supervisionPct === null) {
     fail('invalid');
   }

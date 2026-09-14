@@ -16,7 +16,7 @@ import {
   currentLocale,
   isUniqueViolation,
   isValidEmail,
-  mintToken,
+  mintShareToken,
   normalizeEmail,
   orgDisplayName,
 } from './helpers';
@@ -48,7 +48,7 @@ export async function inviteMember(input: {
     return { ok: false, error: 'already_member' };
   }
 
-  const { raw, hash } = mintToken();
+  const { raw, hash } = mintShareToken();
   const expiresAt = new Date(Date.now() + INVITE_TTL_DAYS * 86400_000);
 
   // Resolve the absolute link BEFORE creating the invite — an unresolvable
@@ -118,7 +118,7 @@ export async function resendInvite(id: string): Promise<ActionResult> {
   const ctx = await requireOrg();
   if (!canManageOrg(ctx.role)) return { ok: false, error: 'forbidden' };
 
-  const { raw, hash } = mintToken();
+  const { raw, hash } = mintShareToken();
   const expiresAt = new Date(Date.now() + INVITE_TTL_DAYS * 86400_000);
   const locale = await currentLocale();
   const link = await buildAcceptUrl(locale, raw);

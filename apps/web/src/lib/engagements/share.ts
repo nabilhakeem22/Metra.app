@@ -11,7 +11,7 @@ import { and, eq, isNull } from 'drizzle-orm';
 import { fail, mutateInOrg } from '@/lib/actions/mutate';
 import type { ActionResult } from '@/lib/actions/result';
 import type { OrgContext } from '@/lib/db/context';
-import { mintToken } from '@/lib/proposals/core';
+import { mintShareToken } from '@/lib/share/token';
 
 /**
  * Mint the FIRST share link for a delivery. Atomic admission gate: sets token_hash
@@ -29,7 +29,7 @@ export async function mintDeliveryLinkCore(
     ctx,
     { capability: 'engagements_issue', action: 'approve', flow: 'interior' },
     async (tx, audit) => {
-      const { raw, hash } = mintToken();
+      const { raw, hash } = mintShareToken();
       const gated = await tx
         .update(designEngagements)
         .set({ tokenHash: hash, shareExpiresAt: null, updatedAt: new Date() })
@@ -75,7 +75,7 @@ export async function rotateDeliveryLinkCore(
     ctx,
     { capability: 'engagements_issue', action: 'approve', flow: 'interior' },
     async (tx, audit) => {
-      const { raw, hash } = mintToken();
+      const { raw, hash } = mintShareToken();
       const updated = await tx
         .update(designEngagements)
         .set({ tokenHash: hash, shareExpiresAt: null, updatedAt: new Date() })

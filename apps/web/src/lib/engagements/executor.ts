@@ -17,11 +17,11 @@ import {
   engagementTransitions,
   paymentEvents,
 } from '@metra/db';
-import { and, eq, inArray } from 'drizzle-orm';
+import { and, eq, inArray, sql } from 'drizzle-orm';
 import { fail, mutateInOrg } from '@/lib/actions/mutate';
 import { err, type ActionResult } from '@/lib/actions/result';
 import type { OrgContext } from '@/lib/db/context';
-import type { PermissionAction } from '@/lib/permissions/roles';
+import { isUuid } from '@/lib/uuid';
 import { recordConceptApproval, recordDesignApproval } from './approvals';
 import { CLIENT_RELEASES, selectReleaseArtifactIds } from './client-release';
 import { insertAsBuiltAttestation } from './attestations';
@@ -33,28 +33,78 @@ import { isRevisionTrigger } from './revision-allowance';
 import { applyRevision, resetRevisionsOnReject } from './revisions';
 import { GUARDS, type GuardFacts } from './guards';
 import {
+  CAPABILITY_ACTION,
   TRANSITIONS,
-  type CapabilityKey,
   type TransitionDef,
   type Trigger,
 } from './transitions';
-
-/**
- * The permission action each capability family gates on. Design/finance triggers
- * are `update` moves (owner/admin/PM or accountant progress the work); the issue
- * family mints client-facing artefacts and is `approve`-only (owner/admin), so it
- * must gate on `approve` — `update` isn't granted for `engagements_issue`.
- */
-const CAPABILITY_ACTION: Record<CapabilityKey, PermissionAction> = {
-  engagements_design: 'update',
-  engagements_finance: 'update',
-  engagements_issue: 'approve',
-};
 
 export interface ExecuteTransitionInput {
   engagementId: string;
   trigger: Trigger;
   payload?: unknown;
+  /**
+   * The caller's name for ONE ATTEMPT at a SELF-LOOP transition (0050). Honoured
+   * only there, because only a self-loop needs it: an advancing edge is already
+   * protected by its own state gate, so its retry finds the engagement moved and
+   * loses. A self-loop's retry is indistinguishable from a genuine second
+   * request, and the one that matters is the UNCERTAIN retry — the write
+   * committed and the response was lost on the way back.
+   *
+   * Must be a UUID when present (malformed is a coded `invalid`, never ignored:
+   * silently dropping a key the caller believed in would give false protection).
+   */
+  idempotencyKey?: string | null;
+}
+
+/**
+ * A self-loop edge: its target IS one of its legal from-states.
+ *
+ * PER DEFINITION, not per firing. attestAsBuiltClean declares
+ * `from: ['final_approval', 'change_triage']` and `to: 'final_approval'`, so
+ * this is true even when the edge actually being fired is the ADVANCING
+ * change_triage -> final_approval one, and that firing stores a key too.
+ * Deliberately harmless: the advancing edge has its own state gate as well, and
+ * since 0050 the key is scoped to the trigger, so the only thing an extra stored
+ * key can ever collapse is a retry of THIS verb — which is what it is for.
+ */
+function isSelfLoop(def: TransitionDef): boolean {
+  const from = Array.isArray(def.from) ? def.from : [def.from];
+  return from.includes(def.to);
+}
+
+/**
+ * Has this exact attempt already committed? Answered BEFORE any fact is read, so
+ * a replay runs no guard, flips no state, fires no side-effect and writes no
+ * ledger row. Runs after lockSelfLoop, so a retry that overlaps the original
+ * waits for it to commit and then sees it.
+ *
+ * THE TRIGGER IS PART OF THE QUESTION. This short-circuit precedes the legal-from
+ * check and every guard, so without it a caller that reused one key across two
+ * verbs would get plain `ok` for the second with no ledger row, no side-effect
+ * and no attestation — a false success on an evidentiary path. A key names one
+ * attempt at ONE act; the same key on a different act is a different act.
+ */
+async function replayedSelfLoop(
+  tx: MetraDb,
+  ctx: OrgContext,
+  def: TransitionDef,
+  input: ExecuteTransitionInput,
+): Promise<boolean> {
+  if (!input.idempotencyKey || !isSelfLoop(def)) return false;
+  const [row] = await tx
+    .select({ id: engagementTransitions.id })
+    .from(engagementTransitions)
+    .where(
+      and(
+        eq(engagementTransitions.orgId, ctx.orgId),
+        eq(engagementTransitions.engagementId, input.engagementId),
+        eq(engagementTransitions.trigger, input.trigger),
+        eq(engagementTransitions.idempotencyKey, input.idempotencyKey),
+      ),
+    )
+    .limit(1);
+  return row !== undefined;
 }
 
 /**
@@ -74,8 +124,7 @@ export interface ExecuteTransitionInput {
  * advancing edges, which the gate already serialises.
  */
 async function lockSelfLoop(tx: MetraDb, def: TransitionDef, id: string) {
-  const from = Array.isArray(def.from) ? def.from : [def.from];
-  if (!from.includes(def.to)) return;
+  if (!isSelfLoop(def)) return;
   await tx
     .select({ id: designEngagements.id })
     .from(designEngagements)
@@ -145,7 +194,14 @@ export async function executeTransition(
   // an unknown trigger has no def and is rejected before any DB work.
   if (!def) return err('illegal_trigger');
 
+  // Normalise before any DB work: '' / whitespace reads as absent (a plain
+  // transition), and a present-but-malformed key is a coded `invalid` rather
+  // than a key quietly dropped on the floor.
+  const idempotencyKey = input.idempotencyKey?.trim() || null;
+  if (idempotencyKey !== null && !isUuid(idempotencyKey)) return err('invalid');
+
   const { engagementId } = input;
+  const selfLoop = isSelfLoop(def);
 
   return mutateInOrg(
     ctx,
@@ -158,6 +214,24 @@ export async function executeTransition(
       // LOCK FIRST on a self-loop, THEN read: every fact below must be the
       // committed one, not a snapshot taken while the winner was still running.
       await lockSelfLoop(tx, def, engagementId);
+
+      // A RETRY OF AN ATTEMPT THAT ALREADY COMMITTED IS A NO-OP. Decided here,
+      // before the engagement is even read, so the replay cannot re-run a guard,
+      // re-fire a side-effect or append a second ledger row. It returns plain
+      // `ok` — the caller asked for this act and this act happened; telling them
+      // "already" would only invite them to wonder whether it really did.
+      if (await replayedSelfLoop(tx, ctx, def, { ...input, idempotencyKey })) {
+        // One tap and four taps are otherwise indistinguishable afterwards: a
+        // replay writes nothing, so without this line the ledger, the audit log
+        // and the Worker log all look exactly as they would have if the studio
+        // had tapped once. The ENGAGEMENT and the TRIGGER, never the key — the
+        // key is the caller's credential for this act and does not belong in a
+        // log line anyone can read.
+        console.info(
+          `engagement transition replayed: ${engagementId} ${input.trigger}`,
+        );
+        return;
+      }
 
       const [engagement] = await tx
         .select()
@@ -295,14 +369,51 @@ export async function executeTransition(
         }
       }
 
-      await tx.insert(engagementTransitions).values({
-        orgId: ctx.orgId,
-        engagementId,
-        trigger: input.trigger,
-        fromState: engagement.state,
-        toState: def.to,
-        actorUserId: ctx.userId,
-      });
+      // THE LEDGER ROW IS ALSO THE LOCK. The pre-check above closes the ordinary
+      // retry; this closes the racing one, where two attempts carrying the same
+      // key both pass the pre-check before either commits. ON CONFLICT DO
+      // NOTHING (never a raised unique violation, which would abort the
+      // surrounding transaction) against the partial arbiter, so the loser
+      // writes nothing and — because the whole transition shares this tx — its
+      // state move and side-effect roll back with it.
+      const ledger = await tx
+        .insert(engagementTransitions)
+        .values({
+          orgId: ctx.orgId,
+          engagementId,
+          trigger: input.trigger,
+          fromState: engagement.state,
+          toState: def.to,
+          actorUserId: ctx.userId,
+          // Self-loops only. On an advancing edge the state gate is the
+          // protection, and storing a key there would let one key block a later,
+          // legitimately different transition on the same engagement.
+          idempotencyKey: selfLoop ? idempotencyKey : null,
+        })
+        .onConflictDoNothing({
+          // For onConflictDoNothing, `where` is the ARBITER predicate: it renders
+          // ON CONFLICT (org_id, engagement_id, trigger, idempotency_key) WHERE
+          // idempotency_key is not null DO NOTHING, matching 0050's partial
+          // unique index exactly (targetWhere is a doUpdate-only option).
+          target: [
+            engagementTransitions.orgId,
+            engagementTransitions.engagementId,
+            engagementTransitions.trigger,
+            engagementTransitions.idempotencyKey,
+          ],
+          where: sql`idempotency_key is not null`,
+        })
+        .returning({ id: engagementTransitions.id });
+      if (!ledger[0]) {
+        // The RACING retry: two attempts carrying one key both passed the
+        // pre-check before either committed, and this is the loser. Its whole
+        // transaction rolls back, which is correct and also silent — so say so
+        // here, by engagement and trigger, before the rollback takes the row.
+        console.info(
+          `engagement transition lost the idempotency race: ${engagementId} ${input.trigger}`,
+        );
+        fail('engagement_state_conflict');
+      }
 
       await audit({
         entity: 'design_engagement',

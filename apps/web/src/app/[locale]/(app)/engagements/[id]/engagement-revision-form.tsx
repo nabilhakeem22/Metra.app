@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import type { ActionResult } from '@/lib/actions/result';
+import type { Trigger } from '@/lib/engagements/transitions';
 import { designChangeRaised, requestRevision } from '@/lib/engagements/actions';
 import {
   revisionAmountRequired,
@@ -40,7 +41,12 @@ export function EngagementRevisionForm({
   // submitted as undefined. The concept and 3D allowances never draw on each other.
   allowances: RevisionAllowances;
   pending: boolean;
-  runAction: (fn: () => Promise<ActionResult>) => void;
+  /** Runs one server action with the per-attempt idempotency key held for THIS
+   *  trigger (0050). Ignore the argument on an edge that does not need one. */
+  runAction: (
+    fn: (idempotencyKey: string) => Promise<ActionResult>,
+    trigger?: Trigger,
+  ) => void;
   onCancel: () => void;
 }) {
   const t = useTranslations('engagements.revisionForm');
@@ -58,10 +64,12 @@ export function EngagementRevisionForm({
       reason: reason.trim() || undefined,
       changeOrderAmount: amountRequired ? amount.trim() || undefined : undefined,
     };
-    runAction(() =>
-      isDesignChange
-        ? designChangeRaised(engagementId, payload)
-        : requestRevision(engagementId, payload),
+    runAction(
+      (idempotencyKey) =>
+        isDesignChange
+          ? designChangeRaised(engagementId, payload)
+          : requestRevision(engagementId, payload, idempotencyKey),
+      trigger,
     );
   }
 

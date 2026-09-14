@@ -1,13 +1,22 @@
 import { describe, expect, it } from 'vitest';
-import { decodeCsv, parseCsv, sniffDelimiter } from './decode';
+import { decodeCsv, parseCsvRows, sniffDelimiter, stripBom } from './decode';
+import { ImportParseError, MAX_RAW_ROWS } from '@/lib/import/limits';
+import { readMoneyString } from '@/lib/money/read';
 import {
   autoDetectMapping,
   mapRows,
   normalizeUnit,
-  parseNumericCell,
-  toWesternDigits,
   DEFAULT_SECTION,
 } from './map';
+
+// The EXACT option set boqs/import/map.ts uses for a cell in an imported sheet —
+// the one money surface that reads Arabic-Indic digits.
+const readImportedCell = (raw: string) =>
+  readMoneyString(raw, {
+    allowNegative: true,
+    allowGroupSeparators: true,
+    allowArabicDigits: true,
+  });
 
 describe('sniffDelimiter', () => {
   it('reads a semicolon sheet, which is what Egyptian Excel writes', () => {
@@ -30,7 +39,10 @@ describe('sniffDelimiter', () => {
   });
 });
 
-describe('parseCsv', () => {
+describe('parseCsvRows', () => {
+  const parseCsv = (text: string, delimiter: string) =>
+    parseCsvRows(text, { delimiter });
+
   it('handles quotes, embedded delimiters and doubled quotes', () => {
     const rows = parseCsv('a,"b,c","say ""hi"""\n1,2,3', ',');
     expect(rows[0]).toEqual(['a', 'b,c', 'say "hi"']);
@@ -43,8 +55,11 @@ describe('parseCsv', () => {
 
   it('strips the UTF-8 BOM Excel writes', () => {
     // Left in place it becomes part of the first header and every mapping misses.
-    const rows = parseCsv('﻿Description,Qty\nWalls,10', ',');
+    // The strip moved OUT of the parser and into the decoder, where both
+    // pipelines get it; the parser itself is now only a parser.
+    const rows = parseCsv(stripBom('﻿Description,Qty\nWalls,10'), ',');
     expect(rows[0]?.[0]).toBe('Description');
+    expect(decodeCsv('﻿Description,Qty\nWalls,10').grid.rows[0]?.[0]).toBe('Description');
   });
 
   it('survives CRLF line endings', () => {
@@ -52,6 +67,29 @@ describe('parseCsv', () => {
       ['a', 'b'],
       ['c', 'd'],
     ]);
+  });
+
+  // THE BUG THE SHARED PARSER FIXES FOR THIS PIPELINE. The BOQ's own parser
+  // opened quote mode on ANY `"`, so an inch mark — and a fit-out BOQ is full of
+  // them — swallowed the rest of the file into one field and every row after it
+  // vanished from the import with no error at all.
+  it('keeps a mid-field quote literal instead of swallowing the rest of the file', () => {
+    expect(parseCsv('code,name,qty\nA-1,3" pipe,120\nA-2,Door,5\n', ',')).toEqual([
+      ['code', 'name', 'qty'],
+      ['A-1', '3" pipe', '120'],
+      ['A-2', 'Door', '5'],
+    ]);
+  });
+
+  it('bails with too_many_rows before building a runaway matrix', () => {
+    // A 5 MB file of bare newlines must not materialise millions of tiny arrays
+    // on its way to the fine row check.
+    expect(() => parseCsvRows('a\n'.repeat(MAX_RAW_ROWS + 10), { delimiter: ',' })).toThrow(
+      ImportParseError,
+    );
+    expect(() =>
+      parseCsvRows('a\n'.repeat(5), { delimiter: ',', maxRows: 3 }),
+    ).toThrow(expect.objectContaining({ reason: 'too_many_rows' }));
   });
 });
 
@@ -66,29 +104,33 @@ describe('decodeCsv', () => {
   });
 });
 
-describe('toWesternDigits', () => {
-  it('converts Arabic-Indic digits', () => {
+describe('an imported numeric cell', () => {
+  it('accepts what people actually type', () => {
+    expect(readImportedCell('1,200.50')).toBe('1200.50');
+    expect(readImportedCell('  12 ')).toBe('12');
+    expect(readImportedCell('١٢٫٥')).toBe('12.5');
+  });
+
+  it('reads Arabic-Indic and Persian digits', () => {
     // A studio on an Arabic keyboard types ١٢٠; Number('١٢٠') is NaN, so without
     // this a perfectly valid sheet imports as a page of errors.
-    expect(toWesternDigits('١٢٠')).toBe('120');
-  });
-
-  it('converts Eastern-Arabic (Persian) digits', () => {
-    expect(toWesternDigits('۱۲۰')).toBe('120');
-  });
-});
-
-describe('parseNumericCell', () => {
-  it('accepts what people actually type', () => {
-    expect(parseNumericCell('1,200.50')).toBe('1200.50');
-    expect(parseNumericCell('  12 ')).toBe('12');
-    expect(parseNumericCell('١٢٫٥')).toBe('12.5');
+    expect(readImportedCell('١٢٠')).toBe('120');
+    expect(readImportedCell('۱۲۰')).toBe('120');
   });
 
   it('rejects text and empties', () => {
-    expect(parseNumericCell('n/a')).toBeNull();
-    expect(parseNumericCell('')).toBeNull();
-    expect(parseNumericCell('12 m2')).toBeNull();
+    expect(readImportedCell('n/a')).toBeNull();
+    expect(readImportedCell('')).toBeNull();
+    expect(readImportedCell('12 m2')).toBeNull();
+  });
+
+  it('REFUSES an ambiguous comma this cell used to read as grouping', () => {
+    // BEHAVIOUR CHANGE (wave 2): '1,5' became 15 in an imported price. The row
+    // now fails with "is not a number", which the studio sees in the problem
+    // list instead of importing a ten-fold error silently.
+    for (const ambiguous of ['1,5', '1,2,3', '1.234,56']) {
+      expect(readImportedCell(ambiguous)).toBeNull();
+    }
   });
 });
 
@@ -194,6 +236,23 @@ describe('mapRows', () => {
     const g = grid('Description,Unit,Qty,Rate\nWalls,m2,-5,50');
     const res = mapRows(g, autoDetectMapping(g.rows[0] as string[]));
     expect(res.rows[0]?.errors).toContain('Quantity cannot be negative');
+  });
+
+  it('tells a too-large cell apart from a cell that is not a number', () => {
+    // Two different problems with two different fixes: a stray unit in the cell
+    // versus a figure past the 1e12 cap that reads perfectly well. "Quantity is
+    // not a number" for 1e13 is wrong, and the studio can see that it is wrong.
+    const tooLarge = grid('Description,Unit,Qty,Rate\nWalls,m2,10000000000000,50');
+    const first = mapRows(tooLarge, autoDetectMapping(tooLarge.rows[0] as string[]));
+    expect(first.rows[0]?.errors).toContain('Quantity is too large');
+
+    const nonsense = grid('Description,Unit,Qty,Rate\nWalls,m2,n/a,50');
+    const second = mapRows(nonsense, autoDetectMapping(nonsense.rows[0] as string[]));
+    expect(second.rows[0]?.errors).toContain('Quantity is not a number');
+
+    const dearRate = grid('Description,Unit,Qty,Rate\nWalls,m2,10,99999999999999');
+    const third = mapRows(dearRate, autoDetectMapping(dearRate.rows[0] as string[]));
+    expect(third.rows[0]?.errors).toContain('Unit price is too large');
   });
 
   it('treats a missing cost as zero, not as an error', () => {

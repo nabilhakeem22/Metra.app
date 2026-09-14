@@ -137,16 +137,23 @@ export async function selectConcept(engagementId: string): Promise<ActionResult>
  * pair and is never touched here), which REQUIRES a positive `changeOrderAmount`
  * in the payload (else the whole transition rolls back with
  * `revision_co_amount_required`). Revalidates the shell on success — never throws.
+ *
+ * SELF-LOOP, so it carries an `idempotencyKey` (0050): negotiation -> negotiation
+ * leaves nothing for a state gate to catch, and a retry after a lost response
+ * would spend a second free revision — or raise a second change order — for one
+ * request.
  */
 export async function requestRevision(
   engagementId: string,
   payload?: RequestRevisionPayload,
+  idempotencyKey?: string,
 ): Promise<ActionResult> {
   const ctx = await requireOrg();
   const res = await executeTransition(ctx, {
     engagementId,
     trigger: 'requestRevision',
     payload,
+    idempotencyKey,
   });
   if (res.ok) revalidatePath('/', 'layout');
   return res;
@@ -217,14 +224,22 @@ export async function flagAsBuiltVariance(
  * has_variance=false). Only admissible for an Off-Plan engagement whose as-built
  * drawings are due (`asBuiltDueOpen`); otherwise fails closed with
  * `as_built_not_due`. Revalidates the shell on success.
+ *
+ * The final_approval -> final_approval edge is a SELF-LOOP, so THIS is the one
+ * that carries an `idempotencyKey` (0050): a retry after a lost response would
+ * otherwise append a second attestation to an INSERT-only ledger, which cannot
+ * be taken back. flagAsBuiltVariance advances to change_triage and is protected
+ * by its own from-state, which is why it takes no key.
  */
 export async function attestAsBuiltClean(
   engagementId: string,
+  idempotencyKey?: string,
 ): Promise<ActionResult> {
   const ctx = await requireOrg();
   const res = await executeTransition(ctx, {
     engagementId,
     trigger: 'attestAsBuiltClean',
+    idempotencyKey,
   });
   if (res.ok) revalidatePath('/', 'layout');
   return res;

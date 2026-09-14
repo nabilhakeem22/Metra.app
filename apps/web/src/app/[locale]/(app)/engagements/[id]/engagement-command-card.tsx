@@ -126,7 +126,12 @@ export function EngagementCommandCard({
   clientActivity: EngagementClientActivityRecord[];
   secondaryTriggers: Trigger[];
   pending: boolean;
-  runAction: (fn: () => Promise<ActionResult>) => void;
+  /** Runs one server action with the page's per-attempt idempotency key
+   *  (0050). Ignore the argument on an edge that does not need one. */
+  runAction: (
+    fn: (idempotencyKey: string) => Promise<ActionResult>,
+    trigger?: Trigger,
+  ) => void;
   onNudge: () => void;
 }) {
   const t = useTranslations('engagements');
@@ -272,7 +277,11 @@ export function EngagementCommandCard({
     }
     if (!preview.primaryTrigger) return;
     const action = DIRECT_TRIGGER_ACTIONS[preview.primaryTrigger];
-    if (action) runAction(() => action(engagementId));
+    // The trigger travels with the call: it is what the held key belongs to.
+    const trigger = preview.primaryTrigger;
+    if (action) {
+      runAction((idempotencyKey) => action(engagementId, idempotencyKey), trigger);
+    }
   }
 
   return (

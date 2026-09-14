@@ -3,8 +3,8 @@
 // first-class price_changes header + one price_change_line per touched item
 // (A2 append-only), all in one transaction.
 import { costItems, priceChangeLines, priceChanges, sections } from '@metra/db';
-import { eq, sql } from 'drizzle-orm';
-import { fail, mutateInOrg } from '@/lib/actions/mutate';
+import { sql } from 'drizzle-orm';
+import { mutateInOrg, requireInOrg } from '@/lib/actions/mutate';
 import { err, type ActionResult } from '@/lib/actions/result';
 import type { OrgContext } from '@/lib/db/context';
 import { isBulkPercent } from './percent';
@@ -71,16 +71,17 @@ export async function bulkUpdatePricesCore(
     async (tx, audit) => {
       // The section must exist in THIS org (RLS-scoped). Its snapshot text is
       // frozen onto the price_changes row (NOT an FK).
-      const [section] = await tx
-        .select({
+      const section = await requireInOrg(
+        tx,
+        sections,
+        input.sectionId,
+        {
           key: sections.key,
           nameEn: sections.nameEn,
           nameAr: sections.nameAr,
-        })
-        .from(sections)
-        .where(eq(sections.id, input.sectionId))
-        .limit(1);
-      if (!section) fail('invalid');
+        },
+        'invalid',
+      );
       const categorySnapshot =
         section.key ?? section.nameEn ?? section.nameAr ?? input.sectionId;
 

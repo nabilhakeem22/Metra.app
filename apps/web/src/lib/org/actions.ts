@@ -21,6 +21,7 @@ import {
   ensureFilesBucket,
   type SignedUpload,
 } from '@/lib/storage';
+import { clean } from '@/lib/validation/text';
 import {
   createOrgCore,
   profileWithinLimits,
@@ -112,11 +113,11 @@ export async function updateOrgProfile(
   const ctx = await requireOrg();
   if (!canManageOrg(ctx.role)) return { ok: false, error: 'forbidden' };
 
-  const nameEn = input.nameEn?.trim() || null;
-  const nameAr = input.nameAr?.trim() || null;
+  const nameEn = clean(input.nameEn);
+  const nameAr = clean(input.nameAr);
   if (!nameEn && !nameAr) return { ok: false, error: 'name_required' };
-  const city = input.city?.trim() || null;
-  const taxRegistrationNumber = input.taxRegistrationNumber?.trim() || null;
+  const city = clean(input.city);
+  const taxRegistrationNumber = clean(input.taxRegistrationNumber);
   if (!profileWithinLimits(nameEn, nameAr, city, taxRegistrationNumber)) {
     return { ok: false, error: 'invalid' };
   }

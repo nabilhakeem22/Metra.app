@@ -19,8 +19,13 @@ import {
 import { eq } from 'drizzle-orm';
 import { fail } from '@/lib/actions/mutate';
 import type { ActionCode } from '@/lib/actions/result';
-import { MONEY_RE, formatMoney4, parseMoney4 } from '@/lib/aggregates/proposal-totals';
+import {
+  formatMoney4,
+  isMoneyString,
+  parseMoney4,
+} from '@/lib/aggregates/proposal-totals';
 import type { OrgContext } from '@/lib/db/context';
+import { isRecord } from '@/lib/guards/is-record';
 
 /** 100.0000 in scale-4 units (the required sum of a percent split). */
 const HUNDRED_PERCENT_4 = parseMoney4('100');
@@ -44,15 +49,6 @@ type FeeScheduleValidation =
 
 const KIND_SET = new Set<string>(MILESTONE_KINDS);
 const BASIS_SET = new Set<string>(MILESTONE_BASES);
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null;
-}
-
-/** A well-formed non-negative scale-4 money string (rejects comma-decimals etc.). */
-function isMoneyString(value: unknown): value is string {
-  return typeof value === 'string' && MONEY_RE.test(value.trim());
-}
 
 /**
  * Validate a fee-schedule payload with exact scale-4 BigInt math. Rules:

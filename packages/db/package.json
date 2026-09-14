@@ -13,6 +13,7 @@
     "generate": "drizzle-kit generate",
     "migrate": "tsx src/scripts/migrate.ts",
     "apply-rls": "tsx src/scripts/apply-rls.ts",
+    "assert-schema-applied": "tsx src/scripts/assert-schema-applied.ts",
     "seed": "tsx src/seed/seed-two-orgs.ts",
     "purge-fixture-orgs": "tsx src/scripts/purge-fixture-orgs.ts",
     "reindex-after-purge": "tsx src/scripts/reindex-after-purge.ts",

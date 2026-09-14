@@ -5,19 +5,18 @@ import 'server-only';
 // can share them: a `'use server'` module may only export async functions, so these
 // sync helpers must live in a plain server-only module. NOT part of the
 // `@/lib/team/actions` public surface.
-import { createHash, randomBytes } from 'node:crypto';
 import { organizations } from '@metra/db';
 import { getLocale } from 'next-intl/server';
 import { withOrgContext, type OrgContext } from '@/lib/db/context';
 import { resolveRequestOrigin } from '@/lib/http/request-origin';
+import { mintShareToken } from '@/lib/share/token';
+
+// The invite token is minted by the same primitive as a document share link:
+// 32 CSPRNG bytes, base64url, stored only as its sha256. Its LIFETIME is its
+// own (INVITE_TTL_DAYS above), which is the only thing that differs.
+export { mintShareToken };
 
 export const INVITE_TTL_DAYS = 7;
-
-export function mintToken() {
-  const raw = randomBytes(32).toString('base64url');
-  const hash = createHash('sha256').update(raw).digest('hex');
-  return { raw, hash };
-}
 
 export function normalizeEmail(email: string): string {
   return email.trim().toLowerCase();

@@ -5,22 +5,8 @@ import { formatPercent, formatQuantity } from '@/lib/format/number';
 import { docYear, formatDocNumber } from '@/lib/format/doc-number';
 import type { ContractDetail } from '@/lib/contracts/queries';
 import { dirFor } from '@/i18n/routing';
+import { esc, pickEscaped } from '@/lib/pdf/html';
 import { fontFaceCss } from './template';
-
-function esc(s: string | null | undefined): string {
-  return (s ?? '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
-}
-
-function pick(ar: string | null, en: string | null, locale: string): string {
-  const wantAr = locale.startsWith('ar');
-  const primary = wantAr ? ar : en;
-  const other = wantAr ? en : ar;
-  return esc((primary && primary.trim() ? primary : other) ?? '');
-}
 
 /**
  * Contract PDF. Same table shape as the proposal PDF (sections + lines + totals),
@@ -44,9 +30,9 @@ export async function buildContractHtml(
   const showCost = opts.variant === 'internal';
   const m = (v: string) => formatMoney(v, locale);
   const num = formatDocNumber('C', detail.number, docYear(null, detail.createdAt));
-  const orgName = pick(opts.orgNameAr, opts.orgNameEn, locale);
-  const clientName = pick(detail.clientNameAr, detail.clientNameEn, locale);
-  const title = pick(detail.titleAr, detail.titleEn, locale);
+  const orgName = pickEscaped(opts.orgNameAr, opts.orgNameEn, locale);
+  const clientName = pickEscaped(detail.clientNameAr, detail.clientNameEn, locale);
+  const title = pickEscaped(detail.titleAr, detail.titleEn, locale);
   const extraCols = showCost ? 2 : 0;
   const revised = detail.revisedValue !== detail.originalValue;
 
@@ -56,7 +42,7 @@ export async function buildContractHtml(
         .map(
           (l) => `
         <tr>
-          <td class="desc">${pick(l.descriptionAr, l.descriptionEn, locale)}</td>
+          <td class="desc">${pickEscaped(l.descriptionAr, l.descriptionEn, locale)}</td>
           <td class="num">${formatQuantity(l.qty, locale)} ${esc(l.unit)}</td>
           ${showCost ? `<td class="num">${m(l.unitCost ?? '0')}</td>` : ''}
           <td class="num">${m(l.unitPrice)}</td>
@@ -67,7 +53,7 @@ export async function buildContractHtml(
         )
         .join('');
       return `
-      <tr class="section"><td colspan="${5 + extraCols}">${pick(s.titleAr, s.titleEn, locale)}</td></tr>
+      <tr class="section"><td colspan="${5 + extraCols}">${pickEscaped(s.titleAr, s.titleEn, locale)}</td></tr>
       ${rows}
       <tr class="subtotal">
         <td colspan="${4 + extraCols}">${'—'}</td>
@@ -77,8 +63,10 @@ export async function buildContractHtml(
     })
     .join('');
 
-  const termRow = (label: string, value: string) =>
-    `<tr><td>${esc(label)}</td><td class="num">${esc(value)}</td></tr>`;
+  // The label arrives ALREADY escaped (it comes from pickEscaped); the value does
+  // not. Escaping both was the F6 double-escape on the contract terms table.
+  const termRow = (escapedLabel: string, value: string) =>
+    `<tr><td>${escapedLabel}</td><td class="num">${esc(value)}</td></tr>`;
 
   return `<!doctype html>
 <html lang="${locale}" dir="${dir}">
@@ -116,13 +104,13 @@ export async function buildContractHtml(
   <table dir="${dir}">
     <thead>
       <tr>
-        <th>${pick('الوصف', 'Description', locale)}</th>
-        <th class="num">${pick('الكمية', 'Qty', locale)}</th>
-        ${showCost ? `<th class="num">${pick('التكلفة', 'Cost', locale)}</th>` : ''}
-        <th class="num">${pick('سعر الوحدة', 'Unit price', locale)}</th>
-        <th class="num">${pick('خصم', 'Disc', locale)}</th>
-        <th class="num">${pick('الإجمالي', 'Total', locale)}</th>
-        ${showCost ? `<th class="num">${pick('الهامش', 'Margin', locale)}</th>` : ''}
+        <th>${pickEscaped('الوصف', 'Description', locale)}</th>
+        <th class="num">${pickEscaped('الكمية', 'Qty', locale)}</th>
+        ${showCost ? `<th class="num">${pickEscaped('التكلفة', 'Cost', locale)}</th>` : ''}
+        <th class="num">${pickEscaped('سعر الوحدة', 'Unit price', locale)}</th>
+        <th class="num">${pickEscaped('خصم', 'Disc', locale)}</th>
+        <th class="num">${pickEscaped('الإجمالي', 'Total', locale)}</th>
+        ${showCost ? `<th class="num">${pickEscaped('الهامش', 'Margin', locale)}</th>` : ''}
       </tr>
     </thead>
     <tbody>
@@ -131,24 +119,24 @@ export async function buildContractHtml(
   </table>
 
   <table class="totals">
-    <tr><td>${pick('المجموع الفرعي', 'Subtotal', locale)}</td><td class="num">${m(detail.subtotal)}</td></tr>
-    <tr><td>${pick('الخصم', 'Discount', locale)}</td><td class="num">${m(detail.discountAmount)}</td></tr>
-    <tr><td>${pick('ضريبة القيمة المضافة', 'VAT', locale)} (${formatPercent(detail.taxRate, locale)})</td><td class="num">${m(detail.taxAmount)}</td></tr>
-    <tr><td>${pick('الإشراف', 'Supervision', locale)} (${formatPercent(detail.supervisionPct, locale)})</td><td class="num">${m(detail.supervisionAmount)}</td></tr>
-    <tr class="grand"><td>${pick('قيمة العقد الأصلية', 'Original value', locale)}</td><td class="num">${m(detail.originalValue)}</td></tr>
-    ${revised ? `<tr class="grand"><td>${pick('القيمة بعد التعديلات', 'Revised value', locale)}</td><td class="num">${m(detail.revisedValue)}</td></tr>` : ''}
-    ${showCost && detail.totalMargin !== undefined ? `<tr><td>${pick('هامش الربح', 'Margin', locale)}</td><td class="num">${m(detail.totalMargin)}</td></tr>` : ''}
+    <tr><td>${pickEscaped('المجموع الفرعي', 'Subtotal', locale)}</td><td class="num">${m(detail.subtotal)}</td></tr>
+    <tr><td>${pickEscaped('الخصم', 'Discount', locale)}</td><td class="num">${m(detail.discountAmount)}</td></tr>
+    <tr><td>${pickEscaped('ضريبة القيمة المضافة', 'VAT', locale)} (${formatPercent(detail.taxRate, locale)})</td><td class="num">${m(detail.taxAmount)}</td></tr>
+    <tr><td>${pickEscaped('الإشراف', 'Supervision', locale)} (${formatPercent(detail.supervisionPct, locale)})</td><td class="num">${m(detail.supervisionAmount)}</td></tr>
+    <tr class="grand"><td>${pickEscaped('قيمة العقد الأصلية', 'Original value', locale)}</td><td class="num">${m(detail.originalValue)}</td></tr>
+    ${revised ? `<tr class="grand"><td>${pickEscaped('القيمة بعد التعديلات', 'Revised value', locale)}</td><td class="num">${m(detail.revisedValue)}</td></tr>` : ''}
+    ${showCost && detail.totalMargin !== undefined ? `<tr><td>${pickEscaped('هامش الربح', 'Margin', locale)}</td><td class="num">${m(detail.totalMargin)}</td></tr>` : ''}
   </table>
 
   <table class="terms totals">
-    ${termRow(pick('نسبة الدفعة المقدمة', 'Advance %', locale), formatPercent(detail.advancePct, locale))}
-    ${termRow(pick('نسبة المحتجز', 'Retention %', locale), formatPercent(detail.retentionPct, locale))}
-    ${detail.paymentTermsDays != null ? termRow(pick('مدة السداد (يوم)', 'Payment terms (days)', locale), String(detail.paymentTermsDays)) : ''}
-    ${detail.startDate ? termRow(pick('تاريخ البدء', 'Start date', locale), esc(detail.startDate)) : ''}
-    ${detail.endDate ? termRow(pick('تاريخ الانتهاء', 'End date', locale), esc(detail.endDate)) : ''}
+    ${termRow(pickEscaped('نسبة الدفعة المقدمة', 'Advance %', locale), formatPercent(detail.advancePct, locale))}
+    ${termRow(pickEscaped('نسبة المحتجز', 'Retention %', locale), formatPercent(detail.retentionPct, locale))}
+    ${detail.paymentTermsDays != null ? termRow(pickEscaped('مدة السداد (يوم)', 'Payment terms (days)', locale), String(detail.paymentTermsDays)) : ''}
+    ${detail.startDate ? termRow(pickEscaped('تاريخ البدء', 'Start date', locale), detail.startDate) : ''}
+    ${detail.endDate ? termRow(pickEscaped('تاريخ الانتهاء', 'End date', locale), detail.endDate) : ''}
   </table>
 
-  <div class="footer">${esc(orgName)} · ${num}</div>
+  <div class="footer">${orgName} · ${num}</div>
 </body>
 </html>`;
 }

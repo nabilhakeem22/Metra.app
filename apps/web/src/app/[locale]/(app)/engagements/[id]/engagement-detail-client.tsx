@@ -18,6 +18,8 @@ import type {
   EngagementTransitionRecord,
 } from '@/lib/engagements/queries';
 import type { CommercialPulse } from '@/lib/engagements/pulse';
+import { keyForAttempt, releasesKey } from '@/lib/engagements/retry-policy';
+import { acknowledgesIssuance } from '@/lib/engagements/rom-ack';
 import type { Trigger } from '@/lib/engagements/transitions';
 import { EngagementCommandCard } from './engagement-command-card';
 import {
@@ -92,6 +94,23 @@ export function EngagementDetailClient({
   const [error, setError] = useState<ActionCode | null>(null);
   // Guards the frame-sized window `pending` cannot -- see runAction below.
   const inFlight = useRef(false);
+  /**
+   * The idempotency key of each attempt currently in doubt (0050), BY TRIGGER.
+   *
+   * Per trigger, not per page. One shared key meant that any of the fifteen
+   * actions on this screen — an upload, a payment, the off-plan toggle —
+   * released the key a half-finished `requestRevision` was holding, and its
+   * retry then minted a fresh one: a second ledger row and a second allowance
+   * spent, caused by a success that had nothing to do with it.
+   *
+   * A key is NOT released when its action fails: it is released when we KNOW
+   * what happened. A definite refusal means the transaction rolled back, so the
+   * next click is a new attempt and gets a new key. 'uncertain', 'generic' and a
+   * thrown rejection mean the opposite — the write may have committed and only
+   * the answer was lost — so the key survives and the retry is recognised as the
+   * same act. See lib/engagements/retry-policy.ts for both rules.
+   */
+  const pendingKeys = useRef(new Map<Trigger, string>());
 
   // The Advance button owns the forward-advance trigger; every OTHER legal,
   // permitted trigger becomes a low-emphasis secondary control (no legal trigger
@@ -108,9 +127,13 @@ export function EngagementDetailClient({
   // permanent "draft" badge on every young engagement says nothing at all.
   const budgetDraft =
     header.romLow !== null && header.romHigh !== null && header.romIssuedAt === null;
+  // 0049: the acknowledgement must answer THIS issuance. A stale one against a
+  // superseded band leaves the studio still awaiting the client, which is what
+  // the server-side romAcknowledged guard already decides — both call
+  // acknowledgesIssuance so the badge and the gate cannot disagree.
   const budgetAwaitingAck =
     header.romIssuedAt !== null &&
-    !events.some((e) => e.kind === 'rom_acknowledgement');
+    !events.some((e) => acknowledgesIssuance(e, header.romIssuedAt));
 
   // Pure derivation over the artifacts the page already loaded (no extra read).
   // The command card needs it to stop offering a 5th concept-option upload —
@@ -149,16 +172,41 @@ export function EngagementDetailClient({
    * instead would strand the page forever on any path where a transition never
    * starts.
    */
-  function runAction(fn: () => Promise<ActionResult>) {
+  function runAction(
+    fn: (idempotencyKey: string) => Promise<ActionResult>,
+    trigger?: Trigger,
+  ) {
     if (inFlight.current) return;
     inFlight.current = true;
     setError(null);
+    // ONE key per ATTEMPT AT ONE TRIGGER, HELD across a retry the user makes
+    // because they were not told what happened. It is minted here rather than
+    // per click, because the whole point is that the RETRY carries the SAME key
+    // as the attempt it is retrying — a fresh key would be a fresh act and would
+    // spend a second free revision. See the ref's declaration for the rest.
+    const idempotencyKey = keyForAttempt(pendingKeys.current, trigger, () =>
+      crypto.randomUUID(),
+    );
+    if (trigger) pendingKeys.current.set(trigger, idempotencyKey);
     startTransition(async () => {
       try {
-        const res = await fn();
-        if (res.ok) router.refresh();
-        else setError((res.error as ActionCode) ?? 'generic');
+        const res = await fn(idempotencyKey);
+        // Only THIS trigger's key is ever touched, and only when the answer is
+        // "it worked" or a DEFINITE refusal — a guard verdict, a forbidden
+        // capability, a state conflict, all of which rolled their transaction
+        // back. `generic`, `uncertain` and any code this build has not heard of
+        // may all mean the write landed and the answer was lost, so they hold.
+        if (trigger && releasesKey(res)) pendingKeys.current.delete(trigger);
+        if (res.ok) {
+          router.refresh();
+        } else {
+          setError((res.error as ActionCode) ?? 'generic');
+        }
       } catch (cause) {
+        // A rejection is the client-side twin of 'uncertain' — the request may
+        // have reached Postgres and committed, and only the response was lost.
+        // So the key is HELD here too; releasing it would hand the retry a fresh
+        // identity and reopen exactly the double-apply this exists to close.
         console.error('engagement action failed before returning a result', cause);
         setError('generic');
       } finally {
