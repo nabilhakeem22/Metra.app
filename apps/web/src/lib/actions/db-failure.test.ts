@@ -16,6 +16,23 @@ describe('isAmbiguousDbOutcome', () => {
     expect(isAmbiguousDbOutcome(pgError('08P01'))).toBe(true);
   });
 
+  it('is true for the codes postgres.js itself raises when the socket dies', () => {
+    // A dropped connection never carries a server SQLSTATE; the driver's own
+    // error factory sets these instead (node_modules/postgres/src/errors.js).
+    for (const code of [
+      'CONNECTION_CLOSED',
+      'CONNECTION_DESTROYED',
+      'CONNECTION_ENDED',
+      'CONNECT_TIMEOUT',
+    ]) {
+      expect(isAmbiguousDbOutcome(pgError(code))).toBe(true);
+    }
+  });
+
+  it('is true for admin_shutdown, which a pooler raises when it recycles a backend', () => {
+    expect(isAmbiguousDbOutcome(pgError('57P01'))).toBe(true);
+  });
+
   it('is false for errors that definitively committed nothing', () => {
     expect(isAmbiguousDbOutcome(pgError('23505'))).toBe(false); // unique violation
     expect(isAmbiguousDbOutcome(pgError('23514'))).toBe(false); // check violation

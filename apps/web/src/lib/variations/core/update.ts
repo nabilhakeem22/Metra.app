@@ -100,9 +100,9 @@ export async function saveVariationDraftCore(
       return err(tooLarge ? 'amount_too_large' : 'invalid');
     }
     if (!pctInRange(discountPct.value)) return err('discount_out_of_range');
-    // The per-FACTOR magnitude loop that used to sit here is gone: the reader
-    // applies MAX_AMOUNT itself, so an over-cap factor already came back null and
-    // failed 'invalid' above. The PRODUCT check below was never redundant.
+    // No per-FACTOR magnitude loop here: the reader applies MAX_AMOUNT itself and
+    // reports an over-cap factor as reason 'too_large', which the block above
+    // turns into amount_too_large. The PRODUCT check below was never redundant.
     if (!l.unit) return err('invalid');
 
     const totals = computeLine({

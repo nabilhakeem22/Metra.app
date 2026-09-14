@@ -19,15 +19,36 @@
  * Pure and dependency-free so it is unit-testable without a database: it reads
  * only the `code` property postgres.js copies off the server's error response.
  */
-const AMBIGUOUS_SQLSTATES: ReadonlySet<string> = new Set(['55P03', '57014']);
+const AMBIGUOUS_SQLSTATES: ReadonlySet<string> = new Set([
+  '55P03',
+  '57014',
+  // admin_shutdown: what the pooler raises when it recycles a backend under a
+  // write in flight. The server is gone; whether COMMIT landed is unknown.
+  '57P01',
+]);
 
 /** SQLSTATE class 08 — connection_exception, every member of it. */
 const CONNECTION_EXCEPTION_CLASS = '08';
+
+/**
+ * A socket that actually dies never produces a server SQLSTATE at all:
+ * postgres.js raises its own connection errors with these `code` values
+ * (see node_modules/postgres/src/errors.js). They are the class-08 outcome in
+ * practice, so they are ambiguous for exactly the same reason.
+ */
+const DRIVER_CONNECTION_CODES: ReadonlySet<string> = new Set([
+  'CONNECTION_CLOSED',
+  'CONNECTION_DESTROYED',
+  'CONNECTION_ENDED',
+  'CONNECT_TIMEOUT',
+]);
 
 export function isAmbiguousDbOutcome(error: unknown): boolean {
   const code = (error as { code?: unknown } | null)?.code;
   if (typeof code !== 'string') return false;
   return (
-    AMBIGUOUS_SQLSTATES.has(code) || code.startsWith(CONNECTION_EXCEPTION_CLASS)
+    AMBIGUOUS_SQLSTATES.has(code) ||
+    DRIVER_CONNECTION_CODES.has(code) ||
+    code.startsWith(CONNECTION_EXCEPTION_CLASS)
   );
 }

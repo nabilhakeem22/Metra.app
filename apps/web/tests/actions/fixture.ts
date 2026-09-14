@@ -220,6 +220,10 @@ export const raw = {
    */
   async explain(text: string): Promise<string> {
     const rows = await pg.begin(async (tx) => {
+      // Fresh statistics first: on a near-empty fixture table with no ANALYZE,
+      // two candidate indexes can tie on cost and the planner breaks the tie by
+      // catalogue order, which is not stable across a re-created database.
+      await tx.unsafe('analyze');
       await tx.unsafe('set local enable_seqscan = off');
       return tx.unsafe(`explain ${text}`);
     });
