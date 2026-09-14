@@ -12,6 +12,20 @@ const SCALE = 10000n; // 1e4 (4 decimal places)
 export const MONEY_RE = /^-?\d+(\.\d+)?$/;
 
 /**
+ * Is `value` a well-formed scale-4 money string? Total over `unknown`, because
+ * every caller is reading an untyped JSONB transition payload where the field may
+ * be a number, an object, or absent entirely. Rejects comma-decimals, Arabic-Indic
+ * digits and exponent literals — `\d` is ASCII-only and the regex is anchored.
+ *
+ * It lives beside MONEY_RE so the shape and its guard cannot drift apart. It had
+ * been declared privately inside the two payload validators, which is two chances
+ * for one of them to be loosened on its own.
+ */
+export function isMoneyString(value: unknown): value is string {
+  return typeof value === 'string' && MONEY_RE.test(value.trim());
+}
+
+/**
  * Truncate a money string to at most 4 decimal places — the scale of every money
  * column in this schema (`numeric(18,4)`).
  *

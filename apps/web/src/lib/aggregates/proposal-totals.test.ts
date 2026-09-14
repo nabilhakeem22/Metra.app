@@ -6,6 +6,7 @@ import {
   computeSection,
   computeTotals,
   formatMoney4,
+  isMoneyString,
   marginPct,
   parseMoney4,
 } from './proposal-totals';
@@ -186,5 +187,26 @@ describe('clampMoney4 — the app and numeric(18,4) must agree', () => {
     // Rejection behaviour is unchanged.
     expect(coerceMoneyInput('-3')).toBe('0');
     expect(coerceMoneyInput('abc')).toBe('0');
+  });
+});
+
+describe('isMoneyString', () => {
+  // Reads an untyped JSONB transition payload, so it must be total over unknown.
+  it('accepts the money shapes a payload legitimately carries', () => {
+    for (const value of ['0', '5', '-5', '1200.5000', '  12.25  ']) {
+      expect(isMoneyString(value)).toBe(true);
+    }
+  });
+
+  it('rejects the corruptions the two former copies each guarded against', () => {
+    for (const value of ['1,5', '١٢٣', '1e3', '0x1A', '', '   ', '.5', '5.']) {
+      expect(isMoneyString(value)).toBe(false);
+    }
+  });
+
+  it('is total over unknown — a payload field may be anything at all', () => {
+    for (const value of [null, undefined, 42, {}, [], true]) {
+      expect(isMoneyString(value)).toBe(false);
+    }
   });
 });
