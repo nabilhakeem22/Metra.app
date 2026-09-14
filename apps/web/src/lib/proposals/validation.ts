@@ -9,7 +9,6 @@
 // resolving unchanged.
 import { MONEY_RE, clampMoney4 } from '@/lib/aggregates/proposal-totals';
 
-export const SHARE_TTL_DAYS = 30;
 const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 // R2 boundary caps (named so the tests + UI can agree on them).

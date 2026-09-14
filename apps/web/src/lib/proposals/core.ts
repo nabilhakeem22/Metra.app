@@ -23,10 +23,14 @@ import {
 
 import { normalizeText, validIsoDate } from './validation';
 
+// The share token, its hash and its lifetime live in the share kernel, which
+// reaches for node:crypto and so may NOT be re-exported from the client-safe
+// ./validation module. Re-exported here so callers keep one import surface.
+export { SHARE_TTL_DAYS } from '@/lib/share/token';
+
 // The pure validators + boundary caps live in ./validation (client-safe, unit-
 // testable). Re-exported so `@/lib/proposals/core` stays the one import surface.
 export {
-  SHARE_TTL_DAYS,
   MAX_SECTIONS,
   MAX_LINES_PER_SECTION,
   MAX_TOTAL_LINES,
