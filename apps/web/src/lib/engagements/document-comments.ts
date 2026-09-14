@@ -16,7 +16,7 @@ import {
 } from '@metra/db';
 import { and, asc, count, eq, gt, notExists, sql } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
-import { fail, mutateInOrg } from '@/lib/actions/mutate';
+import { fail, mutateInOrg, requireInOrg } from '@/lib/actions/mutate';
 import type { ActionResult } from '@/lib/actions/result';
 import type { OrgContext } from '@/lib/db/context';
 import { withOrgContext } from '@/lib/db/context';
@@ -100,22 +100,24 @@ export async function replyToDocumentCore(
     ctx,
     { capability: 'engagements_design', action: 'update', flow: 'interior' },
     async (tx, audit) => {
-      const [artifact] = await tx
-        .select({
+      const artifact = await requireInOrg(
+        tx,
+        engagementArtifacts,
+        input.artifactId,
+        {
           id: engagementArtifacts.id,
           engagementId: engagementArtifacts.engagementId,
-        })
-        .from(engagementArtifacts)
-        .where(eq(engagementArtifacts.id, input.artifactId))
-        .limit(1);
-      if (!artifact) fail('invalid');
+        },
+        'invalid',
+      );
 
-      const [engagement] = await tx
-        .select({ id: designEngagements.id, state: designEngagements.state })
-        .from(designEngagements)
-        .where(eq(designEngagements.id, artifact.engagementId))
-        .limit(1);
-      if (!engagement) fail('engagement_not_found');
+      const engagement = await requireInOrg(
+        tx,
+        designEngagements,
+        artifact.engagementId,
+        { id: designEngagements.id, state: designEngagements.state },
+        'engagement_not_found',
+      );
       if (isTerminal(engagement.state)) fail('engagement_not_active');
 
       await tx.insert(engagementDocumentComments).values({

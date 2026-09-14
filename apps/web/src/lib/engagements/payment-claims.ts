@@ -11,7 +11,7 @@ import 'server-only';
 // the amount at confirm time, so it is re-validated here, not trusted from the claim.
 import { clientPaymentClaims, designEngagements, paymentEvents } from '@metra/db';
 import { and, eq, sql } from 'drizzle-orm';
-import { fail, mutateInOrg } from '@/lib/actions/mutate';
+import { fail, mutateInOrg, requireInOrg } from '@/lib/actions/mutate';
 import type { ActionResult } from '@/lib/actions/result';
 import { MONEY_RE, formatMoney4, parseMoney4 } from '@/lib/aggregates/proposal-totals';
 import type { OrgContext } from '@/lib/db/context';
@@ -93,12 +93,13 @@ export async function confirmPaymentClaimCore(
 
       // Terminal guard (mirrors recordPaymentCore): never record money once the
       // engagement finished, even if the claim was made while it was active.
-      const [engagement] = await tx
-        .select({ state: designEngagements.state })
-        .from(designEngagements)
-        .where(eq(designEngagements.id, claim.engagementId))
-        .limit(1);
-      if (!engagement) fail('engagement_not_found');
+      const engagement = await requireInOrg(
+        tx,
+        designEngagements,
+        claim.engagementId,
+        { state: designEngagements.state },
+        'engagement_not_found',
+      );
       if (isTerminal(engagement.state)) fail('engagement_not_active');
 
       // Record the real payment, keyed so a raced / replayed confirm dedups to

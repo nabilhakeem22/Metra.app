@@ -21,7 +21,7 @@ import {
   type EngagementArtifactKind,
 } from '@metra/db';
 import { and, eq } from 'drizzle-orm';
-import { fail, mutateInOrg } from '@/lib/actions/mutate';
+import { fail, mutateInOrg, requireInOrg } from '@/lib/actions/mutate';
 import type { ActionResult } from '@/lib/actions/result';
 import type { OrgContext } from '@/lib/db/context';
 import { isTerminal } from './states';
@@ -79,12 +79,13 @@ export async function recordArtifactCore(
     ctx,
     { capability: 'engagements_design', action: 'create', flow: 'interior' },
     async (tx, audit) => {
-      const [engagement] = await tx
-        .select({ id: designEngagements.id, state: designEngagements.state })
-        .from(designEngagements)
-        .where(eq(designEngagements.id, input.engagementId))
-        .limit(1);
-      if (!engagement) fail('engagement_not_found');
+      const engagement = await requireInOrg(
+        tx,
+        designEngagements,
+        input.engagementId,
+        { id: designEngagements.id, state: designEngagements.state },
+        'engagement_not_found',
+      );
       // No recording an artifact against a finished engagement (abandoned / closed).
       if (isTerminal(engagement.state)) fail('engagement_not_active');
 

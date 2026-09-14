@@ -11,8 +11,8 @@
 // transition) that appends the client's acknowledgement of the firm's ROM band,
 // snapshotting the current ROM into the event so the acknowledged range is frozen.
 import { designEngagements, engagementEvents, type MetraDb } from '@metra/db';
-import { eq, sql } from 'drizzle-orm';
-import { fail, mutateInOrg } from '@/lib/actions/mutate';
+import { sql } from 'drizzle-orm';
+import { fail, mutateInOrg, requireInOrg } from '@/lib/actions/mutate';
 import { err, type ActionResult } from '@/lib/actions/result';
 import { isValidOccurredOn } from './event-provenance';
 import type { OrgContext } from '@/lib/db/context';
@@ -120,18 +120,19 @@ export async function recordRomAcknowledgementCore(
     ctx,
     { capability: 'engagements_design', action: 'create', flow: 'interior' },
     async (tx, audit) => {
-      const [engagement] = await tx
-        .select({
+      const engagement = await requireInOrg(
+        tx,
+        designEngagements,
+        input.engagementId,
+        {
           id: designEngagements.id,
           state: designEngagements.state,
           romLow: designEngagements.romLow,
           romHigh: designEngagements.romHigh,
           romIssuedAt: designEngagements.romIssuedAt,
-        })
-        .from(designEngagements)
-        .where(eq(designEngagements.id, input.engagementId))
-        .limit(1);
-      if (!engagement) fail('engagement_not_found');
+        },
+        'engagement_not_found',
+      );
       // No acknowledging a range on a finished engagement (abandoned / closed).
       if (isTerminal(engagement.state)) fail('engagement_not_active');
       // Can't acknowledge a range that was never entered (Step 10's setEngagementRom).

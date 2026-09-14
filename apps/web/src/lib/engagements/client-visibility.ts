@@ -9,7 +9,7 @@
 // `requireOrg()` + `revalidatePath`.
 import { designEngagements, engagementArtifacts } from '@metra/db';
 import { and, eq } from 'drizzle-orm';
-import { fail, mutateInOrg } from '@/lib/actions/mutate';
+import { fail, mutateInOrg, requireInOrg } from '@/lib/actions/mutate';
 import type { ActionResult } from '@/lib/actions/result';
 import type { OrgContext } from '@/lib/db/context';
 import { isTerminal } from './states';
@@ -48,25 +48,27 @@ export async function setArtifactClientVisibilityCore(
     async (tx, audit) => {
       // RLS scopes this read to the caller's org, so a FOREIGN artifact simply does
       // not resolve and is indistinguishable from one that never existed.
-      const [artifact] = await tx
-        .select({
+      const artifact = await requireInOrg(
+        tx,
+        engagementArtifacts,
+        input.artifactId,
+        {
           id: engagementArtifacts.id,
           engagementId: engagementArtifacts.engagementId,
           fileId: engagementArtifacts.fileId,
           clientVisible: engagementArtifacts.clientVisible,
-        })
-        .from(engagementArtifacts)
-        .where(eq(engagementArtifacts.id, input.artifactId))
-        .limit(1);
-      if (!artifact) fail('invalid');
+        },
+        'invalid',
+      );
       if (!artifact.fileId) fail('invalid');
 
-      const [engagement] = await tx
-        .select({ id: designEngagements.id, state: designEngagements.state })
-        .from(designEngagements)
-        .where(eq(designEngagements.id, artifact.engagementId))
-        .limit(1);
-      if (!engagement) fail('engagement_not_found');
+      const engagement = await requireInOrg(
+        tx,
+        designEngagements,
+        artifact.engagementId,
+        { id: designEngagements.id, state: designEngagements.state },
+        'engagement_not_found',
+      );
       if (isTerminal(engagement.state)) fail('engagement_not_active');
 
       await tx
