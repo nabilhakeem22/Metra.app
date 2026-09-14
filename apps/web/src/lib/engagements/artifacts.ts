@@ -26,6 +26,12 @@ import type { ActionResult } from '@/lib/actions/result';
 import type { OrgContext } from '@/lib/db/context';
 import { isTerminal } from './states';
 import { isUuid } from '@/lib/uuid';
+import {
+  MAX_LABEL_CHARS,
+  MAX_NOTE_CHARS,
+  TOO_LONG,
+  optionalText,
+} from '@/lib/validation/text';
 
 const KIND_SET = new Set<string>(ENGAGEMENT_ARTIFACT_KINDS);
 
@@ -36,12 +42,6 @@ export interface RecordArtifactInput {
   contentHash?: string | null;
   label?: string | null;
   note?: string | null;
-}
-
-/** Trim a nullable free-text field to a stored value ('' / whitespace -> null). */
-function optionalText(value: string | null | undefined): string | null {
-  const trimmed = value?.trim();
-  return trimmed ? trimmed : null;
 }
 
 /**
@@ -66,9 +66,14 @@ export async function recordArtifactCore(
   if (fileId !== null && !isUuid(fileId)) {
     return { ok: false, error: 'invalid' };
   }
-  const contentHash = optionalText(input.contentHash);
-  const label = optionalText(input.label);
-  const note = optionalText(input.note);
+  const contentHash = optionalText(input.contentHash, MAX_LABEL_CHARS);
+  const label = optionalText(input.label, MAX_LABEL_CHARS);
+  const note = optionalText(input.note, MAX_NOTE_CHARS);
+  // An over-long field is a REFUSAL, not a truncation: storing the first 200
+  // characters of a label would quietly rename the studio's artifact.
+  if (contentHash === TOO_LONG || label === TOO_LONG || note === TOO_LONG) {
+    return { ok: false, error: 'invalid' };
+  }
 
   return mutateInOrg(
     ctx,

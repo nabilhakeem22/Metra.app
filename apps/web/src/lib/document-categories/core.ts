@@ -19,6 +19,7 @@ import { and, desc, eq } from 'drizzle-orm';
 import { fail, mutateInOrg } from '@/lib/actions/mutate';
 import { err, type ActionResult } from '@/lib/actions/result';
 import type { OrgContext } from '@/lib/db/context';
+import { clean } from '@/lib/validation/text';
 import { isUuid } from '@/lib/uuid';
 
 const NAME_MAX = 80;
@@ -26,10 +27,6 @@ const NAME_MAX = 80;
 export interface DocumentCategoryInput {
   nameEn?: string | null;
   nameAr?: string | null;
-}
-
-function clean(v: string | null | undefined): string | null {
-  return v?.trim() || null;
 }
 
 /** At least one locale, neither over the cap — mirrors the bilingual DB CHECK. */

@@ -8,6 +8,7 @@ import { eq } from 'drizzle-orm';
 import { fail } from '@/lib/actions/mutate';
 import { err, type ActionResult } from '@/lib/actions/result';
 import { isUuid } from '@/lib/uuid';
+import { clean, normalizePercent } from '@/lib/validation/text';
 
 export interface ProjectInput {
   /** Optional: CREATE allocates one (P-YYYY-NNNN). Update must supply the stored
@@ -33,21 +34,6 @@ function isStatus(v: unknown): v is ProjectStatus {
   return (PROJECT_STATUSES as readonly string[]).includes(v as string);
 }
 
-const PCT_RE = /^\d+(\.\d+)?$/;
-
-function clean(v: string | null | undefined): string | null {
-  return v?.trim() || null;
-}
-
-/** Non-negative percentage in [0,100] as a decimal string, or null if invalid. */
-function normPct(v: string | null | undefined): string | null {
-  const s = v?.trim();
-  if (s === undefined || s === '') return '0';
-  if (!PCT_RE.test(s)) return null;
-  const n = Number(s);
-  if (!Number.isFinite(n) || n < 0 || n > 100) return null;
-  return s;
-}
 
 // Boundary length caps (defense-in-depth), mirroring org/core profileWithinLimits.
 const LIMITS = {
@@ -101,8 +87,8 @@ export function validate(
   const typeId = clean(input.typeId);
   if (typeId && !isUuid(typeId)) return err('invalid');
 
-  const advancePct = normPct(input.advancePct);
-  const retentionPct = normPct(input.retentionPct);
+  const advancePct = normalizePercent(input.advancePct);
+  const retentionPct = normalizePercent(input.retentionPct);
   if (advancePct === null || retentionPct === null) return err('invalid');
 
   const startDate = clean(input.startDate);

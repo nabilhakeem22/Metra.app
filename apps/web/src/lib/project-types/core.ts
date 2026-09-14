@@ -5,6 +5,7 @@ import { and, eq, ilike, or } from 'drizzle-orm';
 import { mutateInOrg } from '@/lib/actions/mutate';
 import { err, type ActionResult } from '@/lib/actions/result';
 import type { OrgContext } from '@/lib/db/context';
+import { clean } from '@/lib/validation/text';
 
 export interface ProjectTypeInput {
   nameEn?: string | null;
@@ -12,10 +13,6 @@ export interface ProjectTypeInput {
 }
 
 const NAME_MAX = 200;
-
-function clean(v: string | null | undefined): string | null {
-  return v?.trim() || null;
-}
 
 /**
  * Create-on-use project type. Idempotent: an active type matching the trimmed

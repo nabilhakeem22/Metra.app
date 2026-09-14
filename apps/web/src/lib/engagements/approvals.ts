@@ -16,6 +16,12 @@ import { fail, mutateInOrg } from '@/lib/actions/mutate';
 import { err, type ActionResult } from '@/lib/actions/result';
 import { isValidOccurredOn } from './event-provenance';
 import type { OrgContext } from '@/lib/db/context';
+import {
+  MAX_LABEL_CHARS,
+  MAX_NOTE_CHARS,
+  TOO_LONG,
+  optionalText,
+} from '@/lib/validation/text';
 import { isTerminal } from './states';
 
 /**
@@ -56,12 +62,6 @@ export async function recordDesignApproval(
   });
 }
 
-/** Trim a nullable free-text field to a stored value ('' / whitespace -> null). */
-function optionalText(value: string | null | undefined): string | null {
-  const trimmed = value?.trim();
-  return trimmed ? trimmed : null;
-}
-
 export interface RecordRomAcknowledgementInput {
   engagementId: string;
   note?: string | null;
@@ -96,19 +96,25 @@ export async function recordRomAcknowledgementCore(
   ctx: OrgContext,
   input: RecordRomAcknowledgementInput,
 ): Promise<ActionResult & { data?: string }> {
-  const note = optionalText(input.note);
+  const note = optionalText(input.note, MAX_NOTE_CHARS);
+  const evidence = optionalText(input.evidence, MAX_NOTE_CHARS);
   // Provenance, validated before the transaction opens. A future date is either
   // a typo or a fabrication, and either way has no business on an evidentiary
   // record. `toISOString` gives today in UTC, which is the same calendar day the
   // `<input type="date">` offered.
-  const occurredOn = optionalText(input.occurredOn);
+  const occurredOn = optionalText(input.occurredOn, MAX_LABEL_CHARS);
+  // An over-long field is a REFUSAL, not a truncation: silently storing the
+  // first 2000 characters of what the studio typed would lose the rest of an
+  // evidentiary note without telling anyone.
+  if (note === TOO_LONG || evidence === TOO_LONG || occurredOn === TOO_LONG) {
+    return err('invalid');
+  }
   if (
     occurredOn !== null &&
     !isValidOccurredOn(occurredOn, new Date().toISOString().slice(0, 10))
   ) {
     return err('invalid');
   }
-  const evidence = optionalText(input.evidence);
 
   return mutateInOrg(
     ctx,

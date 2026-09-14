@@ -18,6 +18,12 @@ import { MONEY_RE, formatMoney4, parseMoney4 } from '@/lib/aggregates/proposal-t
 import type { OrgContext } from '@/lib/db/context';
 import { isTerminal } from './states';
 import { isUuid } from '@/lib/uuid';
+import {
+  MAX_LABEL_CHARS,
+  MAX_NOTE_CHARS,
+  TOO_LONG,
+  optionalText,
+} from '@/lib/validation/text';
 
 const KIND_SET = new Set<string>(PAYMENT_EVENT_KINDS);
 
@@ -36,12 +42,6 @@ export interface RecordPaymentInput {
    * non-UUID key is rejected with a coded `invalid`.
    */
   idempotencyKey?: string | null;
-}
-
-/** Trim a nullable free-text field to a stored value ('' / whitespace -> null). */
-function optionalText(value: string | null | undefined): string | null {
-  const trimmed = value?.trim();
-  return trimmed ? trimmed : null;
 }
 
 /**
@@ -80,9 +80,14 @@ export async function recordPaymentCore(
     return { ok: false, error: 'invalid' };
   }
 
-  const method = optionalText(input.method);
-  const reference = optionalText(input.reference);
-  const note = optionalText(input.note);
+  const method = optionalText(input.method, MAX_LABEL_CHARS);
+  const reference = optionalText(input.reference, MAX_LABEL_CHARS);
+  const note = optionalText(input.note, MAX_NOTE_CHARS);
+  // An over-long field is a REFUSAL, not a truncation: a payment reference cut
+  // at 200 characters is a reference that reconciles against nothing.
+  if (method === TOO_LONG || reference === TOO_LONG || note === TOO_LONG) {
+    return { ok: false, error: 'invalid' };
+  }
 
   // Set inside the tx when a keyed insert loses the ON CONFLICT race (or replays
   // its own earlier write): the existing row is returned, no second row/audit.
