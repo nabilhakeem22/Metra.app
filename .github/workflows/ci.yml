@@ -123,3 +123,12 @@ jobs:
         # so the build's type-check fails on `Property 'HYPERDRIVE' does not
         # exist on type 'CloudflareEnv'`.
         run: npx wrangler types --env-interface=CloudflareEnv ./cloudflare-env.d.ts && npx opennextjs-cloudflare build
+
+      - name: Assert no secret was baked into the Worker bundle
+        working-directory: apps/web
+        # OpenNext resolves process.env from server code at BUILD time and writes
+        # what it saw into .open-next/cloudflare/next-env.mjs, which ships inside
+        # the deployed artifact. Public vars belong there; a service-role key
+        # does not. Runs immediately after the build, because that file is the
+        # only place the mistake is visible — it compiles and lints perfectly.
+        run: node scripts/assert-no-baked-secrets.mjs
