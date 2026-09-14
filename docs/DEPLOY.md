@@ -150,6 +150,46 @@ the symptom is automations silently not firing.
 Run `npm run db:migrate`, then `npm run db:apply-rls` (RLS, roles and functions
 live there, never in a migration).
 
+### Migrate BEFORE you deploy — and prove it
+
+**Owner pre-merge step, every time a migration is in the diff.** With the
+production `DATABASE_URL` in the repo-root `.env`:
+
+```bash
+npm run assert-schema-applied -w @metra/db
+```
+
+It reads `information_schema` (one connection, writes nothing) and compares it
+against every column the drizzle schema declares. Exit 0 means the database is
+ready for this code; exit 1 lists exactly what is missing.
+
+`deploy.yml` cannot do this for you: it holds `CLOUDFLARE_API_TOKEN` and no
+database credential at all, which is deliberate — a deploy workflow that can
+reach production Postgres is a larger blast radius than the check is worth.
+
+**Deploying before migrating is not a degraded state for the engagement module,
+it is a TOTAL one.** Drizzle builds an explicit column list from the schema file,
+so a single missing column fails the WHOLE query with 42703
+(`undefined_column`). Measured against the live database at 0048: `select()` on
+`engagement_events` raises 42703 for `acknowledged_issue_at`, and on
+`engagement_transitions` for `idempotency_key`. `loadGuardFacts` full-row-selects
+both, so every transition fails, and with them the timeline, the ROM badge and
+the corrections path — eight call sites. There is no partial symptom to notice
+first; the module stops.
+
+### The migrator's lock window grows with every appended migration
+
+`npm run db:migrate` runs the pending files as ONE transaction. 0049 and 0050
+together hold ACCESS EXCLUSIVE on `engagement_events` and
+`engagement_transitions` for about five round trips (~630 ms from a workstation;
+the app's own `lock_timeout` is 5 s, so roughly 8× headroom). That headroom is
+not a constant: each migration appended to the same pending batch adds its
+statements to the same lock window. Two DDL migrations are comfortable, ten are
+not. If a batch ever grows past a handful of table-rewriting statements, run it
+in smaller batches or in a maintenance window rather than trusting the margin.
+Atomicity is the compensation: a 55P03 rolls the whole batch back, so a failed
+migrate leaves the previous indexes intact.
+
 ### After 0048/0049: acknowledged build-cost bands must be re-issued AND re-acknowledged
 
 Two migrations, one operator task, and neither backfills — by design.

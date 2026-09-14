@@ -211,6 +211,15 @@ export async function executeTransition(
       // `ok` — the caller asked for this act and this act happened; telling them
       // "already" would only invite them to wonder whether it really did.
       if (await replayedSelfLoop(tx, ctx, def, { ...input, idempotencyKey })) {
+        // One tap and four taps are otherwise indistinguishable afterwards: a
+        // replay writes nothing, so without this line the ledger, the audit log
+        // and the Worker log all look exactly as they would have if the studio
+        // had tapped once. The ENGAGEMENT and the TRIGGER, never the key — the
+        // key is the caller's credential for this act and does not belong in a
+        // log line anyone can read.
+        console.info(
+          `engagement transition replayed: ${engagementId} ${input.trigger}`,
+        );
         return;
       }
 
@@ -385,7 +394,16 @@ export async function executeTransition(
           where: sql`idempotency_key is not null`,
         })
         .returning({ id: engagementTransitions.id });
-      if (!ledger[0]) fail('engagement_state_conflict');
+      if (!ledger[0]) {
+        // The RACING retry: two attempts carrying one key both passed the
+        // pre-check before either committed, and this is the loser. Its whole
+        // transaction rolls back, which is correct and also silent — so say so
+        // here, by engagement and trigger, before the rollback takes the row.
+        console.info(
+          `engagement transition lost the idempotency race: ${engagementId} ${input.trigger}`,
+        );
+        fail('engagement_state_conflict');
+      }
 
       await audit({
         entity: 'design_engagement',
