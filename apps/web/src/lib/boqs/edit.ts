@@ -4,6 +4,7 @@ import { eq, sql } from 'drizzle-orm';
 import { fail, mutateInOrg } from '@/lib/actions/mutate';
 import { err, type ActionResult } from '@/lib/actions/result';
 import { computeLine } from '@/lib/aggregates/proposal-totals';
+import { readMoneyString } from '@/lib/money/read';
 import { withinMagnitude } from '@/lib/proposals/validation';
 import type { OrgContext } from '@/lib/db/context';
 import { bilingualFor } from './bilingual';
@@ -11,7 +12,6 @@ import { MAX_BOQ_LINES, recomputeBoqTotals } from './core';
 import {
   MAX_DESCRIPTION,
   normalizeLinePatch,
-  readNumericField,
   type BoqLinePatch,
 } from './edit-input';
 
@@ -297,7 +297,9 @@ export async function setBoqDiscountCore(
   ctx: OrgContext,
   input: { boqId: string; discountPct: string },
 ): Promise<ActionResult> {
-  const pct = readNumericField(input.discountPct);
+  // Typed by the studio, so the same rule as every other sheet field: a
+  // separator is fine, anything else is a refusal rather than a zero.
+  const pct = readMoneyString(input.discountPct, { allowGroupSeparators: true });
   // 0..100 is the schema's own range (boq_lines_discount_pct_range's sibling on
   // boqs); refusing here means the CHECK is a backstop rather than the error path.
   if (pct === null || Number(pct) > 100) return err('invalid_discount');

@@ -4,6 +4,7 @@
 import { costItems, type CostItemUnit, type MetraDb } from '@metra/db';
 import { inArray } from 'drizzle-orm';
 import { fail } from '@/lib/actions/mutate';
+import { readMoneyString } from '@/lib/money/read';
 import {
   computeLine,
   computeSection,
@@ -11,7 +12,6 @@ import {
   type SectionTotals,
 } from '@/lib/aggregates/proposal-totals';
 import {
-  normalizeMoney,
   normalizeText,
   pctInRange,
   withinMagnitude,
@@ -128,10 +128,10 @@ export function resolveDraftLines(
             : '0';
       }
 
-      const qty = normalizeMoney(line.qty);
-      const unitCost = normalizeMoney(rawCost);
-      const unitPrice = normalizeMoney(resolvedUnitPrice);
-      const discountPct = normalizeMoney(line.discountPct);
+      const qty = readMoneyString(line.qty, { blank: '0' });
+      const unitCost = readMoneyString(rawCost, { blank: '0' });
+      const unitPrice = readMoneyString(resolvedUnitPrice, { blank: '0' });
+      const discountPct = readMoneyString(line.discountPct, { blank: '0' });
       if (
         qty === null ||
         unitCost === null ||
@@ -142,13 +142,10 @@ export function resolveDraftLines(
       ) {
         fail('line_required');
       }
-      if (
-        !withinMagnitude(qty!) ||
-        !withinMagnitude(unitCost!) ||
-        !withinMagnitude(unitPrice!)
-      ) {
-        fail('amount_too_large');
-      }
+      // The per-FACTOR magnitude check that used to sit here is gone:
+      // readMoneyString applies MAX_AMOUNT itself, so an over-cap factor already
+      // came back null and failed `line_required` above. The PRODUCT check below
+      // is the one that was never redundant.
       if (!pctInRange(discountPct!)) fail('discount_out_of_range');
 
       const totals = computeLine({

@@ -37,7 +37,6 @@ export {
   MAX_AMOUNT,
   LINE_INSERT_CHUNK,
   normalizeText,
-  normalizeMoney,
   withinMagnitude,
   pctInRange,
   validIsoDate,

@@ -13,18 +13,18 @@ import { fail, mutateInOrg } from '@/lib/actions/mutate';
 import { err, type ActionResult } from '@/lib/actions/result';
 import { computeVariationNetDelta } from '@/lib/aggregates/contract-value';
 import { computeLine } from '@/lib/aggregates/proposal-totals';
+import { readMoneyString } from '@/lib/money/read';
 import type { OrgContext } from '@/lib/db/context';
 import {
   chunk,
   LINE_INSERT_CHUNK,
   MAX_TOTAL_LINES,
-  normalizeMoney,
   normalizeText,
   pctInRange,
   withinMagnitude,
 } from '@/lib/proposals/core';
 import { isUuid } from '@/lib/uuid';
-import { normalizeSignedMoney } from '../validation';
+import { SIGNED_MONEY_FIELD } from '../validation';
 
 export interface VariationLineInput {
   /** Baseline contract line this changes; null/absent = brand-new scope. */
@@ -88,10 +88,10 @@ export async function saveVariationDraftCore(
     const descriptionAr = normalizeText(l.descriptionAr);
     const descriptionEn = normalizeText(l.descriptionEn);
     if (!descriptionAr && !descriptionEn) return err('line_required');
-    const qty = normalizeSignedMoney(l.qty);
-    const unitCost = normalizeMoney(l.unitCost);
-    const unitPrice = normalizeMoney(l.unitPrice);
-    const discountPct = normalizeMoney(l.discountPct);
+    const qty = readMoneyString(l.qty, SIGNED_MONEY_FIELD);
+    const unitCost = readMoneyString(l.unitCost, { blank: '0' });
+    const unitPrice = readMoneyString(l.unitPrice, { blank: '0' });
+    const discountPct = readMoneyString(l.discountPct, { blank: '0' });
     if (qty === null || unitCost === null || unitPrice === null || discountPct === null) {
       return err('invalid');
     }

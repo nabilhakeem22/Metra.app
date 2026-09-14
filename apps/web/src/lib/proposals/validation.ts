@@ -7,7 +7,7 @@
 // through a database suite. They are the cheapest, highest-value thing to prove, so
 // they live here now and ./core.ts re-exports them — every existing import site keeps
 // resolving unchanged.
-import { MONEY_RE, clampMoney4 } from '@/lib/aggregates/proposal-totals';
+import { MONEY_RE } from '@/lib/aggregates/proposal-totals';
 
 const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -25,19 +25,6 @@ export { MAX_AMOUNT, withinMagnitude } from '@/lib/money/read';
 
 export function normalizeText(v: string | null | undefined): string | null {
   return v?.trim() || null;
-}
-
-/** Non-negative money string or null. */
-export function normalizeMoney(
-  v: string | null | undefined,
-  fallback = '0',
-): string | null {
-  const s = v?.trim();
-  if (s === undefined || s === '') return fallback;
-  if (!MONEY_RE.test(s) || s.startsWith('-')) return null;
-  // Clamp to the column's scale so the previewed total and the stored total agree
-  // (the app truncates past 4dp, numeric(18,4) rounds — see clampMoney4).
-  return clampMoney4(s);
 }
 
 /** A percentage between 0 and 100 inclusive. Shape-checked first, for the same

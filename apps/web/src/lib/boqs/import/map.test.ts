@@ -1,13 +1,21 @@
 import { describe, expect, it } from 'vitest';
 import { decodeCsv, parseCsv, sniffDelimiter } from './decode';
+import { readMoneyString } from '@/lib/money/read';
 import {
   autoDetectMapping,
   mapRows,
   normalizeUnit,
-  parseNumericCell,
-  toWesternDigits,
   DEFAULT_SECTION,
 } from './map';
+
+// The EXACT option set boqs/import/map.ts uses for a cell in an imported sheet —
+// the one money surface that reads Arabic-Indic digits.
+const readImportedCell = (raw: string) =>
+  readMoneyString(raw, {
+    allowNegative: true,
+    allowGroupSeparators: true,
+    allowArabicDigits: true,
+  });
 
 describe('sniffDelimiter', () => {
   it('reads a semicolon sheet, which is what Egyptian Excel writes', () => {
@@ -66,29 +74,33 @@ describe('decodeCsv', () => {
   });
 });
 
-describe('toWesternDigits', () => {
-  it('converts Arabic-Indic digits', () => {
+describe('an imported numeric cell', () => {
+  it('accepts what people actually type', () => {
+    expect(readImportedCell('1,200.50')).toBe('1200.50');
+    expect(readImportedCell('  12 ')).toBe('12');
+    expect(readImportedCell('١٢٫٥')).toBe('12.5');
+  });
+
+  it('reads Arabic-Indic and Persian digits', () => {
     // A studio on an Arabic keyboard types ١٢٠; Number('١٢٠') is NaN, so without
     // this a perfectly valid sheet imports as a page of errors.
-    expect(toWesternDigits('١٢٠')).toBe('120');
-  });
-
-  it('converts Eastern-Arabic (Persian) digits', () => {
-    expect(toWesternDigits('۱۲۰')).toBe('120');
-  });
-});
-
-describe('parseNumericCell', () => {
-  it('accepts what people actually type', () => {
-    expect(parseNumericCell('1,200.50')).toBe('1200.50');
-    expect(parseNumericCell('  12 ')).toBe('12');
-    expect(parseNumericCell('١٢٫٥')).toBe('12.5');
+    expect(readImportedCell('١٢٠')).toBe('120');
+    expect(readImportedCell('۱۲۰')).toBe('120');
   });
 
   it('rejects text and empties', () => {
-    expect(parseNumericCell('n/a')).toBeNull();
-    expect(parseNumericCell('')).toBeNull();
-    expect(parseNumericCell('12 m2')).toBeNull();
+    expect(readImportedCell('n/a')).toBeNull();
+    expect(readImportedCell('')).toBeNull();
+    expect(readImportedCell('12 m2')).toBeNull();
+  });
+
+  it('REFUSES an ambiguous comma this cell used to read as grouping', () => {
+    // BEHAVIOUR CHANGE (wave 2): '1,5' became 15 in an imported price. The row
+    // now fails with "is not a number", which the studio sees in the problem
+    // list instead of importing a ten-fold error silently.
+    for (const ambiguous of ['1,5', '1,2,3', '1.234,56']) {
+      expect(readImportedCell(ambiguous)).toBeNull();
+    }
   });
 });
 

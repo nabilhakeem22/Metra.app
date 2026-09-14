@@ -10,8 +10,7 @@
 // value the browser would have rejected.
 
 import type { ActionCode } from '@/lib/actions/result';
-import { MONEY_RE, clampMoney4 } from '@/lib/aggregates/proposal-totals';
-import { withinMagnitude } from '@/lib/proposals/validation';
+import { readMoneyString } from '@/lib/money/read';
 
 /**
  * Metra's units, in the order the picker offers them. Mirrors the
@@ -57,49 +56,34 @@ export type PatchResult =
   | { ok: false; error: ActionCode };
 
 /**
- * Read a number the studio typed.
+ * A number the studio TYPED into the sheet.
  *
  * Group separators come out because people type "1,500" — but anything else is
  * a REFUSAL, never a coercion. `coerceMoneyInput` reads garbage as '0', which is
  * right for an import preview (skip the bad row, show it in the problem list)
  * and wrong here: silently reading a mistyped rate as zero changes the money on
  * a document the client is going to sign, and the studio would have no way of
- * knowing it happened.
- *
- * Returns null for anything it will not accept, including a blank — a rate the
- * studio cleared is a question for the caller, not a zero.
+ * knowing it happened. No blank either — a rate the studio CLEARED is a question
+ * for the caller, not a zero. And no negative: that is a variation-order
+ * de-scope, never a BOQ line (the boq_lines_qty_non_negative CHECK agrees).
  */
-export function readNumericField(raw: string): string | null {
-  // Latin digits are used in both locales (see lib/format/number.ts), so the
-  // separators to strip are the ASCII ones plus the Arabic thousands mark that
-  // an ar-EG keyboard can still produce.
-  // The class below holds three INVISIBLE characters: U+066C (the Arabic
-  // thousands separator) and the two no-break spaces a paste out of Excel carries.
-  const t = raw.replace(/[\s,\u066C\u00A0\u202F]/g, '');
-  if (t === '') return null;
-  if (!MONEY_RE.test(t)) return null;
-  // A negative quantity is a de-scope in a variation order, never a BOQ line —
-  // the same rule the boq_lines_qty_non_negative CHECK enforces.
-  if (t.startsWith('-')) return null;
-  return clampMoney4(t);
-}
+const TYPED_FIELD = { allowGroupSeparators: true } as const;
 
 type FieldResult = { value: string } | { error: ActionCode };
 
 /**
  * A quantity or a rate: readable, non-negative, and inside the magnitude cap.
  *
- * The cap is the one the import and the proposal builder already enforce
- * (MAX_AMOUNT, 1e12). Without it the sheet was the one money surface where a
- * pasted 1e17 reached the arithmetic: the factors are each storable, but their
- * product overflows numeric(18,4) and the write fails as a raw 22003 instead of
- * a coded refusal the studio can read.
+ * The cap is MAX_AMOUNT (1e12) and readMoneyString applies it, so a pasted 1e17
+ * comes back null here alongside every other unreadable input — the sheet was
+ * once the one money surface that let such a factor through to the arithmetic,
+ * where its product overflows numeric(18,4) and the write fails as a raw 22003.
+ * The PRODUCTS are still checked separately by the caller with
+ * `amount_too_large`, which is the case a per-factor check could never catch.
  */
 function readAmountField(raw: string, ifUnreadable: ActionCode): FieldResult {
-  const value = readNumericField(raw);
-  if (value === null) return { error: ifUnreadable };
-  if (!withinMagnitude(value)) return { error: 'amount_too_large' };
-  return { value };
+  const value = readMoneyString(raw, TYPED_FIELD);
+  return value === null ? { error: ifUnreadable } : { value };
 }
 
 function isBoqUnit(value: string): value is BoqUnit {

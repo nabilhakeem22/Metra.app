@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { MAX_AMOUNT, readMoneyString, withinMagnitude } from './read';
+import type { ReadMoneyOptions } from './read';
 
 // Six parsers collapse into this one. The suite is written as the union of what
 // all six accepted, plus the one place they DISAGREED — the comma — where the
@@ -122,5 +123,37 @@ describe('withinMagnitude', () => {
     expect(withinMagnitude(String(MAX_AMOUNT))).toBe(true);
     expect(withinMagnitude(String(-MAX_AMOUNT))).toBe(true);
     expect(withinMagnitude(String(MAX_AMOUNT + 1))).toBe(false);
+  });
+});
+
+// The six parsers this kernel replaced, as the exact option sets their call
+// sites now pass. Pinned together because the whole claim of the refactor is
+// that these six agree — on the magnitude cap, on the scale clamp, and above all
+// on the comma.
+describe('the six former parsers', () => {
+  const sites: Array<[string, ReadMoneyOptions]> = [
+    ['proposals normalizeMoney', { blank: '0' }],
+    ['price-book normMoney', { allowGroupSeparators: true, blank: '0' }],
+    ['boqs readNumericField', { allowGroupSeparators: true }],
+    ['price-book parseMoney', { allowGroupSeparators: true, blank: '0' }],
+    [
+      'boqs parseNumericCell',
+      { allowNegative: true, allowGroupSeparators: true, allowArabicDigits: true },
+    ],
+    ['variations normalizeSignedMoney', { allowNegative: true, blank: '0' }],
+  ];
+
+  it.each(sites)('%s refuses 1e17', (_name, options) => {
+    expect(readMoneyString('1e17', options)).toBeNull();
+    expect(readMoneyString('100000000000000000', options)).toBeNull();
+  });
+
+  it.each(sites)('%s clamps 2.99999 to the stored scale', (_name, options) => {
+    expect(readMoneyString('2.99999', options)).toBe('2.9999');
+  });
+
+  it.each(sites)('%s refuses the ambiguous comma', (_name, options) => {
+    // Three of the six used to read '1,5' as 15.
+    expect(readMoneyString('1,5', options)).toBeNull();
   });
 });

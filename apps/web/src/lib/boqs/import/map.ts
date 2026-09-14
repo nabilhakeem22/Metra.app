@@ -5,6 +5,7 @@
 // Nothing here knows what a CSV is. It takes a SheetGrid, so the same code
 // serves an XLSX decoder unchanged.
 
+import { readMoneyString } from '@/lib/money/read';
 import type { SheetGrid } from './decode';
 
 /** The fields a BOQ line can be imported from. Order drives the template. */
@@ -77,29 +78,20 @@ export function autoDetectMapping(header: string[]): ColumnMapping {
 }
 
 /**
- * Arabic-Indic and Eastern-Arabic digits to Western. A studio typing into Excel
- * on an Arabic keyboard produces ٠١٢٣; Metra renders Western numerals
- * everywhere, and `Number('١٢')` is NaN — so a sheet that looks perfectly valid
- * would import as a page of errors without this.
+ * A numeric cell as typed by a human: "1,200.50", "١٢٫٥", " 12 ".
+ *
+ * This is the ONLY money surface that reads Arabic-Indic digits, and it has to:
+ * a studio typing into Excel on an Arabic keyboard produces ٠١٢٣, `Number('١٢')`
+ * is NaN, and a sheet that looks perfectly valid would otherwise import as a
+ * page of errors. Negatives are read here and rejected by the row validator
+ * below with a message, rather than refused as unreadable — "cannot be negative"
+ * tells the studio what to fix; "is not a number" does not.
  */
-export function toWesternDigits(s: string): string {
-  return s.replace(/[٠-٩۰-۹]/g, (d) => {
-    const code = d.charCodeAt(0);
-    const base = code >= 0x06f0 ? 0x06f0 : 0x0660;
-    return String(code - base);
-  });
-}
-
-/** A numeric cell as typed by a human: "1,200.50", "١٢٫٥", " 12 ". */
-export function parseNumericCell(raw: string): string | null {
-  const t = toWesternDigits(raw)
-    .replace(/٫/g, '.') // Arabic decimal separator
-    .replace(/[,\s٬]/g, '') // thousands separators, spaces
-    .trim();
-  if (t === '') return null;
-  if (!/^-?\d+(\.\d+)?$/.test(t)) return null;
-  return t;
-}
+const IMPORTED_CELL = {
+  allowNegative: true,
+  allowGroupSeparators: true,
+  allowArabicDigits: true,
+} as const;
 
 /** Metra's unit list, and what studios actually write for each. */
 const UNIT_ALIASES: Record<string, string[]> = {
@@ -206,18 +198,18 @@ export function mapRows(
       );
     }
 
-    const qty = parseNumericCell(rawQty);
+    const qty = readMoneyString(rawQty, IMPORTED_CELL);
     if (qty === null) errors.push('Quantity is not a number');
     else if (qty.startsWith('-')) errors.push('Quantity cannot be negative');
 
-    const unitPrice = parseNumericCell(cell(row, mapping.unitPrice));
+    const unitPrice = readMoneyString(cell(row, mapping.unitPrice), IMPORTED_CELL);
     if (unitPrice === null) errors.push('Unit price is not a number');
     else if (unitPrice.startsWith('-')) errors.push('Unit price cannot be negative');
 
     // Cost is optional: a line without one is tracked for quantity but blind on
     // margin, which is a real state and not an error.
     const rawCost = cell(row, mapping.unitCost);
-    const unitCost = rawCost.trim() === '' ? '0' : parseNumericCell(rawCost);
+    const unitCost = rawCost.trim() === '' ? '0' : readMoneyString(rawCost, IMPORTED_CELL);
     if (unitCost === null) errors.push('Unit cost is not a number');
 
     if (errors.length > 0) return { rowNumber, line: null, errors };
