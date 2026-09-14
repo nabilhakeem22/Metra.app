@@ -25,7 +25,7 @@
  */
 import { Buffer } from 'node:buffer';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
-import { dirname, join, relative, resolve } from 'node:path';
+import { dirname, extname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const here = dirname(fileURLToPath(import.meta.url)); // apps/web/scripts
@@ -72,6 +72,22 @@ function assignedKeys(source) {
   return [...new Set(keys)];
 }
 
+/**
+ * The emitted env module, in a shape this script understands.
+ *
+ * The current OpenNext writes `export const production = {"KEY":"value",…}` per
+ * mode; older versions wrote `process.env.KEY = …`. Recognising the SHAPE is what
+ * lets zero keys mean two different things honestly: an empty `export const
+ * production = {}` is a build with no .env file, which is the outcome we want,
+ * while a file we cannot recognise at all means OpenNext changed and this script
+ * is now measuring nothing.
+ */
+const KNOWN_SHAPES = [/export\s+const\s+\w+\s*=\s*\{/, /process\.env(?:\.\w+|\[)/];
+
+function looksLikeEnvModule(source) {
+  return KNOWN_SHAPES.some((shape) => shape.test(source));
+}
+
 /** Value shapes that cannot belong to a public var, whatever they are named. */
 const VALUE_PATTERNS = [
   { what: 'a Resend API key', pattern: /\bre_[A-Za-z0-9]{16,}/ },
@@ -102,6 +118,16 @@ function hasServiceRoleJwt(text) {
   return false;
 }
 
+/**
+ * Where a baked value can actually be: compiled modules and their data.
+ *
+ * NOT documentation. `node_modules/postgres/README.md` ships inside the bundle
+ * and its usage example is `postgres://username:password@host:port/database` —
+ * a shape-only scan cannot tell that from a real DSN, and failing a deploy over
+ * a library's README is the kind of false alarm that gets a check deleted.
+ */
+const SCANNED_EXTENSIONS = new Set(['.js', '.mjs', '.cjs', '.json', '.html']);
+
 /** Every file under `dir`, depth first. */
 function* filesUnder(dir) {
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
@@ -115,8 +141,9 @@ function* filesUnder(dir) {
 function filesHoldingSecrets() {
   const hits = [];
   for (const path of filesUnder(bundleDir)) {
-    // A wasm blob or a source map is megabytes of noise; a baked secret lives in
-    // a module, so skip the outliers by size rather than read them all.
+    if (!SCANNED_EXTENSIONS.has(extname(path))) continue;
+    // A source map is megabytes of noise; a baked secret lives in a module, so
+    // skip the outliers by size rather than read them all.
     if (statSync(path).size > 8 * 1024 * 1024) continue;
     const text = readFileSync(path, 'latin1');
     const hit =
@@ -130,11 +157,12 @@ function filesHoldingSecrets() {
 const source = readEnvFile();
 const keys = assignedKeys(source);
 
-if (keys.length === 0) {
+if (keys.length === 0 && !looksLikeEnvModule(source)) {
   bail(
-    `no assigned keys found in ${envFile}\n` +
-      'The emitted shape changed — UPDATE THIS SCRIPT. Matching nothing is how a ' +
-      'check like this dies: every build passes, including the one baking a secret.',
+    `no assigned keys found in ${envFile}, and it is not a module this script ` +
+      'recognises.\nThe emitted shape changed — UPDATE THIS SCRIPT. Matching ' +
+      'nothing is how a check like this dies: every build passes, including the ' +
+      'one that bakes a secret.',
   );
 }
 
@@ -162,5 +190,8 @@ if (withSecretValues.length > 0) {
 
 console.log(
   `assert-no-baked-secrets: OK (${keys.length} key(s), all public or framework; ` +
-    'no secret-shaped values in the bundle).',
+    'no secret-shaped values in the bundle).' +
+    (keys.length === 0
+      ? '\n  The env module is EMPTY, which is what a build with no .env file looks like.'
+      : ''),
 );

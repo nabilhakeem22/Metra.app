@@ -19,8 +19,9 @@ afterEach(() => {
   for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true });
 });
 
-/** A throwaway apps/web-shaped tree with `contents` as the emitted env module. */
-function stage(contents: string | null): string {
+/** A throwaway apps/web-shaped tree with `contents` as the emitted env module,
+ *  plus any extra bundle files the case needs (path relative to .open-next). */
+function stage(contents: string | null, extras: Record<string, string> = {}): string {
   const root = mkdtempSync(join(tmpdir(), 'baked-secrets-'));
   roots.push(root);
   mkdirSync(join(root, 'scripts'), { recursive: true });
@@ -29,12 +30,20 @@ function stage(contents: string | null): string {
     mkdirSync(join(root, '.open-next', 'cloudflare'), { recursive: true });
     writeFileSync(join(root, '.open-next', 'cloudflare', 'next-env.mjs'), contents, 'utf8');
   }
+  for (const [relativePath, body] of Object.entries(extras)) {
+    const full = join(root, '.open-next', relativePath);
+    mkdirSync(dirname(full), { recursive: true });
+    writeFileSync(full, body, 'utf8');
+  }
   return join(root, 'scripts', 'assert-no-baked-secrets.mjs');
 }
 
-function run(contents: string | null): { code: number; output: string } {
+function run(
+  contents: string | null,
+  extras: Record<string, string> = {},
+): { code: number; output: string } {
   try {
-    const output = execFileSync(process.execPath, [stage(contents)], {
+    const output = execFileSync(process.execPath, [stage(contents, extras)], {
       encoding: 'utf8',
       stdio: ['ignore', 'pipe', 'pipe'],
     });
@@ -98,12 +107,52 @@ describe('assert-no-baked-secrets', () => {
     expect(output).toContain('RESEND_FROM');
   });
 
-  it('FAILS when it matches NOTHING, instead of reporting a clean build', () => {
+  it('FAILS when it matches NOTHING in a module it does not recognise', () => {
     // The failure mode that would have killed this check quietly: a shape it
     // cannot parse reads exactly like a build with no secrets in it.
     const { code, output } = run('export default freshShape(someOtherThing);\n');
     expect(code).not.toBe(0);
     expect(output).toContain('emitted shape changed');
+  });
+
+  it('PASSES on an empty env module, which is what CI is supposed to produce', () => {
+    // OpenNext emits one object per mode, compiled from the .env* FILES present.
+    // No .env, no keys — the desired outcome, and it must not read as a broken
+    // check. The shape is recognised; it is simply empty.
+    const { code, output } = run(
+      'export const production = {};\nexport const development = {};\n',
+    );
+    expect(code).toBe(0);
+    expect(output).toContain('EMPTY');
+  });
+
+  it('reads the object-per-mode shape OpenNext actually emits', () => {
+    const { code, output } = run(
+      'export const production = {"NEXT_PUBLIC_APP_URL":"x","DATABASE_URL":"y"};\n',
+    );
+    expect(code).not.toBe(0);
+    expect(output).toContain('DATABASE_URL');
+  });
+
+  it('does not fail a deploy over a library README', () => {
+    // node_modules/postgres/README.md ships inside the bundle and documents
+    // `postgres://username:password@host:port/database`. A shape-only scan cannot
+    // tell that from a real DSN, so the value pass reads compiled files only.
+    const { code } = run(CI_SHAPED, {
+      'server-functions/default/node_modules/postgres/README.md':
+        'const sql = postgres("postgres://username:password@host:port/database");',
+    });
+    expect(code).toBe(0);
+  });
+
+  it('still catches the same DSN in a compiled module', () => {
+    const { code, output } = run(CI_SHAPED, {
+      'server-functions/default/index.mjs':
+        'const url = "postgresql://metra:hunter2@db.host:5432/x";',
+    });
+    expect(code).not.toBe(0);
+    expect(output).toContain('index.mjs');
+    expect(output).not.toContain('hunter2');
   });
 
   it('catches a secret VALUE even under a public-looking key', () => {
