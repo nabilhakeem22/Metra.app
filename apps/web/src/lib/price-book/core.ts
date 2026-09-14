@@ -3,7 +3,7 @@
 // session/requireOrg work and delegate. Exercised directly by *.dbtest.ts.
 import { costItems, sections, type CostItemUnit, type MetraDb } from '@metra/db';
 import { and, eq, ne } from 'drizzle-orm';
-import { fail, mutateInOrg } from '@/lib/actions/mutate';
+import { fail, mutateInOrg, requireInOrg } from '@/lib/actions/mutate';
 import { err, type ActionResult } from '@/lib/actions/result';
 import type { OrgContext } from '@/lib/db/context';
 import { UNIT_TOKENS } from './import';
@@ -178,12 +178,13 @@ export async function setCostItemActiveCore(
     ctx,
     { capability: 'price_book', action: 'update' },
     async (tx, audit) => {
-      const [before] = await tx
-        .select({ id: costItems.id, active: costItems.active })
-        .from(costItems)
-        .where(eq(costItems.id, input.id))
-        .limit(1);
-      if (!before) fail('invalid');
+      const before = await requireInOrg(
+        tx,
+        costItems,
+        input.id,
+        { id: costItems.id, active: costItems.active },
+        'invalid',
+      );
 
       await tx
         .update(costItems)

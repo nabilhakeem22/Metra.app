@@ -9,7 +9,7 @@ import {
   proposals,
 } from '@metra/db';
 import { and, eq } from 'drizzle-orm';
-import { fail, mutateInOrg } from '@/lib/actions/mutate';
+import { fail, mutateInOrg, requireInOrg } from '@/lib/actions/mutate';
 import type { ActionResult } from '@/lib/actions/result';
 import { appendSystemActivity } from '@/lib/activities/core';
 import type { OrgContext } from '@/lib/db/context';
@@ -228,12 +228,13 @@ export async function deleteDraftProposalCore(
     ctx,
     { capability: 'proposals_build', action: 'update' },
     async (tx, audit) => {
-      const [proposal] = await tx
-        .select({ status: proposals.status })
-        .from(proposals)
-        .where(eq(proposals.id, input.id))
-        .limit(1);
-      if (!proposal) fail('invalid');
+      const proposal = await requireInOrg(
+        tx,
+        proposals,
+        input.id,
+        { status: proposals.status },
+        'invalid',
+      );
       if (proposal.status !== 'draft') fail('proposal_not_draft');
 
       await tx.delete(proposals).where(eq(proposals.id, input.id));

@@ -3,7 +3,7 @@
 // touched here.
 import { contracts } from '@metra/db';
 import { and, eq } from 'drizzle-orm';
-import { fail, mutateInOrg } from '@/lib/actions/mutate';
+import { fail, mutateInOrg, requireInOrg } from '@/lib/actions/mutate';
 import { err, type ActionResult } from '@/lib/actions/result';
 import type { OrgContext } from '@/lib/db/context';
 import { isUuid } from '@/lib/uuid';
@@ -78,12 +78,13 @@ export async function saveContractDraftCore(
     ctx,
     { capability: 'contracts_generate', action: 'update' },
     async (tx, audit) => {
-      const [row] = await tx
-        .select({ status: contracts.status })
-        .from(contracts)
-        .where(eq(contracts.id, id))
-        .limit(1);
-      if (!row) fail('invalid');
+      const row = await requireInOrg(
+        tx,
+        contracts,
+        id,
+        { status: contracts.status },
+        'invalid',
+      );
       if (row.status !== 'draft') fail('contract_not_draft');
 
       // Only touch fields the caller actually provided (`undefined` = leave as-is).

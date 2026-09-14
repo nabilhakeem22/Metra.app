@@ -4,7 +4,7 @@
 // token path (app_variation_respond_by_token), never the matrix.
 import { contracts, variationOrderEvents, variationOrders } from '@metra/db';
 import { and, eq, sql } from 'drizzle-orm';
-import { fail, mutateInOrg } from '@/lib/actions/mutate';
+import { fail, mutateInOrg, requireInOrg } from '@/lib/actions/mutate';
 import type { ActionResult } from '@/lib/actions/result';
 import type { OrgContext } from '@/lib/db/context';
 import { mintShareToken, shareExpiryFromNow } from '@/lib/share/token';
@@ -50,12 +50,13 @@ export async function internalApproveVariationCore(
 
       // A contract that is no longer live carries no commercial change: a VO
       // drafted before termination must not be approvable afterwards.
-      const [contract] = await tx
-        .select({ status: contracts.status })
-        .from(contracts)
-        .where(eq(contracts.id, locked.contractId))
-        .limit(1);
-      if (!contract) fail('invalid');
+      const contract = await requireInOrg(
+        tx,
+        contracts,
+        locked.contractId,
+        { status: contracts.status },
+        'invalid',
+      );
       if (!canInternalApproveVariation(locked.status, contract.status)) {
         fail('contract_not_issued');
       }

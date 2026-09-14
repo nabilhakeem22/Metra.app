@@ -1,7 +1,7 @@
 import 'server-only';
 import { boqLines, boqSections, boqs } from '@metra/db';
 import { eq, sql } from 'drizzle-orm';
-import { fail, mutateInOrg } from '@/lib/actions/mutate';
+import { fail, mutateInOrg, requireInOrg } from '@/lib/actions/mutate';
 import { err, type ActionResult } from '@/lib/actions/result';
 import { computeLine } from '@/lib/aggregates/proposal-totals';
 import { readMoneyString } from '@/lib/money/read';
@@ -92,17 +92,18 @@ export async function updateBoqLineCore(
       // of qty/price/cost the patch did not carry, and reading them here rather
       // than accepting them from the sheet is what stops a stale tab from
       // reviving a figure someone else already changed.
-      const [current] = await tx
-        .select({
+      const current = await requireInOrg(
+        tx,
+        boqLines,
+        input.lineId,
+        {
           qty: boqLines.qty,
           unitPrice: boqLines.unitPrice,
           unitCost: boqLines.unitCost,
           discountPct: boqLines.discountPct,
-        })
-        .from(boqLines)
-        .where(eq(boqLines.id, input.lineId))
-        .limit(1);
-      if (!current) fail('line_not_found');
+        },
+        'line_not_found',
+      );
 
       const qty = clean.value.qty ?? current.qty;
       const unitPrice = clean.value.unitPrice ?? current.unitPrice;
@@ -254,12 +255,13 @@ export async function addBoqSectionCore(
     ctx,
     { capability: 'boq_build', action: 'create' },
     async (tx) => {
-      const [boq] = await tx
-        .select({ id: boqs.id, status: boqs.status })
-        .from(boqs)
-        .where(eq(boqs.id, input.boqId))
-        .limit(1);
-      if (!boq) fail('boq_not_found');
+      const boq = await requireInOrg(
+        tx,
+        boqs,
+        input.boqId,
+        { id: boqs.id, status: boqs.status },
+        'boq_not_found',
+      );
       if (boq.status !== 'draft') fail('boq_not_draft');
 
       const [{ maxSort = -1 } = { maxSort: -1 }] = await tx
@@ -308,12 +310,13 @@ export async function setBoqDiscountCore(
     ctx,
     { capability: 'boq_build', action: 'update' },
     async (tx) => {
-      const [boq] = await tx
-        .select({ id: boqs.id, status: boqs.status })
-        .from(boqs)
-        .where(eq(boqs.id, input.boqId))
-        .limit(1);
-      if (!boq) fail('boq_not_found');
+      const boq = await requireInOrg(
+        tx,
+        boqs,
+        input.boqId,
+        { id: boqs.id, status: boqs.status },
+        'boq_not_found',
+      );
       if (boq.status !== 'draft') fail('boq_not_draft');
 
       await tx
