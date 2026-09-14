@@ -88,16 +88,34 @@ secrets). `CRON_SECRET` is added when the automation cron is enabled.
 Run `npm run db:migrate`, then `npm run db:apply-rls` (RLS, roles and functions
 live there, never in a migration).
 
-### After 0048: acknowledged build-cost bands must be re-issued
+### After 0048/0049: acknowledged build-cost bands must be re-issued AND re-acknowledged
 
-0048 added `design_engagements.rom_issued_at` and does **not** backfill it. Every
-band that a client acknowledged before the migration therefore sits against a
-NULL `rom_issued_at`, and the engagement fails `rom_not_acknowledged` at the next
-gate until the band is issued and acknowledged again. This is deliberate — an
-acknowledgement whose issue date is unknown is not evidence the client saw the
-band that is on the record now — but it needs an operator to clear it.
+Two migrations, one operator task, and neither backfills — by design.
 
-Count the affected engagements (read-only):
+0048 added `design_engagements.rom_issued_at`, so a band acknowledged before it
+sits against a NULL issue date. 0049 added
+`engagement_events.acknowledged_issue_at`, so an acknowledgement recorded before
+it does not say WHICH issuance it answered. Both read the same way: an
+acknowledgement whose issuance is unknown is not evidence that the client saw
+the band on the record now. The engagement therefore fails
+`rom_not_acknowledged` at the next gate until the band is issued and
+acknowledged again.
+
+The portal handles its own half automatically. Because the SDFs compare
+`acknowledged_issue_at IS NOT DISTINCT FROM rom_issued_at`, a NULL never matches
+a real instant, so the delivery link **re-offers the acknowledge verb** as soon
+as the band is issued — the client does not need a new link and the studio does
+not need to do anything to make the verb reappear.
+
+Count the acknowledgements that carry no issuance (read-only):
+
+```sql
+select count(*) from engagement_events e
+where e.acknowledged_issue_at is null
+  and e.kind = 'rom_acknowledgement';
+```
+
+And the engagements still waiting on an issuance at all (read-only):
 
 ```sql
 select count(*) from design_engagements de
@@ -108,8 +126,15 @@ where exists (
 ```
 
 For each one: open the engagement, **Issue to client** on the build-cost band,
-and ask the client to acknowledge it. Nothing else clears the flag; there is no
-backfill script by design.
+and ask the client to acknowledge it from their delivery link. Nothing else
+clears the flag; there is no backfill script, because stamping a date onto an
+old acknowledgement would be inventing evidence on an evidentiary record.
+
+### After 0050: nothing to do
+
+0050 added `engagement_transitions.idempotency_key` and its partial unique
+index. Additive and nullable: every existing row keeps a NULL key, and code
+deployed before it simply never sends one.
 
 ## Testing against a database
 
