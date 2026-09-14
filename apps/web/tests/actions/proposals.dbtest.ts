@@ -481,9 +481,16 @@ describe('F4 — date + amount bounds', () => {
     const { ctx, clientId, projectId } = await setup();
     expect(await createProposalCore(ctx, { clientId, projectId, issueDate: '2026-13-40' })).toEqual({ ok: false, error: 'invalid_date' });
     const id = ((await createProposalCore(ctx, { clientId, projectId })) as { data?: string }).data!;
+    // THE CODE CHANGED IN WAVE 2, THE REFUSAL DID NOT. readMoneyString applies
+    // MAX_AMOUNT itself, so a single FACTOR above 1e12 is now unreadable rather
+    // than readable-but-too-big, and the line reports 'line_required'. What this
+    // test exists to prove — that an oversized amount is a CODED refusal and
+    // never an unlocalizable 'generic' from a numeric(18,4) overflow — still
+    // holds. 'amount_too_large' survives on the PRODUCTS, which is the case a
+    // per-factor check could never catch; the next two tests are those.
     expect(
       await saveProposalDraftCore(ctx, { id, sections: [{ titleEn: 'S', lines: [{ descriptionEn: 'x', qty: '1', unit: 'sqm', unitCost: '0', unitPrice: '9999999999999', discountPct: '0' }] }] }),
-    ).toEqual({ ok: false, error: 'amount_too_large' });
+    ).toEqual({ ok: false, error: 'line_required' });
   });
 
   // Each FACTOR passes the cap; their PRODUCT does not. Before the line-total

@@ -96,9 +96,9 @@ export async function saveVariationDraftCore(
       return err('invalid');
     }
     if (!pctInRange(discountPct)) return err('discount_out_of_range');
-    for (const v of [qty, unitCost, unitPrice]) {
-      if (!withinMagnitude(v)) return err('amount_too_large');
-    }
+    // The per-FACTOR magnitude loop that used to sit here is gone: readMoneyString
+    // applies MAX_AMOUNT itself, so an over-cap factor already came back null and
+    // failed 'invalid' above. The PRODUCT check below was never redundant.
     if (!l.unit) return err('invalid');
 
     const totals = computeLine({ qty, unitCost, unitPrice, discountPct });
