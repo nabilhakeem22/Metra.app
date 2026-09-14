@@ -1031,11 +1031,17 @@ as $$
           -- Never offer the verb for a band the client cannot even see.
           and de.rom_issued_at is not null
           and de.state not in ('closed_design_only', 'execution', 'abandoned')
+          -- 0049: an acknowledgement answers ONE issuance. Re-issuing a revised
+          -- band re-offers the verb, because the client has not seen these
+          -- numbers. `is not distinct from` so a legacy NULL acknowledgement
+          -- (recorded before 0049, issuance unknown) does NOT match a real
+          -- issuance instant and therefore does not suppress the verb.
           and not exists (
             select 1 from public.engagement_events e
             where e.engagement_id = de.id
               and e.actor_channel = 'client'
               and e.kind = 'rom_acknowledgement'
+              and e.acknowledged_issue_at is not distinct from de.rom_issued_at
           )
         union all
         select 'acknowledge_handoff', 6
@@ -1250,6 +1256,11 @@ begin
           then ee.kind in ('concept_approval', 'concept_change_request')
         when v_kind in ('design_approval', 'design_change_request')
           then ee.kind in ('design_approval', 'design_change_request')
+        -- 0049: a ROM acknowledgement is per ISSUANCE, not per engagement. Only
+        -- an acknowledgement of THIS issuance instant is a repeat; one against a
+        -- superseded band (or a legacy NULL) leaves the verb open.
+        when v_kind = 'rom_acknowledgement'
+          then ee.kind = v_kind and ee.acknowledged_issue_at is not distinct from ri
         else ee.kind = v_kind
       end
   ) then
@@ -1259,12 +1270,15 @@ begin
   begin
     insert into public.engagement_events
       (id, org_id, engagement_id, kind, actor_channel, actor_name, actor_ip,
-       actor_user_agent, note, range_low, range_high)
+       actor_user_agent, note, range_low, range_high, acknowledged_issue_at)
       values (
         gen_random_uuid(), oid, eid, v_kind, 'client', p_name, p_ip, p_ua,
         left(p_note, 2000),
         case when v_kind = 'rom_acknowledgement' then rl else null end,
-        case when v_kind = 'rom_acknowledgement' then rh else null end
+        case when v_kind = 'rom_acknowledgement' then rh else null end,
+        -- 0049: WHICH issuance this answers. `ri` was read under the row lock
+        -- taken above, so it is the same instant the precondition checked.
+        case when v_kind = 'rom_acknowledgement' then ri else null end
       );
   exception when unique_violation then
     return 'already';
