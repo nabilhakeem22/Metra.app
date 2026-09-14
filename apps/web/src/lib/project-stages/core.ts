@@ -3,7 +3,7 @@
 // writes gate on `projects`/update. The parent project must be in-org.
 import { STAGE_STATUSES, projectStages, projects, type StageStatus } from '@metra/db';
 import { eq } from 'drizzle-orm';
-import { fail, mutateInOrg } from '@/lib/actions/mutate';
+import { mutateInOrg, requireInOrg } from '@/lib/actions/mutate';
 import { err, type ActionResult } from '@/lib/actions/result';
 import type { OrgContext } from '@/lib/db/context';
 import { isUuid } from '@/lib/uuid';
@@ -55,12 +55,9 @@ export async function addStageCore(
     ctx,
     { capability: 'projects', action: 'update' },
     async (tx, audit) => {
-      const [project] = await tx
-        .select({ id: projects.id })
-        .from(projects)
-        .where(eq(projects.id, input.projectId))
-        .limit(1);
-      if (!project) fail('invalid');
+      // An existence assertion, not a read: the call IS the check, and it
+      // fails with a coded error for an id that is absent or another tenant's.
+      await requireInOrg(tx, projects, input.projectId, { id: projects.id }, 'invalid');
 
       // Default sort: append to the end.
       let sortOrder = input.sortOrder ?? null;
@@ -125,12 +122,9 @@ export async function updateStageCore(
     ctx,
     { capability: 'projects', action: 'update' },
     async (tx, audit) => {
-      const [before] = await tx
-        .select({ id: projectStages.id })
-        .from(projectStages)
-        .where(eq(projectStages.id, input.id))
-        .limit(1);
-      if (!before) fail('invalid');
+      // An existence assertion, not a read: the call IS the check, and it
+      // fails with a coded error for an id that is absent or another tenant's.
+      await requireInOrg(tx, projectStages, input.id, { id: projectStages.id }, 'invalid');
 
       const patch: Record<string, unknown> = { updatedAt: new Date() };
       if (nameEn !== undefined) patch.nameEn = nameEn;

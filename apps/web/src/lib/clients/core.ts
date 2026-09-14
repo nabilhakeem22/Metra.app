@@ -3,7 +3,7 @@
 // Exercised directly by tests/actions/clients.dbtest.ts.
 import { CLIENT_TYPES, clients, type ClientType } from '@metra/db';
 import { eq } from 'drizzle-orm';
-import { fail, mutateInOrg } from '@/lib/actions/mutate';
+import { fail, mutateInOrg, requireInOrg } from '@/lib/actions/mutate';
 import { err, type ActionResult } from '@/lib/actions/result';
 import { appendSystemActivity } from '@/lib/activities/core';
 import type { OrgContext } from '@/lib/db/context';
@@ -146,12 +146,13 @@ export async function updateClientCore(
     ctx,
     { capability: 'clients', action: 'update' },
     async (tx, audit) => {
-      const [before] = await tx
-        .select({ id: clients.id, phone: clients.phone })
-        .from(clients)
-        .where(eq(clients.id, input.id))
-        .limit(1);
-      if (!before) fail('invalid');
+      const before = await requireInOrg(
+        tx,
+        clients,
+        input.id,
+        { id: clients.id, phone: clients.phone },
+        'invalid',
+      );
       // Forward-only tightening, and it must distinguish OMITTED from CLEARED.
       // `normalized()` maps both `undefined` and `''` to null, so checking `v.phone`
       // alone would reject an ordinary partial save that simply did not mention the
@@ -189,12 +190,13 @@ export async function setClientActiveCore(
     ctx,
     { capability: 'clients', action: 'update' },
     async (tx, audit) => {
-      const [before] = await tx
-        .select({ id: clients.id, active: clients.active })
-        .from(clients)
-        .where(eq(clients.id, input.id))
-        .limit(1);
-      if (!before) fail('invalid');
+      const before = await requireInOrg(
+        tx,
+        clients,
+        input.id,
+        { id: clients.id, active: clients.active },
+        'invalid',
+      );
 
       await tx
         .update(clients)

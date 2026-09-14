@@ -16,7 +16,7 @@ import 'server-only';
 // leaves everything already filed exactly where it is.
 import { documentCategories } from '@metra/db';
 import { and, desc, eq } from 'drizzle-orm';
-import { fail, mutateInOrg } from '@/lib/actions/mutate';
+import { mutateInOrg, requireInOrg } from '@/lib/actions/mutate';
 import { err, type ActionResult } from '@/lib/actions/result';
 import type { OrgContext } from '@/lib/db/context';
 import { clean } from '@/lib/validation/text';
@@ -98,12 +98,13 @@ export async function updateDocumentCategoryCore(
     ctx,
     { capability: 'projects', action: 'update' },
     async (tx, audit) => {
-      const [before] = await tx
-        .select({ id: documentCategories.id, active: documentCategories.active })
-        .from(documentCategories)
-        .where(eq(documentCategories.id, input.id))
-        .limit(1);
-      if (!before) fail('invalid');
+      const before = await requireInOrg(
+        tx,
+        documentCategories,
+        input.id,
+        { id: documentCategories.id, active: documentCategories.active },
+        'invalid',
+      );
 
       await tx
         .update(documentCategories)
