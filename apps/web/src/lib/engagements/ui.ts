@@ -6,23 +6,14 @@
 // proxy. Do NOT import any runtime value from `@metra/db`, `queries.ts` or
 // `actions.ts` here.
 import { can } from '../permissions/can';
-import type { MemberRole, PermissionAction } from '../permissions/roles';
+import type { MemberRole } from '../permissions/roles';
 import {
+  CAPABILITY_ACTION,
   TRANSITIONS,
   WIRED_TRIGGERS,
-  type CapabilityKey,
   type Trigger,
 } from './transitions';
 import type { DesignState } from './states';
-
-// Mirror of the executor's CAPABILITY_ACTION (kept here because that map lives in
-// the server-only executor and this module must stay client-safe). Design/finance
-// triggers are `update` moves; the issue family is `approve`-only.
-const CAPABILITY_ACTION: Record<CapabilityKey, PermissionAction> = {
-  engagements_design: 'update',
-  engagements_finance: 'update',
-  engagements_issue: 'approve',
-};
 
 /**
  * The wired triggers that are legal FROM `state`: their `from` includes the state

@@ -21,7 +21,6 @@ import { and, eq, inArray, sql } from 'drizzle-orm';
 import { fail, mutateInOrg } from '@/lib/actions/mutate';
 import { err, type ActionResult } from '@/lib/actions/result';
 import type { OrgContext } from '@/lib/db/context';
-import type { PermissionAction } from '@/lib/permissions/roles';
 import { isUuid } from '@/lib/uuid';
 import { recordConceptApproval, recordDesignApproval } from './approvals';
 import { CLIENT_RELEASES, selectReleaseArtifactIds } from './client-release';
@@ -34,23 +33,11 @@ import { isRevisionTrigger } from './revision-allowance';
 import { applyRevision, resetRevisionsOnReject } from './revisions';
 import { GUARDS, type GuardFacts } from './guards';
 import {
+  CAPABILITY_ACTION,
   TRANSITIONS,
-  type CapabilityKey,
   type TransitionDef,
   type Trigger,
 } from './transitions';
-
-/**
- * The permission action each capability family gates on. Design/finance triggers
- * are `update` moves (owner/admin/PM or accountant progress the work); the issue
- * family mints client-facing artefacts and is `approve`-only (owner/admin), so it
- * must gate on `approve` — `update` isn't granted for `engagements_issue`.
- */
-const CAPABILITY_ACTION: Record<CapabilityKey, PermissionAction> = {
-  engagements_design: 'update',
-  engagements_finance: 'update',
-  engagements_issue: 'approve',
-};
 
 export interface ExecuteTransitionInput {
   engagementId: string;
