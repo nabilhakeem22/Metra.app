@@ -227,10 +227,37 @@ where exists (
 ) and de.rom_issued_at is null;
 ```
 
-For each one: open the engagement, **Issue to client** on the build-cost band,
-and ask the client to acknowledge it from their delivery link. Nothing else
-clears the flag; there is no backfill script, because stamping a date onto an
-old acknowledgement would be inventing evidence on an evidentiary record.
+And the acknowledgements recorded BETWEEN the 0048 and 0049 deploys — the band
+was issued, so `rom_issued_at` is set, but the acknowledgement does not say which
+issuance it answered (read-only):
+
+```sql
+select count(*) from engagement_events e
+join design_engagements de on de.id = e.engagement_id
+where e.kind = 'rom_acknowledgement'
+  and e.acknowledged_issue_at is null
+  and de.rom_issued_at is not null;
+```
+
+**That population needs THREE steps, not two, and the order matters.** `Issue to
+client` refuses an engagement that already has a `rom_issued_at` — it answers
+`rom_already_issued`, by design: issuing twice would stamp a second instant on a
+band nobody re-sent. So for each engagement in that count:
+
+1. **Re-set the band** (Set build-cost range — the same numbers are fine).
+   Setting it clears `rom_issued_at` unconditionally, because a band the client
+   has seen is a figure they may be budgeting against and changing it un-tells
+   them.
+2. **Issue to client.** Now it is admitted, and stamps a fresh issuance instant.
+3. **The client acknowledges** from their existing delivery link — the portal
+   re-offers the verb by itself, because a NULL never matches a real instant.
+
+An engagement with no `rom_issued_at` at all (the first count above) skips step 1
+— it has nothing to clear.
+
+Nothing else clears the flag; there is no backfill script, because stamping a
+date onto an old acknowledgement would be inventing evidence on an evidentiary
+record.
 
 ### After 0050: nothing to do
 
