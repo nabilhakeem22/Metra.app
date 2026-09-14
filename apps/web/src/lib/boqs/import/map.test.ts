@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { decodeCsv, parseCsv, sniffDelimiter } from './decode';
+import { decodeCsv, parseCsvRows, sniffDelimiter, stripBom } from './decode';
+import { ImportParseError, MAX_RAW_ROWS } from '@/lib/import/limits';
 import { readMoneyString } from '@/lib/money/read';
 import {
   autoDetectMapping,
@@ -38,7 +39,10 @@ describe('sniffDelimiter', () => {
   });
 });
 
-describe('parseCsv', () => {
+describe('parseCsvRows', () => {
+  const parseCsv = (text: string, delimiter: string) =>
+    parseCsvRows(text, { delimiter });
+
   it('handles quotes, embedded delimiters and doubled quotes', () => {
     const rows = parseCsv('a,"b,c","say ""hi"""\n1,2,3', ',');
     expect(rows[0]).toEqual(['a', 'b,c', 'say "hi"']);
@@ -51,8 +55,11 @@ describe('parseCsv', () => {
 
   it('strips the UTF-8 BOM Excel writes', () => {
     // Left in place it becomes part of the first header and every mapping misses.
-    const rows = parseCsv('﻿Description,Qty\nWalls,10', ',');
+    // The strip moved OUT of the parser and into the decoder, where both
+    // pipelines get it; the parser itself is now only a parser.
+    const rows = parseCsv(stripBom('﻿Description,Qty\nWalls,10'), ',');
     expect(rows[0]?.[0]).toBe('Description');
+    expect(decodeCsv('﻿Description,Qty\nWalls,10').grid.rows[0]?.[0]).toBe('Description');
   });
 
   it('survives CRLF line endings', () => {
@@ -60,6 +67,29 @@ describe('parseCsv', () => {
       ['a', 'b'],
       ['c', 'd'],
     ]);
+  });
+
+  // THE BUG THE SHARED PARSER FIXES FOR THIS PIPELINE. The BOQ's own parser
+  // opened quote mode on ANY `"`, so an inch mark — and a fit-out BOQ is full of
+  // them — swallowed the rest of the file into one field and every row after it
+  // vanished from the import with no error at all.
+  it('keeps a mid-field quote literal instead of swallowing the rest of the file', () => {
+    expect(parseCsv('code,name,qty\nA-1,3" pipe,120\nA-2,Door,5\n', ',')).toEqual([
+      ['code', 'name', 'qty'],
+      ['A-1', '3" pipe', '120'],
+      ['A-2', 'Door', '5'],
+    ]);
+  });
+
+  it('bails with too_many_rows before building a runaway matrix', () => {
+    // A 5 MB file of bare newlines must not materialise millions of tiny arrays
+    // on its way to the fine row check.
+    expect(() => parseCsvRows('a\n'.repeat(MAX_RAW_ROWS + 10), { delimiter: ',' })).toThrow(
+      ImportParseError,
+    );
+    expect(() =>
+      parseCsvRows('a\n'.repeat(5), { delimiter: ',', maxRows: 3 }),
+    ).toThrow(expect.objectContaining({ reason: 'too_many_rows' }));
   });
 });
 
