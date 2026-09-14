@@ -13,7 +13,7 @@ import { fail, mutateInOrg } from '@/lib/actions/mutate';
 import { err, type ActionResult } from '@/lib/actions/result';
 import { computeVariationNetDelta } from '@/lib/aggregates/contract-value';
 import { computeLine } from '@/lib/aggregates/proposal-totals';
-import { readMoneyString } from '@/lib/money/read';
+import { readMoney } from '@/lib/money/read';
 import type { OrgContext } from '@/lib/db/context';
 import {
   chunk,
@@ -88,20 +88,29 @@ export async function saveVariationDraftCore(
     const descriptionAr = normalizeText(l.descriptionAr);
     const descriptionEn = normalizeText(l.descriptionEn);
     if (!descriptionAr && !descriptionEn) return err('line_required');
-    const qty = readMoneyString(l.qty, SIGNED_MONEY_FIELD);
-    const unitCost = readMoneyString(l.unitCost, { blank: '0' });
-    const unitPrice = readMoneyString(l.unitPrice, { blank: '0' });
-    const discountPct = readMoneyString(l.discountPct, { blank: '0' });
-    if (qty === null || unitCost === null || unitPrice === null || discountPct === null) {
-      return err('invalid');
+    const qty = readMoney(l.qty, SIGNED_MONEY_FIELD);
+    const unitCost = readMoney(l.unitCost, { blank: '0' });
+    const unitPrice = readMoney(l.unitPrice, { blank: '0' });
+    const discountPct = readMoney(l.discountPct, { blank: '0' });
+    if (!qty.ok || !unitCost.ok || !unitPrice.ok || !discountPct.ok) {
+      // Past the cap is its own answer: a bare `invalid` on a variation line
+      // whose quantity is 1e13 tells the studio nothing it can act on.
+      const factors = [qty, unitCost, unitPrice, discountPct];
+      const tooLarge = factors.some((f) => !f.ok && f.reason === 'too_large');
+      return err(tooLarge ? 'amount_too_large' : 'invalid');
     }
-    if (!pctInRange(discountPct)) return err('discount_out_of_range');
-    // The per-FACTOR magnitude loop that used to sit here is gone: readMoneyString
+    if (!pctInRange(discountPct.value)) return err('discount_out_of_range');
+    // The per-FACTOR magnitude loop that used to sit here is gone: the reader
     // applies MAX_AMOUNT itself, so an over-cap factor already came back null and
     // failed 'invalid' above. The PRODUCT check below was never redundant.
     if (!l.unit) return err('invalid');
 
-    const totals = computeLine({ qty, unitCost, unitPrice, discountPct });
+    const totals = computeLine({
+      qty: qty.value,
+      unitCost: unitCost.value,
+      unitPrice: unitPrice.value,
+      discountPct: discountPct.value,
+    });
     // The FACTORS were each inside the cap; their PRODUCT need not be. A
     // line total past the cap overflows numeric(18,4) at the database — and so
     // does a line cost or margin, which are persisted on the same row. A signed
@@ -119,11 +128,11 @@ export async function saveVariationDraftCore(
       costItemId: l.costItemId?.trim() || null,
       descriptionAr,
       descriptionEn,
-      qty,
+      qty: qty.value,
       unit: l.unit,
-      unitCost,
-      unitPrice,
-      discountPct,
+      unitCost: unitCost.value,
+      unitPrice: unitPrice.value,
+      discountPct: discountPct.value,
       lineCost: totals.lineCost,
       lineTotal: totals.lineTotal,
       lineMargin: totals.lineMargin,

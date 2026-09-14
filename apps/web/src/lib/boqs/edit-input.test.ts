@@ -138,18 +138,25 @@ describe('normalizeLinePatch', () => {
     // 1e17: storable as a factor, but its product with any rate overflows
     // numeric(18,4) — the sheet was the one money surface that let it through.
     //
-    // THE CODE CHANGED IN WAVE 2, the refusal did not. readMoneyString applies
-    // MAX_AMOUNT itself, so an over-cap factor is now unreadable rather than
-    // readable-but-too-big, and the field reports its own 'invalid_*' code. The
-    // distinct 'amount_too_large' still exists where it always mattered: on the
-    // computed line TOTAL, which overflows from factors that each fit.
+    // THE EXPECTATION MOVED BACK. For one wave this asserted 'invalid_qty',
+    // because the reader answered a single `null` for every failure and the
+    // field could only report its own code — so a studio pasting 1e17 was told
+    // its number was not a number. readMoney now says WHICH failure it was, and
+    // 'amount_too_large' is both the truth and what main said. The same code
+    // still covers the case it always covered: a computed line TOTAL that
+    // overflows from factors which each fit.
     expect(normalizeLinePatch({ qty: '100000000000000000' })).toEqual({
       ok: false,
-      error: 'invalid_qty',
+      error: 'amount_too_large',
     });
     expect(normalizeLinePatch({ unitPrice: String(MAX_AMOUNT + 1) })).toEqual({
       ok: false,
-      error: 'invalid_price',
+      error: 'amount_too_large',
+    });
+    // A cell that genuinely is not a number still gets the field's own code.
+    expect(normalizeLinePatch({ qty: 'twelve' })).toEqual({
+      ok: false,
+      error: 'invalid_qty',
     });
     // The cap itself is still acceptable.
     expect(normalizeLinePatch({ qty: String(MAX_AMOUNT) }).ok).toBe(true);

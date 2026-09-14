@@ -301,6 +301,22 @@ describe('M10: a variation total past the money cap is coded, not generic', () =
     const { contractId } = await issuedContract(ctx, clientId, projectId);
     const voId = ((await createVariationDraftCore(ctx, { contractId, titleEn: 'Huge' })) as { data?: string }).data!;
 
+    // A FACTOR past the cap is its own answer. It used to be a bare 'invalid',
+    // which tells a studio looking at a quantity of 1e13 nothing it can act on.
+    expect(
+      await saveVariationDraftCore(ctx, {
+        id: voId,
+        lines: [{ descriptionEn: 'x', qty: '10000000000000', unit: 'lump_sum', unitCost: '0', unitPrice: '1', discountPct: '0' }],
+      }),
+    ).toEqual({ ok: false, error: 'amount_too_large' });
+    // ...and a cell that is not a number at all still answers 'invalid'.
+    expect(
+      await saveVariationDraftCore(ctx, {
+        id: voId,
+        lines: [{ descriptionEn: 'x', qty: 'twelve', unit: 'lump_sum', unitCost: '0', unitPrice: '1', discountPct: '0' }],
+      }),
+    ).toEqual({ ok: false, error: 'invalid' });
+
     // Each factor is inside the cap; the product is not.
     expect(
       await saveVariationDraftCore(ctx, {

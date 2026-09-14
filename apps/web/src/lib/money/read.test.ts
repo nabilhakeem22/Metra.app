@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { MAX_AMOUNT, readMoneyString, withinMagnitude } from './read';
+import { MAX_AMOUNT, readMoney, readMoneyString, withinMagnitude } from './read';
 import type { ReadMoneyOptions } from './read';
 
 // Six parsers collapse into this one. The suite is written as the union of what
@@ -132,6 +132,41 @@ describe('readMoneyString — Arabic numerals', () => {
     // Only the spreadsheet import opts in. §4.1: Metra renders Western numerals,
     // so an Arabic-Indic digit in a form field is a paste accident, not intent.
     expect(readMoneyString('١٢٣', { allowGroupSeparators: true })).toBeNull();
+  });
+});
+
+describe('readMoney — the reason, not just the refusal', () => {
+  it('says too_large for a figure past the cap', () => {
+    // The distinction the string form cannot make: 1e13 IS a number, and being
+    // told it is not one is both wrong and unactionable.
+    expect(readMoney('10000000000000')).toEqual({ ok: false, reason: 'too_large' });
+    expect(readMoney(String(MAX_AMOUNT + 1))).toEqual({ ok: false, reason: 'too_large' });
+  });
+
+  it('says invalid for everything that is not a number', () => {
+    expect(readMoney('twelve')).toEqual({ ok: false, reason: 'invalid' });
+    expect(readMoney('1,5', { allowGroupSeparators: true })).toEqual({
+      ok: false,
+      reason: 'invalid',
+    });
+    expect(readMoney('-5')).toEqual({ ok: false, reason: 'invalid' });
+    expect(readMoney('')).toEqual({ ok: false, reason: 'invalid' });
+  });
+
+  it('carries the value, and the blank default, when it reads', () => {
+    expect(readMoney('1200.5')).toEqual({ ok: true, value: '1200.5' });
+    expect(readMoney('', { blank: '0' })).toEqual({ ok: true, value: '0' });
+    expect(readMoney(String(MAX_AMOUNT))).toEqual({
+      ok: true,
+      value: String(MAX_AMOUNT),
+    });
+  });
+
+  it('is what readMoneyString is made of', () => {
+    for (const raw of ['1200.5', 'twelve', '10000000000000', '']) {
+      const result = readMoney(raw);
+      expect(readMoneyString(raw)).toBe(result.ok ? result.value : null);
+    }
   });
 });
 

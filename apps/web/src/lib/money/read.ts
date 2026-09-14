@@ -13,6 +13,7 @@
  * accepted ONLY in strict thousands grouping and refused everywhere else.
  */
 import { MONEY_RE, clampMoney4 } from '@/lib/aggregates/proposal-totals';
+import { toLatinNumerals, withoutSeparators } from './separators';
 
 /** F4 magnitude cap — numeric(18,4) tops out near 1e14, so stay well under it. */
 export const MAX_AMOUNT = 1_000_000_000_000; // 1e12
@@ -40,28 +41,63 @@ export interface ReadMoneyOptions {
 }
 
 /**
- * Read `raw` as a canonical money string, or `null` if it is not one.
+ * What a money string read as, or WHY it did not.
+ *
+ * The reason is the point. Every caller used to see one `null` and answer with
+ * its own generic code, so a pasted 1e13 quantity was reported as "not a
+ * number" — which is both wrong and unactionable, because the studio can see
+ * perfectly well that it IS a number. `too_large` says the one true thing.
+ */
+export type ReadMoneyResult =
+  | { ok: true; value: string }
+  | { ok: false; reason: 'invalid' | 'too_large' };
+
+const INVALID: ReadMoneyResult = { ok: false, reason: 'invalid' };
+
+/** An absent/empty input: the caller's `blank`, or a refusal when it has none. */
+function fromBlank(blank: string | null): ReadMoneyResult {
+  return blank === null ? INVALID : { ok: true, value: blank };
+}
+
+/**
+ * Read `raw` as a canonical money string, or say why it is not one.
  *
  * Pipeline: canonicalise (digits, then separators) -> anchored MONEY_RE ->
  * sign rule -> clamp to the numeric(18,4) scale -> magnitude cap.
+ */
+export function readMoney(
+  raw: string | null | undefined,
+  options: ReadMoneyOptions = {},
+): ReadMoneyResult {
+  const { allowNegative = false, allowGroupSeparators = false } = options;
+  const { allowArabicDigits = false, blank = null } = options;
+  if (raw === null || raw === undefined) return fromBlank(blank);
+
+  const latin = allowArabicDigits ? toLatinNumerals(raw) : raw;
+  const canonical = allowGroupSeparators ? withoutSeparators(latin) : latin.trim();
+  if (canonical === null) return INVALID;
+  if (canonical === '') return fromBlank(blank);
+
+  if (!MONEY_RE.test(canonical)) return INVALID;
+  if (!allowNegative && canonical.startsWith('-')) return INVALID;
+  const clamped = clampMoney4(canonical);
+  if (!withinMagnitude(clamped)) return { ok: false, reason: 'too_large' };
+  return { ok: true, value: clamped };
+}
+
+/**
+ * The string form: the value, or `null` for any failure.
+ *
+ * Most callers have exactly one thing to say about an unreadable field and this
+ * is the shape for them. A caller that must tell "not a number" from "past the
+ * cap" — the line editors, the draft save, the importer — reads `readMoney`.
  */
 export function readMoneyString(
   raw: string | null | undefined,
   options: ReadMoneyOptions = {},
 ): string | null {
-  const { allowNegative = false, allowGroupSeparators = false } = options;
-  const { allowArabicDigits = false, blank = null } = options;
-  if (raw === null || raw === undefined) return blank;
-
-  const latin = allowArabicDigits ? toLatinNumerals(raw) : raw;
-  const canonical = allowGroupSeparators ? withoutSeparators(latin) : latin.trim();
-  if (canonical === null) return null;
-  if (canonical === '') return blank;
-
-  if (!MONEY_RE.test(canonical)) return null;
-  if (!allowNegative && canonical.startsWith('-')) return null;
-  const clamped = clampMoney4(canonical);
-  return withinMagnitude(clamped) ? clamped : null;
+  const result = readMoney(raw, options);
+  return result.ok ? result.value : null;
 }
 
 /**
@@ -73,54 +109,4 @@ export function readMoneyString(
 export function withinMagnitude(value: string): boolean {
   if (!MONEY_RE.test(value.trim())) return false;
   return Math.abs(Number(value)) <= MAX_AMOUNT;
-}
-
-const ARABIC_NUMERALS_RE = /[\u0660-\u0669\u06F0-\u06F9]/g;
-
-/** Arabic-Indic + Persian digits to Latin, U+066B (Arabic decimal separator) to
- *  '.'. U+066C (Arabic thousands separator) is LEFT IN PLACE — it is a grouping
- *  separator and goes through the same strict check as the comma. */
-function toLatinNumerals(value: string): string {
-  return value
-    .replace(ARABIC_NUMERALS_RE, (digit) => {
-      const code = digit.charCodeAt(0);
-      const base = code >= 0x06f0 ? 0x06f0 : 0x0660;
-      return String(code - base);
-    })
-    .replace(/\u066B/g, '.');
-}
-
-/**
- * Everything a human or a spreadsheet uses to group thousands.
- *
- * A SPACE IS NOT NOISE. Stripping whitespace unconditionally read `'1 5'` as
- * `15` and `'1 2 3'` as `123` — the same ten-fold money error the comma rule
- * exists to prevent, wearing an invisible character. Two of these are invisible
- * (U+00A0, U+202F) and one more is easy to miss (U+066C), which is exactly why
- * each must prove it is in a thousands POSITION before it is removed.
- */
-const GROUPING_SEPARATORS = [',', '\u066C', ' ', '\u00A0', '\u202F'];
-
-/** Strict grouping with ONE separator: 1–3 leading digits, then groups of 3. */
-function groupedWith(separator: string): RegExp {
-  const escaped = separator === ',' ? ',' : `\\u${separator.charCodeAt(0).toString(16).padStart(4, '0')}`;
-  return new RegExp(`^-?\\d{1,3}(${escaped}\\d{3})+(\\.\\d+)?$`);
-}
-
-/**
- * Strip grouping separators, or refuse. `null` = refuse.
- *
- * Outer whitespace is trimmed first — leading and trailing space is formatting,
- * not grouping. What is left may use ONE separator, in thousands positions only:
- * a second kind ('1 234,567') is a sheet whose own convention is unclear, and
- * guessing at that is how a rate becomes a thousand times itself.
- */
-function withoutSeparators(value: string): string | null {
-  const trimmed = value.trim();
-  const used = GROUPING_SEPARATORS.filter((separator) => trimmed.includes(separator));
-  if (used.length === 0) return trimmed;
-  if (used.length > 1) return null;
-  const [separator] = used;
-  if (!groupedWith(separator).test(trimmed)) return null;
-  return trimmed.split(separator).join('');
 }

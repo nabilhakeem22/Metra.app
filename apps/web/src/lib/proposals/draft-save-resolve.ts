@@ -4,7 +4,7 @@
 import { costItems, type CostItemUnit, type MetraDb } from '@metra/db';
 import { inArray } from 'drizzle-orm';
 import { fail } from '@/lib/actions/mutate';
-import { readMoneyString } from '@/lib/money/read';
+import { readMoney } from '@/lib/money/read';
 import {
   computeLine,
   computeSection,
@@ -128,31 +128,26 @@ export function resolveDraftLines(
             : '0';
       }
 
-      const qty = readMoneyString(line.qty, { blank: '0' });
-      const unitCost = readMoneyString(rawCost, { blank: '0' });
-      const unitPrice = readMoneyString(resolvedUnitPrice, { blank: '0' });
-      const discountPct = readMoneyString(line.discountPct, { blank: '0' });
-      if (
-        qty === null ||
-        unitCost === null ||
-        unitPrice === null ||
-        discountPct === null ||
-        !resolvedUnit ||
-        (!descriptionEn && !descriptionAr)
-      ) {
-        fail('line_required');
+      const qty = readMoney(line.qty, { blank: '0' });
+      const unitCost = readMoney(rawCost, { blank: '0' });
+      const unitPrice = readMoney(resolvedUnitPrice, { blank: '0' });
+      const discountPct = readMoney(line.discountPct, { blank: '0' });
+      if (!qty.ok || !unitCost.ok || !unitPrice.ok || !discountPct.ok) {
+        // A factor PAST THE CAP says so. It reached here as a plain
+        // `line_required` — "this line is missing something" for a line whose
+        // problem was that one of its numbers is 1e13.
+        const factors = [qty, unitCost, unitPrice, discountPct];
+        const tooLarge = factors.some((f) => !f.ok && f.reason === 'too_large');
+        fail(tooLarge ? 'amount_too_large' : 'line_required');
       }
-      // The per-FACTOR magnitude check that used to sit here is gone:
-      // readMoneyString applies MAX_AMOUNT itself, so an over-cap factor already
-      // came back null and failed `line_required` above. The PRODUCT check below
-      // is the one that was never redundant.
-      if (!pctInRange(discountPct!)) fail('discount_out_of_range');
+      if (!resolvedUnit || (!descriptionEn && !descriptionAr)) fail('line_required');
+      if (!pctInRange(discountPct.value)) fail('discount_out_of_range');
 
       const totals = computeLine({
-        qty: qty!,
-        unitCost: unitCost!,
-        unitPrice: unitPrice!,
-        discountPct: discountPct!,
+        qty: qty.value,
+        unitCost: unitCost.value,
+        unitPrice: unitPrice.value,
+        discountPct: discountPct.value,
       });
       // The FACTORS were each inside the cap; their PRODUCT need not be. qty and
       // unit_price of 1e12 each pass the checks above and multiply to 1e24, which
@@ -174,11 +169,11 @@ export function resolveDraftLines(
         costItemId,
         descriptionAr,
         descriptionEn,
-        qty: qty!,
-        unit: resolvedUnit!,
-        unitCost: unitCost!,
-        unitPrice: unitPrice!,
-        discountPct: discountPct!,
+        qty: qty.value,
+        unit: resolvedUnit,
+        unitCost: unitCost.value,
+        unitPrice: unitPrice.value,
+        discountPct: discountPct.value,
         lineCost: totals.lineCost,
         lineTotal: totals.lineTotal,
         lineMargin: totals.lineMargin,

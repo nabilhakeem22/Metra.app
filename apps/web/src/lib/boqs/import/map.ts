@@ -5,7 +5,7 @@
 // Nothing here knows what a CSV is. It takes a SheetGrid, so the same code
 // serves an XLSX decoder unchanged.
 
-import { readMoneyString } from '@/lib/money/read';
+import { readMoney } from '@/lib/money/read';
 import type { SheetGrid } from './decode';
 
 /** The fields a BOQ line can be imported from. Order drives the template. */
@@ -92,6 +92,21 @@ const IMPORTED_CELL = {
   allowGroupSeparators: true,
   allowArabicDigits: true,
 } as const;
+
+/**
+ * One money cell, with the row error it earns. `null` = the row is rejected.
+ *
+ * "Is not a number" and "is too large" are different problems and the studio
+ * fixes them differently: one is a typo or a stray unit in the cell, the other
+ * is a figure past the 1e12 cap that reads perfectly well. Telling a studio
+ * that 10000000000000 is not a number is both wrong and unactionable.
+ */
+function readCell(raw: string, label: string, errors: string[]): string | null {
+  const result = readMoney(raw, IMPORTED_CELL);
+  if (result.ok) return result.value;
+  errors.push(`${label} ${result.reason === 'too_large' ? 'is too large' : 'is not a number'}`);
+  return null;
+}
 
 /** Metra's unit list, and what studios actually write for each. */
 const UNIT_ALIASES: Record<string, string[]> = {
@@ -198,19 +213,19 @@ export function mapRows(
       );
     }
 
-    const qty = readMoneyString(rawQty, IMPORTED_CELL);
-    if (qty === null) errors.push('Quantity is not a number');
-    else if (qty.startsWith('-')) errors.push('Quantity cannot be negative');
+    const qty = readCell(rawQty, 'Quantity', errors);
+    if (qty !== null && qty.startsWith('-')) errors.push('Quantity cannot be negative');
 
-    const unitPrice = readMoneyString(cell(row, mapping.unitPrice), IMPORTED_CELL);
-    if (unitPrice === null) errors.push('Unit price is not a number');
-    else if (unitPrice.startsWith('-')) errors.push('Unit price cannot be negative');
+    const unitPrice = readCell(cell(row, mapping.unitPrice), 'Unit price', errors);
+    if (unitPrice !== null && unitPrice.startsWith('-')) {
+      errors.push('Unit price cannot be negative');
+    }
 
     // Cost is optional: a line without one is tracked for quantity but blind on
     // margin, which is a real state and not an error.
     const rawCost = cell(row, mapping.unitCost);
-    const unitCost = rawCost.trim() === '' ? '0' : readMoneyString(rawCost, IMPORTED_CELL);
-    if (unitCost === null) errors.push('Unit cost is not a number');
+    const unitCost =
+      rawCost.trim() === '' ? '0' : readCell(rawCost, 'Unit cost', errors);
 
     if (errors.length > 0) return { rowNumber, line: null, errors };
 

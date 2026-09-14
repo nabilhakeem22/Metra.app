@@ -238,6 +238,23 @@ describe('mapRows', () => {
     expect(res.rows[0]?.errors).toContain('Quantity cannot be negative');
   });
 
+  it('tells a too-large cell apart from a cell that is not a number', () => {
+    // Two different problems with two different fixes: a stray unit in the cell
+    // versus a figure past the 1e12 cap that reads perfectly well. "Quantity is
+    // not a number" for 1e13 is wrong, and the studio can see that it is wrong.
+    const tooLarge = grid('Description,Unit,Qty,Rate\nWalls,m2,10000000000000,50');
+    const first = mapRows(tooLarge, autoDetectMapping(tooLarge.rows[0] as string[]));
+    expect(first.rows[0]?.errors).toContain('Quantity is too large');
+
+    const nonsense = grid('Description,Unit,Qty,Rate\nWalls,m2,n/a,50');
+    const second = mapRows(nonsense, autoDetectMapping(nonsense.rows[0] as string[]));
+    expect(second.rows[0]?.errors).toContain('Quantity is not a number');
+
+    const dearRate = grid('Description,Unit,Qty,Rate\nWalls,m2,10,99999999999999');
+    const third = mapRows(dearRate, autoDetectMapping(dearRate.rows[0] as string[]));
+    expect(third.rows[0]?.errors).toContain('Unit price is too large');
+  });
+
   it('treats a missing cost as zero, not as an error', () => {
     // A line with no cost basis is blind on margin — a real state, not a fault.
     const g = grid('Description,Unit,Qty,Rate,Cost\nWalls,m2,10,50,');

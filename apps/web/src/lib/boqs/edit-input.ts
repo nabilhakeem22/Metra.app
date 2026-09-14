@@ -10,7 +10,7 @@
 // value the browser would have rejected.
 
 import type { ActionCode } from '@/lib/actions/result';
-import { readMoneyString } from '@/lib/money/read';
+import { readMoney } from '@/lib/money/read';
 
 /**
  * Metra's units, in the order the picker offers them. Mirrors the
@@ -74,16 +74,18 @@ type FieldResult = { value: string } | { error: ActionCode };
 /**
  * A quantity or a rate: readable, non-negative, and inside the magnitude cap.
  *
- * The cap is MAX_AMOUNT (1e12) and readMoneyString applies it, so a pasted 1e17
- * comes back null here alongside every other unreadable input — the sheet was
- * once the one money surface that let such a factor through to the arithmetic,
- * where its product overflows numeric(18,4) and the write fails as a raw 22003.
- * The PRODUCTS are still checked separately by the caller with
- * `amount_too_large`, which is the case a per-factor check could never catch.
+ * The cap is MAX_AMOUNT (1e12) and the reader applies it, so a pasted 1e17 is
+ * refused here — the sheet was once the one money surface that let such a factor
+ * through to the arithmetic, where its product overflows numeric(18,4) and the
+ * write fails as a raw 22003. It is refused with `amount_too_large` rather than
+ * `invalid_qty`: the studio can see that 1e17 is a number, and being told it is
+ * not one is both wrong and unactionable. The PRODUCTS are still checked
+ * separately by the caller, which is the case no per-factor check could catch.
  */
 function readAmountField(raw: string, ifUnreadable: ActionCode): FieldResult {
-  const value = readMoneyString(raw, TYPED_FIELD);
-  return value === null ? { error: ifUnreadable } : { value };
+  const result = readMoney(raw, TYPED_FIELD);
+  if (result.ok) return { value: result.value };
+  return { error: result.reason === 'too_large' ? 'amount_too_large' : ifUnreadable };
 }
 
 function isBoqUnit(value: string): value is BoqUnit {
