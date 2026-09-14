@@ -23,15 +23,33 @@ export const MAX_IMPORT_ROWS = 2000;
  * MAX_IMPORT_ROWS check runs. Far above any real sheet, so it only ever trips on
  * abusive input; the exact 2000-ok/2001-rejected data-row boundary is still
  * enforced downstream after blank-row filtering.
+ *
+ * 5× MAX_IMPORT_ROWS, not 25×: at 50,000 a 3.4 MiB file of bare newlines was
+ * fully parsed (+37 MiB of heap) before the bail, which is a lot of work to do
+ * on the way to refusing.
  */
-export const MAX_RAW_ROWS = 50_000;
+export const MAX_RAW_ROWS = 10_000;
+
+/**
+ * The other axis. A row cap bounds how many rows exist and says NOTHING about
+ * how wide one is: 1 MiB of commas is a SINGLE row of 1,048,577 fields, which
+ * cost +17.6 MiB of heap and never came near MAX_RAW_ROWS. This ceiling is
+ * counted per FIELD, so a runaway width bails on the same terms a runaway height
+ * does. 64 columns × the row cap — a real BOQ is eight columns wide.
+ */
+export const MAX_IMPORT_CELLS = MAX_IMPORT_ROWS * 64;
 
 /**
  * Why an import could not be read. Coded rather than free text because each one
  * maps to a different sentence the studio can act on: make the file smaller,
  * split it, it has no rows, or it is not a CSV at all.
  */
-export type ImportParseReason = 'too_large' | 'too_many_rows' | 'empty' | 'unreadable';
+export type ImportParseReason =
+  | 'too_large'
+  | 'too_many_rows'
+  | 'too_many_cells'
+  | 'empty'
+  | 'unreadable';
 
 export class ImportParseError extends Error {
   constructor(public reason: ImportParseReason) {

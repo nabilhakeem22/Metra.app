@@ -12,7 +12,7 @@
  * of a field, which is the rule that reads a real sheet correctly. That rule is
  * the one kept here.
  */
-import { ImportParseError, MAX_RAW_ROWS } from './limits';
+import { ImportParseError, MAX_IMPORT_CELLS, MAX_RAW_ROWS } from './limits';
 
 export interface ParseCsvOptions {
   /** Sniffed by the decoder; defaults to a comma. */
@@ -44,10 +44,16 @@ export function parseCsvRows(text: string, options: ParseCsvOptions = {}): strin
   // a literal rather than a re-open.
   let fieldWasQuoted = false;
 
+  // Counted per FIELD, because the row cap bounds height only: 1 MiB of commas
+  // is ONE row of a million fields and never reaches maxRows.
+  let cells = 0;
+
   const pushField = () => {
     row.push(field.trim());
     field = '';
     fieldWasQuoted = false;
+    cells += 1;
+    if (cells > MAX_IMPORT_CELLS) throw new ImportParseError('too_many_cells');
   };
   const pushRow = () => {
     pushField();
