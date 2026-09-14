@@ -62,13 +62,20 @@ async function forceState(engagementId: string, state: string): Promise<void> {
   );
 }
 
-/** The client-channel ROM acknowledgements, with the issuance each one answers. */
+/**
+ * The client-channel ROM acknowledgements, with the issuance each one answers.
+ *
+ * The instant comes back as ::text on purpose. timestamptz carries MICROSECONDS
+ * and a JS Date only carries milliseconds, so two issuances a few hundred
+ * microseconds apart — which is what a test does — revive as the same Date and
+ * the assertion that they differ would fail against correct data.
+ */
 async function romAckRows(engagementId: string) {
   return raw.query<{
     range_low: string | null;
     acknowledged_issue_at: string | null;
   }>(
-    `select range_low, acknowledged_issue_at
+    `select range_low, acknowledged_issue_at::text as acknowledged_issue_at
        from public.engagement_events
       where engagement_id = '${engagementId}'
         and actor_channel = 'client' and kind = 'rom_acknowledgement'
@@ -535,7 +542,7 @@ describe('delivery respond — an acknowledgement answers ONE issuance (0049)', 
     ]);
     // Each row names the issuance it answered, and they are different instants.
     expect(rows.every((row) => row.acknowledged_issue_at !== null)).toBe(true);
-    expect(new Set(rows.map((row) => String(row.acknowledged_issue_at))).size).toBe(2);
+    expect(new Set(rows.map((row) => row.acknowledged_issue_at)).size).toBe(2);
 
     // The verb closes again, now against the CURRENT issuance.
     expect(
