@@ -249,7 +249,12 @@ export async function addBoqSectionCore(
   input: { boqId: string; title: string },
 ): Promise<ActionResult & { data?: string }> {
   const title = input.title.trim();
-  if (title === '' || title.length > MAX_DESCRIPTION) return err('name_required');
+  // `name_required` used to serve this, the org bilingual check AND the BOQ
+  // title, so the studio adding a nameless section was told to "enter at least
+  // one company name". One string cannot answer for three different things.
+  if (title === '' || title.length > MAX_DESCRIPTION) {
+    return err('section_name_required');
+  }
 
   return mutateInOrg(
     ctx,

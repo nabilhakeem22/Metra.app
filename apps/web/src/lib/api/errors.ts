@@ -171,6 +171,7 @@ export const ACTION_CODE_PROBLEM: Record<ActionCode, ApiProblemKind> = {
   // Editing a draft BOQ line by line.
   line_not_found: 'not-found',
   section_not_found: 'not-found',
+  section_name_required: 'bad-request',
   description_required: 'bad-request',
   description_too_long: 'bad-request',
   item_code_too_long: 'bad-request',

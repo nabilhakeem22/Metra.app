@@ -95,6 +95,7 @@ export type ActionCode =
   // Editing a draft BOQ line by line (boqs/edit.ts + boqs/edit-input.ts).
   | 'line_not_found'
   | 'section_not_found'
+  | 'section_name_required'
   | 'description_required'
   | 'description_too_long'
   | 'item_code_too_long'
