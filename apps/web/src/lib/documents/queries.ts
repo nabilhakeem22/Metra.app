@@ -2,6 +2,7 @@ import 'server-only';
 import { documentCategories, files } from '@metra/db';
 import { and, desc, eq } from 'drizzle-orm';
 import { withOrgContext, type OrgContext } from '@/lib/db/context';
+import { boundedPage, type PageFilter } from '@/lib/db/list-bounds';
 import type { DocumentEntitySpec } from './entities';
 
 /** A file stapled to a client or a project, as the documents tab renders it. */
@@ -28,20 +29,30 @@ const DOCUMENT_COLUMNS = {
   categoryNameAr: documentCategories.nameAr,
 } as const;
 
-/** Files attached to one parent row (entity + entity_id), newest first. */
+/**
+ * Files attached to one parent row (entity + entity_id), newest first.
+ *
+ * BOUNDED, like every other register: the parent filter is a scope, not a cap,
+ * and files-per-client only ever grows. The defaults are `boundedPage`'s, so a
+ * caller that passes no page gets the first 100 newest.
+ */
 export function listDocuments(
   ctx: OrgContext,
   spec: DocumentEntitySpec,
   parentId: string,
+  filter: PageFilter = {},
 ): Promise<EntityDocument[]> {
   return withOrgContext(ctx, async (tx) => {
+    const page = boundedPage(filter);
     const rows = await tx
       .select(DOCUMENT_COLUMNS)
       .from(files)
       // LEFT so an uncategorised document is still listed.
       .leftJoin(documentCategories, eq(documentCategories.id, files.categoryId))
       .where(and(eq(files.entity, spec.entity), eq(files.entityId, parentId)))
-      .orderBy(desc(files.createdAt));
+      .orderBy(desc(files.createdAt))
+      .limit(page.limit)
+      .offset(page.offset);
     return rows.map(({ createdAt, ...rest }) => ({
       ...rest,
       createdAt: createdAt.toISOString(),
