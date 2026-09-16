@@ -30,7 +30,7 @@ import type { MemberRole } from '@metra/db';
 
 // Read-back instruments.
 //
-// `lib/variations/queries` used to export a `getVariationWithLines` and a
+// `lib/variations/queries` used to export a detail-with-lines query and a
 // per-project approved-total query, and this suite was their ONLY caller —
 // nothing in the product read either one, because the register on the contract
 // detail page is the only variation surface that exists. The dead queries are

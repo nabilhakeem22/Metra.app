@@ -143,7 +143,7 @@ describe('readMoney — the reason, not just the refusal', () => {
     expect(readMoney(String(MAX_AMOUNT + 1))).toEqual({ ok: false, reason: 'too_large' });
   });
 
-  it('says invalid for everything that is not a number', () => {
+  it('says invalid for everything unreadable', () => {
     expect(readMoney('twelve')).toEqual({ ok: false, reason: 'invalid' });
     expect(readMoney('1,5', { allowGroupSeparators: true })).toEqual({
       ok: false,

@@ -129,7 +129,7 @@ describe('an imported numeric cell', () => {
 
   it('REFUSES an ambiguous comma this cell used to read as grouping', () => {
     // BEHAVIOUR CHANGE (wave 2): '1,5' became 15 in an imported price. The row
-    // now fails with "is not a number", which the studio sees in the problem
+    // now fails with the unreadable-cell code, which the studio sees in the problem
     // list instead of importing a ten-fold error silently.
     for (const ambiguous of ['1,5', '1,2,3', '1.234,56']) {
       expect(readImportedCell(ambiguous)).toBeNull();
@@ -243,7 +243,7 @@ describe('mapRows', () => {
     expect(res.rows[0]?.issues).toContainEqual({ code: 'qty_negative' });
   });
 
-  it('tells a too-large cell apart from a cell that is not a number', () => {
+  it('tells a too-large cell apart from an unreadable one', () => {
     // Two different problems with two different fixes: a stray unit in the cell
     // versus a figure past the 1e12 cap that reads perfectly well. "Quantity is
     // not a number" for 1e13 is wrong, and the studio can see that it is wrong.

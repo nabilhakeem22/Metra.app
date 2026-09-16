@@ -152,7 +152,7 @@ describe('normalizeLinePatch', () => {
       ok: false,
       error: 'amount_too_large',
     });
-    // A cell that genuinely is not a number still gets the field's own code.
+    // A cell that genuinely holds no number still gets the field's own code.
     expect(normalizeLinePatch({ qty: 'twelve' })).toEqual({
       ok: false,
       error: 'invalid_qty',

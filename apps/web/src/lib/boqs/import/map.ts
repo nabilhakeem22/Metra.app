@@ -85,8 +85,8 @@ export function autoDetectMapping(header: string[]): ColumnMapping {
  * is NaN, and a sheet that looks perfectly valid would otherwise import as a
  * page of errors. Negatives are read here and rejected by the row validator
  * below with their own code (`*_negative`) rather than refused as unreadable:
- * "the quantity cannot be negative" tells the studio what to fix, and the code
- * for an unreadable cell does not.
+ * the negative-quantity code tells the studio what to fix, and the code for an
+ * unreadable cell does not.
  */
 const IMPORTED_CELL = {
   allowNegative: true,
