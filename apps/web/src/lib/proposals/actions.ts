@@ -1,21 +1,16 @@
 'use server';
 
-import { organizations } from '@metra/db';
+// 'use server' wrappers ONLY: session work + delegate. No SQL here.
+//
+// Every export in this file is a callable RPC endpoint, so the two heavy bodies
+// live beside it instead: ./send-email.ts (the best-effort client email) and
+// ./preview-html.ts (the in-app preview render).
+
 import { getLocale } from 'next-intl/server';
 import { refreshApp } from '@/lib/actions/refresh';
 import type { ActionResult } from '@/lib/actions/result';
 import { requireOrg } from '@/lib/auth/require-org';
-import { withOrgContext } from '@/lib/db/context';
-import { sendProposalEmail } from '@/lib/email/resend';
-import { formatMoney } from '@/lib/format/money';
 import { resolveRequestOrigin } from '@/lib/http/request-origin';
-import {
-  formatProposalNumber,
-  proposalYear,
-} from '@/lib/format/proposal-number';
-import { buildProposalHtml } from '@/lib/pdf/proposal-template';
-import { can, canSeeMargin } from '@/lib/permissions/can';
-import { eq } from 'drizzle-orm';
 import {
   createProposalCore,
   deleteDraftProposalCore,
@@ -26,7 +21,18 @@ import {
   type CreateProposalInput,
   type SaveDraftInput,
 } from './core';
-import { getProposalForPdf, getProposalSendMeta } from './queries';
+import { renderProposalPreviewHtml } from './preview-html';
+import { notifyClientOfSentProposal } from './send-email';
+
+/** The reader's locale, or the product default. `getLocale()` throws outside a
+ *  request scope, which a server action can be called from during a replay. */
+async function currentLocale(): Promise<string> {
+  try {
+    return await getLocale();
+  } catch {
+    return 'ar-EG';
+  }
+}
 
 export async function createProposal(
   input: CreateProposalInput,
@@ -61,55 +67,17 @@ export async function sendProposal(id: string): Promise<
   if (!origin) return { ok: false, error: 'generic' };
   const res = await sendProposalCore(ctx, { id });
   if (!res.ok || !res.data) return { ok: res.ok, error: res.error };
-  let locale = 'ar-EG';
-  try {
-    locale = await getLocale();
-  } catch {
-    /* default locale */
-  }
+
+  const locale = await currentLocale();
   const link = `${origin}/${locale}/p/${res.data}`;
   refreshApp();
-
-  // Best-effort client email. The proposal is ALREADY sent (core committed); a
-  // meta-load or email failure must never roll that back or throw here.
-  let emailSent = false;
-  let emailSkippedNoAddress = false;
-  try {
-    const meta = await getProposalSendMeta(ctx, id);
-    const clientEmail = meta?.clientEmail?.trim() || null;
-    if (!clientEmail) {
-      emailSkippedNoAddress = true;
-    } else if (meta) {
-      const [org] = await withOrgContext(ctx, (tx) =>
-        tx
-          .select({ nameEn: organizations.nameEn, nameAr: organizations.nameAr })
-          .from(organizations)
-          .where(eq(organizations.id, ctx.orgId))
-          .limit(1),
-      );
-      const orgName =
-        (locale.startsWith('ar')
-          ? org?.nameAr || org?.nameEn
-          : org?.nameEn || org?.nameAr) ?? 'Metra';
-      const sent = await sendProposalEmail({
-        to: clientEmail,
-        orgName,
-        proposalNumber: formatProposalNumber(
-          meta.number,
-          proposalYear(null, new Date()),
-        ),
-        totalDisplay: formatMoney(meta.total, locale),
-        expiryDate: meta.expiryDate,
-        acceptUrl: link,
-        locale,
-      });
-      emailSent = sent.sent;
-    }
-  } catch (err) {
-    console.error('sendProposal email step failed (send unaffected):', err);
-  }
-
-  return { ok: true, link, emailSent, emailSkippedNoAddress };
+  // The proposal is ALREADY sent. The email is best-effort and cannot fail this.
+  const email = await notifyClientOfSentProposal(ctx, {
+    proposalId: id,
+    acceptUrl: link,
+    locale,
+  });
+  return { ok: true, link, ...email };
 }
 
 export async function expireProposal(id: string): Promise<ActionResult> {
@@ -139,39 +107,7 @@ export async function getProposalPreviewHtml(
   variant: 'client' | 'internal',
 ): Promise<ActionResult & { html?: string }> {
   const ctx = await requireOrg();
-  if (!can(ctx.role, 'proposals_build', 'read')) {
-    return { ok: false, error: 'forbidden' };
-  }
-  try {
-    const [org] = await withOrgContext(ctx, (tx) =>
-      tx
-        .select({
-          nameEn: organizations.nameEn,
-          nameAr: organizations.nameAr,
-          hide: organizations.hideMarginFromPm,
-          defaultLocale: organizations.defaultLocale,
-        })
-        .from(organizations)
-        .limit(1),
-    );
-    const seeMargin = canSeeMargin(ctx.role, org?.hide ?? true);
-    if (variant === 'internal' && !seeMargin) {
-      return { ok: false, error: 'forbidden' };
-    }
-    const detail = await getProposalForPdf(ctx, id, variant === 'internal');
-    if (!detail) return { ok: false, error: 'invalid' };
-
-    const html = await buildProposalHtml(detail, {
-      locale: org?.defaultLocale ?? 'ar-EG',
-      variant,
-      orgNameAr: org?.nameAr ?? null,
-      orgNameEn: org?.nameEn ?? null,
-    });
-    return { ok: true, html };
-  } catch (err) {
-    console.error('getProposalPreviewHtml failed:', err);
-    return { ok: false, error: 'generic' };
-  }
+  return renderProposalPreviewHtml(ctx, id, variant);
 }
 
 export async function deleteDraftProposal(id: string): Promise<ActionResult> {

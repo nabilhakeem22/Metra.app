@@ -4,11 +4,8 @@ import { refreshApp } from '@/lib/actions/refresh';
 import type { ActionResult } from '@/lib/actions/result';
 import { requireOrg } from '@/lib/auth/require-org';
 import type { SignedUpload } from '@/lib/storage';
-import {
-  createDocumentUploadCore,
-  deleteDocumentCore,
-  getDocumentUrlCore,
-} from './core';
+import { deleteDocumentCore, getDocumentUrlCore } from './core';
+import { createDocumentUploadCore } from './upload';
 import { DOCUMENT_ENTITIES } from './entities';
 
 // 'use server' wrappers ONLY: session work + delegate. No SQL here.

@@ -17,6 +17,17 @@ export interface EntityDocument {
   categoryNameAr: string | null;
 }
 
+/** The tab's columns, as DATA. Storage bucket and object key stay server-side. */
+const DOCUMENT_COLUMNS = {
+  id: files.id,
+  originalName: files.originalName,
+  contentType: files.contentType,
+  createdAt: files.createdAt,
+  categoryId: files.categoryId,
+  categoryNameEn: documentCategories.nameEn,
+  categoryNameAr: documentCategories.nameAr,
+} as const;
+
 /** Files attached to one parent row (entity + entity_id), newest first. */
 export function listDocuments(
   ctx: OrgContext,
@@ -25,28 +36,15 @@ export function listDocuments(
 ): Promise<EntityDocument[]> {
   return withOrgContext(ctx, async (tx) => {
     const rows = await tx
-      .select({
-        id: files.id,
-        originalName: files.originalName,
-        contentType: files.contentType,
-        createdAt: files.createdAt,
-        categoryId: files.categoryId,
-        categoryNameEn: documentCategories.nameEn,
-        categoryNameAr: documentCategories.nameAr,
-      })
+      .select(DOCUMENT_COLUMNS)
       .from(files)
       // LEFT so an uncategorised document is still listed.
       .leftJoin(documentCategories, eq(documentCategories.id, files.categoryId))
       .where(and(eq(files.entity, spec.entity), eq(files.entityId, parentId)))
       .orderBy(desc(files.createdAt));
-    return rows.map((r) => ({
-      id: r.id,
-      originalName: r.originalName,
-      contentType: r.contentType,
-      createdAt: r.createdAt.toISOString(),
-      categoryId: r.categoryId,
-      categoryNameEn: r.categoryNameEn,
-      categoryNameAr: r.categoryNameAr,
+    return rows.map(({ createdAt, ...rest }) => ({
+      ...rest,
+      createdAt: createdAt.toISOString(),
     }));
   });
 }

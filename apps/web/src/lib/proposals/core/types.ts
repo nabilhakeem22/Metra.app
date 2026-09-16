@@ -1,9 +1,18 @@
-// The draft input shapes the builder posts and the save pipeline reads.
+// The proposal input shapes the builder posts and the cores read.
 //
 // PURE TYPES ONLY — no `server-only`, no runtime value, nothing to execute. They
 // live apart from ./create.ts because every stage of the save (validate, resolve,
 // persist) needs them and none of those stages needs proposal creation.
 import type { CostItemUnit } from '@metra/db';
+
+export interface CreateProposalInput {
+  clientId: string;
+  projectId: string;
+  titleAr?: string | null;
+  titleEn?: string | null;
+  issueDate?: string | null;
+  expiryDate?: string | null;
+}
 
 export interface LineInput {
   /** Stable identity of an EXISTING line (round-tripped by the builder) so its

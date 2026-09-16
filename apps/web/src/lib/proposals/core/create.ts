@@ -11,49 +11,17 @@ import { eq } from 'drizzle-orm';
 import { fail, mutateInOrg } from '@/lib/actions/mutate';
 import type { AuditEntry } from '@/lib/audit';
 import { allocateNumber } from '@/lib/db/allocate-number';
-import { err, type ActionCode, type ActionResult } from '@/lib/actions/result';
+import { err, type ActionResult } from '@/lib/actions/result';
 import type { OrgContext } from '@/lib/db/context';
-import { isUuid } from '@/lib/uuid';
 import { formatProposalNumber, proposalYear } from '@/lib/format/proposal-number';
-import { validIsoDate } from '@/lib/validation/iso-date';
 import { clean } from '@/lib/validation/text';
+import {
+  validateCreateInput,
+  type ValidatedCreateInput,
+} from './create-input';
+import type { CreateProposalInput } from './types';
 
-export interface CreateProposalInput {
-  clientId: string;
-  projectId: string;
-  titleAr?: string | null;
-  titleEn?: string | null;
-  issueDate?: string | null;
-  expiryDate?: string | null;
-}
-
-/** The input after trimming, with every id and date proved well-formed. */
-interface ValidatedCreateInput {
-  clientId: string;
-  projectId: string;
-  issueDate: string | null;
-  expiryDate: string | null;
-}
-
-/**
- * Shape-check the input BEFORE the transaction opens.
- *
- * A malformed client id answers `client_required` rather than `invalid`, because
- * "pick a client" is what the studio can actually do about it.
- */
-function validateCreateInput(
-  input: CreateProposalInput,
-): ValidatedCreateInput | ActionCode {
-  const clientId = input.clientId?.trim();
-  const projectId = input.projectId?.trim();
-  if (!clientId || !isUuid(clientId)) return 'client_required';
-  if (!projectId || !isUuid(projectId)) return 'invalid';
-  const issueDate = clean(input.issueDate);
-  const expiryDate = clean(input.expiryDate);
-  if (issueDate && !validIsoDate(issueDate)) return 'invalid_date';
-  if (expiryDate && !validIsoDate(expiryDate)) return 'invalid_date';
-  return { clientId, projectId, issueDate, expiryDate };
-}
+export type { CreateProposalInput } from './types';
 
 /** Both parents must exist IN THIS ORG and be active before a proposal names them. */
 async function assertClientProjectUsable(

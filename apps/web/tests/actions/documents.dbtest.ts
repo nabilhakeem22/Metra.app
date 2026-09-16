@@ -4,11 +4,8 @@ import { createClientCore } from '@/lib/clients/core';
 import { listClients } from '@/lib/clients/queries';
 import { createProjectCore } from '@/lib/projects/core';
 import { listProjects } from '@/lib/projects/queries';
-import {
-  createDocumentUploadCore,
-  deleteDocumentCore,
-  getDocumentUrlCore,
-} from '@/lib/documents/core';
+import { deleteDocumentCore, getDocumentUrlCore } from '@/lib/documents/core';
+import { createDocumentUploadCore } from '@/lib/documents/upload';
 import { DOCUMENT_ENTITIES } from '@/lib/documents/entities';
 import { listDocuments } from '@/lib/documents/queries';
 import { closeFixture, ctxFor, raw, seedOrg, teardown } from './fixture';
