@@ -22,22 +22,22 @@ import { fail, mutateInOrg } from '@/lib/actions/mutate';
 import { err, type ActionResult } from '@/lib/actions/result';
 import type { OrgContext } from '@/lib/db/context';
 import { isUuid } from '@/lib/uuid';
-import { recordConceptApproval, recordDesignApproval } from './approvals';
-import { CLIENT_RELEASES, selectReleaseArtifactIds } from './client-release';
-import { insertAsBuiltAttestation } from './attestations';
-import { settleConceptAndLock } from './concept';
-import { liveEvents } from './event-provenance';
-import { generateFeeSchedule } from './fee-schedule';
-import { captureRenderManifest } from './renders';
-import { isRevisionTrigger } from './revision-allowance';
-import { applyRevision, resetRevisionsOnReject } from './revisions';
-import { GUARDS, type GuardFacts } from './guards';
+import { recordConceptApproval, recordDesignApproval } from '../approvals';
+import { CLIENT_RELEASES, selectReleaseArtifactIds } from '../client-release';
+import { insertAsBuiltAttestation } from '../attestations';
+import { settleConceptAndLock } from '../concept';
+import { liveEvents } from '../event-provenance';
+import { generateFeeSchedule } from '../fee-schedule';
+import { captureRenderManifest } from '../renders';
+import { isRevisionTrigger } from '../revision-allowance';
+import { applyRevision, resetRevisionsOnReject } from '../revisions';
+import { GUARDS, type GuardFacts } from '../guards';
 import {
   CAPABILITY_ACTION,
   TRANSITIONS,
   type TransitionDef,
   type Trigger,
-} from './transitions';
+} from '../transitions';
 
 export interface ExecuteTransitionInput {
   engagementId: string;
