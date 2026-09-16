@@ -34,14 +34,36 @@ export interface PublicVariation {
   share_expires_at: string | null;
   /** Is the parent contract still commercially live (issued or signed)? */
   contractActive: boolean;
+  /**
+   * WHO rejected this variation order, or null when nothing was recorded (0051).
+   * 'client' is the client's own refusal through the token path; 'staff' is the
+   * termination cascade, which is the only staff route to `rejected` — there is
+   * no staff "reject VO" action. null is every row written before 0051.
+   */
+  rejectionChannel: 'client' | 'staff' | null;
   org: { name_ar: string | null; name_en: string | null; logo_file_id: string | null };
   lines: PublicVariationLine[];
 }
 
 /** The SDF's snake_case document, before it is mapped onto PublicVariation. */
-type VariationTokenDocument = Omit<PublicVariation, 'contractActive'> & {
+type VariationTokenDocument = Omit<
+  PublicVariation,
+  'contractActive' | 'rejectionChannel'
+> & {
   contract_active: boolean | null;
+  rejection_channel: unknown;
 };
+
+/**
+ * The recorded rejection channel, or null — mapped DEFENSIVELY, exactly as
+ * `contract_active` is: anything that is not the string 'client' or 'staff'
+ * becomes null, including the `undefined` an un-applied function returns. null
+ * then falls through the decided-message ladder to today's wording, so an app
+ * that knows this field can read a database that does not yet write it.
+ */
+function toRejectionChannel(value: unknown): 'client' | 'staff' | null {
+  return value === 'client' || value === 'staff' ? value : null;
+}
 
 export async function getVariationByToken(
   rawToken: string,
@@ -53,10 +75,18 @@ export async function getVariationByToken(
     sql`select public.app_variation_by_token(${hash}) as data`,
   );
   if (!document) return null;
-  const { contract_active: contractActive, ...rest } = document;
+  const {
+    contract_active: contractActive,
+    rejection_channel: rejectionChannel,
+    ...rest
+  } = document;
   // Only an explicit false marks the contract dead. The respond SDF is the real
   // gate, so a document from an un-applied function must not black out the portal.
-  return { ...rest, contractActive: contractActive !== false };
+  return {
+    ...rest,
+    contractActive: contractActive !== false,
+    rejectionChannel: toRejectionChannel(rejectionChannel),
+  };
 }
 
 /** The variation approve/reject surface, which additionally reaches
