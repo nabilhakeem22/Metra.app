@@ -15,9 +15,8 @@ import { computeVariationNetDelta } from '@/lib/aggregates/contract-value';
 import { computeLine } from '@/lib/aggregates/proposal-totals';
 import { readMoney } from '@/lib/money/read';
 import type { OrgContext } from '@/lib/db/context';
+import { insertLinesInChunks } from '@/lib/lines/insert-chunked';
 import {
-  chunk,
-  LINE_INSERT_CHUNK,
   MAX_TOTAL_LINES,
   normalizeText,
   pctInRange,
@@ -212,9 +211,7 @@ export async function saveVariationDraftCore(
           lineMargin: p.lineMargin,
           sortOrder: p.sortOrder,
         }));
-        for (const part of chunk(rows, LINE_INSERT_CHUNK)) {
-          await tx.insert(variationOrderLines).values(part);
-        }
+        await insertLinesInChunks(tx, variationOrderLines, rows);
       }
 
       const h = input.header ?? {};

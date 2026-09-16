@@ -1,7 +1,7 @@
 // Stage 3 of the draft save: batch-insert the resolved sections (subtotal
 // precomputed) then all lines, chunked to stay under the bind-parameter cap.
 import { proposalLines, proposalSections, type MetraDb } from '@metra/db';
-import { chunk, LINE_INSERT_CHUNK } from './core';
+import { insertLinesInChunks } from '@/lib/lines/insert-chunked';
 import type { ResolvedSection } from './draft-save-resolve';
 
 /** Batch-insert the resolved sections (subtotal precomputed) then all lines. */
@@ -34,7 +34,5 @@ export async function persistDraftSectionsAndLines(
       ...line,
     })),
   );
-  for (const part of chunk(lineRows, LINE_INSERT_CHUNK)) {
-    await tx.insert(proposalLines).values(part);
-  }
+  await insertLinesInChunks(tx, proposalLines, lineRows);
 }

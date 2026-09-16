@@ -14,7 +14,8 @@ import type { ActionResult } from '@/lib/actions/result';
 import { appendSystemActivity } from '@/lib/activities/core';
 import type { OrgContext } from '@/lib/db/context';
 import { mintShareToken, shareExpiryFromNow } from '@/lib/share/token';
-import { chunk, LINE_INSERT_CHUNK, nextNumber } from './core';
+import { nextNumber } from './core';
+import { insertLinesInChunks } from '@/lib/lines/insert-chunked';
 
 export async function sendProposalCore(
   ctx: OrgContext,
@@ -194,9 +195,7 @@ export async function supersedeProposalCore(
           lineMargin: l.lineMargin,
           sortOrder: l.sortOrder,
         }));
-        for (const part of chunk(newLineRows, LINE_INSERT_CHUNK)) {
-          await tx.insert(proposalLines).values(part);
-        }
+        await insertLinesInChunks(tx, proposalLines, newLineRows);
       }
 
       await tx.insert(proposalEvents).values({

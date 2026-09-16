@@ -18,7 +18,7 @@ import { err, type ActionResult } from '@/lib/actions/result';
 import { allocateNumber } from '@/lib/db/allocate-number';
 import type { OrgContext } from '@/lib/db/context';
 import { formatDocNumber } from '@/lib/format/doc-number';
-import { chunk, LINE_INSERT_CHUNK } from '@/lib/proposals/core';
+import { insertLinesInChunks } from '@/lib/lines/insert-chunked';
 import { isUuid } from '@/lib/uuid';
 
 /** Postgres unique-violation SQLSTATE. */
@@ -189,9 +189,7 @@ export async function generateContractCore(
           lineMargin: l.lineMargin,
           sortOrder: l.sortOrder,
         }));
-        for (const part of chunk(newLineRows, LINE_INSERT_CHUNK)) {
-          await tx.insert(contractLines).values(part);
-        }
+        await insertLinesInChunks(tx, contractLines, newLineRows);
       }
 
       await audit({
