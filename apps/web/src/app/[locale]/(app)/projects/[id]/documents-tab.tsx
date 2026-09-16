@@ -14,8 +14,8 @@ import {
   createProjectDocumentUpload,
   deleteProjectDocument,
   getProjectDocumentUrl,
-} from '@/lib/project-documents/actions';
-import type { ProjectDocument } from '@/lib/project-documents/queries';
+} from '@/lib/documents/actions';
+import type { EntityDocument } from '@/lib/documents/queries';
 import { groupByCategory } from '@/components/documents/document-groups';
 import { formatDate } from '@/lib/format/date';
 import { pickLocale } from '@/lib/i18n/pick-locale';
@@ -27,7 +27,7 @@ export function DocumentsTab({
   canManage,
 }: {
   projectId: string;
-  documents: ProjectDocument[];
+  documents: EntityDocument[];
   /** The firm's ACTIVE filing categories — what a new document may go under. */
   categories: Array<{ id: string; nameEn: string | null; nameAr: string | null }>;
   canManage: boolean;

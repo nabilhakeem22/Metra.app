@@ -4,7 +4,8 @@ import { notFound } from 'next/navigation';
 import { Link } from '@/i18n/routing';
 import { requireOrg } from '@/lib/auth/require-org';
 import { listEntityLogs } from '@/lib/logs/queries';
-import { listClientDocuments } from '@/lib/client-documents/queries';
+import { DOCUMENT_ENTITIES } from '@/lib/documents/entities';
+import { listDocuments } from '@/lib/documents/queries';
 import { listActiveDocumentCategories } from '@/lib/document-categories/queries';
 import { listContacts } from '@/lib/client-contacts/queries';
 import { getClientEffectiveRates } from '@/lib/clients/financials';
@@ -134,7 +135,7 @@ export default async function ClientProfilePage({
         {tab === 'documents' && (
           <DocumentsTab
             clientId={id}
-            documents={await listClientDocuments(ctx, id)}
+            documents={await listDocuments(ctx, DOCUMENT_ENTITIES.client, id)}
             categories={await listActiveDocumentCategories(ctx)}
             canManage={canActivity}
           />

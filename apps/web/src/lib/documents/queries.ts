@@ -2,8 +2,10 @@ import 'server-only';
 import { documentCategories, files } from '@metra/db';
 import { and, desc, eq } from 'drizzle-orm';
 import { withOrgContext, type OrgContext } from '@/lib/db/context';
+import type { DocumentEntitySpec } from './entities';
 
-export interface ClientDocument {
+/** A file stapled to a client or a project, as the documents tab renders it. */
+export interface EntityDocument {
   id: string;
   originalName: string | null;
   contentType: string | null;
@@ -15,11 +17,12 @@ export interface ClientDocument {
   categoryNameAr: string | null;
 }
 
-/** Files attached to a client (entity='client', entity_id=clientId), newest first. */
-export function listClientDocuments(
+/** Files attached to one parent row (entity + entity_id), newest first. */
+export function listDocuments(
   ctx: OrgContext,
-  clientId: string,
-): Promise<ClientDocument[]> {
+  spec: DocumentEntitySpec,
+  parentId: string,
+): Promise<EntityDocument[]> {
   return withOrgContext(ctx, async (tx) => {
     const rows = await tx
       .select({
@@ -34,7 +37,7 @@ export function listClientDocuments(
       .from(files)
       // LEFT so an uncategorised document is still listed.
       .leftJoin(documentCategories, eq(documentCategories.id, files.categoryId))
-      .where(and(eq(files.entity, 'client'), eq(files.entityId, clientId)))
+      .where(and(eq(files.entity, spec.entity), eq(files.entityId, parentId)))
       .orderBy(desc(files.createdAt));
     return rows.map((r) => ({
       id: r.id,
