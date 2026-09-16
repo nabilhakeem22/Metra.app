@@ -1,5 +1,5 @@
 // Design-Engagement Machine — the SIDE-EFFECT table (wave 4). This replaces a
-// ten-branch `if (def.sideEffect === …)` ladder in the executor. `TransitionDef.
+// ten-branch if-ladder over `def.sideEffect` in the executor. `TransitionDef.
 // sideEffect` is `SideEffectKey | null`, so AT MOST ONE ever fired: the ladder
 // carried no ordering semantics and nothing is lost by making it a lookup. What
 // is gained is the guard engine's own property (guards/registry.ts): a
