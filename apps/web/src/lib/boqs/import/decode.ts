@@ -16,6 +16,7 @@ export {
   padToRectangle,
   sniffDelimiter,
   stripBom,
+  type DecodeNote,
   type DecodeResult,
   type SheetGrid,
 } from '@/lib/import/decode';

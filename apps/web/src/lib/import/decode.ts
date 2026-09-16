@@ -16,11 +16,20 @@ export interface SheetGrid {
   rows: string[][];
 }
 
+/**
+ * What the decoder had to GUESS, as a CODE rather than an English sentence.
+ *
+ * These render in an Arabic-first product. They were `'Read as
+ * semicolon-separated.'` — an English string built in a pure module, carried
+ * through the preview and printed verbatim into the ar-EG UI.
+ */
+export type DecodeNote = 'semicolon_separated' | 'tab_separated';
+
 export interface DecodeResult {
   grid: SheetGrid;
-  /** What the decoder had to GUESS. Surfaced so the preview can say so — a
-   *  guess the studio cannot see is a guess it cannot correct. */
-  notes: string[];
+  /** Surfaced so the preview can say so — a guess the studio cannot see is a
+   *  guess it cannot correct. */
+  notes: DecodeNote[];
 }
 
 /** Excel writes a UTF-8 BOM; left in place it becomes part of the first header
@@ -67,12 +76,10 @@ export function decodeCsv(
   options: { maxRows?: number } = {},
 ): DecodeResult {
   const source = stripBom(text);
-  const notes: string[] = [];
+  const notes: DecodeNote[] = [];
   const delimiter = sniffDelimiter(source);
   if (delimiter !== ',') {
-    notes.push(
-      delimiter === ';' ? 'Read as semicolon-separated.' : 'Read as tab-separated.',
-    );
+    notes.push(delimiter === ';' ? 'semicolon_separated' : 'tab_separated');
   }
   const rows = dropBlankRows(
     parseCsvRows(source, { delimiter, maxRows: options.maxRows ?? MAX_RAW_ROWS }),

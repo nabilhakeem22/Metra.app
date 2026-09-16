@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import type { ContractDetail } from '@/lib/contracts/queries-detail';
+import type { ContractDetail } from '@/lib/contracts/queries';
 
 // ./template reaches @/lib/cf/context, which is `server-only` and calls
 // getCloudflareContext(). Stub both so the builder runs in Node: fontFaceCss()

@@ -1,10 +1,11 @@
 import 'server-only';
-// Public (no-session) contract share. Runs the SECURITY DEFINER token SDFs on the
-// base connection — NO withOrgContext, NO org GUCs. The token IS the auth. The
-// SDF omits every cost/margin column, so nothing here can leak the firm's cost.
+// Public (no-session) contract share. The SECURITY DEFINER token SDFs run through
+// `lib/share/sdf-call`, the one sanctioned base-connection surface — NO
+// withOrgContext, NO org GUCs. The token IS the auth. The SDF omits every
+// cost/margin column, so nothing here can leak the firm's cost.
 import { createHash } from 'node:crypto';
 import { sql } from 'drizzle-orm';
-import { withRequestDb } from '@/lib/db/client';
+import { normalizeRawToken, readSdfCode, readSdfJson } from '@/lib/share/sdf-call';
 import { mapDocumentSdfCode, type TokenResponseError } from '@/lib/share/sdf-result';
 import { hashShareToken } from '@/lib/share/token';
 
@@ -73,12 +74,12 @@ export interface PublicContract {
 export async function getContractByToken(
   rawToken: string,
 ): Promise<PublicContract | null> {
-  if (!rawToken || !rawToken.trim()) return null;
-  const hash = hashShareToken(rawToken);
-  const rows = (await withRequestDb((db) =>
-    db.execute(sql`select public.app_contract_by_token(${hash}) as data`),
-  )) as unknown as Array<{ data: PublicContract | null }>;
-  return rows[0]?.data ?? null;
+  const token = normalizeRawToken(rawToken);
+  if (!token) return null;
+  const hash = hashShareToken(token);
+  return readSdfJson<PublicContract>(
+    sql`select public.app_contract_by_token(${hash}) as data`,
+  );
 }
 
 /** A stable content hash of the acknowledged document (the "PDF hash" per A5). */
@@ -101,13 +102,12 @@ export async function acknowledgeContractByToken(
     pdfHash?: string | null;
   },
 ): Promise<{ ok: boolean; error?: AckError }> {
-  if (!rawToken || !rawToken.trim()) return { ok: false, error: 'token_invalid' };
-  const hash = hashShareToken(rawToken);
-  const rows = (await withRequestDb((db) =>
-    db.execute(sql`select public.app_contract_ack_by_token(
-      ${hash}, ${input.actorName ?? null}, ${input.ip ?? null},
-      ${input.userAgent ?? null}, ${input.pdfHash ?? null}
-    ) as code`),
-  )) as unknown as Array<{ code: string }>;
-  return mapDocumentSdfCode(rows[0]?.code);
+  const token = normalizeRawToken(rawToken);
+  if (!token) return { ok: false, error: 'token_invalid' };
+  const hash = hashShareToken(token);
+  const code = await readSdfCode(sql`select public.app_contract_ack_by_token(
+    ${hash}, ${input.actorName ?? null}, ${input.ip ?? null},
+    ${input.userAgent ?? null}, ${input.pdfHash ?? null}
+  ) as code`);
+  return mapDocumentSdfCode(code);
 }

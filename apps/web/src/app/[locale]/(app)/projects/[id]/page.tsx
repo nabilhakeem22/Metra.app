@@ -9,7 +9,8 @@ import {
   countProjectDeliveries,
   getEngagementByProject,
 } from '@/lib/engagements/queries';
-import { listProjectDocuments } from '@/lib/project-documents/queries';
+import { DOCUMENT_ENTITIES } from '@/lib/documents/entities';
+import { listDocuments } from '@/lib/documents/queries';
 import { listActiveDocumentCategories } from '@/lib/document-categories/queries';
 import { listProjectTypes } from '@/lib/project-types/queries';
 import { getProjectById, getProjectOverview } from '@/lib/projects/queries';
@@ -174,7 +175,7 @@ export default async function ProjectProfilePage({
         {tab === 'documents' && (
           <DocumentsTab
             projectId={id}
-            documents={await listProjectDocuments(ctx, id)}
+            documents={await listDocuments(ctx, DOCUMENT_ENTITIES.project, id)}
             categories={await listActiveDocumentCategories(ctx)}
             canManage={canActivity}
           />

@@ -1,18 +1,15 @@
 // Contract draft edits: saveContractDraftCore. Edits a DRAFT contract's HEADER
 // only — lines/totals are the frozen baseline from generation and are never
-// touched here.
+// touched here. The validation and the column patch live in ./update-header.ts,
+// which is pure and therefore unit-testable without a database.
 import { contracts } from '@metra/db';
 import { and, eq } from 'drizzle-orm';
 import { fail, mutateInOrg, requireInOrg } from '@/lib/actions/mutate';
+import type { AuditEntry } from '@/lib/audit';
 import { err, type ActionResult } from '@/lib/actions/result';
 import type { OrgContext } from '@/lib/db/context';
 import { isUuid } from '@/lib/uuid';
-import { readMoneyString } from '@/lib/money/read';
-import {
-  normalizeText,
-  pctInRange,
-  validIsoDate,
-} from '@/lib/proposals/core';
+import { contractHeaderPatch, validateContractHeader } from './update-header';
 
 export interface ContractHeaderInput {
   titleAr?: string | null;
@@ -43,6 +40,21 @@ export interface SaveContractDraftInput {
   header: ContractHeaderInput;
 }
 
+/** The ledger entry a header edit leaves. The columns themselves are not logged:
+ *  a contract header carries commercial terms, and the audit row is queryable. */
+function auditContractHeaderSaved(
+  audit: (entry: AuditEntry) => Promise<void>,
+  contractId: string,
+): Promise<void> {
+  return audit({
+    entity: 'contract',
+    entityId: contractId,
+    action: 'update',
+    before: null,
+    after: { header: true },
+  });
+}
+
 /**
  * Edit a DRAFT contract's header only (lines/totals are the frozen baseline from
  * generation and are never edited here). Rejects a non-draft contract with
@@ -54,25 +66,9 @@ export async function saveContractDraftCore(
 ): Promise<ActionResult> {
   const id = input.id?.trim();
   if (!id || !isUuid(id)) return err('invalid');
-  const h = input.header ?? {};
-
-  const retentionPct =
-    h.retentionPct != null ? readMoneyString(h.retentionPct, { blank: '0' }) : undefined;
-  const advancePct =
-    h.advancePct != null ? readMoneyString(h.advancePct, { blank: '0' }) : undefined;
-  if (retentionPct === null || (retentionPct !== undefined && !pctInRange(retentionPct))) {
-    return err('invalid_percentage');
-  }
-  if (advancePct === null || (advancePct !== undefined && !pctInRange(advancePct))) {
-    return err('invalid_percentage');
-  }
-  const signatureDate = normalizeText(h.signatureDate);
-  const startDate = normalizeText(h.startDate);
-  const endDate = normalizeText(h.endDate);
-  for (const d of [signatureDate, startDate, endDate]) {
-    if (d && !validIsoDate(d)) return err('invalid_date');
-  }
-  if (startDate && endDate && endDate < startDate) return err('invalid_dates');
+  const header = input.header ?? {};
+  const validated = validateContractHeader(header);
+  if (typeof validated === 'string') return err(validated);
 
   return mutateInOrg(
     ctx,
@@ -86,53 +82,11 @@ export async function saveContractDraftCore(
         'invalid',
       );
       if (row.status !== 'draft') fail('contract_not_draft');
-
-      // Only touch fields the caller actually provided (`undefined` = leave as-is).
-      // Nulling title_ar + title_en unconditionally would trip the bilingual CHECK.
-      const set: Record<string, unknown> = { updatedAt: new Date() };
-      if (h.titleAr !== undefined) set.titleAr = normalizeText(h.titleAr);
-      if (h.titleEn !== undefined) set.titleEn = normalizeText(h.titleEn);
-      if (h.signatureDate !== undefined) set.signatureDate = signatureDate;
-      if (h.startDate !== undefined) set.startDate = startDate;
-      if (h.endDate !== undefined) set.endDate = endDate;
-      if (retentionPct !== undefined) set.retentionPct = retentionPct;
-      if (h.retentionReleaseTermsAr !== undefined)
-        set.retentionReleaseTermsAr = normalizeText(h.retentionReleaseTermsAr);
-      if (h.retentionReleaseTermsEn !== undefined)
-        set.retentionReleaseTermsEn = normalizeText(h.retentionReleaseTermsEn);
-      if (advancePct !== undefined) set.advancePct = advancePct;
-      if (h.advanceRecoveryMethod != null)
-        set.advanceRecoveryMethod = h.advanceRecoveryMethod.trim() || 'prorata';
-      if (h.paymentTermsDays !== undefined) set.paymentTermsDays = h.paymentTermsDays;
-      if (h.paymentScheduleMode != null)
-        set.paymentScheduleMode = h.paymentScheduleMode.trim() || 'milestone';
-      if (h.penaltyAr !== undefined) set.penaltyAr = normalizeText(h.penaltyAr);
-      if (h.penaltyEn !== undefined) set.penaltyEn = normalizeText(h.penaltyEn);
-      if (h.defectsLiabilityDays !== undefined)
-        set.defectsLiabilityDays = h.defectsLiabilityDays;
-      if (h.scopeInclusionsAr !== undefined)
-        set.scopeInclusionsAr = normalizeText(h.scopeInclusionsAr);
-      if (h.scopeInclusionsEn !== undefined)
-        set.scopeInclusionsEn = normalizeText(h.scopeInclusionsEn);
-      if (h.scopeExclusionsAr !== undefined)
-        set.scopeExclusionsAr = normalizeText(h.scopeExclusionsAr);
-      if (h.scopeExclusionsEn !== undefined)
-        set.scopeExclusionsEn = normalizeText(h.scopeExclusionsEn);
-      if (h.termsAr !== undefined) set.termsAr = normalizeText(h.termsAr);
-      if (h.termsEn !== undefined) set.termsEn = normalizeText(h.termsEn);
-
       await tx
         .update(contracts)
-        .set(set)
+        .set(contractHeaderPatch(header, validated))
         .where(and(eq(contracts.id, id), eq(contracts.status, 'draft')));
-
-      await audit({
-        entity: 'contract',
-        entityId: id,
-        action: 'update',
-        before: null,
-        after: { header: true },
-      });
+      await auditContractHeaderSaved(audit, id);
     },
   );
 }

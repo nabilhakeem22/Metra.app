@@ -7,7 +7,8 @@ import { mutateInOrg, requireInOrg } from '@/lib/actions/mutate';
 import { err, type ActionResult } from '@/lib/actions/result';
 import type { OrgContext } from '@/lib/db/context';
 import { isUuid } from '@/lib/uuid';
-import { clean, normalizePercent } from '@/lib/validation/text';
+import { clean } from '@/lib/validation/text';
+import { normalizePercent } from '@/lib/validation/percent';
 
 const NAME_MAX = 200;
 const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;

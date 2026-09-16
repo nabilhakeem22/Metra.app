@@ -452,7 +452,7 @@
     "generic": "حصلت مشكلة. حاول تاني.",
     "uncertain": "مش متأكدين إذا كان ده اتحفظ ولا لأ. اعمل تحديث للصفحة عشان تتأكد قبل ما تحاول تاني.",
     "file_too_large": "الملف ده كبير أوي. الحد الأقصى 100 ميجابايت.",
-    "name_required": "اكتب اسم شركة واحدة على الأقل.",
+    "name_required": "اكتب اسم",
     "last_owner": "مش هتقدر تشيل أو تنزل رتبة آخر مالك.",
     "owner_immutable": "المالك بس هو اللي يقدر يغير مالك تاني.",
     "self": "مش هتقدر تغير دورك أو تشيل نفسك من هنا.",
@@ -477,7 +477,7 @@
     "discount_out_of_range": "الخصم لازم يكون بين 0 و100",
     "supervision_out_of_range": "الإشراف لازم يكون بين 0 و100",
     "tax_out_of_range": "نسبة الضريبة لازم تكون بين 0 و100",
-    "too_many_lines": "العرض ده فيه بنود كتيرة زيادة عن اللزوم.",
+    "too_many_lines": "المستند ده فيه بنود كتيرة زيادة عن اللزوم",
     "invalid_date": "اكتب تاريخ صح",
     "amount_too_large": "المبلغ ده كبير أوي",
     "last_primary_contact": "حدد جهة اتصال تانية كجهة أساسية قبل ما تشيل دي.",
@@ -533,7 +533,20 @@
     "project_limit_reached": "باقتك مفيهاش أماكن مشاريع زيادة. تواصل معانا عشان تضيف أكتر.",
     "event_not_found": "السجل ده مش موجود في التعاقد ده.",
     "already_corrected": "السجل ده اتسحب بالفعل.",
-    "rom_already_issued": "المدى ده اتبعت للعميل خلاص"
+    "rom_already_issued": "المدى ده اتبعت للعميل خلاص",
+    "boq_not_draft": "المقايسة دي اتصدرت وخلاص مش هينفع تتعدل",
+    "boq_not_found": "المقايسة دي مش موجودة",
+    "line_not_found": "البند ده مش موجود. حدّث الشيت",
+    "section_not_found": "القسم ده مش موجود. حدّث الشيت",
+    "description_required": "البند محتاج وصف",
+    "description_too_long": "الوصف ده طويل أوي",
+    "item_code_too_long": "كود البند ده طويل أوي",
+    "invalid_unit": "الوحدة دي مش من وحدات ميترا",
+    "invalid_qty": "الكمية دي مش رقم",
+    "invalid_price": "الفئة دي مش رقم",
+    "invalid_discount": "الخصم لازم يكون بين 0 و 100",
+    "section_name_required": "القسم محتاج اسم",
+    "section_name_too_long": "اسم القسم ده طويل أوي"
   },
   "common": {
     "untranslated": "غير مترجم",
@@ -1136,14 +1149,24 @@
         "keyboardHint": "زرار Tab بيحركك بالعرض · Enter بينزلك لتحت في العمود · Esc بيرجع الخلية زي ما كانت",
         "costedCopy": "نسخة بالتكاليف",
         "costedCopyFor": "نسخة بالتكاليف من المقايسة {number}",
-        "errQty": "الكمية دي مش رقم",
-        "errPrice": "الفئة دي مش رقم",
-        "errDescription": "البند محتاج وصف",
-        "errFrozen": "المقايسة دي اتصدرت وخلاص مش هينفع تتعدل",
-        "errTooMany": "المقايسة دي وصلت للحد الأقصى من البنود",
-        "errForbidden": "معندكش صلاحية تعدل المقايسة دي",
-        "errDiscount": "الخصم لازم يكون بين 0 و 100",
-        "errSectionName": "القسم محتاج اسم"
+        "importErrors": {
+          "unmapped_columns": "ناقص عمود: {value}",
+          "description_empty": "الوصف فاضي",
+          "unit_empty": "الوحدة فاضية",
+          "unit_unknown": "{value} مش من وحدات ميترا",
+          "qty_not_a_number": "الكمية مش رقم",
+          "qty_too_large": "الكمية كبيرة أوي",
+          "qty_negative": "الكمية ماينفعش تكون بالسالب",
+          "unit_price_not_a_number": "سعر الوحدة مش رقم",
+          "unit_price_too_large": "سعر الوحدة كبير أوي",
+          "unit_price_negative": "سعر الوحدة ماينفعش يكون بالسالب",
+          "unit_cost_not_a_number": "تكلفة الوحدة مش رقم",
+          "unit_cost_too_large": "تكلفة الوحدة كبيرة أوي"
+        },
+        "importNotes": {
+          "semicolon_separated": "اتقري على إنه مفصول بفاصلة منقوطة",
+          "tab_separated": "اتقري على إنه مفصول بـ Tab"
+        }
       }
     }
   },

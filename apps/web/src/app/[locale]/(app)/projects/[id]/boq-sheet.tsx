@@ -15,6 +15,7 @@ import {
 } from '@/lib/boqs/actions';
 import { BOQ_UNITS, type BoqLinePatch } from '@/lib/boqs/edit-input';
 import type { BoqDetail, BoqLineRow } from '@/lib/boqs/queries';
+import { resolveActionError } from '@/lib/actions/error-message';
 import { formatMoney } from '@/lib/format/money';
 import { formatQuantity } from '@/lib/format/number';
 
@@ -62,6 +63,11 @@ export function BoqSheet({
   actions?: ReactNode;
 }) {
   const t = useTranslations('projects.profile.boq');
+  // Coded server refusals resolve through the SHARED errors catalogue. This
+  // screen used to map eight of them by hand and send everything else to
+  // "That change was not saved", which is what an over-length description or a
+  // vanished line looked like to the studio.
+  const te = useTranslations('errors');
   const locale = useLocale();
   const [pending, start] = useTransition();
 
@@ -78,30 +84,6 @@ export function BoqSheet({
   const gridRef = useRef<HTMLTableElement>(null);
 
   const money = (v: string) => formatMoney(v, locale);
-
-  /** Server refusals the sheet can name precisely. Anything else is generic. */
-  function refusal(error?: string): string {
-    switch (error) {
-      case 'invalid_qty':
-        return t('errQty');
-      case 'invalid_price':
-        return t('errPrice');
-      case 'description_required':
-        return t('errDescription');
-      case 'boq_not_draft':
-        return t('errFrozen');
-      case 'too_many_lines':
-        return t('errTooMany');
-      case 'invalid_discount':
-        return t('errDiscount');
-      case 'name_required':
-        return t('errSectionName');
-      case 'forbidden':
-        return t('errForbidden');
-      default:
-        return t('saveFailed');
-    }
-  }
 
   const lines: EditableLine[] = useMemo(
     () =>
@@ -184,7 +166,7 @@ export function BoqSheet({
           // The edit STAYS on screen when the server refuses it. Reverting to
           // the stored value would throw away what the studio typed and leave
           // them guessing which cell was wrong.
-          toast({ title: refusal(res.error), variant: 'destructive' });
+          toast({ title: resolveActionError(res.error, te), variant: 'destructive' });
         }
       } catch {
         toast({ title: t('saveFailed'), variant: 'destructive' });
@@ -256,14 +238,14 @@ export function BoqSheet({
   function onAddLine(sectionId: string): void {
     start(async () => {
       const res = await addBoqLine({ sectionId, description: t('newLine') });
-      if (!res.ok) toast({ title: refusal(res.error), variant: 'destructive' });
+      if (!res.ok) toast({ title: resolveActionError(res.error, te), variant: 'destructive' });
     });
   }
 
   function onAddSection(): void {
     start(async () => {
       const res = await addBoqSection({ boqId: boq.id, title: t('newSection') });
-      if (!res.ok) toast({ title: refusal(res.error), variant: 'destructive' });
+      if (!res.ok) toast({ title: resolveActionError(res.error, te), variant: 'destructive' });
     });
   }
 
@@ -272,14 +254,14 @@ export function BoqSheet({
     start(async () => {
       const res = await setBoqDiscount({ boqId: boq.id, discountPct: typed });
       if (res.ok) setDiscount(null);
-      else toast({ title: refusal(res.error), variant: 'destructive' });
+      else toast({ title: resolveActionError(res.error, te), variant: 'destructive' });
     });
   }
 
   function onDeleteLine(lineId: string): void {
     start(async () => {
       const res = await deleteBoqLine({ lineId });
-      if (!res.ok) toast({ title: refusal(res.error), variant: 'destructive' });
+      if (!res.ok) toast({ title: resolveActionError(res.error, te), variant: 'destructive' });
     });
   }
 

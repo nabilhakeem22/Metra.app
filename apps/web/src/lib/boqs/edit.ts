@@ -5,7 +5,7 @@ import { fail, mutateInOrg, requireInOrg } from '@/lib/actions/mutate';
 import { err, type ActionResult } from '@/lib/actions/result';
 import { computeLine } from '@/lib/aggregates/proposal-totals';
 import { readMoneyString } from '@/lib/money/read';
-import { withinMagnitude } from '@/lib/proposals/validation';
+import { withinMagnitude } from '@/lib/money/read';
 import type { OrgContext } from '@/lib/db/context';
 import { bilingualFor } from './bilingual';
 import { MAX_BOQ_LINES, recomputeBoqTotals } from './core';
@@ -161,9 +161,11 @@ export async function addBoqLineCore(
   input: { sectionId: string; description: string },
 ): Promise<ActionResult & { data?: string }> {
   const description = input.description.trim();
-  if (description === '' || description.length > MAX_DESCRIPTION) {
-    return err('description_required');
-  }
+  // Two refusals, not one: a studio that TYPED a description, an over-long
+  // one, must not be told the line needs one — the trap addBoqSectionCore
+  // fell into with `section_name_required`.
+  if (description === '') return err('description_required');
+  if (description.length > MAX_DESCRIPTION) return err('description_too_long');
 
   return mutateInOrg(
     ctx,
@@ -249,7 +251,13 @@ export async function addBoqSectionCore(
   input: { boqId: string; title: string },
 ): Promise<ActionResult & { data?: string }> {
   const title = input.title.trim();
-  if (title === '' || title.length > MAX_DESCRIPTION) return err('name_required');
+  // `name_required` used to serve this, the org bilingual check AND the BOQ
+  // title, so the studio adding a nameless section was told to "enter at least
+  // one company name". One string cannot answer for three different things —
+  // and neither can `section_name_required`, which was left answering for two:
+  // a studio that TYPED a name, an over-long one, was told the section needs one.
+  if (title === '') return err('section_name_required');
+  if (title.length > MAX_DESCRIPTION) return err('section_name_too_long');
 
   return mutateInOrg(
     ctx,

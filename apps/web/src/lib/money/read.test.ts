@@ -143,7 +143,7 @@ describe('readMoney — the reason, not just the refusal', () => {
     expect(readMoney(String(MAX_AMOUNT + 1))).toEqual({ ok: false, reason: 'too_large' });
   });
 
-  it('says invalid for everything that is not a number', () => {
+  it('says invalid for everything unreadable', () => {
     expect(readMoney('twelve')).toEqual({ ok: false, reason: 'invalid' });
     expect(readMoney('1,5', { allowGroupSeparators: true })).toEqual({
       ok: false,
@@ -213,5 +213,67 @@ describe('the six former parsers', () => {
   it.each(sites)('%s refuses the ambiguous comma', (_name, options) => {
     // Three of the six used to read '1,5' as 15.
     expect(readMoneyString('1,5', options)).toBeNull();
+  });
+});
+
+// Arrived with lib/proposals/validation.test.ts when the proposal validators were
+// dissolved into the kernels. The option set below is the EXACT one the proposal
+// header and line validators pass, so these cases pin the caller's contract, not
+// just the reader's.
+const readAmount = (value: string | null | undefined, blank = '0') =>
+  readMoneyString(value, { blank });
+
+describe('a proposal money field', () => {
+  it('falls back for absent input and rejects a malformed one', () => {
+    expect(readAmount(null)).toBe('0');
+    expect(readAmount(undefined)).toBe('0');
+    expect(readAmount('')).toBe('0');
+    expect(readAmount('   ')).toBe('0');
+    expect(readAmount(null, '7')).toBe('7');
+    expect(readAmount('abc')).toBeNull();
+    expect(readAmount('1,000')).toBeNull();
+    expect(readAmount('1e3')).toBeNull();
+    expect(readAmount('0x10')).toBeNull();
+  });
+
+  it('rejects negatives — money here is never signed', () => {
+    expect(readAmount('-1')).toBeNull();
+    expect(readAmount('-0.5')).toBeNull();
+  });
+
+  it('clamps past the 4th decimal so the stored value cannot differ', () => {
+    // The bug this closes: the app truncates past 4dp but numeric(18,4) ROUNDS, so
+    // '2.99999' previewed as 2.9999 and came back from the database as 3.0000.
+    expect(readAmount('2.99999')).toBe('2.9999');
+    expect(readAmount('1.00005')).toBe('1.0000');
+    // Anything already within scale is returned untouched.
+    expect(readAmount('5')).toBe('5');
+    expect(readAmount('5.1234')).toBe('5.1234');
+  });
+});
+
+describe('withinMagnitude — the cases the proposal validators pinned', () => {
+  it('accepts up to the cap and rejects beyond it', () => {
+    expect(withinMagnitude('0')).toBe(true);
+    expect(withinMagnitude(String(MAX_AMOUNT))).toBe(true);
+    expect(withinMagnitude(String(MAX_AMOUNT + 1))).toBe(false);
+    expect(withinMagnitude('99999999999999999999')).toBe(false);
+  });
+
+  it('rejects what bare Number() would have accepted', () => {
+    // Number('0x10') is 16 and Number('') is 0 — both would have passed the cap.
+    // Unreachable today because every call site normalizes first; pinned so that
+    // stays a property of the function rather than of its callers.
+    for (const junk of ['0x10', '1e2', '0b11', '', '   ', 'abc']) {
+      expect(withinMagnitude(junk)).toBe(false);
+    }
+  });
+
+  it('still accepts surrounding whitespace, like every other normalizer here', () => {
+    // Trimming is deliberate and shared with normalizeMoney: a newline-prefixed
+    // '5' is a valid 5, not junk. Pinned so a future tightening does not silently
+    // start rejecting pasted input.
+    expect(withinMagnitude('\n5')).toBe(true);
+    expect(withinMagnitude('  12.5  ')).toBe(true);
   });
 });

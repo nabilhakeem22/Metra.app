@@ -154,7 +154,7 @@ export async function getDeliverableUrlCore(
   );
   if (!owned) return err('invalid');
   try {
-    const url = await getSignedUrl(ctx, fileId, 300);
+    const url = await getSignedUrl(ctx, fileId, { ttlSeconds: 300 });
     return { ok: true, url };
   } catch {
     return err('invalid');

@@ -4,13 +4,13 @@ import {
   MAX_NOTE_CHARS,
   TOO_LONG,
   clean,
-  normalizePercent,
   optionalText,
 } from './text';
 
-// These three shapes replace fourteen hand-copied declarations across the domain
+// These two shapes replace eleven hand-copied declarations across the domain
 // cores. The copies agreed on behaviour, so this suite pins the behaviour they
 // agreed on — anything here that changes is a change to what the product accepts.
+// Percentages moved with their function to ./percent.test.ts.
 
 describe('clean', () => {
   it('collapses every flavour of absent to null', () => {
@@ -23,6 +23,17 @@ describe('clean', () => {
     expect(clean('  Hassan & Sons  ')).toBe('Hassan & Sons');
     expect(clean('0')).toBe('0');
     expect(clean('  مكتب ميترا ')).toBe('مكتب ميترا');
+  });
+
+  it('matches the former proposals `normalizeText` case for case', () => {
+    // `lib/proposals/validation.ts` carried a byte-identical second copy of this
+    // function under a different name, used at 35 sites. Its whole suite is
+    // reproduced here so the merge is provably not a behaviour change.
+    expect(clean('  hello  ')).toBe('hello');
+    expect(clean('   ')).toBeNull();
+    expect(clean('')).toBeNull();
+    expect(clean(null)).toBeNull();
+    expect(clean(undefined)).toBeNull();
   });
 });
 
@@ -63,39 +74,5 @@ describe('optionalText', () => {
   it('keeps the note cap aligned with left(p_note, 2000) in the SDFs', () => {
     expect(MAX_NOTE_CHARS).toBe(2000);
     expect(MAX_LABEL_CHARS).toBe(200);
-  });
-});
-
-describe('normalizePercent', () => {
-  it('returns the blank value for absent input, defaulting to zero', () => {
-    for (const value of [null, undefined, '', '  ']) {
-      expect(normalizePercent(value)).toBe('0');
-      expect(normalizePercent(value, '12')).toBe('12'); // caller-chosen blank
-    }
-  });
-
-  it('accepts the decimal percentage strings the forms actually submit', () => {
-    expect(normalizePercent('0')).toBe('0');
-    expect(normalizePercent('10')).toBe('10');
-    expect(normalizePercent('12.5')).toBe('12.5');
-    expect(normalizePercent('100')).toBe('100');
-    expect(normalizePercent('  7.25  ')).toBe('7.25'); // trimmed, then shape-checked
-  });
-
-  it('refuses what Number() would have silently accepted', () => {
-    // Every one of these coerces to a finite number in [0,100] under Number(), so
-    // a range check alone would let them through to a numeric column.
-    expect(Number('1e2')).toBe(100);
-    expect(Number('0x1A')).toBe(26);
-    expect(Number('')).toBe(0);
-    for (const value of ['1e2', '0x1A', '+5', '5%', '1,5', '.5', '5.', 'NaN', 'Infinity']) {
-      expect(normalizePercent(value)).toBeNull();
-    }
-  });
-
-  it('refuses negatives and anything past 100', () => {
-    for (const value of ['-1', '100.0001', '101', '1000']) {
-      expect(normalizePercent(value)).toBeNull();
-    }
   });
 });

@@ -8,7 +8,8 @@ import { eq } from 'drizzle-orm';
 import { fail } from '@/lib/actions/mutate';
 import { err, type ActionResult } from '@/lib/actions/result';
 import { isUuid } from '@/lib/uuid';
-import { clean, normalizePercent } from '@/lib/validation/text';
+import { clean } from '@/lib/validation/text';
+import { normalizePercent } from '@/lib/validation/percent';
 
 export interface ProjectInput {
   /** Optional: CREATE allocates one (P-YYYY-NNNN). Update must supply the stored

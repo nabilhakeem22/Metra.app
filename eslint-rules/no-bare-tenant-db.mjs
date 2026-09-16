@@ -63,20 +63,15 @@
 // connection and have each been individually reviewed as safe:
 //   1. Public token-hash SECURITY DEFINER calls — the opaque token IS the auth,
 //      and the SDF omits every cost/margin column, so nothing can leak the firm's
-//      cost or another tenant's data:
-//        apps/web/src/lib/proposals/public.ts
-//        apps/web/src/lib/contracts/public.ts
-//        apps/web/src/lib/engagements/public.ts
-//        apps/web/src/lib/engagements/public-documents.ts — the same token surface:
-//          it resolves ONE released document of the token's own delivery and returns
-//          only a storage bucket/key + kind; the client-supplied document id is a
-//          filter inside an already-proven delivery, never a lookup key of its own.
-//        apps/web/src/lib/engagements/public-comments.ts — the same token surface
-//          again (split out of public.ts): it reads and appends messages on ONE
-//          released document of the token's own delivery. Identity-blind on the
-//          studio side and cost-blind throughout; the document id is a filter
-//          within a delivery the token already proved.
-//        apps/web/src/lib/variations/public.ts
+//      cost or another tenant's data. There is now ONE file for all of them; every
+//      portal (proposals, contracts, variations, and the four delivery-portal
+//      files) runs its SDF through it and contains no `withRequestDb`,
+//      no `.execute(`, no `.unsafe(` of its own:
+//        apps/web/src/lib/share/sdf-call.ts — readSdfJson / readSdfCode, which
+//          execute a caller-built SQL object and read one column off row 0.
+//          Nothing is interpolated; there is no string-concatenation path, and the
+//          file has no other reason to exist, so an unrelated base-connection
+//          query added here would be conspicuous in review.
 //   2. The public API-key resolver, which wraps its SDF in a transaction and drops
 //      into `set local role metra_app` before the call:
 //        apps/web/src/lib/api-keys/resolve.ts
@@ -94,6 +89,17 @@
 //
 // If you are adding a genuinely-new sanctioned base-connection use, add its file
 // here WITH a comment justifying why it is safe — do not disable the rule inline.
+//
+// THE SECOND FENCE — WHO MAY CALL sdf-call.ts. Concentrating nine allowlisted
+// files into one moved the exemption but not the ENFORCEMENT: `import
+// { readSdfJson } from '@/lib/share/sdf-call'` plus any built SQL object then ran
+// on the BYPASSRLS socket from anywhere under apps/web/src, with no lint error,
+// no allowlist entry and no review signal. A security review wrote exactly that
+// file, ran eslint on it, and got exit 0. So importing or naming that module's
+// runners is itself fenced, to the token portals that legitimately need it — see
+// SDF_CALLER_ALLOWLIST below. `sdf-call.ts` additionally asserts at RUNTIME that
+// the statement it is handed is a `select public.app_*(…)`, so both halves of
+// "this socket only ever runs token SDFs" are enforced rather than documented.
 
 /** Query methods that actually touch data — Drizzle builders plus postgres.js's
  * `.unsafe`. `transaction` is deliberately excluded: it only opens a tx; the risk
@@ -178,12 +184,7 @@ function staticKeyName(computed, key) {
 // Allowlisted files (path suffixes) — the sanctioned base-connection exceptions
 // documented above. Matched against the normalised (forward-slash) filename.
 const ALLOWLISTED_FILES = [
-  'apps/web/src/lib/proposals/public.ts',
-  'apps/web/src/lib/contracts/public.ts',
-  'apps/web/src/lib/engagements/public.ts',
-  'apps/web/src/lib/engagements/public-documents.ts',
-  'apps/web/src/lib/engagements/public-comments.ts',
-  'apps/web/src/lib/variations/public.ts',
+  'apps/web/src/lib/share/sdf-call.ts',
   'apps/web/src/lib/api-keys/resolve.ts',
   'apps/web/src/lib/automation/system-context.ts',
   'apps/web/src/lib/automation/runner.ts',
@@ -205,6 +206,53 @@ function isAllowlisted(filename) {
   return ALLOWLISTED_DIRS.some((d) => norm.includes(d));
 }
 
+/** The two runners in `lib/share/sdf-call.ts` that execute on the base connection. */
+const SDF_RUNNERS = new Set(['readSdfJson', 'readSdfCode']);
+
+// The files that may reach `lib/share/sdf-call.ts` — the token portals, each of
+// which resolves a share token to its sha256 hash and passes it to a SECURITY
+// DEFINER function that omits every cost/margin column. A new entry here means a
+// new public surface, which is exactly the diff a reviewer should be shown.
+const SDF_CALLER_ALLOWLIST = [
+  'apps/web/src/lib/proposals/public.ts',
+  'apps/web/src/lib/contracts/public.ts',
+  'apps/web/src/lib/variations/public.ts',
+  'apps/web/src/lib/engagements/public/delivery.ts',
+  'apps/web/src/lib/engagements/public/respond.ts',
+  'apps/web/src/lib/engagements/public-documents.ts',
+  'apps/web/src/lib/engagements/public-comments.ts',
+  // The module itself (it DEFINES the runners) and its own unit test.
+  'apps/web/src/lib/share/sdf-call.ts',
+  'apps/web/src/lib/share/sdf-call.test.ts',
+];
+
+function isSdfCallerAllowlisted(filename) {
+  if (!filename) return false;
+  const norm = filename.replace(/\\/g, '/');
+  return SDF_CALLER_ALLOWLIST.some((f) => norm.endsWith(f));
+}
+
+/**
+ * Is this import specifier `lib/share/sdf-call`, however it is spelled?
+ *
+ * The `@/`-aliased form and the relative one resolve to the same module, and a
+ * sibling gate was walked through with `../../` in this exact codebase — so the
+ * module is recognised by its TAIL, not by one spelling of its path.
+ */
+function isSdfCallModule(source) {
+  return typeof source === 'string' && /(^|\/)sdf-call(\.[jt]s)?$/.test(source);
+}
+
+/** An identifier that merely NAMES a runner (an import binding, a property key). */
+function isNonReferenceIdentifier(node) {
+  const parent = node.parent;
+  if (!parent) return false;
+  if (parent.type === 'ImportSpecifier' || parent.type === 'ExportSpecifier') return true;
+  if (parent.type === 'MemberExpression') return !parent.computed && parent.property === node;
+  if (parent.type === 'Property') return !parent.computed && parent.key === node;
+  return false;
+}
+
 /** @type {import('eslint').Rule.RuleModule} */
 export const noBareTenantDb = {
   meta: {
@@ -219,6 +267,8 @@ export const noBareTenantDb = {
         'Drizzle `.{{method}}()` on the raw request/base connection runs as the BYPASSRLS login role and can read/write across every tenant. Wrap org-scoped access in withOrgContext()/withUserContext(). If this is a sanctioned base-connection use (public token SDF, api-key resolver, automation system read), allowlist the file in eslint-rules/no-bare-tenant-db.mjs.',
       rawHandleArgument:
         '`{{helper}}()` is given the raw request/base connection. Its where clause carries no org predicate on purpose — the RLS transaction is the tenancy boundary — so on the BYPASSRLS handle it resolves an id belonging to ANY tenant. Pass the `tx` from withOrgContext()/withUserContext().',
+      sdfCallerNotAllowlisted:
+        '`lib/share/sdf-call` executes its statement on the BYPASSRLS base connection with no org GUCs — the share TOKEN is the only auth. Only the token portals may reach it, and this file is not one of them. Read org-scoped data through withOrgContext()/withUserContext(); if this really is a new public token surface, add the file to SDF_CALLER_ALLOWLIST in eslint-rules/no-bare-tenant-db.mjs with a reason.',
     },
   },
   create(context) {
@@ -226,8 +276,30 @@ export const noBareTenantDb = {
       context.filename ??
       (context.getFilename && context.getFilename()) ??
       '';
+
+    // The second fence: who may reach the one sanctioned base-connection surface.
+    // It is NOT skipped by the base-connection allowlist above — the two lists
+    // sanction different things, and a file allowlisted to open the raw socket
+    // itself has no standing to run somebody else's token SDF.
+    const sdfCallerVisitors = isSdfCallerAllowlisted(filename)
+      ? {}
+      : {
+          ImportDeclaration(node) {
+            if (!isSdfCallModule(node.source.value)) return;
+            context.report({ node: node.source, messageId: 'sdfCallerNotAllowlisted' });
+          },
+          Identifier(node) {
+            // Catches a runner reached some way the import check cannot see — a
+            // re-export, a dynamic import, a barrel. The import binding itself is
+            // skipped so the statement above reports it exactly once.
+            if (!SDF_RUNNERS.has(node.name)) return;
+            if (isNonReferenceIdentifier(node)) return;
+            context.report({ node, messageId: 'sdfCallerNotAllowlisted' });
+          },
+        };
+
     // Whole-file opt-out for the reviewed, sanctioned exceptions.
-    if (isAllowlisted(filename)) return {};
+    if (isAllowlisted(filename)) return sdfCallerVisitors;
 
     const sourceCode =
       context.sourceCode ??
@@ -391,6 +463,7 @@ export const noBareTenantDb = {
     }
 
     return {
+      ...sdfCallerVisitors,
       // `` sql`select …` `` on the raw postgres.js handle — no method call to
       // catch, so the tagged template is its own visitor.
       TaggedTemplateExpression(node) {

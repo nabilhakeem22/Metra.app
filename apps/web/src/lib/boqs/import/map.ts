@@ -55,6 +55,29 @@ const HEADER_ALIASES: Record<ImportField, string[]> = {
   costItemCode: ['price book', 'price book code', 'pb code', 'كود التسعير'],
 };
 
+/**
+ * The header text Metra CALLS each column — the canonical spelling of its first
+ * alias above.
+ *
+ * The downloaded template writes exactly these strings (`./template.ts` imports
+ * this table), and `autoDetectMapping` matches them, so they are the one
+ * spelling that is both what a studio sees across the top of their sheet and
+ * what this file expects. A missing-column message names THESE, never the field
+ * identifiers: "ناقص عمود: unitPrice" asks an Arabic-first studio to match a
+ * camelCase word against a spreadsheet that has never contained one.
+ */
+export const CANONICAL_HEADERS: Record<ImportField, string> = {
+  itemCode: 'Item',
+  section: 'Section',
+  description: 'Description',
+  unit: 'Unit',
+  qty: 'Qty',
+  unitPrice: 'Unit price',
+  unitCost: 'Unit cost',
+  provisional: 'Provisional',
+  costItemCode: 'Price book',
+};
+
 /** Fields without which a row cannot become a line. */
 const REQUIRED: ImportField[] = ['description', 'unit', 'qty', 'unitPrice'];
 
@@ -84,8 +107,9 @@ export function autoDetectMapping(header: string[]): ColumnMapping {
  * a studio typing into Excel on an Arabic keyboard produces ٠١٢٣, `Number('١٢')`
  * is NaN, and a sheet that looks perfectly valid would otherwise import as a
  * page of errors. Negatives are read here and rejected by the row validator
- * below with a message, rather than refused as unreadable — "cannot be negative"
- * tells the studio what to fix; "is not a number" does not.
+ * below with their own code (`*_negative`) rather than refused as unreadable:
+ * the negative-quantity code tells the studio what to fix, and the code for an
+ * unreadable cell does not.
  */
 const IMPORTED_CELL = {
   allowNegative: true,
@@ -94,17 +118,53 @@ const IMPORTED_CELL = {
 } as const;
 
 /**
- * One money cell, with the row error it earns. `null` = the row is rejected.
- *
- * "Is not a number" and "is too large" are different problems and the studio
- * fixes them differently: one is a typo or a stray unit in the cell, the other
- * is a figure past the 1e12 cap that reads perfectly well. Telling a studio
- * that 10000000000000 is not a number is both wrong and unactionable.
+ * Why a row cannot become a line. A CODE, never a sentence: the importer runs in
+ * an Arabic-first product and every one of these used to be built here as English
+ * prose and printed verbatim into the ar-EG preview. Mirrors the price book's
+ * `ImportRowError` + `priceBook.import.errors.*`.
  */
-function readCell(raw: string, label: string, errors: string[]): string | null {
+export type BoqImportRowErrorCode =
+  | 'unmapped_columns'
+  | 'description_empty'
+  | 'unit_empty'
+  | 'unit_unknown'
+  | 'qty_not_a_number'
+  | 'qty_too_large'
+  | 'qty_negative'
+  | 'unit_price_not_a_number'
+  | 'unit_price_too_large'
+  | 'unit_price_negative'
+  | 'unit_cost_not_a_number'
+  | 'unit_cost_too_large';
+
+export interface BoqImportRowIssue {
+  code: BoqImportRowErrorCode;
+  /** The offending cell, or the joined field list for `unmapped_columns`. The
+   *  message interpolates it, so the studio sees WHICH value was refused. */
+  value?: string;
+}
+
+/** The three money cells, and the two codes each can earn. */
+type MoneyField = 'qty' | 'unit_price' | 'unit_cost';
+
+/**
+ * One money cell, with the row issue it earns. `null` = the row is rejected.
+ *
+ * `*_not_a_number` and `*_too_large` are different problems and the studio fixes
+ * them differently: one is a typo or a stray unit in the cell, the other is a
+ * figure past the 1e12 cap that reads perfectly well. Reporting 10000000000000
+ * as unreadable is both wrong and unactionable.
+ */
+function readCell(
+  raw: string,
+  field: MoneyField,
+  issues: BoqImportRowIssue[],
+): string | null {
   const result = readMoney(raw, IMPORTED_CELL);
   if (result.ok) return result.value;
-  errors.push(`${label} ${result.reason === 'too_large' ? 'is too large' : 'is not a number'}`);
+  issues.push({
+    code: `${field}${result.reason === 'too_large' ? '_too_large' : '_not_a_number'}`,
+  });
   return null;
 }
 
@@ -144,7 +204,7 @@ export interface RowVerdict {
   /** 1-based row number IN THE FILE, so an error names what the studio sees. */
   rowNumber: number;
   line: ImportedLine | null;
-  errors: string[];
+  issues: BoqImportRowIssue[];
   /**
    * Deliberately left out of this BOQ rather than faulty. The template is
    * generated from the studio's whole price book, so most rows come back with an
@@ -184,13 +244,18 @@ export function mapRows(
 
   const rows: RowVerdict[] = dataRows.map((row, i) => {
     const rowNumber = headerRowIndex + 2 + i;
-    const errors: string[] = [];
+    const issues: BoqImportRowIssue[] = [];
 
     if (missing.length > 0) {
       return {
         rowNumber,
         line: null,
-        errors: [`Unmapped column: ${missing.join(', ')}`],
+        issues: [
+          {
+            code: 'unmapped_columns',
+            value: missing.map((field) => CANONICAL_HEADERS[field]).join(', '),
+          },
+        ],
       };
     }
 
@@ -198,36 +263,36 @@ export function mapRows(
     // else, so a price-book row the studio skipped is never also reported as
     // missing a description or carrying an odd unit.
     const rawQty = cell(row, mapping.qty).trim();
-    if (rawQty === '') return { rowNumber, line: null, errors: [], skipped: true };
+    if (rawQty === '') return { rowNumber, line: null, issues: [], skipped: true };
 
     const description = cell(row, mapping.description).trim();
-    if (description === '') errors.push('Description is empty');
+    if (description === '') issues.push({ code: 'description_empty' });
 
     const rawUnit = cell(row, mapping.unit);
     const unit = normalizeUnit(rawUnit);
     if (unit === null) {
-      errors.push(
+      issues.push(
         rawUnit.trim() === ''
-          ? 'Unit is empty'
-          : `Unit "${rawUnit.trim()}" is not one of Metra's units`,
+          ? { code: 'unit_empty' }
+          : { code: 'unit_unknown', value: rawUnit.trim() },
       );
     }
 
-    const qty = readCell(rawQty, 'Quantity', errors);
-    if (qty !== null && qty.startsWith('-')) errors.push('Quantity cannot be negative');
+    const qty = readCell(rawQty, 'qty', issues);
+    if (qty !== null && qty.startsWith('-')) issues.push({ code: 'qty_negative' });
 
-    const unitPrice = readCell(cell(row, mapping.unitPrice), 'Unit price', errors);
+    const unitPrice = readCell(cell(row, mapping.unitPrice), 'unit_price', issues);
     if (unitPrice !== null && unitPrice.startsWith('-')) {
-      errors.push('Unit price cannot be negative');
+      issues.push({ code: 'unit_price_negative' });
     }
 
     // Cost is optional: a line without one is tracked for quantity but blind on
     // margin, which is a real state and not an error.
     const rawCost = cell(row, mapping.unitCost);
     const unitCost =
-      rawCost.trim() === '' ? '0' : readCell(rawCost, 'Unit cost', errors);
+      rawCost.trim() === '' ? '0' : readCell(rawCost, 'unit_cost', issues);
 
-    if (errors.length > 0) return { rowNumber, line: null, errors };
+    if (issues.length > 0) return { rowNumber, line: null, issues };
 
     const sectionRaw = cell(row, mapping.section).trim();
     const codeRaw = cell(row, mapping.itemCode).trim();
@@ -235,7 +300,7 @@ export function mapRows(
 
     return {
       rowNumber,
-      errors: [],
+      issues: [],
       line: {
         itemCode: codeRaw === '' ? null : codeRaw,
         section: sectionRaw === '' ? DEFAULT_SECTION : sectionRaw,

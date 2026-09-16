@@ -9,7 +9,7 @@ import { fail, mutateInOrg, requireInOrg } from '@/lib/actions/mutate';
 import { err, type ActionResult } from '@/lib/actions/result';
 import { allocateNumber } from '@/lib/db/allocate-number';
 import type { OrgContext } from '@/lib/db/context';
-import { normalizeText } from '@/lib/proposals/core';
+import { clean } from '@/lib/validation/text';
 import { ACTIVE_STATES } from './states';
 import { isUuid } from '@/lib/uuid';
 
@@ -63,8 +63,8 @@ export async function createEngagementCore(
 ): Promise<ActionResult> {
   const clientId = input.clientId?.trim();
   const projectId = input.projectId?.trim();
-  const titleAr = normalizeText(input.titleAr);
-  const titleEn = normalizeText(input.titleEn);
+  const titleAr = clean(input.titleAr);
+  const titleEn = clean(input.titleEn);
   if (!titleAr && !titleEn) return err('engagement_title_required');
   if (!clientId || !isUuid(clientId)) {
     return err('engagement_client_required');

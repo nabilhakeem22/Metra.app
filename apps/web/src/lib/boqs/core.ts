@@ -17,11 +17,8 @@ import {
   parseMoney4,
   type SectionTotals,
 } from '@/lib/aggregates/proposal-totals';
-import {
-  chunk,
-  LINE_INSERT_CHUNK,
-  withinMagnitude,
-} from '@/lib/proposals/validation';
+import { withinMagnitude } from '@/lib/money/read';
+import { insertLinesInChunks } from '@/lib/lines/insert-chunked';
 import { computeBoqTotals } from './totals';
 import type { ImportedLine } from './import/map';
 import { bilingualFor } from './bilingual';
@@ -247,9 +244,7 @@ export async function commitImportCore(
       // Batched: one insert per import, not one per line — and chunked, because
       // a full 2000-line sheet is ~34,000 bind parameters, over half of what a
       // single statement can carry before it fails outright.
-      for (const part of chunk(pendingLines, LINE_INSERT_CHUNK)) {
-        await tx.insert(boqLines).values(part);
-      }
+      await insertLinesInChunks(tx, boqLines, pendingLines);
 
       await recomputeBoqTotals(tx, input.boqId, boq.discountPct);
 

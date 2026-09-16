@@ -102,6 +102,8 @@ const ALL_CODES: ActionCode[] = [
   'file_too_large',
   'line_not_found',
   'section_not_found',
+  'section_name_required',
+  'section_name_too_long',
   'description_required',
   'description_too_long',
   'item_code_too_long',

@@ -11,9 +11,9 @@ import 'server-only';
 // revoked / expired token, a DB throw — resolves to the SAME null, so the endpoint
 // has no oracle to probe.
 import { sql } from 'drizzle-orm';
-import { withRequestDb } from '@/lib/db/client';
+import { normalizeRawToken, readSdfJson } from '@/lib/share/sdf-call';
 import { hashShareToken } from '@/lib/share/token';
-import { ALLOWED_EXTENSIONS } from './deliverable-files';
+import { safeExtension } from '@/lib/files/safe-name';
 import { parseDocumentAccess, type DocumentAccess } from './document-access';
 import { isUuid } from '@/lib/uuid';
 import {
@@ -21,23 +21,6 @@ import {
   KIND_CATEGORY,
   isClientDocumentKind,
 } from './portal-documents';
-
-/**
- * The ONLY extensions that may appear in a client download name — the union of the
- * upload allowlist, so the two can never drift (pdf, dwg, dxf, png, jpg, jpeg,
- * xlsx, csv). Deliberately an ALLOWLIST, not a shape check: `download=` is appended
- * to the signed URL AFTER signing and is therefore not covered by the storage JWT,
- * so an attacker who obtains a link can strip it. Anything active (html, htm, svg,
- * xml, …) must never be able to ride the name; an unknown extension is dropped and
- * the file is simply saved as the bare category slug.
- *
- * `public-documents.test.ts` pins the resulting union, so widening the UPLOAD
- * allowlist to an active type fails loudly there instead of silently reaching the
- * client.
- */
-const DOWNLOAD_NAME_EXTENSIONS: ReadonlySet<string> = new Set(
-  Object.values(ALLOWED_EXTENSIONS).flat(),
-);
 
 export interface DeliveryDocumentTarget {
   bucket: string;
@@ -60,25 +43,6 @@ interface DocumentSnapshot {
 }
 
 /**
- * The lowercase extension of a stored filename, or null. TWO gates, in order:
- *  1. SHAPE — the final dot-segment must be 1–5 ASCII alphanumerics after
- *     lowercasing, so nothing with a quote, semicolon, newline, slash or unicode
- *     can ever reach a Content-Disposition header;
- *  2. MEMBERSHIP — it must be one of DOWNLOAD_NAME_EXTENSIONS. Shape alone was not
- *     enough: `html`/`htm`/`svg` all pass it, and the `download=` param that would
- *     force an attachment is appended after the URL is signed and can be stripped.
- * Anything else yields null and the download name carries no extension at all.
- */
-export function safeExtension(originalName: string | null | undefined): string | null {
-  if (typeof originalName !== 'string') return null;
-  const dot = originalName.lastIndexOf('.');
-  if (dot < 0 || dot === originalName.length - 1) return null;
-  const candidate = originalName.slice(dot + 1).toLowerCase();
-  if (!/^[a-z0-9]{1,5}$/.test(candidate)) return null;
-  return DOWNLOAD_NAME_EXTENSIONS.has(candidate) ? candidate : null;
-}
-
-/**
  * Resolve ONE released document of a delivery by its RAW share token, or null. The
  * token is sha256-hashed here (never sent to the DB in the clear, never logged).
  * Returns the bucket + object key to sign, and the client-facing download name.
@@ -87,17 +51,15 @@ export async function getDeliveryDocumentByToken(
   rawToken: string,
   documentId: string,
 ): Promise<DeliveryDocumentTarget | null> {
-  if (!rawToken || !rawToken.trim()) return null;
+  const token = normalizeRawToken(rawToken);
+  if (!token) return null;
   if (!isUuid(documentId)) return null;
-  const hash = hashShareToken(rawToken);
+  const hash = hashShareToken(token);
 
   try {
-    const rows = (await withRequestDb((db) =>
-      db.execute(
-        sql`select public.app_delivery_document_by_token(${hash}, ${documentId}::uuid) as data`,
-      ),
-    )) as unknown as Array<{ data: DocumentSnapshot | null }>;
-    const snapshot = rows[0]?.data ?? null;
+    const snapshot = await readSdfJson<DocumentSnapshot>(
+      sql`select public.app_delivery_document_by_token(${hash}, ${documentId}::uuid) as data`,
+    );
     if (!snapshot) return null;
 
     const { bucket, object_key: objectKey } = snapshot;

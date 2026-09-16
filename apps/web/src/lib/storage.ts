@@ -162,11 +162,16 @@ export async function createSignedObjectUrl(
  * Returns a time-limited signed download URL for a file, but ONLY if the file
  * belongs to the caller's org — the lookup runs under RLS, so an org-B context
  * cannot resolve (and therefore cannot sign) an org-A file.
+ *
+ * `download` is the name the browser saves as, and passing it is what makes
+ * Storage answer `Content-Disposition: attachment` instead of serving the bytes
+ * inline on the Supabase project origin. Build it with
+ * `lib/files/safe-name.ts safeDownloadName` — never from a raw stored filename.
  */
 export async function getSignedUrl(
   ctx: OrgContext,
   fileId: string,
-  ttlSeconds = 3600,
+  opts: { ttlSeconds?: number; download?: string } = {},
 ): Promise<string> {
   const rows = await withOrgContext(ctx, (tx) =>
     tx
@@ -180,11 +185,58 @@ export async function getSignedUrl(
     throw new Error('File not found in this org');
   }
 
-  return createSignedObjectUrl(rows[0].bucket, rows[0].objectKey, ttlSeconds);
+  return createSignedObjectUrl(rows[0].bucket, rows[0].objectKey, opts.ttlSeconds ?? 3600, {
+    download: opts.download,
+  });
 }
 
-/** Idempotently creates the private files bucket. Run once during setup. */
-export async function ensureFilesBucket(): Promise<void> {
+/**
+ * Delete one stored object.
+ *
+ * For AFTER the `files` row is gone and its transaction has committed, never
+ * inside it: Storage is an HTTP dependency, and holding a Postgres transaction
+ * open across a third party's outage is how a lock wait becomes an incident. The
+ * caller therefore treats a failure as best-effort — a failed remove leaves the
+ * orphan that deleting nothing at all used to leave every single time.
+ *
+ * Throws on a Storage error, so the caller decides what an orphan costs.
+ */
+export async function removeStoredObject(
+  bucket: string,
+  objectKey: string,
+): Promise<void> {
+  const supabase = createSupabaseAdminClient();
+  const { error } = await supabase.storage.from(bucket).remove([objectKey]);
+  if (error) throw error;
+}
+
+/**
+ * The in-flight or settled answer to "does the bucket exist", per isolate.
+ *
+ * Memoised on the PROMISE rather than a boolean so two uploads arriving together
+ * share one round trip instead of racing two. A failure clears it, so a Storage
+ * outage during the first upload does not poison every later one.
+ */
+let filesBucketReady: Promise<void> | null = null;
+
+/**
+ * Idempotently creates the private files bucket.
+ *
+ * Every document upload awaited this, and every call issued a `getBucket` HTTP
+ * round trip — an upload cost three RLS transactions plus one Storage request
+ * that exists only to ask a question whose answer never changes. The bucket is
+ * created once in the lifetime of a deployment and cannot go back to not
+ * existing, so the answer is cached for the life of the isolate.
+ */
+export function ensureFilesBucket(): Promise<void> {
+  filesBucketReady ??= createFilesBucket().catch((error: unknown) => {
+    filesBucketReady = null;
+    throw error;
+  });
+  return filesBucketReady;
+}
+
+async function createFilesBucket(): Promise<void> {
   const supabase = createSupabaseAdminClient();
   const { data } = await supabase.storage.getBucket(FILES_BUCKET);
   if (!data) {

@@ -20,10 +20,7 @@ vi.mock('@/lib/db/client', () => ({
   },
 }));
 
-const { getDeliveryDocumentByToken, safeExtension } = await import(
-  './public-documents'
-);
-const { ALLOWED_EXTENSIONS } = await import('./deliverable-files');
+const { getDeliveryDocumentByToken } = await import('./public-documents');
 
 const DOCUMENT_ID = '11111111-2222-4333-8444-555555555555';
 
@@ -47,76 +44,6 @@ afterEach(() => {
   dbState.rows = [];
   dbState.calls = 0;
   vi.restoreAllMocks();
-});
-
-describe('safeExtension', () => {
-  // The download allowlist is DERIVED from the upload allowlist so the two cannot
-  // drift. This pins the resulting union, so widening the upload list to an active
-  // type (svg, html, …) fails HERE and forces a deliberate decision instead of
-  // silently reaching a client's browser.
-  it('pins the derived allowlist to exactly the upload union', () => {
-    const union = [...new Set(Object.values(ALLOWED_EXTENSIONS).flat())].sort();
-    expect(union).toEqual(
-      ['csv', 'dwg', 'dxf', 'jpeg', 'jpg', 'pdf', 'png', 'xlsx'].sort(),
-    );
-  });
-
-  it('lowercases every ALLOWLISTED extension', () => {
-    expect(safeExtension('drawing.PDF')).toBe('pdf');
-    expect(safeExtension('a.b.c.xlsx')).toBe('xlsx');
-    for (const extension of ['pdf', 'dwg', 'dxf', 'png', 'jpg', 'jpeg', 'xlsx', 'csv']) {
-      expect(safeExtension(`file.${extension}`)).toBe(extension);
-      expect(safeExtension(`file.${extension.toUpperCase()}`)).toBe(extension);
-    }
-  });
-
-  // S3: the `download=` param that would force an attachment is appended to the
-  // signed URL AFTER signing, so it is NOT covered by the storage JWT and can be
-  // stripped by whoever holds the link. A shape-only check let html/htm/svg through;
-  // membership in the upload allowlist is the actual gate.
-  it('REJECTS active-content extensions even though they pass the shape check', () => {
-    for (const extension of ['html', 'htm', 'svg', 'xml', 'js', 'mjs', 'php']) {
-      expect(safeExtension(`file.${extension}`)).toBeNull();
-    }
-  });
-
-  it('rejects a well-shaped but non-allowlisted extension', () => {
-    for (const name of ['x.abcde', 'x.zip', 'x.exe', 'x.docx', 'x.txt', 'x.a']) {
-      expect(safeExtension(name)).toBeNull();
-    }
-  });
-
-  it('still rejects header-injection shapes that merely contain an allowed word', () => {
-    for (const name of [
-      'file.pdf;x',
-      'file.pdf"',
-      'file.pdf\r\nX-Evil: 1',
-      'file.pdf/../../etc',
-      'file. pdf',
-    ]) {
-      expect(safeExtension(name)).toBeNull();
-    }
-  });
-
-  it('returns null when there is nothing safe to use', () => {
-    for (const name of [
-      null,
-      undefined,
-      '',
-      'noextension',
-      'trailing.',
-      '.hidden-has-ext-but-fine', // 'hidden-has-ext-but-fine' is not [a-z0-9]{1,5}
-      'file.toolongext',
-      'file.pd f',
-      'file.pd/f',
-      'file.pd"f',
-      'file.رسم',
-      'file.p\ndf',
-    ]) {
-      expect(safeExtension(name as string | null)).toBeNull();
-    }
-  });
-
 });
 
 describe('getDeliveryDocumentByToken', () => {

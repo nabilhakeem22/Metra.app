@@ -51,7 +51,7 @@ it('no-bare-tenant-db: flags raw-connection queries, allows scoped ones', () => 
       },
       // Allowlisted sanctioned exception — raw db.execute permitted.
       {
-        filename: 'apps/web/src/lib/proposals/public.ts',
+        filename: 'apps/web/src/lib/share/sdf-call.ts',
         code: 'withRequestDb((db) => db.execute(sql`select public.app_proposal_by_token(${h})`));',
       },
       // Allowlisted automation system read.
@@ -76,6 +76,31 @@ it('no-bare-tenant-db: flags raw-connection queries, allows scoped ones', () => 
       {
         filename: 'apps/web/src/lib/clients/queries.ts',
         code: 'getDb()[method]();',
+      },
+      // THE SECOND FENCE, allowed side: the token portals are the reason
+      // sdf-call.ts exists. Each passes a token HASH to a SECURITY DEFINER
+      // function that omits every cost/margin column.
+      {
+        filename: 'apps/web/src/lib/proposals/public.ts',
+        code: "import { readSdfJson } from '@/lib/share/sdf-call';\nreadSdfJson(query);",
+      },
+      {
+        filename: 'apps/web/src/lib/engagements/public/delivery.ts',
+        code: "import { normalizeRawToken, readSdfJson } from '@/lib/share/sdf-call';\nreadSdfJson(q);",
+      },
+      {
+        filename: 'apps/web/src/lib/engagements/public-comments.ts',
+        code: "import { readSdfCode } from '@/lib/share/sdf-call';\nreadSdfCode(q);",
+      },
+      // The module's own unit test imports it relatively.
+      {
+        filename: 'apps/web/src/lib/share/sdf-call.test.ts',
+        code: "import { readSdfJson } from './sdf-call';\nreadSdfJson(q);",
+      },
+      // A property that merely SHARES a runner's name is not a reference to it.
+      {
+        filename: 'apps/web/src/lib/clients/queries.ts',
+        code: 'const shape = { readSdfJson: 1 }; use(shape.readSdfJson);',
       },
     ],
     invalid: [
@@ -231,6 +256,49 @@ it('no-bare-tenant-db: flags raw-connection queries, allows scoped ones', () => 
         filename: 'apps/web/src/lib/clients/queries.ts',
         code: 'const conn = getRequestConnection(); conn.db.$with(cte).select().from(cte);',
         errors: [{ messageId: 'bareQuery' }],
+      },
+      // S1: THE SECOND FENCE. Concentrating nine allowlisted files into one moved
+      // the exemption but not the enforcement — a security review wrote this exact
+      // file in lib/clients, ran eslint, and got exit 0. Two reports: the import,
+      // and the call that runs on the BYPASSRLS socket.
+      {
+        filename: 'apps/web/src/lib/clients/secprobe-sdf.ts',
+        code: "import { readSdfJson } from '@/lib/share/sdf-call';\nawait readSdfJson(sql`select * from public.clients`);",
+        errors: [
+          { messageId: 'sdfCallerNotAllowlisted' },
+          { messageId: 'sdfCallerNotAllowlisted' },
+        ],
+      },
+      // The RELATIVE spelling resolves to the same module — the evasion that
+      // defeated the sibling module-shape gate.
+      {
+        filename: 'apps/web/src/lib/clients/secprobe-sdf.ts',
+        code: "import { readSdfCode } from '../share/sdf-call';\n",
+        errors: [{ messageId: 'sdfCallerNotAllowlisted' }],
+      },
+      // Importing only the token normaliser still names the fenced module: the
+      // whole file is the exemption surface, not one of its exports.
+      {
+        filename: 'apps/web/src/lib/clients/queries.ts',
+        code: "import { normalizeRawToken } from '@/lib/share/sdf-call';\n",
+        errors: [{ messageId: 'sdfCallerNotAllowlisted' }],
+      },
+      // A runner reached without a matching import — a re-export, a barrel, a
+      // dynamic import. Both the binding and the call are named, so both report.
+      {
+        filename: 'apps/web/src/lib/clients/queries.ts',
+        code: 'const { readSdfJson } = await import(modulePath);\nreadSdfJson(q);',
+        errors: [
+          { messageId: 'sdfCallerNotAllowlisted' },
+          { messageId: 'sdfCallerNotAllowlisted' },
+        ],
+      },
+      // A file allowlisted to open the raw socket itself has no standing to run
+      // somebody ELSE's token SDF: the two allowlists sanction different things.
+      {
+        filename: 'apps/web/src/lib/automation/runner.ts',
+        code: "import { readSdfJson } from '@/lib/share/sdf-call';\n",
+        errors: [{ messageId: 'sdfCallerNotAllowlisted' }],
       },
     ],
   });

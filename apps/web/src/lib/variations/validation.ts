@@ -1,7 +1,7 @@
 // Variation-order input validation — PURE and CLIENT-SAFE (no db, no
-// `server-only`), mirroring lib/proposals/validation.ts so the money rules
-// standing between a pasted string and a numeric(18,4) column are unit-testable
-// without a database.
+// `server-only`), so the money rule standing between a pasted string and a
+// numeric(18,4) column is unit-testable without a database. MODULE-SPECIFIC by
+// design: the shared readers live in lib/money and lib/validation.
 /**
  * A variation-order quantity may be NEGATIVE — that is what a de-scope IS — and
  * an absent one is a zero. Everything else is the shared money rule.

@@ -2,38 +2,108 @@
 // sections, lines and FROZEN totals into a new DRAFT contract — the server never
 // recomputes them here (the contract baseline must equal the accepted quote to
 // the piastre).
-import {
-  contractLines,
-  contractSections,
-  contracts,
-  proposalLines,
-  proposalSections,
-  proposals,
-  clients,
-  projects,
-} from '@metra/db';
+//
+// Five named phases: load the accepted proposal, load the inherited percentages,
+// persist the header (./create-header.ts), copy the sections and lines
+// (./create-copy.ts), audit. The transaction boundary is unchanged — all five
+// run inside the one `mutateInOrg`, so any failure rolls the whole thing back.
+import { contracts, proposals, clients, projects, type MetraDb } from '@metra/db';
 import { eq } from 'drizzle-orm';
 import { fail, mutateInOrg } from '@/lib/actions/mutate';
+import type { AuditEntry } from '@/lib/audit';
 import { err, type ActionResult } from '@/lib/actions/result';
 import { allocateNumber } from '@/lib/db/allocate-number';
 import type { OrgContext } from '@/lib/db/context';
-import { formatDocNumber } from '@/lib/format/doc-number';
-import { chunk, LINE_INSERT_CHUNK } from '@/lib/proposals/core';
 import { isUuid } from '@/lib/uuid';
-
-/** Postgres unique-violation SQLSTATE. */
-const UNIQUE_VIOLATION = '23505';
-
-function isUniqueViolation(e: unknown): boolean {
-  return (
-    typeof e === 'object' &&
-    e !== null &&
-    (e as { code?: string }).code === UNIQUE_VIOLATION
-  );
-}
+import { copyProposalContentToContract } from './create-copy';
+import { persistContractHeader } from './create-header';
 
 export interface GenerateContractInput {
   proposalId: string;
+}
+
+type ProposalRow = typeof proposals.$inferSelect;
+
+/**
+ * The accepted proposal this contract is generated from.
+ *
+ * Also the duplicate fast path (AC2): one contract per proposal. The unique index
+ * on (org_id, source_proposal_id) is the REAL race guard — this check only spares
+ * the common case an insert that would have failed anyway.
+ */
+async function loadAcceptedProposal(
+  tx: MetraDb,
+  proposalId: string,
+): Promise<ProposalRow> {
+  const [proposal] = await tx
+    .select()
+    .from(proposals)
+    .where(eq(proposals.id, proposalId))
+    .limit(1);
+  if (!proposal) fail('invalid');
+  if (proposal.status !== 'accepted') fail('proposal_not_accepted');
+
+  const existing = await tx
+    .select({ id: contracts.id })
+    .from(contracts)
+    .where(eq(contracts.sourceProposalId, proposalId))
+    .limit(1);
+  if (existing[0]) fail('contract_exists');
+  return proposal;
+}
+
+/** A configured (non-null) percentage, or undefined so the caller can fall back. */
+function pickPct(value: string | null | undefined): string | undefined {
+  return value ?? undefined;
+}
+
+/**
+ * Retention and advance inherit project -> client -> 0.
+ *
+ * Zero when unset, deliberately: A4 forbids seeding an industry-typical figure a
+ * firm never agreed to.
+ */
+async function loadInheritedPercentages(
+  tx: MetraDb,
+  proposal: ProposalRow,
+): Promise<{ advancePct: string; retentionPct: string }> {
+  const [project] = await tx
+    .select({ advancePct: projects.advancePct, retentionPct: projects.retentionPct })
+    .from(projects)
+    .where(eq(projects.id, proposal.projectId))
+    .limit(1);
+  const [client] = await tx
+    .select({ advancePct: clients.advancePct, retentionPct: clients.retentionPct })
+    .from(clients)
+    .where(eq(clients.id, proposal.clientId))
+    .limit(1);
+  return {
+    advancePct: pickPct(project?.advancePct) ?? pickPct(client?.advancePct) ?? '0',
+    retentionPct:
+      pickPct(project?.retentionPct) ?? pickPct(client?.retentionPct) ?? '0',
+  };
+}
+
+/** The contract's per-org number, serialized by a transaction-scoped advisory
+ *  lock so two concurrent generates can never collide on it. */
+function allocateContractNumber(tx: MetraDb, orgId: string): Promise<number> {
+  return allocateNumber(tx, orgId, 'contracts', 'contracts', 'number');
+}
+
+/** The ledger entry a generated contract leaves: which number, from which quote. */
+function auditContractGenerated(
+  audit: (entry: AuditEntry) => Promise<void>,
+  contractId: string,
+  number: number,
+  proposalId: string,
+): Promise<void> {
+  return audit({
+    entity: 'contract',
+    entityId: contractId,
+    action: 'create',
+    before: null,
+    after: { number, source_proposal_id: proposalId },
+  });
 }
 
 /**
@@ -54,159 +124,15 @@ export async function generateContractCore(
     ctx,
     { capability: 'contracts_generate', action: 'create' },
     async (tx, audit) => {
-      const [proposal] = await tx
-        .select()
-        .from(proposals)
-        .where(eq(proposals.id, proposalId))
-        .limit(1);
-      if (!proposal) fail('invalid');
-      if (proposal.status !== 'accepted') fail('proposal_not_accepted');
-
-      // Fast path for the common duplicate case (AC2). The unique index is the
-      // real race guard, caught below.
-      const existing = await tx
-        .select({ id: contracts.id })
-        .from(contracts)
-        .where(eq(contracts.sourceProposalId, proposalId))
-        .limit(1);
-      if (existing[0]) fail('contract_exists');
-
-      // Retention/advance inherit project -> client -> 0.
-      const [project] = await tx
-        .select({
-          advancePct: projects.advancePct,
-          retentionPct: projects.retentionPct,
-        })
-        .from(projects)
-        .where(eq(projects.id, proposal.projectId))
-        .limit(1);
-      const [client] = await tx
-        .select({
-          advancePct: clients.advancePct,
-          retentionPct: clients.retentionPct,
-        })
-        .from(clients)
-        .where(eq(clients.id, proposal.clientId))
-        .limit(1);
-      const advancePct =
-        pickPct(project?.advancePct) ?? pickPct(client?.advancePct) ?? '0';
-      const retentionPct =
-        pickPct(project?.retentionPct) ?? pickPct(client?.retentionPct) ?? '0';
-
-      const number = await allocateNumber(
-        tx,
-        ctx.orgId,
-        'contracts',
-        'contracts',
-        'number',
+      const proposal = await loadAcceptedProposal(tx, proposalId);
+      const percentages = await loadInheritedPercentages(tx, proposal);
+      const number = await allocateContractNumber(tx, ctx.orgId);
+      const contractId = await persistContractHeader(
+        tx, ctx.orgId, proposal, number, percentages,
       );
-
-      let insertedId: string;
-      try {
-        const [row] = await tx
-          .insert(contracts)
-          .values({
-            orgId: ctx.orgId,
-            number,
-            // The source proposal always carries a title (bilingualCheck), so the
-            // snapshot satisfies the contract's own present-check; fall back to
-            // the display number only in the impossible both-null case.
-            titleAr: proposal.titleAr,
-            titleEn:
-              proposal.titleAr || proposal.titleEn
-                ? proposal.titleEn
-                : formatDocNumber(
-                    'C',
-                    number,
-                    new Date(proposal.createdAt).getFullYear(),
-                  ),
-            sourceProposalId: proposalId,
-            clientId: proposal.clientId,
-            projectId: proposal.projectId,
-            currency: proposal.currency,
-            advancePct,
-            retentionPct,
-            originalValue: proposal.total,
-            discountPct: proposal.discountPct,
-            taxRate: proposal.taxRate,
-            supervisionPct: proposal.supervisionPct,
-            subtotal: proposal.subtotal,
-            discountAmount: proposal.discountAmount,
-            taxableBase: proposal.taxableBase,
-            taxAmount: proposal.taxAmount,
-            supervisionAmount: proposal.supervisionAmount,
-            totalCost: proposal.totalCost,
-            totalMargin: proposal.totalMargin,
-          })
-          .returning({ id: contracts.id });
-        insertedId = row.id;
-      } catch (e) {
-        // Lost the race for (org_id, source_proposal_id): one contract already exists.
-        if (isUniqueViolation(e)) fail('contract_exists');
-        throw e;
-      }
-
-      // Deep-copy sections + lines (batched, no N+1).
-      const oldSections = await tx
-        .select()
-        .from(proposalSections)
-        .where(eq(proposalSections.proposalId, proposalId))
-        .orderBy(proposalSections.sortOrder);
-      if (oldSections.length) {
-        const newSecs = await tx
-          .insert(contractSections)
-          .values(
-            oldSections.map((s) => ({
-              orgId: ctx.orgId,
-              contractId: insertedId,
-              titleAr: s.titleAr,
-              titleEn: s.titleEn,
-              sortOrder: s.sortOrder,
-              sectionSubtotal: s.sectionSubtotal,
-            })),
-          )
-          .returning({ id: contractSections.id });
-        const idMap = new Map(oldSections.map((s, i) => [s.id, newSecs[i].id]));
-
-        const oldLines = await tx
-          .select()
-          .from(proposalLines)
-          .where(eq(proposalLines.proposalId, proposalId));
-        const newLineRows = oldLines.map((l) => ({
-          orgId: ctx.orgId,
-          contractId: insertedId,
-          sectionId: idMap.get(l.sectionId)!,
-          costItemId: l.costItemId,
-          descriptionAr: l.descriptionAr,
-          descriptionEn: l.descriptionEn,
-          qty: l.qty,
-          unit: l.unit,
-          unitCost: l.unitCost,
-          unitPrice: l.unitPrice,
-          discountPct: l.discountPct,
-          lineCost: l.lineCost,
-          lineTotal: l.lineTotal,
-          lineMargin: l.lineMargin,
-          sortOrder: l.sortOrder,
-        }));
-        for (const part of chunk(newLineRows, LINE_INSERT_CHUNK)) {
-          await tx.insert(contractLines).values(part);
-        }
-      }
-
-      await audit({
-        entity: 'contract',
-        entityId: insertedId,
-        action: 'create',
-        before: null,
-        after: { number, source_proposal_id: proposalId },
-      });
-      return insertedId;
+      await copyProposalContentToContract(tx, ctx.orgId, proposalId, contractId);
+      await auditContractGenerated(audit, contractId, number, proposalId);
+      return contractId;
     },
   );
-}
-
-/** A configured (non-null) percentage, or undefined so the caller can fall back. */
-function pickPct(v: string | null | undefined): string | undefined {
-  return v ?? undefined;
 }

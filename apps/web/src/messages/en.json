@@ -452,7 +452,7 @@
     "generic": "Something went wrong. Please try again.",
     "uncertain": "We couldn't confirm whether that saved. Refresh to check before trying again.",
     "file_too_large": "That file is too large. The limit is 100 MB.",
-    "name_required": "Enter at least one company name.",
+    "name_required": "Enter a name.",
     "last_owner": "You can't remove or demote the last owner.",
     "owner_immutable": "Only an owner can change an owner.",
     "self": "You can't change your own role or remove yourself here.",
@@ -477,7 +477,7 @@
     "discount_out_of_range": "Discount must be between 0 and 100",
     "supervision_out_of_range": "Supervision must be between 0 and 100",
     "tax_out_of_range": "VAT rate must be between 0 and 100",
-    "too_many_lines": "This proposal has too many lines",
+    "too_many_lines": "This document has too many lines.",
     "invalid_date": "Enter a valid date",
     "amount_too_large": "That amount is too large",
     "last_primary_contact": "Set another contact as primary before removing this one",
@@ -533,7 +533,20 @@
     "project_limit_reached": "Your plan has no project seats left. Contact us to add more.",
     "event_not_found": "That record is not on this engagement.",
     "already_corrected": "That record has already been retracted.",
-    "rom_already_issued": "This range has already been issued to the client"
+    "rom_already_issued": "This range has already been issued to the client",
+    "boq_not_draft": "This BOQ is issued and can no longer be changed.",
+    "boq_not_found": "That bill of quantities no longer exists.",
+    "line_not_found": "That line no longer exists. Refresh the sheet.",
+    "section_not_found": "That section no longer exists. Refresh the sheet.",
+    "description_required": "A line needs a description.",
+    "description_too_long": "That description is too long.",
+    "item_code_too_long": "That item code is too long.",
+    "invalid_unit": "That is not one of Metra's units.",
+    "invalid_qty": "That quantity is not a number.",
+    "invalid_price": "That rate is not a number.",
+    "invalid_discount": "The discount must be between 0 and 100.",
+    "section_name_required": "A section needs a name.",
+    "section_name_too_long": "That section name is too long."
   },
   "common": {
     "untranslated": "untranslated",
@@ -1136,14 +1149,24 @@
         "keyboardHint": "Tab moves across · Enter moves down the column · Esc reverts the cell",
         "costedCopy": "Costed copy",
         "costedCopyFor": "Costed copy of BOQ {number}",
-        "errQty": "That quantity is not a number",
-        "errPrice": "That rate is not a number",
-        "errDescription": "A line needs a description",
-        "errFrozen": "This BOQ is issued and can no longer be changed",
-        "errTooMany": "This BOQ has reached its line limit",
-        "errForbidden": "You do not have permission to change this BOQ",
-        "errDiscount": "The discount must be between 0 and 100",
-        "errSectionName": "A section needs a name"
+        "importErrors": {
+          "unmapped_columns": "Missing column: {value}",
+          "description_empty": "Description is empty",
+          "unit_empty": "Unit is empty",
+          "unit_unknown": "{value} is not one of Metra's units",
+          "qty_not_a_number": "Quantity is not a number",
+          "qty_too_large": "Quantity is too large",
+          "qty_negative": "Quantity cannot be negative",
+          "unit_price_not_a_number": "Unit price is not a number",
+          "unit_price_too_large": "Unit price is too large",
+          "unit_price_negative": "Unit price cannot be negative",
+          "unit_cost_not_a_number": "Unit cost is not a number",
+          "unit_cost_too_large": "Unit cost is too large"
+        },
+        "importNotes": {
+          "semicolon_separated": "Read as semicolon-separated.",
+          "tab_separated": "Read as tab-separated."
+        }
       }
     }
   },

@@ -1,7 +1,7 @@
 import { getContractForPdf } from '@/lib/contracts/queries';
 import { buildContractHtml } from '@/lib/pdf/contract-template';
 import { servePdfDocument } from '@/lib/pdf/route-handler';
-import { MAX_TOTAL_LINES } from '@/lib/proposals/core';
+import { MAX_TOTAL_LINES } from '@/lib/lines/limits';
 
 // Chromium is Node-only; this API endpoint gates itself (the i18n matcher skips /api).
 export const runtime = 'nodejs';

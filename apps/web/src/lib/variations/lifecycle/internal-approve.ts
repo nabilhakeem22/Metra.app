@@ -2,13 +2,32 @@
 // admission gate (UPDATE ... WHERE status=... RETURNING, check rowCount), owner/
 // admin only (variations_price). Client approve/reject is the unauthenticated
 // token path (app_variation_respond_by_token), never the matrix.
-import { contracts, variationOrderEvents, variationOrders } from '@metra/db';
-import { and, eq, sql } from 'drizzle-orm';
-import { fail, mutateInOrg, requireInOrg } from '@/lib/actions/mutate';
+import { variationOrderEvents, type MetraDb } from '@metra/db';
+import { mutateInOrg } from '@/lib/actions/mutate';
 import type { ActionResult } from '@/lib/actions/result';
 import type { OrgContext } from '@/lib/db/context';
 import { mintShareToken, shareExpiryFromNow } from '@/lib/share/token';
-import { canInternalApproveVariation } from '../lifecycle-rules';
+import {
+  assertContractStillLive,
+  freezeAndApprove,
+  lockDraftVariation,
+} from './internal-approve-gate';
+
+/** The append-only ledger row for the transition. */
+async function recordInternalApprovedEvent(
+  tx: MetraDb,
+  ctx: OrgContext,
+  variationOrderId: string,
+): Promise<void> {
+  await tx.insert(variationOrderEvents).values({
+    orgId: ctx.orgId,
+    variationOrderId,
+    kind: 'internal_approved',
+    actorUserId: ctx.userId,
+    fromStatus: 'draft',
+    toStatus: 'internal_approved',
+  });
+}
 
 /**
  * Internal approval: draft->internal_approved (owner/admin, variations_price).
@@ -34,69 +53,12 @@ export async function internalApproveVariationCore(
     ctx,
     { capability: 'variations_price', action: 'approve' },
     async (tx, audit) => {
-      // Serialization point: hold the VO row lock across the freeze so a
-      // concurrent line rewrite (which also locks this row) can't slip in.
-      const [locked] = await tx
-        .select({
-          status: variationOrders.status,
-          contractId: variationOrders.contractId,
-        })
-        .from(variationOrders)
-        .where(eq(variationOrders.id, input.id))
-        .for('update')
-        .limit(1);
-      if (!locked) fail('invalid');
-      if (locked.status !== 'draft') fail('variation_not_draft');
-
-      // A contract that is no longer live carries no commercial change: a VO
-      // drafted before termination must not be approvable afterwards.
-      const contract = await requireInOrg(
-        tx,
-        contracts,
-        locked.contractId,
-        { status: contracts.status },
-        'invalid',
-      );
-      if (!canInternalApproveVariation(locked.status, contract.status)) {
-        fail('contract_not_issued');
-      }
+      const locked = await lockDraftVariation(tx, input.id);
+      await assertContractStillLive(tx, locked.status, locked.contractId);
 
       const { raw, hash } = mintShareToken();
-      const shareExpiresAt = shareExpiryFromNow();
-
-      // net_delta = Σ line_total, computed IN the UPDATE (atomic with the freeze).
-      // Equivalent to computeVariationNetDelta (both sum line_total), exact in SQL.
-      const gated = await tx
-        .update(variationOrders)
-        .set({
-          status: 'internal_approved',
-          netDelta: sql`(
-            select coalesce(sum(line_total), 0)
-            from public.variation_order_lines
-            where variation_order_id = ${input.id}
-          )`,
-          tokenHash: hash,
-          shareExpiresAt,
-          updatedAt: new Date(),
-        })
-        .where(
-          and(
-            eq(variationOrders.id, input.id),
-            eq(variationOrders.status, 'draft'),
-          ),
-        )
-        .returning({ id: variationOrders.id });
-      if (!gated[0]) fail('variation_not_draft');
-
-      await tx.insert(variationOrderEvents).values({
-        orgId: ctx.orgId,
-        variationOrderId: input.id,
-        kind: 'internal_approved',
-        actorUserId: ctx.userId,
-        fromStatus: 'draft',
-        toStatus: 'internal_approved',
-      });
-
+      await freezeAndApprove(tx, input.id, hash, shareExpiryFromNow());
+      await recordInternalApprovedEvent(tx, ctx, input.id);
       await audit({
         entity: 'variation_order',
         entityId: input.id,

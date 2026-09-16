@@ -1,7 +1,6 @@
 import { COST_ITEM_UNITS } from '@metra/db';
 import { describe, expect, it } from 'vitest';
-import { MAX_AMOUNT } from '@/lib/proposals/validation';
-import { readMoneyString } from '@/lib/money/read';
+import { MAX_AMOUNT, readMoneyString } from '@/lib/money/read';
 import {
   BOQ_UNITS,
   MAX_DESCRIPTION,
@@ -153,7 +152,7 @@ describe('normalizeLinePatch', () => {
       ok: false,
       error: 'amount_too_large',
     });
-    // A cell that genuinely is not a number still gets the field's own code.
+    // A cell that genuinely holds no number still gets the field's own code.
     expect(normalizeLinePatch({ qty: 'twelve' })).toEqual({
       ok: false,
       error: 'invalid_qty',

@@ -10,7 +10,7 @@ import 'server-only';
 // ADVISORY: a comment moves no state, opens no change order and clears no guard.
 // The stage approve / request-changes buttons remain the only way to move anything.
 import { sql } from 'drizzle-orm';
-import { withRequestDb } from '@/lib/db/client';
+import { normalizeRawToken, readSdfCode, readSdfJson } from '@/lib/share/sdf-call';
 import { hashShareToken } from '@/lib/share/token';
 import { isUuid } from '@/lib/uuid';
 import type { DeliveryActionError } from './public';
@@ -68,17 +68,17 @@ export async function getDeliveryDocumentCommentsByToken(
   rawToken: string,
   documentId: string,
 ): Promise<PublicDocumentComment[]> {
-  if (!rawToken?.trim() || !isUuid(documentId)) return [];
-  const hash = hashShareToken(rawToken);
+  const token = normalizeRawToken(rawToken);
+  if (!token || !isUuid(documentId)) return [];
+  const hash = hashShareToken(token);
   try {
-    const rows = (await withRequestDb((db) =>
-      db.execute(
-        sql`select public.app_delivery_document_comments_by_token(
-          ${hash}, ${documentId}::uuid
-        ) as thread`,
-      ),
-    )) as unknown as Array<{ thread: unknown }>;
-    const thread = rows[0]?.thread;
+    // Aliased `data` (it was `thread`) so the one shared reader can read it. The
+    // alias is local to this statement; the SDF and its payload are untouched.
+    const thread = await readSdfJson<unknown>(
+      sql`select public.app_delivery_document_comments_by_token(
+        ${hash}, ${documentId}::uuid
+      ) as data`,
+    );
     if (!Array.isArray(thread)) return [];
     return thread.filter(isRenderableComment).map((row) => ({
       id: row.id,
@@ -125,18 +125,17 @@ export async function addDeliveryCommentByToken(
     userAgent?: string | null;
   },
 ): Promise<DeliveryCommentResult> {
-  if (!rawToken?.trim()) return { ok: false, error: 'token_invalid' };
+  const token = normalizeRawToken(rawToken);
+  if (!token) return { ok: false, error: 'token_invalid' };
   // The uuid is validated BEFORE the DB so a malformed id can never reach the cast.
   if (!isUuid(input.documentId)) return { ok: false, error: 'token_invalid' };
   if (!input.body?.trim()) return { ok: false, error: 'empty' };
-  const hash = hashShareToken(rawToken);
-  const rows = (await withRequestDb((db) =>
-    db.execute(sql`select public.app_delivery_comment_by_token(
-      ${hash}, ${input.documentId}::uuid, ${input.body}, ${input.actorName ?? null},
-      ${input.ip ?? null}, ${input.userAgent ?? null}
-    ) as code`),
-  )) as unknown as Array<{ code: string }>;
-  switch (rows[0]?.code) {
+  const hash = hashShareToken(token);
+  const code = await readSdfCode(sql`select public.app_delivery_comment_by_token(
+    ${hash}, ${input.documentId}::uuid, ${input.body}, ${input.actorName ?? null},
+    ${input.ip ?? null}, ${input.userAgent ?? null}
+  ) as code`);
+  switch (code) {
     case 'ok':
       return { ok: true };
     case 'too_many':

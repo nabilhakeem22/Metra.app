@@ -8,6 +8,7 @@ import {
   normalizeUnit,
   DEFAULT_SECTION,
 } from './map';
+import { buildTemplateCsv } from './template';
 
 // The EXACT option set boqs/import/map.ts uses for a cell in an imported sheet —
 // the one money surface that reads Arabic-Indic digits.
@@ -100,7 +101,10 @@ describe('decodeCsv', () => {
   });
 
   it('says so when it had to guess a non-comma delimiter', () => {
-    expect(decodeCsv('a;b\n1;2').notes).toContain('Read as semicolon-separated.');
+    // A CODE, not an English sentence: this note renders in an Arabic-first UI.
+    expect(decodeCsv('a;b\n1;2').notes).toEqual(['semicolon_separated']);
+    expect(decodeCsv('a\tb\n1\t2').notes).toEqual(['tab_separated']);
+    expect(decodeCsv('a,b\n1,2').notes).toEqual([]);
   });
 });
 
@@ -126,7 +130,7 @@ describe('an imported numeric cell', () => {
 
   it('REFUSES an ambiguous comma this cell used to read as grouping', () => {
     // BEHAVIOUR CHANGE (wave 2): '1,5' became 15 in an imported price. The row
-    // now fails with "is not a number", which the studio sees in the problem
+    // now fails with the unreadable-cell code, which the studio sees in the problem
     // list instead of importing a ten-fold error silently.
     for (const ambiguous of ['1,5', '1,2,3', '1.234,56']) {
       expect(readImportedCell(ambiguous)).toBeNull();
@@ -209,12 +213,14 @@ describe('mapRows', () => {
     expect(res.ok[1]?.unit).toBe('linear_meter');
   });
 
-  it('numbers errors by the row the studio sees in Excel', () => {
-    // Header is row 1, so the first data row is row 2.
+  it('numbers rows as Excel does, and carries the offending cell as a VALUE', () => {
+    // Header is row 1, so the first data row is row 2. The cell travels as
+    // `value` rather than baked into an English sentence, so the ar-EG catalogue
+    // can interpolate it.
     const g = grid('Description,Unit,Qty,Rate\nWalls,tonne,10,50');
     const res = mapRows(g, autoDetectMapping(g.rows[0] as string[]));
     expect(res.rows[0]?.rowNumber).toBe(2);
-    expect(res.rows[0]?.errors[0]).toContain('tonne');
+    expect(res.rows[0]?.issues[0]).toEqual({ code: 'unit_unknown', value: 'tonne' });
   });
 
   it('reports every bad row instead of stopping at the first', () => {
@@ -235,24 +241,24 @@ describe('mapRows', () => {
   it('rejects a negative quantity — a de-scope is a variation, never a BOQ line', () => {
     const g = grid('Description,Unit,Qty,Rate\nWalls,m2,-5,50');
     const res = mapRows(g, autoDetectMapping(g.rows[0] as string[]));
-    expect(res.rows[0]?.errors).toContain('Quantity cannot be negative');
+    expect(res.rows[0]?.issues).toContainEqual({ code: 'qty_negative' });
   });
 
-  it('tells a too-large cell apart from a cell that is not a number', () => {
+  it('tells a too-large cell apart from an unreadable one', () => {
     // Two different problems with two different fixes: a stray unit in the cell
     // versus a figure past the 1e12 cap that reads perfectly well. "Quantity is
     // not a number" for 1e13 is wrong, and the studio can see that it is wrong.
     const tooLarge = grid('Description,Unit,Qty,Rate\nWalls,m2,10000000000000,50');
     const first = mapRows(tooLarge, autoDetectMapping(tooLarge.rows[0] as string[]));
-    expect(first.rows[0]?.errors).toContain('Quantity is too large');
+    expect(first.rows[0]?.issues).toContainEqual({ code: 'qty_too_large' });
 
     const nonsense = grid('Description,Unit,Qty,Rate\nWalls,m2,n/a,50');
     const second = mapRows(nonsense, autoDetectMapping(nonsense.rows[0] as string[]));
-    expect(second.rows[0]?.errors).toContain('Quantity is not a number');
+    expect(second.rows[0]?.issues).toContainEqual({ code: 'qty_not_a_number' });
 
     const dearRate = grid('Description,Unit,Qty,Rate\nWalls,m2,10,99999999999999');
     const third = mapRows(dearRate, autoDetectMapping(dearRate.rows[0] as string[]));
-    expect(third.rows[0]?.errors).toContain('Unit price is too large');
+    expect(third.rows[0]?.issues).toContainEqual({ code: 'unit_price_too_large' });
   });
 
   it('treats a missing cost as zero, not as an error', () => {
@@ -281,7 +287,31 @@ describe('mapRows', () => {
     const g = grid('Description,Unit,Qty\nWalls,m2,10');
     const res = mapRows(g, autoDetectMapping(g.rows[0] as string[]));
     expect(res.ok).toHaveLength(0);
-    expect(res.rows[0]?.errors[0]).toContain('unitPrice');
+    // The COLUMN as the sheet spells it, not the field identifier: a studio
+    // cannot find "unitPrice" across the top of their own spreadsheet.
+    expect(res.rows[0]?.issues[0]).toEqual({
+      code: 'unmapped_columns',
+      value: 'Unit price',
+    });
+  });
+
+  it('names every missing column, in template order', () => {
+    const g = grid('Item,Section\nA,B');
+    const res = mapRows(g, autoDetectMapping(g.rows[0] as string[]));
+    expect(res.rows[0]?.issues[0]).toEqual({
+      code: 'unmapped_columns',
+      value: 'Description, Unit, Qty, Unit price',
+    });
+  });
+
+  it('names columns with the exact text the downloaded template writes', () => {
+    // One table serves both, so a studio who used our template and deleted a
+    // column is told the name that was standing in it.
+    const [headerLine] = stripBom(buildTemplateCsv()).split('\n');
+    const header = headerLine?.split(',');
+    for (const label of ['Description', 'Unit', 'Qty', 'Unit price']) {
+      expect(header).toContain(label);
+    }
   });
 
   it('imports an Arabic sheet end to end', () => {
