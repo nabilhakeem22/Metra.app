@@ -161,9 +161,11 @@ export async function addBoqLineCore(
   input: { sectionId: string; description: string },
 ): Promise<ActionResult & { data?: string }> {
   const description = input.description.trim();
-  if (description === '' || description.length > MAX_DESCRIPTION) {
-    return err('description_required');
-  }
+  // Two refusals, not one: a studio that TYPED a description, an over-long
+  // one, must not be told the line needs one — the trap addBoqSectionCore
+  // fell into with `section_name_required`.
+  if (description === '') return err('description_required');
+  if (description.length > MAX_DESCRIPTION) return err('description_too_long');
 
   return mutateInOrg(
     ctx,

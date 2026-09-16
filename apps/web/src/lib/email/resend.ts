@@ -35,10 +35,11 @@ async function dispatchEmail(
   const from = runtimeSecret('RESEND_FROM');
   if (!apiKey || !from) return { sent: false };
   try {
-    const { Resend } = await import('resend');
-    const resend = new Resend(apiKey);
+    // The deadline covers the SDK import too, so its timer is armed
+    // synchronously — before the first await — and nothing inside the send
+    // can start the clock late.
     const res = await withDeadline(
-      resend.emails.send({ from, ...payload }),
+      sendViaResend(apiKey, from, payload),
       EMAIL_TIMEOUT_MS,
       label,
     );
@@ -47,6 +48,16 @@ async function dispatchEmail(
     console.error(`${label} failed:`, err);
     return { sent: false };
   }
+}
+
+/** The SDK is loaded lazily: most requests never send an email. */
+async function sendViaResend(
+  apiKey: string,
+  from: string,
+  payload: { to: string; subject: string; html: string; text: string },
+): Promise<{ error: unknown }> {
+  const { Resend } = await import('resend');
+  return new Resend(apiKey).emails.send({ from, ...payload });
 }
 
 export interface SendInviteEmailInput {

@@ -59,9 +59,9 @@ describe('sendProposalEmail', () => {
     // the request, and the studio never got the link the action exists to return.
     send.mockReturnValue(new Promise(() => {}));
     const pending = sendProposalEmail(input);
-    // The SDK is loaded by a dynamic import, so the deadline's timer is armed a
-    // few microtasks in. Let those drain before the clock moves.
-    await vi.advanceTimersByTimeAsync(0);
+    // The deadline is armed before the SDK's dynamic import is awaited, so the
+    // clock can move at once: no microtask drain for a cold cache or a loaded
+    // CPU to race.
     await vi.advanceTimersByTimeAsync(EMAIL_TIMEOUT_MS);
     await expect(pending).resolves.toEqual({ sent: false });
     expect(console.error).toHaveBeenCalledWith(
