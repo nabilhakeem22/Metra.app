@@ -63,7 +63,12 @@
 // connection and have each been individually reviewed as safe:
 //   1. Public token-hash SECURITY DEFINER calls — the opaque token IS the auth,
 //      and the SDF omits every cost/margin column, so nothing can leak the firm's
-//      cost or another tenant's data:
+//      cost or another tenant's data. The two runners in share/sdf-call.ts are
+//      becoming the single surface for all of them; the portals below come off
+//      this list as each adopts it:
+//        apps/web/src/lib/share/sdf-call.ts — readSdfJson / readSdfCode, which
+//          execute a caller-built SQL object and read one column off row 0.
+//          Nothing is interpolated; there is no string-concatenation path.
 //        apps/web/src/lib/proposals/public.ts
 //        apps/web/src/lib/contracts/public.ts
 //        apps/web/src/lib/engagements/public.ts
@@ -178,6 +183,7 @@ function staticKeyName(computed, key) {
 // Allowlisted files (path suffixes) — the sanctioned base-connection exceptions
 // documented above. Matched against the normalised (forward-slash) filename.
 const ALLOWLISTED_FILES = [
+  'apps/web/src/lib/share/sdf-call.ts',
   'apps/web/src/lib/proposals/public.ts',
   'apps/web/src/lib/contracts/public.ts',
   'apps/web/src/lib/engagements/public.ts',
