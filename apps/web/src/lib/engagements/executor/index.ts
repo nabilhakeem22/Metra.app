@@ -11,11 +11,7 @@ import {
   type MetraDb,
   designEngagements,
   engagementArtifacts,
-  engagementChangeOrders,
-  engagementEvents,
-  engagementMilestones,
   engagementTransitions,
-  paymentEvents,
 } from '@metra/db';
 import { and, eq, inArray, sql } from 'drizzle-orm';
 import { fail, mutateInOrg } from '@/lib/actions/mutate';
@@ -26,18 +22,19 @@ import { recordConceptApproval, recordDesignApproval } from '../approvals';
 import { CLIENT_RELEASES, selectReleaseArtifactIds } from '../client-release';
 import { insertAsBuiltAttestation } from '../attestations';
 import { settleConceptAndLock } from '../concept';
-import { liveEvents } from '../event-provenance';
 import { generateFeeSchedule } from '../fee-schedule';
 import { captureRenderManifest } from '../renders';
 import { isRevisionTrigger } from '../revision-allowance';
 import { applyRevision, resetRevisionsOnReject } from '../revisions';
-import { GUARDS, type GuardFacts } from '../guards';
 import {
   CAPABILITY_ACTION,
   TRANSITIONS,
   type TransitionDef,
   type Trigger,
 } from '../transitions';
+import { isSelfLoop, validateLegalFrom } from './admissibility';
+import { loadGuardFacts } from './facts';
+import { validateGuards } from './guards-run';
 
 export interface ExecuteTransitionInput {
   engagementId: string;
@@ -55,22 +52,6 @@ export interface ExecuteTransitionInput {
    * silently dropping a key the caller believed in would give false protection).
    */
   idempotencyKey?: string | null;
-}
-
-/**
- * A self-loop edge: its target IS one of its legal from-states.
- *
- * PER DEFINITION, not per firing. attestAsBuiltClean declares
- * `from: ['final_approval', 'change_triage']` and `to: 'final_approval'`, so
- * this is true even when the edge actually being fired is the ADVANCING
- * change_triage -> final_approval one, and that firing stores a key too.
- * Deliberately harmless: the advancing edge has its own state gate as well, and
- * since 0050 the key is scoped to the trigger, so the only thing an extra stored
- * key can ever collapse is a retry of THIS verb — which is what it is for.
- */
-function isSelfLoop(def: TransitionDef): boolean {
-  const from = Array.isArray(def.from) ? def.from : [def.from];
-  return from.includes(def.to);
 }
 
 /**
@@ -130,47 +111,6 @@ async function lockSelfLoop(tx: MetraDb, def: TransitionDef, id: string) {
     .from(designEngagements)
     .where(eq(designEngagements.id, id))
     .for('update');
-}
-
-/**
- * Every fact the guards read, loaded inside the transaction and AFTER the
- * self-loop lock. Guards are PURE, so the executor pre-loads for them: the
- * engagement row plus (Step 4) the fee-schedule milestones and the append-only
- * payment ledger, (Step 5) the recorded artifacts, and (Step 9) the raised
- * change orders.
- */
-async function loadGuardFacts(
-  tx: MetraDb,
-  engagementId: string,
-  engagement: GuardFacts['engagement'],
-): Promise<GuardFacts> {
-  const milestones = await tx
-    .select()
-    .from(engagementMilestones)
-    .where(eq(engagementMilestones.engagementId, engagementId));
-  const payments = await tx
-    .select()
-    .from(paymentEvents)
-    .where(eq(paymentEvents.engagementId, engagementId));
-  const artifacts = await tx
-    .select()
-    .from(engagementArtifacts)
-    .where(eq(engagementArtifacts.engagementId, engagementId));
-  const changeOrders = await tx
-    .select()
-    .from(engagementChangeOrders)
-    .where(eq(engagementChangeOrders.engagementId, engagementId));
-  // LIVE events only. A correction cannot delete the row it retracts -- the
-  // ledger is INSERT-only by grant -- so the retracted row is still here, and a
-  // guard counting it would let a mistake the studio has formally withdrawn go on
-  // unlocking the gate it opened.
-  const events = liveEvents(
-    await tx
-      .select()
-      .from(engagementEvents)
-      .where(eq(engagementEvents.engagementId, engagementId)),
-  );
-  return { engagement, milestones, payments, artifacts, changeOrders, events };
 }
 
 /**
@@ -240,15 +180,11 @@ export async function executeTransition(
         .limit(1);
       if (!engagement) fail('engagement_not_found');
 
-      const legalFrom = Array.isArray(def.from) ? def.from : [def.from];
-      if (!legalFrom.includes(engagement.state)) fail('illegal_trigger');
+      validateLegalFrom(def, engagement.state);
 
-      const facts = await loadGuardFacts(tx, engagementId, engagement);
+      const facts = await loadGuardFacts(tx, engagement);
       const { artifacts } = facts;
-      for (const guardKey of def.guards) {
-        const verdict = GUARDS[guardKey](facts);
-        if (!verdict.ok) fail(verdict.code);
-      }
+      validateGuards(def, facts);
 
       // Admission gate: only the writer that flips the state off the expected
       // `from` value proceeds — so a side-effect never runs twice for one move. A
