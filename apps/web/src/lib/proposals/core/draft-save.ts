@@ -15,7 +15,7 @@ import type { ActionResult } from '@/lib/actions/result';
 import { computeTotals } from '@/lib/aggregates/proposal-totals';
 import type { OrgContext } from '@/lib/db/context';
 import { canSeeMargin } from '@/lib/permissions/can';
-import type { SaveDraftInput } from './core';
+import type { SaveDraftInput } from './types';
 import { enforceLineCaps, validateDraftHeader } from './draft-save-validate';
 import { loadCostItemMap, resolveDraftLines } from './draft-save-resolve';
 import { withinMagnitude } from '@/lib/money/read';

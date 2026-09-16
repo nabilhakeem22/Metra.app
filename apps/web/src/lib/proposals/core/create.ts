@@ -1,17 +1,15 @@
-// Proposal creation + the shared draft input shapes. The heavy draft save lives
-// in ./draft-save and the lifecycle transitions in ./lifecycle; both are
-// re-exported here so `@/lib/proposals/core` stays one import surface for the
-// module's own callers. The server recomputes EVERY total from the money engine
-// and never trusts a client-supplied subtotal/total.
+// Creating a proposal: the client/project usability guard and the first row.
+// The server recomputes EVERY total from the money engine and never trusts a
+// client-supplied subtotal/total, so nothing numeric enters here.
 //
-// What this file no longer does is re-export the SHARED kernels. It used to, and
-// that single habit is why contracts, variations, boqs and both PDF routes
-// imported the PROPOSALS module to reach a percentage check or a chunked insert.
+// This file was `lib/proposals/core.ts`, which also re-exported the SHARED
+// kernels — the one habit that made contracts, variations, boqs and both PDF
+// routes import the PROPOSALS module to reach a percentage check or a chunked
+// insert. The kernels now live in lib/{lines,money,validation,share}.
 import {
   clients,
   projects,
   proposals,
-  type CostItemUnit,
   type MetraDb,
 } from '@metra/db';
 import { eq } from 'drizzle-orm';
@@ -116,55 +114,3 @@ export async function createProposalCore(
     },
   );
 }
-
-export interface LineInput {
-  /** Stable identity of an EXISTING line (round-tripped by the builder) so its
-   * stored cost is preserved on save. Absent/unknown -> treated as a new line. */
-  id?: string | null;
-  costItemId?: string | null;
-  descriptionAr?: string | null;
-  descriptionEn?: string | null;
-  qty?: string | null;
-  unit?: CostItemUnit | null;
-  unitCost?: string | null;
-  unitPrice?: string | null;
-  discountPct?: string | null;
-  sortOrder?: number;
-}
-
-export interface SectionInput {
-  id?: string;
-  titleAr?: string | null;
-  titleEn?: string | null;
-  sortOrder?: number;
-  lines: LineInput[];
-}
-
-export interface SaveDraftInput {
-  id: string;
-  header?: {
-    titleAr?: string | null;
-    titleEn?: string | null;
-    issueDate?: string | null;
-    expiryDate?: string | null;
-    discountPct?: string | null;
-    taxRate?: string | null;
-    supervisionPct?: string | null;
-    currency?: string | null;
-    notesAr?: string | null;
-    notesEn?: string | null;
-    termsAr?: string | null;
-    termsEn?: string | null;
-  };
-  sections: SectionInput[];
-}
-
-// The heavy draft save + the lifecycle transitions live in their own modules but
-// stay importable from here (the historical import surface for callers/tests).
-export { saveProposalDraftCore } from './draft-save';
-export {
-  deleteDraftProposalCore,
-  expireProposalCore,
-  sendProposalCore,
-  supersedeProposalCore,
-} from './lifecycle';

@@ -12,7 +12,7 @@ import {
 import { validIsoDate } from '@/lib/validation/iso-date';
 import { isPercentInRange } from '@/lib/validation/percent';
 import { clean } from '@/lib/validation/text';
-import type { SaveDraftInput, SectionInput } from './core';
+import type { SaveDraftInput, SectionInput } from './types';
 
 type ProposalRow = typeof proposals.$inferSelect;
 type DraftHeader = NonNullable<SaveDraftInput['header']>;

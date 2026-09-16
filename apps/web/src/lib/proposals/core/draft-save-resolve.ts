@@ -14,7 +14,7 @@ import {
 import { withinMagnitude } from '@/lib/money/read';
 import { isPercentInRange } from '@/lib/validation/percent';
 import { clean } from '@/lib/validation/text';
-import type { SectionInput } from './core';
+import type { SectionInput } from './types';
 
 interface CostItemResolved {
   unit: CostItemUnit;

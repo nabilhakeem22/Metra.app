@@ -1,7 +1,8 @@
-// Proposal lifecycle transitions. Each state change is an ATOMIC admission gate
-// (UPDATE ... WHERE status=... RETURNING, check rowCount) — never read-then-write
-// — so concurrent callers can't double-send / double-supersede. Accept/reject
-// metadata lives in the append-only events table (the locked row can't hold it).
+// sent -> superseded, plus a new draft carrying a deep copy of the sections and
+// lines. A sent proposal is immutable, so "revise it" means "replace it".
+// Each state change is an ATOMIC admission gate (UPDATE ... WHERE status=...
+// RETURNING, check rowCount) — never read-then-write — so concurrent callers
+// cannot double-apply it.
 import {
   proposalEvents,
   proposalLines,
@@ -9,96 +10,11 @@ import {
   proposals,
 } from '@metra/db';
 import { and, eq } from 'drizzle-orm';
-import { fail, mutateInOrg, requireInOrg } from '@/lib/actions/mutate';
+import { fail, mutateInOrg } from '@/lib/actions/mutate';
 import type { ActionResult } from '@/lib/actions/result';
-import { appendSystemActivity } from '@/lib/activities/core';
 import type { OrgContext } from '@/lib/db/context';
-import { mintShareToken, shareExpiryFromNow } from '@/lib/share/token';
 import { allocateNumber } from '@/lib/db/allocate-number';
 import { insertLinesInChunks } from '@/lib/lines/insert-chunked';
-
-export async function sendProposalCore(
-  ctx: OrgContext,
-  input: { id: string },
-): Promise<ActionResult & { data?: string }> {
-  return mutateInOrg(
-    ctx,
-    { capability: 'proposals_send', action: 'approve' },
-    async (tx, audit) => {
-      const { raw, hash } = mintShareToken();
-      const shareExpiresAt = shareExpiryFromNow();
-
-      // R3: the draft->sent transition IS the admission gate. A concurrent 2nd
-      // send finds status<>'draft' -> 0 rows -> proposal_not_draft, no event, no
-      // link (and never overwrites the live token).
-      const gated = await tx
-        .update(proposals)
-        .set({
-          status: 'sent',
-          tokenHash: hash,
-          shareExpiresAt,
-          updatedAt: new Date(),
-        })
-        .where(and(eq(proposals.id, input.id), eq(proposals.status, 'draft')))
-        .returning({ id: proposals.id, clientId: proposals.clientId });
-      if (!gated[0]) fail('proposal_not_draft');
-
-      await tx.insert(proposalEvents).values({
-        orgId: ctx.orgId,
-        proposalId: input.id,
-        kind: 'sent',
-        actorUserId: ctx.userId,
-        fromStatus: 'draft',
-        toStatus: 'sent',
-      });
-
-      // Client activity feed: a proposal was sent.
-      await appendSystemActivity(tx, ctx, {
-        entityType: 'client',
-        entityId: gated[0].clientId,
-        kind: 'proposal_sent',
-        meta: { proposal_id: input.id },
-      });
-
-      await audit({
-        entity: 'proposal',
-        entityId: input.id,
-        action: 'issue',
-        before: { status: 'draft' },
-        after: { status: 'sent' },
-      });
-      // The raw token — the action wrapper turns it into the public link.
-      return raw;
-    },
-  );
-}
-
-export async function expireProposalCore(
-  ctx: OrgContext,
-  input: { id: string },
-): Promise<ActionResult> {
-  return mutateInOrg(
-    ctx,
-    { capability: 'proposals_send', action: 'approve' },
-    async (tx) => {
-      const updated = await tx
-        .update(proposals)
-        .set({ status: 'expired', updatedAt: new Date() })
-        .where(and(eq(proposals.id, input.id), eq(proposals.status, 'sent')))
-        .returning({ id: proposals.id });
-      if (!updated[0]) fail('invalid');
-
-      await tx.insert(proposalEvents).values({
-        orgId: ctx.orgId,
-        proposalId: input.id,
-        kind: 'expired',
-        actorUserId: ctx.userId,
-        fromStatus: 'sent',
-        toStatus: 'expired',
-      });
-    },
-  );
-}
 
 export async function supersedeProposalCore(
   ctx: OrgContext,
@@ -221,35 +137,6 @@ export async function supersedeProposalCore(
         after: { number, version: old.version + 1 },
       });
       return copy.id;
-    },
-  );
-}
-
-export async function deleteDraftProposalCore(
-  ctx: OrgContext,
-  input: { id: string },
-): Promise<ActionResult> {
-  return mutateInOrg(
-    ctx,
-    { capability: 'proposals_build', action: 'update' },
-    async (tx, audit) => {
-      const proposal = await requireInOrg(
-        tx,
-        proposals,
-        input.id,
-        { status: proposals.status },
-        'invalid',
-      );
-      if (proposal.status !== 'draft') fail('proposal_not_draft');
-
-      await tx.delete(proposals).where(eq(proposals.id, input.id));
-      await audit({
-        entity: 'proposal',
-        entityId: input.id,
-        action: 'delete',
-        before: { status: 'draft' },
-        after: null,
-      });
     },
   );
 }
