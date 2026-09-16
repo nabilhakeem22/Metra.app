@@ -2,7 +2,7 @@ import 'server-only';
 import type { MemberRole } from '@metra/db';
 import { sql } from 'drizzle-orm';
 import { cookies } from 'next/headers';
-import { redirect } from 'next/navigation';
+import { notFound, redirect } from 'next/navigation';
 import { withUserContext, type OrgContext } from '@/lib/db/context';
 import { ACTIVE_ORG_COOKIE } from './active-org';
 import { getSessionUser } from './session';
@@ -38,11 +38,25 @@ export async function requireOrg(): Promise<OrgContext> {
     redirect('/onboarding');
   }
 
+  // THE `client` ROLE IS NOT AN INTERNAL ROLE. It belongs to the P4 client
+  // portal, which authenticates with a share token and never calls this. The app
+  // shell already 404s it, but a layout is not a gate: server actions are
+  // directly invokable without one ever rendering, and every internal action
+  // starts here. `client` holds `projects: R`, so `getProjectDocumentUrl` would
+  // mint a signed download URL for any project document in the org given the
+  // file's id. Nothing can reach it today (`team/invitable.ts` makes the role
+  // non-invitable, so the membership cannot be created through the product) —
+  // this is the fence that keeps it unreachable the day P4 provisions one.
+  const internalOrgs = orgs.filter((org) => org.role !== 'client');
+  if (internalOrgs.length === 0) {
+    notFound();
+  }
+
   const cookieStore = await cookies();
   const requested = cookieStore.get(ACTIVE_ORG_COOKIE)?.value;
 
   const active =
-    (requested && orgs.find((o) => o.orgId === requested)) || orgs[0];
+    (requested && internalOrgs.find((o) => o.orgId === requested)) || internalOrgs[0];
 
   // Clear a stale/tampered cookie that doesn't match a real membership.
   if (requested && requested !== active.orgId) {
