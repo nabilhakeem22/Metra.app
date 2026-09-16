@@ -2056,6 +2056,10 @@
       "title": "This link is no longer available",
       "body": "The link may have expired or been turned off. Please contact your design team for an up-to-date link."
     },
+    "readFailed": {
+      "title": "We could not load this page",
+      "body": "Something went wrong on our side. Please refresh in a moment; your link is still valid."
+    },
     "greeting": "Hello, {name} 👋",
     "firmSubtitle": "Your design project",
     "journey": {

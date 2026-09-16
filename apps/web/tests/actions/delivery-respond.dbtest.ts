@@ -8,9 +8,9 @@ import { executeTransition } from '@/lib/engagements/executor';
 import { recordPaymentCore } from '@/lib/engagements/payments';
 import { getEngagementClientActivity } from '@/lib/engagements/queries';
 import {
-  getDeliveryByToken,
   recordDeliveryActionByToken,
 } from '@/lib/engagements/public';
+import { deliveryOrNull } from './delivery-read';
 import { setEngagementRomCore } from '@/lib/engagements/rom';
 import { issueRomCore } from '@/lib/engagements/rom-issue';
 import { mintDeliveryLinkCore } from '@/lib/engagements/share';
@@ -250,7 +250,7 @@ describe('app_delivery_respond_by_token — client_actions never leaks a raw sta
 
     // After the client acts, the mapped surface no longer offers the pair.
     await recordDeliveryActionByToken(token, { action: 'approve_concept' });
-    const after = await getDeliveryByToken(token);
+    const after = await deliveryOrNull(token);
     expect(after!.clientActions).not.toContain('approve_concept');
     expect(after!.clientActions).not.toContain('request_concept_changes');
   });
@@ -511,7 +511,7 @@ describe('delivery respond — an acknowledgement answers ONE issuance (0049)', 
     ).toEqual({ ok: true, code: 'already' });
     expect(await romAckRows(engagementId)).toHaveLength(1);
     expect(
-      (await getDeliveryByToken(token))!.clientActions,
+      (await deliveryOrNull(token))!.clientActions,
     ).not.toContain('acknowledge_rom');
 
     // 2. The studio revises the band. Different numbers, never shown yet.
@@ -525,7 +525,7 @@ describe('delivery respond — an acknowledgement answers ONE issuance (0049)', 
     // 3. THE POINT: the client has not agreed to these figures, so the portal
     // asks again. Before 0049 the stale acknowledgement suppressed the verb and
     // the record said the client had agreed to a band they never saw.
-    const reOffered = await getDeliveryByToken(token);
+    const reOffered = await deliveryOrNull(token);
     expect(reOffered!.rom).toEqual({ low: '900000.0000', high: '1400000.0000' });
     expect(reOffered!.clientActions).toContain('acknowledge_rom');
 
@@ -546,7 +546,7 @@ describe('delivery respond — an acknowledgement answers ONE issuance (0049)', 
 
     // The verb closes again, now against the CURRENT issuance.
     expect(
-      (await getDeliveryByToken(token))!.clientActions,
+      (await deliveryOrNull(token))!.clientActions,
     ).not.toContain('acknowledge_rom');
   });
 
@@ -593,7 +593,7 @@ describe('delivery respond — an acknowledgement answers ONE issuance (0049)', 
     );
 
     expect(
-      (await getDeliveryByToken(token))!.clientActions,
+      (await deliveryOrNull(token))!.clientActions,
     ).toContain('acknowledge_rom');
     expect(
       await recordDeliveryActionByToken(token, { action: 'acknowledge_rom' }),

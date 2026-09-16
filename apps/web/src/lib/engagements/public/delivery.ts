@@ -34,13 +34,31 @@ async function loadDeliverySnapshot(
 }
 
 /**
- * Resolve a delivery by its RAW share token, or null. Server-only; never logs
- * the raw token.
+ * Why the portal has nothing to render.
+ *
+ * `not_found` is PERMANENT — an unknown, revoked or expired token, or a snapshot
+ * this build cannot render. `read_failed` is TRANSIENT: the database or the SDF
+ * threw, the client's link is still perfectly valid, and the honest thing to say
+ * is "try again in a moment" rather than "this link does not work".
+ *
+ * ONE null was the whole defect (W3-7): a client re-opening a VALID link during
+ * a database blip was told their link was dead. It is the only open item in this
+ * wave that a paying firm's own client can see.
+ */
+export type DeliveryReadResult =
+  | { status: 'ok'; delivery: PublicDelivery }
+  | { status: 'not_found' }
+  | { status: 'read_failed' };
+
+/**
+ * Resolve a delivery by its RAW share token. Server-only; never logs the raw
+ * token.
  *
  * HARDENED (read-path defense): the SDF execute AND the whole mapping run inside
- * ONE try/catch. A VALID token can never 500 — any throw (or any malformed
- * field) logs a token-free breadcrumb and returns null, which the page renders
- * as the friendly not-found.
+ * ONE try/catch. A VALID token can never 500 — any throw logs a token-free
+ * breadcrumb and answers `read_failed`, which the page renders as "we could not
+ * load this, your link is still valid"; a token that resolves to nothing, and a
+ * snapshot this build cannot shape, answer `not_found`.
  *
  * THE BREADCRUMB CARRIES THE ERROR. It used to carry only `hasSnapshot`, so a
  * transient database failure and an expired link produced the same dead page for
@@ -51,17 +69,18 @@ async function loadDeliverySnapshot(
  */
 export async function getDeliveryByToken(
   rawToken: string,
-): Promise<PublicDelivery | null> {
+): Promise<DeliveryReadResult> {
   // Distinguishes "the SDF call itself threw" from "mapping a returned snapshot
   // threw" — WITHOUT logging the token or any client data.
   let hasSnapshot = false;
   try {
     const snapshot = await loadDeliverySnapshot(rawToken);
-    if (!snapshot) return null;
+    if (!snapshot) return { status: 'not_found' };
     hasSnapshot = true;
-    return shapeDelivery(snapshot);
+    const delivery = shapeDelivery(snapshot);
+    return delivery ? { status: 'ok', delivery } : { status: 'not_found' };
   } catch (error) {
     console.error('delivery read failed', { hasSnapshot, error });
-    return null;
+    return { status: 'read_failed' };
   }
 }

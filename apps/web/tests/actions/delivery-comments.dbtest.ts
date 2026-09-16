@@ -10,7 +10,7 @@ import {
   listDocumentCommentsCore,
   replyToDocumentCore,
 } from '@/lib/engagements/document-comments';
-import { getDeliveryByToken } from '@/lib/engagements/public';
+import { deliveryOrNull } from './delivery-read';
 import {
   addDeliveryCommentByToken,
   getDeliveryDocumentCommentsByToken,
@@ -351,7 +351,7 @@ describe('the snapshot count', () => {
     });
     await replyToDocumentCore(delivery.ctx, { artifactId: documentId, body: 'ok' });
 
-    const snapshot = await getDeliveryByToken(delivery.token);
+    const snapshot = await deliveryOrNull(delivery.token);
     const doc = snapshot!.documents.find((d) => d.id === documentId);
     expect(doc?.commentCount).toBe(2);
     // The first paint must carry the COUNT only — the thread is a separate fetch.

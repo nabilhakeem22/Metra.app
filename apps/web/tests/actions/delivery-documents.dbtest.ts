@@ -6,7 +6,7 @@ import { recordArtifactCore } from '@/lib/engagements/artifacts';
 import { setArtifactClientVisibilityCore } from '@/lib/engagements/client-visibility';
 import { createEngagementCore } from '@/lib/engagements/core';
 import { executeTransition } from '@/lib/engagements/executor';
-import { getDeliveryByToken } from '@/lib/engagements/public';
+import { deliveryOrNull } from './delivery-read';
 import { getDeliveryDocumentByToken } from '@/lib/engagements/public-documents';
 import { recordPaymentCore } from '@/lib/engagements/payments';
 import {
@@ -127,7 +127,7 @@ describe('portal documents — the released list on the token snapshot', () => {
       await seedFile(delivery.orgId, delivery.engagementId),
     );
 
-    const snapshot = await getDeliveryByToken(delivery.token);
+    const snapshot = await deliveryOrNull(delivery.token);
     expect(snapshot).not.toBeNull();
     const ids = snapshot!.documents.map((d) => d.id);
     expect(ids).toEqual([visibleId]);
@@ -152,7 +152,7 @@ describe('portal documents — the released list on the token snapshot', () => {
       'boq',
       await seedFile(delivery.orgId, delivery.engagementId),
     );
-    const snapshot = await getDeliveryByToken(delivery.token);
+    const snapshot = await deliveryOrNull(delivery.token);
     expect(snapshot!.documents).toEqual([]);
   });
 });
@@ -249,7 +249,7 @@ describe('portal documents — the download resolver has no oracle', () => {
       getDeliveryDocumentByToken(delivery.token, artifactId),
     ).resolves.toBeNull();
     // …and it drops off the portal list too.
-    const snapshot = await getDeliveryByToken(delivery.token);
+    const snapshot = await deliveryOrNull(delivery.token);
     expect(snapshot!.documents).toEqual([]);
   });
 
@@ -317,7 +317,7 @@ describe('portal documents — the download resolver has no oracle', () => {
     await expect(
       getDeliveryDocumentByToken(a.token, forgedId),
     ).resolves.toBeNull();
-    const snapshot = await getDeliveryByToken(a.token);
+    const snapshot = await deliveryOrNull(a.token);
     expect(snapshot!.documents.map((d) => d.id)).not.toContain(forgedId);
   });
 
@@ -543,7 +543,7 @@ describe('portal documents — auto-share reaches the portal end to end', () => 
       (await executeTransition(ctx, { engagementId, trigger: 'optionsReady' })).ok,
     ).toBe(true);
 
-    const snapshot = await getDeliveryByToken(token);
+    const snapshot = await deliveryOrNull(token);
     const ids = snapshot!.documents.map((d) => d.id).sort();
     expect(ids).toEqual([optionA, optionB].sort());
     expect(ids).not.toContain(boq);
