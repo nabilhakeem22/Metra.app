@@ -70,7 +70,8 @@
 //        apps/web/src/lib/share/sdf-call.ts — readSdfJson / readSdfCode, which
 //          execute a caller-built SQL object and read one column off row 0.
 //          Nothing is interpolated; there is no string-concatenation path.
-//        apps/web/src/lib/engagements/public.ts
+//        apps/web/src/lib/engagements/public/delivery.ts
+//        apps/web/src/lib/engagements/public/respond.ts
 //        apps/web/src/lib/engagements/public-documents.ts — the same token surface:
 //          it resolves ONE released document of the token's own delivery and returns
 //          only a storage bucket/key + kind; the client-supplied document id is a
@@ -182,7 +183,8 @@ function staticKeyName(computed, key) {
 // documented above. Matched against the normalised (forward-slash) filename.
 const ALLOWLISTED_FILES = [
   'apps/web/src/lib/share/sdf-call.ts',
-  'apps/web/src/lib/engagements/public.ts',
+  'apps/web/src/lib/engagements/public/delivery.ts',
+  'apps/web/src/lib/engagements/public/respond.ts',
   'apps/web/src/lib/engagements/public-documents.ts',
   'apps/web/src/lib/engagements/public-comments.ts',
   'apps/web/src/lib/api-keys/resolve.ts',

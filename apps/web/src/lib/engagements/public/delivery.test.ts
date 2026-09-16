@@ -19,7 +19,7 @@ vi.mock('@/lib/db/client', () => ({
   },
 }));
 
-const { getDeliveryByToken } = await import('./public');
+const { getDeliveryByToken } = await import('./delivery');
 
 /** A fully-valid snapshot; each test corrupts one field to prove graceful decay. */
 function validSnapshot(): Record<string, unknown> {
