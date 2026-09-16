@@ -1,43 +1,16 @@
-// Stage 2 of the draft save: load the referenced cost items, then resolve every
-// section + line in memory (cost by the F1 stable-id rule, price/unit from the
-// line or the price book) and compute each line + section total.
-import { costItems, type CostItemUnit, type MetraDb } from '@metra/db';
-import { inArray } from 'drizzle-orm';
+// Stage 2 of the draft save: resolve every section and its lines in memory, and
+// compute each section total. PURE (no DB) — the caller batches the writes
+// afterwards, so a coded refusal here costs nothing.
 import { fail } from '@/lib/actions/mutate';
-import { readMoney } from '@/lib/money/read';
-import {
-  computeLine,
-  computeSection,
-  type LineTotals,
-  type SectionTotals,
-} from '@/lib/aggregates/proposal-totals';
-import { withinMagnitude } from '@/lib/money/read';
-import { isPercentInRange } from '@/lib/validation/percent';
+import type { SectionTotals } from '@/lib/aggregates/proposal-totals';
 import { clean } from '@/lib/validation/text';
+import { computeSectionWithinCap } from './draft-save-caps';
+import type { CostItemResolved } from './draft-save-cost-items';
+import { resolveDraftLine, type ResolvedLine } from './draft-save-resolve-line';
 import type { SectionInput } from './types';
 
-interface CostItemResolved {
-  unit: CostItemUnit;
-  defaultUnitCost: string;
-  defaultUnitPrice: string;
-  nameEn: string | null;
-  nameAr: string | null;
-}
-
-export interface ResolvedLine {
-  costItemId: string | null;
-  descriptionAr: string | null;
-  descriptionEn: string | null;
-  qty: string;
-  unit: CostItemUnit;
-  unitCost: string;
-  unitPrice: string;
-  discountPct: string;
-  lineCost: string;
-  lineTotal: string;
-  lineMargin: string;
-  sortOrder: number;
-}
+export type { ResolvedLine } from './draft-save-resolve-line';
+export { loadCostItemMap } from './draft-save-cost-items';
 
 export interface ResolvedSection {
   titleAr: string | null;
@@ -47,41 +20,37 @@ export interface ResolvedSection {
   lines: ResolvedLine[];
 }
 
-/** One lookup for every referenced cost item; validates each exists + is active. */
-export async function loadCostItemMap(
-  tx: MetraDb,
-  sections: SectionInput[],
-): Promise<Map<string, CostItemResolved>> {
-  const costItemIds = [
-    ...new Set(
-      sections.flatMap((section) =>
-        section.lines
-          .map((line) => line.costItemId?.trim())
-          .filter((id): id is string => !!id),
-      ),
-    ),
-  ];
-  const costItemMap = new Map<string, CostItemResolved>();
-  if (costItemIds.length) {
-    const costItemRows = await tx
-      .select()
-      .from(costItems)
-      .where(inArray(costItems.id, costItemIds));
-    for (const costItem of costItemRows) {
-      if (!costItem.active) fail('invalid');
-      costItemMap.set(costItem.id, costItem);
-    }
-    for (const costItemId of costItemIds) {
-      if (!costItemMap.has(costItemId)) fail('invalid');
-    }
-  }
-  return costItemMap;
+/** One section and every line under it. `sortOrder` falls back to its position. */
+function resolveDraftSection(
+  section: SectionInput,
+  index: number,
+  costItemMap: Map<string, CostItemResolved>,
+  costSnapshot: Map<string, string>,
+  seeMargin: boolean,
+): { section: ResolvedSection; totals: SectionTotals } {
+  const titleEn = clean(section.titleEn);
+  const titleAr = clean(section.titleAr);
+  if (!titleEn && !titleAr) fail('name_required');
+
+  const resolved = section.lines.map((line, lineIndex) =>
+    resolveDraftLine(line, lineIndex, costItemMap, costSnapshot, seeMargin),
+  );
+  const totals = computeSectionWithinCap(resolved.map((entry) => entry.totals));
+  return {
+    totals,
+    section: {
+      titleAr,
+      titleEn,
+      sortOrder: section.sortOrder ?? index,
+      subtotal: totals.sectionSubtotal,
+      lines: resolved.map((entry) => entry.line),
+    },
+  };
 }
 
 /**
- * Resolve every section + line in memory (cost by F1 stable-id rule, price/unit
- * from the line or the price book), computing each line + section total. Pure
- * (no DB) — the caller batches the writes afterwards.
+ * Resolve every section + line (cost by the F1 stable-id rule, price/unit from
+ * the line or the price book), computing each line + section total.
  */
 export function resolveDraftLines(
   sections: SectionInput[],
@@ -89,116 +58,11 @@ export function resolveDraftLines(
   costSnapshot: Map<string, string>,
   seeMargin: boolean,
 ): { resolvedSections: ResolvedSection[]; sectionTotals: SectionTotals[] } {
-  const resolvedSections: ResolvedSection[] = [];
-  const sectionTotals: SectionTotals[] = [];
-
-  for (const [sectionIndex, section] of sections.entries()) {
-    const sectionTitleEn = clean(section.titleEn);
-    const sectionTitleAr = clean(section.titleAr);
-    if (!sectionTitleEn && !sectionTitleAr) fail('name_required');
-
-    const lineTotals: LineTotals[] = [];
-    const lines: ResolvedLine[] = [];
-    for (const [lineIndex, line] of section.lines.entries()) {
-      const costItemId = line.costItemId?.trim() || null;
-      const costItem = costItemId ? costItemMap.get(costItemId) : undefined;
-      const resolvedUnit = line.unit ?? costItem?.unit ?? null;
-      const resolvedUnitPrice =
-        line.unitPrice ?? costItem?.defaultUnitPrice ?? null;
-      const descriptionEn =
-        clean(line.descriptionEn) ?? costItem?.nameEn ?? null;
-      const descriptionAr =
-        clean(line.descriptionAr) ?? costItem?.nameAr ?? null;
-
-      // F1 cost resolution by stable identity.
-      const lineId = line.id?.trim() || null;
-      const isExisting = !!lineId && costSnapshot.has(lineId);
-      let rawCost: string | null;
-      if (isExisting) {
-        rawCost = seeMargin
-          ? (line.unitCost ?? costSnapshot.get(lineId!)!)
-          : costSnapshot.get(lineId!)!;
-      } else {
-        rawCost = costItemId
-          ? costItem!.defaultUnitCost
-          : seeMargin
-            ? line.unitCost || '0'
-            : '0';
-      }
-
-      const qty = readMoney(line.qty, { blank: '0' });
-      const unitCost = readMoney(rawCost, { blank: '0' });
-      const unitPrice = readMoney(resolvedUnitPrice, { blank: '0' });
-      const discountPct = readMoney(line.discountPct, { blank: '0' });
-      if (!qty.ok || !unitCost.ok || !unitPrice.ok || !discountPct.ok) {
-        // A factor PAST THE CAP says so. It reached here as a plain
-        // `line_required` — "this line is missing something" for a line whose
-        // problem was that one of its numbers is 1e13.
-        const factors = [qty, unitCost, unitPrice, discountPct];
-        const tooLarge = factors.some((f) => !f.ok && f.reason === 'too_large');
-        fail(tooLarge ? 'amount_too_large' : 'line_required');
-      }
-      if (!resolvedUnit || (!descriptionEn && !descriptionAr)) fail('line_required');
-      if (!isPercentInRange(discountPct.value)) fail('discount_out_of_range');
-
-      const totals = computeLine({
-        qty: qty.value,
-        unitCost: unitCost.value,
-        unitPrice: unitPrice.value,
-        discountPct: discountPct.value,
-      });
-      // The FACTORS were each inside the cap; their PRODUCT need not be. qty and
-      // unit_price of 1e12 each pass the checks above and multiply to 1e24, which
-      // overflows numeric(18,4) at the database and aborts the whole save with an
-      // unlocalizable error instead of a coded one.
-      // ALL THREE products are persisted, so all three are checked: a cheap price
-      // with an absurd cost overflows line_cost (and line_margin with it) exactly
-      // the same way, and only the document total was catching that — after the
-      // lines had already been written.
-      if (
-        !withinMagnitude(totals.lineTotal) ||
-        !withinMagnitude(totals.lineCost) ||
-        !withinMagnitude(totals.lineMargin)
-      ) {
-        fail('amount_too_large');
-      }
-      lineTotals.push(totals);
-      lines.push({
-        costItemId,
-        descriptionAr,
-        descriptionEn,
-        qty: qty.value,
-        unit: resolvedUnit,
-        unitCost: unitCost.value,
-        unitPrice: unitPrice.value,
-        discountPct: discountPct.value,
-        lineCost: totals.lineCost,
-        lineTotal: totals.lineTotal,
-        lineMargin: totals.lineMargin,
-        sortOrder: line.sortOrder ?? lineIndex,
-      });
-    }
-    const sectionSubtotals = computeSection(lineTotals);
-    // …and the SECTION sum need not be inside the cap either. This runs here,
-    // not beside the document total, because the section subtotal is PERSISTED
-    // before the document total is computed — a sum past the cap would reach
-    // numeric(18,4) first and come back as an unlocalizable 'generic'.
-    if (
-      !withinMagnitude(sectionSubtotals.sectionSubtotal) ||
-      !withinMagnitude(sectionSubtotals.sectionCost) ||
-      !withinMagnitude(sectionSubtotals.sectionMargin)
-    ) {
-      fail('amount_too_large');
-    }
-    sectionTotals.push(sectionSubtotals);
-    resolvedSections.push({
-      titleAr: sectionTitleAr,
-      titleEn: sectionTitleEn,
-      sortOrder: section.sortOrder ?? sectionIndex,
-      subtotal: sectionSubtotals.sectionSubtotal,
-      lines,
-    });
-  }
-
-  return { resolvedSections, sectionTotals };
+  const resolved = sections.map((section, index) =>
+    resolveDraftSection(section, index, costItemMap, costSnapshot, seeMargin),
+  );
+  return {
+    resolvedSections: resolved.map((entry) => entry.section),
+    sectionTotals: resolved.map((entry) => entry.totals),
+  };
 }

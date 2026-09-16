@@ -1,81 +1,17 @@
 import 'server-only';
-import {
-  clients,
-  proposalLines,
-  proposalSections,
-  proposals,
-  type ProposalStatus,
-} from '@metra/db';
-import { asc, eq } from 'drizzle-orm';
-import {
-  computeSection,
-  type LineTotals,
-} from '@/lib/aggregates/proposal-totals';
+// The full proposal, margin-gated: header, sections with their lines. Three named
+// phases — load the header (./detail-header.ts), load the sections
+// (./detail-sections.ts), assemble — rather than one 149-line function.
 import { withOrgContext, type OrgContext } from '@/lib/db/context';
+import { loadProposalHeader } from './detail-header';
+import { loadProposalSections } from './detail-sections';
+import type { ProposalDetail } from './detail-types';
 
-export interface ProposalDetailLine {
-  id: string;
-  descriptionAr: string | null;
-  descriptionEn: string | null;
-  costItemId: string | null;
-  qty: string;
-  unit: string;
-  unitPrice: string;
-  discountPct: string;
-  lineTotal: string;
-  sortOrder: number;
-  // margin-gated
-  unitCost?: string;
-  lineCost?: string;
-  lineMargin?: string;
-}
-
-export interface ProposalDetailSection {
-  id: string;
-  titleAr: string | null;
-  titleEn: string | null;
-  sortOrder: number;
-  sectionSubtotal: string;
-  lines: ProposalDetailLine[];
-  // margin-gated
-  sectionCost?: string;
-  sectionMargin?: string;
-}
-
-export interface ProposalDetail {
-  id: string;
-  number: number;
-  titleAr: string | null;
-  titleEn: string | null;
-  status: ProposalStatus;
-  currency: string;
-  issueDate: string | null;
-  expiryDate: string | null;
-  createdAt: string;
-  version: number;
-  supersedesId: string | null;
-  clientId: string;
-  projectId: string;
-  clientNameEn: string | null;
-  clientNameAr: string | null;
-  discountPct: string;
-  taxRate: string;
-  supervisionPct: string;
-  subtotal: string;
-  discountAmount: string;
-  taxableBase: string;
-  taxAmount: string;
-  supervisionAmount: string;
-  total: string;
-  notesAr: string | null;
-  notesEn: string | null;
-  termsAr: string | null;
-  termsEn: string | null;
-  sections: ProposalDetailSection[];
-  // margin-gated
-  totalCost?: string;
-  totalMargin?: string;
-}
+export type {
+  ProposalDetail,
+  ProposalDetailLine,
+  ProposalDetailSection,
+} from './detail-types';
 
 async function loadDetail(
   ctx: OrgContext,
@@ -83,146 +19,17 @@ async function loadDetail(
   canSeeMargin: boolean,
 ): Promise<ProposalDetail | null> {
   return withOrgContext(ctx, async (tx) => {
-    const [p] = await tx
-      .select({
-        id: proposals.id,
-        number: proposals.number,
-        titleAr: proposals.titleAr,
-        titleEn: proposals.titleEn,
-        status: proposals.status,
-        currency: proposals.currency,
-        issueDate: proposals.issueDate,
-        expiryDate: proposals.expiryDate,
-        createdAt: proposals.createdAt,
-        version: proposals.version,
-        supersedesId: proposals.supersedesId,
-        clientId: proposals.clientId,
-        projectId: proposals.projectId,
-        discountPct: proposals.discountPct,
-        taxRate: proposals.taxRate,
-        supervisionPct: proposals.supervisionPct,
-        subtotal: proposals.subtotal,
-        discountAmount: proposals.discountAmount,
-        taxableBase: proposals.taxableBase,
-        taxAmount: proposals.taxAmount,
-        supervisionAmount: proposals.supervisionAmount,
-        total: proposals.total,
-        totalCost: proposals.totalCost,
-        totalMargin: proposals.totalMargin,
-        notesAr: proposals.notesAr,
-        notesEn: proposals.notesEn,
-        termsAr: proposals.termsAr,
-        termsEn: proposals.termsEn,
-        clientNameEn: clients.nameEn,
-        clientNameAr: clients.nameAr,
-      })
-      .from(proposals)
-      .leftJoin(clients, eq(clients.id, proposals.clientId))
-      .where(eq(proposals.id, id))
-      .limit(1);
-    if (!p) return null;
+    const header = await loadProposalHeader(tx, id);
+    if (!header) return null;
 
-    const secs = await tx
-      .select()
-      .from(proposalSections)
-      .where(eq(proposalSections.proposalId, id))
-      .orderBy(asc(proposalSections.sortOrder));
-    const allLines = await tx
-      .select()
-      .from(proposalLines)
-      .where(eq(proposalLines.proposalId, id))
-      .orderBy(asc(proposalLines.sortOrder));
-
-    // R5: group lines by section once (avoids an O(sections*lines) nested filter).
-    const linesBySection = new Map<string, typeof allLines>();
-    for (const l of allLines) {
-      const arr = linesBySection.get(l.sectionId);
-      if (arr) arr.push(l);
-      else linesBySection.set(l.sectionId, [l]);
-    }
-
-    const sections: ProposalDetailSection[] = secs.map((s) => {
-      const secLines = linesBySection.get(s.id) ?? [];
-      const lines: ProposalDetailLine[] = secLines.map((l) => {
-        const base: ProposalDetailLine = {
-          id: l.id,
-          descriptionAr: l.descriptionAr,
-          descriptionEn: l.descriptionEn,
-          costItemId: l.costItemId,
-          qty: l.qty,
-          unit: l.unit,
-          unitPrice: l.unitPrice,
-          discountPct: l.discountPct,
-          lineTotal: l.lineTotal,
-          sortOrder: l.sortOrder,
-        };
-        if (canSeeMargin) {
-          base.unitCost = l.unitCost;
-          base.lineCost = l.lineCost;
-          base.lineMargin = l.lineMargin;
-        }
-        return base;
-      });
-      const section: ProposalDetailSection = {
-        id: s.id,
-        titleAr: s.titleAr,
-        titleEn: s.titleEn,
-        sortOrder: s.sortOrder,
-        sectionSubtotal: s.sectionSubtotal,
-        lines,
-      };
-      if (canSeeMargin) {
-        const totals = computeSection(
-          secLines.map(
-            (l): LineTotals => ({
-              lineCost: l.lineCost,
-              lineTotal: l.lineTotal,
-              lineMargin: l.lineMargin,
-            }),
-          ),
-        );
-        section.sectionCost = totals.sectionCost;
-        section.sectionMargin = totals.sectionMargin;
-      }
-      return section;
-    });
-
-    const detail: ProposalDetail = {
-      id: p.id,
-      number: p.number,
-      titleAr: p.titleAr,
-      titleEn: p.titleEn,
-      status: p.status,
-      currency: p.currency,
-      issueDate: p.issueDate,
-      expiryDate: p.expiryDate,
-      createdAt: p.createdAt.toISOString(),
-      version: p.version,
-      supersedesId: p.supersedesId,
-      clientId: p.clientId,
-      projectId: p.projectId,
-      clientNameEn: p.clientNameEn,
-      clientNameAr: p.clientNameAr,
-      discountPct: p.discountPct,
-      taxRate: p.taxRate,
-      supervisionPct: p.supervisionPct,
-      subtotal: p.subtotal,
-      discountAmount: p.discountAmount,
-      taxableBase: p.taxableBase,
-      taxAmount: p.taxAmount,
-      supervisionAmount: p.supervisionAmount,
-      total: p.total,
-      notesAr: p.notesAr,
-      notesEn: p.notesEn,
-      termsAr: p.termsAr,
-      termsEn: p.termsEn,
-      sections,
+    const { createdAt, totalCost, totalMargin, ...rest } = header;
+    return {
+      ...rest,
+      createdAt: createdAt.toISOString(),
+      sections: await loadProposalSections(tx, id, canSeeMargin),
+      // Absent, not null, when the caller may not see margin.
+      ...(canSeeMargin ? { totalCost, totalMargin } : {}),
     };
-    if (canSeeMargin) {
-      detail.totalCost = p.totalCost;
-      detail.totalMargin = p.totalMargin;
-    }
-    return detail;
   });
 }
 
