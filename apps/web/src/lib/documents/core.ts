@@ -1,8 +1,7 @@
 import 'server-only';
 import { files } from '@metra/db';
 import { and, eq } from 'drizzle-orm';
-import { revalidatePath } from 'next/cache';
-import { recordAudit } from '@/lib/audit';
+import { fail, mutateInOrg } from '@/lib/actions/mutate';
 import { err, type ActionResult } from '@/lib/actions/result';
 import { withOrgContext, type OrgContext } from '@/lib/db/context';
 import { can } from '@/lib/permissions/can';
@@ -100,32 +99,42 @@ export async function getDocumentUrlCore(
   }
 }
 
-/** Delete one document row. Same entity filter, and so the same cross-entity
- *  refusal, as the URL mint above. */
+/**
+ * Delete one document row. Same entity filter, and so the same cross-entity
+ * refusal, as the URL mint above.
+ *
+ * Over `mutateInOrg` — the house spine — rather than a hand-rolled
+ * `withOrgContext` + `recordAudit`: the capability is checked before the
+ * transaction opens, a thrown `ActionError` becomes its coded failure, and an
+ * ambiguous outcome (write deadline, lock timeout, dropped socket) surfaces as
+ * `uncertain` instead of as a flat success. That last one is the reason: the
+ * previous shape returned `{ ok: true }` from inside the callback, so a
+ * connection dropped after the DELETE but before COMMIT would have been reported
+ * to the studio as a deleted file that is still there.
+ */
 export async function deleteDocumentCore(
   ctx: OrgContext,
   spec: DocumentEntitySpec,
   fileId: string,
 ): Promise<ActionResult> {
-  if (!can(ctx.role, spec.writeCapability, 'create')) return err('forbidden');
-  return withOrgContext(ctx, async (tx) => {
-    const [owned] = await tx
-      .select({ id: files.id })
-      .from(files)
-      .where(and(eq(files.id, fileId), eq(files.entity, spec.entity)))
-      .limit(1);
-    if (!owned) return { ok: false, error: 'invalid' };
-    await tx.delete(files).where(eq(files.id, fileId));
-    await recordAudit(tx, {
-      entity: 'file',
-      entityId: fileId,
-      action: 'delete',
-      before: null,
-      after: null,
-    });
-    // TASK 17 IS A MOVE: this sits inside the transaction callback exactly where
-    // `client-documents/actions.ts:109` had it. Task 18 lifts it out.
-    revalidatePath('/', 'layout');
-    return { ok: true };
-  });
+  return mutateInOrg(
+    ctx,
+    { capability: spec.writeCapability, action: 'create' },
+    async (tx, audit) => {
+      const [owned] = await tx
+        .select({ id: files.id })
+        .from(files)
+        .where(and(eq(files.id, fileId), eq(files.entity, spec.entity)))
+        .limit(1);
+      if (!owned) fail('invalid');
+      await tx.delete(files).where(eq(files.id, fileId));
+      await audit({
+        entity: 'file',
+        entityId: fileId,
+        action: 'delete',
+        before: null,
+        after: null,
+      });
+    },
+  );
 }
