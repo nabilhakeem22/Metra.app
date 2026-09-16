@@ -11,12 +11,10 @@ import {
   type LineTotals,
   type SectionTotals,
 } from '@/lib/aggregates/proposal-totals';
-import {
-  normalizeText,
-  pctInRange,
-  withinMagnitude,
-  type SectionInput,
-} from './core';
+import { withinMagnitude } from '@/lib/money/read';
+import { isPercentInRange } from '@/lib/validation/percent';
+import { clean } from '@/lib/validation/text';
+import type { SectionInput } from './core';
 
 interface CostItemResolved {
   unit: CostItemUnit;
@@ -95,8 +93,8 @@ export function resolveDraftLines(
   const sectionTotals: SectionTotals[] = [];
 
   for (const [sectionIndex, section] of sections.entries()) {
-    const sectionTitleEn = normalizeText(section.titleEn);
-    const sectionTitleAr = normalizeText(section.titleAr);
+    const sectionTitleEn = clean(section.titleEn);
+    const sectionTitleAr = clean(section.titleAr);
     if (!sectionTitleEn && !sectionTitleAr) fail('name_required');
 
     const lineTotals: LineTotals[] = [];
@@ -108,9 +106,9 @@ export function resolveDraftLines(
       const resolvedUnitPrice =
         line.unitPrice ?? costItem?.defaultUnitPrice ?? null;
       const descriptionEn =
-        normalizeText(line.descriptionEn) ?? costItem?.nameEn ?? null;
+        clean(line.descriptionEn) ?? costItem?.nameEn ?? null;
       const descriptionAr =
-        normalizeText(line.descriptionAr) ?? costItem?.nameAr ?? null;
+        clean(line.descriptionAr) ?? costItem?.nameAr ?? null;
 
       // F1 cost resolution by stable identity.
       const lineId = line.id?.trim() || null;
@@ -141,7 +139,7 @@ export function resolveDraftLines(
         fail(tooLarge ? 'amount_too_large' : 'line_required');
       }
       if (!resolvedUnit || (!descriptionEn && !descriptionAr)) fail('line_required');
-      if (!pctInRange(discountPct.value)) fail('discount_out_of_range');
+      if (!isPercentInRange(discountPct.value)) fail('discount_out_of_range');
 
       const totals = computeLine({
         qty: qty.value,

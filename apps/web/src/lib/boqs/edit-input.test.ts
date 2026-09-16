@@ -1,7 +1,6 @@
 import { COST_ITEM_UNITS } from '@metra/db';
 import { describe, expect, it } from 'vitest';
-import { MAX_AMOUNT } from '@/lib/proposals/validation';
-import { readMoneyString } from '@/lib/money/read';
+import { MAX_AMOUNT, readMoneyString } from '@/lib/money/read';
 import {
   BOQ_UNITS,
   MAX_DESCRIPTION,

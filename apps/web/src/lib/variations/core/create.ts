@@ -5,7 +5,7 @@ import { fail, mutateInOrg, requireInOrg } from '@/lib/actions/mutate';
 import { err, type ActionResult } from '@/lib/actions/result';
 import { allocateNumber } from '@/lib/db/allocate-number';
 import type { OrgContext } from '@/lib/db/context';
-import { normalizeText } from '@/lib/proposals/core';
+import { clean } from '@/lib/validation/text';
 import { isUuid } from '@/lib/uuid';
 
 export interface CreateVariationDraftInput {
@@ -26,8 +26,8 @@ export async function createVariationDraftCore(
 ): Promise<ActionResult> {
   const contractId = input.contractId?.trim();
   if (!contractId || !isUuid(contractId)) return err('invalid');
-  const titleAr = normalizeText(input.titleAr);
-  const titleEn = normalizeText(input.titleEn);
+  const titleAr = clean(input.titleAr);
+  const titleEn = clean(input.titleEn);
   if (!titleAr && !titleEn) return err('name_required');
 
   return mutateInOrg(
@@ -61,8 +61,8 @@ export async function createVariationDraftCore(
           projectId: contract.projectId,
           titleAr,
           titleEn,
-          reasonAr: normalizeText(input.reasonAr),
-          reasonEn: normalizeText(input.reasonEn),
+          reasonAr: clean(input.reasonAr),
+          reasonEn: clean(input.reasonEn),
         })
         .returning({ id: variationOrders.id });
 

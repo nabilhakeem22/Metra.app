@@ -18,7 +18,7 @@ import { canSeeMargin } from '@/lib/permissions/can';
 import type { SaveDraftInput } from './core';
 import { enforceLineCaps, validateDraftHeader } from './draft-save-validate';
 import { loadCostItemMap, resolveDraftLines } from './draft-save-resolve';
-import { withinMagnitude } from './validation';
+import { withinMagnitude } from '@/lib/money/read';
 import { persistDraftSectionsAndLines } from './draft-save-persist';
 
 export async function saveProposalDraftCore(

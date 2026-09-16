@@ -24,6 +24,17 @@ describe('clean', () => {
     expect(clean('0')).toBe('0');
     expect(clean('  مكتب ميترا ')).toBe('مكتب ميترا');
   });
+
+  it('matches the former proposals `normalizeText` case for case', () => {
+    // `lib/proposals/validation.ts` carried a byte-identical second copy of this
+    // function under a different name, used at 35 sites. Its whole suite is
+    // reproduced here so the merge is provably not a behaviour change.
+    expect(clean('  hello  ')).toBe('hello');
+    expect(clean('   ')).toBeNull();
+    expect(clean('')).toBeNull();
+    expect(clean(null)).toBeNull();
+    expect(clean(undefined)).toBeNull();
+  });
 });
 
 describe('optionalText', () => {

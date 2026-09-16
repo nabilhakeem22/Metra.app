@@ -1,8 +1,12 @@
-// Shared proposal-core guards, normalizers, and constants + createProposalCore.
-// The heavy draft save lives in ./draft-save and the lifecycle transitions in
-// ./lifecycle; both are re-exported here so `@/lib/proposals/core` stays the one
-// import surface for callers/tests. The server recomputes EVERY total from the
-// money engine and never trusts a client-supplied subtotal/total.
+// Proposal creation + the shared draft input shapes. The heavy draft save lives
+// in ./draft-save and the lifecycle transitions in ./lifecycle; both are
+// re-exported here so `@/lib/proposals/core` stays one import surface for the
+// module's own callers. The server recomputes EVERY total from the money engine
+// and never trusts a client-supplied subtotal/total.
+//
+// What this file no longer does is re-export the SHARED kernels. It used to, and
+// that single habit is why contracts, variations, boqs and both PDF routes
+// imported the PROPOSALS module to reach a percentage check or a chunked insert.
 import {
   clients,
   projects,
@@ -19,28 +23,8 @@ import {
   formatProposalNumber,
   proposalYear,
 } from '@/lib/format/proposal-number';
-
-import { normalizeText, validIsoDate } from './validation';
-
-// The share token, its hash and its lifetime live in the share kernel, which
-// reaches for node:crypto and so may NOT be re-exported from the client-safe
-// ./validation module. Re-exported here so callers keep one import surface.
-export { SHARE_TTL_DAYS, mintShareToken } from '@/lib/share/token';
-
-// The pure validators + boundary caps live in ./validation (client-safe, unit-
-// testable). Re-exported so `@/lib/proposals/core` stays the one import surface.
-export {
-  MAX_SECTIONS,
-  MAX_LINES_PER_SECTION,
-  MAX_TOTAL_LINES,
-  MAX_AMOUNT,
-  LINE_INSERT_CHUNK,
-  normalizeText,
-  withinMagnitude,
-  pctInRange,
-  validIsoDate,
-  chunk,
-} from './validation';
+import { validIsoDate } from '@/lib/validation/iso-date';
+import { clean } from '@/lib/validation/text';
 
 /** Per-org advisory lock so concurrent creates never collide on `number`. */
 export async function nextNumber(tx: MetraDb, orgId: string): Promise<number> {
@@ -89,8 +73,8 @@ export async function createProposalCore(
   const projectId = input.projectId?.trim();
   if (!clientId || !isUuid(clientId)) return err('client_required');
   if (!projectId || !isUuid(projectId)) return err('invalid');
-  const issueDate = normalizeText(input.issueDate);
-  const expiryDate = normalizeText(input.expiryDate);
+  const issueDate = clean(input.issueDate);
+  const expiryDate = clean(input.expiryDate);
   if (issueDate && !validIsoDate(issueDate)) return err('invalid_date');
   if (expiryDate && !validIsoDate(expiryDate)) return err('invalid_date');
 
@@ -101,8 +85,8 @@ export async function createProposalCore(
       await assertClientProjectUsable(tx, clientId, projectId);
       const number = await nextNumber(tx, ctx.orgId);
 
-      let titleEn = normalizeText(input.titleEn);
-      const titleAr = normalizeText(input.titleAr);
+      let titleEn = clean(input.titleEn);
+      const titleAr = clean(input.titleAr);
       if (!titleEn && !titleAr) {
         // The DB requires a title; default to the display number.
         titleEn = formatProposalNumber(

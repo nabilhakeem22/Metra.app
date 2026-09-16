@@ -5,7 +5,7 @@ import { fail, mutateInOrg, requireInOrg } from '@/lib/actions/mutate';
 import { err, type ActionResult } from '@/lib/actions/result';
 import { computeLine } from '@/lib/aggregates/proposal-totals';
 import { readMoneyString } from '@/lib/money/read';
-import { withinMagnitude } from '@/lib/proposals/validation';
+import { withinMagnitude } from '@/lib/money/read';
 import type { OrgContext } from '@/lib/db/context';
 import { bilingualFor } from './bilingual';
 import { MAX_BOQ_LINES, recomputeBoqTotals } from './core';

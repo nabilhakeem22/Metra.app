@@ -8,12 +8,11 @@ import {
   MAX_LINES_PER_SECTION,
   MAX_SECTIONS,
   MAX_TOTAL_LINES,
-  normalizeText,
-  pctInRange,
-  validIsoDate,
-  type SaveDraftInput,
-  type SectionInput,
-} from './core';
+} from '@/lib/lines/limits';
+import { validIsoDate } from '@/lib/validation/iso-date';
+import { isPercentInRange } from '@/lib/validation/percent';
+import { clean } from '@/lib/validation/text';
+import type { SaveDraftInput, SectionInput } from './core';
 
 type ProposalRow = typeof proposals.$inferSelect;
 type DraftHeader = NonNullable<SaveDraftInput['header']>;
@@ -50,22 +49,22 @@ export function validateDraftHeader(
   if (discountPct === null || taxRate === null || supervisionPct === null) {
     fail('invalid');
   }
-  if (!pctInRange(discountPct!)) fail('discount_out_of_range');
-  if (!pctInRange(supervisionPct!)) fail('supervision_out_of_range');
-  if (!pctInRange(taxRate!)) fail('tax_out_of_range');
+  if (!isPercentInRange(discountPct!)) fail('discount_out_of_range');
+  if (!isPercentInRange(supervisionPct!)) fail('supervision_out_of_range');
+  if (!isPercentInRange(taxRate!)) fail('tax_out_of_range');
   const titleEn =
-    header.titleEn !== undefined ? normalizeText(header.titleEn) : proposal.titleEn;
+    header.titleEn !== undefined ? clean(header.titleEn) : proposal.titleEn;
   const titleAr =
-    header.titleAr !== undefined ? normalizeText(header.titleAr) : proposal.titleAr;
+    header.titleAr !== undefined ? clean(header.titleAr) : proposal.titleAr;
   if (!titleEn && !titleAr) fail('name_required');
 
   const issueDate =
     header.issueDate !== undefined
-      ? normalizeText(header.issueDate)
+      ? clean(header.issueDate)
       : proposal.issueDate;
   const expiryDate =
     header.expiryDate !== undefined
-      ? normalizeText(header.expiryDate)
+      ? clean(header.expiryDate)
       : proposal.expiryDate;
   if (issueDate && !validIsoDate(issueDate)) fail('invalid_date');
   if (expiryDate && !validIsoDate(expiryDate)) fail('invalid_date');
@@ -78,15 +77,15 @@ export function validateDraftHeader(
     titleAr,
     issueDate,
     expiryDate,
-    currency: normalizeText(header.currency) ?? proposal.currency,
+    currency: clean(header.currency) ?? proposal.currency,
     notesAr:
-      header.notesAr !== undefined ? normalizeText(header.notesAr) : proposal.notesAr,
+      header.notesAr !== undefined ? clean(header.notesAr) : proposal.notesAr,
     notesEn:
-      header.notesEn !== undefined ? normalizeText(header.notesEn) : proposal.notesEn,
+      header.notesEn !== undefined ? clean(header.notesEn) : proposal.notesEn,
     termsAr:
-      header.termsAr !== undefined ? normalizeText(header.termsAr) : proposal.termsAr,
+      header.termsAr !== undefined ? clean(header.termsAr) : proposal.termsAr,
     termsEn:
-      header.termsEn !== undefined ? normalizeText(header.termsEn) : proposal.termsEn,
+      header.termsEn !== undefined ? clean(header.termsEn) : proposal.termsEn,
   };
 }
 

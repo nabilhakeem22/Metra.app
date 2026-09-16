@@ -8,11 +8,9 @@ import { err, type ActionResult } from '@/lib/actions/result';
 import type { OrgContext } from '@/lib/db/context';
 import { isUuid } from '@/lib/uuid';
 import { readMoneyString } from '@/lib/money/read';
-import {
-  normalizeText,
-  pctInRange,
-  validIsoDate,
-} from '@/lib/proposals/core';
+import { validIsoDate } from '@/lib/validation/iso-date';
+import { isPercentInRange } from '@/lib/validation/percent';
+import { clean } from '@/lib/validation/text';
 
 export interface ContractHeaderInput {
   titleAr?: string | null;
@@ -60,15 +58,15 @@ export async function saveContractDraftCore(
     h.retentionPct != null ? readMoneyString(h.retentionPct, { blank: '0' }) : undefined;
   const advancePct =
     h.advancePct != null ? readMoneyString(h.advancePct, { blank: '0' }) : undefined;
-  if (retentionPct === null || (retentionPct !== undefined && !pctInRange(retentionPct))) {
+  if (retentionPct === null || (retentionPct !== undefined && !isPercentInRange(retentionPct))) {
     return err('invalid_percentage');
   }
-  if (advancePct === null || (advancePct !== undefined && !pctInRange(advancePct))) {
+  if (advancePct === null || (advancePct !== undefined && !isPercentInRange(advancePct))) {
     return err('invalid_percentage');
   }
-  const signatureDate = normalizeText(h.signatureDate);
-  const startDate = normalizeText(h.startDate);
-  const endDate = normalizeText(h.endDate);
+  const signatureDate = clean(h.signatureDate);
+  const startDate = clean(h.startDate);
+  const endDate = clean(h.endDate);
   for (const d of [signatureDate, startDate, endDate]) {
     if (d && !validIsoDate(d)) return err('invalid_date');
   }
@@ -90,36 +88,36 @@ export async function saveContractDraftCore(
       // Only touch fields the caller actually provided (`undefined` = leave as-is).
       // Nulling title_ar + title_en unconditionally would trip the bilingual CHECK.
       const set: Record<string, unknown> = { updatedAt: new Date() };
-      if (h.titleAr !== undefined) set.titleAr = normalizeText(h.titleAr);
-      if (h.titleEn !== undefined) set.titleEn = normalizeText(h.titleEn);
+      if (h.titleAr !== undefined) set.titleAr = clean(h.titleAr);
+      if (h.titleEn !== undefined) set.titleEn = clean(h.titleEn);
       if (h.signatureDate !== undefined) set.signatureDate = signatureDate;
       if (h.startDate !== undefined) set.startDate = startDate;
       if (h.endDate !== undefined) set.endDate = endDate;
       if (retentionPct !== undefined) set.retentionPct = retentionPct;
       if (h.retentionReleaseTermsAr !== undefined)
-        set.retentionReleaseTermsAr = normalizeText(h.retentionReleaseTermsAr);
+        set.retentionReleaseTermsAr = clean(h.retentionReleaseTermsAr);
       if (h.retentionReleaseTermsEn !== undefined)
-        set.retentionReleaseTermsEn = normalizeText(h.retentionReleaseTermsEn);
+        set.retentionReleaseTermsEn = clean(h.retentionReleaseTermsEn);
       if (advancePct !== undefined) set.advancePct = advancePct;
       if (h.advanceRecoveryMethod != null)
         set.advanceRecoveryMethod = h.advanceRecoveryMethod.trim() || 'prorata';
       if (h.paymentTermsDays !== undefined) set.paymentTermsDays = h.paymentTermsDays;
       if (h.paymentScheduleMode != null)
         set.paymentScheduleMode = h.paymentScheduleMode.trim() || 'milestone';
-      if (h.penaltyAr !== undefined) set.penaltyAr = normalizeText(h.penaltyAr);
-      if (h.penaltyEn !== undefined) set.penaltyEn = normalizeText(h.penaltyEn);
+      if (h.penaltyAr !== undefined) set.penaltyAr = clean(h.penaltyAr);
+      if (h.penaltyEn !== undefined) set.penaltyEn = clean(h.penaltyEn);
       if (h.defectsLiabilityDays !== undefined)
         set.defectsLiabilityDays = h.defectsLiabilityDays;
       if (h.scopeInclusionsAr !== undefined)
-        set.scopeInclusionsAr = normalizeText(h.scopeInclusionsAr);
+        set.scopeInclusionsAr = clean(h.scopeInclusionsAr);
       if (h.scopeInclusionsEn !== undefined)
-        set.scopeInclusionsEn = normalizeText(h.scopeInclusionsEn);
+        set.scopeInclusionsEn = clean(h.scopeInclusionsEn);
       if (h.scopeExclusionsAr !== undefined)
-        set.scopeExclusionsAr = normalizeText(h.scopeExclusionsAr);
+        set.scopeExclusionsAr = clean(h.scopeExclusionsAr);
       if (h.scopeExclusionsEn !== undefined)
-        set.scopeExclusionsEn = normalizeText(h.scopeExclusionsEn);
-      if (h.termsAr !== undefined) set.termsAr = normalizeText(h.termsAr);
-      if (h.termsEn !== undefined) set.termsEn = normalizeText(h.termsEn);
+        set.scopeExclusionsEn = clean(h.scopeExclusionsEn);
+      if (h.termsAr !== undefined) set.termsAr = clean(h.termsAr);
+      if (h.termsEn !== undefined) set.termsEn = clean(h.termsEn);
 
       await tx
         .update(contracts)

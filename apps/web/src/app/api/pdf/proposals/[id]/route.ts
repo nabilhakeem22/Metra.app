@@ -1,6 +1,6 @@
 import { buildProposalHtml } from '@/lib/pdf/proposal-template';
 import { servePdfDocument } from '@/lib/pdf/route-handler';
-import { MAX_TOTAL_LINES } from '@/lib/proposals/core';
+import { MAX_TOTAL_LINES } from '@/lib/lines/limits';
 import { getProposalForPdf } from '@/lib/proposals/queries';
 
 // Chromium is Node-only; this API endpoint gates itself (the i18n matcher skips /api).

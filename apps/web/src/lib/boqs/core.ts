@@ -17,7 +17,7 @@ import {
   parseMoney4,
   type SectionTotals,
 } from '@/lib/aggregates/proposal-totals';
-import { withinMagnitude } from '@/lib/proposals/validation';
+import { withinMagnitude } from '@/lib/money/read';
 import { insertLinesInChunks } from '@/lib/lines/insert-chunked';
 import { computeBoqTotals } from './totals';
 import type { ImportedLine } from './import/map';

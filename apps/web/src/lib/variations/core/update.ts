@@ -16,12 +16,10 @@ import { computeLine } from '@/lib/aggregates/proposal-totals';
 import { readMoney } from '@/lib/money/read';
 import type { OrgContext } from '@/lib/db/context';
 import { insertLinesInChunks } from '@/lib/lines/insert-chunked';
-import {
-  MAX_TOTAL_LINES,
-  normalizeText,
-  pctInRange,
-  withinMagnitude,
-} from '@/lib/proposals/core';
+import { MAX_TOTAL_LINES } from '@/lib/lines/limits';
+import { withinMagnitude } from '@/lib/money/read';
+import { isPercentInRange } from '@/lib/validation/percent';
+import { clean } from '@/lib/validation/text';
 import { isUuid } from '@/lib/uuid';
 import { SIGNED_MONEY_FIELD } from '../validation';
 
@@ -84,8 +82,8 @@ export async function saveVariationDraftCore(
   }> = [];
   for (let i = 0; i < lines.length; i += 1) {
     const l = lines[i];
-    const descriptionAr = normalizeText(l.descriptionAr);
-    const descriptionEn = normalizeText(l.descriptionEn);
+    const descriptionAr = clean(l.descriptionAr);
+    const descriptionEn = clean(l.descriptionEn);
     if (!descriptionAr && !descriptionEn) return err('line_required');
     const qty = readMoney(l.qty, SIGNED_MONEY_FIELD);
     const unitCost = readMoney(l.unitCost, { blank: '0' });
@@ -98,7 +96,7 @@ export async function saveVariationDraftCore(
       const tooLarge = factors.some((f) => !f.ok && f.reason === 'too_large');
       return err(tooLarge ? 'amount_too_large' : 'invalid');
     }
-    if (!pctInRange(discountPct.value)) return err('discount_out_of_range');
+    if (!isPercentInRange(discountPct.value)) return err('discount_out_of_range');
     // No per-FACTOR magnitude loop here: the reader applies MAX_AMOUNT itself and
     // reports an over-cap factor as reason 'too_large', which the block above
     // turns into amount_too_large. The PRODUCT check below was never redundant.
@@ -221,10 +219,10 @@ export async function saveVariationDraftCore(
       const saved = await tx
         .update(variationOrders)
         .set({
-          ...(h.titleAr !== undefined ? { titleAr: normalizeText(h.titleAr) } : {}),
-          ...(h.titleEn !== undefined ? { titleEn: normalizeText(h.titleEn) } : {}),
-          ...(h.reasonAr !== undefined ? { reasonAr: normalizeText(h.reasonAr) } : {}),
-          ...(h.reasonEn !== undefined ? { reasonEn: normalizeText(h.reasonEn) } : {}),
+          ...(h.titleAr !== undefined ? { titleAr: clean(h.titleAr) } : {}),
+          ...(h.titleEn !== undefined ? { titleEn: clean(h.titleEn) } : {}),
+          ...(h.reasonAr !== undefined ? { reasonAr: clean(h.reasonAr) } : {}),
+          ...(h.reasonEn !== undefined ? { reasonEn: clean(h.reasonEn) } : {}),
           netDelta,
           updatedAt: new Date(),
         })
