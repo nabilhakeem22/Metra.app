@@ -195,6 +195,21 @@ describe('documents: the cross-entity guard', () => {
     ).toHaveLength(1);
   });
 
+  it('refuses a CLIENT file id handed to deleteProjectDocument', async () => {
+    // The other direction. It used to be a second SELECT's business and is now
+    // the DELETE's own `where`, so the statement that gates is the statement
+    // that writes — there is no window between proving ownership and removing.
+    const { orgId, ctx, clientId } = await seedOrgWithParents();
+    const clientFile = await seedFile(orgId, 'client', clientId);
+    expect(
+      await deleteDocumentCore(ctx, DOCUMENT_ENTITIES.project, clientFile),
+    ).toEqual({ ok: false, error: 'invalid' });
+    expect(
+      await raw.query(`select id from public.files where id = '${clientFile}'`),
+    ).toHaveLength(1);
+    expect(await auditRowsFor(orgId, clientFile)).toHaveLength(0);
+  });
+
   it('refuses a PROJECT file id handed to getClientDocumentUrl', async () => {
     // Only the REFUSAL is asserted. The success path ends in Supabase Storage
     // (`getSignedUrl`), which this suite does not stand up — so asserting on it

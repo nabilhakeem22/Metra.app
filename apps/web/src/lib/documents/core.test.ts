@@ -18,11 +18,50 @@ vi.mock('@/lib/db/context', () => ({
 }));
 
 const getSignedUrl = vi.fn<() => Promise<string>>();
+const removeStoredObject = vi.fn<(...args: string[]) => Promise<void>>();
 vi.mock('@/lib/storage', () => ({
   getSignedUrl: () => getSignedUrl(),
+  removeStoredObject: (bucket: string, objectKey: string) =>
+    removeStoredObject(bucket, objectKey),
 }));
 
-import { getDocumentUrlCore } from './core';
+// The spine, with its transaction and its audit replaced but its CONTRACT kept:
+// an ActionError becomes its code, anything else becomes `generic`, and the
+// callback's return value rides out as `data`. The capability gate and the real
+// RLS refusals are proven in tests/actions/documents.dbtest.ts.
+const deletedRows = vi.fn<() => unknown[]>();
+const auditEntries: unknown[] = [];
+vi.mock('@/lib/actions/mutate', async () => {
+  const result = await vi.importActual<typeof import('@/lib/actions/result')>(
+    '@/lib/actions/result',
+  );
+  return {
+    fail: result.fail,
+    ActionError: result.ActionError,
+    mutateInOrg: async (
+      _ctx: unknown,
+      _opts: unknown,
+      fn: (tx: unknown, audit: (entry: unknown) => Promise<void>) => Promise<unknown>,
+    ) => {
+      const tx = {
+        delete: () => ({ where: () => ({ returning: () => deletedRows() }) }),
+      };
+      try {
+        const data = await fn(tx, async (entry) => {
+          auditEntries.push(entry);
+        });
+        return { ok: true, data };
+      } catch (error) {
+        return {
+          ok: false,
+          error: error instanceof result.ActionError ? error.code : 'generic',
+        };
+      }
+    },
+  };
+});
+
+import { deleteDocumentCore, getDocumentUrlCore } from './core';
 import { DOCUMENT_ENTITIES } from './entities';
 
 const ctx = {
@@ -35,6 +74,9 @@ const ctx = {
 beforeEach(() => {
   ownedRow.mockReset();
   getSignedUrl.mockReset();
+  removeStoredObject.mockReset();
+  deletedRows.mockReset();
+  auditEntries.length = 0;
   vi.spyOn(console, 'error').mockImplementation(() => {});
 });
 
@@ -76,5 +118,52 @@ describe('getDocumentUrlCore', () => {
     await expect(
       getDocumentUrlCore(clientRole, DOCUMENT_ENTITIES.client, 'file-1'),
     ).resolves.toEqual({ ok: false, error: 'forbidden' });
+  });
+});
+
+describe('deleteDocumentCore', () => {
+  const storedObject = { bucket: 'metra-files', objectKey: 'org-1/client/file-1' };
+
+  it('deletes the bytes too, AFTER the row is gone', async () => {
+    // Nothing in the product deleted a stored object at all, so every document
+    // a studio ever deleted left its bytes in the bucket forever.
+    deletedRows.mockReturnValue([storedObject]);
+    await expect(
+      deleteDocumentCore(ctx, DOCUMENT_ENTITIES.client, 'file-1'),
+    ).resolves.toEqual({ ok: true });
+    expect(removeStoredObject).toHaveBeenCalledWith(
+      storedObject.bucket,
+      storedObject.objectKey,
+    );
+    expect(auditEntries).toHaveLength(1);
+  });
+
+  it('does not leak the object key back to the caller', async () => {
+    // This rides out through a 'use server' action; the bucket path is plumbing.
+    deletedRows.mockReturnValue([storedObject]);
+    const answer = await deleteDocumentCore(ctx, DOCUMENT_ENTITIES.client, 'file-1');
+    expect(Object.keys(answer)).toEqual(['ok']);
+  });
+
+  it('still answers ok when Storage refuses the remove — the row IS deleted', async () => {
+    deletedRows.mockReturnValue([storedObject]);
+    removeStoredObject.mockRejectedValue(new Error('storage 503'));
+    await expect(
+      deleteDocumentCore(ctx, DOCUMENT_ENTITIES.client, 'file-1'),
+    ).resolves.toEqual({ ok: true });
+    expect(console.error).toHaveBeenCalledWith(
+      'document object remove failed',
+      expect.objectContaining(storedObject),
+    );
+  });
+
+  it('answers `invalid` and removes NOTHING when the gated delete returns no row', async () => {
+    // Another org's file (RLS), another entity's file, or one already deleted.
+    deletedRows.mockReturnValue([]);
+    await expect(
+      deleteDocumentCore(ctx, DOCUMENT_ENTITIES.client, 'file-1'),
+    ).resolves.toEqual({ ok: false, error: 'invalid' });
+    expect(removeStoredObject).not.toHaveBeenCalled();
+    expect(auditEntries).toHaveLength(0);
   });
 });
