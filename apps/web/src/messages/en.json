@@ -1147,15 +1147,7 @@
         "discountPct": "Discount percentage",
         "keyboardHint": "Tab moves across · Enter moves down the column · Esc reverts the cell",
         "costedCopy": "Costed copy",
-        "costedCopyFor": "Costed copy of BOQ {number}",
-        "errQty": "That quantity is not a number",
-        "errPrice": "That rate is not a number",
-        "errDescription": "A line needs a description",
-        "errFrozen": "This BOQ is issued and can no longer be changed",
-        "errTooMany": "This BOQ has reached its line limit",
-        "errForbidden": "You do not have permission to change this BOQ",
-        "errDiscount": "The discount must be between 0 and 100",
-        "errSectionName": "A section needs a name"
+        "costedCopyFor": "Costed copy of BOQ {number}"
       }
     }
   },
