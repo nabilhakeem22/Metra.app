@@ -55,6 +55,29 @@ const HEADER_ALIASES: Record<ImportField, string[]> = {
   costItemCode: ['price book', 'price book code', 'pb code', 'كود التسعير'],
 };
 
+/**
+ * The header text Metra CALLS each column — the canonical spelling of its first
+ * alias above.
+ *
+ * The downloaded template writes exactly these strings (`./template.ts` imports
+ * this table), and `autoDetectMapping` matches them, so they are the one
+ * spelling that is both what a studio sees across the top of their sheet and
+ * what this file expects. A missing-column message names THESE, never the field
+ * identifiers: "ناقص عمود: unitPrice" asks an Arabic-first studio to match a
+ * camelCase word against a spreadsheet that has never contained one.
+ */
+export const CANONICAL_HEADERS: Record<ImportField, string> = {
+  itemCode: 'Item',
+  section: 'Section',
+  description: 'Description',
+  unit: 'Unit',
+  qty: 'Qty',
+  unitPrice: 'Unit price',
+  unitCost: 'Unit cost',
+  provisional: 'Provisional',
+  costItemCode: 'Price book',
+};
+
 /** Fields without which a row cannot become a line. */
 const REQUIRED: ImportField[] = ['description', 'unit', 'qty', 'unitPrice'];
 
@@ -227,7 +250,12 @@ export function mapRows(
       return {
         rowNumber,
         line: null,
-        issues: [{ code: 'unmapped_columns', value: missing.join(', ') }],
+        issues: [
+          {
+            code: 'unmapped_columns',
+            value: missing.map((field) => CANONICAL_HEADERS[field]).join(', '),
+          },
+        ],
       };
     }
 

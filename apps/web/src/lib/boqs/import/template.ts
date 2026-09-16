@@ -6,7 +6,7 @@
 // and they are the same strings `autoDetectMapping` already recognises, so a
 // returned template maps itself with nothing for the studio to confirm.
 
-import { IMPORT_FIELDS, type ImportField } from './map';
+import { CANONICAL_HEADERS, IMPORT_FIELDS, type ImportField } from './map';
 
 /**
  * Byte-order mark.
@@ -22,19 +22,6 @@ import { IMPORT_FIELDS, type ImportField } from './map';
  * first version of this file was caught.
  */
 const BOM = '﻿';
-
-/** Header text per column. These exact strings are what auto-detection matches. */
-const HEADERS: Record<ImportField, string> = {
-  itemCode: 'Item',
-  section: 'Section',
-  description: 'Description',
-  unit: 'Unit',
-  qty: 'Qty',
-  unitPrice: 'Unit price',
-  unitCost: 'Unit cost',
-  provisional: 'Provisional',
-  costItemCode: 'Price book',
-};
 
 /**
  * One filled row, so the studio can see the expected shape of the two columns
@@ -105,7 +92,7 @@ export interface TemplateOptions {
 /** Build the template as CSV text. */
 export function buildTemplateCsv(opts: TemplateOptions = {}): string {
   const items = opts.items ?? [];
-  const rows = [IMPORT_FIELDS.map((f) => HEADERS[f])];
+  const rows = [IMPORT_FIELDS.map((field) => CANONICAL_HEADERS[field])];
 
   if (opts.includeExample ?? items.length === 0) {
     rows.push(IMPORT_FIELDS.map((f) => EXAMPLE[f]));

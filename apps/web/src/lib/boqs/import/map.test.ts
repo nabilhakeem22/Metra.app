@@ -8,6 +8,7 @@ import {
   normalizeUnit,
   DEFAULT_SECTION,
 } from './map';
+import { buildTemplateCsv } from './template';
 
 // The EXACT option set boqs/import/map.ts uses for a cell in an imported sheet —
 // the one money surface that reads Arabic-Indic digits.
@@ -286,10 +287,31 @@ describe('mapRows', () => {
     const g = grid('Description,Unit,Qty\nWalls,m2,10');
     const res = mapRows(g, autoDetectMapping(g.rows[0] as string[]));
     expect(res.ok).toHaveLength(0);
+    // The COLUMN as the sheet spells it, not the field identifier: a studio
+    // cannot find "unitPrice" across the top of their own spreadsheet.
     expect(res.rows[0]?.issues[0]).toEqual({
       code: 'unmapped_columns',
-      value: 'unitPrice',
+      value: 'Unit price',
     });
+  });
+
+  it('names every missing column, in template order', () => {
+    const g = grid('Item,Section\nA,B');
+    const res = mapRows(g, autoDetectMapping(g.rows[0] as string[]));
+    expect(res.rows[0]?.issues[0]).toEqual({
+      code: 'unmapped_columns',
+      value: 'Description, Unit, Qty, Unit price',
+    });
+  });
+
+  it('names columns with the exact text the downloaded template writes', () => {
+    // One table serves both, so a studio who used our template and deleted a
+    // column is told the name that was standing in it.
+    const [headerLine] = stripBom(buildTemplateCsv()).split('\n');
+    const header = headerLine?.split(',');
+    for (const label of ['Description', 'Unit', 'Qty', 'Unit price']) {
+      expect(header).toContain(label);
+    }
   });
 
   it('imports an Arabic sheet end to end', () => {
