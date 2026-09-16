@@ -8,6 +8,7 @@
 // Guards stay PURE: this file gathers every fact, then asks the guard engine to
 // decide.
 import {
+  type DesignEngagement,
   type MetraDb,
   designEngagements,
   engagementArtifacts,
@@ -19,14 +20,7 @@ import { err, type ActionResult } from '@/lib/actions/result';
 import type { AuditEntry } from '@/lib/audit';
 import type { OrgContext } from '@/lib/db/context';
 import { isUuid } from '@/lib/uuid';
-import { recordConceptApproval, recordDesignApproval } from '../approvals';
 import { CLIENT_RELEASES, selectReleaseArtifactIds } from '../client-release';
-import { insertAsBuiltAttestation } from '../attestations';
-import { settleConceptAndLock } from '../concept';
-import { generateFeeSchedule } from '../fee-schedule';
-import { captureRenderManifest } from '../renders';
-import { isRevisionTrigger } from '../revision-allowance';
-import { applyRevision, resetRevisionsOnReject } from '../revisions';
 import {
   CAPABILITY_ACTION,
   TRANSITIONS,
@@ -37,6 +31,7 @@ import { isSelfLoop, validateLegalFrom } from './admissibility';
 import { loadGuardFacts } from './facts';
 import { validateGuards } from './guards-run';
 import { hasCommittedAttempt, lockSelfLoop } from './self-loop';
+import { SIDE_EFFECTS } from './side-effects';
 
 export interface ExecuteTransitionInput {
   engagementId: string;
@@ -70,6 +65,29 @@ export interface TransitionRun {
   input: ExecuteTransitionInput;
   /** Trimmed + UUID-validated, or null. Stored ONLY on a self-loop ledger row. */
   idempotencyKey: string | null;
+}
+
+/**
+ * Apply the ONE side-effect this edge carries, if it carries one.
+ *
+ * Runs INSIDE the executor's tx, after the gate, so it commits atomically with
+ * the state move. A `fail()` inside a handler rolls the whole tx back — no state
+ * change, no side-effect rows. `def.sideEffect` is `SideEffectKey | null`, so at
+ * most one handler ever runs: this is a lookup, not a ladder, and a key without
+ * a handler is a compile error in `SIDE_EFFECTS`.
+ */
+async function applySideEffect(
+  run: TransitionRun,
+  engagement: DesignEngagement,
+): Promise<void> {
+  if (!run.def.sideEffect) return;
+  await SIDE_EFFECTS[run.def.sideEffect]({
+    tx: run.tx,
+    ctx: run.ctx,
+    engagement,
+    trigger: run.input.trigger,
+    payload: run.input.payload,
+  });
 }
 
 /**
@@ -154,80 +172,8 @@ export async function executeTransition(
         .returning({ id: designEngagements.id });
       if (!gated[0]) fail('engagement_state_conflict');
 
-      // Side-effect: runs INSIDE this tx, after the gate, so it commits atomically
-      // with the state move. A `fail()` inside it rolls the whole tx back — no
-      // state change, no side-effect rows. Each key has exactly one branch.
-      if (def.sideEffect === 'generateFeeSchedule') {
-        await generateFeeSchedule(tx, ctx, engagementId, input.payload);
-      }
-      // Deposit cleared -> the engagement advances to SURVEY (the state move
-      // above). "Activate project" is interpreted minimally here: for an Off-Plan
-      // engagement, the as-built drawings become due. We deliberately do NOT
-      // reach into the projects module / bump project.status this step.
-      if (def.sideEffect === 'activateOnDeposit' && engagement.offPlan) {
-        await tx
-          .update(designEngagements)
-          .set({ asBuiltDue: true, updatedAt: new Date() })
-          .where(eq(designEngagements.id, engagementId));
-      }
-      // selectConcept (Step 7): the Gate-A installment already cleared (guard),
-      // so the concept selection is witnessed by ONE append-only approvals row,
-      // committed atomically with the concept_review -> negotiation move.
-      if (def.sideEffect === 'recordConceptApproval') {
-        await recordConceptApproval(tx, ctx, engagementId);
-      }
-      // requestRevision (Step 8, self-loop) / designChangeRaised (the 3D loop):
-      // increment the FIRING EDGE's revision counter — the two allowances are
-      // independent — and, once that count crosses that edge's free allowance,
-      // raise a design-fee change order. Atomic with the transition row: a missing
-      // change-order amount `fail()`s and rolls the increment back too. The trigger
-      // is re-narrowed here because only the two revision edges carry this
-      // side-effect; a future edge wired to it without a counter pair fails CLOSED
-      // rather than silently spending the concept allowance.
-      if (def.sideEffect === 'applyRevision') {
-        const revisionTrigger = input.trigger;
-        if (!isRevisionTrigger(revisionTrigger)) fail('illegal_trigger');
-        await applyRevision(tx, ctx, engagement, revisionTrigger, input.payload);
-      }
-      // confirmConcept (Step 9): the `revisionCosSettled` guard proved every raised
-      // change order is covered, so settle them all (status -> settled, settled_at
-      // = now()) and stamp `concept_locked_at`. Atomic with the negotiation ->
-      // design_3d move — a guard failure leaves COs `raised`, the lock null.
-      if (def.sideEffect === 'settleConceptAndLock') {
-        await settleConceptAndLock(tx, engagementId);
-      }
-      // rendersReady (Step 11): the `rendersPresent` guard proved at least one
-      // approved render exists, so capture the deterministic baseline manifest hash
-      // over those renders and stamp `renders_ready_at`. Atomic with the design_3d
-      // -> final_approval move — a guard failure leaves both columns null.
-      if (def.sideEffect === 'captureRenderManifest') {
-        await captureRenderManifest(tx, engagementId);
-      }
-      // flagAsBuiltVariance (Step 13): the `asBuiltDueOpen` guard proved the
-      // as-built drawings are due, so append ONE `as_built_attestation` event with
-      // has_variance=true. Atomic with the final_approval -> change_triage move.
-      if (def.sideEffect === 'recordAsBuiltVariance') {
-        await insertAsBuiltAttestation(tx, ctx, engagementId, true);
-      }
-      // attestAsBuiltClean (Step 13): a clean as-built attestation — append ONE
-      // `as_built_attestation` event with has_variance=false. Atomic with the move
-      // to final_approval (the self-loop OR the change_triage reconciliation).
-      if (def.sideEffect === 'recordAsBuiltClean') {
-        await insertAsBuiltAttestation(tx, ctx, engagementId, false);
-      }
-      // approveDesign (Step 14, Gate B): the ROM ack, as-built reconciliation and
-      // Gate-B installment guards have all passed, so witness the design sign-off
-      // with ONE append-only `design_approval` event. Atomic with the
-      // final_approval -> shop_drawings move.
-      if (def.sideEffect === 'recordDesignApproval') {
-        await recordDesignApproval(tx, ctx, engagementId);
-      }
-      // rejectDesign (Step 14, Gate B): bounce back to negotiation and refill the
-      // free-revision allowance (revision_count -> 0, concept_locked_at -> null).
-      // Atomic with the final_approval -> negotiation move.
-      if (def.sideEffect === 'resetRevisionsOnReject') {
-        await resetRevisionsOnReject(tx, engagementId);
-      }
+      // The ONE side-effect this edge carries, if any — see applySideEffect.
+      await applySideEffect(run, engagement);
 
       // Client Deliverables (Step 1): auto-share. A release-carrying edge publishes
       // its deliverable package to the tokenized client portal INSIDE this tx, after
