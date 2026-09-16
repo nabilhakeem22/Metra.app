@@ -1,3 +1,8 @@
+// BARREL LAW: a module barrel re-exports only symbols defined under that module's
+// own `core/`, `lifecycle/` or `queries/`. It never re-exports a shared kernel and
+// it never re-exports another module. Cross-module reuse goes through
+// `lib/<kernel>`.
+//
 // Barrel for the contract-core surface. The single 348-line `core.ts` was split
 // by operation group (SRP): `create` (generateContractCore), `update`
 // (saveContractDraftCore), and the pre-existing sibling `../lifecycle`

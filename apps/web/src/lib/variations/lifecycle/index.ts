@@ -1,3 +1,8 @@
+// BARREL LAW: a module barrel re-exports only symbols defined under that module's
+// own `core/`, `lifecycle/` or `queries/`. It never re-exports a shared kernel and
+// it never re-exports another module. Cross-module reuse goes through
+// `lib/<kernel>`.
+//
 // Barrel for the variation-order lifecycle transitions. The single `lifecycle.ts`
 // was split by transition (SRP) once each one grew its own contract-activity
 // guard: `internal-approve` (draft->internal_approved, mints the client token)
