@@ -14,8 +14,9 @@ import {
   type CostItemUnit,
   type MetraDb,
 } from '@metra/db';
-import { eq, sql } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import { fail, mutateInOrg } from '@/lib/actions/mutate';
+import { allocateNumber } from '@/lib/db/allocate-number';
 import { err, type ActionResult } from '@/lib/actions/result';
 import type { OrgContext } from '@/lib/db/context';
 import { isUuid } from '@/lib/uuid';
@@ -25,17 +26,6 @@ import {
 } from '@/lib/format/proposal-number';
 import { validIsoDate } from '@/lib/validation/iso-date';
 import { clean } from '@/lib/validation/text';
-
-/** Per-org advisory lock so concurrent creates never collide on `number`. */
-export async function nextNumber(tx: MetraDb, orgId: string): Promise<number> {
-  await tx.execute(
-    sql`select pg_advisory_xact_lock(hashtext(${`${orgId}:proposals`}))`,
-  );
-  const [row] = await tx
-    .select({ max: sql<number>`coalesce(max(${proposals.number}), 0)` })
-    .from(proposals);
-  return Number(row?.max ?? 0) + 1;
-}
 
 async function assertClientProjectUsable(
   tx: MetraDb,
@@ -83,7 +73,13 @@ export async function createProposalCore(
     { capability: 'proposals_build', action: 'create' },
     async (tx, audit) => {
       await assertClientProjectUsable(tx, clientId, projectId);
-      const number = await nextNumber(tx, ctx.orgId);
+      const number = await allocateNumber(
+        tx,
+        ctx.orgId,
+        'proposals',
+        'proposals',
+        'number',
+      );
 
       let titleEn = clean(input.titleEn);
       const titleAr = clean(input.titleAr);

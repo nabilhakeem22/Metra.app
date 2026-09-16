@@ -14,7 +14,7 @@ import type { ActionResult } from '@/lib/actions/result';
 import { appendSystemActivity } from '@/lib/activities/core';
 import type { OrgContext } from '@/lib/db/context';
 import { mintShareToken, shareExpiryFromNow } from '@/lib/share/token';
-import { nextNumber } from './core';
+import { allocateNumber } from '@/lib/db/allocate-number';
 import { insertLinesInChunks } from '@/lib/lines/insert-chunked';
 
 export async function sendProposalCore(
@@ -118,7 +118,13 @@ export async function supersedeProposalCore(
         .returning();
       if (!old) fail('invalid');
 
-      const number = await nextNumber(tx, ctx.orgId);
+      const number = await allocateNumber(
+        tx,
+        ctx.orgId,
+        'proposals',
+        'proposals',
+        'number',
+      );
       const [copy] = await tx
         .insert(proposals)
         .values({
