@@ -5,7 +5,7 @@ import 'server-only';
 // is the whole difference between a signal and a document response — a client
 // double-tapping on a phone must not be shown an error.
 import { sql } from 'drizzle-orm';
-import { withRequestDb } from '@/lib/db/client';
+import { normalizeRawToken, readSdfCode } from '@/lib/share/sdf-call';
 import {
   mapSignalSdfCode,
   type SignalSdfResult,
@@ -42,15 +42,14 @@ export async function recordDeliveryActionByToken(
     userAgent?: string | null;
   },
 ): Promise<DeliveryActionResult> {
-  if (!rawToken || !rawToken.trim()) return { ok: false, error: 'token_invalid' };
-  const hash = hashShareToken(rawToken);
-  const rows = (await withRequestDb((db) =>
-    db.execute(sql`select public.app_delivery_respond_by_token(
-      ${hash}, ${input.action}, ${input.note ?? null}, ${input.actorName ?? null},
-      ${input.ip ?? null}, ${input.userAgent ?? null}
-    ) as code`),
-  )) as unknown as Array<{ code: string }>;
-  return mapSignalSdfCode(rows[0]?.code);
+  const token = normalizeRawToken(rawToken);
+  if (!token) return { ok: false, error: 'token_invalid' };
+  const hash = hashShareToken(token);
+  const code = await readSdfCode(sql`select public.app_delivery_respond_by_token(
+    ${hash}, ${input.action}, ${input.note ?? null}, ${input.actorName ?? null},
+    ${input.ip ?? null}, ${input.userAgent ?? null}
+  ) as code`);
+  return mapSignalSdfCode(code);
 }
 
 /**
@@ -74,13 +73,12 @@ export async function claimPaymentByToken(
     userAgent?: string | null;
   },
 ): Promise<DeliveryActionResult> {
-  if (!rawToken || !rawToken.trim()) return { ok: false, error: 'token_invalid' };
-  const hash = hashShareToken(rawToken);
-  const rows = (await withRequestDb((db) =>
-    db.execute(sql`select public.app_delivery_claim_payment_by_token(
-      ${hash}, ${input.milestoneKind}, ${input.note ?? null},
-      ${input.actorName ?? null}, ${input.ip ?? null}, ${input.userAgent ?? null}
-    ) as code`),
-  )) as unknown as Array<{ code: string }>;
-  return mapSignalSdfCode(rows[0]?.code);
+  const token = normalizeRawToken(rawToken);
+  if (!token) return { ok: false, error: 'token_invalid' };
+  const hash = hashShareToken(token);
+  const code = await readSdfCode(sql`select public.app_delivery_claim_payment_by_token(
+    ${hash}, ${input.milestoneKind}, ${input.note ?? null},
+    ${input.actorName ?? null}, ${input.ip ?? null}, ${input.userAgent ?? null}
+  ) as code`);
+  return mapSignalSdfCode(code);
 }

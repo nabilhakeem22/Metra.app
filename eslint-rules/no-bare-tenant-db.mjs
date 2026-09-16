@@ -63,24 +63,15 @@
 // connection and have each been individually reviewed as safe:
 //   1. Public token-hash SECURITY DEFINER calls — the opaque token IS the auth,
 //      and the SDF omits every cost/margin column, so nothing can leak the firm's
-//      cost or another tenant's data. The two runners in share/sdf-call.ts are
-//      the single surface for all of them. The three DOCUMENT portals
-//      (proposals / contracts / variations) adopted it and came OFF this list —
-//      each contains no `withRequestDb`, no `.execute(`, no `.unsafe(` at all:
+//      cost or another tenant's data. There is now ONE file for all of them; every
+//      portal (proposals, contracts, variations, and the four delivery-portal
+//      files) runs its SDF through it and contains no `withRequestDb`,
+//      no `.execute(`, no `.unsafe(` of its own:
 //        apps/web/src/lib/share/sdf-call.ts — readSdfJson / readSdfCode, which
 //          execute a caller-built SQL object and read one column off row 0.
-//          Nothing is interpolated; there is no string-concatenation path.
-//        apps/web/src/lib/engagements/public/delivery.ts
-//        apps/web/src/lib/engagements/public/respond.ts
-//        apps/web/src/lib/engagements/public-documents.ts — the same token surface:
-//          it resolves ONE released document of the token's own delivery and returns
-//          only a storage bucket/key + kind; the client-supplied document id is a
-//          filter inside an already-proven delivery, never a lookup key of its own.
-//        apps/web/src/lib/engagements/public-comments.ts — the same token surface
-//          again (split out of public.ts): it reads and appends messages on ONE
-//          released document of the token's own delivery. Identity-blind on the
-//          studio side and cost-blind throughout; the document id is a filter
-//          within a delivery the token already proved.
+//          Nothing is interpolated; there is no string-concatenation path, and the
+//          file has no other reason to exist, so an unrelated base-connection
+//          query added here would be conspicuous in review.
 //   2. The public API-key resolver, which wraps its SDF in a transaction and drops
 //      into `set local role metra_app` before the call:
 //        apps/web/src/lib/api-keys/resolve.ts
@@ -183,10 +174,6 @@ function staticKeyName(computed, key) {
 // documented above. Matched against the normalised (forward-slash) filename.
 const ALLOWLISTED_FILES = [
   'apps/web/src/lib/share/sdf-call.ts',
-  'apps/web/src/lib/engagements/public/delivery.ts',
-  'apps/web/src/lib/engagements/public/respond.ts',
-  'apps/web/src/lib/engagements/public-documents.ts',
-  'apps/web/src/lib/engagements/public-comments.ts',
   'apps/web/src/lib/api-keys/resolve.ts',
   'apps/web/src/lib/automation/system-context.ts',
   'apps/web/src/lib/automation/runner.ts',

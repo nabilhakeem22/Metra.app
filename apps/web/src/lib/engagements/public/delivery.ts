@@ -5,7 +5,7 @@ import 'server-only';
 // physically omits every cost/margin/build-cost/token/internal column, so nothing
 // here can leak the firm's cost. The raw token is never logged.
 import { sql } from 'drizzle-orm';
-import { withRequestDb } from '@/lib/db/client';
+import { normalizeRawToken, readSdfJson } from '@/lib/share/sdf-call';
 import { hashShareToken } from '@/lib/share/token';
 import { KIND_CATEGORY } from '../portal-documents';
 import { PORTAL_STAGE_LABEL, PORTAL_STAGE_NOTE } from '../portal-labels';
@@ -38,18 +38,18 @@ import type { PublicDelivery } from './types';
 export async function getDeliveryByToken(
   rawToken: string,
 ): Promise<PublicDelivery | null> {
-  if (!rawToken || !rawToken.trim()) return null;
-  const hash = hashShareToken(rawToken);
+  const token = normalizeRawToken(rawToken);
+  if (!token) return null;
+  const hash = hashShareToken(token);
 
   // `hasSnapshot` distinguishes "the DB/SDF call itself threw" from "the mapping
   // of a returned snapshot threw" in the log breadcrumb — WITHOUT ever logging the
   // token or any client data.
   let hasSnapshot = false;
   try {
-    const rows = (await withRequestDb((db) =>
-      db.execute(sql`select public.app_delivery_by_token(${hash}) as data`),
-    )) as unknown as Array<{ data: DeliverySnapshot | null }>;
-    const snapshot = rows[0]?.data ?? null;
+    const snapshot = await readSdfJson<DeliverySnapshot>(
+      sql`select public.app_delivery_by_token(${hash}) as data`,
+    );
     if (!snapshot) return null;
     hasSnapshot = true;
 

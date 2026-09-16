@@ -11,7 +11,7 @@ import 'server-only';
 // revoked / expired token, a DB throw — resolves to the SAME null, so the endpoint
 // has no oracle to probe.
 import { sql } from 'drizzle-orm';
-import { withRequestDb } from '@/lib/db/client';
+import { normalizeRawToken, readSdfJson } from '@/lib/share/sdf-call';
 import { hashShareToken } from '@/lib/share/token';
 import { ALLOWED_EXTENSIONS } from './deliverable-files';
 import { parseDocumentAccess, type DocumentAccess } from './document-access';
@@ -87,17 +87,15 @@ export async function getDeliveryDocumentByToken(
   rawToken: string,
   documentId: string,
 ): Promise<DeliveryDocumentTarget | null> {
-  if (!rawToken || !rawToken.trim()) return null;
+  const token = normalizeRawToken(rawToken);
+  if (!token) return null;
   if (!isUuid(documentId)) return null;
-  const hash = hashShareToken(rawToken);
+  const hash = hashShareToken(token);
 
   try {
-    const rows = (await withRequestDb((db) =>
-      db.execute(
-        sql`select public.app_delivery_document_by_token(${hash}, ${documentId}::uuid) as data`,
-      ),
-    )) as unknown as Array<{ data: DocumentSnapshot | null }>;
-    const snapshot = rows[0]?.data ?? null;
+    const snapshot = await readSdfJson<DocumentSnapshot>(
+      sql`select public.app_delivery_document_by_token(${hash}, ${documentId}::uuid) as data`,
+    );
     if (!snapshot) return null;
 
     const { bucket, object_key: objectKey } = snapshot;
