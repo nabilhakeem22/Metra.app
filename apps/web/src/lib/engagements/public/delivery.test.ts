@@ -68,8 +68,13 @@ describe('getDeliveryByToken hardening', () => {
     dbState.throwOnCall = true;
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     await expect(getDeliveryByToken('raw-token')).resolves.toBeNull();
-    // Breadcrumb logged, but NEVER the raw token.
-    expect(errorSpy).toHaveBeenCalledWith('delivery read failed', { hasSnapshot: false });
+    // Breadcrumb logged WITH the error: a client whose database blinked and a
+    // client whose link expired see the SAME dead page, so this line is the only
+    // thing that can tell on-call which happened. But NEVER the raw token.
+    expect(errorSpy).toHaveBeenCalledWith('delivery read failed', {
+      hasSnapshot: false,
+      error: expect.objectContaining({ message: 'db exploded' }),
+    });
     const logged = JSON.stringify(errorSpy.mock.calls);
     expect(logged).not.toContain('raw-token');
   });
