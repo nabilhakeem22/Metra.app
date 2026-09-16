@@ -1,10 +1,12 @@
-// Design-Engagement Machine — the guard-fact LOAD (wave 4, extracted from
-// `executor.ts` verbatim). Reads only: five SELECTs inside the caller's
-// transaction, in the order they were always issued, with no SQL text changed.
+// Design-Engagement Machine — the executor's READS (wave 4, extracted from
+// `executor.ts` verbatim). Reads only: the engagement row, then the five guard-
+// fact SELECTs, inside the caller's transaction, in the order they were always
+// issued, with no SQL text changed.
 import {
   type MetraDb,
   type DesignEngagement,
   type EngagementEvent,
+  designEngagements,
   engagementArtifacts,
   engagementChangeOrders,
   engagementEvents,
@@ -12,8 +14,29 @@ import {
   paymentEvents,
 } from '@metra/db';
 import { eq } from 'drizzle-orm';
+import { fail } from '@/lib/actions/result';
 import { liveEvents } from '../event-provenance';
 import type { GuardFacts } from '../guards';
+import type { TransitionRun } from './index';
+
+/**
+ * The engagement this transition moves, or `engagement_not_found`.
+ *
+ * The `where` carries NO org predicate on purpose: the RLS transaction is the
+ * tenancy boundary, so a row belonging to another org is simply invisible here
+ * and a forged id from another tenant answers "not found" like a deleted one.
+ */
+export async function loadEngagementForTransition(
+  run: TransitionRun,
+): Promise<DesignEngagement> {
+  const [engagement] = await run.tx
+    .select()
+    .from(designEngagements)
+    .where(eq(designEngagements.id, run.input.engagementId))
+    .limit(1);
+  if (!engagement) fail('engagement_not_found');
+  return engagement;
+}
 
 /**
  * Every fact the guards read, loaded inside the transaction and AFTER the

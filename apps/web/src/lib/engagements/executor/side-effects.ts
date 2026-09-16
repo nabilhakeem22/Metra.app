@@ -17,6 +17,7 @@ import { captureRenderManifest } from '../renders';
 import { isRevisionTrigger } from '../revision-allowance';
 import { applyRevision, resetRevisionsOnReject } from '../revisions';
 import type { SideEffectKey, Trigger } from '../transitions';
+import type { TransitionRun } from './index';
 
 /**
  * Everything a side-effect may read. The engagement row is the one loaded
@@ -112,3 +113,26 @@ export const SIDE_EFFECTS: Record<SideEffectKey, SideEffectHandler> = {
   resetRevisionsOnReject: ({ tx, engagement }) =>
     resetRevisionsOnReject(tx, engagement.id),
 };
+
+/**
+ * Apply the ONE side-effect this edge carries, if it carries one.
+ *
+ * Runs INSIDE the executor's tx, after the gate, so it commits atomically with
+ * the state move. A `fail()` inside a handler rolls the whole tx back — no state
+ * change, no side-effect rows. `def.sideEffect` is `SideEffectKey | null`, so at
+ * most one handler ever runs: this is a lookup, not a ladder, and a key without
+ * a handler is a compile error in `SIDE_EFFECTS`.
+ */
+export async function applySideEffect(
+  run: TransitionRun,
+  engagement: DesignEngagement,
+): Promise<void> {
+  if (!run.def.sideEffect) return;
+  await SIDE_EFFECTS[run.def.sideEffect]({
+    tx: run.tx,
+    ctx: run.ctx,
+    engagement,
+    trigger: run.input.trigger,
+    payload: run.input.payload,
+  });
+}
