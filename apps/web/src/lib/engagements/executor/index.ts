@@ -16,6 +16,7 @@ import {
 import { and, eq, inArray, sql } from 'drizzle-orm';
 import { fail, mutateInOrg } from '@/lib/actions/mutate';
 import { err, type ActionResult } from '@/lib/actions/result';
+import type { AuditEntry } from '@/lib/audit';
 import type { OrgContext } from '@/lib/db/context';
 import { isUuid } from '@/lib/uuid';
 import { recordConceptApproval, recordDesignApproval } from '../approvals';
@@ -35,6 +36,7 @@ import {
 import { isSelfLoop, validateLegalFrom } from './admissibility';
 import { loadGuardFacts } from './facts';
 import { validateGuards } from './guards-run';
+import { hasCommittedAttempt, lockSelfLoop } from './self-loop';
 
 export interface ExecuteTransitionInput {
   engagementId: string;
@@ -55,62 +57,19 @@ export interface ExecuteTransitionInput {
 }
 
 /**
- * Has this exact attempt already committed? Answered BEFORE any fact is read, so
- * a replay runs no guard, flips no state, fires no side-effect and writes no
- * ledger row. Runs after lockSelfLoop, so a retry that overlaps the original
- * waits for it to commit and then sees it.
- *
- * THE TRIGGER IS PART OF THE QUESTION. This short-circuit precedes the legal-from
- * check and every guard, so without it a caller that reused one key across two
- * verbs would get plain `ok` for the second with no ledger row, no side-effect
- * and no attestation — a false success on an evidentiary path. A key names one
- * attempt at ONE act; the same key on a different act is a different act.
+ * Everything ONE transition attempt needs, resolved once and passed to every
+ * phase as a single object — never seven positional arguments. The `tx` here is
+ * the one `mutateInOrg` opened: every phase shares it, so the transaction
+ * boundary is the callback's, not any phase's.
  */
-async function replayedSelfLoop(
-  tx: MetraDb,
-  ctx: OrgContext,
-  def: TransitionDef,
-  input: ExecuteTransitionInput,
-): Promise<boolean> {
-  if (!input.idempotencyKey || !isSelfLoop(def)) return false;
-  const [row] = await tx
-    .select({ id: engagementTransitions.id })
-    .from(engagementTransitions)
-    .where(
-      and(
-        eq(engagementTransitions.orgId, ctx.orgId),
-        eq(engagementTransitions.engagementId, input.engagementId),
-        eq(engagementTransitions.trigger, input.trigger),
-        eq(engagementTransitions.idempotencyKey, input.idempotencyKey),
-      ),
-    )
-    .limit(1);
-  return row !== undefined;
-}
-
-/**
- * Serialise the racers on a SELF-LOOP edge, BEFORE any fact is read. The state
- * gate cannot: a self-loop's target IS its expected state, so
- * `UPDATE ... WHERE state = <expected>` matches for every concurrent caller and
- * they all proceed to run the side-effect. Two simultaneous requestRevision calls
- * therefore both incremented the revision count from the same stale read and one
- * free revision was spent twice — or, at the allowance edge, two change orders
- * were raised for one revision.
- *
- * THE ORDER IS THE POINT: this takes the row lock by id and the caller loads the
- * engagement and every guard fact AFTERWARDS, so the second caller waits for the
- * first to commit and then reads the COMMITTED revision count, as-built flag and
- * ledger — not the snapshot it took before queuing. Locking after the load would
- * serialise the writers while leaving both reading the same stale row. No-op on
- * advancing edges, which the gate already serialises.
- */
-async function lockSelfLoop(tx: MetraDb, def: TransitionDef, id: string) {
-  if (!isSelfLoop(def)) return;
-  await tx
-    .select({ id: designEngagements.id })
-    .from(designEngagements)
-    .where(eq(designEngagements.id, id))
-    .for('update');
+export interface TransitionRun {
+  tx: MetraDb;
+  audit: (entry: AuditEntry) => Promise<void>;
+  ctx: OrgContext;
+  def: TransitionDef;
+  input: ExecuteTransitionInput;
+  /** Trimmed + UUID-validated, or null. Stored ONLY on a self-loop ledger row. */
+  idempotencyKey: string | null;
 }
 
 /**
@@ -151,27 +110,18 @@ export async function executeTransition(
       flow: 'interior',
     },
     async (tx, audit) => {
+      const run: TransitionRun = { tx, audit, ctx, def, input, idempotencyKey };
+
       // LOCK FIRST on a self-loop, THEN read: every fact below must be the
       // committed one, not a snapshot taken while the winner was still running.
-      await lockSelfLoop(tx, def, engagementId);
+      await lockSelfLoop(run);
 
       // A RETRY OF AN ATTEMPT THAT ALREADY COMMITTED IS A NO-OP. Decided here,
       // before the engagement is even read, so the replay cannot re-run a guard,
       // re-fire a side-effect or append a second ledger row. It returns plain
       // `ok` — the caller asked for this act and this act happened; telling them
       // "already" would only invite them to wonder whether it really did.
-      if (await replayedSelfLoop(tx, ctx, def, { ...input, idempotencyKey })) {
-        // One tap and four taps are otherwise indistinguishable afterwards: a
-        // replay writes nothing, so without this line the ledger, the audit log
-        // and the Worker log all look exactly as they would have if the studio
-        // had tapped once. The ENGAGEMENT and the TRIGGER, never the key — the
-        // key is the caller's credential for this act and does not belong in a
-        // log line anyone can read.
-        console.info(
-          `engagement transition replayed: ${engagementId} ${input.trigger}`,
-        );
-        return;
-      }
+      if (await hasCommittedAttempt(run)) return;
 
       const [engagement] = await tx
         .select()
