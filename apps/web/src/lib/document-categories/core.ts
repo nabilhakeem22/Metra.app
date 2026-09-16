@@ -36,10 +36,6 @@ function validNames(nameEn: string | null, nameAr: string | null): boolean {
 }
 
 /**
- * Add a category to the end of the firm's list. `key` stays null — that column marks
- * a row that came from the seeded defaults, and a firm's own category is not one.
- */
-/**
  * The next position at the end of the firm's list.
  *
  * Read INSIDE the caller's transaction so two concurrent adds cannot both claim
@@ -74,6 +70,10 @@ function auditCategoryChange(
   });
 }
 
+/**
+ * Add a category to the end of the firm's list. `key` stays null — that column marks
+ * a row that came from the seeded defaults, and a firm's own category is not one.
+ */
 export async function createDocumentCategoryCore(
   ctx: OrgContext,
   input: DocumentCategoryInput,

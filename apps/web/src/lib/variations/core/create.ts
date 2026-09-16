@@ -18,10 +18,6 @@ export interface CreateVariationDraftInput {
 }
 
 /**
- * Create a DRAFT variation order against an ISSUED or SIGNED contract. Gate
- * variations_draft/create. Allocates the per-org VO number (VO-YYYY-NNNN).
- */
-/**
  * The contract this VO changes, refusing one that is not live.
  *
  * A VO against a draft contract has nothing to vary, and one against a terminated
@@ -90,6 +86,10 @@ function auditVariationCreated(
   });
 }
 
+/**
+ * Create a DRAFT variation order against an ISSUED or SIGNED contract. Gate
+ * variations_draft/create. Allocates the per-org VO number (VO-YYYY-NNNN).
+ */
 export async function createVariationDraftCore(
   ctx: OrgContext,
   input: CreateVariationDraftInput,

@@ -13,22 +13,6 @@ import {
   lockDraftVariation,
 } from './internal-approve-gate';
 
-/**
- * Internal approval: draft->internal_approved (owner/admin, variations_price).
- *
- * R1 INVARIANT: the frozen `net_delta` MUST equal the sum of the frozen lines.
- * We (1) take a row lock on the VO first (SELECT ... FOR UPDATE) so a concurrent
- * `saveVariationDraftCore` — which also locks the VO row before rewriting its
- * lines — is serialized against us, then (2) compute `net_delta` as a subquery
- * over the lines INSIDE the gating UPDATE, so the read of the lines, the freeze
- * of the total, and the status flip are one atomic statement. A line rewrite can
- * therefore never interleave between the sum and the freeze. The client token is
- * ALSO minted here — the draft row is still unlocked, so this is the last write
- * that may touch a non-status column; the immutability trigger then permits only
- * the status flip on issue (the SDF keeps the token inert until then).
- * Owner/admin only; a concurrent 2nd call finds status<>'draft' ->
- * variation_not_draft.
- */
 /** The append-only ledger row for the transition. */
 async function recordInternalApprovedEvent(
   tx: MetraDb,
@@ -45,6 +29,22 @@ async function recordInternalApprovedEvent(
   });
 }
 
+/**
+ * Internal approval: draft->internal_approved (owner/admin, variations_price).
+ *
+ * R1 INVARIANT: the frozen `net_delta` MUST equal the sum of the frozen lines.
+ * We (1) take a row lock on the VO first (SELECT ... FOR UPDATE) so a concurrent
+ * `saveVariationDraftCore` — which also locks the VO row before rewriting its
+ * lines — is serialized against us, then (2) compute `net_delta` as a subquery
+ * over the lines INSIDE the gating UPDATE, so the read of the lines, the freeze
+ * of the total, and the status flip are one atomic statement. A line rewrite can
+ * therefore never interleave between the sum and the freeze. The client token is
+ * ALSO minted here — the draft row is still unlocked, so this is the last write
+ * that may touch a non-status column; the immutability trigger then permits only
+ * the status flip on issue (the SDF keeps the token inert until then).
+ * Owner/admin only; a concurrent 2nd call finds status<>'draft' ->
+ * variation_not_draft.
+ */
 export async function internalApproveVariationCore(
   ctx: OrgContext,
   input: { id: string },

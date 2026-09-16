@@ -13,14 +13,6 @@ import type { OrgContext } from '@/lib/db/context';
 import { rejectVariationsOnContractTermination } from '@/lib/variations/lifecycle';
 
 /**
- * Terminate an issued or signed contract: (issued|signed)->terminated. Owner/admin
- * only. The transition IS the admission gate — a concurrent 2nd call finds the
- * status no longer in (issued,signed) -> 0 rows -> contract_not_signable.
- *
- * Cascades: every variation order still awaiting a decision is rejected in the
- * same transaction, so no VO can be approved against a contract that is gone.
- */
-/**
  * Flip (issued|signed) -> terminated.
  *
  * The transition IS the admission gate: a concurrent 2nd call finds the status no
@@ -81,6 +73,14 @@ async function auditCascadedRejections(
   }
 }
 
+/**
+ * Terminate an issued or signed contract: (issued|signed)->terminated. Owner/admin
+ * only. The transition IS the admission gate — a concurrent 2nd call finds the
+ * status no longer in (issued,signed) -> 0 rows -> contract_not_signable.
+ *
+ * Cascades: every variation order still awaiting a decision is rejected in the
+ * same transaction, so no VO can be approved against a contract that is gone.
+ */
 export async function terminateContractCore(
   ctx: OrgContext,
   input: { id: string },

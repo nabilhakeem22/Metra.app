@@ -14,13 +14,6 @@ import type { OrgContext } from '@/lib/db/context';
 import { mintShareToken, shareExpiryFromNow } from '@/lib/share/token';
 
 /**
- * Issue a draft contract: draft->issued, mint the client acknowledgement token,
- * write the event. Owner/admin only (contracts_issue). The transition IS the
- * admission gate — a concurrent 2nd issue finds status<>'draft' -> 0 rows ->
- * contract_not_draft, no 2nd token, no 2nd event. Returns the RAW token; the
- * action wrapper turns it into the public acknowledgement link.
- */
-/**
  * Flip draft -> issued and stamp the acknowledgement token.
  *
  * A concurrent 2nd issue finds status<>'draft', affects 0 rows and fails
@@ -57,6 +50,13 @@ async function recordIssuedEvent(
   });
 }
 
+/**
+ * Issue a draft contract: draft->issued, mint the client acknowledgement token,
+ * write the event. Owner/admin only (contracts_issue). The transition IS the
+ * admission gate — a concurrent 2nd issue finds status<>'draft' -> 0 rows ->
+ * contract_not_draft, no 2nd token, no 2nd event. Returns the RAW token; the
+ * action wrapper turns it into the public acknowledgement link.
+ */
 export async function issueContractCore(
   ctx: OrgContext,
   input: { id: string },

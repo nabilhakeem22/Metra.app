@@ -16,15 +16,6 @@ import type { OrgContext } from '@/lib/db/context';
 import { canIssueVariation } from '../lifecycle-rules';
 
 /**
- * Issue to the client: internal_approved->issued (owner/admin, variations_price).
- * A PURE status flip — the token was already minted at internal approval (the
- * last write A2 immutability permits on a non-status column), so this activates it
- * (the SDF exposes only issued/approved/rejected VOs) and writes the event. The
- * transition IS the admission gate — a concurrent 2nd issue finds
- * status<>'internal_approved' -> variation_not_internal_approved. The contract
- * must still be live: terminating it closes the VO out instead.
- */
-/**
  * The VO's status and its contract's, read together.
  *
  * INNER JOIN on (id, org_id): a VO whose contract is invisible under RLS simply
@@ -91,6 +82,15 @@ async function recordIssuedEvent(
   });
 }
 
+/**
+ * Issue to the client: internal_approved->issued (owner/admin, variations_price).
+ * A PURE status flip — the token was already minted at internal approval (the
+ * last write A2 immutability permits on a non-status column), so this activates it
+ * (the SDF exposes only issued/approved/rejected VOs) and writes the event. The
+ * transition IS the admission gate — a concurrent 2nd issue finds
+ * status<>'internal_approved' -> variation_not_internal_approved. The contract
+ * must still be live: terminating it closes the VO out instead.
+ */
 export async function issueVariationCore(
   ctx: OrgContext,
   input: { id: string },
