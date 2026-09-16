@@ -3,7 +3,7 @@ import 'server-only';
 // "what exists", this answers "what needs me". Split out of a 210-line
 // `dashboard/queries.ts` — see ./index.ts.
 import { clients, designEngagements, projects } from '@metra/db';
-import { asc, eq, notInArray } from 'drizzle-orm';
+import { asc, eq, notInArray, sql } from 'drizzle-orm';
 import { withOrgContext, type OrgContext } from '@/lib/db/context';
 import type { DesignState } from '@/lib/engagements/states';
 import { TERMINAL_STATES } from '@/lib/engagements/states';
@@ -65,5 +65,27 @@ export function listDashboardDeliveries(
       .orderBy(asc(designEngagements.updatedAt))
       .limit(limit);
     return rows.map((r) => ({ ...r, updatedAt: r.updatedAt.toISOString() }));
+  });
+}
+
+/**
+ * How many deliveries are in flight — the number the panel's badge shows so the
+ * header can say what the cap is hiding.
+ *
+ * It exists SEPARATELY from `getDashboardCounts` because it belongs to the
+ * panel, not to the firm-wide block: a role entitled to the work list but not to
+ * firm figures (a project_manager) must still be told the true size of the list
+ * it is looking at — `deliveries.length` would say 6 when there are forty. It
+ * counts exactly the rows `listDashboardDeliveries` selects from, so withholding
+ * it while showing the list would be incoherent rather than private. Callers
+ * that already have the firm block read it from there and do not issue this.
+ */
+export function countActiveDeliveries(ctx: OrgContext): Promise<number> {
+  return withOrgContext(ctx, async (tx) => {
+    const [row] = await tx
+      .select({ active: sql<number>`count(*)::int` })
+      .from(designEngagements)
+      .where(notInArray(designEngagements.state, TERMINAL));
+    return row?.active ?? 0;
   });
 }

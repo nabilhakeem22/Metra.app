@@ -19,13 +19,17 @@ import { can } from '@/lib/permissions/can';
 import { readOnboarding } from '@/lib/onboarding/merge';
 import { getOnboardingProgress } from '@/lib/onboarding/progress';
 import {
-  getClientsByMonth,
-  getDashboardCounts,
-  getProjectsByMonth,
+  countActiveDeliveries,
   listDashboardDeliveries,
 } from '@/lib/dashboard/queries';
+import {
+  clientColumns,
+  projectColumns,
+  sliceTotals,
+} from '@/lib/dashboard/chart-columns';
+import { loadFirmFigures } from '@/lib/dashboard/firm-figures';
 import { pickPrimaryCta } from '@/lib/dashboard/primary-cta';
-import { fillMonths, parseRange } from '@/lib/dashboard/range';
+import { parseRange } from '@/lib/dashboard/range';
 
 /** How many in-flight deliveries the panel shows before deferring to the list. */
 const DELIVERY_ROWS = 6;
@@ -68,76 +72,48 @@ export default async function DashboardPage({
 
   const primary = pickPrimaryCta(ctx.role, { profileComplete, teamInvited });
 
-  // The dashboard's real figures. Three reads in parallel — the counts, and the
-  // two monthly series behind the charts.
-  // The panel is hidden entirely from roles that cannot read engagements, so the
-  // query is not even issued for them; the team card is gated the same way, on
-  // the capability that guards /team itself.
+  // The dashboard's real figures.
+  //
+  // The deliveries panel is hidden entirely from roles that cannot read
+  // engagements, so the query is not even issued for them; the team headcount is
+  // gated the same way, on the capability that guards /team itself.
+  //
+  // THE FIRM-WIDE BLOCK IS NULL FOR A ROLE THAT MAY NOT SEE IT — the four stat
+  // cards, both charts and the range filter — and `loadFirmFigures` decides that
+  // BEFORE issuing a query, so a fenced role costs zero round trips and the
+  // figures it may not see are never computed at all. See
+  // `lib/dashboard/firm-visibility.ts` for the two gates (the §2.2 grant, then
+  // the org's own narrowing) and why a refusal renders NOTHING rather than a
+  // locked placeholder.
   const canSeeDeliveries = can(ctx.role, 'engagements_design', 'read');
   const canSeeTeam = can(ctx.role, 'users_settings', 'read');
-  const [counts, projectMonths, clientMonths, deliveries] = await Promise.all([
-    getDashboardCounts(ctx, { includeTeamMembers: canSeeTeam }),
-    getProjectsByMonth(ctx, range),
-    getClientsByMonth(ctx, range),
+  const [firm, deliveries] = await Promise.all([
+    loadFirmFigures(ctx, { org, range, includeTeamMembers: canSeeTeam }),
     canSeeDeliveries
       ? listDashboardDeliveries(ctx, DELIVERY_ROWS)
       : Promise.resolve([]),
   ]);
 
-  // Postgres only returns months that HAVE rows, so the gaps are filled here: a
-  // chart that silently skips a quiet month misrepresents the trend.
+  // The panel's badge counts the SAME rows the panel lists, so a role entitled to
+  // the work list but not to firm figures still gets a TRUE number rather than
+  // the capped `deliveries.length`. One extra indexed count, and only on the
+  // fenced path — a caller that already has the firm block reads it from there.
+  const activeDeliveries =
+    firm?.counts.deliveriesActive ??
+    (canSeeDeliveries ? await countActiveDeliveries(ctx) : 0);
+
+  // The only computation left on this page is the month LABEL, which needs the
+  // request's locale. Every shaping decision is in `lib/dashboard/chart-columns`,
+  // which has its own tests.
   const monthLabel = (month: string) =>
     new Date(`${month}-01T00:00:00Z`).toLocaleDateString(locale, {
       month: 'short',
       timeZone: 'UTC',
     });
-  const projectColumns = fillMonths(
-    projectMonths,
-    range,
-    (month) => ({ month, active: 0, completed: 0, other: 0 }),
-  ).map((m) => ({
-    month: m.month,
-    label: monthLabel(m.month),
-    segments: [
-      { key: 'active', value: m.active },
-      { key: 'completed', value: m.completed },
-      { key: 'other', value: m.other },
-    ],
-  }));
-  const clientColumns = fillMonths(
-    clientMonths,
-    range,
-    (month) => ({ month, active: 0, inactive: 0 }),
-  ).map((m) => ({
-    month: m.month,
-    label: monthLabel(m.month),
-    segments: [
-      { key: 'active', value: m.active },
-      { key: 'inactive', value: m.inactive },
-    ],
-  }));
-
-  // COMPOSITION over the SAME window the bars covered. Summing the monthly
-  // buckets keeps the range filter meaningful and needs no new query -- the
-  // donut answers "what is the split" over exactly the period the bars used to
-  // trend across. The month-by-month shape is what the form gives up.
-  const sumBy = (
-    columns: { segments: Array<{ key: string; value: number }> }[],
-    key: string,
-  ) =>
-    columns.reduce(
-      (total, column) =>
-        total + (column.segments.find((s) => s.key === key)?.value ?? 0),
-      0,
-    );
-  const projectSlices = ['active', 'completed', 'other'].map((key) => ({
-    key,
-    value: sumBy(projectColumns, key),
-  }));
-  const clientSlices = ['active', 'inactive'].map((key) => ({
-    key,
-    value: sumBy(clientColumns, key),
-  }));
+  const charts = firm && {
+    projects: projectColumns(firm.projectMonths, range, monthLabel),
+    clients: clientColumns(firm.clientMonths, range, monthLabel),
+  };
   // The arc starts at the reading edge, so ar-EG sweeps from the other end.
   const rtl = locale.startsWith('ar');
 
@@ -172,84 +148,97 @@ export default async function DashboardPage({
 
       <GettingStarted result={checklist} orgId={ctx.orgId} dismissed={dismissed} />
 
-      {/* The headline figures, each a link into the module it counts. */}
-      <div className="grid gap-[14px] sm:grid-cols-2 lg:grid-cols-4">
-        <DashboardStatCard
-          label={d('cards.clients')}
-          value={counts.clientsTotal}
-          activeLabel={d('cards.active')}
-          activeValue={counts.clientsActive}
-          icon={Users}
-          href="/clients"
-        />
-        <DashboardStatCard
-          label={d('cards.projects')}
-          value={counts.projectsTotal}
-          activeLabel={d('cards.active')}
-          activeValue={counts.projectsActive}
-          icon={FolderKanban}
-          href="/projects"
-        />
-        {canSeeDeliveries && (
+      {/* The headline figures, each a link into the module it counts. FIRM-WIDE:
+          absent entirely for a role the firm has not entitled to them. */}
+      {firm && (
+        <div className="grid gap-[14px] sm:grid-cols-2 lg:grid-cols-4">
           <DashboardStatCard
-            label={d('cards.deliveries')}
-            value={counts.deliveriesTotal}
-            activeLabel={d('cards.inFlight')}
-            activeValue={counts.deliveriesActive}
-            icon={Compass}
-            href="/engagements"
+            label={d('cards.clients')}
+            value={firm.counts.clientsTotal}
+            activeLabel={d('cards.active')}
+            activeValue={firm.counts.clientsActive}
+            icon={Users}
+            href="/clients"
           />
-        )}
-        {canSeeTeam && (
           <DashboardStatCard
-            label={d('cards.team')}
-            value={counts.teamMembers ?? 0}
-            icon={UsersRound}
-            href="/team"
+            label={d('cards.projects')}
+            value={firm.counts.projectsTotal}
+            activeLabel={d('cards.active')}
+            activeValue={firm.counts.projectsActive}
+            icon={FolderKanban}
+            href="/projects"
           />
-        )}
-      </div>
+          {canSeeDeliveries && (
+            <DashboardStatCard
+              label={d('cards.deliveries')}
+              value={firm.counts.deliveriesTotal}
+              activeLabel={d('cards.inFlight')}
+              activeValue={firm.counts.deliveriesActive}
+              icon={Compass}
+              href="/engagements"
+            />
+          )}
+          {canSeeTeam && (
+            <DashboardStatCard
+              label={d('cards.team')}
+              value={firm.counts.teamMembers ?? 0}
+              icon={UsersRound}
+              href="/team"
+            />
+          )}
+        </div>
+      )}
 
       {canSeeDeliveries && (
         <DeliveriesPanel
           deliveries={deliveries}
-          totalActive={counts.deliveriesActive}
+          totalActive={activeDeliveries}
           locale={locale}
           now={new Date()}
         />
       )}
 
-      <div className="flex items-center justify-end">
-        <DashboardRangeFilter active={range} />
-      </div>
+      {/* The range filter belongs to the charts, so it goes with them: leaving a
+          control that reshapes figures nobody can see would be a dead affordance. */}
+      {charts && (
+        <>
+          <div className="flex items-center justify-end">
+            <DashboardRangeFilter active={range} />
+          </div>
 
-      <div className="grid gap-[14px] lg:grid-cols-2">
-        <DashboardDonut
-          title={d('charts.projects')}
-          summary={d('charts.projectsSummary', { n: range })}
-          emptyLabel={d('charts.empty')}
-          totalLabel={d('charts.total')}
-          slices={projectSlices}
-          rtl={rtl}
-          series={[
-            { key: 'active', label: d('charts.statusActive'), token: '--chart-1' },
-            { key: 'completed', label: d('charts.statusCompleted'), token: '--chart-2' },
-            { key: 'other', label: d('charts.statusOther'), token: '--chart-3' },
-          ]}
-        />
-        <DashboardDonut
-          title={d('charts.clients')}
-          summary={d('charts.clientsSummary', { n: range })}
-          emptyLabel={d('charts.empty')}
-          totalLabel={d('charts.total')}
-          slices={clientSlices}
-          rtl={rtl}
-          series={[
-            { key: 'active', label: d('charts.clientActive'), token: '--chart-1' },
-            { key: 'inactive', label: d('charts.clientInactive'), token: '--chart-3' },
-          ]}
-        />
-      </div>
+          <div className="grid gap-[14px] lg:grid-cols-2">
+            <DashboardDonut
+              title={d('charts.projects')}
+              summary={d('charts.projectsSummary', { n: range })}
+              emptyLabel={d('charts.empty')}
+              totalLabel={d('charts.total')}
+              slices={sliceTotals(charts.projects, [
+                'active',
+                'completed',
+                'other',
+              ])}
+              rtl={rtl}
+              series={[
+                { key: 'active', label: d('charts.statusActive'), token: '--chart-1' },
+                { key: 'completed', label: d('charts.statusCompleted'), token: '--chart-2' },
+                { key: 'other', label: d('charts.statusOther'), token: '--chart-3' },
+              ]}
+            />
+            <DashboardDonut
+              title={d('charts.clients')}
+              summary={d('charts.clientsSummary', { n: range })}
+              emptyLabel={d('charts.empty')}
+              totalLabel={d('charts.total')}
+              slices={sliceTotals(charts.clients, ['active', 'inactive'])}
+              rtl={rtl}
+              series={[
+                { key: 'active', label: d('charts.clientActive'), token: '--chart-1' },
+                { key: 'inactive', label: d('charts.clientInactive'), token: '--chart-3' },
+              ]}
+            />
+          </div>
+        </>
+      )}
     </div>
   );
 }

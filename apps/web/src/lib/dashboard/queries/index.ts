@@ -12,6 +12,7 @@ export {
   type ProjectsMonth,
 } from './trends';
 export {
+  countActiveDeliveries,
   listDashboardDeliveries,
   type DashboardDelivery,
 } from './deliveries';
