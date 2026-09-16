@@ -14,7 +14,10 @@ vi.mock('@/lib/db/client', () => ({
 import { sql } from 'drizzle-orm';
 import { normalizeRawToken, readSdfCode, readSdfJson } from './sdf-call';
 
-const anyQuery = sql`select 1 as data`;
+// Any token SDF call: the runners now ASSERT this shape before the round trip,
+// so a fixture that is not one would be refused before the row-shape reading the
+// cases below are about.
+const anyQuery = sql`select public.app_proposal_by_token(${'hash'}) as data`;
 
 describe('normalizeRawToken', () => {
   it('refuses absent and blank before any round-trip', () => {
@@ -48,6 +51,45 @@ describe('readSdfJson', () => {
     await expect(readSdfJson(anyQuery)).resolves.toBeNull();
     execute.mockResolvedValueOnce([{ data: null }]);
     await expect(readSdfJson(anyQuery)).resolves.toBeNull();
+  });
+});
+
+describe('the token-SDF shape assertion', () => {
+  it('runs a select on a public.app_* function', async () => {
+    execute.mockResolvedValueOnce([{ data: 1 }]);
+    await expect(
+      readSdfJson(sql`select public.app_delivery_by_token(${'hash'}) as data`),
+    ).resolves.toBe(1);
+    // Leading newline and a multi-line call, as four of the real portals write it.
+    execute.mockResolvedValueOnce([{ code: 'ok' }]);
+    await expect(
+      readSdfCode(sql`
+        select public.app_delivery_comment_by_token(
+          ${'hash'}, ${'doc'}::uuid
+        ) as code`),
+    ).resolves.toBe('ok');
+  });
+
+  it('refuses an ordinary query, without borrowing a connection', async () => {
+    // "These runners only ever call token SDFs" was a comment, and a comment is
+    // not a boundary: a security review ran `select * from clients` through this
+    // module on the BYPASSRLS socket and got lint-clean, exit 0.
+    execute.mockClear();
+    const refused = [
+      sql`select * from public.clients`,
+      sql`select public.other_function(${'x'})`,
+      sql`update public.app_delivery set state = 'x'`,
+      sql`  select  public.appx_delivery_by_token(${'h'}) as data`,
+    ];
+    for (const query of refused) {
+      await expect(readSdfJson(query)).rejects.toThrow(
+        /token SECURITY DEFINER functions only/,
+      );
+      await expect(readSdfCode(query)).rejects.toThrow(
+        /token SECURITY DEFINER functions only/,
+      );
+    }
+    expect(execute).not.toHaveBeenCalled();
   });
 });
 

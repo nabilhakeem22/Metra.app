@@ -32,6 +32,42 @@ export function normalizeRawToken(raw: string | null | undefined): string | null
   return trimmed ? trimmed : null;
 }
 
+/** A token SDF call and nothing else: `select public.app_<name>(`, then arguments. */
+const TOKEN_SDF_CALL = /^\s*select\s+public\.app_[a-z0-9_]+\s*\(/i;
+
+/**
+ * The literal text a built `SQL` opens with.
+ *
+ * Drizzle splits a template into chunks: the literal segments are `StringChunk`s
+ * carrying `value: string[]`, and every interpolated value is a separate chunk it
+ * binds as a parameter. So the FIRST chunk is the statement's opening text with no
+ * caller data in it — safe to read, and safe to put in an error message.
+ */
+function leadingSqlText(query: SQL): string {
+  const [first] = (query as unknown as { queryChunks?: unknown[] }).queryChunks ?? [];
+  const value = (first as { value?: unknown } | undefined)?.value;
+  if (Array.isArray(value)) return value.join('');
+  return typeof value === 'string' ? value : '';
+}
+
+/**
+ * Refuse anything that is not a token SDF call, before it reaches the socket.
+ *
+ * "These runners only ever call token SECURITY DEFINER functions" was a comment,
+ * and a comment is not a boundary: the eslint fence stops a NEW file importing
+ * this module, and this stops an ALLOWLISTED one handing it an ordinary query.
+ * A refusal here is a programming error, not a user input — every real caller is
+ * a `sql` template literal in this repository — so it throws rather than
+ * returning, and it throws BEFORE the connection is borrowed.
+ */
+function assertTokenSdf(query: SQL): void {
+  const leading = leadingSqlText(query);
+  if (TOKEN_SDF_CALL.test(leading)) return;
+  throw new Error(
+    `sdf-call runs token SECURITY DEFINER functions only; refused: ${leading.trim().slice(0, 80)}`,
+  );
+}
+
 /**
  * Run a token SDF that returns ONE json column aliased `data`, e.g.
  * ``sql`select public.app_proposal_by_token(${hash}) as data` ``.
@@ -42,6 +78,7 @@ export function normalizeRawToken(raw: string | null | undefined): string | null
  * of those it was is an oracle.
  */
 export async function readSdfJson<TPayload>(query: SQL): Promise<TPayload | null> {
+  assertTokenSdf(query);
   const rows = (await withRequestDb((db) => db.execute(query))) as unknown as Array<{
     data: TPayload | null;
   }>;
@@ -56,6 +93,7 @@ export async function readSdfJson<TPayload>(query: SQL): Promise<TPayload | null
  * ./sdf-result.ts read that as `token_invalid`, same as any unrecognised code.
  */
 export async function readSdfCode(query: SQL): Promise<string | undefined> {
+  assertTokenSdf(query);
   const rows = (await withRequestDb((db) => db.execute(query))) as unknown as Array<{
     code: string;
   }>;
