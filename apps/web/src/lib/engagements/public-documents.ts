@@ -13,7 +13,7 @@ import 'server-only';
 import { sql } from 'drizzle-orm';
 import { normalizeRawToken, readSdfJson } from '@/lib/share/sdf-call';
 import { hashShareToken } from '@/lib/share/token';
-import { ALLOWED_EXTENSIONS } from './deliverable-files';
+import { safeExtension } from '@/lib/files/safe-name';
 import { parseDocumentAccess, type DocumentAccess } from './document-access';
 import { isUuid } from '@/lib/uuid';
 import {
@@ -21,23 +21,6 @@ import {
   KIND_CATEGORY,
   isClientDocumentKind,
 } from './portal-documents';
-
-/**
- * The ONLY extensions that may appear in a client download name — the union of the
- * upload allowlist, so the two can never drift (pdf, dwg, dxf, png, jpg, jpeg,
- * xlsx, csv). Deliberately an ALLOWLIST, not a shape check: `download=` is appended
- * to the signed URL AFTER signing and is therefore not covered by the storage JWT,
- * so an attacker who obtains a link can strip it. Anything active (html, htm, svg,
- * xml, …) must never be able to ride the name; an unknown extension is dropped and
- * the file is simply saved as the bare category slug.
- *
- * `public-documents.test.ts` pins the resulting union, so widening the UPLOAD
- * allowlist to an active type fails loudly there instead of silently reaching the
- * client.
- */
-const DOWNLOAD_NAME_EXTENSIONS: ReadonlySet<string> = new Set(
-  Object.values(ALLOWED_EXTENSIONS).flat(),
-);
 
 export interface DeliveryDocumentTarget {
   bucket: string;
@@ -57,25 +40,6 @@ interface DocumentSnapshot {
   kind?: string | null;
   original_name?: string | null;
   access?: string | null;
-}
-
-/**
- * The lowercase extension of a stored filename, or null. TWO gates, in order:
- *  1. SHAPE — the final dot-segment must be 1–5 ASCII alphanumerics after
- *     lowercasing, so nothing with a quote, semicolon, newline, slash or unicode
- *     can ever reach a Content-Disposition header;
- *  2. MEMBERSHIP — it must be one of DOWNLOAD_NAME_EXTENSIONS. Shape alone was not
- *     enough: `html`/`htm`/`svg` all pass it, and the `download=` param that would
- *     force an attachment is appended after the URL is signed and can be stripped.
- * Anything else yields null and the download name carries no extension at all.
- */
-export function safeExtension(originalName: string | null | undefined): string | null {
-  if (typeof originalName !== 'string') return null;
-  const dot = originalName.lastIndexOf('.');
-  if (dot < 0 || dot === originalName.length - 1) return null;
-  const candidate = originalName.slice(dot + 1).toLowerCase();
-  if (!/^[a-z0-9]{1,5}$/.test(candidate)) return null;
-  return DOWNLOAD_NAME_EXTENSIONS.has(candidate) ? candidate : null;
 }
 
 /**

@@ -17,10 +17,10 @@ vi.mock('@/lib/db/context', () => ({
     }),
 }));
 
-const getSignedUrl = vi.fn<() => Promise<string>>();
+const getSignedUrl = vi.fn<(...args: unknown[]) => Promise<string>>();
 const removeStoredObject = vi.fn<(...args: string[]) => Promise<void>>();
 vi.mock('@/lib/storage', () => ({
-  getSignedUrl: () => getSignedUrl(),
+  getSignedUrl: (...args: unknown[]) => getSignedUrl(...args),
   removeStoredObject: (bucket: string, objectKey: string) =>
     removeStoredObject(bucket, objectKey),
 }));
@@ -82,11 +82,33 @@ beforeEach(() => {
 
 describe('getDocumentUrlCore', () => {
   it('signs a URL for a file of this entity in this org', async () => {
-    ownedRow.mockReturnValue({ id: 'file-1' });
+    ownedRow.mockReturnValue({ id: 'file-1', originalName: 'Site survey.pdf' });
     getSignedUrl.mockResolvedValue('https://storage.example/signed');
     await expect(
       getDocumentUrlCore(ctx, DOCUMENT_ENTITIES.client, 'file-1'),
     ).resolves.toEqual({ ok: true, url: 'https://storage.example/signed' });
+  });
+
+  it('signs as an ATTACHMENT, with the extension allowlist applied', async () => {
+    // Served inline, an uploaded .html executes on the Supabase project origin.
+    // A download name makes Storage answer Content-Disposition: attachment, and
+    // the allowlist drops the extension so nothing can render it either way.
+    ownedRow.mockReturnValue({ id: 'file-1', originalName: 'Invoice.html' });
+    getSignedUrl.mockResolvedValue('https://storage.example/signed');
+    await getDocumentUrlCore(ctx, DOCUMENT_ENTITIES.client, 'file-1');
+    expect(getSignedUrl).toHaveBeenCalledWith(ctx, 'file-1', { download: 'Invoice' });
+
+    ownedRow.mockReturnValue({ id: 'file-1', originalName: 'Site survey v2.PDF' });
+    await getDocumentUrlCore(ctx, DOCUMENT_ENTITIES.client, 'file-1');
+    expect(getSignedUrl).toHaveBeenLastCalledWith(ctx, 'file-1', {
+      download: 'Site survey v2.pdf',
+    });
+
+    ownedRow.mockReturnValue({ id: 'file-1', originalName: null });
+    await getDocumentUrlCore(ctx, DOCUMENT_ENTITIES.client, 'file-1');
+    expect(getSignedUrl).toHaveBeenLastCalledWith(ctx, 'file-1', {
+      download: 'document',
+    });
   });
 
   it('answers `invalid` for a file this entity does not own — and never signs', async () => {
@@ -101,7 +123,7 @@ describe('getDocumentUrlCore', () => {
     // The not-found answer is decided before the try. An outage answering
     // `invalid` told the studio the file no longer exists — and told the log
     // nothing at all, so on-call could not tell an outage from a junk id.
-    ownedRow.mockReturnValue({ id: 'file-1' });
+    ownedRow.mockReturnValue({ id: 'file-1', originalName: 'plan.pdf' });
     getSignedUrl.mockRejectedValue(new Error('storage 503'));
     await expect(
       getDocumentUrlCore(ctx, DOCUMENT_ENTITIES.client, 'file-1'),

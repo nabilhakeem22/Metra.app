@@ -7,6 +7,7 @@ import { fail, mutateInOrg } from '@/lib/actions/mutate';
 import { err, type ActionResult } from '@/lib/actions/result';
 import { withOrgContext, type OrgContext } from '@/lib/db/context';
 import { can } from '@/lib/permissions/can';
+import { safeDownloadName } from '@/lib/files/safe-name';
 import { getSignedUrl, removeStoredObject } from '@/lib/storage';
 import type { DocumentEntitySpec } from './entities';
 
@@ -22,9 +23,9 @@ async function ownedDocument(
   tx: MetraDb,
   spec: DocumentEntitySpec,
   fileId: string,
-): Promise<{ id: string } | undefined> {
+): Promise<{ id: string; originalName: string | null } | undefined> {
   const [owned] = await tx
-    .select({ id: files.id })
+    .select({ id: files.id, originalName: files.originalName })
     .from(files)
     .where(and(eq(files.id, fileId), eq(files.entity, spec.entity)))
     .limit(1);
@@ -36,13 +37,19 @@ async function ownedDocument(
  *
  * Refused for a file of the wrong entity or another org — see `ownedDocument`.
  *
- * The NOT-FOUND answer is decided above, by `ownedDocument`. By the time the
- * `try` runs the row is proved to exist, so what the catch holds is a dependency
- * failure — a Storage 5xx, a timeout, a bad key (or, vanishingly, a row deleted
- * between the two reads). Answering `invalid` made an outage indistinguishable
- * from a deleted file, on screen ("that no longer exists") and in the log, which
- * said nothing at all. It logs the error and answers `generic`, so on-call can
- * tell "Storage is down" from "this id is junk".
+ * SIGNED AS AN ATTACHMENT, always. A signed URL with no download name is served
+ * INLINE, so an uploaded `Invoice.html` — the content type comes verbatim from
+ * the uploader's browser — rendered as a page on the Supabase project origin and
+ * executed there: in-org phishing under a URL that looks like the firm's own
+ * storage. `safeDownloadName` is the client portal's extension allowlist, so
+ * `.html`/`.svg` lose the extension and every document is saved, not rendered.
+ *
+ * The NOT-FOUND answer is decided above, by `ownedDocument`, so what the catch
+ * holds is a dependency failure — a Storage 5xx, a timeout, a bad key (or,
+ * vanishingly, a row deleted between the two reads). Answering `invalid` made an
+ * outage indistinguishable from a deleted file, on screen ("that no longer
+ * exists") and in the log, which said nothing. It logs the error and answers
+ * `generic`, so on-call can tell "Storage is down" from "this id is junk".
  */
 export async function getDocumentUrlCore(
   ctx: OrgContext,
@@ -55,7 +62,9 @@ export async function getDocumentUrlCore(
   );
   if (!owned) return err('invalid');
   try {
-    const url = await getSignedUrl(ctx, fileId);
+    const url = await getSignedUrl(ctx, fileId, {
+      download: safeDownloadName(owned.originalName),
+    });
     return { ok: true, url };
   } catch (error) {
     console.error('document url mint failed', { fileId, entity: spec.entity, error });

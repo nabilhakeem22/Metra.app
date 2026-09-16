@@ -162,11 +162,16 @@ export async function createSignedObjectUrl(
  * Returns a time-limited signed download URL for a file, but ONLY if the file
  * belongs to the caller's org — the lookup runs under RLS, so an org-B context
  * cannot resolve (and therefore cannot sign) an org-A file.
+ *
+ * `download` is the name the browser saves as, and passing it is what makes
+ * Storage answer `Content-Disposition: attachment` instead of serving the bytes
+ * inline on the Supabase project origin. Build it with
+ * `lib/files/safe-name.ts safeDownloadName` — never from a raw stored filename.
  */
 export async function getSignedUrl(
   ctx: OrgContext,
   fileId: string,
-  ttlSeconds = 3600,
+  opts: { ttlSeconds?: number; download?: string } = {},
 ): Promise<string> {
   const rows = await withOrgContext(ctx, (tx) =>
     tx
@@ -180,7 +185,9 @@ export async function getSignedUrl(
     throw new Error('File not found in this org');
   }
 
-  return createSignedObjectUrl(rows[0].bucket, rows[0].objectKey, ttlSeconds);
+  return createSignedObjectUrl(rows[0].bucket, rows[0].objectKey, opts.ttlSeconds ?? 3600, {
+    download: opts.download,
+  });
 }
 
 /**
