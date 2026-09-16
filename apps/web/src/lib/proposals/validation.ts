@@ -9,7 +9,9 @@
 // resolving unchanged.
 import { MONEY_RE } from '@/lib/aggregates/proposal-totals';
 
-const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+// An ISO calendar date is not a proposal idea either; it lives in the validation
+// kernel next to the other input-boundary readers.
+export { validIsoDate } from '@/lib/validation/iso-date';
 
 // The section/line caps are not proposal-specific — contracts, variations and
 // BOQs enforce the same numbers — so they live in the line kernel. Re-exported
@@ -39,12 +41,6 @@ export function pctInRange(s: string): boolean {
   if (!MONEY_RE.test(t) || t.startsWith('-')) return false;
   const n = Number(t);
   return Number.isFinite(n) && n >= 0 && n <= 100;
-}
-
-export function validIsoDate(s: string): boolean {
-  if (!ISO_DATE_RE.test(s)) return false;
-  const d = new Date(`${s}T00:00:00Z`);
-  return Number.isFinite(d.getTime()) && d.toISOString().slice(0, 10) === s;
 }
 
 export function chunk<T>(arr: T[], size: number): T[][] {
