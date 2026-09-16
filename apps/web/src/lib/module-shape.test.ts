@@ -1,6 +1,7 @@
 import { readFileSync, readdirSync } from 'node:fs';
 import { sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
 
 /**
@@ -31,13 +32,6 @@ interface SourceFile {
   text: string;
 }
 
-/**
- * Every `from '…'` specifier in a file: `import … from`, `export … from`,
- * `export * from`, single OR double quoted, one line or many. The character class
- * excludes quotes and semicolons so a match cannot run past the end of its own
- * statement, and it admits newlines so a multi-line `import { … }` is read whole.
- */
-const SPECIFIER = /(?:^|\n)[ \t]*(?:import|export)\b[^;'"]*?from[ \t\n]*['"]([^'"]+)['"]/g;
 
 /**
  * A specifier as the module it actually resolves to, written `@/…`.
@@ -60,14 +54,27 @@ export function resolveSpecifier(fromFile: string, specifier: string): string | 
   return `@/${resolved.join('/')}`;
 }
 
-/** The modules a file depends on, each as a resolved `@/…` path. */
+/**
+ * Every module a file depends on: static imports, `export … from`, `export *`,
+ * SIDE-EFFECT imports (`import 'x'`) and dynamic `import(...)`. Scanned by the
+ * TypeScript compiler's own pre-processor — no Program, no type-checker, ~180ms
+ * for the whole tree, and no new dependency (`typescript` is already a
+ * devDependency of both the root and apps/web).
+ *
+ * THIS REPLACES A REGEX, and the regex is what a tester walked through. It was
+ * anchored on `from`, so it could not see `import 'server-only'` — 124 such
+ * specifiers exist in this tree, which means a side-effect import of a forbidden
+ * module was a hole nobody had counted. It also could not see `await
+ * import('../../proposals/core')`, a comment containing a semicolon or an
+ * apostrophe inside a multi-line import, or two import statements on one line.
+ * The compiler's scanner sees all of them because it is reading TOKENS, not
+ * looking for a shape.
+ */
 export function importedModules(file: SourceFile): string[] {
-  const modules: string[] = [];
-  for (const [, specifier] of file.text.matchAll(SPECIFIER)) {
-    const resolved = resolveSpecifier(file.path, specifier);
-    if (resolved) modules.push(resolved);
-  }
-  return modules;
+  return ts
+    .preProcessFile(file.text, true, true)
+    .importedFiles.map((reference) => resolveSpecifier(file.path, reference.fileName))
+    .filter((module): module is string => module !== null);
 }
 
 /** Is `module` that path, or something underneath it? */
@@ -95,7 +102,14 @@ const PROPOSAL_INTERNALS = [
   '@/lib/proposals/lifecycle',
 ];
 
-const BARREL = /^\/lib\/(proposals|contracts|variations)\/.*\/index\.ts$/;
+/**
+ * A barrel: `index.ts` ANYWHERE under one of the three document modules,
+ * including the MODULE-LEVEL one (`/lib/variations/index.ts`). The previous
+ * pattern required a directory between the module and the index, so a
+ * module-level barrel re-exporting another module's kernel was not a barrel to
+ * this gate at all — evasion E4.
+ */
+const BARREL = /^\/lib\/(proposals|contracts|variations)\/(.*\/)?index\.ts$/;
 
 export function ruleOneOffenders(files: SourceFile[]): string[] {
   return files
@@ -183,9 +197,11 @@ describe('module shape', () => {
 
   it('rule 3 covers every barrel the three modules actually have', () => {
     // If a module loses its index.ts the rule above passes vacuously, so the
-    // count is pinned: 3 modules x {core, lifecycle, queries}.
+    // floor is pinned: 3 modules x {core, lifecycle, queries}. It is a FLOOR and
+    // not an equality now that the pattern also matches a module-level
+    // `index.ts` — adding one must not fail this, but it must carry the law.
     const barrels = files.filter((file) => BARREL.test(file.path));
-    expect(barrels).toHaveLength(9);
+    expect(barrels.length).toBeGreaterThanOrEqual(9);
     for (const barrel of barrels) expect(barrel.text).toContain('BARREL LAW');
   });
 });
@@ -248,6 +264,80 @@ describe('the gate catches what was walked through it', () => {
     );
     expect(ruleThreeOffenders(reexport)).toHaveLength(1);
     expect(ruleTwoOffenders(reexport)).toHaveLength(1);
+  });
+
+  // ── THE SIX F5 WALKED THROUGH ──────────────────────────────────────────
+  // Every one of these PASSED the regex this file used to use. Each is a fixture
+  // rather than a real module so the proof survives without anybody re-adding a
+  // probe file to the tree.
+
+  it('evasion D: a RELATIVE dynamic import reaches a proposals internal', () => {
+    const offender = file(
+      '/lib/contracts/core/gate-evasion.ts',
+      'export async function reach() {\n' +
+        "  const mod = await import('../../proposals/core');\n" +
+        '  return mod;\n}\n',
+    );
+    expect(ruleOneOffenders(offender)).toHaveLength(1);
+    expect(ruleTwoOffenders(offender)).toHaveLength(1);
+  });
+
+  it('evasion E: an ALIASED dynamic import reaches a proposals internal', () => {
+    const offender = file(
+      '/lib/variations/gate-evasion.ts',
+      "const load = () => import('@/lib/proposals/lifecycle');\n",
+    );
+    expect(ruleOneOffenders(offender)).toHaveLength(1);
+    expect(ruleTwoOffenders(offender)).toHaveLength(1);
+  });
+
+  it('evasion F: a comment holding a SEMICOLON inside a multi-line import', () => {
+    const offender = file(
+      '/lib/contracts/gate-evasion.ts',
+      'import {\n' +
+        '  // totals; margins; everything\n' +
+        '  createProposalCore,\n' +
+        "} from '@/lib/proposals/core';\n",
+    );
+    expect(ruleOneOffenders(offender)).toHaveLength(1);
+  });
+
+  it('evasion G: a comment holding an APOSTROPHE inside a multi-line import', () => {
+    const offender = file(
+      '/lib/contracts/gate-evasion.ts',
+      'import {\n' +
+        "  // the studio's own rates\n" +
+        '  createProposalCore,\n' +
+        "} from '@/lib/proposals/core';\n",
+    );
+    expect(ruleOneOffenders(offender)).toHaveLength(1);
+  });
+
+  it('evasion H: TWO import statements on ONE line', () => {
+    const offender = file(
+      '/lib/contracts/gate-evasion.ts',
+      "import { a } from './local'; import { b } from '@/lib/proposals/core';\n",
+    );
+    expect(ruleOneOffenders(offender)).toHaveLength(1);
+  });
+
+  it('evasion I: a MODULE-LEVEL index.ts is a barrel too', () => {
+    const offender = file(
+      '/lib/variations/index.ts',
+      "// BARREL LAW\nexport { clean } from '@/lib/validation/text';\n",
+    );
+    expect(BARREL.test('/lib/variations/index.ts')).toBe(true);
+    expect(ruleThreeOffenders(offender)).toHaveLength(1);
+  });
+
+  it('a SIDE-EFFECT import of a forbidden module is seen', () => {
+    // `import 'x'` carries no `from`, so the regex was structurally blind to it.
+    const offender = file(
+      '/lib/contracts/gate-evasion.ts',
+      "import '@/lib/proposals/core';\n",
+    );
+    expect(ruleOneOffenders(offender)).toHaveLength(1);
+    expect(ruleTwoOffenders(offender)).toHaveLength(1);
   });
 
   it('the legal shapes stay legal', () => {
