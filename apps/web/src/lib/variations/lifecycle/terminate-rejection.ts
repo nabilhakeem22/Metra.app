@@ -51,6 +51,13 @@ async function appendRejectionEvents(
       orgId: ctx.orgId,
       variationOrderId: vo.id,
       kind: 'rejected' as const,
+      // THE CASCADE, NOT THE CLIENT (0051). This is the row that makes the
+      // difference readable: a VO reaches `rejected` either because the client
+      // refused it or because the contract was terminated under it, and until
+      // this column existed the portal had to guess from the contract's status —
+      // and told a client who HAD refused that they never decided. The other
+      // route stamps 'client' inside `app_variation_respond_by_token`.
+      actorChannel: 'staff' as const,
       actorUserId: ctx.userId,
       fromStatus: vo.fromStatus,
       toStatus: 'rejected' as const,

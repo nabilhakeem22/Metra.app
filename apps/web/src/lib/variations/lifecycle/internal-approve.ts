@@ -23,6 +23,10 @@ async function recordInternalApprovedEvent(
     orgId: ctx.orgId,
     variationOrderId,
     kind: 'internal_approved',
+    // A session action by a member of the studio (0051). Every producer of a
+    // variation_order_events row now STATES its channel, so `rejected` can be
+    // read back as "the client refused" or "the termination closed it".
+    actorChannel: 'staff',
     actorUserId: ctx.userId,
     fromStatus: 'draft',
     toStatus: 'internal_approved',
