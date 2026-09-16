@@ -130,17 +130,14 @@ export async function deleteDocumentCore(
  * Delete the bytes behind a document that is already gone from the database.
  *
  * AFTER the transaction commits, and best-effort. Nothing in the product deleted
- * a stored object at all (`grep -rn "\.remove(" apps/web/src workers` was zero
- * hits), so every document a studio ever deleted left its bytes in the bucket
- * forever — unreferenced, un-enumerable once the row was gone, still holding a
- * client's drawings after the studio believed they were destroyed, and still
- * billed for.
+ * a stored object at all, so every document a studio ever deleted left its bytes
+ * in the bucket forever — unreferenced, un-enumerable once the row carrying the
+ * key was gone, still holding a client's drawings, and still billed for.
  *
  * It cannot run INSIDE the transaction: Storage is an HTTP dependency and the
  * row lock would be held across its outage. It cannot fail the action either —
- * the row IS deleted and the studio's answer must not change because a bucket
- * call timed out. A failure is logged and leaves exactly the orphan today's code
- * leaves every time.
+ * the row IS deleted. A failure is logged and leaves exactly the orphan today's
+ * code leaves every time.
  */
 async function discardStoredBytes(deleted: DeletedObject | undefined): Promise<void> {
   if (!deleted) return;
