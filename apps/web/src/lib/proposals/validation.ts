@@ -11,11 +11,15 @@ import { MONEY_RE } from '@/lib/aggregates/proposal-totals';
 
 const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
-// R2 boundary caps (named so the tests + UI can agree on them).
-export const MAX_SECTIONS = 100;
-export const MAX_LINES_PER_SECTION = 500;
-export const MAX_TOTAL_LINES = 2000;
-export const LINE_INSERT_CHUNK = 500;
+// The section/line caps are not proposal-specific — contracts, variations and
+// BOQs enforce the same numbers — so they live in the line kernel. Re-exported
+// here so the sites that import them from this module keep resolving unchanged.
+export {
+  MAX_SECTIONS,
+  MAX_LINES_PER_SECTION,
+  MAX_TOTAL_LINES,
+  LINE_INSERT_CHUNK,
+} from '@/lib/lines/limits';
 
 // The money magnitude cap and its guard are not proposal-specific — BOQs,
 // variations and the price book enforce them too — so they live in the money

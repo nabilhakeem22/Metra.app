@@ -7,7 +7,13 @@ import {
   pctInRange,
   validIsoDate,
   withinMagnitude,
-} from './validation';
+} from '@/lib/proposals/validation';
+import {
+  LINE_INSERT_CHUNK,
+  MAX_LINES_PER_SECTION,
+  MAX_SECTIONS,
+  MAX_TOTAL_LINES,
+} from './limits';
 
 // The EXACT option set the proposal header and line validators use: an omitted
 // field falls back to a caller-supplied value rather than being refused.
@@ -18,6 +24,29 @@ const readAmount = (value: string | null | undefined, blank = '0') =>
 // entirely on database suites that only run in CI. These are the pure validators
 // that stand between a pasted string and a money column, so they are the part that
 // most deserved proving in milliseconds rather than minutes.
+
+describe('the line caps', () => {
+  it('pins the numbers the builder guard and the server core must agree on', () => {
+    // Four modules (proposals, contracts, variations, boqs) enforce these. They
+    // are pinned here rather than in each module so a change is one visible diff
+    // instead of four that can drift apart.
+    expect(MAX_SECTIONS).toBe(100);
+    expect(MAX_LINES_PER_SECTION).toBe(500);
+    expect(MAX_TOTAL_LINES).toBe(2000);
+  });
+
+  it('keeps the insert batch clear of the bind-parameter ceiling', () => {
+    // A line row carries ~15 columns; Postgres refuses past 65,535 parameters.
+    expect(LINE_INSERT_CHUNK).toBe(500);
+    expect(LINE_INSERT_CHUNK * 15).toBeLessThan(65_535);
+  });
+
+  it('allows a document that fills every section without hitting the total', () => {
+    // MAX_TOTAL_LINES is the binding constraint, not MAX_SECTIONS x MAX_LINES:
+    // the per-section cap alone would permit 50,000 lines.
+    expect(MAX_SECTIONS * MAX_LINES_PER_SECTION).toBeGreaterThan(MAX_TOTAL_LINES);
+  });
+});
 
 describe('a proposal money field', () => {
   it('falls back for absent input and rejects a malformed one', () => {
