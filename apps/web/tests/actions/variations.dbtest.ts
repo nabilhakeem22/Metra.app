@@ -23,13 +23,43 @@ import {
   saveVariationDraftCore,
 } from '@/lib/variations/core';
 import { getVariationByToken, respondToVariationByToken } from '@/lib/variations/public';
-import {
-  getProjectApprovedVariationTotal,
-  getVariationWithLines,
-} from '@/lib/variations/queries';
+import { computeVariationNetDelta } from '@/lib/aggregates/contract-value';
 import { closeFixture, ctxFor, raw, seedOrg, teardown } from './fixture';
 import type { OrgContext } from '@/lib/db/context';
 import type { MemberRole } from '@metra/db';
+
+// Read-back instruments.
+//
+// `lib/variations/queries` used to export a `getVariationWithLines` and a
+// per-project approved-total query, and this suite was their ONLY caller —
+// nothing in the product read either one, because the register on the contract
+// detail page is the only variation surface that exists. The dead queries are
+// gone; the read-back is what it always was underneath, a direct select. Every
+// assertion below is unchanged.
+async function readSavedVariation(
+  variationOrderId: string,
+): Promise<{ netDelta: string; lineTotals: string[] }> {
+  const [header] = await raw.query<{ net_delta: string }>(
+    `select net_delta from public.variation_orders where id = '${variationOrderId}'`,
+  );
+  const lines = await raw.query<{ line_total: string }>(
+    `select line_total from public.variation_order_lines` +
+      ` where variation_order_id = '${variationOrderId}' order by sort_order asc`,
+  );
+  return { netDelta: header.net_delta, lineTotals: lines.map((l) => l.line_total) };
+}
+
+/** Sigma netDelta of the APPROVED VOs for a project — the register's bottom line.
+ *  The same pure aggregate the deleted query used, over the same rows. */
+async function approvedVariationTotal(projectId: string): Promise<string> {
+  const rows = await raw.query<{ net_delta: string }>(
+    `select net_delta from public.variation_orders` +
+      ` where project_id = '${projectId}' and status = 'approved'`,
+  );
+  return computeVariationNetDelta(
+    rows.map((r) => ({ lineCost: '0', lineTotal: r.net_delta, lineMargin: '0' })),
+  );
+}
 
 const orgIds: string[] = [];
 afterAll(async () => {
@@ -82,11 +112,11 @@ describe('variation draft save recomputes server-side (AC8)', () => {
       ],
     });
     expect(res.ok).toBe(true);
-    const d = await getVariationWithLines(ctx, voId, true);
+    const saved = await readSavedVariation(voId);
     // 3*200 - 150 = 450
-    expect(d!.netDelta).toBe('450.0000');
-    expect(d!.lines[0].lineTotal).toBe('600.0000');
-    expect(d!.lines[1].lineTotal).toBe('-150.0000');
+    expect(saved.netDelta).toBe('450.0000');
+    expect(saved.lineTotals[0]).toBe('600.0000');
+    expect(saved.lineTotals[1]).toBe('-150.0000');
   });
 
   it('a fully negative VO yields a negative netDelta', async () => {
@@ -97,8 +127,7 @@ describe('variation draft save recomputes server-side (AC8)', () => {
       id: voId,
       lines: [{ descriptionEn: 'Cut scope', qty: '-2', unit: 'lump_sum', unitCost: '0', unitPrice: '500', discountPct: '0' }],
     });
-    const d = await getVariationWithLines(ctx, voId, true);
-    expect(d!.netDelta).toBe('-1000.0000');
+    expect((await readSavedVariation(voId)).netDelta).toBe('-1000.0000');
   });
 
   it('rejects creating a VO against a draft (non-issued) contract', async () => {
@@ -189,7 +218,7 @@ describe('client decision via token + revised value (AC9)', () => {
     expect(detail!.revisedValue).toBe('1640.0000');
 
     // Per-project approved-VO register total = exactly Σ approved deltas = 500.
-    const total = await getProjectApprovedVariationTotal(ctx, projectId);
+    const total = await approvedVariationTotal(projectId);
     expect(total).toBe('500.0000');
   });
 
@@ -291,7 +320,7 @@ describe('F1: a de-scope reverses an add to the piastre', () => {
     // Revised value back to the original baseline, and the register nets to 0.
     const detail = await getContractWithLines(ctx, contractId, true);
     expect(detail!.revisedValue).toBe(detail!.originalValue);
-    expect(await getProjectApprovedVariationTotal(ctx, projectId)).toBe('0.0000');
+    expect(await approvedVariationTotal(projectId)).toBe('0.0000');
   });
 });
 
