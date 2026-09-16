@@ -21,6 +21,20 @@ import { DOCUMENT_ENTITIES } from './entities';
 // yet roll back — and it means the core cannot be called from a DB test, an API
 // route or the cron runner, none of which have a Next request to revalidate.
 
+/**
+ * Does a delete's outcome oblige us to drop the server-rendered cache?
+ *
+ * `ok` obviously. `uncertain` too: `mutateInOrg` answers it when the write
+ * outcome is AMBIGUOUS (write deadline, lock timeout, dropped socket), which
+ * means the DELETE may well have committed. Skipping the revalidation there
+ * leaves every rendered surface listing a file that is already gone — the studio
+ * clicks delete again and is told the file does not exist while looking at it.
+ * A needless cache bust costs one re-render; a missed one costs a wrong screen.
+ */
+function deleteChangedSomething(result: ActionResult): boolean {
+  return result.ok || result.error === 'uncertain';
+}
+
 export async function createClientDocumentUpload(input: {
   clientId: string;
   contentType?: string;
@@ -46,7 +60,7 @@ export async function getClientDocumentUrl(
 export async function deleteClientDocument(fileId: string): Promise<ActionResult> {
   const ctx = await requireOrg();
   const result = await deleteDocumentCore(ctx, DOCUMENT_ENTITIES.client, fileId);
-  if (result.ok) refreshApp();
+  if (deleteChangedSomething(result)) refreshApp();
   return result;
 }
 
@@ -75,6 +89,6 @@ export async function getProjectDocumentUrl(
 export async function deleteProjectDocument(fileId: string): Promise<ActionResult> {
   const ctx = await requireOrg();
   const result = await deleteDocumentCore(ctx, DOCUMENT_ENTITIES.project, fileId);
-  if (result.ok) refreshApp();
+  if (deleteChangedSomething(result)) refreshApp();
   return result;
 }

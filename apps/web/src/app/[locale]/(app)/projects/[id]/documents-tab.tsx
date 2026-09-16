@@ -78,7 +78,11 @@ export function DocumentsTab({
   function onDownload(id: string) {
     startTransition(async () => {
       const res = await getProjectDocumentUrl(id);
-      if (res.ok && res.url) window.open(res.url, '_blank', 'noopener');
+      if (res.ok && res.url) {
+        window.open(res.url, '_blank', 'noopener');
+        return;
+      }
+      toast({ title: resolveActionError(res.error, te), variant: 'destructive' });
     });
   }
 
@@ -88,7 +92,13 @@ export function DocumentsTab({
       if (res.ok) {
         toast({ title: t('deleted') });
         router.refresh();
+        return;
       }
+      // Every coded refusal is SHOWN, `uncertain` above all: the row may or may
+      // not be gone, so the studio is told to refresh and check rather than left
+      // watching a file that did not react to being deleted.
+      toast({ title: resolveActionError(res.error, te), variant: 'destructive' });
+      router.refresh();
     });
   }
 
