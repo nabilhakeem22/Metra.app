@@ -7,7 +7,8 @@ import {
   proposals,
   type MetraDb,
 } from '@metra/db';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
+import { fail } from '@/lib/actions/mutate';
 import { insertLinesInChunks } from '@/lib/lines/insert-chunked';
 import type { DocTotals } from '@/lib/aggregates/proposal-totals';
 import type { ResolvedHeader } from './draft-save-validate';
@@ -89,14 +90,26 @@ function totalsColumns(totals: DocTotals) {
   };
 }
 
-/** Stamp the normalized header and the recomputed document totals. */
+/**
+ * Stamp the normalized header and the recomputed document totals, RE-ASSERTING
+ * the draft gate — as `variations/core/update-persist.ts persistVariationHeader`
+ * does, and as this statement did not.
+ *
+ * A draft save racing a send is a NORMAL race: the loser blocked on the send's
+ * row lock, then `trg_proposals_immutable` raised MT100 and rolled the whole
+ * transaction back. Correct, but MT100 is not a code `mutationFailureCode`
+ * classifies, so the studio was answered `generic` — "something went wrong" —
+ * and a `console.error('mutateInOrg failed:')` went into the log for a race the
+ * product expects. Gating the UPDATE answers `proposal_not_draft`, which the
+ * catalogue already has in both languages, and writes no false defect line.
+ */
 export async function persistDraftHeaderAndTotals(
   tx: MetraDb,
   proposalId: string,
   header: ResolvedHeader,
   totals: DocTotals,
 ): Promise<void> {
-  await tx
+  const saved = await tx
     .update(proposals)
     .set({
       titleAr: header.titleAr,
@@ -114,5 +127,7 @@ export async function persistDraftHeaderAndTotals(
       ...totalsColumns(totals),
       updatedAt: new Date(),
     })
-    .where(eq(proposals.id, proposalId));
+    .where(and(eq(proposals.id, proposalId), eq(proposals.status, 'draft')))
+    .returning({ id: proposals.id });
+  if (!saved[0]) fail('proposal_not_draft');
 }
