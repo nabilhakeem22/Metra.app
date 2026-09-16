@@ -9,6 +9,7 @@
 // (internal-approve / issue) — re-exported here so `@/lib/variations/core` stays
 // the one import surface for callers/tests. Pure structural refactor — no query,
 // type, or behaviour changed.
+export * from './types';
 export * from './create';
 export * from './update';
 export {
