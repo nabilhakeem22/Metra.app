@@ -257,6 +257,14 @@ describe('R-C a draft save racing a send', () => {
       data?: string;
     }).data!;
     await saveProposalDraftCore(ctx, { id, sections: oneSection });
+    // The total the ONE-line document settles at, read rather than assumed: the
+    // engine applies the org's default tax and supervision on top of the line
+    // set, so a literal here would be asserting the seed's VAT rate, not
+    // atomicity. This is the value the document must still carry if the save
+    // loses, and must NOT carry if it wins.
+    const [before] = await raw.query<{ total: string }>(
+      `select total from public.proposals where id = '${id}'`,
+    );
 
     const [save, send] = await Promise.all([
       saveProposalDraftCore(ctx, {
@@ -275,20 +283,31 @@ describe('R-C a draft save racing a send', () => {
       sendProposalCore(ctx, { id }),
     ]);
 
-    const [row] = await raw.query<{ status: string; total: string; title_en: string | null }>(
-      `select status, total, title_en from public.proposals where id = '${id}'`,
+    const [row] = await raw.query<{
+      status: string;
+      subtotal: string;
+      total: string;
+      title_en: string | null;
+    }>(
+      `select status, subtotal, total, title_en from public.proposals where id = '${id}'`,
     );
-    const lines = await raw.query<{ n: number }>(
-      `select count(*)::int as n from public.proposal_lines where proposal_id = '${id}'`,
+    const [lines] = await raw.query<{ n: number; sum: string }>(
+      `select count(*)::int as n, coalesce(sum(line_total), 0)::text as sum
+         from public.proposal_lines where proposal_id = '${id}'`,
     );
-    // ATOMICITY: the stored total must match the stored line set, whichever won.
+    // ATOMICITY, as the invariant rather than as an arithmetic literal: the
+    // stored subtotal IS the sum of the stored lines, whichever writer won.
+    // A half-write — two lines under the one-line money, or one line under the
+    // two-line money — breaks this no matter which way the race resolved.
+    expect(Number(row.subtotal)).toBe(Number(lines.sum));
     if (save.ok) {
-      expect(lines[0].n).toBe(2);
-      expect(Number(row.total)).toBe(2300);
+      expect(lines.n).toBe(2);
+      expect(Number(row.total)).toBeGreaterThan(Number(before.total));
       expect(row.title_en).toBe('Edited mid-send');
     } else {
-      expect(lines[0].n).toBe(1);
-      expect(Number(row.total)).toBe(1000);
+      expect(lines.n).toBe(1);
+      expect(Number(row.total)).toBe(Number(before.total));
+      expect(row.title_en).not.toBe('Edited mid-send');
       // OBSERVABILITY: which refusal the loser gets depends on where the send's
       // COMMIT lands relative to the save's own statements, and both answers are
       // correct. If the save's line writes run first, `enforce_proposal_child_draft`
