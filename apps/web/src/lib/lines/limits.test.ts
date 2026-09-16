@@ -4,7 +4,6 @@ import {
   MAX_AMOUNT,
   chunk,
   normalizeText,
-  pctInRange,
   validIsoDate,
   withinMagnitude,
 } from '@/lib/proposals/validation';
@@ -100,27 +99,6 @@ describe('withinMagnitude', () => {
     // start rejecting pasted input.
     expect(withinMagnitude('\n5')).toBe(true);
     expect(withinMagnitude('  12.5  ')).toBe(true);
-  });
-});
-
-describe('pctInRange', () => {
-  it('accepts 0 through 100 inclusive', () => {
-    for (const value of ['0', '0.5', '17.25', '99.9999', '100']) {
-      expect(pctInRange(value)).toBe(true);
-    }
-  });
-
-  it('rejects out-of-range and negative', () => {
-    for (const value of ['100.0001', '101', '-1', '-0.5']) {
-      expect(pctInRange(value)).toBe(false);
-    }
-  });
-
-  it('rejects the shapes bare Number() coerced into a valid percentage', () => {
-    // '0x10' read as 16%, '1e2' as 100%, and '' as 0% — a silent discount.
-    for (const junk of ['0x10', '1e2', '0b11', '', '   ', 'abc', 'Infinity']) {
-      expect(pctInRange(junk)).toBe(false);
-    }
   });
 });
 

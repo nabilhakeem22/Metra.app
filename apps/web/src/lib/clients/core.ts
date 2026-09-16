@@ -7,7 +7,8 @@ import { fail, mutateInOrg, requireInOrg } from '@/lib/actions/mutate';
 import { err, type ActionResult } from '@/lib/actions/result';
 import { appendSystemActivity } from '@/lib/activities/core';
 import type { OrgContext } from '@/lib/db/context';
-import { clean, normalizePercent } from '@/lib/validation/text';
+import { clean } from '@/lib/validation/text';
+import { normalizePercent } from '@/lib/validation/percent';
 
 export interface ClientInput {
   nameEn?: string | null;

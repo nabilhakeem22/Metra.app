@@ -1,14 +1,15 @@
 /**
- * Free-text and percentage normalisation for action-core input boundaries.
+ * Free-text normalisation for action-core input boundaries.
  *
  * PURE and CLIENT-SAFE: no imports, no `server-only`, no 'use client'.
  *
- * Every one of these three shapes had been hand-copied across the domain cores —
- * `clean` seven times, `normPct` (with its private `PCT_RE`) three times,
+ * Both shapes had been hand-copied across the domain cores — `clean` seven times,
  * `optionalText` four times — plus two sites that inlined the trim ladder by hand.
- * They agreed today, which is precisely the danger: one of them tightening a cap or
- * a regex and the other thirteen staying behind is a silent divergence in what the
- * product accepts as input.
+ * They agreed today, which is precisely the danger: one of them tightening a cap
+ * and the others staying behind is a silent divergence in what the product accepts
+ * as input.
+ *
+ * Percentages moved to ./percent.ts: free text and percentages are two jobs.
  */
 
 /** Trim a nullable free-text field to a stored value: '' / whitespace / null /
@@ -60,31 +61,3 @@ export function optionalText(
   if (trimmed === null) return null;
   return [...trimmed].length > max ? TOO_LONG : trimmed;
 }
-
-/**
- * A non-negative percentage in [0, 100] as a decimal string, or `null` if the input
- * is not one. Absent input (null / undefined / '' / whitespace) yields `blank`,
- * which defaults to `'0'` because every current call site stores a zero rather than
- * a NULL percentage.
- *
- * The shape is checked with a regex BEFORE `Number()` is ever consulted, and that
- * ordering is the whole point: `Number()` happily accepts `'1e2'` (→ 100),
- * `'0x1A'` (→ 26), `' 5 '` and `''` (→ 0). Accepting any of those would let a
- * value that is not a decimal percentage string reach a `numeric` column whose
- * CHECK constraint then raises 23514 at write time instead of returning a coded
- * error. The regex refuses all four; the range check then refuses 100.0001.
- */
-export function normalizePercent(
-  value: string | null | undefined,
-  blank: string = '0',
-): string | null {
-  const trimmed = clean(value);
-  if (trimmed === null) return blank;
-  if (!PERCENT_RE.test(trimmed)) return null;
-  const parsed = Number(trimmed);
-  if (!Number.isFinite(parsed) || parsed < 0 || parsed > 100) return null;
-  return trimmed;
-}
-
-/** Unsigned decimal, no exponent, no sign, no separators. Anchored at both ends. */
-const PERCENT_RE = /^\d+(\.\d+)?$/;
