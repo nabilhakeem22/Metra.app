@@ -23,7 +23,7 @@ import {
   isTerminal,
   type DesignState,
 } from './states';
-import { TRANSITIONS, WIRED_TRIGGERS } from './transitions';
+import { TRANSITIONS, type Trigger } from './transitions';
 
 // THE UI WALK — "can the cockpit satisfy the gate it is showing?"
 //
@@ -272,16 +272,16 @@ describe('SATISFIED_BY covers the guard registry exactly', () => {
     }
   });
 
-  it('no WIRED trigger is gated by a guard declared unwired', () => {
+  it('no trigger is gated by a guard declared unwired', () => {
     // Stronger than the per-state rule below (which only inspects the ONE forward
-    // trigger the cockpit resolves): a wired trigger reachable as a SECONDARY
-    // action — designChangeRaised is exactly that — must not sit behind a guard
-    // that always denies, or the studio gets a button that can never succeed.
-    for (const trigger of WIRED_TRIGGERS) {
+    // trigger the cockpit resolves): a trigger reachable as a SECONDARY action —
+    // designChangeRaised is exactly that — must not sit behind a guard that
+    // always denies, or the studio gets a button that can never succeed.
+    for (const trigger of Object.keys(TRANSITIONS) as Trigger[]) {
       for (const guard of TRANSITIONS[trigger].guards) {
         expect(
           SATISFIED_BY[guard].via,
-          `"${trigger}" is in WIRED_TRIGGERS but is gated by "${guard}", declared 'unwired' (always denies). Wire the guard, or take the trigger back out of WIRED_TRIGGERS.`,
+          `"${trigger}" is gated by "${guard}", declared 'unwired' (always denies). Wire the guard, or stop offering the trigger.`,
         ).not.toBe('unwired');
       }
     }
@@ -456,7 +456,7 @@ describe('the whole state space is accounted for', () => {
 
       expect(
         terminal || trigger !== null || declared,
-        `State "${state}" is not terminal, resolves NO forward trigger, and is not listed in STATES_INTENTIONALLY_WITHOUT_FORWARD_TRIGGER. The cockpit would render a card with no next action and no way out. Wire a forward transition (and add it to WIRED_TRIGGERS) or declare the dead end on purpose.`,
+        `State "${state}" is not terminal, resolves NO forward trigger, and is not listed in STATES_INTENTIONALLY_WITHOUT_FORWARD_TRIGGER. The cockpit would render a card with no next action and no way out. Wire a forward transition or declare the dead end on purpose.`,
       ).toBe(true);
     });
   }

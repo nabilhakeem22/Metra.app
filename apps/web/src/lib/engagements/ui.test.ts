@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { WIRED_TRIGGERS } from './transitions';
+import { DESIGN_STATES } from './states';
 import {
   PAYLOAD_TRIGGERS,
   canRunTrigger,
@@ -86,14 +86,19 @@ describe('triggerNeedsForm', () => {
     expect(triggerNeedsForm('approveDesign')).toBe(false);
   });
 
-  it('every payload trigger is a wired trigger the UI can actually offer', () => {
+  it('every payload trigger is one the UI can actually offer somewhere', () => {
     // A form for a trigger nobody can fire is a dead affordance; conversely a
     // payload-carrying trigger fired WITHOUT its form silently drops the input.
+    // Asked of `legalTriggersFrom` rather than of a hand-kept set, so it stays
+    // an observation about the machine instead of about a list beside it.
     for (const trigger of PAYLOAD_TRIGGERS) {
+      const offeredAt = DESIGN_STATES.filter((state) =>
+        legalTriggersFrom(state).includes(trigger),
+      );
       expect(
-        WIRED_TRIGGERS.has(trigger),
-        `"${trigger}" opens a payload form but is not wired — the UI would render a form for an unfireable edge.`,
-      ).toBe(true);
+        offeredAt.length,
+        `"${trigger}" opens a payload form but is legal from no state — the UI would render a form for an unfireable edge.`,
+      ).toBeGreaterThan(0);
     }
   });
 });

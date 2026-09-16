@@ -7,23 +7,16 @@
 // `actions.ts` here.
 import { can } from '../permissions/can';
 import type { MemberRole } from '../permissions/roles';
-import {
-  CAPABILITY_ACTION,
-  TRANSITIONS,
-  WIRED_TRIGGERS,
-  type Trigger,
-} from './transitions';
+import { CAPABILITY_ACTION, TRANSITIONS, type Trigger } from './transitions';
 import type { DesignState } from './states';
 
 /**
- * The wired triggers that are legal FROM `state`: their `from` includes the state
- * AND they are in `WIRED_TRIGGERS` (a not-yet-enabled trigger is never offered).
+ * The triggers that are legal FROM `state`: their `from` includes the state.
  * Returned in the registry's declaration order — the UI renders them as the
  * engagement's next-action buttons. A terminal state yields an empty list.
  */
 export function legalTriggersFrom(state: DesignState): Trigger[] {
   return (Object.keys(TRANSITIONS) as Trigger[]).filter((trigger) => {
-    if (!WIRED_TRIGGERS.has(trigger)) return false;
     const from = TRANSITIONS[trigger].from;
     return Array.isArray(from) ? from.includes(state) : from === state;
   });
@@ -34,7 +27,7 @@ export function legalTriggersFrom(state: DesignState): Trigger[] {
  * directly: `submitDesignFee` (design fee + milestone split) and the two revision
  * edges — `requestRevision` (concept) and `designChangeRaised` (3D) — which both
  * take an optional reason plus the change-order amount that becomes required once
- * the revision crosses the free allowance. Every other wired trigger fires with no
+ * the revision crosses the free allowance. Every other trigger fires with no
  * input.
  */
 export const PAYLOAD_TRIGGERS: ReadonlySet<Trigger> = new Set<Trigger>([
