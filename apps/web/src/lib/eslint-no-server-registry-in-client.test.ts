@@ -19,7 +19,7 @@ it('no-server-registry-in-client: bans the barrel value-import that caused the o
       {
         code:
           "'use client';\n" +
-          "import { MONEY_GUARD_MILESTONE } from '@/lib/engagements/guards/money';",
+          "import { MONEY_GUARD_MILESTONE } from '@/lib/engagements/guards/trigger-money-gate';",
       },
       // Type-only imports are erased at compile time and reach no bundle.
       {

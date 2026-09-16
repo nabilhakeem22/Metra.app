@@ -13,13 +13,14 @@ import { conceptOptionsAtCapacity } from '@/lib/engagements/concept-options';
 import type { EngagementGatePreview } from '@/lib/engagements/gate-preview';
 import { inlineDropzoneCategory } from '@/lib/engagements/inline-dropzone-category';
 import type { EngagementClientActivityRecord } from '@/lib/engagements/queries/client-activity';
-// Import from the LEAF (guards/money), not the guards barrel: the barrel also
-// re-exports GUARDS from ./registry, which would drag the whole guard engine
-// (registry -> readiness/money -> transitions) into THIS client chunk. That heavy,
-// cycle-prone graph can evaluate a binding as `undefined` at client module-init
-// (vitest even deadlocks importing it) and throw at render. The leaf carries only
-// the pure MONEY_GUARD_MILESTONE map + erased types — no registry, no cycle.
-import { MONEY_GUARD_MILESTONE } from '@/lib/engagements/guards/money';
+// Import from the LEAF (guards/trigger-money-gate), not the guards barrel: the
+// barrel also re-exports GUARDS from ./registry, which would drag the whole guard
+// engine (registry -> readiness/money -> transitions) into THIS client chunk. That
+// heavy, cycle-prone graph can evaluate a binding as `undefined` at client
+// module-init (vitest even deadlocks importing it) and throw at render. The leaf
+// carries only the pure MONEY_GUARD_MILESTONE map + erased types — no registry,
+// no cycle.
+import { MONEY_GUARD_MILESTONE } from '@/lib/engagements/guards/trigger-money-gate';
 import type { BoqStepSummary } from '@/lib/boqs/step';
 import { EngagementBoqStep } from './engagement-boq-step';
 import { stateMilestone } from '@/lib/engagements/journey-map';

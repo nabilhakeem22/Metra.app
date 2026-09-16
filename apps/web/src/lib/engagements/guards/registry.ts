@@ -2,13 +2,13 @@
 // readiness guard families into the single `GuardKey -> predicate` map the
 // executor resolves against. PURE and CLIENT-SAFE: static wiring only.
 import type { GuardFacts, GuardKey, GuardResult } from './facts';
+import { revisionCosSettled } from './money-change-orders';
 import {
   balanceCleared,
   depositCleared,
   gateAInstallmentCleared,
   gateBInstallmentCleared,
-  revisionCosSettled,
-} from './money';
+} from './money-milestones';
 import {
   asBuiltDueOpen,
   asBuiltReconciled,
