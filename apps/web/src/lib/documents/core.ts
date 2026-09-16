@@ -8,6 +8,10 @@ import { err, type ActionResult } from '@/lib/actions/result';
 import { withOrgContext, type OrgContext } from '@/lib/db/context';
 import { can } from '@/lib/permissions/can';
 import { safeDownloadName } from '@/lib/files/safe-name';
+import {
+  STORAGE_CLEANUP_TIMEOUT_MS,
+  withDeadline,
+} from '@/lib/http/deadlines';
 import { getSignedUrl, removeStoredObject } from '@/lib/storage';
 import type { DocumentEntitySpec } from './entities';
 
@@ -138,11 +142,23 @@ export async function deleteDocumentCore(
  * row lock would be held across its outage. It cannot fail the action either —
  * the row IS deleted. A failure is logged and leaves exactly the orphan today's
  * code leaves every time.
+ *
+ * AND IT MUST NOT HOLD THE USER. The Storage client carries the 15s upload
+ * deadline, which is the wrong budget here: the user is watching a spinner for
+ * work that has already succeeded. `withDeadline` bounds the WAIT, not the
+ * work — correct in this one place, because the underlying `remove` finishing
+ * after we stop waiting is a success we simply did not observe, and the row is
+ * gone either way. An `HttpDeadlineError` lands in the same catch as any other
+ * failure and leaves the same breadcrumb.
  */
 async function discardStoredBytes(deleted: DeletedObject | undefined): Promise<void> {
   if (!deleted) return;
   try {
-    await removeStoredObject(deleted.bucket, deleted.objectKey);
+    await withDeadline(
+      removeStoredObject(deleted.bucket, deleted.objectKey),
+      STORAGE_CLEANUP_TIMEOUT_MS,
+      'storage cleanup',
+    );
   } catch (error) {
     console.error('document object remove failed', { ...deleted, error });
   }

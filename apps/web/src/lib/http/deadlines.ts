@@ -18,6 +18,15 @@
 export const STORAGE_TIMEOUT_MS = 15_000;
 
 /**
+ * Deleting the bytes behind a row that is ALREADY committed. Best-effort by
+ * definition — a failure leaves the orphan that deleting nothing left every time
+ * before — so the caller is a user watching a spinner for work that already
+ * succeeded. Three seconds, not the 15 the upload path needs: a studio clearing
+ * ten files during a Storage outage waited 150 seconds for ten successes.
+ */
+export const STORAGE_CLEANUP_TIMEOUT_MS = 3_000;
+
+/**
  * Resend. Much tighter, because sending email is BEST-EFFORT by design: the
  * proposal is already committed and the share link already minted, so the honest
  * answer after five seconds is `emailSent: false` and a studio that can copy the

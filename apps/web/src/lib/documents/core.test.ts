@@ -61,6 +61,10 @@ vi.mock('@/lib/actions/mutate', async () => {
   };
 });
 
+import {
+  HttpDeadlineError,
+  STORAGE_CLEANUP_TIMEOUT_MS,
+} from '@/lib/http/deadlines';
 import { deleteDocumentCore, getDocumentUrlCore } from './core';
 import { DOCUMENT_ENTITIES } from './entities';
 
@@ -177,6 +181,30 @@ describe('deleteDocumentCore', () => {
       'document object remove failed',
       expect.objectContaining(storedObject),
     );
+  });
+
+  it('does not hold the caller when Storage never answers at all', async () => {
+    // The row is committed and gone; the bytes are best-effort. A Storage origin
+    // that accepts the connection and never replies used to hold this action for
+    // the upload client's 15 seconds — a studio clearing ten files waited 150.
+    // STORAGE_CLEANUP_TIMEOUT_MS bounds the WAIT (not the work: a `remove` that
+    // lands later is a success we did not observe, and the row is gone either
+    // way), so the action still resolves `{ ok: true }` and still leaves the
+    // same breadcrumb.
+    vi.useFakeTimers();
+    try {
+      deletedRows.mockReturnValue([storedObject]);
+      removeStoredObject.mockReturnValue(new Promise<void>(() => {}));
+      const answer = deleteDocumentCore(ctx, DOCUMENT_ENTITIES.client, 'file-1');
+      await vi.advanceTimersByTimeAsync(STORAGE_CLEANUP_TIMEOUT_MS + 1);
+      await expect(answer).resolves.toEqual({ ok: true });
+      expect(console.error).toHaveBeenCalledWith(
+        'document object remove failed',
+        expect.objectContaining({ error: expect.any(HttpDeadlineError) }),
+      );
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('answers `invalid` and removes NOTHING when the gated delete returns no row', async () => {
