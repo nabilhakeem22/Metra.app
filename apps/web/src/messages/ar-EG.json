@@ -1599,8 +1599,7 @@
       "shopDrawingsPresent": "تم تسجيل رسومات الورشة",
       "boqPresent": "تم تسجيل المقايسة",
       "balanceCleared": "تم سداد باقي الدفعة",
-      "handoffAcknowledged": "تم تأكيد التسليم",
-      "pendingGuard": "مش متاح دلوقتي"
+      "handoffAcknowledged": "تم تأكيد التسليم"
     },
     "hero": {
       "day": "اليوم {n}",

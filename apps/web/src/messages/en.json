@@ -1599,8 +1599,7 @@
       "shopDrawingsPresent": "Shop drawings recorded",
       "boqPresent": "BOQ recorded",
       "balanceCleared": "Balance payment cleared",
-      "handoffAcknowledged": "Handoff acknowledged",
-      "pendingGuard": "Not yet available"
+      "handoffAcknowledged": "Handoff acknowledged"
     },
     "hero": {
       "day": "Day {n}",

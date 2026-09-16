@@ -23,7 +23,7 @@ import {
   isTerminal,
   type DesignState,
 } from './states';
-import { TRANSITIONS, type Trigger } from './transitions';
+import { TRANSITIONS } from './transitions';
 
 // THE UI WALK — "can the cockpit satisfy the gate it is showing?"
 //
@@ -53,15 +53,7 @@ type Satisfier =
   /** The command card's own inline dropzone at that state records the artifact. */
   | { via: 'cardDropzone'; kind: EngagementArtifactKind; min?: number }
   /** A named non-dropzone path — a form, a toolbar panel, a portal action, money. */
-  | { via: 'affordance'; what: string }
-  /**
-   * `pendingGuard` — the fail-closed sentinel. It is still REGISTERED in
-   * `GUARDS` but, since the 3D revision loop was wired, it is referenced by NO
-   * transition. Kept declared so the sentinel stays available for the next
-   * declared-but-unbuilt edge, and so the rule below keeps forbidding it on any
-   * trigger the cockpit offers.
-   */
-  | { via: 'unwired' };
+  | { via: 'affordance'; what: string };
 
 /**
  * How the cockpit satisfies each guard. Typed as a TOTAL `Record<GuardKey, …>`
@@ -133,9 +125,6 @@ const SATISFIED_BY: Record<GuardKey, Satisfier> = {
     via: 'affordance',
     what: 'off-plan toggle on the command card — as_built_due is set at confirmAndPayDeposit for an off-plan job',
   },
-
-  // --- the fail-closed sentinel: registered, but on no edge at all.
-  pendingGuard: { via: 'unwired' },
 };
 
 /**
@@ -259,7 +248,7 @@ describe('SATISFIED_BY covers the guard registry exactly', () => {
     expect(Object.keys(SATISFIED_BY).sort()).toEqual([...GUARD_KEYS].sort());
   });
 
-  it('names a concrete affordance for every non-dropzone, non-unwired guard', () => {
+  it('names a concrete affordance for every non-dropzone guard', () => {
     for (const [guard, satisfier] of Object.entries(SATISFIED_BY) as [
       GuardKey,
       Satisfier,
@@ -269,21 +258,6 @@ describe('SATISFIED_BY covers the guard registry exactly', () => {
         satisfier.what.trim().length,
         `${guard} is declared 'affordance' but names no path — "how does the studio clear this?" must have an answer someone can navigate to.`,
       ).toBeGreaterThan(0);
-    }
-  });
-
-  it('no trigger is gated by a guard declared unwired', () => {
-    // Stronger than the per-state rule below (which only inspects the ONE forward
-    // trigger the cockpit resolves): a trigger reachable as a SECONDARY action —
-    // designChangeRaised is exactly that — must not sit behind a guard that
-    // always denies, or the studio gets a button that can never succeed.
-    for (const trigger of Object.keys(TRANSITIONS) as Trigger[]) {
-      for (const guard of TRANSITIONS[trigger].guards) {
-        expect(
-          SATISFIED_BY[guard].via,
-          `"${trigger}" is gated by "${guard}", declared 'unwired' (always denies). Wire the guard, or stop offering the trigger.`,
-        ).not.toBe('unwired');
-      }
     }
   });
 });
@@ -361,16 +335,6 @@ describe('every state can clear the gate its own cockpit is showing', () => {
 
     for (const guard of TRANSITIONS[trigger].guards) {
       const satisfier = SATISFIED_BY[guard];
-
-      if (satisfier.via === 'unwired') {
-        it(`${state}: never offers the unwired guard "${guard}" as its next action`, () => {
-          expect.unreachable(
-            `The forward trigger "${trigger}" at "${state}" is gated by "${guard}", which is declared 'unwired' (pendingGuard — always denies). The cockpit would show a next action that can NEVER be completed. Wire the guard, or stop offering the trigger.`,
-          );
-        });
-        continue;
-      }
-
       if (satisfier.via !== 'cardDropzone') continue;
 
       it(`${state}: the card's dropzone can satisfy "${guard}"`, () => {

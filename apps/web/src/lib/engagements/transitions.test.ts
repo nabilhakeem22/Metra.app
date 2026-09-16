@@ -317,12 +317,5 @@ describe('transition registry', () => {
           state !== 'closed_design_only',
       ).sort(),
     );
-
-    // NO edge routes through the fail-closed `pendingGuard` sentinel any more.
-    // This is the runtime witness for "declared but unfireable is now empty".
-    const onSentinel = ALL_TRIGGERS.filter((trigger) =>
-      TRANSITIONS[trigger].guards.includes('pendingGuard'),
-    );
-    expect(onSentinel).toEqual([]);
   });
 });

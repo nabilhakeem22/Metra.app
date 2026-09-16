@@ -6,7 +6,7 @@ import {
   conceptOptionsAtCapacity,
   countConceptOptions,
 } from './concept-options';
-import { optionsReady } from './guards/readiness';
+import { optionsReady } from './guards/readiness-artifacts';
 import type { GuardFacts } from './guards/facts';
 
 /** A facts bundle carrying `n` concept options — all optionsReady reads. */

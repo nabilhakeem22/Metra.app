@@ -26,7 +26,7 @@ import type { TransitionRun } from './index';
  * gate, so it commits atomically with the state move; a `fail()` inside one
  * rolls the whole transition back — no state change, no side-effect rows.
  */
-export interface SideEffectContext {
+interface SideEffectContext {
   tx: MetraDb;
   ctx: OrgContext;
   engagement: DesignEngagement;
@@ -34,10 +34,12 @@ export interface SideEffectContext {
   payload: unknown;
 }
 
-export type SideEffectHandler = (context: SideEffectContext) => Promise<void>;
+type SideEffectHandler = (context: SideEffectContext) => Promise<void>;
 
-/** Keyed by SideEffectKey: a key with no handler does not compile. */
-export const SIDE_EFFECTS: Record<SideEffectKey, SideEffectHandler> = {
+/** Keyed by SideEffectKey: a key with no handler does not compile. Module-private
+ *  — `applySideEffect` below is the ONLY way to reach a handler, which is what
+ *  "its handler is the ONLY place it may run" means in practice. */
+const SIDE_EFFECTS: Record<SideEffectKey, SideEffectHandler> = {
   generateFeeSchedule: ({ tx, ctx, engagement, payload }) =>
     generateFeeSchedule(tx, ctx, engagement.id, payload),
 

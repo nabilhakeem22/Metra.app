@@ -1029,18 +1029,6 @@ describe('balanceCleared', () => {
   });
 });
 
-describe('pendingGuard', () => {
-  it('always fails closed with transition_not_yet_enabled', () => {
-    expect(GUARDS.pendingGuard(engagement({}))).toEqual({
-      ok: false,
-      code: 'transition_not_yet_enabled',
-    });
-    expect(
-      GUARDS.pendingGuard(engagement({ titleAr: null, titleEn: null })),
-    ).toEqual({ ok: false, code: 'transition_not_yet_enabled' });
-  });
-});
-
 describe('moneyGuardOf', () => {
   it('maps each pay-and-advance trigger to its money-milestone guard', () => {
     expect(moneyGuardOf('confirmAndPayDeposit')).toBe('depositCleared');
