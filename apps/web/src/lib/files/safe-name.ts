@@ -47,21 +47,52 @@ export function safeExtension(originalName: string | null | undefined): string |
 }
 
 /**
- * Characters that must never reach a Content-Disposition header or a filesystem:
- * C0/C1 controls (CR and LF would split the header, NUL truncates a path), the
- * BIDI overrides (an RLO turns `gnp.exe` into `exe.png` on screen), the quote,
- * backslash, semicolon, comma and colon that END a header parameter, and the
- * path and Windows-reserved punctuation. EVERYTHING ELSE SURVIVES, Arabic
- * included.
- *
- * This is a DENYLIST where an allowlist used to be, and that is the fix: the
- * allowlist was `[A-Za-z0-9 _-]`, so an Arabic name reduced to nothing and every
- * document an Egyptian studio named in its own language downloaded as
- * `document.pdf`. The extension allowlist above is a different decision and does
- * NOT change — it is what stops `Invoice.html` being served as a page.
+ * Punctuation that ENDS a header parameter or NAMES A PATH, so it must never
+ * reach a Content-Disposition header or a filesystem.
  */
-const UNSAFE_IN_DOWNLOAD_NAME =
-  /[\u0000-\u001F\u007F-\u009F\u200E\u200F\u202A-\u202E\u2066-\u2069"\\\/;,:*?<>|]+/g;
+const UNSAFE_PUNCTUATION: ReadonlySet<string> = new Set([
+  '"',
+  '\\',
+  '/',
+  ';',
+  ',',
+  ':',
+  '*',
+  '?',
+  '<',
+  '>',
+  '|',
+]);
+
+/**
+ * Is this ONE character unsafe in a download name?
+ *
+ *  - C0/C1 controls: CR and LF would split the header, NUL truncates a path;
+ *  - U+200E/U+200F, U+202A-U+202E and U+2066-U+2069: the BIDI marks,
+ *    embeddings, OVERRIDES and isolates. An RLO turns `gnp.exe` into `exe.png`
+ *    on screen, which is a filename that lies about what it is;
+ *  - the punctuation above.
+ *
+ * EVERYTHING ELSE SURVIVES, ARABIC INCLUDED. This is a DENYLIST where an
+ * allowlist used to be, and that is the fix: the allowlist was
+ * `[A-Za-z0-9 _-]`, so an Arabic name reduced to nothing and every document an
+ * Egyptian studio named in its own language downloaded as `document.pdf`. The
+ * EXTENSION allowlist above is a different decision and does NOT change - it is
+ * what stops `Invoice.html` being served as a page.
+ *
+ * A PREDICATE OVER CODE POINTS, not a regex character class, on purpose: a class
+ * spelling out the C0 range is a `no-control-regex` error, and silencing a real
+ * lint gate to keep a denylist would be trading a rule for punctuation.
+ */
+function isUnsafeInDownloadName(character: string): boolean {
+  const code = character.codePointAt(0) ?? 0;
+  if (code <= 0x1f) return true;
+  if (code >= 0x7f && code <= 0x9f) return true;
+  if (code === 0x200e || code === 0x200f) return true;
+  if (code >= 0x202a && code <= 0x202e) return true;
+  if (code >= 0x2066 && code <= 0x2069) return true;
+  return UNSAFE_PUNCTUATION.has(character);
+}
 
 /** The download-name stem cap, in CODE POINTS. */
 const MAX_DOWNLOAD_STEM_CHARS = 60;
@@ -79,12 +110,12 @@ function safeStem(originalName: string): string | null {
   const dot = originalName.lastIndexOf('.');
   // `dot === 0` is a dotfile (".pdf"): there is no stem, not a stem of ".pdf".
   const stem = dot >= 0 ? originalName.slice(0, dot) : originalName;
-  const cleaned = [
-    ...stem
-      .replace(UNSAFE_IN_DOWNLOAD_NAME, ' ')
-      .replace(/\s+/g, ' ')
-      .trim(),
-  ]
+  const swept = [...stem]
+    .map((character) => (isUnsafeInDownloadName(character) ? ' ' : character))
+    .join('')
+    .replace(/\s+/g, ' ')
+    .trim();
+  const cleaned = [...swept]
     .slice(0, MAX_DOWNLOAD_STEM_CHARS)
     .join('')
     .trim();
