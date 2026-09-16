@@ -64,13 +64,12 @@
 //   1. Public token-hash SECURITY DEFINER calls — the opaque token IS the auth,
 //      and the SDF omits every cost/margin column, so nothing can leak the firm's
 //      cost or another tenant's data. The two runners in share/sdf-call.ts are
-//      becoming the single surface for all of them; the portals below come off
-//      this list as each adopts it:
+//      the single surface for all of them. The three DOCUMENT portals
+//      (proposals / contracts / variations) adopted it and came OFF this list —
+//      each contains no `withRequestDb`, no `.execute(`, no `.unsafe(` at all:
 //        apps/web/src/lib/share/sdf-call.ts — readSdfJson / readSdfCode, which
 //          execute a caller-built SQL object and read one column off row 0.
 //          Nothing is interpolated; there is no string-concatenation path.
-//        apps/web/src/lib/proposals/public.ts
-//        apps/web/src/lib/contracts/public.ts
 //        apps/web/src/lib/engagements/public.ts
 //        apps/web/src/lib/engagements/public-documents.ts — the same token surface:
 //          it resolves ONE released document of the token's own delivery and returns
@@ -81,7 +80,6 @@
 //          released document of the token's own delivery. Identity-blind on the
 //          studio side and cost-blind throughout; the document id is a filter
 //          within a delivery the token already proved.
-//        apps/web/src/lib/variations/public.ts
 //   2. The public API-key resolver, which wraps its SDF in a transaction and drops
 //      into `set local role metra_app` before the call:
 //        apps/web/src/lib/api-keys/resolve.ts
@@ -184,12 +182,9 @@ function staticKeyName(computed, key) {
 // documented above. Matched against the normalised (forward-slash) filename.
 const ALLOWLISTED_FILES = [
   'apps/web/src/lib/share/sdf-call.ts',
-  'apps/web/src/lib/proposals/public.ts',
-  'apps/web/src/lib/contracts/public.ts',
   'apps/web/src/lib/engagements/public.ts',
   'apps/web/src/lib/engagements/public-documents.ts',
   'apps/web/src/lib/engagements/public-comments.ts',
-  'apps/web/src/lib/variations/public.ts',
   'apps/web/src/lib/api-keys/resolve.ts',
   'apps/web/src/lib/automation/system-context.ts',
   'apps/web/src/lib/automation/runner.ts',

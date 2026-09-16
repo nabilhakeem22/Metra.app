@@ -1,9 +1,10 @@
 import 'server-only';
-// Public (no-session) variation-order share. Runs the SECURITY DEFINER token SDFs
-// on the base connection — NO withOrgContext, NO org GUCs. The token IS the auth.
-// The SDF omits every cost/margin column, so nothing here can leak the firm's cost.
+// Public (no-session) variation-order share. The SECURITY DEFINER token SDFs run
+// through `lib/share/sdf-call`, the one sanctioned base-connection surface — NO
+// withOrgContext, NO org GUCs. The token IS the auth. The SDF omits every
+// cost/margin column, so nothing here can leak the firm's cost.
 import { sql } from 'drizzle-orm';
-import { withRequestDb } from '@/lib/db/client';
+import { normalizeRawToken, readSdfCode, readSdfJson } from '@/lib/share/sdf-call';
 import { mapDocumentSdfCode, type TokenResponseError } from '@/lib/share/sdf-result';
 import { hashShareToken } from '@/lib/share/token';
 
@@ -45,12 +46,12 @@ type VariationTokenDocument = Omit<PublicVariation, 'contractActive'> & {
 export async function getVariationByToken(
   rawToken: string,
 ): Promise<PublicVariation | null> {
-  if (!rawToken || !rawToken.trim()) return null;
-  const hash = hashShareToken(rawToken);
-  const rows = (await withRequestDb((db) =>
-    db.execute(sql`select public.app_variation_by_token(${hash}) as data`),
-  )) as unknown as Array<{ data: VariationTokenDocument | null }>;
-  const document = rows[0]?.data ?? null;
+  const token = normalizeRawToken(rawToken);
+  if (!token) return null;
+  const hash = hashShareToken(token);
+  const document = await readSdfJson<VariationTokenDocument>(
+    sql`select public.app_variation_by_token(${hash}) as data`,
+  );
   if (!document) return null;
   const { contract_active: contractActive, ...rest } = document;
   // Only an explicit false marks the contract dead. The respond SDF is the real
@@ -71,13 +72,12 @@ export async function respondToVariationByToken(
     userAgent?: string | null;
   },
 ): Promise<{ ok: boolean; error?: RespondError }> {
-  if (!rawToken || !rawToken.trim()) return { ok: false, error: 'token_invalid' };
-  const hash = hashShareToken(rawToken);
-  const rows = (await withRequestDb((db) =>
-    db.execute(sql`select public.app_variation_respond_by_token(
-      ${hash}, ${input.decision}, ${input.actorName ?? null},
-      ${input.ip ?? null}, ${input.userAgent ?? null}
-    ) as code`),
-  )) as unknown as Array<{ code: string }>;
-  return mapDocumentSdfCode(rows[0]?.code);
+  const token = normalizeRawToken(rawToken);
+  if (!token) return { ok: false, error: 'token_invalid' };
+  const hash = hashShareToken(token);
+  const code = await readSdfCode(sql`select public.app_variation_respond_by_token(
+    ${hash}, ${input.decision}, ${input.actorName ?? null},
+    ${input.ip ?? null}, ${input.userAgent ?? null}
+  ) as code`);
+  return mapDocumentSdfCode(code);
 }

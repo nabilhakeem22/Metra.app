@@ -51,7 +51,7 @@ it('no-bare-tenant-db: flags raw-connection queries, allows scoped ones', () => 
       },
       // Allowlisted sanctioned exception — raw db.execute permitted.
       {
-        filename: 'apps/web/src/lib/proposals/public.ts',
+        filename: 'apps/web/src/lib/share/sdf-call.ts',
         code: 'withRequestDb((db) => db.execute(sql`select public.app_proposal_by_token(${h})`));',
       },
       // Allowlisted automation system read.
