@@ -34,6 +34,14 @@ async function ownedDocument(
  * A signed download URL for one document (org-scoped).
  *
  * Refused for a file of the wrong entity or another org — see `ownedDocument`.
+ *
+ * The NOT-FOUND answer is decided above, by `ownedDocument`. By the time the
+ * `try` runs the row is proved to exist, so what the catch holds is a dependency
+ * failure — a Storage 5xx, a timeout, a bad key (or, vanishingly, a row deleted
+ * between the two reads). Answering `invalid` made an outage indistinguishable
+ * from a deleted file, on screen ("that no longer exists") and in the log, which
+ * said nothing at all. It logs the error and answers `generic`, so on-call can
+ * tell "Storage is down" from "this id is junk".
  */
 export async function getDocumentUrlCore(
   ctx: OrgContext,
@@ -48,8 +56,9 @@ export async function getDocumentUrlCore(
   try {
     const url = await getSignedUrl(ctx, fileId);
     return { ok: true, url };
-  } catch {
-    return { ok: false, error: 'invalid' };
+  } catch (error) {
+    console.error('document url mint failed', { fileId, entity: spec.entity, error });
+    return err('generic');
   }
 }
 
