@@ -122,7 +122,15 @@ export async function generateContractCore(
 
   return mutateInOrg(
     ctx,
-    { capability: 'contracts_generate', action: 'create' },
+    {
+      capability: 'contracts_generate',
+      action: 'create',
+      // (org_id, source_proposal_id) is unique: two studios pressing Generate on
+      // the same accepted proposal is a NORMAL race, and the loser's 23505 means
+      // exactly one thing here — the contract it wanted already exists. Naming it
+      // keeps `generic` (and a false `mutateInOrg failed` log line) off the path.
+      conflictCode: 'contract_exists',
+    },
     async (tx, audit) => {
       const proposal = await loadAcceptedProposal(tx, proposalId);
       const percentages = await loadInheritedPercentages(tx, proposal);

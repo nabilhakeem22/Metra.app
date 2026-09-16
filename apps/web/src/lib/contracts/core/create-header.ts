@@ -2,21 +2,11 @@ import 'server-only';
 // Writing the contract's own row, from the accepted proposal it is generated
 // from. Nothing here is recomputed — see `contractTotalsFromProposal`.
 import { contracts, proposals, type MetraDb } from '@metra/db';
+import { isUniqueViolation } from '@/lib/actions/db-conflict';
 import { fail } from '@/lib/actions/mutate';
 import { formatDocNumber } from '@/lib/format/doc-number';
 
 type ProposalRow = typeof proposals.$inferSelect;
-
-/** Postgres unique-violation SQLSTATE. */
-const UNIQUE_VIOLATION = '23505';
-
-function isUniqueViolation(e: unknown): boolean {
-  return (
-    typeof e === 'object' &&
-    e !== null &&
-    (e as { code?: string }).code === UNIQUE_VIOLATION
-  );
-}
 
 /**
  * The FROZEN money the contract inherits, value for value.

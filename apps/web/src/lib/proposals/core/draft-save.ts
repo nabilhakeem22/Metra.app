@@ -89,7 +89,16 @@ export async function saveProposalDraftCore(
 ): Promise<ActionResult> {
   return mutateInOrg(
     ctx,
-    { capability: 'proposals_build', action: 'update' },
+    {
+      capability: 'proposals_build',
+      action: 'update',
+      // A draft save racing a send is a NORMAL race: the loser blocks on the
+      // send's row lock, then `trg_proposals_immutable` raises MT100 and the
+      // whole transaction rolls back. The proposal is no longer a draft, which
+      // is a sentence the catalogue already has in both languages — see
+      // `draft-save-persist.ts`, which described this defect in prose.
+      immutableCode: 'proposal_not_draft',
+    },
     async (tx, audit) => {
       const proposal = await loadDraftProposal(tx, input.id);
       const seeMargin = await loadMarginVisibility(tx, ctx);

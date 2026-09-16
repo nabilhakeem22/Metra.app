@@ -373,9 +373,11 @@ describe('R-D contract transitions under concurrency', () => {
       `select count(*)::int as n from public.contracts where source_proposal_id = '${id}'`,
     );
     expect(rows[0].n).toBe(1);
-    // The unique index is the race guard; the loser should still be told why.
-    // Today it can answer `generic` (a 23505 mutateInOrg does not classify).
-    expect(['contract_exists', 'generic']).toContain((a.ok ? b : a).error);
+    // The unique index is the race guard, and the loser is now TOLD SO: the
+    // generate mutation declares `conflictCode: 'contract_exists'`, so its 23505
+    // is named instead of falling through to `generic` plus a false
+    // `mutateInOrg failed` line in the log.
+    expect((a.ok ? b : a).error).toBe('contract_exists');
   });
 
   it('two concurrent terminations reject the open VO exactly once', async () => {

@@ -26,14 +26,6 @@ export function isValidEmail(email: string): boolean {
   return /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email);
 }
 
-export function isUniqueViolation(e: unknown): boolean {
-  return (
-    typeof e === 'object' &&
-    e !== null &&
-    (e as { code?: string }).code === '23505'
-  );
-}
-
 export async function currentLocale(): Promise<string> {
   try {
     return await getLocale();
