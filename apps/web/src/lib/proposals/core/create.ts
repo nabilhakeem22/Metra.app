@@ -6,25 +6,56 @@
 // kernels — the one habit that made contracts, variations, boqs and both PDF
 // routes import the PROPOSALS module to reach a percentage check or a chunked
 // insert. The kernels now live in lib/{lines,money,validation,share}.
-import {
-  clients,
-  projects,
-  proposals,
-  type MetraDb,
-} from '@metra/db';
+import { clients, projects, proposals, type MetraDb } from '@metra/db';
 import { eq } from 'drizzle-orm';
 import { fail, mutateInOrg } from '@/lib/actions/mutate';
+import type { AuditEntry } from '@/lib/audit';
 import { allocateNumber } from '@/lib/db/allocate-number';
-import { err, type ActionResult } from '@/lib/actions/result';
+import { err, type ActionCode, type ActionResult } from '@/lib/actions/result';
 import type { OrgContext } from '@/lib/db/context';
 import { isUuid } from '@/lib/uuid';
-import {
-  formatProposalNumber,
-  proposalYear,
-} from '@/lib/format/proposal-number';
+import { formatProposalNumber, proposalYear } from '@/lib/format/proposal-number';
 import { validIsoDate } from '@/lib/validation/iso-date';
 import { clean } from '@/lib/validation/text';
 
+export interface CreateProposalInput {
+  clientId: string;
+  projectId: string;
+  titleAr?: string | null;
+  titleEn?: string | null;
+  issueDate?: string | null;
+  expiryDate?: string | null;
+}
+
+/** The input after trimming, with every id and date proved well-formed. */
+interface ValidatedCreateInput {
+  clientId: string;
+  projectId: string;
+  issueDate: string | null;
+  expiryDate: string | null;
+}
+
+/**
+ * Shape-check the input BEFORE the transaction opens.
+ *
+ * A malformed client id answers `client_required` rather than `invalid`, because
+ * "pick a client" is what the studio can actually do about it.
+ */
+function validateCreateInput(
+  input: CreateProposalInput,
+): ValidatedCreateInput | ActionCode {
+  const clientId = input.clientId?.trim();
+  const projectId = input.projectId?.trim();
+  if (!clientId || !isUuid(clientId)) return 'client_required';
+  if (!projectId || !isUuid(projectId)) return 'invalid';
+  const issueDate = clean(input.issueDate);
+  const expiryDate = clean(input.expiryDate);
+  if (issueDate && !validIsoDate(issueDate)) return 'invalid_date';
+  if (expiryDate && !validIsoDate(expiryDate)) return 'invalid_date';
+  return { clientId, projectId, issueDate, expiryDate };
+}
+
+/** Both parents must exist IN THIS ORG and be active before a proposal names them. */
 async function assertClientProjectUsable(
   tx: MetraDb,
   clientId: string,
@@ -44,73 +75,95 @@ async function assertClientProjectUsable(
   if (!project || !project.active) fail('invalid');
 }
 
-export interface CreateProposalInput {
-  clientId: string;
-  projectId: string;
-  titleAr?: string | null;
-  titleEn?: string | null;
-  issueDate?: string | null;
-  expiryDate?: string | null;
+/**
+ * The stored title. The database requires one, and a studio may legitimately
+ * create a proposal before it has decided what to call it, so an untitled one is
+ * named after its own display number rather than refused.
+ */
+function defaultedTitles(
+  input: CreateProposalInput,
+  number: number,
+  issueDate: string | null,
+): { titleAr: string | null; titleEn: string | null } {
+  const titleAr = clean(input.titleAr);
+  const titleEn = clean(input.titleEn);
+  if (titleEn || titleAr) return { titleAr, titleEn };
+  return {
+    titleAr,
+    titleEn: formatProposalNumber(number, proposalYear(issueDate, new Date())),
+  };
+}
+
+/** Per-org numbering, serialized by a transaction-scoped advisory lock. */
+function allocateProposalNumber(tx: MetraDb, orgId: string): Promise<number> {
+  return allocateNumber(tx, orgId, 'proposals', 'proposals', 'number');
+}
+
+/** Insert the proposal row and return its id. No money enters here. */
+async function persistNewProposal(
+  tx: MetraDb,
+  orgId: string,
+  number: number,
+  validated: ValidatedCreateInput,
+  input: CreateProposalInput,
+): Promise<string> {
+  const [row] = await tx
+    .insert(proposals)
+    .values({
+      orgId,
+      number,
+      ...defaultedTitles(input, number, validated.issueDate),
+      clientId: validated.clientId,
+      projectId: validated.projectId,
+      issueDate: validated.issueDate,
+      expiryDate: validated.expiryDate,
+    })
+    .returning({ id: proposals.id });
+  return row.id;
+}
+
+/** The ledger entry a new proposal leaves: which number, for whom, on what. */
+function auditProposalCreated(
+  audit: (entry: AuditEntry) => Promise<void>,
+  proposalId: string,
+  number: number,
+  validated: ValidatedCreateInput,
+): Promise<void> {
+  return audit({
+    entity: 'proposal',
+    entityId: proposalId,
+    action: 'create',
+    before: null,
+    after: {
+      number,
+      client_id: validated.clientId,
+      project_id: validated.projectId,
+    },
+  });
 }
 
 export async function createProposalCore(
   ctx: OrgContext,
   input: CreateProposalInput,
 ): Promise<ActionResult> {
-  const clientId = input.clientId?.trim();
-  const projectId = input.projectId?.trim();
-  if (!clientId || !isUuid(clientId)) return err('client_required');
-  if (!projectId || !isUuid(projectId)) return err('invalid');
-  const issueDate = clean(input.issueDate);
-  const expiryDate = clean(input.expiryDate);
-  if (issueDate && !validIsoDate(issueDate)) return err('invalid_date');
-  if (expiryDate && !validIsoDate(expiryDate)) return err('invalid_date');
+  const validated = validateCreateInput(input);
+  if (typeof validated === 'string') return err(validated);
 
   return mutateInOrg(
     ctx,
     { capability: 'proposals_build', action: 'create' },
     async (tx, audit) => {
-      await assertClientProjectUsable(tx, clientId, projectId);
-      const number = await allocateNumber(
+      await assertClientProjectUsable(tx, validated.clientId, validated.projectId);
+      const number = await allocateProposalNumber(tx, ctx.orgId);
+      const proposalId = await persistNewProposal(
         tx,
         ctx.orgId,
-        'proposals',
-        'proposals',
-        'number',
+        number,
+        validated,
+        input,
       );
-
-      let titleEn = clean(input.titleEn);
-      const titleAr = clean(input.titleAr);
-      if (!titleEn && !titleAr) {
-        // The DB requires a title; default to the display number.
-        titleEn = formatProposalNumber(
-          number,
-          proposalYear(issueDate, new Date()),
-        );
-      }
-
-      const [row] = await tx
-        .insert(proposals)
-        .values({
-          orgId: ctx.orgId,
-          number,
-          titleAr,
-          titleEn,
-          clientId,
-          projectId,
-          issueDate,
-          expiryDate,
-        })
-        .returning({ id: proposals.id });
-
-      await audit({
-        entity: 'proposal',
-        entityId: row.id,
-        action: 'create',
-        before: null,
-        after: { number, client_id: clientId, project_id: projectId },
-      });
-      return row.id;
+      await auditProposalCreated(audit, proposalId, number, validated);
+      return proposalId;
     },
   );
 }

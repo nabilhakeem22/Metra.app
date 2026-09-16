@@ -2,7 +2,13 @@
 // admission gate (UPDATE ... WHERE status=... RETURNING, check rowCount), owner/
 // admin only (variations_price). Client approve/reject is the unauthenticated
 // token path (app_variation_respond_by_token), never the matrix.
-import { contracts, variationOrderEvents, variationOrders } from '@metra/db';
+import {
+  contracts,
+  variationOrderEvents,
+  variationOrders,
+  type MetraDb,
+  type VariationStatus,
+} from '@metra/db';
 import { and, eq, sql } from 'drizzle-orm';
 import { fail, mutateInOrg, requireInOrg } from '@/lib/actions/mutate';
 import type { ActionResult } from '@/lib/actions/result';
@@ -26,6 +32,106 @@ import { canInternalApproveVariation } from '../lifecycle-rules';
  * Owner/admin only; a concurrent 2nd call finds status<>'draft' ->
  * variation_not_draft.
  */
+/**
+ * Lock the VO row FOR UPDATE and refuse anything that is not a draft.
+ *
+ * The serialization point: a concurrent line rewrite also locks this row, so it
+ * cannot slip between the sum below and the freeze.
+ */
+async function lockDraftVariation(
+  tx: MetraDb,
+  variationOrderId: string,
+): Promise<{ status: VariationStatus; contractId: string }> {
+  const [locked] = await tx
+    .select({
+      status: variationOrders.status,
+      contractId: variationOrders.contractId,
+    })
+    .from(variationOrders)
+    .where(eq(variationOrders.id, variationOrderId))
+    .for('update')
+    .limit(1);
+  if (!locked) fail('invalid');
+  if (locked.status !== 'draft') fail('variation_not_draft');
+  return locked;
+}
+
+/**
+ * Freeze net_delta and flip draft -> internal_approved, IN ONE STATEMENT.
+ *
+ * net_delta = Σ line_total computed inside the UPDATE, so the read of the lines,
+ * the freeze of the total and the status flip are atomic and a line rewrite can
+ * never interleave between them. Equivalent to computeVariationNetDelta (both sum
+ * line_total) and exact in SQL.
+ */
+async function freezeAndApprove(
+  tx: MetraDb,
+  variationOrderId: string,
+  tokenHash: string,
+  shareExpiresAt: Date,
+): Promise<void> {
+  const gated = await tx
+    .update(variationOrders)
+    .set({
+      status: 'internal_approved',
+      netDelta: sql`(
+        select coalesce(sum(line_total), 0)
+        from public.variation_order_lines
+        where variation_order_id = ${variationOrderId}
+      )`,
+      tokenHash,
+      shareExpiresAt,
+      updatedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(variationOrders.id, variationOrderId),
+        eq(variationOrders.status, 'draft'),
+      ),
+    )
+    .returning({ id: variationOrders.id });
+  if (!gated[0]) fail('variation_not_draft');
+}
+
+/**
+ * The contract must still be live.
+ *
+ * A VO drafted before its contract was terminated must not become approvable
+ * afterwards: a dead contract carries no commercial change.
+ */
+async function assertContractStillLive(
+  tx: MetraDb,
+  variationStatus: VariationStatus,
+  contractId: string,
+): Promise<void> {
+  const contract = await requireInOrg(
+    tx,
+    contracts,
+    contractId,
+    { status: contracts.status },
+    'invalid',
+  );
+  if (!canInternalApproveVariation(variationStatus, contract.status)) {
+    fail('contract_not_issued');
+  }
+}
+
+/** The append-only ledger row for the transition. */
+async function recordInternalApprovedEvent(
+  tx: MetraDb,
+  ctx: OrgContext,
+  variationOrderId: string,
+): Promise<void> {
+  await tx.insert(variationOrderEvents).values({
+    orgId: ctx.orgId,
+    variationOrderId,
+    kind: 'internal_approved',
+    actorUserId: ctx.userId,
+    fromStatus: 'draft',
+    toStatus: 'internal_approved',
+  });
+}
+
 export async function internalApproveVariationCore(
   ctx: OrgContext,
   input: { id: string },
@@ -34,69 +140,12 @@ export async function internalApproveVariationCore(
     ctx,
     { capability: 'variations_price', action: 'approve' },
     async (tx, audit) => {
-      // Serialization point: hold the VO row lock across the freeze so a
-      // concurrent line rewrite (which also locks this row) can't slip in.
-      const [locked] = await tx
-        .select({
-          status: variationOrders.status,
-          contractId: variationOrders.contractId,
-        })
-        .from(variationOrders)
-        .where(eq(variationOrders.id, input.id))
-        .for('update')
-        .limit(1);
-      if (!locked) fail('invalid');
-      if (locked.status !== 'draft') fail('variation_not_draft');
-
-      // A contract that is no longer live carries no commercial change: a VO
-      // drafted before termination must not be approvable afterwards.
-      const contract = await requireInOrg(
-        tx,
-        contracts,
-        locked.contractId,
-        { status: contracts.status },
-        'invalid',
-      );
-      if (!canInternalApproveVariation(locked.status, contract.status)) {
-        fail('contract_not_issued');
-      }
+      const locked = await lockDraftVariation(tx, input.id);
+      await assertContractStillLive(tx, locked.status, locked.contractId);
 
       const { raw, hash } = mintShareToken();
-      const shareExpiresAt = shareExpiryFromNow();
-
-      // net_delta = Σ line_total, computed IN the UPDATE (atomic with the freeze).
-      // Equivalent to computeVariationNetDelta (both sum line_total), exact in SQL.
-      const gated = await tx
-        .update(variationOrders)
-        .set({
-          status: 'internal_approved',
-          netDelta: sql`(
-            select coalesce(sum(line_total), 0)
-            from public.variation_order_lines
-            where variation_order_id = ${input.id}
-          )`,
-          tokenHash: hash,
-          shareExpiresAt,
-          updatedAt: new Date(),
-        })
-        .where(
-          and(
-            eq(variationOrders.id, input.id),
-            eq(variationOrders.status, 'draft'),
-          ),
-        )
-        .returning({ id: variationOrders.id });
-      if (!gated[0]) fail('variation_not_draft');
-
-      await tx.insert(variationOrderEvents).values({
-        orgId: ctx.orgId,
-        variationOrderId: input.id,
-        kind: 'internal_approved',
-        actorUserId: ctx.userId,
-        fromStatus: 'draft',
-        toStatus: 'internal_approved',
-      });
-
+      await freezeAndApprove(tx, input.id, hash, shareExpiryFromNow());
+      await recordInternalApprovedEvent(tx, ctx, input.id);
       await audit({
         entity: 'variation_order',
         entityId: input.id,
