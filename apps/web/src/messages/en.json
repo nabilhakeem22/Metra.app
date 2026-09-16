@@ -545,7 +545,8 @@
     "invalid_qty": "That quantity is not a number.",
     "invalid_price": "That rate is not a number.",
     "invalid_discount": "The discount must be between 0 and 100.",
-    "section_name_required": "A section needs a name."
+    "section_name_required": "A section needs a name.",
+    "section_name_too_long": "That section name is too long."
   },
   "common": {
     "untranslated": "untranslated",

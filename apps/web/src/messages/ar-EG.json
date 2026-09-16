@@ -545,7 +545,8 @@
     "invalid_qty": "الكمية دي مش رقم",
     "invalid_price": "الفئة دي مش رقم",
     "invalid_discount": "الخصم لازم يكون بين 0 و 100",
-    "section_name_required": "القسم محتاج اسم"
+    "section_name_required": "القسم محتاج اسم",
+    "section_name_too_long": "اسم القسم ده طويل أوي"
   },
   "common": {
     "untranslated": "غير مترجم",
