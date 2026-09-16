@@ -5,8 +5,14 @@
  * directly — a hostile sheet is exactly the input one wants to assert on without
  * a session, and the action wrapper's only remaining job is `requireOrg()`.
  */
-import { decodeCsv } from './decode';
-import { autoDetectMapping, mapRows, type ImportedLine } from './map';
+import type { ActionCode } from '@/lib/actions/result';
+import { decodeCsv, type DecodeNote } from './decode';
+import {
+  autoDetectMapping,
+  mapRows,
+  type BoqImportRowIssue,
+  type ImportedLine,
+} from './map';
 import {
   ImportParseError,
   MAX_IMPORT_BYTES,
@@ -15,12 +21,14 @@ import {
 
 export interface ImportPreview {
   ok: boolean;
-  error?: string;
+  /** An ActionCode, so the page resolves it through the shared errors catalogue
+   *  instead of showing one blanket "could not read that sheet" for every cause. */
+  error?: ActionCode;
   /** Lines that would be created. */
   lines?: ImportedLine[];
-  /** Row number + reason for everything that would not. */
-  problems?: { rowNumber: number; errors: string[] }[];
-  notes?: string[];
+  /** Row number + coded reasons for everything that would not. */
+  problems?: { rowNumber: number; issues: BoqImportRowIssue[] }[];
+  notes?: DecodeNote[];
 }
 
 /**
@@ -28,7 +36,7 @@ export interface ImportPreview {
  * code the price-book path already uses, so "too big" reads the same whichever
  * importer the studio went through.
  */
-function previewErrorFor(reason: ImportParseReason): string {
+function previewErrorFor(reason: ImportParseReason): ActionCode {
   return reason === 'empty' || reason === 'unreadable'
     ? 'invalid'
     : 'import_too_large';
@@ -78,8 +86,8 @@ export function previewBoqImportText(csvText: string): ImportPreview {
     ok: true,
     lines: result.ok,
     problems: result.rows
-      .filter((r) => r.errors.length > 0)
-      .map((r) => ({ rowNumber: r.rowNumber, errors: r.errors })),
+      .filter((r) => r.issues.length > 0)
+      .map((r) => ({ rowNumber: r.rowNumber, issues: r.issues })),
     notes: decoded.notes,
   };
 }

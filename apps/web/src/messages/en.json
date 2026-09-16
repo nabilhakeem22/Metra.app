@@ -1147,7 +1147,25 @@
         "discountPct": "Discount percentage",
         "keyboardHint": "Tab moves across · Enter moves down the column · Esc reverts the cell",
         "costedCopy": "Costed copy",
-        "costedCopyFor": "Costed copy of BOQ {number}"
+        "costedCopyFor": "Costed copy of BOQ {number}",
+        "importErrors": {
+          "unmapped_columns": "Missing column: {value}",
+          "description_empty": "Description is empty",
+          "unit_empty": "Unit is empty",
+          "unit_unknown": "{value} is not one of Metra's units",
+          "qty_not_a_number": "Quantity is not a number",
+          "qty_too_large": "Quantity is too large",
+          "qty_negative": "Quantity cannot be negative",
+          "unit_price_not_a_number": "Unit price is not a number",
+          "unit_price_too_large": "Unit price is too large",
+          "unit_price_negative": "Unit price cannot be negative",
+          "unit_cost_not_a_number": "Unit cost is not a number",
+          "unit_cost_too_large": "Unit cost is too large"
+        },
+        "importNotes": {
+          "semicolon_separated": "Read as semicolon-separated.",
+          "tab_separated": "Read as tab-separated."
+        }
       }
     }
   },

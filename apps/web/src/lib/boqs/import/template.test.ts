@@ -84,7 +84,7 @@ describe('the template round trip', () => {
     const semi = `${csv.split(',').join(';')}\r\n2.01;Painting;Walls;sqm;50;85;40;no;\r\n`;
     const { grid, notes } = decodeCsv(semi);
     const res = mapRows(grid, autoDetectMapping(grid.rows[0] as string[]));
-    expect(notes).toContain('Read as semicolon-separated.');
+    expect(notes).toContain('semicolon_separated');
     expect(res.errorCount).toBe(0);
     expect(res.ok[0]?.description).toBe('Walls');
   });

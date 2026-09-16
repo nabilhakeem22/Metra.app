@@ -1147,7 +1147,25 @@
         "discountPct": "نسبة الخصم",
         "keyboardHint": "زرار Tab بيحركك بالعرض · Enter بينزلك لتحت في العمود · Esc بيرجع الخلية زي ما كانت",
         "costedCopy": "نسخة بالتكاليف",
-        "costedCopyFor": "نسخة بالتكاليف من المقايسة {number}"
+        "costedCopyFor": "نسخة بالتكاليف من المقايسة {number}",
+        "importErrors": {
+          "unmapped_columns": "ناقص عمود: {value}",
+          "description_empty": "الوصف فاضي",
+          "unit_empty": "الوحدة فاضية",
+          "unit_unknown": "{value} مش من وحدات ميترا",
+          "qty_not_a_number": "الكمية مش رقم",
+          "qty_too_large": "الكمية كبيرة أوي",
+          "qty_negative": "الكمية ماينفعش تكون بالسالب",
+          "unit_price_not_a_number": "سعر الوحدة مش رقم",
+          "unit_price_too_large": "سعر الوحدة كبير أوي",
+          "unit_price_negative": "سعر الوحدة ماينفعش يكون بالسالب",
+          "unit_cost_not_a_number": "تكلفة الوحدة مش رقم",
+          "unit_cost_too_large": "تكلفة الوحدة كبيرة أوي"
+        },
+        "importNotes": {
+          "semicolon_separated": "اتقري على إنه مفصول بفاصلة منقوطة",
+          "tab_separated": "اتقري على إنه مفصول بـ Tab"
+        }
       }
     }
   },

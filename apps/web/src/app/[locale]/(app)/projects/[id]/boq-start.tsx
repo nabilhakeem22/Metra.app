@@ -5,6 +5,7 @@ import { useTranslations } from 'next-intl';
 import { useRef, useState, useTransition } from 'react';
 import { Button } from '@/components/ui/button';
 import { toast } from '@/hooks/use-toast';
+import { resolveActionError } from '@/lib/actions/error-message';
 import {
   commitBoqImport,
   createBoq,
@@ -23,6 +24,10 @@ import {
  */
 export function BoqStart({ projectId }: { projectId: string }) {
   const t = useTranslations('projects.profile.boq');
+  // Coded refusals from the preview resolve through the shared errors catalogue:
+  // a sheet over the size cap and a sheet that will not parse are different
+  // problems, and `importFailed` said the same thing about both.
+  const te = useTranslations('errors');
   const [pending, start] = useTransition();
   const [preview, setPreview] = useState<ImportPreview | null>(null);
   const [boqId, setBoqId] = useState<string | null>(null);
@@ -34,7 +39,10 @@ export function BoqStart({ projectId }: { projectId: string }) {
         const text = await file.text();
         const res = await previewBoqImport(text);
         if (!res.ok) {
-          toast({ title: t('importFailed'), variant: 'destructive' });
+          toast({
+            title: resolveActionError(res.error, te),
+            variant: 'destructive',
+          });
           return;
         }
         setPreview(res);
@@ -124,7 +132,7 @@ export function BoqStart({ projectId }: { projectId: string }) {
 
           {preview.notes?.map((note) => (
             <p key={note} className="text-xs text-[color:var(--text-muted)]">
-              {note}
+              {t(`importNotes.${note}`)}
             </p>
           ))}
 
@@ -139,7 +147,12 @@ export function BoqStart({ projectId }: { projectId: string }) {
               <ul className="max-h-40 space-y-0.5 overflow-y-auto text-xs text-[color:var(--text-muted)]">
                 {preview.problems.slice(0, 20).map((p) => (
                   <li key={p.rowNumber}>
-                    {t('rowLabel', { row: String(p.rowNumber) })} — {p.errors.join('; ')}
+                    {t('rowLabel', { row: String(p.rowNumber) })} —{' '}
+                    {p.issues
+                      .map((issue) =>
+                        t(`importErrors.${issue.code}`, { value: issue.value ?? '' }),
+                      )
+                      .join('; ')}
                   </li>
                 ))}
               </ul>
