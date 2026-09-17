@@ -36,6 +36,7 @@ import {
   saveVariationDraftCore,
 } from '@/lib/variations/core';
 import { closeFixture, ctxFor, raw, seedOrg, teardown } from './fixture';
+import { recordDurationMetric } from './step-summary';
 import { withOrgContext, type OrgContext } from '@/lib/db/context';
 
 const orgIds: string[] = [];
@@ -484,6 +485,12 @@ describe('R-E line volume at the MAX_TOTAL_LINES cap', () => {
     // was really guarding is asserted without a database or a clock in
     // `src/lib/lines/insert-chunked.test.ts` (2,000 rows -> 4 statements).
     console.log(`2000-line draft save: ${elapsed}ms`);
+    // ...and the number goes somewhere a human will actually see it, as a TREND
+    // across runs. 12,000 ms is a BUDGET PRINTED FOR COMPARISON, not a
+    // threshold: ~6x the measured ~2 s and comfortably under the 20 s
+    // statement_timeout that `res.ok` above already enforces. Nothing here
+    // fails on the clock - that is the whole point of the wave-4 deletion.
+    recordDurationMetric('2,000-line proposal save', elapsed, 12000);
 
     // A re-save that sends NO sections must EMPTY the document (deviation D7.1).
     const emptied = await saveProposalDraftCore(ctx, { id, sections: [] });
