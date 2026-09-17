@@ -7,6 +7,7 @@ import { computeLine } from '@/lib/aggregates/proposal-totals';
 import { readMoneyString } from '@/lib/money/read';
 import { withinMagnitude } from '@/lib/money/read';
 import type { OrgContext } from '@/lib/db/context';
+import { countCharacters } from '@/lib/validation/text';
 import { bilingualFor } from './bilingual';
 import { MAX_BOQ_LINES, recomputeBoqTotals } from './core';
 import {
@@ -165,7 +166,9 @@ export async function addBoqLineCore(
   // one, must not be told the line needs one — the trap addBoqSectionCore
   // fell into with `section_name_required`.
   if (description === '') return err('description_required');
-  if (description.length > MAX_DESCRIPTION) return err('description_too_long');
+  if (countCharacters(description) > MAX_DESCRIPTION) {
+    return err('description_too_long');
+  }
 
   return mutateInOrg(
     ctx,
@@ -257,7 +260,7 @@ export async function addBoqSectionCore(
   // and neither can `section_name_required`, which was left answering for two:
   // a studio that TYPED a name, an over-long one, was told the section needs one.
   if (title === '') return err('section_name_required');
-  if (title.length > MAX_DESCRIPTION) return err('section_name_too_long');
+  if (countCharacters(title) > MAX_DESCRIPTION) return err('section_name_too_long');
 
   return mutateInOrg(
     ctx,

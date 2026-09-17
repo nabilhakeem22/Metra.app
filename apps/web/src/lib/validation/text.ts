@@ -12,6 +12,23 @@
  * Percentages moved to ./percent.ts: free text and percentages are two jobs.
  */
 
+/**
+ * How long a string is, in CODE POINTS — the unit Postgres counts, and the unit
+ * `optionalText` below already used inline.
+ *
+ * `.length` counts UTF-16 units, so a description of 251 astral characters
+ * measures 502 here and 251 there: refused by the app, accepted by the database.
+ * The direction is always SAFE (the app refuses more than the database would
+ * truncate), but "refused for being too long" is a lie when the database would
+ * have stored it, and a studio pasting a spec with an emoji in it has no way to
+ * know why. Arabic text is unaffected either way: one unit per character.
+ *
+ * One rule, one home. Every cap in the codebase measures through this.
+ */
+export function countCharacters(text: string): number {
+  return [...text].length;
+}
+
 /** Trim a nullable free-text field to a stored value: '' / whitespace / null /
  *  undefined all collapse to `null`, so "the user cleared the box" and "the user
  *  never filled it in" reach the database as the same absent value. */
@@ -59,5 +76,5 @@ export function optionalText(
 ): string | null | TooLong {
   const trimmed = clean(value);
   if (trimmed === null) return null;
-  return [...trimmed].length > max ? TOO_LONG : trimmed;
+  return countCharacters(trimmed) > max ? TOO_LONG : trimmed;
 }

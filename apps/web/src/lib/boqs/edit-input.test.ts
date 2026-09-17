@@ -133,6 +133,24 @@ describe('normalizeLinePatch', () => {
     ).toEqual({ ok: false, error: 'description_too_long' });
   });
 
+  // W3-9. The cap counts CODE POINTS, the unit Postgres counts — not UTF-16
+  // units. An astral character is two units and one character, so a description
+  // of exactly MAX_DESCRIPTION astral characters measured 1000 under `.length`
+  // and was refused here while the database would have stored it happily.
+  it('measures the description cap in CODE POINTS, not UTF-16 units', () => {
+    const atCap = '\u{1F9F1}'.repeat(MAX_DESCRIPTION);
+    expect([...atCap].length).toBe(MAX_DESCRIPTION);
+    expect(atCap.length).toBe(MAX_DESCRIPTION * 2);
+
+    expect(normalizeLinePatch({ description: atCap })).toEqual({
+      ok: true,
+      value: { description: atCap },
+    });
+    expect(
+      normalizeLinePatch({ description: '\u{1F9F1}'.repeat(MAX_DESCRIPTION + 1) }),
+    ).toEqual({ ok: false, error: 'description_too_long' });
+  });
+
   it('refuses an amount past the magnitude cap the import already enforces', () => {
     // 1e17: storable as a factor, but its product with any rate overflows
     // numeric(18,4) — the sheet was the one money surface that let it through.

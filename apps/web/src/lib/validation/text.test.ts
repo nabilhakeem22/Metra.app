@@ -5,6 +5,7 @@ import {
   TOO_LONG,
   clean,
   optionalText,
+  countCharacters,
 } from './text';
 
 // These two shapes replace eleven hand-copied declarations across the domain
@@ -74,5 +75,20 @@ describe('optionalText', () => {
   it('keeps the note cap aligned with left(p_note, 2000) in the SDFs', () => {
     expect(MAX_NOTE_CHARS).toBe(2000);
     expect(MAX_LABEL_CHARS).toBe(200);
+  });
+});
+
+describe('countCharacters', () => {
+  it('counts CODE POINTS, not UTF-16 units', () => {
+    expect(countCharacters('\u{1F9F1}\u{1F9F1}')).toBe(2);
+    expect('\u{1F9F1}\u{1F9F1}'.length).toBe(4);
+  });
+
+  it('Arabic is one unit per character either way', () => {
+    expect(countCharacters('سقف جبسوم')).toBe('سقف جبسوم'.length);
+  });
+
+  it('the empty string is zero', () => {
+    expect(countCharacters('')).toBe(0);
   });
 });

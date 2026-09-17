@@ -11,6 +11,7 @@
 
 import type { ActionCode } from '@/lib/actions/result';
 import { readMoney } from '@/lib/money/read';
+import { countCharacters } from '@/lib/validation/text';
 
 /**
  * Metra's units, in the order the picker offers them. Mirrors the
@@ -132,7 +133,7 @@ function readTextFields(
     // The bilingual CHECK demands one side be present, so a blank description is
     // not a value this table can hold.
     if (text === '') return 'description_required';
-    if (text.length > MAX_DESCRIPTION) return 'description_too_long';
+    if (countCharacters(text) > MAX_DESCRIPTION) return 'description_too_long';
     value.description = text;
   }
 
