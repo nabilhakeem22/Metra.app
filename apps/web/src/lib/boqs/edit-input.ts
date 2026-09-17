@@ -123,7 +123,11 @@ function readTextFields(
 ): ActionCode | null {
   if (patch.itemCode !== undefined) {
     const code = (patch.itemCode ?? '').trim();
-    if (code.length > MAX_ITEM_CODE) return 'item_code_too_long';
+    // CODE POINTS, like the description cap ten lines below and every other cap
+    // in the codebase (lib/validation/text.ts: "one rule, one home"). W3-9 moved
+    // the description and left this one counting UTF-16 units, so 21 astral
+    // characters were refused against a cap of 40.
+    if (countCharacters(code) > MAX_ITEM_CODE) return 'item_code_too_long';
     // An emptied code is a real edit — the line simply stops carrying one.
     value.itemCode = code === '' ? null : code;
   }

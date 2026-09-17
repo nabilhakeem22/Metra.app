@@ -133,6 +133,31 @@ describe('normalizeLinePatch', () => {
     ).toEqual({ ok: false, error: 'description_too_long' });
   });
 
+  // F2 (wave-5 remediation). W3-9 moved the description cap to code points and
+  // left the item-code cap on `.length` ten lines above it, so 21 astral
+  // characters were refused against a cap of 40. item_code is unbounded `text`
+  // in Postgres, so nothing was being mis-mirrored -- it was simply a wrong
+  // refusal, and two caps in one function measuring two different things.
+  it('measures the ITEM CODE cap in code points too', () => {
+    const astral = '\u{1F9F1}'.repeat(21);
+    expect([...astral].length).toBe(21);
+    expect(astral.length).toBe(42); // past MAX_ITEM_CODE only as UTF-16 units
+
+    expect(normalizeLinePatch({ itemCode: astral })).toEqual({
+      ok: true,
+      value: { itemCode: astral },
+    });
+
+    const atCap = '\u{1F9F1}'.repeat(MAX_ITEM_CODE);
+    expect(normalizeLinePatch({ itemCode: atCap })).toEqual({
+      ok: true,
+      value: { itemCode: atCap },
+    });
+    expect(
+      normalizeLinePatch({ itemCode: '\u{1F9F1}'.repeat(MAX_ITEM_CODE + 1) }),
+    ).toEqual({ ok: false, error: 'item_code_too_long' });
+  });
+
   // W3-9. The cap counts CODE POINTS, the unit Postgres counts — not UTF-16
   // units. An astral character is two units and one character, so a description
   // of exactly MAX_DESCRIPTION astral characters measured 1000 under `.length`
