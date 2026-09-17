@@ -5,12 +5,20 @@
  *
  * Three rules, each of which was a real regression rather than a hypothetical:
  *
- *   1. ROOT `DEPLOY.md` MUST NOT EXIST. Owner decision 9 put the deploy runbook
- *      at `docs/DEPLOY.md` and nowhere else. Wave 0 deleted the root copy; wave
- *      2 recreated it as an 8-line pointer; nothing in the repo noticed either
- *      time. A decision enforced by memory, whose failure is silent, is not a
- *      decision — the same argument `ci.yml`'s own header makes about the
- *      `validate/**` trigger.
+ *   1. `DEPLOY.md` EXISTS AT `docs/DEPLOY.md` AND NOWHERE ELSE IN THE TREE.
+ *      Owner decision 9 put the deploy runbook there. Wave 0 deleted the root
+ *      copy; wave 2 recreated it as an 8-line pointer; nothing in the repo
+ *      noticed either time. A decision enforced by memory, whose failure is
+ *      silent, is not a decision — the same argument `ci.yml`'s own header
+ *      makes about the `validate/**` trigger.
+ *
+ *      This rule used to check the REPO ROOT ONLY while its own message said
+ *      "and nowhere else", so `apps/web/DEPLOY.md` passed — verified by
+ *      execution, exit 0. It now WALKS the tree, skipping `node_modules`,
+ *      `.git`, `.next` and `.open-next`. Deliberately wider than
+ *      `git ls-files`: the recurrence this exists to stop starts as an
+ *      untracked file somebody created by hand, which is how both earlier ones
+ *      started.
  *
  *   2. NO `vercel` IN ANY TRACKED `*.md`, except `docs/BUILD-LOG.md`. The app
  *      moved to Cloudflare Workers in August 2026, so a document that sends an
@@ -39,7 +47,7 @@
  * Run it with `npm run docs:check`.
  */
 import { execFileSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 /** The one file allowed to say "Vercel", because it is a history. */
@@ -72,14 +80,33 @@ function trackedMarkdown(root) {
     .filter(Boolean);
 }
 
-/** @returns {string[]} one human-readable failure per offending line. */
-function checkRootRunbook(files) {
-  if (!files.includes('DEPLOY.md')) return [];
-  return [
-    'DEPLOY.md:1  Owner decision 9: the deploy runbook lives at ' +
-      `${RUNBOOK} and nowhere else. A runbook that exists twice is a ` +
-      'runbook that is wrong in one place. Delete the root copy.',
-  ];
+/** Build output and dependency trees hold nobody's runbook. */
+const SKIPPED_DIRS = new Set(['node_modules', '.git', '.next', '.open-next']);
+
+/** Every path (repo-relative, forward slashes) whose basename is `DEPLOY.md`. */
+function findRunbooks(root, relative = '') {
+  const found = [];
+  for (const entry of readdirSync(join(root, relative), { withFileTypes: true })) {
+    const path = relative ? `${relative}/${entry.name}` : entry.name;
+    if (entry.isDirectory()) {
+      if (!SKIPPED_DIRS.has(entry.name)) found.push(...findRunbooks(root, path));
+    } else if (entry.name === 'DEPLOY.md') {
+      found.push(path);
+    }
+  }
+  return found;
+}
+
+/** @returns {string[]} one human-readable failure per offending copy. */
+function checkRunbookIsUnique(root) {
+  return findRunbooks(root)
+    .filter((path) => path !== RUNBOOK)
+    .map(
+      (path) =>
+        `${path}:1  Owner decision 9: the deploy runbook lives at ` +
+        `${RUNBOOK} and nowhere else. A runbook that exists twice is a ` +
+        'runbook that is wrong in one place. Delete this copy.',
+    );
 }
 
 function checkVercel(root, files) {
@@ -122,7 +149,7 @@ function main() {
   const root = repoRoot();
   const files = trackedMarkdown(root);
   const failures = [
-    ...checkRootRunbook(files),
+    ...checkRunbookIsUnique(root),
     ...checkVercel(root, files),
     ...checkArabicDashes(root, files),
   ];
@@ -135,8 +162,9 @@ function main() {
   }
 
   console.log(
-    `docs:check OK — ${files.length} tracked .md files; no root DEPLOY.md, ` +
-      `no Vercel outside ${VERCEL_EXEMPT}, no dash inside Arabic prose.`,
+    `docs:check OK — ${files.length} tracked .md files; ${RUNBOOK} is the only ` +
+      `DEPLOY.md in the tree; no Vercel outside ${VERCEL_EXEMPT}; no dash ` +
+      'inside Arabic prose.',
   );
 }
 

@@ -55,7 +55,7 @@ Agents run these literally. These are exactly what `.github/workflows/ci.yml` ru
 | E2E tests | — (none) |
 | Lint | `npm run lint` *(root; includes `metra/no-physical-inline-direction`)* |
 | i18n gate | `npm run i18n:validate` *(key parity, ICU placeholders, Western numerals — no API key, never calls Gemini)* |
-| Docs gate | `npm run docs:check` *(no root `DEPLOY.md`; no stale-host mention in a tracked `*.md` outside `docs/BUILD-LOG.md`; no em/en dash inside Arabic prose)* |
+| Docs gate | `npm run docs:check` *(`docs/DEPLOY.md` is the ONLY `DEPLOY.md` in the tree — walked, so an untracked copy counts; no stale-host mention in a tracked `*.md` outside `docs/BUILD-LOG.md`; no em/en dash inside Arabic prose)* |
 | Type check | `cd apps/web && npx tsc --noEmit` — **and the same in `packages/db`**; they are two tsconfigs and only one of them is in the CI build step |
 | Migrations | `npm run migrate -w @metra/db` **then** `npm run apply-rls -w @metra/db` (RLS/roles/functions) **then** `npm run seed -w @metra/db` |
 | New migration | `npm run generate -w @metra/db` — ⚠️ drizzle-kit's rename prompt is an interactive TUI that can't run headless; 0013–0051 were hand-authored. The baseline snapshot is the one the NEWEST `meta/_journal.json` entry names (today **`migrations/meta/0051_snapshot.json`**), which is what `generate` diffs against; `db:assert-snapshot` and `db:generate-baseline` derive it from the journal rather than naming it. Read `docs/DEPLOY.md` before using it. |

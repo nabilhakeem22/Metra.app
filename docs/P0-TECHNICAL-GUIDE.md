@@ -386,7 +386,7 @@ container, in this order:
 
 1. `npm ci` (deterministic, from the committed lockfile)
 2. **i18n validate** — key parity, ICU placeholders, Western numerals
-3. **docs gate** (`npm run docs:check`) — no root `DEPLOY.md`, no stale-host
+3. **docs gate** (`npm run docs:check`) — one `DEPLOY.md` in the whole tree, no stale-host
    mention in a tracked `*.md` outside `docs/BUILD-LOG.md`, no em/en dash inside
    Arabic prose
 4. **lint** — including the physical `left`/`right` ban
