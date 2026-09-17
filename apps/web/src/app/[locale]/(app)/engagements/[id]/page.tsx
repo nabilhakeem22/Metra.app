@@ -179,7 +179,13 @@ export default async function EngagementDetailPage({
           />
         </div>
       )}
+      {/* KEYED ON THE ENGAGEMENT. Without it a soft navigation between two
+          engagements re-renders the same element type at the same position and
+          React keeps the subtree alive, so the cockpit's client state — the open
+          tab, and the idempotency keys of any attempt still in doubt — carries
+          across from the engagement the studio just left. */}
       <EngagementDetailClient
+        key={header.id}
         header={header}
       boqSummary={await getProjectBoqSummary(ctx, header.projectId)}
         feeSchedule={feeSchedule}

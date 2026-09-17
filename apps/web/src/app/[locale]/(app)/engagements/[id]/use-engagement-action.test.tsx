@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest';
+import { useState } from 'react';
 import { act, fireEvent, screen } from '@testing-library/react';
 import { renderWithIntl } from '@/test/render-with-intl';
 import type { ActionResult } from '@/lib/actions/result';
@@ -24,22 +25,38 @@ vi.mock('@/i18n/routing', async (importOriginal) => ({
 
 const TRIGGERS: Trigger[] = ['requestRevision', 'approveDesign'];
 
-/** Every key the hook was handed, in order, tagged with the trigger it named. */
-const sent: { trigger: string; key: string }[] = [];
+/** Every key the hook was handed, in order, tagged with the trigger it named
+ *  and the engagement it was dispatched for. */
+const sent: { trigger: string; key: string; engagementId: string }[] = [];
 
-/** What the next dispatch of each trigger resolves to (or throws). */
-const answers = new Map<string, ActionResult | 'throw'>();
+/** What the next dispatch of each trigger resolves to (or throws, or waits for). */
+const answers = new Map<string, ActionResult | 'throw' | 'defer'>();
 
-function ActionProbe({ mintKey }: { mintKey: () => string }) {
+/** The resolver of the one 'defer'red dispatch, so a test can land an answer
+ *  AFTER the studio has navigated somewhere else. */
+let landAnswer: ((result: ActionResult) => void) | null = null;
+
+function ActionProbe({
+  mintKey,
+  engagementId = 'e-1',
+}: {
+  mintKey: () => string;
+  engagementId?: string;
+}) {
   const { pending, error, runAction } = useEngagementAction({
-    engagementId: 'e-1',
+    engagementId,
     mintKey,
   });
   const dispatch = (label: string, trigger?: Trigger) =>
     runAction(async (idempotencyKey) => {
-      sent.push({ trigger: label, key: idempotencyKey });
+      sent.push({ trigger: label, key: idempotencyKey, engagementId });
       const answer = answers.get(label) ?? { ok: true };
       if (answer === 'throw') throw new Error('transport died');
+      if (answer === 'defer') {
+        return new Promise<ActionResult>((resolve) => {
+          landAnswer = resolve;
+        });
+      }
       return answer;
     }, trigger);
 
@@ -92,9 +109,36 @@ function keysFor(trigger: string): string[] {
   return sent.filter((entry) => entry.trigger === trigger).map((entry) => entry.key);
 }
 
+/**
+ * The cockpit's own shape: the id changes WITHOUT a remount. `page.tsx` renders
+ * <EngagementDetailClient> at a fixed position, so before the `key` landed a
+ * soft navigation between two engagements re-rendered the same element type
+ * there and React kept the subtree -- and everything it was holding -- alive.
+ */
+function SwitchingProbe({ mintKey }: { mintKey: () => string }) {
+  const [engagementId, setEngagementId] = useState('e-1');
+  return (
+    <div>
+      <button
+        type="button"
+        onClick={() => setEngagementId((current) => (current === 'e-1' ? 'e-2' : 'e-1'))}
+      >
+        switch
+      </button>
+      <ActionProbe mintKey={mintKey} engagementId={engagementId} />
+    </div>
+  );
+}
+
+function mountSwitchingProbe() {
+  const mintKey = () => `key-${++minted}`;
+  return renderWithIntl(<SwitchingProbe mintKey={mintKey} />);
+}
+
 beforeEach(() => {
   sent.length = 0;
   answers.clear();
+  landAnswer = null;
   router.refresh.mockClear();
   // A9: held keys are now mirrored to sessionStorage, which outlives a single
   // mount by design. Without this, a key held by one test is read back by the
@@ -289,5 +333,69 @@ describe('useEngagementAction — the key survives a remount (A9)', () => {
     } finally {
       vi.unstubAllGlobals();
     }
+  });
+});
+
+/**
+ * Wave-5 remediation F1 = R4: the held-key map belongs to ONE ENGAGEMENT.
+ *
+ * A9 seeded it once per mount and mirrored it under whatever id was current, and
+ * `page.tsx` rendered the cockpit with no `key` -- so a soft navigation from e-1
+ * to e-2 sent e-2's write under e-1's idempotency key and overwrote the entry
+ * e-1 was holding. Both halves are fixed: the page keys the subtree, and the map
+ * is re-seeded whenever the engagement under it changes.
+ */
+describe('useEngagementAction — the map belongs to ONE engagement (F1/R4)', () => {
+  test('e-1 keeps its key, e-2 mints its own, and the retry on e-1 reuses e-1s', async () => {
+    mountSwitchingProbe();
+
+    // 1. e-1 is left in doubt: it holds key-1.
+    answers.set('requestRevision', { ok: false, error: 'uncertain' });
+    await press('requestRevision');
+    expect(sessionStorage.getItem('metra.pendingKeys.e-1')).toContain('key-1');
+
+    // 2. the id changes under the live subtree, and 3. e-2 succeeds.
+    await press('switch');
+    answers.set('requestRevision', { ok: true });
+    await press('requestRevision');
+
+    // e-1's entry is untouched by anything e-2 did.
+    expect(sessionStorage.getItem('metra.pendingKeys.e-1')).toContain('key-1');
+    expect(sessionStorage.getItem('metra.pendingKeys.e-2')).toBeNull();
+
+    // 4. back to e-1, and the in-doubt attempt is retried.
+    await press('switch');
+    answers.set('requestRevision', { ok: false, error: 'uncertain' });
+    await press('requestRevision');
+
+    const dispatches = sent.filter((entry) => entry.trigger === 'requestRevision');
+    expect(dispatches.map((entry) => entry.engagementId)).toEqual(['e-1', 'e-2', 'e-1']);
+    expect(dispatches[0]!.key).toBe('key-1');
+    // e-2's write carried its OWN key, not the one e-1 was holding.
+    expect(dispatches[1]!.key).not.toBe(dispatches[0]!.key);
+    // and the retry is recognised as the SAME act it was before the detour.
+    expect(dispatches[2]!.key).toBe(dispatches[0]!.key);
+  });
+
+  test('an answer landing after the studio moved on settles the engagement it was sent for', async () => {
+    mountSwitchingProbe();
+    answers.set('requestRevision', 'defer');
+    await press('requestRevision'); // e-1, still in flight
+    await press('switch'); // now looking at e-2
+
+    // A DEFINITE refusal: e-1's key is released -- on e-1.
+    await act(async () => {
+      landAnswer?.({ ok: false, error: 'forbidden' });
+    });
+    expect(sessionStorage.getItem('metra.pendingKeys.e-1')).toBeNull();
+    expect(sessionStorage.getItem('metra.pendingKeys.e-2')).toBeNull();
+
+    // and e-2's next act is its own, not a key inherited from the detour.
+    answers.set('requestRevision', { ok: false, error: 'uncertain' });
+    await press('requestRevision');
+    const dispatches = sent.filter((entry) => entry.trigger === 'requestRevision');
+    expect(dispatches[1]!.engagementId).toBe('e-2');
+    expect(dispatches[1]!.key).not.toBe(dispatches[0]!.key);
+    expect(sessionStorage.getItem('metra.pendingKeys.e-2')).toContain(dispatches[1]!.key);
   });
 });

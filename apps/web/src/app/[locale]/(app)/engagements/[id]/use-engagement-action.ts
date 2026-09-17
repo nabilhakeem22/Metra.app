@@ -3,9 +3,9 @@
 import { useRef, useState, useTransition } from 'react';
 import { useRouter } from '@/i18n/routing';
 import type { ActionCode, ActionResult } from '@/lib/actions/result';
-import { keyForAttempt, releasesKey } from '@/lib/engagements/retry-policy';
+import { releasesKey } from '@/lib/engagements/retry-policy';
 import type { Trigger } from '@/lib/engagements/transitions';
-import { readHeldKeys, writeHeldKeys } from './held-keys-store';
+import { useHeldKeys } from './use-held-keys';
 
 export interface EngagementActionApi {
   pending: boolean;
@@ -63,48 +63,23 @@ export function useEngagementAction(
   const [error, setError] = useState<ActionCode | null>(null);
   // Guards the frame-sized window `pending` cannot -- see above.
   const inFlight = useRef(false);
-  /**
-   * The idempotency key of each attempt currently in doubt (0050), BY TRIGGER.
-   *
-   * Per trigger, not per page. One shared key meant that any of the fifteen
-   * actions on this screen — an upload, a payment, the off-plan toggle —
-   * released the key a half-finished `requestRevision` was holding, and its
-   * retry then minted a fresh one: a second ledger row and a second allowance
-   * spent, caused by a success that had nothing to do with it.
-   *
-   * A key is NOT released when its action fails: it is released when we KNOW
-   * what happened. A definite refusal means the transaction rolled back, so the
-   * next click is a new attempt and gets a new key. 'uncertain', 'generic' and a
-   * thrown rejection mean the opposite — the write may have committed and only
-   * the answer was lost — so the key survives and the retry is recognised as the
-   * same act. See lib/engagements/retry-policy.ts for both rules.
-   *
-   * SEEDED FROM sessionStorage on the first render of this mount (A9), so a key
-   * held for an attempt in doubt survives a remount — a soft navigation away and
-   * back, a Fast Refresh, a router.refresh() that replaces the tree. Without it
-   * the retry after a remount mints a fresh key, which is a fresh act: one
-   * duplicate revision, or one duplicate attestation. See held-keys-store.ts.
-   */
-  const pendingKeys = useRef<Map<Trigger, string> | null>(null);
-  pendingKeys.current ??= readHeldKeys(options.engagementId);
-  const held = pendingKeys.current;
+  // The keys of the attempts currently in doubt, per trigger and per
+  // engagement, mirrored to sessionStorage. See use-held-keys.ts.
+  const heldKeys = useHeldKeys(options.engagementId);
   const mintKey = options.mintKey ?? (() => crypto.randomUUID());
 
-  /** Every mutation of the map goes through here, so the mirror cannot drift. */
-  function persistHeldKeys(): void {
-    writeHeldKeys(options.engagementId, held);
-  }
-
-  function settle(trigger: Trigger | undefined, result: ActionResult): void {
-    // Only THIS trigger's key is ever touched, and only when the answer is
-    // "it worked" or a DEFINITE refusal — a guard verdict, a forbidden
-    // capability, a state conflict, all of which rolled their transaction
-    // back. `generic`, `uncertain` and any code this build has not heard of
-    // may all mean the write landed and the answer was lost, so they hold.
-    if (trigger && releasesKey(result)) {
-      held.delete(trigger);
-      persistHeldKeys();
-    }
+  function settle(
+    engagementId: string,
+    trigger: Trigger | undefined,
+    result: ActionResult,
+  ): void {
+    // Only THIS trigger's key on THIS engagement is ever touched, and only when
+    // the answer is "it worked" or a DEFINITE refusal — a guard verdict, a
+    // forbidden capability, a state conflict, all of which rolled their
+    // transaction back. `generic`, `uncertain` and any code this build has not
+    // heard of may all mean the write landed and the answer was lost, so they
+    // hold.
+    if (trigger && releasesKey(result)) heldKeys.release(engagementId, trigger);
     if (result.ok) router.refresh();
     else setError((result.error as ActionCode) ?? 'generic');
   }
@@ -116,19 +91,19 @@ export function useEngagementAction(
     if (inFlight.current) return;
     inFlight.current = true;
     setError(null);
+    // The engagement this attempt belongs to, read ONCE. A soft navigation while
+    // it is in flight must not settle whichever engagement is on screen when the
+    // answer lands.
+    const engagementId = options.engagementId;
     // ONE key per ATTEMPT AT ONE TRIGGER, HELD across a retry the user makes
-    // because they were not told what happened. It is minted here rather than
+    // because they were not told what happened. It is claimed here rather than
     // per click, because the whole point is that the RETRY carries the SAME key
     // as the attempt it is retrying — a fresh key would be a fresh act and would
-    // spend a second free revision. See the ref's declaration for the rest.
-    const idempotencyKey = keyForAttempt(held, trigger, mintKey);
-    if (trigger) {
-      held.set(trigger, idempotencyKey);
-      persistHeldKeys();
-    }
+    // spend a second free revision. See use-held-keys.ts for the rest.
+    const idempotencyKey = heldKeys.claim(engagementId, trigger, mintKey);
     startTransition(async () => {
       try {
-        settle(trigger, await fn(idempotencyKey));
+        settle(engagementId, trigger, await fn(idempotencyKey));
       } catch (cause) {
         // A rejection is the client-side twin of 'uncertain' — the request may
         // have reached Postgres and committed, and only the response was lost.
