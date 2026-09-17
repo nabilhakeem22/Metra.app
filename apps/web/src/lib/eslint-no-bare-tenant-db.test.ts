@@ -97,10 +97,33 @@ it('no-bare-tenant-db: flags raw-connection queries, allows scoped ones', () => 
         filename: 'apps/web/src/lib/share/sdf-call.test.ts',
         code: "import { readSdfJson } from './sdf-call';\nreadSdfJson(q);",
       },
+      // An allowlisted portal may reach the module by ANY of the six forms.
+      {
+        filename: 'apps/web/src/lib/proposals/public.ts',
+        code: "const m = require('@/lib/share/sdf-call');\n",
+      },
+      // A `require` of anything else is not this rule's business, and neither is
+      // a local function that merely shares the name (the W3-3 false positive).
+      {
+        filename: 'apps/web/src/lib/clients/queries.ts',
+        code: "const fs = require('node:fs');\nconst q = require(somePath);",
+      },
       // A property that merely SHARES a runner's name is not a reference to it.
       {
         filename: 'apps/web/src/lib/clients/queries.ts',
         code: 'const shape = { readSdfJson: 1 }; use(shape.readSdfJson);',
+      },
+      // W3-3, CLOSED BY CONSTRUCTION: a LOCAL function that happens to be called
+      // `readSdfJson` reaches nothing. The fence judges the module a file
+      // depends on, so a name that names nothing outside this file is not a
+      // dependency and is not reported.
+      {
+        filename: 'apps/web/src/lib/clients/queries.ts',
+        code:
+          'function readSdfJson(query) {\n' +
+          '  return localCache.get(query);\n' +
+          '}\n' +
+          'export const rows = readSdfJson("clients");\n',
       },
     ],
     invalid: [
@@ -259,15 +282,15 @@ it('no-bare-tenant-db: flags raw-connection queries, allows scoped ones', () => 
       },
       // S1: THE SECOND FENCE. Concentrating nine allowlisted files into one moved
       // the exemption but not the enforcement — a security review wrote this exact
-      // file in lib/clients, ran eslint, and got exit 0. Two reports: the import,
-      // and the call that runs on the BYPASSRLS socket.
+      // file in lib/clients, ran eslint, and got exit 0. ONE report now, at the
+      // specifier: the DEPENDENCY is the violation. Reporting the call site as
+      // well said the same thing twice, and the name-based check that produced
+      // the second report also fired on any local function that merely shared
+      // the name (W3-3).
       {
         filename: 'apps/web/src/lib/clients/secprobe-sdf.ts',
         code: "import { readSdfJson } from '@/lib/share/sdf-call';\nawait readSdfJson(sql`select * from public.clients`);",
-        errors: [
-          { messageId: 'sdfCallerNotAllowlisted' },
-          { messageId: 'sdfCallerNotAllowlisted' },
-        ],
+        errors: [{ messageId: 'sdfCallerNotAllowlisted' }],
       },
       // The RELATIVE spelling resolves to the same module — the evasion that
       // defeated the sibling module-shape gate.
@@ -283,21 +306,78 @@ it('no-bare-tenant-db: flags raw-connection queries, allows scoped ones', () => 
         code: "import { normalizeRawToken } from '@/lib/share/sdf-call';\n",
         errors: [{ messageId: 'sdfCallerNotAllowlisted' }],
       },
-      // A runner reached without a matching import — a re-export, a barrel, a
-      // dynamic import. Both the binding and the call are named, so both report.
+      // A DYNAMIC import of the fenced module, with the runner reached by a
+      // property call on the resolved namespace. The specifier is a literal, so
+      // the rule resolves it and reports at the specifier.
       {
         filename: 'apps/web/src/lib/clients/queries.ts',
-        code: 'const { readSdfJson } = await import(modulePath);\nreadSdfJson(q);',
-        errors: [
-          { messageId: 'sdfCallerNotAllowlisted' },
-          { messageId: 'sdfCallerNotAllowlisted' },
-        ],
+        code:
+          "const rows = await import('@/lib/share/sdf-call').then((m) => m.readSdfJson(q));\n",
+        errors: [{ messageId: 'sdfCallerNotAllowlisted' }],
+      },
+      // A RE-EXPORT is a dependency. Reporting it here is what closes the
+      // aliased-barrel evasion at its source: a barrel cannot launder the runner
+      // to consumers under a legal-looking path, because the barrel itself is
+      // the violation.
+      {
+        filename: 'apps/web/src/lib/clients/barrel.ts',
+        code: "export { readSdfJson } from '@/lib/share/sdf-call';\n",
+        errors: [{ messageId: 'sdfCallerNotAllowlisted' }],
+      },
+      // `export * from` forwards it without even naming it.
+      {
+        filename: 'apps/web/src/lib/clients/barrel.ts',
+        code: "export * from '@/lib/share/sdf-call';\n",
+        errors: [{ messageId: 'sdfCallerNotAllowlisted' }],
+      },
+      // An ALIASED import, spelled relatively and with the extension — the module
+      // is recognised by its TAIL, not by one spelling of its path.
+      {
+        filename: 'apps/web/src/lib/clients/queries.ts',
+        code: "import { readSdfJson as runner } from '../share/sdf-call.ts';\nrunner(q);",
+        errors: [{ messageId: 'sdfCallerNotAllowlisted' }],
+      },
+      // A bare SIDE-EFFECT import still makes this file depend on the module.
+      {
+        filename: 'apps/web/src/lib/clients/queries.ts',
+        code: "import '@/lib/share/sdf-call';\n",
+        errors: [{ messageId: 'sdfCallerNotAllowlisted' }],
       },
       // A file allowlisted to open the raw socket itself has no standing to run
       // somebody ELSE's token SDF: the two allowlists sanction different things.
       {
         filename: 'apps/web/src/lib/automation/runner.ts',
         code: "import { readSdfJson } from '@/lib/share/sdf-call';\n",
+        errors: [{ messageId: 'sdfCallerNotAllowlisted' }],
+      },
+      // S1/F3: `require('…')`. The sibling gate's `ts.preProcessFile` scanner
+      // DOES return a specifier for this shape, so a fence that did not see it
+      // made "one rule, two hosts" false. Belt-and-braces in apps/web —
+      // `@typescript-eslint/no-require-imports` is error repo-wide — but the
+      // fence must not depend on another rule staying switched on.
+      {
+        filename: 'apps/web/src/lib/clients/secprobe-sdf.ts',
+        code: "const m = require('@/lib/share/sdf-call');\nm.readSdfJson(q);",
+        errors: [{ messageId: 'sdfCallerNotAllowlisted' }],
+      },
+      // …spelled relatively, with the extension, and with a template literal
+      // instead of quotes: one module, three punctuations.
+      {
+        filename: 'apps/web/src/lib/clients/secprobe-sdf.ts',
+        code: "const m = require(`../share/sdf-call.ts`);\n",
+        errors: [{ messageId: 'sdfCallerNotAllowlisted' }],
+      },
+      // `import x = require('…')` — TypeScript's own form, a different AST node.
+      {
+        filename: 'apps/web/src/lib/clients/secprobe-sdf.ts',
+        code: "import runner = require('@/lib/share/sdf-call');\nrunner.readSdfCode(q);",
+        errors: [{ messageId: 'sdfCallerNotAllowlisted' }],
+      },
+      // A file allowlisted for the BASE connection takes the early return, which
+      // hands back the SDF visitors alone — the require branch must survive it.
+      {
+        filename: 'apps/web/src/lib/automation/runner.ts',
+        code: "const m = require('@/lib/share/sdf-call');\n",
         errors: [{ messageId: 'sdfCallerNotAllowlisted' }],
       },
     ],

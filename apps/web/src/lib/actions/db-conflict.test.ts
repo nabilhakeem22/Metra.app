@@ -1,0 +1,102 @@
+import { describe, expect, it } from 'vitest';
+import { isAmbiguousDbOutcome } from './db-failure';
+import {
+  constraintNameOf,
+  isImmutabilityViolation,
+  isUniqueViolation,
+  isUniqueViolationOf,
+} from './db-conflict';
+
+describe('isUniqueViolation', () => {
+  it('recognises 23505', () => {
+    expect(isUniqueViolation({ code: '23505' })).toBe(true);
+  });
+
+  it('is false for MT100, a plain Error, null and a non-string code', () => {
+    expect(isUniqueViolation({ code: 'MT100' })).toBe(false);
+    expect(isUniqueViolation(new Error('boom'))).toBe(false);
+    expect(isUniqueViolation(null)).toBe(false);
+    expect(isUniqueViolation(undefined)).toBe(false);
+    expect(isUniqueViolation({ code: 23505 })).toBe(false);
+  });
+});
+
+describe('isUniqueViolationOf', () => {
+  const CONSTRAINT = 'contracts_org_id_source_proposal_unique';
+
+  it('is true only when the SQLSTATE and the constraint name both match', () => {
+    expect(
+      isUniqueViolationOf({ code: '23505', constraint_name: CONSTRAINT }, CONSTRAINT),
+    ).toBe(true);
+  });
+
+  it('is false for a 23505 raised by a DIFFERENT constraint on the same table', () => {
+    // The whole point: `generateContractCore` runs five phases in one
+    // transaction, and a collision on the contract NUMBER means the allocator
+    // failed. Answering it "a contract already exists" would dress a defect as
+    // an expected race and delete its log line.
+    expect(
+      isUniqueViolationOf(
+        { code: '23505', constraint_name: 'contracts_org_id_number_unique' },
+        CONSTRAINT,
+      ),
+    ).toBe(false);
+  });
+
+  it('is false when the server attributed the error to no constraint at all', () => {
+    expect(isUniqueViolationOf({ code: '23505' }, CONSTRAINT)).toBe(false);
+    expect(isUniqueViolationOf({ code: '23505', constraint_name: '' }, CONSTRAINT)).toBe(
+      false,
+    );
+    expect(isUniqueViolationOf({ code: '23505', constraint_name: 7 }, CONSTRAINT)).toBe(
+      false,
+    );
+  });
+
+  it('is false for the right constraint under the WRONG SQLSTATE', () => {
+    expect(
+      isUniqueViolationOf({ code: 'MT100', constraint_name: CONSTRAINT }, CONSTRAINT),
+    ).toBe(false);
+    expect(isUniqueViolationOf(null, CONSTRAINT)).toBe(false);
+  });
+});
+
+describe('constraintNameOf', () => {
+  it('reads the server-supplied name, and nothing else', () => {
+    expect(constraintNameOf({ constraint_name: 'clients_org_id_phone_unique' })).toBe(
+      'clients_org_id_phone_unique',
+    );
+    expect(constraintNameOf({ code: '23505' })).toBeNull();
+    expect(constraintNameOf({ constraint_name: '' })).toBeNull();
+    expect(constraintNameOf(new Error('boom'))).toBeNull();
+    expect(constraintNameOf(null)).toBeNull();
+  });
+});
+
+describe('isImmutabilityViolation', () => {
+  it('recognises MT100', () => {
+    expect(isImmutabilityViolation({ code: 'MT100' })).toBe(true);
+  });
+
+  it('is false for 23505, a plain Error and null', () => {
+    expect(isImmutabilityViolation({ code: '23505' })).toBe(false);
+    expect(isImmutabilityViolation(new Error('boom'))).toBe(false);
+    expect(isImmutabilityViolation(null)).toBe(false);
+  });
+});
+
+describe('a refusal is never confused with an ambiguous outcome', () => {
+  it('55P03 stays AMBIGUOUS and reaches neither classifier', () => {
+    // The ordering inside mutationFailureCode depends on this: a lock timeout
+    // must surface as `uncertain` so the caller HOLDS its idempotency key. If it
+    // could also read as a named conflict, a retry would mint a fresh key.
+    expect(isAmbiguousDbOutcome({ code: '55P03' })).toBe(true);
+    expect(isUniqueViolation({ code: '55P03' })).toBe(false);
+    expect(isImmutabilityViolation({ code: '55P03' })).toBe(false);
+  });
+
+  it('23505 and MT100 are NOT ambiguous', () => {
+    expect(isAmbiguousDbOutcome({ code: '23505' })).toBe(false);
+    expect(isAmbiguousDbOutcome({ code: 'MT100' })).toBe(false);
+  });
+});

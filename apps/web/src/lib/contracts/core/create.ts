@@ -16,7 +16,10 @@ import { allocateNumber } from '@/lib/db/allocate-number';
 import type { OrgContext } from '@/lib/db/context';
 import { isUuid } from '@/lib/uuid';
 import { copyProposalContentToContract } from './create-copy';
-import { persistContractHeader } from './create-header';
+import {
+  CONTRACT_PER_PROPOSAL_CONSTRAINT,
+  persistContractHeader,
+} from './create-header';
 
 export interface GenerateContractInput {
   proposalId: string;
@@ -122,7 +125,25 @@ export async function generateContractCore(
 
   return mutateInOrg(
     ctx,
-    { capability: 'contracts_generate', action: 'create' },
+    {
+      capability: 'contracts_generate',
+      action: 'create',
+      // (org_id, source_proposal_id) is unique: two studios pressing Generate on
+      // the same accepted proposal is a NORMAL race, and the loser's 23505 means
+      // exactly one thing here — the contract it wanted already exists. Naming it
+      // keeps `generic` (and a false `mutateInOrg failed` log line) off the path.
+      //
+      // The CONSTRAINT is named too, and that is the whole safety of it. This
+      // transaction runs five phases; `allocateContractNumber` and the copy both
+      // write under unique indexes of their own. A bare code would have answered
+      // "a contract already exists" to a collision on
+      // contracts_org_id_number_unique — a broken allocator wearing a sentence
+      // about something else, with its log line removed.
+      conflict: {
+        constraint: CONTRACT_PER_PROPOSAL_CONSTRAINT,
+        code: 'contract_exists',
+      },
+    },
     async (tx, audit) => {
       const proposal = await loadAcceptedProposal(tx, proposalId);
       const percentages = await loadInheritedPercentages(tx, proposal);

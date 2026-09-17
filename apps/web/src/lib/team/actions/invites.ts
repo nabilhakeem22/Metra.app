@@ -7,6 +7,7 @@ import { requireOrg } from '@/lib/auth/require-org';
 import { withOrgContext } from '@/lib/db/context';
 import { sendInviteEmail } from '@/lib/email/resend';
 import { canManageOrg } from '@/lib/permissions/can';
+import { isUniqueViolation } from '@/lib/actions/db-conflict';
 import { type ActionResult } from '@/lib/actions/result';
 import { getOrgMemberIdentities } from '../identities';
 import { isInvitableRole } from '../invitable';
@@ -14,7 +15,6 @@ import {
   INVITE_TTL_DAYS,
   buildAcceptUrl,
   currentLocale,
-  isUniqueViolation,
   isValidEmail,
   mintShareToken,
   normalizeEmail,

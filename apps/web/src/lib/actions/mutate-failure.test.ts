@@ -15,11 +15,21 @@ vi.mock('@/lib/db/context', () => ({ withOrgContext: vi.fn() }));
 const ctx = { orgId: 'o1', userId: 'u1', role: 'owner' } as unknown as OrgContext;
 const openTransaction = vi.mocked(withOrgContext);
 
-/** Every mutation rejects the same way here — only the thrown value differs. */
-function rejectWith(thrown: unknown) {
+type MutateOptions = Parameters<typeof mutateInOrg>[1];
+
+/** Every mutation rejects the same way here — the thrown value and the options
+ *  are what differ. */
+function rejectWith(thrown: unknown, opts: MutateOptions = {}) {
   openTransaction.mockRejectedValueOnce(thrown);
-  return mutateInOrg(ctx, {}, async () => undefined);
+  return mutateInOrg(ctx, opts, async () => undefined);
 }
+
+const CONTRACT_RACE: MutateOptions = {
+  conflict: {
+    constraint: 'contracts_org_id_source_proposal_unique',
+    code: 'contract_exists',
+  },
+};
 
 describe('mutateInOrg failure mapping', () => {
   beforeEach(() => {
@@ -59,6 +69,107 @@ describe('mutateInOrg failure mapping', () => {
       ok: false,
       error: 'illegal_trigger',
     });
+  });
+
+  it('names a 23505 only when the CONSTRAINT is the one the caller named', async () => {
+    await expect(
+      rejectWith(
+        { code: '23505', constraint_name: 'contracts_org_id_source_proposal_unique' },
+        CONTRACT_RACE,
+      ),
+    ).resolves.toEqual({ ok: false, error: 'contract_exists' });
+  });
+
+  it('leaves ANOTHER constraint\'s 23505 in the tail — generic, and LOGGED', async () => {
+    // The finding this closes: `generateContractCore` runs five phases in one
+    // transaction. A collision on contracts_org_id_number_unique means the
+    // number allocator failed, and the bare-code version answered it "a contract
+    // already exists" while removing the only record that it happened.
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
+    await expect(
+      rejectWith(
+        { code: '23505', constraint_name: 'contracts_org_id_number_unique' },
+        CONTRACT_RACE,
+      ),
+    ).resolves.toEqual({ ok: false, error: 'generic' });
+    expect(logged).toHaveBeenCalledOnce();
+    logged.mockRestore();
+  });
+
+  it('leaves an UNATTRIBUTED 23505 in the tail too', async () => {
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
+    await expect(rejectWith({ code: '23505' }, CONTRACT_RACE)).resolves.toEqual({
+      ok: false,
+      error: 'generic',
+    });
+    expect(logged).toHaveBeenCalledOnce();
+    logged.mockRestore();
+  });
+
+  it('leaves every 23505 in the tail when the mutation named no race at all', async () => {
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
+    await expect(
+      rejectWith({ code: '23505', constraint_name: 'clients_org_id_phone_unique' }),
+    ).resolves.toEqual({ ok: false, error: 'generic' });
+    expect(logged).toHaveBeenCalledOnce();
+    logged.mockRestore();
+  });
+
+  it('still answers an MT100 with the immutable code, which names no constraint', async () => {
+    // MT100 is raised by `enforce_immutable_when`, a TRIGGER: the server
+    // attributes it to no constraint, so `immutableCode` stays a bare code.
+    await expect(
+      rejectWith({ code: 'MT100' }, { immutableCode: 'proposal_not_draft' }),
+    ).resolves.toEqual({ ok: false, error: 'proposal_not_draft' });
+  });
+
+  it('logs a WHITELIST of the failure, never the error object', async () => {
+    // postgres.js Object.assigns every server field onto the error, ENUMERABLE,
+    // and for a 23505 `detail` carries the colliding row's key values. The log
+    // line must describe the SHAPE of the failure and nothing about the row.
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
+    await expect(
+      rejectWith({
+        name: 'PostgresError',
+        code: '23505',
+        constraint_name: 'clients_org_id_phone_unique',
+        table_name: 'clients',
+        message: 'duplicate key value violates unique constraint',
+        detail: 'Key (org_id, phone)=(…, 01000000000) already exists.',
+        where: 'PL/pgSQL function do_something() line 3',
+        schema_name: 'public',
+      }),
+    ).resolves.toEqual({ ok: false, error: 'generic' });
+    expect(logged).toHaveBeenCalledWith('mutateInOrg failed:', {
+      name: 'PostgresError',
+      code: '23505',
+      constraint_name: 'clients_org_id_phone_unique',
+      table_name: 'clients',
+      message: 'duplicate key value violates unique constraint',
+    });
+    logged.mockRestore();
+  });
+
+  it('drops a non-string field rather than passing the value through', async () => {
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
+    await rejectWith({
+      code: '42703',
+      message: 'column "nope" does not exist',
+      constraint_name: { toString: () => 'not a string' },
+      table_name: '',
+    });
+    expect(logged).toHaveBeenCalledWith('mutateInOrg failed:', {
+      code: '42703',
+      message: 'column "nope" does not exist',
+    });
+    logged.mockRestore();
+  });
+
+  it('says what it got when a non-object was thrown', async () => {
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
+    await rejectWith('just a string');
+    expect(logged).toHaveBeenCalledWith('mutateInOrg failed:', { thrown: 'string' });
+    logged.mockRestore();
   });
 
   it('keeps generic for a failure it cannot classify', async () => {

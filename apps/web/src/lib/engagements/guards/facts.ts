@@ -48,8 +48,7 @@ export type GuardKey =
   | 'shopDrawingsPresent'
   | 'boqPresent'
   | 'balanceCleared'
-  | 'handoffAcknowledged'
-  | 'pendingGuard';
+  | 'handoffAcknowledged';
 
 /** The shared pass verdict every guard returns on success. */
 export const pass: GuardResult = { ok: true };

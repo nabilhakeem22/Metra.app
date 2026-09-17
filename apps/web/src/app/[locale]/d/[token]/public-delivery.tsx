@@ -2,7 +2,7 @@
 
 import { useLocale, useTranslations } from 'next-intl';
 import { paymentGlance } from '@/lib/engagements/portal-hero';
-import type { PublicDelivery } from '@/lib/engagements/public';
+import type { DeliveryReadResult } from '@/lib/engagements/public';
 import { DocumentsCard } from './portal/documents-card';
 import { FirmHeader } from './portal/firm-header';
 import { Greeting } from './portal/greeting';
@@ -18,15 +18,18 @@ import { PortalCommandCard } from './portal/command-card';
  * payment glance → what's-next → footer. Every derivation (journey position, hero) is computed
  * server-side and carries NO raw machine state; every figure is a client-DUE
  * amount (no cost/margin ever reaches this surface). Bilingual, RTL-safe, Western
- * numerals, logical CSS only. A null delivery renders the friendly not-found.
+ * numerals, logical CSS only. A read that produced no delivery renders ONE OF TWO
+ * notices, and which one matters: `not_found` is permanent and tells the client to
+ * ask their design team for a new link; `read_failed` is transient and tells them
+ * their link is still valid.
  */
 export function PublicDeliveryView({
   token,
-  delivery,
+  read,
   documentUnavailable = false,
 }: {
   token: string;
-  delivery: PublicDelivery | null;
+  read: DeliveryReadResult;
   /** Set when the download route bounced back — the client asked for a document
    *  that is not (or is no longer) available to them. */
   documentUnavailable?: boolean;
@@ -34,16 +37,19 @@ export function PublicDeliveryView({
   const t = useTranslations('delivery');
   const locale = useLocale();
 
-  if (!delivery) {
+  if (read.status !== 'ok') {
+    const notice = read.status === 'read_failed' ? 'readFailed' : 'notFound';
     return (
       <div className="client-portal flex min-h-screen items-center justify-center p-6 text-center">
         <div className="max-w-sm space-y-2">
-          <p className="text-lg font-semibold">{t('notFound.title')}</p>
-          <p className="text-sm text-muted-foreground">{t('notFound.body')}</p>
+          <p className="text-lg font-semibold">{t(notice + '.title')}</p>
+          <p className="text-sm text-muted-foreground">{t(notice + '.body')}</p>
         </div>
       </div>
     );
   }
+
+  const { delivery } = read;
 
   const wantAr = locale.startsWith('ar');
   const pick = (ar: string | null, en: string | null) =>

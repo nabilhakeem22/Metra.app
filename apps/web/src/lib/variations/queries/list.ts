@@ -1,6 +1,11 @@
 import 'server-only';
-import { contracts, variationOrders, type VariationStatus } from '@metra/db';
-import { and, desc, eq, type SQL } from 'drizzle-orm';
+import {
+  contracts,
+  variationOrderEvents,
+  variationOrders,
+  type VariationStatus,
+} from '@metra/db';
+import { and, desc, eq, sql, type SQL } from 'drizzle-orm';
 import { withOrgContext, type OrgContext } from '@/lib/db/context';
 import { boundedPage } from '@/lib/db/list-bounds';
 
@@ -14,6 +19,12 @@ export interface VariationListRow {
   contractId: string;
   contractNumber: number | null;
   createdAt: string;
+  /**
+   * WHO rejected it (0051) — 'client', 'staff' (the termination cascade), or
+   * null for a row written before the column. Meaningless unless `status` is
+   * `rejected`; `lib/variations/status-label.ts` is the only reader.
+   */
+  rejectionChannel: string | null;
 }
 
 export interface ListVariationsFilter {
@@ -35,6 +46,15 @@ const VARIATION_LIST_COLUMNS = {
   contractId: variationOrders.contractId,
   contractNumber: contracts.number,
   createdAt: variationOrders.createdAt,
+  // The newest `rejected` event's channel, as a correlated subquery rather than
+  // a join: at most one row is wanted per variation order, and a join would
+  // multiply the register by the whole event history. Covered by
+  // variation_order_events_variationOrder_idx (org_id, variation_order_id), and
+  // it reads a table this transaction is already scoped to by RLS.
+  rejectionChannel: sql<string | null>`(
+    select e.actor_channel from ${variationOrderEvents} e
+    where e.variation_order_id = ${variationOrders.id} and e.kind = 'rejected'
+    order by e.decided_at desc, e.id desc limit 1)`,
 } as const;
 
 /** The filter as SQL. Every caller passes a parent, but none of them is a bound. */

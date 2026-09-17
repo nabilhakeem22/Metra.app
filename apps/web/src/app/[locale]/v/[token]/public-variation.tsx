@@ -57,6 +57,7 @@ export function PublicVariationView({
     status: variation.status,
     contractActive: variation.contractActive,
     outcome,
+    rejectionChannel: variation.rejectionChannel,
   };
   const decided = variationIsDecided(decisionState);
   const decidedMessage = t(`client.${variationDecidedKey(decisionState)}`);

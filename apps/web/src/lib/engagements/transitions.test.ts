@@ -4,7 +4,6 @@ import { GUARDS, type GuardKey } from './guards';
 import { DESIGN_STATES, type DesignState } from './states';
 import {
   TRANSITIONS,
-  WIRED_TRIGGERS,
   type Trigger,
 } from './transitions';
 
@@ -128,12 +127,9 @@ describe('transition registry', () => {
   });
 
   it('all 19 triggers are wired; nothing routes through the fail-closed sentinel', () => {
-    // The 3D revision loop wired `designChangeRaised`, so WIRED_TRIGGERS is now
-    // the COMPLETE trigger set — there is no declared-but-unfireable edge left.
-    expect([...WIRED_TRIGGERS].sort()).toEqual([...ALL_TRIGGERS].sort());
-    expect(WIRED_TRIGGERS.size).toBe(19);
-
-    // Each wired trigger carries a concrete guard, never the sentinel.
+    // Every declared trigger has an edge: `TRANSITIONS` is annotated
+    // `Record<Trigger, TransitionDef>`, so a trigger filed in no edge file does
+    // not compile. Each one carries a concrete guard, never the sentinel.
     expect(TRANSITIONS.submitDesignFee.guards).toEqual(['scopeInputsPresent']);
     expect(TRANSITIONS.submitDesignFee.from).toBe('created');
     expect(TRANSITIONS.submitDesignFee.to).toBe('design_proposal');
@@ -321,14 +317,5 @@ describe('transition registry', () => {
           state !== 'closed_design_only',
       ).sort(),
     );
-
-    // NO edge routes through the fail-closed `pendingGuard` sentinel any more.
-    // This is the runtime witness for "declared but unfireable is now empty": if
-    // a future step parks a new trigger on the sentinel it must ALSO be kept out
-    // of WIRED_TRIGGERS, and this assertion is what forces that pairing.
-    const onSentinel = ALL_TRIGGERS.filter((trigger) =>
-      TRANSITIONS[trigger].guards.includes('pendingGuard'),
-    );
-    expect(onSentinel).toEqual([]);
   });
 });

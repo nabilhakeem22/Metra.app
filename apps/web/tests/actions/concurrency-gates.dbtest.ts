@@ -236,16 +236,45 @@ describe('R-B proposal transitions under concurrency', () => {
     expect(lines[0].n).toBe(1);
   });
 
-  it('allocateNumber: ten concurrent creates get ten distinct numbers', async () => {
+  it('allocateNumber: concurrent creates never issue one number twice', async () => {
+    // WHAT THIS CASE CLAIMS: the per-org advisory lock makes number allocation
+    // exclusive. It does NOT claim ten waiters all beat a 5s `lock_timeout` on a
+    // shared runner — that was a pin on the runner's speed, and a tenth waiter
+    // timing out is a RECORDED FACT (a coded ambiguous outcome) rather than a
+    // defect. What must never happen is two documents carrying one number, or a
+    // success with no row behind it.
     const { ctx, clientId, projectId } = await setup();
     const results = await Promise.all(
       Array.from({ length: 10 }, () => createProposalCore(ctx, { clientId, projectId })),
     );
-    expect(okCount(results as Array<{ ok: boolean }>)).toBe(10);
+    const succeeded = okCount(results as Array<{ ok: boolean }>);
+    // Not vacuous: at least one caller got through.
+    expect(succeeded).toBeGreaterThan(0);
+
     const numbers = await raw.query<{ number: number }>(
       `select number from public.proposals where project_id = '${projectId}' order by number`,
     );
+    // No number issued twice ...
     expect(new Set(numbers.map((n) => n.number)).size).toBe(numbers.length);
+    // ... and each success wrote exactly one row, so no `ok` is a phantom.
+    expect(numbers.length).toBe(succeeded);
+    // Every failure is an AMBIGUOUS outcome, never a refusal: the allocator has
+    // no reason to refuse, so anything else here is a real defect.
+    //
+    // `generic` is NOT in that set, and the exclusion is the whole point.
+    // `mutationFailureCode` classifies in a fixed order — ActionError -> its
+    // code; DbWriteUncertainError or isAmbiguousDbOutcome (55P03 lock timeout,
+    // 57014, dropped socket) -> `uncertain`; the caller's conflictCode /
+    // immutableCode; then EVERYTHING ELSE -> `generic`. `createProposalCore`
+    // declares no conflictCode, so the only way a caller here answers `generic`
+    // is an unclassified throw, and the headline candidate is a 23505 on
+    // proposals (org_id, number) — precisely what a BROKEN advisory lock
+    // produces. Admitting it would have made this case green for the one defect
+    // it exists to catch: 1 success, 9 rows refused by the unique index,
+    // distinct numbers, numbers.length === succeeded, all assertions pass.
+    for (const result of results as Array<{ ok: boolean; error?: string }>) {
+      if (!result.ok) expect(['uncertain']).toContain(result.error);
+    }
   });
 });
 
@@ -312,16 +341,24 @@ describe('R-C a draft save racing a send', () => {
       // COMMIT lands relative to the save's own statements, and both answers are
       // correct. If the save's line writes run first, `enforce_proposal_child_draft`
       // still reads 'draft' (a plain SELECT does not block on an uncommitted
-      // row lock) and the save is then refused by its own gated header UPDATE,
-      // which is `proposal_not_draft` — the gate this loop added. If the send
-      // commits before those writes, the MT100 trigger fires instead and
-      // `mutationFailureCode` does not classify MT100, so it is `generic`.
-      // What must never happen is `ok` on a frozen document, or a silent
-      // half-write; the assertions above are the ones that matter.
-      expect(['proposal_not_draft', 'generic', 'uncertain']).toContain(save.error);
+      // row lock) and the save is then refused by its own gated header UPDATE.
+      // If the send commits before those writes, the MT100 trigger fires
+      // instead. BOTH now answer `proposal_not_draft` — task 9 gave the draft
+      // save `immutableCode: 'proposal_not_draft'`, so `generic` is gone from
+      // this set and a `generic` here would be a real defect.
+      expect(['proposal_not_draft', 'uncertain']).toContain(save.error);
     }
-    expect(send.ok).toBe(true);
-    expect(row.status).toBe('sent');
+    // THE SEND CAN LEGITIMATELY LOSE. It blocks on the save's row lock like any
+    // other writer, so pinning `send.ok` pinned which racer won — which is not a
+    // property of the code. What the case exists to claim is that BOTH writers
+    // never succeed and the document is never half-written; the subtotal/lines
+    // coherence assertion above is unconditional and holds either way.
+    if (send.ok) {
+      expect(row.status).toBe('sent');
+    } else {
+      expect(['uncertain', 'generic', 'proposal_not_draft']).toContain(send.error);
+      expect(row.status).toBe('draft');
+    }
   });
 
   it('the draft-save header write is GATED on status, deterministically', async () => {
@@ -373,9 +410,11 @@ describe('R-D contract transitions under concurrency', () => {
       `select count(*)::int as n from public.contracts where source_proposal_id = '${id}'`,
     );
     expect(rows[0].n).toBe(1);
-    // The unique index is the race guard; the loser should still be told why.
-    // Today it can answer `generic` (a 23505 mutateInOrg does not classify).
-    expect(['contract_exists', 'generic']).toContain((a.ok ? b : a).error);
+    // The unique index is the race guard, and the loser is now TOLD SO: the
+    // generate mutation declares `conflictCode: 'contract_exists'`, so its 23505
+    // is named instead of falling through to `generic` plus a false
+    // `mutateInOrg failed` line in the log.
+    expect((a.ok ? b : a).error).toBe('contract_exists');
   });
 
   it('two concurrent terminations reject the open VO exactly once', async () => {
@@ -438,11 +477,13 @@ describe('R-E line volume at the MAX_TOTAL_LINES cap', () => {
       `select count(*)::int as n from public.proposal_lines where proposal_id = '${id}'`,
     );
     expect(lines[0].n).toBe(2000);
-    // Budget: 4 statements of 500 rows (~7.5k bind parameters each). If this
-    // approaches the 20s statement_timeout, the chunk size or the transaction
-    // shape has changed.
+    // The OBSERVATION is the useful part and it stays; the assertion on it was a
+    // pin on a shared runner's speed and is gone. The 20s `statement_timeout` it
+    // feared is ALREADY asserted by `res.ok` above: a statement past it raises
+    // 57014, which `mutationFailureCode` answers `uncertain`. The chunk shape it
+    // was really guarding is asserted without a database or a clock in
+    // `src/lib/lines/insert-chunked.test.ts` (2,000 rows -> 4 statements).
     console.log(`2000-line draft save: ${elapsed}ms`);
-    expect(elapsed).toBeLessThan(15000);
 
     // A re-save that sends NO sections must EMPTY the document (deviation D7.1).
     const emptied = await saveProposalDraftCore(ctx, { id, sections: [] });

@@ -15,6 +15,9 @@ import {
   saveVariationDraft,
 } from '@/lib/variations/actions';
 import type { VariationListRow } from '@/lib/variations/queries';
+// A PURE leaf, not the queries barrel: this is a 'use client' module and the
+// derivation it needs is one function over two fields.
+import { variationStatusKey } from '@/lib/variations/status-label';
 import type {
   BaselineLine,
   ContractAction,
@@ -28,6 +31,10 @@ const VO_STATUS_STYLE: Record<string, string> = {
   issued: 'bg-[color:var(--brand-tint)] text-[color:var(--brand-ink)]',
   approved: 'bg-[color:var(--success-tint)] text-[color:var(--success)]',
   rejected: 'bg-destructive/10 text-destructive',
+  // MUTED, deliberately not the destructive red: a variation the TERMINATION
+  // CASCADE closed is bookkeeping, and painting it like a client's refusal
+  // tells the studio a negotiation went wrong when none happened.
+  rejected_on_termination: 'bg-muted text-muted-foreground',
 };
 
 export function VariationRegister({
@@ -151,7 +158,9 @@ export function VariationRegister({
           <CardContent className="overflow-x-auto p-0">
             <table className="w-full text-sm">
               <tbody>
-                {variations.map((v) => (
+                {variations.map((v) => {
+                  const statusKey = variationStatusKey(v);
+                  return (
                   <tr key={v.id} className="border-b last:border-0">
                     <td className="px-4 py-2 font-mono text-xs" dir="ltr">
                       {formatDocNumber('VO', v.number, docYear(null, v.createdAt))}
@@ -160,8 +169,8 @@ export function VariationRegister({
                       {pickLocale({ nameAr: v.titleAr, nameEn: v.titleEn }, 'name', locale).value}
                     </td>
                     <td className="px-4 py-2">
-                      <span className={`rounded-full px-2 py-0.5 text-xs ${VO_STATUS_STYLE[v.status] ?? 'bg-muted'}`}>
-                        {tv(`status.${v.status}`)}
+                      <span className={`rounded-full px-2 py-0.5 text-xs ${VO_STATUS_STYLE[statusKey] ?? 'bg-muted'}`}>
+                        {tv(`status.${statusKey}`)}
                       </span>
                     </td>
                     <td className="px-4 py-2 text-end" dir="ltr">
@@ -189,7 +198,8 @@ export function VariationRegister({
                       )}
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </CardContent>

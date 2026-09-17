@@ -4,7 +4,7 @@ import { createClientCore } from '@/lib/clients/core';
 import { listClients } from '@/lib/clients/queries';
 import { createEngagementCore } from '@/lib/engagements/core';
 import { executeTransition } from '@/lib/engagements/executor';
-import { getDeliveryByToken } from '@/lib/engagements/public';
+import { deliveryOrNull } from './delivery-read';
 import { recordPaymentCore } from '@/lib/engagements/payments';
 import { setEngagementRomCore } from '@/lib/engagements/rom';
 import { issueRomCore } from '@/lib/engagements/rom-issue';
@@ -115,7 +115,7 @@ describe('delivery portal — cost-safe token snapshot', () => {
     }
 
     // Mapped surface — the shape the portal renders.
-    const delivery = await getDeliveryByToken(token);
+    const delivery = await deliveryOrNull(token);
     expect(delivery).not.toBeNull();
     expect(delivery!.number).toBeGreaterThan(0);
     // Raw machine state must NOT be on the client-facing shape (S1); the mapped
@@ -149,7 +149,7 @@ describe('delivery portal — cost-safe token snapshot', () => {
   });
 
   it('an unknown token resolves to null', async () => {
-    const delivery = await getDeliveryByToken('this-token-was-never-minted');
+    const delivery = await deliveryOrNull('this-token-was-never-minted');
     expect(delivery).toBeNull();
   });
 
@@ -157,11 +157,11 @@ describe('delivery portal — cost-safe token snapshot', () => {
     const { ctx, engagementId } = await seedDelivery('revoke');
     const minted = await mintDeliveryLinkCore(ctx, engagementId);
     const token = minted.data!;
-    expect(await getDeliveryByToken(token)).not.toBeNull();
+    expect(await deliveryOrNull(token)).not.toBeNull();
 
     const revoked = await revokeDeliveryLinkCore(ctx, engagementId);
     expect(revoked.ok).toBe(true);
-    expect(await getDeliveryByToken(token)).toBeNull();
+    expect(await deliveryOrNull(token)).toBeNull();
   });
 
   it('rotate kills the old token and issues a fresh one', async () => {
@@ -173,8 +173,8 @@ describe('delivery portal — cost-safe token snapshot', () => {
     const newToken = rotated.data!;
 
     expect(newToken).not.toBe(oldToken);
-    expect(await getDeliveryByToken(oldToken)).toBeNull();
-    expect(await getDeliveryByToken(newToken)).not.toBeNull();
+    expect(await deliveryOrNull(oldToken)).toBeNull();
+    expect(await deliveryOrNull(newToken)).not.toBeNull();
   });
 
   it('an expired link resolves to null', async () => {
@@ -187,7 +187,7 @@ describe('delivery portal — cost-safe token snapshot', () => {
          set share_expires_at = now() - interval '1 day'
        where id = '${engagementId}'`,
     );
-    expect(await getDeliveryByToken(token)).toBeNull();
+    expect(await deliveryOrNull(token)).toBeNull();
   });
 
   it("token A never resolves delivery B (cross-delivery isolation)", async () => {
@@ -196,8 +196,8 @@ describe('delivery portal — cost-safe token snapshot', () => {
     const tokenA = (await mintDeliveryLinkCore(a.ctx, a.engagementId)).data!;
     const tokenB = (await mintDeliveryLinkCore(b.ctx, b.engagementId)).data!;
 
-    const resolvedA = await getDeliveryByToken(tokenA);
-    const resolvedB = await getDeliveryByToken(tokenB);
+    const resolvedA = await deliveryOrNull(tokenA);
+    const resolvedB = await deliveryOrNull(tokenB);
     expect(resolvedA!.id).toBe(a.engagementId);
     expect(resolvedB!.id).toBe(b.engagementId);
     expect(resolvedA!.id).not.toBe(resolvedB!.id);
@@ -254,7 +254,7 @@ describe('delivery portal — the band appears only once it is issued (M31)', ()
       romHigh: '800000',
     });
 
-    const snapshot = await getDeliveryByToken(token);
+    const snapshot = await deliveryOrNull(token);
     expect(snapshot!.rom).toBeNull();
     expect(snapshot!.clientActions).not.toContain('acknowledge_rom');
   });
@@ -269,7 +269,7 @@ describe('delivery portal — the band appears only once it is issued (M31)', ()
     });
     expect((await issueRomCore(ctx, { engagementId })).ok).toBe(true);
 
-    const snapshot = await getDeliveryByToken(token);
+    const snapshot = await deliveryOrNull(token);
     expect(snapshot!.rom).toEqual({ low: '500000.0000', high: '800000.0000' });
     expect(snapshot!.clientActions).toContain('acknowledge_rom');
   });
@@ -283,7 +283,7 @@ describe('delivery portal — the band appears only once it is issued (M31)', ()
       romHigh: '800000',
     });
     await issueRomCore(ctx, { engagementId });
-    expect((await getDeliveryByToken(token))!.rom).not.toBeNull();
+    expect((await deliveryOrNull(token))!.rom).not.toBeNull();
 
     // The studio revises the band: the client stops seeing it until it is sent
     // again, so they can never acknowledge a number nobody chose to show them.
@@ -292,7 +292,7 @@ describe('delivery portal — the band appears only once it is issued (M31)', ()
       romLow: '600000',
       romHigh: '900000',
     });
-    const snapshot = await getDeliveryByToken(token);
+    const snapshot = await deliveryOrNull(token);
     expect(snapshot!.rom).toBeNull();
     expect(snapshot!.clientActions).not.toContain('acknowledge_rom');
   });

@@ -1,4 +1,6 @@
+import { sql } from 'drizzle-orm';
 import {
+  check,
   pgTable,
   text,
   timestamp,
@@ -31,6 +33,20 @@ export const variationOrderEvents = pgTable(
     userAgent: text('user_agent'),
     fromStatus: text('from_status'),
     toStatus: text('to_status'),
+    /**
+     * WHICH CHANNEL decided this event — 'staff' or 'client', or NULL
+     * (`variation_order_events_actor_channel_check`, below).
+     *
+     * NULLABLE with NO DEFAULT, deliberately unlike `engagement_events`, whose
+     * `not null default 'staff'` is only safe because it was there from row one.
+     * NULL means "we did not record which channel decided this", which is the
+     * truth for every row written before 0051; the read ladder in
+     * `lib/variations/decided-message.ts` falls back to the old ordering for
+     * NULL, so no historical page changes its wording. There is no backfill —
+     * every discriminator one could use is nullable on BOTH paths, so it would
+     * be a guess on an evidentiary record.
+     */
+    actorChannel: text('actor_channel'),
     decidedAt: timestamp('decided_at', { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -38,6 +54,13 @@ export const variationOrderEvents = pgTable(
   (t) => [
     unique('variation_order_events_org_id_id_unique').on(t.orgId, t.id),
     ...sameOrgFk(t, 'variationOrder', variationOrders, { onDelete: 'cascade' }),
+    // 0051 adds this as ADD CONSTRAINT ... NOT VALID + VALIDATE CONSTRAINT, so
+    // it carries a NAME and belongs here under the same name — the schema is the
+    // declaration of what the database holds, not only of its columns.
+    check(
+      'variation_order_events_actor_channel_check',
+      sql`actor_channel is null or actor_channel in ('staff', 'client')`,
+    ),
   ],
 );
 

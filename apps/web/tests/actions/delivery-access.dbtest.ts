@@ -7,7 +7,7 @@ import { setArtifactClientVisibilityCore } from '@/lib/engagements/client-visibi
 import { createEngagementCore } from '@/lib/engagements/core';
 import { executeTransition } from '@/lib/engagements/executor';
 import { recordPaymentCore } from '@/lib/engagements/payments';
-import { getDeliveryByToken } from '@/lib/engagements/public';
+import { deliveryOrNull } from './delivery-read';
 import { getDeliveryDocumentByToken } from '@/lib/engagements/public-documents';
 import { mintDeliveryLinkCore } from '@/lib/engagements/share';
 import { createProjectCore } from '@/lib/projects/core';
@@ -135,7 +135,7 @@ async function listedAccess(
   delivery: Seeded,
   artifactId: string,
 ): Promise<string | undefined> {
-  const snapshot = await getDeliveryByToken(delivery.token);
+  const snapshot = await deliveryOrNull(delivery.token);
   return snapshot?.documents.find((d) => d.id === artifactId)?.access;
 }
 

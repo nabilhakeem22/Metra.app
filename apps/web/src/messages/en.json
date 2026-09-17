@@ -1456,7 +1456,8 @@
       "internal_approved": "Internally approved",
       "issued": "Issued",
       "approved": "Approved",
-      "rejected": "Rejected"
+      "rejected": "Rejected",
+      "rejected_on_termination": "Closed with the contract"
     },
     "client": {
       "title": "Variation order",
@@ -1469,7 +1470,8 @@
       "already": "A decision has already been recorded for this variation order.",
       "expired": "This link has expired.",
       "invalid": "This link is not valid.",
-      "contractInactive": "This contract is no longer active, so this variation order can no longer be decided."
+      "contractInactive": "This contract is no longer active, so this variation order can no longer be decided.",
+      "rejectedOnTermination": "This variation order was closed because the contract was terminated. You did not decide it."
     }
   },
   "engagements": {
@@ -1599,8 +1601,7 @@
       "shopDrawingsPresent": "Shop drawings recorded",
       "boqPresent": "BOQ recorded",
       "balanceCleared": "Balance payment cleared",
-      "handoffAcknowledged": "Handoff acknowledged",
-      "pendingGuard": "Not yet available"
+      "handoffAcknowledged": "Handoff acknowledged"
     },
     "hero": {
       "day": "Day {n}",
@@ -2056,6 +2057,10 @@
     "notFound": {
       "title": "This link is no longer available",
       "body": "The link may have expired or been turned off. Please contact your design team for an up-to-date link."
+    },
+    "readFailed": {
+      "title": "We could not load this page",
+      "body": "Something went wrong on our side. Please refresh in a moment; your link is still valid."
     },
     "greeting": "Hello, {name} 👋",
     "firmSubtitle": "Your design project",

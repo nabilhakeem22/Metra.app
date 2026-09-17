@@ -66,8 +66,14 @@ describe('insertLinesInChunks', () => {
   it('preserves order and loses no row across the batches', async () => {
     // A full 2,000-line import: line 1,499 must still be the 1,499th row written,
     // because `sortOrder` is assigned before the split and read back after it.
+    //
+    // This case is also what `concurrency-gates.dbtest.ts` used to be asking when
+    // it timed a 2,000-line save against a 15-second wall clock (W3-6): the
+    // invariant it wanted was "the insert is still batched", which is decided
+    // here, with no database and no clock.
     const { tx, inserts } = recordingTransaction();
     await insertLinesInChunks(tx, fakeTable, rowsOf(2000));
+    expect(inserts).toHaveLength(Math.ceil(2000 / LINE_INSERT_CHUNK));
     expect(inserts).toHaveLength(4);
     const written = inserts.flatMap((i) => i.rows);
     expect(written).toHaveLength(2000);

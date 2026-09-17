@@ -76,6 +76,8 @@ async function recordIssuedEvent(
     orgId: ctx.orgId,
     variationOrderId,
     kind: 'issued',
+    // A session action by a member of the studio (0051).
+    actorChannel: 'staff',
     actorUserId: ctx.userId,
     fromStatus: 'internal_approved',
     toStatus: 'issued',

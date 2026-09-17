@@ -4,6 +4,7 @@ import { and, eq } from 'drizzle-orm';
 import { err, type ActionResult } from '@/lib/actions/result';
 import type { OrgContext } from '@/lib/db/context';
 import { withOrgContext } from '@/lib/db/context';
+import { safeDownloadName } from '@/lib/files/safe-name';
 import { can } from '@/lib/permissions/can';
 import {
   createSignedUploadUrl,
@@ -147,14 +148,23 @@ export async function getDeliverableUrlCore(
   if (!can(ctx.role, 'engagements_design', 'read')) return err('forbidden');
   const [owned] = await withOrgContext(ctx, (tx) =>
     tx
-      .select({ id: files.id })
+      .select({ id: files.id, originalName: files.originalName })
       .from(files)
       .where(and(eq(files.id, fileId), eq(files.entity, 'engagement')))
       .limit(1),
   );
   if (!owned) return err('invalid');
   try {
-    const url = await getSignedUrl(ctx, fileId, { ttlSeconds: 300 });
+    // The download NAME is the point, not a nicety: `contentType` is taken
+    // verbatim from the caller at upload, so a file NAMED `x.pdf` can be STORED
+    // as `text/html`, and an inline mint serves it as a PAGE on the Supabase
+    // origin. The upload extension allowlist makes that hard; `safeDownloadName`
+    // makes it inert, because Storage answers `Content-Disposition: attachment`
+    // when a download name is passed and drops an active extension either way.
+    const url = await getSignedUrl(ctx, fileId, {
+      ttlSeconds: 300,
+      download: safeDownloadName(owned.originalName),
+    });
     return { ok: true, url };
   } catch {
     return err('invalid');

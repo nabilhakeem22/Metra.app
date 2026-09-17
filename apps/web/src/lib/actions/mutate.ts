@@ -11,6 +11,7 @@ import {
 import type { Flow } from '@/lib/entitlements/flows';
 import { can } from '@/lib/permissions/can';
 import type { Capability, PermissionAction } from '@/lib/permissions/roles';
+import { isImmutabilityViolation, isUniqueViolationOf } from './db-conflict';
 import { isAmbiguousDbOutcome } from './db-failure';
 import { ActionError, type ActionCode, type ActionResult } from './result';
 
@@ -25,10 +26,34 @@ export { ActionError, fail } from './result';
  * (before `fn`) and the mutation is refused with `flow_not_enabled` if the plan
  * doesn't turn that guided flow on. ActionError -> its coded failure; anything
  * else -> logged + 'generic'.
+ *
+ * `conflict` / `immutableCode` let a mutation NAME the race it can lose. Both
+ * are optional and both are per-mutation on purpose: 23505 means "a contract
+ * already exists" at contracts/generate and something else entirely at
+ * team/invite, so the wrapper cannot know the sentence — only the caller can.
+ *
+ * `conflict` names the CONSTRAINT as well as the code, because a mutation is
+ * several statements and only one of them is the race the caller means. The
+ * first version took a bare code and answered it for ANY 23505 in the
+ * transaction: `generateContractCore` would have called a collision on the
+ * contract NUMBER "a contract already exists", and removed the one log line
+ * that recorded it.
  */
 export async function mutateInOrg<T = void>(
   ctx: OrgContext,
-  opts: { capability?: Capability; action?: PermissionAction; flow?: Flow },
+  opts: {
+    capability?: Capability;
+    action?: PermissionAction;
+    flow?: Flow;
+    /**
+     * The code a 23505 from ONE NAMED constraint means. Any other 23505 —
+     * including one from a different constraint on the same table — stays
+     * `generic` and is logged, because it is not the race the caller named.
+     */
+    conflict?: { constraint: string; code: ActionCode };
+    /** The code an MT100 from THIS mutation means (the row locked under us). */
+    immutableCode?: ActionCode;
+  },
   fn: (tx: MetraDb, audit: (e: AuditEntry) => Promise<void>) => Promise<T>,
 ): Promise<ActionResult & { data?: T }> {
   if (
@@ -54,29 +79,94 @@ export async function mutateInOrg<T = void>(
     );
     return { ok: true, data };
   } catch (e) {
-    return { ok: false, error: mutationFailureCode(e) };
+    return { ok: false, error: mutationFailureCode(e, opts) };
   }
 }
 
 /**
- * The code a caught mutation failure answers with.
+ * The code a caught mutation failure answers with. THE ORDER IS THE CONTRACT.
  *
- * Two families are AMBIGUOUS rather than failed, and both must surface as
- * `uncertain` so the cockpit HOLDS the attempt's idempotency key instead of
- * retrying under a fresh one: a write deadline (the abandoned tx may still
- * COMMIT — see DbWriteUncertainError) and a lock timeout / cancelled statement /
- * dropped connection (see isAmbiguousDbOutcome — the attempt being retried may
- * be the very thing holding that lock, and it is still free to commit). Neither
- * is logged as an error: they are expected slow-origin paths, not defects.
+ * `ActionError` first: a coded refusal the mutation raised itself outranks any
+ * SQLSTATE reading.
+ *
+ * AMBIGUOUS second, and it must stay ahead of the two named conflicts below.
+ * Two families are ambiguous rather than failed, and both surface as `uncertain`
+ * so the cockpit HOLDS the attempt's idempotency key instead of retrying under a
+ * fresh one: a write deadline (the abandoned tx may still COMMIT — see
+ * DbWriteUncertainError) and a lock timeout / cancelled statement / dropped
+ * connection (see isAmbiguousDbOutcome — the attempt being retried may be the
+ * very thing holding that lock, and it is still free to commit). Re-labelling
+ * one of those a REFUSAL would tell a caller the write is dead when it is not.
+ *
+ * Then the caller's own names for 23505 and MT100, if it gave any — and the
+ * 23505 only when the CONSTRAINT matches too. An unexpected unique violation
+ * inside a mutation that named a different one is not a refusal the product has
+ * a sentence for; it belongs in the tail, with the log line.
+ *
+ * A MAPPED CODE IS NOT LOGGED AS AN ERROR, and neither is an ambiguous one:
+ * they are expected races the product has a sentence for, and a false defect
+ * line in the log is half of what this exists to remove. Only the unclassified
+ * tail reaches `console.error` + `generic`, and what it logs is a WHITELIST —
+ * see `loggableFailure`, and never the error object itself.
  */
-function mutationFailureCode(e: unknown): ActionCode {
+function mutationFailureCode(
+  e: unknown,
+  opts: {
+    conflict?: { constraint: string; code: ActionCode };
+    immutableCode?: ActionCode;
+  },
+): ActionCode {
   if (e instanceof ActionError) return e.code;
   if (e instanceof DbWriteUncertainError || isAmbiguousDbOutcome(e)) {
     return 'uncertain';
   }
-  console.error('mutateInOrg failed:', e);
+  if (opts.conflict && isUniqueViolationOf(e, opts.conflict.constraint)) {
+    return opts.conflict.code;
+  }
+  if (opts.immutableCode && isImmutabilityViolation(e)) return opts.immutableCode;
+  console.error('mutateInOrg failed:', loggableFailure(e));
   return 'generic';
 }
+
+/**
+ * The fields of an unclassified failure that may be written to the log — a
+ * WHITELIST, never the error object.
+ *
+ * postgres.js builds its PostgresError by `Object.assign`-ing every field of the
+ * server's ErrorResponse onto the error, and those fields are ENUMERABLE. One of
+ * them is `detail`, and for a 23505 `detail` is the row: `Key (org_id, email)=
+ * (…, someone@example.com) already exists.` Logging the error object therefore
+ * logs whatever the colliding index is built on, and the index a future mutation
+ * races is not something this line can know in advance. (`query` and
+ * `parameters` are non-enumerable unless postgres.js debug is on, which it is
+ * not — but that is a property of somebody else's library, which is the wrong
+ * thing to depend on.)
+ *
+ * Five fields, all of them describing the SHAPE of the failure rather than the
+ * row: `name`, `code`, `constraint_name`, `table_name`, `message`. Together they
+ * answer "which constraint on which table refused, and with what SQLSTATE",
+ * which is the whole diagnostic value of this line. Strings only, so a field
+ * carrying a structured value cannot smuggle an object in.
+ */
+function loggableFailure(e: unknown): Record<string, string> {
+  const source = e as Record<string, unknown> | null | undefined;
+  const safe: Record<string, string> = {};
+  for (const field of LOGGABLE_ERROR_FIELDS) {
+    const value = source?.[field];
+    if (typeof value === 'string' && value.length > 0) safe[field] = value;
+  }
+  // A thrown non-object would otherwise log as `{}`, which reads like a bug in
+  // this function rather than a fact about the failure.
+  return Object.keys(safe).length > 0 ? safe : { thrown: typeof e };
+}
+
+const LOGGABLE_ERROR_FIELDS = [
+  'name',
+  'code',
+  'constraint_name',
+  'table_name',
+  'message',
+] as const;
 
 /**
  * The single row `id` names in THIS org, or a coded failure.

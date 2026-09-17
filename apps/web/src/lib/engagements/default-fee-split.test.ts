@@ -5,7 +5,7 @@ import {
   OPTIONAL_MILESTONE_KINDS,
   byDueOrder,
 } from './default-fee-split';
-import { MONEY_GUARD_MILESTONE } from './guards/money';
+import { MONEY_GUARD_MILESTONE } from './guards/trigger-money-gate';
 import { TRANSITIONS, type Trigger } from './transitions';
 
 describe('the default fee split', () => {
