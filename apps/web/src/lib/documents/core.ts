@@ -5,6 +5,7 @@ import { files, type MetraDb } from '@metra/db';
 import { and, eq } from 'drizzle-orm';
 import { fail, mutateInOrg } from '@/lib/actions/mutate';
 import { err, type ActionResult } from '@/lib/actions/result';
+import { cfExecutionContext, isCloudflareRuntime } from '@/lib/cf/context';
 import { withOrgContext, type OrgContext } from '@/lib/db/context';
 import { can } from '@/lib/permissions/can';
 import { safeDownloadName } from '@/lib/files/safe-name';
@@ -150,16 +151,51 @@ export async function deleteDocumentCore(
  * after we stop waiting is a success we simply did not observe, and the row is
  * gone either way. An `HttpDeadlineError` lands in the same catch as any other
  * failure and leaves the same breadcrumb.
+ *
+ * "NOT OBSERVED" ONLY COUNTS IF THE WORK SURVIVES. On the Workers runtime the
+ * isolate is free to be torn down once the response is sent, so a `remove` still
+ * in flight past the 3s deadline was not merely unobserved — it was KILLED, and
+ * the orphan was permanent (the object key is unreachable from the database the
+ * moment the row is deleted, and there is no reconciliation job). The removal is
+ * therefore handed to `ctx.waitUntil`, which keeps the isolate alive until it
+ * settles, while the request stops WAITING for it after the deadline. Two
+ * different bounds for two different things.
+ *
+ * Off-platform (`next dev`, vitest) there is no execution context and nothing
+ * tears the process down at response time, so the await is the whole story and
+ * the branch is skipped.
  */
 async function discardStoredBytes(deleted: DeletedObject | undefined): Promise<void> {
   if (!deleted) return;
+  // The catch is attached HERE, to the removal itself, so the promise handed to
+  // waitUntil can never reject — and so a failure that lands after the deadline
+  // still leaves its breadcrumb instead of becoming an unhandled rejection.
+  const removal = removeStoredObject(deleted.bucket, deleted.objectKey).catch(
+    (error: unknown) => {
+      console.error('document object remove failed', { ...deleted, error });
+    },
+  );
+  keepAlivePastResponse(removal);
   try {
-    await withDeadline(
-      removeStoredObject(deleted.bucket, deleted.objectKey),
-      STORAGE_CLEANUP_TIMEOUT_MS,
-      'storage cleanup',
-    );
+    await withDeadline(removal, STORAGE_CLEANUP_TIMEOUT_MS, 'storage cleanup');
   } catch (error) {
     console.error('document object remove failed', { ...deleted, error });
+  }
+}
+
+/**
+ * Ask the Workers runtime to keep the isolate alive for `work` after the
+ * response. A no-op everywhere else.
+ *
+ * BEST-EFFORT, like the `after()` teardown in `lib/db/request-connection.ts`:
+ * some OpenNext render scopes have no execution context wired, and failing to
+ * defer best-effort cleanup must never fail a delete that has already committed.
+ */
+function keepAlivePastResponse(work: Promise<unknown>): void {
+  if (!isCloudflareRuntime()) return;
+  try {
+    cfExecutionContext().waitUntil(work);
+  } catch (error) {
+    console.warn('discardStoredBytes: waitUntil unavailable', error);
   }
 }
