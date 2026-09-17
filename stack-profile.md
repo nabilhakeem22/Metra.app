@@ -50,13 +50,15 @@ Agents run these literally. These are exactly what `.github/workflows/ci.yml` ru
 | Build | `npm run build -w @metra/web` |
 | Unit tests (web) | `npm run test -w @metra/web` |
 | Unit tests (db) | `npm run test -w @metra/db` |
-| Action-core DB tests | `npm run test:actions -w @metra/web` *(seeded DB via `apps/web/tests/actions/fixture.ts`)* |
-| Cross-tenant isolation gate | `npm run test:isolation -w @metra/db` |
+| Action-core DB tests | `npm run test:actions -w @metra/web` *(seeded DB via `apps/web/tests/actions/fixture.ts`; **`assertLocalDatabase` refuses a non-local host** — CI, or a local docker Postgres)* |
+| Cross-tenant isolation gate | `npm run test:isolation -w @metra/db` *(same local-only guard)* |
 | E2E tests | — (none) |
 | Lint | `npm run lint` *(root; includes `metra/no-physical-inline-direction`)* |
-| Type check | `cd apps/web && npx tsc --noEmit` |
+| i18n gate | `npm run i18n:validate` *(key parity, ICU placeholders, Western numerals — no API key, never calls Gemini)* |
+| Docs gate | `npm run docs:check` *(no root `DEPLOY.md`; no stale-host mention in a tracked `*.md` outside `docs/BUILD-LOG.md`; no em/en dash inside Arabic prose)* |
+| Type check | `cd apps/web && npx tsc --noEmit` — **and the same in `packages/db`**; they are two tsconfigs and only one of them is in the CI build step |
 | Migrations | `npm run migrate -w @metra/db` **then** `npm run apply-rls -w @metra/db` (RLS/roles/functions) **then** `npm run seed -w @metra/db` |
-| New migration | `npm run generate -w @metra/db` — ⚠️ drizzle-kit's rename prompt is an interactive TUI that can't run headless; 0013/0014/0015 were hand-authored. **Snapshot has drifted — regenerate/verify `migrations/meta` before the next `generate`.** |
+| New migration | `npm run generate -w @metra/db` — ⚠️ drizzle-kit's rename prompt is an interactive TUI that can't run headless; 0013–0051 were hand-authored. **`migrations/meta` is 35 snapshots behind the journal, so `generate` diffs against `0016` and re-proposes most of the schema.** Read `docs/DEPLOY.md` before using it. |
 
 ## Conventions
 
@@ -106,7 +108,12 @@ Estimates (pilot phase — the 5 pilot firms are an open PRD §10 decision):
 
 - p95 API latency: `DECIDE`
 - Page load: `DECIDE`
-- PDF render: target < ~5s (P0 spike). Pre-pilot debt: DB/getUser timeouts, N+1 identity resolver, PDF throttle.
+- PDF render: target < ~5s (P0 spike). Pre-pilot debt: the **N+1 identity
+  resolver** (`lib/team/identities.ts` calls `getUserById` once per member) and
+  the **per-page repeated auth work** (no React `cache()` dedupe). The DB
+  timeouts are DONE (`lock_timeout 5s` / `statement_timeout 20s` /
+  `idle_in_transaction_session_timeout 30s` per transaction) and so is the PDF
+  throttle (503 + `retry-after: 5` at the renderer's concurrency cap).
 
 ## Third-party integrations
 
@@ -143,7 +150,7 @@ The architect may not design around these:
 - **Server-safe constants:** never export a value/const from a `'use client'` module and import it into a server component — it becomes a client-reference proxy → runtime 500 (passes tsc/build). Shared constants live in a plain non-client module (see `tabs.ts`).
 - Every new org-scoped table → isolation gate coverage + `fixture.ts` teardown (FK-safe order) + RLS in `apply-rls`.
 - Message-key parity + Western numerals; logical CSS only; no demo data.
-- **The CI from-scratch replay (`.github/workflows/ci.yml`: lint→unit→migrate→apply-rls→seed→isolation→test:actions→OpenNext build→assert-no-baked-secrets on a fresh Postgres) is the REAL gate.** Local checks use the already-migrated warm DB and miss clean-room failures. Verify CI green after every push.
+- **The CI from-scratch replay (`.github/workflows/ci.yml`: i18n→docs→lint→unit→migration-batch-size→migrate→apply-rls→seed→isolation→test:actions→OpenNext build→assert-no-baked-secrets on a fresh Postgres) is the REAL gate.** Local checks use the already-migrated warm DB and miss clean-room failures. Verify CI green after every push.
 - **Workflow:** plan & confirm (architect → owner sign-off) before the coder writes code. Keep every mutation a self-contained `*Core(ctx,input)→ActionResult` (API-ready — a future Public API slice wraps them).
 
 ## Out of bounds
