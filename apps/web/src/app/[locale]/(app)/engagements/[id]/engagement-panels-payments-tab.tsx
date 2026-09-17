@@ -4,7 +4,6 @@ import { Banknote } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import type { ActionResult } from '@/lib/actions/result';
 import type { CommercialPulse } from '@/lib/engagements/pulse';
 import type {
   EngagementFeeSchedule,
@@ -16,6 +15,7 @@ import { Empty, MONEY } from './engagement-panels-parts';
 import { PaymentsPanel } from './engagement-panels-payments';
 import { PaymentPanel } from './engagement-payment-panel';
 import { EngagementPulseBar } from './engagement-pulse-bar';
+import type { RunAction } from './use-engagement-action';
 
 /**
  * The Payments detail tab — the commercial pulse, the fee schedule and the
@@ -43,7 +43,7 @@ export function PaymentsTab({
   pulse: CommercialPulse;
   canRecordPayment: boolean;
   pending: boolean;
-  runAction: (fn: () => Promise<ActionResult>) => void;
+  runAction: RunAction;
 }) {
   const tp = useTranslations('engagements.panels');
   const tpa = useTranslations('engagements.panelActions');

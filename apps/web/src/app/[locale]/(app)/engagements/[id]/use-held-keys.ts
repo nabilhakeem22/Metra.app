@@ -1,8 +1,12 @@
 'use client';
 
 import { useRef, type RefObject } from 'react';
-import { hasLanded, keyForAttempt, type HeldKey } from '@/lib/engagements/held-key';
-import type { Trigger } from '@/lib/engagements/transitions';
+import {
+  hasLanded,
+  keyForAttempt,
+  type HeldKey,
+  type HeldKeyTrigger,
+} from '@/lib/engagements/held-key';
 import { readHeldKeys, writeHeldKeys } from './held-keys-store';
 
 /**
@@ -14,6 +18,13 @@ import { readHeldKeys, writeHeldKeys } from './held-keys-store';
  * the key a half-finished `requestRevision` was holding, and its retry then
  * minted a fresh one: a second ledger row and a second allowance spent, caused
  * by a success that had nothing to do with it.
+ *
+ * A RECORDED PAYMENT IS IN THIS MAP TOO, under PAYMENT_HELD_TRIGGER, named by
+ * the kind and amount being recorded. It is not a lifecycle trigger, but the
+ * server reads its key as the same proof of sameness — so before this it was the
+ * one write on the screen minting a key per PANEL OPEN and bounded by nothing:
+ * two genuinely different payments logged without closing the panel went out on
+ * ONE key, and the second was answered with the first one's row.
  *
  * A key is NOT released when its action fails: it is released when we KNOW what
  * happened. A definite refusal means the transaction rolled back, so the next
@@ -50,16 +61,18 @@ export interface HeldKeysApi {
    */
   claim(
     engagementId: string,
-    trigger: Trigger | undefined,
+    trigger: HeldKeyTrigger | undefined,
     mintKey: () => string,
+    /** What the act IS, where the trigger does not say it — see HeldKey.act. */
+    act?: string,
   ): string;
   /** Drop the key `trigger` was holding on `engagementId`: that act is settled. */
-  release(engagementId: string, trigger: Trigger): void;
+  release(engagementId: string, trigger: HeldKeyTrigger): void;
 }
 
 interface SeededKeys {
   engagementId: string;
-  held: Map<Trigger, HeldKey>;
+  held: Map<HeldKeyTrigger, HeldKey>;
 }
 
 /**
@@ -72,7 +85,7 @@ function keysFor(
   seeded: RefObject<SeededKeys | null>,
   engagementId: string,
   currentEngagementId: string,
-): Map<Trigger, HeldKey> {
+): Map<HeldKeyTrigger, HeldKey> {
   const current = seeded.current;
   if (current?.engagementId === engagementId) return current.held;
   const held = readHeldKeys(engagementId);
@@ -90,7 +103,7 @@ export function useHeldKeys(
 ): HeldKeysApi {
   const seeded = useRef<SeededKeys | null>(null);
   return {
-    claim(engagementId, trigger, mintKey) {
+    claim(engagementId, trigger, mintKey, act) {
       const held = keysFor(seeded, engagementId, currentEngagementId);
       // The ledger the page is showing says the attempt this key names landed
       // after all, which is what `uncertain` could not tell the studio. It has
@@ -98,7 +111,7 @@ export function useHeldKeys(
       if (trigger && hasLanded(held.get(trigger), landedAt?.get(trigger))) {
         held.delete(trigger);
       }
-      const attempt = keyForAttempt(held, trigger, mintKey, Date.now());
+      const attempt = keyForAttempt(held, trigger, mintKey, Date.now(), act);
       // An edge that passes no trigger holds nothing: it mints a key nobody
       // reads, so it can neither take nor release another act's key.
       if (trigger) {

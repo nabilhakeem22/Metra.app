@@ -66,13 +66,14 @@ export function EngagementTabStrip(props: EngagementTabStripProps) {
             type="button"
             role="tab"
             aria-selected={active}
-            // LOCKED WHILE A WRITE IS IN FLIGHT. Navigating away unmounts the
-            // open panel -- and with it `PaymentPanel`'s per-mount idempotency
-            // key, so a submit whose response was lost would come back on a
-            // FRESH key and land as a genuine duplicate against an append-only
-            // ledger. Safe to do only because `runAction` can no longer leave
-            // `pending` stuck; before that this would have locked navigation
-            // permanently on one failed action.
+            // LOCKED WHILE A WRITE IS IN FLIGHT. Switching tabs unmounts the open
+            // panel under an answer that has not arrived, and a studio who cannot
+            // see the form they submitted cannot tell what happened to it. The
+            // KEY itself now survives the unmount (it is held in the store, not in
+            // the panel), so what this prevents is the confusion, not a duplicate.
+            // Safe to do only because `runAction` can no longer leave `pending`
+            // stuck; before that this would have locked navigation permanently on
+            // one failed action.
             disabled={props.pending}
             onClick={() => props.onSelect(tab)}
             className={`${TAB_BASE} ${active ? TAB_ACTIVE : TAB_IDLE}`}

@@ -15,7 +15,30 @@ export interface HeldKey {
    * the window below bounds the act, not the chain of retries.
    */
   heldAt: number;
+  /**
+   * WHAT THE ACT WAS, where its name does not say it: the inputs the studio
+   * typed, as one string (a payment's kind and amount). A retry of the SAME act
+   * carries the held key; a DIFFERENT amount typed after an `uncertain` is a NEW
+   * act and gets a fresh key — the refusal tells the studio to refresh and check
+   * before trying again, so somebody who then changes the figure is recording
+   * something else, and the server would answer it with the ORIGINAL row. Absent
+   * on a lifecycle trigger, where the trigger IS the act.
+   */
+  act?: string;
 }
+
+/**
+ * The name a RECORDED PAYMENT holds its key under. Not one of the 19 lifecycle
+ * triggers — a payment appends to `payment_events`, never to the transition
+ * ledger — but it is an act a studio can be left in doubt about, and
+ * `payments.ts` reads its key as the same proof of sameness the executor does.
+ * So it is held, expired and released by these rules, under a name no trigger
+ * uses.
+ */
+export const PAYMENT_HELD_TRIGGER = 'recordPayment';
+
+/** What a held key can be filed under: one lifecycle trigger, or the payment. */
+export type HeldKeyTrigger = Trigger | typeof PAYMENT_HELD_TRIGGER;
 
 /**
  * How long a held key may still name the attempt that minted it: FIFTEEN MINUTES.
@@ -48,7 +71,7 @@ export const HELD_KEY_TTL_MS = 15 * 60 * 1000;
  * allowance decrement, from a success that had nothing to do with it. A key
  * names one attempt at ONE act, on the client exactly as in 0050's index.
  */
-export type HeldKeys = ReadonlyMap<Trigger, HeldKey>;
+export type HeldKeys = ReadonlyMap<HeldKeyTrigger, HeldKey>;
 
 /** Is this key still inside the window in which it names an attempt in doubt? */
 export function isHeldKeyLive(entry: HeldKey, now: number): boolean {
@@ -87,16 +110,21 @@ export function hasLanded(
  *
  * AN EXPIRED KEY IS NOT REUSED even though it is still in the map: the map lives
  * as long as the tab, and a tab can sit open all day. See HELD_KEY_TTL_MS.
+ *
+ * NOR IS A KEY HELD FOR A DIFFERENT ACT. `act` describes what was attempted
+ * where the name does not (a payment's kind and amount); a held key answers for
+ * the act that minted it and for nothing else. See HeldKey.act.
  */
 export function keyForAttempt(
   held: HeldKeys,
-  trigger: Trigger | undefined,
+  trigger: HeldKeyTrigger | undefined,
   mintKey: () => string,
   now: number,
+  act?: string,
 ): HeldKey {
   const entry = trigger === undefined ? undefined : held.get(trigger);
-  if (entry !== undefined && isHeldKeyLive(entry, now)) return entry;
-  return { key: mintKey(), heldAt: now };
+  if (entry !== undefined && isHeldKeyLive(entry, now) && entry.act === act) return entry;
+  return { key: mintKey(), heldAt: now, act };
 }
 
 /**

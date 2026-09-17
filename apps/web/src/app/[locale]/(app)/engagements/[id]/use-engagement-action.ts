@@ -3,17 +3,27 @@
 import { useRef, useState, useTransition } from 'react';
 import { useRouter } from '@/i18n/routing';
 import type { ActionCode, ActionResult } from '@/lib/actions/result';
+import type { HeldKeyTrigger } from '@/lib/engagements/held-key';
 import { releasesKey } from '@/lib/engagements/retry-policy';
-import type { Trigger } from '@/lib/engagements/transitions';
 import { useHeldKeys } from './use-held-keys';
+
+/**
+ * Runs ONE server action with the idempotency key held for the act it belongs to
+ * (0050). `trigger` names the act — a payment is not a lifecycle trigger and
+ * holds its key under PAYMENT_HELD_TRIGGER; `act` describes WHICH one, where the
+ * name does not (see HeldKey.act). An edge that needs no key passes neither and
+ * ignores the argument.
+ */
+export type RunAction = (
+  fn: (idempotencyKey: string) => Promise<ActionResult>,
+  trigger?: HeldKeyTrigger,
+  act?: string,
+) => void;
 
 export interface EngagementActionApi {
   pending: boolean;
   error: ActionCode | null;
-  runAction(
-    fn: (idempotencyKey: string) => Promise<ActionResult>,
-    trigger?: Trigger,
-  ): void;
+  runAction: RunAction;
 }
 
 export interface EngagementActionOptions {
@@ -76,7 +86,7 @@ export function useEngagementAction(
 
   function settle(
     engagementId: string,
-    trigger: Trigger | undefined,
+    trigger: HeldKeyTrigger | undefined,
     result: ActionResult,
   ): void {
     // Only THIS trigger's key on THIS engagement is ever touched, and only when
@@ -92,7 +102,8 @@ export function useEngagementAction(
 
   function runAction(
     fn: (idempotencyKey: string) => Promise<ActionResult>,
-    trigger?: Trigger,
+    trigger?: HeldKeyTrigger,
+    act?: string,
   ): void {
     if (inFlight.current) return;
     inFlight.current = true;
@@ -101,12 +112,14 @@ export function useEngagementAction(
     // it is in flight must not settle whichever engagement is on screen when the
     // answer lands.
     const engagementId = options.engagementId;
-    // ONE key per ATTEMPT AT ONE TRIGGER, HELD across a retry the user makes
-    // because they were not told what happened. It is claimed here rather than
-    // per click, because the whole point is that the RETRY carries the SAME key
-    // as the attempt it is retrying — a fresh key would be a fresh act and would
-    // spend a second free revision. See use-held-keys.ts for the rest.
-    const idempotencyKey = heldKeys.claim(engagementId, trigger, mintKey);
+    // ONE key per ATTEMPT AT ONE ACT, HELD across a retry the user makes because
+    // they were not told what happened. It is claimed here rather than per
+    // click, because the whole point is that the RETRY carries the SAME key as
+    // the attempt it is retrying — a fresh key would be a fresh act and would
+    // spend a second free revision. The act is the trigger, narrowed by `act`
+    // where the trigger does not say what was attempted (a payment's kind and
+    // amount): a different figure is a different act. See use-held-keys.ts.
+    const idempotencyKey = heldKeys.claim(engagementId, trigger, mintKey, act);
     startTransition(async () => {
       try {
         settle(engagementId, trigger, await fn(idempotencyKey));

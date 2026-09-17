@@ -103,9 +103,9 @@ describe('EngagementTabStrip — selection and the in-flight lock', () => {
     expect(onSelect).toHaveBeenCalledWith('changeOrders');
   });
 
-  // Navigating away unmounts the open panel and with it PaymentPanel's per-mount
-  // idempotency key, so a submit whose response was lost would come back on a
-  // FRESH key and land as a genuine duplicate against an append-only ledger.
+  // Switching tabs unmounts the open panel under an answer that has not arrived;
+  // a studio who cannot see the form they submitted cannot tell what happened to
+  // it. (The key survives the unmount — it is held in the store, not the panel.)
   test('pending disables ALL FIVE tabs', () => {
     renderStrip({ pending: true });
     const tabs = screen.getAllByRole('tab');

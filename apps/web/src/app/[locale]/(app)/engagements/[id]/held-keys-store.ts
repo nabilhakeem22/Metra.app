@@ -1,5 +1,8 @@
-import { isHeldKeyLive, type HeldKey } from '@/lib/engagements/held-key';
-import type { Trigger } from '@/lib/engagements/transitions';
+import {
+  isHeldKeyLive,
+  type HeldKey,
+  type HeldKeyTrigger,
+} from '@/lib/engagements/held-key';
 import { isUuid } from '@/lib/uuid';
 
 /**
@@ -46,22 +49,30 @@ export function heldKeysStorageKey(engagementId: string): string {
  */
 function readEntry(value: unknown): HeldKey | null {
   if (typeof value !== 'object' || value === null) return null;
-  const { key, heldAt } = value as { key?: unknown; heldAt?: unknown };
+  const { key, heldAt, act } = value as {
+    key?: unknown;
+    heldAt?: unknown;
+    act?: unknown;
+  };
   if (!isUuid(key)) return null;
   if (typeof heldAt !== 'number' || !Number.isFinite(heldAt)) return null;
-  return { key, heldAt };
+  // `act` is absent for every lifecycle trigger and a plain string for the acts
+  // that need one. It is only ever COMPARED, never sent, so a wrong-typed one is
+  // refused with the entry rather than coerced.
+  if (act !== undefined && typeof act !== 'string') return null;
+  return act === undefined ? { key, heldAt } : { key, heldAt, act };
 }
 
 /** Read the keys this tab is still holding for this engagement, or an empty map. */
 export function readHeldKeys(
   engagementId: string,
   now: number = Date.now(),
-): Map<Trigger, HeldKey> {
+): Map<HeldKeyTrigger, HeldKey> {
   try {
     const raw = globalThis.sessionStorage?.getItem(heldKeysStorageKey(engagementId));
     if (!raw) return new Map();
     const stored = JSON.parse(raw) as Record<string, unknown>;
-    const held = new Map<Trigger, HeldKey>();
+    const held = new Map<HeldKeyTrigger, HeldKey>();
     let discarded = false;
     // TRIGGER NAMES are read back UNVALIDATED against the Trigger union on
     // purpose: an entry written by an older build naming a trigger this one has
@@ -69,7 +80,9 @@ export function readHeldKeys(
     // because it is what gets sent to the server as the idempotency key.
     for (const [trigger, value] of Object.entries(stored)) {
       const entry = readEntry(value);
-      if (entry !== null && isHeldKeyLive(entry, now)) held.set(trigger as Trigger, entry);
+      if (entry !== null && isHeldKeyLive(entry, now)) {
+        held.set(trigger as HeldKeyTrigger, entry);
+      }
       else discarded = true;
     }
     // An expired or malformed entry is ERASED here, not left to be re-read and
@@ -84,7 +97,7 @@ export function readHeldKeys(
 /** Mirror the map, or REMOVE the entry once nothing is held. */
 export function writeHeldKeys(
   engagementId: string,
-  held: ReadonlyMap<Trigger, HeldKey>,
+  held: ReadonlyMap<HeldKeyTrigger, HeldKey>,
 ): void {
   try {
     const storage = globalThis.sessionStorage;

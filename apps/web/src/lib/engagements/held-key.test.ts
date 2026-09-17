@@ -1,12 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import type { Trigger } from './transitions';
+import { TRANSITIONS, type Trigger } from './transitions';
 import {
   HELD_KEY_TTL_MS,
+  PAYMENT_HELD_TRIGGER,
   hasLanded,
   isHeldKeyLive,
   keyForAttempt,
   latestTransitionAtByTrigger,
   type HeldKey,
+  type HeldKeyTrigger,
 } from './held-key';
 import { releasesKey } from './retry-policy';
 
@@ -73,6 +75,71 @@ describe('keyForAttempt', () => {
     expect(keyForAttempt(keys, 'requestRevision', mint('second-key'), NOW).key).toBe(
       'first-key',
     );
+  });
+});
+
+/**
+ * RT2: a payment is an act the trigger's NAME does not describe — the studio can
+ * log two genuinely different payments through one control. `act` is what makes
+ * the second one a second act.
+ */
+describe('keyForAttempt — the act, where the trigger does not name it', () => {
+  const heldPayment = (act: string) =>
+    new Map<HeldKeyTrigger, HeldKey>([
+      [PAYMENT_HELD_TRIGGER, { key: 'held-key', heldAt: NOW, act }],
+    ]);
+
+  it('re-uses the key when the SAME act is retried inside the window', () => {
+    const attempt = keyForAttempt(
+      heldPayment('deposit|50000'),
+      PAYMENT_HELD_TRIGGER,
+      mint('fresh-key'),
+      NOW + 60_000,
+      'deposit|50000',
+    );
+    expect(attempt.key).toBe('held-key');
+    expect(attempt.heldAt).toBe(NOW);
+  });
+
+  it('mints a fresh key for a DIFFERENT amount at the same trigger', () => {
+    const attempt = keyForAttempt(
+      heldPayment('deposit|50000'),
+      PAYMENT_HELD_TRIGGER,
+      mint('fresh-key'),
+      NOW + 60_000,
+      'deposit|75000',
+    );
+    expect(attempt.key).toBe('fresh-key');
+    expect(attempt.act).toBe('deposit|75000');
+  });
+
+  it('mints a fresh key for a different KIND at the same amount', () => {
+    expect(
+      keyForAttempt(
+        heldPayment('deposit|50000'),
+        PAYMENT_HELD_TRIGGER,
+        mint('fresh-key'),
+        NOW,
+        'gate_a|50000',
+      ).key,
+    ).toBe('fresh-key');
+  });
+
+  it('does not let an act-less entry answer for an act, or the reverse', () => {
+    // A stored entry from a build that named no act cannot stand in for one, and
+    // a lifecycle trigger (which passes none) cannot pick up a payment's.
+    const actless = new Map<HeldKeyTrigger, HeldKey>([
+      [PAYMENT_HELD_TRIGGER, { key: 'held-key', heldAt: NOW }],
+    ]);
+    expect(
+      keyForAttempt(actless, PAYMENT_HELD_TRIGGER, mint('fresh'), NOW, 'deposit|50000').key,
+    ).toBe('fresh');
+    const paid = heldPayment('deposit|50000');
+    expect(keyForAttempt(paid, PAYMENT_HELD_TRIGGER, mint('fresh'), NOW).key).toBe('fresh');
+  });
+
+  it('is not a lifecycle trigger, so it can never collide with one', () => {
+    expect(Object.keys(TRANSITIONS)).not.toContain(PAYMENT_HELD_TRIGGER);
   });
 });
 
