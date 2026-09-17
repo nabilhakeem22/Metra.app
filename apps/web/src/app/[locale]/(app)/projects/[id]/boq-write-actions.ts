@@ -105,7 +105,15 @@ export function addSection(context: WriteContext): void {
 }
 
 export function discountBlur(context: WriteContext, typed: string): void {
-  if (typed === trimNumber(context.boq.discountPct)) return;
+  if (typed === trimNumber(context.boq.discountPct)) {
+    // Focused, changed nothing (or typed it back). No write — and the local
+    // override has done its job, so it goes, exactly as an unchanged cell's
+    // does. Leaving it behind pinned a percentage on screen that the discount
+    // and total beside it then contradicted, the moment anybody else changed
+    // the document discount under the open sheet.
+    context.edits.setDiscount(null);
+    return;
+  }
   context.start(async () => {
     const result = await setBoqDiscount({
       boqId: context.boq.id,

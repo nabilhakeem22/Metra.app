@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest';
+import { useState } from 'react';
 import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { messageAt, renderWithIntl } from '@/test/render-with-intl';
 import type { CapturedToast } from '@/test/doubles';
@@ -322,5 +323,88 @@ describe('BoqSheet \u2014 the cost of one keystroke', () => {
     expect(cells[1]!.value).toBe('سقف معلق');
     expect(cells[0]!.value).toBe('بند 0');
     expect(cells[2]!.value).toBe('بند 2');
+  });
+});
+
+/**
+ * Wave-5 remediation RT3: once a blur has decided NOT to write, the local
+ * override is dropped, so the percentage follows the record like every figure
+ * beside it.
+ *
+ * `discountBlur` returned early on the no-write path without clearing the draft,
+ * so a studio who typed a percentage and typed it back left an override pinned
+ * to the field. When the document discount then changed underneath — another
+ * user, a revalidation — the sheet showed the OLD percentage next to the NEW
+ * discount amount and the NEW total: three numbers on three adjacent rows that
+ * cannot all be true.
+ */
+describe('BoqSheet — the discount editor after a blur that wrote nothing', () => {
+  /** The sheet under a revalidation: the same open sheet, a new record. */
+  function SheetUnderRevalidation({ revalidated }: { revalidated: BoqDetail }) {
+    const [boq, setBoq] = useState<BoqDetail>(boqFixture);
+    return (
+      <div>
+        <button type="button" onClick={() => setBoq(revalidated)}>
+          revalidate
+        </button>
+        <BoqSheet boq={boq} canEdit />
+      </div>
+    );
+  }
+
+  function discountField(): HTMLInputElement {
+    return screen.getByLabelText(ar('projects.profile.boq.discountPct')) as HTMLInputElement;
+  }
+
+  /** The stored 5% document discount, moved to 20% by somebody else. */
+  function atTwentyPercent(): BoqDetail {
+    return {
+      ...boqFixture(),
+      discountPct: '20.0000',
+      discountAmount: '2000.0000',
+      total: '8000.0000',
+    };
+  }
+
+  test('the field follows the RECORD again after the change is typed back', async () => {
+    renderWithIntl(<SheetUnderRevalidation revalidated={atTwentyPercent()} />);
+    const field = discountField();
+
+    fireEvent.focus(field);
+    fireEvent.change(field, { target: { value: '7' } });
+    fireEvent.change(field, { target: { value: '5' } });
+    fireEvent.blur(field);
+
+    // Nothing changed, so nothing is written — that part was always right.
+    expect(actions.setBoqDiscount).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: 'revalidate' }));
+
+    await waitFor(() => {
+      expect(discountField().value).toBe('20');
+    });
+    // and the two money rows the percentage has to agree with.
+    const cells = [...document.querySelectorAll('td')].map(
+      (cell) => cell.textContent?.trim() ?? '',
+    );
+    expect(cells).toContain(formatMoney('2000.0000', 'ar-EG'));
+    expect(cells).toContain(formatMoney('8000.0000', 'ar-EG'));
+    expect(toasts).toHaveLength(0);
+  });
+
+  test('a blur that DOES write still keeps the typed value until the record lands', async () => {
+    actions.setBoqDiscount.mockResolvedValue({ ok: true });
+    renderWithIntl(<SheetUnderRevalidation revalidated={atTwentyPercent()} />);
+    const field = discountField();
+
+    fireEvent.change(field, { target: { value: '7' } });
+    fireEvent.blur(field);
+
+    await waitFor(() => {
+      expect(actions.setBoqDiscount).toHaveBeenCalledWith({
+        boqId: 'boq-1',
+        discountPct: '7',
+      });
+    });
   });
 });
