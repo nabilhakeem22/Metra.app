@@ -295,6 +295,14 @@ export const noBareTenantDb = {
     messages: {
       bareQuery:
         'Drizzle `.{{method}}()` on the raw request/base connection runs as the BYPASSRLS login role and can read/write across every tenant. Wrap org-scoped access in withOrgContext()/withUserContext(). If this is a sanctioned base-connection use (public token SDF, api-key resolver, automation system read), allowlist the file in eslint-rules/no-bare-tenant-db.mjs.',
+      // A tagged template has NO method name to interpolate. The previous
+      // version reported `bareQuery` with `data: { method: 'sql``' }`, which
+      // rendered as "Drizzle `.sql``()`" - punctuation that is not a method and
+      // not anything a developer could search for. A separate messageId with no
+      // placeholder is one line more and cannot render a method that does not
+      // exist.
+      bareTaggedSqlQuery:
+        'A tagged-template query on the raw request/base connection runs as the BYPASSRLS login role and can read/write across every tenant. Wrap org-scoped access in withOrgContext()/withUserContext(). If this is a sanctioned base-connection use (public token SDF, api-key resolver, automation system read), allowlist the file in eslint-rules/no-bare-tenant-db.mjs.',
       rawHandleArgument:
         '`{{helper}}()` is given the raw request/base connection. Its where clause carries no org predicate on purpose — the RLS transaction is the tenancy boundary — so on the BYPASSRLS handle it resolves an id belonging to ANY tenant. Pass the `tx` from withOrgContext()/withUserContext().',
       sdfCallerNotAllowlisted:
@@ -555,11 +563,8 @@ export const noBareTenantDb = {
       // catch, so the tagged template is its own visitor.
       TaggedTemplateExpression(node) {
         if (!isRawExpr(node.tag)) return;
-        context.report({
-          node: node.tag,
-          messageId: 'bareQuery',
-          data: { method: 'sql``' },
-        });
+        // No `data`: this messageId has no placeholder, by construction.
+        context.report({ node: node.tag, messageId: 'bareTaggedSqlQuery' });
       },
       CallExpression(node) {
         // The spread above cannot carry a second `CallExpression`, so the SDF

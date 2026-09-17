@@ -135,13 +135,13 @@ it('no-bare-tenant-db: flags raw-connection queries, allows scoped ones', () => 
         // A computed key written as an interpolation-free template literal.
         filename: 'apps/web/src/lib/clients/queries.ts',
         code: 'const conn = getRequestConnection(); await conn[`sql`]`select 1`;',
-        errors: [{ messageId: 'bareQuery' }],
+        errors: [{ messageId: 'bareTaggedSqlQuery' }],
       },
       {
         // A rest binding holds every key the factory returned, handles included.
         filename: 'apps/web/src/lib/clients/queries.ts',
         code: 'const { ...rest } = getRequestConnection(); await rest.sql`select 1`;',
-        errors: [{ messageId: 'bareQuery' }],
+        errors: [{ messageId: 'bareTaggedSqlQuery' }],
       },
       {
         // A query method reached by computed string.
@@ -154,7 +154,7 @@ it('no-bare-tenant-db: flags raw-connection queries, allows scoped ones', () => 
       {
         filename: 'apps/web/src/lib/clients/queries.ts',
         code: 'const { sql } = getRequestConnection(); await sql`select * from public.clients`;',
-        errors: [{ messageId: 'bareQuery' }],
+        errors: [{ messageId: 'bareTaggedSqlQuery' }],
       },
       {
         filename: 'apps/web/src/lib/clients/queries.ts',
@@ -164,7 +164,7 @@ it('no-bare-tenant-db: flags raw-connection queries, allows scoped ones', () => 
       {
         filename: 'apps/web/src/lib/clients/queries.ts',
         code: 'const { pg } = getRequestConnection(); await pg`select 1`;',
-        errors: [{ messageId: 'bareQuery' }],
+        errors: [{ messageId: 'bareTaggedSqlQuery' }],
       },
       // Bare read on the withRequestDb callback param, non-allowlisted file.
       {
@@ -198,22 +198,22 @@ it('no-bare-tenant-db: flags raw-connection queries, allows scoped ones', () => 
       {
         filename: 'apps/web/src/lib/clients/queries.ts',
         code: 'const { sql: raw } = getRequestConnection(); await raw`select * from public.clients`;',
-        errors: [{ messageId: 'bareQuery' }],
+        errors: [{ messageId: 'bareTaggedSqlQuery' }],
       },
       {
         filename: 'apps/web/src/lib/clients/queries.ts',
         code: 'await (getRequestConnection().sql)`select * from public.clients`;',
-        errors: [{ messageId: 'bareQuery' }],
+        errors: [{ messageId: 'bareTaggedSqlQuery' }],
       },
       {
         filename: 'apps/web/src/lib/clients/queries.ts',
         code: 'const conn = getRequestConnection(); await conn.sql`select 1`;',
-        errors: [{ messageId: 'bareQuery' }],
+        errors: [{ messageId: 'bareTaggedSqlQuery' }],
       },
       {
         filename: 'apps/web/src/lib/clients/queries.ts',
         code: "const c = getRequestConnection(); await c['sql']`select 1`;",
-        errors: [{ messageId: 'bareQuery' }],
+        errors: [{ messageId: 'bareTaggedSqlQuery' }],
       },
       {
         filename: 'apps/web/src/lib/clients/queries.ts',
