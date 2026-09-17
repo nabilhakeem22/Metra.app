@@ -1,4 +1,11 @@
 import 'server-only';
+// HISTORY: this file was split out of `lib/dashboard/queries.ts` in 6d29a1a and
+// kept only 29% of it (`git show --find-renames=20% 6d29a1a` reports
+// `R029 queries.ts -> queries/trends.ts`), which is below git's 50% rename
+// threshold - so plain `git log --follow` on this path stops at the split and
+// returns ONE commit. Use `git log --follow -M20% -- <this file>` to reach the
+// FOUR commits before it. (`engagements/guards/milestone-math.ts` carries the
+// same trap from wave 4: 1 commit plain, 16 at -M20%.)
 // The dashboard's MONTHLY TRENDS — the two series the charts are shaped from.
 //
 // This file is `dashboard/queries.ts` renamed (wave 4): the counts and the
