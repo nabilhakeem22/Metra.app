@@ -19,9 +19,9 @@ import {
 } from '@/lib/aggregates/proposal-totals';
 import { withinMagnitude } from '@/lib/money/read';
 import { insertLinesInChunks } from '@/lib/lines/insert-chunked';
-import { computeBoqTotals } from './totals';
-import type { ImportedLine } from './import/map';
-import { bilingualFor } from './bilingual';
+import { computeBoqTotals } from '../totals';
+import type { ImportedLine } from '../import/map';
+import { bilingualFor } from '../bilingual';
 
 /** Hard cap, mirroring the proposal builder's. A spreadsheet can hold anything. */
 export const MAX_BOQ_LINES = 2000;
