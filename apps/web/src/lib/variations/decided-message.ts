@@ -55,18 +55,22 @@ export interface VariationDecisionState {
  *    rejected a variation, watched the contract be terminated, and was then told
  *    "this contract is no longer in force" as though they had never decided.
  *
- * 4. Their click, this session, before any refresh.
+ * 4. `contractInactive` for everything else on a dead contract.
  *
- * 5. `contractInactive` for everything else on a dead contract.
- *
- * 6. THE LEGACY ROW, AND WHY THERE IS NO REGRESSION. `rejectionChannel` is null
+ * 5. A REJECTION WITH NO RECORDED CHANNEL — the client's click this session, or
+ *    a row's own status. THIS LINE AND THE ONE ABOVE IT ARE IN MAIN'S ORDER, and
+ *    that is a requirement rather than an accident. `rejectionChannel` is null
  *    for every event written before 0051 and there is NO backfill (A2 — every
  *    discriminator survives both paths, so a backfill would be a guess on an
- *    evidentiary record). A null-channel rejection on a LIVE contract reaches
- *    this line and reads `rejected`, exactly as it does today; on a terminated
- *    contract it stops at rule 5 and reads `contractInactive`, exactly as it
- *    does today. Deleting this line as "unreachable" would silently re-label
- *    every historical rejection.
+ *    evidentiary record), so A2 says a null-channel row must render exactly what
+ *    it renders on main: `rejected` on a live contract, `contractInactive` on a
+ *    terminated one. The first version of this ladder lifted `outcome ===
+ *    'rejected'` ABOVE rule 4 and diverged from main in 5 of 84 null-channel
+ *    combinations. `decided-message.test.ts` now sweeps all 84 against a verbatim
+ *    copy of main's ladder and requires zero divergences.
+ *
+ *    Rules 2 and 3 are what the wave actually changes, and they only fire for a
+ *    RECORDED channel — which no pre-0051 row has.
  *
  * `already` is the fall-through rather than a case of its own: every other
  * branch is a thing we can name, and "you have already responded" is what is
@@ -81,9 +85,8 @@ export function variationDecidedKey(
     return 'rejectedOnTermination';
   }
   if (status === 'rejected' && rejectionChannel === 'client') return 'rejected';
-  if (outcome === 'rejected') return 'rejected';
   if (!contractActive || outcome === 'contractInactive') return 'contractInactive';
-  if (status === 'rejected') return 'rejected';
+  if (outcome === 'rejected' || status === 'rejected') return 'rejected';
   if (outcome === 'expired') return 'expired';
   if (outcome === 'invalid') return 'invalid';
   return 'already';
