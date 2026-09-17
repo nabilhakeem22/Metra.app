@@ -14,9 +14,10 @@
 -- ABOUT TG_ARGV[3]. It exists for `on delete set null` foreign keys: when a
 -- parent row is deleted, Postgres UPDATEs the child, and a locked child would
 -- otherwise raise MT100 and abort a delete that has nothing to do with
--- immutability. (On a COMPOSITE (org_id, x_id) FK, Postgres nulls org_id as
--- well, so that delete is refused for an unrelated reason until the constraint
--- is narrowed to `SET NULL (x_id)`.) Only a change TO NULL is tolerated;
+-- immutability. (On a COMPOSITE (org_id, x_id) FK, Postgres used to null org_id
+-- as well, so that delete was refused for an unrelated reason; migration 0052
+-- narrowed all eleven of ours to `SET NULL (x_id)`.) Only a change TO NULL is
+-- tolerated;
 -- writing a new NON-NULL value into one of those columns is still MT100. OMIT
 -- IT AND THE TRIGGER BEHAVES EXACTLY AS IT DID BEFORE THIS ARGUMENT EXISTED -
 -- every attached trigger that passes three arguments cannot reach the branch at
@@ -39,13 +40,13 @@
 -- row was admitted by this branch - a locked document's timestamp could be moved
 -- on its own, which is not something a cascade ever does.
 --
--- CONSEQUENCE, stated so nobody reads the branch as live: with the depth gate
--- in place, branch 2 is reachable ONLY from a cascade, and the eleven composite
--- `on delete set null` FKs mean no such cascade can complete today (it nulls
--- `org_id` too, which is NOT NULL, so the parent delete is refused first). When
--- wave 7 narrows them to `ON DELETE SET NULL (x_id)` the branch starts carrying
--- traffic - or the argument can be deleted outright, which is the better end
--- state.
+-- CONSEQUENCE, stated so nobody reads the branch as dead: with the depth gate in
+-- place, branch 2 is reachable ONLY from a cascade, and until migration 0052 no
+-- such cascade could complete (the composite FK nulled `org_id` too, which is
+-- NOT NULL, so the parent delete was refused first). 0052 narrowed all eleven to
+-- `ON DELETE SET NULL (x_id)`, so the branch NOW CARRIES REAL TRAFFIC - deleting
+-- a document or a design engagement that an ISSUED bill points at is exactly it,
+-- and `tests/actions/composite-fk-cascade.dbtest.ts` is where that is proven.
 --
 -- Decision matrix for "cannot be edited once issued":
 --   * append-only ledgers (e.g. audit_log) -> use GRANTs (no UPDATE/DELETE), and

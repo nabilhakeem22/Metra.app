@@ -35,6 +35,25 @@ type OnDelete = 'restrict' | 'cascade' | 'set null' | 'no action' | 'set default
  * generate` refuses to run at all on a duplicated index name - it aborts before
  * writing anything - so the collision is not cosmetic: it makes the one command
  * that authors a migration unusable.
+ *
+ * `onDelete: 'set null'` HERE IS NOT WHAT THE DATABASE HOLDS, and the gap is
+ * deliberate. Postgres's bare `ON DELETE SET NULL` nulls EVERY referencing
+ * column, and on a composite `(org_id, <name>_id)` that includes `org_id`, which
+ * is `not null` on every org-scoped table - so the parent delete was refused
+ * outright (23502, or MT100 under an immutability trigger), for all eleven
+ * set-null constraints this helper emits. The correct action is
+ * `ON DELETE SET NULL (<name>_id)`, which PostgreSQL 15+ supports and
+ * **drizzle-orm 0.36 cannot express**: `foreignKey().onDelete()` takes an action
+ * and no column list, and snapshot format v7 has no field for one.
+ *
+ * So from `migrations/0052_composite_fk_set_null_columns.sql` onward those
+ * constraints carry the COLUMN LIST in the database while this file keeps
+ * emitting the bare action - which is what keeps `db:assert-snapshot` green (the
+ * schema and the snapshot still agree on the ACTION, and that is all either of
+ * them records). CONSEQUENCE FOR THE NEXT PERSON: a NEW `set null` composite FK
+ * added through this helper is BORN WITH THE DEFECT and must be narrowed by its
+ * own migration. 0052's straggler check is what refuses to let one through
+ * unnoticed.
  */
 export function sameOrgFk(
   t: Record<string, AnyPgColumn>,
