@@ -19,7 +19,7 @@ import type {
 } from '@/lib/engagements/queries';
 import type { CommercialPulse } from '@/lib/engagements/pulse';
 import { keyForAttempt, releasesKey } from '@/lib/engagements/retry-policy';
-import { acknowledgesIssuance } from '@/lib/engagements/rom-ack';
+import { resolveBudgetBadge } from '@/lib/engagements/budget-badge';
 import type { Trigger } from '@/lib/engagements/transitions';
 import { EngagementCommandCard } from './engagement-command-card';
 import {
@@ -119,21 +119,9 @@ export function EngagementDetailClient({
     (trigger) => trigger !== gatePreview.primaryTrigger,
   );
 
-  // TWO states, not one. A band the studio has typed but not sent is a DRAFT and
-  // the client cannot see it; a band that has been sent and not yet acknowledged
-  // is AWAITING the client. Conflating them told the studio to chase a client who
-  // had never been shown anything. Derived from data the page already holds.
-  // A band must EXIST to be a draft: without one there is nothing drafted, and a
-  // permanent "draft" badge on every young engagement says nothing at all.
-  const budgetDraft =
-    header.romLow !== null && header.romHigh !== null && header.romIssuedAt === null;
-  // 0049: the acknowledgement must answer THIS issuance. A stale one against a
-  // superseded band leaves the studio still awaiting the client, which is what
-  // the server-side romAcknowledged guard already decides — both call
-  // acknowledgesIssuance so the badge and the gate cannot disagree.
-  const budgetAwaitingAck =
-    header.romIssuedAt !== null &&
-    !events.some((e) => acknowledgesIssuance(e, header.romIssuedAt));
+  // Derived from data the page already holds; the rule itself lives in
+  // lib/engagements/budget-badge.ts, where it can be tested.
+  const budgetBadge = resolveBudgetBadge(header, events);
 
   // Pure derivation over the artifacts the page already loaded (no extra read).
   // The command card needs it to stop offering a 5th concept-option upload —
@@ -287,13 +275,13 @@ export function EngagementDetailClient({
           // and the client has not yet acknowledged is unissued work sitting in
           // that tab, and saying so is worth more than saying "1".
           const budgetState =
-            tb !== 'budget'
+            tb !== 'budget' || budgetBadge === null
               ? null
-              : budgetDraft
-                ? t('offPlan.budgetDraftBadge')
-                : budgetAwaitingAck
-                  ? t('offPlan.budgetAwaitingAckBadge')
-                  : null;
+              : t(
+                  budgetBadge === 'draft'
+                    ? 'offPlan.budgetDraftBadge'
+                    : 'offPlan.budgetAwaitingAckBadge',
+                );
           const active = tab === tb;
           return (
             <button
