@@ -48,6 +48,11 @@ const journal: { entries: JournalEntry[] } = JSON.parse(
  *
  * Nothing may be added to this list. A new migration is stamped with the real
  * time it was authored, and must still exceed every entry above it.
+ *
+ * CONSEQUENCE, until 2026-09-17T22:19:17.550Z: no new migration can satisfy
+ * both rules, because the real time is still below 0051's stamp. That window
+ * closes on its own; a migration authored after it is stamped normally. One
+ * authored inside it must wait for the window, not be hand-stamped ahead.
  */
 const STAMPED_AHEAD_OF_WALL_CLOCK = new Set([
   '0050_transition_idempotency',

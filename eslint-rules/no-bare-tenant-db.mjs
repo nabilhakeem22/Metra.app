@@ -126,6 +126,7 @@
 // demonstrated against this rule and both returning zero messages:
 //        `import(`@/lib/share/sdf-${part}`)`   an interpolated template
 //        `import(modulePath)`                  an identifier
+//        `createRequire(import.meta.url)(…)`   a require obtained as a value
 // The sibling `ts.preProcessFile` scanner returns [] for them too, so neither
 // host sees a computed specifier; no such call site exists today (the only
 // importers are the seven allowlisted portals). Also out of reach: a reflective

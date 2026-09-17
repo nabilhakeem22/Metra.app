@@ -179,7 +179,15 @@ async function discardStoredBytes(deleted: DeletedObject | undefined): Promise<v
   try {
     await withDeadline(removal, STORAGE_CLEANUP_TIMEOUT_MS, 'storage cleanup');
   } catch (error) {
-    console.error('document object remove failed', { ...deleted, error });
+    // `removal` never rejects (its catch is above), so the only thing that can
+    // land here is the deadline: the response stops waiting, the removal has
+    // NOT failed — on Workers it is still running under waitUntil. Say that,
+    // rather than logging a failure the breadcrumb above may never confirm.
+    console.warn('document object remove still running past the cleanup deadline', {
+      ...deleted,
+      deadlineMs: STORAGE_CLEANUP_TIMEOUT_MS,
+      error,
+    });
   }
 }
 

@@ -207,8 +207,8 @@ describe('deleteDocumentCore', () => {
     // the upload client's 15 seconds — a studio clearing ten files waited 150.
     // STORAGE_CLEANUP_TIMEOUT_MS bounds the WAIT (not the work: a `remove` that
     // lands later is a success we did not observe, and the row is gone either
-    // way), so the action still resolves `{ ok: true }` and still leaves the
-    // same breadcrumb.
+    // way), so the action still resolves `{ ok: true }` and says the removal
+    // is STILL RUNNING — not that it failed, which nobody has observed.
     vi.useFakeTimers();
     try {
       deletedRows.mockReturnValue([storedObject]);
@@ -216,9 +216,13 @@ describe('deleteDocumentCore', () => {
       const answer = deleteDocumentCore(ctx, DOCUMENT_ENTITIES.client, 'file-1');
       await vi.advanceTimersByTimeAsync(STORAGE_CLEANUP_TIMEOUT_MS + 1);
       await expect(answer).resolves.toEqual({ ok: true });
-      expect(console.error).toHaveBeenCalledWith(
-        'document object remove failed',
+      expect(console.warn).toHaveBeenCalledWith(
+        'document object remove still running past the cleanup deadline',
         expect.objectContaining({ error: expect.any(HttpDeadlineError) }),
+      );
+      expect(console.error).not.toHaveBeenCalledWith(
+        'document object remove failed',
+        expect.anything(),
       );
     } finally {
       vi.useRealTimers();
