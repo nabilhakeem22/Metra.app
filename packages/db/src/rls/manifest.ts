@@ -34,7 +34,7 @@ export const RLS_APPLY_ORDER = [
   'functions/60-delivery-documents.sql',
   'immutability.sql',
   'roles.sql',
-  'policies.sql',
+  'policies/00-core.sql',
 ] as const;
 
 export type RlsFile = (typeof RLS_APPLY_ORDER)[number];
