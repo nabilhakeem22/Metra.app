@@ -203,6 +203,28 @@ describe('PaymentForm — one key per deliberate act', () => {
     expect(payments[0]!.key).not.toBe(payments[1]!.key);
   });
 
+  // F3: the two references differ only at character 41, and the server accepts
+  // 200. While the act truncated each value at 40, this was ONE act and the
+  // second wire was answered with the first one's row.
+  test('two wire references differing past character 40 are two acts', async () => {
+    renderWithIntl(<FormProbe />);
+    actions.logPaymentAndAdvance.mockResolvedValue({ ok: false, error: 'uncertain' });
+    const reference = (sequence: string) =>
+      `EGY-NBE-WIRE-2026-09-17-BRANCH-014-SEQ-${sequence}`;
+
+    openDetails();
+    const field = screen.getByLabelText(ar('engagements.controls.reference'));
+    fireEvent.change(field, { target: { value: reference('0001') } });
+    await record('50000');
+
+    setNow(START + 3 * 60_000);
+    fireEvent.change(field, { target: { value: reference('0002') } });
+    await submit();
+
+    const payments = sent();
+    expect(payments[0]!.key).not.toBe(payments[1]!.key);
+  });
+
   test("after an 'uncertain', a CHANGED METHOD is a new act with a new key", async () => {
     renderWithIntl(<FormProbe />);
     actions.logPaymentAndAdvance.mockResolvedValue({ ok: false, error: 'uncertain' });

@@ -65,13 +65,32 @@ export function heldKeySlot(trigger: HeldKeyTrigger, act?: string): HeldKeySlot 
 }
 
 /**
- * How much of one field's value takes part in naming the act. Every value the
- * server can accept here is far shorter (a scale-4 money string, a reference, a
- * method); the cap exists because these fields are free text, the result is
- * mirrored to sessionStorage, and a pasted essay should not be carried there.
- * Two inputs can only collide past the cap if both are refused anyway.
+ * FNV-1a over the UTF-8 bytes, 64-bit, as sixteen hex characters.
+ *
+ * NOT a truncation, which is what this replaced: the act used to be the first 40
+ * characters of each value, and the server accepts 200 for `reference` and
+ * `method` — so two wire references from one bank on one day
+ * (`…BRANCH-014-SEQ-0001` and `…-0002`) were ONE act, and the second payment was
+ * answered with the first one's row. A hash reads every character and is short
+ * whatever the input, which is what the cap was really for.
+ *
+ * NOT cryptographic, and does not need to be: it distinguishes a handful of acts
+ * inside one tab inside fifteen minutes, and the consequence of the collision it
+ * cannot have is a retry being recognised. FNV-1a is four lines and no
+ * dependency. A side effect worth having: the amount the studio typed is no
+ * longer mirrored into sessionStorage in the clear.
  */
-const MAX_ACT_FIELD_CHARS = 40;
+const FNV_OFFSET_BASIS = 0xcbf29ce484222325n;
+const FNV_PRIME = 0x100000001b3n;
+const SIXTY_FOUR_BITS = 0xffffffffffffffffn;
+
+function fnv1a64(text: string): string {
+  let hash = FNV_OFFSET_BASIS;
+  for (const byte of new TextEncoder().encode(text)) {
+    hash = ((hash ^ BigInt(byte)) * FNV_PRIME) & SIXTY_FOUR_BITS;
+  }
+  return hash.toString(16).padStart(16, '0');
+}
 
 /**
  * WHAT THIS ACT IS, from the values being submitted.
@@ -81,13 +100,13 @@ const MAX_ACT_FIELD_CHARS = 40;
  * answered by the server with the FIRST attempt's row, so the second write is
  * discarded and the studio is told it worked.
  *
- * Sorted by name, and JSON rather than a joined string: the result must not
- * depend on the literal order the caller happened to write the object in, and a
- * value containing the separator must not be able to impersonate another field.
+ * The canonical form hashed here is sorted by field name and JSON, so the result
+ * cannot depend on the order the caller wrote the object in and no value can
+ * impersonate another field by containing a separator.
  */
 export function actFrom(fields: Record<string, string | null | undefined>): string {
   const named = Object.keys(fields)
     .sort()
-    .map((name) => [name, (fields[name] ?? '').slice(0, MAX_ACT_FIELD_CHARS)]);
-  return JSON.stringify(named);
+    .map((name) => [name, fields[name] ?? '']);
+  return fnv1a64(JSON.stringify(named));
 }

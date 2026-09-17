@@ -44,21 +44,61 @@ describe('actFrom', () => {
     expect(actFrom({ method: null })).toBe(actFrom({ method: '' }));
   });
 
-  it('cannot be impersonated by a value that contains the separator', () => {
+  it('cannot be impersonated by a value that contains a separator', () => {
     // A joined string ('a=1|b=2') would make these two collide. They must not.
     expect(actFrom({ a: '1', b: '2' })).not.toBe(actFrom({ a: '1|b=2' }));
     expect(actFrom({ a: '1", "b' })).not.toBe(actFrom({ a: '1', b: '' }));
   });
 
-  it('caps each value, so a pasted essay cannot be carried into storage', () => {
-    const long = actFrom({ note: 'x'.repeat(5_000) });
-    expect(long.length).toBeLessThan(100);
-    // and two values that differ only past the cap are then the same act — both
-    // are far beyond anything the server accepts, so both are refused anyway.
-    expect(actFrom({ note: 'x'.repeat(5_000) })).toBe(actFrom({ note: 'x'.repeat(6_000) }));
+  // F3: the act used to be the first 40 characters of each value, and the server
+  // accepts 200 for `reference` and `method` — so two wire references from one
+  // bank on one day were ONE act and the second payment was answered with the
+  // first one's row. These are the re-test's exact strings.
+  it('distinguishes two bank references that differ only at character 41', () => {
+    const wire = (sequence: string) => ({
+      kind: 'deposit',
+      amount: '50000',
+      method: 'bank',
+      reference: `EGY-NBE-WIRE-2026-09-17-BRANCH-014-SEQ-${sequence}`,
+    });
+    expect(wire('0001').reference.length).toBeGreaterThan(40);
+    expect(actFrom(wire('0001'))).not.toBe(actFrom(wire('0002')));
   });
 
-  it('distinguishes values that differ INSIDE the cap', () => {
+  it('distinguishes two 41-digit amounts, which MONEY_RE does accept', () => {
+    // No studio types these; the regex has no length bound, so the fingerprint
+    // must not be where that bound is quietly imposed.
+    expect(actFrom({ amount: `${'0'.repeat(40)}1` })).not.toBe(
+      actFrom({ amount: `${'0'.repeat(40)}2` }),
+    );
+  });
+
+  it('is sixteen hex characters whatever the input is', () => {
+    const short = actFrom({ a: '' });
+    const long = actFrom({ note: 'x'.repeat(50_000), reference: 'y'.repeat(5_000) });
+    expect(short).toMatch(/^[0-9a-f]{16}$/);
+    expect(long).toMatch(/^[0-9a-f]{16}$/);
+    expect(short).not.toBe(long);
+  });
+
+  it('reads the WHOLE value, however long', () => {
+    const essay = 'x'.repeat(5_000);
+    expect(actFrom({ note: `${essay}a` })).not.toBe(actFrom({ note: `${essay}b` }));
+  });
+
+  it('distinguishes values that differ by one character anywhere', () => {
     expect(actFrom({ amount: '50000.0000' })).not.toBe(actFrom({ amount: '50000.0001' }));
+  });
+
+  // PINNED TO LITERALS, because "the same act" has to mean the same thing in
+  // every build: a key held in an open tab at the moment of a deploy must still
+  // match its own act afterwards. This reds on any change to the canonical form
+  // OR to the hash — FNV-1a/64 over the UTF-8 bytes, whose own reference vectors
+  // ('' -> cbf29ce484222325, 'a' -> af63dc4c8601ec8c) this implementation
+  // reproduces.
+  it('is stable across builds, pinned to its output', () => {
+    expect(actFrom({ kind: 'deposit', amount: '50000' })).toBe('80434ce69bb98586');
+    expect(actFrom({ amount: '50000', kind: 'deposit' })).toBe('80434ce69bb98586');
+    expect(actFrom({})).toBe('09612b07b5ecb5a5');
   });
 });
