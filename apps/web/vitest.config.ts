@@ -22,8 +22,16 @@ export default defineConfig({
     },
   },
   test: {
-    // src only. The database suites live under tests/actions and run from
-    // vitest.actions.config.ts against a real Postgres.
-    include: [resolve(dir, 'src/**/*.test.ts').replace(/\\/g, '/')],
+    // src, PLUS the plain `*.test.ts` under tests/actions. The database suites
+    // there are `*.dbtest.ts`, matched by neither pattern here and run from
+    // vitest.actions.config.ts against a real Postgres — so this still opens no
+    // connection and needs no DATABASE_URL. It is what lets the test
+    // INFRASTRUCTURE that lives beside them (step-summary) be unit tested at
+    // all; before, a helper in that folder could only be exercised by running
+    // the whole database suite.
+    include: [
+      resolve(dir, 'src/**/*.test.ts').replace(/\\/g, '/'),
+      resolve(dir, 'tests/actions/**/*.test.ts').replace(/\\/g, '/'),
+    ],
   },
 });
