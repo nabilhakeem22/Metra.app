@@ -8,22 +8,13 @@ import type { ActionResult } from '@/lib/actions/result';
 // A plain PURE module (no barrel, no server-only, no db runtime) — see the
 // guards/money note below for why this component only ever imports leaves.
 import { findLatestClientChangeRequestNote } from '@/lib/engagements/client-activity-note';
-import { deriveCommandCard, type CommandCardMode } from '@/lib/engagements/command-card';
-import { conceptOptionsAtCapacity } from '@/lib/engagements/concept-options';
+import { deriveCommandCard } from '@/lib/engagements/command-card';
+import { resolveCommandCardChrome } from '@/lib/engagements/command-card-chrome';
+import { resolveCommandCardCtas } from '@/lib/engagements/command-card-ctas';
 import type { EngagementGatePreview } from '@/lib/engagements/gate-preview';
-import { inlineDropzoneCategory } from '@/lib/engagements/inline-dropzone-category';
 import type { EngagementClientActivityRecord } from '@/lib/engagements/queries/client-activity';
-// Import from the LEAF (guards/trigger-money-gate), not the guards barrel: the
-// barrel also re-exports GUARDS from ./registry, which would drag the whole guard
-// engine (registry -> readiness/money -> transitions) into THIS client chunk. That
-// heavy, cycle-prone graph can evaluate a binding as `undefined` at client
-// module-init (vitest even deadlocks importing it) and throw at render. The leaf
-// carries only the pure MONEY_GUARD_MILESTONE map + erased types — no registry,
-// no cycle.
-import { MONEY_GUARD_MILESTONE } from '@/lib/engagements/guards/trigger-money-gate';
 import type { BoqStepSummary } from '@/lib/boqs/step';
 import { EngagementBoqStep } from './engagement-boq-step';
-import { stateMilestone } from '@/lib/engagements/journey-map';
 import type { RevisionAllowances } from '@/lib/engagements/revision-allowance';
 import { resolveStageAction } from '@/lib/engagements/stage-action';
 import { isTerminal, type DesignState } from '@/lib/engagements/states';
@@ -56,24 +47,6 @@ import { DIRECT_TRIGGER_ACTIONS } from './trigger-actions';
 // what blocks Advance = the checklist row, marked ● unmet (never also a hint
 // interpolation or a note under the button). The hint POINTS at the checklist, it
 // does not restate it. Adding a second rendering of either is a regression.
-
-/**
- * The human status pill, pure from the command view + the pending
- * client-payment-claim count. blockedClient with a pending claim reads as
- * "payment to confirm" (the studio's move to record it), not "waiting on client".
- */
-function derivePillKey(mode: CommandCardMode, paymentClaimCount: number): string {
-  switch (mode) {
-    case 'closed':
-      return 'closed';
-    case 'ready':
-      return 'ready';
-    case 'blockedStudio':
-      return 'studio';
-    default:
-      return paymentClaimCount > 0 ? 'paymentToConfirm' : 'waitingClient';
-  }
-}
 
 export function EngagementCommandCard({
   engagementId,
@@ -149,89 +122,27 @@ export function EngagementCommandCard({
     isTerminal: isTerminal(state),
   });
   const closed = view.mode === 'closed';
-  const pillKey = derivePillKey(view.mode, paymentClaimCount);
-  // ONE highlighted statement of where things stand, not two. In every mode but one
-  // the pill and the headline two lines below say the same thing — identically for
-  // blockedClient ("Waiting on the client" / "Waiting on the client"), near enough
-  // for the others — and the headline is the better of the pair because it also
-  // names the phase. So the pill renders ONLY for `paymentToConfirm`, where it
-  // names a TASK the headline does not: the headline there reads "waiting on the
-  // client" while a claim actually sits with the studio. The mode's colour is not
-  // lost with it — the accent stripe and the border still carry it.
-  const showPaymentPill = pillKey === 'paymentToConfirm';
-
-  // Mode-driven accent (amber/warn for the blocked attention states, brand for
-  // ready, neutral for closed) — expressed through the app's semantic tokens so
-  // both themes + RTL stay correct.
-  const accent: 'neutral' | 'brand' | 'warn' = closed
-    ? 'neutral'
-    : view.mode === 'ready'
-      ? 'brand'
-      : 'warn';
-  const stripeClass =
-    accent === 'warn'
-      ? 'bg-[color:var(--warn)]'
-      : accent === 'brand'
-        ? 'bg-brand'
-        : 'bg-[color:var(--rule)]';
-  const pillClass =
-    accent === 'warn'
-      ? 'bg-[color:var(--warn-tint)] text-[color:var(--warn)]'
-      : accent === 'brand'
-        ? 'bg-brand-tint text-brand-ink'
-        : 'bg-[color:var(--track)] text-[color:var(--text-muted)]';
-  const borderClass =
-    accent === 'warn'
-      ? 'border-[color:var(--warn-tint)]'
-      : accent === 'brand'
-        ? 'border-[color:var(--brand-tint-border)]'
-        : 'border-[color:var(--rule)]';
+  const { pillKey, showPaymentPill, stripeClass, pillClass, borderClass, waitingOnClient } =
+    resolveCommandCardChrome({ mode: view.mode, paymentClaimCount });
   const showNudgePill = view.showNudge && canShare;
-  // Every unmet guard is one the CLIENT clears, so there is no studio action.
-  const waitingOnClient = view.mode === 'blockedClient';
 
-  // Is the stage's literal act ALREADY a control on this card? When the studio is
-  // blocked and the inline dropzone is the thing that clears it, the dropzone IS
-  // the act -- worded from the same registry row as the headline -- and the
-  // disabled Advance underneath is a second, dead, differently-worded button for
-  // the same move. That is the duplication Option D exists to remove, so it goes.
-  //
-  // It STAYS in the blocked states with no dropzone (created, the Gate-B holds):
-  // there nothing else on the card names the forward move, and a disabled button
-  // that says what you are working toward is better than no button at all.
-
-  // The inline attachment dropzone is THE ONE ACTION when the studio's next move
-  // is to attach a deliverable at this stage (null otherwise). Concept options are
-  // append-only and capped at four by `optionsReady`, so the dropzone stops
-  // OFFERING an upload at the cap rather than letting the studio walk into a state
-  // with no way back — the other categories have no cap and never reach this.
-  const dropzoneCategory = inlineDropzoneCategory(state);
-  const dropzoneAtCapacity =
-    dropzoneCategory === 'conceptOption' && conceptOptionsAtCapacity(conceptOptionCount);
-  const actOnCard =
-    view.mode === 'blockedStudio' &&
-    dropzoneCategory !== null &&
-    canUpload &&
-    !dropzoneAtCapacity;
-  // The off-plan toggle only makes sense before the survey branch — the proposal
-  // milestone (created / design_proposal), and only for a role that may update.
-  const atProposal = !closed && stateMilestone(state).index === 0;
-
-  // A blocking money gate whose shortfall we can pre-fill — the pay-and-advance
-  // path. `amountDue` is only set on a blocking payment gate (see gate-preview).
-  const paymentItem = preview.items.find(
-    (item) => !item.ok && MONEY_GUARD_MILESTONE[item.guard] && item.amountDue,
-  );
-  const paymentKind = paymentItem
-    ? MONEY_GUARD_MILESTONE[paymentItem.guard]
-    : undefined;
-  const showPayCta = Boolean(
-    preview.primaryTrigger &&
-      paymentItem &&
-      paymentKind &&
-      canRecordPayment &&
-      canAdvance,
-  );
+  const {
+    showPayCta,
+    paymentKind,
+    paymentItem,
+    atProposal,
+    dropzoneCategory,
+    dropzoneAtCapacity,
+    actOnCard,
+  } = resolveCommandCardCtas(preview, {
+    canRecordPayment,
+    canAdvance,
+    canUpload,
+    state,
+    mode: view.mode,
+    closed,
+    conceptOptionCount,
+  });
 
   // The client's latest change-request text — the brief for the revision the
   // studio is about to make. It belongs next to the headline, not buried in the
