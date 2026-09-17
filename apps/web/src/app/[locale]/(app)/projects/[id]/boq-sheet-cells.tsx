@@ -1,7 +1,8 @@
 'use client';
 
 import type { KeyboardEvent, ReactNode } from 'react';
-import type { Column } from './boq-sheet-columns';
+import type { Column, EditableLine } from './boq-sheet-columns';
+import type { BoqSheetRowApi } from './boq-sheet-row-api';
 
 // The BOQ sheet's table cells. EVERY CELL IS THE INPUT — no drawer, no modal, no
 // edit button per row: a studio pricing a fit-out is doing data entry across
@@ -106,6 +107,39 @@ export function BoqCellInput({
       onBlur={onBlur}
       onKeyDown={onKeyDown}
       className={`${CELL_INPUT_CLASS} ${mono ? 'font-mono tabular-nums' : ''} ${numeric ? 'text-end' : ''}`}
+    />
+  );
+}
+
+/**
+ * The four TYPED columns differ only in their label and their shape, so they
+ * share one input rather than four near-identical copies of the same six props.
+ */
+export function EditableCell({
+  line,
+  column,
+  label,
+  api,
+  mono,
+  numeric,
+}: {
+  line: EditableLine;
+  column: Column;
+  label: string;
+  api: BoqSheetRowApi;
+  mono?: boolean;
+  numeric?: boolean;
+}) {
+  return (
+    <BoqCellInput
+      value={api.cellValue(line, column)}
+      onChange={(value) => api.setCell(line.id, column, value)}
+      onBlur={() => api.onCellBlur(line, column)}
+      onKeyDown={(event) => api.onKeyDown(event, line, column)}
+      column={column}
+      label={label}
+      mono={mono}
+      numeric={numeric}
     />
   );
 }
