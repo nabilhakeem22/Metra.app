@@ -58,7 +58,8 @@ Agents run these literally. These are exactly what `.github/workflows/ci.yml` ru
 | Docs gate | `npm run docs:check` *(no root `DEPLOY.md`; no stale-host mention in a tracked `*.md` outside `docs/BUILD-LOG.md`; no em/en dash inside Arabic prose)* |
 | Type check | `cd apps/web && npx tsc --noEmit` — **and the same in `packages/db`**; they are two tsconfigs and only one of them is in the CI build step |
 | Migrations | `npm run migrate -w @metra/db` **then** `npm run apply-rls -w @metra/db` (RLS/roles/functions) **then** `npm run seed -w @metra/db` |
-| New migration | `npm run generate -w @metra/db` — ⚠️ drizzle-kit's rename prompt is an interactive TUI that can't run headless; 0013–0051 were hand-authored. **`migrations/meta` is 35 snapshots behind the journal, so `generate` diffs against `0016` and re-proposes most of the schema.** Read `docs/DEPLOY.md` before using it. |
+| New migration | `npm run generate -w @metra/db` — ⚠️ drizzle-kit's rename prompt is an interactive TUI that can't run headless; 0013–0051 were hand-authored. The snapshot is re-baselined at **`migrations/meta/0051_snapshot.json`**, which is what `generate` now diffs against. Read `docs/DEPLOY.md` before using it. |
+| Snapshot gate | `npm run db:assert-snapshot` *(regenerates into an empty temp dir and deep-compares; **no database**, ~2 s). Fix a difference with `npm run db:generate-baseline`, never with an in-place `generate`.)* |
 
 ## Conventions
 
