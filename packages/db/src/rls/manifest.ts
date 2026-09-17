@@ -26,6 +26,12 @@
  */
 export const RLS_APPLY_ORDER = [
   'functions/00-org-context.sql',
+  'functions/10-proposals.sql',
+  'functions/20-api-keys.sql',
+  'functions/30-contracts-variations.sql',
+  'functions/40-delivery-read.sql',
+  'functions/50-delivery-write.sql',
+  'functions/60-delivery-documents.sql',
   'immutability.sql',
   'roles.sql',
   'policies.sql',

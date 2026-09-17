@@ -1,5 +1,5 @@
-import { readFileSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { dirname, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { RLS_APPLY_ORDER } from './manifest';
@@ -22,6 +22,7 @@ import { RLS_APPLY_ORDER } from './manifest';
 // flag working code.
 
 const here = dirname(fileURLToPath(import.meta.url));
+const rlsDir = here;
 // The manifest, not a filename: apply-rls concatenates these in this order, so
 // this is the order Postgres sees. Reading it here also makes the test STRONGER
 // than it could be against one file - it now catches a `language sql` function
@@ -61,6 +62,34 @@ function functionBlocks(sql: string): FunctionBlock[] {
     return { ...entry, language, body };
   });
 }
+
+describe('rls/manifest.ts covers every .sql file under rls/', () => {
+  // The same silent-omission shape as journal defect D7: a .sql file with no
+  // manifest entry is NEVER APPLIED, with no error and no log line, and the
+  // symptom turns up somewhere else entirely (D7 surfaced as apply-rls failing
+  // to create a function whose column did not exist). A manifest entry with no
+  // file is the mirror image: apply-rls throws ENOENT halfway through a run.
+  const onDisk = readdirSync(rlsDir, { recursive: true, withFileTypes: true })
+    .filter((entry) => entry.isFile() && entry.name.endsWith('.sql'))
+    .map((entry) => {
+      const absolute = resolve(entry.parentPath ?? entry.path, entry.name);
+      // Manifest entries are written with forward slashes on every platform.
+      return relative(rlsDir, absolute).split(sep).join('/');
+    })
+    .sort();
+
+  it('lists every .sql file on disk exactly once', () => {
+    expect([...RLS_APPLY_ORDER].sort()).toEqual(onDisk);
+  });
+
+  it('lists nothing that is not on disk', () => {
+    for (const file of RLS_APPLY_ORDER) {
+      expect(existsSync(resolve(rlsDir, file)), `${file} is in RLS_APPLY_ORDER but not on disk`).toBe(
+        true,
+      );
+    }
+  });
+});
 
 describe('rls/functions/* definition order', () => {
   const clean = scannable(source);
