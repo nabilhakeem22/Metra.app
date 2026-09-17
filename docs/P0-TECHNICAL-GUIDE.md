@@ -386,13 +386,16 @@ container, in this order:
 
 1. `npm ci` (deterministic, from the committed lockfile)
 2. **i18n validate** — key parity, ICU placeholders, Western numerals
-3. **lint** — including the physical `left`/`right` ban
-4. **unit tests (db)**, then **unit tests (web)**
-5. **migrate** → **apply-rls** → **seed**
-6. **the cross-tenant isolation gate**
-7. **action-core DB tests** (`*.dbtest.ts`, seeded DB, fabricated `OrgContext`)
-8. **the OpenNext Cloudflare build** (no deploy) — proves the Worker bundle builds
-9. **`assert-no-baked-secrets`** — proves no secret was compiled into it
+3. **docs gate** (`npm run docs:check`) — no root `DEPLOY.md`, no stale-host
+   mention in a tracked `*.md` outside `docs/BUILD-LOG.md`, no em/en dash inside
+   Arabic prose
+4. **lint** — including the physical `left`/`right` ban
+5. **unit tests (db)**, then **unit tests (web)**
+6. **migrate** → **apply-rls** → **seed**
+7. **the cross-tenant isolation gate**
+8. **action-core DB tests** (`*.dbtest.ts`, seeded DB, fabricated `OrgContext`)
+9. **the OpenNext Cloudflare build** (no deploy) — proves the Worker bundle builds
+10. **`assert-no-baked-secrets`** — proves no secret was compiled into it
 
 A green CI on `main` is what triggers `deploy.yml`.
 

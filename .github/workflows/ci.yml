@@ -76,6 +76,13 @@ jobs:
       - name: i18n validate (parity + placeholders + numerals)
         run: npm run i18n:validate
 
+      # Documentation ratchet (no network, no database): the root DEPLOY.md
+      # stays deleted (owner decision 9), no tracked .md outside docs/BUILD-LOG.md
+      # mentions the host we left, and no em/en dash sits inside Arabic prose.
+      # Each of the three was a real regression that nothing noticed.
+      - name: Docs gate (decision 9, stale-host mentions, Arabic dashes)
+        run: npm run docs:check
+
       - name: Lint (includes physical left/right ban)
         run: npm run lint
 
