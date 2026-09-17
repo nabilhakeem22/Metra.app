@@ -54,9 +54,18 @@
 -- Raises SQLSTATE MT100 (reserved: immutability violation) on any illegal change.
 -- Idempotent (create or replace); attached to no table here.
 
+-- `set search_path = ''` for the same reason enforce_account_id_immutable below
+-- has it: every name this body uses (to_jsonb, string_to_array, replace,
+-- coalesce, cardinality, pg_trigger_depth, the jsonb `-` and `=` operators)
+-- lives in pg_catalog, which is always implicitly on the path, so pinning the
+-- path costs nothing and stops the resolution depending on the INVOKING role's
+-- search_path. It was the one function of the thirty under rls/ without it, and
+-- this wave added new logic to it. No body change is needed: nothing here is
+-- resolved through `public`.
 create or replace function public.enforce_immutable_when()
 returns trigger
 language plpgsql
+set search_path = ''
 as $$
 declare
   status_col  text := TG_ARGV[0];

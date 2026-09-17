@@ -174,6 +174,15 @@ revoke execute on function public.app_proposal_respond_by_token(text, text, text
 -- caller-supplied p_name/p_ip/p_ua audit parameters.
 grant execute on function public.enforce_contract_child_draft() to metra_app;
 grant execute on function public.enforce_variation_child_draft() to metra_app;
+-- The BOQ child-draft guard, for SYMMETRY and nothing more. Postgres checks
+-- EXECUTE on a trigger function at CREATE TRIGGER time (done here by the owning
+-- role), not on each firing, and a direct call to a plpgsql trigger function
+-- raises 0A000 before the body runs - so none of these four grants is load
+-- bearing. What is load bearing is that the file which IS the privilege model
+-- says the same thing about four identical objects: this was the only one of the
+-- thirty functions under rls/ with no line here, which left the next reader to
+-- work out for themselves whether the other three grants were required or noise.
+grant execute on function public.enforce_boq_child_draft() to metra_app;
 grant execute on function public.app_contract_by_token(text) to metra_app;
 revoke execute on function public.app_contract_by_token(text) from public;
 grant execute on function public.app_contract_ack_by_token(text, text, text, text, text) to metra_app;
