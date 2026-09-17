@@ -33,6 +33,14 @@
 //
 // The `.sql` the generator also writes is DISCARDED with the temp directory. Only
 // the baseline snapshot itself is ever written back.
+//
+// THE GENERATOR VERSION IS PART OF THE ARTEFACT, which is why `drizzle-kit` is
+// pinned EXACTLY (`"0.28.1"`, not `"^0.28.1"`) in packages/db. The committed
+// snapshot is that version's byte output. CI runs `npm ci` and was always
+// pinned by the lockfile; a developer running `npm install` was not, and on
+// 0.28.x+1 this check would go red and instruct `db:generate-baseline`, which
+// would re-baseline to the NEW generator's output and commit it — reddening CI
+// the other way. The fix instruction and the gate must not be able to diverge.
 import { spawnSync } from 'node:child_process';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
