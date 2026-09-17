@@ -67,12 +67,33 @@ export default tseslint.config(
       // a devDependency that cannot resolve in the Worker bundle. This is a
       // boundary the repo otherwise enforces hard, so it fails closed here too.
       // Test files are exempted below; they are who the helpers are for.
+      //
+      // BOTH SPELLINGS ARE BANNED. `no-restricted-imports` matches the SPECIFIER
+      // STRING, not the file it resolves to, so the alias group alone left
+      // `../test/doubles` — the form somebody working inside src/lib writes by
+      // accident — completely invisible. The three helpers are named because a
+      // bare `**/test/*` would also catch unrelated directories called `test`.
+      //
+      // WHAT IS STILL NOT COVERED: `await import('@/test/doubles')`. This core
+      // rule visits import DECLARATIONS only, so a dynamic import reaches the
+      // same module unreported. Covering it needs an `ImportExpression` visitor,
+      // which means a rule of our own — `metra/no-server-registry-in-client` is
+      // not it: that rule is about barrels inside 'use client' modules and has
+      // no such visitor to extend. Deliberately left: the static forms are what
+      // anybody actually writes, and a `no-restricted-imports` that silently
+      // half-covers a boundary is worse than one whose gap is written down.
       'no-restricted-imports': [
         'error',
         {
           patterns: [
             {
-              group: ['@/test', '@/test/*'],
+              group: [
+                '@/test',
+                '@/test/*',
+                '**/test/render-with-intl*',
+                '**/test/doubles*',
+                '**/test/documents-tab-contract*',
+              ],
               message:
                 'apps/web/src/test/* is TEST-ONLY (it imports vitest at module scope). ' +
                 'A product module must not import it: the OpenNext Worker bundle cannot ' +
