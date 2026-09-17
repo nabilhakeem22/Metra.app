@@ -14,7 +14,10 @@
 -- ABOUT TG_ARGV[3]. It exists for `on delete set null` foreign keys: when a
 -- parent row is deleted, Postgres UPDATEs the child, and a locked child would
 -- otherwise raise MT100 and abort a delete that has nothing to do with
--- immutability. Only a change TO NULL is tolerated; writing a new NON-NULL value
+-- immutability. (On a COMPOSITE (org_id, x_id) FK, Postgres nulls org_id as
+-- well, so that delete is refused for an unrelated reason until the constraint
+-- is narrowed to `SET NULL (x_id)`; this argument is still what the referential
+-- action needs, and is tested by the statement it issues.) Only a change TO NULL is tolerated; writing a new NON-NULL value
 -- into one of those columns is still MT100. OMIT IT AND THE TRIGGER BEHAVES
 -- EXACTLY AS IT DID BEFORE THIS ARGUMENT EXISTED - every attached trigger that
 -- passes three arguments cannot reach the branch at all.

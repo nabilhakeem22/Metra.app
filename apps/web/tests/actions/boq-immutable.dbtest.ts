@@ -15,11 +15,18 @@ import { closeFixture, ctxFor, raw, seedOrg, teardown } from './fixture';
 //
 // The load-bearing case here is the FOURTH TG_ARGV. `boqs.engagement_id` and
 // `boqs.source_file_id` are both declared `on delete set null`
-// (schema/boqs.ts:79-82), so deleting a design engagement, or deleting the
-// imported spreadsheet, makes POSTGRES ITSELF update an issued BOQ row. Without
-// the fourth argument the trigger would raise MT100 and abort a delete that has
-// nothing to do with immutability - a user-visible break of a path that works
-// today. Both cascades are asserted below, not just the file one.
+// (schema/boqs.ts:79-82), so Postgres's referential action UPDATES an issued BOQ
+// row, and without the fourth argument the trigger raises MT100 on it.
+//
+// THE PLAN ASSUMED THAT DELETE WORKS TODAY. IT DOES NOT, and the last test in
+// this file is why: the FK is COMPOSITE, `(org_id, x_id) -> target(org_id, id)`,
+// and `ON DELETE SET NULL` with no column list nulls ALL of the referencing
+// columns - `org_id` included, which is `not null`. So the parent delete is
+// already refused whether or not the BOQ is issued. The fourth argument is still
+// correct and still necessary (it is what the referential action needs the moment
+// the FK is narrowed to `SET NULL (x_id)`), so the branch is tested DIRECTLY by
+// the statement the cascade would issue, and the FK defect is asserted and
+// reported separately.
 //
 // TEARDOWN NEEDS NOTHING NEW: fixture.ts:314 sets
 // `session_replication_role = 'replica'` for the whole teardown transaction,
@@ -196,38 +203,44 @@ describe('a BOQ is frozen at the database once it is issued', () => {
     expect(row.n).toBe(1);
   });
 
-  it('still lets the imported SOURCE FILE be deleted (the 4th-TG_ARGV cascade)', async () => {
+  it('lets the DATABASE null a cascade column on an issued BOQ (the 4th TG_ARGV)', async () => {
+    // The branch the fourth argument adds, tested directly rather than through
+    // the foreign key - see the last test in this file for why the real cascade
+    // cannot reach it. An UPDATE that ONLY nulls engagement_id, or ONLY nulls
+    // source_file_id, on an ISSUED row is exactly the statement Postgres's
+    // referential action would issue, and it must be admitted.
     const fixture = await setup();
     expect(await issue(fixture)).toBeNull();
 
-    const code = await sqlstateOf(() =>
-      raw.query(`delete from public.files where id = '${fixture.fileId}'`),
-    );
-    expect(code).toBeNull();
-
-    const [row] = await raw.query<{ source_file_id: string | null; status: string }>(
-      `select source_file_id, status from public.boqs where id = '${fixture.boqId}'`,
-    );
-    expect(row.source_file_id).toBeNull();
-    expect(row.status).toBe('issued');
-  });
-
-  it('still lets the design ENGAGEMENT be deleted (the same cascade, other column)', async () => {
-    const fixture = await setup();
-    expect(await issue(fixture)).toBeNull();
-
-    const code = await sqlstateOf(() =>
-      raw.query(
-        `delete from public.design_engagements where id = '${fixture.engagementId}'`,
+    expect(
+      await sqlstateOf(() =>
+        raw.query(
+          `update public.boqs set engagement_id = null where id = '${fixture.boqId}'`,
+        ),
       ),
-    );
-    expect(code).toBeNull();
+    ).toBeNull();
+    expect(
+      await sqlstateOf(() =>
+        raw.query(
+          `update public.boqs set source_file_id = null where id = '${fixture.boqId}'`,
+        ),
+      ),
+    ).toBeNull();
 
-    const [row] = await raw.query<{ engagement_id: string | null; status: string }>(
-      `select engagement_id, status from public.boqs where id = '${fixture.boqId}'`,
+    const [row] = await raw.query<{
+      engagement_id: string | null;
+      source_file_id: string | null;
+      status: string;
+    }>(
+      `select engagement_id, source_file_id, status from public.boqs where id = '${fixture.boqId}'`,
     );
     expect(row.engagement_id).toBeNull();
+    expect(row.source_file_id).toBeNull();
     expect(row.status).toBe('issued');
+
+    // Without the fourth argument this same statement is MT100: with the
+    // argument removed from the trigger, branch 2 is unreachable and the row is
+    // "not a whitelisted status transition". That is the whole point of it.
   });
 
   it('still refuses a NON-NULL write to a cascade column on an issued BOQ', async () => {
@@ -248,5 +261,65 @@ describe('a BOQ is frozen at the database once it is issued', () => {
       ),
     );
     expect(code).toBe('MT100');
+  });
+
+  it('CANNOT use the real cascade, because the composite FK nulls org_id too', async () => {
+    // A DEFECT THIS TEST FOUND, and it is NOT caused by the immutability trigger.
+    //
+    // `boqs.engagement_id` and `boqs.source_file_id` are the second column of a
+    // COMPOSITE foreign key, (org_id, x_id) -> target(org_id, id). Postgres's
+    // `ON DELETE SET NULL` with no column list sets ALL of the referencing
+    // columns to null - including `org_id`, which is `not null` on every
+    // org-scoped table. So the referential action produces a row the table
+    // cannot hold, and deleting the parent is refused WHETHER OR NOT the BOQ is
+    // issued. Diagnosed codes: 23502 (not_null_violation) on a DRAFT row, and
+    // MT100 on an ISSUED one only because a BEFORE trigger runs before the
+    // not-null check and sees org_id change first.
+    //
+    // 0041_boq.sql:142-150 declares both constraints exactly that way, and
+    // `sameOrgFk` emits the same shape for ELEVEN `on delete set null` FKs
+    // across the schema (boq_lines/contract_lines/proposal_lines/
+    // variation_order_lines -> cost_items, projects -> project_types, ...), so
+    // "delete a cost item that a line references" is the same trap.
+    //
+    // THE FIX IS A MIGRATION - `ON DELETE SET NULL (x_id)`, which Postgres 15
+    // supports - and migrations are out of scope for this wave. Reported.
+    const fixture = await setup();
+
+    const asDraft = await sqlstateOf(() =>
+      raw.query(`delete from public.files where id = '${fixture.fileId}'`),
+    );
+    expect(await issue(fixture)).toBeNull();
+    const asIssued = await sqlstateOf(() =>
+      raw.query(
+        `delete from public.design_engagements where id = '${fixture.engagementId}'`,
+      ),
+    );
+    // Recorded rather than only asserted, so the run's log carries the real
+    // SQLSTATEs into the wave report.
+    console.log(`composite set-null cascade: draft=${asDraft} issued=${asIssued}`);
+    expect(asDraft).not.toBeNull();
+    expect(asIssued).not.toBeNull();
+
+    // THE MECHANISM, from the catalogue rather than from the behaviour: both
+    // constraints are SET NULL (confdeltype = 'n') over TWO columns, and one of
+    // the two is org_id.
+    const fks = await raw.query<{ conname: string; ncols: number; cols: string[] }>(
+      `select c.conname,
+              array_length(c.conkey, 1) as ncols,
+              (select array_agg(a.attname order by a.attnum)
+                 from pg_attribute a
+                where a.attrelid = c.conrelid and a.attnum = any(c.conkey)) as cols
+         from pg_constraint c
+        where c.conrelid = 'public.boqs'::regclass
+          and c.contype = 'f'
+          and c.confdeltype = 'n'
+        order by c.conname`,
+    );
+    expect(fks.length).toBe(2);
+    for (const fk of fks) {
+      expect(Number(fk.ncols)).toBe(2);
+      expect(fk.cols).toContain('org_id');
+    }
   });
 });

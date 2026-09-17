@@ -494,6 +494,15 @@ columns is still MT100. Omit it and the trigger behaves exactly as it did before
 the argument existed. `trg_boqs_immutable` is the one trigger that passes it
 (`'engagement_id,source_file_id'`).
 
+> **Open defect, found by `boq-immutable.dbtest.ts` and unrelated to the
+> trigger.** `sameOrgFk(..., { onDelete: 'set null' })` emits a COMPOSITE
+> `(org_id, x_id) -> target(org_id, id)` foreign key, and Postgres's
+> `ON DELETE SET NULL` with no column list nulls **all** of the referencing
+> columns — `org_id` included, which is `not null` on every org-scoped table. So
+> deleting the parent of such a reference is refused today (23502), on eleven
+> FKs across the schema. The fix is `ON DELETE SET NULL (x_id)`, which is a
+> migration.
+
 Once a row's status is in the locked set, the trigger:
 - rejects `DELETE` with SQLSTATE **`MT100`**;
 - rejects any `UPDATE` except a transition to a whitelisted status where only

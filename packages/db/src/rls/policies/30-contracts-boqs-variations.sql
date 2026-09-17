@@ -201,10 +201,17 @@ create trigger trg_variation_order_lines_parent_draft
 --
 -- THE FOURTH ARGUMENT names the two columns the DATABASE nulls out by itself:
 -- boqs.engagement_id and boqs.source_file_id are both declared `on delete set
--- null` (schema/boqs.ts:79-82), so deleting a design engagement, or deleting the
--- imported spreadsheet through documents/core.ts or storage.ts, makes Postgres
--- UPDATE the BOQ row. Without that argument the cascade would raise MT100 and
--- abort a delete that has nothing to do with immutability.
+-- null` (schema/boqs.ts:79-82), so Postgres's referential action UPDATES the BOQ
+-- row and without that argument it would raise MT100 on a delete that has
+-- nothing to do with immutability.
+--
+-- SEPARATE, PRE-EXISTING DEFECT, measured by tests/actions/boq-immutable.dbtest.ts
+-- and NOT caused by this trigger: both FKs are COMPOSITE, (org_id, x_id) ->
+-- target(org_id, id), and `ON DELETE SET NULL` with no column list nulls ALL the
+-- referencing columns - org_id included, which is `not null`. So the parent
+-- delete is refused today regardless. Narrowing those FKs to
+-- `ON DELETE SET NULL (x_id)` is a migration and is out of scope here; this
+-- argument is what the cascade will need the moment that lands.
 --
 -- draft -> issued is UNAFFECTED: boqs/issue.ts updates `where status = 'draft'`,
 -- so at BEFORE UPDATE the OLD row is still draft and the not-locked branch
