@@ -498,5 +498,9 @@ Prefer `sameOrgRef` / `sameOrgFk` (`packages/db/src/schema/org-ref.ts`) for
 child→parent references within an org. The composite FK `(org_id, <name>_id) ->
 target(org_id, id)` makes a cross-org reference impossible at the database
 (requires the target's universal `unique(org_id, id)`), and ships an
-`(org_id, <name>_id)` index. The older `enforce_same_org()` trigger is deprecated
+`(org_id, <name>_id)` index — unless the table passes `{ index: false }`, which
+means "this table already declares a WIDER index under the exact name this helper
+would generate". That option exists because a duplicated index name makes
+`drizzle-kit generate` abort before writing anything; it is not a way to skip an
+index that should exist. The older `enforce_same_org()` trigger is deprecated
 for hot paths (kept only for non-composite / cross-schema targets).
