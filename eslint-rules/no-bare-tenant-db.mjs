@@ -39,12 +39,29 @@
 // org-scoped read written in this codebase. `.query` propagates raw-ness through
 // every property access after it (isRelationalPath), and `findFirst`/`findMany`
 // are query methods.
+// BINDING `.query` TO A NAME IS REPORTED AT THE BINDING. `isRelationalPath`
+// walks LEFT through an UNBROKEN member chain, so any hop through an identifier
+// ended the walk and `const q = db.query; q.clients.findMany()` linted clean —
+// as did `const { query } = db` and `const { query: qq } = db`. All three were
+// measured silent. The third is what a developer actually writes to shorten a
+// line, so it is not an evasion, it is the mistake. Following the alias would
+// mean tracking a fourth classification through the whole resolver; reporting
+// the DECLARATOR is one visitor, cannot miss a later use, and points at the
+// line that needs changing. Only when the source is a raw handle: the same
+// binding off a `tx` from withOrgContext is the sanctioned shape and is silent.
 // KNOWN LIMITS (deliberate): raw-ness does not survive a return from a local
 // helper, nor a LATER re-assignment (`let q; q = db;` - only a declarator's own
 // initialiser is followed); a COMPUTED key that is not a literal or
 // an interpolation-free template (`conn[key]`, `getDb()[method]()`) cannot be
-// resolved statically at all. Four more are RuleTester-proven and left open on
-// purpose — `Reflect.get(conn, 'sql')`, `Object.values(getRequestConnection())[1]`,
+// resolved statically at all. THREE MORE INITIALISER SHAPES resolve to 'unknown'
+// and are therefore silent, all three RuleTester-pinned below so the list stays
+// honest rather than aspirational: a nullish coalesce (`const q = tx ?? db`,
+// a realistic idiom for this codebase's shape), a ternary
+// (`const q = cond ? tx : db`) and a DEFAULT PARAMETER
+// (`function f(x = getDb()) { x.select() }`). Each is a shape where the value
+// depends on something the syntax does not decide. Four more are RuleTester-proven
+// and left open on purpose — `Reflect.get(conn, 'sql')`,
+// `Object.values(getRequestConnection())[1]`,
 // a class FIELD holding the handle, an array destructure of a connection: this
 // rule reads syntax, and a value that has been through a reflective read or an
 // index is no longer syntax. Each takes deliberate effort to write — not the
@@ -324,6 +341,8 @@ export const noBareTenantDb = {
       // exist.
       bareTaggedSqlQuery:
         'A tagged-template query on the raw request/base connection runs as the BYPASSRLS login role and can read/write across every tenant. Wrap org-scoped access in withOrgContext()/withUserContext(). If this is a sanctioned base-connection use (public token SDF, api-key resolver, automation system read), allowlist the file in eslint-rules/no-bare-tenant-db.mjs.',
+      boundRelationalQuery:
+        "Binding drizzle's relational api off the raw request/base connection (`const q = db.query`, `const { query } = db`) hands a name to the BYPASSRLS socket, and every `q.<table>.findMany()` after it reads across every tenant with no row-level-security backstop. Reported here at the binding because the alias is where it is still one line to fix. Wrap org-scoped access in withOrgContext()/withUserContext() and bind off the `tx` it gives you.",
       rawHandleArgument:
         '`{{helper}}()` is given the raw request/base connection. Its where clause carries no org predicate on purpose — the RLS transaction is the tenancy boundary — so on the BYPASSRLS handle it resolves an id belonging to ANY tenant. Pass the `tx` from withOrgContext()/withUserContext().',
       sdfCallerNotAllowlisted:
@@ -623,8 +642,39 @@ export const noBareTenantDb = {
       return result;
     }
 
+    /** The `query` property this object pattern binds, or null. */
+    function boundQueryProperty(pattern) {
+      if (!pattern || pattern.type !== 'ObjectPattern') return null;
+      return (
+        pattern.properties.find(
+          (property) =>
+            property.type === 'Property' &&
+            staticKeyName(property.computed, property.key) === 'query',
+        ) ?? null
+      );
+    }
+
     return {
       ...sdfCallerVisitors,
+      // `const q = db.query` / `const { query } = db` / `const { query: qq } = db`.
+      // Reported at the BINDING: `isRelationalPath` walks an unbroken member
+      // chain, so every one of these ended the walk and linted clean, and the
+      // alias is where it is still one line to fix.
+      VariableDeclarator(node) {
+        const init = unwrapAwait(node.init);
+        if (!init) return;
+        if (init.type === 'MemberExpression') {
+          const key = staticKeyName(init.computed, init.property);
+          if (key === 'query' && isRawExpr(init.object)) {
+            context.report({ node: node.id, messageId: 'boundRelationalQuery' });
+          }
+          return;
+        }
+        const bound = boundQueryProperty(node.id);
+        if (bound && isRawExpr(init)) {
+          context.report({ node: bound.value, messageId: 'boundRelationalQuery' });
+        }
+      },
       // `` sql`select …` `` on the raw postgres.js handle — no method call to
       // catch, so the tagged template is its own visitor.
       TaggedTemplateExpression(node) {

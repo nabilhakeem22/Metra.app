@@ -81,6 +81,40 @@ it('no-bare-tenant-db: flags raw-connection queries, allows scoped ones', () => 
         filename: 'apps/web/src/lib/clients/queries.ts',
         code: 'function f(tx) { return tx.query.clients.findMany(); }',
       },
+      // F3/S6: binding `.query` off a SCOPED handle is the sanctioned shape and
+      // stays silent. The new report fires on the RAW handle only.
+      {
+        filename: 'apps/web/src/lib/clients/queries.ts',
+        code: 'function f(tx) { const q = tx.query; return q.clients.findMany(); }',
+      },
+      {
+        filename: 'apps/web/src/lib/clients/queries.ts',
+        code: 'function f(tx) { const { query } = tx; return query.clients.findMany(); }',
+      },
+      // ...and `query` destructured off something this rule cannot classify is
+      // never invented into a report: failing closed here means 'unknown', not
+      // 'raw'.
+      {
+        filename: 'apps/web/src/lib/clients/queries.ts',
+        code: 'const { query } = buildSomething(); query.clients.findMany();',
+      },
+      // THE THREE INITIALISER SHAPES NAMED IN KNOWN LIMITS, pinned as valid so
+      // the documented list stays a measured fact rather than an aspiration.
+      // Each is a shape where the value depends on something the syntax does not
+      // decide, and each is SILENT today. If a future change starts reporting
+      // one of them, this case fails and the comment gets corrected with it.
+      {
+        filename: 'apps/web/src/lib/clients/queries.ts',
+        code: 'withRequestDb((h) => { const q = h ?? h; return q.select().from(clients); });',
+      },
+      {
+        filename: 'apps/web/src/lib/clients/queries.ts',
+        code: 'withRequestDb((h) => { const q = true ? h : h; return q.select().from(clients); });',
+      },
+      {
+        filename: 'apps/web/src/lib/clients/queries.ts',
+        code: 'function f(x = getDb()) { return x.select().from(clients); }',
+      },
       // O6a, the cycle guard, asserted so a future change to the alias hop
       // cannot turn it into a stack overflow: `let a = b; let b = a;` resolves
       // to 'unknown' and reports NOTHING.
@@ -330,6 +364,53 @@ it('no-bare-tenant-db: flags raw-connection queries, allows scoped ones', () => 
         filename: 'apps/web/src/lib/clients/queries.ts',
         code: 'await db.query.clients.findFirst({ where: eq(clients.id, id) });',
         errors: [{ messageId: 'bareQuery' }],
+      },
+      // F3/S6: the three shapes that were SILENT. `isRelationalPath` walks an
+      // unbroken member chain, so binding `.query` to a name ended the walk and
+      // every one of these linted clean — including `const q = db.query`, which
+      // is what a developer writes to shorten a line rather than to evade a
+      // rule. Reported at the BINDING: one report, on the line that needs
+      // changing, and it cannot miss a later use.
+      {
+        filename: 'apps/web/src/lib/clients/queries.ts',
+        code: 'withRequestDb((db) => { const q = db.query; return q.clients.findMany(); });',
+        errors: [{ messageId: 'boundRelationalQuery' }],
+      },
+      {
+        filename: 'apps/web/src/lib/clients/queries.ts',
+        code: 'withRequestDb((db) => { const { query } = db; return query.clients.findMany(); });',
+        errors: [{ messageId: 'boundRelationalQuery' }],
+      },
+      {
+        filename: 'apps/web/src/lib/clients/queries.ts',
+        code: 'withRequestDb((db) => { const { query: qq } = db; return qq.clients.findMany(); });',
+        errors: [{ messageId: 'boundRelationalQuery' }],
+      },
+      // The handle reached by a PROPERTY of a connection object, then bound:
+      // the binding report uses the same isRawExpr as everything else, so it
+      // inherits every way the raw handle is recognised.
+      {
+        filename: 'apps/web/src/lib/clients/queries.ts',
+        code: "const conn = getRequestConnection(); const q = conn.db.query; q.clients.findMany();",
+        errors: [{ messageId: 'boundRelationalQuery' }],
+      },
+      // `db['query']` is the same read as `db.query`, and only the punctuation
+      // differs — staticKeyName resolves both.
+      {
+        filename: 'apps/web/src/lib/clients/queries.ts',
+        code: "const q = db['query']; q.clients.findMany();",
+        errors: [{ messageId: 'boundRelationalQuery' }],
+      },
+      // `const { query } = db` ALREADY classified the binding as raw (that is
+      // why `query.findMany()` was caught while `query.clients.findMany()` was
+      // not), so this shape now reports TWICE: once at the binding, once at the
+      // call. Pinned rather than smoothed over — the second report is the
+      // pre-existing one and suppressing it would be a behaviour change nobody
+      // asked for.
+      {
+        filename: 'apps/web/src/lib/clients/queries.ts',
+        code: 'withRequestDb((db) => { const { query } = db; return query.findMany(); });',
+        errors: [{ messageId: 'boundRelationalQuery' }, { messageId: 'bareQuery' }],
       },
       // S1: THE SECOND FENCE. Concentrating nine allowlisted files into one moved
       // the exemption but not the enforcement — a security review wrote this exact
