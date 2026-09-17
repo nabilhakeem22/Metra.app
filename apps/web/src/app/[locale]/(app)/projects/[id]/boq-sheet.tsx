@@ -18,6 +18,13 @@ import type { BoqDetail, BoqLineRow } from '@/lib/boqs/queries';
 import { resolveActionError } from '@/lib/actions/error-message';
 import { formatMoney } from '@/lib/format/money';
 import { formatQuantity } from '@/lib/format/number';
+import {
+  recordValue,
+  trimNumber,
+  type Column,
+  type EditableLine,
+} from './boq-sheet-columns';
+import { focusNextInColumn } from './boq-sheet-focus';
 
 /**
  * The BOQ as one sheet.
@@ -39,17 +46,6 @@ import { formatQuantity } from '@/lib/format/number';
  * SAVE IS PER LINE, ON BLUR. Not per keystroke — a half-typed rate ("15" on the
  * way to "1500") must never be written to a document a client will sign.
  */
-
-/** Trim a stored scale-4 figure to something worth typing over: 8.5000 -> 8.5 */
-function trimNumber(v: string): string {
-  if (!v.includes('.')) return v;
-  const t = v.replace(/0+$/, '').replace(/\.$/, '');
-  return t === '' || t === '-' ? '0' : t;
-}
-
-interface EditableLine extends BoqLineRow {
-  sectionId: string;
-}
 
 export function BoqSheet({
   boq,
@@ -101,20 +97,7 @@ export function BoqSheet({
 
   /** What a cell should show: the local edit if there is one, else the record. */
   function cellValue(line: EditableLine, col: Column): string {
-    const edit = edits[line.id]?.[col];
-    if (edit !== undefined) return edit;
-    switch (col) {
-      case 'itemCode':
-        return line.itemCode ?? '';
-      case 'description':
-        return line.description;
-      case 'qty':
-        return trimNumber(line.qty);
-      case 'unitPrice':
-        return trimNumber(line.unitPrice);
-      case 'unit':
-        return line.unit;
-    }
+    return edits[line.id]?.[col] ?? recordValue(line, col);
   }
 
   /**
@@ -179,7 +162,7 @@ export function BoqSheet({
   function onCellBlur(line: EditableLine, col: Column): void {
     const typed = edits[line.id]?.[col];
     if (typed === undefined) return;
-    if (typed === cellValueFromRecord(line, col)) {
+    if (typed === recordValue(line, col)) {
       // Focused, changed nothing (or typed it back). No write.
       setEdits((prev) => {
         const row = { ...(prev[line.id] ?? {}) };
@@ -216,14 +199,7 @@ export function BoqSheet({
     }
     if (e.key !== 'Enter') return;
     e.preventDefault();
-    const cells = gridRef.current?.querySelectorAll<HTMLElement>(
-      `[data-col="${col}"]`,
-    );
-    if (!cells) return;
-    const list = [...cells];
-    const here = list.indexOf(e.currentTarget);
-    const next = list[here + 1];
-    next?.focus();
+    focusNextInColumn(gridRef.current, col, e.currentTarget);
   }
 
   function toggleSection(id: string): void {
@@ -664,23 +640,6 @@ export function BoqSheet({
       )}
     </div>
   );
-}
-
-type Column = 'itemCode' | 'description' | 'unit' | 'qty' | 'unitPrice';
-
-function cellValueFromRecord(line: EditableLine, col: Column): string {
-  switch (col) {
-    case 'itemCode':
-      return line.itemCode ?? '';
-    case 'description':
-      return line.description;
-    case 'qty':
-      return trimNumber(line.qty);
-    case 'unitPrice':
-      return trimNumber(line.unitPrice);
-    case 'unit':
-      return line.unit;
-  }
 }
 
 function Th({
