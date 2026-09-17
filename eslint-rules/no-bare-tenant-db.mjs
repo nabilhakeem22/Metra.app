@@ -33,6 +33,12 @@
 // NEITHER RENAMING NOR DOTTING HIDES IT: the handle is known by the PROPERTY it
 // came from, not the local name, and the connection object is tracked too — so
 // `{ sql: raw }`, `conn.sql`, `conn['sql']` and `getRequestConnection().sql` count.
+// DRIZZLE'S RELATIONAL API COUNTS TOO. `db.query.clients.findMany()` reads the
+// same rows on the same BYPASSRLS socket as `db.select().from(clients)`, and it
+// is drizzle's DOCUMENTED read surface — the most likely shape of the next
+// org-scoped read written in this codebase. `.query` propagates raw-ness through
+// every property access after it (isRelationalPath), and `findFirst`/`findMany`
+// are query methods.
 // KNOWN LIMITS (deliberate): raw-ness does not survive a return from a local
 // helper, nor a LATER re-assignment (`let q; q = db;` - only a declarator's own
 // initialiser is followed); a COMPUTED key that is not a literal or
@@ -161,6 +167,12 @@ const QUERY_METHODS = new Set([
   'delete',
   'execute',
   'unsafe',
+  // Drizzle's RELATIONAL query api: `db.query.<table>.findMany()`. It is
+  // drizzle's documented read surface and the most likely shape of the next
+  // org-scoped read in this codebase, and it was completely outside the rule -
+  // both the method names and the `.query` hop. See isRelationalPath.
+  'findFirst',
+  'findMany',
 ]);
 
 /** Builder methods that return the SAME un-scoped connection: `db.with(cte)
@@ -424,6 +436,23 @@ export const noBareTenantDb = {
       return null;
     }
 
+    /**
+     * Drizzle's relational read path: `<raw>.query.<table>` and anything dotted
+     * off it. `.query` is the hop that matters - once the receiver of `.query`
+     * is raw, every further property access is still the same un-scoped
+     * connection, so `db.query.clients.findMany()` is a bare `db.select()`
+     * wearing drizzle's relational api. The recursion walks LEFT to the `.query`
+     * hop and classifies its object; a computed key that cannot be resolved
+     * statically stops it, exactly as it stops the rest of this rule.
+     */
+    function isRelationalPath(node) {
+      if (!node || node.type !== 'MemberExpression') return false;
+      const key = staticKeyName(node.computed, node.property);
+      if (key === null) return false;
+      if (key === 'query') return isRawExpr(node.object);
+      return isRelationalPath(node.object);
+    }
+
     // Is this expression node the raw connection? (Identifier resolved to a raw
     // binding, a `getDb()` call, or ANY handle key read off a connection object —
     // `getRequestConnection().sql`, `conn.pg`, `conn['sql']`.)
@@ -439,12 +468,18 @@ export const noBareTenantDb = {
         // `.sql`/`.pg` are the SAME socket as `.db`: dotting the connection object
         // instead of destructuring it changes nothing.
         const key = staticKeyName(node.computed, node.property);
-        if (key === null || !RAW_HANDLE_KEYS.has(key)) return false;
-        const object = unwrapAwait(node.object);
-        if (rawFactoryName(object)) return true;
-        return (
-          object.type === 'Identifier' && classifyIdentifier(object) === 'connection'
-        );
+        if (key !== null && RAW_HANDLE_KEYS.has(key)) {
+          const object = unwrapAwait(node.object);
+          if (rawFactoryName(object)) return true;
+          if (
+            object.type === 'Identifier' &&
+            classifyIdentifier(object) === 'connection'
+          ) {
+            return true;
+          }
+        }
+        // Checked AFTER the handle keys, so nothing already classified changes.
+        return isRelationalPath(node);
       }
       // `<raw>.with(cte)` returns the raw connection's own builder, so whatever
       // is queried on the result is queried on the raw connection.

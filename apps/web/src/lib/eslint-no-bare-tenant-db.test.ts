@@ -72,6 +72,15 @@ it('no-bare-tenant-db: flags raw-connection queries, allows scoped ones', () => 
         filename: 'apps/web/src/lib/clients/queries.ts',
         code: 'function f(tx) { const q = tx; return q.select().from(clients); }',
       },
+      // O6b: the relational api on an RLS-SCOPED handle is the sanctioned
+      // shape and must stay silent. (A handle literally named `db` is raw by
+      // this rule's name convention whatever its binding - that convention is
+      // deliberate and predates this change - so the scoped case is written the
+      // way the codebase writes it, as `tx`.)
+      {
+        filename: 'apps/web/src/lib/clients/queries.ts',
+        code: 'function f(tx) { return tx.query.clients.findMany(); }',
+      },
       // O6a, the cycle guard, asserted so a future change to the alias hop
       // cannot turn it into a stack overflow: `let a = b; let b = a;` resolves
       // to 'unknown' and reports NOTHING.
@@ -306,6 +315,20 @@ it('no-bare-tenant-db: flags raw-connection queries, allows scoped ones', () => 
       {
         filename: 'apps/web/src/lib/clients/queries.ts',
         code: 'const { db } = getRequestConnection(); const q = db; await q.execute(stmt);',
+        errors: [{ messageId: 'bareQuery' }],
+      },
+      // O6b: drizzle's RELATIONAL api. `db.query.clients.findMany()` is the
+      // documented read surface and the most likely shape of the next
+      // org-scoped read; QUERY_METHODS listed neither method and isRawExpr did
+      // not follow the `.query` hop, so both linted clean.
+      {
+        filename: 'apps/web/src/lib/clients/queries.ts',
+        code: 'await db.query.clients.findMany();',
+        errors: [{ messageId: 'bareQuery' }],
+      },
+      {
+        filename: 'apps/web/src/lib/clients/queries.ts',
+        code: 'await db.query.clients.findFirst({ where: eq(clients.id, id) });',
         errors: [{ messageId: 'bareQuery' }],
       },
       // S1: THE SECOND FENCE. Concentrating nine allowlisted files into one moved
