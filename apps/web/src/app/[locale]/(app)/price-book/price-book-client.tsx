@@ -1,26 +1,19 @@
 'use client';
 
-import { BookText, Loader2, Upload } from 'lucide-react';
-import { useLocale, useTranslations } from 'next-intl';
-import { useMemo, useState, useTransition } from 'react';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
-import { EmptyState } from '@/components/ui/empty-state';
-import { toast } from '@/hooks/use-toast';
-import { useRouter } from '@/i18n/routing';
-import { resolveActionError } from '@/lib/actions/error-message';
-import type { ActionCode } from '@/lib/actions/result';
-import {
-  loadStarterCatalogue,
-  setCostItemActive,
-} from '@/lib/price-book/actions';
-import { addSection } from '@/lib/sections/actions';
+import { useMemo, useState } from 'react';
 import { BulkUpdateDialog } from './bulk-update-dialog';
 import { CostItemForm } from './cost-item-form';
 import { ImportWizard } from './import-wizard';
+import { PriceBookEmpty } from './price-book-empty';
+import {
+  filterCostItems,
+  groupBySection,
+  type PriceBookFilter,
+} from './price-book-filters';
 import { PriceBookTable } from './price-book-table';
 import { PriceBookToolbar } from './price-book-toolbar';
 import type { PriceBookItem, SectionOption } from './types';
+import { usePriceBookActions } from './use-price-book-actions';
 
 export interface PriceBookClientProps {
   items: PriceBookItem[];
@@ -28,111 +21,25 @@ export interface PriceBookClientProps {
   canManage: boolean;
 }
 
-export function PriceBookClient({
-  items,
-  sections,
-  canManage,
-}: PriceBookClientProps) {
-  const t = useTranslations('priceBook');
-  const te = useTranslations('errors');
-  const locale = useLocale();
-  const router = useRouter();
+/** Everything visible by default: the book is a catalogue, not a filtered view. */
+const NO_FILTER: PriceBookFilter = { query: '', sectionId: 'all', activeOnly: false };
 
-  const [q, setQ] = useState('');
-  const [sectionFilter, setSectionFilter] = useState<string>('all');
-  const [activeOnly, setActiveOnly] = useState(false);
+export function PriceBookClient({ items, sections, canManage }: PriceBookClientProps) {
+  const [filter, setFilter] = useState<PriceBookFilter>(NO_FILTER);
   const [newSection, setNewSection] = useState('');
-
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<PriceBookItem | null>(null);
   const [bulkOpen, setBulkOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
-  const [pending, startTransition] = useTransition();
+  const actions = usePriceBookActions();
 
-  const filtered = useMemo(() => {
-    const needle = q.trim().toLowerCase();
-    return items.filter((i) => {
-      if (sectionFilter !== 'all' && i.sectionId !== sectionFilter) return false;
-      if (activeOnly && !i.active) return false;
-      if (needle) {
-        const hay = `${i.code} ${i.nameEn ?? ''} ${i.nameAr ?? ''}`.toLowerCase();
-        if (!hay.includes(needle)) return false;
-      }
-      return true;
-    });
-  }, [items, q, sectionFilter, activeOnly]);
+  const groups = useMemo(
+    () => groupBySection(filterCostItems(items, filter), sections),
+    [items, filter, sections],
+  );
 
-  const grouped = useMemo(() => {
-    return sections
-      .map((s) => ({
-        section: s,
-        rows: filtered.filter((i) => i.sectionId === s.id),
-      }))
-      .filter((g) => g.rows.length > 0);
-  }, [filtered, sections]);
-
-  function onAddSection() {
-    const name = newSection.trim();
-    if (!name) return;
-    startTransition(async () => {
-      const res = await addSection(
-        locale.startsWith('ar') ? { nameAr: name } : { nameEn: name },
-      );
-      if (res.ok) {
-        setNewSection('');
-        toast({ title: t('toast.sectionAdded') });
-        router.refresh();
-      } else {
-        toast({
-          title: resolveActionError(res.error as ActionCode, te),
-          variant: 'destructive',
-        });
-      }
-    });
-  }
-
-  function openNew() {
-    setEditing(null);
-    setFormOpen(true);
-  }
-  function openEdit(item: PriceBookItem) {
-    setEditing(item);
-    setFormOpen(true);
-  }
-
-  function toggleActive(item: PriceBookItem) {
-    startTransition(async () => {
-      const res = await setCostItemActive(item.id, !item.active);
-      toast(
-        res.ok
-          ? { title: t(item.active ? 'toast.deactivated' : 'toast.activated') }
-          : {
-              title: resolveActionError(res.error as ActionCode, te),
-              variant: 'destructive',
-            },
-      );
-    });
-  }
-
-  function onLoadStarter() {
-    startTransition(async () => {
-      const res = await loadStarterCatalogue();
-      if (res.ok) {
-        toast({
-          title:
-            (res.data?.inserted ?? 0) > 0
-              ? t('toast.starterLoaded', { count: res.data?.inserted ?? 0 })
-              : t('toast.starterExists'),
-        });
-      } else {
-        toast({
-          title: resolveActionError(res.error as ActionCode, te),
-          variant: 'destructive',
-        });
-      }
-    });
-  }
-
+  // The four dialogs stay CHILDREN of this component: each is a Radix portal
+  // whose open state belongs to the page, not to the toolbar button that opens it.
   const dialogs = canManage && (
     <>
       <CostItemForm
@@ -141,15 +48,11 @@ export function PriceBookClient({
         item={editing}
         sections={sections}
       />
-      <BulkUpdateDialog
-        open={bulkOpen}
-        onOpenChange={setBulkOpen}
-        sections={sections}
-      />
+      <BulkUpdateDialog open={bulkOpen} onOpenChange={setBulkOpen} sections={sections} />
       <ImportWizard
         open={importOpen}
         onOpenChange={setImportOpen}
-        existingCodes={items.map((i) => i.code)}
+        existingCodes={items.map((item) => item.code)}
         sections={sections}
       />
     </>
@@ -159,34 +62,12 @@ export function PriceBookClient({
     return (
       <>
         {dialogs}
-        <Card>
-          <CardContent className="py-4">
-            <EmptyState
-              icon={<BookText className="size-6" aria-hidden />}
-              title={t('empty.title')}
-              description={t('empty.description')}
-              action={
-                canManage ? (
-                  <div className="flex flex-wrap justify-center gap-2">
-                    <Button data-tour="price-book-new" onClick={onLoadStarter} disabled={pending}>
-                      {pending && (
-                        <Loader2 className="size-4 animate-spin" aria-hidden />
-                      )}
-                      {t('empty.loadStarter')}
-                    </Button>
-                    <Button
-                      variant="outline"
-                      onClick={() => setImportOpen(true)}
-                    >
-                      <Upload className="size-4" aria-hidden />
-                      {t('empty.importExcel')}
-                    </Button>
-                  </div>
-                ) : undefined
-              }
-            />
-          </CardContent>
-        </Card>
+        <PriceBookEmpty
+          canManage={canManage}
+          pending={actions.pending}
+          onLoadStarter={actions.loadStarter}
+          onImport={() => setImportOpen(true)}
+        />
       </>
     );
   }
@@ -196,29 +77,35 @@ export function PriceBookClient({
       {dialogs}
 
       <PriceBookToolbar
-        q={q}
-        onQChange={setQ}
-        sectionFilter={sectionFilter}
-        onSectionFilterChange={setSectionFilter}
-        activeOnly={activeOnly}
-        onActiveOnlyChange={setActiveOnly}
+        q={filter.query}
+        onQChange={(query) => setFilter({ ...filter, query })}
+        sectionFilter={filter.sectionId}
+        onSectionFilterChange={(sectionId) => setFilter({ ...filter, sectionId })}
+        activeOnly={filter.activeOnly}
+        onActiveOnlyChange={(activeOnly) => setFilter({ ...filter, activeOnly })}
         sections={sections}
         canManage={canManage}
         newSection={newSection}
         onNewSectionChange={setNewSection}
-        onAddSection={onAddSection}
-        pending={pending}
+        onAddSection={() => actions.addNewSection(newSection, () => setNewSection(''))}
+        pending={actions.pending}
         onBulkUpdate={() => setBulkOpen(true)}
         onImport={() => setImportOpen(true)}
-        onNew={openNew}
+        onNew={() => {
+          setEditing(null);
+          setFormOpen(true);
+        }}
       />
 
       <PriceBookTable
-        groups={grouped}
+        groups={groups}
         canManage={canManage}
-        pending={pending}
-        onEdit={openEdit}
-        onToggleActive={toggleActive}
+        pending={actions.pending}
+        onEdit={(item) => {
+          setEditing(item);
+          setFormOpen(true);
+        }}
+        onToggleActive={actions.toggleActive}
       />
     </div>
   );
