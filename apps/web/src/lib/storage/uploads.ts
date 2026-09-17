@@ -1,11 +1,56 @@
 import 'server-only';
+// Registering a file row and getting its bytes into the bucket. Two entry points:
+// a signed URL for a browser PUT, and a direct upload for bytes the server
+// generated itself. Split from the old 248-line lib/storage.ts (W3-10).
 import { randomUUID } from 'node:crypto';
 import { files } from '@metra/db';
 import { eq } from 'drizzle-orm';
 import { withOrgContext, type OrgContext } from '@/lib/db/context';
 import { createSupabaseAdminClient } from '@/lib/supabase/admin';
+import { FILES_BUCKET } from './bucket';
 
-const FILES_BUCKET = 'metra-files';
+/**
+ * Register the `files` metadata row for a new object, UNDER ORG RLS.
+ *
+ * The row is written before any byte reaches the bucket, so an upload can never
+ * leave an object in storage that nothing in the database points at. The object
+ * key is always `{org_id}/{entity}/{uuid}`, which keys storage to the org path
+ * prefix — it is derived here, with the row, rather than by each caller.
+ */
+async function registerFileRow(
+  ctx: OrgContext,
+  entity: string,
+  row: {
+    originalName?: string | null;
+    contentType?: string | null;
+    entityId?: string | null;
+    categoryId?: string | null;
+  },
+): Promise<{ fileId: string; objectKey: string }> {
+  const fileId = randomUUID();
+  const objectKey = `${ctx.orgId}/${entity}/${fileId}`;
+  await withOrgContext(ctx, (tx) =>
+    tx.insert(files).values({
+      id: fileId,
+      orgId: ctx.orgId,
+      entity,
+      entityId: row.entityId ?? null,
+      categoryId: row.categoryId ?? null,
+      bucket: FILES_BUCKET,
+      objectKey,
+      originalName: row.originalName ?? null,
+      contentType: row.contentType ?? null,
+      createdBy: ctx.userId,
+    }),
+  );
+  return { fileId, objectKey };
+}
+
+/** Drop a row whose bytes never arrived: a files row with no object behind it is
+ *  a download that 404s later rather than an error now. */
+async function unregisterFileRow(ctx: OrgContext, fileId: string): Promise<void> {
+  await withOrgContext(ctx, (tx) => tx.delete(files).where(eq(files.id, fileId)));
+}
 
 export interface SignedUpload {
   fileId: string;
@@ -31,23 +76,7 @@ export async function createSignedUploadUrl(
     categoryId?: string | null;
   },
 ): Promise<SignedUpload> {
-  const fileId = randomUUID();
-  const objectKey = `${ctx.orgId}/${entity}/${fileId}`;
-
-  await withOrgContext(ctx, (tx) =>
-    tx.insert(files).values({
-      id: fileId,
-      orgId: ctx.orgId,
-      entity,
-      entityId: opts?.entityId ?? null,
-      categoryId: opts?.categoryId ?? null,
-      bucket: FILES_BUCKET,
-      objectKey,
-      originalName: opts?.originalName ?? null,
-      contentType: opts?.contentType ?? null,
-      createdBy: ctx.userId,
-    }),
-  );
+  const { fileId, objectKey } = await registerFileRow(ctx, entity, opts ?? {});
 
   const supabase = createSupabaseAdminClient();
   const { data, error } = await supabase.storage
@@ -86,23 +115,7 @@ export async function storeGeneratedFile(
     categoryId?: string | null;
   },
 ): Promise<{ fileId: string; objectKey: string }> {
-  const fileId = randomUUID();
-  const objectKey = `${ctx.orgId}/${entity}/${fileId}`;
-
-  await withOrgContext(ctx, (tx) =>
-    tx.insert(files).values({
-      id: fileId,
-      orgId: ctx.orgId,
-      entity,
-      entityId: opts.entityId ?? null,
-      categoryId: opts.categoryId ?? null,
-      bucket: FILES_BUCKET,
-      objectKey,
-      originalName: opts.originalName,
-      contentType: opts.contentType,
-      createdBy: ctx.userId,
-    }),
-  );
+  const { fileId, objectKey } = await registerFileRow(ctx, entity, opts);
 
   const supabase = createSupabaseAdminClient();
   const { error } = await supabase.storage
@@ -113,136 +126,9 @@ export async function storeGeneratedFile(
     });
 
   if (error) {
-    await withOrgContext(ctx, (tx) =>
-      tx.delete(files).where(eq(files.id, fileId)),
-    );
+    await unregisterFileRow(ctx, fileId);
     throw error;
   }
 
   return { fileId, objectKey };
-}
-
-/**
- * Signs an ALREADY-AUTHORIZED storage object. This is the low-level primitive: it
- * performs NO authorization of its own, so every caller must have proven the
- * object belongs to whoever is asking BEFORE calling it — `getSignedUrl` below
- * proves it with an RLS-scoped lookup, the client portal's download route proves it
- * with the share-token SDF (which is why that path cannot use `getSignedUrl`: it
- * has no session and therefore no OrgContext). `download` sets the filename the
- * browser saves as (Content-Disposition attachment). Throws on a Storage error.
- */
-export async function createSignedObjectUrl(
-  bucket: string,
-  objectKey: string,
-  ttlSeconds: number,
-  opts?: {
-    download?: string;
-    /** Storage-side image transform. Used by the client portal to serve a
-     *  DOWNSCALED rendition of an approved render while payments are outstanding,
-     *  so the full-resolution deliverable never leaves the bucket. Ignored by
-     *  Storage for non-image objects, which is why the caller must not rely on it
-     *  alone for a non-image file. */
-    transform?: {
-      width?: number;
-      height?: number;
-      resize?: 'cover' | 'contain' | 'fill';
-      quality?: number;
-    };
-  },
-): Promise<string> {
-  const supabase = createSupabaseAdminClient();
-  const { data, error } = await supabase.storage
-    .from(bucket)
-    .createSignedUrl(objectKey, ttlSeconds, opts);
-  if (error) throw error;
-  return data.signedUrl;
-}
-
-/**
- * Returns a time-limited signed download URL for a file, but ONLY if the file
- * belongs to the caller's org — the lookup runs under RLS, so an org-B context
- * cannot resolve (and therefore cannot sign) an org-A file.
- *
- * `download` is the name the browser saves as, and passing it is what makes
- * Storage answer `Content-Disposition: attachment` instead of serving the bytes
- * inline on the Supabase project origin. Build it with
- * `lib/files/safe-name.ts safeDownloadName` — never from a raw stored filename.
- */
-export async function getSignedUrl(
-  ctx: OrgContext,
-  fileId: string,
-  opts: { ttlSeconds?: number; download?: string } = {},
-): Promise<string> {
-  const rows = await withOrgContext(ctx, (tx) =>
-    tx
-      .select({ objectKey: files.objectKey, bucket: files.bucket })
-      .from(files)
-      .where(eq(files.id, fileId))
-      .limit(1),
-  );
-
-  if (rows.length === 0) {
-    throw new Error('File not found in this org');
-  }
-
-  return createSignedObjectUrl(rows[0].bucket, rows[0].objectKey, opts.ttlSeconds ?? 3600, {
-    download: opts.download,
-  });
-}
-
-/**
- * Delete one stored object.
- *
- * For AFTER the `files` row is gone and its transaction has committed, never
- * inside it: Storage is an HTTP dependency, and holding a Postgres transaction
- * open across a third party's outage is how a lock wait becomes an incident. The
- * caller therefore treats a failure as best-effort — a failed remove leaves the
- * orphan that deleting nothing at all used to leave every single time.
- *
- * Throws on a Storage error, so the caller decides what an orphan costs.
- */
-export async function removeStoredObject(
-  bucket: string,
-  objectKey: string,
-): Promise<void> {
-  const supabase = createSupabaseAdminClient();
-  const { error } = await supabase.storage.from(bucket).remove([objectKey]);
-  if (error) throw error;
-}
-
-/**
- * The in-flight or settled answer to "does the bucket exist", per isolate.
- *
- * Memoised on the PROMISE rather than a boolean so two uploads arriving together
- * share one round trip instead of racing two. A failure clears it, so a Storage
- * outage during the first upload does not poison every later one.
- */
-let filesBucketReady: Promise<void> | null = null;
-
-/**
- * Idempotently creates the private files bucket.
- *
- * Every document upload awaited this, and every call issued a `getBucket` HTTP
- * round trip — an upload cost three RLS transactions plus one Storage request
- * that exists only to ask a question whose answer never changes. The bucket is
- * created once in the lifetime of a deployment and cannot go back to not
- * existing, so the answer is cached for the life of the isolate.
- */
-export function ensureFilesBucket(): Promise<void> {
-  filesBucketReady ??= createFilesBucket().catch((error: unknown) => {
-    filesBucketReady = null;
-    throw error;
-  });
-  return filesBucketReady;
-}
-
-async function createFilesBucket(): Promise<void> {
-  const supabase = createSupabaseAdminClient();
-  const { data } = await supabase.storage.getBucket(FILES_BUCKET);
-  if (!data) {
-    const { error } = await supabase.storage.createBucket(FILES_BUCKET, {
-      public: false,
-    });
-    if (error && !/already exists/i.test(error.message)) throw error;
-  }
 }

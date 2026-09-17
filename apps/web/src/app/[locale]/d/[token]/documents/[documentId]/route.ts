@@ -5,7 +5,7 @@ import {
 } from '@/lib/engagements/document-access';
 import { getDeliveryDocumentByToken } from '@/lib/engagements/public-documents';
 import { LOCALES, routing } from '@/i18n/routing';
-import { createSignedObjectUrl } from '@/lib/storage/uploads';
+import { createSignedObjectUrl } from '@/lib/storage/signed-urls';
 import { isUuid } from '@/lib/uuid';
 
 // Client Deliverables, Step 1 — the session-less download endpoint for ONE released
