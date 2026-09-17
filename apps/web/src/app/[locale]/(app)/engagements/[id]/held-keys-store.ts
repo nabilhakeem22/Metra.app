@@ -1,8 +1,5 @@
-import {
-  isHeldKeyLive,
-  type HeldKey,
-  type HeldKeyTrigger,
-} from '@/lib/engagements/held-key';
+import type { HeldKeyTrigger } from '@/lib/engagements/held-act';
+import { isHeldKeyLive, type HeldKey } from '@/lib/engagements/held-key';
 import { isUuid } from '@/lib/uuid';
 
 /**

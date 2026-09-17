@@ -13,13 +13,9 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { recordPayment } from '@/lib/engagements/actions';
-import { PAYMENT_HELD_TRIGGER } from '@/lib/engagements/held-key';
+import { PAYMENT_HELD_TRIGGER, actFrom } from '@/lib/engagements/held-act';
 import { FormActions } from './engagement-form-actions';
 import type { RunAction } from './use-engagement-action';
-
-/** How much of a typed amount names the act. A money string the server accepts
- *  is under 20 characters; this only bounds what a paste can put in storage. */
-const MAX_ACT_AMOUNT_CHARS = 40;
 
 // Enum values declared locally (typed by the type-only @metra/db import) — a
 // client component must never import a runtime @metra/db value.
@@ -81,10 +77,8 @@ export function PaymentPanel({
         return res;
       },
       PAYMENT_HELD_TRIGGER,
-      // WHAT THIS ACT IS. Capped, because the field is free text and this string
-      // is mirrored to sessionStorage; every amount the server can accept is far
-      // shorter, so two inputs can only collide past the cap if both are refused.
-      `${payKind}|${amount.slice(0, MAX_ACT_AMOUNT_CHARS)}`,
+      // WHAT THIS ACT IS — every field this request carries. See actFrom.
+      actFrom({ kind: payKind, amount }),
     );
   }
 

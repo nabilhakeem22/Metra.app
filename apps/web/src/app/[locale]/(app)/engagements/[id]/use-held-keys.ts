@@ -1,12 +1,8 @@
 'use client';
 
 import { useRef, type RefObject } from 'react';
-import {
-  hasLanded,
-  keyForAttempt,
-  type HeldKey,
-  type HeldKeyTrigger,
-} from '@/lib/engagements/held-key';
+import type { HeldKeyTrigger } from '@/lib/engagements/held-act';
+import { hasLanded, keyForAttempt, type HeldKey } from '@/lib/engagements/held-key';
 import { readHeldKeys, writeHeldKeys } from './held-keys-store';
 
 /**

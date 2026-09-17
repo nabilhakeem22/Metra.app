@@ -1,13 +1,12 @@
 'use client';
 
-import type { ActionResult } from '@/lib/actions/result';
 import type { CommandCardView } from '@/lib/engagements/command-card';
 import type { CommandCardCtas } from '@/lib/engagements/command-card-ctas';
 import type { EngagementGatePreview } from '@/lib/engagements/gate-preview';
-import type { Trigger } from '@/lib/engagements/transitions';
 import { EngagementFeeForm } from './engagement-fee-form';
 import { EngagementOffPlanToggle } from './engagement-off-plan-toggle';
 import { PaymentForm } from './engagement-payment-form';
+import type { RunAction } from './use-engagement-action';
 
 // The three inputs the command card can open under its action row: the design-fee
 // form, the pay-and-advance form, and the off-plan toggle. Each is closed by
@@ -22,10 +21,7 @@ export interface CommandCardFormsProps {
   offPlan: { enabled: boolean; canSet: boolean };
   pending: boolean;
   handlers: {
-    runAction: (
-      fn: (idempotencyKey: string) => Promise<ActionResult>,
-      trigger?: Trigger,
-    ) => void;
+    runAction: RunAction;
     closeFee: () => void;
     closePay: () => void;
   };

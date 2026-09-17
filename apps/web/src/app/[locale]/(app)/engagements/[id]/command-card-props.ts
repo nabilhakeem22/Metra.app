@@ -1,10 +1,10 @@
 import type { BoqStepSummary } from '@/lib/boqs/step';
-import type { ActionResult } from '@/lib/actions/result';
 import type { EngagementGatePreview } from '@/lib/engagements/gate-preview';
 import type { EngagementClientActivityRecord } from '@/lib/engagements/queries/client-activity';
 import type { RevisionAllowances } from '@/lib/engagements/revision-allowance';
 import type { DesignState } from '@/lib/engagements/states';
 import type { Trigger } from '@/lib/engagements/transitions';
+import type { RunAction } from './use-engagement-action';
 
 /**
  * Everything the cockpit hands the command card, as ONE named contract.
@@ -43,11 +43,8 @@ export interface EngagementCommandCardProps {
   clientActivity: EngagementClientActivityRecord[];
   secondaryTriggers: Trigger[];
   pending: boolean;
-  /** Runs one server action with the page's per-attempt idempotency key
-   *  (0050). Ignore the argument on an edge that does not need one. */
-  runAction: (
-    fn: (idempotencyKey: string) => Promise<ActionResult>,
-    trigger?: Trigger,
-  ) => void;
+  /** Runs one server action with the idempotency key held for that act (0050).
+   *  Ignore the argument on an edge that does not need one. */
+  runAction: RunAction;
   onNudge: () => void;
 }

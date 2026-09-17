@@ -3,16 +3,16 @@
 import { useRef, useState, useTransition } from 'react';
 import { useRouter } from '@/i18n/routing';
 import type { ActionCode, ActionResult } from '@/lib/actions/result';
-import type { HeldKeyTrigger } from '@/lib/engagements/held-key';
+import type { HeldKeyTrigger } from '@/lib/engagements/held-act';
 import { releasesKey } from '@/lib/engagements/retry-policy';
 import { useHeldKeys } from './use-held-keys';
 
 /**
  * Runs ONE server action with the idempotency key held for the act it belongs to
- * (0050). `trigger` names the act — a payment is not a lifecycle trigger and
- * holds its key under PAYMENT_HELD_TRIGGER; `act` describes WHICH one, where the
- * name does not (see HeldKey.act). An edge that needs no key passes neither and
- * ignores the argument.
+ * (0050). `trigger` names the CONTROL — the two money controls are not lifecycle
+ * triggers and hold their keys under their own names (held-act.ts); `act`
+ * describes WHICH act it was, where the name does not (see HeldKey.act). An edge
+ * that needs no key passes neither and ignores the argument.
  */
 export type RunAction = (
   fn: (idempotencyKey: string) => Promise<ActionResult>,

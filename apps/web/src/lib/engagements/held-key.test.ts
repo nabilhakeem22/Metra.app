@@ -1,14 +1,17 @@
 import { describe, expect, it } from 'vitest';
-import { TRANSITIONS, type Trigger } from './transitions';
+import type { Trigger } from './transitions';
+import {
+  PAYMENT_HELD_TRIGGER,
+  actFrom,
+  type HeldKeyTrigger,
+} from './held-act';
 import {
   HELD_KEY_TTL_MS,
-  PAYMENT_HELD_TRIGGER,
   hasLanded,
   isHeldKeyLive,
   keyForAttempt,
   landedKeysOf,
   type HeldKey,
-  type HeldKeyTrigger,
 } from './held-key';
 import { releasesKey } from './retry-policy';
 
@@ -103,14 +106,14 @@ describe('keyForAttempt — the act, where the trigger does not name it', () => 
 
   it('mints a fresh key for a DIFFERENT amount at the same trigger', () => {
     const attempt = keyForAttempt(
-      heldPayment('deposit|50000'),
+      heldPayment(actFrom({ kind: 'deposit', amount: '50000' })),
       PAYMENT_HELD_TRIGGER,
       mint('fresh-key'),
       NOW + 60_000,
-      'deposit|75000',
+      actFrom({ kind: 'deposit', amount: '75000' }),
     );
     expect(attempt.key).toBe('fresh-key');
-    expect(attempt.act).toBe('deposit|75000');
+    expect(attempt.act).toBe(actFrom({ kind: 'deposit', amount: '75000' }));
   });
 
   it('mints a fresh key for a different KIND at the same amount', () => {
@@ -136,10 +139,6 @@ describe('keyForAttempt — the act, where the trigger does not name it', () => 
     ).toBe('fresh');
     const paid = heldPayment('deposit|50000');
     expect(keyForAttempt(paid, PAYMENT_HELD_TRIGGER, mint('fresh'), NOW).key).toBe('fresh');
-  });
-
-  it('is not a lifecycle trigger, so it can never collide with one', () => {
-    expect(Object.keys(TRANSITIONS)).not.toContain(PAYMENT_HELD_TRIGGER);
   });
 });
 

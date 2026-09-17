@@ -1,4 +1,4 @@
-import type { Trigger } from './transitions';
+import type { HeldKeyTrigger } from './held-act';
 
 /**
  * ONE ATTEMPT'S IDEMPOTENCY KEY, with the instant that attempt was made.
@@ -16,29 +16,16 @@ export interface HeldKey {
    */
   heldAt: number;
   /**
-   * WHAT THE ACT WAS, where its name does not say it: the inputs the studio
-   * typed, as one string (a payment's kind and amount). A retry of the SAME act
-   * carries the held key; a DIFFERENT amount typed after an `uncertain` is a NEW
-   * act and gets a fresh key — the refusal tells the studio to refresh and check
-   * before trying again, so somebody who then changes the figure is recording
-   * something else, and the server would answer it with the ORIGINAL row. Absent
-   * on a lifecycle trigger, where the trigger IS the act.
+   * WHAT THE ACT WAS, where its name does not say it: EVERY field the attempt
+   * submitted, as one string — `actFrom` in held-act.ts builds it. A retry of
+   * the SAME act carries the held key; a DIFFERENT amount typed after an
+   * `uncertain` is a NEW act and gets a fresh key, because the refusal tells the
+   * studio to refresh and check before trying again, so somebody who then
+   * changes a figure is recording something else and the server would answer it
+   * with the ORIGINAL row. Absent on a lifecycle trigger: the trigger IS the act.
    */
   act?: string;
 }
-
-/**
- * The name a RECORDED PAYMENT holds its key under. Not one of the 19 lifecycle
- * triggers — a payment appends to `payment_events`, never to the transition
- * ledger — but it is an act a studio can be left in doubt about, and
- * `payments.ts` reads its key as the same proof of sameness the executor does.
- * So it is held, expired and released by these rules, under a name no trigger
- * uses.
- */
-export const PAYMENT_HELD_TRIGGER = 'recordPayment';
-
-/** What a held key can be filed under: one lifecycle trigger, or the payment. */
-export type HeldKeyTrigger = Trigger | typeof PAYMENT_HELD_TRIGGER;
 
 /**
  * How long a held key may still name the attempt that minted it: FIFTEEN MINUTES.
