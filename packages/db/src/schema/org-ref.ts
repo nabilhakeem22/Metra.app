@@ -4,7 +4,8 @@
 // A child row references a parent WITHIN the same org via a composite FK
 // (org_id, <name>_id) -> parent(org_id, id). Because the target's universal
 // unique(org_id, id) is the referenced key, a cross-org reference is impossible
-// at the database. Ships an (org_id, <name>_id) index (org_id leads).
+// at the database. Ships an (org_id, <name>_id) index (org_id leads) unless the
+// table already declares a wider index under that exact name - see `index: false`.
 import { getTableName } from 'drizzle-orm';
 import { foreignKey, index, uuid, type AnyPgColumn } from 'drizzle-orm/pg-core';
 
@@ -26,12 +27,20 @@ type OnDelete = 'restrict' | 'cascade' | 'set null' | 'no action' | 'set default
  * Composite same-org FK + index for a child column produced by sameOrgRef.
  * Spread the result into the table's config array. Precondition: `target` has
  * unique(org_id, id).
+ *
+ * `index: false` means ONE thing: **this table already declares a wider index
+ * under the exact name this helper would generate, with the same leading
+ * columns, so the generated one would be a duplicate NAME rather than an extra
+ * index.** It is not a way to skip an index that should exist. `drizzle-kit
+ * generate` refuses to run at all on a duplicated index name - it aborts before
+ * writing anything - so the collision is not cosmetic: it makes the one command
+ * that authors a migration unusable.
  */
 export function sameOrgFk(
   t: Record<string, AnyPgColumn>,
   name: string,
   target: SameOrgTarget,
-  opts?: { onDelete?: OnDelete },
+  opts?: { onDelete?: OnDelete; index?: boolean },
 ) {
   const child = t[`${name}Id`];
   const table = getTableName(
@@ -43,6 +52,8 @@ export function sameOrgFk(
       foreignColumns: [target.orgId, target.id],
       name: `${table}_${name}_same_org_fk`,
     }).onDelete(opts?.onDelete ?? 'restrict'),
-    index(`${table}_${name}_idx`).on(t.orgId, child),
+    ...(opts?.index === false
+      ? []
+      : [index(`${table}_${name}_idx`).on(t.orgId, child)]),
   ];
 }

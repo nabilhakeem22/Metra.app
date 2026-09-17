@@ -1,4 +1,4 @@
-// Does the database this URL points at have every column the code expects?
+// Does the database this URL points at have every object the code expects?
 //
 // THE FAILURE THIS EXISTS TO PREVENT. Deploying code before its migration is not
 // a degraded state for the engagement module, it is a TOTAL one: drizzle's
@@ -13,85 +13,61 @@
 // deploy.yml cannot run this — it holds no database credential, only
 // CLOUDFLARE_API_TOKEN — so this is the OWNER'S pre-merge step, with the exact
 // command in docs/DEPLOY.md. Read-only: it opens one connection, reads
-// information_schema, and writes nothing.
-import { is } from 'drizzle-orm';
-import { getTableConfig, PgTable } from 'drizzle-orm/pg-core';
+// catalogues, and writes nothing.
+//
+// FOUR KINDS, ONE EXIT CODE — and the exit code is COLUMNS ONLY.
+//
+//   columns      (gate)          declaredTables()      vs information_schema.columns
+//   indexes      (report only)   declaredIndexes()     vs pg_indexes
+//   constraints  (report only)   declaredConstraints() vs pg_constraint
+//   functions    (report only)   declaredFunctions()   vs pg_proc
+//
+// The three new sections PRINT and do not gate, deliberately:
+//
+//   (a) identifier drift is real and already known. 0017 wrote six index names
+//       and six constraint names UNQUOTED in camelCase, so Postgres folded them
+//       to lower case — in production AND in every fresh CI database built from
+//       these migrations. A case-sensitive gate would therefore go red
+//       everywhere, over a defect it is merely reporting.
+//   (b) this check runs read-only BEFORE `apply-rls` in the deploy order
+//       (docs/DEPLOY.md), so a function-name gate would refuse to start on any
+//       function that the pending apply-rls run is about to create.
+//
+// For the same reason it is NOT a CI step: CI's fresh database is built from the
+// same migrations and would show the same folded names.
+//
+// ALL FOUR SECTIONS PRINT ON THE FAILING RUN. The exit code is columns only,
+// but the three report-only catalogues are what tell the owner what ELSE is out
+// of step, and that run is the one whose output gets pasted into an incident.
+// The previous version computed them and then exited before printing them.
+//
+// What the code declares, and how a name is compared, lives in
+// `schema-catalogue.ts` — which has no connection and is unit-tested. The four
+// reads and the report they print live in `schema-check.ts`, which takes the
+// handle as an argument and returns the exit code — so this file is only the
+// wiring: open a connection, run it, close it, exit.
 import { createSql } from '../client';
 import { MIGRATION_DATABASE_URL } from '../env';
-import * as schema from '../schema/index';
+import { runSchemaCheck } from './schema-check';
 
-/** Every table the CODE declares, as table name -> column names. */
-function declaredTables(): Map<string, Set<string>> {
-  const declared = new Map<string, Set<string>>();
-  for (const value of Object.values(schema)) {
-    if (!is(value, PgTable)) continue;
-    const config = getTableConfig(value);
-    declared.set(config.name, new Set(config.columns.map((column) => column.name)));
-  }
-  return declared;
-}
-
-/** Every table the DATABASE has in `public`, as table name -> column names. */
-async function appliedTables(
-  sql: ReturnType<typeof createSql>,
-): Promise<Map<string, Set<string>>> {
-  const rows = (await sql`
-    select table_name, column_name
-      from information_schema.columns
-     where table_schema = 'public'
-  `) as unknown as Array<{ table_name: string; column_name: string }>;
-  const applied = new Map<string, Set<string>>();
-  for (const row of rows) {
-    const columns = applied.get(row.table_name) ?? new Set<string>();
-    columns.add(row.column_name);
-    applied.set(row.table_name, columns);
-  }
-  return applied;
-}
-
-/** One line per thing the code needs and the database does not have. */
-function missingFrom(
-  declared: Map<string, Set<string>>,
-  applied: Map<string, Set<string>>,
-): string[] {
-  const gaps: string[] = [];
-  for (const [table, columns] of declared) {
-    const live = applied.get(table);
-    if (!live) {
-      gaps.push(`  - table ${table} is missing entirely`);
-      continue;
-    }
-    const absent = [...columns].filter((column) => !live.has(column));
-    if (absent.length > 0) gaps.push(`  - ${table}: ${absent.join(', ')}`);
-  }
-  return gaps;
-}
-
-async function main() {
+async function main(): Promise<number> {
   const sql = createSql(MIGRATION_DATABASE_URL(), { max: 1, prepare: false });
   try {
-    const declared = declaredTables();
-    const gaps = missingFrom(declared, await appliedTables(sql));
-    if (gaps.length > 0) {
-      console.error(
-        'assert-schema-applied: this database is BEHIND the code.\n' +
-          `${gaps.join('\n')}\n\n` +
-          'Run `npm run migrate -w @metra/db` (then `npm run apply-rls -w @metra/db`) ' +
-          'BEFORE shipping this code. Deploying first is not a partial outage: ' +
-          "drizzle names every column in its SELECT, so one missing column is 42703 " +
-          'for the whole query.',
-      );
-      process.exit(1);
-    }
-    console.log(
-      `assert-schema-applied: OK — ${declared.size} declared table(s), every column present.`,
-    );
+    return await runSchemaCheck(sql);
   } finally {
     await sql.end();
   }
 }
 
-main().catch((error: Error) => {
-  console.error('assert-schema-applied failed:', error.message);
-  process.exit(1);
-});
+// `process.exitCode`, not `process.exit()`: the latter tears the process down
+// where it stands, which on a failing run is exactly when there is the most
+// buffered output to lose. Nothing here keeps the loop alive once `sql.end()`
+// has resolved.
+main()
+  .then((code) => {
+    process.exitCode = code;
+  })
+  .catch((error: Error) => {
+    console.error('assert-schema-applied failed:', error.message);
+    process.exitCode = 1;
+  });

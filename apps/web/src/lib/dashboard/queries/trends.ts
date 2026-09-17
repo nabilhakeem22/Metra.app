@@ -1,4 +1,15 @@
 import 'server-only';
+// HISTORY: this file was split out of `lib/dashboard/queries.ts` in 6d29a1a and
+// kept only 29% of it (`git show --find-renames=20% 6d29a1a` reports
+// `R029 queries.ts -> queries/trends.ts`), which is below git's 50% rename
+// threshold - so plain `git log --follow` on this path STOPS AT 6d29a1a and
+// shows nothing before it. Use `git log --follow -M20% -- <this file>` to reach
+// the FOUR commits that precede the split (d0eb9a6, cc31abf, 81d51ee and the
+// split itself). Stated as "stops at 6d29a1a" rather than as a commit count
+// on purpose: a count includes every commit made since, starting with the one
+// that added this comment. (`engagements/guards/milestone-math.ts` carries the
+// same trap from wave 4: plain --follow stops at its own split; -M20% reaches
+// fifteen more.)
 // The dashboard's MONTHLY TRENDS — the two series the charts are shaped from.
 //
 // This file is `dashboard/queries.ts` renamed (wave 4): the counts and the

@@ -50,13 +50,16 @@ Agents run these literally. These are exactly what `.github/workflows/ci.yml` ru
 | Build | `npm run build -w @metra/web` |
 | Unit tests (web) | `npm run test -w @metra/web` |
 | Unit tests (db) | `npm run test -w @metra/db` |
-| Action-core DB tests | `npm run test:actions -w @metra/web` *(seeded DB via `apps/web/tests/actions/fixture.ts`)* |
-| Cross-tenant isolation gate | `npm run test:isolation -w @metra/db` |
+| Action-core DB tests | `npm run test:actions -w @metra/web` *(seeded DB via `apps/web/tests/actions/fixture.ts`; **`assertLocalDatabase` refuses a non-local host** — CI, or a local docker Postgres)* |
+| Cross-tenant isolation gate | `npm run test:isolation -w @metra/db` *(same local-only guard)* |
 | E2E tests | — (none) |
 | Lint | `npm run lint` *(root; includes `metra/no-physical-inline-direction`)* |
-| Type check | `cd apps/web && npx tsc --noEmit` |
+| i18n gate | `npm run i18n:validate` *(key parity, ICU placeholders, Western numerals — no API key, never calls Gemini)* |
+| Docs gate | `npm run docs:check` *(`docs/DEPLOY.md` is the ONLY `DEPLOY.md` in the tree — walked, so an untracked copy counts; no stale-host mention in a tracked `*.md` outside `docs/BUILD-LOG.md`; no em/en dash inside Arabic prose)* |
+| Type check | `cd apps/web && npx tsc --noEmit` — **and the same in `packages/db`**; they are two tsconfigs and only one of them is in the CI build step |
 | Migrations | `npm run migrate -w @metra/db` **then** `npm run apply-rls -w @metra/db` (RLS/roles/functions) **then** `npm run seed -w @metra/db` |
-| New migration | `npm run generate -w @metra/db` — ⚠️ drizzle-kit's rename prompt is an interactive TUI that can't run headless; 0013/0014/0015 were hand-authored. **Snapshot has drifted — regenerate/verify `migrations/meta` before the next `generate`.** |
+| New migration | `npm run generate -w @metra/db` — ⚠️ drizzle-kit's rename prompt is an interactive TUI that can't run headless; 0013–0051 were hand-authored. The baseline snapshot is the one the NEWEST `meta/_journal.json` entry names (today **`migrations/meta/0051_snapshot.json`**), which is what `generate` diffs against; `db:assert-snapshot` and `db:generate-baseline` derive it from the journal rather than naming it. Read `docs/DEPLOY.md` before using it. |
+| Snapshot gate | `npm run db:assert-snapshot` *(regenerates into an empty temp dir and deep-compares; **no database**, ~2 s; **CI runs it on every push**, with `DATABASE_URL` removed from that step's env). Fix a difference with `npm run db:generate-baseline`, never with an in-place `generate`. **`drizzle-kit` is pinned EXACTLY at `0.28.1`** in `packages/db` — the committed snapshot is that version's byte output, so the generator version is part of the artefact.)* |
 
 ## Conventions
 
@@ -65,12 +68,12 @@ Agents run these literally. These are exactly what `.github/workflows/ci.yml` ru
 - **Error handling:** unified `ActionResult` + `ActionCode` union + `resolveActionError(code,t)` (localized, never raw English). `mutateInOrg` catches and returns coded errors. Server actions RETURN `ActionResult` — never throw to the client. Modal/form callers MUST wrap awaits so a rejected action can't leave a spinner stuck.
 - **Logging:** `console.error` on the server. Read it with **`npx wrangler tail`** (live) or the Workers Logs view in the Cloudflare dashboard. Never log PII, secrets, tokens, or raw share tokens (store only the sha256 hash).
 - **Naming:** intent-revealing, no abbreviations (Rulebook #4).
-- **Folder structure:** per-domain `apps/web/src/lib/{module}/{core,queries,actions}.ts`; schema `packages/db/src/schema/*.ts`; RLS `packages/db/src/rls/{policies,roles,functions,immutability}.sql`; UI `apps/web/src/app/[locale]/(app)/{module}/`.
+- **Folder structure:** per-domain `apps/web/src/lib/{module}/{core,queries,actions}.ts`; schema `packages/db/src/schema/*.ts`; RLS `packages/db/src/rls/{functions/*,policies/*,roles,immutability}.sql`, applied in the order `rls/manifest.ts` declares; UI `apps/web/src/app/[locale]/(app)/{module}/`.
 - **Anything the coder must mirror (exemplars):**
   - Tabbed feature → `apps/web/src/app/[locale]/(app)/clients/[id]/` (server `page.tsx` + `'use client'` `profile-tabs.tsx` + **server-safe `tabs.ts`** + per-tab server/client components).
   - Domain lib → `apps/web/src/lib/client-contacts/{core,queries,actions}.ts`.
   - Schema-only migration → `packages/db/migrations/0015_project_profile.sql`.
-  - RLS for a new table → add to `rls/policies.sql` + `rls/roles.sql` (NOT the migration).
+  - RLS for a new table → add to the right `rls/policies/*.sql` + `rls/roles.sql` (NOT the migration). A NEW `.sql` file under `rls/` must also be added to `rls/manifest.ts`, or it is never applied and nothing says so.
 - **Money law:** EGP; `numeric(18,4)` carried as a string; piastre-exact BigInt math (round half-up), never float; rendered IBM Plex Mono, tabular, `direction:ltr`, `text-align:end`.
 - **No demo/fake data** — honest empty states + "activates with X" locked states for not-yet-built dependencies.
 
@@ -106,7 +109,27 @@ Estimates (pilot phase — the 5 pilot firms are an open PRD §10 decision):
 
 - p95 API latency: `DECIDE`
 - Page load: `DECIDE`
-- PDF render: target < ~5s (P0 spike). Pre-pilot debt: DB/getUser timeouts, N+1 identity resolver, PDF throttle.
+- PDF render: target < ~5s (P0 spike). Pre-pilot debt: the **N+1 identity
+  resolver** (`lib/team/identities.ts` calls `getUserById` once per member) and
+  the **per-page repeated auth work** (no React `cache()` dedupe). The DB
+  timeouts are DONE and so is the PDF throttle (503 + `retry-after: 5` at the
+  renderer's concurrency cap).
+- **Two `lock_timeout`s, on two different connections — do not quote one for the
+  other.** The **app request** transaction uses `lock_timeout 5s` /
+  `statement_timeout 20s` / `idle_in_transaction_session_timeout 30s`
+  (`packages/db/src/org-context.ts`). The **schema-changing scripts**
+  (`db:migrate`, `db:apply-rls`, the fixture purge) use
+  **`MIGRATION_LOCK_TIMEOUT = '3s'`** (`packages/db/src/scripts/lock-timeout.ts`),
+  set with `set_config` and **read back from `pg_settings`** before any DDL runs
+  because Supavisor discards startup parameters. `db:apply-rls` also sets
+  `statement_timeout 60s`, which `db:migrate` does not.
+- Measured margins, so nobody re-derives them from the wrong number: 0049 + 0050
+  hold ACCESS EXCLUSIVE for **~630 ms** against the migrator's **3 s** — a
+  **~4.8× self-abort margin**, NOT the "~8×" that came from comparing it against
+  the app's 5 s. `apply-rls`'s worst case is one file, not the run:
+  `policies/10-catalogue.sql` locks **11 tables** in one implicit transaction, so
+  **11 × 3 s = 33 s** is the bound if every one of them is blocked (the split
+  from one `policies.sql` cut this from 46 tables at once). See `docs/DEPLOY.md`.
 
 ## Third-party integrations
 
@@ -139,11 +162,16 @@ The inputs that are weird *in Egyptian fit-out specifically* — this is what ma
 
 The architect may not design around these:
 - **The Refactoring Rulebook** (above).
-- **Migrations = schema + data-backfill ONLY.** NEVER `create policy`, `grant … to metra_app`, or reference an apply-rls function (`app_is_current_org_member()` etc.) inside a migration — those objects don't exist yet on a fresh CI DB at migrate time (this broke CI on 0013/0014). RLS lives ONLY in `rls/policies.sql` + `rls/roles.sql`, applied by `apply-rls` AFTER migrate.
+- **Migrations = schema + data-backfill ONLY.** NEVER `create policy`, `grant … to metra_app`, or reference an apply-rls function (`app_is_current_org_member()` etc.) inside a migration — those objects don't exist yet on a fresh CI DB at migrate time (this broke CI on 0013/0014). RLS lives ONLY in `rls/policies/*.sql` + `rls/roles.sql`, applied by `apply-rls` AFTER migrate.
+- **`rls/**.sql` is exempt from the 150-line rule.** Split at function and domain
+  boundaries only; never inside one SDF or one table's policy block. The apply
+  order is `rls/manifest.ts` and nothing else — a `.sql` file under `rls/` that
+  is not in the manifest is NEVER APPLIED, silently, and
+  `rls/functions-order.test.ts` is what fails on it.
 - **Server-safe constants:** never export a value/const from a `'use client'` module and import it into a server component — it becomes a client-reference proxy → runtime 500 (passes tsc/build). Shared constants live in a plain non-client module (see `tabs.ts`).
 - Every new org-scoped table → isolation gate coverage + `fixture.ts` teardown (FK-safe order) + RLS in `apply-rls`.
 - Message-key parity + Western numerals; logical CSS only; no demo data.
-- **The CI from-scratch replay (`.github/workflows/ci.yml`: lint→unit→migrate→apply-rls→seed→isolation→test:actions→OpenNext build→assert-no-baked-secrets on a fresh Postgres) is the REAL gate.** Local checks use the already-migrated warm DB and miss clean-room failures. Verify CI green after every push.
+- **The CI from-scratch replay (`.github/workflows/ci.yml`: i18n→docs→lint→unit(db)→snapshot→unit(web)→migration-batch-size→migrate→apply-rls→seed→isolation→test:actions→OpenNext build→assert-no-baked-secrets on a fresh Postgres) is the REAL gate.** Local checks use the already-migrated warm DB and miss clean-room failures. Verify CI green after every push.
 - **Workflow:** plan & confirm (architect → owner sign-off) before the coder writes code. Keep every mutation a self-contained `*Core(ctx,input)→ActionResult` (API-ready — a future Public API slice wraps them).
 
 ## Out of bounds

@@ -73,12 +73,18 @@ export const engagementDocumentComments = pgTable(
       'engagement_document_comments_body_length',
       sql`length(btrim(body)) between 1 and 2000`,
     ),
+    // The cockpit's per-engagement roll-up (thread counts + awaiting-reply) is
+    // exactly the index sameOrgFk generates - same name, same columns - so it
+    // is NOT declared again below.
     ...sameOrgFk(t, 'engagement', designEngagements, { onDelete: 'cascade' }),
-    ...sameOrgFk(t, 'artifact', engagementArtifacts, { onDelete: 'cascade' }),
-    // The thread read: every message on one document, oldest first.
+    // The thread read: every message on one document, oldest first. This index
+    // carries the same NAME sameOrgFk would generate and a WIDER column list,
+    // so sameOrgFk's is suppressed rather than duplicated.
+    ...sameOrgFk(t, 'artifact', engagementArtifacts, {
+      onDelete: 'cascade',
+      index: false,
+    }),
     index('engagement_document_comments_artifact_idx').on(t.orgId, t.artifactId, t.createdAt),
-    // The cockpit's per-engagement roll-up (thread counts + awaiting-reply).
-    index('engagement_document_comments_engagement_idx').on(t.orgId, t.engagementId),
   ],
 );
 

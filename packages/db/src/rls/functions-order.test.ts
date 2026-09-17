@@ -1,18 +1,20 @@
-import { readFileSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { dirname, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
+import { RLS_APPLY_ORDER } from './manifest';
 
-// apply-rls runs functions.sql as ONE multi-statement script, and PostgreSQL
+// apply-rls runs the functions/* files in RLS_APPLY_ORDER, and PostgreSQL
 // validates a `language sql` function body at CREATE time (check_function_bodies is
 // on by default). So a `language sql` function that calls another `public.app_*`
-// function defined LOWER DOWN THE SAME FILE fails to create — with a confusing
+// function defined LATER IN THAT SEQUENCE fails to create — with a confusing
 // "function ... does not exist" naming the CALLEE, not the caller, and reported
 // against whichever file apply-rls was on.
 //
 // That is invisible to tsc, to lint and to every unit test: it only shows up when a
-// real database replays the file, which locally is never. This test makes it a
-// LOCAL failure by reading the same file and checking definition order.
+// real database replays the files, which locally is never. This test makes it a
+// LOCAL failure by reading the same files, in the same order, and checking
+// definition order across the whole sequence.
 //
 // SCOPE, deliberately narrow: only `language sql` bodies. A `language plpgsql` body
 // is NOT parsed at creation — its calls resolve at runtime — so a forward reference
@@ -20,7 +22,16 @@ import { describe, expect, it } from 'vitest';
 // flag working code.
 
 const here = dirname(fileURLToPath(import.meta.url));
-const source = readFileSync(resolve(here, 'functions.sql'), 'utf8');
+const rlsDir = here;
+// The manifest, not a filename: apply-rls concatenates these in this order, so
+// this is the order Postgres sees. Reading it here also makes the test STRONGER
+// than it could be against one file - it now catches a `language sql` function
+// that calls a helper defined in a LATER file, a forward reference across files
+// that no test could see before.
+const functionFiles = RLS_APPLY_ORDER.filter((file) => file.startsWith('functions/'));
+const source = functionFiles
+  .map((file) => readFileSync(resolve(here, file), 'utf8'))
+  .join('\n');
 
 /** Strip `--` line comments and `drop function ...;` statements, so a name that
  *  merely APPEARS in prose or in a drop is never mistaken for a call. */
@@ -52,7 +63,35 @@ function functionBlocks(sql: string): FunctionBlock[] {
   });
 }
 
-describe('functions.sql definition order', () => {
+describe('rls/manifest.ts covers every .sql file under rls/', () => {
+  // The same silent-omission shape as journal defect D7: a .sql file with no
+  // manifest entry is NEVER APPLIED, with no error and no log line, and the
+  // symptom turns up somewhere else entirely (D7 surfaced as apply-rls failing
+  // to create a function whose column did not exist). A manifest entry with no
+  // file is the mirror image: apply-rls throws ENOENT halfway through a run.
+  const onDisk = readdirSync(rlsDir, { recursive: true, withFileTypes: true })
+    .filter((entry) => entry.isFile() && entry.name.endsWith('.sql'))
+    .map((entry) => {
+      const absolute = resolve(entry.parentPath ?? entry.path, entry.name);
+      // Manifest entries are written with forward slashes on every platform.
+      return relative(rlsDir, absolute).split(sep).join('/');
+    })
+    .sort();
+
+  it('lists every .sql file on disk exactly once', () => {
+    expect([...RLS_APPLY_ORDER].sort()).toEqual(onDisk);
+  });
+
+  it('lists nothing that is not on disk', () => {
+    for (const file of RLS_APPLY_ORDER) {
+      expect(existsSync(resolve(rlsDir, file)), `${file} is in RLS_APPLY_ORDER but not on disk`).toBe(
+        true,
+      );
+    }
+  });
+});
+
+describe('rls/functions/* definition order', () => {
   const clean = scannable(source);
   const blocks = functionBlocks(clean);
   const definedAt = new Map<string, number>();
@@ -79,7 +118,7 @@ describe('functions.sql definition order', () => {
         if (calleeStart === undefined) continue; // not defined in this file
         if (calleeStart > block.start) {
           violations.push(
-            `${block.name} (language sql) calls public.${callee}, which is defined later in functions.sql`,
+            `${block.name} (language sql) calls public.${callee}, which is defined LATER in the RLS_APPLY_ORDER concatenation of rls/functions/*`,
           );
         }
       }

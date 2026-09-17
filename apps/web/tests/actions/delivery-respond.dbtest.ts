@@ -550,24 +550,33 @@ describe('delivery respond — an acknowledgement answers ONE issuance (0049)', 
     ).not.toContain('acknowledge_rom');
   });
 
-  it('leaves the portal client-signal lookup on an index', async () => {
-    // 0049 narrowed 0033's unique index with a second predicate conjunct, and
-    // both halves are now PARTIAL on acknowledged_issue_at. A partial index only
-    // answers a query that IMPLIES its predicate, and the portal's SDFs ask
-    // `engagement_id = $1 and actor_channel = 'client' and kind = $2` — which
+  it('keeps the portal client-signal lookup served by its own index', async () => {
+    // 0049's INDEX is the invariant. Which index a planner PICKS on a two-row
+    // fixture is not: EXPLAIN with enable_seqscan=off on a near-empty table
+    // decides between two same-cost candidates by catalogue order, which is not
+    // stable across a re-created database - so the previous version of this test
+    // asserted a coin flip that had landed heads so far.
+    //
+    // What 0049 actually guarantees is a NON-PARTIAL index on exactly
+    // (engagement_id, actor_channel, kind). 0049 narrowed 0033's unique index
+    // with a second predicate conjunct, and both halves are now PARTIAL on
+    // acknowledged_issue_at; a partial index only answers a query that IMPLIES
+    // its predicate, and the portal's SDFs ask
+    // `engagement_id = $1 and actor_channel = 'client' and kind = $2`, which
     // implies neither. Those functions run as postgres with rolbypassrls, so
-    // there is no org_id qual to reach the org-leading index either: without the
-    // plain index 0049 adds, every portal load scans the whole ledger four times.
-    const plan = await raw.explain(
-      `select 1 from public.engagement_events
-        where engagement_id = '00000000-0000-0000-0000-000000000001'
-          and actor_channel = 'client' and kind = 'rom_acknowledgement'`,
+    // there is no org_id qual to reach the org-leading index either. Without
+    // this index every portal load scans the whole ledger four times.
+    //
+    // So the assertion is the catalogue, not the planner: the index exists, its
+    // key is exactly those three columns in that order, and it carries no WHERE.
+    const [row] = await raw.query<{ indexdef: string }>(
+      `select indexdef from pg_indexes
+        where schemaname = 'public'
+          and indexname = 'engagement_events_engagement_channel_kind_idx'`,
     );
-    expect(plan).toContain('Index');
-    // WHICH index is the assertion. Seq scans are disabled in raw.explain, so
-    // "an index was used" alone would also be satisfied by an end-to-end read of
-    // the org-leading index — the very scan this is here to prevent.
-    expect(plan).toContain('engagement_events_engagement_channel_kind_idx');
+    expect(row).toBeDefined();
+    expect(row.indexdef).toContain('(engagement_id, actor_channel, kind)');
+    expect(row.indexdef).not.toContain(' WHERE '); // partial => cannot serve the SDF
   });
 
   it('a legacy acknowledgement with no issuance stamp does not suppress the verb', async () => {

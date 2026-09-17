@@ -47,6 +47,15 @@ grant select, insert, update, delete on public.contracts         to metra_app;
 grant select, insert, update, delete on public.contract_sections to metra_app;
 grant select, insert, update, delete on public.contract_lines    to metra_app;
 grant select, insert, update, delete on public.boqs              to metra_app;
+-- ...except DELETE. No code path deletes a BOQ (`git grep "delete(boqs)"
+-- apps/web/src` = 0 hits), and a BOQ that has been issued to a client is
+-- evidence. Revoked rather than left granted "in case": if a delete-a-draft-BOQ
+-- feature is ever built, re-grant it here, narrowly, in the commit that builds
+-- it. boq_sections / boq_lines KEEP delete - the edit path removes lines from a
+-- DRAFT - and trg_boq_{sections,lines}_parent_draft is what fences that. The
+-- revoke removes the grant on already-provisioned databases; on a fresh one it
+-- is a no-op after the line above.
+revoke delete on public.boqs from metra_app;
 grant select, insert, update, delete on public.boq_sections      to metra_app;
 grant select, insert, update, delete on public.boq_lines         to metra_app;
 grant select, insert, update, delete on public.variation_orders      to metra_app;
@@ -165,6 +174,15 @@ revoke execute on function public.app_proposal_respond_by_token(text, text, text
 -- caller-supplied p_name/p_ip/p_ua audit parameters.
 grant execute on function public.enforce_contract_child_draft() to metra_app;
 grant execute on function public.enforce_variation_child_draft() to metra_app;
+-- The BOQ child-draft guard, for SYMMETRY and nothing more. Postgres checks
+-- EXECUTE on a trigger function at CREATE TRIGGER time (done here by the owning
+-- role), not on each firing, and a direct call to a plpgsql trigger function
+-- raises 0A000 before the body runs - so none of these four grants is load
+-- bearing. What is load bearing is that the file which IS the privilege model
+-- says the same thing about four identical objects: this was the only one of the
+-- thirty functions under rls/ with no line here, which left the next reader to
+-- work out for themselves whether the other three grants were required or noise.
+grant execute on function public.enforce_boq_child_draft() to metra_app;
 grant execute on function public.app_contract_by_token(text) to metra_app;
 revoke execute on function public.app_contract_by_token(text) from public;
 grant execute on function public.app_contract_ack_by_token(text, text, text, text, text) to metra_app;
