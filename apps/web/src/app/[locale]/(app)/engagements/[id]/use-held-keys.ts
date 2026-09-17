@@ -39,8 +39,8 @@ import { readHeldKeys, writeHeldKeys } from './held-keys-store';
  * mints a fresh key, which is a fresh act: one duplicate revision, or one
  * duplicate attestation. See held-keys-store.ts.
  *
- * AND BOUNDED, twice over: a key expires (HELD_KEY_TTL_MS) and a key whose act
- * the engagement's own ledger says has LANDED is dropped before the next attempt
+ * AND BOUNDED, twice over: a key expires (HELD_KEY_TTL_MS) and a key the
+ * engagement's own ledger already CARRIES is dropped before the next attempt
  * chooses one. Without either, the key named that trigger until the tab closed,
  * and a genuinely new act hours later was answered "already done" by the server
  * and silently discarded. See `@/lib/engagements/held-key`.
@@ -94,12 +94,13 @@ function keysFor(
 }
 
 /**
- * @param landedAt when each trigger last produced a transition ON THIS
- * ENGAGEMENT, epoch ms, from the ledger the page already loaded.
+ * @param landedKeys every idempotency key the ledger of THIS ENGAGEMENT already
+ * carries, from the transitions the page loaded. A key in there names an attempt
+ * that committed after all.
  */
 export function useHeldKeys(
   currentEngagementId: string,
-  landedAt?: ReadonlyMap<string, number>,
+  landedKeys?: ReadonlySet<string>,
 ): HeldKeysApi {
   const seeded = useRef<SeededKeys | null>(null);
   return {
@@ -108,7 +109,7 @@ export function useHeldKeys(
       // The ledger the page is showing says the attempt this key names landed
       // after all, which is what `uncertain` could not tell the studio. It has
       // done its job: this click is a NEW act and gets a new key.
-      if (trigger && hasLanded(held.get(trigger), landedAt?.get(trigger))) {
+      if (trigger && hasLanded(held.get(trigger), landedKeys)) {
         held.delete(trigger);
       }
       const attempt = keyForAttempt(held, trigger, mintKey, Date.now(), act);

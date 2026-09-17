@@ -39,15 +39,15 @@ let landAnswer: ((result: ActionResult) => void) | null = null;
 function ActionProbe({
   mintKey,
   engagementId = 'e-1',
-  landedAt,
+  landedKeys,
 }: {
   mintKey: () => string;
   engagementId?: string;
-  landedAt?: ReadonlyMap<string, number>;
+  landedKeys?: ReadonlySet<string>;
 }) {
   const { pending, error, runAction } = useEngagementAction({
     engagementId,
-    landedAt,
+    landedKeys,
     mintKey,
   });
   const dispatch = (label: string, trigger?: Trigger) =>
@@ -98,11 +98,11 @@ let minted = 0;
  *  and still readable: the mint counter is the last digit of the first group. */
 const mintedKey = (count: number) => `0000000${count}-0000-4000-8000-000000000000`;
 
-function mountProbe(landedAt?: ReadonlyMap<string, number>) {
+function mountProbe(landedKeys?: ReadonlySet<string>) {
   const mintKey = () => mintedKey(++minted);
   // Through the harness, not a bare RTL render: renderWithIntl is what registers
   // afterEach(cleanup), and two mounted probes would each answer getByRole.
-  return renderWithIntl(<ActionProbe mintKey={mintKey} landedAt={landedAt} />);
+  return renderWithIntl(<ActionProbe mintKey={mintKey} landedKeys={landedKeys} />);
 }
 
 /** Click a button and let the transition settle. */
@@ -487,32 +487,66 @@ describe('useEngagementAction — a held key expires (R1)', () => {
     expect(sessionStorage.getItem('metra.pendingKeys.e-1')).not.toContain(mintedKey(1));
   });
 
-  // The other bound: the page comes back showing that the attempt DID land.
-  // "Refresh to check before trying again" is then answered, and the next click
-  // is a decision the studio has taken with the record in front of them.
-  test('a key whose act the LEDGER says landed is dropped, not re-used', async () => {
+  // The other bound: the page comes back CARRYING the key the attempt was sent
+  // with. "Refresh to check before trying again" is then answered by the record
+  // itself, and the next click is a decision taken with it in front of them.
+  test('a key the LEDGER CARRIES is dropped, not re-used', async () => {
     setNow(START);
     sessionStorage.setItem(
       'metra.pendingKeys.e-1',
       JSON.stringify({ requestRevision: { key: LANDED_KEY, heldAt: START - 60_000 } }),
     );
-    mountProbe(new Map([['requestRevision', START - 30_000]]));
+    mountProbe(new Set([LANDED_KEY]));
     answers.set('requestRevision', { ok: false, error: 'uncertain' });
     await press('requestRevision');
 
     expect(keysFor('requestRevision')[0]).not.toBe(LANDED_KEY);
   });
 
-  test('a transition OLDER than the attempt says nothing, and the key is kept', async () => {
+  test('a ledger carrying OTHER acts says nothing, and the key is kept', async () => {
     setNow(START);
     sessionStorage.setItem(
       'metra.pendingKeys.e-1',
       JSON.stringify({ requestRevision: { key: LANDED_KEY, heldAt: START - 60_000 } }),
     );
-    mountProbe(new Map([['requestRevision', START - 90_000]]));
+    mountProbe(new Set(['bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb']));
     answers.set('requestRevision', { ok: false, error: 'uncertain' });
     await press('requestRevision');
 
     expect(keysFor('requestRevision')[0]).toBe(LANDED_KEY);
+  });
+
+  /**
+   * RT1. The drop used to compare the browser's `heldAt` against the newest
+   * `decidedAt` at that trigger, so a laptop ten minutes behind the server threw
+   * away a LIVE key and the retry of an attempt that had already committed went
+   * out as a new act. Identity has no opinion about either clock.
+   */
+  test('a browser BEHIND the server keeps its live key', async () => {
+    // The attempt is stamped ten minutes in the past by a slow clock, and the
+    // engagement has an EARLIER act at the same trigger in its ledger.
+    setNow(START - 10 * 60_000);
+    sessionStorage.setItem(
+      'metra.pendingKeys.e-1',
+      JSON.stringify({ requestRevision: { key: LANDED_KEY, heldAt: START - 10 * 60_000 } }),
+    );
+    mountProbe(new Set(['bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb']));
+    answers.set('requestRevision', { ok: false, error: 'uncertain' });
+    await press('requestRevision');
+
+    expect(keysFor('requestRevision')[0]).toBe(LANDED_KEY);
+  });
+
+  test('a browser AHEAD of the server still drops a key the ledger carries', async () => {
+    setNow(START + 10 * 60_000);
+    sessionStorage.setItem(
+      'metra.pendingKeys.e-1',
+      JSON.stringify({ requestRevision: { key: LANDED_KEY, heldAt: START + 10 * 60_000 } }),
+    );
+    mountProbe(new Set([LANDED_KEY]));
+    answers.set('requestRevision', { ok: false, error: 'uncertain' });
+    await press('requestRevision');
+
+    expect(keysFor('requestRevision')[0]).not.toBe(LANDED_KEY);
   });
 });

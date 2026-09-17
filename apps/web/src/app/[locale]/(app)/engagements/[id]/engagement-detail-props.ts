@@ -29,6 +29,13 @@ export interface EngagementDetailProps {
   artifacts: EngagementArtifactRecord[];
   events: EngagementEventRecord[];
   changeOrders: EngagementChangeOrderRecord[];
+  /**
+   * The transition ledger. Two readers: the Timeline draws it, and the cockpit
+   * folds the IDEMPOTENCY KEYS on these rows into the set that decides whether a
+   * key it is still holding has landed (`landedKeysOf` → `hasLanded`). That is
+   * why the row carries `idempotencyKey`, and why this contract, not a second
+   * query, is where the keys come from.
+   */
   transitions: EngagementTransitionRecord[];
   clientActivity: EngagementClientActivityRecord[];
   boqSummary: BoqStepSummary | null;

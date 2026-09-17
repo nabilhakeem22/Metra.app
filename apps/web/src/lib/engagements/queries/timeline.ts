@@ -16,6 +16,16 @@ export interface EngagementTransitionRecord {
   toState: DesignEngagementState | null;
   actorUserId: string | null;
   note: string | null;
+  /**
+   * The key the cockpit sent with the attempt that wrote this row, where 0050
+   * records one (self-loop edges; NULL on every other edge and on every row
+   * written before 0050). Selected because the cockpit ANSWERS A QUESTION WITH
+   * IT: a key it is still holding for an attempt it was never told the outcome
+   * of has landed iff a row here carries that exact key — see
+   * `@/lib/engagements/held-key`. It is an opaque UUID this client minted, never
+   * a secret and never rendered.
+   */
+  idempotencyKey: string | null;
   decidedAt: Date;
 }
 
@@ -37,6 +47,7 @@ export function getEngagementTransitions(
         toState: engagementTransitions.toState,
         actorUserId: engagementTransitions.actorUserId,
         note: engagementTransitions.note,
+        idempotencyKey: engagementTransitions.idempotencyKey,
         decidedAt: engagementTransitions.decidedAt,
       })
       .from(engagementTransitions)

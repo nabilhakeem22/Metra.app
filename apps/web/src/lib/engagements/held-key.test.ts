@@ -6,7 +6,7 @@ import {
   hasLanded,
   isHeldKeyLive,
   keyForAttempt,
-  latestTransitionAtByTrigger,
+  landedKeysOf,
   type HeldKey,
   type HeldKeyTrigger,
 } from './held-key';
@@ -155,46 +155,51 @@ describe('isHeldKeyLive', () => {
   });
 });
 
+/**
+ * RT1: this used to compare the BROWSER's `heldAt` against POSTGRES's
+ * `decidedAt`, so a laptop running behind the server dropped a key that was
+ * still live and the retry went out as a new act. It is an identity check now,
+ * and the clocks cannot reach it.
+ */
 describe('hasLanded', () => {
   const entry: HeldKey = { key: 'held-key', heldAt: NOW };
+  const landed = (...keys: string[]) => new Set(keys);
 
-  it('is true when the engagement recorded that act AFTER the attempt', () => {
-    expect(hasLanded(entry, NOW + 1_000)).toBe(true);
+  it('is true when the ledger carries THIS key', () => {
+    expect(hasLanded(entry, landed('other-key', 'held-key'))).toBe(true);
   });
 
-  it('is false for a transition that predates the attempt', () => {
-    // Somebody else's earlier act at the same trigger says nothing about ours.
-    expect(hasLanded(entry, NOW - 1_000)).toBe(false);
-  });
-
-  it('HOLDS on a tie, and on a trigger with no transition at all', () => {
-    // Two clocks (the browser and Postgres). Wrongly holding a key costs
-    // nothing; wrongly dropping one is the double-apply.
-    expect(hasLanded(entry, NOW)).toBe(false);
+  it('is false when it carries other keys, or none', () => {
+    expect(hasLanded(entry, landed('other-key'))).toBe(false);
+    expect(hasLanded(entry, landed())).toBe(false);
     expect(hasLanded(entry, undefined)).toBe(false);
-    expect(hasLanded(undefined, NOW + 1_000)).toBe(false);
+    expect(hasLanded(undefined, landed('held-key'))).toBe(false);
+  });
+
+  it('IGNORES THE CLOCKS, in both directions', () => {
+    // The browser ten minutes BEHIND the server, with a transition from an
+    // earlier act at the same trigger: the old rule dropped this live key.
+    const skewedBehind: HeldKey = { key: 'held-key', heldAt: NOW - 10 * 60_000 };
+    expect(hasLanded(skewedBehind, landed('an-earlier-act'))).toBe(false);
+    // And a browser AHEAD of the server does not hold a key the ledger carries.
+    const skewedAhead: HeldKey = { key: 'held-key', heldAt: NOW + 10 * 60_000 };
+    expect(hasLanded(skewedAhead, landed('held-key'))).toBe(true);
   });
 });
 
-describe('latestTransitionAtByTrigger', () => {
-  const at = (iso: string) => new Date(iso);
-
-  it('takes the NEWEST row per trigger, whatever order the ledger arrives in', () => {
-    const latest = latestTransitionAtByTrigger([
-      { trigger: 'requestRevision', decidedAt: at('2026-09-17T09:00:00.000Z') },
-      { trigger: 'requestRevision', decidedAt: at('2026-09-17T11:00:00.000Z') },
-      { trigger: 'approveDesign', decidedAt: at('2026-09-17T10:00:00.000Z') },
+describe('landedKeysOf', () => {
+  it('collects every key the ledger carries, whatever order it arrives in', () => {
+    const landed = landedKeysOf([
+      { idempotencyKey: 'key-a' },
+      { idempotencyKey: 'key-b' },
+      { idempotencyKey: 'key-a' },
     ]);
-    expect(latest.get('requestRevision')).toBe(Date.parse('2026-09-17T11:00:00.000Z'));
-    expect(latest.get('approveDesign')).toBe(Date.parse('2026-09-17T10:00:00.000Z'));
+    expect([...landed].sort()).toEqual(['key-a', 'key-b']);
   });
 
-  it('skips the rows that name no trigger, and reports nothing for an empty ledger', () => {
-    // A correction row carries a null trigger; it is not an act anyone retries.
-    const latest = latestTransitionAtByTrigger([
-      { trigger: null, decidedAt: at('2026-09-17T12:00:00.000Z') },
-    ]);
-    expect(latest.size).toBe(0);
-    expect(latestTransitionAtByTrigger([]).size).toBe(0);
+  it('ignores the rows that carry no key, and reports nothing for an empty ledger', () => {
+    // Every edge that is not a self-loop, and every row written before 0050.
+    expect(landedKeysOf([{ idempotencyKey: null }]).size).toBe(0);
+    expect(landedKeysOf([]).size).toBe(0);
   });
 });
