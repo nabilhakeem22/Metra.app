@@ -126,21 +126,22 @@ jobs:
       # legitimately need more, split the merge, or raise MAX_PENDING_MIGRATIONS
       # in the SAME commit that explains why. The count goes to the run summary
       # either way, so the number is visible on a green run too.
+      #
+      # The script lives in the repo rather than inline HERE so that the text CI
+      # runs is the text a dry run exercises - an inline copy and a local
+      # reproduction drift, and this gate's failure mode is silence. It also
+      # carries the base selection, which is not one rule: a push to `main` is
+      # measured against `github.event.before`, because merge-base(main, main) is
+      # HEAD and made every main push count 0. Everything else keeps the
+      # merge-base with origin/main. The values are passed through `env:` rather
+      # than interpolated into the shell.
       - name: Migration batch size
         env:
           MAX_PENDING_MIGRATIONS: '4'
-        run: |
-          set -euo pipefail
-          git fetch --no-tags --quiet origin main
-          base="$(git merge-base origin/main HEAD)"
-          count="$(git diff --name-only --diff-filter=A "$base" HEAD -- packages/db/migrations | grep -c '\.sql$' || true)"
-          line="pending migrations: $count / $MAX_PENDING_MIGRATIONS"
-          echo "$line"
-          echo "$line" >> "$GITHUB_STEP_SUMMARY"
-          if [ "$count" -gt "$MAX_PENDING_MIGRATIONS" ]; then
-            echo "::error::$line - one db:migrate transaction would hold ACCESS EXCLUSIVE for the whole batch. Split the merge, or raise MAX_PENDING_MIGRATIONS in the same commit that explains why."
-            exit 1
-          fi
+          EVENT_NAME: ${{ github.event_name }}
+          REF_NAME: ${{ github.ref_name }}
+          BEFORE_SHA: ${{ github.event.before }}
+        run: bash scripts/ci/count-pending-migrations.sh
 
       - name: Apply migrations
         run: npm run migrate -w @metra/db

@@ -259,14 +259,32 @@ Splitting `policies.sql` into six cut this worst case from **46 tables at once t
 11**. Every statement under `rls/` is idempotent, so the recovery is to re-run
 the command from the top.
 
-CI now counts the migrations a branch ADDS relative to `main` and fails above
+CI counts **the batch a single deploy of this ref would apply** and fails above
 **`MAX_PENDING_MIGRATIONS = 4`** (`.github/workflows/ci.yml`, step *"Migration
-batch size"*). The count is written to the run's step summary as
-`pending migrations: N / 4` **either way**, so the number is visible on a green
-run too, and it needs the `fetch-depth: 0` on the checkout - a depth-1 clone has
-no merge base to count against. Four DDL migrations in one `db:migrate`
-transaction is comfortable; ten is not. If you legitimately need more, split the
-merge, or raise the constant **in the same commit that explains why**.
+batch size"*, running `scripts/ci/count-pending-migrations.sh`). The count is
+written to the run's step summary as `pending migrations: N / 4 (base: ...)`
+**either way**, so the number is visible on a green run too, and it needs the
+`fetch-depth: 0` on the checkout — a depth-1 clone has no base to count against.
+Four DDL migrations in one `db:migrate` transaction is comfortable; ten is not.
+If you legitimately need more, split the merge, or raise the constant **in the
+same commit that explains why**.
+
+**The base is not one rule, and that was a real hole.** On a push to `main` the
+base is `github.event.before`, the previous main tip. It used to be
+`git merge-base origin/main HEAD`, which on a main push *is* HEAD — so the count
+was always **0** and pushes to `main` were **structurally ungated**: a squash
+merge landing four migrations went green by construction. On every other ref the
+merge-base with `origin/main` is kept, because the branch delta is what a
+reviewer is being asked to approve. A base that is absent, all-zeroes (a
+first/force push) or not in the clone falls back to `HEAD~1` with a
+`::warning::`; it never aborts the job with a 128.
+
+**What it cannot see:** the target database's `drizzle.__drizzle_migrations`.
+Anything already merged but not yet applied by the lead is part of the real
+pending batch and is not counted here. Two branches adding four each are both
+green, and `main` then holds eight for one `db:migrate`. The pre-merge
+`assert-schema-applied` run above is where "pending on THIS database" is
+knowable; this gate is the cheap fence that stops one branch proposing ten.
 
 ### Recovery: acknowledgements recorded between the 0048 and 0049 deploys
 
