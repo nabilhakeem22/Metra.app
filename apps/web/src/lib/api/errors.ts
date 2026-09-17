@@ -124,7 +124,6 @@ export const ACTION_CODE_PROBLEM: Record<ActionCode, ApiProblemKind> = {
   engagement_not_found: 'bad-request',
   engagement_not_active: 'bad-request',
   illegal_trigger: 'bad-request',
-  transition_not_yet_enabled: 'bad-request',
   engagement_state_conflict: 'bad-request',
   guard_scope_inputs_missing: 'bad-request',
   design_fee_required: 'bad-request',

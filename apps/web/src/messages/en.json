@@ -495,7 +495,6 @@
     "engagement_not_found": "This delivery could not be found",
     "engagement_not_active": "This delivery is closed — no payments can be recorded",
     "illegal_trigger": "This action isn't allowed from the current stage",
-    "transition_not_yet_enabled": "This step isn't available yet",
     "engagement_state_conflict": "This delivery was just updated — reload and try again",
     "guard_scope_inputs_missing": "Add a title, client, and project before continuing",
     "design_fee_required": "Enter a design fee greater than zero",

@@ -495,7 +495,6 @@
     "engagement_not_found": "التسليم ده مش موجود",
     "engagement_not_active": "التسليم ده مقفول، ومينفعش تسجل دفعات",
     "illegal_trigger": "الإجراء ده مش مسموح بيه في المرحلة الحالية",
-    "transition_not_yet_enabled": "الخطوة دي لسه مش متاحة",
     "engagement_state_conflict": "التسليم ده لسه متحدث حالا، اعمل تحديث للصفحة وجرب تاني",
     "guard_scope_inputs_missing": "ضيف عنوان وعميل ومشروع الأول عشان تكمل",
     "design_fee_required": "دخل أتعاب تصميم أكبر من الصفر",

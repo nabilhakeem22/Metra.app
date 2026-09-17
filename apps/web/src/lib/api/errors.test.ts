@@ -63,7 +63,6 @@ const ALL_CODES: ActionCode[] = [
   'engagement_not_found',
   'engagement_not_active',
   'illegal_trigger',
-  'transition_not_yet_enabled',
   'engagement_state_conflict',
   'guard_scope_inputs_missing',
   'design_fee_required',

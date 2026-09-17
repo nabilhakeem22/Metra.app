@@ -113,14 +113,14 @@ describe('executeTransition — submitDesignFee (Design-Engagement Machine, Step
   });
 
   it('a failing guard -> its coded reason, state + ledger untouched', async () => {
-    // This replaces the old `transition_not_yet_enabled` case. That test drove
-    // `designChangeRaised`, the last trigger parked on the fail-closed
-    // `pendingGuard` sentinel — the 3D revision loop wired it, so NO edge routes
-    // through the sentinel any more and the executor can no longer reach that
-    // branch through a real trigger (`transitions.test.ts` pins that emptiness;
-    // `guards.test.ts` still pins the sentinel's own verdict). The property this
-    // case actually protects — a guard failure rolls the whole transition back —
-    // is preserved here against a REAL guard instead.
+    // This replaces a case that drove `designChangeRaised` while it was still
+    // parked on the fail-closed `pendingGuard` sentinel. The 3D revision loop
+    // wired that trigger, so no edge routes through the sentinel any more
+    // (`transitions.test.ts` pins that emptiness), wave 4 deleted `pendingGuard`
+    // itself, and wave 5 deleted the ActionCode it used to return — which had no
+    // producer left anywhere in the tree. The property this case actually
+    // protects — a guard failure rolls the whole transition back — is preserved
+    // here against a REAL guard instead.
     const { ctx, engagementId } = await setup();
     await executeTransition(ctx, { engagementId, trigger: 'submitDesignFee', payload: VALID_FEE });
     expect(await stateOf(engagementId)).toBe('design_proposal');

@@ -40,7 +40,6 @@ export const DEFINITE_REFUSALS: ReadonlySet<ActionCode> = new Set<ActionCode>([
   'handoff_not_open',
   'immutable',
   // Guard verdicts — pure decisions taken before the state gate.
-  'transition_not_yet_enabled',
   'guard_scope_inputs_missing',
   'deposit_not_cleared',
   'gate_a_not_cleared',
