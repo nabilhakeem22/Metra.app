@@ -3,6 +3,8 @@ import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { messageAt, renderWithIntl } from '@/test/render-with-intl';
 import type { CapturedToast } from '@/test/doubles';
 import type { BoqDetail } from '@/lib/boqs/queries';
+import { formatMoney } from '@/lib/format/money';
+import { formatQuantity } from '@/lib/format/number';
 import { BoqSheet } from './boq-sheet';
 
 // @/lib/boqs/actions is 'use server' — it reaches requireOrg and the whole
@@ -214,5 +216,36 @@ describe('BoqSheet — the refusal paths', () => {
     });
     expect(actions.updateBoqLine).not.toHaveBeenCalled();
     expect(toasts).toHaveLength(0);
+  });
+});
+
+/**
+ * Wave-5 remediation R2: the read-only figures are formatted INSIDE the branch
+ * that renders them. The split hoisted both calls above the `canEdit` branch, so
+ * an editable sheet formatted two numbers per row that it then threw away --
+ * measured at 2,000 lines: 4,103 formatMoney + 2,000 formatQuantity calls per
+ * keystroke, against 2,103 + 0 once the calls went back where main had them.
+ *
+ * Nothing had ever rendered the read-only sheet, so moving them back could have
+ * emptied those cells in silence. This is what stops that.
+ */
+describe('BoqSheet \u2014 the issued (read-only) sheet still shows its figures', () => {
+  test('the quantity and rate cells carry the STORED figures, formatted', () => {
+    const view = renderWithIntl(<BoqSheet boq={boqFixture()} canEdit={false} />);
+
+    // No cell inputs at all: an issued sheet is not typed into. (The header's
+    // search box is not a cell and stays.)
+    expect(view.container.querySelectorAll('input[data-col]')).toHaveLength(0);
+
+    const cells = [...view.container.querySelectorAll('td')].map(
+      (cell) => cell.textContent?.trim() ?? '',
+    );
+    const quantity = formatQuantity('4.0000', 'ar-EG');
+    const rate = formatMoney('2500.0000', 'ar-EG');
+    expect(quantity).not.toBe('');
+    expect(rate).not.toBe('');
+    expect(cells).toContain(quantity);
+    expect(cells).toContain(rate);
+    expect(cells).toContain(formatMoney('10000.0000', 'ar-EG'));
   });
 });

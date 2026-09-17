@@ -89,15 +89,17 @@ function BoqNumberCell({
   const t = useTranslations('projects.profile.boq');
   const locale = useLocale();
   const label = column === 'qty' ? t('col.qty') : t('col.rate');
-  const stored =
-    column === 'qty' ? formatQuantity(line.qty, locale) : api.money(line.unitPrice);
   return (
     <Td num>
       {api.canEdit ? (
         <EditableCell line={line} column={column} label={label} api={api} mono numeric />
       ) : (
+        // FORMATTED INSIDE THE BRANCH THAT RENDERS IT. Hoisted out, an editable
+        // sheet -- the only mode you can type in -- paid for a number it threw
+        // away on every row of every render: two fresh Intl.NumberFormat
+        // instances per row, 4,000 of them per keystroke at 2,000 lines.
         <span className={READ_ONLY_NUMBER} dir="ltr">
-          {stored}
+          {column === 'qty' ? formatQuantity(line.qty, locale) : api.money(line.unitPrice)}
         </span>
       )}
     </Td>
