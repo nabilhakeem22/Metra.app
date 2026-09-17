@@ -112,9 +112,24 @@ Estimates (pilot phase — the 5 pilot firms are an open PRD §10 decision):
 - PDF render: target < ~5s (P0 spike). Pre-pilot debt: the **N+1 identity
   resolver** (`lib/team/identities.ts` calls `getUserById` once per member) and
   the **per-page repeated auth work** (no React `cache()` dedupe). The DB
-  timeouts are DONE (`lock_timeout 5s` / `statement_timeout 20s` /
-  `idle_in_transaction_session_timeout 30s` per transaction) and so is the PDF
-  throttle (503 + `retry-after: 5` at the renderer's concurrency cap).
+  timeouts are DONE and so is the PDF throttle (503 + `retry-after: 5` at the
+  renderer's concurrency cap).
+- **Two `lock_timeout`s, on two different connections — do not quote one for the
+  other.** The **app request** transaction uses `lock_timeout 5s` /
+  `statement_timeout 20s` / `idle_in_transaction_session_timeout 30s`
+  (`packages/db/src/org-context.ts`). The **schema-changing scripts**
+  (`db:migrate`, `db:apply-rls`, the fixture purge) use
+  **`MIGRATION_LOCK_TIMEOUT = '3s'`** (`packages/db/src/scripts/lock-timeout.ts`),
+  set with `set_config` and **read back from `pg_settings`** before any DDL runs
+  because Supavisor discards startup parameters. `db:apply-rls` also sets
+  `statement_timeout 60s`, which `db:migrate` does not.
+- Measured margins, so nobody re-derives them from the wrong number: 0049 + 0050
+  hold ACCESS EXCLUSIVE for **~630 ms** against the migrator's **3 s** — a
+  **~4.8× self-abort margin**, NOT the "~8×" that came from comparing it against
+  the app's 5 s. `apply-rls`'s worst case is one file, not the run:
+  `policies/10-catalogue.sql` locks **11 tables** in one implicit transaction, so
+  **11 × 3 s = 33 s** is the bound if every one of them is blocked (the split
+  from one `policies.sql` cut this from 46 tables at once). See `docs/DEPLOY.md`.
 
 ## Third-party integrations
 

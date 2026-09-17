@@ -13,7 +13,7 @@ import { fileURLToPath } from 'node:url';
 import { createSql } from '../client';
 import { MIGRATION_DATABASE_URL } from '../env';
 import { RLS_APPLY_ORDER } from '../rls/manifest';
-import { MIGRATION_LOCK_TIMEOUT, applyLockTimeout } from './lock-timeout';
+import { MIGRATION_LOCK_TIMEOUT, applyRlsTimeouts } from './lock-timeout';
 import { declaredCounts, verifyRlsApplied } from './verify-rls-applied';
 
 const here = dirname(fileURLToPath(import.meta.url)); // packages/db/src/scripts
@@ -36,7 +36,20 @@ async function main(): Promise<number> {
     // already touched until the whole file finished. MORE files therefore means
     // more implicit transactions and strictly SHORTER individual lock windows,
     // not longer ones.
-    await applyLockTimeout(sql);
+    //
+    // WORST CASE, measured from the statement census: policies/10-catalogue.sql
+    // takes ACCESS EXCLUSIVE on ELEVEN distinct tables inside one implicit
+    // transaction, and `lock_timeout` bounds each lock WAIT, not the file - so
+    // with a blocker on every one of them the file can spend 11 x 3 s = 33 s
+    // before giving up. Realistically (one long reader on the last table) it is
+    // ~3 s of blocked writes on ten tables, then 55P03 and a clean roll-back of
+    // that file. The split cut this from 46 tables at once to 11.
+    //
+    // `statement_timeout` is the OTHER half and is why applyRlsTimeouts, not
+    // applyLockTimeout: lock_timeout bounds a lock wait and nothing else, so a
+    // half-open Supavisor socket after a successful connect leaves `sql.unsafe`
+    // waiting forever with no error. 60 s turns that into 57014.
+    await applyRlsTimeouts(sql);
     for (const file of files) {
       const path = resolve(rlsDir, file);
       const content = readFileSync(path, 'utf8');

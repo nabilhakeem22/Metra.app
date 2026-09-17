@@ -116,12 +116,16 @@ jobs:
 
       # O9 - `db:migrate` runs every PENDING migration as ONE transaction, so the
       # ACCESS EXCLUSIVE window is the sum of the batch, not of one file. 0049 +
-      # 0050 measured ~630 ms against a 5 s lock_timeout (~8x headroom); ten DDL
-      # migrations in one batch would not be. This counts what the ref adds
-      # relative to `main` and fails above the constant. If you legitimately need
-      # more, split the merge, or raise MAX_PENDING_MIGRATIONS in the SAME commit
-      # that explains why. The count goes to the run summary either way, so the
-      # number is visible on a green run too.
+      # 0050 measured ~630 ms against the MIGRATOR's OWN lock_timeout of 3 s
+      # (`packages/db/src/scripts/lock-timeout.ts`) - a ~4.8x self-abort margin.
+      # It is NOT the app's 5 s: that is `org-context.ts`, a different connection
+      # answering a different question, and the earlier "~8x headroom" here
+      # compared the migrator's window against the app's bound. Ten DDL
+      # migrations in one batch would not fit that margin. This counts the batch
+      # a single deploy would apply and fails above the constant. If you
+      # legitimately need more, split the merge, or raise MAX_PENDING_MIGRATIONS
+      # in the SAME commit that explains why. The count goes to the run summary
+      # either way, so the number is visible on a green run too.
       - name: Migration batch size
         env:
           MAX_PENDING_MIGRATIONS: '4'

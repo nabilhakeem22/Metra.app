@@ -210,18 +210,54 @@ Migrations are hand-authored, additive, and applied as ONE transaction by
 `npm run db:migrate`. RLS objects never live in one (see *The pre-merge
 database step*).
 
+### The two `lock_timeout`s, and which one decides
+
+There are two, on two different connections, and they answer two different
+questions. Mixing them up is how the earlier "~8× headroom" in this file got
+written.
+
+| setting | where | value | what it bounds |
+|---|---|---|---|
+| `MIGRATION_LOCK_TIMEOUT` | `packages/db/src/scripts/lock-timeout.ts` | **`3s`** | how long **`db:migrate`, `db:apply-rls` and the fixture purge** will WAIT for a table lock before giving up with 55P03 |
+| the app's | `packages/db/src/org-context.ts:47` | `5s` | how long a **request** will wait, per transaction |
+
+`db:migrate` sets its own `lock_timeout = 3 s` **and reads it back from
+`pg_settings` before any DDL runs** — Supabase's session pooler discards a
+client's startup parameters, so an unverified setting is one that silently did
+nothing. A blocked run aborts with 55P03 and rolls the whole batch back.
+
+`db:apply-rls` additionally sets **`statement_timeout = 60 s`**, read back the
+same way. `lock_timeout` bounds each lock WAIT and nothing else, so after a
+successful connect a half-open pooler socket would otherwise leave the applier
+waiting forever with no error, on no deadline.
+
 ### The migrator's lock window grows with every appended migration
 
 `npm run db:migrate` runs the pending files as ONE transaction. 0049 and 0050
 together hold ACCESS EXCLUSIVE on `engagement_events` and
-`engagement_transitions` for about five round trips (~630 ms from a workstation;
-the app's own `lock_timeout` is 5 s, so roughly 8× headroom). That headroom is
-not a constant: each migration appended to the same pending batch adds its
-statements to the same lock window. Two DDL migrations are comfortable, ten are
-not. If a batch ever grows past a handful of table-rewriting statements, run it
-in smaller batches or in a maintenance window rather than trusting the margin.
-Atomicity is the compensation: a 55P03 rolls the whole batch back, so a failed
-migrate leaves the previous indexes intact.
+`engagement_transitions` for about five round trips (**~630 ms** from a
+workstation). Against the migrator's own 3 s that is a **~4.8× self-abort
+margin** — the figure that decides whether `db:migrate` gives up, and the only
+one that matters here. The app's 5 s is a different connection and does not
+apply. That margin is not a constant: each migration appended to the same pending
+batch adds its statements to the same lock window. Two DDL migrations are
+comfortable, ten are not. If a batch ever grows past a handful of table-rewriting
+statements, run it in smaller batches or in a maintenance window rather than
+trusting the margin. Atomicity is the compensation: a 55P03 rolls the whole batch
+back, so a failed migrate leaves the previous indexes intact.
+
+### `apply-rls`'s worst case is one file, not the run
+
+Each `rls/*.sql` file goes over the simple query protocol as ONE implicit
+transaction, so every ACCESS EXCLUSIVE lock it takes is held until that file
+finishes — and `lock_timeout` bounds each lock WAIT, not the file. The biggest
+is **`policies/10-catalogue.sql`, which locks 11 distinct tables**, so with a
+blocker on every one of them that file can spend **11 × 3 s = 33 s** before
+giving up. The realistic case — one long reader on the last table — is ~3 s of
+blocked writes on ten tables, then 55P03 and a clean roll-back of *that file*.
+Splitting `policies.sql` into six cut this worst case from **46 tables at once to
+11**. Every statement under `rls/` is idempotent, so the recovery is to re-run
+the command from the top.
 
 CI now counts the migrations a branch ADDS relative to `main` and fails above
 **`MAX_PENDING_MIGRATIONS = 4`** (`.github/workflows/ci.yml`, step *"Migration
