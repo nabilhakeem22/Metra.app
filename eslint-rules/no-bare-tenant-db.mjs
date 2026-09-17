@@ -101,20 +101,47 @@
 // the statement it is handed is a `select public.app_*(…)`, so both halves of
 // "this socket only ever runs token SDFs" are enforced rather than documented.
 //
-// WHAT IT COVERS, exactly: every way one module can name another in source —
-// `import … from`, a bare side-effect `import '…'`, `export { … } from`,
-// `export * from`, and `import('…')` with a literal or interpolation-free
-// template specifier. The rule judges the RESOLVED MODULE and reports at the
-// specifier, so a file that RE-EXPORTS a runner is reported at its own
-// `export … from` and its consumers cannot reach the runner by a legal path.
+// WHAT IT COVERS, exactly — the seven source forms that name a module, across
+// six visitors, each with a RuleTester case:
+//        `import … from '…'`            ImportDeclaration
+//        `import '…'` (side effect)     ImportDeclaration
+//        `export { … } from '…'`        ExportNamedDeclaration
+//        `export * from '…'`            ExportAllDeclaration
+//        `import('…')`                  ImportExpression
+//        `import x = require('…')`      TSImportEqualsDeclaration
+//        `require('…')`                 CallExpression
+// The last two are covered because the SIBLING gate covers them: the
+// `ts.preProcessFile` scanner in `apps/web/src/lib/module-shape.test.ts` returns
+// a specifier for both `require` shapes, and "one rule, two hosts" is only true
+// if both hosts see the same shapes. They are belt-and-braces in apps/web —
+// `@typescript-eslint/no-require-imports` is error repo-wide (eslint.config.mjs)
+// and the Worker bundle is ESM — but the fence should not depend on another
+// rule staying switched on. The specifier may be a string literal or an
+// interpolation-free template in every form. The rule judges the RESOLVED
+// MODULE and reports at the specifier, so a file that RE-EXPORTS a runner is
+// reported at its own `export … from` and its consumers cannot reach the runner
+// by a legal path.
 //
-// WHAT IT CANNOT COVER, stated plainly rather than implied: a specifier computed
-// at runtime (`await import(modulePath)`), a reflective read
-// (`globalThis[name]`), or a runner handed across a module boundary as a value.
-// A syntax rule cannot see any of those, and the previous version's attempt to —
-// reporting every IDENTIFIER named `readSdfJson` — bought no real coverage and
-// cost a false positive on a local function that merely shared the name (W3-3).
-// The RUNTIME assertion inside `sdf-call.ts` is the backstop for all three.
+// WHAT IT CANNOT COVER, stated exactly rather than implied. Two shapes, both
+// demonstrated against this rule and both returning zero messages:
+//        `import(`@/lib/share/sdf-${part}`)`   an interpolated template
+//        `import(modulePath)`                  an identifier
+// The sibling `ts.preProcessFile` scanner returns [] for them too, so neither
+// host sees a computed specifier; no such call site exists today (the only
+// importers are the seven allowlisted portals). Also out of reach: a reflective
+// read (`globalThis[name]`) and a runner handed across a module boundary as a
+// VALUE. A syntax rule cannot see any of these, and the previous version's
+// attempt to — reporting every IDENTIFIER named `readSdfJson` — bought no real
+// coverage and cost a false positive on a local function that merely shared the
+// name (W3-3).
+//
+// WHAT THE RUNTIME BACKSTOP ACTUALLY BUYS, stated precisely because the previous
+// wording over-claimed it: `assertTokenSdf` in `sdf-call.ts` constrains the
+// STATEMENT, not the CALLER. It refuses anything that is not a
+// `select public.app_*(…)`, so a module reached by a computed specifier still
+// cannot run `select * from clients` on the BYPASSRLS socket. It does NOT
+// establish that the caller was entitled to run a token SDF at all — that half
+// is the allowlist above, and the allowlist is a syntax rule.
 
 /** Query methods that actually touch data — Drizzle builders plus postgres.js's
  * `.unsafe`. `transaction` is deliberately excluded: it only opens a tx; the risk
@@ -288,7 +315,30 @@ export const noBareTenantDb = {
       context.report({ node: source, messageId: 'sdfCallerNotAllowlisted' });
     };
 
-    const sdfCallerVisitors = isSdfCallerAllowlisted(filename)
+    /**
+     * The specifier node of a `require('…')` naming the fenced module, or null.
+     * Exported through `reportSdfRequire` rather than inlined because the main
+     * visitor set has its OWN `CallExpression` — the spread below would silently
+     * drop a second one, which is the kind of quiet hole this fence exists to
+     * close.
+     */
+    const sdfRequireSpecifier = (node) => {
+      if (node.callee.type !== 'Identifier' || node.callee.name !== 'require') return null;
+      const [first] = node.arguments;
+      if (!first) return null;
+      const specifier = staticKeyName(true, first);
+      return specifier !== null && isSdfCallModule(specifier) ? first : null;
+    };
+
+    const sdfCallerFenced = !isSdfCallerAllowlisted(filename);
+
+    const reportSdfRequire = (node) => {
+      if (!sdfCallerFenced) return;
+      const specifier = sdfRequireSpecifier(node);
+      if (specifier) context.report({ node: specifier, messageId: 'sdfCallerNotAllowlisted' });
+    };
+
+    const sdfCallerVisitors = !sdfCallerFenced
       ? {}
       : {
           // `import … from '…'` AND the bare side-effect `import '…'`: both are
@@ -315,6 +365,22 @@ export const noBareTenantDb = {
             const specifier = staticKeyName(true, node.source);
             if (specifier === null || !isSdfCallModule(specifier)) return;
             context.report({ node: node.source, messageId: 'sdfCallerNotAllowlisted' });
+          },
+          // `import runner = require('…')` — TypeScript's own import form. Its
+          // module reference is a TSExternalModuleReference wrapping the literal.
+          TSImportEqualsDeclaration(node) {
+            const reference = node.moduleReference;
+            if (!reference || reference.type !== 'TSExternalModuleReference') return;
+            const specifier = staticKeyName(true, reference.expression);
+            if (specifier === null || !isSdfCallModule(specifier)) return;
+            context.report({ node: reference.expression, messageId: 'sdfCallerNotAllowlisted' });
+          },
+          // `require('…')` as an expression. Only reached when the file is
+          // allowlisted for the BASE connection (the early return below hands
+          // back exactly this object); every other file goes through the main
+          // CallExpression visitor, which calls the same helper first.
+          CallExpression(node) {
+            reportSdfRequire(node);
           },
         };
 
@@ -495,6 +561,9 @@ export const noBareTenantDb = {
         });
       },
       CallExpression(node) {
+        // The spread above cannot carry a second `CallExpression`, so the SDF
+        // fence's `require('…')` branch is invoked here by hand.
+        reportSdfRequire(node);
         const callee = node.callee;
         if (callee.type === 'Identifier') {
           // A plain call: the hazard is handing the raw handle to a helper that

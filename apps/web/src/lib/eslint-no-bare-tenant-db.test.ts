@@ -97,6 +97,17 @@ it('no-bare-tenant-db: flags raw-connection queries, allows scoped ones', () => 
         filename: 'apps/web/src/lib/share/sdf-call.test.ts',
         code: "import { readSdfJson } from './sdf-call';\nreadSdfJson(q);",
       },
+      // An allowlisted portal may reach the module by ANY of the six forms.
+      {
+        filename: 'apps/web/src/lib/proposals/public.ts',
+        code: "const m = require('@/lib/share/sdf-call');\n",
+      },
+      // A `require` of anything else is not this rule's business, and neither is
+      // a local function that merely shares the name (the W3-3 false positive).
+      {
+        filename: 'apps/web/src/lib/clients/queries.ts',
+        code: "const fs = require('node:fs');\nconst q = require(somePath);",
+      },
       // A property that merely SHARES a runner's name is not a reference to it.
       {
         filename: 'apps/web/src/lib/clients/queries.ts',
@@ -337,6 +348,36 @@ it('no-bare-tenant-db: flags raw-connection queries, allows scoped ones', () => 
       {
         filename: 'apps/web/src/lib/automation/runner.ts',
         code: "import { readSdfJson } from '@/lib/share/sdf-call';\n",
+        errors: [{ messageId: 'sdfCallerNotAllowlisted' }],
+      },
+      // S1/F3: `require('…')`. The sibling gate's `ts.preProcessFile` scanner
+      // DOES return a specifier for this shape, so a fence that did not see it
+      // made "one rule, two hosts" false. Belt-and-braces in apps/web —
+      // `@typescript-eslint/no-require-imports` is error repo-wide — but the
+      // fence must not depend on another rule staying switched on.
+      {
+        filename: 'apps/web/src/lib/clients/secprobe-sdf.ts',
+        code: "const m = require('@/lib/share/sdf-call');\nm.readSdfJson(q);",
+        errors: [{ messageId: 'sdfCallerNotAllowlisted' }],
+      },
+      // …spelled relatively, with the extension, and with a template literal
+      // instead of quotes: one module, three punctuations.
+      {
+        filename: 'apps/web/src/lib/clients/secprobe-sdf.ts',
+        code: "const m = require(`../share/sdf-call.ts`);\n",
+        errors: [{ messageId: 'sdfCallerNotAllowlisted' }],
+      },
+      // `import x = require('…')` — TypeScript's own form, a different AST node.
+      {
+        filename: 'apps/web/src/lib/clients/secprobe-sdf.ts',
+        code: "import runner = require('@/lib/share/sdf-call');\nrunner.readSdfCode(q);",
+        errors: [{ messageId: 'sdfCallerNotAllowlisted' }],
+      },
+      // A file allowlisted for the BASE connection takes the early return, which
+      // hands back the SDF visitors alone — the require branch must survive it.
+      {
+        filename: 'apps/web/src/lib/automation/runner.ts',
+        code: "const m = require('@/lib/share/sdf-call');\n",
         errors: [{ messageId: 'sdfCallerNotAllowlisted' }],
       },
     ],
