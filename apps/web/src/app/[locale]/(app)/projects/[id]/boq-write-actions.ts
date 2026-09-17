@@ -14,6 +14,7 @@ import type { BoqDetail } from '@/lib/boqs/queries';
 import { resolveActionError } from '@/lib/actions/error-message';
 import type { ActionCode } from '@/lib/actions/result';
 import { recordValue, trimNumber, type Column, type EditableLine } from './boq-sheet-columns';
+import { cellKey, type CellWriteLatch } from './cell-write-latch';
 import type { BoqEditsApi } from './use-boq-edits';
 
 /**
@@ -32,6 +33,8 @@ export interface WriteContext {
   boq: BoqDetail;
   edits: BoqEditsApi;
   start: TransitionStartFunction;
+  /** Orders two saves of the SAME cell — see cell-write-latch.ts. */
+  latch: CellWriteLatch;
   sheetText: (key: string) => string;
   errorText: (key: string) => string;
 }
@@ -43,7 +46,16 @@ function refuse(context: WriteContext, code: ActionCode | undefined): void {
   });
 }
 
-/** Commit one line. Called on blur, and only when something actually changed. */
+/**
+ * Commit one line. Called on blur, and only when something actually changed.
+ *
+ * THE CELL IS LATCHED, so a second save of the same cell WAITS for the first
+ * rather than racing it — the whole reason is in cell-write-latch.ts. The row is
+ * marked saving SYNCHRONOUSLY, before anything is queued, so a write that is
+ * merely waiting its turn still shows as unsaved; `markSaving` counts, so the
+ * first write finishing does not report "all saved" over a second still in
+ * flight.
+ */
 export function saveLine(
   context: WriteContext,
   line: EditableLine,
@@ -51,22 +63,29 @@ export function saveLine(
   columns: Column[],
 ): void {
   context.edits.markSaving(line.id, true);
-  context.start(async () => {
-    try {
-      const result = await updateBoqLine({ lineId: line.id, patch });
-      // Drop the local edit so the revalidated record takes over. Anything still
-      // being typed in another cell of the same row is untouched.
-      if (result.ok) context.edits.clearColumns(line.id, columns);
-      // The edit STAYS on screen when the server refuses it. Reverting to the
-      // stored value would throw away what the studio typed and leave them
-      // guessing which cell was wrong.
-      else refuse(context, result.error);
-    } catch {
-      toast({ title: context.sheetText('saveFailed'), variant: 'destructive' });
-    } finally {
-      context.edits.markSaving(line.id, false);
-    }
-  });
+  context.start(() =>
+    context.latch.run(cellKey(line.id, columns), async () => {
+      try {
+        const result = await updateBoqLine({ lineId: line.id, patch });
+        // Drop the local edit so the revalidated record takes over. Anything still
+        // being typed in another cell of the same row is untouched.
+        if (result.ok) context.edits.clearColumns(line.id, columns);
+        // The edit STAYS on screen when the server refuses it. Reverting to the
+        // stored value would throw away what the studio typed and leave them
+        // guessing which cell was wrong.
+        else refuse(context, result.error);
+      } catch (cause) {
+        // A REJECTION LEAVES NO TRACE ANYWHERE ELSE: `mutateInOrg` never saw it,
+        // so the server has nothing, and the toast below is gone in five seconds.
+        // Logged the way use-engagement-action.ts logs its twin, so
+        // `wrangler tail` carries a failed BOQ save at all.
+        console.error('boq line save failed before returning a result', cause);
+        toast({ title: context.sheetText('saveFailed'), variant: 'destructive' });
+      } finally {
+        context.edits.markSaving(line.id, false);
+      }
+    }),
+  );
 }
 
 export function cellBlur(

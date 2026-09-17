@@ -14,6 +14,7 @@ import {
   saveLine,
   type WriteContext,
 } from './boq-write-actions';
+import { createCellWriteLatch } from './cell-write-latch';
 import type { BoqEditsApi } from './use-boq-edits';
 
 /**
@@ -43,6 +44,11 @@ export interface BoqWritesApi extends BoqWriteHandlers {
  * is assigned during render rather than in an effect, because a blur can fire
  * before the effect of the render that caused it has run, and a save must never
  * carry the previous boq.
+ *
+ * THE LATCH LIVES IN A REF FOR THE LIFE OF THE SHEET, one per mounted sheet.
+ * It has to outlive every render (a per-render latch orders nothing) and must
+ * NOT outlive the mount: its keys are line ids, and a second sheet's writes are
+ * a different document's.
  */
 export function useBoqWrites(options: {
   boq: BoqDetail;
@@ -51,8 +57,9 @@ export function useBoqWrites(options: {
   const sheetText = useTranslations('projects.profile.boq');
   const errorText = useTranslations('errors');
   const [pending, start] = useTransition();
-  const context = useRef<WriteContext>({ ...options, start, sheetText, errorText });
-  context.current = { ...options, start, sheetText, errorText };
+  const latch = useRef(createCellWriteLatch()).current;
+  const context = useRef<WriteContext>({ ...options, start, latch, sheetText, errorText });
+  context.current = { ...options, start, latch, sheetText, errorText };
 
   const handlers = useMemo<BoqWriteHandlers>(
     () => ({
