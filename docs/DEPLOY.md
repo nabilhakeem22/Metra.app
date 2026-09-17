@@ -4,7 +4,24 @@ Production runs on **Cloudflare Workers** (OpenNext adapter), worker **`metra-we
 currently served at `https://metra-web.nabil-hakeem22.workers.dev` (add a custom
 domain later via the worker's **Settings → Domains**).
 
-## How deploys happen
+## The system, in one picture
+
+Everything below assumes these. Nobody had written them down in one place.
+
+| thing | value |
+|---|---|
+| Host | Cloudflare Workers, worker **`metra-web`**, built from `apps/web` by `@opennextjs/cloudflare` |
+| URL | `https://metra-web.nabil-hakeem22.workers.dev` (a custom domain is added on the worker's **Settings -> Domains**) |
+| Postgres | Supabase `eu-west-1`, reached through the **Hyperdrive** binding to the **session pooler `:5432`**. The Worker never dials Supabase directly |
+| Files | Supabase Storage, private `metra-files` bucket, signed URLs |
+| PDF | `@cloudflare/puppeteer` on the **`BROWSER`** binding (Cloudflare Browser Rendering) - **not** a bundled Chromium |
+| Rate limit | the Workers Rate Limiting bindings in `apps/web/wrangler.jsonc` (`ratelimits`). It **fails open**; the contract is [API.md](API.md), which this file deliberately does not restate |
+| Cron | worker **`metra-cron`** (`workers/cron`), a separate wrangler project outside the npm workspaces. Needs `APP_ORIGIN` and a `CRON_SECRET` matching `metra-web`'s |
+| Deploy trigger | `deploy.yml`, on `workflow_run` of **CI** on `main`, gated on the repository variable **`DEPLOY_ENABLED == 'true'`** |
+| Rollback lever | **`npx wrangler rollback`** on the Worker - not a git revert. The command and what it does not undo are under *Rolling back* |
+| Logs | `npx wrangler tail metra-web` / `npx wrangler tail metra-cron` |
+
+## How a deploy happens
 
 `.github/workflows/deploy.yml` builds and deploys the worker automatically **after
 CI passes on `main`**. You should not need to run `wrangler deploy` by hand.
@@ -17,42 +34,14 @@ NEXT_PUBLIC_APP_URL=https://metra-web.nabil-hakeem22.workers.dev npx opennextjs-
 npx wrangler deploy
 ```
 
-## One-time activation of auto-deploy
+Auto-deploy is **on** and has been since commit `a2e9b6c`: a green CI run on
+`main` triggers `deploy.yml`, which builds and `wrangler deploy`s the worker.
+`DEPLOY_ENABLED` must be `true` or the deploy job is skipped, so a merge with
+the flag unset ships nothing and reports nothing.
 
-In GitHub → the repo → **Settings → Secrets and variables → Actions**:
+### Two things that were fixed to get here
 
-### Variables tab → New repository variable (7)
-
-| Name | Value |
-|------|-------|
-| `NEXT_PUBLIC_SUPABASE_URL` | copy from your local `.env` |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | copy from your local `.env` (public key) |
-| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | copy from your local `.env` (public key) |
-| `NEXT_PUBLIC_DEFAULT_LOCALE` | `ar-EG` |
-| `NEXT_PUBLIC_APP_URL` | `https://metra-web.nabil-hakeem22.workers.dev` |
-| `CLOUDFLARE_ACCOUNT_ID` | `0454e69f5ed32ae9b6311bc5196ef073` |
-| `DEPLOY_ENABLED` | `true`  ← set this **last**, it arms the workflow |
-
-### Secrets tab → New repository secret (1)
-
-| Name | Value |
-|------|-------|
-| `CLOUDFLARE_API_TOKEN` | create in Cloudflare (below) |
-
-**Create `CLOUDFLARE_API_TOKEN`:** Cloudflare dashboard → **My Profile → API Tokens
-→ Create Token → "Edit Cloudflare Workers"** template → Account = your account →
-Continue → Create Token → copy the value into the GitHub secret above.
-
-Once `DEPLOY_ENABLED = true`, every green push to `main` deploys. Until then the
-deploy job is skipped (no failed runs).
-
-## CI/CD notes (resolved — auto-deploy is live)
-
-Auto-deploy is **on**: a green CI run on `main` triggers `deploy.yml`, which builds
-and `wrangler deploy`s the worker. First successful auto-deploy: commit `a2e9b6c`.
-
-Two things were fixed to get here (history, so the setup isn't accidentally
-reverted):
+History, so the setup is not accidentally reverted.
 
 1. **Deterministic install.** Both workflows use **`npm ci`** against the committed
    `package-lock.json` — never `rm -f package-lock.json && npm install`. The old
@@ -74,7 +63,62 @@ reverted):
    which fails tsc on `Property 'HYPERDRIVE' does not exist on type 'CloudflareEnv'`.
    Keep the `--env-interface` flags in both `ci.yml` and `deploy.yml`.
 
-Manual `wrangler deploy` (above) still works as a fallback.
+### Re-arming auto-deploy if the repo variables are ever lost
+
+Auto-deploy is already on; what follows is the recovery procedure, not a to-do.
+In GitHub -> the repo -> **Settings -> Secrets and variables -> Actions**:
+
+#### Variables tab → New repository variable (7)
+
+| Name | Value |
+|------|-------|
+| `NEXT_PUBLIC_SUPABASE_URL` | copy from your local `.env` |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | copy from your local `.env` (public key) |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | copy from your local `.env` (public key) |
+| `NEXT_PUBLIC_DEFAULT_LOCALE` | `ar-EG` |
+| `NEXT_PUBLIC_APP_URL` | `https://metra-web.nabil-hakeem22.workers.dev` |
+| `CLOUDFLARE_ACCOUNT_ID` | `0454e69f5ed32ae9b6311bc5196ef073` |
+| `DEPLOY_ENABLED` | `true`  ← set this **last**, it arms the workflow |
+
+#### Secrets tab → New repository secret (1)
+
+| Name | Value |
+|------|-------|
+| `CLOUDFLARE_API_TOKEN` | create in Cloudflare (below) |
+
+**Create `CLOUDFLARE_API_TOKEN`:** Cloudflare dashboard → **My Profile → API Tokens
+→ Create Token → "Edit Cloudflare Workers"** template → Account = your account →
+Continue → Create Token → copy the value into the GitHub secret above.
+Set `DEPLOY_ENABLED` **last**: it is the flag that arms the workflow.
+
+## The pre-merge database step
+
+Run `npm run db:migrate`, then `npm run db:apply-rls` (RLS, roles and functions
+live there, never in a migration).
+
+Then, **every time a migration is in the diff**, prove it landed:
+
+```bash
+npm run assert-schema-applied -w @metra/db
+```
+
+It reads `information_schema` (one connection, writes nothing) and compares it
+against every column the drizzle schema declares. Exit 0 means the database is
+ready for this code; exit 1 lists exactly what is missing.
+
+`deploy.yml` cannot do this for you: it holds `CLOUDFLARE_API_TOKEN` and no
+database credential at all, which is deliberate — a deploy workflow that can
+reach production Postgres is a larger blast radius than the check is worth.
+
+**Deploying before migrating is not a degraded state for the engagement module,
+it is a TOTAL one.** Drizzle builds an explicit column list from the schema file,
+so a single missing column fails the WHOLE query with 42703
+(`undefined_column`). Measured against the live database at 0048: `select()` on
+`engagement_events` raises 42703 for `acknowledged_issue_at`, and on
+`engagement_transitions` for `idempotency_key`. `loadGuardFacts` full-row-selects
+both, so every transition fails, and with them the timeline, the ROM badge and
+the corrections path — eight call sites. There is no partial symptom to notice
+first; the module stops.
 
 ## Runtime secrets (set on the Worker, never in this repo)
 
@@ -132,7 +176,7 @@ failure to mint signed file URLs, not as a login failure.
 `CRON_SECRET` is shared with the scheduled Worker and must be rotated in BOTH
 places or the cron stops being authorised — see below.
 
-### The cron Worker is a separate deployment
+## The cron Worker is a separate deployment
 
 `workers/cron` is **not** an npm workspace and is **not** deployed by
 `deploy.yml`. It has its own `wrangler.jsonc` and is deployed on its own.
@@ -147,35 +191,9 @@ the symptom is automations silently not firing.
 
 ## Migrations
 
-Run `npm run db:migrate`, then `npm run db:apply-rls` (RLS, roles and functions
-live there, never in a migration).
-
-### Migrate BEFORE you deploy — and prove it
-
-**Owner pre-merge step, every time a migration is in the diff.** With the
-production `DATABASE_URL` in the repo-root `.env`:
-
-```bash
-npm run assert-schema-applied -w @metra/db
-```
-
-It reads `information_schema` (one connection, writes nothing) and compares it
-against every column the drizzle schema declares. Exit 0 means the database is
-ready for this code; exit 1 lists exactly what is missing.
-
-`deploy.yml` cannot do this for you: it holds `CLOUDFLARE_API_TOKEN` and no
-database credential at all, which is deliberate — a deploy workflow that can
-reach production Postgres is a larger blast radius than the check is worth.
-
-**Deploying before migrating is not a degraded state for the engagement module,
-it is a TOTAL one.** Drizzle builds an explicit column list from the schema file,
-so a single missing column fails the WHOLE query with 42703
-(`undefined_column`). Measured against the live database at 0048: `select()` on
-`engagement_events` raises 42703 for `acknowledged_issue_at`, and on
-`engagement_transitions` for `idempotency_key`. `loadGuardFacts` full-row-selects
-both, so every transition fails, and with them the timeline, the ROM badge and
-the corrections path — eight call sites. There is no partial symptom to notice
-first; the module stops.
+Migrations are hand-authored, additive, and applied as ONE transaction by
+`npm run db:migrate`. RLS objects never live in one (see *The pre-merge
+database step*).
 
 ### The migrator's lock window grows with every appended migration
 
@@ -190,7 +208,7 @@ in smaller batches or in a maintenance window rather than trusting the margin.
 Atomicity is the compensation: a 55P03 rolls the whole batch back, so a failed
 migrate leaves the previous indexes intact.
 
-### After 0048/0049: acknowledged build-cost bands must be re-issued AND re-acknowledged
+### Recovery: acknowledgements recorded between the 0048 and 0049 deploys
 
 Two migrations, one operator task, and neither backfills — by design.
 
@@ -259,11 +277,45 @@ Nothing else clears the flag; there is no backfill script, because stamping a
 date onto an old acknowledgement would be inventing evidence on an evidentiary
 record.
 
-### After 0050: nothing to do
+### After 0050 and 0051: nothing to do
 
 0050 added `engagement_transitions.idempotency_key` and its partial unique
 index. Additive and nullable: every existing row keeps a NULL key, and code
 deployed before it simply never sends one.
+
+0051 added `variation_order_events.actor_channel` and its CHECK. Additive and
+nullable in exactly the same way: rows written before it keep a NULL channel,
+and code deployed before it never sends one.
+
+## Rolling back
+
+**The lever is `wrangler`, not git.** A git revert has to go through CI and a
+rebuild before it changes anything a user sees; a Worker rollback is immediate
+and needs no build.
+
+```bash
+cd apps/web
+npx wrangler rollback metra-web            # interactive: pick the previous version
+npx wrangler deployments list              # what is deployed now, and what preceded it
+```
+
+Three things a rollback does NOT undo, and they are the reason the pre-merge
+database step exists:
+
+- **Migrations.** A rolled-back Worker runs older code against the newer schema.
+  Additive, nullable migrations are safe in that direction by construction, which
+  is why every migration in this repo is additive - a column the old code does
+  not know about is a column it never selects.
+- **`apply-rls` changes.** Policies, grants and triggers are applied out of band
+  and stay applied. Each of them has a one-line revert, which belongs in the wave
+  report that introduced it.
+- **Worker secrets.** `wrangler rollback` restores code, not secrets. A rotated
+  secret stays rotated.
+
+After rolling back, hit an authenticated page and watch `npx wrangler tail
+metra-web` for `42501` (a missing grant), `MT100` (an immutability trigger) and
+`42703` (`undefined_column` - the schema is behind the code, which means the
+migration did not run).
 
 ## Testing against a database
 
