@@ -111,8 +111,8 @@ See `.env.example` for the full list. Key notes:
 | `npm run test:isolation` | Cross-tenant RLS isolation test (needs a seeded LOCAL DB) |
 | `npm run i18n:validate` | Message-key parity, ICU placeholders, Western numerals |
 | `npm run docs:check` | Docs gate: no root `DEPLOY.md`, no stale-host mention outside `docs/BUILD-LOG.md`, no dash inside Arabic prose |
-| `npm run db:generate` | Generate a Drizzle migration from schema changes. ⚠️ **Read [docs/DEPLOY.md](docs/DEPLOY.md) first.** It diffs `src/schema/` against `migrations/meta/0051_snapshot.json`, and it can open drizzle-kit's interactive **rename prompt**, which cannot run headless. Migrations 0013–0051 were hand-authored. |
-| `npm run db:assert-snapshot` | Proves `migrations/meta/0051_snapshot.json` still describes `src/schema/`. Opens **no database** (~2 s); CI runs it on every push. |
+| `npm run db:generate` | Generate a Drizzle migration from schema changes. ⚠️ **Read [docs/DEPLOY.md](docs/DEPLOY.md) first.** It diffs `src/schema/` against the snapshot of the newest entry in `migrations/meta/_journal.json` (today `meta/0051_snapshot.json`), and it can open drizzle-kit's interactive **rename prompt**, which cannot run headless. Migrations 0013–0051 were hand-authored. |
+| `npm run db:assert-snapshot` | Proves the baseline snapshot — the one the newest journal entry names, derived, never hardcoded — still describes `src/schema/`. Opens **no database** (~2 s); CI runs it on every push. |
 | `npm run db:generate-baseline` | Rewrites that one snapshot file after a deliberate schema change. Writes nothing else, asks nothing, touches no database. |
 | `npm run db:migrate` | Apply migrations to the DB (`DATABASE_URL`) |
 | `npm run db:apply-rls` | Apply roles + RLS policies + trigger functions |

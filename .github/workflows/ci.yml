@@ -97,8 +97,11 @@ jobs:
       # The drizzle snapshot is what `generate` DIFFS AGAINST, and meta/ had gone
       # 35 snapshots behind the journal without anything saying so. This
       # regenerates into a fresh EMPTY temp directory and deep-compares against
-      # meta/0051_snapshot.json ignoring id/prevId. It runs here, before any
-      # database step, because it needs none and so should fail fast.
+      # the snapshot of the NEWEST journal entry, ignoring id/prevId. WHICH file
+      # that is comes from meta/_journal.json (snapshot-baseline.ts), never from
+      # a literal - a hardcoded 0051 made this step red on a correct tree the day
+      # a 0052 landed, and green on a stale snapshot afterwards. It runs here,
+      # before any database step, because it needs none and so should fail fast.
       #
       # `env -u DATABASE_URL` is DELIBERATE and is the assertion: the script
       # passes no --config, so drizzle.config.ts is never evaluated and no socket

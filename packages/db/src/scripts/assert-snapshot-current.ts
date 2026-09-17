@@ -1,4 +1,10 @@
-// Does `migrations/meta/0051_snapshot.json` still describe `src/schema/`?
+// Does the BASELINE SNAPSHOT still describe `src/schema/`?
+//
+// WHICH snapshot is the baseline is derived from `migrations/meta/_journal.json`
+// - the newest entry's index - and never typed here as a literal. See
+// `snapshot-baseline.ts` for why that matters: two hardcoded names (0051 and its
+// chain predecessor 0016) made this gate go red on a correct tree the moment a
+// 0052 landed, and made its own printed remedy re-arm the silent failure.
 //
 // WHY THIS EXISTS. `drizzle-kit generate` does not read the migrations FOLDER —
 // it diffs the schema against the NEWEST SNAPSHOT. `meta/` held 17 snapshots for
@@ -26,14 +32,14 @@
 // a runner. stdin is closed as well, belt and braces.
 //
 // The `.sql` the generator also writes is DISCARDED with the temp directory. Only
-// `meta/0051_snapshot.json` is ever written back.
-import { deepStrictEqual } from 'node:assert';
+// the baseline snapshot itself is ever written back.
 import { spawnSync } from 'node:child_process';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { baselineToWrite, compareWithBaseline, type Snapshot } from './snapshot-baseline';
 
 const here = dirname(fileURLToPath(import.meta.url)); // packages/db/src/scripts
 
@@ -48,10 +54,7 @@ function toPosix(path: string): string {
 }
 
 const schemaPath = toPosix(resolve(here, '../schema/index.ts'));
-const baselinePath = resolve(here, '../../migrations/meta/0051_snapshot.json');
-
-/** The snapshot chain: 0051 continues from 0016, the newest one that exists. */
-const PREV_SNAPSHOT = resolve(here, '../../migrations/meta/0016_snapshot.json');
+const migrationsFolder = resolve(here, '../../migrations');
 
 const GENERATE_TIMEOUT_MS = 180_000;
 
@@ -93,13 +96,6 @@ function drizzleKitBin(): string {
     dir = parent;
   }
 }
-
-type Snapshot = Record<string, unknown> & {
-  id?: string;
-  prevId?: string;
-  tables?: Record<string, unknown>;
-  enums?: Record<string, unknown>;
-};
 
 /** Generate into a fresh empty directory and return the snapshot it wrote. */
 function generateIntoTempDir(): Snapshot {
@@ -143,43 +139,17 @@ function generateIntoTempDir(): Snapshot {
   }
 }
 
-/** A copy without the two fields that are per-generation identity, not schema. */
-function withoutIdentity(snapshot: Snapshot): Snapshot {
-  const copy = { ...snapshot };
-  delete copy.id;
-  delete copy.prevId;
-  return copy;
+function fixInstructions(baselineName: string): string {
+  return (
+    'The drizzle snapshot is behind `src/schema/`. Re-baseline it:\n' +
+    '  npm run db:generate-baseline\n' +
+    `which writes \`migrations/${baselineName}\` and NOTHING else — it never\n` +
+    'touches a database and never asks a question. Then commit that one file.\n' +
+    'DO NOT run `drizzle-kit generate` in place to fix this: it will try to author a\n' +
+    'migration you did not ask for, and it can open a rename prompt that cannot\n' +
+    'answer itself.'
+  );
 }
-
-/** The first JSON path at which two values differ, for a useful error line. */
-function firstDifference(a: unknown, b: unknown, path = ''): string | null {
-  if (a === b) return null;
-  const bothObjects =
-    typeof a === 'object' && a !== null && typeof b === 'object' && b !== null;
-  if (!bothObjects) return path || '(root)';
-  const keys = new Set([
-    ...Object.keys(a as Record<string, unknown>),
-    ...Object.keys(b as Record<string, unknown>),
-  ]);
-  for (const key of [...keys].sort()) {
-    const next = firstDifference(
-      (a as Record<string, unknown>)[key],
-      (b as Record<string, unknown>)[key],
-      path ? `${path}.${key}` : key,
-    );
-    if (next) return next;
-  }
-  return null;
-}
-
-const FIX_INSTRUCTIONS =
-  'The drizzle snapshot is behind `src/schema/`. Re-baseline it:\n' +
-  '  npm run db:generate-baseline\n' +
-  'which writes `migrations/meta/0051_snapshot.json` and NOTHING else — it never\n' +
-  'touches a database and never asks a question. Then commit that one file.\n' +
-  'DO NOT run `drizzle-kit generate` in place to fix this: it will try to author a\n' +
-  'migration you did not ask for, and it can open a rename prompt that cannot\n' +
-  'answer itself.';
 
 function main() {
   const write = process.argv.includes('--write');
@@ -188,12 +158,19 @@ function main() {
   const enums = Object.keys(generated.enums ?? {}).length;
 
   if (write) {
-    const prevId = (JSON.parse(readFileSync(PREV_SNAPSHOT, 'utf8')) as Snapshot).id;
-    const baseline = { ...generated, prevId };
-    writeFileSync(baselinePath, `${JSON.stringify(baseline, null, 2)}\n`, 'utf8');
+    const { baselineName, previousName, baseline } = baselineToWrite(
+      generated,
+      migrationsFolder,
+    );
+    writeFileSync(
+      resolve(migrationsFolder, baselineName),
+      `${JSON.stringify(baseline, null, 2)}\n`,
+      'utf8',
+    );
     console.log(
-      `db:generate-baseline: wrote migrations/meta/0051_snapshot.json — ` +
-        `${tables} tables, ${enums} enums, prevId ${String(prevId)}.\n` +
+      `db:generate-baseline: wrote migrations/${baselineName} — ` +
+        `${tables} tables, ${enums} enums, prevId ${String(baseline.prevId)} ` +
+        `(${previousName ?? 'no earlier snapshot — this one starts the chain'}).\n` +
         'That is the ONLY file written. The .sql drizzle-kit also emits was ' +
         'discarded with the temp directory — do not go looking for it, and do ' +
         'not commit one.',
@@ -201,22 +178,26 @@ function main() {
     return;
   }
 
-  const baseline = JSON.parse(readFileSync(baselinePath, 'utf8')) as Snapshot;
-  const left = withoutIdentity(baseline);
-  const right = withoutIdentity(generated);
-  try {
-    deepStrictEqual(left, right);
-  } catch {
-    const where = firstDifference(left, right) ?? '(unknown)';
+  const comparison = compareWithBaseline(generated, migrationsFolder);
+  if (comparison.status === 'missing') {
     console.error(
-      `assert-snapshot: meta/0051_snapshot.json does NOT match the schema.\n` +
-        `First difference at: ${where}\n\n${FIX_INSTRUCTIONS}`,
+      `assert-snapshot: migrations/${comparison.baselineName} does not exist, and it is ` +
+        `what \`generate\` diffs against — journal entry ${comparison.tag} is the newest.\n\n` +
+        fixInstructions(comparison.baselineName),
+    );
+    process.exit(1);
+  }
+  if (comparison.status === 'differs') {
+    console.error(
+      `assert-snapshot: ${comparison.baselineName} does NOT match the schema.\n` +
+        `First difference at: ${comparison.difference}\n\n` +
+        fixInstructions(comparison.baselineName),
     );
     process.exit(1);
   }
   console.log(
     `assert-snapshot: OK — ${tables} tables, ${enums} enums; ` +
-      'meta/0051_snapshot.json matches the schema.',
+      `${comparison.baselineName} matches the schema.`,
   );
 }
 

@@ -2,6 +2,7 @@ import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
+import { baselineSnapshotName, snapshotName } from './snapshot-baseline';
 
 // The journal is the migrator's ONLY input. `migrate()` does not read the
 // migrations FOLDER — it reads `meta/_journal.json`, and for each entry applies
@@ -99,8 +100,15 @@ describe('migrations/meta/_journal.json', () => {
     // hurt nothing and `drizzle-kit check` walks the chain without them. What
     // must never regress is the NEWEST one, which is the only snapshot
     // `generate` and `npm run db:assert-snapshot` actually read.
+    //
+    // The NAME comes from `snapshot-baseline.ts`, which is what the gate and
+    // `db:generate-baseline` also call, so this test and those two commands
+    // CANNOT disagree about which file is the baseline. They used to: the gate
+    // named 0051 by hand, so the day a 0052 entry lands this case goes red for a
+    // file the gate would never read, while the gate stays green on a stale one.
     const newest = journal.entries[journal.entries.length - 1];
-    const snapshot = `meta/${String(newest.idx).padStart(4, '0')}_snapshot.json`;
+    const snapshot = baselineSnapshotName(migrationsFolder);
+    expect(snapshot).toBe(snapshotName(newest.idx));
     expect(
       existsSync(resolve(migrationsFolder, snapshot)),
       `${snapshot} is missing for journal entry ${newest.tag}. Re-baseline it with ` +
