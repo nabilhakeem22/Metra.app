@@ -14,8 +14,8 @@
  *
  *      This rule used to check the REPO ROOT ONLY while its own message said
  *      "and nowhere else", so `apps/web/DEPLOY.md` passed — verified by
- *      execution, exit 0. It now WALKS the tree, skipping `node_modules`,
- *      `.git`, `.next` and `.open-next`. Deliberately wider than
+ *      execution, exit 0. It now WALKS the tree, skipping build output,
+ *      dependencies and `.claude` (see SKIPPED_DIRS). Deliberately wider than
  *      `git ls-files`: the recurrence this exists to stop starts as an
  *      untracked file somebody created by hand, which is how both earlier ones
  *      started.
@@ -80,8 +80,22 @@ function trackedMarkdown(root) {
     .filter(Boolean);
 }
 
-/** Build output and dependency trees hold nobody's runbook. */
-const SKIPPED_DIRS = new Set(['node_modules', '.git', '.next', '.open-next']);
+/**
+ * Build output and dependency trees hold nobody's runbook — and neither does
+ * `.claude`, which holds gitignored agent WORKTREES: whole copies of this repo
+ * at other commits, one of which still carries the root `DEPLOY.md` this rule
+ * had deleted. Walking them made the gate RED on every machine running an agent
+ * and GREEN on CI, where no such directory exists — a check that disagrees with
+ * CI teaches people to ignore it, which is the one thing a ratchet cannot
+ * survive. They are not source: `git ls-files .claude` is empty.
+ */
+const SKIPPED_DIRS = new Set([
+  'node_modules',
+  '.git',
+  '.next',
+  '.open-next',
+  '.claude',
+]);
 
 /** Every path (repo-relative, forward slashes) whose basename is `DEPLOY.md`. */
 function findRunbooks(root, relative = '') {

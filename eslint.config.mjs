@@ -74,14 +74,16 @@ export default tseslint.config(
       // accident — completely invisible. The three helpers are named because a
       // bare `**/test/*` would also catch unrelated directories called `test`.
       //
-      // WHAT IS STILL NOT COVERED: `await import('@/test/doubles')`. This core
-      // rule visits import DECLARATIONS only, so a dynamic import reaches the
-      // same module unreported. Covering it needs an `ImportExpression` visitor,
-      // which means a rule of our own — `metra/no-server-registry-in-client` is
-      // not it: that rule is about barrels inside 'use client' modules and has
-      // no such visitor to extend. Deliberately left: the static forms are what
-      // anybody actually writes, and a `no-restricted-imports` that silently
-      // half-covers a boundary is worse than one whose gap is written down.
+      // WHAT IS STILL NOT COVERED: a DYNAMIC import, in EITHER spelling —
+      // `await import('@/test/doubles')` and `await import('../test/doubles')`
+      // are both clean. This core rule visits import DECLARATIONS only, so a
+      // dynamic import reaches the same module unreported whichever specifier
+      // it uses. Covering it needs an `ImportExpression` visitor, which means a
+      // rule of our own — `metra/no-server-registry-in-client` is not it: that
+      // rule is about barrels inside 'use client' modules and has no such
+      // visitor to extend. Deliberately left: the static forms are what anybody
+      // actually writes, and a `no-restricted-imports` that silently half-covers
+      // a boundary is worse than one whose gap is written down.
       'no-restricted-imports': [
         'error',
         {
