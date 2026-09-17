@@ -1,11 +1,12 @@
--- 0052 — the eleven composite `ON DELETE SET NULL` foreign keys learn WHICH
+-- 0052 — the twelve composite `ON DELETE SET NULL` foreign keys learn WHICH
 -- column to null. SCHEMA ONLY: no column added, no data touched, no apply-rls
 -- object referenced, no enum label named.
 --
 -- THE DEFECT. `sameOrgFk` (src/schema/org-ref.ts) emits the composite tenancy
 -- FK `(org_id, <x>_id) -> parent(org_id, id)`, which is what makes a cross-org
--- reference impossible at the database. Eleven of those are declared
--- `on delete set null`. PostgreSQL's `ON DELETE SET NULL` **with no column
+-- reference impossible at the database. ELEVEN of those are declared
+-- `on delete set null` in `src/schema/`, and a TWELFTH exists in the database
+-- only (see below). PostgreSQL's `ON DELETE SET NULL` **with no column
 -- list nulls EVERY referencing column** — `org_id` included, and `org_id` is
 -- `not null` on every org-scoped table. So the referential action produces a
 -- row the table cannot hold and the PARENT DELETE IS REFUSED, always:
@@ -20,8 +21,23 @@
 -- writes `boqs.source_file_id`, that spreadsheet becomes permanently
 -- undeletable and the studio sees a generic failure with no recovery. Deleting
 -- a price-book cost item — an obvious next catalogue feature — lands on four of
--- the eleven at once. `purge-fixture-orgs-tables.ts` survives only because its
--- delete order happens to be child-first today.
+-- them at once. `purge-fixture-orgs-tables.ts` survives only because its delete
+-- order happens to be child-first today.
+--
+-- THE TWELFTH, WHICH NO READING OF THE SCHEMA COULD HAVE FOUND.
+-- `files_category_same_org_fk` (0040) is a composite `ON DELETE SET NULL` in
+-- every database — and `src/schema/files.ts` DOES NOT DECLARE IT AT ALL; it
+-- carries only the partial `files_org_category_idx`. So it is absent from
+-- `declaredConstraints()`, absent from the drizzle snapshot, and invisible to
+-- `assert-schema-applied`, which is one-directional by design (an object the
+-- database has and the schema does not is normally legitimate). The wave-6
+-- survey read the snapshot and found eleven; the straggler check at the bottom
+-- of this file read the CATALOGUE, on CI's fresh database, and found twelve —
+-- on its first run, by failing the migration. Latent today (nothing deletes a
+-- document category) but `document_categories` exists so a firm can manage its
+-- own filing, so the delete arrives the day that screen does. The SCHEMA-side
+-- gap — files.ts should declare this FK — is reported, not fixed here: it moves
+-- the snapshot and belongs in its own commit.
 --
 -- THE FIX, available since PostgreSQL 15 and therefore on Supabase (17) and on
 -- CI (postgres:17): `ON DELETE SET NULL (<x>_id)`. The referential action then
@@ -38,7 +54,7 @@
 -- bottom of this file is the closest thing, and it runs once, here.
 --
 -- THE NAMES ARE THE PROD/CI CATALOGUE SPELLINGS, NOT THE SCHEMA'S. Six of these
--- eleven were written UNQUOTED in camelCase by 0017 / 0034 / 0046 and Postgres
+-- twelve were written UNQUOTED in camelCase by 0017 / 0034 / 0046 and Postgres
 -- folded them to lower case; two more (`boqs_source_file_same_org_fk`,
 -- `boq_lines_cost_item_same_org_fk`) were written in snake_case by 0041 while
 -- the schema declares camelCase. Every database built from these migrations —
@@ -51,13 +67,13 @@
 --
 -- LOCKS, stated plainly. `db:migrate` runs every pending migration in ONE
 -- transaction (src/scripts/migrate.ts), so the first `DROP CONSTRAINT`'s ACCESS
--- EXCLUSIVE is held until the whole batch commits — across nine child tables
--- and seven parents, sixteen tables in all. `NOT VALID` + `VALIDATE` is the
+-- EXCLUSIVE is held until the whole batch commits — across ten child tables and
+-- five further parents, FIFTEEN distinct tables in all. `NOT VALID` + `VALIDATE` is the
 -- house convention (0044, 0051) and is kept here for the same reasons: either
 -- half is independently idempotent, the scan is a separate named statement, and
 -- the file reads as the steps it is. It does NOT shorten the hold on this run —
 -- VALIDATE's weaker SHARE UPDATE EXCLUSIVE cannot downgrade a lock already
--- held. At pilot volume (low thousands of rows per org across all nine
+-- held. At pilot volume (low thousands of rows per org across all ten
 -- children) the scans are milliseconds; the convention is what keeps that true
 -- at 10^6, where the two halves would be split across two merges instead.
 --
@@ -86,7 +102,9 @@ BEGIN
         ('projects',                  'projects_type_same_org_fk',                                    'type_id',                       'project_types'),
         ('proposals',                 'proposals_supersedes_same_org_fk',                             'supersedes_id',                 'proposals'),
         ('client_payment_claims',     'client_payment_claims_confirmedpaymentevent_same_org_fk',      'confirmed_payment_event_id',    'payment_events'),
-        ('engagement_change_orders',  'engagement_change_orders_settledbypaymentevent_same_org_fk',   'settled_by_payment_event_id',   'payment_events')
+        ('engagement_change_orders',  'engagement_change_orders_settledbypaymentevent_same_org_fk',   'settled_by_payment_event_id',   'payment_events'),
+        -- Declared by NO schema file. Found by the straggler check below.
+        ('files',                     'files_category_same_org_fk',                                   'category_id',                   'document_categories')
       ) AS t(child, conname, child_col, parent)
   LOOP
     IF NOT EXISTS (
@@ -125,11 +143,12 @@ BEGIN
     narrowed := narrowed + 1;
   END LOOP;
 
-  -- THE STRAGGLER CHECK. After this file, NO composite foreign key in `public`
-  -- may still carry an unqualified SET NULL, or name `org_id` in its column
-  -- list. This is what makes the eleven-row list above an assertion rather than
-  -- a hope: a twelfth such FK added between the wave-6 survey and this run
-  -- fails the migration here instead of shipping the same latent outage. A
+  -- THE STRAGGLER CHECK, WHICH HAS ALREADY EARNED ITS KEEP. After this file, NO
+  -- composite foreign key in `public` may still carry an unqualified SET NULL,
+  -- or name `org_id` in its column list. That is what makes the list above an
+  -- assertion rather than a hope — and on its very first CI run it refused the
+  -- migration with `1 composite set-null foreign key(s) still null every
+  -- referencing column`, which is how `files_category_same_org_fk` was found. A
   -- SINGLE-column set-null FK is untouched and uncounted — nulling its one
   -- column is correct by construction.
   SELECT count(*) INTO stragglers
@@ -151,7 +170,7 @@ BEGIN
 
   IF stragglers > 0 THEN
     RAISE EXCEPTION
-      '0052: % composite set-null foreign key(s) still null every referencing column (org_id included). Add them to the list in this file.',
+      '0052: % composite set-null foreign key(s) still null every referencing column (org_id included). Read pg_constraint for contype=f, confdeltype=n and an empty confdelsetcols, and add them to the list in this file.',
       stragglers;
   END IF;
 

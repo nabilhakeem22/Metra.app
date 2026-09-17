@@ -209,7 +209,7 @@ create trigger trg_variation_order_lines_parent_draft
 -- (org_id, x_id) -> target(org_id, id), and `ON DELETE SET NULL` with no column
 -- list nulls ALL the referencing columns - org_id included, which is `not null`
 -- - so the parent delete used to be refused regardless of this trigger
--- (measured by tests/actions/boq-immutable.dbtest.ts). 0052 narrowed all eleven
+-- (measured by tests/actions/boq-immutable.dbtest.ts). 0052 narrowed all twelve
 -- such FKs to `ON DELETE SET NULL (x_id)`, so the fourth argument now carries
 -- real traffic rather than standing ready for it.
 --

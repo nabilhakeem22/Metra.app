@@ -41,7 +41,9 @@ type OnDelete = 'restrict' | 'cascade' | 'set null' | 'no action' | 'set default
  * column, and on a composite `(org_id, <name>_id)` that includes `org_id`, which
  * is `not null` on every org-scoped table - so the parent delete was refused
  * outright (23502, or MT100 under an immutability trigger), for all eleven
- * set-null constraints this helper emits. The correct action is
+ * set-null constraints this helper emits - and for a twelfth,
+ * `files_category_same_org_fk`, which 0040 hand-wrote in the same shape without
+ * going through this helper at all. The correct action is
  * `ON DELETE SET NULL (<name>_id)`, which PostgreSQL 15+ supports and
  * **drizzle-orm 0.36 cannot express**: `foreignKey().onDelete()` takes an action
  * and no column list, and snapshot format v7 has no field for one.

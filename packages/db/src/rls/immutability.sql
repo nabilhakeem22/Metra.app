@@ -16,7 +16,7 @@
 -- otherwise raise MT100 and abort a delete that has nothing to do with
 -- immutability. (On a COMPOSITE (org_id, x_id) FK, Postgres used to null org_id
 -- as well, so that delete was refused for an unrelated reason; migration 0052
--- narrowed all eleven of ours to `SET NULL (x_id)`.) Only a change TO NULL is
+-- narrowed all twelve of ours to `SET NULL (x_id)`.) Only a change TO NULL is
 -- tolerated;
 -- writing a new NON-NULL value into one of those columns is still MT100. OMIT
 -- IT AND THE TRIGGER BEHAVES EXACTLY AS IT DID BEFORE THIS ARGUMENT EXISTED -
@@ -43,7 +43,7 @@
 -- CONSEQUENCE, stated so nobody reads the branch as dead: with the depth gate in
 -- place, branch 2 is reachable ONLY from a cascade, and until migration 0052 no
 -- such cascade could complete (the composite FK nulled `org_id` too, which is
--- NOT NULL, so the parent delete was refused first). 0052 narrowed all eleven to
+-- NOT NULL, so the parent delete was refused first). 0052 narrowed all twelve to
 -- `ON DELETE SET NULL (x_id)`, so the branch NOW CARRIES REAL TRAFFIC - deleting
 -- a document or a design engagement that an ISSUED bill points at is exactly it,
 -- and `tests/actions/composite-fk-cascade.dbtest.ts` is where that is proven.

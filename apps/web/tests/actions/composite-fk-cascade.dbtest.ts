@@ -10,7 +10,7 @@ import { closeFixture, ctxFor, raw, seedOrg, teardown } from './fixture';
 
 // WHAT 0052 BOUGHT, asserted against a real Postgres.
 //
-// Every one of the eleven `on delete set null` composite FKs used to null
+// Every one of the twelve `on delete set null` composite FKs used to null
 // `org_id` as well as the reference, because Postgres's bare `ON DELETE SET
 // NULL` nulls EVERY referencing column. `org_id` is `not null` on every
 // org-scoped table, so the PARENT DELETE WAS ALWAYS REFUSED - 23502 on an
@@ -19,7 +19,11 @@ import { closeFixture, ctxFor, raw, seedOrg, teardown } from './fixture';
 // `boq-immutable.dbtest.ts` measured exactly that, and its last case has been
 // rewritten to the post-0052 truth; this file is the positive proof.
 //
-// 0052 narrows all eleven to `ON DELETE SET NULL (<x>_id)`. Two properties are
+// 0052 narrows all twelve to `ON DELETE SET NULL (<x>_id)`. ELEVEN are declared
+// in `src/schema/`; the twelfth, `files_category_same_org_fk`, exists in the
+// database only (0040 created it, `files.ts` never declared it) and was found by
+// 0052's own straggler check failing the first CI run. The count assertion at
+// the bottom of this file is what keeps that number honest. Two properties are
 // asserted here, and NEITHER is visible to `db:assert-snapshot` (snapshot format
 // v7 has no field for the column list) or to `assert-schema-applied` (it
 // compares `conname` only):
@@ -41,7 +45,7 @@ import { closeFixture, ctxFor, raw, seedOrg, teardown } from './fixture';
 // `boq-immutable.dbtest.ts`, deliberately not duplicated here).
 //
 // The pair under test is `boqs -> files` (`source_file_id`) and
-// `boqs -> design_engagements` (`engagement_id`): the only two of the eleven
+// `boqs -> design_engagements` (`engagement_id`): the only two of the twelve
 // whose child table also carries an immutability trigger, so they are the pair
 // that exercises the most.
 
@@ -296,8 +300,10 @@ describe('a composite set-null cascade nulls the reference and leaves org_id alo
     );
     expect(stragglers).toEqual([]);
 
-    // And the count is still eleven, so a narrowing that was dropped rather than
-    // fixed does not pass as "no stragglers".
+    // And the count is still twelve, so a narrowing that was DROPPED rather than
+    // fixed does not pass as "no stragglers". Eleven are declared in
+    // `src/schema/`; the twelfth is `files_category_same_org_fk`, which 0040
+    // created and no schema file declares - see 0052's header.
     const [narrowed] = await raw.query<{ n: number }>(
       `select count(*)::int as n
          from pg_constraint c
@@ -308,6 +314,6 @@ describe('a composite set-null cascade nulls the reference and leaves org_id alo
           and c.confdeltype = 'n'
           and array_length(c.conkey, 1) > 1`,
     );
-    expect(Number(narrowed.n)).toBe(11);
+    expect(Number(narrowed.n)).toBe(12);
   });
 });
