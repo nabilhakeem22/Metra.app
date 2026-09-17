@@ -59,7 +59,13 @@
 // a realistic idiom for this codebase's shape), a ternary
 // (`const q = cond ? tx : db`) and a DEFAULT PARAMETER
 // (`function f(x = getDb()) { x.select() }`). Each is a shape where the value
-// depends on something the syntax does not decide. Four more are RuleTester-proven
+// depends on something the syntax does not decide. TWO MORE, measured by the
+// wave-6 re-test and left open for now: a destructure whose initialiser is a
+// MEMBER expression (`const { query } = getRequestConnection().db` — only an
+// identifier initialiser is unpacked) and an OPTIONAL chain to the relational
+// api (`const q = db?.query` — the ChainExpression is not unwrapped at a
+// binding, though `db?.query.x.findMany()` and `db?.select()` are reported at
+// the call). Neither appears in the tree. Four more are RuleTester-proven
 // and left open on purpose — `Reflect.get(conn, 'sql')`,
 // `Object.values(getRequestConnection())[1]`,
 // a class FIELD holding the handle, an array destructure of a connection: this

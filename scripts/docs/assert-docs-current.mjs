@@ -90,7 +90,7 @@ function findRunbooks(root, relative = '') {
     const path = relative ? `${relative}/${entry.name}` : entry.name;
     if (entry.isDirectory()) {
       if (!SKIPPED_DIRS.has(entry.name)) found.push(...findRunbooks(root, path));
-    } else if (entry.name === 'DEPLOY.md') {
+    } else if (entry.name.toLowerCase() === 'deploy.md') {
       found.push(path);
     }
   }

@@ -67,7 +67,10 @@ fi
 
 line="pending migrations: $count / $MAX_PENDING_MIGRATIONS (base: $base_kind)"
 echo "$line"
-[ -n "${GITHUB_STEP_SUMMARY:-}" ] && echo "$line" >> "$GITHUB_STEP_SUMMARY"
+if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
+  # Best-effort: a summary that cannot be written must never fail an under-budget run.
+  echo "$line" >> "$GITHUB_STEP_SUMMARY" || echo "::warning::could not append to GITHUB_STEP_SUMMARY"
+fi
 
 if [ "$count" -gt "$MAX_PENDING_MIGRATIONS" ]; then
   echo "::error::$line - one db:migrate transaction would hold ACCESS EXCLUSIVE for the whole batch. Split the merge, or raise MAX_PENDING_MIGRATIONS in the same commit that explains why."

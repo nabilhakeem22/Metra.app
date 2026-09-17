@@ -126,3 +126,68 @@ describe('what the real manifest declares', () => {
     }
   });
 });
+
+// The re-test proved the first version of these parsers could mis-pair a
+// trigger with the WRONG table or declare a commented-out object as real —
+// and `apply-rls` turns either into a refused deploy on a correct database.
+// Every shape below was an executed evasion; each now pins the fix.
+describe('the parsers read SQL the way Postgres does', () => {
+  it('ignores a comment between the timing keyword and the table', () => {
+    expect(
+      triggersIn(
+        'create trigger trg_a\n' +
+          '  before update -- fires on every save, on purpose\n' +
+          '  on public.boqs for each row execute function f();\n' +
+          'create trigger trg_b after insert on public.contracts for each row execute function f();',
+      ),
+    ).toEqual(['boqs.trg_a', 'contracts.trg_b']);
+  });
+
+  it('accepts a schema-less table without swallowing the next statement', () => {
+    expect(
+      triggersIn(
+        'create trigger trg_a before update on boqs for each row execute function f();\n' +
+          'create trigger trg_b before delete on public.contracts for each row execute function f();',
+      ),
+    ).toEqual(['boqs.trg_a', 'contracts.trg_b']);
+    expect(policiesIn('create policy p on boqs using (true);')).toEqual(['boqs.p']);
+  });
+
+  it('declares nothing for a commented-out create', () => {
+    expect(
+      policiesIn('-- create policy old_one on public.clients using (true);\n/* create policy gone on public.boqs using (true); */'),
+    ).toEqual([]);
+    expect(functionsIn('-- create or replace function public.retired() ...')).toEqual([]);
+  });
+
+  it('folds unquoted identifiers to lower case, keeps quoted spelling', () => {
+    expect(policiesIn('CREATE POLICY ORG_ISOLATION ON PUBLIC.CLIENTS USING (true);')).toEqual([
+      'clients.org_isolation',
+    ]);
+    expect(policiesIn('create policy "MixedCase" on public."Odd_Table" using (true);')).toEqual([
+      'Odd_Table.MixedCase',
+    ]);
+  });
+
+  it('sees constraint triggers, `or replace` triggers and `or replace`-less functions', () => {
+    expect(
+      triggersIn(
+        'create constraint trigger trg_c after insert on public.audit_log deferrable for each row execute function f();\n' +
+          'create or replace trigger trg_d before update on public.boqs for each row execute function f();',
+      ),
+    ).toEqual(['audit_log.trg_c', 'boqs.trg_d']);
+    expect(functionsIn('create function public.plain() returns void language sql as $$ select 1 $$;')).toEqual([
+      'plain',
+    ]);
+  });
+
+  it('is not fooled by a `when` clause that contains the word on', () => {
+    expect(
+      triggersIn(
+        'create trigger trg_w before update on public.boqs\n' +
+          '  for each row when (old.status is distinct from new.status) -- only on a change\n' +
+          '  execute function f();',
+      ),
+    ).toEqual(['boqs.trg_w']);
+  });
+});
