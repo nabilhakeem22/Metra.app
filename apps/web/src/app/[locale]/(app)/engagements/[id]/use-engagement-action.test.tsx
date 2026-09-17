@@ -94,8 +94,12 @@ function ActionProbe({
 // pass for the wrong reason.
 let minted = 0;
 
+/** UUID-SHAPED, because the sessionStorage mirror refuses anything else (S1) --
+ *  and still readable: the mint counter is the last digit of the first group. */
+const mintedKey = (count: number) => `0000000${count}-0000-4000-8000-000000000000`;
+
 function mountProbe(landedAt?: ReadonlyMap<string, number>) {
-  const mintKey = () => `key-${++minted}`;
+  const mintKey = () => mintedKey(++minted);
   // Through the harness, not a bare RTL render: renderWithIntl is what registers
   // afterEach(cleanup), and two mounted probes would each answer getByRole.
   return renderWithIntl(<ActionProbe mintKey={mintKey} landedAt={landedAt} />);
@@ -134,7 +138,7 @@ function SwitchingProbe({ mintKey }: { mintKey: () => string }) {
 }
 
 function mountSwitchingProbe() {
-  const mintKey = () => `key-${++minted}`;
+  const mintKey = () => mintedKey(++minted);
   return renderWithIntl(<SwitchingProbe mintKey={mintKey} />);
 }
 
@@ -352,10 +356,10 @@ describe('useEngagementAction — the map belongs to ONE engagement (F1/R4)', ()
   test('e-1 keeps its key, e-2 mints its own, and the retry on e-1 reuses e-1s', async () => {
     mountSwitchingProbe();
 
-    // 1. e-1 is left in doubt: it holds key-1.
+    // 1. e-1 is left in doubt: it holds the first key it minted.
     answers.set('requestRevision', { ok: false, error: 'uncertain' });
     await press('requestRevision');
-    expect(sessionStorage.getItem('metra.pendingKeys.e-1')).toContain('key-1');
+    expect(sessionStorage.getItem('metra.pendingKeys.e-1')).toContain(mintedKey(1));
 
     // 2. the id changes under the live subtree, and 3. e-2 succeeds.
     await press('switch');
@@ -363,7 +367,7 @@ describe('useEngagementAction — the map belongs to ONE engagement (F1/R4)', ()
     await press('requestRevision');
 
     // e-1's entry is untouched by anything e-2 did.
-    expect(sessionStorage.getItem('metra.pendingKeys.e-1')).toContain('key-1');
+    expect(sessionStorage.getItem('metra.pendingKeys.e-1')).toContain(mintedKey(1));
     expect(sessionStorage.getItem('metra.pendingKeys.e-2')).toBeNull();
 
     // 4. back to e-1, and the in-doubt attempt is retried.
@@ -373,7 +377,7 @@ describe('useEngagementAction — the map belongs to ONE engagement (F1/R4)', ()
 
     const dispatches = sent.filter((entry) => entry.trigger === 'requestRevision');
     expect(dispatches.map((entry) => entry.engagementId)).toEqual(['e-1', 'e-2', 'e-1']);
-    expect(dispatches[0]!.key).toBe('key-1');
+    expect(dispatches[0]!.key).toBe(mintedKey(1));
     // e-2's write carried its OWN key, not the one e-1 was holding.
     expect(dispatches[1]!.key).not.toBe(dispatches[0]!.key);
     // and the retry is recognised as the SAME act it was before the detour.
@@ -415,6 +419,8 @@ describe('useEngagementAction — the map belongs to ONE engagement (F1/R4)', ()
  */
 describe('useEngagementAction — a held key expires (R1)', () => {
   const START = Date.parse('2026-09-17T10:00:00.000Z');
+  /** The key a previous mount left in storage. UUID-shaped, as the store demands. */
+  const LANDED_KEY = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
   let clock: ReturnType<typeof vi.spyOn> | null = null;
 
   function setNow(at: number): void {
@@ -469,7 +475,7 @@ describe('useEngagementAction — a held key expires (R1)', () => {
     const first = mountProbe();
     answers.set('requestRevision', { ok: false, error: 'uncertain' });
     await press('requestRevision');
-    expect(sessionStorage.getItem('metra.pendingKeys.e-1')).toContain('key-1');
+    expect(sessionStorage.getItem('metra.pendingKeys.e-1')).toContain(mintedKey(1));
     first.unmount();
 
     setNow(START + 16 * 60_000);
@@ -478,7 +484,7 @@ describe('useEngagementAction — a held key expires (R1)', () => {
 
     const keys = keysFor('requestRevision');
     expect(keys[0]).not.toBe(keys[1]);
-    expect(sessionStorage.getItem('metra.pendingKeys.e-1')).not.toContain('key-1');
+    expect(sessionStorage.getItem('metra.pendingKeys.e-1')).not.toContain(mintedKey(1));
   });
 
   // The other bound: the page comes back showing that the attempt DID land.
@@ -488,25 +494,25 @@ describe('useEngagementAction — a held key expires (R1)', () => {
     setNow(START);
     sessionStorage.setItem(
       'metra.pendingKeys.e-1',
-      JSON.stringify({ requestRevision: { key: 'old-key', heldAt: START - 60_000 } }),
+      JSON.stringify({ requestRevision: { key: LANDED_KEY, heldAt: START - 60_000 } }),
     );
     mountProbe(new Map([['requestRevision', START - 30_000]]));
     answers.set('requestRevision', { ok: false, error: 'uncertain' });
     await press('requestRevision');
 
-    expect(keysFor('requestRevision')[0]).not.toBe('old-key');
+    expect(keysFor('requestRevision')[0]).not.toBe(LANDED_KEY);
   });
 
   test('a transition OLDER than the attempt says nothing, and the key is kept', async () => {
     setNow(START);
     sessionStorage.setItem(
       'metra.pendingKeys.e-1',
-      JSON.stringify({ requestRevision: { key: 'old-key', heldAt: START - 60_000 } }),
+      JSON.stringify({ requestRevision: { key: LANDED_KEY, heldAt: START - 60_000 } }),
     );
     mountProbe(new Map([['requestRevision', START - 90_000]]));
     answers.set('requestRevision', { ok: false, error: 'uncertain' });
     await press('requestRevision');
 
-    expect(keysFor('requestRevision')[0]).toBe('old-key');
+    expect(keysFor('requestRevision')[0]).toBe(LANDED_KEY);
   });
 });

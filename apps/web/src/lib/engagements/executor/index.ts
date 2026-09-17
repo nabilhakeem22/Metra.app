@@ -14,7 +14,7 @@ import { mutateInOrg } from '@/lib/actions/mutate';
 import { err, type ActionResult } from '@/lib/actions/result';
 import type { AuditEntry } from '@/lib/audit';
 import type { OrgContext } from '@/lib/db/context';
-import { isUuid } from '@/lib/uuid';
+import { NOT_UUID, optionalUuid } from '@/lib/uuid';
 import {
   CAPABILITY_ACTION,
   TRANSITIONS,
@@ -87,9 +87,10 @@ export async function executeTransition(
 
   // Normalise before any DB work: '' / whitespace reads as absent (a plain
   // transition), and a present-but-malformed key is a coded `invalid` rather
-  // than a key quietly dropped on the floor.
-  const idempotencyKey = input.idempotencyKey?.trim() || null;
-  if (idempotencyKey !== null && !isUuid(idempotencyKey)) return err('invalid');
+  // than a key quietly dropped on the floor. A present-but-NON-STRING key is
+  // `invalid` too rather than a TypeError escaping the action — see optionalUuid.
+  const idempotencyKey = optionalUuid(input.idempotencyKey);
+  if (idempotencyKey === NOT_UUID) return err('invalid');
 
   return mutateInOrg(
     ctx,

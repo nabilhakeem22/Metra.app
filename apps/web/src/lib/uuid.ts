@@ -26,3 +26,40 @@ export const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f
 export function isUuid(value: unknown): value is string {
   return typeof value === 'string' && UUID_RE.test(value);
 }
+
+/**
+ * The malformed signal from {@link optionalUuid}. A distinct `unique symbol`
+ * rather than `null`, because the two outcomes must not be confused: `null` means
+ * "absent, proceed without one", while this means "present but refuse the whole
+ * call". Mirrors `optionalText`'s TOO_LONG.
+ */
+export const NOT_UUID: unique symbol = Symbol('NOT_UUID');
+export type NotUuid = typeof NOT_UUID;
+
+/**
+ * Read an OPTIONAL uuid off untrusted input: null when it is absent (including
+ * '' and whitespace), the trimmed uuid when it is one, NOT_UUID for anything
+ * else.
+ *
+ * `unknown`, not `string | null | undefined`, ON PURPOSE. The declared type of a
+ * server-action argument is a compile-time promise about what the caller MEANT
+ * to send; what arrives is whatever was serialised across the RSC boundary. The
+ * idempotency key now comes from sessionStorage (A9), which devtools or a
+ * post-XSS script can write, and `value?.trim()` on an object threw a TypeError
+ * out of the core — past `mutateInOrg`, past the action wrapper — so the server
+ * action REJECTED instead of returning a coded ActionResult, which this
+ * codebase's error convention forbids. A non-string is simply `invalid` now.
+ *
+ * Call site:
+ * ```ts
+ * const idempotencyKey = optionalUuid(input.idempotencyKey);
+ * if (idempotencyKey === NOT_UUID) return err('invalid');
+ * ```
+ */
+export function optionalUuid(value: unknown): string | null | NotUuid {
+  if (value === null || value === undefined) return null;
+  if (typeof value !== 'string') return NOT_UUID;
+  const trimmed = value.trim();
+  if (trimmed === '') return null;
+  return isUuid(trimmed) ? trimmed : NOT_UUID;
+}

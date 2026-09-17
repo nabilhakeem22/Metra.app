@@ -1,5 +1,6 @@
 import { isHeldKeyLive, type HeldKey } from '@/lib/engagements/held-key';
 import type { Trigger } from '@/lib/engagements/transitions';
+import { isUuid } from '@/lib/uuid';
 
 /**
  * The held idempotency keys, MIRRORED to sessionStorage (wave-2 A9).
@@ -36,11 +37,17 @@ export function heldKeysStorageKey(engagementId: string): string {
  * carried its instant. It is refused rather than adopted with a guessed
  * `heldAt`: a guess would either resurrect a key this rule exists to expire or
  * expire one that is still live, and the cost of refusing is one minted key.
+ *
+ * THE KEY MUST BE UUID-SHAPED (S1). This value is handed to a server action as
+ * the idempotency key, and sessionStorage is writable by devtools or a post-XSS
+ * script; the cores refuse a non-uuid with a coded `invalid`, so a poisoned
+ * entry would otherwise be replayed and re-persisted on every retry. Refusing it
+ * on READ is the half that self-heals.
  */
 function readEntry(value: unknown): HeldKey | null {
   if (typeof value !== 'object' || value === null) return null;
   const { key, heldAt } = value as { key?: unknown; heldAt?: unknown };
-  if (typeof key !== 'string' || key === '') return null;
+  if (!isUuid(key)) return null;
   if (typeof heldAt !== 'number' || !Number.isFinite(heldAt)) return null;
   return { key, heldAt };
 }
