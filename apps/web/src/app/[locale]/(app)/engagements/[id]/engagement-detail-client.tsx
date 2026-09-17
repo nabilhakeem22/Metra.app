@@ -26,7 +26,8 @@ import {
   EngagementPanels,
   type PanelCapabilities,
 } from './engagement-panels';
-import { ENGAGEMENT_TABS, type EngagementTab } from './tabs';
+import { EngagementTabStrip } from './engagement-tab-strip';
+import type { EngagementTab } from './tabs';
 import {
   DELIVERY_SHARE_ANCHOR_ID,
   DELIVERY_SHARE_OPEN_EVENT,
@@ -254,74 +255,14 @@ export function EngagementDetailClient({
         </p>
       )}
 
-      {/* A SEGMENTED control on a track, not an underline row: the active tab is a
-          raised panel of the same material as the surface it reveals below, which
-          is what makes the tab and its body read as one object. */}
-      <div
-        className="flex flex-wrap gap-1 rounded-[var(--r-item)] p-1"
-        style={{ background: 'var(--track)' }}
-        role="tablist"
-      >
-        {ENGAGEMENT_TABS.map((tb) => {
-          // A tab wears a badge when it holds something ADDRESSED TO the studio:
-          // a client payment claim to confirm, or a client question to answer.
-          const badgeCount =
-            tb === 'payments'
-              ? paymentClaimCount
-              : tb === 'files'
-                ? awaitingReplyCount
-                : 0;
-          // Budget's badge is a STATE, not a count -- a range the studio has set
-          // and the client has not yet acknowledged is unissued work sitting in
-          // that tab, and saying so is worth more than saying "1".
-          const budgetState =
-            tb !== 'budget' || budgetBadge === null
-              ? null
-              : t(
-                  budgetBadge === 'draft'
-                    ? 'offPlan.budgetDraftBadge'
-                    : 'offPlan.budgetAwaitingAckBadge',
-                );
-          const active = tab === tb;
-          return (
-            <button
-              key={tb}
-              type="button"
-              role="tab"
-              aria-selected={active}
-              // LOCKED WHILE A WRITE IS IN FLIGHT. Navigating away unmounts the
-              // open panel -- and with it `PaymentPanel`'s per-mount idempotency
-              // key, so a submit whose response was lost would come back on a
-              // FRESH key and land as a genuine duplicate against an append-only
-              // ledger. Safe to do only because `runAction` can no longer leave
-              // `pending` stuck; before that this would have locked navigation
-              // permanently on one failed action.
-              disabled={pending}
-              onClick={() => setTab(tb)}
-              className={`inline-flex items-center gap-1.5 rounded-[10px] px-3.5 py-1.5 text-[13px] transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
-                active
-                  ? 'bg-card font-bold text-[color:var(--text)] shadow-sm'
-                  : 'font-medium text-[color:var(--text-muted)] hover:text-[color:var(--text)]'
-              }`}
-            >
-              {tp(tb)}
-              {budgetState && (
-                <span className="font-mono text-[9.5px] font-bold uppercase tracking-[0.06em] text-[color:var(--warn)]">
-                  {budgetState}
-                </span>
-              )}
-              {badgeCount > 0 && (
-                <span
-                  className="inline-flex items-center rounded-[var(--r-pill)] bg-[color:var(--warn-tint)] px-1.5 py-0.5 text-[10px] font-semibold text-[color:var(--warn)]"
-                  dir="ltr"
-                >
-                  {t('paymentsBadge', { n: badgeCount })}
-                </span>
-              )}
-            </button>
-          );
-        })}
-      </div>
+      <EngagementTabStrip
+        tab={tab}
+        onSelect={setTab}
+        paymentClaimCount={paymentClaimCount}
+        awaitingReplyCount={awaitingReplyCount}
+        budget={budgetBadge}
+        pending={pending}
+      />
 
       <EngagementPanels
         tab={tab}
