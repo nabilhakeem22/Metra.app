@@ -21,9 +21,25 @@ export default defineConfig({
       '@': resolve(dir, 'src'),
     },
   },
+  // apps/web/tsconfig.json sets "jsx": "preserve" because Next requires it.
+  // esbuild honours that and emits the CLASSIC React.createElement, so a .test.tsx
+  // dies with `ReferenceError: React is not defined`. The unit runner is not Next,
+  // so it gets the automatic runtime instead. Measured, not assumed.
+  esbuild: { jsx: 'automatic', jsxImportSource: 'react' },
   test: {
     // src only. The database suites live under tests/actions and run from
-    // vitest.actions.config.ts against a real Postgres.
-    include: [resolve(dir, 'src/**/*.test.ts').replace(/\\/g, '/')],
+    // vitest.actions.config.ts against a real Postgres. The two include sets are
+    // disjoint by construction: this one is src/**, that one is tests/actions/**,
+    // so no *.dbtest.ts can ever be collected by the component runner.
+    include: [
+      resolve(dir, 'src/**/*.test.ts').replace(/\\/g, '/'),
+      resolve(dir, 'src/**/*.test.tsx').replace(/\\/g, '/'),
+    ],
+    // Node stays the default so the existing node files run byte-identically.
+    // Only a .tsx file — i.e. only a file that renders — pays for a DOM. That is
+    // also the naming rule for this suite: a test that touches `document` is
+    // named .test.tsx, whether or not it contains JSX.
+    environment: 'node',
+    environmentMatchGlobs: [['**/*.test.tsx', 'happy-dom']],
   },
 });
