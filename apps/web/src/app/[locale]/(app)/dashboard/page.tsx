@@ -28,6 +28,7 @@ import {
   sliceTotals,
 } from '@/lib/dashboard/chart-columns';
 import { loadFirmFigures } from '@/lib/dashboard/firm-figures';
+import { canSeeFirmFigures } from '@/lib/dashboard/firm-visibility';
 import { pickPrimaryCta } from '@/lib/dashboard/primary-cta';
 import { parseRange } from '@/lib/dashboard/range';
 
@@ -87,20 +88,30 @@ export default async function DashboardPage({
   // locked placeholder.
   const canSeeDeliveries = can(ctx.role, 'engagements_design', 'read');
   const canSeeTeam = can(ctx.role, 'users_settings', 'read');
-  const [firm, deliveries] = await Promise.all([
+  // The panel's badge counts the SAME rows the panel lists, so a role entitled
+  // to the work list but not to firm figures still gets a TRUE number rather
+  // than the capped `deliveries.length`. One extra indexed count, and only on
+  // the fenced path — a caller that already has the firm block reads it from
+  // there.
+  //
+  // It joins the FAN-OUT rather than following it. `canSeeFirmFigures` is pure
+  // and is the same predicate `loadFirmFigures` applies to decide whether to
+  // issue anything, so whether this count is needed is knowable here, before any
+  // query runs. Awaiting it after the Promise.all added a whole serial
+  // `withOrgContext` — BEGIN, the GUC preamble, the count, COMMIT — to the
+  // critical path of precisely the roles this page was made cheaper for.
+  const entitledToFirmFigures = canSeeFirmFigures(ctx.role, org);
+  const [firm, deliveries, fencedActiveCount] = await Promise.all([
     loadFirmFigures(ctx, { org, range, includeTeamMembers: canSeeTeam }),
     canSeeDeliveries
       ? listDashboardDeliveries(ctx, DELIVERY_ROWS)
       : Promise.resolve([]),
+    !entitledToFirmFigures && canSeeDeliveries
+      ? countActiveDeliveries(ctx)
+      : Promise.resolve(null),
   ]);
 
-  // The panel's badge counts the SAME rows the panel lists, so a role entitled to
-  // the work list but not to firm figures still gets a TRUE number rather than
-  // the capped `deliveries.length`. One extra indexed count, and only on the
-  // fenced path — a caller that already has the firm block reads it from there.
-  const activeDeliveries =
-    firm?.counts.deliveriesActive ??
-    (canSeeDeliveries ? await countActiveDeliveries(ctx) : 0);
+  const activeDeliveries = firm?.counts.deliveriesActive ?? fencedActiveCount ?? 0;
 
   // The only computation left on this page is the month LABEL, which needs the
   // request's locale. Every shaping decision is in `lib/dashboard/chart-columns`,
