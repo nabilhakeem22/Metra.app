@@ -38,9 +38,10 @@ let minted = 0;
  * where the key it sends comes from. A panel handed a stub would prove nothing —
  * the defect being pinned here is precisely that the panel used to mint its own.
  */
-function PanelProbe() {
+function PanelProbe({ landedKeys }: { landedKeys?: ReadonlySet<string> }) {
   const { pending, runAction } = useEngagementAction({
     engagementId: 'e-1',
+    landedKeys,
     mintKey: () => mintedKey(++minted),
   });
   return (
@@ -224,6 +225,45 @@ describe('PaymentPanel — one key per deliberate act', () => {
     await record('50000');
 
     expect(sent()[0]!.key).not.toBe(sent()[1]!.key);
+  });
+
+  /**
+   * F2: a payment writes no transition row, so until the PAYMENT ledger was
+   * folded into `landedKeys` nothing could ever tell the cockpit that a payment
+   * in doubt had landed. A studio who did exactly what the `uncertain` copy says
+   * — refresh, look, and only then decide — had their next, genuinely new
+   * payment of the same figure answered with the first one's row and reported as
+   * saved.
+   */
+  test('a payment the LEDGER now carries is dropped, so the next identical one is a new act', async () => {
+    const first = renderWithIntl(<PanelProbe />);
+    actions.recordPayment.mockResolvedValue({ ok: false, error: 'uncertain' });
+    await record('50000');
+    const heldKey = sent()[0]!.key;
+    first.unmount();
+
+    // The studio refreshes. The page comes back with the payment ledger CARRYING
+    // that key: the attempt committed after all.
+    setNow(START + 5 * 60_000);
+    renderWithIntl(<PanelProbe landedKeys={new Set([heldKey])} />);
+    actions.recordPayment.mockResolvedValue({ ok: true });
+    await record('50000');
+
+    expect(sent()[1]!.key).not.toBe(heldKey);
+  });
+
+  test('a ledger carrying OTHER payments still holds the key in doubt', async () => {
+    const first = renderWithIntl(<PanelProbe />);
+    actions.recordPayment.mockResolvedValue({ ok: false, error: 'uncertain' });
+    await record('50000');
+    const heldKey = sent()[0]!.key;
+    first.unmount();
+
+    setNow(START + 5 * 60_000);
+    renderWithIntl(<PanelProbe landedKeys={new Set(['somebody-elses-key'])} />);
+    await record('50000');
+
+    expect(sent()[1]!.key).toBe(heldKey);
   });
 
   test('the held key survives a REMOUNT of the panel, as the triggers do', async () => {

@@ -195,9 +195,20 @@ describe('landedKeysOf', () => {
     expect([...landed].sort()).toEqual(['key-a', 'key-b']);
   });
 
+  // F2: a payment writes no transition row, so the payment ledger is the only
+  // record that can say a payment key landed.
+  it('UNIONS the ledgers it is given — transitions AND payments', () => {
+    const landed = landedKeysOf(
+      [{ idempotencyKey: 'from-a-transition' }],
+      [{ idempotencyKey: 'from-a-payment' }, { idempotencyKey: null }],
+    );
+    expect([...landed].sort()).toEqual(['from-a-payment', 'from-a-transition']);
+  });
+
   it('ignores the rows that carry no key, and reports nothing for an empty ledger', () => {
     // Every edge that is not a self-loop, and every row written before 0050.
     expect(landedKeysOf([{ idempotencyKey: null }]).size).toBe(0);
     expect(landedKeysOf([]).size).toBe(0);
+    expect(landedKeysOf().size).toBe(0);
   });
 });

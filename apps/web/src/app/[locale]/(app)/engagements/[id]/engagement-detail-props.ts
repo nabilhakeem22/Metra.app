@@ -25,6 +25,12 @@ import type { PanelCapabilities } from './engagement-panels';
 export interface EngagementDetailProps {
   header: EngagementHeader;
   feeSchedule: EngagementFeeSchedule;
+  /**
+   * The payment ledger. Two readers, like `transitions` below: the Payments tab
+   * draws it, and the cockpit folds the IDEMPOTENCY KEYS on these rows into the
+   * set that decides whether a key it is still holding has landed. A payment
+   * writes no transition row, so this is the only record that can say so.
+   */
   payments: EngagementPayment[];
   artifacts: EngagementArtifactRecord[];
   events: EngagementEventRecord[];

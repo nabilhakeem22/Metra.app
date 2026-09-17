@@ -110,18 +110,27 @@ export function keyForAttempt(
 }
 
 /**
- * Every idempotency key the engagement's ledger already carries, from the
- * transitions the detail page has loaded. Feeds `hasLanded`.
+ * Every idempotency key this engagement's own records already carry, from what
+ * the detail page has loaded. Feeds `hasLanded`.
+ *
+ * TWO LEDGERS, because the acts that hold keys write to two: the transition
+ * ledger (self-loop edges) and `payment_events` (both money controls). While
+ * only transitions were folded in, a payment could never be recognised as
+ * landed — so a studio who did exactly what the `uncertain` copy says (refresh,
+ * look, and only then decide) still had their next, deliberate payment answered
+ * with the first one's row.
  *
  * Order does not matter and neither does the trigger a row names: the key alone
  * identifies the attempt. A row carrying no key contributes nothing.
  */
 export function landedKeysOf(
-  transitions: readonly { idempotencyKey: string | null }[],
+  ...ledgers: readonly (readonly { idempotencyKey: string | null }[])[]
 ): Set<string> {
   const landed = new Set<string>();
-  for (const transition of transitions) {
-    if (transition.idempotencyKey !== null) landed.add(transition.idempotencyKey);
+  for (const ledger of ledgers) {
+    for (const row of ledger) {
+      if (row.idempotencyKey !== null) landed.add(row.idempotencyKey);
+    }
   }
   return landed;
 }

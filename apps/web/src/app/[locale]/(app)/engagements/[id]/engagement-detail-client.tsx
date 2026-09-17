@@ -49,9 +49,10 @@ export function EngagementDetailClient({
   const [tab, setTab] = useState<EngagementTab>('files');
   const { pending, error, runAction } = useEngagementAction({
     engagementId: header.id,
-    // The engagement's own ledger, so a key held for an attempt the studio was
-    // never told the outcome of is dropped once a row here CARRIES that key.
-    landedKeys: landedKeysOf(transitions),
+    // The engagement's own records, so a key held for an attempt the studio was
+    // never told the outcome of is dropped once a row CARRIES that key. Both
+    // ledgers: a transition writes one, and so does a payment.
+    landedKeys: landedKeysOf(transitions, payments),
   });
   // The Advance button owns the forward-advance trigger; every OTHER legal,
   // permitted trigger becomes a low-emphasis secondary control (no legal trigger
