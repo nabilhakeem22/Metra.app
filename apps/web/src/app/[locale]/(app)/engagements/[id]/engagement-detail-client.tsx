@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { Link } from '@/i18n/routing';
 import { resolveActionError } from '@/lib/actions/error-message';
 import { resolveBudgetBadge } from '@/lib/engagements/budget-badge';
+import { latestTransitionAtByTrigger } from '@/lib/engagements/held-key';
 import { countConceptOptions } from '@/lib/engagements/concept-options';
 import { EngagementCommandCard } from './engagement-command-card';
 import type { EngagementDetailProps } from './engagement-detail-props';
@@ -48,6 +49,9 @@ export function EngagementDetailClient({
   const [tab, setTab] = useState<EngagementTab>('files');
   const { pending, error, runAction } = useEngagementAction({
     engagementId: header.id,
+    // The engagement's own ledger, so a key held for an attempt the studio was
+    // never told the outcome of is dropped once the record shows it landed.
+    landedAt: latestTransitionAtByTrigger(transitions),
   });
   // The Advance button owns the forward-advance trigger; every OTHER legal,
   // permitted trigger becomes a low-emphasis secondary control (no legal trigger

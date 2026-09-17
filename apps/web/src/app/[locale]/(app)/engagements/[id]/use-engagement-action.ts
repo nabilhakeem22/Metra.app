@@ -18,6 +18,12 @@ export interface EngagementActionApi {
 
 export interface EngagementActionOptions {
   engagementId: string;
+  /**
+   * When each trigger last produced a transition on this engagement, epoch ms,
+   * from the ledger the page already loaded. A held key whose act the ledger
+   * says has landed is dropped rather than reused — see held-key.ts.
+   */
+  landedAt?: ReadonlyMap<string, number>;
   /** Injected so a test can assert key IDENTITY rather than UUID shape.
    *  Defaults to crypto.randomUUID. */
   mintKey?: () => string;
@@ -65,7 +71,7 @@ export function useEngagementAction(
   const inFlight = useRef(false);
   // The keys of the attempts currently in doubt, per trigger and per
   // engagement, mirrored to sessionStorage. See use-held-keys.ts.
-  const heldKeys = useHeldKeys(options.engagementId);
+  const heldKeys = useHeldKeys(options.engagementId, options.landedAt);
   const mintKey = options.mintKey ?? (() => crypto.randomUUID());
 
   function settle(

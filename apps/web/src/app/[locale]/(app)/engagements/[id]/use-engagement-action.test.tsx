@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, test, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { useState } from 'react';
 import { act, fireEvent, screen } from '@testing-library/react';
 import { renderWithIntl } from '@/test/render-with-intl';
@@ -39,12 +39,15 @@ let landAnswer: ((result: ActionResult) => void) | null = null;
 function ActionProbe({
   mintKey,
   engagementId = 'e-1',
+  landedAt,
 }: {
   mintKey: () => string;
   engagementId?: string;
+  landedAt?: ReadonlyMap<string, number>;
 }) {
   const { pending, error, runAction } = useEngagementAction({
     engagementId,
+    landedAt,
     mintKey,
   });
   const dispatch = (label: string, trigger?: Trigger) =>
@@ -91,11 +94,11 @@ function ActionProbe({
 // pass for the wrong reason.
 let minted = 0;
 
-function mountProbe() {
+function mountProbe(landedAt?: ReadonlyMap<string, number>) {
   const mintKey = () => `key-${++minted}`;
   // Through the harness, not a bare RTL render: renderWithIntl is what registers
   // afterEach(cleanup), and two mounted probes would each answer getByRole.
-  return renderWithIntl(<ActionProbe mintKey={mintKey} />);
+  return renderWithIntl(<ActionProbe mintKey={mintKey} landedAt={landedAt} />);
 }
 
 /** Click a button and let the transition settle. */
@@ -397,5 +400,113 @@ describe('useEngagementAction — the map belongs to ONE engagement (F1/R4)', ()
     expect(dispatches[1]!.engagementId).toBe('e-2');
     expect(dispatches[1]!.key).not.toBe(dispatches[0]!.key);
     expect(sessionStorage.getItem('metra.pendingKeys.e-2')).toContain(dispatches[1]!.key);
+  });
+});
+
+/**
+ * Wave-5 remediation R1: a held key does not outlive the act it names.
+ *
+ * A9 gave it the life of the TAB with nothing bounding it, and the server reads
+ * the key as proof of sameness — payments.ts returns the ORIGINAL row, the
+ * executor's self-loop short-circuits to a bare `ok`. So a genuinely NEW act at
+ * the same trigger later in the same tab was answered "done" and the write was
+ * discarded. Two bounds: a fifteen-minute window, and the engagement's own
+ * ledger saying the attempt landed after all.
+ */
+describe('useEngagementAction — a held key expires (R1)', () => {
+  const START = Date.parse('2026-09-17T10:00:00.000Z');
+  let clock: ReturnType<typeof vi.spyOn> | null = null;
+
+  function setNow(at: number): void {
+    clock ??= vi.spyOn(Date, 'now');
+    clock.mockReturnValue(at);
+  }
+
+  afterEach(() => {
+    clock?.mockRestore();
+    clock = null;
+  });
+
+  test('a retry INSIDE the window is the same act', async () => {
+    setNow(START);
+    mountProbe();
+    answers.set('requestRevision', { ok: false, error: 'uncertain' });
+    await press('requestRevision');
+
+    setNow(START + 14 * 60_000);
+    await press('requestRevision');
+
+    const keys = keysFor('requestRevision');
+    expect(keys).toHaveLength(2);
+    expect(keys[0]).toBe(keys[1]);
+  });
+
+  test('the same click SIX HOURS later is a new act, in the same tab', async () => {
+    setNow(START);
+    mountProbe();
+    answers.set('requestRevision', { ok: false, error: 'uncertain' });
+    await press('requestRevision');
+
+    // The studio gave up, left the tab open, and came back to record something
+    // genuinely different. Under A9 this carried the 10:00 key and the server
+    // answered it with the 10:00 row.
+    setNow(START + 6 * 60 * 60_000);
+    await press('requestRevision');
+
+    const keys = keysFor('requestRevision');
+    expect(keys[0]).not.toBe(keys[1]);
+    // and the new attempt is what is now being held, stamped with now.
+    const stored = JSON.parse(sessionStorage.getItem('metra.pendingKeys.e-1')!) as Record<
+      string,
+      { key: string; heldAt: number }
+    >;
+    expect(stored.requestRevision!.key).toBe(keys[1]);
+    expect(stored.requestRevision!.heldAt).toBe(START + 6 * 60 * 60_000);
+  });
+
+  test('an expired entry is ERASED from storage rather than replayed after a remount', async () => {
+    setNow(START);
+    const first = mountProbe();
+    answers.set('requestRevision', { ok: false, error: 'uncertain' });
+    await press('requestRevision');
+    expect(sessionStorage.getItem('metra.pendingKeys.e-1')).toContain('key-1');
+    first.unmount();
+
+    setNow(START + 16 * 60_000);
+    mountProbe();
+    await press('requestRevision');
+
+    const keys = keysFor('requestRevision');
+    expect(keys[0]).not.toBe(keys[1]);
+    expect(sessionStorage.getItem('metra.pendingKeys.e-1')).not.toContain('key-1');
+  });
+
+  // The other bound: the page comes back showing that the attempt DID land.
+  // "Refresh to check before trying again" is then answered, and the next click
+  // is a decision the studio has taken with the record in front of them.
+  test('a key whose act the LEDGER says landed is dropped, not re-used', async () => {
+    setNow(START);
+    sessionStorage.setItem(
+      'metra.pendingKeys.e-1',
+      JSON.stringify({ requestRevision: { key: 'old-key', heldAt: START - 60_000 } }),
+    );
+    mountProbe(new Map([['requestRevision', START - 30_000]]));
+    answers.set('requestRevision', { ok: false, error: 'uncertain' });
+    await press('requestRevision');
+
+    expect(keysFor('requestRevision')[0]).not.toBe('old-key');
+  });
+
+  test('a transition OLDER than the attempt says nothing, and the key is kept', async () => {
+    setNow(START);
+    sessionStorage.setItem(
+      'metra.pendingKeys.e-1',
+      JSON.stringify({ requestRevision: { key: 'old-key', heldAt: START - 60_000 } }),
+    );
+    mountProbe(new Map([['requestRevision', START - 90_000]]));
+    answers.set('requestRevision', { ok: false, error: 'uncertain' });
+    await press('requestRevision');
+
+    expect(keysFor('requestRevision')[0]).toBe('old-key');
   });
 });

@@ -1,3 +1,4 @@
+import { isHeldKeyLive, type HeldKey } from '@/lib/engagements/held-key';
 import type { Trigger } from '@/lib/engagements/transitions';
 
 /**
@@ -14,6 +15,10 @@ import type { Trigger } from '@/lib/engagements/transitions';
  * which is a worse failure than the one this fixes. The entry is namespaced per
  * engagement and removed the moment the map empties.
  *
+ * AND EVERY ENTRY CARRIES ITS OWN INSTANT, so the mirror cannot outlive what it
+ * describes. A key older than HELD_KEY_TTL_MS is dropped on the way past and
+ * erased from storage — see `@/lib/engagements/held-key` for why fifteen minutes.
+ *
  * EVERY call is wrapped: Safari private mode throws on `sessionStorage` ACCESS,
  * not just on write, and a cockpit that will not render because storage is
  * unavailable is a far larger defect than the one being closed. On any throw the
@@ -24,25 +29,56 @@ export function heldKeysStorageKey(engagementId: string): string {
   return `metra.pendingKeys.${engagementId}`;
 }
 
-/** Read the keys this tab was holding for this engagement, or an empty map. */
-export function readHeldKeys(engagementId: string): Map<Trigger, string> {
+/**
+ * One stored entry, or null if it is not one of ours.
+ *
+ * A bare string is what the FIRST version of this mirror wrote, before a key
+ * carried its instant. It is refused rather than adopted with a guessed
+ * `heldAt`: a guess would either resurrect a key this rule exists to expire or
+ * expire one that is still live, and the cost of refusing is one minted key.
+ */
+function readEntry(value: unknown): HeldKey | null {
+  if (typeof value !== 'object' || value === null) return null;
+  const { key, heldAt } = value as { key?: unknown; heldAt?: unknown };
+  if (typeof key !== 'string' || key === '') return null;
+  if (typeof heldAt !== 'number' || !Number.isFinite(heldAt)) return null;
+  return { key, heldAt };
+}
+
+/** Read the keys this tab is still holding for this engagement, or an empty map. */
+export function readHeldKeys(
+  engagementId: string,
+  now: number = Date.now(),
+): Map<Trigger, HeldKey> {
   try {
     const raw = globalThis.sessionStorage?.getItem(heldKeysStorageKey(engagementId));
     if (!raw) return new Map();
-    const stored = JSON.parse(raw) as Record<string, string>;
-    // Entries are read back UNVALIDATED against the Trigger union on purpose: an
-    // entry written by an older build naming a trigger this one has dropped is
-    // simply a key nobody will ever ask for, and it is removed when the map next
-    // empties. Refusing to parse the whole record because of one stale name would
-    // throw away the keys that still matter.
-    return new Map(Object.entries(stored) as [Trigger, string][]);
+    const stored = JSON.parse(raw) as Record<string, unknown>;
+    const held = new Map<Trigger, HeldKey>();
+    let discarded = false;
+    // TRIGGER NAMES are read back UNVALIDATED against the Trigger union on
+    // purpose: an entry written by an older build naming a trigger this one has
+    // dropped is simply a key nobody will ever ask for. The VALUE is validated,
+    // because it is what gets sent to the server as the idempotency key.
+    for (const [trigger, value] of Object.entries(stored)) {
+      const entry = readEntry(value);
+      if (entry !== null && isHeldKeyLive(entry, now)) held.set(trigger as Trigger, entry);
+      else discarded = true;
+    }
+    // An expired or malformed entry is ERASED here, not left to be re-read and
+    // re-discarded on every mount for the life of the tab.
+    if (discarded) writeHeldKeys(engagementId, held);
+    return held;
   } catch {
     return new Map();
   }
 }
 
 /** Mirror the map, or REMOVE the entry once nothing is held. */
-export function writeHeldKeys(engagementId: string, held: Map<Trigger, string>): void {
+export function writeHeldKeys(
+  engagementId: string,
+  held: ReadonlyMap<Trigger, HeldKey>,
+): void {
   try {
     const storage = globalThis.sessionStorage;
     if (!storage) return;

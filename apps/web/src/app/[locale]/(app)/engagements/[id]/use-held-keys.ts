@@ -1,7 +1,7 @@
 'use client';
 
 import { useRef, type RefObject } from 'react';
-import { keyForAttempt } from '@/lib/engagements/retry-policy';
+import { hasLanded, keyForAttempt, type HeldKey } from '@/lib/engagements/held-key';
 import type { Trigger } from '@/lib/engagements/transitions';
 import { readHeldKeys, writeHeldKeys } from './held-keys-store';
 
@@ -28,6 +28,12 @@ import { readHeldKeys, writeHeldKeys } from './held-keys-store';
  * mints a fresh key, which is a fresh act: one duplicate revision, or one
  * duplicate attestation. See held-keys-store.ts.
  *
+ * AND BOUNDED, twice over: a key expires (HELD_KEY_TTL_MS) and a key whose act
+ * the engagement's own ledger says has LANDED is dropped before the next attempt
+ * chooses one. Without either, the key named that trigger until the tab closed,
+ * and a genuinely new act hours later was answered "already done" by the server
+ * and silently discarded. See `@/lib/engagements/held-key`.
+ *
  * AND RE-SEEDED WHEN THE ENGAGEMENT CHANGES. The server page renders the cockpit
  * subtree with a `key`, so /engagements/e-1 -> /engagements/e-2 remounts it —
  * but a ref seeded once per mount is not an invariant anyone can rely on from
@@ -53,7 +59,7 @@ export interface HeldKeysApi {
 
 interface SeededKeys {
   engagementId: string;
-  held: Map<Trigger, string>;
+  held: Map<Trigger, HeldKey>;
 }
 
 /**
@@ -66,7 +72,7 @@ function keysFor(
   seeded: RefObject<SeededKeys | null>,
   engagementId: string,
   currentEngagementId: string,
-): Map<Trigger, string> {
+): Map<Trigger, HeldKey> {
   const current = seeded.current;
   if (current?.engagementId === engagementId) return current.held;
   const held = readHeldKeys(engagementId);
@@ -74,19 +80,32 @@ function keysFor(
   return held;
 }
 
-export function useHeldKeys(currentEngagementId: string): HeldKeysApi {
+/**
+ * @param landedAt when each trigger last produced a transition ON THIS
+ * ENGAGEMENT, epoch ms, from the ledger the page already loaded.
+ */
+export function useHeldKeys(
+  currentEngagementId: string,
+  landedAt?: ReadonlyMap<string, number>,
+): HeldKeysApi {
   const seeded = useRef<SeededKeys | null>(null);
   return {
     claim(engagementId, trigger, mintKey) {
       const held = keysFor(seeded, engagementId, currentEngagementId);
-      const idempotencyKey = keyForAttempt(held, trigger, mintKey);
+      // The ledger the page is showing says the attempt this key names landed
+      // after all, which is what `uncertain` could not tell the studio. It has
+      // done its job: this click is a NEW act and gets a new key.
+      if (trigger && hasLanded(held.get(trigger), landedAt?.get(trigger))) {
+        held.delete(trigger);
+      }
+      const attempt = keyForAttempt(held, trigger, mintKey, Date.now());
       // An edge that passes no trigger holds nothing: it mints a key nobody
       // reads, so it can neither take nor release another act's key.
       if (trigger) {
-        held.set(trigger, idempotencyKey);
+        held.set(trigger, attempt);
         writeHeldKeys(engagementId, held);
       }
-      return idempotencyKey;
+      return attempt.key;
     },
     release(engagementId, trigger) {
       const held = keysFor(seeded, engagementId, currentEngagementId);
