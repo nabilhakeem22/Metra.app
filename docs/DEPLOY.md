@@ -4,7 +4,24 @@ Production runs on **Cloudflare Workers** (OpenNext adapter), worker **`metra-we
 currently served at `https://metra-web.nabil-hakeem22.workers.dev` (add a custom
 domain later via the worker's **Settings → Domains**).
 
-## How deploys happen
+## The system, in one picture
+
+Everything below assumes these. Nobody had written them down in one place.
+
+| thing | value |
+|---|---|
+| Host | Cloudflare Workers, worker **`metra-web`**, built from `apps/web` by `@opennextjs/cloudflare` |
+| URL | `https://metra-web.nabil-hakeem22.workers.dev` (a custom domain is added on the worker's **Settings -> Domains**) |
+| Postgres | Supabase `eu-west-1`, reached through the **Hyperdrive** binding to the **session pooler `:5432`**. The Worker never dials Supabase directly |
+| Files | Supabase Storage, private `metra-files` bucket, signed URLs |
+| PDF | `@cloudflare/puppeteer` on the **`BROWSER`** binding (Cloudflare Browser Rendering) - **not** a bundled Chromium |
+| Rate limit | the Workers Rate Limiting bindings in `apps/web/wrangler.jsonc` (`ratelimits`). It **fails open**; the contract is [API.md](API.md), which this file deliberately does not restate |
+| Cron | worker **`metra-cron`** (`workers/cron`), a separate wrangler project outside the npm workspaces. Needs `APP_ORIGIN` and a `CRON_SECRET` matching `metra-web`'s |
+| Deploy trigger | `deploy.yml`, on `workflow_run` of **CI** on `main`, gated on the repository variable **`DEPLOY_ENABLED == 'true'`** |
+| Rollback lever | **`npx wrangler rollback`** on the Worker - not a git revert. The command and what it does not undo are under *Rolling back* |
+| Logs | `npx wrangler tail metra-web` / `npx wrangler tail metra-cron` |
+
+## How a deploy happens
 
 `.github/workflows/deploy.yml` builds and deploys the worker automatically **after
 CI passes on `main`**. You should not need to run `wrangler deploy` by hand.
@@ -17,42 +34,14 @@ NEXT_PUBLIC_APP_URL=https://metra-web.nabil-hakeem22.workers.dev npx opennextjs-
 npx wrangler deploy
 ```
 
-## One-time activation of auto-deploy
+Auto-deploy is **on** and has been since commit `a2e9b6c`: a green CI run on
+`main` triggers `deploy.yml`, which builds and `wrangler deploy`s the worker.
+`DEPLOY_ENABLED` must be `true` or the deploy job is skipped, so a merge with
+the flag unset ships nothing and reports nothing.
 
-In GitHub → the repo → **Settings → Secrets and variables → Actions**:
+### Two things that were fixed to get here
 
-### Variables tab → New repository variable (7)
-
-| Name | Value |
-|------|-------|
-| `NEXT_PUBLIC_SUPABASE_URL` | copy from your local `.env` |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | copy from your local `.env` (public key) |
-| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | copy from your local `.env` (public key) |
-| `NEXT_PUBLIC_DEFAULT_LOCALE` | `ar-EG` |
-| `NEXT_PUBLIC_APP_URL` | `https://metra-web.nabil-hakeem22.workers.dev` |
-| `CLOUDFLARE_ACCOUNT_ID` | `0454e69f5ed32ae9b6311bc5196ef073` |
-| `DEPLOY_ENABLED` | `true`  ← set this **last**, it arms the workflow |
-
-### Secrets tab → New repository secret (1)
-
-| Name | Value |
-|------|-------|
-| `CLOUDFLARE_API_TOKEN` | create in Cloudflare (below) |
-
-**Create `CLOUDFLARE_API_TOKEN`:** Cloudflare dashboard → **My Profile → API Tokens
-→ Create Token → "Edit Cloudflare Workers"** template → Account = your account →
-Continue → Create Token → copy the value into the GitHub secret above.
-
-Once `DEPLOY_ENABLED = true`, every green push to `main` deploys. Until then the
-deploy job is skipped (no failed runs).
-
-## CI/CD notes (resolved — auto-deploy is live)
-
-Auto-deploy is **on**: a green CI run on `main` triggers `deploy.yml`, which builds
-and `wrangler deploy`s the worker. First successful auto-deploy: commit `a2e9b6c`.
-
-Two things were fixed to get here (history, so the setup isn't accidentally
-reverted):
+History, so the setup is not accidentally reverted.
 
 1. **Deterministic install.** Both workflows use **`npm ci`** against the committed
    `package-lock.json` — never `rm -f package-lock.json && npm install`. The old
@@ -74,7 +63,77 @@ reverted):
    which fails tsc on `Property 'HYPERDRIVE' does not exist on type 'CloudflareEnv'`.
    Keep the `--env-interface` flags in both `ci.yml` and `deploy.yml`.
 
-Manual `wrangler deploy` (above) still works as a fallback.
+### Re-arming auto-deploy if the repo variables are ever lost
+
+Auto-deploy is already on; what follows is the recovery procedure, not a to-do.
+In GitHub -> the repo -> **Settings -> Secrets and variables -> Actions**:
+
+#### Variables tab → New repository variable (7)
+
+| Name | Value |
+|------|-------|
+| `NEXT_PUBLIC_SUPABASE_URL` | copy from your local `.env` |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | copy from your local `.env` (public key) |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | copy from your local `.env` (public key) |
+| `NEXT_PUBLIC_DEFAULT_LOCALE` | `ar-EG` |
+| `NEXT_PUBLIC_APP_URL` | `https://metra-web.nabil-hakeem22.workers.dev` |
+| `CLOUDFLARE_ACCOUNT_ID` | `0454e69f5ed32ae9b6311bc5196ef073` |
+| `DEPLOY_ENABLED` | `true`  ← set this **last**, it arms the workflow |
+
+#### Secrets tab → New repository secret (1)
+
+| Name | Value |
+|------|-------|
+| `CLOUDFLARE_API_TOKEN` | create in Cloudflare (below) |
+
+**Create `CLOUDFLARE_API_TOKEN`:** Cloudflare dashboard → **My Profile → API Tokens
+→ Create Token → "Edit Cloudflare Workers"** template → Account = your account →
+Continue → Create Token → copy the value into the GitHub secret above.
+Set `DEPLOY_ENABLED` **last**: it is the flag that arms the workflow.
+
+## The pre-merge database step
+
+Run `npm run db:migrate`, then `npm run db:apply-rls` (RLS, roles and functions
+live there, never in a migration).
+
+`db:apply-rls` **verifies itself now.** After the fifteen files it re-reads
+`pg_class`, `pg_policies`, `pg_trigger`, `pg_proc` and `pg_roles` on the same
+connection and exits **1** listing anything the manifest declares that the
+database does not have: every schema table RLS-enabled **and** forced, all 46
+policies, all 12 triggers, all 30 functions, and `metra_app` present and neither
+LOGIN nor BYPASSRLS. A green run ends with `apply-rls: verified in the
+catalogues — 46 tables, 46 policies, 12 triggers, 30 functions, ...`. Before
+this, the only post-condition was that no statement threw — which says a file
+RAN, not that its objects exist. Indexes and constraints are deliberately **not**
+checked here: they carry the 0017 case-fold drift and would be red on every
+database, which is why they stay report-only in `assert-schema-applied`.
+
+Every statement under `rls/` is idempotent, so the fix for a red verification is
+to re-run the command.
+
+Then, **every time a migration is in the diff**, prove it landed:
+
+```bash
+npm run assert-schema-applied -w @metra/db
+```
+
+It reads `information_schema` (one connection, writes nothing) and compares it
+against every column the drizzle schema declares. Exit 0 means the database is
+ready for this code; exit 1 lists exactly what is missing.
+
+`deploy.yml` cannot do this for you: it holds `CLOUDFLARE_API_TOKEN` and no
+database credential at all, which is deliberate — a deploy workflow that can
+reach production Postgres is a larger blast radius than the check is worth.
+
+**Deploying before migrating is not a degraded state for the engagement module,
+it is a TOTAL one.** Drizzle builds an explicit column list from the schema file,
+so a single missing column fails the WHOLE query with 42703
+(`undefined_column`). Measured against the live database at 0048: `select()` on
+`engagement_events` raises 42703 for `acknowledged_issue_at`, and on
+`engagement_transitions` for `idempotency_key`. `loadGuardFacts` full-row-selects
+both, so every transition fails, and with them the timeline, the ROM badge and
+the corrections path — eight call sites. There is no partial symptom to notice
+first; the module stops.
 
 ## Runtime secrets (set on the Worker, never in this repo)
 
@@ -132,7 +191,7 @@ failure to mint signed file URLs, not as a login failure.
 `CRON_SECRET` is shared with the scheduled Worker and must be rotated in BOTH
 places or the cron stops being authorised — see below.
 
-### The cron Worker is a separate deployment
+## The cron Worker is a separate deployment
 
 `workers/cron` is **not** an npm workspace and is **not** deployed by
 `deploy.yml`. It has its own `wrangler.jsonc` and is deployed on its own.
@@ -147,50 +206,87 @@ the symptom is automations silently not firing.
 
 ## Migrations
 
-Run `npm run db:migrate`, then `npm run db:apply-rls` (RLS, roles and functions
-live there, never in a migration).
+Migrations are hand-authored, additive, and applied as ONE transaction by
+`npm run db:migrate`. RLS objects never live in one (see *The pre-merge
+database step*).
 
-### Migrate BEFORE you deploy — and prove it
+### The two `lock_timeout`s, and which one decides
 
-**Owner pre-merge step, every time a migration is in the diff.** With the
-production `DATABASE_URL` in the repo-root `.env`:
+There are two, on two different connections, and they answer two different
+questions. Mixing them up is how the earlier "~8× headroom" in this file got
+written.
 
-```bash
-npm run assert-schema-applied -w @metra/db
-```
+| setting | where | value | what it bounds |
+|---|---|---|---|
+| `MIGRATION_LOCK_TIMEOUT` | `packages/db/src/scripts/lock-timeout.ts` | **`3s`** | how long **`db:migrate`, `db:apply-rls` and the fixture purge** will WAIT for a table lock before giving up with 55P03 |
+| the app's | `packages/db/src/org-context.ts:47` | `5s` | how long a **request** will wait, per transaction |
 
-It reads `information_schema` (one connection, writes nothing) and compares it
-against every column the drizzle schema declares. Exit 0 means the database is
-ready for this code; exit 1 lists exactly what is missing.
+`db:migrate` sets its own `lock_timeout = 3 s` **and reads it back from
+`pg_settings` before any DDL runs** — Supabase's session pooler discards a
+client's startup parameters, so an unverified setting is one that silently did
+nothing. A blocked run aborts with 55P03 and rolls the whole batch back.
 
-`deploy.yml` cannot do this for you: it holds `CLOUDFLARE_API_TOKEN` and no
-database credential at all, which is deliberate — a deploy workflow that can
-reach production Postgres is a larger blast radius than the check is worth.
-
-**Deploying before migrating is not a degraded state for the engagement module,
-it is a TOTAL one.** Drizzle builds an explicit column list from the schema file,
-so a single missing column fails the WHOLE query with 42703
-(`undefined_column`). Measured against the live database at 0048: `select()` on
-`engagement_events` raises 42703 for `acknowledged_issue_at`, and on
-`engagement_transitions` for `idempotency_key`. `loadGuardFacts` full-row-selects
-both, so every transition fails, and with them the timeline, the ROM badge and
-the corrections path — eight call sites. There is no partial symptom to notice
-first; the module stops.
+`db:apply-rls` additionally sets **`statement_timeout = 60 s`**, read back the
+same way. `lock_timeout` bounds each lock WAIT and nothing else, so after a
+successful connect a half-open pooler socket would otherwise leave the applier
+waiting forever with no error, on no deadline.
 
 ### The migrator's lock window grows with every appended migration
 
 `npm run db:migrate` runs the pending files as ONE transaction. 0049 and 0050
 together hold ACCESS EXCLUSIVE on `engagement_events` and
-`engagement_transitions` for about five round trips (~630 ms from a workstation;
-the app's own `lock_timeout` is 5 s, so roughly 8× headroom). That headroom is
-not a constant: each migration appended to the same pending batch adds its
-statements to the same lock window. Two DDL migrations are comfortable, ten are
-not. If a batch ever grows past a handful of table-rewriting statements, run it
-in smaller batches or in a maintenance window rather than trusting the margin.
-Atomicity is the compensation: a 55P03 rolls the whole batch back, so a failed
-migrate leaves the previous indexes intact.
+`engagement_transitions` for about five round trips (**~630 ms** from a
+workstation). Against the migrator's own 3 s that is a **~4.8× self-abort
+margin** — the figure that decides whether `db:migrate` gives up, and the only
+one that matters here. The app's 5 s is a different connection and does not
+apply. That margin is not a constant: each migration appended to the same pending
+batch adds its statements to the same lock window. Two DDL migrations are
+comfortable, ten are not. If a batch ever grows past a handful of table-rewriting
+statements, run it in smaller batches or in a maintenance window rather than
+trusting the margin. Atomicity is the compensation: a 55P03 rolls the whole batch
+back, so a failed migrate leaves the previous indexes intact.
 
-### After 0048/0049: acknowledged build-cost bands must be re-issued AND re-acknowledged
+### `apply-rls`'s worst case is one file, not the run
+
+Each `rls/*.sql` file goes over the simple query protocol as ONE implicit
+transaction, so every ACCESS EXCLUSIVE lock it takes is held until that file
+finishes — and `lock_timeout` bounds each lock WAIT, not the file. The biggest
+is **`policies/10-catalogue.sql`, which locks 11 distinct tables**, so with a
+blocker on every one of them that file can spend **11 × 3 s = 33 s** before
+giving up. The realistic case — one long reader on the last table — is ~3 s of
+blocked writes on ten tables, then 55P03 and a clean roll-back of *that file*.
+Splitting `policies.sql` into six cut this worst case from **46 tables at once to
+11**. Every statement under `rls/` is idempotent, so the recovery is to re-run
+the command from the top.
+
+CI counts **the batch a single deploy of this ref would apply** and fails above
+**`MAX_PENDING_MIGRATIONS = 4`** (`.github/workflows/ci.yml`, step *"Migration
+batch size"*, running `scripts/ci/count-pending-migrations.sh`). The count is
+written to the run's step summary as `pending migrations: N / 4 (base: ...)`
+**either way**, so the number is visible on a green run too, and it needs the
+`fetch-depth: 0` on the checkout — a depth-1 clone has no base to count against.
+Four DDL migrations in one `db:migrate` transaction is comfortable; ten is not.
+If you legitimately need more, split the merge, or raise the constant **in the
+same commit that explains why**.
+
+**The base is not one rule, and that was a real hole.** On a push to `main` the
+base is `github.event.before`, the previous main tip. It used to be
+`git merge-base origin/main HEAD`, which on a main push *is* HEAD — so the count
+was always **0** and pushes to `main` were **structurally ungated**: a squash
+merge landing four migrations went green by construction. On every other ref the
+merge-base with `origin/main` is kept, because the branch delta is what a
+reviewer is being asked to approve. A base that is absent, all-zeroes (a
+first/force push) or not in the clone falls back to `HEAD~1` with a
+`::warning::`; it never aborts the job with a 128.
+
+**What it cannot see:** the target database's `drizzle.__drizzle_migrations`.
+Anything already merged but not yet applied by the lead is part of the real
+pending batch and is not counted here. Two branches adding four each are both
+green, and `main` then holds eight for one `db:migrate`. The pre-merge
+`assert-schema-applied` run above is where "pending on THIS database" is
+knowable; this gate is the cheap fence that stops one branch proposing ten.
+
+### Recovery: acknowledgements recorded between the 0048 and 0049 deploys
 
 Two migrations, one operator task, and neither backfills — by design.
 
@@ -239,31 +335,72 @@ where e.kind = 'rom_acknowledgement'
   and de.rom_issued_at is not null;
 ```
 
-**That population needs THREE steps, not two, and the order matters.** `Issue to
-client` refuses an engagement that already has a `rom_issued_at` — it answers
-`rom_already_issued`, by design: issuing twice would stamp a second instant on a
-band nobody re-sent. So for each engagement in that count:
+**That population needs ONE step, not three.**
 
-1. **Re-set the band** (Set build-cost range — the same numbers are fine).
-   Setting it clears `rom_issued_at` unconditionally, because a band the client
-   has seen is a figure they may be budgeting against and changing it un-tells
-   them.
-2. **Issue to client.** Now it is admitted, and stamps a fresh issuance instant.
-3. **The client acknowledges** from their existing delivery link — the portal
-   re-offers the verb by itself, because a NULL never matches a real instant.
+1. **Ask the client to tap Acknowledge again**, on the delivery link they
+   already have.
 
-An engagement with no `rom_issued_at` at all (the first count above) skips step 1
-— it has nothing to clear.
+That is the whole procedure. The portal compares `acknowledged_issue_at IS NOT
+DISTINCT FROM rom_issued_at` (`rls/functions/50-delivery-write.sql`, the repeat-suppression branch
+of the respond function), and a NULL never matches a real instant — so for an
+engagement whose band is already issued, the link is **already re-offering the
+acknowledge verb**. Nothing on the studio side has to happen first.
+
+> **An earlier version of this runbook told you to re-set the band first. Do
+> not.** "Re-set the band" clears `rom_issued_at` unconditionally, which un-tells
+> a client a figure they may be budgeting against — in order to work around a
+> `rom_already_issued` refusal (`lib/engagements/rom-issue.ts:44`) that the NULL
+> comparison means you never actually hit. The refusal only guards a band that
+> IS currently issued and acknowledged against; it is not in the way here.
+
+Re-issuing is needed only for an engagement with **no `rom_issued_at` at all**
+(the second count query above) — there is nothing to acknowledge until a band
+has been issued. Set the band, issue it, and the client acknowledges from the
+same link.
 
 Nothing else clears the flag; there is no backfill script, because stamping a
 date onto an old acknowledgement would be inventing evidence on an evidentiary
 record.
 
-### After 0050: nothing to do
+### After 0050 and 0051: nothing to do
 
 0050 added `engagement_transitions.idempotency_key` and its partial unique
 index. Additive and nullable: every existing row keeps a NULL key, and code
 deployed before it simply never sends one.
+
+0051 added `variation_order_events.actor_channel` and its CHECK. Additive and
+nullable in exactly the same way: rows written before it keep a NULL channel,
+and code deployed before it never sends one.
+
+## Rolling back
+
+**The lever is `wrangler`, not git.** A git revert has to go through CI and a
+rebuild before it changes anything a user sees; a Worker rollback is immediate
+and needs no build.
+
+```bash
+cd apps/web
+npx wrangler rollback metra-web            # interactive: pick the previous version
+npx wrangler deployments list              # what is deployed now, and what preceded it
+```
+
+Three things a rollback does NOT undo, and they are the reason the pre-merge
+database step exists:
+
+- **Migrations.** A rolled-back Worker runs older code against the newer schema.
+  Additive, nullable migrations are safe in that direction by construction, which
+  is why every migration in this repo is additive - a column the old code does
+  not know about is a column it never selects.
+- **`apply-rls` changes.** Policies, grants and triggers are applied out of band
+  and stay applied. Each of them has a one-line revert, which belongs in the wave
+  report that introduced it.
+- **Worker secrets.** `wrangler rollback` restores code, not secrets. A rotated
+  secret stays rotated.
+
+After rolling back, hit an authenticated page and watch `npx wrangler tail
+metra-web` for `42501` (a missing grant), `MT100` (an immutability trigger) and
+`42703` (`undefined_column` - the schema is behind the code, which means the
+migration did not run).
 
 ## Testing against a database
 

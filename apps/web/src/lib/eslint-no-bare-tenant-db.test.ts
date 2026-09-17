@@ -64,6 +64,64 @@ it('no-bare-tenant-db: flags raw-connection queries, allows scoped ones', () => 
         filename: 'tests/isolation/shared-pool.test.ts',
         code: 'const rows = await db.execute(sql`select current_user`);',
       },
+      // O6a: an alias inherits what it was initialised FROM, so a scoped
+      // handle stays scoped through one. `tx` is a free parameter here
+      // ('unknown' - the caller owns the scoping), and 'unknown' must not
+      // become 'raw' just because it passed through a const.
+      {
+        filename: 'apps/web/src/lib/clients/queries.ts',
+        code: 'function f(tx) { const q = tx; return q.select().from(clients); }',
+      },
+      // O6b: the relational api on an RLS-SCOPED handle is the sanctioned
+      // shape and must stay silent. (A handle literally named `db` is raw by
+      // this rule's name convention whatever its binding - that convention is
+      // deliberate and predates this change - so the scoped case is written the
+      // way the codebase writes it, as `tx`.)
+      {
+        filename: 'apps/web/src/lib/clients/queries.ts',
+        code: 'function f(tx) { return tx.query.clients.findMany(); }',
+      },
+      // F3/S6: binding `.query` off a SCOPED handle is the sanctioned shape and
+      // stays silent. The new report fires on the RAW handle only.
+      {
+        filename: 'apps/web/src/lib/clients/queries.ts',
+        code: 'function f(tx) { const q = tx.query; return q.clients.findMany(); }',
+      },
+      {
+        filename: 'apps/web/src/lib/clients/queries.ts',
+        code: 'function f(tx) { const { query } = tx; return query.clients.findMany(); }',
+      },
+      // ...and `query` destructured off something this rule cannot classify is
+      // never invented into a report: failing closed here means 'unknown', not
+      // 'raw'.
+      {
+        filename: 'apps/web/src/lib/clients/queries.ts',
+        code: 'const { query } = buildSomething(); query.clients.findMany();',
+      },
+      // THE THREE INITIALISER SHAPES NAMED IN KNOWN LIMITS, pinned as valid so
+      // the documented list stays a measured fact rather than an aspiration.
+      // Each is a shape where the value depends on something the syntax does not
+      // decide, and each is SILENT today. If a future change starts reporting
+      // one of them, this case fails and the comment gets corrected with it.
+      {
+        filename: 'apps/web/src/lib/clients/queries.ts',
+        code: 'withRequestDb((h) => { const q = h ?? h; return q.select().from(clients); });',
+      },
+      {
+        filename: 'apps/web/src/lib/clients/queries.ts',
+        code: 'withRequestDb((h) => { const q = true ? h : h; return q.select().from(clients); });',
+      },
+      {
+        filename: 'apps/web/src/lib/clients/queries.ts',
+        code: 'function f(x = getDb()) { return x.select().from(clients); }',
+      },
+      // O6a, the cycle guard, asserted so a future change to the alias hop
+      // cannot turn it into a stack overflow: `let a = b; let b = a;` resolves
+      // to 'unknown' and reports NOTHING.
+      {
+        filename: 'apps/web/src/lib/clients/queries.ts',
+        code: 'let a = b; let b = a; a.select().from(clients);',
+      },
       // A GENUINELY DYNAMIC key is a stated KNOWN LIMIT, not an oversight: a
       // syntax rule cannot resolve `conn[key]`, and pretending otherwise would
       // mean guessing. It also takes deliberate effort to write, which is not
@@ -135,13 +193,13 @@ it('no-bare-tenant-db: flags raw-connection queries, allows scoped ones', () => 
         // A computed key written as an interpolation-free template literal.
         filename: 'apps/web/src/lib/clients/queries.ts',
         code: 'const conn = getRequestConnection(); await conn[`sql`]`select 1`;',
-        errors: [{ messageId: 'bareQuery' }],
+        errors: [{ messageId: 'bareTaggedSqlQuery' }],
       },
       {
         // A rest binding holds every key the factory returned, handles included.
         filename: 'apps/web/src/lib/clients/queries.ts',
         code: 'const { ...rest } = getRequestConnection(); await rest.sql`select 1`;',
-        errors: [{ messageId: 'bareQuery' }],
+        errors: [{ messageId: 'bareTaggedSqlQuery' }],
       },
       {
         // A query method reached by computed string.
@@ -154,7 +212,7 @@ it('no-bare-tenant-db: flags raw-connection queries, allows scoped ones', () => 
       {
         filename: 'apps/web/src/lib/clients/queries.ts',
         code: 'const { sql } = getRequestConnection(); await sql`select * from public.clients`;',
-        errors: [{ messageId: 'bareQuery' }],
+        errors: [{ messageId: 'bareTaggedSqlQuery' }],
       },
       {
         filename: 'apps/web/src/lib/clients/queries.ts',
@@ -164,7 +222,7 @@ it('no-bare-tenant-db: flags raw-connection queries, allows scoped ones', () => 
       {
         filename: 'apps/web/src/lib/clients/queries.ts',
         code: 'const { pg } = getRequestConnection(); await pg`select 1`;',
-        errors: [{ messageId: 'bareQuery' }],
+        errors: [{ messageId: 'bareTaggedSqlQuery' }],
       },
       // Bare read on the withRequestDb callback param, non-allowlisted file.
       {
@@ -198,22 +256,22 @@ it('no-bare-tenant-db: flags raw-connection queries, allows scoped ones', () => 
       {
         filename: 'apps/web/src/lib/clients/queries.ts',
         code: 'const { sql: raw } = getRequestConnection(); await raw`select * from public.clients`;',
-        errors: [{ messageId: 'bareQuery' }],
+        errors: [{ messageId: 'bareTaggedSqlQuery' }],
       },
       {
         filename: 'apps/web/src/lib/clients/queries.ts',
         code: 'await (getRequestConnection().sql)`select * from public.clients`;',
-        errors: [{ messageId: 'bareQuery' }],
+        errors: [{ messageId: 'bareTaggedSqlQuery' }],
       },
       {
         filename: 'apps/web/src/lib/clients/queries.ts',
         code: 'const conn = getRequestConnection(); await conn.sql`select 1`;',
-        errors: [{ messageId: 'bareQuery' }],
+        errors: [{ messageId: 'bareTaggedSqlQuery' }],
       },
       {
         filename: 'apps/web/src/lib/clients/queries.ts',
         code: "const c = getRequestConnection(); await c['sql']`select 1`;",
-        errors: [{ messageId: 'bareQuery' }],
+        errors: [{ messageId: 'bareTaggedSqlQuery' }],
       },
       {
         filename: 'apps/web/src/lib/clients/queries.ts',
@@ -279,6 +337,80 @@ it('no-bare-tenant-db: flags raw-connection queries, allows scoped ones', () => 
         filename: 'apps/web/src/lib/clients/queries.ts',
         code: 'const conn = getRequestConnection(); conn.db.$with(cte).select().from(cte);',
         errors: [{ messageId: 'bareQuery' }],
+      },
+      // O6a: the one-level alias. `const q = db` is what a developer writes to
+      // shorten a line, and before this it silenced the rule completely while
+      // running exactly the same BYPASSRLS query.
+      {
+        filename: 'apps/web/src/lib/clients/queries.ts',
+        code: 'const q = db; await q.select().from(clients);',
+        errors: [{ messageId: 'bareQuery' }],
+      },
+      {
+        filename: 'apps/web/src/lib/clients/queries.ts',
+        code: 'const { db } = getRequestConnection(); const q = db; await q.execute(stmt);',
+        errors: [{ messageId: 'bareQuery' }],
+      },
+      // O6b: drizzle's RELATIONAL api. `db.query.clients.findMany()` is the
+      // documented read surface and the most likely shape of the next
+      // org-scoped read; QUERY_METHODS listed neither method and isRawExpr did
+      // not follow the `.query` hop, so both linted clean.
+      {
+        filename: 'apps/web/src/lib/clients/queries.ts',
+        code: 'await db.query.clients.findMany();',
+        errors: [{ messageId: 'bareQuery' }],
+      },
+      {
+        filename: 'apps/web/src/lib/clients/queries.ts',
+        code: 'await db.query.clients.findFirst({ where: eq(clients.id, id) });',
+        errors: [{ messageId: 'bareQuery' }],
+      },
+      // F3/S6: the three shapes that were SILENT. `isRelationalPath` walks an
+      // unbroken member chain, so binding `.query` to a name ended the walk and
+      // every one of these linted clean — including `const q = db.query`, which
+      // is what a developer writes to shorten a line rather than to evade a
+      // rule. Reported at the BINDING: one report, on the line that needs
+      // changing, and it cannot miss a later use.
+      {
+        filename: 'apps/web/src/lib/clients/queries.ts',
+        code: 'withRequestDb((db) => { const q = db.query; return q.clients.findMany(); });',
+        errors: [{ messageId: 'boundRelationalQuery' }],
+      },
+      {
+        filename: 'apps/web/src/lib/clients/queries.ts',
+        code: 'withRequestDb((db) => { const { query } = db; return query.clients.findMany(); });',
+        errors: [{ messageId: 'boundRelationalQuery' }],
+      },
+      {
+        filename: 'apps/web/src/lib/clients/queries.ts',
+        code: 'withRequestDb((db) => { const { query: qq } = db; return qq.clients.findMany(); });',
+        errors: [{ messageId: 'boundRelationalQuery' }],
+      },
+      // The handle reached by a PROPERTY of a connection object, then bound:
+      // the binding report uses the same isRawExpr as everything else, so it
+      // inherits every way the raw handle is recognised.
+      {
+        filename: 'apps/web/src/lib/clients/queries.ts',
+        code: "const conn = getRequestConnection(); const q = conn.db.query; q.clients.findMany();",
+        errors: [{ messageId: 'boundRelationalQuery' }],
+      },
+      // `db['query']` is the same read as `db.query`, and only the punctuation
+      // differs — staticKeyName resolves both.
+      {
+        filename: 'apps/web/src/lib/clients/queries.ts',
+        code: "const q = db['query']; q.clients.findMany();",
+        errors: [{ messageId: 'boundRelationalQuery' }],
+      },
+      // `const { query } = db` ALREADY classified the binding as raw (that is
+      // why `query.findMany()` was caught while `query.clients.findMany()` was
+      // not), so this shape now reports TWICE: once at the binding, once at the
+      // call. Pinned rather than smoothed over — the second report is the
+      // pre-existing one and suppressing it would be a behaviour change nobody
+      // asked for.
+      {
+        filename: 'apps/web/src/lib/clients/queries.ts',
+        code: 'withRequestDb((db) => { const { query } = db; return query.findMany(); });',
+        errors: [{ messageId: 'boundRelationalQuery' }, { messageId: 'bareQuery' }],
       },
       // S1: THE SECOND FENCE. Concentrating nine allowlisted files into one moved
       // the exemption but not the enforcement — a security review wrote this exact

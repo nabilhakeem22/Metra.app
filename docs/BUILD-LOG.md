@@ -23,7 +23,9 @@ Findings loop back to the coder; testers re-verify; the PM re-verdicts. This is 
 several **critical bugs were caught before they ever shipped** (see below).
 
 Every phase was verified (tsc + build + lint + unit + the isolation gate),
-secret-safety-checked, and deployed to Vercel. Nothing was pushed until green.
+secret-safety-checked, and deployed (to Vercel at the time; the app moved to
+Cloudflare Workers in August 2026 — see docs/DEPLOY.md). Nothing was pushed
+until green.
 
 ---
 

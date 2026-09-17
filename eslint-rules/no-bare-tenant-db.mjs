@@ -33,11 +33,41 @@
 // NEITHER RENAMING NOR DOTTING HIDES IT: the handle is known by the PROPERTY it
 // came from, not the local name, and the connection object is tracked too — so
 // `{ sql: raw }`, `conn.sql`, `conn['sql']` and `getRequestConnection().sql` count.
-// KNOWN LIMITS (deliberate): raw-ness survives neither a return from a local helper
-// nor an assignment into an outer `let`; a COMPUTED key that is not a literal or
+// DRIZZLE'S RELATIONAL API COUNTS TOO. `db.query.clients.findMany()` reads the
+// same rows on the same BYPASSRLS socket as `db.select().from(clients)`, and it
+// is drizzle's DOCUMENTED read surface — the most likely shape of the next
+// org-scoped read written in this codebase. `.query` propagates raw-ness through
+// every property access after it (isRelationalPath), and `findFirst`/`findMany`
+// are query methods.
+// BINDING `.query` TO A NAME IS REPORTED AT THE BINDING. `isRelationalPath`
+// walks LEFT through an UNBROKEN member chain, so any hop through an identifier
+// ended the walk and `const q = db.query; q.clients.findMany()` linted clean —
+// as did `const { query } = db` and `const { query: qq } = db`. All three were
+// measured silent. The third is what a developer actually writes to shorten a
+// line, so it is not an evasion, it is the mistake. Following the alias would
+// mean tracking a fourth classification through the whole resolver; reporting
+// the DECLARATOR is one visitor, cannot miss a later use, and points at the
+// line that needs changing. Only when the source is a raw handle: the same
+// binding off a `tx` from withOrgContext is the sanctioned shape and is silent.
+// KNOWN LIMITS (deliberate): raw-ness does not survive a return from a local
+// helper, nor a LATER re-assignment (`let q; q = db;` - only a declarator's own
+// initialiser is followed); a COMPUTED key that is not a literal or
 // an interpolation-free template (`conn[key]`, `getDb()[method]()`) cannot be
-// resolved statically at all. Four more are RuleTester-proven and left open on
-// purpose — `Reflect.get(conn, 'sql')`, `Object.values(getRequestConnection())[1]`,
+// resolved statically at all. THREE MORE INITIALISER SHAPES resolve to 'unknown'
+// and are therefore silent, all three RuleTester-pinned below so the list stays
+// honest rather than aspirational: a nullish coalesce (`const q = tx ?? db`,
+// a realistic idiom for this codebase's shape), a ternary
+// (`const q = cond ? tx : db`) and a DEFAULT PARAMETER
+// (`function f(x = getDb()) { x.select() }`). Each is a shape where the value
+// depends on something the syntax does not decide. TWO MORE, measured by the
+// wave-6 re-test and left open for now: a destructure whose initialiser is a
+// MEMBER expression (`const { query } = getRequestConnection().db` — only an
+// identifier initialiser is unpacked) and an OPTIONAL chain to the relational
+// api (`const q = db?.query` — the ChainExpression is not unwrapped at a
+// binding, though `db?.query.x.findMany()` and `db?.select()` are reported at
+// the call). Neither appears in the tree. Four more are RuleTester-proven
+// and left open on purpose — `Reflect.get(conn, 'sql')`,
+// `Object.values(getRequestConnection())[1]`,
 // a class FIELD holding the handle, an array destructure of a connection: this
 // rule reads syntax, and a value that has been through a reflective read or an
 // index is no longer syntax. Each takes deliberate effort to write — not the
@@ -160,6 +190,12 @@ const QUERY_METHODS = new Set([
   'delete',
   'execute',
   'unsafe',
+  // Drizzle's RELATIONAL query api: `db.query.<table>.findMany()`. It is
+  // drizzle's documented read surface and the most likely shape of the next
+  // org-scoped read in this codebase, and it was completely outside the rule -
+  // both the method names and the `.query` hop. See isRelationalPath.
+  'findFirst',
+  'findMany',
 ]);
 
 /** Builder methods that return the SAME un-scoped connection: `db.with(cte)
@@ -194,6 +230,14 @@ const RAW_FACTORIES = new Set([
 
 /** The keys of a `{ db, sql, pg }` connection — all three are the SAME socket. */
 const RAW_HANDLE_KEYS = new Set(['db', 'sql', 'pg']);
+
+/** How many `const a = b` hops the classifier follows before giving up.
+ * `const q = db` is the shortest way to lose this rule, and it is what a
+ * developer writes to shorten a line - not an evasion. The bound exists so a
+ * pathological file cannot turn a lint run into a deep recursion; a chain this
+ * long is not a thing anyone writes. Past it the answer is 'unknown', never
+ * 'safe' and never 'raw'. */
+const ALIAS_DEPTH = 8;
 
 /** `await getRequestConnection()` classifies exactly like `getRequestConnection()`. */
 function unwrapAwait(node) {
@@ -295,6 +339,16 @@ export const noBareTenantDb = {
     messages: {
       bareQuery:
         'Drizzle `.{{method}}()` on the raw request/base connection runs as the BYPASSRLS login role and can read/write across every tenant. Wrap org-scoped access in withOrgContext()/withUserContext(). If this is a sanctioned base-connection use (public token SDF, api-key resolver, automation system read), allowlist the file in eslint-rules/no-bare-tenant-db.mjs.',
+      // A tagged template has NO method name to interpolate. The previous
+      // version reported `bareQuery` with `data: { method: 'sql``' }`, which
+      // rendered as "Drizzle `.sql``()`" - punctuation that is not a method and
+      // not anything a developer could search for. A separate messageId with no
+      // placeholder is one line more and cannot render a method that does not
+      // exist.
+      bareTaggedSqlQuery:
+        'A tagged-template query on the raw request/base connection runs as the BYPASSRLS login role and can read/write across every tenant. Wrap org-scoped access in withOrgContext()/withUserContext(). If this is a sanctioned base-connection use (public token SDF, api-key resolver, automation system read), allowlist the file in eslint-rules/no-bare-tenant-db.mjs.',
+      boundRelationalQuery:
+        "Binding drizzle's relational api off the raw request/base connection (`const q = db.query`, `const { query } = db`) hands a name to the BYPASSRLS socket, and every `q.<table>.findMany()` after it reads across every tenant with no row-level-security backstop. Reported here at the binding because the alias is where it is still one line to fix. Wrap org-scoped access in withOrgContext()/withUserContext() and bind off the `tx` it gives you.",
       rawHandleArgument:
         '`{{helper}}()` is given the raw request/base connection. Its where clause carries no org predicate on purpose — the RLS transaction is the tenancy boundary — so on the BYPASSRLS handle it resolves an id belonging to ANY tenant. Pass the `tx` from withOrgContext()/withUserContext().',
       sdfCallerNotAllowlisted:
@@ -407,6 +461,23 @@ export const noBareTenantDb = {
       return null;
     }
 
+    /**
+     * Drizzle's relational read path: `<raw>.query.<table>` and anything dotted
+     * off it. `.query` is the hop that matters - once the receiver of `.query`
+     * is raw, every further property access is still the same un-scoped
+     * connection, so `db.query.clients.findMany()` is a bare `db.select()`
+     * wearing drizzle's relational api. The recursion walks LEFT to the `.query`
+     * hop and classifies its object; a computed key that cannot be resolved
+     * statically stops it, exactly as it stops the rest of this rule.
+     */
+    function isRelationalPath(node) {
+      if (!node || node.type !== 'MemberExpression') return false;
+      const key = staticKeyName(node.computed, node.property);
+      if (key === null) return false;
+      if (key === 'query') return isRawExpr(node.object);
+      return isRelationalPath(node.object);
+    }
+
     // Is this expression node the raw connection? (Identifier resolved to a raw
     // binding, a `getDb()` call, or ANY handle key read off a connection object —
     // `getRequestConnection().sql`, `conn.pg`, `conn['sql']`.)
@@ -422,12 +493,18 @@ export const noBareTenantDb = {
         // `.sql`/`.pg` are the SAME socket as `.db`: dotting the connection object
         // instead of destructuring it changes nothing.
         const key = staticKeyName(node.computed, node.property);
-        if (key === null || !RAW_HANDLE_KEYS.has(key)) return false;
-        const object = unwrapAwait(node.object);
-        if (rawFactoryName(object)) return true;
-        return (
-          object.type === 'Identifier' && classifyIdentifier(object) === 'connection'
-        );
+        if (key !== null && RAW_HANDLE_KEYS.has(key)) {
+          const object = unwrapAwait(node.object);
+          if (rawFactoryName(object)) return true;
+          if (
+            object.type === 'Identifier' &&
+            classifyIdentifier(object) === 'connection'
+          ) {
+            return true;
+          }
+        }
+        // Checked AFTER the handle keys, so nothing already classified changes.
+        return isRelationalPath(node);
       }
       // `<raw>.with(cte)` returns the raw connection's own builder, so whatever
       // is queried on the result is queried on the raw connection.
@@ -438,8 +515,11 @@ export const noBareTenantDb = {
       return false;
     }
 
-    // Classify a variable definition as 'raw' | 'safe' | 'unknown'.
-    function classifyDef(def) {
+    // Classify a variable definition as 'raw' | 'safe' | 'connection' | 'unknown'.
+    // `seen`/`depth` are the alias chain this definition is being resolved
+    // inside; they are threaded through so a cycle resolves to 'unknown'
+    // instead of recursing.
+    function classifyDef(def, seen, depth) {
       if (def.type === 'Parameter') {
         const fn = def.node; // Arrow/Function(Expression|Declaration)
         const parent = fn && fn.parent;
@@ -467,7 +547,7 @@ export const noBareTenantDb = {
         return 'unknown';
       }
       if (def.type === 'Variable') {
-        return classifyDeclarator(def.node, def.name);
+        return classifyDeclarator(def.node, def.name, seen, depth);
       }
       return 'unknown';
     }
@@ -478,7 +558,7 @@ export const noBareTenantDb = {
      * `const conn = getRequestConnection()` (the connection OBJECT, whose handle
      * keys are raw) | `const x = createRuntimeConnection().sql`.
      */
-    function classifyDeclarator(decl, nameNode) {
+    function classifyDeclarator(decl, nameNode, seen, depth) {
       const init = decl && unwrapAwait(decl.init);
       if (!init) return 'unknown';
       const factory = rawFactoryName(init);
@@ -494,6 +574,14 @@ export const noBareTenantDb = {
         return 'connection';
       }
       if (init.type === 'MemberExpression' && isRawExpr(init)) return 'raw';
+      // `const q = db` / `const c = conn`: a one-level alias inherits whatever
+      // the identifier it was initialised from is. Bounded by ALIAS_DEPTH and by
+      // the `seen` set, so `let a = b; let b = a;` resolves to 'unknown' rather
+      // than recursing. Failing closed here means 'unknown', not 'raw' - the
+      // rule never invents a report it cannot justify.
+      if (init.type === 'Identifier') {
+        return classifyIdentifier(init, seen, depth + 1);
+      }
       return 'unknown';
     }
 
@@ -524,16 +612,27 @@ export const noBareTenantDb = {
       });
     }
 
-    function classifyIdentifier(idNode) {
-      const cached = classifyCache.get(idNode);
-      if (cached !== undefined) return cached;
-      classifyCache.set(idNode, 'unknown'); // cycle guard
+    function classifyIdentifier(idNode, seen, depth) {
+      // Entry call (no alias chain yet): this is the only depth that is
+      // memoised, because a result reached under a depth/cycle bound is about
+      // THAT chain and must not be cached as the answer for the identifier.
+      const isEntry = seen === undefined;
+      if (isEntry) {
+        const cached = classifyCache.get(idNode);
+        if (cached !== undefined) return cached;
+        classifyCache.set(idNode, 'unknown'); // cycle guard
+        seen = new Set();
+        depth = 0;
+      }
 
       let result = 'unknown';
       const variable = resolveVariable(idNode);
-      if (variable) {
+      // A variable already on this alias chain, or a chain longer than
+      // ALIAS_DEPTH, resolves to 'unknown' and stops.
+      if (variable && !seen.has(variable) && depth <= ALIAS_DEPTH) {
+        seen.add(variable);
         for (const def of variable.defs) {
-          const c = classifyDef(def);
+          const c = classifyDef(def, seen, depth);
           if (c !== 'unknown') {
             result = c;
             break;
@@ -545,21 +644,49 @@ export const noBareTenantDb = {
       // planted `db.select(...)` whose binding the scope walk can't reach.
       if (result === 'unknown' && idNode.name === 'db') result = 'raw';
 
-      classifyCache.set(idNode, result);
+      if (isEntry) classifyCache.set(idNode, result);
       return result;
+    }
+
+    /** The `query` property this object pattern binds, or null. */
+    function boundQueryProperty(pattern) {
+      if (!pattern || pattern.type !== 'ObjectPattern') return null;
+      return (
+        pattern.properties.find(
+          (property) =>
+            property.type === 'Property' &&
+            staticKeyName(property.computed, property.key) === 'query',
+        ) ?? null
+      );
     }
 
     return {
       ...sdfCallerVisitors,
+      // `const q = db.query` / `const { query } = db` / `const { query: qq } = db`.
+      // Reported at the BINDING: `isRelationalPath` walks an unbroken member
+      // chain, so every one of these ended the walk and linted clean, and the
+      // alias is where it is still one line to fix.
+      VariableDeclarator(node) {
+        const init = unwrapAwait(node.init);
+        if (!init) return;
+        if (init.type === 'MemberExpression') {
+          const key = staticKeyName(init.computed, init.property);
+          if (key === 'query' && isRawExpr(init.object)) {
+            context.report({ node: node.id, messageId: 'boundRelationalQuery' });
+          }
+          return;
+        }
+        const bound = boundQueryProperty(node.id);
+        if (bound && isRawExpr(init)) {
+          context.report({ node: bound.value, messageId: 'boundRelationalQuery' });
+        }
+      },
       // `` sql`select …` `` on the raw postgres.js handle — no method call to
       // catch, so the tagged template is its own visitor.
       TaggedTemplateExpression(node) {
         if (!isRawExpr(node.tag)) return;
-        context.report({
-          node: node.tag,
-          messageId: 'bareQuery',
-          data: { method: 'sql``' },
-        });
+        // No `data`: this messageId has no placeholder, by construction.
+        context.report({ node: node.tag, messageId: 'bareTaggedSqlQuery' });
       },
       CallExpression(node) {
         // The spread above cannot carry a second `CallExpression`, so the SDF

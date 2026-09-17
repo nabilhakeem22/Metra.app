@@ -1,7 +1,8 @@
-import { readFileSync, readdirSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
+import { baselineSnapshotName, snapshotName } from './snapshot-baseline';
 
 // The journal is the migrator's ONLY input. `migrate()` does not read the
 // migrations FOLDER — it reads `meta/_journal.json`, and for each entry applies
@@ -86,6 +87,33 @@ describe('migrations/meta/_journal.json', () => {
       .filter((entry, index) => index > 0 && entry.when <= journal.entries[index - 1].when)
       .map((entry) => `${entry.tag} (when=${entry.when}) is not above the entry before it`);
     expect(outOfOrder).toEqual([]);
+  });
+
+  it('has a snapshot for its NEWEST entry, because that is what generate diffs against', () => {
+    // `drizzle-kit generate` does not read this folder - it diffs src/schema/
+    // against the newest SNAPSHOT. A missing one is silent and expensive: the
+    // next `generate` diffs against whatever older snapshot it finds and
+    // re-proposes most of the schema as new.
+    //
+    // meta/ is 35 snapshots behind by history (0000-0016 exist; 0017-0050 were
+    // never written) and that is deliberately NOT asserted here - those files
+    // hurt nothing and `drizzle-kit check` walks the chain without them. What
+    // must never regress is the NEWEST one, which is the only snapshot
+    // `generate` and `npm run db:assert-snapshot` actually read.
+    //
+    // The NAME comes from `snapshot-baseline.ts`, which is what the gate and
+    // `db:generate-baseline` also call, so this test and those two commands
+    // CANNOT disagree about which file is the baseline. They used to: the gate
+    // named 0051 by hand, so the day a 0052 entry lands this case goes red for a
+    // file the gate would never read, while the gate stays green on a stale one.
+    const newest = journal.entries[journal.entries.length - 1];
+    const snapshot = baselineSnapshotName(migrationsFolder);
+    expect(snapshot).toBe(snapshotName(newest.idx));
+    expect(
+      existsSync(resolve(migrationsFolder, snapshot)),
+      `${snapshot} is missing for journal entry ${newest.tag}. Re-baseline it with ` +
+        '`npm run db:generate-baseline` (it writes that one file and touches no database).',
+    ).toBe(true);
   });
 
   it('stamps `when` with a real instant, never a future one', () => {

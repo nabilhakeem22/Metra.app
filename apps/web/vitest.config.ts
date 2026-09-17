@@ -27,13 +27,16 @@ export default defineConfig({
   // so it gets the automatic runtime instead. Measured, not assumed.
   esbuild: { jsx: 'automatic', jsxImportSource: 'react' },
   test: {
-    // src only. The database suites live under tests/actions and run from
-    // vitest.actions.config.ts against a real Postgres. The two include sets are
-    // disjoint by construction: this one is src/**, that one is tests/actions/**,
-    // so no *.dbtest.ts can ever be collected by the component runner.
+    // src, PLUS the plain `*.test.ts` under tests/actions. The DATABASE suites
+    // there are `*.dbtest.ts` — matched by neither pattern here, and run from
+    // vitest.actions.config.ts against a real Postgres — so this runner still
+    // opens no connection and needs no DATABASE_URL. Including the plain ones is
+    // what lets the test INFRASTRUCTURE that lives beside them (step-summary) be
+    // unit tested at all.
     include: [
       resolve(dir, 'src/**/*.test.ts').replace(/\\/g, '/'),
       resolve(dir, 'src/**/*.test.tsx').replace(/\\/g, '/'),
+      resolve(dir, 'tests/actions/**/*.test.ts').replace(/\\/g, '/'),
     ],
     // Node stays the default so the existing node files run byte-identically.
     // Only a .tsx file — i.e. only a file that renders — pays for a DOM. That is

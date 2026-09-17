@@ -54,6 +54,11 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Full history: the "Migration batch size" step below counts the
+          # migrations this ref ADDS relative to `main`, and a depth-1 checkout
+          # has no merge base to count against.
+          fetch-depth: 0
 
       - uses: actions/setup-node@v4
         with:
@@ -76,18 +81,78 @@ jobs:
       - name: i18n validate (parity + placeholders + numerals)
         run: npm run i18n:validate
 
+      # Documentation ratchet (no network, no database): the root DEPLOY.md
+      # stays deleted (owner decision 9), no tracked .md outside docs/BUILD-LOG.md
+      # mentions the host we left, and no em/en dash sits inside Arabic prose.
+      # Each of the three was a real regression that nothing noticed.
+      - name: Docs gate (decision 9, stale-host mentions, Arabic dashes)
+        run: npm run docs:check
+
       - name: Lint (includes physical left/right ban)
         run: npm run lint
 
       - name: Unit tests (db)
         run: npm run test -w @metra/db
 
+      # The drizzle snapshot is what `generate` DIFFS AGAINST, and meta/ had gone
+      # 35 snapshots behind the journal without anything saying so. This
+      # regenerates into a fresh EMPTY temp directory and deep-compares against
+      # the snapshot of the NEWEST journal entry, ignoring id/prevId. WHICH file
+      # that is comes from meta/_journal.json (snapshot-baseline.ts), never from
+      # a literal - a hardcoded 0051 made this step red on a correct tree the day
+      # a 0052 landed, and green on a stale snapshot afterwards. It runs here,
+      # before any database step, because it needs none and so should fail fast.
+      #
+      # `env -u DATABASE_URL` is DELIBERATE and is the assertion: the script
+      # passes no --config, so drizzle.config.ts is never evaluated and no socket
+      # is opened. If a future change starts reaching for a database, this step
+      # fails loudly instead of quietly connecting to the CI Postgres that the
+      # job-level env would otherwise hand it.
+      - name: Drizzle snapshot matches the schema
+        run: env -u DATABASE_URL -u DATABASE_POOL_URL npm run db:assert-snapshot
+
       - name: Unit tests (web)
         run: npm run test -w @metra/web
+
+      # O9 - `db:migrate` runs every PENDING migration as ONE transaction, so the
+      # ACCESS EXCLUSIVE window is the sum of the batch, not of one file. 0049 +
+      # 0050 measured ~630 ms against the MIGRATOR's OWN lock_timeout of 3 s
+      # (`packages/db/src/scripts/lock-timeout.ts`) - a ~4.8x self-abort margin.
+      # It is NOT the app's 5 s: that is `org-context.ts`, a different connection
+      # answering a different question, and the earlier "~8x headroom" here
+      # compared the migrator's window against the app's bound. Ten DDL
+      # migrations in one batch would not fit that margin. This counts the batch
+      # a single deploy would apply and fails above the constant. If you
+      # legitimately need more, split the merge, or raise MAX_PENDING_MIGRATIONS
+      # in the SAME commit that explains why. The count goes to the run summary
+      # either way, so the number is visible on a green run too.
+      #
+      # The script lives in the repo rather than inline HERE so that the text CI
+      # runs is the text a dry run exercises - an inline copy and a local
+      # reproduction drift, and this gate's failure mode is silence. It also
+      # carries the base selection, which is not one rule: a push to `main` is
+      # measured against `github.event.before`, because merge-base(main, main) is
+      # HEAD and made every main push count 0. Everything else keeps the
+      # merge-base with origin/main. The values are passed through `env:` rather
+      # than interpolated into the shell.
+      - name: Migration batch size
+        env:
+          MAX_PENDING_MIGRATIONS: '4'
+          EVENT_NAME: ${{ github.event_name }}
+          REF_NAME: ${{ github.ref_name }}
+          BEFORE_SHA: ${{ github.event.before }}
+        run: bash scripts/ci/count-pending-migrations.sh
 
       - name: Apply migrations
         run: npm run migrate -w @metra/db
 
+      # S2/R5 - this step is ALSO the post-apply verification, with nothing extra
+      # to invoke. `apply-rls` now re-reads pg_class / pg_policies / pg_trigger /
+      # pg_proc / pg_roles on the same connection after the loop and exits 1 with
+      # the offending list, so a manifest file that never ran fails HERE, on a
+      # fresh database, instead of surfacing as a missing policy in production
+      # weeks later. A green step is now evidence the objects EXIST, not only
+      # that no statement threw.
       - name: Apply RLS, roles (metra_app) and functions
         run: npm run apply-rls -w @metra/db
 

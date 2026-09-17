@@ -1,41 +1,94 @@
-// The lock bound shared by every schema-changing script (migrate, apply-rls).
+// The timeouts every schema-changing script sets on its own connection, and the
+// read-back that proves they stuck (migrate, apply-rls, purge-fixture-orgs).
 import type { PostgresJs } from '../client';
 
 /**
- * Why a schema-changing connection caps how long it will WAIT for a table lock:
- * such a script runs its DDL inside a transaction (the drizzle migrator uses ONE
- * for all pending migrations; `sql.unsafe` on the simple protocol makes each
- * `rls/*.sql` file one implicit transaction), and every lock the DDL takes
- * (ACCESS EXCLUSIVE) is held until that transaction commits. The role's default
- * `lock_timeout` is 0 — wait forever — so a single open reader on a table being
- * altered makes the DDL queue behind it, and because a pending ACCESS EXCLUSIVE
- * request blocks every later lock request on that table, the app's own queries
- * then queue behind the script: one idle transaction stalls the whole table.
- * 3 s makes a blocked run fail fast and loudly (SQLSTATE 55P03) so it can simply
- * be retried in a quiet window, instead of taking production down while it waits.
+ * The two bounds, with the millisecond value Postgres actually stores beside the
+ * text used to set it. BOTH ARE NEEDED, and the reason is the trap this pair
+ * exists to avoid: `current_setting` REFORMATS a GUC, so `set_config(…, '60s')`
+ * reads back as `'1min'`. A read-back that compares the formatted text would
+ * throw on a value that stuck perfectly. `pg_settings.setting` is always the
+ * base unit (milliseconds here) as a plain number, so the check compares that.
  */
-export const MIGRATION_LOCK_TIMEOUT = '3s';
+const TIMEOUTS = {
+  /**
+   * How long a schema-changing connection will WAIT for a table lock. Such a
+   * script runs its DDL inside a transaction (the drizzle migrator uses ONE for
+   * all pending migrations; `sql.unsafe` on the simple protocol makes each
+   * `rls/*.sql` file one implicit transaction), and every lock the DDL takes
+   * (ACCESS EXCLUSIVE) is held until that transaction commits. The role's
+   * default is 0 — wait forever — so a single open reader on a table being
+   * altered makes the DDL queue behind it, and because a pending ACCESS
+   * EXCLUSIVE request blocks every later lock request on that table, the app's
+   * own queries then queue behind the script: one idle transaction stalls the
+   * whole table. 3 s makes a blocked run fail fast and loudly (SQLSTATE 55P03)
+   * so it can simply be retried in a quiet window.
+   *
+   * THIS IS NOT THE APP'S 5 s. `org-context.ts:47` sets `lock_timeout = 5s` on
+   * the REQUEST connection — a different connection answering a different
+   * question. See docs/DEPLOY.md.
+   */
+  lock_timeout: { text: '3s', ms: 3_000 },
+  /**
+   * How long ONE statement may run before 57014. `lock_timeout` bounds each lock
+   * WAIT and nothing else: after a successful connect, a stalled socket makes
+   * `sql.unsafe` wait forever, because postgres.js has no query-level deadline
+   * and no TCP keepalive is configured here — a half-open Supavisor connection
+   * turns into an operator staring at `Applying policies/10-…` with no error.
+   * 60 s is generous for catalogue-only DDL (the whole 15-file apply measures
+   * 1 s in CI) and turns any unforeseen scan into a clean, named failure.
+   */
+  statement_timeout: { text: '60s', ms: 60_000 },
+} as const;
+
+type TimeoutName = keyof typeof TIMEOUTS;
+
+/** Exported for postgres.js's `connection` startup parameter, which Supavisor
+ * may discard — which is exactly why the read-back below exists. */
+export const MIGRATION_LOCK_TIMEOUT = TIMEOUTS.lock_timeout.text;
 
 /**
- * Sets `lock_timeout` on the session and PROVES it stuck before any DDL runs.
- * The startup-parameter route alone is not enough: Supabase's session pooler
- * (Supavisor) discards the client's startup parameters — measured,
+ * Set the named timeouts on the session and PROVE they stuck before any DDL
+ * runs. The startup-parameter route alone is not enough: Supabase's session
+ * pooler (Supavisor) discards the client's startup parameters — measured,
  * `current_setting('lock_timeout')` still reported 0 with postgres.js's
  * `connection` option, and even application_name came back as 'Supavisor'. A
  * session-level `set_config` does stick, and these scripts open the pool with
  * `max: 1`, so this is the very connection the DDL will run on. The read-back is
  * the point: an unverified belt that silently did nothing is worse than none.
  */
-export async function applyLockTimeout(sql: PostgresJs): Promise<void> {
-  await sql`select set_config('lock_timeout', ${MIGRATION_LOCK_TIMEOUT}, false)`;
-  const [row] = await sql<
-    { lockTimeout: string }[]
-  >`select current_setting('lock_timeout') as "lockTimeout"`;
-  if (row?.lockTimeout !== MIGRATION_LOCK_TIMEOUT) {
-    throw new Error(
-      `lock_timeout is "${row?.lockTimeout ?? 'unreadable'}" after set_config, ` +
-        `expected "${MIGRATION_LOCK_TIMEOUT}" — refusing to run DDL unbounded.`,
-    );
+async function applyTimeouts(sql: PostgresJs, names: readonly TimeoutName[]): Promise<void> {
+  for (const name of names) {
+    await sql`select set_config(${name}, ${TIMEOUTS[name].text}, false)`;
   }
-  console.log(`lock_timeout = ${row.lockTimeout} (verified on this session)`);
+  const rows = (await sql`
+    select name, setting from pg_settings where name = any(${[...names]}::text[])
+  `) as unknown as Array<{ name: string; setting: string }>;
+  const applied = new Map(rows.map((row) => [row.name, Number(row.setting)]));
+  for (const name of names) {
+    const value = applied.get(name);
+    if (value !== TIMEOUTS[name].ms) {
+      throw new Error(
+        `${name} is ${value === undefined ? 'unreadable' : `${value}ms`} after set_config, ` +
+          `expected ${TIMEOUTS[name].ms}ms (${TIMEOUTS[name].text}) — refusing to run DDL unbounded.`,
+      );
+    }
+  }
+  console.log(
+    `${names.map((name) => `${name} = ${TIMEOUTS[name].text}`).join(', ')} ` +
+      '(read back from pg_settings on this session)',
+  );
+}
+
+/** `lock_timeout` only — the migrator and the fixture purge. */
+export async function applyLockTimeout(sql: PostgresJs): Promise<void> {
+  await applyTimeouts(sql, ['lock_timeout']);
+}
+
+/**
+ * `lock_timeout` AND `statement_timeout` — `apply-rls`, which runs fifteen
+ * files as fifteen separate implicit transactions and has no other deadline.
+ */
+export async function applyRlsTimeouts(sql: PostgresJs): Promise<void> {
+  await applyTimeouts(sql, ['lock_timeout', 'statement_timeout']);
 }
