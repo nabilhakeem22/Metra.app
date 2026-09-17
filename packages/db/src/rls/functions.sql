@@ -693,15 +693,26 @@ as $$
     -- WHO rejected this variation order (0051), or null when the row predates
     -- the column. `contract_active` alone could not tell a client's own refusal
     -- from a termination cascade, so the portal denied decisions clients had
-    -- actually made. Newest `rejected` event wins; covered by
-    -- variation_order_events_variationOrder_idx (org_id, variation_order_id).
+    -- actually made. Newest `rejected` event wins.
+    --
+    -- `e.org_id = v.org_id` is what makes the index usable, and it is not
+    -- decoration: the covering index is
+    -- variation_order_events_variationOrder_idx (org_id, variation_order_id),
+    -- a btree whose LEADING column must be constrained for an index scan. This
+    -- function is `security definer ... set search_path = ''`, so no RLS policy
+    -- injects an org predicate the way `org_isolation` does for the equivalent
+    -- read in lib/variations/queries/list.ts — without it, this per-open portal
+    -- read plans a full scan of the event ledger. It narrows nothing: the FK on
+    -- variation_order_events is the composite (org_id, variation_order_id), so
+    -- an event already cannot belong to an org other than its VO's.
+    --
     -- ADDITIVE: an app that does not know this key ignores it, and an app that
     -- does, reading an un-applied function, gets undefined -> null -> today's
     -- behaviour. The deploy is therefore safe in EITHER order, exactly as
     -- `contract_active` already documents.
     'rejection_channel', (
       select e.actor_channel from public.variation_order_events e
-      where e.variation_order_id = v.id and e.kind = 'rejected'
+      where e.org_id = v.org_id and e.variation_order_id = v.id and e.kind = 'rejected'
       order by e.decided_at desc, e.id desc limit 1
     ),
     'org', jsonb_build_object(
