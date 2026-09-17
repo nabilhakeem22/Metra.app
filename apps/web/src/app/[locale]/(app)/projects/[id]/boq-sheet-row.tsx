@@ -1,7 +1,6 @@
 'use client';
 
 import { useLocale, useTranslations } from 'next-intl';
-import type { KeyboardEvent } from 'react';
 import { BOQ_UNITS } from '@/lib/boqs/edit-input';
 import { formatQuantity } from '@/lib/format/number';
 import { EditableCell, Td } from './boq-sheet-cells';

@@ -19,7 +19,6 @@ import {
 import { CommandCardSteps } from './command-card-steps';
 import { EngagementHeroBadges } from './engagement-hero-badges';
 import { EngagementSecondaryActions } from './engagement-secondary-actions';
-import { DIRECT_TRIGGER_ACTIONS } from './trigger-actions';
 
 // The cockpit COMMAND CARD — the single "what's next" surface, as a stacked card.
 // COMPOSITION ONLY: each numbered section is the file named after it
