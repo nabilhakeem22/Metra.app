@@ -123,6 +123,55 @@ describe('mutateInOrg failure mapping', () => {
     ).resolves.toEqual({ ok: false, error: 'proposal_not_draft' });
   });
 
+  it('logs a WHITELIST of the failure, never the error object', async () => {
+    // postgres.js Object.assigns every server field onto the error, ENUMERABLE,
+    // and for a 23505 `detail` carries the colliding row's key values. The log
+    // line must describe the SHAPE of the failure and nothing about the row.
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
+    await expect(
+      rejectWith({
+        name: 'PostgresError',
+        code: '23505',
+        constraint_name: 'clients_org_id_phone_unique',
+        table_name: 'clients',
+        message: 'duplicate key value violates unique constraint',
+        detail: 'Key (org_id, phone)=(…, 01000000000) already exists.',
+        where: 'PL/pgSQL function do_something() line 3',
+        schema_name: 'public',
+      }),
+    ).resolves.toEqual({ ok: false, error: 'generic' });
+    expect(logged).toHaveBeenCalledWith('mutateInOrg failed:', {
+      name: 'PostgresError',
+      code: '23505',
+      constraint_name: 'clients_org_id_phone_unique',
+      table_name: 'clients',
+      message: 'duplicate key value violates unique constraint',
+    });
+    logged.mockRestore();
+  });
+
+  it('drops a non-string field rather than passing the value through', async () => {
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
+    await rejectWith({
+      code: '42703',
+      message: 'column "nope" does not exist',
+      constraint_name: { toString: () => 'not a string' },
+      table_name: '',
+    });
+    expect(logged).toHaveBeenCalledWith('mutateInOrg failed:', {
+      code: '42703',
+      message: 'column "nope" does not exist',
+    });
+    logged.mockRestore();
+  });
+
+  it('says what it got when a non-object was thrown', async () => {
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
+    await rejectWith('just a string');
+    expect(logged).toHaveBeenCalledWith('mutateInOrg failed:', { thrown: 'string' });
+    logged.mockRestore();
+  });
+
   it('keeps generic for a failure it cannot classify', async () => {
     const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
     await expect(rejectWith(new Error('boom'))).resolves.toEqual({
