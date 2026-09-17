@@ -1,7 +1,11 @@
 'use client';
 
 import { useRef, type RefObject } from 'react';
-import type { HeldKeyTrigger } from '@/lib/engagements/held-act';
+import {
+  heldKeySlot,
+  type HeldKeySlot,
+  type HeldKeyTrigger,
+} from '@/lib/engagements/held-act';
 import { hasLanded, keyForAttempt, type HeldKey } from '@/lib/engagements/held-key';
 import { readHeldKeys, writeHeldKeys } from './held-keys-store';
 
@@ -14,6 +18,10 @@ import { readHeldKeys, writeHeldKeys } from './held-keys-store';
  * the key a half-finished `requestRevision` was holding, and its retry then
  * minted a fresh one: a second ledger row and a second allowance spent, caused
  * by a success that had nothing to do with it.
+ *
+ * ONE ENTRY PER ACT, not per control: the map is keyed by the SLOT (control +
+ * act), so a second act at one control cannot evict — or, when it settles,
+ * release — the key the first is still holding. See held-act.ts.
  *
  * A RECORDED PAYMENT IS IN THIS MAP TOO, under PAYMENT_HELD_TRIGGER, named by
  * the kind and amount being recorded. It is not a lifecycle trigger, but the
@@ -59,16 +67,20 @@ export interface HeldKeysApi {
     engagementId: string,
     trigger: HeldKeyTrigger | undefined,
     mintKey: () => string,
-    /** What the act IS, where the trigger does not say it — see HeldKey.act. */
+    /** What the act IS, where the trigger does not say it — see actFrom. */
     act?: string,
   ): string;
-  /** Drop the key `trigger` was holding on `engagementId`: that act is settled. */
-  release(engagementId: string, trigger: HeldKeyTrigger): void;
+  /**
+   * Drop the key held for THAT ACT at `trigger` on `engagementId`: it is settled.
+   * Only that entry — another act at the same control may still be in doubt, and
+   * releasing its key would hand its retry a fresh identity.
+   */
+  release(engagementId: string, trigger: HeldKeyTrigger, act?: string): void;
 }
 
 interface SeededKeys {
   engagementId: string;
-  held: Map<HeldKeyTrigger, HeldKey>;
+  held: Map<HeldKeySlot, HeldKey>;
 }
 
 /**
@@ -81,7 +93,7 @@ function keysFor(
   seeded: RefObject<SeededKeys | null>,
   engagementId: string,
   currentEngagementId: string,
-): Map<HeldKeyTrigger, HeldKey> {
+): Map<HeldKeySlot, HeldKey> {
   const current = seeded.current;
   if (current?.engagementId === engagementId) return current.held;
   const held = readHeldKeys(engagementId);
@@ -102,24 +114,25 @@ export function useHeldKeys(
   return {
     claim(engagementId, trigger, mintKey, act) {
       const held = keysFor(seeded, engagementId, currentEngagementId);
+      const slot = trigger === undefined ? undefined : heldKeySlot(trigger, act);
       // The ledger the page is showing says the attempt this key names landed
       // after all, which is what `uncertain` could not tell the studio. It has
       // done its job: this click is a NEW act and gets a new key.
-      if (trigger && hasLanded(held.get(trigger), landedKeys)) {
-        held.delete(trigger);
+      if (slot !== undefined && hasLanded(held.get(slot), landedKeys)) {
+        held.delete(slot);
       }
-      const attempt = keyForAttempt(held, trigger, mintKey, Date.now(), act);
+      const attempt = keyForAttempt(held, slot, mintKey, Date.now());
       // An edge that passes no trigger holds nothing: it mints a key nobody
       // reads, so it can neither take nor release another act's key.
-      if (trigger) {
-        held.set(trigger, attempt);
+      if (slot !== undefined) {
+        held.set(slot, attempt);
         writeHeldKeys(engagementId, held);
       }
       return attempt.key;
     },
-    release(engagementId, trigger) {
+    release(engagementId, trigger, act) {
       const held = keysFor(seeded, engagementId, currentEngagementId);
-      held.delete(trigger);
+      held.delete(heldKeySlot(trigger, act));
       writeHeldKeys(engagementId, held);
     },
   };

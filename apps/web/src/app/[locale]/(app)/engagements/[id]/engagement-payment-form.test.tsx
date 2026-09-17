@@ -132,6 +132,32 @@ describe('PaymentForm — one key per deliberate act', () => {
     expect(payments[0]!.key).not.toBe(payments[1]!.key);
   });
 
+  // THE F1 REPRO (re-test `[B2]`), on the hero path — where the duplicate is
+  // worse: `logPaymentAndAdvanceCore` records and THEN advances, in two steps, so
+  // a duplicated payment persists even when the advance is refused afterwards.
+  test('a definitely-refused TYPO between an attempt and its retry does not take its key', async () => {
+    renderWithIntl(<FormProbe />);
+    actions.logPaymentAndAdvance.mockResolvedValue({ ok: false, error: 'uncertain' });
+    await record('50000');
+    const heldKey = sent()[0]!.key;
+
+    setNow(START + 60_000);
+    actions.logPaymentAndAdvance.mockResolvedValue({
+      ok: false,
+      error: 'payment_amount_invalid',
+    });
+    await record('5o,ooo');
+
+    setNow(START + 120_000);
+    actions.logPaymentAndAdvance.mockResolvedValue({ ok: false, error: 'uncertain' });
+    await record('50000');
+
+    const payments = sent();
+    expect(payments.map((payment) => payment.amount)).toEqual(['50000', '5o,ooo', '50000']);
+    expect(payments[1]!.key).not.toBe(heldKey);
+    expect(payments[2]!.key).toBe(heldKey);
+  });
+
   test("an 'uncertain' answer, retried with the SAME input, carries the SAME key", async () => {
     renderWithIntl(<FormProbe />);
     actions.logPaymentAndAdvance.mockResolvedValue({ ok: false, error: 'uncertain' });
@@ -231,6 +257,11 @@ describe('PaymentForm — one key per deliberate act', () => {
       string,
       unknown
     >;
-    expect(Object.keys(stored)).toEqual(['logPaymentAndAdvance']);
+    // ONE entry, filed under this control AND this act (F1) — never under the
+    // bare control name, which the panel would then share.
+    const slots = Object.keys(stored);
+    expect(slots).toHaveLength(1);
+    expect(slots[0]!.startsWith('logPaymentAndAdvance|')).toBe(true);
+    expect(slots[0]).not.toBe('logPaymentAndAdvance');
   });
 });

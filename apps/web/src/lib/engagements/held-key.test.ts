@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import type { Trigger } from './transitions';
 import {
   PAYMENT_HELD_TRIGGER,
   actFrom,
-  type HeldKeyTrigger,
+  heldKeySlot,
+  type HeldKeySlot,
 } from './held-act';
 import {
   HELD_KEY_TTL_MS,
@@ -18,14 +18,17 @@ import { releasesKey } from './retry-policy';
 const NOW = Date.parse('2026-09-17T10:00:00.000Z');
 const mint = (key: string) => () => key;
 
-function holding(trigger: Trigger, key: string, heldAt: number) {
-  return new Map<Trigger, HeldKey>([[trigger, { key, heldAt }]]);
+function holding(slot: HeldKeySlot, key: string, heldAt: number) {
+  return new Map<HeldKeySlot, HeldKey>([[slot, { key, heldAt }]]);
 }
+
+const REVISION = heldKeySlot('requestRevision');
+const ATTESTATION = heldKeySlot('attestAsBuiltClean');
 
 describe('keyForAttempt', () => {
   it('re-uses the key this TRIGGER is still holding, inside the window', () => {
-    const held = holding('requestRevision', 'held-key', NOW - 60_000);
-    const attempt = keyForAttempt(held, 'requestRevision', mint('fresh-key'), NOW);
+    const held = holding(REVISION, 'held-key', NOW - 60_000);
+    const attempt = keyForAttempt(held, REVISION, mint('fresh-key'), NOW);
     expect(attempt.key).toBe('held-key');
     // The RETRY KEEPS THE ORIGINAL INSTANT: the window bounds the act, not the
     // chain of retries, so a key cannot be walked forward indefinitely.
@@ -33,8 +36,8 @@ describe('keyForAttempt', () => {
   });
 
   it('mints a fresh key for a trigger holding nothing', () => {
-    const held = holding('requestRevision', 'held-key', NOW);
-    const attempt = keyForAttempt(held, 'attestAsBuiltClean', mint('fresh-key'), NOW);
+    const held = holding(REVISION, 'held-key', NOW);
+    const attempt = keyForAttempt(held, ATTESTATION, mint('fresh-key'), NOW);
     expect(attempt.key).toBe('fresh-key');
     expect(attempt.heldAt).toBe(NOW);
   });
@@ -42,7 +45,7 @@ describe('keyForAttempt', () => {
   it('never reaches into the map for an edge that ignores the key', () => {
     // The upload, the note, the off-plan toggle. They pass no trigger, so they
     // can neither take nor release another act's key — which is the whole bug.
-    const held = holding('requestRevision', 'held-key', NOW);
+    const held = holding(REVISION, 'held-key', NOW);
     expect(keyForAttempt(held, undefined, mint('fresh-key'), NOW).key).toBe('fresh-key');
   });
 
@@ -50,95 +53,91 @@ describe('keyForAttempt', () => {
   // sameness, so a genuinely new act at the same trigger later in the same tab
   // was answered "done" and the write was discarded.
   it('does NOT re-use a key past the window, even though the map still has it', () => {
-    const held = holding('requestRevision', 'held-key', NOW - HELD_KEY_TTL_MS - 1);
-    const attempt = keyForAttempt(held, 'requestRevision', mint('fresh-key'), NOW);
+    const held = holding(REVISION, 'held-key', NOW - HELD_KEY_TTL_MS - 1);
+    const attempt = keyForAttempt(held, REVISION, mint('fresh-key'), NOW);
     expect(attempt.key).toBe('fresh-key');
     expect(attempt.heldAt).toBe(NOW);
   });
 
   it('re-uses it at exactly the window, and not one millisecond later', () => {
-    const atCap = holding('requestRevision', 'held-key', NOW - HELD_KEY_TTL_MS);
-    expect(keyForAttempt(atCap, 'requestRevision', mint('fresh'), NOW).key).toBe('held-key');
-    const pastCap = holding('requestRevision', 'held-key', NOW - HELD_KEY_TTL_MS - 1);
-    expect(keyForAttempt(pastCap, 'requestRevision', mint('fresh'), NOW).key).toBe('fresh');
+    const atCap = holding(REVISION, 'held-key', NOW - HELD_KEY_TTL_MS);
+    expect(keyForAttempt(atCap, REVISION, mint('fresh'), NOW).key).toBe('held-key');
+    const pastCap = holding(REVISION, 'held-key', NOW - HELD_KEY_TTL_MS - 1);
+    expect(keyForAttempt(pastCap, REVISION, mint('fresh'), NOW).key).toBe('fresh');
   });
 
   it('describes the sequence that spent two free revisions', () => {
     // requestRevision is uncertain (key held) -> an UNRELATED action succeeds ->
     // the retry must still carry the original key. Under one shared ref the
     // success in the middle cleared it and the retry became a second act.
-    const keys = new Map<Trigger, HeldKey>();
-    const first = keyForAttempt(keys, 'requestRevision', mint('first-key'), NOW);
-    keys.set('requestRevision', first);
-    if (releasesKey({ ok: false, error: 'uncertain' })) keys.delete('requestRevision');
+    const keys = new Map<HeldKeySlot, HeldKey>();
+    const first = keyForAttempt(keys, REVISION, mint('first-key'), NOW);
+    keys.set(REVISION, first);
+    if (releasesKey({ ok: false, error: 'uncertain' })) keys.delete(REVISION);
 
-    // The unrelated success: no trigger, so it touches nothing.
+    // The unrelated success: no slot, so it touches nothing.
     expect(keyForAttempt(keys, undefined, mint('upload-key'), NOW).key).toBe('upload-key');
 
-    expect(keyForAttempt(keys, 'requestRevision', mint('second-key'), NOW).key).toBe(
-      'first-key',
-    );
+    expect(keyForAttempt(keys, REVISION, mint('second-key'), NOW).key).toBe('first-key');
   });
 });
 
 /**
- * RT2: a payment is an act the trigger's NAME does not describe — the studio can
- * log two genuinely different payments through one control. `act` is what makes
- * the second one a second act.
+ * RT2 + F1: a payment is an act the control's NAME does not describe, and ONE
+ * control can hold TWO acts in doubt at once. The act is part of the SLOT, so
+ * `keyForAttempt` never has to compare it — it only ever reads its own entry.
  */
-describe('keyForAttempt — the act, where the trigger does not name it', () => {
-  const heldPayment = (act: string) =>
-    new Map<HeldKeyTrigger, HeldKey>([
-      [PAYMENT_HELD_TRIGGER, { key: 'held-key', heldAt: NOW, act }],
-    ]);
+describe('keyForAttempt — one entry per ACT, not per control', () => {
+  const slotFor = (amount: string) =>
+    heldKeySlot(PAYMENT_HELD_TRIGGER, actFrom({ kind: 'deposit', amount }));
+  const heldPayment = (amount: string) =>
+    new Map<HeldKeySlot, HeldKey>([[slotFor(amount), { key: 'held-key', heldAt: NOW }]]);
 
   it('re-uses the key when the SAME act is retried inside the window', () => {
     const attempt = keyForAttempt(
-      heldPayment('deposit|50000'),
-      PAYMENT_HELD_TRIGGER,
+      heldPayment('50000'),
+      slotFor('50000'),
       mint('fresh-key'),
       NOW + 60_000,
-      'deposit|50000',
     );
     expect(attempt.key).toBe('held-key');
     expect(attempt.heldAt).toBe(NOW);
   });
 
-  it('mints a fresh key for a DIFFERENT amount at the same trigger', () => {
+  it('mints a fresh key for a DIFFERENT amount at the same control', () => {
     const attempt = keyForAttempt(
-      heldPayment(actFrom({ kind: 'deposit', amount: '50000' })),
-      PAYMENT_HELD_TRIGGER,
+      heldPayment('50000'),
+      slotFor('75000'),
       mint('fresh-key'),
       NOW + 60_000,
-      actFrom({ kind: 'deposit', amount: '75000' }),
     );
     expect(attempt.key).toBe('fresh-key');
-    expect(attempt.act).toBe(actFrom({ kind: 'deposit', amount: '75000' }));
   });
 
-  it('mints a fresh key for a different KIND at the same amount', () => {
-    expect(
-      keyForAttempt(
-        heldPayment('deposit|50000'),
-        PAYMENT_HELD_TRIGGER,
-        mint('fresh-key'),
-        NOW,
-        'gate_a|50000',
-      ).key,
-    ).toBe('fresh-key');
+  // THE F1 REPRO, at the level of the map: the second act must not be able to
+  // take the first act's entry, and settling the second must not remove it.
+  it('leaves the first act HELD while a second act at the same control settles', () => {
+    const held = heldPayment('50000');
+    const second = keyForAttempt(held, slotFor('5o,ooo'), mint('second-key'), NOW + 60_000);
+    held.set(slotFor('5o,ooo'), second);
+    // The typo is definitely refused, so ITS entry is released — and only its.
+    if (releasesKey({ ok: false, error: 'payment_amount_invalid' })) {
+      held.delete(slotFor('5o,ooo'));
+    }
+    expect(keyForAttempt(held, slotFor('50000'), mint('third-key'), NOW + 120_000).key).toBe(
+      'held-key',
+    );
   });
 
-  it('does not let an act-less entry answer for an act, or the reverse', () => {
-    // A stored entry from a build that named no act cannot stand in for one, and
-    // a lifecycle trigger (which passes none) cannot pick up a payment's.
-    const actless = new Map<HeldKeyTrigger, HeldKey>([
-      [PAYMENT_HELD_TRIGGER, { key: 'held-key', heldAt: NOW }],
-    ]);
-    expect(
-      keyForAttempt(actless, PAYMENT_HELD_TRIGGER, mint('fresh'), NOW, 'deposit|50000').key,
-    ).toBe('fresh');
-    const paid = heldPayment('deposit|50000');
-    expect(keyForAttempt(paid, PAYMENT_HELD_TRIGGER, mint('fresh'), NOW).key).toBe('fresh');
+  it('files the same act at two different controls separately', () => {
+    const act = actFrom({ kind: 'deposit', amount: '50000' });
+    expect(heldKeySlot('recordPayment', act)).not.toBe(
+      heldKeySlot('logPaymentAndAdvance', act),
+    );
+  });
+
+  it('a lifecycle trigger, which has no act, always files in the same slot', () => {
+    expect(heldKeySlot('requestRevision')).toBe(heldKeySlot('requestRevision', undefined));
   });
 });
 

@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { act, fireEvent, screen } from '@testing-library/react';
 import { renderWithIntl } from '@/test/render-with-intl';
 import type { ActionResult } from '@/lib/actions/result';
+import { heldKeySlot } from '@/lib/engagements/held-act';
 import type { Trigger } from '@/lib/engagements/transitions';
 import { useEngagementAction } from './use-engagement-action';
 
@@ -421,6 +422,8 @@ describe('useEngagementAction — a held key expires (R1)', () => {
   const START = Date.parse('2026-09-17T10:00:00.000Z');
   /** The key a previous mount left in storage. UUID-shaped, as the store demands. */
   const LANDED_KEY = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+  /** Where a lifecycle trigger's key is filed: the trigger, and no act. */
+  const REVISION = heldKeySlot('requestRevision');
   let clock: ReturnType<typeof vi.spyOn> | null = null;
 
   function setNow(at: number): void {
@@ -466,8 +469,8 @@ describe('useEngagementAction — a held key expires (R1)', () => {
       string,
       { key: string; heldAt: number }
     >;
-    expect(stored.requestRevision!.key).toBe(keys[1]);
-    expect(stored.requestRevision!.heldAt).toBe(START + 6 * 60 * 60_000);
+    expect(stored[REVISION]!.key).toBe(keys[1]);
+    expect(stored[REVISION]!.heldAt).toBe(START + 6 * 60 * 60_000);
   });
 
   test('an expired entry is ERASED from storage rather than replayed after a remount', async () => {
@@ -494,7 +497,7 @@ describe('useEngagementAction — a held key expires (R1)', () => {
     setNow(START);
     sessionStorage.setItem(
       'metra.pendingKeys.e-1',
-      JSON.stringify({ requestRevision: { key: LANDED_KEY, heldAt: START - 60_000 } }),
+      JSON.stringify({ [REVISION]: { key: LANDED_KEY, heldAt: START - 60_000 } }),
     );
     mountProbe(new Set([LANDED_KEY]));
     answers.set('requestRevision', { ok: false, error: 'uncertain' });
@@ -507,7 +510,7 @@ describe('useEngagementAction — a held key expires (R1)', () => {
     setNow(START);
     sessionStorage.setItem(
       'metra.pendingKeys.e-1',
-      JSON.stringify({ requestRevision: { key: LANDED_KEY, heldAt: START - 60_000 } }),
+      JSON.stringify({ [REVISION]: { key: LANDED_KEY, heldAt: START - 60_000 } }),
     );
     mountProbe(new Set(['bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb']));
     answers.set('requestRevision', { ok: false, error: 'uncertain' });
@@ -528,7 +531,7 @@ describe('useEngagementAction — a held key expires (R1)', () => {
     setNow(START - 10 * 60_000);
     sessionStorage.setItem(
       'metra.pendingKeys.e-1',
-      JSON.stringify({ requestRevision: { key: LANDED_KEY, heldAt: START - 10 * 60_000 } }),
+      JSON.stringify({ [REVISION]: { key: LANDED_KEY, heldAt: START - 10 * 60_000 } }),
     );
     mountProbe(new Set(['bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb']));
     answers.set('requestRevision', { ok: false, error: 'uncertain' });
@@ -541,7 +544,7 @@ describe('useEngagementAction — a held key expires (R1)', () => {
     setNow(START + 10 * 60_000);
     sessionStorage.setItem(
       'metra.pendingKeys.e-1',
-      JSON.stringify({ requestRevision: { key: LANDED_KEY, heldAt: START + 10 * 60_000 } }),
+      JSON.stringify({ [REVISION]: { key: LANDED_KEY, heldAt: START + 10 * 60_000 } }),
     );
     mountProbe(new Set([LANDED_KEY]));
     answers.set('requestRevision', { ok: false, error: 'uncertain' });

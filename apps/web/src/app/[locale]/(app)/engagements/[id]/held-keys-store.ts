@@ -1,4 +1,7 @@
-import type { HeldKeyTrigger } from '@/lib/engagements/held-act';
+import {
+  HELD_KEY_SLOT_SEPARATOR,
+  type HeldKeySlot,
+} from '@/lib/engagements/held-act';
 import { isHeldKeyLive, type HeldKey } from '@/lib/engagements/held-key';
 import { isUuid } from '@/lib/uuid';
 
@@ -46,41 +49,44 @@ export function heldKeysStorageKey(engagementId: string): string {
  */
 function readEntry(value: unknown): HeldKey | null {
   if (typeof value !== 'object' || value === null) return null;
-  const { key, heldAt, act } = value as {
-    key?: unknown;
-    heldAt?: unknown;
-    act?: unknown;
-  };
+  const { key, heldAt } = value as { key?: unknown; heldAt?: unknown };
   if (!isUuid(key)) return null;
   if (typeof heldAt !== 'number' || !Number.isFinite(heldAt)) return null;
-  // `act` is absent for every lifecycle trigger and a plain string for the acts
-  // that need one. It is only ever COMPARED, never sent, so a wrong-typed one is
-  // refused with the entry rather than coerced.
-  if (act !== undefined && typeof act !== 'string') return null;
-  return act === undefined ? { key, heldAt } : { key, heldAt, act };
+  return { key, heldAt };
+}
+
+/**
+ * A name written by the build that filed ONE ENTRY PER CONTROL carries no
+ * separator: its act is inside the value, where nothing now looks for it. Such an
+ * entry is DROPPED rather than adopted — adopting it would hand a control's next
+ * act a key minted for a different one, which is the defect the slot exists to
+ * close, and the cost of dropping it is one minted key.
+ */
+function isSlotName(name: string): boolean {
+  return name.includes(HELD_KEY_SLOT_SEPARATOR);
 }
 
 /** Read the keys this tab is still holding for this engagement, or an empty map. */
 export function readHeldKeys(
   engagementId: string,
   now: number = Date.now(),
-): Map<HeldKeyTrigger, HeldKey> {
+): Map<HeldKeySlot, HeldKey> {
   try {
     const raw = globalThis.sessionStorage?.getItem(heldKeysStorageKey(engagementId));
     if (!raw) return new Map();
     const stored = JSON.parse(raw) as Record<string, unknown>;
-    const held = new Map<HeldKeyTrigger, HeldKey>();
+    const held = new Map<HeldKeySlot, HeldKey>();
     let discarded = false;
-    // TRIGGER NAMES are read back UNVALIDATED against the Trigger union on
-    // purpose: an entry written by an older build naming a trigger this one has
-    // dropped is simply a key nobody will ever ask for. The VALUE is validated,
-    // because it is what gets sent to the server as the idempotency key.
-    for (const [trigger, value] of Object.entries(stored)) {
+    // SLOT NAMES are read back UNVALIDATED against the Trigger union on purpose:
+    // an entry naming a trigger this build has dropped, or an act nobody will
+    // submit again, is simply a key nobody will ever ask for. Two things ARE
+    // checked: the value (it is what gets sent to the server as the idempotency
+    // key), and that the name is a SLOT at all.
+    for (const [slot, value] of Object.entries(stored)) {
       const entry = readEntry(value);
-      if (entry !== null && isHeldKeyLive(entry, now)) {
-        held.set(trigger as HeldKeyTrigger, entry);
-      }
-      else discarded = true;
+      if (entry !== null && isSlotName(slot) && isHeldKeyLive(entry, now)) {
+        held.set(slot as HeldKeySlot, entry);
+      } else discarded = true;
     }
     // An expired or malformed entry is ERASED here, not left to be re-read and
     // re-discarded on every mount for the life of the tab.
@@ -94,7 +100,7 @@ export function readHeldKeys(
 /** Mirror the map, or REMOVE the entry once nothing is held. */
 export function writeHeldKeys(
   engagementId: string,
-  held: ReadonlyMap<HeldKeyTrigger, HeldKey>,
+  held: ReadonlyMap<HeldKeySlot, HeldKey>,
 ): void {
   try {
     const storage = globalThis.sessionStorage;

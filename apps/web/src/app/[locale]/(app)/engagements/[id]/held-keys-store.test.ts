@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { heldKeySlot, type HeldKeySlot } from '@/lib/engagements/held-act';
 import { HELD_KEY_TTL_MS, type HeldKey } from '@/lib/engagements/held-key';
-import type { Trigger } from '@/lib/engagements/transitions';
 import { heldKeysStorageKey, readHeldKeys, writeHeldKeys } from './held-keys-store';
 
 // A node test, not a .test.tsx: this module touches `sessionStorage` and nothing
@@ -36,9 +36,15 @@ function put(record: Record<string, unknown>): void {
   store[NAME] = JSON.stringify(record);
 }
 
-function held(entries: [Trigger, HeldKey][]): Map<Trigger, HeldKey> {
+function held(entries: [HeldKeySlot, HeldKey][]): Map<HeldKeySlot, HeldKey> {
   return new Map(entries);
 }
+
+/** The slot a lifecycle trigger files under: the trigger, and no act. */
+const REVISION = heldKeySlot('requestRevision');
+const APPROVAL = heldKeySlot('approveDesign');
+/** ...and one money act's slot, where the act IS part of the name. */
+const PAYMENT = heldKeySlot('recordPayment', 'act-abc');
 
 beforeEach(() => {
   ops.length = 0;
@@ -52,15 +58,15 @@ afterEach(() => {
 
 describe('writeHeldKeys', () => {
   it('mirrors the map under a per-engagement name, instants and all', () => {
-    writeHeldKeys('e-1', held([['requestRevision', { key: KEY_1, heldAt: NOW }]]));
+    writeHeldKeys('e-1', held([[REVISION, { key: KEY_1, heldAt: NOW }]]));
     expect(JSON.parse(store[NAME]!)).toEqual({
-      requestRevision: { key: KEY_1, heldAt: NOW },
+      [REVISION]: { key: KEY_1, heldAt: NOW },
     });
     expect(store[heldKeysStorageKey('e-2')]).toBeUndefined();
   });
 
   it('REMOVES the entry once nothing is held', () => {
-    put({ requestRevision: { key: KEY_1, heldAt: NOW } });
+    put({ [REVISION]: { key: KEY_1, heldAt: NOW } });
     writeHeldKeys('e-1', held([]));
     expect(store[NAME]).toBeUndefined();
     expect(ops).toContain(`remove ${NAME}`);
@@ -69,8 +75,8 @@ describe('writeHeldKeys', () => {
 
 describe('readHeldKeys', () => {
   it('reads back what was written', () => {
-    writeHeldKeys('e-1', held([['requestRevision', { key: KEY_1, heldAt: NOW }]]));
-    expect(readHeldKeys('e-1', NOW).get('requestRevision')).toEqual({
+    writeHeldKeys('e-1', held([[REVISION, { key: KEY_1, heldAt: NOW }]]));
+    expect(readHeldKeys('e-1', NOW).get(REVISION)).toEqual({
       key: KEY_1,
       heldAt: NOW,
     });
@@ -79,7 +85,7 @@ describe('readHeldKeys', () => {
   // R1: without this the key named its trigger until the tab closed, and a
   // genuinely new act hours later was deduped against the old one by the server.
   it('drops an EXPIRED entry and erases it from storage', () => {
-    put({ requestRevision: { key: KEY_1, heldAt: NOW - HELD_KEY_TTL_MS - 1 } });
+    put({ [REVISION]: { key: KEY_1, heldAt: NOW - HELD_KEY_TTL_MS - 1 } });
     expect(readHeldKeys('e-1', NOW).size).toBe(0);
     expect(store[NAME]).toBeUndefined();
     expect(ops).toContain(`remove ${NAME}`);
@@ -87,18 +93,18 @@ describe('readHeldKeys', () => {
 
   it('keeps a live entry beside an expired one, and rewrites only the survivor', () => {
     put({
-      requestRevision: { key: KEY_1, heldAt: NOW - 60_000 },
-      approveDesign: { key: KEY_2, heldAt: NOW - HELD_KEY_TTL_MS - 1 },
+      [REVISION]: { key: KEY_1, heldAt: NOW - 60_000 },
+      [APPROVAL]: { key: KEY_2, heldAt: NOW - HELD_KEY_TTL_MS - 1 },
     });
     const keys = readHeldKeys('e-1', NOW);
-    expect([...keys.keys()]).toEqual(['requestRevision']);
+    expect([...keys.keys()]).toEqual([REVISION]);
     expect(JSON.parse(store[NAME]!)).toEqual({
-      requestRevision: { key: KEY_1, heldAt: NOW - 60_000 },
+      [REVISION]: { key: KEY_1, heldAt: NOW - 60_000 },
     });
   });
 
   it('leaves storage alone when every entry is live', () => {
-    put({ requestRevision: { key: KEY_1, heldAt: NOW } });
+    put({ [REVISION]: { key: KEY_1, heldAt: NOW } });
     readHeldKeys('e-1', NOW);
     expect(ops).toEqual([`get ${NAME}`]);
   });
@@ -106,13 +112,13 @@ describe('readHeldKeys', () => {
   it('discards a value that is not one of ours, including the old bare string', () => {
     // The first version of this mirror wrote `{"requestRevision":"<uuid>"}`. It
     // is refused rather than adopted with a guessed instant.
-    put({ requestRevision: KEY_1 });
+    put({ [REVISION]: KEY_1 });
     expect(readHeldKeys('e-1', NOW).size).toBe(0);
-    put({ requestRevision: { key: { evil: 1 }, heldAt: NOW } });
+    put({ [REVISION]: { key: { evil: 1 }, heldAt: NOW } });
     expect(readHeldKeys('e-1', NOW).size).toBe(0);
-    put({ requestRevision: { key: KEY_1, heldAt: 'soon' } });
+    put({ [REVISION]: { key: KEY_1, heldAt: 'soon' } });
     expect(readHeldKeys('e-1', NOW).size).toBe(0);
-    put({ requestRevision: { key: KEY_1 } });
+    put({ [REVISION]: { key: KEY_1 } });
     expect(readHeldKeys('e-1', NOW).size).toBe(0);
   });
 
@@ -122,15 +128,52 @@ describe('readHeldKeys', () => {
   // refusal is not a DEFINITE one, so the poisoned entry was re-sent on every
   // retry and re-persisted.
   it('discards a key that is not UUID-SHAPED, and erases it', () => {
-    put({ requestRevision: { key: 'not-a-uuid', heldAt: NOW } });
+    put({ [REVISION]: { key: 'not-a-uuid', heldAt: NOW } });
     expect(readHeldKeys('e-1', NOW).size).toBe(0);
     expect(store[NAME]).toBeUndefined();
 
-    put({ requestRevision: { key: `${KEY_1} `, heldAt: NOW } });
+    put({ [REVISION]: { key: `${KEY_1} `, heldAt: NOW } });
     expect(readHeldKeys('e-1', NOW).size).toBe(0);
 
-    put({ requestRevision: { key: KEY_1.toUpperCase(), heldAt: NOW } });
-    expect(readHeldKeys('e-1', NOW).get('requestRevision')?.key).toBe(KEY_1.toUpperCase());
+    put({ [REVISION]: { key: KEY_1.toUpperCase(), heldAt: NOW } });
+    expect(readHeldKeys('e-1', NOW).get(REVISION)?.key).toBe(KEY_1.toUpperCase());
+  });
+
+  // The build before this one filed ONE ENTRY PER CONTROL: the name was the bare
+  // trigger and the act sat inside the value. Adopting such an entry would hand a
+  // control's next act a key minted for a DIFFERENT one — the defect the slot
+  // exists to close — so it is dropped and erased, at the cost of one minted key.
+  it('drops a name written by the one-entry-per-control build, and erases it', () => {
+    put({ recordPayment: { key: KEY_1, heldAt: NOW, act: 'deposit|50000' } });
+    expect(readHeldKeys('e-1', NOW).size).toBe(0);
+    expect(store[NAME]).toBeUndefined();
+    expect(ops).toContain(`remove ${NAME}`);
+  });
+
+  it('keeps a live SLOT beside a dropped v1 name', () => {
+    put({
+      recordPayment: { key: KEY_2, heldAt: NOW, act: 'deposit|50000' },
+      [PAYMENT]: { key: KEY_1, heldAt: NOW },
+    });
+    const keys = readHeldKeys('e-1', NOW);
+    expect([...keys.keys()]).toEqual([PAYMENT]);
+    expect(JSON.parse(store[NAME]!)).toEqual({ [PAYMENT]: { key: KEY_1, heldAt: NOW } });
+  });
+
+  it('files two ACTS at one control separately', () => {
+    // The F1 repro, at the storage layer: two acts, two entries, neither
+    // overwriting the other.
+    const other = heldKeySlot('recordPayment', 'act-xyz');
+    writeHeldKeys(
+      'e-1',
+      held([
+        [PAYMENT, { key: KEY_1, heldAt: NOW }],
+        [other, { key: KEY_2, heldAt: NOW }],
+      ]),
+    );
+    const keys = readHeldKeys('e-1', NOW);
+    expect(keys.get(PAYMENT)?.key).toBe(KEY_1);
+    expect(keys.get(other)?.key).toBe(KEY_2);
   });
 
   it('survives junk in the slot without throwing', () => {
@@ -143,7 +186,7 @@ describe('readHeldKeys', () => {
   });
 
   it('does not let a stored __proto__ entry poison Object.prototype', () => {
-    put({ __proto__: { key: KEY_1, heldAt: NOW } });
+    put({ [`__proto__|`]: { key: KEY_1, heldAt: NOW } });
     readHeldKeys('e-1', NOW);
     expect(({} as Record<string, unknown>).key).toBeUndefined();
   });
@@ -163,7 +206,7 @@ describe('readHeldKeys', () => {
     });
     expect(readHeldKeys('e-1', NOW).size).toBe(0);
     expect(() =>
-      writeHeldKeys('e-1', held([['requestRevision', { key: KEY_1, heldAt: NOW }]])),
+      writeHeldKeys('e-1', held([[REVISION, { key: KEY_1, heldAt: NOW }]])),
     ).not.toThrow();
   });
 

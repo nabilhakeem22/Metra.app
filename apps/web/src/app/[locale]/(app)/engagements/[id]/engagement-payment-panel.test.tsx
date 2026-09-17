@@ -130,6 +130,49 @@ describe('PaymentPanel — one key per deliberate act', () => {
     expect(sessionStorage.getItem('metra.pendingKeys.e-1')).toBeNull();
   });
 
+  // THE F1 REPRO (re-test `[B2b]`). The map used to hold ONE ENTRY PER CONTROL,
+  // so the typo's entry evicted the in-doubt one and its definite refusal then
+  // released the slot outright — and the retry of the FIRST act, two minutes into
+  // a fifteen-minute window, went out under a fresh identity. If the first
+  // attempt had committed, that is a second EGP 50,000 row in an append-only
+  // ledger, reported as saved.
+  test('a definitely-refused TYPO between an attempt and its retry does not take its key', async () => {
+    renderWithIntl(<PanelProbe />);
+    actions.recordPayment.mockResolvedValue({ ok: false, error: 'uncertain' });
+    await record('50000');
+    const heldKey = sent()[0]!.key;
+
+    setNow(START + 60_000);
+    actions.recordPayment.mockResolvedValue({ ok: false, error: 'payment_amount_invalid' });
+    await record('50,000');
+
+    setNow(START + 120_000);
+    actions.recordPayment.mockResolvedValue({ ok: false, error: 'uncertain' });
+    await record('50000');
+
+    const payments = sent();
+    expect(payments.map((payment) => payment.amount)).toEqual(['50000', '50,000', '50000']);
+    expect(payments[1]!.key).not.toBe(heldKey);
+    expect(payments[2]!.key).toBe(heldKey);
+  });
+
+  test('a SUCCESSFUL different payment does not release the in-doubt one either', async () => {
+    renderWithIntl(<PanelProbe />);
+    actions.recordPayment.mockResolvedValue({ ok: false, error: 'uncertain' });
+    await record('50000');
+    const heldKey = sent()[0]!.key;
+
+    setNow(START + 60_000);
+    actions.recordPayment.mockResolvedValue({ ok: true });
+    await record('75000');
+
+    setNow(START + 120_000);
+    actions.recordPayment.mockResolvedValue({ ok: false, error: 'uncertain' });
+    await record('50000');
+
+    expect(sent()[2]!.key).toBe(heldKey);
+  });
+
   test("an 'uncertain' answer, retried with the SAME amount, carries the SAME key", async () => {
     renderWithIntl(<PanelProbe />);
     actions.recordPayment.mockResolvedValue({ ok: false, error: 'uncertain' });

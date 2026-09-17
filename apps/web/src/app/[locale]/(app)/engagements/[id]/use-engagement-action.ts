@@ -87,15 +87,16 @@ export function useEngagementAction(
   function settle(
     engagementId: string,
     trigger: HeldKeyTrigger | undefined,
+    act: string | undefined,
     result: ActionResult,
   ): void {
-    // Only THIS trigger's key on THIS engagement is ever touched, and only when
-    // the answer is "it worked" or a DEFINITE refusal — a guard verdict, a
-    // forbidden capability, a state conflict, all of which rolled their
-    // transaction back. `generic`, `uncertain` and any code this build has not
-    // heard of may all mean the write landed and the answer was lost, so they
-    // hold.
-    if (trigger && releasesKey(result)) heldKeys.release(engagementId, trigger);
+    // Only THIS ACT's key at THIS trigger on THIS engagement is ever touched —
+    // another act at the same control may still be in doubt — and only when the
+    // answer is "it worked" or a DEFINITE refusal: a guard verdict, a forbidden
+    // capability, a state conflict, all of which rolled their transaction back.
+    // `generic`, `uncertain` and any code this build has not heard of may all
+    // mean the write landed and the answer was lost, so they hold.
+    if (trigger && releasesKey(result)) heldKeys.release(engagementId, trigger, act);
     if (result.ok) router.refresh();
     else setError((result.error as ActionCode) ?? 'generic');
   }
@@ -122,7 +123,7 @@ export function useEngagementAction(
     const idempotencyKey = heldKeys.claim(engagementId, trigger, mintKey, act);
     startTransition(async () => {
       try {
-        settle(engagementId, trigger, await fn(idempotencyKey));
+        settle(engagementId, trigger, act, await fn(idempotencyKey));
       } catch (cause) {
         // A rejection is the client-side twin of 'uncertain' — the request may
         // have reached Postgres and committed, and only the response was lost.

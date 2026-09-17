@@ -24,11 +24,45 @@ export const PAYMENT_HELD_TRIGGER = 'recordPayment';
  */
 export const PAY_AND_ADVANCE_HELD_TRIGGER = 'logPaymentAndAdvance';
 
-/** What a held key can be filed under: a lifecycle trigger, or a money control. */
+/** The CONTROL a held key belongs to: a lifecycle trigger, or a money control. */
 export type HeldKeyTrigger =
   | Trigger
   | typeof PAYMENT_HELD_TRIGGER
   | typeof PAY_AND_ADVANCE_HELD_TRIGGER;
+
+declare const heldKeySlotBrand: unique symbol;
+
+/**
+ * WHERE ONE ATTEMPT'S KEY IS FILED: the control AND the act, together.
+ *
+ * ONE ENTRY PER ACT, not one per control. While the map held one entry per
+ * CONTROL, a second act at the same control overwrote the entry the first was
+ * still holding — and a definite refusal on that second act then deleted the
+ * slot outright, so the studio's retry of the first act (an attempt nobody knew
+ * the outcome of, well inside its TTL) went out under a FRESH identity. If the
+ * first attempt had committed, that retry is a second EGP row in an append-only
+ * ledger. Typing a figure wrong between an in-doubt attempt and its retry was
+ * enough to reach it.
+ *
+ * Branded so a bare trigger cannot be handed to the map by mistake.
+ */
+export type HeldKeySlot = string & { readonly [heldKeySlotBrand]: true };
+
+/**
+ * SEPARATES THE CONTROL FROM THE ACT in a slot, and is the version marker.
+ *
+ * No trigger name contains it, so the control is everything before the FIRST
+ * one and nothing has to parse the act (which is opaque). An entry read back
+ * WITHOUT it was written by the build that filed one entry per control: its act
+ * is inside the value rather than in the name, and it is dropped rather than
+ * adopted — see held-keys-store.ts.
+ */
+export const HELD_KEY_SLOT_SEPARATOR = '|';
+
+/** Where the key for this attempt at `trigger`, with these inputs, is filed. */
+export function heldKeySlot(trigger: HeldKeyTrigger, act?: string): HeldKeySlot {
+  return `${trigger}${HELD_KEY_SLOT_SEPARATOR}${act ?? ''}` as HeldKeySlot;
+}
 
 /**
  * How much of one field's value takes part in naming the act. Every value the

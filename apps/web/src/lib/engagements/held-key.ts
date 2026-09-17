@@ -1,4 +1,4 @@
-import type { HeldKeyTrigger } from './held-act';
+import type { HeldKeySlot } from './held-act';
 
 /**
  * ONE ATTEMPT'S IDEMPOTENCY KEY, with the instant that attempt was made.
@@ -15,16 +15,6 @@ export interface HeldKey {
    * the window below bounds the act, not the chain of retries.
    */
   heldAt: number;
-  /**
-   * WHAT THE ACT WAS, where its name does not say it: EVERY field the attempt
-   * submitted, as one string — `actFrom` in held-act.ts builds it. A retry of
-   * the SAME act carries the held key; a DIFFERENT amount typed after an
-   * `uncertain` is a NEW act and gets a fresh key, because the refusal tells the
-   * studio to refresh and check before trying again, so somebody who then
-   * changes a figure is recording something else and the server would answer it
-   * with the ORIGINAL row. Absent on a lifecycle trigger: the trigger IS the act.
-   */
-  act?: string;
 }
 
 /**
@@ -50,14 +40,15 @@ export interface HeldKey {
 export const HELD_KEY_TTL_MS = 15 * 60 * 1000;
 
 /**
- * The keys the cockpit is still holding, by the ACT each one names. One key per
- * PAGE was wrong: fifteen call sites shared it, so uploading a file cleared the
- * key a half-finished `requestRevision` was holding and the retry minted a fresh
- * one — a second ledger row and a second allowance decrement, from a success
- * that had nothing to do with it. A key names one attempt at ONE act, on the
- * client exactly as in 0050's index.
+ * The keys the cockpit is still holding, BY SLOT — one entry per ACT.
+ *
+ * One key per PAGE was wrong: fifteen call sites shared it, so uploading a file
+ * cleared the key a half-finished `requestRevision` was holding and the retry
+ * minted a fresh one. One key per CONTROL was wrong for the same reason one step
+ * down: a second act at that control evicted the first. A key names one attempt
+ * at ONE act, on the client exactly as in 0050's index. See held-act.ts.
  */
-export type HeldKeys = ReadonlyMap<HeldKeyTrigger, HeldKey>;
+export type HeldKeys = ReadonlyMap<HeldKeySlot, HeldKey>;
 
 /** Is this key still inside the window in which it names an attempt in doubt? */
 export function isHeldKeyLive(entry: HeldKey, now: number): boolean {
@@ -95,28 +86,27 @@ export function hasLanded(
 }
 
 /**
- * The key the next attempt at `trigger` must carry: the one still being held for
- * an attempt in doubt, or a fresh one stamped with now.
+ * The key the next attempt in `slot` must carry: the one still being held for an
+ * attempt in doubt, or a fresh one stamped with now.
  *
- * `trigger` is undefined for the edges that ignore the argument entirely — an
+ * The slot is undefined for the edges that ignore the argument entirely — an
  * upload, a note, the off-plan toggle. Those mint a key nobody reads rather than
  * reaching into the map, so they can neither take nor release another act's key.
  *
- * AN EXPIRED KEY IS NOT REUSED even though it is still in the map (the map lives
- * as long as the tab, and a tab can sit open all day — see HELD_KEY_TTL_MS), and
- * NOR IS ONE HELD FOR A DIFFERENT ACT: a held key answers for the act that
- * minted it and for nothing else. See HeldKey.act.
+ * AN EXPIRED KEY IS NOT REUSED even though it is still in the map: the map lives
+ * as long as the tab, and a tab can sit open all day. See HELD_KEY_TTL_MS. A key
+ * held for a DIFFERENT act is not reused either, and needs no check here — a
+ * different act is a different SLOT, and this one only ever reads its own.
  */
 export function keyForAttempt(
   held: HeldKeys,
-  trigger: HeldKeyTrigger | undefined,
+  slot: HeldKeySlot | undefined,
   mintKey: () => string,
   now: number,
-  act?: string,
 ): HeldKey {
-  const entry = trigger === undefined ? undefined : held.get(trigger);
-  if (entry !== undefined && isHeldKeyLive(entry, now) && entry.act === act) return entry;
-  return { key: mintKey(), heldAt: now, act };
+  const entry = slot === undefined ? undefined : held.get(slot);
+  if (entry !== undefined && isHeldKeyLive(entry, now)) return entry;
+  return { key: mintKey(), heldAt: now };
 }
 
 /**
