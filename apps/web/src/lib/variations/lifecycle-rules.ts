@@ -9,7 +9,7 @@ import type { ContractStatus, VariationStatus } from '@metra/db';
  * has not reached the client yet and `terminated` has left them: neither can
  * carry a priced change.
  */
-export const ACTIVE_CONTRACT_STATUSES = ['issued', 'signed'] as const;
+const ACTIVE_CONTRACT_STATUSES = ['issued', 'signed'] as const;
 
 export function isContractActive(status: ContractStatus): boolean {
   return (ACTIVE_CONTRACT_STATUSES as readonly string[]).includes(status);
@@ -36,7 +36,7 @@ export function canIssueVariation(
  * closes them out; `approved` and `rejected` are already decided and are left
  * exactly as they are (approved work was agreed and still owes money).
  */
-export const OPEN_VARIATION_STATUSES = [
+const OPEN_VARIATION_STATUSES = [
   'draft',
   'internal_approved',
   'issued',

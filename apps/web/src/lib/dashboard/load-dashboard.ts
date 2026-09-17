@@ -17,7 +17,7 @@ import {
 } from './queries';
 
 /** How many in-flight deliveries the panel shows before deferring to the list. */
-export const DELIVERY_ROWS = 6;
+const DELIVERY_ROWS = 6;
 
 export interface DashboardFigures {
   /** NULL when this role may not see firm-wide figures (wave-4 A5). */
