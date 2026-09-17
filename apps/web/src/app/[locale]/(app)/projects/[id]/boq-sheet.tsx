@@ -3,28 +3,15 @@
 import { ChevronDown, Loader2, Plus, Search, Trash2 } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
 import type { CSSProperties, KeyboardEvent, ReactNode } from 'react';
-import { useMemo, useRef, useState, useTransition } from 'react';
-import { toast } from '@/hooks/use-toast';
-import { computeLine } from '@/lib/aggregates/proposal-totals';
-import {
-  addBoqLine,
-  addBoqSection,
-  deleteBoqLine,
-  setBoqDiscount,
-  updateBoqLine,
-} from '@/lib/boqs/actions';
-import { BOQ_UNITS, type BoqLinePatch } from '@/lib/boqs/edit-input';
+import { useMemo, useRef, useState } from 'react';
+import { BOQ_UNITS } from '@/lib/boqs/edit-input';
 import type { BoqDetail, BoqLineRow } from '@/lib/boqs/queries';
-import { resolveActionError } from '@/lib/actions/error-message';
 import { formatMoney } from '@/lib/format/money';
 import { formatQuantity } from '@/lib/format/number';
-import {
-  recordValue,
-  trimNumber,
-  type Column,
-  type EditableLine,
-} from './boq-sheet-columns';
+import { trimNumber, type Column, type EditableLine } from './boq-sheet-columns';
 import { focusNextInColumn } from './boq-sheet-focus';
+import { useBoqEdits } from './use-boq-edits';
+import { useBoqWrites } from './use-boq-writes';
 
 /**
  * The BOQ as one sheet.
@@ -59,24 +46,11 @@ export function BoqSheet({
   actions?: ReactNode;
 }) {
   const t = useTranslations('projects.profile.boq');
-  // Coded server refusals resolve through the SHARED errors catalogue. This
-  // screen used to map eight of them by hand and send everything else to
-  // "That change was not saved", which is what an over-length description or a
-  // vanished line looked like to the studio.
-  const te = useTranslations('errors');
   const locale = useLocale();
-  const [pending, start] = useTransition();
-
-  // Local edits, keyed lineId -> column -> what the studio typed. Cleared on a
-  // successful save, after which the revalidated props are the truth again.
-  // Overriding rather than mirroring means a save landing from another tab is
-  // not fought over: only the cells actually being typed in are held locally.
-  const [edits, setEdits] = useState<Record<string, Partial<Record<Column, string>>>>({});
-  const [savingIds, setSavingIds] = useState<Set<string>>(new Set());
+  const edits = useBoqEdits();
+  const writes = useBoqWrites({ boq, edits });
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [query, setQuery] = useState('');
-  /** Local edit of the document discount, same override rule as a cell. */
-  const [discount, setDiscount] = useState<string | null>(null);
   const gridRef = useRef<HTMLTableElement>(null);
 
   const money = (v: string) => formatMoney(v, locale);
@@ -95,106 +69,13 @@ export function BoqSheet({
     `${l.itemCode ?? ''} ${l.description}`.toLowerCase().includes(needle);
   const visibleCount = lines.filter(matches).length;
 
-  /** What a cell should show: the local edit if there is one, else the record. */
-  function cellValue(line: EditableLine, col: Column): string {
-    return edits[line.id]?.[col] ?? recordValue(line, col);
-  }
-
-  /**
-   * The amount as it will be stored, recomputed from what is on screen.
-   *
-   * It runs the SAME `computeLine` the server runs, so the number the studio is
-   * steering by while typing is the number that lands in the row — rather than a
-   * browser-side approximation that disagrees with the document by a piastre.
-   */
-  function amountOf(line: EditableLine): string {
-    const qty = edits[line.id]?.qty;
-    const price = edits[line.id]?.unitPrice;
-    if (qty === undefined && price === undefined) return line.lineTotal;
-    return computeLine({
-      qty: qty ?? line.qty,
-      unitPrice: price ?? line.unitPrice,
-      unitCost: '0',
-      discountPct: line.discountPct,
-    }).lineTotal;
-  }
-
-  function markSaving(id: string, on: boolean): void {
-    setSavingIds((prev) => {
-      const next = new Set(prev);
-      if (on) next.add(id);
-      else next.delete(id);
-      return next;
-    });
-  }
-
-  /** Commit one line. Called on blur, and only when something actually changed. */
-  function saveLine(line: EditableLine, patch: BoqLinePatch, cols: Column[]): void {
-    markSaving(line.id, true);
-    start(async () => {
-      try {
-        const res = await updateBoqLine({ lineId: line.id, patch });
-        if (res.ok) {
-          // Drop the local edit so the revalidated record takes over. Anything
-          // still being typed in another cell of the same row is untouched.
-          setEdits((prev) => {
-            const row = { ...(prev[line.id] ?? {}) };
-            for (const c of cols) delete row[c];
-            const next = { ...prev };
-            if (Object.keys(row).length === 0) delete next[line.id];
-            else next[line.id] = row;
-            return next;
-          });
-        } else {
-          // The edit STAYS on screen when the server refuses it. Reverting to
-          // the stored value would throw away what the studio typed and leave
-          // them guessing which cell was wrong.
-          toast({ title: resolveActionError(res.error, te), variant: 'destructive' });
-        }
-      } catch {
-        toast({ title: t('saveFailed'), variant: 'destructive' });
-      } finally {
-        markSaving(line.id, false);
-      }
-    });
-  }
-
-  function onCellBlur(line: EditableLine, col: Column): void {
-    const typed = edits[line.id]?.[col];
-    if (typed === undefined) return;
-    if (typed === recordValue(line, col)) {
-      // Focused, changed nothing (or typed it back). No write.
-      setEdits((prev) => {
-        const row = { ...(prev[line.id] ?? {}) };
-        delete row[col];
-        const next = { ...prev };
-        if (Object.keys(row).length === 0) delete next[line.id];
-        else next[line.id] = row;
-        return next;
-      });
-      return;
-    }
-    saveLine(line, { [col]: typed } as BoqLinePatch, [col]);
-  }
-
-  function setCell(id: string, col: Column, value: string): void {
-    setEdits((prev) => ({ ...prev, [id]: { ...(prev[id] ?? {}), [col]: value } }));
-  }
-
   /**
    * Enter walks DOWN the column, which is how a rate list is actually typed.
    * Tab still moves across. Escape puts the cell back and writes nothing.
    */
   function onKeyDown(e: KeyboardEvent<HTMLElement>, line: EditableLine, col: Column): void {
     if (e.key === 'Escape') {
-      setEdits((prev) => {
-        const row = { ...(prev[line.id] ?? {}) };
-        delete row[col];
-        const next = { ...prev };
-        if (Object.keys(row).length === 0) delete next[line.id];
-        else next[line.id] = row;
-        return next;
-      });
+      edits.clearColumns(line.id, [col]);
       return;
     }
     if (e.key !== 'Enter') return;
@@ -208,36 +89,6 @@ export function BoqSheet({
       if (next.has(id)) next.delete(id);
       else next.add(id);
       return next;
-    });
-  }
-
-  function onAddLine(sectionId: string): void {
-    start(async () => {
-      const res = await addBoqLine({ sectionId, description: t('newLine') });
-      if (!res.ok) toast({ title: resolveActionError(res.error, te), variant: 'destructive' });
-    });
-  }
-
-  function onAddSection(): void {
-    start(async () => {
-      const res = await addBoqSection({ boqId: boq.id, title: t('newSection') });
-      if (!res.ok) toast({ title: resolveActionError(res.error, te), variant: 'destructive' });
-    });
-  }
-
-  function onDiscountBlur(typed: string): void {
-    if (typed === trimNumber(boq.discountPct)) return;
-    start(async () => {
-      const res = await setBoqDiscount({ boqId: boq.id, discountPct: typed });
-      if (res.ok) setDiscount(null);
-      else toast({ title: resolveActionError(res.error, te), variant: 'destructive' });
-    });
-  }
-
-  function onDeleteLine(lineId: string): void {
-    start(async () => {
-      const res = await deleteBoqLine({ lineId });
-      if (!res.ok) toast({ title: resolveActionError(res.error, te), variant: 'destructive' });
     });
   }
 
@@ -364,12 +215,12 @@ export function BoqSheet({
                       key={line.id}
                       className="group border-b border-[color:var(--rule-soft)]"
                     >
-                      <Td sticky="a" dirty={edits[line.id] !== undefined}>
+                      <Td sticky="a" dirty={edits.isDirty(line.id)}>
                         {canEdit ? (
                           <Cell
-                            value={cellValue(line, 'itemCode')}
-                            onChange={(v) => setCell(line.id, 'itemCode', v)}
-                            onBlur={() => onCellBlur(line, 'itemCode')}
+                            value={edits.cellValue(line, 'itemCode')}
+                            onChange={(v) => edits.setCell(line.id, 'itemCode', v)}
+                            onBlur={() => writes.onCellBlur(line, 'itemCode')}
                             onKeyDown={(e) => onKeyDown(e, line, 'itemCode')}
                             col="itemCode"
                             label={t('col.code')}
@@ -384,9 +235,9 @@ export function BoqSheet({
                       <Td sticky="b">
                         {canEdit ? (
                           <Cell
-                            value={cellValue(line, 'description')}
-                            onChange={(v) => setCell(line.id, 'description', v)}
-                            onBlur={() => onCellBlur(line, 'description')}
+                            value={edits.cellValue(line, 'description')}
+                            onChange={(v) => edits.setCell(line.id, 'description', v)}
+                            onBlur={() => writes.onCellBlur(line, 'description')}
                             onKeyDown={(e) => onKeyDown(e, line, 'description')}
                             col="description"
                             label={t('col.description')}
@@ -400,12 +251,12 @@ export function BoqSheet({
                       <Td>
                         {canEdit ? (
                           <select
-                            value={cellValue(line, 'unit')}
+                            value={edits.cellValue(line, 'unit')}
                             data-col="unit"
                             aria-label={t('col.unit')}
                             onChange={(e) => {
-                              setCell(line.id, 'unit', e.target.value);
-                              saveLine(line, { unit: e.target.value }, ['unit']);
+                              edits.setCell(line.id, 'unit', e.target.value);
+                              writes.saveLine(line, { unit: e.target.value }, ['unit']);
                             }}
                             className="w-full cursor-pointer rounded-[8px] border border-transparent bg-transparent p-3 text-sm text-[color:var(--text)] hover:bg-[color:var(--track)] focus:border-[color:hsl(var(--brand))] focus:outline-none"
                           >
@@ -424,9 +275,9 @@ export function BoqSheet({
                       <Td num>
                         {canEdit ? (
                           <Cell
-                            value={cellValue(line, 'qty')}
-                            onChange={(v) => setCell(line.id, 'qty', v)}
-                            onBlur={() => onCellBlur(line, 'qty')}
+                            value={edits.cellValue(line, 'qty')}
+                            onChange={(v) => edits.setCell(line.id, 'qty', v)}
+                            onBlur={() => writes.onCellBlur(line, 'qty')}
                             onKeyDown={(e) => onKeyDown(e, line, 'qty')}
                             col="qty"
                             label={t('col.qty')}
@@ -445,9 +296,9 @@ export function BoqSheet({
                       <Td num>
                         {canEdit ? (
                           <Cell
-                            value={cellValue(line, 'unitPrice')}
-                            onChange={(v) => setCell(line.id, 'unitPrice', v)}
-                            onBlur={() => onCellBlur(line, 'unitPrice')}
+                            value={edits.cellValue(line, 'unitPrice')}
+                            onChange={(v) => edits.setCell(line.id, 'unitPrice', v)}
+                            onBlur={() => writes.onCellBlur(line, 'unitPrice')}
                             onKeyDown={(e) => onKeyDown(e, line, 'unitPrice')}
                             col="unitPrice"
                             label={t('col.rate')}
@@ -468,7 +319,7 @@ export function BoqSheet({
                           className="block whitespace-nowrap p-3 text-end font-mono font-semibold tabular-nums text-[color:var(--text)]"
                           dir="ltr"
                         >
-                          {money(amountOf(line))}
+                          {money(edits.amountOf(line))}
                         </span>
                       </Td>
                       <Td>
@@ -479,9 +330,9 @@ export function BoqSheet({
                               aria-pressed={line.provisional}
                               aria-label={t('provisional')}
                               title={t('provisional')}
-                              disabled={pending}
+                              disabled={writes.pending}
                               onClick={() =>
-                                saveLine(line, { provisional: !line.provisional }, [])
+                                writes.saveLine(line, { provisional: !line.provisional }, [])
                               }
                               className="inline-flex size-6 items-center justify-center rounded-[8px] border font-mono text-[10px] font-bold"
                               style={
@@ -517,7 +368,7 @@ export function BoqSheet({
                       {canEdit && (
                         <Td>
                           <div className="flex justify-center p-3">
-                            {savingIds.has(line.id) ? (
+                            {edits.isSaving(line.id) ? (
                               <Loader2
                                 className="size-4 animate-spin text-[color:var(--text-faint)]"
                                 aria-label={t('saving')}
@@ -525,8 +376,8 @@ export function BoqSheet({
                             ) : (
                               <button
                                 type="button"
-                                onClick={() => onDeleteLine(line.id)}
-                                disabled={pending}
+                                onClick={() => writes.onDeleteLine(line.id)}
+                                disabled={writes.pending}
                                 aria-label={t('deleteLine')}
                                 title={t('deleteLine')}
                                 className="rounded-[8px] p-1 text-[color:var(--text-faint)] hover:text-[color:var(--danger)]"
@@ -545,8 +396,8 @@ export function BoqSheet({
                     <td colSpan={colCount} className="p-2 ps-4">
                       <button
                         type="button"
-                        onClick={() => onAddLine(section.id)}
-                        disabled={pending}
+                        onClick={() => writes.onAddLine(section.id)}
+                        disabled={writes.pending}
                         className="inline-flex items-center gap-2 rounded-pill border border-dashed border-[color:var(--rule)] px-4 py-2 text-[13px] font-semibold text-[color:var(--brand-ink)] hover:border-[color:hsl(var(--brand))] hover:bg-[color:var(--brand-tint)]"
                       >
                         <Plus className="size-3.5" aria-hidden />
@@ -577,9 +428,9 @@ export function BoqSheet({
                 editor={
                   <>
                     <input
-                      value={discount ?? trimNumber(boq.discountPct)}
-                      onChange={(e) => setDiscount(e.target.value)}
-                      onBlur={(e) => onDiscountBlur(e.target.value.trim())}
+                      value={edits.discount ?? trimNumber(boq.discountPct)}
+                      onChange={(e) => edits.setDiscount(e.target.value)}
+                      onBlur={(e) => writes.onDiscountBlur(e.target.value.trim())}
                       aria-label={t('discountPct')}
                       dir="ltr"
                       inputMode="decimal"
@@ -614,8 +465,8 @@ export function BoqSheet({
         <div className="flex flex-wrap items-center gap-3 border-t border-[color:var(--rule)] p-3 text-[13px]">
           <button
             type="button"
-            onClick={onAddSection}
-            disabled={pending}
+            onClick={writes.onAddSection}
+            disabled={writes.pending}
             className="inline-flex items-center gap-2 rounded-pill border border-dashed border-[color:var(--rule)] px-4 py-2 text-[13px] font-semibold text-[color:var(--brand-ink)] hover:border-[color:hsl(var(--brand))] hover:bg-[color:var(--brand-tint)]"
           >
             <Plus className="size-3.5" aria-hidden />
@@ -623,15 +474,15 @@ export function BoqSheet({
           </button>
           <span
             className="inline-flex items-center gap-2 font-semibold"
-            style={{ color: savingIds.size > 0 ? 'var(--text-muted)' : 'var(--success)' }}
+            style={{ color: edits.savingCount > 0 ? 'var(--text-muted)' : 'var(--success)' }}
           >
             <span
               className="size-2 rounded-full"
               style={{
-                background: savingIds.size > 0 ? 'var(--text-faint)' : 'var(--success)',
+                background: edits.savingCount > 0 ? 'var(--text-faint)' : 'var(--success)',
               }}
             />
-            {savingIds.size > 0 ? t('saving') : t('allSaved')}
+            {edits.savingCount > 0 ? t('saving') : t('allSaved')}
           </span>
           <span className="ms-auto text-xs text-[color:var(--text-faint)]">
             {t('keyboardHint')}
