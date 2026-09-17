@@ -8,7 +8,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { logPaymentAndAdvance } from '@/lib/engagements/actions';
 import type { EngagementGatePreview } from '@/lib/engagements/gate-preview';
-import { PAY_AND_ADVANCE_HELD_TRIGGER, actFrom } from '@/lib/engagements/held-act';
+import { PAY_AND_ADVANCE_HELD_TRIGGER, actOf } from '@/lib/engagements/held-act';
+import type { LogPaymentAndAdvanceInput } from '@/lib/engagements/pay-and-advance';
 // Leaf import (guards/trigger-money-gate), not the barrel — the barrel also pulls
 // GUARDS from ./registry into this client chunk (heavy, cycle-prone, can init a
 // binding as undefined at render). The leaf is the pure MONEY_GUARD_MILESTONE map
@@ -64,8 +65,11 @@ export function PaymentForm({
 
   function submit() {
     if (!advanceTrigger) return;
+    // THE REQUEST, minus its key: one object, used twice. `actOf` is typed
+    // against the same shape, so a field added to the request and forgotten in
+    // the fingerprint does not compile.
     const submitted = {
-      kind: paymentKind,
+      paymentKind,
       amount: amount.trim(),
       method: method.trim() || null,
       reference: reference.trim() || null,
@@ -73,21 +77,12 @@ export function PaymentForm({
     };
     runAction(
       async (idempotencyKey) => {
-        const res = await logPaymentAndAdvance(engagementId, {
-          paymentKind: submitted.kind,
-          amount: submitted.amount,
-          method: submitted.method,
-          reference: submitted.reference,
-          advanceTrigger: submitted.advanceTrigger,
-          idempotencyKey,
-        });
+        const res = await logPaymentAndAdvance(engagementId, { ...submitted, idempotencyKey });
         if (res.ok) onDone();
         return res;
       },
       PAY_AND_ADVANCE_HELD_TRIGGER,
-      // WHAT THIS ACT IS — the SAME object the request is built from, so a field
-      // cannot be added to one and forgotten in the other.
-      actFrom(submitted),
+      actOf<Omit<LogPaymentAndAdvanceInput, 'idempotencyKey'>>(submitted),
     );
   }
 

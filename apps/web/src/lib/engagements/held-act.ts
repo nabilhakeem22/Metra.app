@@ -110,3 +110,27 @@ export function actFrom(fields: Record<string, string | null | undefined>): stri
     .map((name) => [name, fields[name] ?? '']);
   return fnv1a64(JSON.stringify(named));
 }
+
+/**
+ * THE FIELDS A REQUEST'S ACT MUST NAME: every property of `T`, each as the
+ * string (or absence) it contributes.
+ *
+ * `Required` on purpose — an OPTIONAL field on the request is MANDATORY here.
+ * An optional field is exactly the kind that gets added to a form and forgotten
+ * in the fingerprint, and a control that does not send one says so with
+ * `undefined` rather than by omission.
+ */
+export type ActFieldsOf<T> = { [K in keyof Required<T>]: string | null | undefined };
+
+/**
+ * `actFrom`, TIED TO THE REQUEST TYPE — use it wherever a request type exists.
+ *
+ * `actOf<Omit<RequestInput, 'idempotencyKey'>>({ … })` makes the sentence above
+ * ("pass EVERY field") a COMPILE ERROR rather than a comment: adding a field to
+ * the request and forgetting it here is TS2345, "Property 'note' is missing".
+ * Without it the omission is silent, and what it costs is a payment the studio
+ * was told had saved.
+ */
+export function actOf<T>(fields: ActFieldsOf<T>): string {
+  return actFrom(fields as Record<string, string | null | undefined>);
+}

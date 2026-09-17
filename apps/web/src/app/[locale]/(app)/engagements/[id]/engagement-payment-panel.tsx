@@ -13,7 +13,8 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { recordPayment } from '@/lib/engagements/actions';
-import { PAYMENT_HELD_TRIGGER, actFrom } from '@/lib/engagements/held-act';
+import { PAYMENT_HELD_TRIGGER, actOf } from '@/lib/engagements/held-act';
+import type { RecordPaymentInput } from '@/lib/engagements/payments';
 import { FormActions } from './engagement-form-actions';
 import type { RunAction } from './use-engagement-action';
 
@@ -64,21 +65,26 @@ export function PaymentPanel({
   const [payAmount, setPayAmount] = useState('');
 
   function save() {
-    const amount = payAmount.trim();
+    // THE REQUEST, minus its key: one object, used twice. The three fields this
+    // panel does not offer are `undefined` rather than absent — `actOf` is typed
+    // against the request, so the day one of them is added here it must be named
+    // in the act as well or the build fails.
+    const submitted = {
+      engagementId,
+      kind: payKind,
+      amount: payAmount.trim(),
+      method: undefined,
+      reference: undefined,
+      note: undefined,
+    };
     runAction(
       async (idempotencyKey) => {
-        const res = await recordPayment({
-          engagementId,
-          kind: payKind,
-          amount,
-          idempotencyKey,
-        });
+        const res = await recordPayment({ ...submitted, idempotencyKey });
         if (res.ok) onDone();
         return res;
       },
       PAYMENT_HELD_TRIGGER,
-      // WHAT THIS ACT IS — every field this request carries. See actFrom.
-      actFrom({ kind: payKind, amount }),
+      actOf<Omit<RecordPaymentInput, 'idempotencyKey'>>(submitted),
     );
   }
 

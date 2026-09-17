@@ -4,6 +4,7 @@ import {
   PAYMENT_HELD_TRIGGER,
   PAY_AND_ADVANCE_HELD_TRIGGER,
   actFrom,
+  actOf,
 } from './held-act';
 
 describe('the names a money control holds its key under', () => {
@@ -100,5 +101,32 @@ describe('actFrom', () => {
     expect(actFrom({ kind: 'deposit', amount: '50000' })).toBe('80434ce69bb98586');
     expect(actFrom({ amount: '50000', kind: 'deposit' })).toBe('80434ce69bb98586');
     expect(actFrom({})).toBe('09612b07b5ecb5a5');
+  });
+});
+
+/**
+ * F5: the fingerprint is tied to the request type, so "pass EVERY field" is a
+ * compile error rather than a comment. The guard is `@ts-expect-error` — the tsc
+ * gate reds on an UNUSED one, so the day the coupling stops working this line
+ * fails the build rather than going quietly green.
+ */
+describe('actOf', () => {
+  interface Request {
+    amount: string;
+    /** Optional on the request, MANDATORY in the act — see ActFieldsOf. */
+    note?: string | null;
+  }
+
+  it('does not compile when a field of the request type is missing', () => {
+    // @ts-expect-error — 'note' is missing: exactly the omission that swallows a
+    // payment silently when nothing checks it.
+    const missing = actOf<Request>({ amount: '50000' });
+    expect(missing).toMatch(/^[0-9a-f]{16}$/);
+  });
+
+  it('accepts the complete field set, and an unsent field named as undefined', () => {
+    const named = actOf<Request>({ amount: '50000', note: undefined });
+    expect(named).toBe(actFrom({ amount: '50000', note: undefined }));
+    expect(named).not.toBe(actOf<Request>({ amount: '50000', note: 'late fee' }));
   });
 });
