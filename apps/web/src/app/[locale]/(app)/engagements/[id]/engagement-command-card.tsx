@@ -1,503 +1,150 @@
 'use client';
 
-import { Link2, Loader2 } from 'lucide-react';
-import { useLocale, useTranslations } from 'next-intl';
+import { useTranslations } from 'next-intl';
 import { useState } from 'react';
-import { Button } from '@/components/ui/button';
-import type { ActionResult } from '@/lib/actions/result';
-// A plain PURE module (no barrel, no server-only, no db runtime) — see the
-// guards/money note below for why this component only ever imports leaves.
-import { findLatestClientChangeRequestNote } from '@/lib/engagements/client-activity-note';
 import { deriveCommandCard } from '@/lib/engagements/command-card';
 import { resolveCommandCardChrome } from '@/lib/engagements/command-card-chrome';
 import { resolveCommandCardCtas } from '@/lib/engagements/command-card-ctas';
-import type { EngagementGatePreview } from '@/lib/engagements/gate-preview';
-import type { EngagementClientActivityRecord } from '@/lib/engagements/queries/client-activity';
-import type { BoqStepSummary } from '@/lib/boqs/step';
-import { EngagementBoqStep } from './engagement-boq-step';
-import type { RevisionAllowances } from '@/lib/engagements/revision-allowance';
-import { resolveStageAction } from '@/lib/engagements/stage-action';
-import { isTerminal, type DesignState } from '@/lib/engagements/states';
-import type { Trigger } from '@/lib/engagements/transitions';
-import { formatDate } from '@/lib/format/date';
-import { EngagementFeeForm } from './engagement-fee-form';
+import { isTerminal } from '@/lib/engagements/states';
+import { CommandCardAction } from './command-card-action';
+import { useCommandCardCopy } from './command-card-copy';
+import { CommandCardForms } from './command-card-forms';
+import { CommandCardHeadline } from './command-card-headline';
+import type { EngagementCommandCardProps } from './command-card-props';
+import {
+  CommandCardAccentStripe,
+  CommandCardShareFooter,
+  CommandCardStatusBand,
+} from './command-card-status-band';
+import { CommandCardSteps } from './command-card-steps';
 import { EngagementHeroBadges } from './engagement-hero-badges';
-import { EngagementHeroChecklist } from './engagement-hero-checklist';
-import { EngagementInlineDropzone } from './engagement-inline-dropzone';
-import { EngagementOffPlanToggle } from './engagement-off-plan-toggle';
-import { PaymentForm } from './engagement-payment-form';
 import { EngagementSecondaryActions } from './engagement-secondary-actions';
-import { EngagementStageSpine } from './engagement-stage-spine';
 import { DIRECT_TRIGGER_ACTIONS } from './trigger-actions';
 
-// The cockpit COMMAND CARD — the single "what's next" surface, redesigned as a
-// stacked card: (1) the STUDIO's STAGE SPINE, gates and all, over a human
-// STATUS PILL; (2) THE ONE
-// ACTION — headline + an inline attachment dropzone OR the fee/pay fields + one
-// highlighted primary button + a "what happens next" helper; (3) a quiet FOOTER
-// (client link + the "more actions" secondary controls).
+// The cockpit COMMAND CARD — the single "what's next" surface, as a stacked card.
+// COMPOSITION ONLY: each numbered section is the file named after it
+// (command-card-{status-band,headline,steps,action,forms}.tsx), and which chrome
+// the card wears and which controls it offers are pure, tested functions in
+// lib/engagements/command-card-{chrome,ctas}.ts.
+//
 // It derives a machine-truthful view from the server gate preview
 // (`deriveCommandCard`): the headline reflects what ACTUALLY blocks Advance — the
 // real unmet forward guards. The client's advisory approval NEVER gates Advance.
-// The BLOCKING money gate always offers pay-and-advance (finance roles), pre-filled
-// to the exact shortfall, with the S1 remount-on-shortfall guard preserved. Logical
-// CSS only (RTL mirrors); money is `tabular-nums`, `dir=ltr` inside the checklist.
 //
 // EACH FACT APPEARS ONCE. Whose move it is = the pill (never also a second line);
 // what blocks Advance = the checklist row, marked ● unmet (never also a hint
-// interpolation or a note under the button). The hint POINTS at the checklist, it
-// does not restate it. Adding a second rendering of either is a regression.
-
-export function EngagementCommandCard({
-  engagementId,
-  projectId,
-  boqSummary,
-  preview,
-  state,
-  allowances,
-  stallDays,
-  canAdvance,
-  canRecordPayment,
-  canShare,
-  canUpload,
-  canSetOffPlan,
-  offPlan,
-  paymentClaimCount,
-  awaitingReplyCount,
-  conceptOptionCount,
-  clientActivity,
-  secondaryTriggers,
-  pending,
-  runAction,
-  onNudge,
-}: {
-  engagementId: string;
-  projectId: string;
-  /** The project's BOQ, for the `boq` step's lead action. Null when none exists. */
-  boqSummary: BoqStepSummary | null;
-  preview: EngagementGatePreview;
-  state: DesignState;
-  /**
-   * BOTH revision counter/allowance pairs — the concept one and the independent
-   * 3D one the `designChangeRaised` form prices against. The hero badge picks
-   * whichever pair the CURRENT state can spend, so it never contradicts the form.
-   */
-  allowances: RevisionAllowances;
-  stallDays: number | null;
-  canAdvance: boolean;
-  canRecordPayment: boolean;
-  canShare: boolean;
-  canUpload: boolean;
-  canSetOffPlan: boolean;
-  offPlan: boolean;
-  paymentClaimCount: number;
-  /** Client Deliverables Step 2 — client questions on documents still awaiting a
-   *  studio reply. Rendered as ONE quiet line, never a second CTA: answering is
-   *  advisory and must not compete with the card's single next action. */
-  awaitingReplyCount: number;
-  /** Concept options already recorded — drives the append-only upload cap. */
-  conceptOptionCount: number;
-  clientActivity: EngagementClientActivityRecord[];
-  secondaryTriggers: Trigger[];
-  pending: boolean;
-  /** Runs one server action with the page's per-attempt idempotency key
-   *  (0050). Ignore the argument on an edge that does not need one. */
-  runAction: (
-    fn: (idempotencyKey: string) => Promise<ActionResult>,
-    trigger?: Trigger,
-  ) => void;
-  onNudge: () => void;
-}) {
+// interpolation or a note under the button). The hint POINTS at the checklist and
+// does not restate it; a second rendering of either is a regression.
+export function EngagementCommandCard(props: EngagementCommandCardProps) {
+  const { engagementId, preview, state, pending, canShare, canUpload, onNudge } = props;
   const t = useTranslations('engagements');
   const th = useTranslations('engagements.hero');
-  const tg = useTranslations('engagements.guard');
-  const tcmd = useTranslations('engagements.command');
-  const tsa = useTranslations('engagements.stageAction');
-  const locale = useLocale();
   const [feeOpen, setFeeOpen] = useState(false);
   const [payOpen, setPayOpen] = useState(false);
-
   const view = deriveCommandCard(preview, {
-    canAdvance,
+    canAdvance: props.canAdvance,
     isTerminal: isTerminal(state),
   });
   const closed = view.mode === 'closed';
-  const { pillKey, showPaymentPill, stripeClass, pillClass, borderClass, waitingOnClient } =
-    resolveCommandCardChrome({ mode: view.mode, paymentClaimCount });
-  const showNudgePill = view.showNudge && canShare;
-
-  const {
-    showPayCta,
-    paymentKind,
-    paymentItem,
-    atProposal,
-    dropzoneCategory,
-    dropzoneAtCapacity,
-    actOnCard,
-  } = resolveCommandCardCtas(preview, {
-    canRecordPayment,
-    canAdvance,
+  const chrome = resolveCommandCardChrome({
+    mode: view.mode,
+    paymentClaimCount: props.paymentClaimCount,
+  });
+  const ctas = resolveCommandCardCtas(preview, {
+    canRecordPayment: props.canRecordPayment,
+    canAdvance: props.canAdvance,
     canUpload,
     state,
     mode: view.mode,
     closed,
-    conceptOptionCount,
+    conceptOptionCount: props.conceptOptionCount,
   });
-
-  // The client's latest change-request text — the brief for the revision the
-  // studio is about to make. It belongs next to the headline, not buried in the
-  // timeline tab. Null when the client has asked for nothing (or asked with no
-  // words), and never an approval's note.
-  const clientNote = findLatestClientChangeRequestNote(clientActivity);
-  const clientNoteDate = clientNote ? formatDate(clientNote.decidedAt, locale) : '';
-
-  // The card names the LITERAL ACT of this stage rather than announcing that a
-  // step exists — the registry is the one place that mapping lives, and it
-  // guarantees a row for every state, so a rescue entry into an unusual stage can
-  // never render a blank hero. `ready` and `closed` already name their own act
-  // (one interpolates the phase, one has nothing to name), so the registry
-  // returns null there and the existing copy stands.
-  // The BLOCKER, not just the state: `final_approval` can be held by either the
-  // cost-range acknowledgement or the as-built reconciliation, and naming the
-  // wrong one is worse than naming neither.
-  const stageAction = resolveStageAction(state, view.mode, view.primaryBlocker);
-  // Order matters and encodes the invariant: `closed` is checked first because
-  // the registry returns null there too, then the two BLOCKED modes (where a row
-  // is guaranteed), and `ready` last. No optional chaining — a null here would be
-  // a bug in the registry, not a case to render around.
-  const headline = closed
-    ? tcmd('closedHeadline')
-    : stageAction
-      ? tsa(`${stageAction.actor}.${stageAction.key}.headline`)
-      : tcmd('readyHeadline', {
-          phase: t(`state.${view.nextPhaseState ?? state}`),
-        });
-  const hint = stageAction
-    ? // Names who is waiting and what unlocks, one clause each. It still does NOT
-      // name the blocking guard: the checklist below lists that exact guard
-      // verbatim with an unmet marker, and a third copy of the same sentence is
-      // precisely what the old generic hint was.
-      tsa(`${stageAction.actor}.${stageAction.key}.sub`)
-    : view.mode === 'ready'
-      ? tcmd('readyHint')
-      : null;
-
-  function fireAdvance() {
-    if (view.advanceNeedsForm) {
-      setFeeOpen((open) => !open);
-      return;
-    }
-    if (!preview.primaryTrigger) return;
-    const action = DIRECT_TRIGGER_ACTIONS[preview.primaryTrigger];
-    // The trigger travels with the call: it is what the held key belongs to.
-    const trigger = preview.primaryTrigger;
-    if (action) {
-      runAction((idempotencyKey) => action(engagementId, idempotencyKey), trigger);
-    }
-  }
+  const copy = useCommandCardCopy({ state, view, closed });
 
   return (
     <section
-      className={`glass relative overflow-hidden p-0 text-[color:var(--text)] ${borderClass}`}
+      className={`glass relative overflow-hidden p-0 text-[color:var(--text)] ${chrome.borderClass}`}
     >
-      {/* Left accent stripe — 4px on the inline-START so it mirrors to the
-          inline-END in ar-EG RTL. Mode-driven color. */}
-      <span
-        aria-hidden
-        className={`pointer-events-none absolute inset-y-0 z-10 w-1 ${stripeClass}`}
-        style={{ insetInlineStart: 0 }}
-      />
+      <CommandCardAccentStripe className={chrome.stripeClass} />
+      <CommandCardStatusBand state={state} chrome={chrome} />
 
-      {/* 1. WHERE WE ARE — ribbon, status and whose-move in ONE tinted band.
-          Grouping them is the point: two stacked strips read as two separate
-          facts, when they are one answer to "where is this". */}
-      <div
-        className="border-b border-[color:var(--rule)] px-5 pb-4 pt-5 sm:px-6"
-        style={{ background: 'var(--track)' }}
-      >
-        <EngagementStageSpine state={state} />
-        {showPaymentPill && (
-          <div className="mt-3.5 flex flex-wrap items-center gap-2.5">
-            <span
-              className={`inline-flex items-center rounded-[var(--r-pill)] px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.08em] ${pillClass}`}
-            >
-              {tcmd(`pill.${pillKey}`)}
-            </span>
-            <span className="text-[12.5px] text-[color:var(--text-muted)]">
-              {tcmd('move.studio')}
-            </span>
-          </div>
+      <div className="px-5 pb-5 pt-5 sm:px-6">
+        {!closed && (
+          <EngagementHeroBadges
+            t={t}
+            th={th}
+            state={state}
+            stallDays={props.stallDays}
+            allowances={props.allowances}
+          />
+        )}
+
+        <CommandCardHeadline
+          closed={closed}
+          copy={copy}
+          clientActivity={props.clientActivity}
+          awaitingReplyCount={props.awaitingReplyCount}
+        />
+
+        {!closed && (
+          <>
+            <CommandCardSteps
+              engagementId={engagementId}
+              project={{ id: props.projectId, state, boqSummary: props.boqSummary }}
+              ctas={ctas}
+              copy={copy}
+              canUpload={canUpload}
+              checklist={{
+                items: preview.items,
+                showNudgePill: view.showNudge && canShare,
+                onNudge,
+              }}
+            />
+
+            <CommandCardAction
+              view={view}
+              ctas={ctas}
+              waitingOnClient={chrome.waitingOnClient}
+              canShare={canShare}
+              pending={pending}
+              onNudge={onNudge}
+              onTogglePay={() => setPayOpen((open) => !open)}
+              advance={{
+                engagementId,
+                preview,
+                runAction: props.runAction,
+                openFeeForm: () => setFeeOpen((open) => !open),
+              }}
+            />
+
+            <CommandCardForms
+              engagementId={engagementId}
+              preview={preview}
+              view={view}
+              ctas={ctas}
+              open={{ fee: feeOpen, pay: payOpen }}
+              offPlan={{ enabled: props.offPlan, canSet: props.canSetOffPlan }}
+              pending={pending}
+              handlers={{
+                runAction: props.runAction,
+                closeFee: () => setFeeOpen(false),
+                closePay: () => setPayOpen(false),
+              }}
+            />
+
+            {/* 3. FOOTER — client link + the "more actions" secondary controls. */}
+            <EngagementSecondaryActions
+              engagementId={engagementId}
+              triggers={props.secondaryTriggers}
+              allowances={props.allowances}
+              pending={pending}
+              runAction={props.runAction}
+            />
+          </>
         )}
       </div>
 
-      <div className="px-5 pb-5 pt-5 sm:px-6">
-      {!closed && (
-        <EngagementHeroBadges
-          t={t}
-          th={th}
-          state={state}
-          stallDays={stallDays}
-          allowances={allowances}
-        />
-      )}
-
-      {/* 2. THE ONE ACTION */}
-      {/* The eyebrow carries the ACTOR. A client-actor stage is not a MISSING
-          next action — it is a different, healthy one — so it gets its own label
-          rather than no label at all, which left the headline floating. */}
-      {!closed && (
-        <p className="mb-1.5 font-mono text-[10.5px] font-bold uppercase tracking-[0.14em] text-[color:var(--text-faint)]">
-          {stageAction?.actor === 'client'
-            ? tcmd('pill.waitingClient')
-            : tcmd('nextAction')}
-        </p>
-      )}
-      <h2 className="mb-1 text-[22px] font-semibold leading-tight tracking-[var(--tracking-title)] text-balance">
-        {headline}
-      </h2>
-      {hint && (
-        <p className="mb-4 text-[13.5px] text-[color:var(--text-muted)]">{hint}</p>
-      )}
-
-      {/* The client's own words — a QUIET callout under the headline, never a
-          second CTA. Plain text: React escapes it, so client-authored input can
-          never inject markup. Logical CSS only, so it mirrors in ar-EG. */}
-      {clientNote && (
-        <div className="mb-4 rounded-[var(--r-panel)] border border-[color:var(--rule)] bg-[color:var(--track)] px-3 py-2.5">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[color:var(--text-faint)]">
-            {tcmd('clientNote')}
-          </p>
-          {/* Clamped to 4 lines: a long client note must never push the primary
-              Advance CTA below the fold — the whole point of this card is one
-              unmissable next action. The full text is always in the Timeline. */}
-          <p className="mt-1 line-clamp-4 whitespace-pre-line break-words text-[13.5px] text-[color:var(--text)]">
-            {t('noteQuote', { note: clientNote.note })}
-          </p>
-          {(clientNote.actorName || clientNoteDate) && (
-            <p className="mt-1 text-[11.5px] text-[color:var(--text-faint)]">
-              {clientNote.actorName && (
-                <span>{t('clientActivity.by', { name: clientNote.actorName })}</span>
-              )}
-              {clientNote.actorName && clientNoteDate && <span aria-hidden> · </span>}
-              {clientNoteDate && (
-                <span className="font-mono" dir="ltr">
-                  {clientNoteDate}
-                </span>
-              )}
-            </p>
-          )}
-        </div>
-      )}
-
-      {/* Client questions waiting on an answer. ONE line, no button — the reply
-          lives on the document itself, in Files. Advisory: it never blocks the
-          advance, so it must never look like it does. */}
-      {!closed && awaitingReplyCount > 0 && (
-        <p className="mb-4 text-[13px] text-[color:var(--text-muted)]">
-          {tcmd('awaitingReply', { n: awaitingReplyCount })}
-        </p>
-      )}
-
-      {!closed && (
-        <>
-          {state === 'boq' && (
-            <EngagementBoqStep projectId={projectId} summary={boqSummary} />
-          )}
-
-          {dropzoneCategory && (
-            <EngagementInlineDropzone
-              engagementId={engagementId}
-              category={dropzoneCategory}
-              canUpload={canUpload}
-              atCapacity={dropzoneAtCapacity}
-              // The headline and the control say the SAME sentence. If they ever
-              // disagree, the registry row is wrong -- that is the check.
-              label={stageAction?.actor === 'studio' ? headline : undefined}
-            />
-          )}
-
-          {preview.items.length > 0 && (
-            <EngagementHeroChecklist
-              th={th}
-              tg={tg}
-              locale={locale}
-              items={preview.items}
-              showNudgePill={showNudgePill}
-              nudgeLabel={tcmd('nudge')}
-              onNudge={onNudge}
-            />
-          )}
-
-          {/* THE one action, full width. An inline row of equal buttons makes the
-              reader choose; a single wide CTA with the secondary beneath it does
-              not. Payment comes FIRST when it is due, because clearing the money
-              is what unblocks the advance underneath it. */}
-          <div className="flex flex-col gap-2.5">
-            {showPayCta && (
-              <Button
-                type="button"
-                className="w-full"
-                disabled={pending}
-                onClick={() => setPayOpen((open) => !open)}
-              >
-                {th('logPaymentAdvance')}
-              </Button>
-            )}
-
-            {/* WAITING ON THE CLIENT: the ADVANCE is dead machinery — nothing the
-                studio does enables it, only the client acting does — so it is
-                replaced by the one move they can still make on this card.
-
-                Note what is NOT hidden: logging a payment. A money guard is
-                client-actionable AND studio-recordable, so a studio that took the
-                transfer offline can settle it themselves and carry on. Hiding
-                that button would have removed a real action, which the first cut
-                of this did.
-
-                Advance is hidden in TWO situations, for the same reason: it cannot
-                move and something better already occupies its place. Here that is the
-                re-share button. The other is `actOnCard` -- the studio is blocked and
-                the dropzone above IS the act, worded from the same registry row as the
-                headline, so a second dead button for the same move is exactly the
-                duplication Option D removes.
-
-                It STAYS, disabled, in the blocked states with no dropzone: there
-                nothing else on the card names the forward move. */}
-            {actOnCard ? null : waitingOnClient ? (
-              canShare && (
-                <Button
-                  type="button"
-                  variant="secondary"
-                  className="w-full"
-                  disabled={pending}
-                  onClick={onNudge}
-                >
-                  <Link2 className="size-4" aria-hidden />
-                  {tcmd('reshare')}
-                </Button>
-              )
-            ) : (
-              <Button
-                type="button"
-                // When Advance is blocked it must READ as disabled — a flat
-                // subdued fill, never the brand CTA that looks clickable.
-                variant={
-                  view.advanceEnabled && !showPayCta ? 'default' : 'secondary'
-                }
-                className="w-full"
-                disabled={!view.advanceEnabled || pending}
-                onClick={fireAdvance}
-              >
-                {pending && view.advanceEnabled && (
-                  <Loader2 className="size-4 animate-spin" aria-hidden />
-                )}
-                {th('advance')}
-              </Button>
-            )}
-          </div>
-
-          {/* WHAT HAPPENS NEXT — one line under the action so it never reads as
-              a dead end. Only in 'ready': naming the next phase while the move is
-              still blocked would promise something the button cannot do. */}
-          {view.mode === 'ready' && view.nextPhaseState && (
-            <p className="mt-2.5 text-center text-[12.5px] text-[color:var(--text-muted)]">
-              {tcmd('advanceLeadsTo', {
-                phase: t(`state.${view.nextPhaseState}`),
-              })}
-            </p>
-          )}
-
-          {/* The hint explains the nudge affordance. In wait mode the button IS
-              that affordance and sits right above, so the line would just be the
-              same sentence twice. */}
-          {view.showNudge && canShare && !waitingOnClient && (
-            <p className="mt-3.5 flex items-baseline gap-1.5 text-[12.5px] text-[color:var(--text-muted)]">
-              <span aria-hidden>◆</span>
-              <span>{tcmd('nudgeHint')}</span>
-            </p>
-          )}
-
-          {showPayCta && (
-            <p className="mt-3.5 flex items-baseline gap-1.5 text-[12.5px] text-[color:var(--text-muted)]">
-              <span aria-hidden>◆</span>
-              <span>{th('payNote')}</span>
-            </p>
-          )}
-
-          {feeOpen && view.mode === 'ready' && view.advanceNeedsForm && (
-            <div className="mt-4">
-              <EngagementFeeForm
-                engagementId={engagementId}
-                pending={pending}
-                onSubmit={(fn) => runAction(fn)}
-                onCancel={() => setFeeOpen(false)}
-              />
-            </div>
-          )}
-
-          {showPayCta &&
-            payOpen &&
-            paymentKind &&
-            paymentItem?.amountDue &&
-            preview.primaryTrigger && (
-              // key = the current shortfall: when a SHORT payment persists and the
-              // server checklist revalidates to a reduced due, this key changes and
-              // React REMOUNTS the form — re-deriving the pre-filled amount from the
-              // new (smaller) due, so a blind re-click can't re-charge the old figure
-              // against the append-only ledger (S1: over-collection on re-click).
-              <PaymentForm
-                key={paymentItem.amountDue}
-                engagementId={engagementId}
-                paymentKind={paymentKind}
-                defaultAmount={paymentItem.amountDue}
-                advanceTrigger={preview.primaryTrigger}
-                pending={pending}
-                runAction={runAction}
-                onDone={() => setPayOpen(false)}
-              />
-            )}
-
-          {/* Off-plan toggle — only at the proposal milestone, for update roles.
-              It drives Step 2 (survey vs AutoCAD import). */}
-          {atProposal && canSetOffPlan && (
-            <EngagementOffPlanToggle
-              engagementId={engagementId}
-              offPlan={offPlan}
-              pending={pending}
-              runAction={runAction}
-            />
-          )}
-
-          {/* 3. FOOTER — client link + the "more actions" secondary controls. */}
-          <EngagementSecondaryActions
-            engagementId={engagementId}
-            triggers={secondaryTriggers}
-            allowances={allowances}
-            pending={pending}
-            runAction={runAction}
-          />
-        </>
-      )}
-      </div>
-
-      {/* 4. QUIET FOOTER — present, never shouting. Its own band rather than a
-          rule inside the body, so the card reads as three regions: where we are,
-          the one action, and everything reachable from here. */}
-      {canShare && (
-        <div
-          className="flex items-center gap-4 border-t border-[color:var(--rule)] px-5 py-3 sm:px-6"
-          style={{ background: 'var(--track)' }}
-        >
-          <button
-            type="button"
-            onClick={onNudge}
-            className="inline-flex items-center gap-1.5 text-[12.5px] font-semibold text-brand-ink hover:underline"
-          >
-            <Link2 className="size-3.5" aria-hidden />
-            {tcmd('nudge')}
-          </button>
-        </div>
-      )}
+      {canShare && <CommandCardShareFooter onNudge={onNudge} />}
     </section>
   );
 }
