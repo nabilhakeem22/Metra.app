@@ -8,7 +8,7 @@ import type { CommandCardMode } from './command-card';
 /** Mode-driven accent: amber for the blocked attention states, brand for ready,
  *  neutral for closed — expressed through the app's semantic tokens so both
  *  themes and RTL stay correct. */
-export type CommandCardAccent = 'neutral' | 'brand' | 'warn';
+type CommandCardAccent = 'neutral' | 'brand' | 'warn';
 
 export interface CommandCardChrome {
   accent: CommandCardAccent;

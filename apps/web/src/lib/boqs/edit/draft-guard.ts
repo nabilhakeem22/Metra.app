@@ -11,7 +11,7 @@ import { fail, mutateInOrg } from '@/lib/actions/mutate';
 export type Tx = Parameters<Parameters<typeof mutateInOrg>[2]>[0];
 
 /** What every line edit needs about the document the line belongs to. */
-export interface DraftLineParent {
+interface DraftLineParent {
   boqId: string;
   sectionId: string;
   discountPct: string;
