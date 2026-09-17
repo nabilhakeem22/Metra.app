@@ -24,9 +24,14 @@ import { closeFixture, ctxFor, raw, seedOrg, teardown } from './fixture';
 // columns - `org_id` included, which is `not null`. So the parent delete is
 // already refused whether or not the BOQ is issued. The fourth argument is still
 // correct and still necessary (it is what the referential action needs the moment
-// the FK is narrowed to `SET NULL (x_id)`), so the branch is tested DIRECTLY by
-// the statement the cascade would issue, and the FK defect is asserted and
+// the FK is narrowed to `SET NULL (x_id)`), and the FK defect is asserted and
 // reported separately.
+//
+// The branch is now fenced to `pg_trigger_depth() > 1` - only a referential
+// action may null those columns - so it can no longer be exercised by issuing
+// the statement the cascade WOULD issue. What is asserted instead is the
+// security property that fence buys: a DIRECT null of either column on an issued
+// BOQ is MT100.
 //
 // TEARDOWN NEEDS NOTHING NEW: fixture.ts:314 sets
 // `session_replication_role = 'replica'` for the whole teardown transaction,
@@ -282,12 +287,27 @@ describe('a BOQ is frozen at the database once it is issued', () => {
     expect(row.n).toBe(1);
   });
 
-  it('lets the DATABASE null a cascade column on an issued BOQ (the 4th TG_ARGV)', async () => {
-    // The branch the fourth argument adds, tested directly rather than through
-    // the foreign key - see the last test in this file for why the real cascade
-    // cannot reach it. An UPDATE that ONLY nulls engagement_id, or ONLY nulls
-    // source_file_id, on an ISSUED row is exactly the statement Postgres's
-    // referential action would issue, and it must be admitted.
+  it('refuses a DIRECT null of a cascade column on an issued BOQ (4th TG_ARGV, depth-gated)', async () => {
+    // THIS CASE'S EXPECTATION WAS INVERTED ON PURPOSE, and it is the only test
+    // in this file that changed meaning. As first shipped, the fourth TG_ARGV
+    // could not tell a referential cascade from a hand-written statement, so
+    // these two UPDATEs were ADMITTED on a BOQ already issued to a client -
+    // detaching it from its design engagement, and detaching the spreadsheet the
+    // client was actually sent. Both raised MT100 before the argument existed,
+    // and metra_app holds `update` on boqs, so the widening was reachable by any
+    // future code path.
+    //
+    // `pg_trigger_depth() > 1` now fences branch 2 to a referential action: a
+    // cascade reaches the child's BEFORE UPDATE from inside the parent's
+    // internal RI trigger (depth >= 2), a direct UPDATE arrives at depth 1.
+    //
+    // WHICH MEANS BRANCH 2 CANNOT BE EXERCISED FROM HERE AT ALL, because the
+    // cascade that would reach it cannot complete: the composite FK nulls
+    // `org_id` too - the last test in this file proves that, with the catalogue
+    // read. Wave 7's `ON DELETE SET NULL (x_id)` narrowing either gives this
+    // branch its first real traffic or lets the fourth argument be deleted
+    // outright. Until then the honest assertion is the one below: the direct
+    // statement is refused.
     const fixture = await setup();
     expect(await issue(fixture)).toBeNull();
 
@@ -297,15 +317,25 @@ describe('a BOQ is frozen at the database once it is issued', () => {
           `update public.boqs set engagement_id = null where id = '${fixture.boqId}'`,
         ),
       ),
-    ).toBeNull();
+    ).toBe('MT100');
     expect(
       await sqlstateOf(() =>
         raw.query(
           `update public.boqs set source_file_id = null where id = '${fixture.boqId}'`,
         ),
       ),
-    ).toBeNull();
+    ).toBe('MT100');
 
+    // A bare timestamp bump is refused too: branch 2 used to strip `updated_at`
+    // unconditionally, so a locked document's timestamp could be moved on its
+    // own. It is now forgiven only when a named column actually went NULL.
+    expect(
+      await sqlstateOf(() =>
+        raw.query(`update public.boqs set updated_at = now() where id = '${fixture.boqId}'`),
+      ),
+    ).toBe('MT100');
+
+    // Nothing moved.
     const [row] = await raw.query<{
       engagement_id: string | null;
       source_file_id: string | null;
@@ -313,13 +343,9 @@ describe('a BOQ is frozen at the database once it is issued', () => {
     }>(
       `select engagement_id, source_file_id, status from public.boqs where id = '${fixture.boqId}'`,
     );
-    expect(row.engagement_id).toBeNull();
-    expect(row.source_file_id).toBeNull();
+    expect(row.engagement_id).toBe(fixture.engagementId);
+    expect(row.source_file_id).toBe(fixture.fileId);
     expect(row.status).toBe('issued');
-
-    // Without the fourth argument this same statement is MT100: with the
-    // argument removed from the trigger, branch 2 is unreachable and the row is
-    // "not a whitelisted status transition". That is the whole point of it.
   });
 
   it('still refuses a NON-NULL write to a cascade column on an issued BOQ', async () => {

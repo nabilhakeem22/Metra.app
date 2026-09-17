@@ -16,11 +16,36 @@
 -- otherwise raise MT100 and abort a delete that has nothing to do with
 -- immutability. (On a COMPOSITE (org_id, x_id) FK, Postgres nulls org_id as
 -- well, so that delete is refused for an unrelated reason until the constraint
--- is narrowed to `SET NULL (x_id)`; this argument is still what the referential
--- action needs, and is tested by the statement it issues.) Only a change TO NULL is tolerated; writing a new NON-NULL value
--- into one of those columns is still MT100. OMIT IT AND THE TRIGGER BEHAVES
--- EXACTLY AS IT DID BEFORE THIS ARGUMENT EXISTED - every attached trigger that
--- passes three arguments cannot reach the branch at all.
+-- is narrowed to `SET NULL (x_id)`.) Only a change TO NULL is tolerated;
+-- writing a new NON-NULL value into one of those columns is still MT100. OMIT
+-- IT AND THE TRIGGER BEHAVES EXACTLY AS IT DID BEFORE THIS ARGUMENT EXISTED -
+-- every attached trigger that passes three arguments cannot reach the branch at
+-- all.
+--
+-- ONLY A REFERENTIAL CASCADE MAY USE IT (`pg_trigger_depth() > 1`). The comment
+-- said "columns the DATABASE ITSELF may null out", but the branch could not tell
+-- a cascade from a hand-written statement, so as first shipped
+-- `update boqs set engagement_id = null` on an ISSUED bill - from metra_app,
+-- from any future code path, from a copy-pasted script - was admitted, detaching
+-- an issued document from its engagement and detaching the spreadsheet the
+-- client was actually sent. All three raised MT100 before the argument existed.
+-- A referential ON DELETE SET NULL action reaches the child's BEFORE UPDATE from
+-- inside the parent's internal RI trigger, so it arrives at depth >= 2; a direct
+-- application UPDATE arrives at depth 1. Nothing in this repo updates a locked
+-- table from a trigger, so the test is exact.
+--
+-- AND `updated_at` IS ONLY FORGIVEN WHEN A NAMED COLUMN ACTUALLY WENT NULL.
+-- Stripping it unconditionally meant a bare `set updated_at = now()` on a locked
+-- row was admitted by this branch - a locked document's timestamp could be moved
+-- on its own, which is not something a cascade ever does.
+--
+-- CONSEQUENCE, stated so nobody reads the branch as live: with the depth gate
+-- in place, branch 2 is reachable ONLY from a cascade, and the eleven composite
+-- `on delete set null` FKs mean no such cascade can complete today (it nulls
+-- `org_id` too, which is NOT NULL, so the parent delete is refused first). When
+-- wave 7 narrows them to `ON DELETE SET NULL (x_id)` the branch starts carrying
+-- traffic - or the argument can be deleted outright, which is the better end
+-- state.
 --
 -- Decision matrix for "cannot be edited once issued":
 --   * append-only ledgers (e.g. audit_log) -> use GRANTs (no UPDATE/DELETE), and
@@ -46,6 +71,7 @@ declare
   new_body    jsonb;
   old_body    jsonb;
   col         text;
+  nulled      boolean := false;
 begin
   old_status := to_jsonb(OLD) ->> status_col;
 
@@ -74,20 +100,33 @@ begin
     return NEW;
   end if;
 
-  -- Branch 2 - the `on delete set null` cascade. Fires ONLY when TG_ARGV[3]
-  -- names columns, so the triggers that pass three arguments cannot reach it.
-  -- The status must be unchanged, and each named column is ignored ONLY when its
-  -- NEW value is NULL: a cascade nulls a column, it never writes a new value
-  -- into one. Everything else must still be byte-identical.
-  if cardinality(cascade_cols) > 0 and new_status is not distinct from old_status then
-    new_body := to_jsonb(NEW) - status_col - 'updated_at';
-    old_body := to_jsonb(OLD) - status_col - 'updated_at';
+  -- Branch 2 - the `on delete set null` cascade. Three fences, all required:
+  --   * TG_ARGV[3] names columns, so a three-argument trigger cannot reach it;
+  --   * the status is unchanged;
+  --   * pg_trigger_depth() > 1, so ONLY a referential action can be the writer.
+  --     A direct UPDATE arrives at depth 1 and falls through to MT100.
+  -- Each named column is then ignored ONLY when it actually WENT null - a
+  -- cascade nulls a column, it never writes a new value into one - and
+  -- `updated_at` is forgiven only if at least one of them did. Everything else
+  -- must still be byte-identical.
+  if cardinality(cascade_cols) > 0
+     and new_status is not distinct from old_status
+     and pg_trigger_depth() > 1 then
+    new_body := to_jsonb(NEW) - status_col;
+    old_body := to_jsonb(OLD) - status_col;
     foreach col in array cascade_cols loop
-      if col <> '' and (new_body ->> col) is null then
+      if col <> ''
+         and (new_body ->> col) is null
+         and (old_body ->> col) is not null then
         new_body := new_body - col;
         old_body := old_body - col;
+        nulled := true;
       end if;
     end loop;
+    if nulled then
+      new_body := new_body - 'updated_at';
+      old_body := old_body - 'updated_at';
+    end if;
     if new_body = old_body then
       return NEW;
     end if;
