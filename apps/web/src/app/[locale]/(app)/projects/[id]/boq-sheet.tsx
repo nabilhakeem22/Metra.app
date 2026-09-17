@@ -2,14 +2,16 @@
 
 import { ChevronDown, Loader2, Plus, Search, Trash2 } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
-import type { CSSProperties, KeyboardEvent, ReactNode } from 'react';
+import type { KeyboardEvent, ReactNode } from 'react';
 import { useMemo, useRef, useState } from 'react';
 import { BOQ_UNITS } from '@/lib/boqs/edit-input';
 import type { BoqDetail, BoqLineRow } from '@/lib/boqs/queries';
 import { formatMoney } from '@/lib/format/money';
 import { formatQuantity } from '@/lib/format/number';
-import { trimNumber, type Column, type EditableLine } from './boq-sheet-columns';
+import type { Column, EditableLine } from './boq-sheet-columns';
+import { BoqCellInput, Td, Th } from './boq-sheet-cells';
 import { focusNextInColumn } from './boq-sheet-focus';
+import { BoqTotals } from './boq-sheet-totals';
 import { useBoqEdits } from './use-boq-edits';
 import { useBoqWrites } from './use-boq-writes';
 
@@ -154,8 +156,8 @@ export function BoqSheet({
           </colgroup>
           <thead>
             <tr>
-              <Th sticky="a">{t('col.code')}</Th>
-              <Th sticky="b">{t('col.description')}</Th>
+              <Th sticky="code">{t('col.code')}</Th>
+              <Th sticky="description">{t('col.description')}</Th>
               <Th>{t('col.unit')}</Th>
               <Th num>{t('col.qty')}</Th>
               <Th num>{t('col.rate')}</Th>
@@ -215,14 +217,14 @@ export function BoqSheet({
                       key={line.id}
                       className="group border-b border-[color:var(--rule-soft)]"
                     >
-                      <Td sticky="a" dirty={edits.isDirty(line.id)}>
+                      <Td sticky="code" dirty={edits.isDirty(line.id)}>
                         {canEdit ? (
-                          <Cell
+                          <BoqCellInput
                             value={edits.cellValue(line, 'itemCode')}
                             onChange={(v) => edits.setCell(line.id, 'itemCode', v)}
                             onBlur={() => writes.onCellBlur(line, 'itemCode')}
                             onKeyDown={(e) => onKeyDown(e, line, 'itemCode')}
-                            col="itemCode"
+                            column="itemCode"
                             label={t('col.code')}
                             mono
                           />
@@ -232,14 +234,14 @@ export function BoqSheet({
                           </span>
                         )}
                       </Td>
-                      <Td sticky="b">
+                      <Td sticky="description">
                         {canEdit ? (
-                          <Cell
+                          <BoqCellInput
                             value={edits.cellValue(line, 'description')}
                             onChange={(v) => edits.setCell(line.id, 'description', v)}
                             onBlur={() => writes.onCellBlur(line, 'description')}
                             onKeyDown={(e) => onKeyDown(e, line, 'description')}
-                            col="description"
+                            column="description"
                             label={t('col.description')}
                           />
                         ) : (
@@ -274,12 +276,12 @@ export function BoqSheet({
                       </Td>
                       <Td num>
                         {canEdit ? (
-                          <Cell
+                          <BoqCellInput
                             value={edits.cellValue(line, 'qty')}
                             onChange={(v) => edits.setCell(line.id, 'qty', v)}
                             onBlur={() => writes.onCellBlur(line, 'qty')}
                             onKeyDown={(e) => onKeyDown(e, line, 'qty')}
-                            col="qty"
+                            column="qty"
                             label={t('col.qty')}
                             mono
                             numeric
@@ -295,12 +297,12 @@ export function BoqSheet({
                       </Td>
                       <Td num>
                         {canEdit ? (
-                          <Cell
+                          <BoqCellInput
                             value={edits.cellValue(line, 'unitPrice')}
                             onChange={(v) => edits.setCell(line.id, 'unitPrice', v)}
                             onBlur={() => writes.onCellBlur(line, 'unitPrice')}
                             onKeyDown={(e) => onKeyDown(e, line, 'unitPrice')}
-                            col="unitPrice"
+                            column="unitPrice"
                             label={t('col.rate')}
                             mono
                             numeric
@@ -410,54 +412,15 @@ export function BoqSheet({
             );
           })}
 
-          {/* Totals are ROWS OF THIS TABLE. The grand total cannot drift out of
-              the Amount column because it is in it. */}
-          <tfoot>
-            <FootRow
-              label={t('subtotal')}
-              value={money(boq.subtotal)}
-              colCount={colCount}
-              tinted
-            />
-            {canEdit ? (
-              <FootRow
-                label={t('discount')}
-                value={money(boq.discountAmount)}
-                colCount={colCount}
-                tinted
-                editor={
-                  <>
-                    <input
-                      value={edits.discount ?? trimNumber(boq.discountPct)}
-                      onChange={(e) => edits.setDiscount(e.target.value)}
-                      onBlur={(e) => writes.onDiscountBlur(e.target.value.trim())}
-                      aria-label={t('discountPct')}
-                      dir="ltr"
-                      inputMode="decimal"
-                      className="w-12 rounded-[8px] border border-transparent bg-transparent p-1 text-end font-mono text-sm tabular-nums text-[color:var(--text)] outline-none hover:bg-[color:var(--track)] focus:border-[color:hsl(var(--brand))]"
-                    />
-                    <span aria-hidden="true">%</span>
-                  </>
-                }
-              />
-            ) : (
-              boq.discountAmount !== '0' &&
-              boq.discountAmount !== '0.0000' && (
-                <FootRow
-                  label={t('discount')}
-                  value={money(boq.discountAmount)}
-                  colCount={colCount}
-                  tinted
-                />
-              )
-            )}
-            <FootRow
-              label={t('total')}
-              value={money(boq.total)}
-              colCount={colCount}
-              grand
-            />
-          </tfoot>
+          <BoqTotals
+            boq={boq}
+            canEdit={canEdit}
+            colCount={colCount}
+            money={money}
+            discount={edits.discount}
+            onDiscountChange={edits.setDiscount}
+            onDiscountBlur={writes.onDiscountBlur}
+          />
         </table>
       </div>
 
@@ -490,152 +453,5 @@ export function BoqSheet({
         </div>
       )}
     </div>
-  );
-}
-
-function Th({
-  children,
-  num,
-  sticky,
-}: {
-  children: ReactNode;
-  num?: boolean;
-  sticky?: 'a' | 'b';
-}) {
-  return (
-    <th
-      scope="col"
-      className={`sticky top-0 whitespace-nowrap bg-[color:var(--thead)] p-3 font-mono text-[11px] font-bold uppercase tracking-[0.09em] text-[color:var(--thead-ink)] ${num ? 'text-end' : 'text-start'}`}
-      style={{
-        zIndex: sticky ? 4 : 3,
-        borderBottom: '1px solid var(--thead-rule)',
-        ...(sticky
-          ? { position: 'sticky', insetInlineStart: sticky === 'a' ? 0 : 72 }
-          : {}),
-      }}
-    >
-      {children}
-    </th>
-  );
-}
-
-function Td({
-  children,
-  num,
-  sticky,
-  dirty,
-}: {
-  children: ReactNode;
-  num?: boolean;
-  sticky?: 'a' | 'b';
-  /** An unsaved row gets an edge. Autosave with no unsaved marker is a lie. */
-  dirty?: boolean;
-}) {
-  return (
-    <td
-      className={`bg-card align-middle ${num ? 'text-end' : ''}`}
-      style={{
-        ...(sticky
-          ? {
-              position: 'sticky',
-              insetInlineStart: sticky === 'a' ? 0 : 72,
-              zIndex: 1,
-            }
-          : {}),
-        ...(dirty ? { boxShadow: 'inset 3px 0 0 var(--warn)' } : {}),
-      }}
-    >
-      {children}
-    </td>
-  );
-}
-
-function Cell({
-  value,
-  onChange,
-  onBlur,
-  onKeyDown,
-  col,
-  label,
-  mono,
-  numeric,
-}: {
-  value: string;
-  onChange: (v: string) => void;
-  onBlur: () => void;
-  onKeyDown: (e: KeyboardEvent<HTMLInputElement>) => void;
-  col: Column;
-  label: string;
-  mono?: boolean;
-  numeric?: boolean;
-}) {
-  return (
-    <input
-      value={value}
-      data-col={col}
-      aria-label={label}
-      dir={numeric ? 'ltr' : 'auto'}
-      inputMode={numeric ? 'decimal' : undefined}
-      onChange={(e) => onChange(e.target.value)}
-      onBlur={onBlur}
-      onKeyDown={onKeyDown}
-      className={`w-full rounded-[8px] border border-transparent bg-transparent p-3 text-sm text-[color:var(--text)] outline-none hover:bg-[color:var(--track)] focus:border-[color:hsl(var(--brand))] focus:bg-[color:var(--field-bg)] ${mono ? 'font-mono tabular-nums' : ''} ${numeric ? 'text-end' : ''}`}
-    />
-  );
-}
-
-function FootRow({
-  label,
-  value,
-  colCount,
-  tinted,
-  grand,
-  editor,
-}: {
-  label: string;
-  value: string;
-  colCount: number;
-  tinted?: boolean;
-  grand?: boolean;
-  /** Rendered beside the label — the discount PERCENTAGE, where the amount it
-   *  produces still lands in the Amount column with everything else. */
-  editor?: ReactNode;
-}) {
-  // ONLY the grand total pins. Sticking all three rows at bottom:0 stacks them
-  // on top of each other — the first render of this sheet showed TOTAL sitting
-  // on top of Subtotal and Discount, hiding both. The grand total is the figure
-  // you steer by; the two above it are reference and can scroll into view with
-  // the end of the sheet.
-  const cell: CSSProperties = {
-    ...(grand ? { position: 'sticky', insetBlockEnd: 0, zIndex: 3 } : {}),
-    background: tinted ? 'var(--track)' : 'hsl(var(--card))',
-    borderTop: grand ? '2px solid var(--rule)' : '1px solid var(--rule-soft)',
-  };
-  return (
-    <tr>
-      <td
-        colSpan={5}
-        style={cell}
-        className={`p-3 font-mono text-[11px] font-bold uppercase tracking-[0.09em] ${grand ? 'text-[color:var(--text)]' : 'text-[color:var(--text-faint)]'}`}
-      >
-        {/* Pinned inside its spanning cell for the same reason as the section
-            title — a totals row whose label has scrolled away is a bare number. */}
-        <span
-          className="inline-flex w-fit items-center gap-2"
-          style={{ position: 'sticky', insetInlineStart: 0 }}
-        >
-          {label}
-          {editor}
-        </span>
-      </td>
-      <td
-        style={cell}
-        dir="ltr"
-        className={`whitespace-nowrap p-3 text-end font-mono font-bold tabular-nums text-[color:var(--text)] ${grand ? 'text-[18px]' : 'text-sm'}`}
-      >
-        {value}
-      </td>
-      <td colSpan={colCount - 6} style={cell} />
-    </tr>
   );
 }
