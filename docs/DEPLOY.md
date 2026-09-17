@@ -96,6 +96,21 @@ Set `DEPLOY_ENABLED` **last**: it is the flag that arms the workflow.
 Run `npm run db:migrate`, then `npm run db:apply-rls` (RLS, roles and functions
 live there, never in a migration).
 
+`db:apply-rls` **verifies itself now.** After the fifteen files it re-reads
+`pg_class`, `pg_policies`, `pg_trigger`, `pg_proc` and `pg_roles` on the same
+connection and exits **1** listing anything the manifest declares that the
+database does not have: every schema table RLS-enabled **and** forced, all 46
+policies, all 12 triggers, all 30 functions, and `metra_app` present and neither
+LOGIN nor BYPASSRLS. A green run ends with `apply-rls: verified in the
+catalogues — 46 tables, 46 policies, 12 triggers, 30 functions, ...`. Before
+this, the only post-condition was that no statement threw — which says a file
+RAN, not that its objects exist. Indexes and constraints are deliberately **not**
+checked here: they carry the 0017 case-fold drift and would be red on every
+database, which is why they stay report-only in `assert-schema-applied`.
+
+Every statement under `rls/` is idempotent, so the fix for a red verification is
+to re-run the command.
+
 Then, **every time a migration is in the diff**, prove it landed:
 
 ```bash

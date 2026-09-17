@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { RLS_APPLY_ORDER } from '../rls/manifest';
+import { declaredFunctions } from './rls-catalogue';
 import {
   declaredConstraints,
-  declaredFunctions,
   declaredIndexes,
   declaredTables,
   missingColumns,

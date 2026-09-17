@@ -11,6 +11,10 @@
 // applied by `apply-rls` and are invisible to the drizzle schema, and
 // hand-authored migrations have added indexes on purpose.
 //
+// The DRIZZLE SCHEMA is the only source read here. What the RLS *SQL* declares -
+// functions, policies, triggers - is parsed out of the manifest files by
+// `rls-catalogue.ts`; `missingNames` below serves both.
+//
 // Name comparison is EXACT and case-sensitive, because that is what Postgres
 // does with a quoted identifier — and the case drift is the thing worth seeing.
 // 0017 wrote six index names and six constraint names UNQUOTED in camelCase, so
@@ -20,10 +24,6 @@
 // twelve objects as "missing".
 import { is } from 'drizzle-orm';
 import { getTableConfig, PgTable } from 'drizzle-orm/pg-core';
-import { readFileSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { RLS_APPLY_ORDER } from '../rls/manifest';
 import * as schema from '../schema/index';
 
 /** Every table the CODE declares, as table name -> column names. */
@@ -67,23 +67,6 @@ export function declaredConstraints(): Map<string, string> {
       if (unique.name) declared.set(unique.name, config.name);
     }
     for (const fk of config.foreignKeys) declared.set(fk.getName(), config.name);
-  }
-  return declared;
-}
-
-const rlsDir = resolve(dirname(fileURLToPath(import.meta.url)), '../rls');
-
-/**
- * Every function the RLS SQL creates, as function name -> the file that creates
- * it, read from the files RLS_APPLY_ORDER names. That is the SAME list
- * `apply-rls` applies, so this cannot drift from what is actually run.
- */
-export function declaredFunctions(): Map<string, string> {
-  const declared = new Map<string, string>();
-  const pattern = /create\s+or\s+replace\s+function\s+public\.([a-z0-9_]+)/gi;
-  for (const file of RLS_APPLY_ORDER) {
-    const content = readFileSync(resolve(rlsDir, file), 'utf8');
-    for (const match of content.matchAll(pattern)) declared.set(match[1], file);
   }
   return declared;
 }

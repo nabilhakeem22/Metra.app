@@ -141,6 +141,13 @@ jobs:
       - name: Apply migrations
         run: npm run migrate -w @metra/db
 
+      # S2/R5 - this step is ALSO the post-apply verification, with nothing extra
+      # to invoke. `apply-rls` now re-reads pg_class / pg_policies / pg_trigger /
+      # pg_proc / pg_roles on the same connection after the loop and exits 1 with
+      # the offending list, so a manifest file that never ran fails HERE, on a
+      # fresh database, instead of surfacing as a missing policy in production
+      # weeks later. A green step is now evidence the objects EXIST, not only
+      # that no statement threw.
       - name: Apply RLS, roles (metra_app) and functions
         run: npm run apply-rls -w @metra/db
 

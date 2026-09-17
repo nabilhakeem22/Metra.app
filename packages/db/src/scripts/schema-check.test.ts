@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { declaredFunctions, declaredTables } from './schema-catalogue';
+import { declaredFunctions } from './rls-catalogue';
+import { declaredTables } from './schema-catalogue';
 import { runSchemaCheck, type CatalogueSql } from './schema-check';
 
 // F2: on the ONE run where the owner is being told the database is behind, the

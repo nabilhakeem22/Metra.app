@@ -12,9 +12,9 @@
 // run that printed a single section. This orders it the other way round:
 // everything prints, THEN the exit code is returned.
 import type { createSql } from '../client';
+import { declaredFunctions } from './rls-catalogue';
 import {
   declaredConstraints,
-  declaredFunctions,
   declaredIndexes,
   declaredTables,
   missingColumns,
