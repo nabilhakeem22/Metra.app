@@ -36,9 +36,16 @@ export function ProposalBuilder({
   const actions = useBuilderActions({
     proposalId: detail.id,
     confirm,
-    // Read at CALL time, not at render time: a save fired from the toolbar must
-    // carry the edit the studio made a keystroke ago, not the draft as it stood
-    // when this hook was last rendered.
+    // A FUNCTION rather than a snapshot, so the hook reads the draft when it
+    // DISPATCHES instead of keeping whichever object it was constructed with.
+    //
+    // It is still THIS RENDER's draft: the arrow closes over `draft`, so a
+    // handler that patches and then saves in the same frame sends the PRE-PATCH
+    // value -- both halves read the same closure. That is the behaviour main
+    // had too (`buildPayload()` closed over the same state), and the path a
+    // studio actually takes -- type, then click Save in a later frame -- carries
+    // the keystroke. Fixing the same-frame case means routing the save through
+    // the state updater, which is a change to useProposalDraft, not to this call.
     draftState: () => ({
       id: detail.id,
       discountPct: draft.discountPct,
