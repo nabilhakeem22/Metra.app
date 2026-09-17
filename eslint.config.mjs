@@ -60,7 +60,33 @@ export default tseslint.config(
         { argsIgnorePattern: '^_', varsIgnorePattern: '^_' },
       ],
       '@typescript-eslint/no-explicit-any': 'off',
+      // TEST-ONLY HELPERS STAY OUT OF THE PRODUCT BUNDLE. apps/web/src/test/*
+      // imports vitest at module scope, and it sits INSIDE src — resolved by the
+      // `@` alias, covered by tsconfig — so a product file importing it would
+      // typecheck and lint clean and then fail the OpenNext build at DEPLOY, on
+      // a devDependency that cannot resolve in the Worker bundle. This is a
+      // boundary the repo otherwise enforces hard, so it fails closed here too.
+      // Test files are exempted below; they are who the helpers are for.
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['@/test', '@/test/*'],
+              message:
+                'apps/web/src/test/* is TEST-ONLY (it imports vitest at module scope). ' +
+                'A product module must not import it: the OpenNext Worker bundle cannot ' +
+                'resolve a devDependency, and that failure would surface at deploy.',
+            },
+          ],
+        },
+      ],
     },
+  },
+  {
+    // The test files themselves — the helpers exist for exactly these.
+    files: ['**/*.test.ts', '**/*.test.tsx', '**/*.dbtest.ts', '**/src/test/**'],
+    rules: { 'no-restricted-imports': 'off' },
   },
   {
     // Node CLI scripts: plain ESM run by `node`, so they legitimately use the
