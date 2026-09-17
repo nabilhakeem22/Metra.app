@@ -11,7 +11,7 @@ import {
 import type { Flow } from '@/lib/entitlements/flows';
 import { can } from '@/lib/permissions/can';
 import type { Capability, PermissionAction } from '@/lib/permissions/roles';
-import { isImmutabilityViolation, isUniqueViolation } from './db-conflict';
+import { isImmutabilityViolation, isUniqueViolationOf } from './db-conflict';
 import { isAmbiguousDbOutcome } from './db-failure';
 import { ActionError, type ActionCode, type ActionResult } from './result';
 
@@ -27,10 +27,17 @@ export { ActionError, fail } from './result';
  * doesn't turn that guided flow on. ActionError -> its coded failure; anything
  * else -> logged + 'generic'.
  *
- * `conflictCode` / `immutableCode` let a mutation NAME the race it can lose.
- * Both are optional and both are per-mutation on purpose: 23505 means
- * "a contract already exists" at contracts/generate and something else entirely
- * at team/invite, so the wrapper cannot know the sentence — only the caller can.
+ * `conflict` / `immutableCode` let a mutation NAME the race it can lose. Both
+ * are optional and both are per-mutation on purpose: 23505 means "a contract
+ * already exists" at contracts/generate and something else entirely at
+ * team/invite, so the wrapper cannot know the sentence — only the caller can.
+ *
+ * `conflict` names the CONSTRAINT as well as the code, because a mutation is
+ * several statements and only one of them is the race the caller means. The
+ * first version took a bare code and answered it for ANY 23505 in the
+ * transaction: `generateContractCore` would have called a collision on the
+ * contract NUMBER "a contract already exists", and removed the one log line
+ * that recorded it.
  */
 export async function mutateInOrg<T = void>(
   ctx: OrgContext,
@@ -38,8 +45,12 @@ export async function mutateInOrg<T = void>(
     capability?: Capability;
     action?: PermissionAction;
     flow?: Flow;
-    /** The code a 23505 from THIS mutation means. Omitted = `generic` + a log line. */
-    conflictCode?: ActionCode;
+    /**
+     * The code a 23505 from ONE NAMED constraint means. Any other 23505 —
+     * including one from a different constraint on the same table — stays
+     * `generic` and is logged, because it is not the race the caller named.
+     */
+    conflict?: { constraint: string; code: ActionCode };
     /** The code an MT100 from THIS mutation means (the row locked under us). */
     immutableCode?: ActionCode;
   },
@@ -87,7 +98,10 @@ export async function mutateInOrg<T = void>(
  * very thing holding that lock, and it is still free to commit). Re-labelling
  * one of those a REFUSAL would tell a caller the write is dead when it is not.
  *
- * Then the caller's own names for 23505 and MT100, if it gave any.
+ * Then the caller's own names for 23505 and MT100, if it gave any — and the
+ * 23505 only when the CONSTRAINT matches too. An unexpected unique violation
+ * inside a mutation that named a different one is not a refusal the product has
+ * a sentence for; it belongs in the tail, with the log line.
  *
  * A MAPPED CODE IS NOT LOGGED AS AN ERROR, and neither is an ambiguous one:
  * they are expected races the product has a sentence for, and a false defect
@@ -96,13 +110,18 @@ export async function mutateInOrg<T = void>(
  */
 function mutationFailureCode(
   e: unknown,
-  opts: { conflictCode?: ActionCode; immutableCode?: ActionCode },
+  opts: {
+    conflict?: { constraint: string; code: ActionCode };
+    immutableCode?: ActionCode;
+  },
 ): ActionCode {
   if (e instanceof ActionError) return e.code;
   if (e instanceof DbWriteUncertainError || isAmbiguousDbOutcome(e)) {
     return 'uncertain';
   }
-  if (opts.conflictCode && isUniqueViolation(e)) return opts.conflictCode;
+  if (opts.conflict && isUniqueViolationOf(e, opts.conflict.constraint)) {
+    return opts.conflict.code;
+  }
   if (opts.immutableCode && isImmutabilityViolation(e)) return opts.immutableCode;
   console.error('mutateInOrg failed:', e);
   return 'generic';

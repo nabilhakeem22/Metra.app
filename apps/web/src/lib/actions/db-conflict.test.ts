@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { isAmbiguousDbOutcome } from './db-failure';
-import { isImmutabilityViolation, isUniqueViolation } from './db-conflict';
+import {
+  constraintNameOf,
+  isImmutabilityViolation,
+  isUniqueViolation,
+  isUniqueViolationOf,
+} from './db-conflict';
 
 describe('isUniqueViolation', () => {
   it('recognises 23505', () => {
@@ -13,6 +18,58 @@ describe('isUniqueViolation', () => {
     expect(isUniqueViolation(null)).toBe(false);
     expect(isUniqueViolation(undefined)).toBe(false);
     expect(isUniqueViolation({ code: 23505 })).toBe(false);
+  });
+});
+
+describe('isUniqueViolationOf', () => {
+  const CONSTRAINT = 'contracts_org_id_source_proposal_unique';
+
+  it('is true only when the SQLSTATE and the constraint name both match', () => {
+    expect(
+      isUniqueViolationOf({ code: '23505', constraint_name: CONSTRAINT }, CONSTRAINT),
+    ).toBe(true);
+  });
+
+  it('is false for a 23505 raised by a DIFFERENT constraint on the same table', () => {
+    // The whole point: `generateContractCore` runs five phases in one
+    // transaction, and a collision on the contract NUMBER means the allocator
+    // failed. Answering it "a contract already exists" would dress a defect as
+    // an expected race and delete its log line.
+    expect(
+      isUniqueViolationOf(
+        { code: '23505', constraint_name: 'contracts_org_id_number_unique' },
+        CONSTRAINT,
+      ),
+    ).toBe(false);
+  });
+
+  it('is false when the server attributed the error to no constraint at all', () => {
+    expect(isUniqueViolationOf({ code: '23505' }, CONSTRAINT)).toBe(false);
+    expect(isUniqueViolationOf({ code: '23505', constraint_name: '' }, CONSTRAINT)).toBe(
+      false,
+    );
+    expect(isUniqueViolationOf({ code: '23505', constraint_name: 7 }, CONSTRAINT)).toBe(
+      false,
+    );
+  });
+
+  it('is false for the right constraint under the WRONG SQLSTATE', () => {
+    expect(
+      isUniqueViolationOf({ code: 'MT100', constraint_name: CONSTRAINT }, CONSTRAINT),
+    ).toBe(false);
+    expect(isUniqueViolationOf(null, CONSTRAINT)).toBe(false);
+  });
+});
+
+describe('constraintNameOf', () => {
+  it('reads the server-supplied name, and nothing else', () => {
+    expect(constraintNameOf({ constraint_name: 'clients_org_id_phone_unique' })).toBe(
+      'clients_org_id_phone_unique',
+    );
+    expect(constraintNameOf({ code: '23505' })).toBeNull();
+    expect(constraintNameOf({ constraint_name: '' })).toBeNull();
+    expect(constraintNameOf(new Error('boom'))).toBeNull();
+    expect(constraintNameOf(null)).toBeNull();
   });
 });
 

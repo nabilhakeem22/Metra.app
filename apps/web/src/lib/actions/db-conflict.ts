@@ -38,6 +38,35 @@ export function isUniqueViolation(error: unknown): boolean {
 }
 
 /**
+ * The constraint a Postgres error names, or null.
+ *
+ * postgres.js copies every field of the server's ErrorResponse onto the thrown
+ * error, `constraint_name` among them (snake_case, as the wire protocol spells
+ * it). It is absent for an error the server did not attribute to a constraint,
+ * and it is not something an attacker chooses: the server writes it.
+ */
+export function constraintNameOf(error: unknown): string | null {
+  const name = (error as { constraint_name?: unknown } | null)?.constraint_name;
+  return typeof name === 'string' && name.length > 0 ? name : null;
+}
+
+/**
+ * SQLSTATE 23505 raised by ONE named constraint — the only 23505 a caller may
+ * translate into its own sentence.
+ *
+ * `isUniqueViolation` alone is not enough for that job. A mutation is usually
+ * several statements in one transaction, and "the 23505 I expected" and "a 23505
+ * I did not expect" are indistinguishable by SQLSTATE: `generateContractCore`
+ * races on (org_id, source_proposal_id), but the same transaction also inserts
+ * a contract NUMBER under its own unique index. Naming the constraint is what
+ * keeps an unexpected collision in the unclassified tail, where it is logged,
+ * instead of being answered "a contract already exists".
+ */
+export function isUniqueViolationOf(error: unknown, constraint: string): boolean {
+  return isUniqueViolation(error) && constraintNameOf(error) === constraint;
+}
+
+/**
  * SQLSTATE MT100 — `enforce_immutable_when` refused an update to a locked row.
  * The row was open when the caller read it and locked by the time it wrote, so
  * this is the LOST side of a normal race (a draft save against a send), not a
