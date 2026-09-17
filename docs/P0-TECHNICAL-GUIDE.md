@@ -391,11 +391,14 @@ container, in this order:
    Arabic prose
 4. **lint** — including the physical `left`/`right` ban
 5. **unit tests (db)**, then **unit tests (web)**
-6. **migrate** → **apply-rls** → **seed**
-7. **the cross-tenant isolation gate**
-8. **action-core DB tests** (`*.dbtest.ts`, seeded DB, fabricated `OrgContext`)
-9. **the OpenNext Cloudflare build** (no deploy) — proves the Worker bundle builds
-10. **`assert-no-baked-secrets`** — proves no secret was compiled into it
+6. **migration batch size** — fails if a branch adds more than
+   `MAX_PENDING_MIGRATIONS = 4` migrations, because `db:migrate` runs the whole
+   pending batch in ONE transaction
+7. **migrate** → **apply-rls** → **seed**
+8. **the cross-tenant isolation gate**
+9. **action-core DB tests** (`*.dbtest.ts`, seeded DB, fabricated `OrgContext`)
+10. **the OpenNext Cloudflare build** (no deploy) — proves the Worker bundle builds
+11. **`assert-no-baked-secrets`** — proves no secret was compiled into it
 
 A green CI on `main` is what triggers `deploy.yml`.
 

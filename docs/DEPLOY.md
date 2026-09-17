@@ -208,6 +208,15 @@ in smaller batches or in a maintenance window rather than trusting the margin.
 Atomicity is the compensation: a 55P03 rolls the whole batch back, so a failed
 migrate leaves the previous indexes intact.
 
+CI now counts the migrations a branch ADDS relative to `main` and fails above
+**`MAX_PENDING_MIGRATIONS = 4`** (`.github/workflows/ci.yml`, step *"Migration
+batch size"*). The count is written to the run's step summary as
+`pending migrations: N / 4` **either way**, so the number is visible on a green
+run too, and it needs the `fetch-depth: 0` on the checkout - a depth-1 clone has
+no merge base to count against. Four DDL migrations in one `db:migrate`
+transaction is comfortable; ten is not. If you legitimately need more, split the
+merge, or raise the constant **in the same commit that explains why**.
+
 ### Recovery: acknowledgements recorded between the 0048 and 0049 deploys
 
 Two migrations, one operator task, and neither backfills — by design.

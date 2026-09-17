@@ -54,6 +54,11 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Full history: the "Migration batch size" step below counts the
+          # migrations this ref ADDS relative to `main`, and a depth-1 checkout
+          # has no merge base to count against.
+          fetch-depth: 0
 
       - uses: actions/setup-node@v4
         with:
@@ -91,6 +96,30 @@ jobs:
 
       - name: Unit tests (web)
         run: npm run test -w @metra/web
+
+      # O9 - `db:migrate` runs every PENDING migration as ONE transaction, so the
+      # ACCESS EXCLUSIVE window is the sum of the batch, not of one file. 0049 +
+      # 0050 measured ~630 ms against a 5 s lock_timeout (~8x headroom); ten DDL
+      # migrations in one batch would not be. This counts what the ref adds
+      # relative to `main` and fails above the constant. If you legitimately need
+      # more, split the merge, or raise MAX_PENDING_MIGRATIONS in the SAME commit
+      # that explains why. The count goes to the run summary either way, so the
+      # number is visible on a green run too.
+      - name: Migration batch size
+        env:
+          MAX_PENDING_MIGRATIONS: '4'
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --quiet origin main
+          base="$(git merge-base origin/main HEAD)"
+          count="$(git diff --name-only --diff-filter=A "$base" HEAD -- packages/db/migrations | grep -c '\.sql$' || true)"
+          line="pending migrations: $count / $MAX_PENDING_MIGRATIONS"
+          echo "$line"
+          echo "$line" >> "$GITHUB_STEP_SUMMARY"
+          if [ "$count" -gt "$MAX_PENDING_MIGRATIONS" ]; then
+            echo "::error::$line - one db:migrate transaction would hold ACCESS EXCLUSIVE for the whole batch. Split the merge, or raise MAX_PENDING_MIGRATIONS in the same commit that explains why."
+            exit 1
+          fi
 
       - name: Apply migrations
         run: npm run migrate -w @metra/db
