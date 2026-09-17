@@ -24,12 +24,22 @@ import type { TransitionDef, Trigger } from './types';
  * compile, and a trigger filed in two of them is a duplicate-key lint error.
  * That is what the hand-kept "which triggers are wired" set used to assert at
  * runtime, and it is why this wave deleted it: it could never be false.
+ *
+ * THE SPREAD ORDER IS A VISIBLE PROPERTY, not a formatting choice. `Object.keys`
+ * of this object is what `legalTriggersFrom` returns, and that list is the order
+ * the engagement's next-action buttons are rendered in. Documentation is spread
+ * BEFORE the 3D approvals for exactly that reason: `designChangeRaised` is filed
+ * with the 3D edges (its home phase) but is also legal from `shop_drawings`,
+ * where the forward action is `draftReady` — and grouping it earlier silently
+ * moved it in front. Measured: with documentation first, all 16 states return
+ * the same trigger order they returned before the split, which
+ * `ui.test.ts` now pins state by state.
  */
 export const TRANSITIONS: Record<Trigger, TransitionDef> = {
   ...PROPOSAL_SURVEY_EDGES,
   ...CONCEPT_LAYOUT_EDGES,
-  ...THREED_APPROVAL_EDGES,
   ...DOCUMENTATION_BOQ_EDGES,
+  ...THREED_APPROVAL_EDGES,
   ...HANDOFF_EXECUTION_EDGES,
   ...OFF_RAMP_EDGES,
 };

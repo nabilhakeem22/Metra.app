@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { DESIGN_STATES } from './states';
+import { DESIGN_STATES, type DesignState } from './states';
+import type { Trigger } from './transitions';
 import {
   PAYLOAD_TRIGGERS,
   canRunTrigger,
@@ -72,6 +73,53 @@ describe('legalTriggersFrom', () => {
     expect(legalTriggersFrom('execution')).toEqual([]);
     expect(legalTriggersFrom('closed_design_only')).toEqual([]);
     expect(legalTriggersFrom('abandoned')).toEqual([]);
+  });
+
+  // THE ORDER, for all 16 states, UNSORTED.
+  //
+  // Every assertion above `.sort()`s, which is right for "which triggers" and
+  // blind to "in what order" — and the order is a product-visible property:
+  // `legalTriggersFrom` returns `Object.keys(TRANSITIONS)` filtered, and the
+  // detail page renders that list as the engagement's next-action buttons.
+  // Splitting the registry into six edge files re-ordered those keys, and
+  // `shop_drawings` came back `[designChangeRaised, draftReady, abandon]`
+  // instead of `[draftReady, designChangeRaised, abandon]` — the forward action
+  // demoted behind the revision loop. It was inert (the primary button is
+  // chosen by STAGE_NUMBER, and the secondary list removes whichever trigger the
+  // primary took), and it was invisible to every test here.
+  //
+  // This table is the pre-split order, state by state. Editing it is allowed;
+  // editing it BY ACCIDENT is what this stops.
+  it('returns the registry order, state by state, for all 16 states', () => {
+    const EXPECTED: Record<DesignState, Trigger[]> = {
+      created: ['submitDesignFee', 'abandon'],
+      design_proposal: ['confirmAndPayDeposit', 'abandon'],
+      survey: ['spatialBaseReady', 'abandon'],
+      layout: ['optionsReady', 'abandon'],
+      concept_review: ['selectConcept', 'abandon'],
+      negotiation: ['requestRevision', 'confirmConcept', 'abandon'],
+      design_3d: ['rendersReady', 'abandon'],
+      final_approval: [
+        'flagAsBuiltVariance',
+        'attestAsBuiltClean',
+        'approveDesign',
+        'rejectDesign',
+        'designChangeRaised',
+        'abandon',
+      ],
+      shop_drawings: ['draftReady', 'designChangeRaised', 'abandon'],
+      boq: ['finalizeBOQ', 'abandon'],
+      execution_decision: ['chooseDesignOnly', 'chooseExecution', 'abandon'],
+      design_only_handoff: ['recipientAcknowledges', 'abandon'],
+      closed_design_only: [],
+      execution: [],
+      abandoned: [],
+      change_triage: ['attestAsBuiltClean', 'abandon'],
+    };
+    // Every state is named — a missing key is a compile error, not a silent gap.
+    for (const state of DESIGN_STATES) {
+      expect(legalTriggersFrom(state), `order at ${state}`).toEqual(EXPECTED[state]);
+    }
   });
 });
 
