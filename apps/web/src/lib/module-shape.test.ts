@@ -1,5 +1,5 @@
 import { readFileSync, readdirSync } from 'node:fs';
-import { sep } from 'node:path';
+import { posix, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
@@ -21,7 +21,9 @@ import { describe, expect, it } from 'vitest';
  * and a tester walked through it three ways in one afternoon: a relative path
  * (`../../proposals/core`), a double-quoted specifier, and a barrel re-exporting
  * two kernels relatively. TypeScript resolves all three to the same modules the
- * rules forbid. So every specifier is now PARSED and RESOLVED before it is judged.
+ * rules forbid. So every specifier is now PARSED, RESOLVED and CANONICALISED
+ * before it is judged — the `@/` branch used to be returned as TEXT, and one
+ * extra slash (`@//lib/proposals/core`) compiled, ran, and evaded rules 1 and 2.
  */
 
 const SRC = fileURLToPath(new URL('..', import.meta.url)); // apps/web/src
@@ -34,7 +36,34 @@ interface SourceFile {
 
 
 /**
- * A specifier as the module it actually resolves to, written `@/…`.
+ * One module path, written the single way this file compares paths: `@/` + the
+ * canonical segments, no `.`, no `..`, no duplicate slash, no extension, no
+ * trailing `/index`.
+ *
+ * The canonical form is the whole point. TypeScript's path mapping is
+ * `"@/*": ["./src/*"]`, and `*` swallows anything — so `@//lib/proposals/core`,
+ * `@/./lib/proposals/core`, `@/lib/../lib/proposals/core` and
+ * `@/lib/proposals/core/index.ts` are FOUR spellings of one module that the
+ * compiler resolves, the bundler resolves, and a gate comparing TEXT does not.
+ * A tester walked through the `@/` branch with exactly one extra slash.
+ *
+ * A `..` that climbs past the root is clamped rather than kept: the specifier
+ * does not resolve at all in that shape, and a gate should judge a nonsense
+ * import rather than wave it through.
+ */
+function canonicalModule(modulePath: string): string {
+  const canonical = posix
+    .normalize(modulePath) // collapses `//`, `.` and `..`
+    .replace(/^(?:\.\.\/)+/, '')
+    .replace(/^\/+/, '')
+    .replace(/\/+$/, '')
+    .replace(/\.(?:tsx?|jsx?|mjs|cjs)$/, '')
+    .replace(/\/index$/, '');
+  return `@/${canonical}`;
+}
+
+/**
+ * A specifier as the module it actually resolves to, in canonical form.
  *
  * A relative specifier is resolved against the importing file's directory, which
  * is the whole point: `../../proposals/core` from `/lib/contracts/core/x.ts` and
@@ -42,16 +71,9 @@ interface SourceFile {
  * same module to this gate. `null` for a package import — not ours to police.
  */
 export function resolveSpecifier(fromFile: string, specifier: string): string | null {
-  if (specifier.startsWith('@/')) return specifier;
+  if (specifier.startsWith('@/')) return canonicalModule(specifier.slice(2));
   if (!specifier.startsWith('.')) return null;
-  const segments = `${fromFile.slice(0, fromFile.lastIndexOf('/'))}/${specifier}`.split('/');
-  const resolved: string[] = [];
-  for (const segment of segments) {
-    if (segment === '' || segment === '.') continue;
-    if (segment === '..') resolved.pop();
-    else resolved.push(segment);
-  }
-  return `@/${resolved.join('/')}`;
+  return canonicalModule(`${fromFile.slice(0, fromFile.lastIndexOf('/'))}/${specifier}`);
 }
 
 /**
@@ -222,6 +244,20 @@ describe('the gate catches what was walked through it', () => {
     expect(resolveSpecifier(from, 'drizzle-orm')).toBeNull();
   });
 
+  it('canonicalises every spelling of ONE aliased module to one string', () => {
+    const from = '/lib/contracts/core/create.ts';
+    const target = '@/lib/proposals/core';
+    expect(resolveSpecifier(from, '@//lib/proposals/core')).toBe(target);
+    expect(resolveSpecifier(from, '@/./lib/proposals/core')).toBe(target);
+    expect(resolveSpecifier(from, '@/lib/../lib/proposals/core')).toBe(target);
+    expect(resolveSpecifier(from, '@/lib/proposals/core/index.ts')).toBe(target);
+    expect(resolveSpecifier(from, '@/lib/proposals//core/')).toBe(target);
+    // the relative half of each has to land on the same string, or the two
+    // branches of the resolver disagree about what one module is called.
+    expect(resolveSpecifier(from, '../..//proposals/core')).toBe(target);
+    expect(resolveSpecifier(from, '../../proposals/core/index.ts')).toBe(target);
+  });
+
   it('evasion A: a RELATIVE import of a proposals internal fails rules 1 and 2', () => {
     const offender = file(
       '/lib/contracts/gate-evasion.ts',
@@ -338,6 +374,48 @@ describe('the gate catches what was walked through it', () => {
     );
     expect(ruleOneOffenders(offender)).toHaveLength(1);
     expect(ruleTwoOffenders(offender)).toHaveLength(1);
+  });
+
+  it('evasion J: `@//` — a SECOND slash in the alias walked through rules 1 and 2', () => {
+    // Executed against the previous version of this file: `tsc --noEmit` exits 0,
+    // vitest imports the REAL module, and both rules reported zero offenders.
+    const offender = file(
+      '/lib/contracts/core/gate-evasion.ts',
+      "import { createProposalCore } from '@//lib/proposals/core';\n",
+    );
+    expect(ruleOneOffenders(offender)).toHaveLength(1);
+    expect(ruleTwoOffenders(offender)).toHaveLength(1);
+  });
+
+  it('evasion K: `@/./`, `@/lib/../lib/` and a spelled-out `/index.ts`', () => {
+    const dotSlash = file(
+      '/lib/variations/gate-evasion.ts',
+      "import { sendProposalCore } from '@/./lib/proposals/lifecycle';\n",
+    );
+    expect(ruleOneOffenders(dotSlash)).toHaveLength(1);
+    expect(ruleTwoOffenders(dotSlash)).toHaveLength(1);
+
+    const climbBack = file(
+      '/lib/contracts/gate-evasion.ts',
+      "import { createProposalCore } from '@/lib/../lib/proposals/core';\n",
+    );
+    expect(ruleOneOffenders(climbBack)).toHaveLength(1);
+    expect(ruleTwoOffenders(climbBack)).toHaveLength(1);
+
+    const spelledOut = file(
+      '/lib/variations/core/gate-evasion.ts',
+      "const load = () => import('@/lib/proposals/core/index.ts');\n",
+    );
+    expect(ruleOneOffenders(spelledOut)).toHaveLength(1);
+    expect(ruleTwoOffenders(spelledOut)).toHaveLength(1);
+  });
+
+  it('evasion M: a barrel crosses module lines through `@//`', () => {
+    const offender = file(
+      '/lib/variations/core/index.ts',
+      "// BARREL LAW\nexport { clean } from '@//lib/validation/text';\n",
+    );
+    expect(ruleThreeOffenders(offender)).toHaveLength(1);
   });
 
   it('the legal shapes stay legal', () => {
