@@ -1,7 +1,6 @@
 'use client';
 
 import { useTranslations } from 'next-intl';
-import type { ActionResult } from '@/lib/actions/result';
 import type { CommercialPulse } from '@/lib/engagements/pulse';
 import type {
   EngagementArtifactRecord,
@@ -20,6 +19,7 @@ import { FilesTab } from './engagement-panels-files';
 import { PaymentsTab } from './engagement-panels-payments-tab';
 import { TimelineTab } from './engagement-panels-timeline';
 import type { EngagementTab } from './tabs';
+import type { RunAction } from './use-engagement-action';
 
 // The engagement detail panels — the fuller record below the command card,
 // dispatched by the five detail tabs. Files (working-files tray + the full
@@ -75,7 +75,7 @@ export function EngagementPanels({
   canUpload: boolean;
   capabilities: PanelCapabilities;
   pending: boolean;
-  runAction: (fn: () => Promise<ActionResult>) => void;
+  runAction: RunAction;
 }) {
   return (
     <section className="overflow-hidden rounded-[var(--r-panel)] border border-[color:var(--rule)] bg-card text-[color:var(--text)] shadow-sm">

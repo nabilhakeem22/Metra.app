@@ -15,3 +15,21 @@ export const DELIVERY_SHARE_ANCHOR_ID = 'delivery-share-link';
  * either side of the server/client boundary and already share this module.
  */
 export const DELIVERY_SHARE_OPEN_EVENT = 'metra:delivery-share-open';
+
+
+/**
+ * Nudge = go to the client-link control on the page above — no new server
+ * action, no notify. It is a COLLAPSED disclosure now, so scrolling alone would
+ * land the studio on a closed row: ask it to open as well.
+ *
+ * It lives beside the two constants it dispatches rather than in the component
+ * that calls it: the function that fires an event and the name of that event are
+ * one fact, and separating them is how a listener ends up subscribed to a string
+ * nobody dispatches any more.
+ */
+export function revealDeliveryShareLink(): void {
+  const anchor = document.getElementById(DELIVERY_SHARE_ANCHOR_ID);
+  anchor?.dispatchEvent(new CustomEvent(DELIVERY_SHARE_OPEN_EVENT));
+  anchor?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  anchor?.focus?.();
+}

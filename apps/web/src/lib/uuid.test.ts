@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { UUID_RE, isUuid } from './uuid';
+import { NOT_UUID, UUID_RE, isUuid, optionalUuid } from './uuid';
 
 // This check is a SECURITY-relevant pre-flight at most of its 20-odd call sites:
 // it stops a malformed id reaching a `::uuid` cast (which raises, turning a coded
@@ -49,5 +49,48 @@ describe('isUuid', () => {
     const id = '3f2504e0-4f89-41d3-9a0c-0305e82c3301';
     expect(UUID_RE.test(id)).toBe(true);
     expect(UUID_RE.test(id)).toBe(true);
+  });
+});
+
+/**
+ * S1: the idempotency key crosses the RSC boundary from the client's
+ * sessionStorage mirror, so `input.idempotencyKey?.trim()` -- whose declared type
+ * says `string | null | undefined` -- could be handed an object and throw a
+ * TypeError out of the core, past mutateInOrg and past the action wrapper. The
+ * server action then REJECTED instead of returning a coded ActionResult.
+ */
+describe('optionalUuid', () => {
+  const id = '3f2504e0-4f89-41d3-9a0c-0305e82c3301';
+
+  it('reads an absent key as "no key", not as a refusal', () => {
+    expect(optionalUuid(undefined)).toBeNull();
+    expect(optionalUuid(null)).toBeNull();
+    expect(optionalUuid('')).toBeNull();
+    expect(optionalUuid('   ')).toBeNull();
+  });
+
+  it('accepts a uuid, trimmed', () => {
+    expect(optionalUuid(id)).toBe(id);
+    expect(optionalUuid(`  ${id}  `)).toBe(id);
+    expect(optionalUuid(id.toUpperCase())).toBe(id.toUpperCase());
+  });
+
+  it('refuses a PRESENT value that is not a uuid STRING', () => {
+    // Every one of these is RSC-serialisable, so every one of them is reachable.
+    for (const value of [{ evil: 1 }, ['a'], 42, true, { trim: 'not a function' }]) {
+      expect(optionalUuid(value)).toBe(NOT_UUID);
+    }
+  });
+
+  it('refuses a string that is not a uuid', () => {
+    expect(optionalUuid('not-a-uuid')).toBe(NOT_UUID);
+    expect(optionalUuid(`${id}' or 1=1--`)).toBe(NOT_UUID);
+  });
+
+  it('separates "absent" from "malformed" with a symbol, never with null', () => {
+    // null means "proceed with no key"; NOT_UUID means "refuse the whole call".
+    // Collapsing them would turn a poisoned key into a silently plain append.
+    expect(NOT_UUID).not.toBeNull();
+    expect(typeof NOT_UUID).toBe('symbol');
   });
 });

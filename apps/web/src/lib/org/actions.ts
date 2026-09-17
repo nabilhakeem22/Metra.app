@@ -16,11 +16,8 @@ import { requireOrg } from '@/lib/auth/require-org';
 import { getSessionUser } from '@/lib/auth/session';
 import { withOrgContext, withUserContext } from '@/lib/db/context';
 import { canManageOrg } from '@/lib/permissions/can';
-import {
-  createSignedUploadUrl,
-  ensureFilesBucket,
-  type SignedUpload,
-} from '@/lib/storage';
+import { ensureFilesBucket } from '@/lib/storage/bucket';
+import { createSignedUploadUrl, type SignedUpload } from '@/lib/storage/uploads';
 import { clean } from '@/lib/validation/text';
 import {
   createOrgCore,

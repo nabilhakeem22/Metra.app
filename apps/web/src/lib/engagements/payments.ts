@@ -17,7 +17,7 @@ import type { ActionResult } from '@/lib/actions/result';
 import { MONEY_RE, formatMoney4, parseMoney4 } from '@/lib/aggregates/proposal-totals';
 import type { OrgContext } from '@/lib/db/context';
 import { isTerminal } from './states';
-import { isUuid } from '@/lib/uuid';
+import { NOT_UUID, optionalUuid } from '@/lib/uuid';
 import {
   MAX_LABEL_CHARS,
   MAX_NOTE_CHARS,
@@ -73,10 +73,10 @@ export async function recordPaymentCore(
   const amount = formatMoney4(amount4);
 
   // Normalise the idempotency key: trim; empty/whitespace/undefined -> null (a
-  // plain append). A present-but-malformed key is a coded 'invalid'.
-  const trimmedKey = input.idempotencyKey?.trim();
-  const idempotencyKey = trimmedKey ? trimmedKey : null;
-  if (idempotencyKey !== null && !isUuid(idempotencyKey)) {
+  // plain append). A present-but-malformed key is a coded 'invalid', and so is a
+  // present-but-non-string one — see optionalUuid for why that is reachable.
+  const idempotencyKey = optionalUuid(input.idempotencyKey);
+  if (idempotencyKey === NOT_UUID) {
     return { ok: false, error: 'invalid' };
   }
 

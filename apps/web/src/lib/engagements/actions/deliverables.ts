@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import type { ActionResult } from '@/lib/actions/result';
 import { requireOrg } from '@/lib/auth/require-org';
-import type { SignedUpload } from '@/lib/storage';
+import type { SignedUpload } from '@/lib/storage/uploads';
 import { recordArtifactCore, type RecordArtifactInput } from '../artifacts';
 import {
   setArtifactClientVisibilityCore,

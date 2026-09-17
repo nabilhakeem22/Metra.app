@@ -13,11 +13,8 @@ import {
   INVALID_CATEGORY,
   resolveCategoryId,
 } from '@/lib/document-categories/resolve';
-import {
-  createSignedUploadUrl,
-  ensureFilesBucket,
-  type SignedUpload,
-} from '@/lib/storage';
+import { ensureFilesBucket } from '@/lib/storage/bucket';
+import { createSignedUploadUrl, type SignedUpload } from '@/lib/storage/uploads';
 import type { DocumentEntitySpec } from './entities';
 
 /**

@@ -17,7 +17,7 @@ vi.mock('@/lib/db/context', () => ({ withOrgContext: vi.fn() }));
 /** A fresh module instance, because the memo it holds is module-scope state. */
 async function freshStorage() {
   vi.resetModules();
-  return import('./storage');
+  return import('./bucket');
 }
 
 beforeEach(() => {

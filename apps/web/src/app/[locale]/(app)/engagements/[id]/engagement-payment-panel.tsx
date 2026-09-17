@@ -12,9 +12,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import type { ActionResult } from '@/lib/actions/result';
 import { recordPayment } from '@/lib/engagements/actions';
+import { PAYMENT_HELD_TRIGGER, actOf } from '@/lib/engagements/held-act';
+import type { RecordPaymentInput } from '@/lib/engagements/payments';
 import { FormActions } from './engagement-form-actions';
+import type { RunAction } from './use-engagement-action';
 
 // Enum values declared locally (typed by the type-only @metra/db import) — a
 // client component must never import a runtime @metra/db value.
@@ -27,11 +29,24 @@ const PAYMENT_KINDS: PaymentEventKind[] = [
 ];
 
 /**
- * Standalone "record a payment" panel. Owns its own kind/amount state and — one
- * per mount — an idempotency key: a fresh mount per panel-open means one key per
- * open, so a double-click within a single open records the payment exactly once
- * (the partial unique index dedups the retry). Closing + reopening the panel is a
- * new mount = a new key = a genuinely new payment.
+ * Standalone "record a payment" panel. Owns its own kind/amount state; the
+ * idempotency key is NOT its own.
+ *
+ * ONE KEY PER DELIBERATE ACT, not one per panel open. A key minted at mount and
+ * reused for everything typed into that open panel meant two genuinely different
+ * payments — EGP 50,000, then EGP 75,000 without closing the panel — went to the
+ * server on ONE key, and `payments.ts` answers a repeated key with the ORIGINAL
+ * row and `ok`, so the second payment was discarded and the panel closed as
+ * though it had saved.
+ *
+ * So the key comes from `runAction`, on exactly the discipline the lifecycle
+ * triggers use: minted at SUBMIT for this kind + amount, HELD (for fifteen
+ * minutes) across a retry of the same figures after an answer that could not say
+ * what happened, and released the moment the server says it worked or definitely
+ * refused. CHANGING THE AMOUNT AFTER AN 'uncertain' IS A NEW ACT and gets a new
+ * key: the refusal tells the studio to refresh and check before trying again, so
+ * a studio who comes back and types a different figure is recording something
+ * else — see HeldKey.act.
  */
 export function PaymentPanel({
   engagementId,
@@ -41,26 +56,36 @@ export function PaymentPanel({
 }: {
   engagementId: string;
   pending: boolean;
-  runAction: (fn: () => Promise<ActionResult>) => void;
+  runAction: RunAction;
   onDone: () => void;
 }) {
   const t = useTranslations('engagements.controls');
   const tk = useTranslations('engagements.paymentKind');
   const [payKind, setPayKind] = useState<PaymentEventKind>('deposit');
   const [payAmount, setPayAmount] = useState('');
-  const [idempotencyKey] = useState(() => crypto.randomUUID());
 
   function save() {
-    runAction(async () => {
-      const res = await recordPayment({
-        engagementId,
-        kind: payKind,
-        amount: payAmount.trim(),
-        idempotencyKey,
-      });
-      if (res.ok) onDone();
-      return res;
-    });
+    // THE REQUEST, minus its key: one object, used twice. The three fields this
+    // panel does not offer are `undefined` rather than absent — `actOf` is typed
+    // against the request, so the day one of them is added here it must be named
+    // in the act as well or the build fails.
+    const submitted = {
+      engagementId,
+      kind: payKind,
+      amount: payAmount.trim(),
+      method: undefined,
+      reference: undefined,
+      note: undefined,
+    };
+    runAction(
+      async (idempotencyKey) => {
+        const res = await recordPayment({ ...submitted, idempotencyKey });
+        if (res.ok) onDone();
+        return res;
+      },
+      PAYMENT_HELD_TRIGGER,
+      actOf<Omit<RecordPaymentInput, 'idempotencyKey'>>(submitted),
+    );
   }
 
   return (

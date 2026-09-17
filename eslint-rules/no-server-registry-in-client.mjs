@@ -24,14 +24,49 @@
 //     the prescribed fix, so it must stay legal.
 //   • Server components and server actions — they are meant to use the barrel.
 //
-// TO EXTEND: add the barrel's `@/`-style specifier to BARRELS below. A barrel
-// belongs here when it re-exports a large registry AND also re-exports small
-// constants a client component might plausibly want.
+// TO EXTEND: every barrel under apps/web/src/lib is classified below — either
+// BANNED (BARRELS) or a deliberate client-callable RPC surface
+// (CLIENT_RPC_BARRELS) — and a test asserts that the classification is COMPLETE
+// (apps/web/src/lib/eslint-no-server-registry-in-client.test.ts). An allowlist
+// that has to be remembered is one that rots, and it rotted the moment wave 5
+// added two barrels nobody added here. A client component that wants a constant
+// out of a banned barrel imports the LEAF instead; that is always available, and
+// it is the fix this rule exists to enforce.
 
-/** Barrels that pull a registry in behind an innocuous-looking constant. */
-const BARRELS = new Set([
+/** The barrels a `'use client'` module may not value-import. */
+export const BARRELS = new Set([
+  '@/lib/boqs/core',
+  '@/lib/boqs/edit',
+  '@/lib/contracts/core',
+  '@/lib/contracts/lifecycle',
+  '@/lib/contracts/queries',
+  '@/lib/dashboard/queries',
+  '@/lib/engagements/executor',
   '@/lib/engagements/guards',
+  '@/lib/engagements/public',
+  '@/lib/engagements/queries',
   '@/lib/engagements/transitions',
+  '@/lib/projects/core',
+  '@/lib/proposals/core',
+  '@/lib/proposals/lifecycle',
+  '@/lib/proposals/queries',
+  '@/lib/variations/core',
+  '@/lib/variations/lifecycle',
+  '@/lib/variations/queries',
+]);
+
+/**
+ * The deliberate exceptions: a SERVER-ACTION barrel IS the RPC surface a client
+ * component is supposed to call. Next replaces each export with a stub, so no
+ * server code follows it into the bundle — that is how every form on this site
+ * submits, across 18 call sites today.
+ *
+ * Listed rather than inferred from a `'use server'` directive, so that a third
+ * one is a DECISION somebody takes and not a directive somebody copied.
+ */
+export const CLIENT_RPC_BARRELS = new Set([
+  '@/lib/engagements/actions',
+  '@/lib/team/actions',
 ]);
 
 /** Is this file a client component? (`'use client'` in the directive prologue.) */

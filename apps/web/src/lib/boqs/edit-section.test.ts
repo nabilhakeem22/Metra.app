@@ -48,6 +48,19 @@ describe('addBoqSectionCore: the section title', () => {
     });
   });
 
+  // W3-9. Code points, the unit Postgres counts. 200 astral characters are 400
+  // UTF-16 units: refused by `.length`, stored by the database.
+  it('measures the title cap in CODE POINTS, not UTF-16 units', async () => {
+    const atCap = '\u{1F9F1}'.repeat(MAX_DESCRIPTION);
+    expect(atCap.length).toBe(MAX_DESCRIPTION * 2);
+    // At the cap it gets PAST both guards and reaches the transaction.
+    await expect(addSection(atCap)).rejects.toThrow(/before any transaction opens/);
+    await expect(addSection('\u{1F9F1}'.repeat(MAX_DESCRIPTION + 1))).resolves.toEqual({
+      ok: false,
+      error: 'section_name_too_long',
+    });
+  });
+
   it('accepts a title at exactly the cap — and then needs the database', async () => {
     // Proof that the boundary is inclusive AND that nothing above refuses early:
     // the only way past both guards is into the transaction, which throws here.

@@ -3,7 +3,7 @@
 import { refreshApp } from '@/lib/actions/refresh';
 import type { ActionResult } from '@/lib/actions/result';
 import { requireOrg } from '@/lib/auth/require-org';
-import type { SignedUpload } from '@/lib/storage';
+import type { SignedUpload } from '@/lib/storage/uploads';
 import { deleteDocumentCore, getDocumentUrlCore } from './core';
 import { createDocumentUploadCore } from './upload';
 import { DOCUMENT_ENTITIES } from './entities';

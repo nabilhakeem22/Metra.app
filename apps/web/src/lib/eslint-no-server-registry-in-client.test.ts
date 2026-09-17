@@ -1,9 +1,16 @@
+import { readdirSync } from 'node:fs';
+import { join, relative, sep } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { RuleTester } from 'eslint';
 import tseslint from 'typescript-eslint';
-import { it } from 'vitest';
+import { expect, it } from 'vitest';
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore - .mjs rule module has no types
-import { noServerRegistryInClient } from '../../../../eslint-rules/no-server-registry-in-client.mjs';
+import {
+  BARRELS,
+  CLIENT_RPC_BARRELS,
+  noServerRegistryInClient,
+} from '../../../../eslint-rules/no-server-registry-in-client.mjs';
 
 const ruleTester = new RuleTester({
   languageOptions: {
@@ -77,4 +84,41 @@ it('no-server-registry-in-client: bans the barrel value-import that caused the o
       },
     ],
   });
+});
+
+/**
+ * S2: the allowlist is an EXACT-MATCH set, so it fails OPEN for every barrel
+ * added after it -- and wave 5 added two (`@/lib/boqs/core`, `@/lib/boqs/edit`)
+ * that nobody added here. The control that exists because this exact mistake
+ * took production down silently stopped covering new barrels.
+ *
+ * This test is the thing that stops it rotting again: every barrel under
+ * apps/web/src/lib must be CLASSIFIED — banned, or a deliberate client-callable
+ * server-action surface — and adding one without classifying it reds the suite
+ * rather than quietly widening the hole.
+ */
+it('no-server-registry-in-client: classifies every lib barrel, so the allowlist cannot rot', () => {
+  const libRoot = fileURLToPath(new URL('.', import.meta.url));
+  const found: string[] = [];
+  (function walk(directory: string) {
+    for (const entry of readdirSync(directory, { withFileTypes: true })) {
+      const path = join(directory, entry.name);
+      if (entry.isDirectory()) walk(path);
+      else if (entry.name === 'index.ts') {
+        const specifier = relative(libRoot, path).split(sep).join('/');
+        found.push(`@/lib/${specifier.replace(/\/index\.ts$/, '')}`);
+      }
+    }
+  })(libRoot);
+
+  // A walk that finds nothing would pass vacuously.
+  expect(found.length).toBeGreaterThan(10);
+  const banned = BARRELS as Set<string>;
+  const callable = CLIENT_RPC_BARRELS as Set<string>;
+  const unclassified = found.filter(
+    (barrel) => !banned.has(barrel) && !callable.has(barrel),
+  );
+  expect(unclassified).toEqual([]);
+  // And no barrel is both banned and callable.
+  expect([...callable].filter((barrel) => banned.has(barrel))).toEqual([]);
 });

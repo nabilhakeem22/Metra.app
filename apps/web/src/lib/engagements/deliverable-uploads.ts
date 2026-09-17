@@ -8,10 +8,10 @@ import { safeDownloadName } from '@/lib/files/safe-name';
 import { can } from '@/lib/permissions/can';
 import {
   createSignedUploadUrl,
-  ensureFilesBucket,
-  getSignedUrl,
   type SignedUpload,
-} from '@/lib/storage';
+} from '@/lib/storage/uploads';
+import { ensureFilesBucket } from '@/lib/storage/bucket';
+import { getSignedUrl } from '@/lib/storage/signed-urls';
 import { recordArtifactCore } from './artifacts';
 import {
   ALLOWED_EXTENSIONS,

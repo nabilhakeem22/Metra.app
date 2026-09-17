@@ -72,3 +72,76 @@ export function coachmarkKey(key: string): CoachKey {
       return null;
   }
 }
+
+/** How far the highlight ring sits outside the anchor. */
+export const ANCHOR_PADDING = 6;
+/** Keep the card this far from every viewport edge. */
+export const VIEWPORT_MARGIN = 16;
+/** Space between the anchor and the card. */
+export const ANCHOR_GAP = 10;
+
+/**
+ * A measured box in LOGICAL terms. `nearEdge`/`farEdge` rather than left/right
+ * for the same reason `inlineStartOffset` takes them that way: this module is the
+ * one place RTL is reasoned about, and naming a physical side here would be the
+ * first step back to a card that mirrors wrong.
+ */
+export interface AnchorBox {
+  top: number;
+  bottom: number;
+  nearEdge: number;
+  farEdge: number;
+  width: number;
+  height: number;
+}
+
+export interface CoachmarkPlacement {
+  /** The highlight ring's logical inset and box. */
+  highlightInset: number;
+  /** The card's logical inset and block-axis top. */
+  cardInset: number;
+  cardTop: number;
+  /** The card's usable width once the viewport margins are taken out. */
+  cardWidth: number;
+}
+
+/**
+ * WHERE THE COACHMARK GOES, as a pure function of (anchor, card, viewport, rtl).
+ *
+ * Everything the card's position depends on is an argument, so RTL placement can
+ * be checked without a browser — which matters because this is the one piece of
+ * the tour no test can SEE: happy-dom has no layout, and a mirrored card that is
+ * half off-screen looks fine in every assertion that is not about pixels.
+ */
+export function resolveCoachmarkPlacement(input: {
+  anchor: AnchorBox;
+  card: { width: number; height: number };
+  viewport: { width: number; height: number };
+  rtl: boolean;
+}): CoachmarkPlacement {
+  const { anchor, card, viewport, rtl } = input;
+  // Logical inset — the distance from the INLINE-START edge (flips in RTL).
+  const highlightInset = inlineStartOffset(
+    anchor.nearEdge,
+    anchor.farEdge,
+    rtl,
+    viewport.width,
+  );
+  // Viewport-aware card placement: clamp horizontally so the card can't run off
+  // the inline-end edge (e.g. an anchor near the right edge), and flip above the
+  // anchor when there's no room below.
+  const cardWidth = Math.min(card.width, viewport.width - VIEWPORT_MARGIN * 2);
+  return {
+    highlightInset,
+    cardWidth,
+    cardInset: clampInset(highlightInset, cardWidth, viewport.width, VIEWPORT_MARGIN),
+    cardTop: cardTop(
+      anchor.top,
+      anchor.bottom,
+      card.height,
+      viewport.height,
+      ANCHOR_GAP,
+      VIEWPORT_MARGIN,
+    ),
+  };
+}

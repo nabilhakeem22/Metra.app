@@ -30,8 +30,13 @@ vi.mock('@/lib/cf/context', () => ({
 
 const getSignedUrl = vi.fn<(...args: unknown[]) => Promise<string>>();
 const removeStoredObject = vi.fn<(...args: string[]) => Promise<void>>();
-vi.mock('@/lib/storage', () => ({
+// TWO mocks, not one. The split moved these two functions into two leaves, and a
+// single vi.mock on the old specifier would have mocked NOTHING while still
+// looking correct.
+vi.mock('@/lib/storage/signed-urls', () => ({
   getSignedUrl: (...args: unknown[]) => getSignedUrl(...args),
+}));
+vi.mock('@/lib/storage/objects', () => ({
   removeStoredObject: (bucket: string, objectKey: string) =>
     removeStoredObject(bucket, objectKey),
 }));

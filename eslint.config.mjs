@@ -60,7 +60,56 @@ export default tseslint.config(
         { argsIgnorePattern: '^_', varsIgnorePattern: '^_' },
       ],
       '@typescript-eslint/no-explicit-any': 'off',
+      // TEST-ONLY HELPERS STAY OUT OF THE PRODUCT BUNDLE. apps/web/src/test/*
+      // imports vitest at module scope, and it sits INSIDE src — resolved by the
+      // `@` alias, covered by tsconfig — so a product file importing it would
+      // typecheck and lint clean and then fail the OpenNext build at DEPLOY, on
+      // a devDependency that cannot resolve in the Worker bundle. This is a
+      // boundary the repo otherwise enforces hard, so it fails closed here too.
+      // Test files are exempted below; they are who the helpers are for.
+      //
+      // BOTH SPELLINGS ARE BANNED. `no-restricted-imports` matches the SPECIFIER
+      // STRING, not the file it resolves to, so the alias group alone left
+      // `../test/doubles` — the form somebody working inside src/lib writes by
+      // accident — completely invisible. The three helpers are named because a
+      // bare `**/test/*` would also catch unrelated directories called `test`.
+      //
+      // WHAT IS STILL NOT COVERED: a DYNAMIC import, in EITHER spelling —
+      // `await import('@/test/doubles')` and `await import('../test/doubles')`
+      // are both clean. This core rule visits import DECLARATIONS only, so a
+      // dynamic import reaches the same module unreported whichever specifier
+      // it uses. Covering it needs an `ImportExpression` visitor, which means a
+      // rule of our own — `metra/no-server-registry-in-client` is not it: that
+      // rule is about barrels inside 'use client' modules and has no such
+      // visitor to extend. Deliberately left: the static forms are what anybody
+      // actually writes, and a `no-restricted-imports` that silently half-covers
+      // a boundary is worse than one whose gap is written down.
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: [
+                '@/test',
+                '@/test/*',
+                '**/test/render-with-intl*',
+                '**/test/doubles*',
+                '**/test/documents-tab-contract*',
+              ],
+              message:
+                'apps/web/src/test/* is TEST-ONLY (it imports vitest at module scope). ' +
+                'A product module must not import it: the OpenNext Worker bundle cannot ' +
+                'resolve a devDependency, and that failure would surface at deploy.',
+            },
+          ],
+        },
+      ],
     },
+  },
+  {
+    // The test files themselves — the helpers exist for exactly these.
+    files: ['**/*.test.ts', '**/*.test.tsx', '**/*.dbtest.ts', '**/src/test/**'],
+    rules: { 'no-restricted-imports': 'off' },
   },
   {
     // Node CLI scripts: plain ESM run by `node`, so they legitimately use the

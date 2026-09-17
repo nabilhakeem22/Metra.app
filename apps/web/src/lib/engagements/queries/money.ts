@@ -98,6 +98,15 @@ export interface EngagementPayment {
   reference: string | null;
   clearedAt: Date;
   note: string | null;
+  /**
+   * The key the cockpit sent with the attempt that recorded this payment (NULL
+   * for a plain append and for anything written before 0050). Selected because
+   * the cockpit answers a question with it: a key it still holds for a payment
+   * it was never told the outcome of has LANDED iff a row here carries it — and
+   * a payment writes no transition row, so nothing else could say so. An opaque
+   * UUID this client minted; never rendered. See `landedKeysOf`.
+   */
+  idempotencyKey: string | null;
 }
 
 /**
@@ -120,6 +129,7 @@ export function getEngagementPayments(
         reference: paymentEvents.reference,
         clearedAt: paymentEvents.clearedAt,
         note: paymentEvents.note,
+        idempotencyKey: paymentEvents.idempotencyKey,
       })
       .from(paymentEvents)
       .where(eq(paymentEvents.engagementId, engagementId))

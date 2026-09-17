@@ -13,7 +13,8 @@ import {
   STORAGE_CLEANUP_TIMEOUT_MS,
   withDeadline,
 } from '@/lib/http/deadlines';
-import { getSignedUrl, removeStoredObject } from '@/lib/storage';
+import { removeStoredObject } from '@/lib/storage/objects';
+import { getSignedUrl } from '@/lib/storage/signed-urls';
 import type { DocumentEntitySpec } from './entities';
 
 /**

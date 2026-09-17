@@ -21,17 +21,28 @@ export default defineConfig({
       '@': resolve(dir, 'src'),
     },
   },
+  // apps/web/tsconfig.json sets "jsx": "preserve" because Next requires it.
+  // esbuild honours that and emits the CLASSIC React.createElement, so a .test.tsx
+  // dies with `ReferenceError: React is not defined`. The unit runner is not Next,
+  // so it gets the automatic runtime instead. Measured, not assumed.
+  esbuild: { jsx: 'automatic', jsxImportSource: 'react' },
   test: {
-    // src, PLUS the plain `*.test.ts` under tests/actions. The database suites
-    // there are `*.dbtest.ts`, matched by neither pattern here and run from
-    // vitest.actions.config.ts against a real Postgres — so this still opens no
-    // connection and needs no DATABASE_URL. It is what lets the test
-    // INFRASTRUCTURE that lives beside them (step-summary) be unit tested at
-    // all; before, a helper in that folder could only be exercised by running
-    // the whole database suite.
+    // src, PLUS the plain `*.test.ts` under tests/actions. The DATABASE suites
+    // there are `*.dbtest.ts` — matched by neither pattern here, and run from
+    // vitest.actions.config.ts against a real Postgres — so this runner still
+    // opens no connection and needs no DATABASE_URL. Including the plain ones is
+    // what lets the test INFRASTRUCTURE that lives beside them (step-summary) be
+    // unit tested at all.
     include: [
       resolve(dir, 'src/**/*.test.ts').replace(/\\/g, '/'),
+      resolve(dir, 'src/**/*.test.tsx').replace(/\\/g, '/'),
       resolve(dir, 'tests/actions/**/*.test.ts').replace(/\\/g, '/'),
     ],
+    // Node stays the default so the existing node files run byte-identically.
+    // Only a .tsx file — i.e. only a file that renders — pays for a DOM. That is
+    // also the naming rule for this suite: a test that touches `document` is
+    // named .test.tsx, whether or not it contains JSX.
+    environment: 'node',
+    environmentMatchGlobs: [['**/*.test.tsx', 'happy-dom']],
   },
 });

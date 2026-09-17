@@ -1,37 +1,19 @@
 'use client';
 
 import { useTranslations } from 'next-intl';
-import { useRef, useState, useTransition } from 'react';
-import { Link, useRouter } from '@/i18n/routing';
+import { useState } from 'react';
+import { Link } from '@/i18n/routing';
 import { resolveActionError } from '@/lib/actions/error-message';
-import type { ActionCode, ActionResult } from '@/lib/actions/result';
+import { resolveBudgetBadge } from '@/lib/engagements/budget-badge';
+import { landedKeysOf } from '@/lib/engagements/held-key';
 import { countConceptOptions } from '@/lib/engagements/concept-options';
-import type { EngagementGatePreview } from '@/lib/engagements/gate-preview';
-import type {
-  EngagementArtifactRecord,
-  EngagementChangeOrderRecord,
-  EngagementClientActivityRecord,
-  EngagementEventRecord,
-  EngagementFeeSchedule,
-  EngagementHeader,
-  EngagementPayment,
-  EngagementTransitionRecord,
-} from '@/lib/engagements/queries';
-import type { CommercialPulse } from '@/lib/engagements/pulse';
-import { keyForAttempt, releasesKey } from '@/lib/engagements/retry-policy';
-import { acknowledgesIssuance } from '@/lib/engagements/rom-ack';
-import type { Trigger } from '@/lib/engagements/transitions';
 import { EngagementCommandCard } from './engagement-command-card';
-import {
-  EngagementPanels,
-  type PanelCapabilities,
-} from './engagement-panels';
-import { ENGAGEMENT_TABS, type EngagementTab } from './tabs';
-import {
-  DELIVERY_SHARE_ANCHOR_ID,
-  DELIVERY_SHARE_OPEN_EVENT,
-} from './share-anchor';
-import type { BoqStepSummary } from '@/lib/boqs/step';
+import type { EngagementDetailProps } from './engagement-detail-props';
+import { EngagementPanels } from './engagement-panels';
+import { EngagementTabStrip } from './engagement-tab-strip';
+import { revealDeliveryShareLink } from './share-anchor';
+import type { EngagementTab } from './tabs';
+import { useEngagementAction } from './use-engagement-action';
 
 // The cockpit's single-column body: the COMMAND CARD (what's next) on top, then
 // the tabbed DETAIL region (Files · Timeline · Payments · Change orders — Files
@@ -61,57 +43,17 @@ export function EngagementDetailClient({
   pulse,
   paymentClaimCount,
   awaitingReplyCount,
-}: {
-  header: EngagementHeader;
-  feeSchedule: EngagementFeeSchedule;
-  payments: EngagementPayment[];
-  artifacts: EngagementArtifactRecord[];
-  events: EngagementEventRecord[];
-  changeOrders: EngagementChangeOrderRecord[];
-  transitions: EngagementTransitionRecord[];
-  clientActivity: EngagementClientActivityRecord[];
-  boqSummary: BoqStepSummary | null;
-  nextActions: Trigger[];
-  capabilities: PanelCapabilities;
-  canUpload: boolean;
-  canShare: boolean;
-  gatePreview: EngagementGatePreview;
-  canAdvance: boolean;
-  stallDays: number | null;
-  pulse: CommercialPulse;
-  paymentClaimCount: number;
-  /** Client Deliverables Step 2 — client questions still awaiting a studio reply,
-   *  across every document on this engagement. Feeds the command card's quiet
-   *  one-line prompt and the Files tab badge. */
-  awaitingReplyCount: number;
-}) {
+}: EngagementDetailProps) {
   const t = useTranslations('engagements');
   const te = useTranslations('errors');
-  const tp = useTranslations('engagements.panels');
-  const router = useRouter();
   const [tab, setTab] = useState<EngagementTab>('files');
-  const [pending, startTransition] = useTransition();
-  const [error, setError] = useState<ActionCode | null>(null);
-  // Guards the frame-sized window `pending` cannot -- see runAction below.
-  const inFlight = useRef(false);
-  /**
-   * The idempotency key of each attempt currently in doubt (0050), BY TRIGGER.
-   *
-   * Per trigger, not per page. One shared key meant that any of the fifteen
-   * actions on this screen — an upload, a payment, the off-plan toggle —
-   * released the key a half-finished `requestRevision` was holding, and its
-   * retry then minted a fresh one: a second ledger row and a second allowance
-   * spent, caused by a success that had nothing to do with it.
-   *
-   * A key is NOT released when its action fails: it is released when we KNOW
-   * what happened. A definite refusal means the transaction rolled back, so the
-   * next click is a new attempt and gets a new key. 'uncertain', 'generic' and a
-   * thrown rejection mean the opposite — the write may have committed and only
-   * the answer was lost — so the key survives and the retry is recognised as the
-   * same act. See lib/engagements/retry-policy.ts for both rules.
-   */
-  const pendingKeys = useRef(new Map<Trigger, string>());
-
+  const { pending, error, runAction } = useEngagementAction({
+    engagementId: header.id,
+    // The engagement's own records, so a key held for an attempt the studio was
+    // never told the outcome of is dropped once a row CARRIES that key. Both
+    // ledgers: a transition writes one, and so does a payment.
+    landedKeys: landedKeysOf(transitions, payments),
+  });
   // The Advance button owns the forward-advance trigger; every OTHER legal,
   // permitted trigger becomes a low-emphasis secondary control (no legal trigger
   // is dropped — Advance ∪ secondary = the capability-filtered legal set).
@@ -119,111 +61,14 @@ export function EngagementDetailClient({
     (trigger) => trigger !== gatePreview.primaryTrigger,
   );
 
-  // TWO states, not one. A band the studio has typed but not sent is a DRAFT and
-  // the client cannot see it; a band that has been sent and not yet acknowledged
-  // is AWAITING the client. Conflating them told the studio to chase a client who
-  // had never been shown anything. Derived from data the page already holds.
-  // A band must EXIST to be a draft: without one there is nothing drafted, and a
-  // permanent "draft" badge on every young engagement says nothing at all.
-  const budgetDraft =
-    header.romLow !== null && header.romHigh !== null && header.romIssuedAt === null;
-  // 0049: the acknowledgement must answer THIS issuance. A stale one against a
-  // superseded band leaves the studio still awaiting the client, which is what
-  // the server-side romAcknowledged guard already decides — both call
-  // acknowledgesIssuance so the badge and the gate cannot disagree.
-  const budgetAwaitingAck =
-    header.romIssuedAt !== null &&
-    !events.some((e) => acknowledgesIssuance(e, header.romIssuedAt));
+  // Derived from data the page already holds; the rule itself lives in
+  // lib/engagements/budget-badge.ts, where it can be tested.
+  const budgetBadge = resolveBudgetBadge(header, events);
 
   // Pure derivation over the artifacts the page already loaded (no extra read).
   // The command card needs it to stop offering a 5th concept-option upload —
   // artifacts are append-only, so overshooting the guard's cap is unrecoverable.
   const conceptOptionCount = countConceptOptions(artifacts);
-
-  /**
-   * Run one server action and refresh on success. THE single entry point for
-   * every write on this page -- all thirteen call sites reach the server through
-   * here -- which is why both guards below belong here and not in a form.
-   *
-   * THE IN-FLIGHT REF CLOSES THE DOUBLE-SUBMIT WINDOW. `pending` comes from
-   * `useTransition` and only flips on a SUBSEQUENT render, so two clicks inside
-   * one frame both see `pending === false` and both dispatch. That was harmless
-   * while these actions were idempotent column writes; it stopped being harmless
-   * when they began appending to a ledger whose grants are INSERT and SELECT
-   * only, so a duplicated row cannot be taken back. A ref is read and written
-   * synchronously, so the second click in the same frame sees the first.
-   *
-   * It is HERE rather than in `FormActions` because only five of the thirteen
-   * call sites are forms. The other eight -- Advance, the off-plan toggle, the
-   * revision form, the payment form, every secondary trigger including the
-   * terminal `abandon` -- would have been left open by a latch inside the form
-   * component.
-   *
-   * THE try/catch IS LOAD-BEARING for the same controls. `pending` gates the
-   * command card, all five tab headers and every panel form; if `fn()` REJECTS --
-   * offline, a Worker rolling mid-request, a half-open origin -- an unguarded
-   * transition never settles and all of them stay disabled with no way back but a
-   * reload. A rejection is a transport failure rather than a coded refusal, so it
-   * surfaces as `generic`; the action's own failures already return
-   * `{ok:false, error}`. It is logged because otherwise it leaves no trace
-   * anywhere: `mutateInOrg` never saw it, so the server has nothing either.
-   *
-   * `finally` releases the ref unconditionally. Tying the release to `pending`
-   * instead would strand the page forever on any path where a transition never
-   * starts.
-   */
-  function runAction(
-    fn: (idempotencyKey: string) => Promise<ActionResult>,
-    trigger?: Trigger,
-  ) {
-    if (inFlight.current) return;
-    inFlight.current = true;
-    setError(null);
-    // ONE key per ATTEMPT AT ONE TRIGGER, HELD across a retry the user makes
-    // because they were not told what happened. It is minted here rather than
-    // per click, because the whole point is that the RETRY carries the SAME key
-    // as the attempt it is retrying — a fresh key would be a fresh act and would
-    // spend a second free revision. See the ref's declaration for the rest.
-    const idempotencyKey = keyForAttempt(pendingKeys.current, trigger, () =>
-      crypto.randomUUID(),
-    );
-    if (trigger) pendingKeys.current.set(trigger, idempotencyKey);
-    startTransition(async () => {
-      try {
-        const res = await fn(idempotencyKey);
-        // Only THIS trigger's key is ever touched, and only when the answer is
-        // "it worked" or a DEFINITE refusal — a guard verdict, a forbidden
-        // capability, a state conflict, all of which rolled their transaction
-        // back. `generic`, `uncertain` and any code this build has not heard of
-        // may all mean the write landed and the answer was lost, so they hold.
-        if (trigger && releasesKey(res)) pendingKeys.current.delete(trigger);
-        if (res.ok) {
-          router.refresh();
-        } else {
-          setError((res.error as ActionCode) ?? 'generic');
-        }
-      } catch (cause) {
-        // A rejection is the client-side twin of 'uncertain' — the request may
-        // have reached Postgres and committed, and only the response was lost.
-        // So the key is HELD here too; releasing it would hand the retry a fresh
-        // identity and reopen exactly the double-apply this exists to close.
-        console.error('engagement action failed before returning a result', cause);
-        setError('generic');
-      } finally {
-        inFlight.current = false;
-      }
-    });
-  }
-
-  // Nudge = go to the client-link control on the page above — no new server
-  // action, no notify. It is a COLLAPSED disclosure now, so scrolling alone
-  // would land the studio on a closed row: ask it to open as well.
-  function revealShareLink() {
-    const el = document.getElementById(DELIVERY_SHARE_ANCHOR_ID);
-    el?.dispatchEvent(new CustomEvent(DELIVERY_SHARE_OPEN_EVENT));
-    el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    el?.focus?.();
-  }
 
   return (
     <div className="space-y-4">
@@ -257,7 +102,7 @@ export function EngagementDetailClient({
         secondaryTriggers={secondaryTriggers}
         pending={pending}
         runAction={runAction}
-        onNudge={revealShareLink}
+        onNudge={revealDeliveryShareLink}
       />
 
       {error && (
@@ -266,74 +111,14 @@ export function EngagementDetailClient({
         </p>
       )}
 
-      {/* A SEGMENTED control on a track, not an underline row: the active tab is a
-          raised panel of the same material as the surface it reveals below, which
-          is what makes the tab and its body read as one object. */}
-      <div
-        className="flex flex-wrap gap-1 rounded-[var(--r-item)] p-1"
-        style={{ background: 'var(--track)' }}
-        role="tablist"
-      >
-        {ENGAGEMENT_TABS.map((tb) => {
-          // A tab wears a badge when it holds something ADDRESSED TO the studio:
-          // a client payment claim to confirm, or a client question to answer.
-          const badgeCount =
-            tb === 'payments'
-              ? paymentClaimCount
-              : tb === 'files'
-                ? awaitingReplyCount
-                : 0;
-          // Budget's badge is a STATE, not a count -- a range the studio has set
-          // and the client has not yet acknowledged is unissued work sitting in
-          // that tab, and saying so is worth more than saying "1".
-          const budgetState =
-            tb !== 'budget'
-              ? null
-              : budgetDraft
-                ? t('offPlan.budgetDraftBadge')
-                : budgetAwaitingAck
-                  ? t('offPlan.budgetAwaitingAckBadge')
-                  : null;
-          const active = tab === tb;
-          return (
-            <button
-              key={tb}
-              type="button"
-              role="tab"
-              aria-selected={active}
-              // LOCKED WHILE A WRITE IS IN FLIGHT. Navigating away unmounts the
-              // open panel -- and with it `PaymentPanel`'s per-mount idempotency
-              // key, so a submit whose response was lost would come back on a
-              // FRESH key and land as a genuine duplicate against an append-only
-              // ledger. Safe to do only because `runAction` can no longer leave
-              // `pending` stuck; before that this would have locked navigation
-              // permanently on one failed action.
-              disabled={pending}
-              onClick={() => setTab(tb)}
-              className={`inline-flex items-center gap-1.5 rounded-[10px] px-3.5 py-1.5 text-[13px] transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
-                active
-                  ? 'bg-card font-bold text-[color:var(--text)] shadow-sm'
-                  : 'font-medium text-[color:var(--text-muted)] hover:text-[color:var(--text)]'
-              }`}
-            >
-              {tp(tb)}
-              {budgetState && (
-                <span className="font-mono text-[9.5px] font-bold uppercase tracking-[0.06em] text-[color:var(--warn)]">
-                  {budgetState}
-                </span>
-              )}
-              {badgeCount > 0 && (
-                <span
-                  className="inline-flex items-center rounded-[var(--r-pill)] bg-[color:var(--warn-tint)] px-1.5 py-0.5 text-[10px] font-semibold text-[color:var(--warn)]"
-                  dir="ltr"
-                >
-                  {t('paymentsBadge', { n: badgeCount })}
-                </span>
-              )}
-            </button>
-          );
-        })}
-      </div>
+      <EngagementTabStrip
+        tab={tab}
+        onSelect={setTab}
+        paymentClaimCount={paymentClaimCount}
+        awaitingReplyCount={awaitingReplyCount}
+        budget={budgetBadge}
+        pending={pending}
+      />
 
       <EngagementPanels
         tab={tab}

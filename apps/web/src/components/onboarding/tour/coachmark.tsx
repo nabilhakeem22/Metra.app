@@ -1,154 +1,28 @@
 'use client';
 
-import { useTranslations } from 'next-intl';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Button } from '@/components/ui/button';
 import { usePathname } from '@/i18n/routing';
 import { cn } from '@/lib/utils';
-import { cardTop, clampInset, coachmarkKey, inlineStartOffset } from './coachmark-logic';
+import { CoachmarkCard } from './coachmark-card';
+import { ANCHOR_PADDING, type CoachmarkPlacement } from './coachmark-logic';
+import { useAnchorRect } from './use-anchor-rect';
+import { useCoachmarkPlacement } from './use-coachmark-placement';
 import { useTour } from './use-tour';
 
-export function Coachmark({ paused = false }: { paused?: boolean }) {
-  const { current, next, prev, stop, index, total } = useTour();
-  const pathname = usePathname();
-  const t = useTranslations();
-  const [rect, setRect] = useState<DOMRect | null>(null);
-  const [cardSize, setCardSize] = useState({ w: 288, h: 168 });
-  const [mounted, setMounted] = useState(false);
-  const cardRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => setMounted(true), []);
-
-  const onPage = !!current && current.page === pathname;
-
-  // Locate the anchor, measure it, and keep it measured (scroll/resize/observer).
-  // A missing anchor after a short retry window self-skips (never throws).
-  useEffect(() => {
-    if (!current || !onPage || paused) {
-      setRect(null);
-      return;
-    }
-    let raf = 0;
-    let tries = 0;
-    let ro: ResizeObserver | null = null;
-    let el: HTMLElement | null = null;
-    const measure = () => {
-      if (el) setRect(el.getBoundingClientRect());
-    };
-    const find = () => {
-      el = document.querySelector<HTMLElement>(`[data-tour="${current.anchor}"]`);
-      if (el) {
-        measure();
-        ro = new ResizeObserver(measure);
-        ro.observe(el);
-      } else if (tries++ < 30) {
-        raf = requestAnimationFrame(find);
-      } else {
-        next(); // self-skip: anchor absent on this page
-      }
-    };
-    find();
-    const onScroll = () => measure();
-    window.addEventListener('scroll', onScroll, true);
-    window.addEventListener('resize', onScroll);
-    return () => {
-      cancelAnimationFrame(raf);
-      ro?.disconnect();
-      window.removeEventListener('scroll', onScroll, true);
-      window.removeEventListener('resize', onScroll);
-    };
-  }, [current, onPage, paused, next]);
-
-  // Focus trap + keyboard control.
-  useEffect(() => {
-    if (!rect) return;
-    const card = cardRef.current;
-    if (!card) return;
-    const prevFocus = document.activeElement as HTMLElement | null;
-    card.focus();
-    const onKey = (e: KeyboardEvent) => {
-      const action = coachmarkKey(e.key);
-      if (action === 'stop') {
-        e.preventDefault();
-        stop();
-      } else if (action === 'next') {
-        e.preventDefault();
-        next();
-      } else if (action === 'prev') {
-        e.preventDefault();
-        prev();
-      } else if (action === 'tab') {
-        const f = card.querySelectorAll<HTMLElement>(
-          'button, [href], input, [tabindex]:not([tabindex="-1"])',
-        );
-        if (f.length === 0) {
-          e.preventDefault();
-          return;
-        }
-        const first = f[0];
-        const last = f[f.length - 1];
-        if (e.shiftKey && document.activeElement === first) {
-          e.preventDefault();
-          last.focus();
-        } else if (!e.shiftKey && document.activeElement === last) {
-          e.preventDefault();
-          first.focus();
-        }
-      }
-    };
-    document.addEventListener('keydown', onKey);
-    return () => {
-      document.removeEventListener('keydown', onKey);
-      prevFocus?.focus?.();
-    };
-  }, [rect, next, prev, stop]);
-
-  // Measure the card so placement can keep it fully on-screen (its height varies
-  // by step content). Guarded so it never loops on identical measurements.
-  useEffect(() => {
-    const card = cardRef.current;
-    if (!card) return;
-    const r = card.getBoundingClientRect();
-    setCardSize((s) =>
-      Math.abs(s.w - r.width) < 1 && Math.abs(s.h - r.height) < 1
-        ? s
-        : { w: r.width, h: r.height },
-    );
-  }, [rect, current?.id]);
-
-  if (!mounted || !current || !onPage || paused || !rect) return null;
-
-  const reduced =
-    window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
-  const rtl = document.documentElement.dir === 'rtl';
-  const pad = 6;
-  const margin = 16; // keep the card this far from every viewport edge
-  const gap = 10; // space between the anchor and the card
-  // Logical inset — the distance from the INLINE-START edge (flips in RTL).
-  const insetStart = inlineStartOffset(
-    rect.left,
-    rect.right,
-    rtl,
-    window.innerWidth,
-  );
-  // Viewport-aware card placement: clamp horizontally so the card can't run off
-  // the inline-end edge (e.g. an anchor near the right edge), and flip above the
-  // anchor when there's no room below.
-  const cardW = Math.min(cardSize.w, window.innerWidth - margin * 2);
-  const cardInset = clampInset(insetStart, cardW, window.innerWidth, margin);
-  const cardTopPx = cardTop(
-    rect.top,
-    rect.bottom,
-    cardSize.h,
-    window.innerHeight,
-    gap,
-    margin,
-  );
-  const titleId = `tour-${current.id}-title`;
-  const isLast = index >= total - 1;
-
-  return createPortal(
+/** The dimmer plus the ring around the anchor. Both are decoration: aria-hidden,
+ *  pointer-events none, so the page underneath stays reachable to a screen reader
+ *  and the card above is the only interactive thing. */
+function CoachmarkHighlight({
+  rect,
+  placement,
+  animated,
+}: {
+  rect: DOMRect;
+  placement: CoachmarkPlacement;
+  animated: boolean;
+}) {
+  return (
     <>
       <div
         aria-hidden
@@ -159,48 +33,67 @@ export function Coachmark({ paused = false }: { paused?: boolean }) {
         aria-hidden
         className={cn(
           'fixed z-[61] rounded-lg border-2 border-primary',
-          !reduced && 'transition-all',
+          animated && 'transition-all',
         )}
         style={{
-          top: rect.top - pad,
-          insetInlineStart: insetStart - pad,
-          width: rect.width + pad * 2,
-          height: rect.height + pad * 2,
+          top: rect.top - ANCHOR_PADDING,
+          insetInlineStart: placement.highlightInset - ANCHOR_PADDING,
+          width: rect.width + ANCHOR_PADDING * 2,
+          height: rect.height + ANCHOR_PADDING * 2,
           pointerEvents: 'none',
         }}
       />
-      <div
-        ref={cardRef}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby={titleId}
-        tabIndex={-1}
-        className="fixed z-[62] w-72 max-w-[calc(100vw-2rem)] rounded-xl border bg-card p-4 shadow-lg focus:outline-none"
-        style={{ top: cardTopPx, insetInlineStart: cardInset }}
-      >
-        <p id={titleId} className="text-sm font-semibold">
-          {t(current.titleKey)}
-        </p>
-        <p className="mt-1 text-sm text-muted-foreground">{t(current.bodyKey)}</p>
-        <div className="mt-3 flex items-center justify-between gap-2">
-          <span className="text-xs text-muted-foreground">
-            {t('tour.stepOf', { current: index + 1, total })}
-          </span>
-          <div className="flex items-center gap-2">
-            <Button type="button" variant="ghost" size="sm" onClick={stop}>
-              {t('tour.skip')}
-            </Button>
-            {index > 0 && (
-              <Button type="button" variant="outline" size="sm" onClick={prev}>
-                {t('tour.back')}
-              </Button>
-            )}
-            <Button type="button" size="sm" onClick={next}>
-              {isLast ? t('tour.done') : t('tour.next')}
-            </Button>
-          </div>
-        </div>
-      </div>
+    </>
+  );
+}
+
+/**
+ * The onboarding coachmark — COMPOSITION.
+ *
+ * Each of the four things this used to do is now the file named after it: finding
+ * and measuring the anchor (use-anchor-rect), turning two measurements into a
+ * position (use-coachmark-placement, over the pure resolveCoachmarkPlacement),
+ * the dialog and its focus trap (coachmark-card), and the dimmer and ring here.
+ */
+export function Coachmark({ paused = false }: { paused?: boolean }) {
+  const { current, next, prev, stop, index, total } = useTour();
+  const pathname = usePathname();
+  const [mounted, setMounted] = useState(false);
+  const cardRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => setMounted(true), []);
+
+  const onPage = !!current && current.page === pathname;
+  const active = onPage && !paused;
+  // `next` is the self-skip: an anchor that never appears is a step we move past.
+  const onMissing = useCallback(() => next(), [next]);
+  const rect = useAnchorRect({
+    anchor: active && current ? current.anchor : null,
+    onMissing,
+  });
+  const placement = useCoachmarkPlacement({
+    cardRef,
+    rect,
+    stepId: current?.id ?? null,
+  });
+
+  if (!mounted || !current || !active || !rect || !placement) return null;
+
+  const animated = !(
+    window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false
+  );
+
+  return createPortal(
+    <>
+      <CoachmarkHighlight rect={rect} placement={placement} animated={animated} />
+      <CoachmarkCard
+        cardRef={cardRef}
+        step={current}
+        position={{ top: placement.cardTop, insetInlineStart: placement.cardInset }}
+        index={index}
+        total={total}
+        controls={{ next, prev, stop }}
+      />
     </>,
     document.body,
   );
