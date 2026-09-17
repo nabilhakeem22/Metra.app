@@ -482,8 +482,17 @@ create trigger trg_invoices_immutable
   for each row
   execute function public.enforce_immutable_when('status','issued','credited,superseded');
 -- TG_ARGV: [0] status column, [1] locked statuses (csv),
---          [2] allowed target statuses a locked row may transition to (csv; '' = none).
+--          [2] allowed target statuses a locked row may transition to (csv; '' = none),
+--          [3] OPTIONAL: columns the DATABASE ITSELF may null out on a locked row (csv).
 ```
+
+The fourth argument exists for `on delete set null` foreign keys: when a parent
+row is deleted Postgres UPDATEs the child, and a locked child would otherwise
+raise MT100 and abort a delete that has nothing to do with immutability. Only a
+change **to NULL** is tolerated; writing a new non-null value into one of those
+columns is still MT100. Omit it and the trigger behaves exactly as it did before
+the argument existed. `trg_boqs_immutable` is the one trigger that passes it
+(`'engagement_id,source_file_id'`).
 
 Once a row's status is in the locked set, the trigger:
 - rejects `DELETE` with SQLSTATE **`MT100`**;

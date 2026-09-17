@@ -360,3 +360,36 @@ begin
   return 'ok';
 end
 $$;
+
+-- Child-draft guard: boq_sections / boq_lines may only be inserted/updated/
+-- deleted while their parent BOQ is still 'draft'. Both carry boq_id directly,
+-- so the lookup is direct - exactly as it is for contracts. SECURITY DEFINER so
+-- the status read is not itself RLS-filtered. Raises MT100 on a frozen change. A
+-- cascade delete of a DRAFT boq still passes (parent is draft at BEFORE DELETE
+-- time). Cloned from enforce_contract_child_draft above, structure for
+-- structure: decision 8's second batch moves BOQ immutability from seven
+-- TypeScript call sites to the database, and the shape a reviewer already knows
+-- is worth more here than a cleverer one.
+create or replace function public.enforce_boq_child_draft()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  j   jsonb;
+  bid uuid;
+  st  text;
+begin
+  if TG_OP = 'DELETE' then j := to_jsonb(OLD); else j := to_jsonb(NEW); end if;
+  bid := (j ->> 'boq_id')::uuid;
+  select status into st from public.boqs where id = bid;
+  if st is not null and st <> 'draft' then
+    raise exception
+      'boq children are frozen once the boq leaves draft (status=%)', st
+      using errcode = 'MT100';
+  end if;
+  if TG_OP = 'DELETE' then return OLD; end if;
+  return NEW;
+end
+$$;

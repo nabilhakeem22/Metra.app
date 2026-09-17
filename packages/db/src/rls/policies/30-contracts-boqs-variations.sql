@@ -194,3 +194,36 @@ create trigger trg_variation_order_lines_parent_draft
   before insert or update or delete on public.variation_order_lines
   for each row
   execute function public.enforce_variation_child_draft();
+
+-- A BOQ is frozen once it leaves 'draft' (decision 8, second batch). Until now
+-- this was enforced only in TypeScript, at seven call sites, and a BOQ that has
+-- been issued to a client is evidence.
+--
+-- THE FOURTH ARGUMENT names the two columns the DATABASE nulls out by itself:
+-- boqs.engagement_id and boqs.source_file_id are both declared `on delete set
+-- null` (schema/boqs.ts:79-82), so deleting a design engagement, or deleting the
+-- imported spreadsheet through documents/core.ts or storage.ts, makes Postgres
+-- UPDATE the BOQ row. Without that argument the cascade would raise MT100 and
+-- abort a delete that has nothing to do with immutability.
+--
+-- draft -> issued is UNAFFECTED: boqs/issue.ts updates `where status = 'draft'`,
+-- so at BEFORE UPDATE the OLD row is still draft and the not-locked branch
+-- returns NEW untouched.
+drop trigger if exists trg_boqs_immutable on public.boqs;
+create trigger trg_boqs_immutable
+  before update or delete on public.boqs
+  for each row
+  execute function public.enforce_immutable_when(
+    'status', 'issued,superseded', 'superseded', 'engagement_id,source_file_id'
+  );
+
+-- Sections + lines can only be mutated while their parent BOQ is 'draft'.
+drop trigger if exists trg_boq_sections_parent_draft on public.boq_sections;
+create trigger trg_boq_sections_parent_draft
+  before insert or update or delete on public.boq_sections
+  for each row execute function public.enforce_boq_child_draft();
+
+drop trigger if exists trg_boq_lines_parent_draft on public.boq_lines;
+create trigger trg_boq_lines_parent_draft
+  before insert or update or delete on public.boq_lines
+  for each row execute function public.enforce_boq_child_draft();
