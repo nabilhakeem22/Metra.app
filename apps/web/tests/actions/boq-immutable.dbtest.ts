@@ -41,6 +41,7 @@ afterAll(async () => {
 
 interface Fixture {
   ctx: OrgContext;
+  projectId: string;
   boqId: string;
   lineId: string;
   fileId: string;
@@ -126,11 +127,45 @@ async function setup(): Promise<Fixture> {
   );
   return {
     ctx,
+    projectId: project.id,
     boqId,
     lineId: line.id,
     fileId: file.id,
     engagementId: engagement.id,
   };
+}
+
+/**
+ * A second, still-DRAFT BOQ in the same org with one line of its own — the
+ * re-parenting target, built through the same import path as `setup()` so its
+ * line carries a real section and passes every CHECK.
+ */
+async function draftSibling(fixture: Fixture): Promise<{ boqId: string; lineId: string }> {
+  const created = await createBoqCore(fixture.ctx, {
+    projectId: fixture.projectId,
+    titleEn: 'Second bill',
+  });
+  const boqId = (created as { data?: string }).data!;
+  await commitImportCore(fixture.ctx, {
+    boqId,
+    lines: [
+      {
+        itemCode: '9.01',
+        section: 'Joinery',
+        description: 'Loose line',
+        unit: 'sqm',
+        qty: '1',
+        unitPrice: '1',
+        unitCost: '0',
+        costItemCode: null,
+        provisional: false,
+      },
+    ],
+  });
+  const [line] = await raw.query<{ id: string }>(
+    `select id from public.boq_lines where boq_id = '${boqId}' limit 1`,
+  );
+  return { boqId, lineId: line.id };
 }
 
 /** Freeze it exactly the way `boqs/issue.ts:134-143` does, as metra_app. */
@@ -175,6 +210,50 @@ describe('a BOQ is frozen at the database once it is issued', () => {
       `select qty from public.boq_lines where id = '${fixture.lineId}'`,
     );
     expect(Number(line.qty)).toBe(100);
+  });
+
+  it('refuses RE-PARENTING a line OUT of an issued BOQ, not only INTO one', async () => {
+    // The hole the clone of enforce_contract_child_draft carried: on UPDATE the
+    // trigger read only NEW's parent, so moving a line from an ISSUED BOQ to a
+    // DRAFT one was admitted - the status read was of the draft target, `boqs`
+    // itself is never touched so trg_boqs_immutable does not fire, and metra_app
+    // holds `update` on boq_lines. The issued document loses a line while its
+    // cached subtotal / total / total_cost stay at the issued figures.
+    const fixture = await setup();
+    const draft = await draftSibling(fixture);
+    expect(await issue(fixture)).toBeNull();
+
+    // OUT of the issued BOQ, into a draft one. OLD's parent is what refuses.
+    const out = await sqlstateOf(() =>
+      withOrgContext(fixture.ctx, (tx) =>
+        tx.execute(
+          sql.raw(
+            `update public.boq_lines set boq_id = '${draft.boqId}' where id = '${fixture.lineId}'`,
+          ),
+        ),
+      ),
+    );
+    expect(out).toBe('MT100');
+
+    // The line is still where it was, and still counted by the issued BOQ.
+    const [line] = await raw.query<{ boq_id: string }>(
+      `select boq_id from public.boq_lines where id = '${fixture.lineId}'`,
+    );
+    expect(line.boq_id).toBe(fixture.boqId);
+
+    // The direction that always worked, asserted so the OLD check cannot be
+    // mistaken for having REPLACED the NEW one: the draft sibling's own line
+    // cannot be moved INTO the issued BOQ either.
+    const into = await sqlstateOf(() =>
+      withOrgContext(fixture.ctx, (tx) =>
+        tx.execute(
+          sql.raw(
+            `update public.boq_lines set boq_id = '${fixture.boqId}' where id = '${draft.lineId}'`,
+          ),
+        ),
+      ),
+    );
+    expect(into).toBe('MT100');
   });
 
   it('refuses a DELETE of an issued BOQ twice over: no grant, and MT100', async () => {

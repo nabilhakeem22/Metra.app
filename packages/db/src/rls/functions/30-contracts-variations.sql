@@ -366,10 +366,32 @@ $$;
 -- so the lookup is direct - exactly as it is for contracts. SECURITY DEFINER so
 -- the status read is not itself RLS-filtered. Raises MT100 on a frozen change. A
 -- cascade delete of a DRAFT boq still passes (parent is draft at BEFORE DELETE
--- time). Cloned from enforce_contract_child_draft above, structure for
--- structure: decision 8's second batch moves BOQ immutability from seven
--- TypeScript call sites to the database, and the shape a reviewer already knows
--- is worth more here than a cleverer one.
+-- time, and on a cascade the parent row is already gone within the same
+-- transaction, so `st is null`).
+--
+-- BOTH PARENTS ARE CHECKED ON UPDATE, which is where the clone of
+-- enforce_contract_child_draft was wrong. Reading only NEW's status admitted
+--
+--     update public.boq_lines set boq_id = '<a DRAFT boq>'
+--      where id = '<a line of an ISSUED boq>'
+--
+-- because the status read was of the DRAFT target; `boqs` itself is never
+-- touched, so trg_boqs_immutable does not fire either, and metra_app holds
+-- `update` on boq_lines. The issued document silently loses a line while its
+-- cached subtotal / total / total_cost stay at the issued figures. No product
+-- path writes boqLines.boqId today - this is exactly the "future action, script,
+-- or migration backfill" the trigger exists for.
+--
+-- THE THREE SIBLING GUARDS HAVE THE SAME HOLE and are deliberately NOT touched
+-- here (pre-existing, five triggers, and each needs its own dbtest):
+-- enforce_proposal_child_draft (proposal_sections, proposal_lines),
+-- enforce_contract_child_draft (contract_sections, contract_lines) and
+-- enforce_variation_child_draft (variation_order_lines). Wave 7.
+--
+-- OLD/NEW are read DIRECTLY rather than through `to_jsonb`: both attached tables
+-- carry boq_id, plpgsql resolves the field at runtime, and materialising an
+-- 18-column row as jsonb to read one uuid is the per-row half of the cost on a
+-- 2,000-line import (~4,300 invocations per full-replace save).
 create or replace function public.enforce_boq_child_draft()
 returns trigger
 language plpgsql
@@ -377,19 +399,29 @@ security definer
 set search_path = ''
 as $$
 declare
-  j   jsonb;
-  bid uuid;
-  st  text;
+  st text;
 begin
-  if TG_OP = 'DELETE' then j := to_jsonb(OLD); else j := to_jsonb(NEW); end if;
-  bid := (j ->> 'boq_id')::uuid;
-  select status into st from public.boqs where id = bid;
+  -- The parent the row is LEAVING (UPDATE) or being removed from (DELETE).
+  -- OLD is NULL on INSERT, hence the guard.
+  if TG_OP <> 'INSERT' then
+    select status into st from public.boqs where id = OLD.boq_id;
+    if st is not null and st <> 'draft' then
+      raise exception
+        'boq children are frozen once the boq leaves draft (status=%)', st
+        using errcode = 'MT100';
+    end if;
+    if TG_OP = 'DELETE' then return OLD; end if;
+    -- An UPDATE that does not move the row has only one parent, already read.
+    if NEW.boq_id is not distinct from OLD.boq_id then return NEW; end if;
+  end if;
+
+  -- The parent the row is ARRIVING at: an INSERT, or an UPDATE that re-parents.
+  select status into st from public.boqs where id = NEW.boq_id;
   if st is not null and st <> 'draft' then
     raise exception
       'boq children are frozen once the boq leaves draft (status=%)', st
       using errcode = 'MT100';
   end if;
-  if TG_OP = 'DELETE' then return OLD; end if;
   return NEW;
 end
 $$;
