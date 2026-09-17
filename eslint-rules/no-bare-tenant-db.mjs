@@ -33,8 +33,9 @@
 // NEITHER RENAMING NOR DOTTING HIDES IT: the handle is known by the PROPERTY it
 // came from, not the local name, and the connection object is tracked too — so
 // `{ sql: raw }`, `conn.sql`, `conn['sql']` and `getRequestConnection().sql` count.
-// KNOWN LIMITS (deliberate): raw-ness survives neither a return from a local helper
-// nor an assignment into an outer `let`; a COMPUTED key that is not a literal or
+// KNOWN LIMITS (deliberate): raw-ness does not survive a return from a local
+// helper, nor a LATER re-assignment (`let q; q = db;` - only a declarator's own
+// initialiser is followed); a COMPUTED key that is not a literal or
 // an interpolation-free template (`conn[key]`, `getDb()[method]()`) cannot be
 // resolved statically at all. Four more are RuleTester-proven and left open on
 // purpose — `Reflect.get(conn, 'sql')`, `Object.values(getRequestConnection())[1]`,
@@ -194,6 +195,14 @@ const RAW_FACTORIES = new Set([
 
 /** The keys of a `{ db, sql, pg }` connection — all three are the SAME socket. */
 const RAW_HANDLE_KEYS = new Set(['db', 'sql', 'pg']);
+
+/** How many `const a = b` hops the classifier follows before giving up.
+ * `const q = db` is the shortest way to lose this rule, and it is what a
+ * developer writes to shorten a line - not an evasion. The bound exists so a
+ * pathological file cannot turn a lint run into a deep recursion; a chain this
+ * long is not a thing anyone writes. Past it the answer is 'unknown', never
+ * 'safe' and never 'raw'. */
+const ALIAS_DEPTH = 8;
 
 /** `await getRequestConnection()` classifies exactly like `getRequestConnection()`. */
 function unwrapAwait(node) {
@@ -446,8 +455,11 @@ export const noBareTenantDb = {
       return false;
     }
 
-    // Classify a variable definition as 'raw' | 'safe' | 'unknown'.
-    function classifyDef(def) {
+    // Classify a variable definition as 'raw' | 'safe' | 'connection' | 'unknown'.
+    // `seen`/`depth` are the alias chain this definition is being resolved
+    // inside; they are threaded through so a cycle resolves to 'unknown'
+    // instead of recursing.
+    function classifyDef(def, seen, depth) {
       if (def.type === 'Parameter') {
         const fn = def.node; // Arrow/Function(Expression|Declaration)
         const parent = fn && fn.parent;
@@ -475,7 +487,7 @@ export const noBareTenantDb = {
         return 'unknown';
       }
       if (def.type === 'Variable') {
-        return classifyDeclarator(def.node, def.name);
+        return classifyDeclarator(def.node, def.name, seen, depth);
       }
       return 'unknown';
     }
@@ -486,7 +498,7 @@ export const noBareTenantDb = {
      * `const conn = getRequestConnection()` (the connection OBJECT, whose handle
      * keys are raw) | `const x = createRuntimeConnection().sql`.
      */
-    function classifyDeclarator(decl, nameNode) {
+    function classifyDeclarator(decl, nameNode, seen, depth) {
       const init = decl && unwrapAwait(decl.init);
       if (!init) return 'unknown';
       const factory = rawFactoryName(init);
@@ -502,6 +514,14 @@ export const noBareTenantDb = {
         return 'connection';
       }
       if (init.type === 'MemberExpression' && isRawExpr(init)) return 'raw';
+      // `const q = db` / `const c = conn`: a one-level alias inherits whatever
+      // the identifier it was initialised from is. Bounded by ALIAS_DEPTH and by
+      // the `seen` set, so `let a = b; let b = a;` resolves to 'unknown' rather
+      // than recursing. Failing closed here means 'unknown', not 'raw' - the
+      // rule never invents a report it cannot justify.
+      if (init.type === 'Identifier') {
+        return classifyIdentifier(init, seen, depth + 1);
+      }
       return 'unknown';
     }
 
@@ -532,16 +552,27 @@ export const noBareTenantDb = {
       });
     }
 
-    function classifyIdentifier(idNode) {
-      const cached = classifyCache.get(idNode);
-      if (cached !== undefined) return cached;
-      classifyCache.set(idNode, 'unknown'); // cycle guard
+    function classifyIdentifier(idNode, seen, depth) {
+      // Entry call (no alias chain yet): this is the only depth that is
+      // memoised, because a result reached under a depth/cycle bound is about
+      // THAT chain and must not be cached as the answer for the identifier.
+      const isEntry = seen === undefined;
+      if (isEntry) {
+        const cached = classifyCache.get(idNode);
+        if (cached !== undefined) return cached;
+        classifyCache.set(idNode, 'unknown'); // cycle guard
+        seen = new Set();
+        depth = 0;
+      }
 
       let result = 'unknown';
       const variable = resolveVariable(idNode);
-      if (variable) {
+      // A variable already on this alias chain, or a chain longer than
+      // ALIAS_DEPTH, resolves to 'unknown' and stops.
+      if (variable && !seen.has(variable) && depth <= ALIAS_DEPTH) {
+        seen.add(variable);
         for (const def of variable.defs) {
-          const c = classifyDef(def);
+          const c = classifyDef(def, seen, depth);
           if (c !== 'unknown') {
             result = c;
             break;
@@ -553,7 +584,7 @@ export const noBareTenantDb = {
       // planted `db.select(...)` whose binding the scope walk can't reach.
       if (result === 'unknown' && idNode.name === 'db') result = 'raw';
 
-      classifyCache.set(idNode, result);
+      if (isEntry) classifyCache.set(idNode, result);
       return result;
     }
 

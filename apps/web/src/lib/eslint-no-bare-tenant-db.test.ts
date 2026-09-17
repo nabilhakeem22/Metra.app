@@ -64,6 +64,21 @@ it('no-bare-tenant-db: flags raw-connection queries, allows scoped ones', () => 
         filename: 'tests/isolation/shared-pool.test.ts',
         code: 'const rows = await db.execute(sql`select current_user`);',
       },
+      // O6a: an alias inherits what it was initialised FROM, so a scoped
+      // handle stays scoped through one. `tx` is a free parameter here
+      // ('unknown' - the caller owns the scoping), and 'unknown' must not
+      // become 'raw' just because it passed through a const.
+      {
+        filename: 'apps/web/src/lib/clients/queries.ts',
+        code: 'function f(tx) { const q = tx; return q.select().from(clients); }',
+      },
+      // O6a, the cycle guard, asserted so a future change to the alias hop
+      // cannot turn it into a stack overflow: `let a = b; let b = a;` resolves
+      // to 'unknown' and reports NOTHING.
+      {
+        filename: 'apps/web/src/lib/clients/queries.ts',
+        code: 'let a = b; let b = a; a.select().from(clients);',
+      },
       // A GENUINELY DYNAMIC key is a stated KNOWN LIMIT, not an oversight: a
       // syntax rule cannot resolve `conn[key]`, and pretending otherwise would
       // mean guessing. It also takes deliberate effort to write, which is not
@@ -278,6 +293,19 @@ it('no-bare-tenant-db: flags raw-connection queries, allows scoped ones', () => 
       {
         filename: 'apps/web/src/lib/clients/queries.ts',
         code: 'const conn = getRequestConnection(); conn.db.$with(cte).select().from(cte);',
+        errors: [{ messageId: 'bareQuery' }],
+      },
+      // O6a: the one-level alias. `const q = db` is what a developer writes to
+      // shorten a line, and before this it silenced the rule completely while
+      // running exactly the same BYPASSRLS query.
+      {
+        filename: 'apps/web/src/lib/clients/queries.ts',
+        code: 'const q = db; await q.select().from(clients);',
+        errors: [{ messageId: 'bareQuery' }],
+      },
+      {
+        filename: 'apps/web/src/lib/clients/queries.ts',
+        code: 'const { db } = getRequestConnection(); const q = db; await q.execute(stmt);',
         errors: [{ messageId: 'bareQuery' }],
       },
       // S1: THE SECOND FENCE. Concentrating nine allowlisted files into one moved
