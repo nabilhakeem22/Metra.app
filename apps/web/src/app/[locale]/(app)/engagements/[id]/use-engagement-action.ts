@@ -5,6 +5,7 @@ import { useRouter } from '@/i18n/routing';
 import type { ActionCode, ActionResult } from '@/lib/actions/result';
 import { keyForAttempt, releasesKey } from '@/lib/engagements/retry-policy';
 import type { Trigger } from '@/lib/engagements/transitions';
+import { readHeldKeys, writeHeldKeys } from './held-keys-store';
 
 export interface EngagementActionApi {
   pending: boolean;
@@ -77,9 +78,22 @@ export function useEngagementAction(
    * thrown rejection mean the opposite — the write may have committed and only
    * the answer was lost — so the key survives and the retry is recognised as the
    * same act. See lib/engagements/retry-policy.ts for both rules.
+   *
+   * SEEDED FROM sessionStorage on the first render of this mount (A9), so a key
+   * held for an attempt in doubt survives a remount — a soft navigation away and
+   * back, a Fast Refresh, a router.refresh() that replaces the tree. Without it
+   * the retry after a remount mints a fresh key, which is a fresh act: one
+   * duplicate revision, or one duplicate attestation. See held-keys-store.ts.
    */
-  const pendingKeys = useRef(new Map<Trigger, string>());
+  const pendingKeys = useRef<Map<Trigger, string> | null>(null);
+  pendingKeys.current ??= readHeldKeys(options.engagementId);
+  const held = pendingKeys.current;
   const mintKey = options.mintKey ?? (() => crypto.randomUUID());
+
+  /** Every mutation of the map goes through here, so the mirror cannot drift. */
+  function persistHeldKeys(): void {
+    writeHeldKeys(options.engagementId, held);
+  }
 
   function settle(trigger: Trigger | undefined, result: ActionResult): void {
     // Only THIS trigger's key is ever touched, and only when the answer is
@@ -87,7 +101,10 @@ export function useEngagementAction(
     // capability, a state conflict, all of which rolled their transaction
     // back. `generic`, `uncertain` and any code this build has not heard of
     // may all mean the write landed and the answer was lost, so they hold.
-    if (trigger && releasesKey(result)) pendingKeys.current.delete(trigger);
+    if (trigger && releasesKey(result)) {
+      held.delete(trigger);
+      persistHeldKeys();
+    }
     if (result.ok) router.refresh();
     else setError((result.error as ActionCode) ?? 'generic');
   }
@@ -104,8 +121,11 @@ export function useEngagementAction(
     // per click, because the whole point is that the RETRY carries the SAME key
     // as the attempt it is retrying — a fresh key would be a fresh act and would
     // spend a second free revision. See the ref's declaration for the rest.
-    const idempotencyKey = keyForAttempt(pendingKeys.current, trigger, mintKey);
-    if (trigger) pendingKeys.current.set(trigger, idempotencyKey);
+    const idempotencyKey = keyForAttempt(held, trigger, mintKey);
+    if (trigger) {
+      held.set(trigger, idempotencyKey);
+      persistHeldKeys();
+    }
     startTransition(async () => {
       try {
         settle(trigger, await fn(idempotencyKey));

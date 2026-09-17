@@ -68,9 +68,14 @@ function ActionProbe({ mintKey }: { mintKey: () => string }) {
   );
 }
 
+// MONOTONIC ACROSS MOUNTS, not per mount. A counter that restarted on every
+// mount would hand the remount the same STRING as the first attempt whether or
+// not the key had actually been carried over, which would make the A9 tests below
+// pass for the wrong reason.
+let minted = 0;
+
 function mountProbe() {
-  let next = 0;
-  const mintKey = () => `key-${++next}`;
+  const mintKey = () => `key-${++minted}`;
   // Through the harness, not a bare RTL render: renderWithIntl is what registers
   // afterEach(cleanup), and two mounted probes would each answer getByRole.
   return renderWithIntl(<ActionProbe mintKey={mintKey} />);
@@ -91,6 +96,12 @@ beforeEach(() => {
   sent.length = 0;
   answers.clear();
   router.refresh.mockClear();
+  // A9: held keys are now mirrored to sessionStorage, which outlives a single
+  // mount by design. Without this, a key held by one test is read back by the
+  // next one's fresh probe — which is exactly the behaviour under test, and
+  // exactly why each test must start from an empty tab.
+  sessionStorage.clear();
+  minted = 0;
 });
 
 /**
@@ -201,5 +212,82 @@ describe('useEngagementAction — settling', () => {
     await press('doubleClick');
 
     expect(keysFor('requestRevision')).toHaveLength(1);
+  });
+});
+
+/**
+ * A9 (wave-2, shipped here): the held keys are mirrored to sessionStorage, so an
+ * attempt in doubt survives a remount. Wave 2 logged the gap as "one duplicate
+ * revision / attestation" and wave 4 did not do it; this is the first wave that
+ * can PROVE it.
+ */
+describe('useEngagementAction — the key survives a remount (A9)', () => {
+  test('hold after uncertain, UNMOUNT, remount, retry — the SAME key', async () => {
+    const first = mountProbe();
+    answers.set('requestRevision', { ok: false, error: 'uncertain' });
+    await press('requestRevision');
+    first.unmount();
+
+    mountProbe();
+    await press('requestRevision');
+
+    const keys = keysFor('requestRevision');
+    expect(keys).toHaveLength(2);
+    expect(keys[0]).toBe(keys[1]);
+  });
+
+  test('a DEFINITE refusal clears the entry, so a remount starts fresh', async () => {
+    const first = mountProbe();
+    answers.set('requestRevision', { ok: false, error: 'forbidden' });
+    await press('requestRevision');
+    expect(sessionStorage.getItem('metra.pendingKeys.e-1')).toBeNull();
+    first.unmount();
+
+    mountProbe();
+    await press('requestRevision');
+    const keys = keysFor('requestRevision');
+    expect(keys[0]).not.toBe(keys[1]);
+  });
+
+  test('the entry is namespaced per engagement', async () => {
+    mountProbe();
+    answers.set('requestRevision', { ok: false, error: 'uncertain' });
+    await press('requestRevision');
+    expect(sessionStorage.getItem('metra.pendingKeys.e-1')).toContain(
+      keysFor('requestRevision')[0]!,
+    );
+    expect(sessionStorage.getItem('metra.pendingKeys.other')).toBeNull();
+  });
+
+  // Safari private mode throws on sessionStorage ACCESS, not just on write. A
+  // cockpit that will not render because storage is unavailable is a far larger
+  // defect than the one A9 closes.
+  test('a sessionStorage that THROWS changes nothing else about the hook', async () => {
+    const exploding = {
+      getItem: () => {
+        throw new Error('SecurityError');
+      },
+      setItem: () => {
+        throw new Error('SecurityError');
+      },
+      removeItem: () => {
+        throw new Error('SecurityError');
+      },
+    };
+    vi.stubGlobal('sessionStorage', exploding);
+    try {
+      mountProbe();
+      answers.set('requestRevision', { ok: false, error: 'uncertain' });
+      await press('requestRevision');
+      await press('requestRevision');
+
+      // Still held IN MEMORY for this mount: only surviving a remount is lost.
+      const keys = keysFor('requestRevision');
+      expect(keys).toHaveLength(2);
+      expect(keys[0]).toBe(keys[1]);
+      expect(screen.getByTestId('error').textContent).toBe('uncertain');
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });
