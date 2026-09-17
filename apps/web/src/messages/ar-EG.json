@@ -1952,7 +1952,9 @@
       "cancel": "إلغاء",
       "occurredOn": "وقت التأكيد",
       "evidence": "الطريقة",
-      "evidencePlaceholder": "مكالمة تليفون، واتساب، إقرار ورقي..."
+      "evidencePlaceholder": "مكالمة تليفون، واتساب، إقرار ورقي...",
+      "alreadyRecorded": "الدفعة دي كانت اتسجلت قبل كده",
+      "alreadyRecordedHint": "ما اتكتبش صف تاني في السجل. المبلغ المحفوظ هو الأول."
     },
     "handoffAck": {
       "title": "تسجيل إيصال التسليم",

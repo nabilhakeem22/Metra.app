@@ -1952,7 +1952,9 @@
       "cancel": "Cancel",
       "occurredOn": "When they confirmed",
       "evidence": "How",
-      "evidencePlaceholder": "Phone call, WhatsApp, signed on paper…"
+      "evidencePlaceholder": "Phone call, WhatsApp, signed on paper…",
+      "alreadyRecorded": "That payment was already recorded",
+      "alreadyRecordedHint": "No second row was written to the ledger. The saved amount is the first one."
     },
     "handoffAck": {
       "title": "Record handoff receipt",

@@ -37,6 +37,10 @@ export interface LogPaymentAndAdvanceInput {
  * The final step's result, plus whether the payment actually persisted — so the
  * action wrapper can revalidate the engagement path even when the advance guard
  * still blocks (the ledger changed and the checklist must refresh).
+ *
+ * `ActionResult.already` on this result means THE PAYMENT was a replay of a key
+ * the ledger already carried, not that the transition was: `paymentRecorded`
+ * says a row exists, `already` says it is not a new one.
  */
 export type LogPaymentAndAdvanceResult = ActionResult & {
   paymentRecorded: boolean;
@@ -81,5 +85,11 @@ export async function logPaymentAndAdvanceCore(
     engagementId,
     trigger: input.advanceTrigger,
   });
-  return { ...advanced, paymentRecorded: true };
+  // `already` IS THE PAYMENT'S, and it is carried out of here deliberately. The
+  // server knew it had appended nothing and said so, and for five waves no screen
+  // looked: both money controls closed on `ok` whether a row was written or the
+  // original was merely handed back. `executeTransition` never sets `already` —
+  // a replayed attempt returns a plain `ok` on purpose (executor/index.ts) — so
+  // there is no second meaning for this flag to collide with here.
+  return { ...advanced, already: recorded.already === true, paymentRecorded: true };
 }

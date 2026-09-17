@@ -25,6 +25,18 @@ vi.mock('@/i18n/routing', async (importOriginal) => ({
 const actions = vi.hoisted(() => ({ logPaymentAndAdvance: vi.fn() }));
 vi.mock('@/lib/engagements/actions', () => actions);
 
+// The toast store is module-level, so a spy on `toast` is the whole surface.
+interface RaisedToast {
+  title?: string;
+  description?: string;
+}
+const toasts = vi.hoisted(() => [] as RaisedToast[]);
+vi.mock('@/hooks/use-toast', () => ({
+  toast: (raised: RaisedToast) => {
+    toasts.push(raised);
+  },
+}));
+
 const ar = (path: string) => messageAt('ar-EG', path);
 
 /** UUID-SHAPED, because the sessionStorage mirror refuses anything else (S1). */
@@ -101,6 +113,7 @@ beforeEach(() => {
   actions.logPaymentAndAdvance.mockResolvedValue({ ok: true });
   router.refresh.mockClear();
   sessionStorage.clear();
+  toasts.length = 0;
   minted = 0;
   setNow(START);
 });
@@ -285,5 +298,57 @@ describe('PaymentForm — one key per deliberate act', () => {
     expect(slots).toHaveLength(1);
     expect(slots[0]!.startsWith('logPaymentAndAdvance|')).toBe(true);
     expect(slots[0]).not.toBe('logPaymentAndAdvance');
+  });
+});
+
+/**
+ * Backlog 18. `recordPaymentCore` has answered a repeated idempotency key with
+ * `{ ok: true, already: true }` since 0050 - the ledger was NOT appended and the
+ * original row was handed back - and for five waves no screen looked.
+ * `logPaymentAndAdvanceCore` used to drop the flag on the floor as well: it
+ * returned `{ ...advanced, paymentRecorded }`, so the combined control could not
+ * have read it even if it had tried.
+ */
+describe('PaymentForm — a replayed payment is SAID, not silently reported as saved', () => {
+  test('an `already` success raises its own message instead of a plain one', async () => {
+    renderWithIntl(<FormProbe />);
+    actions.logPaymentAndAdvance.mockResolvedValue({ ok: true, already: true });
+
+    await record('50000');
+
+    expect(toasts).toEqual([
+      {
+        title: ar('engagements.controls.alreadyRecorded'),
+        description: ar('engagements.controls.alreadyRecordedHint'),
+      },
+    ]);
+    // Still a success: the form closes and the page refreshes, because a row for
+    // this act DOES exist. What changed is that the studio is told which one.
+    expect(router.refresh).toHaveBeenCalled();
+  });
+
+  test('an ordinary success says nothing extra', async () => {
+    renderWithIntl(<FormProbe />);
+    actions.logPaymentAndAdvance.mockResolvedValue({ ok: true });
+
+    await record('50000');
+
+    expect(toasts).toEqual([]);
+  });
+
+  test('a REFUSAL carrying `already` says nothing — the flag is only read on ok', async () => {
+    // `already` rides out beside a blocked advance (the payment replayed, the
+    // guard still refused). Announcing "already recorded" over a refusal would
+    // tell the studio the opposite of what happened.
+    renderWithIntl(<FormProbe />);
+    actions.logPaymentAndAdvance.mockResolvedValue({
+      ok: false,
+      error: 'gate_a_not_cleared',
+      already: true,
+    });
+
+    await record('50000');
+
+    expect(toasts).toEqual([]);
   });
 });

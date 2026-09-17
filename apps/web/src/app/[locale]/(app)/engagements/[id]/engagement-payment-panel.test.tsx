@@ -26,6 +26,18 @@ vi.mock('@/i18n/routing', async (importOriginal) => ({
 const actions = vi.hoisted(() => ({ recordPayment: vi.fn() }));
 vi.mock('@/lib/engagements/actions', () => actions);
 
+// The toast store is module-level, so a spy on `toast` is the whole surface.
+interface RaisedToast {
+  title?: string;
+  description?: string;
+}
+const toasts = vi.hoisted(() => [] as RaisedToast[]);
+vi.mock('@/hooks/use-toast', () => ({
+  toast: (raised: RaisedToast) => {
+    toasts.push(raised);
+  },
+}));
+
 const ar = (path: string) => messageAt('ar-EG', path);
 
 /** UUID-SHAPED, because the sessionStorage mirror refuses anything else (S1) —
@@ -87,6 +99,7 @@ beforeEach(() => {
   // The held keys are mirrored to sessionStorage, which outlives one mount by
   // design — so each test must start from an empty tab.
   sessionStorage.clear();
+  toasts.length = 0;
   minted = 0;
   setNow(START);
 });
@@ -276,5 +289,61 @@ describe('PaymentPanel — one key per deliberate act', () => {
     await record('50000');
 
     expect(sent()[0]!.key).toBe(sent()[1]!.key);
+  });
+});
+
+/**
+ * Backlog 18, and the cheapest fix in the whole programme: `recordPaymentCore`
+ * has answered a repeated idempotency key with `{ ok: true, already: true }`
+ * since 0050 - the ledger was NOT appended, the ORIGINAL row came back - and
+ * this panel closed on it exactly as it closes on a fresh write. Three testers
+ * traced duplicate-payment defects across two waves and every one of them ended
+ * here: the server already knew, and no screen looked.
+ */
+describe('PaymentPanel — a replayed payment is SAID, not silently reported as saved', () => {
+  test('an `already` success raises its own message instead of a plain one', async () => {
+    renderWithIntl(<PanelProbe />);
+    actions.recordPayment.mockResolvedValue({ ok: true, already: true });
+
+    await record('50000');
+
+    expect(toasts).toEqual([
+      {
+        title: ar('engagements.controls.alreadyRecorded'),
+        description: ar('engagements.controls.alreadyRecordedHint'),
+      },
+    ]);
+    // Still a success: a row for this act exists, so the panel closes and the
+    // page refreshes. What changed is that the studio is told WHICH row.
+    expect(router.refresh).toHaveBeenCalled();
+  });
+
+  test('an ordinary success says nothing extra', async () => {
+    renderWithIntl(<PanelProbe />);
+    actions.recordPayment.mockResolvedValue({ ok: true });
+
+    await record('50000');
+
+    expect(toasts).toEqual([]);
+  });
+
+  test('the retry of an in-doubt attempt is where this actually fires', async () => {
+    // The held-key path end to end: an `uncertain` first answer holds the key,
+    // the studio retries the SAME figures, the server recognises the key and
+    // answers `already`. Before this change that retry looked like a clean save,
+    // which is the one reading that could make a studio record it a third time.
+    renderWithIntl(<PanelProbe />);
+    actions.recordPayment.mockResolvedValue({ ok: false, error: 'uncertain' });
+    await record('50000');
+    expect(toasts).toEqual([]);
+
+    setNow(START + 60_000);
+    actions.recordPayment.mockResolvedValue({ ok: true, already: true });
+    await record('50000');
+
+    const payments = sent();
+    expect(payments[0]!.key).toBe(payments[1]!.key);
+    expect(toasts).toHaveLength(1);
+    expect(toasts[0]!.title).toBe(ar('engagements.controls.alreadyRecorded'));
   });
 });
