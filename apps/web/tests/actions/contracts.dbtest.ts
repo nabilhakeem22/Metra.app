@@ -156,6 +156,68 @@ describe('contract immutability + lifecycle (AC4, AC5, AC6)', () => {
     ).rejects.toMatchObject({ code: 'MT100' });
   });
 
+  it('refuses RE-PARENTING a line OUT of an issued contract, not only INTO one', async () => {
+    // The hole `enforce_contract_child_draft` carried until wave 7: on UPDATE it
+    // read only NEW's parent, so moving a line from an ISSUED contract to a
+    // DRAFT one was admitted - the status read was of the draft target,
+    // `contracts` itself is never touched so `trg_contracts_immutable` does not
+    // fire, and metra_app holds `update` on both child tables. The issued
+    // document loses a line while its frozen `original_value` - the figure the
+    // client signed - stays where it was.
+    const { ctx, clientId, projectId, contractId } = await issuedContract();
+    expect((await issueContractCore(ctx, { id: contractId })).ok).toBe(true);
+
+    // A second accepted proposal gives a second, still-DRAFT contract in the
+    // same org: there is one contract per proposal, so it needs its own.
+    const { id: secondProposal } = await acceptedProposal(ctx, clientId, projectId);
+    const draftContractId = (
+      (await generateContractCore(ctx, { proposalId: secondProposal })) as { data?: string }
+    ).data!;
+
+    const [issuedLine] = await raw.query<{ id: string }>(
+      `select id from public.contract_lines where contract_id = '${contractId}' order by sort_order limit 1`,
+    );
+    const [draftLine] = await raw.query<{ id: string }>(
+      `select id from public.contract_lines where contract_id = '${draftContractId}' order by sort_order limit 1`,
+    );
+
+    // OUT of the issued contract. OLD's parent is what refuses.
+    await expect(
+      withOrgContext(ctx, (tx) =>
+        tx.execute(
+          sql`update public.contract_lines set contract_id = ${draftContractId} where id = ${issuedLine.id}`,
+        ),
+      ),
+    ).rejects.toMatchObject({ code: 'MT100' });
+
+    // The direction that always worked, so the OLD check cannot be mistaken for
+    // having REPLACED the NEW one.
+    await expect(
+      withOrgContext(ctx, (tx) =>
+        tx.execute(
+          sql`update public.contract_lines set contract_id = ${contractId} where id = ${draftLine.id}`,
+        ),
+      ),
+    ).rejects.toMatchObject({ code: 'MT100' });
+
+    // The line is still where it was, and still counted by the issued contract.
+    const [stillThere] = await raw.query<{ contract_id: string }>(
+      `select contract_id from public.contract_lines where id = '${issuedLine.id}'`,
+    );
+    expect(stillThere.contract_id).toBe(contractId);
+
+    // A DRAFT line is still editable: this guard fences issued documents, it
+    // does not freeze the builder. Without it the two refusals above would also
+    // pass on a trigger that simply rejected every write.
+    await withOrgContext(ctx, (tx) =>
+      tx.execute(sql`update public.contract_lines set unit_price = '7' where id = ${draftLine.id}`),
+    );
+    const [edited] = await raw.query<{ unit_price: string }>(
+      `select unit_price from public.contract_lines where id = '${draftLine.id}'`,
+    );
+    expect(Number(edited.unit_price)).toBe(7);
+  });
+
   it('AC6: issue is atomic — concurrent 2nd call -> contract_not_draft, no 2nd token', async () => {
     const { ctx, contractId } = await issuedContract();
     const [a, b] = await Promise.all([

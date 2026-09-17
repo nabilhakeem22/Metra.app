@@ -16,6 +16,28 @@
 -- status lookup is not itself RLS-filtered. Raises MT100 on a frozen change.
 -- A cascade delete of a DRAFT proposal still passes (parent is draft at BEFORE
 -- DELETE time).
+--
+-- BOTH PARENTS ARE CHECKED ON UPDATE, which is what this guard was missing until
+-- wave 7. Reading only NEW's status admitted
+--
+--     update public.proposal_sections set proposal_id = '<a DRAFT proposal>'
+--      where id = '<a section of a SENT proposal>'
+--
+-- and the `proposal_lines.section_id` twin of it, because the status read was of
+-- the DRAFT target. `proposals` itself is never touched, so
+-- `trg_proposals_immutable` does not fire either, and metra_app holds `update`
+-- on both child tables. The sent document silently loses a section while its
+-- cached subtotal / taxable_base / total stay at the sent figures - which is the
+-- number the client is looking at. No product path writes either column today;
+-- this is the future action, script or backfill the trigger exists for, and it
+-- is the same hole `enforce_boq_child_draft` closed in wave 6.
+--
+-- THE TWO ATTACHED TABLES REACH THE PROPOSAL BY DIFFERENT COLUMNS
+-- (`proposal_sections.proposal_id`, `proposal_lines.section_id` -> its section's
+-- proposal), so the row is read through `to_jsonb` rather than as `OLD.<col>`:
+-- a direct field reference to a column the OTHER table does not have would raise
+-- at runtime the first time this trigger fired on it. The BOQ and contract twins
+-- read their column directly precisely because both of THEIR tables carry it.
 create or replace function public.enforce_proposal_child_draft()
 returns trigger
 language plpgsql
@@ -23,28 +45,49 @@ security definer
 set search_path = ''
 as $$
 declare
-  j   jsonb;
-  pid uuid;
-  st  text;
+  old_pid uuid;
+  new_pid uuid;
+  st      text;
 begin
-  if TG_OP = 'DELETE' then j := to_jsonb(OLD); else j := to_jsonb(NEW); end if;
+  -- The parent the row is LEAVING (UPDATE) or being removed from (DELETE).
+  -- OLD is NULL on INSERT, hence the guard.
+  if TG_OP <> 'INSERT' then
+    if TG_TABLE_NAME = 'proposal_sections' then
+      old_pid := (to_jsonb(OLD) ->> 'proposal_id')::uuid;
+    else
+      select proposal_id into old_pid
+        from public.proposal_sections
+        where id = (to_jsonb(OLD) ->> 'section_id')::uuid;
+    end if;
 
-  if TG_TABLE_NAME = 'proposal_sections' then
-    pid := (j ->> 'proposal_id')::uuid;
-  else
-    select proposal_id into pid
-      from public.proposal_sections
-      where id = (j ->> 'section_id')::uuid;
+    select status into st from public.proposals where id = old_pid;
+    if st is not null and st <> 'draft' then
+      raise exception
+        'proposal children are frozen once the proposal leaves draft (status=%)', st
+        using errcode = 'MT100';
+    end if;
+
+    if TG_OP = 'DELETE' then return OLD; end if;
   end if;
 
-  select status into st from public.proposals where id = pid;
+  -- The parent the row is ARRIVING at: an INSERT, or an UPDATE that re-parents.
+  if TG_TABLE_NAME = 'proposal_sections' then
+    new_pid := (to_jsonb(NEW) ->> 'proposal_id')::uuid;
+  else
+    select proposal_id into new_pid
+      from public.proposal_sections
+      where id = (to_jsonb(NEW) ->> 'section_id')::uuid;
+  end if;
+
+  -- An UPDATE that does not move the row has only one parent, already read.
+  if TG_OP = 'UPDATE' and new_pid is not distinct from old_pid then return NEW; end if;
+
+  select status into st from public.proposals where id = new_pid;
   if st is not null and st <> 'draft' then
     raise exception
       'proposal children are frozen once the proposal leaves draft (status=%)', st
       using errcode = 'MT100';
   end if;
-
-  if TG_OP = 'DELETE' then return OLD; end if;
   return NEW;
 end
 $$;
