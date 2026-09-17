@@ -30,7 +30,7 @@ vi.mock('@/lib/cf/context', () => ({
 
 const getSignedUrl = vi.fn<(...args: unknown[]) => Promise<string>>();
 const removeStoredObject = vi.fn<(...args: string[]) => Promise<void>>();
-vi.mock('@/lib/storage', () => ({
+vi.mock('@/lib/storage/uploads', () => ({
   getSignedUrl: (...args: unknown[]) => getSignedUrl(...args),
   removeStoredObject: (bucket: string, objectKey: string) =>
     removeStoredObject(bucket, objectKey),

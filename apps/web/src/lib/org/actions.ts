@@ -20,7 +20,7 @@ import {
   createSignedUploadUrl,
   ensureFilesBucket,
   type SignedUpload,
-} from '@/lib/storage';
+} from '@/lib/storage/uploads';
 import { clean } from '@/lib/validation/text';
 import {
   createOrgCore,

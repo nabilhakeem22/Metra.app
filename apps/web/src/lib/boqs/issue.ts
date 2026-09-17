@@ -14,7 +14,7 @@ import type { OrgContext } from '@/lib/db/context';
 import { withOrgContext } from '@/lib/db/context';
 import { buildBoqHtml, formatBoqNumber } from '@/lib/pdf/boq-template';
 import { renderPdf } from '@/lib/pdf/render';
-import { storeGeneratedFile } from '@/lib/storage';
+import { storeGeneratedFile } from '@/lib/storage/uploads';
 import { getProjectBoq } from './queries';
 
 /**

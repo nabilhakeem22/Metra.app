@@ -17,7 +17,7 @@ import {
   createSignedUploadUrl,
   ensureFilesBucket,
   type SignedUpload,
-} from '@/lib/storage';
+} from '@/lib/storage/uploads';
 import type { DocumentEntitySpec } from './entities';
 
 /**

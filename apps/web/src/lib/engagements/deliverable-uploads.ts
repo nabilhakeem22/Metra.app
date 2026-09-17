@@ -11,7 +11,7 @@ import {
   ensureFilesBucket,
   getSignedUrl,
   type SignedUpload,
-} from '@/lib/storage';
+} from '@/lib/storage/uploads';
 import { recordArtifactCore } from './artifacts';
 import {
   ALLOWED_EXTENSIONS,
