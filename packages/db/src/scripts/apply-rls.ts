@@ -1,22 +1,20 @@
 // Applies roles + RLS policies + trigger functions. Run AFTER migrate.
-// Order matters: functions -> roles (grants execute on the function) -> policies.
+// Order matters: functions -> immutability -> roles (grants execute on the
+// function) -> policies. The list itself lives in rls/manifest.ts.
 import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createSql } from '../client';
 import { MIGRATION_DATABASE_URL } from '../env';
+import { RLS_APPLY_ORDER } from '../rls/manifest';
 import { MIGRATION_LOCK_TIMEOUT, applyLockTimeout } from './lock-timeout';
 
 const here = dirname(fileURLToPath(import.meta.url)); // packages/db/src/scripts
 const rlsDir = resolve(here, '../rls');
 // Order: functions + immutability (create fns) -> roles (grant execute) ->
-// policies (reference fns).
-const files = [
-  'functions.sql',
-  'immutability.sql',
-  'roles.sql',
-  'policies.sql',
-];
+// policies (reference fns). It is written down in ONE place, rls/manifest.ts,
+// which this script and rls/functions-order.test.ts both read.
+const files = RLS_APPLY_ORDER;
 
 async function main() {
   const sql = createSql(MIGRATION_DATABASE_URL(), {
@@ -28,7 +26,9 @@ async function main() {
     // Before the first `sql.unsafe`: each file goes over the simple protocol as
     // ONE implicit transaction, so a single `alter table ... enable row level
     // security` that blocks would hold ACCESS EXCLUSIVE on every table the file
-    // already touched until the whole file finished.
+    // already touched until the whole file finished. MORE files therefore means
+    // more implicit transactions and strictly SHORTER individual lock windows,
+    // not longer ones.
     await applyLockTimeout(sql);
     for (const file of files) {
       const path = resolve(rlsDir, file);

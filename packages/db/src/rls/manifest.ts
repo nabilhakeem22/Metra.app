@@ -25,7 +25,7 @@
  * the symptom turns up somewhere else entirely.
  */
 export const RLS_APPLY_ORDER = [
-  'functions.sql',
+  'functions/00-org-context.sql',
   'immutability.sql',
   'roles.sql',
   'policies.sql',
