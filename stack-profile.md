@@ -68,12 +68,12 @@ Agents run these literally. These are exactly what `.github/workflows/ci.yml` ru
 - **Error handling:** unified `ActionResult` + `ActionCode` union + `resolveActionError(code,t)` (localized, never raw English). `mutateInOrg` catches and returns coded errors. Server actions RETURN `ActionResult` — never throw to the client. Modal/form callers MUST wrap awaits so a rejected action can't leave a spinner stuck.
 - **Logging:** `console.error` on the server. Read it with **`npx wrangler tail`** (live) or the Workers Logs view in the Cloudflare dashboard. Never log PII, secrets, tokens, or raw share tokens (store only the sha256 hash).
 - **Naming:** intent-revealing, no abbreviations (Rulebook #4).
-- **Folder structure:** per-domain `apps/web/src/lib/{module}/{core,queries,actions}.ts`; schema `packages/db/src/schema/*.ts`; RLS `packages/db/src/rls/{policies,roles,functions,immutability}.sql`; UI `apps/web/src/app/[locale]/(app)/{module}/`.
+- **Folder structure:** per-domain `apps/web/src/lib/{module}/{core,queries,actions}.ts`; schema `packages/db/src/schema/*.ts`; RLS `packages/db/src/rls/{functions/*,policies/*,roles,immutability}.sql`, applied in the order `rls/manifest.ts` declares; UI `apps/web/src/app/[locale]/(app)/{module}/`.
 - **Anything the coder must mirror (exemplars):**
   - Tabbed feature → `apps/web/src/app/[locale]/(app)/clients/[id]/` (server `page.tsx` + `'use client'` `profile-tabs.tsx` + **server-safe `tabs.ts`** + per-tab server/client components).
   - Domain lib → `apps/web/src/lib/client-contacts/{core,queries,actions}.ts`.
   - Schema-only migration → `packages/db/migrations/0015_project_profile.sql`.
-  - RLS for a new table → add to `rls/policies.sql` + `rls/roles.sql` (NOT the migration).
+  - RLS for a new table → add to the right `rls/policies/*.sql` + `rls/roles.sql` (NOT the migration). A NEW `.sql` file under `rls/` must also be added to `rls/manifest.ts`, or it is never applied and nothing says so.
 - **Money law:** EGP; `numeric(18,4)` carried as a string; piastre-exact BigInt math (round half-up), never float; rendered IBM Plex Mono, tabular, `direction:ltr`, `text-align:end`.
 - **No demo/fake data** — honest empty states + "activates with X" locked states for not-yet-built dependencies.
 
@@ -147,7 +147,12 @@ The inputs that are weird *in Egyptian fit-out specifically* — this is what ma
 
 The architect may not design around these:
 - **The Refactoring Rulebook** (above).
-- **Migrations = schema + data-backfill ONLY.** NEVER `create policy`, `grant … to metra_app`, or reference an apply-rls function (`app_is_current_org_member()` etc.) inside a migration — those objects don't exist yet on a fresh CI DB at migrate time (this broke CI on 0013/0014). RLS lives ONLY in `rls/policies.sql` + `rls/roles.sql`, applied by `apply-rls` AFTER migrate.
+- **Migrations = schema + data-backfill ONLY.** NEVER `create policy`, `grant … to metra_app`, or reference an apply-rls function (`app_is_current_org_member()` etc.) inside a migration — those objects don't exist yet on a fresh CI DB at migrate time (this broke CI on 0013/0014). RLS lives ONLY in `rls/policies/*.sql` + `rls/roles.sql`, applied by `apply-rls` AFTER migrate.
+- **`rls/**.sql` is exempt from the 150-line rule.** Split at function and domain
+  boundaries only; never inside one SDF or one table's policy block. The apply
+  order is `rls/manifest.ts` and nothing else — a `.sql` file under `rls/` that
+  is not in the manifest is NEVER APPLIED, silently, and
+  `rls/functions-order.test.ts` is what fails on it.
 - **Server-safe constants:** never export a value/const from a `'use client'` module and import it into a server component — it becomes a client-reference proxy → runtime 500 (passes tsc/build). Shared constants live in a plain non-client module (see `tabs.ts`).
 - Every new org-scoped table → isolation gate coverage + `fixture.ts` teardown (FK-safe order) + RLS in `apply-rls`.
 - Message-key parity + Western numerals; logical CSS only; no demo data.

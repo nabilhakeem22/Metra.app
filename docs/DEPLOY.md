@@ -272,7 +272,7 @@ where e.kind = 'rom_acknowledgement'
    already have.
 
 That is the whole procedure. The portal compares `acknowledged_issue_at IS NOT
-DISTINCT FROM rom_issued_at` (`rls/functions.sql`, the repeat-suppression branch
+DISTINCT FROM rom_issued_at` (`rls/functions/50-delivery-write.sql`, the repeat-suppression branch
 of the respond function), and a NULL never matches a real instant — so for an
 engagement whose band is already issued, the link is **already re-offering the
 acknowledge verb**. Nothing on the studio side has to happen first.

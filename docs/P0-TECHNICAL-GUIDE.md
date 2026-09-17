@@ -216,7 +216,7 @@ members (founding) **or** an `accepted` invitation exists for the caller's own
 `app.current_user_email` (accept). `user_id = current_user` appears only in a
 `WITH CHECK` clause, never in a `USING` clause, so it cannot re-open a read leak.
 
-### 5.2 SECURITY DEFINER helpers (`packages/db/src/rls/functions.sql`)
+### 5.2 SECURITY DEFINER helpers (`packages/db/src/rls/functions/*.sql`)
 
 Two families, all `SET search_path = ''`, all **granted only to `metra_app`** and
 **revoked from `public`/`anon`/`authenticated`/`service_role`** — verified not
