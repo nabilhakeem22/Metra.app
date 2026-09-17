@@ -36,123 +36,38 @@
 // For the same reason it is NOT a CI step: CI's fresh database is built from the
 // same migrations and would show the same folded names.
 //
+// ALL FOUR SECTIONS PRINT ON THE FAILING RUN. The exit code is columns only,
+// but the three report-only catalogues are what tell the owner what ELSE is out
+// of step, and that run is the one whose output gets pasted into an incident.
+// The previous version computed them and then exited before printing them.
+//
 // What the code declares, and how a name is compared, lives in
-// `schema-catalogue.ts` — which has no connection and is unit-tested.
+// `schema-catalogue.ts` — which has no connection and is unit-tested. The four
+// reads and the report they print live in `schema-check.ts`, which takes the
+// handle as an argument and returns the exit code — so this file is only the
+// wiring: open a connection, run it, close it, exit.
 import { createSql } from '../client';
 import { MIGRATION_DATABASE_URL } from '../env';
-import {
-  declaredConstraints,
-  declaredFunctions,
-  declaredIndexes,
-  declaredTables,
-  missingColumns,
-  missingNames,
-} from './schema-catalogue';
+import { runSchemaCheck } from './schema-check';
 
-type Sql = ReturnType<typeof createSql>;
-
-/** Every table the DATABASE has in `public`, as table name -> column names. */
-async function appliedTables(sql: Sql): Promise<Map<string, Set<string>>> {
-  const rows = (await sql`
-    select table_name, column_name
-      from information_schema.columns
-     where table_schema = 'public'
-  `) as unknown as Array<{ table_name: string; column_name: string }>;
-  const applied = new Map<string, Set<string>>();
-  for (const row of rows) {
-    const columns = applied.get(row.table_name) ?? new Set<string>();
-    columns.add(row.column_name);
-    applied.set(row.table_name, columns);
-  }
-  return applied;
-}
-
-/** Every index / constraint / function name the DATABASE has in `public`. */
-async function appliedNames(
-  sql: Sql,
-  kind: 'index' | 'constraint' | 'function',
-): Promise<Set<string>> {
-  const rows = (await (kind === 'index'
-    ? sql`select indexname as name from pg_indexes where schemaname = 'public'`
-    : kind === 'constraint'
-      ? sql`select c.conname as name
-              from pg_constraint c
-              join pg_namespace n on n.oid = c.connamespace
-             where n.nspname = 'public'`
-      : sql`select p.proname as name
-              from pg_proc p
-              join pg_namespace n on n.oid = p.pronamespace
-             where n.nspname = 'public'`)) as unknown as Array<{ name: string }>;
-  return new Set(rows.map((row) => row.name));
-}
-
-/** Print one report-only section. Returns its gap count, for the closing note. */
-function report(title: string, declaredCount: number, gaps: string[]): number {
-  if (gaps.length === 0) {
-    console.log(
-      `assert-schema-applied: ${title} — ${declaredCount} declared, all present.`,
-    );
-    return 0;
-  }
-  console.log(
-    `assert-schema-applied: ${title} — ${declaredCount} declared, ${gaps.length} ` +
-      `NOT FOUND (report only, does not fail this check):\n${gaps.join('\n')}`,
-  );
-  return gaps.length;
-}
-
-const DRIFT_NOTE =
-  '\nThose three sections are REPORT ONLY: the exit code above is governed by ' +
-  'columns alone.\n' +
-  'A name that differs only in CASE means the object was created by an UNQUOTED ' +
-  'camelCase identifier in a hand-authored migration, which Postgres folded to ' +
-  'lower case — in every database built from these migrations, production and CI ' +
-  'alike. Compare the catalogue against `src/schema/` before assuming the object ' +
-  'is missing: the fix is a schema-side name alignment or a rename migration, ' +
-  'never a re-create.\n' +
-  'A name absent under ANY casing is either an index the schema declares that no ' +
-  'migration ever created, or an `apply-rls` object this database has not had ' +
-  'applied yet.';
-
-async function main() {
+async function main(): Promise<number> {
   const sql = createSql(MIGRATION_DATABASE_URL(), { max: 1, prepare: false });
   try {
-    const declared = declaredTables();
-    const gaps = missingColumns(declared, await appliedTables(sql));
-
-    const indexes = declaredIndexes();
-    const constraints = declaredConstraints();
-    const functions = declaredFunctions();
-    const indexGaps = missingNames(indexes, await appliedNames(sql, 'index'));
-    const constraintGaps = missingNames(constraints, await appliedNames(sql, 'constraint'));
-    const functionGaps = missingNames(functions, await appliedNames(sql, 'function'));
-
-    if (gaps.length > 0) {
-      console.error(
-        'assert-schema-applied: this database is BEHIND the code.\n' +
-          `${gaps.join('\n')}\n\n` +
-          'Run `npm run migrate -w @metra/db` (then `npm run apply-rls -w @metra/db`) ' +
-          'BEFORE shipping this code. Deploying first is not a partial outage: ' +
-          "drizzle names every column in its SELECT, so one missing column is 42703 " +
-          'for the whole query.',
-      );
-      process.exit(1);
-    }
-    console.log(
-      `assert-schema-applied: OK — ${declared.size} declared table(s), every column present.`,
-    );
-
-    const total =
-      report('indexes', indexes.size, indexGaps) +
-      report('constraints', constraints.size, constraintGaps) +
-      report('functions', functions.size, functionGaps);
-    if (total > 0) console.log(DRIFT_NOTE);
+    return await runSchemaCheck(sql);
   } finally {
     await sql.end();
   }
 }
 
-main().catch((error: Error) => {
-  console.error('assert-schema-applied failed:', error.message);
-  process.exit(1);
-});
+// `process.exitCode`, not `process.exit()`: the latter tears the process down
+// where it stands, which on a failing run is exactly when there is the most
+// buffered output to lose. Nothing here keeps the loop alive once `sql.end()`
+// has resolved.
+main()
+  .then((code) => {
+    process.exitCode = code;
+  })
+  .catch((error: Error) => {
+    console.error('assert-schema-applied failed:', error.message);
+    process.exitCode = 1;
+  });
