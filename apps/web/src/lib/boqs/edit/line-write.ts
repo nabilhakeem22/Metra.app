@@ -8,13 +8,13 @@ import { readMoneyString } from '@/lib/money/read';
 import { withinMagnitude } from '@/lib/money/read';
 import type { OrgContext } from '@/lib/db/context';
 import { countCharacters } from '@/lib/validation/text';
-import { bilingualFor } from './bilingual';
-import { MAX_BOQ_LINES, recomputeBoqTotals } from './core';
+import { bilingualFor } from '../bilingual';
+import { MAX_BOQ_LINES, recomputeBoqTotals } from '../core';
 import {
   MAX_DESCRIPTION,
   normalizeLinePatch,
   type BoqLinePatch,
-} from './edit-input';
+} from '../edit-input';
 
 /**
  * Editing a draft BOQ line by line.
