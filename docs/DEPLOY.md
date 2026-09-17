@@ -257,21 +257,28 @@ where e.kind = 'rom_acknowledgement'
   and de.rom_issued_at is not null;
 ```
 
-**That population needs THREE steps, not two, and the order matters.** `Issue to
-client` refuses an engagement that already has a `rom_issued_at` — it answers
-`rom_already_issued`, by design: issuing twice would stamp a second instant on a
-band nobody re-sent. So for each engagement in that count:
+**That population needs ONE step, not three.**
 
-1. **Re-set the band** (Set build-cost range — the same numbers are fine).
-   Setting it clears `rom_issued_at` unconditionally, because a band the client
-   has seen is a figure they may be budgeting against and changing it un-tells
-   them.
-2. **Issue to client.** Now it is admitted, and stamps a fresh issuance instant.
-3. **The client acknowledges** from their existing delivery link — the portal
-   re-offers the verb by itself, because a NULL never matches a real instant.
+1. **Ask the client to tap Acknowledge again**, on the delivery link they
+   already have.
 
-An engagement with no `rom_issued_at` at all (the first count above) skips step 1
-— it has nothing to clear.
+That is the whole procedure. The portal compares `acknowledged_issue_at IS NOT
+DISTINCT FROM rom_issued_at` (`rls/functions.sql`, the repeat-suppression branch
+of the respond function), and a NULL never matches a real instant — so for an
+engagement whose band is already issued, the link is **already re-offering the
+acknowledge verb**. Nothing on the studio side has to happen first.
+
+> **An earlier version of this runbook told you to re-set the band first. Do
+> not.** "Re-set the band" clears `rom_issued_at` unconditionally, which un-tells
+> a client a figure they may be budgeting against — in order to work around a
+> `rom_already_issued` refusal (`lib/engagements/rom-issue.ts:44`) that the NULL
+> comparison means you never actually hit. The refusal only guards a band that
+> IS currently issued and acknowledged against; it is not in the way here.
+
+Re-issuing is needed only for an engagement with **no `rom_issued_at` at all**
+(the second count query above) — there is nothing to acknowledge until a band
+has been issued. Set the band, issue it, and the client acknowledges from the
+same link.
 
 Nothing else clears the flag; there is no backfill script, because stamping a
 date onto an old acknowledgement would be inventing evidence on an evidentiary
