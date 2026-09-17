@@ -260,8 +260,20 @@ describe('R-B proposal transitions under concurrency', () => {
     expect(numbers.length).toBe(succeeded);
     // Every failure is an AMBIGUOUS outcome, never a refusal: the allocator has
     // no reason to refuse, so anything else here is a real defect.
+    //
+    // `generic` is NOT in that set, and the exclusion is the whole point.
+    // `mutationFailureCode` classifies in a fixed order — ActionError -> its
+    // code; DbWriteUncertainError or isAmbiguousDbOutcome (55P03 lock timeout,
+    // 57014, dropped socket) -> `uncertain`; the caller's conflictCode /
+    // immutableCode; then EVERYTHING ELSE -> `generic`. `createProposalCore`
+    // declares no conflictCode, so the only way a caller here answers `generic`
+    // is an unclassified throw, and the headline candidate is a 23505 on
+    // proposals (org_id, number) — precisely what a BROKEN advisory lock
+    // produces. Admitting it would have made this case green for the one defect
+    // it exists to catch: 1 success, 9 rows refused by the unique index,
+    // distinct numbers, numbers.length === succeeded, all assertions pass.
     for (const result of results as Array<{ ok: boolean; error?: string }>) {
-      if (!result.ok) expect(['uncertain', 'generic']).toContain(result.error);
+      if (!result.ok) expect(['uncertain']).toContain(result.error);
     }
   });
 });
