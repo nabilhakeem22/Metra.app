@@ -30,9 +30,12 @@ const PROVISIONAL_OFF: CSSProperties = {
 export function BoqProvisionalCell({
   line,
   api,
+  pending,
 }: {
   line: EditableLine;
   api: BoqSheetRowApi;
+  /** SOME write on the sheet is in flight. */
+  pending: boolean;
 }) {
   const t = useTranslations('projects.profile.boq');
   return (
@@ -44,7 +47,7 @@ export function BoqProvisionalCell({
             aria-pressed={line.provisional}
             aria-label={t('provisional')}
             title={t('provisional')}
-            disabled={api.pending}
+            disabled={pending}
             onClick={() => api.saveLine(line, { provisional: !line.provisional }, [])}
             className="inline-flex size-6 items-center justify-center rounded-[8px] border font-mono text-[10px] font-bold"
             style={line.provisional ? PROVISIONAL_ON : PROVISIONAL_OFF}
@@ -70,15 +73,21 @@ export function BoqProvisionalCell({
 export function BoqRowActionsCell({
   line,
   api,
+  saving,
+  pending,
 }: {
   line: EditableLine;
   api: BoqSheetRowApi;
+  /** THIS row is mid-save. */
+  saving: boolean;
+  /** SOME write on the sheet is in flight. */
+  pending: boolean;
 }) {
   const t = useTranslations('projects.profile.boq');
   return (
     <Td>
       <div className="flex justify-center p-3">
-        {api.isSaving(line.id) ? (
+        {saving ? (
           <Loader2
             className="size-4 animate-spin text-[color:var(--text-faint)]"
             aria-label={t('saving')}
@@ -87,7 +96,7 @@ export function BoqRowActionsCell({
           <button
             type="button"
             onClick={() => api.onDeleteLine(line.id)}
-            disabled={api.pending}
+            disabled={pending}
             aria-label={t('deleteLine')}
             title={t('deleteLine')}
             className="rounded-[8px] p-1 text-[color:var(--text-faint)] hover:text-[color:var(--danger)]"

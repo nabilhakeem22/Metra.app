@@ -1,32 +1,33 @@
 'use client';
 
-import { useState } from 'react';
-import { computeLine } from '@/lib/aggregates/proposal-totals';
-import { recordValue, type Column, type EditableLine } from './boq-sheet-columns';
-
-/** lineId -> column -> what the studio typed but has not committed. */
-type CellEdits = Record<string, Partial<Record<Column, string>>>;
+import { useCallback, useState } from 'react';
+import type { CellEdits, Column } from './boq-sheet-columns';
 
 /**
- * Everything the BOQ sheet holds LOCALLY while a studio types, and every pure
- * read over it. No server call lives here — writes are use-boq-writes.ts.
+ * Everything the BOQ sheet holds LOCALLY while a studio types. No server call
+ * lives here — writes are use-boq-writes.ts — and no derived READ lives here
+ * either: `cellValueOf` and `amountOf` are pure functions in
+ * boq-sheet-columns.ts, so a row can run them over its own props.
  *
  * Local edits OVERRIDE rather than MIRROR the record. Mirroring would mean a save
  * landing from another tab is fought over; overriding means only the cells
  * actually being typed in are held locally, and everything else is whatever the
  * revalidated props say.
+ *
+ * THE STATE IS HANDED OUT AS DATA AND EVERY HANDLER IS STABLE — `useCallback`
+ * with no dependency, state reached through the updater form. That is what makes
+ * `React.memo` on a row work: a keystroke changes ONE row's slice of `cells`, so
+ * every other row is handed identical props and does not re-render. While this
+ * returned a fresh closure per member per render, memo was a no-op and one
+ * keystroke on a 2,000-line sheet re-rendered all 2,000 rows.
  */
 export interface BoqEditsApi {
-  /** True while the row has any uncommitted cell. An unsaved row gets an edge. */
-  isDirty(lineId: string): boolean;
+  /** lineId -> column -> what the studio typed but has not committed. */
+  cells: CellEdits;
+  /** The rows mid-save. Drives the per-row spinner. */
+  savingIds: ReadonlySet<string>;
   /** How many rows are mid-save. Drives the "saving"/"all saved" footer light. */
   savingCount: number;
-  isSaving(lineId: string): boolean;
-  /** What a cell should show: the local edit if there is one, else the record. */
-  cellValue(line: EditableLine, column: Column): string;
-  /** Only what was TYPED, or undefined. A blur with nothing typed writes nothing. */
-  typedValue(line: EditableLine, column: Column): string | undefined;
-  amountOf(line: EditableLine): string;
   setCell(lineId: string, column: Column, value: string): void;
   clearColumns(lineId: string, columns: Column[]): void;
   markSaving(lineId: string, saving: boolean): void;
@@ -56,43 +57,30 @@ function withSaving(saving: Set<string>, lineId: string, on: boolean): Set<strin
   return next;
 }
 
-/**
- * The amount as it will be STORED, recomputed from what is on screen.
- *
- * It runs the SAME `computeLine` the server runs, so the number the studio is
- * steering by while typing is the number that lands in the row — rather than a
- * browser-side approximation that disagrees with the document by a piastre.
- */
-function amountFor(edits: CellEdits, line: EditableLine): string {
-  const qty = edits[line.id]?.qty;
-  const unitPrice = edits[line.id]?.unitPrice;
-  if (qty === undefined && unitPrice === undefined) return line.lineTotal;
-  return computeLine({
-    qty: qty ?? line.qty,
-    unitPrice: unitPrice ?? line.unitPrice,
-    unitCost: '0',
-    discountPct: line.discountPct,
-  }).lineTotal;
-}
-
 export function useBoqEdits(): BoqEditsApi {
-  const [edits, setEdits] = useState<CellEdits>({});
+  const [cells, setCells] = useState<CellEdits>({});
   const [savingIds, setSavingIds] = useState<Set<string>>(new Set());
   const [discount, setDiscount] = useState<string | null>(null);
 
+  const setCell = useCallback((lineId: string, column: Column, value: string) => {
+    setCells((previous) => withCell(previous, lineId, column, value));
+  }, []);
+
+  const clearColumns = useCallback((lineId: string, columns: Column[]) => {
+    setCells((previous) => withoutColumns(previous, lineId, columns));
+  }, []);
+
+  const markSaving = useCallback((lineId: string, saving: boolean) => {
+    setSavingIds((previous) => withSaving(previous, lineId, saving));
+  }, []);
+
   return {
-    isDirty: (lineId) => edits[lineId] !== undefined,
+    cells,
+    savingIds,
     savingCount: savingIds.size,
-    isSaving: (lineId) => savingIds.has(lineId),
-    cellValue: (line, column) => edits[line.id]?.[column] ?? recordValue(line, column),
-    typedValue: (line, column) => edits[line.id]?.[column],
-    amountOf: (line) => amountFor(edits, line),
-    setCell: (lineId, column, value) =>
-      setEdits((prev) => withCell(prev, lineId, column, value)),
-    clearColumns: (lineId, columns) =>
-      setEdits((prev) => withoutColumns(prev, lineId, columns)),
-    markSaving: (lineId, saving) =>
-      setSavingIds((prev) => withSaving(prev, lineId, saving)),
+    setCell,
+    clearColumns,
+    markSaving,
     discount,
     setDiscount,
   };

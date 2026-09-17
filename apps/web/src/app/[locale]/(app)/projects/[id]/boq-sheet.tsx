@@ -1,25 +1,21 @@
 'use client';
 
-import { useLocale } from 'next-intl';
-import type { KeyboardEvent, ReactNode } from 'react';
-import { useRef, useState } from 'react';
+import type { ReactNode } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import type { BoqDetail } from '@/lib/boqs/queries';
-import { formatMoney } from '@/lib/format/money';
 import { BoqSheetFooter, BoqSheetHeader } from './boq-sheet-chrome';
-import type { Column, EditableLine } from './boq-sheet-columns';
-import { focusNextInColumn } from './boq-sheet-focus';
 import { BoqSheetHead } from './boq-sheet-head';
-import type { BoqSheetRowApi } from './boq-sheet-row-api';
 import { countVisibleLines, searchNeedle, visibleLines } from './boq-sheet-search';
 import { BoqSectionBody } from './boq-sheet-section';
 import { BoqTotals } from './boq-sheet-totals';
 import { useBoqEdits } from './use-boq-edits';
+import { useBoqRowApi } from './use-boq-row-api';
 import { useBoqWrites } from './use-boq-writes';
 
 /**
  * The BOQ as one sheet — COMPOSITION ONLY. What each piece owns is in the file
- * named after it: columns, focus, search, edits, writes, head, chrome, section,
- * row, cells, totals.
+ * named after it: columns, focus, search, edits, writes, row api, head, chrome,
+ * section, row, cells, totals.
  *
  * The frame holds still while you work in it — the column header is pinned, the
  * totals are pinned, and the code and description columns stay put while the
@@ -37,51 +33,46 @@ export function BoqSheet({
   /** Issue / download controls — owned by the tab, rendered in this header. */
   actions?: ReactNode;
 }) {
-  const locale = useLocale();
   const edits = useBoqEdits();
   const writes = useBoqWrites({ boq, edits });
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [query, setQuery] = useState('');
   const gridRef = useRef<HTMLTableElement>(null);
+  const rowApi = useBoqRowApi({ canEdit, edits, writes, gridRef });
 
-  const money = (value: string) => formatMoney(value, locale);
   const needle = searchNeedle(query);
+  const colCount = canEdit ? 8 : 7;
 
-  /**
-   * Enter walks DOWN the column, which is how a rate list is actually typed.
-   * Tab still moves across. Escape puts the cell back and writes nothing.
-   */
-  function onKeyDown(
-    event: KeyboardEvent<HTMLElement>,
-    line: EditableLine,
-    column: Column,
-  ): void {
-    if (event.key === 'Escape') {
-      edits.clearColumns(line.id, [column]);
-      return;
-    }
-    if (event.key !== 'Enter') return;
-    event.preventDefault();
-    focusNextInColumn(gridRef.current, column, event.currentTarget);
-  }
-
-  function toggleSection(sectionId: string): void {
-    setCollapsed((prev) => {
-      const next = new Set(prev);
+  const toggleSection = useCallback((sectionId: string): void => {
+    setCollapsed((previous) => {
+      const next = new Set(previous);
       if (next.has(sectionId)) next.delete(sectionId);
       else next.add(sectionId);
       return next;
     });
-  }
+  }, []);
 
-  const colCount = canEdit ? 8 : 7;
-  const rowApi: BoqSheetRowApi = { canEdit, money, onKeyDown, ...edits, ...writes };
+  /**
+   * THE FILTERED ROWS, computed once per (boq, query) rather than per render.
+   * Identity matters here as much as cost: `visibleLines` rebuilds every line
+   * object, so a fresh array per keystroke would hand every memoised row a new
+   * `line` and defeat the memo entirely.
+   */
+  const bodies = useMemo(
+    () =>
+      boq.sections.map((section) => ({
+        section,
+        lines: visibleLines(section, needle),
+      })),
+    [boq, needle],
+  );
+  const visibleCount = useMemo(() => countVisibleLines(boq, needle), [boq, needle]);
 
   return (
     <div className="overflow-hidden rounded-[var(--r-panel,20px)] border border-[color:var(--rule)] bg-card shadow-sm">
       <BoqSheetHeader
         boq={boq}
-        visibleCount={countVisibleLines(boq, needle)}
+        visibleCount={visibleCount}
         query={query}
         onQueryChange={setQuery}
         actions={actions}
@@ -97,15 +88,18 @@ export function BoqSheet({
         >
           <BoqSheetHead canEdit={canEdit} />
 
-          {boq.sections.map((section) => (
+          {bodies.map(({ section, lines }) => (
             <BoqSectionBody
               key={section.id}
               section={section}
-              lines={visibleLines(section, needle)}
+              lines={lines}
               collapsed={collapsed.has(section.id)}
               colCount={colCount}
               searching={needle !== ''}
               api={rowApi}
+              cells={edits.cells}
+              savingIds={edits.savingIds}
+              pending={writes.pending}
               onToggle={() => toggleSection(section.id)}
             />
           ))}
@@ -114,7 +108,7 @@ export function BoqSheet({
             boq={boq}
             canEdit={canEdit}
             colCount={colCount}
-            money={money}
+            money={rowApi.money}
             discount={edits.discount}
             onDiscountChange={edits.setDiscount}
             onDiscountBlur={writes.onDiscountBlur}

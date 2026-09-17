@@ -1,3 +1,4 @@
+import { computeLine } from '@/lib/aggregates/proposal-totals';
 import type { BoqLineRow } from '@/lib/boqs/queries';
 
 // The BOQ sheet's COLUMN vocabulary. A plain module, not 'use client': it holds
@@ -11,6 +12,12 @@ export type Column = 'itemCode' | 'description' | 'unit' | 'qty' | 'unitPrice';
 export interface EditableLine extends BoqLineRow {
   sectionId: string;
 }
+
+/** What ONE row holds locally: the columns typed into but not yet committed. */
+export type RowEdits = Partial<Record<Column, string>>;
+
+/** lineId -> what that row holds locally. */
+export type CellEdits = Record<string, RowEdits>;
 
 /** Trim a stored scale-4 figure to something worth typing over: 8.5000 -> 8.5 */
 export function trimNumber(value: string): string {
@@ -42,4 +49,38 @@ export function recordValue(line: EditableLine, column: Column): string {
     case 'unit':
       return line.unit;
   }
+}
+
+/**
+ * What a cell should SHOW: the local edit if there is one, else the record.
+ *
+ * It takes the row's own edits rather than the whole sheet's, because that is
+ * what a row is handed as a prop — which is what lets the row be memoised and a
+ * keystroke re-render one row instead of two thousand.
+ */
+export function cellValueOf(
+  line: EditableLine,
+  column: Column,
+  typed: RowEdits | undefined,
+): string {
+  return typed?.[column] ?? recordValue(line, column);
+}
+
+/**
+ * The amount as it will be STORED, recomputed from what is on screen.
+ *
+ * It runs the SAME `computeLine` the server runs, so the number the studio is
+ * steering by while typing is the number that lands in the row — rather than a
+ * browser-side approximation that disagrees with the document by a piastre.
+ */
+export function amountOf(line: EditableLine, typed: RowEdits | undefined): string {
+  const qty = typed?.qty;
+  const unitPrice = typed?.unitPrice;
+  if (qty === undefined && unitPrice === undefined) return line.lineTotal;
+  return computeLine({
+    qty: qty ?? line.qty,
+    unitPrice: unitPrice ?? line.unitPrice,
+    unitCost: '0',
+    discountPct: line.discountPct,
+  }).lineTotal;
 }

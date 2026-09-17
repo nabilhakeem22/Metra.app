@@ -119,6 +119,7 @@ export function EditableCell({
   line,
   column,
   label,
+  value,
   api,
   mono,
   numeric,
@@ -126,13 +127,17 @@ export function EditableCell({
   line: EditableLine;
   column: Column;
   label: string;
+  /** What this cell SHOWS, resolved by the row from its own props (cellValueOf).
+   *  Passed in rather than read back out of a shared api, so the api can stay
+   *  stable and the row can be memoised. */
+  value: string;
   api: BoqSheetRowApi;
   mono?: boolean;
   numeric?: boolean;
 }) {
   return (
     <BoqCellInput
-      value={api.cellValue(line, column)}
+      value={value}
       onChange={(value) => api.setCell(line.id, column, value)}
       onBlur={() => api.onCellBlur(line, column)}
       onKeyDown={(event) => api.onKeyDown(event, line, column)}

@@ -20,6 +20,25 @@ const actions = vi.hoisted(() => ({
 }));
 vi.mock('@/lib/boqs/actions', () => actions);
 
+/**
+ * A RENDER COUNTER THAT NEEDS NO INSTRUMENTATION. formatMoney is called exactly
+ * once per rendered ROW (the amount cell), once per rendered section header and
+ * a fixed handful by the totals block, so counting calls counts renders. The
+ * mock delegates to the real formatter, so every other assertion in this file
+ * still reads a real formatted figure.
+ */
+const moneyCalls = vi.hoisted(() => ({ count: 0 }));
+vi.mock('@/lib/format/money', async (importOriginal) => {
+  const real = await importOriginal<typeof import('@/lib/format/money')>();
+  return {
+    ...real,
+    formatMoney: (value: string | number | null | undefined, locale: string) => {
+      moneyCalls.count += 1;
+      return real.formatMoney(value, locale);
+    },
+  };
+});
+
 const toasts = vi.hoisted(() => [] as CapturedToast[]);
 vi.mock('@/hooks/use-toast', () => ({
   toast: (raised: CapturedToast) => {
@@ -247,5 +266,61 @@ describe('BoqSheet \u2014 the issued (read-only) sheet still shows its figures',
     expect(cells).toContain(quantity);
     expect(cells).toContain(rate);
     expect(cells).toContain(formatMoney('10000.0000', 'ar-EG'));
+  });
+});
+
+/**
+ * Wave-5 remediation R3: a keystroke re-renders ONE row, not the sheet.
+ *
+ * `rowApi` used to be rebuilt every render from two hooks that each returned a
+ * new object full of new closures, and `visibleLines` rebuilt every line object
+ * on every render, so React.memo on a row could never bail out. Measured on a
+ * 2,000-line sheet: 2,103 row-amount formats per keystroke and ~1,200ms; 104 and
+ * ~100ms once the identities were stable and the row memoised.
+ *
+ * The invariant is stated as a RATIO rather than a constant, so a future cell
+ * that legitimately formats one more figure does not red this test while a
+ * re-render of the whole sheet still does.
+ */
+describe('BoqSheet \u2014 the cost of one keystroke', () => {
+  function wideBoq(lineCount: number): BoqDetail {
+    const base = boqFixture();
+    const lines = Array.from({ length: lineCount }, (_unused, index) => ({
+      ...base.sections[0]!.lines[0]!,
+      id: `line-${index}`,
+      description: `\u0628\u0646\u062f ${index}`,
+    }));
+    return { ...base, lineCount, sections: [{ ...base.sections[0]!, lines }] };
+  }
+
+  function keystrokeCost(lineCount: number): number {
+    const view = renderWithIntl(<BoqSheet boq={wideBoq(lineCount)} canEdit />);
+    const cell = view.container.querySelector(
+      'input[data-col="description"]',
+    ) as HTMLInputElement;
+    moneyCalls.count = 0;
+    fireEvent.change(cell, { target: { value: 'سقف معلق' } });
+    const cost = moneyCalls.count;
+    view.unmount();
+    return cost;
+  }
+
+  test('costs the SAME on a 40-line sheet as on a 10-line one', () => {
+    const small = keystrokeCost(10);
+    const large = keystrokeCost(40);
+    expect(small).toBeGreaterThan(0);
+    expect(large).toBe(small);
+  });
+
+  test('and the row being typed in DOES re-render, with its own value', () => {
+    const view = renderWithIntl(<BoqSheet boq={wideBoq(3)} canEdit />);
+    const cells = [
+      ...view.container.querySelectorAll('input[data-col="description"]'),
+    ] as HTMLInputElement[];
+    fireEvent.change(cells[1]!, { target: { value: 'سقف معلق' } });
+
+    expect(cells[1]!.value).toBe('سقف معلق');
+    expect(cells[0]!.value).toBe('بند 0');
+    expect(cells[2]!.value).toBe('بند 2');
   });
 });

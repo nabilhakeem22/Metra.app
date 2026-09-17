@@ -3,7 +3,7 @@
 import { ChevronDown, Plus } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import type { BoqSectionRow } from '@/lib/boqs/queries';
-import type { EditableLine } from './boq-sheet-columns';
+import type { CellEdits, EditableLine } from './boq-sheet-columns';
 import { BoqSheetRow } from './boq-sheet-row';
 import type { BoqSheetRowApi } from './boq-sheet-row-api';
 
@@ -72,6 +72,9 @@ export function BoqSectionBody({
   colCount,
   searching,
   api,
+  cells,
+  savingIds,
+  pending,
   onToggle,
 }: {
   section: BoqSectionRow;
@@ -83,6 +86,14 @@ export function BoqSectionBody({
    *  not match the query and would appear to do nothing. */
   searching: boolean;
   api: BoqSheetRowApi;
+  /** The whole sheet's local edits. Each row is handed ONLY its own slice, whose
+   *  identity changes only when that row changes — which is what lets a memoised
+   *  row skip a keystroke typed into a different one. */
+  cells: CellEdits;
+  /** The rows mid-save. */
+  savingIds: ReadonlySet<string>;
+  /** SOME write on the sheet is in flight. */
+  pending: boolean;
   onToggle: () => void;
 }) {
   const t = useTranslations('projects.profile.boq');
@@ -95,14 +106,24 @@ export function BoqSectionBody({
         money={api.money}
         onToggle={onToggle}
       />
-      {!collapsed && lines.map((line) => <BoqSheetRow key={line.id} line={line} api={api} />)}
+      {!collapsed &&
+        lines.map((line) => (
+          <BoqSheetRow
+            key={line.id}
+            line={line}
+            api={api}
+            typed={cells[line.id]}
+            saving={savingIds.has(line.id)}
+            pending={pending}
+          />
+        ))}
       {api.canEdit && !collapsed && !searching && (
         <tr>
           <td colSpan={colCount} className="p-2 ps-4">
             <button
               type="button"
               onClick={() => api.onAddLine(section.id)}
-              disabled={api.pending}
+              disabled={pending}
               className={BOQ_ADD_BUTTON_CLASS}
             >
               <Plus className="size-3.5" aria-hidden />
