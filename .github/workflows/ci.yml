@@ -94,6 +94,20 @@ jobs:
       - name: Unit tests (db)
         run: npm run test -w @metra/db
 
+      # The drizzle snapshot is what `generate` DIFFS AGAINST, and meta/ had gone
+      # 35 snapshots behind the journal without anything saying so. This
+      # regenerates into a fresh EMPTY temp directory and deep-compares against
+      # meta/0051_snapshot.json ignoring id/prevId. It runs here, before any
+      # database step, because it needs none and so should fail fast.
+      #
+      # `env -u DATABASE_URL` is DELIBERATE and is the assertion: the script
+      # passes no --config, so drizzle.config.ts is never evaluated and no socket
+      # is opened. If a future change starts reaching for a database, this step
+      # fails loudly instead of quietly connecting to the CI Postgres that the
+      # job-level env would otherwise hand it.
+      - name: Drizzle snapshot matches the schema
+        run: env -u DATABASE_URL -u DATABASE_POOL_URL npm run db:assert-snapshot
+
       - name: Unit tests (web)
         run: npm run test -w @metra/web
 

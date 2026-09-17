@@ -59,7 +59,7 @@ Agents run these literally. These are exactly what `.github/workflows/ci.yml` ru
 | Type check | `cd apps/web && npx tsc --noEmit` — **and the same in `packages/db`**; they are two tsconfigs and only one of them is in the CI build step |
 | Migrations | `npm run migrate -w @metra/db` **then** `npm run apply-rls -w @metra/db` (RLS/roles/functions) **then** `npm run seed -w @metra/db` |
 | New migration | `npm run generate -w @metra/db` — ⚠️ drizzle-kit's rename prompt is an interactive TUI that can't run headless; 0013–0051 were hand-authored. The snapshot is re-baselined at **`migrations/meta/0051_snapshot.json`**, which is what `generate` now diffs against. Read `docs/DEPLOY.md` before using it. |
-| Snapshot gate | `npm run db:assert-snapshot` *(regenerates into an empty temp dir and deep-compares; **no database**, ~2 s). Fix a difference with `npm run db:generate-baseline`, never with an in-place `generate`.)* |
+| Snapshot gate | `npm run db:assert-snapshot` *(regenerates into an empty temp dir and deep-compares; **no database**, ~2 s; **CI runs it on every push**, with `DATABASE_URL` removed from that step's env). Fix a difference with `npm run db:generate-baseline`, never with an in-place `generate`.)* |
 
 ## Conventions
 
@@ -151,7 +151,7 @@ The architect may not design around these:
 - **Server-safe constants:** never export a value/const from a `'use client'` module and import it into a server component — it becomes a client-reference proxy → runtime 500 (passes tsc/build). Shared constants live in a plain non-client module (see `tabs.ts`).
 - Every new org-scoped table → isolation gate coverage + `fixture.ts` teardown (FK-safe order) + RLS in `apply-rls`.
 - Message-key parity + Western numerals; logical CSS only; no demo data.
-- **The CI from-scratch replay (`.github/workflows/ci.yml`: i18n→docs→lint→unit→migration-batch-size→migrate→apply-rls→seed→isolation→test:actions→OpenNext build→assert-no-baked-secrets on a fresh Postgres) is the REAL gate.** Local checks use the already-migrated warm DB and miss clean-room failures. Verify CI green after every push.
+- **The CI from-scratch replay (`.github/workflows/ci.yml`: i18n→docs→lint→unit(db)→snapshot→unit(web)→migration-batch-size→migrate→apply-rls→seed→isolation→test:actions→OpenNext build→assert-no-baked-secrets on a fresh Postgres) is the REAL gate.** Local checks use the already-migrated warm DB and miss clean-room failures. Verify CI green after every push.
 - **Workflow:** plan & confirm (architect → owner sign-off) before the coder writes code. Keep every mutation a self-contained `*Core(ctx,input)→ActionResult` (API-ready — a future Public API slice wraps them).
 
 ## Out of bounds

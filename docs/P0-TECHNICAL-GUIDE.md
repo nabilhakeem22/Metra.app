@@ -390,7 +390,8 @@ container, in this order:
    mention in a tracked `*.md` outside `docs/BUILD-LOG.md`, no em/en dash inside
    Arabic prose
 4. **lint** — including the physical `left`/`right` ban
-5. **unit tests (db)**, then **unit tests (web)**
+5. **unit tests (db)** → **the drizzle snapshot gate** (`db:assert-snapshot`, run
+   with `DATABASE_URL` removed from its env) → **unit tests (web)**
 6. **migration batch size** — fails if a branch adds more than
    `MAX_PENDING_MIGRATIONS = 4` migrations, because `db:migrate` runs the whole
    pending batch in ONE transaction
