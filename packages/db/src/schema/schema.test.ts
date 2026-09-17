@@ -16,6 +16,7 @@ import { sameOrgFk, sameOrgRef } from './org-ref';
 import { organizations } from './organizations';
 import { projects } from './projects';
 import { proposals } from './proposals';
+import { variationOrderEvents } from './variation-order-events';
 
 // drizzle 0.36 does not export the shape of an index column; this is the slice
 // the assertions read — .desc() lands in indexConfig.order.
@@ -150,6 +151,27 @@ describe('tax_rate range checks (0044)', () => {
   ])('%s carries %s', (_name, table, constraint) => {
     const cfg = getTableConfig(table as typeof proposals);
     expect(cfg.checks.map((c) => c.name)).toContain(constraint);
+  });
+});
+
+// 0051 adds the column with ADD CONSTRAINT ... NOT VALID + VALIDATE CONSTRAINT
+// rather than an inline CHECK, so the constraint has a name — and a named
+// constraint the database holds is a constraint this schema must declare, or
+// the two drift silently.
+describe('variation_order_events.actor_channel (0051)', () => {
+  const cfg = getTableConfig(variationOrderEvents);
+
+  it('is nullable with no default: NULL means "not recorded", and there is no backfill', () => {
+    const column = cfg.columns.find((c) => c.name === 'actor_channel');
+    expect(column).toBeDefined();
+    expect(column?.notNull).toBe(false);
+    expect(column?.hasDefault).toBe(false);
+  });
+
+  it('carries variation_order_events_actor_channel_check', () => {
+    expect(cfg.checks.map((c) => c.name)).toContain(
+      'variation_order_events_actor_channel_check',
+    );
   });
 });
 

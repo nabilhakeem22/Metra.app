@@ -33,22 +33,53 @@
 -- read ladder falls back to today's ordering for NULL, so no historical page
 -- changes its wording.
 --
--- The CHECK is INLINE in the ADD COLUMN — one statement, so no later statement
--- in this transaction reads a column an earlier one added. No enum type is
--- involved at all.
+-- ADD COLUMN, then ADD CONSTRAINT ... NOT VALID, then VALIDATE CONSTRAINT —
+-- 0044's pattern, and the repo's convention for a CHECK added to a table that
+-- already has rows. It replaces an INLINE CHECK on the ADD COLUMN, which a
+-- reliability review flagged: ALTER TABLE's phase-3 pass validates a newly added
+-- CHECK with a full table scan, and that scan runs while the ACCESS EXCLUSIVE
+-- lock is held. `set_config('lock_timeout', ...)` bounds lock ACQUISITION only,
+-- never hold time.
+--
+-- WHAT THE SPLIT DOES NOT BUY, stated as plainly as 0044 states it: this whole
+-- file runs inside the migrator's single transaction, so the ACCESS EXCLUSIVE
+-- lock taken by the ADD COLUMN above is held until that transaction commits.
+-- VALIDATE's weaker SHARE UPDATE EXCLUSIVE cannot downgrade a lock already
+-- held, so on THIS run the hold time is what it was. What the split does buy is
+-- real but narrower: the scan is a separate, named statement that can be run on
+-- its own against a large table, either half is independently idempotent, and
+-- the file reads as the two distinct steps it is. `variation_order_events`
+-- holds a handful of rows per variation order, so the scan is milliseconds at
+-- today's scale either way; the convention is what keeps that true at 10^6.
+--
+-- A plpgsql block executes its statements in order, planning each as it runs, so
+-- the ADD CONSTRAINT below sees the column the statement above it added.
 --
 -- lock_timeout: ADD COLUMN of a nullable text is a catalogue-only change in
 -- PG11+ (no table rewrite), but it still needs a brief ACCESS EXCLUSIVE lock. 3s
 -- makes it fail fast with 55P03 behind a long reader rather than queue every
--- writer behind it; the statement is IF NOT EXISTS, so a re-run is safe.
+-- writer behind it. ADD COLUMN is IF NOT EXISTS and the constraint is guarded by
+-- a pg_constraint lookup, so a re-run is a no-op.
 --
 -- RLS and privileges unchanged, and NOTHING from apply-rls is referenced or
 -- required here: `org_isolation` and the table-level append-only privileges
 -- (select + insert, no update, no delete) already cover a new column.
-DO $$ BEGIN
+DO $$
+BEGIN
   PERFORM set_config('lock_timeout', '3s', true);
+
   ALTER TABLE public.variation_order_events
-    ADD COLUMN IF NOT EXISTS actor_channel text
-    CONSTRAINT variation_order_events_actor_channel_check
-      CHECK (actor_channel IS NULL OR actor_channel IN ('staff', 'client'));
+    ADD COLUMN IF NOT EXISTS actor_channel text;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conname = 'variation_order_events_actor_channel_check'
+  ) THEN
+    ALTER TABLE public.variation_order_events
+      ADD CONSTRAINT variation_order_events_actor_channel_check
+      CHECK (actor_channel IS NULL OR actor_channel IN ('staff', 'client')) NOT VALID;
+
+    ALTER TABLE public.variation_order_events
+      VALIDATE CONSTRAINT variation_order_events_actor_channel_check;
+  END IF;
 END $$;

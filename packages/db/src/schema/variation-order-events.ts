@@ -1,4 +1,6 @@
+import { sql } from 'drizzle-orm';
 import {
+  check,
   pgTable,
   text,
   timestamp,
@@ -32,8 +34,8 @@ export const variationOrderEvents = pgTable(
     fromStatus: text('from_status'),
     toStatus: text('to_status'),
     /**
-     * WHICH CHANNEL decided this event — 'staff' or 'client' (0051, CHECKed
-     * there).
+     * WHICH CHANNEL decided this event — 'staff' or 'client', or NULL
+     * (`variation_order_events_actor_channel_check`, below).
      *
      * NULLABLE with NO DEFAULT, deliberately unlike `engagement_events`, whose
      * `not null default 'staff'` is only safe because it was there from row one.
@@ -52,6 +54,13 @@ export const variationOrderEvents = pgTable(
   (t) => [
     unique('variation_order_events_org_id_id_unique').on(t.orgId, t.id),
     ...sameOrgFk(t, 'variationOrder', variationOrders, { onDelete: 'cascade' }),
+    // 0051 adds this as ADD CONSTRAINT ... NOT VALID + VALIDATE CONSTRAINT, so
+    // it carries a NAME and belongs here under the same name — the schema is the
+    // declaration of what the database holds, not only of its columns.
+    check(
+      'variation_order_events_actor_channel_check',
+      sql`actor_channel is null or actor_channel in ('staff', 'client')`,
+    ),
   ],
 );
 
