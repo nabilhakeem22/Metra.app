@@ -62,7 +62,7 @@ function fixtureSql(catalogues: Catalogues) {
         { tableLevel: grant.tableLevel, columnLevel: grant.columns.length > 0 },
       ]);
     }
-    if (text.includes('column_privileges')) {
+    if (text.includes('has_column_privilege')) {
       const grant = catalogues.grant ?? appliedGrant();
       return Promise.resolve(grant.columns.map((name) => ({ name })));
     }

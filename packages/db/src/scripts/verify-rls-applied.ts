@@ -128,14 +128,30 @@ const ROLES_SQL = resolve(dirname(fileURLToPath(import.meta.url)), '../rls/roles
  */
 async function grantProblems(sql: Sql): Promise<string[]> {
   const [privilege] = (await sql`
-    select has_table_privilege(${APP_ROLE}, 'public.design_engagements', 'update') as "tableLevel",
-           has_any_column_privilege(${APP_ROLE}, 'public.design_engagements', 'update') as "columnLevel"
+    select has_table_privilege(${APP_ROLE}::name, 'public.design_engagements'::text, 'update')
+             as "tableLevel",
+           has_any_column_privilege(${APP_ROLE}::name, 'public.design_engagements'::text, 'update')
+             as "columnLevel"
   `) as unknown as Array<{ tableLevel: boolean; columnLevel: boolean }>;
+
+  // Read the columns through `has_column_privilege` over `pg_attribute` rather
+  // than from `information_schema.column_privileges`. That view shows only rows
+  // whose grantor or grantee is a CURRENTLY ENABLED role, so what it returns
+  // depends on which role happens to be running `apply-rls` — a post-condition
+  // that answers differently for two operators is not a post-condition. The
+  // catalogue read is the same answer for anyone. `has_column_privilege` is true
+  // for a table-level grant as well as a column-level one, which is exactly
+  // right here: it reports the EFFECTIVE set, and the table-level half is
+  // asserted separately above.
   const rows = (await sql`
-    select column_name as name
-      from information_schema.column_privileges
-     where table_schema = 'public' and table_name = 'design_engagements'
-       and grantee = ${APP_ROLE} and privilege_type = 'UPDATE'
+    select a.attname as name
+      from pg_attribute a
+      join pg_class c     on c.oid = a.attrelid
+      join pg_namespace n on n.oid = c.relnamespace
+     where n.nspname = 'public' and c.relname = 'design_engagements'
+       and a.attnum > 0 and not a.attisdropped
+       and has_column_privilege(${APP_ROLE}::name, c.oid, a.attnum, 'update')
+     order by 1
   `) as unknown as Array<{ name: string }>;
 
   const problems: string[] = [];
