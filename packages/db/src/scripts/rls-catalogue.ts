@@ -61,6 +61,27 @@ const TRIGGER_PATTERN = new RegExp(
 // SQL with every double-dash line comment and every slash-star block comment
 // removed. Dollar-quoted bodies are left alone: nothing this file declares is
 // spelled inside one.
+//
+// KNOWN LIMIT — IT DOES NOT KNOW WHAT A STRING LITERAL IS. A `--` or a `/*`
+// INSIDE a quoted literal is read as the start of a comment, and everything
+// after it on that line (or up to the next `*/`) is deleted. So
+//
+//     raise exception 'value -- not allowed';
+//
+// loses its closing quote as far as this reader is concerned, and any
+// `create function` / `create policy` / `create trigger` in the rest of that
+// span disappears with it.
+//
+// WHY IT IS WRITTEN DOWN RATHER THAN FIXED. The failure is a FALSE RED, never a
+// false green: a declaration that is eaten is one `apply-rls` then reports as
+// MISSING from the database, which stops a deploy instead of passing a broken
+// one. And it is measured rather than assumed — the real tree parses to 30
+// functions, 46 policies and 12 triggers, which is exactly what the catalogues
+// hold. This gate now reds a deploy, so the limit belongs on the page instead of
+// being rediscovered at 03:00. If a `--` or `/*` ever has to live inside an RLS
+// string literal, the fix is a real scanner here — `migration-catalogue.ts`'s
+// `withoutComments` already is one and can be copied — never a change to the SQL
+// to appease the regex.
 export function withoutSqlComments(content: string): string {
   return content.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/--[^\n]*/g, '');
 }

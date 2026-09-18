@@ -1,22 +1,22 @@
 // Writing an imported sheet into a draft BOQ. PURE core — no next/*, no cookies.
-import { boqLines, boqSections, boqs } from '@metra/db';
-import { eq, sql } from 'drizzle-orm';
+//
+// THE SHAPE of the import lives here; the arithmetic is `import-pricing.ts` and
+// the writes are `import-persist.ts`. That seam was already described in
+// import-pricing.ts's own header when this file was created; it is split along it
+// now because the file was born at 153 lines, three over the Hard 150-line cap.
+import { boqSections, boqs } from '@metra/db';
+import { eq } from 'drizzle-orm';
 import { fail, mutateInOrg, requireInOrg } from '@/lib/actions/mutate';
 import { err, type ActionResult } from '@/lib/actions/result';
 import type { OrgContext } from '@/lib/db/context';
-import { insertLinesInChunks } from '@/lib/lines/insert-chunked';
 import type { ImportedLine } from '../import/map';
-import { bilingualFor } from '../bilingual';
 import { MAX_BOQ_LINES } from './create';
 import {
-  buildImportedLine,
-  resolvePriceBook,
-  type PendingLine,
-  type PriceBook,
-} from './import-pricing';
-import { recomputeBoqTotals } from './recompute';
-
-type Tx = Parameters<Parameters<typeof mutateInOrg>[2]>[0];
+  finalizeImportedBoq,
+  highestSectionSortOrder,
+  persistImportSections,
+} from './import-persist';
+import { resolvePriceBook } from './import-pricing';
 
 /** Group imported lines by their section label, preserving first-seen order. */
 function groupBySection(lines: ImportedLine[]): Map<string, ImportedLine[]> {
@@ -43,68 +43,6 @@ function validateImportedLines(lines: ImportedLine[]): ActionResult | null {
   if (lines.length === 0) return err('invalid');
   if (lines.length > MAX_BOQ_LINES) return err('too_many_lines');
   return null;
-}
-
-/** Where the imported sections start, so an append does not collide with what is there. */
-async function highestSectionSortOrder(tx: Tx, boqId: string): Promise<number> {
-  const [{ maxSort = -1 } = { maxSort: -1 }] = await tx
-    .select({ maxSort: sql<number>`coalesce(max(${boqSections.sortOrder}), -1)::int` })
-    .from(boqSections)
-    .where(eq(boqSections.boqId, boqId));
-  return maxSort;
-}
-
-/** Insert one section per group, in first-seen order, and price its lines. */
-async function persistImportSections(
-  tx: Tx,
-  context: { orgId: string; boqId: string; priceBook: PriceBook; startSortOrder: number },
-  groups: Map<string, ImportedLine[]>,
-): Promise<PendingLine[]> {
-  let sortOrder = context.startSortOrder;
-  const pendingLines: PendingLine[] = [];
-  for (const [title, groupLines] of groups) {
-    sortOrder += 1;
-    const [section] = await tx
-      .insert(boqSections)
-      .values({
-        orgId: context.orgId,
-        boqId: context.boqId,
-        titleAr: bilingualFor(title).descriptionAr,
-        titleEn: bilingualFor(title).descriptionEn,
-        sortOrder,
-      })
-      .returning({ id: boqSections.id });
-    if (!section) fail('invalid');
-
-    groupLines.forEach((line, i) => {
-      pendingLines.push(buildImportedLine({ ...context, sectionId: section.id }, line, i));
-    });
-  }
-  return pendingLines;
-}
-
-/** The lines, the totals and the provenance — in that order, in this transaction. */
-async function finalizeImportedBoq(
-  tx: Tx,
-  input: CommitImportInput,
-  discountPct: string,
-  pendingLines: PendingLine[],
-): Promise<void> {
-  // Batched: one insert per import, not one per line — and chunked, because a
-  // full 2000-line sheet is ~34,000 bind parameters, over half of what a single
-  // statement can carry before it fails outright.
-  await insertLinesInChunks(tx, boqLines, pendingLines);
-
-  await recomputeBoqTotals(tx, input.boqId, discountPct);
-
-  if (input.sourceFileId) {
-    await tx
-      .update(boqs)
-      .set({ source: 'imported', sourceFileId: input.sourceFileId })
-      .where(eq(boqs.id, input.boqId));
-  } else {
-    await tx.update(boqs).set({ source: 'imported' }).where(eq(boqs.id, input.boqId));
-  }
 }
 
 /**

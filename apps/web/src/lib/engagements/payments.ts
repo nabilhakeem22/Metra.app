@@ -5,35 +5,23 @@
 // scale-4 BigInt (never parseFloat). The engagement is verified in-org (RLS
 // scopes the read) before the insert, so a caller cannot record against a
 // foreign engagement.
-import {
-  PAYMENT_EVENT_KINDS,
-  designEngagements,
-  paymentEvents,
-  type PaymentEventKind,
-} from '@metra/db';
-import { and, eq, sql } from 'drizzle-orm';
+//
+// THREE NAMED STAGES, one file each, on the seam
+// `proposals/core/draft-save-*.ts` already uses: `payment-input.ts` decides
+// (no database), `payment-append.ts` writes (no decisions), and this file is the
+// gate and the order. `recordPaymentCore` was 142 lines with all three inlined —
+// over the 120 the wave-5 gate asked for, on the path three testers spent two
+// waves failing to break.
+import { designEngagements } from '@metra/db';
 import { fail, mutateInOrg, requireInOrg } from '@/lib/actions/mutate';
 import type { ActionResult } from '@/lib/actions/result';
-import { MONEY_RE, formatMoney4, parseMoney4 } from '@/lib/aggregates/proposal-totals';
 import type { OrgContext } from '@/lib/db/context';
 import { isTerminal } from './states';
-import { NOT_UUID, optionalUuid } from '@/lib/uuid';
-import {
-  MAX_LABEL_CHARS,
-  MAX_NOTE_CHARS,
-  TOO_LONG,
-  optionalText,
-} from '@/lib/validation/text';
+import { appendKeyedPayment, appendPayment, auditPayment } from './payment-append';
+import { normalizePayment, type RawPaymentFields } from './payment-input';
 
-const KIND_SET = new Set<string>(PAYMENT_EVENT_KINDS);
-
-export interface RecordPaymentInput {
+export interface RecordPaymentInput extends RawPaymentFields {
   engagementId: string;
-  kind: PaymentEventKind;
-  amount: string;
-  method?: string | null;
-  reference?: string | null;
-  note?: string | null;
   /**
    * Optional client-supplied idempotency key (UUID). Absent/empty -> a plain
    * append. A present, well-formed key dedups a retried recording via the partial
@@ -52,42 +40,18 @@ export interface RecordPaymentInput {
  * absent/foreign); insert one `payment_events` row with `cleared_at = now()` and
  * `recorded_by = ctx.userId`. Returns the new payment id. Never throws to the
  * client — coded ActionResult only.
+ *
+ * `already: true` means THE LEDGER WAS NOT APPENDED: a key the ledger already
+ * carried was replayed and the ORIGINAL row's id came back. Both money controls
+ * read it and say so now (backlog 18); for five waves nothing did.
  */
 export async function recordPaymentCore(
   ctx: OrgContext,
   input: RecordPaymentInput,
 ): Promise<ActionResult & { data?: string; already?: boolean }> {
-  if (typeof input.kind !== 'string' || !KIND_SET.has(input.kind)) {
-    return { ok: false, error: 'invalid' };
-  }
-  if (typeof input.amount !== 'string' || !MONEY_RE.test(input.amount.trim())) {
-    return { ok: false, error: 'payment_amount_invalid' };
-  }
-  const amount4 = parseMoney4(input.amount);
-  if (amount4 <= 0n) {
-    return { ok: false, error: 'payment_amount_invalid' };
-  }
-  // Persist the canonical scale-4 value so the STORED amount is exactly the one
-  // the app validated (and the depositCleared guard later trusts) — the DB
-  // numeric(18,4) would otherwise round a >4-decimal input up past what we OK'd.
-  const amount = formatMoney4(amount4);
-
-  // Normalise the idempotency key: trim; empty/whitespace/undefined -> null (a
-  // plain append). A present-but-malformed key is a coded 'invalid', and so is a
-  // present-but-non-string one — see optionalUuid for why that is reachable.
-  const idempotencyKey = optionalUuid(input.idempotencyKey);
-  if (idempotencyKey === NOT_UUID) {
-    return { ok: false, error: 'invalid' };
-  }
-
-  const method = optionalText(input.method, MAX_LABEL_CHARS);
-  const reference = optionalText(input.reference, MAX_LABEL_CHARS);
-  const note = optionalText(input.note, MAX_NOTE_CHARS);
-  // An over-long field is a REFUSAL, not a truncation: a payment reference cut
-  // at 200 characters is a reference that reconciles against nothing.
-  if (method === TOO_LONG || reference === TOO_LONG || note === TOO_LONG) {
-    return { ok: false, error: 'invalid' };
-  }
+  const clean = normalizePayment(input);
+  if (!clean.ok) return { ok: false, error: clean.error };
+  const payment = clean.value;
 
   // Set inside the tx when a keyed insert loses the ON CONFLICT race (or replays
   // its own earlier write): the existing row is returned, no second row/audit.
@@ -107,89 +71,24 @@ export async function recordPaymentCore(
       // No recording a payment against a finished engagement (abandoned / closed).
       if (isTerminal(engagement.state)) fail('engagement_not_active');
 
-      // KEYED PATH — dedup via the partial unique arbiter (first-write-wins).
-      // ON CONFLICT DO NOTHING (not a raised unique violation) so the surrounding
-      // withOrgContext transaction is never aborted — the codebase's established
-      // idempotency idiom (mirrors claimPeriod). This preserves append-only:
-      // never an UPDATE, so a replay keeps the ORIGINAL amount (first-write-wins).
-      if (idempotencyKey !== null) {
-        const inserted = await tx
-          .insert(paymentEvents)
-          .values({
-            orgId: ctx.orgId,
-            engagementId: input.engagementId,
-            kind: input.kind,
-            amount,
-            method,
-            reference,
-            recordedBy: ctx.userId,
-            note,
-            idempotencyKey,
-          })
-          .onConflictDoNothing({
-            // For onConflictDoNothing, `where` is the ARBITER predicate — it
-            // renders `ON CONFLICT (org_id, engagement_id, idempotency_key)
-            // WHERE idempotency_key is not null DO NOTHING`, matching the partial
-            // unique index exactly (targetWhere is a doUpdate-only option).
-            target: [
-              paymentEvents.orgId,
-              paymentEvents.engagementId,
-              paymentEvents.idempotencyKey,
-            ],
-            where: sql`idempotency_key is not null`,
-          })
-          .returning({ id: paymentEvents.id });
-
-        if (inserted.length > 0) {
-          await audit({
-            entity: 'design_engagement',
-            entityId: input.engagementId,
-            action: 'create',
-            before: null,
-            after: { payment_id: inserted[0].id, kind: input.kind, amount },
-          });
-          return inserted[0].id;
+      if (payment.idempotencyKey !== null) {
+        const keyed = await appendKeyedPayment(
+          tx,
+          ctx,
+          input.engagementId,
+          payment,
+          payment.idempotencyKey,
+        );
+        already = keyed.already;
+        if (!keyed.already) {
+          await auditPayment(audit, input.engagementId, keyed.id, payment);
         }
-
-        // Lost the race / replay: return the winning row's id, no second audit.
-        const [existing] = await tx
-          .select({ id: paymentEvents.id })
-          .from(paymentEvents)
-          .where(
-            and(
-              eq(paymentEvents.orgId, ctx.orgId),
-              eq(paymentEvents.engagementId, input.engagementId),
-              eq(paymentEvents.idempotencyKey, idempotencyKey),
-            ),
-          )
-          .limit(1);
-        already = true;
-        return existing.id;
+        return keyed.id;
       }
 
-      // KEYLESS PATH — byte-identical to the original plain append.
-      const [row] = await tx
-        .insert(paymentEvents)
-        .values({
-          orgId: ctx.orgId,
-          engagementId: input.engagementId,
-          kind: input.kind,
-          amount,
-          method,
-          reference,
-          recordedBy: ctx.userId,
-          note,
-        })
-        .returning({ id: paymentEvents.id });
-
-      await audit({
-        entity: 'design_engagement',
-        entityId: input.engagementId,
-        action: 'create',
-        before: null,
-        after: { payment_id: row.id, kind: input.kind, amount },
-      });
-      return row.id;
+      const id = await appendPayment(tx, ctx, input.engagementId, payment);
+      await auditPayment(audit, input.engagementId, id, payment);
+      return id;
     },
   );
 
