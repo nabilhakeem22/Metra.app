@@ -49,15 +49,30 @@
 -- `ALTER INDEX / RENAME CONSTRAINT` is catalogue-only: ACCESS EXCLUSIVE, but no
 -- scan and no rebuild.
 --
--- Idempotent: every rename is guarded on the OLD name existing and the NEW one
--- not, and every create is IF NOT EXISTS. The two assertions at the bottom then
--- refuse to let this file report success on a catalogue that is still adrift, so
--- a mistyped or silently-skipped rename fails the migration rather than leaving
--- the drift exactly where it was. After this runs, `assert-schema-applied` must
--- report 0 NOT FOUND in all four sections.
+-- IDEMPOTENT, and this is exactly what that means here: every rename is guarded
+-- on the OLD name still existing, and every create is IF NOT EXISTS. A re-run
+-- finds every guard false and does nothing. A catalogue that somehow holds BOTH
+-- spellings of one object is not silently accepted either — the rename then
+-- fails on 42P07/42710 and the whole batch rolls back, which is the loud outcome.
+--
+-- WHAT THE FOUR ASSERTIONS AT THE BOTTOM CHECK, precisely, because the previous
+-- version of this paragraph claimed more than the file did (wave 7 R3):
+--   1. none of the six OLD index names survives;
+--   2. none of the ten OLD constraint names survives;
+--   3. all SIXTEEN new index names are PRESENT — the six renamed to and the ten
+--      created;
+--   4. all TEN new constraint names are PRESENT.
+-- Checks 3 and 4 are the half that was missing. Every rename here is guarded on
+-- the old name, so a rename whose guard is false is a silent no-op: on a
+-- catalogue where the old name was never there under that spelling, checks 1 and
+-- 2 pass trivially and the file used to report success having renamed nothing.
+-- Asserting the NEW names closes that: after this file, the catalogue holds the
+-- name `src/schema/` declares or the migration raises. After it runs,
+-- `assert-schema-applied` must report 0 NOT FOUND in all four sections.
 DO $$
 DECLARE
   leftovers text[];
+  absent    text[];
 BEGIN
   PERFORM set_config('lock_timeout', '3s', true);
 
@@ -233,5 +248,55 @@ BEGIN
    WHERE EXISTS (SELECT 1 FROM pg_constraint WHERE conname = t.name);
   IF cardinality(leftovers) > 0 THEN
     RAISE EXCEPTION '0053: constraint name(s) not renamed: %', array_to_string(leftovers, ', ');
+  END IF;
+
+  -- And the other direction, which is the one a guarded rename can fail
+  -- silently: every name this file renames TO or creates must now BE there.
+  -- Sixteen indexes — the six renamed plus the ten created — spelled as
+  -- `src/schema/` declares them, case included.
+  SELECT coalesce(array_agg(name), '{}'::text[]) INTO absent
+    FROM (VALUES
+      ('contract_lines_costItem_idx'),
+      ('contracts_sourceProposal_idx'),
+      ('variation_order_events_variationOrder_idx'),
+      ('variation_order_lines_variationOrder_idx'),
+      ('variation_order_lines_contractLine_idx'),
+      ('variation_order_lines_costItem_idx'),
+      ('boqs_client_idx'),
+      ('boqs_engagement_idx'),
+      ('boqs_sourceFile_idx'),
+      ('boq_lines_costItem_idx'),
+      ('boqs_project_idx'),
+      ('boq_sections_boq_idx'),
+      ('boq_lines_boq_idx'),
+      ('boq_lines_section_idx'),
+      ('contract_sections_contract_idx'),
+      ('project_stages_project_idx')
+    ) AS t(name)
+   WHERE NOT EXISTS (
+     SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+      WHERE n.nspname = 'public' AND c.relkind = 'i' AND c.relname = t.name
+   );
+  IF cardinality(absent) > 0 THEN
+    RAISE EXCEPTION '0053: index name(s) MISSING after rename/create: %', array_to_string(absent, ', ');
+  END IF;
+
+  -- Ten constraints, same reasoning.
+  SELECT coalesce(array_agg(name), '{}'::text[]) INTO absent
+    FROM (VALUES
+      ('client_payment_claims_confirmedPaymentEvent_same_org_fk'),
+      ('contract_lines_costItem_same_org_fk'),
+      ('contracts_sourceProposal_same_org_fk'),
+      ('engagement_change_orders_settledByPaymentEvent_same_org_fk'),
+      ('variation_order_events_variationOrder_same_org_fk'),
+      ('variation_order_lines_variationOrder_same_org_fk'),
+      ('variation_order_lines_contractLine_same_org_fk'),
+      ('variation_order_lines_costItem_same_org_fk'),
+      ('boqs_sourceFile_same_org_fk'),
+      ('boq_lines_costItem_same_org_fk')
+    ) AS t(name)
+   WHERE NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = t.name);
+  IF cardinality(absent) > 0 THEN
+    RAISE EXCEPTION '0053: constraint name(s) MISSING after rename: %', array_to_string(absent, ', ');
   END IF;
 END $$;
