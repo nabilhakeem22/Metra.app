@@ -87,10 +87,16 @@ grant select, insert, update, delete on public.variation_order_lines to metra_ap
 --
 -- The REVOKE removes the earlier table-level UPDATE on already-provisioned
 -- databases; on a fresh one it is a no-op. It must come BEFORE the column grant
--- and cannot come after: a table-level UPDATE subsumes every column, so leaving
--- it in place would make the narrowing cosmetic. (Postgres keeps the two kinds
--- independent — revoking the table-level privilege does not touch column-level
--- grants — so the order below is the only one that converges.)
+-- and cannot come after, for TWO reasons that point the same way. A table-level
+-- UPDATE subsumes every column, so leaving it in place would make the narrowing
+-- cosmetic; and a table-level REVOKE takes the column grants WITH it —
+-- PostgreSQL's REVOKE reference: "when revoking privileges on a table, the
+-- corresponding column privileges (if any) are automatically revoked on each
+-- column of the table, as well." So a tidy-up `revoke update` appended anywhere
+-- BELOW the grant is not a no-op: it leaves metra_app with no UPDATE at all on
+-- this table and 42501s every transition, ROM issue, render stamp, share-token
+-- mint and revision-counter move. `design-engagement-grants.test.ts` fails on
+-- ANY revoke that sits after the grant, not merely on the first one it finds.
 grant select, insert on public.design_engagements to metra_app;
 revoke update on public.design_engagements from metra_app;
 grant update (

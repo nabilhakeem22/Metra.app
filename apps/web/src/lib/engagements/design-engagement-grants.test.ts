@@ -1,9 +1,15 @@
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import ts from 'typescript';
 import { getTableColumns } from 'drizzle-orm';
 import { designEngagements } from '@metra/db';
 import { describe, expect, it } from 'vitest';
+import {
+  grantedUpdateColumns,
+  tableLevelUpdateGrants,
+  updateRevokes,
+} from '../../../../../packages/db/src/scripts/design-engagement-grant';
 
 // THE GRANT AND THE CODE, KEPT HONEST BY A MACHINE.
 //
@@ -27,33 +33,39 @@ import { describe, expect, it } from 'vitest';
 // is the only artefact available before the grant is applied, which is exactly
 // when this has to fail.
 //
-// THE `.set({…})` GREP IS NOT ENOUGH, and that is the trap this file is built
-// around: `revisions.ts` writes through `REVISION_COUNTERS[trigger].increment()`,
-// a FACTORY returning a `PgUpdateSetSource`, so its two columns — one of them
-// `design_revision_count`, which a hand-written list missed — are invisible to
-// any grep for `.set({`. Every non-literal `.set(...)` argument must therefore
-// be named in INDIRECT_SET_SOURCES below, and the test fails on one that is not.
+// WHY THE TYPESCRIPT AST AND NOT A STRING SEARCH. The first version of this file
+// looked for the literal `update(designEngagements)`. Wave 7's testers walked
+// past it four ways in one sitting (R1, F3): a local alias
+// (`const table = designEngagements`), a space inside the call
+// (`update( designEngagements )`), an upsert
+// (`insert(designEngagements)…onConflictDoUpdate({ set })`), and raw
+// `sql` naming the table — each of them writing `free_revision_n`, the allowance
+// column the grant exists to protect, with the suite still green. A literal
+// search can only ever be extended one evasion at a time; the compiler's own
+// parser sees the call however it is spelled.
+//
+// WHAT THIS FILE REFUSES TO GUESS. It throws — by file:line, with the expression
+// text — rather than deriving a short list, on: a spread or computed key in a
+// `set`, a `.update(…)` argument it cannot resolve to a table, a `.set(…)`
+// argument that is not an object literal and not produced by a helper ANNOTATED
+// `PgUpdateSetSource<typeof designEngagements>`, and any raw SQL naming the
+// table. A grant list derived from a scan that shrugs is worth nothing.
 
 const here = dirname(fileURLToPath(import.meta.url)); // apps/web/src/lib/engagements
 const SOURCE_ROOT = resolve(here, '../..'); // apps/web/src
 const ROLES_SQL = resolve(here, '../../../../../packages/db/src/rls/roles.sql');
 
+/** The drizzle table object's exported name, and the table it maps to. */
+const TABLE_EXPORT = 'designEngagements';
+const TABLE_SQL_NAME = 'design_engagements';
+
 /**
- * A `.set(...)` argument that is NOT an object literal, and where its columns
- * are declared. The key is the argument expression exactly as it is written at
- * the update site, with whitespace collapsed.
- *
- * `declaration` is the start of a TOP-LEVEL statement in `file`; everything from
- * it to the first line that is a bare `}` / `};` is searched for property keys
- * that are columns of `design_engagements`. Nothing may be added here without
- * reading the producer and agreeing that its columns are what it writes.
+ * The annotation that makes a `set` producer readable, whitespace removed.
+ * A helper returning this type is the ONE indirect route allowed — its object
+ * literals are read for column keys — because the type names the table, so a
+ * producer for some other table cannot be mistaken for one of these.
  */
-const INDIRECT_SET_SOURCES: Record<string, { file: string; declaration: string }> = {
-  'counter.increment(new Date())': {
-    file: 'lib/engagements/revisions.ts',
-    declaration: 'const REVISION_COUNTERS',
-  },
-};
+const SET_SOURCE_TYPE = `PgUpdateSetSource<typeof${TABLE_EXPORT}>`;
 
 /** prop name (`revisionCount`) -> column name (`revision_count`). */
 const COLUMN_OF = new Map<string, string>(
@@ -63,228 +75,463 @@ const COLUMN_OF = new Map<string, string>(
   ]),
 );
 
-function sourceFiles(root: string): string[] {
+interface Scanned {
+  relative: string;
+  source: ts.SourceFile;
+  /** Every `const x = <expr>` in the file, for resolving an alias to its root. */
+  initializers: Map<string, ts.Expression>;
+}
+
+/** Local names in ONE file, classified. */
+interface Bindings {
+  /** Names bound to the design_engagements table object. */
+  table: Set<string>;
+  /** `import * as x` names — `x.designEngagements` is the table. */
+  namespaces: Set<string>;
+  /** Names bound to something that is NOT this table (another drizzle table). */
+  other: Set<string>;
+}
+
+function allSourceFiles(root: string): string[] {
   const found: string[] = [];
   for (const entry of readdirSync(root)) {
     const path = join(root, entry);
-    if (statSync(path).isDirectory()) found.push(...sourceFiles(path));
+    if (statSync(path).isDirectory()) found.push(...allSourceFiles(path));
     else if (/\.tsx?$/.test(entry) && !/\.test\.tsx?$/.test(entry)) found.push(path);
   }
   return found;
 }
 
-/**
- * The text between `text[open]` (an opening bracket) and its match, brackets
- * excluded. String literals, template literals and comments are skipped, so a
- * `)` inside `'…'` or a `//` line does not close the span.
- */
-function balanced(text: string, open: number): string {
-  const PAIRS: Record<string, string> = { '(': ')', '{': '}', '[': ']' };
-  const closer = PAIRS[text[open]];
-  if (!closer) throw new Error(`balanced: ${text[open]} at ${String(open)} is not an opener`);
-  let depth = 0;
-  for (let i = open; i < text.length; i += 1) {
-    const char = text[i];
-    if (char === '/' && text[i + 1] === '/') {
-      i = text.indexOf('\n', i);
-      if (i === -1) break;
-      continue;
-    }
-    if (char === '/' && text[i + 1] === '*') {
-      i = text.indexOf('*/', i + 2) + 1;
-      continue;
-    }
-    if (char === "'" || char === '"' || char === '`') {
-      i += 1;
-      while (i < text.length && text[i] !== char) i += text[i] === '\\' ? 2 : 1;
-      continue;
-    }
-    if (char in PAIRS) depth += 1;
-    else if (char === ')' || char === '}' || char === ']') {
-      depth -= 1;
-      if (depth === 0) return text.slice(open + 1, i);
-    }
-  }
-  throw new Error(`balanced: no match for ${text[open]} at ${String(open)}`);
-}
-
-/** An object literal's body split at its OWN commas, comments removed. */
-function topLevelElements(body: string): string[] {
-  const elements: string[] = [];
-  let depth = 0;
-  let current = '';
-  for (let i = 0; i < body.length; i += 1) {
-    const char = body[i];
-    if (char === '/' && body[i + 1] === '/') {
-      const end = body.indexOf('\n', i);
-      i = end === -1 ? body.length : end;
-      continue;
-    }
-    if (char === '/' && body[i + 1] === '*') {
-      i = body.indexOf('*/', i + 2) + 1;
-      continue;
-    }
-    if (char === "'" || char === '"' || char === '`') {
-      const quote = char;
-      const start = i;
-      i += 1;
-      while (i < body.length && body[i] !== quote) i += body[i] === '\\' ? 2 : 1;
-      current += body.slice(start, i + 1);
-      continue;
-    }
-    if (char === '(' || char === '{' || char === '[') depth += 1;
-    else if (char === ')' || char === '}' || char === ']') depth -= 1;
-    else if (char === ',' && depth === 0) {
-      elements.push(current);
-      current = '';
-      continue;
-    }
-    current += char;
-  }
-  elements.push(current);
-  return elements.map((element) => element.trim()).filter((element) => element.length > 0);
-}
-
-/**
- * The keys of an object literal's OWN level. BOTH spellings count: `updatedAt:
- * now` and the SHORTHAND `designFee` — three of the thirteen sites use shorthand
- * and a colon-only reader silently misses them, which is precisely how a
- * hand-written grant list goes stale.
- */
-function topLevelKeys(body: string, where: string): string[] {
-  return topLevelElements(body).map((element) => {
-    if (element.startsWith('...')) {
-      // A spread hides its keys from every static reader, this one included.
-      throw new Error(`the .set({…}) at ${where} spreads "${element}" — not derivable`);
-    }
-    const named = /^([A-Za-z_$][\w$]*)\s*(:|$)/.exec(element);
-    if (!named) {
-      throw new Error(`the .set({…}) at ${where} has an unreadable member "${element}"`);
-    }
-    return named[1];
+function walk(node: ts.Node, visit: (node: ts.Node) => void): void {
+  visit(node);
+  node.forEachChild((child) => {
+    walk(child, visit);
   });
 }
 
-/** Every `identifier:` in a region, at any depth — filtered to columns by the caller. */
-function propertyKeysAnywhere(region: string): string[] {
-  return [...region.matchAll(/(^|[^\w$.])([A-Za-z_$][\w$]*)\s*:/g)].map((m) => m[2]);
+function collapsed(text: string): string {
+  return text.replace(/\s+/g, '');
 }
 
-interface UpdateSite {
-  where: string;
-  argument: string;
-}
-
-/** Every `update(designEngagements)` site in the app, with its `.set(` argument. */
-function updateSites(): UpdateSite[] {
-  const sites: UpdateSite[] = [];
-  for (const path of sourceFiles(SOURCE_ROOT)) {
-    const text = readFileSync(path, 'utf8');
-    const relative = path.slice(SOURCE_ROOT.length + 1).replace(/\\/g, '/');
-    let from = 0;
-    for (;;) {
-      const at = text.indexOf('update(designEngagements)', from);
-      if (at === -1) break;
-      from = at + 1;
-      const setAt = text.indexOf('.set(', at);
-      if (setAt === -1) {
-        throw new Error(`update(designEngagements) at ${relative} has no .set(`);
+/**
+ * Which local names in ONE file are the table, given the names the table is
+ * exported under. `import`, `import * as`, `const t = designEngagements` and
+ * `const { designEngagements: t } = schema` all land here; anything else a file
+ * does to reach the table is caught later, as an unresolvable `.update()`.
+ */
+function bindingsIn(file: Scanned, exportNames: ReadonlySet<string>): Bindings {
+  const bindings: Bindings = { table: new Set(), namespaces: new Set(), other: new Set() };
+  walk(file.source, (node) => {
+    if (ts.isImportDeclaration(node) && node.importClause) {
+      const clause = node.importClause;
+      if (clause.namedBindings && ts.isNamespaceImport(clause.namedBindings)) {
+        bindings.namespaces.add(clause.namedBindings.name.text);
       }
-      const line = text.slice(0, at).split('\n').length;
-      sites.push({
-        where: `${relative}:${String(line)}`,
-        argument: balanced(text, setAt + '.set'.length).trim(),
+      if (clause.namedBindings && ts.isNamedImports(clause.namedBindings)) {
+        for (const element of clause.namedBindings.elements) {
+          if (clause.isTypeOnly || element.isTypeOnly) continue;
+          const imported = (element.propertyName ?? element.name).text;
+          if (exportNames.has(imported)) bindings.table.add(element.name.text);
+          else bindings.other.add(element.name.text);
+        }
+      }
+      return;
+    }
+    if (!ts.isVariableDeclaration(node)) return;
+    if (ts.isObjectBindingPattern(node.name)) {
+      for (const element of node.name.elements) {
+        const key = element.propertyName ?? element.name;
+        if (!ts.isIdentifier(key) || !ts.isIdentifier(element.name)) continue;
+        if (exportNames.has(key.text)) bindings.table.add(element.name.text);
+      }
+      return;
+    }
+    if (!ts.isIdentifier(node.name) || !node.initializer) return;
+    const initializer = node.initializer;
+    if (ts.isIdentifier(initializer) && exportNames.has(initializer.text)) {
+      bindings.table.add(node.name.text);
+    } else if (
+      ts.isPropertyAccessExpression(initializer) &&
+      exportNames.has(initializer.name.text)
+    ) {
+      bindings.table.add(node.name.text);
+    }
+  });
+  // A chain of aliases (`const a = designEngagements; const b = a;`) resolves by
+  // repeating until nothing new is named.
+  for (let pass = 0; pass < 4; pass += 1) {
+    let grew = false;
+    for (const [name, initializer] of file.initializers) {
+      if (bindings.table.has(name)) continue;
+      if (ts.isIdentifier(initializer) && bindings.table.has(initializer.text)) {
+        bindings.table.add(name);
+        bindings.other.delete(name);
+        grew = true;
+      }
+    }
+    if (!grew) break;
+  }
+  return bindings;
+}
+
+/**
+ * Every name the table is exported or RE-exported under, tree-wide. Seeded with
+ * the drizzle export and grown to a fixed point, so `export { designEngagements
+ * as engagements }` in one file makes `engagements` a table name in the next.
+ */
+function tableExportNames(files: Scanned[]): Set<string> {
+  const names = new Set([TABLE_EXPORT]);
+  for (let pass = 0; pass < 4; pass += 1) {
+    let grew = false;
+    for (const file of files) {
+      const local = bindingsIn(file, names).table;
+      walk(file.source, (node) => {
+        if (
+          ts.isExportDeclaration(node) &&
+          node.exportClause &&
+          ts.isNamedExports(node.exportClause)
+        ) {
+          for (const element of node.exportClause.elements) {
+            const from = (element.propertyName ?? element.name).text;
+            if ((names.has(from) || local.has(from)) && !names.has(element.name.text)) {
+              names.add(element.name.text);
+              grew = true;
+            }
+          }
+        }
+        if (
+          ts.isVariableDeclaration(node) &&
+          ts.isIdentifier(node.name) &&
+          node.initializer &&
+          ts.isIdentifier(node.initializer) &&
+          local.has(node.initializer.text) &&
+          !names.has(node.name.text)
+        ) {
+          names.add(node.name.text);
+          grew = true;
+        }
       });
     }
+    if (!grew) break;
+  }
+  return names;
+}
+
+type Resolution = 'table' | 'other' | 'unknown';
+
+function classify(expression: ts.Expression, bindings: Bindings): Resolution {
+  if (ts.isIdentifier(expression)) {
+    if (bindings.table.has(expression.text)) return 'table';
+    if (bindings.other.has(expression.text)) return 'other';
+    return 'unknown';
+  }
+  if (ts.isPropertyAccessExpression(expression) && ts.isIdentifier(expression.expression)) {
+    if (bindings.namespaces.has(expression.expression.text)) {
+      return expression.name.text === TABLE_EXPORT ? 'table' : 'other';
+    }
+  }
+  return 'unknown';
+}
+
+/** `a.b(c).d(e)` -> the calls that follow `a.b(c)`, keyed by method name. */
+function methodChain(call: ts.CallExpression): Map<string, ts.CallExpression> {
+  const chain = new Map<string, ts.CallExpression>();
+  let current: ts.Node = call;
+  for (;;) {
+    const access = current.parent;
+    if (!access || !ts.isPropertyAccessExpression(access) || access.expression !== current) break;
+    const next = access.parent;
+    if (!next || !ts.isCallExpression(next) || next.expression !== access) break;
+    if (!chain.has(access.name.text)) chain.set(access.name.text, next);
+    current = next;
+  }
+  return chain;
+}
+
+/** The leftmost identifier of `a.b[c](d)` — `a`. */
+function rootIdentifier(expression: ts.Expression): ts.Identifier | undefined {
+  let current: ts.Expression = expression;
+  for (let depth = 0; depth < 12; depth += 1) {
+    if (ts.isIdentifier(current)) return current;
+    if (
+      ts.isCallExpression(current) ||
+      ts.isPropertyAccessExpression(current) ||
+      ts.isElementAccessExpression(current) ||
+      ts.isParenthesizedExpression(current) ||
+      ts.isAwaitExpression(current)
+    ) {
+      current = current.expression;
+      continue;
+    }
+    return undefined;
+  }
+  return undefined;
+}
+
+function whereIs(file: Scanned, node: ts.Node): string {
+  const { line } = file.source.getLineAndCharacterOfPosition(node.getStart(file.source));
+  return `${file.relative}:${String(line + 1)}`;
+}
+
+/** Every `design_engagements` column named as a key anywhere under `node`. */
+function columnKeysUnder(node: ts.Node): string[] {
+  const columns: string[] = [];
+  walk(node, (child) => {
+    if (!ts.isObjectLiteralExpression(child)) return;
+    for (const property of child.properties) {
+      const name = ts.isShorthandPropertyAssignment(property)
+        ? property.name.text
+        : ts.isPropertyAssignment(property) &&
+            (ts.isIdentifier(property.name) || ts.isStringLiteral(property.name))
+          ? property.name.text
+          : undefined;
+      const column = name === undefined ? undefined : COLUMN_OF.get(name);
+      if (column) columns.push(column);
+    }
+  });
+  return columns;
+}
+
+interface SetSourceHelper {
+  where: string;
+  columns: string[];
+}
+
+/**
+ * Every declaration ANNOTATED `PgUpdateSetSource<typeof designEngagements>`, with
+ * the columns its object literals name. `revisions.ts` writes through
+ * `REVISION_COUNTERS[trigger].increment(now)` — a factory whose two columns, one
+ * of them `design_revision_count`, no grep for `.set({` can see. The annotation
+ * is what makes it readable, and the hand-kept list of such producers this file
+ * used to carry is gone with it.
+ */
+function setSourceHelpers(files: Scanned[]): Map<string, SetSourceHelper> {
+  const helpers = new Map<string, SetSourceHelper>();
+  for (const file of files) {
+    walk(file.source, (node) => {
+      if (!ts.isVariableDeclaration(node) && !ts.isFunctionDeclaration(node)) return;
+      if (!node.type || !collapsed(node.type.getText(file.source)).includes(SET_SOURCE_TYPE)) return;
+      if (!node.name || !ts.isIdentifier(node.name)) return;
+      const columns = columnKeysUnder(node);
+      if (columns.length === 0) {
+        throw new Error(
+          `${whereIs(file, node)}: ${node.name.text} is typed ${SET_SOURCE_TYPE} and names no ` +
+            `${TABLE_SQL_NAME} column — its set source is not derivable`,
+        );
+      }
+      helpers.set(node.name.text, { where: whereIs(file, node), columns });
+    });
+  }
+  return helpers;
+}
+
+/** The columns of a `set` object literal. Spreads and computed keys throw. */
+function columnsOfSetLiteral(literal: ts.ObjectLiteralExpression, where: string): string[] {
+  return literal.properties.map((property) => {
+    if (ts.isSpreadAssignment(property)) {
+      throw new Error(`the set at ${where} spreads "${property.getText()}" — not derivable`);
+    }
+    const name = property.name;
+    if (!name || !(ts.isIdentifier(name) || ts.isStringLiteral(name))) {
+      throw new Error(`the set at ${where} has an unreadable member "${property.getText()}"`);
+    }
+    const column = COLUMN_OF.get(name.text);
+    if (!column) {
+      throw new Error(
+        `${where} sets "${name.text}", which is not a column of ${TABLE_SQL_NAME}`,
+      );
+    }
+    return column;
+  });
+}
+
+/**
+ * The columns of a `set` argument that is NOT an object literal: its expression
+ * is resolved, through local `const` aliases, back to a declaration annotated
+ * `PgUpdateSetSource<typeof designEngagements>`. Anything else throws.
+ */
+function columnsOfSetExpression(
+  argument: ts.Expression,
+  file: Scanned,
+  helpers: ReadonlyMap<string, SetSourceHelper>,
+  where: string,
+): string[] {
+  let current: ts.Expression | undefined = argument;
+  for (let depth = 0; current && depth < 8; depth += 1) {
+    const root = rootIdentifier(current);
+    if (!root) break;
+    const helper = helpers.get(root.text);
+    if (helper) return helper.columns;
+    current = file.initializers.get(root.text);
+  }
+  throw new Error(
+    `${where}: .set(${collapsed(argument.getText(file.source))}) is not an object literal and ` +
+      `does not resolve to a helper typed ${SET_SOURCE_TYPE} — annotate the producer or inline ` +
+      'the object',
+  );
+}
+
+/**
+ * Raw SQL naming the table is BANNED rather than parsed. A structural scan can
+ * follow the ORM however the call is spelled; it can never read an arbitrary
+ * string, so the one route it cannot cover is the one route that must not exist.
+ */
+function refuseRawSql(file: Scanned): void {
+  walk(file.source, (node) => {
+    const isSqlTemplate =
+      ts.isTaggedTemplateExpression(node) &&
+      /(^|\.)sql$/.test(collapsed(node.tag.getText(file.source)));
+    const isExecute =
+      ts.isCallExpression(node) &&
+      ts.isPropertyAccessExpression(node.expression) &&
+      node.expression.name.text === 'execute';
+    if (!isSqlTemplate && !isExecute) return;
+    if (!new RegExp(TABLE_SQL_NAME, 'i').test(node.getText(file.source))) return;
+    throw new Error(
+      `${whereIs(file, node)}: raw SQL names ${TABLE_SQL_NAME}. No static reader can derive the ` +
+        'columns it writes, so the grant list cannot be kept honest against it — use the ORM',
+    );
+  });
+}
+
+interface WriteSite {
+  where: string;
+  columns: string[];
+}
+
+/** Every site in the app that writes columns of `design_engagements`. */
+function writeSites(files: Scanned[], exportNames: ReadonlySet<string>): WriteSite[] {
+  const helpers = setSourceHelpers(files);
+  const sites: WriteSite[] = [];
+  for (const file of files) {
+    refuseRawSql(file);
+    const bindings = bindingsIn(file, exportNames);
+    walk(file.source, (node) => {
+      if (!ts.isCallExpression(node) || !ts.isPropertyAccessExpression(node.expression)) return;
+      const method = node.expression.name.text;
+      if ((method !== 'update' && method !== 'insert') || node.arguments.length !== 1) return;
+      const chain = methodChain(node);
+      const setCall = method === 'update' ? chain.get('set') : chain.get('onConflictDoUpdate');
+      const target = classify(node.arguments[0], bindings);
+      const where = whereIs(file, node);
+
+      // `createHash(...).update(bytes)` is an `.update()` too. What tells the two
+      // apart is the drizzle builder that must follow: an update with no `.set`
+      // in its chain is not a query at all, so it is not this table's business —
+      // UNLESS its argument IS the table, which is then a chain this cannot read.
+      // A plain INSERT with no `onConflictDoUpdate` writes no column through
+      // UPDATE and is none of this file's business; an insert whose builder is
+      // not followed HERE might carry one, and is refused.
+      if (!setCall) {
+        if (target !== 'table') return;
+        if (method === 'insert' && chain.size > 0) return;
+        throw new Error(
+          `${where}: ${method}(<${TABLE_SQL_NAME}>) has no ` +
+            `${method === 'update' ? '.set(…)' : 'readable builder'} in its chain — ` +
+            'the columns it writes are not derivable',
+        );
+      }
+      if (target === 'unknown') {
+        throw new Error(
+          `${where}: ${method}(${collapsed(node.arguments[0].getText(file.source))}) writes ` +
+            'through a target this scan cannot resolve to a table — name the table directly',
+        );
+      }
+      if (target === 'other') return;
+
+      if (method === 'update') {
+        const argument = setCall.arguments[0];
+        if (!argument) throw new Error(`${where}: .set() takes no argument`);
+        sites.push({
+          where,
+          columns: ts.isObjectLiteralExpression(argument)
+            ? columnsOfSetLiteral(argument, where)
+            : columnsOfSetExpression(argument, file, helpers, where),
+        });
+        return;
+      }
+
+      // The upsert: `onConflictDoUpdate({ target, set: {…} })`. Its `set` is an
+      // UPDATE of this table by another name, and was invisible for a whole wave.
+      const options = setCall.arguments[0];
+      if (!options || !ts.isObjectLiteralExpression(options)) {
+        throw new Error(`${where}: onConflictDoUpdate's argument is not an object literal`);
+      }
+      const set = options.properties.find(
+        (property) =>
+          ts.isPropertyAssignment(property) &&
+          ts.isIdentifier(property.name) &&
+          property.name.text === 'set',
+      );
+      if (!set || !ts.isPropertyAssignment(set)) {
+        throw new Error(`${where}: onConflictDoUpdate has no readable "set"`);
+      }
+      sites.push({
+        where,
+        columns: ts.isObjectLiteralExpression(set.initializer)
+          ? columnsOfSetLiteral(set.initializer, where)
+          : columnsOfSetExpression(set.initializer, file, helpers, where),
+      });
+    });
   }
   return sites;
 }
 
-/** The columns an INDIRECT_SET_SOURCES entry's producer writes. */
-function columnsOfIndirectSource(expression: string): string[] {
-  const source = INDIRECT_SET_SOURCES[expression];
-  const text = readFileSync(resolve(SOURCE_ROOT, source.file), 'utf8');
-  const at = text.indexOf(source.declaration);
-  if (at === -1) {
-    throw new Error(`${source.file} no longer declares ${source.declaration}`);
-  }
-  const end = /^\}[;,]?\s*$/m.exec(text.slice(at))?.index;
-  if (end === undefined) {
-    throw new Error(`${source.declaration} in ${source.file} has no top-level end`);
-  }
-  const columns = propertyKeysAnywhere(text.slice(at, at + end))
-    .map((prop) => COLUMN_OF.get(prop))
-    .filter((column): column is string => column !== undefined);
-  if (columns.length === 0) {
-    throw new Error(`${source.declaration} names no design_engagements column`);
-  }
-  return columns;
+function parse(path: string, text: string): Scanned {
+  const relative = path.slice(SOURCE_ROOT.length + 1).replace(/\\/g, '/');
+  const source = ts.createSourceFile(
+    relative,
+    text,
+    ts.ScriptTarget.Latest,
+    true,
+    path.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS,
+  );
+  const initializers = new Map<string, ts.Expression>();
+  walk(source, (node) => {
+    if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && node.initializer) {
+      initializers.set(node.name.text, node.initializer);
+    }
+  });
+  return { relative, source, initializers };
 }
 
-/** The column list of `grant update (…) on public.design_engagements`. */
-function grantedColumns(): string[] {
-  const text = readFileSync(ROLES_SQL, 'utf8');
-  const match =
-    /grant\s+update\s*\(([^)]*)\)\s*on\s+public\.design_engagements\s+to\s+metra_app\s*;/i.exec(
-      text,
-    );
-  if (!match) {
-    throw new Error(
-      'roles.sql has no `grant update (…) on public.design_engagements to metra_app;`',
-    );
+/**
+ * The files worth parsing: those whose TEXT names the table under any of its
+ * export aliases, or names it in SQL. A file that spells none of those cannot
+ * reach the table, and parsing all 888 source files to learn that would make
+ * this test slow enough to be skipped. Grown to a fixed point, so a re-export
+ * alias pulls its own consumers in.
+ */
+function scanTargets(): Scanned[] {
+  const texts = new Map(
+    allSourceFiles(SOURCE_ROOT).map((path) => [path, readFileSync(path, 'utf8')]),
+  );
+  let names = [TABLE_EXPORT, TABLE_SQL_NAME];
+  let files: Scanned[] = [];
+  for (let pass = 0; pass < 4; pass += 1) {
+    files = [...texts]
+      .filter(([, text]) => names.some((name) => text.includes(name)))
+      .map(([path, text]) => parse(path, text));
+    const grown = [...tableExportNames(files), TABLE_SQL_NAME];
+    if (grown.length === names.length) return files;
+    names = grown;
   }
-  return match[1]
-    .split(',')
-    .map((name) => name.replace(/--[^\n]*/g, '').trim())
-    .filter((name) => name.length > 0);
+  return files;
 }
+
+const scanned = scanTargets();
+const sites = writeSites(scanned, tableExportNames(scanned));
 
 describe('design_engagements column grants match what the app writes', () => {
-  const sites = updateSites();
-
   it('finds the update sites it is meant to be checking', () => {
     // A guard on the guard: a rename of `designEngagements` or a move of the
     // source root would otherwise make every assertion below pass vacuously.
     expect(sites.length).toBeGreaterThanOrEqual(13);
   });
 
-  it('can derive EVERY .set(…) argument — a new indirect producer must be declared', () => {
-    const undeclared = sites
-      .filter((site) => !site.argument.startsWith('{'))
-      .map((site) => ({ ...site, key: site.argument.replace(/\s+/g, ' ') }))
-      .filter((site) => !(site.key in INDIRECT_SET_SOURCES))
-      .map((site) => `${site.where}: .set(${site.key})`);
-    expect(undeclared).toEqual([]);
-
-    // And nothing is declared that no site uses any more: a stale entry would
-    // keep granting a column the app stopped writing.
-    const used = new Set(
-      sites.map((site) => site.argument.replace(/\s+/g, ' ')).filter((key) => key in INDIRECT_SET_SOURCES),
-    );
-    expect([...Object.keys(INDIRECT_SET_SOURCES)].filter((key) => !used.has(key))).toEqual([]);
-  });
-
   it('grants exactly the columns the update sites write — no more, no fewer', () => {
-    const written = new Set<string>();
-    for (const site of sites) {
-      if (site.argument.startsWith('{')) {
-        for (const prop of topLevelKeys(balanced(site.argument, 0), site.where)) {
-          const column = COLUMN_OF.get(prop);
-          if (!column) {
-            throw new Error(
-              `${site.where} sets "${prop}", which is not a column of design_engagements`,
-            );
-          }
-          written.add(column);
-        }
-      } else {
-        for (const column of columnsOfIndirectSource(site.argument.replace(/\s+/g, ' '))) {
-          written.add(column);
-        }
-      }
-    }
-
-    const granted = new Set(grantedColumns());
+    const written = new Set(sites.flatMap((site) => site.columns));
+    const granted = new Set(grantedUpdateColumns(readFileSync(ROLES_SQL, 'utf8')));
     const missing = [...written].filter((column) => !granted.has(column)).sort();
     const surplus = [...granted].filter((column) => !written.has(column)).sort();
 
@@ -297,20 +544,24 @@ describe('design_engagements column grants match what the app writes', () => {
 
   it('keeps the table-level UPDATE revoked, so the column list is not cosmetic', () => {
     // A table-level UPDATE subsumes every column grant, so a re-widening would
-    // leave the list above passing while granting the whole row. The revoke must
-    // also come BEFORE the column grant, or it removes it again.
+    // leave the list above passing while granting the whole row. Both readings
+    // live in `design-engagement-grant.ts`, which the database-side gate shares,
+    // and both are asked of comment-free text.
     const text = readFileSync(ROLES_SQL, 'utf8');
-    expect(text).toMatch(/revoke\s+update\s+on\s+public\.design_engagements\s+from\s+metra_app\s*;/i);
-    expect(text).not.toMatch(
-      /grant[^;(]*\bupdate\b[^;(]*\s+on\s+public\.design_engagements\s+to\s+metra_app\s*;/i,
-    );
-    const revokeAt = text.search(/revoke\s+update\s+on\s+public\.design_engagements/i);
-    const grantAt = text.search(/grant\s+update\s*\([^)]*\)\s*on\s+public\.design_engagements/i);
-    expect(revokeAt).toBeLessThan(grantAt);
+    expect(tableLevelUpdateGrants(text)).toEqual([]);
+
+    // EVERY revoke must come before the column grant, not just the first one:
+    // revoking the table-level privilege takes the column grants with it, so one
+    // appended below the grant leaves metra_app with no UPDATE at all.
+    const revokes = updateRevokes(text);
+    expect(revokes.after).toEqual([]);
+    expect(revokes.before).toEqual([
+      'revoke update on public.design_engagements from metra_app;',
+    ]);
   });
 
   it('never grants a column the schema does not have', () => {
-    const unknown = grantedColumns().filter(
+    const unknown = grantedUpdateColumns(readFileSync(ROLES_SQL, 'utf8')).filter(
       (column) => ![...COLUMN_OF.values()].includes(column),
     );
     expect(unknown).toEqual([]);
