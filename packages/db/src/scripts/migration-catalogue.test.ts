@@ -1,7 +1,9 @@
-import { dirname, resolve } from 'node:path';
+import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { migrationCatalogue, withoutComments } from './migration-catalogue';
+import { migrationCatalogue } from './migration-catalogue';
 import { declaredConstraints, declaredIndexes } from './schema-catalogue';
 
 // DOES A MIGRATION ACTUALLY CREATE WHAT THE SCHEMA DECLARES, UNDER THAT EXACT NAME?
@@ -81,9 +83,74 @@ describe('every declared object is built by some migration, under that exact nam
     expect(built.constraints.has('boqs_source_file_same_org_fk')).toBe(false);
   });
 
-  it('does not mistake a `--` inside a string literal for a comment', () => {
-    const kept = withoutComments(`select 'a -- b' as x; -- gone\nselect 1`);
-    expect(kept).toContain("'a -- b'");
-    expect(kept).not.toContain('gone');
+  it('carries no object that only a MESSAGE names', () => {
+    // F5: `RAISE EXCEPTION '0053: constraint name(s) not renamed: %'` matched
+    // `constraint <identifier>` inside the preserved literal and put a phantom
+    // constraint called `name` into the real catalogue. Surplus names are never
+    // reported (the comparison is one-directional), so this one was invisible.
+    expect(catalogue.constraints.has('name')).toBe(false);
+    // Every real constraint in this schema is `<table>_<what>_<kind>`; a bare
+    // word is prose that got read as SQL.
+    for (const name of catalogue.constraints) expect(name).toMatch(/_/);
+  });
+});
+
+/** A throwaway migrations folder: a journal plus the given files, in order. */
+function folderOf(files: Record<string, string>): string {
+  const folder = mkdtempSync(join(tmpdir(), 'metra-catalogue-'));
+  mkdirSync(join(folder, 'meta'));
+  writeFileSync(
+    join(folder, 'meta/_journal.json'),
+    JSON.stringify({ entries: Object.keys(files).map((tag, idx) => ({ idx, tag })) }),
+  );
+  for (const [tag, sql] of Object.entries(files)) writeFileSync(join(folder, `${tag}.sql`), sql);
+  return folder;
+}
+
+describe('a name inside a string literal is PROSE, and moves nothing', () => {
+  it('cannot satisfy the check for an index no statement creates (F2)', () => {
+    // The evasion, measured on the real tree before this fix: delete the
+    // `CREATE INDEX IF NOT EXISTS boqs_client_idx` line from 0053, add a RAISE
+    // NOTICE that merely NAMES it, and the gate went green again. Not
+    // hypothetical prose — 0052 and 0053 both name indexes and constraints in
+    // their RAISE messages.
+    const built = migrationCatalogue(
+      folderOf({
+        '0001_talk': `DO $$ BEGIN
+           RAISE NOTICE 'runbook: create index boqs_client_idx on public.boqs (org_id, client_id)';
+         END $$;`,
+      }),
+    );
+    expect(built.indexes.has('boqs_client_idx')).toBe(false);
+  });
+
+  it('cannot DELETE a constraint some statement really created (F5)', () => {
+    const built = migrationCatalogue(
+      folderOf({
+        '0001_create': 'ALTER TABLE public.t ADD CONSTRAINT real_con CHECK (n > 0);',
+        '0002_talk': `DO $$ BEGIN
+           RAISE NOTICE 'to undo by hand: alter table t drop constraint real_con';
+         END $$;`,
+      }),
+    );
+    // The false-RED direction: it would send someone hunting a defect that is
+    // not there.
+    expect(built.constraints.has('real_con')).toBe(true);
+  });
+
+  it('still reads the DDL inside a dollar-quoted DO body (F6)', () => {
+    // The body is TRANSPARENT, not stripped: every statement 0052 and 0053 run
+    // is inside one, and a reader that skipped them would replay an empty file
+    // and report the whole schema missing. A `--` comment in the body is still
+    // a comment.
+    const built = migrationCatalogue(
+      folderOf({
+        '0001_do': `DO $$ BEGIN
+           -- CREATE INDEX commented_idx ON public.t (a);
+           CREATE INDEX IF NOT EXISTS real_idx ON public.t (a);
+         END $$;`,
+      }),
+    );
+    expect([...built.indexes]).toEqual(['real_idx']);
   });
 });

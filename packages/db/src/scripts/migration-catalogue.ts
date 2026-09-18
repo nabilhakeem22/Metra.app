@@ -31,10 +31,23 @@
 //   * ONE-DIRECTIONAL. Extra objects a migration creates and the schema does not
 //     declare are legitimate (partial indexes, operational indexes) and never
 //     reported.
-//   * `--` INSIDE A STRING LITERAL is not a comment, and is handled: string and
-//     dollar-quoted bodies are copied through the comment stripper verbatim.
+//   * PROSE IS NOT SQL, and this is the limit that was WRONG here until wave 7's
+//     loop 1. The text is run through `sql-text.ts` first, which removes comments
+//     AND the content of single-quoted literals, so an object named inside a
+//     `RAISE NOTICE '…'` neither enters the catalogue nor leaves it. Both
+//     directions were live: `RAISE EXCEPTION '0053: constraint name(s) not
+//     renamed: %'` put a phantom constraint called `name` in (F5), and a name
+//     mentioned in a NOTICE satisfied the check for an index whose CREATE had
+//     been deleted (F2). Dollar-quoted bodies are TRANSPARENT rather than
+//     stripped — 0052 and 0053 are one `DO $$ … $$` each and every statement they
+//     run is inside one, so a reader that skipped those bodies would replay
+//     nothing and report green. The previous note here claimed string and
+//     dollar-quoted bodies were "copied through the comment stripper verbatim";
+//     the first half was true and is now deliberately false, and the second half
+//     never was (F6).
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { scannableSql } from './sql-text';
 
 interface JournalEntry {
   idx: number;
@@ -80,49 +93,6 @@ function identifierAt(match: RegExpMatchArray, quoted: number): string | null {
   if (literal !== undefined) return literal;
   const bare = match[quoted + 1];
   return bare === undefined ? null : bare.toLowerCase();
-}
-
-/**
- * `--` and block comments removed; string literals and dollar-quoted bodies copied
- * through untouched, so a `--` inside one is not mistaken for a comment.
- */
-export function withoutComments(sql: string): string {
-  let out = '';
-  let i = 0;
-  while (i < sql.length) {
-    const char = sql[i];
-    if (char === "'" || char === '"') {
-      let j = i + 1;
-      while (j < sql.length) {
-        if (sql[j] === char) {
-          if (sql[j + 1] === char) {
-            j += 2;
-            continue;
-          }
-          break;
-        }
-        j += 1;
-      }
-      out += sql.slice(i, j + 1);
-      i = j + 1;
-      continue;
-    }
-    if (char === '-' && sql[i + 1] === '-') {
-      const end = sql.indexOf('\n', i);
-      i = end === -1 ? sql.length : end;
-      out += '\n';
-      continue;
-    }
-    if (char === '/' && sql[i + 1] === '*') {
-      const end = sql.indexOf('*/', i + 2);
-      i = end === -1 ? sql.length : end + 2;
-      out += ' ';
-      continue;
-    }
-    out += char;
-    i += 1;
-  }
-  return out;
 }
 
 type Step = { at: number; apply: (catalogue: MigrationCatalogue) => void };
@@ -177,7 +147,7 @@ export function migrationCatalogue(migrationsFolder: string): MigrationCatalogue
   ) as { entries: JournalEntry[] };
   const catalogue: MigrationCatalogue = { indexes: new Set(), constraints: new Set() };
   for (const entry of journal.entries) {
-    const text = withoutComments(
+    const text = scannableSql(
       readFileSync(resolve(migrationsFolder, `${entry.tag}.sql`), 'utf8'),
     );
     for (const step of stepsIn(text)) step.apply(catalogue);
