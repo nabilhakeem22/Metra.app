@@ -164,6 +164,7 @@ describe('saveLine', () => {
   });
 
   it('clears the local edit on ok and leaves it on a coded refusal', async () => {
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     const { context, edits, settle } = harness();
     actions.updateBoqLine.mockResolvedValueOnce({ ok: false, error: 'invalid_qty' });
 
@@ -172,6 +173,16 @@ describe('saveLine', () => {
 
     expect(edits.saved).toEqual([]);
     expect(toasts).toEqual([{ title: 'errors.invalid_qty', variant: 'destructive' }]);
+    // F7: the CODED refusal is the common failure of this screen and used to
+    // leave no trace at all — `mutateInOrg` logs what the server threw, never
+    // what it decided.
+    expect(logged).toHaveBeenCalledTimes(1);
+    expect(logged.mock.calls[0]![0]).toBe('boq line save refused');
+    expect(logged.mock.calls[0]![1]).toEqual({
+      lineId: 'line-1',
+      columns: ['qty'],
+      code: 'invalid_qty',
+    });
   });
 
   it('LOGS a save that rejected, as well as toasting it (W5 R8)', async () => {
@@ -187,6 +198,8 @@ describe('saveLine', () => {
 
     expect(logged).toHaveBeenCalledTimes(1);
     expect(logged.mock.calls[0]![0]).toBe('boq line save failed before returning a result');
+    // F7: with the row, so a failed save on a 2,000-line sheet can be tied to one.
+    expect(logged.mock.calls[0]![1]).toEqual({ lineId: 'line-1', columns: ['qty'] });
     expect(toasts).toEqual([{ title: 'sheet.saveFailed', variant: 'destructive' }]);
   });
 

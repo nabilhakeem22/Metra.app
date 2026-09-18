@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { sql } from 'drizzle-orm';
 import { afterAll, describe, expect, it } from 'vitest';
 import { commitImportCore, createBoqCore } from '@/lib/boqs/core';
@@ -170,6 +173,27 @@ async function boqRow(boqId: string): Promise<BoqRow> {
   return row;
 }
 
+const here = dirname(fileURLToPath(import.meta.url)); // apps/web/tests/actions
+const MIGRATION_0052 = resolve(
+  here,
+  '../../../../packages/db/migrations/0052_composite_fk_set_null_columns.sql',
+);
+
+/**
+ * How many composite set-null foreign keys 0052 narrows, read from the VALUES
+ * table in the migration itself: one row per `('<child>', '<conname>',
+ * '<column>', '<parent>')`. The migration is the list; a literal here would be a
+ * second one, and the two would drift the first time a thirteenth FK is added.
+ */
+function narrowedByMigration0052(): number {
+  const text = readFileSync(MIGRATION_0052, 'utf8');
+  const table = /FROM \(VALUES([\s\S]*?)\) AS t\(child, conname, child_col, parent\)/.exec(text);
+  if (!table) throw new Error('0052 no longer carries a `FROM (VALUES …) AS t(child, conname, child_col, parent)` table');
+  const rows = [...table[1].matchAll(/\(\s*'[^']+'\s*,\s*'[^']+'\s*,\s*'[^']+'\s*,\s*'[^']+'\s*\)/g)];
+  if (rows.length === 0) throw new Error('0052 declares no foreign keys to narrow');
+  return rows.length;
+}
+
 describe('a composite set-null cascade nulls the reference and leaves org_id alone', () => {
   it('deletes the source FILE of a DRAFT boq: source_file_id goes null, org_id and the other parent do not', async () => {
     const fixture = await setup();
@@ -300,10 +324,14 @@ describe('a composite set-null cascade nulls the reference and leaves org_id alo
     );
     expect(stragglers).toEqual([]);
 
-    // And the count is still twelve, so a narrowing that was DROPPED rather than
-    // fixed does not pass as "no stragglers". Eleven are declared in
-    // `src/schema/`; the twelfth is `files_category_same_org_fk`, which 0040
-    // created and no schema file declares - see 0052's header.
+    // And the count still equals the number of rows in 0052's OWN table, so a
+    // narrowing that was DROPPED rather than fixed does not pass as "no
+    // stragglers". Derived rather than written as `12`, because the number is a
+    // CENSUS, not a limit: the day a thirteenth composite set-null FK is added,
+    // 0052 grows a row and this assertion follows it, instead of going red in a
+    // place that reads like a defect (wave 7 R10). Eleven of today's twelve are
+    // declared in `src/schema/`; the twelfth is `files_category_same_org_fk`,
+    // which 0040 created and no schema file declares - see 0052's header.
     const [narrowed] = await raw.query<{ n: number }>(
       `select count(*)::int as n
          from pg_constraint c
@@ -314,6 +342,6 @@ describe('a composite set-null cascade nulls the reference and leaves org_id alo
           and c.confdeltype = 'n'
           and array_length(c.conkey, 1) > 1`,
     );
-    expect(Number(narrowed.n)).toBe(12);
+    expect(Number(narrowed.n)).toBe(narrowedByMigration0052());
   });
 });

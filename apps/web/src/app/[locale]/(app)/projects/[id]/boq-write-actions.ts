@@ -97,13 +97,31 @@ export function saveLine(
             // The edit STAYS on screen when the server refuses it. Reverting to
             // the stored value would throw away what the studio typed and leave
             // them guessing which cell was wrong.
-            else refuse(context, result.error);
+            //
+            // AND THE REFUSAL IS LOGGED, not only toasted. A coded refusal —
+            // `amount_too_large`, `boq_not_draft`, a line that has vanished — is
+            // the COMMON failure of this screen and it left no trace anywhere:
+            // `mutateInOrg` logs what the server threw, never what it decided.
+            // On a 2,000-line sheet a toast that is gone in five seconds is the
+            // entire record, and it does not say which row.
+            else {
+              console.error('boq line save refused', {
+                lineId: line.id,
+                columns,
+                code: result.error,
+              });
+              refuse(context, result.error);
+            }
           } catch (cause) {
             // A REJECTION LEAVES NO TRACE ANYWHERE ELSE: `mutateInOrg` never saw
             // it, so the server has nothing, and the toast below is gone in five
             // seconds. Logged the way use-engagement-action.ts logs its twin, so
             // `wrangler tail` carries a failed BOQ save at all.
-            console.error('boq line save failed before returning a result', cause);
+            console.error(
+              'boq line save failed before returning a result',
+              { lineId: line.id, columns },
+              cause,
+            );
             toast({ title: context.sheetText('saveFailed'), variant: 'destructive' });
           }
         },

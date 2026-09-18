@@ -72,16 +72,28 @@ const TRIGGER_PATTERN = new RegExp(
 // `create function` / `create policy` / `create trigger` in the rest of that
 // span disappears with it.
 //
-// WHY IT IS WRITTEN DOWN RATHER THAN FIXED. The failure is a FALSE RED, never a
-// false green: a declaration that is eaten is one `apply-rls` then reports as
-// MISSING from the database, which stops a deploy instead of passing a broken
-// one. And it is measured rather than assumed — the real tree parses to 30
-// functions, 46 policies and 12 triggers, which is exactly what the catalogues
-// hold. This gate now reds a deploy, so the limit belongs on the page instead of
-// being rediscovered at 03:00. If a `--` or `/*` ever has to live inside an RLS
-// string literal, the fix is a real scanner here — `migration-catalogue.ts`'s
-// `withoutComments` already is one and can be copied — never a change to the SQL
-// to appease the regex.
+// WHICH DIRECTION IT FAILS IN, corrected. This block used to say the failure was
+// "a FALSE RED, never a false green". That is backwards (wave 7 S5). `apply-rls`
+// applies the RAW file text (`apply-rls.ts`, `sql.unsafe(content)`), so an eaten
+// declaration is still CREATED in the database; this parser feeds only the
+// DECLARED side of a comparison that runs one way, declared -> database. An eaten
+// declaration therefore drops OUT of the declared set and is never checked at
+// all: a FALSE GREEN, on the one gate that exists to prove `apply-rls` landed.
+//
+// WHAT CATCHES IT ANYWAY, and what does not. `rls-catalogue.test.ts` pins the
+// counts at 46 policies / 12 triggers / 30 functions, so an EXISTING declaration
+// that starts being eaten reds immediately. A NEW declaration eaten on the day it
+// is written is not caught: the parser returns the old count and the old
+// expectation still passes. Raise those numbers with every addition — they are a
+// floor, not a fact about the parser.
+//
+// WHY IT IS WRITTEN DOWN RATHER THAN FIXED. It is measured rather than assumed:
+// the real tree parses to 30 functions, 46 policies and 12 triggers, which is
+// exactly what the catalogues hold, so nothing in the tree has this shape today.
+// If a `--` or `/*` ever has to live inside an RLS string literal, the fix is the
+// real scanner that now exists — `sql-text.ts`'s `scannableSql`, which strips
+// literal content and is transparent through dollar-quoted bodies — never a
+// change to the SQL to appease the regex.
 export function withoutSqlComments(content: string): string {
   return content.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/--[^\n]*/g, '');
 }
