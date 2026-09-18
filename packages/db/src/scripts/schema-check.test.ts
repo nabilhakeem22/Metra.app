@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { declaredFunctions } from './rls-catalogue';
-import { declaredTables } from './schema-catalogue';
+import { declaredCompositeSetNullFks, declaredTables } from './schema-catalogue';
 import { runSchemaCheck, type CatalogueSql } from './schema-check';
 
 // F2: on the ONE run where the owner is being told the database is behind, the
@@ -37,6 +37,31 @@ const NARROWED: CompositeFk = {
   set_cols: ['engagement_id'],
 };
 
+/**
+ * A correctly narrowed database: one row per composite set-null FK `src/schema/`
+ * declares, plus `files_category_same_org_fk`, which 0040 created and no schema
+ * file declares. Twelve, as production will hold after 0052 — and derived, so the
+ * floor added in L3 is satisfied by the fixture for the same reason it is
+ * satisfied by a real database.
+ */
+function narrowedCatalogue(): CompositeFk[] {
+  const rows = [...declaredCompositeSetNullFks()].map(([name, child]) => ({
+    name,
+    child,
+    fk_cols: ['org_id', `${name}_col`],
+    set_cols: [`${name}_col`],
+  }));
+  return [
+    ...rows,
+    {
+      name: 'files_category_same_org_fk',
+      child: 'files',
+      fk_cols: ['org_id', 'category_id'],
+      set_cols: ['category_id'],
+    },
+  ];
+}
+
 /** A postgres.js stand-in that answers the four catalogue reads from fixtures. */
 function fixtureSql(catalogues: Catalogues): CatalogueSql {
   const declared = declaredTables();
@@ -44,7 +69,7 @@ function fixtureSql(catalogues: Catalogues): CatalogueSql {
   const sql = (strings: TemplateStringsArray) => {
     const text = strings.join(' ');
     if (text.includes('confdeltype')) {
-      return Promise.resolve(catalogues.compositeFks ?? [NARROWED]);
+      return Promise.resolve(catalogues.compositeFks ?? narrowedCatalogue());
     }
     if (text.includes('information_schema.columns')) {
       const rows: Array<{ table_name: string; column_name: string }> = [];
@@ -171,7 +196,7 @@ describe('composite set-null foreign keys are a GATE, not a report (R6)', () => 
     const code = await runSchemaCheck(fixtureSql(completeCatalogues()));
     expect(code).toBe(0);
     expect(logged.join('\n')).toContain(
-      'composite set-null FKs — 1 found, every one narrowed to a single non-org_id column',
+      'composite set-null FKs — 12 found (11 declared in src/schema/), every one narrowed',
     );
   });
 
@@ -181,7 +206,7 @@ describe('composite set-null foreign keys are a GATE, not a report (R6)', () => 
       fixtureSql({
         ...completeCatalogues(),
         compositeFks: [
-          NARROWED,
+          ...narrowedCatalogue(),
           {
             name: 'files_category_same_org_fk',
             child: 'files',
@@ -202,7 +227,7 @@ describe('composite set-null foreign keys are a GATE, not a report (R6)', () => 
     const code = await runSchemaCheck(
       fixtureSql({
         ...completeCatalogues(),
-        compositeFks: [{ ...NARROWED, set_cols: ['org_id'] }],
+        compositeFks: [...narrowedCatalogue(), { ...NARROWED, set_cols: ['org_id'] }],
       }),
     );
     expect(code).toBe(1);
@@ -217,7 +242,7 @@ describe('composite set-null foreign keys are a GATE, not a report (R6)', () => 
     const code = await runSchemaCheck(
       fixtureSql({
         ...completeCatalogues(),
-        compositeFks: [{ ...NARROWED, set_cols: ['client_id'] }],
+        compositeFks: [...narrowedCatalogue(), { ...NARROWED, set_cols: ['client_id'] }],
       }),
     );
     expect(code).toBe(1);
@@ -231,10 +256,47 @@ describe('composite set-null foreign keys are a GATE, not a report (R6)', () => 
     const code = await runSchemaCheck(
       fixtureSql({
         ...completeCatalogues(),
-        compositeFks: [{ ...NARROWED, set_cols: ['engagement_id', 'org_id'] }],
+        compositeFks: [...narrowedCatalogue(), { ...NARROWED, set_cols: ['engagement_id', 'org_id'] }],
       }),
     );
     expect(code).toBe(1);
     expect(errored.join('\n')).toContain('a narrowed FK nulls exactly one column');
+  });
+});
+
+describe('the floor under the composite set-null gate (L3)', () => {
+  // Every other guard shipped this wave carries a guard on the guard. This one
+  // did not: a fixture answering `[]` printed "0 found, every one narrowed" and
+  // exited 0, so a schema edit that turned an `onDelete: 'set null'` into
+  // anything else would drop the row out of the query and the count would fall
+  // silently.
+  it('FAILS when the database holds fewer than src/schema declares', async () => {
+    captureConsole();
+    const code = await runSchemaCheck(
+      fixtureSql({ ...completeCatalogues(), compositeFks: [] }),
+    );
+    expect(code).toBe(1);
+    expect(errored.join('\n')).toContain(
+      `only 0 found and src/schema/ declares ${String(declaredCompositeSetNullFks().size)}`,
+    );
+  });
+
+  it('derives the floor from the schema, and the schema declares eleven', () => {
+    // Eleven, not twelve: the database also holds `files_category_same_org_fk`,
+    // which 0040 created and `files.ts` declares nowhere. That is why this is a
+    // FLOOR and not an equality.
+    const declared = declaredCompositeSetNullFks();
+    expect(declared.size).toBe(11);
+    expect(declared.get('boqs_engagement_same_org_fk')).toBe('boqs');
+    expect(declared.has('files_category_same_org_fk')).toBe(false);
+  });
+
+  it('passes on the twelve a narrowed database holds', async () => {
+    captureConsole();
+    const code = await runSchemaCheck(
+      fixtureSql({ ...completeCatalogues(), compositeFks: narrowedCatalogue() }),
+    );
+    expect(code).toBe(0);
+    expect(logged.join('\n')).toContain('12 found (11 declared in src/schema/)');
   });
 });

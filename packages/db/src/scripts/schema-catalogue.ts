@@ -71,6 +71,32 @@ export function declaredConstraints(): Map<string, string> {
   return declared;
 }
 
+/**
+ * Every COMPOSITE `on delete set null` foreign key the CODE declares — every
+ * `sameOrgFk(…, { onDelete: 'set null' })` — as constraint name -> its table.
+ *
+ * It exists to give `assert-schema-applied`'s composite set-null section a FLOOR.
+ * That section reads the database and reports what it finds; against an empty
+ * answer it printed "0 found, every one narrowed" and exited 0, which is the
+ * shape of every gate that has no guard on the guard (wave 7 L3). Eleven are
+ * declared here today; the database holds twelve, because 0040 created
+ * `files_category_same_org_fk` and `files.ts` never declared it — so this is a
+ * floor, one-directional like everything else in this file, never an equality.
+ */
+export function declaredCompositeSetNullFks(): Map<string, string> {
+  const declared = new Map<string, string>();
+  for (const value of Object.values(schema)) {
+    if (!is(value, PgTable)) continue;
+    const config = getTableConfig(value);
+    for (const fk of config.foreignKeys) {
+      if (fk.onDelete !== 'set null') continue;
+      if (fk.reference().columns.length < 2) continue;
+      declared.set(fk.getName(), config.name);
+    }
+  }
+  return declared;
+}
+
 /** One line per column the code needs and the database does not have. */
 export function missingColumns(
   declared: Map<string, Set<string>>,

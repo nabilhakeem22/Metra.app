@@ -56,6 +56,29 @@
  * response that never arrives (wave 7 S6). After WRITE_DEADLINE_MS the latch
  * RELEASES the strand — queued writes proceed — and calls the request's
  * `onDeadline`, which is where the log and the refusal on screen live.
+ *
+ * KNOWN LIMIT — IT HOLDS BY OVERLAP AND COALESCES BY THE EXACT COLUMN LIST, so
+ * two OVERLAPPING but differently-shaped writes can leave in the wrong order
+ * (wave 7 L1). `run` decides "am I held?" with `overlaps()`, which is right, and
+ * then picks its queue slot by the sorted column list, so a later request with an
+ * EARLIER key replaces that entry in place — in front of an entry queued before
+ * it. Typed in this order on one line:
+ *
+ *     1st  ['qty']              qty = 12   (in flight)
+ *     2nd  ['qty','unitPrice']  qty = 13   (queued, its own entry)
+ *     3rd  ['qty']              qty = 14   (queued behind, its own entry)
+ *     4th  ['qty','unitPrice']  qty = 15   (COALESCES onto the 2nd — in front)
+ *
+ * the send order is 12, then 15, then 14, and the document ends holding 14 — the
+ * value the studio replaced. LATENT, for the same reason R7 was: every `saveLine`
+ * call site passes at most one column today — `[]` (boq-sheet-row-controls.tsx),
+ * `['unit']` (boq-sheet-row-fields.tsx) and `[column]` (boq-write-actions.ts) —
+ * so two strands of one line never overlap. THE FIRST TWO-COLUMN CONTROL ANYONE
+ * ADDS MAKES IT LIVE AND SILENT. The fix when that day comes is to coalesce by
+ * OVERLAP as well: fold the arriving write into the earliest entry it overlaps
+ * rather than into the one whose key matches, and keep the queue in arrival
+ * order. Not done here because it is a behaviour change with no caller to prove
+ * it, and this wave's brief says so.
  */
 
 /**

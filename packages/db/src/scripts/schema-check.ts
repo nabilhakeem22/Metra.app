@@ -14,6 +14,7 @@
 import type { createSql } from '../client';
 import { declaredFunctions } from './rls-catalogue';
 import {
+  declaredCompositeSetNullFks,
   declaredConstraints,
   declaredIndexes,
   declaredTables,
@@ -215,12 +216,22 @@ export async function runSchemaCheck(sql: CatalogueSql): Promise<number> {
     .map((fk) => ({ fk, problem: narrowingProblem(fk) }))
     .filter((checked) => checked.problem !== undefined)
     .map((checked) => `  - ${checked.fk.name} (on ${checked.fk.child}) ${checked.problem ?? ''}`);
-  if (unnarrowed.length === 0) {
+
+  // THE FLOOR, and the reason it is here: this section reports what the database
+  // HAS, so an empty answer read "0 found, every one narrowed" and exited 0 — a
+  // gate with no guard on the guard (wave 7 L3). The number is derived from
+  // `src/schema/`, never written down, and it is a floor rather than an equality
+  // because the database legitimately holds one MORE than the schema declares.
+  const declaredFks = declaredCompositeSetNullFks();
+  const behind = compositeFks.length < declaredFks.size;
+
+  if (unnarrowed.length === 0 && !behind) {
     console.log(
-      `assert-schema-applied: composite set-null FKs — ${compositeFks.length} found, ` +
-        'every one narrowed to a single non-org_id column.',
+      `assert-schema-applied: composite set-null FKs — ${compositeFks.length} found ` +
+        `(${declaredFks.size} declared in src/schema/), every one narrowed to a single ` +
+        'non-org_id column.',
     );
-  } else {
+  } else if (unnarrowed.length > 0) {
     console.error(
       `assert-schema-applied: composite set-null FKs — ${compositeFks.length} found, ` +
         `${unnarrowed.length} NOT NARROWED (this FAILS the check):\n${unnarrowed.join('\n')}\n\n` +
@@ -229,6 +240,14 @@ export async function runSchemaCheck(sql: CatalogueSql): Promise<number> {
         'delete, org_id included — the row keeps existing with no tenant.',
     );
   }
+  if (behind) {
+    console.error(
+      `assert-schema-applied: composite set-null FKs — only ${compositeFks.length} found and ` +
+        `src/schema/ declares ${declaredFks.size} (this FAILS the check). Either this database ` +
+        'is behind the code, or a composite ON DELETE SET NULL was re-created with a different ' +
+        'referential action — which this section would otherwise report as nothing at all.',
+    );
+  }
 
-  return columnGaps.length > 0 || unnarrowed.length > 0 ? 1 : 0;
+  return columnGaps.length > 0 || unnarrowed.length > 0 || behind ? 1 : 0;
 }
