@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useMemo, useState } from 'react';
-import type { CellEdits, Column } from './boq-sheet-columns';
+import type { CellEdits, Column, RowEdits } from './boq-sheet-columns';
 
 /**
  * Everything the BOQ sheet holds LOCALLY while a studio types. No server call
@@ -29,7 +29,15 @@ export interface BoqEditsApi {
   /** How many rows are mid-save. Drives the "saving"/"all saved" footer light. */
   savingCount: number;
   setCell(lineId: string, column: Column, value: string): void;
+  /** Drop the local override outright — Escape, and a blur that changed nothing. */
   clearColumns(lineId: string, columns: Column[]): void;
+  /**
+   * Drop the local override for each column whose typed value is STILL the value
+   * that was just saved. A cell the studio has re-typed since keeps its override:
+   * the record coming back names the superseded figure, and the write carrying
+   * the new one has not been sent yet.
+   */
+  clearSaved(lineId: string, saved: RowEdits): void;
   markSaving(lineId: string, saving: boolean): void;
   /** Local edit of the document discount — same override rule as a cell. */
   discount: string | null;
@@ -44,6 +52,24 @@ function withCell(edits: CellEdits, lineId: string, column: Column, value: strin
 function withoutColumns(edits: CellEdits, lineId: string, columns: Column[]): CellEdits {
   const row = { ...(edits[lineId] ?? {}) };
   for (const column of columns) delete row[column];
+  const next = { ...edits };
+  if (Object.keys(row).length === 0) delete next[lineId];
+  else next[lineId] = row;
+  return next;
+}
+
+/**
+ * Drop only what was SAVED, leaving anything typed since. Same shape as
+ * `withoutColumns`, one condition apart — and that condition is the whole of
+ * wave 7 F4: the first write's success used to clear the cell outright, throwing
+ * away the value a second, still-QUEUED write was carrying. The money figure on
+ * screen fell back to the superseded record for a full round trip.
+ */
+function withoutSaved(edits: CellEdits, lineId: string, saved: RowEdits): CellEdits {
+  const row = { ...(edits[lineId] ?? {}) };
+  for (const [column, value] of Object.entries(saved)) {
+    if (row[column as Column] === value) delete row[column as Column];
+  }
   const next = { ...edits };
   if (Object.keys(row).length === 0) delete next[lineId];
   else next[lineId] = row;
@@ -89,6 +115,10 @@ export function useBoqEdits(): BoqEditsApi {
     setCells((previous) => withoutColumns(previous, lineId, columns));
   }, []);
 
+  const clearSaved = useCallback((lineId: string, saved: RowEdits) => {
+    setCells((previous) => withoutSaved(previous, lineId, saved));
+  }, []);
+
   const markSaving = useCallback((lineId: string, on: boolean) => {
     setSaving((previous) => withSaving(previous, lineId, on));
   }, []);
@@ -104,6 +134,7 @@ export function useBoqEdits(): BoqEditsApi {
     savingCount: savingIds.size,
     setCell,
     clearColumns,
+    clearSaved,
     markSaving,
     discount,
     setDiscount,

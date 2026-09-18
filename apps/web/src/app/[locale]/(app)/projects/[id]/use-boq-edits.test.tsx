@@ -85,3 +85,49 @@ describe('useBoqEdits — saves in flight are COUNTED, not a membership set', ()
     expect(edits.latest().savingIds).toBe(before);
   });
 });
+
+describe('clearSaved — a write clears only what it actually saved (F4)', () => {
+  it('keeps the override when the studio has re-typed the cell since', () => {
+    // The sequence: type 12, blur (write A goes out), type 15, blur (write B is
+    // COALESCED behind A). A comes back ok. Clearing `qty` outright here drops
+    // the 15 the studio can see and that B is carrying, and the cell falls back
+    // to the superseded record for a whole round trip.
+    const edits = editsHarness();
+    act(() => {
+      edits.latest().setCell('line-1', 'qty', '12');
+    });
+    act(() => {
+      edits.latest().setCell('line-1', 'qty', '15');
+    });
+    act(() => {
+      edits.latest().clearSaved('line-1', { qty: '12' });
+    });
+    expect(edits.latest().cells).toEqual({ 'line-1': { qty: '15' } });
+  });
+
+  it('drops the override when the saved value is still what is on screen', () => {
+    const edits = editsHarness();
+    act(() => {
+      edits.latest().setCell('line-1', 'qty', '12');
+    });
+    act(() => {
+      edits.latest().clearSaved('line-1', { qty: '12' });
+    });
+    // The row itself goes with its last cell, so the sheet holds nothing local.
+    expect(edits.latest().cells).toEqual({});
+  });
+
+  it('leaves the row’s OTHER cells alone', () => {
+    const edits = editsHarness();
+    act(() => {
+      edits.latest().setCell('line-1', 'qty', '12');
+    });
+    act(() => {
+      edits.latest().setCell('line-1', 'unitPrice', '99');
+    });
+    act(() => {
+      edits.latest().clearSaved('line-1', { qty: '12' });
+    });
+    expect(edits.latest().cells).toEqual({ 'line-1': { unitPrice: '99' } });
+  });
+});

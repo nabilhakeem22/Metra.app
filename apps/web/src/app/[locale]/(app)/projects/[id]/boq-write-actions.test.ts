@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { WRITE_DEADLINE_MS } from './cell-write-latch';
 import type { BoqDetail } from '@/lib/boqs/queries';
-import type { Column, EditableLine } from './boq-sheet-columns';
+import type { Column, EditableLine, RowEdits } from './boq-sheet-columns';
 import { saveLine, type WriteContext } from './boq-write-actions';
 import { createCellWriteLatch } from './cell-write-latch';
 
@@ -33,9 +34,11 @@ vi.mock('@/hooks/use-toast', () => ({
 function fakeEdits() {
   const inFlight = new Map<string, number>();
   const cleared: { lineId: string; columns: Column[] }[] = [];
+  const saved: { lineId: string; saved: RowEdits }[] = [];
   return {
     inFlight,
     cleared,
+    saved,
     api: {
       cells: {},
       savingIds: new Set<string>(),
@@ -43,6 +46,9 @@ function fakeEdits() {
       setCell: vi.fn(),
       clearColumns: (lineId: string, columns: Column[]) => {
         cleared.push({ lineId, columns });
+      },
+      clearSaved: (lineId: string, values: RowEdits) => {
+        saved.push({ lineId, saved: values });
       },
       markSaving: (lineId: string, on: boolean) => {
         const next = (inFlight.get(lineId) ?? 0) + (on ? 1 : -1);
@@ -164,7 +170,7 @@ describe('saveLine', () => {
     saveLine(context, LINE, { qty: 'x' }, ['qty']);
     await settle();
 
-    expect(edits.cleared).toEqual([]);
+    expect(edits.saved).toEqual([]);
     expect(toasts).toEqual([{ title: 'errors.invalid_qty', variant: 'destructive' }]);
   });
 
@@ -196,7 +202,99 @@ describe('saveLine', () => {
     await settle();
 
     expect(actions.updateBoqLine).toHaveBeenCalledTimes(2);
-    expect(edits.cleared).toEqual([{ lineId: 'line-1', columns: ['qty'] }]);
+    expect(edits.saved).toEqual([{ lineId: 'line-1', saved: { qty: '15' } }]);
     expect(logged).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('saveLine — coalescing and the deadline', () => {
+  it('sends the FIRST and the LAST value of a chain, never the one in between', async () => {
+    // Three blurs on one cell used to be three round trips of sheet-wide
+    // `pending` (R4: 1029 ms for ten, at a 100 ms round trip). The middle value
+    // is superseded before it is sent — the studio replaced it, and the server
+    // never needed to hear about it.
+    const { context, settle } = harness();
+    let releaseFirst!: (value: { ok: boolean }) => void;
+    actions.updateBoqLine.mockImplementationOnce(
+      () =>
+        new Promise<{ ok: boolean }>((resolve) => {
+          releaseFirst = resolve;
+        }),
+    );
+
+    saveLine(context, LINE, { qty: '12' }, ['qty']);
+    saveLine(context, LINE, { qty: '15' }, ['qty']);
+    saveLine(context, LINE, { qty: '18' }, ['qty']);
+    await Promise.resolve();
+    expect(actions.updateBoqLine).toHaveBeenCalledTimes(1);
+
+    releaseFirst({ ok: true });
+    await settle();
+
+    expect(actions.updateBoqLine).toHaveBeenCalledTimes(2);
+    expect(actions.updateBoqLine.mock.calls[1]![0]).toEqual({
+      lineId: 'line-1',
+      patch: { qty: '18' },
+    });
+  });
+
+  it('unwinds the saving count for a write that is superseded before it is sent', async () => {
+    // The unmark hangs off the LATCH's promise, not the request's: a superseded
+    // write never runs, so a `finally` inside the request would leave the row
+    // marked saving for ever.
+    const { context, edits, settle } = harness();
+    let releaseFirst!: (value: { ok: boolean }) => void;
+    actions.updateBoqLine.mockImplementationOnce(
+      () =>
+        new Promise<{ ok: boolean }>((resolve) => {
+          releaseFirst = resolve;
+        }),
+    );
+
+    saveLine(context, LINE, { qty: '12' }, ['qty']);
+    saveLine(context, LINE, { qty: '15' }, ['qty']);
+    saveLine(context, LINE, { qty: '18' }, ['qty']);
+    expect(edits.inFlight.get('line-1')).toBe(3);
+
+    await Promise.resolve();
+    await Promise.resolve();
+    // One of the three is gone already — it will never be sent.
+    expect(edits.inFlight.get('line-1')).toBe(2);
+
+    releaseFirst({ ok: true });
+    await settle();
+    expect(edits.inFlight.has('line-1')).toBe(false);
+  });
+
+  it('clears only the columns whose LATEST value it wrote (F4)', async () => {
+    const { context, edits, settle } = harness();
+    saveLine(context, LINE, { qty: '12' }, ['qty']);
+    await settle();
+    // What it saved, not which columns it touched: `useBoqEdits` compares this
+    // against what the cell holds NOW and keeps an override the studio has
+    // re-typed since.
+    expect(edits.saved).toEqual([{ lineId: 'line-1', saved: { qty: '12' } }]);
+  });
+
+  it('gives the cell back, logs and toasts when a write never answers (S6)', async () => {
+    vi.useFakeTimers();
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const { context, edits } = harness();
+    actions.updateBoqLine.mockImplementationOnce(() => new Promise(() => undefined));
+    actions.updateBoqLine.mockResolvedValueOnce({ ok: true });
+
+    saveLine(context, LINE, { qty: '12' }, ['qty']);
+    saveLine(context, LINE, { qty: '15' }, ['qty']);
+    await vi.advanceTimersByTimeAsync(WRITE_DEADLINE_MS);
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(logged.mock.calls[0]![0]).toBe('boq line save passed its deadline with no answer');
+    expect(logged.mock.calls[0]![1]).toEqual({ lineId: 'line-1', columns: ['qty'] });
+    expect(toasts).toEqual([{ title: 'sheet.saveFailed', variant: 'destructive' }]);
+    // The write queued behind the stuck one has been sent, and the row is no
+    // longer marked saving.
+    expect(actions.updateBoqLine).toHaveBeenCalledTimes(2);
+    expect(edits.inFlight.has('line-1')).toBe(false);
+    vi.useRealTimers();
   });
 });
