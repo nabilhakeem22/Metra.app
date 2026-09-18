@@ -226,10 +226,26 @@ written.
 client's startup parameters, so an unverified setting is one that silently did
 nothing. A blocked run aborts with 55P03 and rolls the whole batch back.
 
-`db:apply-rls` additionally sets **`statement_timeout = 60 s`**, read back the
-same way. `lock_timeout` bounds each lock WAIT and nothing else, so after a
-successful connect a half-open pooler socket would otherwise leave the applier
-waiting forever with no error, on no deadline.
+### The other deadline: `statement_timeout`
+
+`lock_timeout` bounds lock ACQUISITION and nothing else. Once a statement HOLDS
+its lock, only `statement_timeout` is left between a stalled scan — or a
+half-open pooler socket, which postgres.js has no query-level deadline for — and
+a script that waits forever while the schema sits locked.
+
+| script | `statement_timeout` | why that number |
+|---|---|---|
+| `db:apply-rls` | **`60s`** | catalogue-only DDL; the whole 15-file apply measures ~1 s in CI |
+| `db:migrate` | **`120s`** | double, because a migration may SCAN: 0052 runs twelve `VALIDATE CONSTRAINT`s and 0053 ten index builds |
+
+Both are set with `set_config` and **read back from `pg_settings`** on the same
+connection, in milliseconds rather than as text — `current_setting` reformats
+`'60s'` to `'1min'`, so a text comparison would fail on a value that stuck. A
+value that did not stick refuses to run DDL at all.
+
+`statement_timeout` bounds each STATEMENT, not the batch: `db:migrate` runs every
+pending file in ONE transaction, so a run may legitimately take longer than 120 s
+while no single statement does.
 
 ### The migrator's lock window grows with every appended migration
 

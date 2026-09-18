@@ -1,6 +1,11 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { PostgresJs } from '../client';
-import { MIGRATION_LOCK_TIMEOUT, applyLockTimeout, applyRlsTimeouts } from './lock-timeout';
+import {
+  MIGRATION_LOCK_TIMEOUT,
+  applyLockTimeout,
+  applyMigrationTimeouts,
+  applyRlsTimeouts,
+} from './lock-timeout';
 
 // R4: `apply-rls` had a verified `lock_timeout` and NO client-side deadline, so
 // after a successful connect a stalled socket left `sql.unsafe` waiting forever
@@ -64,6 +69,47 @@ describe('applyLockTimeout', () => {
   it('throws when the setting cannot be read back at all', async () => {
     const recorded: Recorded = { setCalls: [] };
     await expect(applyLockTimeout(fixtureSql({}, recorded))).rejects.toThrow(/unreadable/);
+  });
+});
+
+describe('applyMigrationTimeouts', () => {
+  it('sets BOTH for db:migrate, statement_timeout at 120 s (R2)', async () => {
+    // `lock_timeout` bounds lock ACQUISITION only. Until wave 7 the migrator set
+    // that and nothing else, so once 0052's first DROP CONSTRAINT HELD its
+    // ACCESS EXCLUSIVE lock a stalled scan or a half-open pooler socket hung the
+    // run forever with ~fifteen relations locked — which blocks SELECT too.
+    silenceLog();
+    const recorded: Recorded = { setCalls: [] };
+    await applyMigrationTimeouts(
+      fixtureSql({ lock_timeout: '3000', statement_timeout: '120000' }, recorded),
+    );
+    expect(recorded.setCalls).toEqual([
+      ['lock_timeout', '3s'],
+      ['statement_timeout', '120s'],
+    ]);
+  });
+
+  it('is DOUBLE the apply-rls deadline, because migrations may scan', async () => {
+    // Not a copy of the 60 s: apply-rls only creates catalogue objects, while
+    // 0052 runs twelve VALIDATE CONSTRAINT scans and 0053 ten index builds. A
+    // 60 s answer here would be refused.
+    const recorded: Recorded = { setCalls: [] };
+    await expect(
+      applyMigrationTimeouts(
+        fixtureSql({ lock_timeout: '3000', statement_timeout: '60000' }, recorded),
+      ),
+    ).rejects.toThrow(
+      /statement_timeout is 60000ms after set_config, expected 120000ms \(120s\)/,
+    );
+  });
+
+  it('refuses a migrate run whose statement_timeout did not stick', async () => {
+    const recorded: Recorded = { setCalls: [] };
+    await expect(
+      applyMigrationTimeouts(
+        fixtureSql({ lock_timeout: '3000', statement_timeout: '0' }, recorded),
+      ),
+    ).rejects.toThrow(/refusing to run DDL unbounded/);
   });
 });
 
