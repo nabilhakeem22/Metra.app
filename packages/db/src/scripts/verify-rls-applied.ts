@@ -25,7 +25,17 @@
 //     load-bearing one, because it is what catches a file that never ran;
 //   * every `create trigger` exists in `pg_trigger` (non-internal);
 //   * every function the manifest defines exists in `pg_proc`;
-//   * the `metra_app` role exists, and is neither LOGIN nor BYPASSRLS.
+//   * the `metra_app` role exists, and is neither LOGIN nor BYPASSRLS;
+//   * `design_engagements` has NO table-level UPDATE for metra_app, and its
+//     column-level UPDATE names EXACTLY the columns roles.sql grants. Wave 7
+//     narrowed that authority to fifteen derived columns so that a free-revision
+//     allowance, a client or a project cannot be moved by any code path; until
+//     wave 7's loop 1 the only thing that checked it was a static text parse of
+//     roles.sql, and this line — "verified in the catalogues … role metra_app
+//     present" — was printed whether the grant was fifteen columns or the whole
+//     row (S4). A table-level UPDATE subsumes every column grant, so BOTH halves
+//     are needed: the absence of the table privilege is what makes the column
+//     list mean anything.
 //
 // NOT indexes and NOT constraints: those carry the known case-fold drift from
 // 0017 (twelve names Postgres folded because they were written unquoted), and a
@@ -40,7 +50,11 @@
 // Function names are compared WITHOUT their argument lists, which is the one
 // hole worth stating: an overload change (`app_claim_invitation(uuid)` ->
 // `(text)`) reads green here.
+import { readFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import type { createSql } from '../client';
+import { GRANTED_UPDATE_TABLE, grantedUpdateColumns } from './design-engagement-grant';
 import { declaredFunctions, declaredPolicies, declaredTriggers } from './rls-catalogue';
 import { declaredTables } from './schema-catalogue';
 
@@ -105,6 +119,57 @@ async function appRoleProblems(sql: Sql): Promise<string[]> {
   return [];
 }
 
+const ROLES_SQL = resolve(dirname(fileURLToPath(import.meta.url)), '../rls/roles.sql');
+
+/**
+ * The `design_engagements` UPDATE authority, compared against roles.sql itself —
+ * the same reader the app-side drift test uses, so the two gates cannot disagree
+ * about what "granted" means.
+ */
+async function grantProblems(sql: Sql): Promise<string[]> {
+  const [privilege] = (await sql`
+    select has_table_privilege(${APP_ROLE}, 'public.design_engagements', 'update') as "tableLevel",
+           has_any_column_privilege(${APP_ROLE}, 'public.design_engagements', 'update') as "columnLevel"
+  `) as unknown as Array<{ tableLevel: boolean; columnLevel: boolean }>;
+  const rows = (await sql`
+    select column_name as name
+      from information_schema.column_privileges
+     where table_schema = 'public' and table_name = 'design_engagements'
+       and grantee = ${APP_ROLE} and privilege_type = 'UPDATE'
+  `) as unknown as Array<{ name: string }>;
+
+  const problems: string[] = [];
+  if (privilege.tableLevel) {
+    problems.push(
+      `  - ${APP_ROLE} has TABLE-LEVEL update on ${GRANTED_UPDATE_TABLE}, which subsumes ` +
+        'every column grant — the narrowing in rls/roles.sql is cosmetic on this database',
+    );
+  }
+  if (!privilege.columnLevel) {
+    problems.push(
+      `  - ${APP_ROLE} has NO update at all on ${GRANTED_UPDATE_TABLE} — every state ` +
+        'transition, ROM issue, render stamp and share-token mint will fail with 42501',
+    );
+  }
+  const granted = new Set(grantedUpdateColumns(readFileSync(ROLES_SQL, 'utf8')));
+  const applied = new Set(rows.map((row) => row.name));
+  const missing = [...granted].filter((column) => !applied.has(column)).sort();
+  const surplus = [...applied].filter((column) => !granted.has(column)).sort();
+  if (missing.length > 0) {
+    problems.push(
+      `  - ${GRANTED_UPDATE_TABLE} column update is MISSING ${missing.join(', ')} — ` +
+        'rls/roles.sql grants them and this database does not have them',
+    );
+  }
+  if (surplus.length > 0) {
+    problems.push(
+      `  - ${GRANTED_UPDATE_TABLE} column update carries ${surplus.join(', ')}, which ` +
+        'rls/roles.sql does not grant — a privilege nothing in the repository asked for',
+    );
+  }
+  return problems;
+}
+
 /** One line per declared object the database does not have. Empty = applied. */
 function missing(declared: Map<string, string>, applied: Set<string>, kind: string): string[] {
   return [...declared]
@@ -137,6 +202,7 @@ export async function verifyRlsApplied(sql: Sql): Promise<string[]> {
   problems.push(...missing(declaredTriggers(), await appliedTriggers(sql), 'trigger'));
   problems.push(...missing(declaredFunctions(), await appliedFunctions(sql), 'function'));
   problems.push(...(await appRoleProblems(sql)));
+  problems.push(...(await grantProblems(sql)));
 
   return problems;
 }

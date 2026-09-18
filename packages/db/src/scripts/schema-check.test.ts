@@ -12,13 +12,30 @@ import { runSchemaCheck, type CatalogueSql } from './schema-check';
 // tagged template with no interpolation, so answering on the query text
 // exercises the real control flow without a database.
 
+interface CompositeFk {
+  name: string;
+  child: string;
+  fk_cols: string[];
+  set_cols: string[];
+}
+
 interface Catalogues {
   /** Tables to OMIT a column from, as table -> the columns the database lacks. */
   missingColumns?: Record<string, string[]>;
   indexNames?: Set<string>;
   constraintNames?: Set<string>;
   functionNames?: Set<string>;
+  /** The composite ON DELETE SET NULL foreign keys this database holds. */
+  compositeFks?: CompositeFk[];
 }
+
+/** One narrowed FK, as 0052 leaves it: one column, its own, never org_id. */
+const NARROWED: CompositeFk = {
+  name: 'boqs_engagement_same_org_fk',
+  child: 'boqs',
+  fk_cols: ['org_id', 'engagement_id'],
+  set_cols: ['engagement_id'],
+};
 
 /** A postgres.js stand-in that answers the four catalogue reads from fixtures. */
 function fixtureSql(catalogues: Catalogues): CatalogueSql {
@@ -26,6 +43,9 @@ function fixtureSql(catalogues: Catalogues): CatalogueSql {
   const absent = catalogues.missingColumns ?? {};
   const sql = (strings: TemplateStringsArray) => {
     const text = strings.join(' ');
+    if (text.includes('confdeltype')) {
+      return Promise.resolve(catalogues.compositeFks ?? [NARROWED]);
+    }
     if (text.includes('information_schema.columns')) {
       const rows: Array<{ table_name: string; column_name: string }> = [];
       for (const [table, columns] of declared) {
@@ -137,5 +157,84 @@ describe('the counts the deploy order asks the owner to compare', () => {
     // grep over rls/ returns 30 with no duplicate name, so the handoff number
     // was one short. Pinned here so the next handoff copies a tested fact.
     expect(declaredFunctions().size).toBe(30);
+  });
+});
+
+describe('composite set-null foreign keys are a GATE, not a report (R6)', () => {
+  // `assert-schema-applied` compares `conname` and a narrowing changes no name,
+  // so before wave 7 step 3 of the deploy printed `constraints — 218 declared,
+  // 0 NOT FOUND` over a catalogue where every composite SET NULL still nulled
+  // org_id on a parent delete. Nothing on PRODUCTION asserted 0052 had done
+  // anything; only a CI dbtest against a fresh database did.
+  it('passes, and says so, when every one is narrowed', async () => {
+    captureConsole();
+    const code = await runSchemaCheck(fixtureSql(completeCatalogues()));
+    expect(code).toBe(0);
+    expect(logged.join('\n')).toContain(
+      'composite set-null FKs — 1 found, every one narrowed to a single non-org_id column',
+    );
+  });
+
+  it('FAILS on one that nulls every referencing column — the pre-0052 shape', async () => {
+    captureConsole();
+    const code = await runSchemaCheck(
+      fixtureSql({
+        ...completeCatalogues(),
+        compositeFks: [
+          NARROWED,
+          {
+            name: 'files_category_same_org_fk',
+            child: 'files',
+            fk_cols: ['org_id', 'category_id'],
+            set_cols: [],
+          },
+        ],
+      }),
+    );
+    expect(code).toBe(1);
+    expect(errored.join('\n')).toContain(
+      'files_category_same_org_fk (on files) nulls EVERY referencing column, org_id included',
+    );
+  });
+
+  it('FAILS on one narrowed onto org_id, which would strip the tenant', async () => {
+    captureConsole();
+    const code = await runSchemaCheck(
+      fixtureSql({
+        ...completeCatalogues(),
+        compositeFks: [{ ...NARROWED, set_cols: ['org_id'] }],
+      }),
+    );
+    expect(code).toBe(1);
+    expect(errored.join('\n')).toContain('nulls org_id, which would strip the row of its tenant');
+  });
+
+  it('FAILS on a hand-applied narrowing onto the WRONG column (S3)', async () => {
+    // 0052's idempotency branch counts any existing column list as "already
+    // narrow" without comparing it, so this shape survives a re-run of the
+    // migration and is invisible to every name comparison.
+    captureConsole();
+    const code = await runSchemaCheck(
+      fixtureSql({
+        ...completeCatalogues(),
+        compositeFks: [{ ...NARROWED, set_cols: ['client_id'] }],
+      }),
+    );
+    expect(code).toBe(1);
+    expect(errored.join('\n')).toContain(
+      'nulls client_id, which is not one of its own referencing columns (engagement_id)',
+    );
+  });
+
+  it('FAILS on one that nulls more than one column', async () => {
+    captureConsole();
+    const code = await runSchemaCheck(
+      fixtureSql({
+        ...completeCatalogues(),
+        compositeFks: [{ ...NARROWED, set_cols: ['engagement_id', 'org_id'] }],
+      }),
+    );
+    expect(code).toBe(1);
+    expect(errored.join('\n')).toContain('a narrowed FK nulls exactly one column');
   });
 });
