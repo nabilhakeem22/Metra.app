@@ -19,6 +19,15 @@
 //   * the CONTENT of single-quoted literals, doubled `''` escapes included. The
 //     empty `''` is left in place so the statement still parses to the eye and
 //     positions stay in order.
+//   * the CONTENT of an E-STRING (`E'…'`), where a BACKSLASH escapes the next
+//     character. This is its own case because the rules differ: in a plain
+//     literal `\'` really does end the string (`standard_conforming_strings` is
+//     on), and in an E-string it does not. Reading one with the plain rules ended
+//     the literal early, and the trailing real quote then REOPENED a string that
+//     swallowed everything up to the next quote or to EOF — so a `DROP INDEX`
+//     after an E-string became invisible, which is a false GREEN on the one gate
+//     that has no other defence (wave 7 L2). Measured: 0 E-strings in the 54
+//     migration files today; this is a fence, not a fix for something live.
 //
 // WHAT IS KEPT:
 //   * double-quoted identifiers, verbatim and with their quotes — they are the
@@ -55,8 +64,15 @@ export function scannableSql(sql: string): string {
       continue;
     }
     if (char === "'") {
+      // An `E` immediately before the quote, and not part of a longer word, makes
+      // this an E-string: a backslash escapes the character after it.
+      const escaping = /[Ee]$/.test(out) && !/[\w$][Ee]$/.test(out);
       let j = i + 1;
       while (j < sql.length) {
+        if (escaping && sql[j] === '\\') {
+          j += 2;
+          continue;
+        }
         if (sql[j] !== "'") {
           j += 1;
           continue;

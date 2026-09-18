@@ -59,9 +59,36 @@ describe('tableLevelUpdateGrants', () => {
       'grant select, insert, update, delete on public.design_engagements to metra_app;',
       'GRANT UPDATE ON PUBLIC.DESIGN_ENGAGEMENTS TO METRA_APP;',
       'grant update\n  on public.design_engagements\n  to metra_app;',
+      'grant update on public.design_engagements to metra_app with grant option;',
+      // M1 — the spellings the first version of this guard walked straight past.
+      'grant all on table public.design_engagements to metra_app;',
+      'grant all privileges on table design_engagements to metra_app;',
+      'grant all on all tables in schema public to metra_app;',
+      'grant update on public."design_engagements" to metra_app;',
+      'grant update on "public"."design_engagements" to metra_app;',
+      'grant update on design_engagements to metra_app;',
+      // PUBLIC is every role, metra_app included.
+      'grant all on public.design_engagements to public;',
     ];
     for (const statement of widened) {
       expect(tableLevelUpdateGrants(SHIPPED + statement)).toHaveLength(1);
+    }
+  });
+
+  it('leaves the column form, and other tables and roles, alone', () => {
+    const narrow = [
+      // A column list is a column list however it is spelled.
+      'grant update (state) on table public.design_engagements to metra_app;',
+      'grant all (state) on public.design_engagements to metra_app;',
+      // Another table, and another role.
+      'grant select, insert, update, delete on public.boqs to metra_app;',
+      'grant all on all tables in schema public to some_reporting_role;',
+      'grant all on public.design_engagements to some_reporting_role;',
+      // Not a privilege grant at all.
+      'grant metra_app to postgres;',
+    ];
+    for (const statement of narrow) {
+      expect(tableLevelUpdateGrants(SHIPPED + statement)).toEqual([]);
     }
   });
 

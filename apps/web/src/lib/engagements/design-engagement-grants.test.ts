@@ -46,14 +46,26 @@ import {
 //
 // WHAT THIS FILE REFUSES TO GUESS. It throws — by file:line, with the expression
 // text — rather than deriving a short list, on: a spread or computed key in a
-// `set`, a `.update(…)` argument it cannot resolve to a table, a `.set(…)`
-// argument that is not an object literal and not produced by a helper ANNOTATED
-// `PgUpdateSetSource<typeof designEngagements>`, and any raw SQL naming the
-// table. A grant list derived from a scan that shrugs is worth nothing.
+// `set` (written at the call site OR inside an annotated producer), a
+// `.update(…)` argument it cannot resolve to a table, a `.set(…)` argument that
+// is not an object literal and not produced by a helper ANNOTATED
+// `PgUpdateSetSource<typeof designEngagements>`, and any string anywhere in a
+// scanned file that spells a WRITE to the table. A grant list derived from a
+// scan that shrugs is worth nothing.
+//
+// WHAT IT READS: `apps/web/src` and `packages/db/src` — `.ts`, `.tsx`, `.mts`,
+// `.cts` — which is every tree that opens a drizzle handle to this table.
+// TESTS ARE EXCLUDED, and `apps/web/tests/**/*.dbtest.ts` DELIBERATELY so: those
+// run through `SET LOCAL ROLE metra_app` against a database that already has the
+// grant, so a dbtest writing a column the grant does not name fails with 42501 in
+// CI — loudly, in the same run, which is the signal this scan exists to produce
+// five steps earlier. Scanning them would add no fence and would red on fixtures
+// that write as the owner on purpose.
 
 const here = dirname(fileURLToPath(import.meta.url)); // apps/web/src/lib/engagements
-const SOURCE_ROOT = resolve(here, '../..'); // apps/web/src
-const ROLES_SQL = resolve(here, '../../../../../packages/db/src/rls/roles.sql');
+const REPO_ROOT = resolve(here, '../../../../..');
+const SCAN_ROOTS = [resolve(REPO_ROOT, 'apps/web/src'), resolve(REPO_ROOT, 'packages/db/src')];
+const ROLES_SQL = resolve(REPO_ROOT, 'packages/db/src/rls/roles.sql');
 
 /** The drizzle table object's exported name, and the table it maps to. */
 const TABLE_EXPORT = 'designEngagements';
@@ -92,12 +104,17 @@ interface Bindings {
   other: Set<string>;
 }
 
+/** Every TypeScript module under `root`, tests excluded. */
 function allSourceFiles(root: string): string[] {
   const found: string[] = [];
   for (const entry of readdirSync(root)) {
     const path = join(root, entry);
     if (statSync(path).isDirectory()) found.push(...allSourceFiles(path));
-    else if (/\.tsx?$/.test(entry) && !/\.test\.tsx?$/.test(entry)) found.push(path);
+    // `.mts` and `.cts` count: the extension filter, not the tree walk, was the
+    // weaker half of this scan's reach.
+    else if (/\.(tsx?|mts|cts)$/.test(entry) && !/\.(test|dbtest)\.(tsx?|mts|cts)$/.test(entry)) {
+      found.push(path);
+    }
   }
   return found;
 }
@@ -273,12 +290,28 @@ function whereIs(file: Scanned, node: ts.Node): string {
   return `${file.relative}:${String(line + 1)}`;
 }
 
-/** Every `design_engagements` column named as a key anywhere under `node`. */
-function columnKeysUnder(node: ts.Node): string[] {
+/**
+ * Every `design_engagements` column named as a key anywhere under `node`.
+ *
+ * A SPREAD or a COMPUTED KEY throws, exactly as it does at a literal `.set({…})`.
+ * It used to be SKIPPED here, which made the annotated producer a way round the
+ * rule the direct path enforces: `const patch: PgUpdateSetSource<typeof
+ * designEngagements> = { ...hidden, state }` derived `['state']` and reported the
+ * file clean while `hidden` carried `freeRevisionN` (wave 7 M2).
+ */
+function columnKeysUnder(node: ts.Node, where: string): string[] {
   const columns: string[] = [];
   walk(node, (child) => {
     if (!ts.isObjectLiteralExpression(child)) return;
     for (const property of child.properties) {
+      if (ts.isSpreadAssignment(property)) {
+        throw new Error(`the set at ${where} spreads "${property.getText()}" — not derivable`);
+      }
+      if (property.name && ts.isComputedPropertyName(property.name)) {
+        throw new Error(
+          `the set at ${where} has a computed key "${property.name.getText()}" — not derivable`,
+        );
+      }
       const name = ts.isShorthandPropertyAssignment(property)
         ? property.name.text
         : ts.isPropertyAssignment(property) &&
@@ -312,7 +345,7 @@ function setSourceHelpers(files: Scanned[]): Map<string, SetSourceHelper> {
       if (!ts.isVariableDeclaration(node) && !ts.isFunctionDeclaration(node)) return;
       if (!node.type || !collapsed(node.type.getText(file.source)).includes(SET_SOURCE_TYPE)) return;
       if (!node.name || !ts.isIdentifier(node.name)) return;
-      const columns = columnKeysUnder(node);
+      const columns = columnKeysUnder(node, whereIs(file, node));
       if (columns.length === 0) {
         throw new Error(
           `${whereIs(file, node)}: ${node.name.text} is typed ${SET_SOURCE_TYPE} and names no ` +
@@ -371,24 +404,32 @@ function columnsOfSetExpression(
   );
 }
 
+/** SQL that WRITES the table, in any spelling an operator would use. */
+const RAW_WRITE =
+  /\b(?:update|insert\s+into|delete\s+from|merge\s+into)\s+(?:only\s+)?(?:"?public"?\s*\.\s*)?"?design_engagements"?\b/i;
+
 /**
- * Raw SQL naming the table is BANNED rather than parsed. A structural scan can
- * follow the ORM however the call is spelled; it can never read an arbitrary
+ * Raw SQL that writes the table is BANNED rather than parsed. A structural scan
+ * can follow the ORM however the call is spelled; it can never read an arbitrary
  * string, so the one route it cannot cover is the one route that must not exist.
+ *
+ * THE BAN IS FILE-LEVEL, on every string and template in the file, whatever runs
+ * it. It used to fire only on a tagged `sql` template or a `.execute(…)` call
+ * whose OWN text named the table, so `const stmt = sql.raw('update
+ * design_engagements …'); db.execute(stmt);` — the same statement over two lines
+ * — walked past it, as did any runner that is not `.execute` (wave 7 M3).
+ *
+ * It matches a WRITE, not the name: `packages/db/src/scripts` reads this table's
+ * catalogue rows in `sql` templates on purpose, and a read cannot move a column.
+ * What it still cannot see is a statement assembled from pieces
+ * (`'upd' + 'ate design_engagements'`); nothing short of running the code can.
  */
 function refuseRawSql(file: Scanned): void {
   walk(file.source, (node) => {
-    const isSqlTemplate =
-      ts.isTaggedTemplateExpression(node) &&
-      /(^|\.)sql$/.test(collapsed(node.tag.getText(file.source)));
-    const isExecute =
-      ts.isCallExpression(node) &&
-      ts.isPropertyAccessExpression(node.expression) &&
-      node.expression.name.text === 'execute';
-    if (!isSqlTemplate && !isExecute) return;
-    if (!new RegExp(TABLE_SQL_NAME, 'i').test(node.getText(file.source))) return;
+    if (!ts.isStringLiteralLike(node) && !ts.isTemplateExpression(node)) return;
+    if (!RAW_WRITE.test(node.getText(file.source))) return;
     throw new Error(
-      `${whereIs(file, node)}: raw SQL names ${TABLE_SQL_NAME}. No static reader can derive the ` +
+      `${whereIs(file, node)}: raw SQL writes ${TABLE_SQL_NAME}. No static reader can derive the ` +
         'columns it writes, so the grant list cannot be kept honest against it — use the ORM',
     );
   });
@@ -478,7 +519,9 @@ function writeSites(files: Scanned[], exportNames: ReadonlySet<string>): WriteSi
 }
 
 function parse(path: string, text: string): Scanned {
-  const relative = path.slice(SOURCE_ROOT.length + 1).replace(/\\/g, '/');
+  // Repo-relative, because two roots are scanned and `lib/engagements/core.ts`
+  // alone would no longer say which package a failure is in.
+  const relative = path.slice(REPO_ROOT.length + 1).replace(/\\/g, '/');
   const source = ts.createSourceFile(
     relative,
     text,
@@ -498,13 +541,16 @@ function parse(path: string, text: string): Scanned {
 /**
  * The files worth parsing: those whose TEXT names the table under any of its
  * export aliases, or names it in SQL. A file that spells none of those cannot
- * reach the table, and parsing all 888 source files to learn that would make
+ * reach the table, and parsing all ~900 source files to learn that would make
  * this test slow enough to be skipped. Grown to a fixed point, so a re-export
  * alias pulls its own consumers in.
  */
 function scanTargets(): Scanned[] {
   const texts = new Map(
-    allSourceFiles(SOURCE_ROOT).map((path) => [path, readFileSync(path, 'utf8')]),
+    SCAN_ROOTS.flatMap((root) => allSourceFiles(root)).map((path) => [
+      path,
+      readFileSync(path, 'utf8'),
+    ]),
   );
   let names = [TABLE_EXPORT, TABLE_SQL_NAME];
   let files: Scanned[] = [];

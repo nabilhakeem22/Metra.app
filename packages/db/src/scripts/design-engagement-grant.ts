@@ -26,20 +26,95 @@ export const GRANTED_UPDATE_TABLE = 'design_engagements';
 const COLUMN_GRANT =
   /grant\s+update\s*\(([^)]*)\)\s*on\s+public\.design_engagements\s+to\s+metra_app\s*;/i;
 
-/**
- * A GRANT that would hand metra_app UPDATE on the whole row. The privilege list
- * is matched by SHAPE rather than by the word `update`: `GRANT ALL` names no such
- * word and confers table-level UPDATE anyway, which is how the first version of
- * this guard was walked past (wave 7 S1). The `[^;(]` classes are what exclude
- * the legitimate column form — a `grant update (…)` cannot reach `on` without
- * crossing its own `(`.
- */
-const TABLE_LEVEL_GRANT =
-  /\bgrant\s+(?:all\s+privileges|all|[^;(]*\bupdate\b)[^;(]*\bon\s+public\.design_engagements[^;(]*;/gi;
-
 /** A REVOKE of table-level UPDATE on the table, in any spelling. */
 const TABLE_LEVEL_REVOKE =
   /\brevoke\b[^;]*\bupdate\b[^;]*\bon\s+public\.design_engagements[^;]*;/gi;
+
+/**
+ * One `GRANT <privileges> ON <targets> TO <grantees>`, split at the keywords that
+ * separate its three parts — outside parentheses, so a column list cannot be
+ * mistaken for the end of the privilege list.
+ */
+interface GrantStatement {
+  privileges: string;
+  targets: string;
+  grantees: string;
+  text: string;
+}
+
+/** The index of `keyword` at paren depth 0, or -1. */
+function topLevelKeyword(statement: string, keyword: string): number {
+  const pattern = new RegExp(`\\b${keyword}\\b`, 'gi');
+  for (const match of statement.matchAll(pattern)) {
+    const before = statement.slice(0, match.index);
+    const depth = (before.match(/\(/g) ?? []).length - (before.match(/\)/g) ?? []).length;
+    if (depth === 0) return match.index;
+  }
+  return -1;
+}
+
+/** Every `grant … on … to …` in the file, as its three parts. */
+function grantStatements(sql: string): GrantStatement[] {
+  const parsed: GrantStatement[] = [];
+  for (const raw of scannableSql(sql).split(';')) {
+    const statement = raw.trim();
+    if (!/^grant\b/i.test(statement)) continue;
+    const on = topLevelKeyword(statement, 'on');
+    if (on === -1) continue; // `grant metra_app to postgres` — a role, not a privilege
+    const to = topLevelKeyword(statement.slice(on), 'to');
+    if (to === -1) continue;
+    parsed.push({
+      privileges: statement.slice('grant'.length, on),
+      targets: statement.slice(on + 'on'.length, on + to),
+      grantees: statement.slice(on + to + 'to'.length),
+      text: `${statement.replace(/\s+/g, ' ').trim()};`,
+    });
+  }
+  return parsed;
+}
+
+/**
+ * Does this privilege list confer UPDATE on the WHOLE ROW?
+ *
+ * By SHAPE, which is what the first version of this guard only claimed to do
+ * (wave 7 S1, M1): a privilege carrying a `( column list )` is column-level and
+ * is the form roles.sql uses; anything else that is `ALL`, `ALL PRIVILEGES` or
+ * names `UPDATE` is the whole row. `GRANT ALL` spells no word "update" and
+ * confers it anyway.
+ */
+function grantsWholeRowUpdate(privileges: string): boolean {
+  const wholeRow = privileges.replace(/\b(?:all\s+privileges|all|update)\s*\([^)]*\)/gi, ' ');
+  return /\b(?:all\s+privileges|all|update)\b/i.test(wholeRow);
+}
+
+/**
+ * Does this target list include `design_engagements`, however it is spelled?
+ *
+ * The optional `TABLE` keyword, the optional schema qualification and either
+ * identifier being quoted are all the same table, and all three walked past the
+ * literal `on public.design_engagements` this used to require (M1). `ON ALL
+ * TABLES IN SCHEMA public` is not the table by name and confers exactly the
+ * privilege this guard is about, so it counts too.
+ */
+function namesTheTable(targets: string): boolean {
+  const cleaned = targets
+    .replace(/"/g, '')
+    .replace(/\s+/g, ' ')
+    .replace(/\s*\.\s*/g, '.')
+    .trim()
+    .toLowerCase();
+  if (/\ball tables in schema\b/.test(cleaned)) return true;
+  return cleaned
+    .replace(/^table\s+/, '')
+    .split(',')
+    .map((name) => name.trim().replace(/^public\./, ''))
+    .includes(GRANTED_UPDATE_TABLE);
+}
+
+/** Does this grant reach metra_app? PUBLIC reaches every role, metra_app too. */
+function reachesAppRole(grantees: string): boolean {
+  return /\b(?:metra_app|public)\b/i.test(grantees.replace(/"/g, ''));
+}
 
 /**
  * The column names of `grant update (…) on public.design_engagements to
@@ -60,11 +135,20 @@ export function grantedUpdateColumns(rolesSql: string): string[] {
     .filter((name) => name.length > 0);
 }
 
-/** Every statement that would restore table-level UPDATE. Must be empty. */
+/**
+ * Every statement that would hand metra_app UPDATE on the whole
+ * `design_engagements` row. Must be empty: a table-level UPDATE subsumes every
+ * column grant, so one of these makes the narrowing in roles.sql cosmetic.
+ */
 export function tableLevelUpdateGrants(rolesSql: string): string[] {
-  return [...scannableSql(rolesSql).matchAll(TABLE_LEVEL_GRANT)].map((match) =>
-    match[0].replace(/\s+/g, ' ').trim(),
-  );
+  return grantStatements(rolesSql)
+    .filter(
+      (grant) =>
+        grantsWholeRowUpdate(grant.privileges) &&
+        namesTheTable(grant.targets) &&
+        reachesAppRole(grant.grantees),
+    )
+    .map((grant) => grant.text);
 }
 
 /**

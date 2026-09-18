@@ -154,3 +154,50 @@ describe('a name inside a string literal is PROSE, and moves nothing', () => {
     expect([...built.indexes]).toEqual(['real_idx']);
   });
 });
+
+describe('an E-string is a string too (L2)', () => {
+  // `E'it\'s'` escapes the quote with a BACKSLASH, which a plain-literal reader
+  // takes as the end of the string. The trailing real quote then REOPENS one and
+  // swallows everything to the next quote or to EOF - both directions are
+  // measured below, and the second is the one this gate has no other defence
+  // against. String.raw, so what the test writes is what the migration holds.
+  it('does not let an escaped quote DELETE a constraint (false red)', () => {
+    const built = migrationCatalogue(
+      folderOf({
+        '0001_create': 'ALTER TABLE public.t ADD CONSTRAINT real_con CHECK (n > 0);',
+        '0002_talk': String.raw`DO $$ BEGIN
+           RAISE NOTICE E'it\'s: alter table t drop constraint real_con';
+         END $$;`,
+      }),
+    );
+    expect(built.constraints.has('real_con')).toBe(true);
+  });
+
+  it('does not let one SWALLOW the statements after it (false green)', () => {
+    const built = migrationCatalogue(
+      folderOf({
+        '0001_create': 'CREATE INDEX IF NOT EXISTS doomed_idx ON public.t (a);',
+        '0002_after': String.raw`DO $$ BEGIN
+           RAISE NOTICE E'it\'s done';
+           DROP INDEX IF EXISTS public.doomed_idx;
+           CREATE INDEX IF NOT EXISTS after_e_idx ON public.t (b);
+         END $$;`,
+      }),
+    );
+    // Before this fix the DROP was invisible - the index stayed in the catalogue
+    // - and the index created after the E-string was never seen at all.
+    expect(built.indexes.has('doomed_idx')).toBe(false);
+    expect(built.indexes.has('after_e_idx')).toBe(true);
+  });
+
+  it('leaves a PLAIN literal alone, where a backslash escapes nothing', () => {
+    // With standard_conforming_strings on, that quote really does end the string.
+    const built = migrationCatalogue(
+      folderOf({
+        '0001_plain': String.raw`SELECT 'a trailing backslash \';
+           CREATE INDEX IF NOT EXISTS plain_idx ON public.t (a);`,
+      }),
+    );
+    expect(built.indexes.has('plain_idx')).toBe(true);
+  });
+});
