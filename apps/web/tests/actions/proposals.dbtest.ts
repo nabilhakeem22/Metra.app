@@ -175,6 +175,88 @@ describe('send + immutability (AC4, AC5)', () => {
       ),
     ).rejects.toMatchObject({ code: 'MT100' });
   });
+
+  it('refuses RE-PARENTING a section or a line OUT of a sent proposal, not only INTO one', async () => {
+    // The hole `enforce_proposal_child_draft` carried until wave 7: on UPDATE it
+    // read only NEW's parent, so moving a child from a SENT proposal to a DRAFT
+    // one was admitted - the status read was of the draft target, `proposals`
+    // itself is never touched so `trg_proposals_immutable` does not fire, and
+    // metra_app holds `update` on both child tables. The sent document loses a
+    // section while its cached subtotal / taxable_base / total stay at the sent
+    // figures, which is the number the client is looking at.
+    const { ctx, clientId, projectId } = await setup();
+    const sentId = ((await createProposalCore(ctx, { clientId, projectId })) as { data?: string }).data!;
+    await saveProposalDraftCore(ctx, { id: sentId, sections: twoSections });
+    await sendProposalCore(ctx, { id: sentId });
+
+    const draftId = ((await createProposalCore(ctx, { clientId, projectId })) as { data?: string }).data!;
+    await saveProposalDraftCore(ctx, { id: draftId, sections: twoSections });
+
+    const [sentSection] = await raw.query<{ id: string }>(
+      `select id from public.proposal_sections where proposal_id = '${sentId}' order by sort_order limit 1`,
+    );
+    const draftSections = await raw.query<{ id: string }>(
+      `select id from public.proposal_sections where proposal_id = '${draftId}' order by sort_order`,
+    );
+    const [sentLine] = await raw.query<{ id: string }>(
+      `select id from public.proposal_lines where section_id = '${sentSection.id}' order by sort_order limit 1`,
+    );
+    const [draftLine] = await raw.query<{ id: string }>(
+      `select id from public.proposal_lines where section_id = '${draftSections[0].id}' order by sort_order limit 1`,
+    );
+
+    // OUT of the sent proposal, into a draft one. OLD's parent is what refuses.
+    await expect(
+      withOrgContext(ctx, (tx) =>
+        tx.execute(
+          sql`update public.proposal_sections set proposal_id = ${draftId} where id = ${sentSection.id}`,
+        ),
+      ),
+    ).rejects.toMatchObject({ code: 'MT100' });
+    await expect(
+      withOrgContext(ctx, (tx) =>
+        tx.execute(
+          sql`update public.proposal_lines set section_id = ${draftSections[0].id} where id = ${sentLine.id}`,
+        ),
+      ),
+    ).rejects.toMatchObject({ code: 'MT100' });
+
+    // The direction that always worked, asserted so the OLD check cannot be
+    // mistaken for having REPLACED the NEW one.
+    await expect(
+      withOrgContext(ctx, (tx) =>
+        tx.execute(
+          sql`update public.proposal_sections set proposal_id = ${sentId} where id = ${draftSections[0].id}`,
+        ),
+      ),
+    ).rejects.toMatchObject({ code: 'MT100' });
+    await expect(
+      withOrgContext(ctx, (tx) =>
+        tx.execute(
+          sql`update public.proposal_lines set section_id = ${sentSection.id} where id = ${draftLine.id}`,
+        ),
+      ),
+    ).rejects.toMatchObject({ code: 'MT100' });
+
+    // Nothing moved.
+    const [stillSent] = await raw.query<{ proposal_id: string }>(
+      `select proposal_id from public.proposal_sections where id = '${sentSection.id}'`,
+    );
+    expect(stillSent.proposal_id).toBe(sentId);
+
+    // And a DRAFT-to-DRAFT move is still ADMITTED: the guard fences sent
+    // documents, it does not freeze the builder. Without this the two refusals
+    // above would also pass on a trigger that simply rejected every re-parent.
+    await withOrgContext(ctx, (tx) =>
+      tx.execute(
+        sql`update public.proposal_lines set section_id = ${draftSections[1].id} where id = ${draftLine.id}`,
+      ),
+    );
+    const [moved] = await raw.query<{ section_id: string }>(
+      `select section_id from public.proposal_lines where id = '${draftLine.id}'`,
+    );
+    expect(moved.section_id).toBe(draftSections[1].id);
+  });
 });
 
 describe('public token share (AC7, AC8)', () => {

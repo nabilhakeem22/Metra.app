@@ -119,6 +119,28 @@ export function useProposalDraft(detail: ProposalDetail): ProposalDraftApi {
     );
   }
 
+  /**
+   * Rewrite ONE section's lines, FROM THE LINES IT HAS RIGHT NOW.
+   *
+   * `addLine` and `removeLine` used to read `sections` out of the render closure
+   * and hand the result to `patchSection` (W5 R7). Two `addLine` calls in one
+   * frame therefore both started from the SAME array, and the second overwrote
+   * the first: one of the two lines was simply gone, with no error and nothing
+   * on screen to say a click had done nothing. The updater form is the whole
+   * fix — `current` inside `setSections` is the latest state, queued updates
+   * included.
+   */
+  function replaceLines(
+    sectionIndex: number,
+    change: (lines: LineState[]) => LineState[],
+  ): void {
+    setSections((current) =>
+      current.map((section, index) =>
+        index === sectionIndex ? { ...section, lines: change(section.lines) } : section,
+      ),
+    );
+  }
+
   return {
     discountPct,
     setDiscountPct,
@@ -135,13 +157,9 @@ export function useProposalDraft(detail: ProposalDetail): ProposalDraftApi {
     removeSection: (sectionIndex) =>
       setSections((current) => current.filter((_, index) => index !== sectionIndex)),
     addLine: (sectionIndex, costItem) =>
-      patchSection(sectionIndex, {
-        lines: [...(sections[sectionIndex]?.lines ?? []), newLine(costItem)],
-      }),
+      replaceLines(sectionIndex, (lines) => [...lines, newLine(costItem)]),
     removeLine: (sectionIndex, lineIndex) =>
-      patchSection(sectionIndex, {
-        lines: (sections[sectionIndex]?.lines ?? []).filter((_, j) => j !== lineIndex),
-      }),
+      replaceLines(sectionIndex, (lines) => lines.filter((_, j) => j !== lineIndex)),
     moveSection: (sectionIndex, direction) =>
       setSections((current) => move(current, sectionIndex, direction)),
   };

@@ -121,8 +121,13 @@ Estimates (pilot phase — the 5 pilot firms are an open PRD §10 decision):
   (`db:migrate`, `db:apply-rls`, the fixture purge) use
   **`MIGRATION_LOCK_TIMEOUT = '3s'`** (`packages/db/src/scripts/lock-timeout.ts`),
   set with `set_config` and **read back from `pg_settings`** before any DDL runs
-  because Supavisor discards startup parameters. `db:apply-rls` also sets
-  `statement_timeout 60s`, which `db:migrate` does not.
+  because Supavisor discards startup parameters. Both also set a
+  **`statement_timeout`**, read back the same way: **`db:apply-rls` 60 s**
+  (catalogue-only DDL) and **`db:migrate` 120 s** — double, because a migration
+  may SCAN (0052 runs twelve `VALIDATE CONSTRAINT`s, 0053 ten index builds). It
+  bounds each STATEMENT, not the batch. `lock_timeout` bounds lock ACQUISITION
+  only: once a statement HOLDS its lock, `statement_timeout` is the only thing
+  between a stalled scan and a script that waits for ever with the schema locked.
 - Measured margins, so nobody re-derives them from the wrong number: 0049 + 0050
   hold ACCESS EXCLUSIVE for **~630 ms** against the migrator's **3 s** — a
   **~4.8× self-abort margin**, NOT the "~8×" that came from comparing it against

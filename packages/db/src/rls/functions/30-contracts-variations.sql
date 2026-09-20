@@ -16,6 +16,24 @@
 -- DEFINER so the status read is not itself RLS-filtered. Raises MT100 on a frozen
 -- change. A cascade delete of a DRAFT contract still passes (parent is draft at
 -- BEFORE DELETE time).
+--
+-- BOTH PARENTS ARE CHECKED ON UPDATE (wave 7), for the reason
+-- `enforce_boq_child_draft` spells out in full further down this file: reading
+-- only NEW's status admitted
+--
+--     update public.contract_lines set contract_id = '<a DRAFT contract>'
+--      where id = '<a line of an ISSUED contract>'
+--
+-- because the status read was of the DRAFT target. `contracts` itself is never
+-- touched, so `trg_contracts_immutable` does not fire, and metra_app holds
+-- `update` on both child tables - so a signed document loses a line while its
+-- frozen `original_value` stays at the signed figure. No product path writes
+-- either column today; this is the future action, script or backfill the trigger
+-- exists for.
+--
+-- OLD/NEW are read DIRECTLY rather than through `to_jsonb`: both attached tables
+-- carry contract_id, and materialising a whole row as jsonb to read one uuid is
+-- per-row cost on the deep copy that generates a contract from a proposal.
 create or replace function public.enforce_contract_child_draft()
 returns trigger
 language plpgsql
@@ -23,19 +41,29 @@ security definer
 set search_path = ''
 as $$
 declare
-  j   jsonb;
-  cid uuid;
-  st  text;
+  st text;
 begin
-  if TG_OP = 'DELETE' then j := to_jsonb(OLD); else j := to_jsonb(NEW); end if;
-  cid := (j ->> 'contract_id')::uuid;
-  select status into st from public.contracts where id = cid;
+  -- The parent the row is LEAVING (UPDATE) or being removed from (DELETE).
+  -- OLD is NULL on INSERT, hence the guard.
+  if TG_OP <> 'INSERT' then
+    select status into st from public.contracts where id = OLD.contract_id;
+    if st is not null and st <> 'draft' then
+      raise exception
+        'contract children are frozen once the contract leaves draft (status=%)', st
+        using errcode = 'MT100';
+    end if;
+    if TG_OP = 'DELETE' then return OLD; end if;
+    -- An UPDATE that does not move the row has only one parent, already read.
+    if NEW.contract_id is not distinct from OLD.contract_id then return NEW; end if;
+  end if;
+
+  -- The parent the row is ARRIVING at: an INSERT, or an UPDATE that re-parents.
+  select status into st from public.contracts where id = NEW.contract_id;
   if st is not null and st <> 'draft' then
     raise exception
       'contract children are frozen once the contract leaves draft (status=%)', st
       using errcode = 'MT100';
   end if;
-  if TG_OP = 'DELETE' then return OLD; end if;
   return NEW;
 end
 $$;
@@ -43,6 +71,12 @@ $$;
 -- Child-draft guard: variation_order_lines may only be inserted/updated/deleted
 -- while their parent VO is still 'draft'. Once a VO is internally approved (or
 -- beyond) its lines and netDelta are frozen. Raises MT100 on a frozen change.
+--
+-- BOTH PARENTS ARE CHECKED ON UPDATE (wave 7) - the same hole as its two
+-- siblings, and the one with the sharpest edge: `net_delta` is frozen at
+-- internal approval, so moving a line OUT of an issued VO left an instruction
+-- the client is being asked to sign claiming money for work its own lines no
+-- longer describe.
 create or replace function public.enforce_variation_child_draft()
 returns trigger
 language plpgsql
@@ -50,19 +84,30 @@ security definer
 set search_path = ''
 as $$
 declare
-  j   jsonb;
-  vid uuid;
-  st  text;
+  st text;
 begin
-  if TG_OP = 'DELETE' then j := to_jsonb(OLD); else j := to_jsonb(NEW); end if;
-  vid := (j ->> 'variation_order_id')::uuid;
-  select status into st from public.variation_orders where id = vid;
+  -- The parent the row is LEAVING (UPDATE) or being removed from (DELETE).
+  if TG_OP <> 'INSERT' then
+    select status into st from public.variation_orders where id = OLD.variation_order_id;
+    if st is not null and st <> 'draft' then
+      raise exception
+        'variation order lines are frozen once the VO leaves draft (status=%)', st
+        using errcode = 'MT100';
+    end if;
+    if TG_OP = 'DELETE' then return OLD; end if;
+    -- An UPDATE that does not move the row has only one parent, already read.
+    if NEW.variation_order_id is not distinct from OLD.variation_order_id then
+      return NEW;
+    end if;
+  end if;
+
+  -- The parent the row is ARRIVING at: an INSERT, or an UPDATE that re-parents.
+  select status into st from public.variation_orders where id = NEW.variation_order_id;
   if st is not null and st <> 'draft' then
     raise exception
       'variation order lines are frozen once the VO leaves draft (status=%)', st
       using errcode = 'MT100';
   end if;
-  if TG_OP = 'DELETE' then return OLD; end if;
   return NEW;
 end
 $$;
@@ -382,11 +427,11 @@ $$;
 -- path writes boqLines.boqId today - this is exactly the "future action, script,
 -- or migration backfill" the trigger exists for.
 --
--- THE THREE SIBLING GUARDS HAVE THE SAME HOLE and are deliberately NOT touched
--- here (pre-existing, five triggers, and each needs its own dbtest):
--- enforce_proposal_child_draft (proposal_sections, proposal_lines),
+-- THE THREE SIBLING GUARDS HAD THE SAME HOLE and wave 7 closed it in the same
+-- shape: enforce_proposal_child_draft (proposal_sections, proposal_lines),
 -- enforce_contract_child_draft (contract_sections, contract_lines) and
--- enforce_variation_child_draft (variation_order_lines). Wave 7.
+-- enforce_variation_child_draft (variation_order_lines). All five triggers now
+-- read OLD as well as NEW on UPDATE, each with its own re-parent dbtest.
 --
 -- OLD/NEW are read DIRECTLY rather than through `to_jsonb`: both attached tables
 -- carry boq_id, plpgsql resolves the field at runtime, and materialising an

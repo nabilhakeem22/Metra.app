@@ -13,7 +13,14 @@ import type { BoqLinePatch } from '@/lib/boqs/edit-input';
 import type { BoqDetail } from '@/lib/boqs/queries';
 import { resolveActionError } from '@/lib/actions/error-message';
 import type { ActionCode } from '@/lib/actions/result';
-import { recordValue, trimNumber, type Column, type EditableLine } from './boq-sheet-columns';
+import {
+  recordValue,
+  trimNumber,
+  type Column,
+  type EditableLine,
+  type RowEdits,
+} from './boq-sheet-columns';
+import type { CellWriteLatch } from './cell-write-latch';
 import type { BoqEditsApi } from './use-boq-edits';
 
 /**
@@ -32,6 +39,8 @@ export interface WriteContext {
   boq: BoqDetail;
   edits: BoqEditsApi;
   start: TransitionStartFunction;
+  /** Orders two saves of the SAME cell — see cell-write-latch.ts. */
+  latch: CellWriteLatch;
   sheetText: (key: string) => string;
   errorText: (key: string) => string;
 }
@@ -43,7 +52,28 @@ function refuse(context: WriteContext, code: ActionCode | undefined): void {
   });
 }
 
-/** Commit one line. Called on blur, and only when something actually changed. */
+/** What this write carries for the cells it names, to compare against later. */
+function savedValues(patch: BoqLinePatch, columns: Column[]): RowEdits {
+  const saved: RowEdits = {};
+  for (const column of columns) {
+    const value = patch[column];
+    if (typeof value === 'string') saved[column] = value;
+  }
+  return saved;
+}
+
+/**
+ * Commit one line. Called on blur, and only when something actually changed.
+ *
+ * THE CELL IS LATCHED, so a second save of the same cell WAITS for the first
+ * rather than racing it, and a THIRD supersedes the second rather than queueing
+ * behind it — the whole reason is in cell-write-latch.ts. The row is marked saving
+ * SYNCHRONOUSLY, before anything is queued, so a write that is merely waiting its
+ * turn still shows as unsaved; `markSaving` counts, so the first write finishing
+ * does not report "all saved" over a second still in flight. The unmark hangs off
+ * the LATCH's promise rather than the request's, because a superseded write never
+ * runs and its row would otherwise stay marked saving forever.
+ */
 export function saveLine(
   context: WriteContext,
   line: EditableLine,
@@ -51,22 +81,64 @@ export function saveLine(
   columns: Column[],
 ): void {
   context.edits.markSaving(line.id, true);
-  context.start(async () => {
-    try {
-      const result = await updateBoqLine({ lineId: line.id, patch });
-      // Drop the local edit so the revalidated record takes over. Anything still
-      // being typed in another cell of the same row is untouched.
-      if (result.ok) context.edits.clearColumns(line.id, columns);
-      // The edit STAYS on screen when the server refuses it. Reverting to the
-      // stored value would throw away what the studio typed and leave them
-      // guessing which cell was wrong.
-      else refuse(context, result.error);
-    } catch {
-      toast({ title: context.sheetText('saveFailed'), variant: 'destructive' });
-    } finally {
-      context.edits.markSaving(line.id, false);
-    }
-  });
+  const saved = savedValues(patch, columns);
+  context.start(() =>
+    context.latch
+      .run({
+        lineId: line.id,
+        columns,
+        write: async () => {
+          try {
+            const result = await updateBoqLine({ lineId: line.id, patch });
+            // Drop the local edit so the revalidated record takes over — but only
+            // for cells that still hold the value this write carried. One the
+            // studio has re-typed keeps its override until its own write lands.
+            if (result.ok) context.edits.clearSaved(line.id, saved);
+            // The edit STAYS on screen when the server refuses it. Reverting to
+            // the stored value would throw away what the studio typed and leave
+            // them guessing which cell was wrong.
+            //
+            // AND THE REFUSAL IS LOGGED, not only toasted. A coded refusal —
+            // `amount_too_large`, `boq_not_draft`, a line that has vanished — is
+            // the COMMON failure of this screen and it left no trace anywhere:
+            // `mutateInOrg` logs what the server threw, never what it decided.
+            // On a 2,000-line sheet a toast that is gone in five seconds is the
+            // entire record, and it does not say which row.
+            else {
+              console.error('boq line save refused', {
+                lineId: line.id,
+                columns,
+                code: result.error,
+              });
+              refuse(context, result.error);
+            }
+          } catch (cause) {
+            // A REJECTION LEAVES NO TRACE ANYWHERE ELSE: `mutateInOrg` never saw
+            // it, so the server has nothing, and the toast below is gone in five
+            // seconds. Logged the way use-engagement-action.ts logs its twin, so
+            // `wrangler tail` carries a failed BOQ save at all.
+            console.error(
+              'boq line save failed before returning a result',
+              { lineId: line.id, columns },
+              cause,
+            );
+            toast({ title: context.sheetText('saveFailed'), variant: 'destructive' });
+          }
+        },
+        onDeadline: () => {
+          // The request never answered. The latch has already given the cell
+          // back; this is the only thing that tells anybody it happened.
+          console.error('boq line save passed its deadline with no answer', {
+            lineId: line.id,
+            columns,
+          });
+          toast({ title: context.sheetText('saveFailed'), variant: 'destructive' });
+        },
+      })
+      .finally(() => {
+        context.edits.markSaving(line.id, false);
+      }),
+  );
 }
 
 export function cellBlur(

@@ -18,20 +18,20 @@ import { closeFixture, ctxFor, raw, seedOrg, teardown } from './fixture';
 // (schema/boqs.ts:79-82), so Postgres's referential action UPDATES an issued BOQ
 // row, and without the fourth argument the trigger raises MT100 on it.
 //
-// THE PLAN ASSUMED THAT DELETE WORKS TODAY. IT DOES NOT, and the last test in
-// this file is why: the FK is COMPOSITE, `(org_id, x_id) -> target(org_id, id)`,
-// and `ON DELETE SET NULL` with no column list nulls ALL of the referencing
-// columns - `org_id` included, which is `not null`. So the parent delete is
-// already refused whether or not the BOQ is issued. The fourth argument is still
-// correct and still necessary (it is what the referential action needs the moment
-// the FK is narrowed to `SET NULL (x_id)`), and the FK defect is asserted and
-// reported separately.
+// WHEN THIS FILE WAS WRITTEN THAT DELETE COULD NOT COMPLETE AT ALL. The FK is
+// COMPOSITE, `(org_id, x_id) -> target(org_id, id)`, and `ON DELETE SET NULL`
+// with no column list nulls ALL of the referencing columns - `org_id` included,
+// which is `not null` - so the parent delete was refused whether or not the BOQ
+// was issued. `0052_composite_fk_set_null_columns.sql` narrowed all eleven such
+// FKs to `ON DELETE SET NULL (x_id)`, which is what finally gives the fourth
+// argument real traffic; the LAST test in this file was inverted by that
+// migration and says so in full.
 //
-// The branch is now fenced to `pg_trigger_depth() > 1` - only a referential
-// action may null those columns - so it can no longer be exercised by issuing
-// the statement the cascade WOULD issue. What is asserted instead is the
-// security property that fence buys: a DIRECT null of either column on an issued
-// BOQ is MT100.
+// The branch is fenced to `pg_trigger_depth() > 1` - only a referential action
+// may null those columns - so it can never be exercised by issuing the statement
+// the cascade WOULD issue by hand. Both halves are asserted: the cascade is
+// admitted (last case), and a DIRECT null of either column on an issued BOQ is
+// still MT100.
 //
 // TEARDOWN NEEDS NOTHING NEW: fixture.ts:314 sets
 // `session_replication_role = 'replica'` for the whole teardown transaction,
@@ -301,13 +301,10 @@ describe('a BOQ is frozen at the database once it is issued', () => {
     // cascade reaches the child's BEFORE UPDATE from inside the parent's
     // internal RI trigger (depth >= 2), a direct UPDATE arrives at depth 1.
     //
-    // WHICH MEANS BRANCH 2 CANNOT BE EXERCISED FROM HERE AT ALL, because the
-    // cascade that would reach it cannot complete: the composite FK nulls
-    // `org_id` too - the last test in this file proves that, with the catalogue
-    // read. Wave 7's `ON DELETE SET NULL (x_id)` narrowing either gives this
-    // branch its first real traffic or lets the fourth argument be deleted
-    // outright. Until then the honest assertion is the one below: the direct
-    // statement is refused.
+    // THE ADMITTING HALF OF BRANCH 2 IS THE LAST TEST IN THIS FILE, and it only
+    // became reachable with 0052's `ON DELETE SET NULL (x_id)` narrowing. THIS
+    // case is the refusing half, and it is the security property the depth fence
+    // buys: the same column, nulled by hand rather than by a cascade, is MT100.
     const fixture = await setup();
     expect(await issue(fixture)).toBeNull();
 
@@ -368,27 +365,27 @@ describe('a BOQ is frozen at the database once it is issued', () => {
     expect(code).toBe('MT100');
   });
 
-  it('CANNOT use the real cascade, because the composite FK nulls org_id too', async () => {
-    // A DEFECT THIS TEST FOUND, and it is NOT caused by the immutability trigger.
-    //
+  it('CAN use the real cascade now that 0052 narrowed the FK, and org_id survives it', async () => {
+    // THIS CASE WAS INVERTED BY MIGRATION 0052, AND THAT IS THE POINT OF THE
+    // MIGRATION. As shipped in wave 6 it asserted the DEFECT it had just found:
     // `boqs.engagement_id` and `boqs.source_file_id` are the second column of a
-    // COMPOSITE foreign key, (org_id, x_id) -> target(org_id, id). Postgres's
-    // `ON DELETE SET NULL` with no column list sets ALL of the referencing
-    // columns to null - including `org_id`, which is `not null` on every
-    // org-scoped table. So the referential action produces a row the table
-    // cannot hold, and deleting the parent is refused WHETHER OR NOT the BOQ is
-    // issued. Diagnosed codes: 23502 (not_null_violation) on a DRAFT row, and
-    // MT100 on an ISSUED one only because a BEFORE trigger runs before the
-    // not-null check and sees org_id change first.
+    // COMPOSITE foreign key, (org_id, x_id) -> target(org_id, id), and
+    // Postgres's `ON DELETE SET NULL` with no column list set ALL of the
+    // referencing columns to null - `org_id` included, which is `not null` on
+    // every org-scoped table. The referential action produced a row the table
+    // could not hold, so deleting the parent was refused whether or not the BOQ
+    // was issued (23502 on a draft row; MT100 on an issued one, only because a
+    // BEFORE trigger runs before the not-null check).
     //
-    // 0041_boq.sql:142-150 declares both constraints exactly that way, and
-    // `sameOrgFk` emits the same shape for ELEVEN `on delete set null` FKs
-    // across the schema (boq_lines/contract_lines/proposal_lines/
-    // variation_order_lines -> cost_items, projects -> project_types, ...), so
-    // "delete a cost item that a line references" is the same trap.
-    //
-    // THE FIX IS A MIGRATION - `ON DELETE SET NULL (x_id)`, which Postgres 15
-    // supports - and migrations are out of scope for this wave. Reported.
+    // `0052_composite_fk_set_null_columns.sql` narrows all eleven such FKs to
+    // `ON DELETE SET NULL (<x>_id)`. The old expectations are now WRONG - they
+    // encoded the bug - so they are replaced rather than relaxed. The full
+    // positive proof (both parents, both statuses, the schema-wide straggler
+    // read) lives in `composite-fk-cascade.dbtest.ts`; what stays HERE is the
+    // half that belongs to this file: the cascade the immutability trigger's
+    // fourth TG_ARGV exists for is ADMITTED, and it is the ONLY way those
+    // columns may go null on an issued BOQ - the direct statement two cases
+    // above is still MT100.
     const fixture = await setup();
 
     const asDraft = await sqlstateOf(() =>
@@ -400,21 +397,44 @@ describe('a BOQ is frozen at the database once it is issued', () => {
         `delete from public.design_engagements where id = '${fixture.engagementId}'`,
       ),
     );
-    // Recorded rather than only asserted, so the run's log carries the real
-    // SQLSTATEs into the wave report.
-    console.log(`composite set-null cascade: draft=${asDraft} issued=${asIssued}`);
-    expect(asDraft).not.toBeNull();
-    expect(asIssued).not.toBeNull();
+    expect(asDraft).toBeNull();
+    expect(asIssued).toBeNull();
+
+    // The row is still there, still issued, still in its org - only the two
+    // references went.
+    const [row] = await raw.query<{
+      org_id: string;
+      engagement_id: string | null;
+      source_file_id: string | null;
+      status: string;
+    }>(
+      `select org_id, engagement_id, source_file_id, status
+         from public.boqs where id = '${fixture.boqId}'`,
+    );
+    expect(row.org_id).toBe(fixture.ctx.orgId);
+    expect(row.engagement_id).toBeNull();
+    expect(row.source_file_id).toBeNull();
+    expect(row.status).toBe('issued');
 
     // THE MECHANISM, from the catalogue rather than from the behaviour: both
-    // constraints are SET NULL (confdeltype = 'n') over TWO columns, and one of
-    // the two is org_id.
-    const fks = await raw.query<{ conname: string; ncols: number; cols: string[] }>(
+    // constraints are still SET NULL (confdeltype = 'n') over TWO referencing
+    // columns, and the set-null list now names exactly ONE of them - never
+    // org_id. Behaviour alone would also pass on a constraint re-created as
+    // `on delete cascade`, which would delete issued BOQs outright.
+    const fks = await raw.query<{
+      conname: string;
+      ncols: number;
+      cols: string[];
+      setcols: string[] | null;
+    }>(
       `select c.conname,
               array_length(c.conkey, 1) as ncols,
               (select array_agg(a.attname order by a.attnum)
                  from pg_attribute a
-                where a.attrelid = c.conrelid and a.attnum = any(c.conkey)) as cols
+                where a.attrelid = c.conrelid and a.attnum = any(c.conkey)) as cols,
+              (select array_agg(a.attname order by a.attnum)
+                 from pg_attribute a
+                where a.attrelid = c.conrelid and a.attnum = any(c.confdelsetcols)) as setcols
          from pg_constraint c
         where c.conrelid = 'public.boqs'::regclass
           and c.contype = 'f'
@@ -425,6 +445,8 @@ describe('a BOQ is frozen at the database once it is issued', () => {
     for (const fk of fks) {
       expect(Number(fk.ncols)).toBe(2);
       expect(fk.cols).toContain('org_id');
+      expect(fk.setcols).toHaveLength(1);
+      expect(fk.setcols).not.toContain('org_id');
     }
   });
 });

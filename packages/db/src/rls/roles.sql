@@ -62,7 +62,60 @@ grant select, insert, update, delete on public.variation_orders      to metra_ap
 grant select, insert, update, delete on public.variation_order_lines to metra_app;
 -- Design Engagements (Step 1): the engagement record is mutable (create + Step 2
 -- state transitions); the transition ledger is append-only (granted below).
-grant select, insert, update on public.design_engagements to metra_app;
+--
+-- UPDATE IS COLUMN-LEVEL, and the list is the fifteen DERIVED columns the app
+-- actually writes after the row exists — nothing else. `design_engagements` is
+-- the widest mutable table in the machine and most of it is CONTRACTUAL: the
+-- client, the project, the number, the two free-revision ALLOWANCES
+-- (`free_revision_n`, `free_design_revision_n`), `created_at`. Those are set at
+-- INSERT (`engagements/core.ts`) and never updated by any path, and an allowance
+-- that could be raised after the fact is a free revision minted out of nothing.
+-- A table-level UPDATE let any future code path — or any SQL injected past the
+-- ORM — move all of them.
+--
+-- THE LIST IS MECHANICALLY CHECKED, which is the only reason it may be
+-- hand-written here: `apps/web/src/lib/engagements/design-engagement-grants.test.ts`
+-- derives the written-column set from EVERY `update(designEngagements)` site in
+-- the app (including the `PgUpdateSetSource` producer a grep for `.set({` cannot
+-- see) and fails with the diff when it stops matching these names. Adding a
+-- column to a `.set({…})` without adding it here reds the unit suite; it does
+-- not wait to become a 42501 in production.
+--
+-- `design_revision_count` IS in the list and `free_revision_n` /
+-- `free_design_revision_n` are NOT — the first is written live by
+-- `revisions.ts`'s counter factory, the other two are never updated at all.
+--
+-- The REVOKE removes the earlier table-level UPDATE on already-provisioned
+-- databases; on a fresh one it is a no-op. It must come BEFORE the column grant
+-- and cannot come after, for TWO reasons that point the same way. A table-level
+-- UPDATE subsumes every column, so leaving it in place would make the narrowing
+-- cosmetic; and a table-level REVOKE takes the column grants WITH it —
+-- PostgreSQL's REVOKE reference: "when revoking privileges on a table, the
+-- corresponding column privileges (if any) are automatically revoked on each
+-- column of the table, as well." So a tidy-up `revoke update` appended anywhere
+-- BELOW the grant is not a no-op: it leaves metra_app with no UPDATE at all on
+-- this table and 42501s every transition, ROM issue, render stamp, share-token
+-- mint and revision-counter move. `design-engagement-grants.test.ts` fails on
+-- ANY revoke that sits after the grant, not merely on the first one it finds.
+grant select, insert on public.design_engagements to metra_app;
+revoke update on public.design_engagements from metra_app;
+grant update (
+  state,
+  design_fee,
+  revision_count,
+  design_revision_count,
+  concept_locked_at,
+  as_built_due,
+  off_plan,
+  render_manifest_hash,
+  renders_ready_at,
+  rom_low,
+  rom_high,
+  rom_issued_at,
+  token_hash,
+  share_expires_at,
+  updated_at
+) on public.design_engagements to metra_app;
 -- engagement_milestones (Step 3): the schedule is written ONCE by
 -- generateFeeSchedule at submitDesignFee and never edited by any code path, so
 -- INSERT-only. This is load-bearing under the Step-14 "absent milestone = free

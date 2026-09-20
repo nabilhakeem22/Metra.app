@@ -14,6 +14,7 @@
 import type { createSql } from '../client';
 import { declaredFunctions } from './rls-catalogue';
 import {
+  declaredCompositeSetNullFks,
   declaredConstraints,
   declaredIndexes,
   declaredTables,
@@ -27,6 +28,16 @@ import {
  * query text and casts it to this type once.
  */
 export type CatalogueSql = ReturnType<typeof createSql>;
+
+/** One composite `ON DELETE SET NULL` foreign key, as the catalogue holds it. */
+interface CompositeSetNullFk {
+  name: string;
+  child: string;
+  /** The columns the FK references with, `org_id` included. */
+  fk_cols: string[];
+  /** The columns it nulls on a parent delete. Empty means "all of them". */
+  set_cols: string[];
+}
 
 /** Every table the DATABASE has in `public`, as table name -> column names. */
 async function appliedTables(sql: CatalogueSql): Promise<Map<string, Set<string>>> {
@@ -63,6 +74,68 @@ async function appliedNames(
   return new Set(rows.map((row) => row.name));
 }
 
+/**
+ * Every composite FK in `public` whose ON DELETE action is SET NULL, with the
+ * columns it nulls and the columns it references.
+ *
+ * `confdelsetcols` is the field 0052 writes, and the only thing in the catalogue
+ * that can tell a NARROWED foreign key from a bare one. Until this section
+ * existed, nothing on production asserted 0052 had done anything at all: the
+ * constraint comparison above reads `conname` and a narrowing changes no name, so
+ * step 3 of the deploy would print `constraints — 218 declared, 0 NOT FOUND` over
+ * a catalogue where every one of the twelve still nulled `org_id` on a parent
+ * delete (wave 7 R6). It is derived from the catalogue rather than from a list, so
+ * a thirteenth such FK added by a future migration is checked without editing this
+ * file. Requires PG15+; production and CI are 17.
+ */
+async function compositeSetNullFks(sql: CatalogueSql): Promise<CompositeSetNullFk[]> {
+  return (await sql`
+    select c.conname   as name,
+           rel.relname as child,
+           coalesce(
+             (select array_agg(a.attname order by a.attnum)
+                from pg_attribute a
+               where a.attrelid = c.conrelid and a.attnum = any(c.conkey)),
+             '{}'::name[]
+           ) as fk_cols,
+           coalesce(
+             (select array_agg(a.attname order by a.attnum)
+                from pg_attribute a
+               where a.attrelid = c.conrelid and a.attnum = any(c.confdelsetcols)),
+             '{}'::name[]
+           ) as set_cols
+      from pg_constraint c
+      join pg_class rel   on rel.oid = c.conrelid
+      join pg_namespace n on n.oid = rel.relnamespace
+     where n.nspname = 'public'
+       and c.contype = 'f'
+       and c.confdeltype = 'n'
+       and array_length(c.conkey, 1) > 1
+     order by 1
+  `) as unknown as CompositeSetNullFk[];
+}
+
+/**
+ * What is wrong with one narrowing, or nothing. A composite set-null FK must null
+ * EXACTLY ONE column, that column must be its own referencing column, and it must
+ * never be `org_id` — nulling the tenant key on a parent delete is the defect 0052
+ * removed, and nulling some OTHER table's column is a hand-applied narrowing that
+ * 0052's own idempotency branch would skip without looking (wave 7 S3).
+ */
+function narrowingProblem(fk: CompositeSetNullFk): string | undefined {
+  const referencing = fk.fk_cols.filter((column) => column !== 'org_id');
+  if (fk.set_cols.length === 0) return 'nulls EVERY referencing column, org_id included';
+  if (fk.set_cols.length !== 1) {
+    return `nulls ${fk.set_cols.join(', ')} — a narrowed FK nulls exactly one column`;
+  }
+  const [only] = fk.set_cols;
+  if (only === 'org_id') return 'nulls org_id, which would strip the row of its tenant';
+  if (!referencing.includes(only)) {
+    return `nulls ${only}, which is not one of its own referencing columns (${referencing.join(', ')})`;
+  }
+  return undefined;
+}
+
 /** Print one report-only section. Returns its gap count, for the closing note. */
 function report(title: string, declaredCount: number, gaps: string[]): number {
   if (gaps.length === 0) {
@@ -79,8 +152,8 @@ function report(title: string, declaredCount: number, gaps: string[]): number {
 }
 
 const DRIFT_NOTE =
-  '\nThose three sections are REPORT ONLY: the exit code above is governed by ' +
-  'columns alone.\n' +
+  '\nThose three sections are REPORT ONLY: the exit code is governed by columns ' +
+  'and by composite set-null foreign keys, not by names.\n' +
   'A name that differs only in CASE means the object was created by an UNQUOTED ' +
   'camelCase identifier in a hand-authored migration, which Postgres folded to ' +
   'lower case — in every database built from these migrations, production and CI ' +
@@ -92,9 +165,17 @@ const DRIFT_NOTE =
   'applied yet.';
 
 /**
- * Read all four catalogues, print all four sections, and return the process
- * exit code — which is governed by COLUMNS ALONE (PM ruling 1b). The three
- * report-only sections print on the failing run too: that is the run whose
+ * Read the catalogues, print every section, and return the process exit code.
+ *
+ * TWO THINGS GATE IT. Columns, as before (PM ruling 1b): a database behind the
+ * code is 42703 for whole queries. And, since wave 7, any composite set-null
+ * foreign key that is not narrowed to exactly one of its own non-`org_id`
+ * columns. The argument that keeps names REPORT ONLY — a case-sensitive gate
+ * would go red everywhere over a defect it is merely reporting — does not apply
+ * to this one: after 0052 the expected value is exactly zero on every database,
+ * and a non-zero is a referential defect rather than a naming one.
+ *
+ * The report-only sections print on the failing run too: that is the run whose
  * output gets pasted into an incident, and it is the one that most needs to say
  * what ELSE is out of step.
  */
@@ -130,5 +211,43 @@ export async function runSchemaCheck(sql: CatalogueSql): Promise<number> {
     report('functions', functions.size, functionGaps);
   if (total > 0) console.log(DRIFT_NOTE);
 
-  return columnGaps.length > 0 ? 1 : 0;
+  const compositeFks = await compositeSetNullFks(sql);
+  const unnarrowed = compositeFks
+    .map((fk) => ({ fk, problem: narrowingProblem(fk) }))
+    .filter((checked) => checked.problem !== undefined)
+    .map((checked) => `  - ${checked.fk.name} (on ${checked.fk.child}) ${checked.problem ?? ''}`);
+
+  // THE FLOOR, and the reason it is here: this section reports what the database
+  // HAS, so an empty answer read "0 found, every one narrowed" and exited 0 — a
+  // gate with no guard on the guard (wave 7 L3). The number is derived from
+  // `src/schema/`, never written down, and it is a floor rather than an equality
+  // because the database legitimately holds one MORE than the schema declares.
+  const declaredFks = declaredCompositeSetNullFks();
+  const behind = compositeFks.length < declaredFks.size;
+
+  if (unnarrowed.length === 0 && !behind) {
+    console.log(
+      `assert-schema-applied: composite set-null FKs — ${compositeFks.length} found ` +
+        `(${declaredFks.size} declared in src/schema/), every one narrowed to a single ` +
+        'non-org_id column.',
+    );
+  } else if (unnarrowed.length > 0) {
+    console.error(
+      `assert-schema-applied: composite set-null FKs — ${compositeFks.length} found, ` +
+        `${unnarrowed.length} NOT NARROWED (this FAILS the check):\n${unnarrowed.join('\n')}\n\n` +
+        'Migration 0052 narrows each of these to the one column it references. An ' +
+        'un-narrowed composite SET NULL nulls EVERY referencing column on a parent ' +
+        'delete, org_id included — the row keeps existing with no tenant.',
+    );
+  }
+  if (behind) {
+    console.error(
+      `assert-schema-applied: composite set-null FKs — only ${compositeFks.length} found and ` +
+        `src/schema/ declares ${declaredFks.size} (this FAILS the check). Either this database ` +
+        'is behind the code, or a composite ON DELETE SET NULL was re-created with a different ' +
+        'referential action — which this section would otherwise report as nothing at all.',
+    );
+  }
+
+  return columnGaps.length > 0 || unnarrowed.length > 0 || behind ? 1 : 0;
 }

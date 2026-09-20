@@ -6,6 +6,7 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { toast } from '@/hooks/use-toast';
 import { logPaymentAndAdvance } from '@/lib/engagements/actions';
 import type { EngagementGatePreview } from '@/lib/engagements/gate-preview';
 import { PAY_AND_ADVANCE_HELD_TRIGGER, actOf } from '@/lib/engagements/held-act';
@@ -78,6 +79,14 @@ export function PaymentForm({
     runAction(
       async (idempotencyKey) => {
         const res = await logPaymentAndAdvance(engagementId, { ...submitted, idempotencyKey });
+        // `already` here is THE PAYMENT'S, threaded out of
+        // `logPaymentAndAdvanceCore`: the ledger was not appended, the original
+        // row was handed back, and the advance then re-ran against it. Without
+        // this the combined control reported that identically to a fresh write
+        // — which is the exact moment a studio needs to be told otherwise.
+        if (res.ok && res.already) {
+          toast({ title: tc('alreadyRecorded'), description: tc('alreadyRecordedHint') });
+        }
         if (res.ok) onDone();
         return res;
       },

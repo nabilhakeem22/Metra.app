@@ -94,6 +94,15 @@ describe('what the real manifest declares', () => {
   it('finds 46 policies, 12 triggers and 30 functions', () => {
     // A guard on the guards: if a parser breaks, these numbers move and the
     // post-apply verification would otherwise silently check nothing.
+    //
+    // These are a FLOOR to be raised with every addition, not a fact about the
+    // parser. `withoutSqlComments` does not know what a string literal is, so a
+    // declaration written with a `--` or `/*` inside one is eaten — and being
+    // eaten drops it out of the DECLARED side of a one-directional comparison,
+    // which is a false GREEN, not the false red that block used to claim
+    // (wave 7 S5). An EXISTING declaration that starts being eaten reds here; a
+    // NEW one eaten on the day it is written does not, because the count stays
+    // where it was.
     expect(declaredPolicies().size).toBe(46);
     expect(declaredTriggers().size).toBe(12);
     expect(declaredFunctions().size).toBe(30);

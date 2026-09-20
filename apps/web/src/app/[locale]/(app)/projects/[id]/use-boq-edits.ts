@@ -1,7 +1,7 @@
 'use client';
 
-import { useCallback, useState } from 'react';
-import type { CellEdits, Column } from './boq-sheet-columns';
+import { useCallback, useMemo, useState } from 'react';
+import type { CellEdits, Column, RowEdits } from './boq-sheet-columns';
 
 /**
  * Everything the BOQ sheet holds LOCALLY while a studio types. No server call
@@ -24,12 +24,20 @@ import type { CellEdits, Column } from './boq-sheet-columns';
 export interface BoqEditsApi {
   /** lineId -> column -> what the studio typed but has not committed. */
   cells: CellEdits;
-  /** The rows mid-save. Drives the per-row spinner. */
+  /** The rows mid-save. `.has(lineId)` drives the per-row spinner. */
   savingIds: ReadonlySet<string>;
   /** How many rows are mid-save. Drives the "saving"/"all saved" footer light. */
   savingCount: number;
   setCell(lineId: string, column: Column, value: string): void;
+  /** Drop the local override outright — Escape, and a blur that changed nothing. */
   clearColumns(lineId: string, columns: Column[]): void;
+  /**
+   * Drop the local override for each column whose typed value is STILL the value
+   * that was just saved. A cell the studio has re-typed since keeps its override:
+   * the record coming back names the superseded figure, and the write carrying
+   * the new one has not been sent yet.
+   */
+  clearSaved(lineId: string, saved: RowEdits): void;
   markSaving(lineId: string, saving: boolean): void;
   /** Local edit of the document discount — same override rule as a cell. */
   discount: string | null;
@@ -50,16 +58,53 @@ function withoutColumns(edits: CellEdits, lineId: string, columns: Column[]): Ce
   return next;
 }
 
-function withSaving(saving: Set<string>, lineId: string, on: boolean): Set<string> {
-  const next = new Set(saving);
-  if (on) next.add(lineId);
+/**
+ * Drop only what was SAVED, leaving anything typed since. Same shape as
+ * `withoutColumns`, one condition apart — and that condition is the whole of
+ * wave 7 F4: the first write's success used to clear the cell outright, throwing
+ * away the value a second, still-QUEUED write was carrying. The money figure on
+ * screen fell back to the superseded record for a full round trip.
+ */
+function withoutSaved(edits: CellEdits, lineId: string, saved: RowEdits): CellEdits {
+  const row = { ...(edits[lineId] ?? {}) };
+  for (const [column, value] of Object.entries(saved)) {
+    if (row[column as Column] === value) delete row[column as Column];
+  }
+  const next = { ...edits };
+  if (Object.keys(row).length === 0) delete next[lineId];
+  else next[lineId] = row;
+  return next;
+}
+
+/**
+ * SAVES IN FLIGHT PER ROW, COUNTED — not a membership set.
+ *
+ * As a Set this said "all saved" while a second write to the same line was still
+ * in flight (W5 R6): two blurs on one row mark it saving twice and unmark it
+ * twice, and the FIRST unmark deleted the id outright. The footer went green,
+ * the row's spinner stopped, and a write was still on the wire. Counting makes
+ * the light tell the truth, and it is what makes the cell latch visible on
+ * screen at all — a queued write is a write that has not happened yet.
+ *
+ * Clamped at zero rather than allowed to go negative: an unbalanced unmark is a
+ * bug, but a row stuck permanently "saving" because the count went to -1 and
+ * back to 0 would be a worse one.
+ */
+function withSaving(
+  saving: Map<string, number>,
+  lineId: string,
+  on: boolean,
+): Map<string, number> {
+  const next = new Map(saving);
+  const inFlight = (next.get(lineId) ?? 0) + (on ? 1 : -1);
+  if (inFlight > 0) next.set(lineId, inFlight);
   else next.delete(lineId);
   return next;
 }
 
 export function useBoqEdits(): BoqEditsApi {
   const [cells, setCells] = useState<CellEdits>({});
-  const [savingIds, setSavingIds] = useState<Set<string>>(new Set());
+  const [saving, setSaving] = useState<Map<string, number>>(new Map());
   const [discount, setDiscount] = useState<string | null>(null);
 
   const setCell = useCallback((lineId: string, column: Column, value: string) => {
@@ -70,9 +115,18 @@ export function useBoqEdits(): BoqEditsApi {
     setCells((previous) => withoutColumns(previous, lineId, columns));
   }, []);
 
-  const markSaving = useCallback((lineId: string, saving: boolean) => {
-    setSavingIds((previous) => withSaving(previous, lineId, saving));
+  const clearSaved = useCallback((lineId: string, saved: RowEdits) => {
+    setCells((previous) => withoutSaved(previous, lineId, saved));
   }, []);
+
+  const markSaving = useCallback((lineId: string, on: boolean) => {
+    setSaving((previous) => withSaving(previous, lineId, on));
+  }, []);
+
+  // Derived, and memoised on the COUNTS — which change only when a save starts
+  // or ends, never on a keystroke. A fresh Set per render would hand every row a
+  // new prop and undo the `React.memo` this file exists to make work.
+  const savingIds = useMemo(() => new Set(saving.keys()), [saving]);
 
   return {
     cells,
@@ -80,6 +134,7 @@ export function useBoqEdits(): BoqEditsApi {
     savingCount: savingIds.size,
     setCell,
     clearColumns,
+    clearSaved,
     markSaving,
     discount,
     setDiscount,

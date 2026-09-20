@@ -61,6 +61,39 @@ const TRIGGER_PATTERN = new RegExp(
 // SQL with every double-dash line comment and every slash-star block comment
 // removed. Dollar-quoted bodies are left alone: nothing this file declares is
 // spelled inside one.
+//
+// KNOWN LIMIT — IT DOES NOT KNOW WHAT A STRING LITERAL IS. A `--` or a `/*`
+// INSIDE a quoted literal is read as the start of a comment, and everything
+// after it on that line (or up to the next `*/`) is deleted. So
+//
+//     raise exception 'value -- not allowed';
+//
+// loses its closing quote as far as this reader is concerned, and any
+// `create function` / `create policy` / `create trigger` in the rest of that
+// span disappears with it.
+//
+// WHICH DIRECTION IT FAILS IN, corrected. This block used to say the failure was
+// "a FALSE RED, never a false green". That is backwards (wave 7 S5). `apply-rls`
+// applies the RAW file text (`apply-rls.ts`, `sql.unsafe(content)`), so an eaten
+// declaration is still CREATED in the database; this parser feeds only the
+// DECLARED side of a comparison that runs one way, declared -> database. An eaten
+// declaration therefore drops OUT of the declared set and is never checked at
+// all: a FALSE GREEN, on the one gate that exists to prove `apply-rls` landed.
+//
+// WHAT CATCHES IT ANYWAY, and what does not. `rls-catalogue.test.ts` pins the
+// counts at 46 policies / 12 triggers / 30 functions, so an EXISTING declaration
+// that starts being eaten reds immediately. A NEW declaration eaten on the day it
+// is written is not caught: the parser returns the old count and the old
+// expectation still passes. Raise those numbers with every addition — they are a
+// floor, not a fact about the parser.
+//
+// WHY IT IS WRITTEN DOWN RATHER THAN FIXED. It is measured rather than assumed:
+// the real tree parses to 30 functions, 46 policies and 12 triggers, which is
+// exactly what the catalogues hold, so nothing in the tree has this shape today.
+// If a `--` or `/*` ever has to live inside an RLS string literal, the fix is the
+// real scanner that now exists — `sql-text.ts`'s `scannableSql`, which strips
+// literal content and is transparent through dollar-quoted bodies — never a
+// change to the SQL to appease the regex.
 export function withoutSqlComments(content: string): string {
   return content.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/--[^\n]*/g, '');
 }

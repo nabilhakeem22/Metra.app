@@ -295,6 +295,71 @@ describe('R1: netDelta freeze is atomic with the lines', () => {
       }),
     ).toEqual({ ok: false, error: 'variation_not_draft' });
   });
+
+  it('refuses RE-PARENTING a line OUT of a frozen VO, not only INTO one', async () => {
+    // The hole `enforce_variation_child_draft` carried until wave 7: on UPDATE
+    // it read only NEW's parent, so moving a line from an internally approved
+    // (or issued) VO to a DRAFT one was admitted - the status read was of the
+    // draft target, `variation_orders` itself is never touched so
+    // `trg_variation_orders_immutable` does not fire, and metra_app holds
+    // `update` on the line table. `net_delta` is frozen at internal approval, so
+    // the instruction the client is asked to sign would claim money for work its
+    // own lines no longer describe.
+    const { ctx, clientId, projectId } = await setup();
+    const { contractId } = await issuedContract(ctx, clientId, projectId);
+
+    const frozenVo = ((await createVariationDraftCore(ctx, { contractId, titleEn: 'Frozen' })) as { data?: string }).data!;
+    await saveVariationDraftCore(ctx, {
+      id: frozenVo,
+      lines: [{ descriptionEn: 'x', qty: '1', unit: 'lump_sum', unitCost: '0', unitPrice: '100', discountPct: '0' }],
+    });
+    await internalApproveVariationCore(ctx, { id: frozenVo });
+
+    const draftVo = ((await createVariationDraftCore(ctx, { contractId, titleEn: 'Still draft' })) as { data?: string }).data!;
+    await saveVariationDraftCore(ctx, {
+      id: draftVo,
+      lines: [{ descriptionEn: 'y', qty: '1', unit: 'lump_sum', unitCost: '0', unitPrice: '200', discountPct: '0' }],
+    });
+
+    const [frozenLine] = await raw.query<{ id: string }>(
+      `select id from public.variation_order_lines where variation_order_id = '${frozenVo}' limit 1`,
+    );
+    const [draftLine] = await raw.query<{ id: string }>(
+      `select id from public.variation_order_lines where variation_order_id = '${draftVo}' limit 1`,
+    );
+
+    // OUT of the frozen VO. OLD's parent is what refuses.
+    await expect(
+      raw.query(
+        `update public.variation_order_lines set variation_order_id = '${draftVo}' where id = '${frozenLine.id}'`,
+      ),
+    ).rejects.toMatchObject({ code: 'MT100' });
+
+    // The direction that always worked, so the OLD check cannot be mistaken for
+    // having REPLACED the NEW one.
+    await expect(
+      raw.query(
+        `update public.variation_order_lines set variation_order_id = '${frozenVo}' where id = '${draftLine.id}'`,
+      ),
+    ).rejects.toMatchObject({ code: 'MT100' });
+
+    // Nothing moved, and the frozen VO still adds up.
+    const [stillThere] = await raw.query<{ variation_order_id: string }>(
+      `select variation_order_id from public.variation_order_lines where id = '${frozenLine.id}'`,
+    );
+    expect(stillThere.variation_order_id).toBe(frozenVo);
+    expect(Number((await readSavedVariation(frozenVo)).netDelta)).toBe(100);
+
+    // A DRAFT line is still editable: the guard fences frozen VOs, it does not
+    // freeze the builder.
+    await raw.query(
+      `update public.variation_order_lines set unit_price = '7' where id = '${draftLine.id}'`,
+    );
+    const [edited] = await raw.query<{ unit_price: string }>(
+      `select unit_price from public.variation_order_lines where id = '${draftLine.id}'`,
+    );
+    expect(Number(edited.unit_price)).toBe(7);
+  });
 });
 
 describe('F1: a de-scope reverses an add to the piastre', () => {

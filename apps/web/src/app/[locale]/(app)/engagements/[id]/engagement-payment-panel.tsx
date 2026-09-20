@@ -12,6 +12,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { toast } from '@/hooks/use-toast';
 import { recordPayment } from '@/lib/engagements/actions';
 import { PAYMENT_HELD_TRIGGER, actOf } from '@/lib/engagements/held-act';
 import type { RecordPaymentInput } from '@/lib/engagements/payments';
@@ -80,6 +81,15 @@ export function PaymentPanel({
     runAction(
       async (idempotencyKey) => {
         const res = await recordPayment({ ...submitted, idempotencyKey });
+        // `already` MEANS THE LEDGER WAS NOT APPENDED. `payments.ts` answers a
+        // repeated key with the ORIGINAL row and `ok`, and until now this panel
+        // closed on that exactly as it closes on a fresh write — so the one case
+        // where the studio most needs to know what happened was the one case
+        // that looked identical to every other success. The server has been
+        // saying so since 0050; nobody was reading it.
+        if (res.ok && res.already) {
+          toast({ title: t('alreadyRecorded'), description: t('alreadyRecordedHint') });
+        }
         if (res.ok) onDone();
         return res;
       },
