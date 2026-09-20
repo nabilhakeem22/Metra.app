@@ -56,6 +56,14 @@
 // function in the database is never reported. Only "the code declares it and the
 // database does not have it".
 //
+// EVERY PRIVILEGE READ RESOLVES ITS TABLE THROUGH `pg_class` rather than through
+// a `'public.<name>'::text` argument. The text form raises 42P01 on a table the
+// database does not have, and that exception does not become a problem LINE — it
+// escapes this function and discards every problem already collected, so the one
+// run that most needs a list (a database behind its migrations) prints none.
+// A LEFT JOIN answers a null oid, the strict privilege functions answer null on
+// it, and the missing table is reported like anything else (wave 8 F9).
+//
 // Function names are compared WITHOUT their argument lists, which is the one
 // hole worth stating: an overload change (`app_claim_invitation(uuid)` ->
 // `(text)`) reads green here.
@@ -140,12 +148,31 @@ const ROLES_SQL = resolve(dirname(fileURLToPath(import.meta.url)), '../rls/roles
  * about what "granted" means.
  */
 async function grantProblems(sql: Sql): Promise<string[]> {
+  // GUARDED ON THE TABLE EXISTING (wave 8 F9). `has_table_privilege(…, text, …)`
+  // raises 42P01 on a name the database does not have, and that exception is not
+  // a problem LINE — it escapes `verifyRlsApplied` and throws away every problem
+  // already collected, so a database missing this table reports nothing about
+  // the forty-six it has. Resolved through `pg_class` instead: a LEFT JOIN
+  // yields a null oid, the privilege functions are strict and answer null on it,
+  // and "the table is not there" becomes a line like any other.
   const [privilege] = (await sql`
-    select has_table_privilege(${APP_ROLE}::name, 'public.design_engagements'::text, 'update')
+    select c.oid is not null as "tableExists",
+           coalesce(has_table_privilege(${APP_ROLE}::name, c.oid, 'update'), false)
              as "tableLevel",
-           has_any_column_privilege(${APP_ROLE}::name, 'public.design_engagements'::text, 'update')
+           coalesce(has_any_column_privilege(${APP_ROLE}::name, c.oid, 'update'), false)
              as "columnLevel"
-  `) as unknown as Array<{ tableLevel: boolean; columnLevel: boolean }>;
+      from (select 1) as present
+      left join pg_class c
+        on c.relname = 'design_engagements'
+       and c.relnamespace = 'public'::regnamespace
+  `) as unknown as Array<{ tableExists: boolean; tableLevel: boolean; columnLevel: boolean }>;
+
+  if (!privilege || !privilege.tableExists) {
+    return [
+      `  - ${GRANTED_UPDATE_TABLE} is not in this database at all, so nothing here ` +
+        'says anything about its UPDATE authority. Run the migrations first.',
+    ];
+  }
 
   // Read the columns through `has_column_privilege` over `pg_attribute` rather
   // than from `information_schema.column_privileges`. That view shows only rows
@@ -249,6 +276,8 @@ const NARROWED_TABLES: Record<string, readonly TablePrivilege[]> = {
 interface AppliedPrivilege {
   table_name: string;
   privilege: string;
+  /** False when this database has no such table — see the read below. */
+  table_exists: boolean;
   granted: boolean;
 }
 
@@ -271,11 +300,18 @@ async function narrowedTableGrantProblems(sql: Sql): Promise<string[]> {
   const rolesSql = readFileSync(ROLES_SQL, 'utf8');
   const tables = Object.keys(NARROWED_TABLES).sort();
   const privileges = [...TABLE_PRIVILEGES];
+  // Resolved through `pg_class`, not through `('public.' || name)::text`: that
+  // form raises 42P01 on a table the database does not have, and the exception
+  // would escape `verifyRlsApplied` and discard every problem already collected
+  // (wave 8 F9). A LEFT JOIN gives a null oid, the strict privilege function
+  // answers null on it, and the missing table is reported as its own line.
   const rows = (await sql`
     select t.name as table_name, p.name as privilege,
-           has_table_privilege(${APP_ROLE}::name, ('public.' || t.name)::text, p.name) as granted
+           c.oid is not null as table_exists,
+           coalesce(has_table_privilege(${APP_ROLE}::name, c.oid, p.name), false) as granted
       from unnest(${tables}::text[]) as t(name)
       cross join unnest(${privileges}::text[]) as p(name)
+      left join pg_class c on c.relname = t.name and c.relnamespace = 'public'::regnamespace
      order by 1, 2
   `) as unknown as AppliedPrivilege[];
 
@@ -287,10 +323,18 @@ async function narrowedTableGrantProblems(sql: Sql): Promise<string[]> {
         .filter((row) => row.table_name === table && row.granted)
         .map((row) => row.privilege as TablePrivilege),
     );
-    if (applied.size === 0 && rows.every((row) => row.table_name !== table)) {
+    const answered = rows.filter((row) => row.table_name === table);
+    if (answered.length === 0) {
       problems.push(
         `  - ${table} was not read back at all — the privilege matrix returned no row ` +
           'for it, so nothing here says anything about its grants',
+      );
+      continue;
+    }
+    if (!answered[0].table_exists) {
+      problems.push(
+        `  - ${table} is not in this database at all, so its grants cannot be checked. ` +
+          'Run the migrations first.',
       );
       continue;
     }

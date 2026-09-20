@@ -37,6 +37,10 @@ interface Catalogues {
    * before a `revoke` was written.
    */
   tableGrants?: Record<string, TablePrivilege[]>;
+  /** Tables this database does NOT have — `has_table_privilege` would 42P01. */
+  missingTables?: string[];
+  /** Tables the matrix query silently returns NO ROW for. */
+  narrowedRowsMissing?: string[];
 }
 
 const ROLES_SQL = resolve(dirname(fileURLToPath(import.meta.url)), '../rls/roles.sql');
@@ -89,19 +93,36 @@ function fixtureSql(catalogues: Catalogues) {
     // The narrowed-table matrix, BEFORE the design_engagements branch: both name
     // `has_table_privilege`, and only this one is a cross join over unnest.
     if (text.includes('unnest')) {
-      const rows: Array<{ table_name: string; privilege: string; granted: boolean }> = [];
+      const rows: Array<{
+        table_name: string;
+        privilege: string;
+        table_exists: boolean;
+        granted: boolean;
+      }> = [];
       for (const table of NARROWED_TABLE_NAMES) {
+        if (catalogues.narrowedRowsMissing?.includes(table)) continue;
+        const exists = !catalogues.missingTables?.includes(table);
         const held = new Set(catalogues.tableGrants?.[table] ?? appliedTableGrant(table));
         for (const privilege of TABLE_PRIVILEGES) {
-          rows.push({ table_name: table, privilege, granted: held.has(privilege) });
+          rows.push({
+            table_name: table,
+            privilege,
+            table_exists: exists,
+            granted: exists && held.has(privilege),
+          });
         }
       }
       return Promise.resolve(rows);
     }
     if (text.includes('has_table_privilege')) {
       const grant = catalogues.grant ?? appliedGrant();
+      const exists = !catalogues.missingTables?.includes('design_engagements');
       return Promise.resolve([
-        { tableLevel: grant.tableLevel, columnLevel: grant.columns.length > 0 },
+        {
+          tableExists: exists,
+          tableLevel: exists && grant.tableLevel,
+          columnLevel: exists && grant.columns.length > 0,
+        },
       ]);
     }
     if (text.includes('has_column_privilege')) {
@@ -429,5 +450,45 @@ describe('REVOKE … FROM PUBLIC removes only the PUBLIC grant (F4)', () => {
       'insert',
       'select',
     ]);
+  });
+});
+
+describe('a table the database does not have is a LINE, not a thrown list (F9)', () => {
+  // `has_table_privilege(…, 'public.<name>'::text, …)` raises 42P01 on a name the
+  // database does not have. That exception escapes `verifyRlsApplied` and takes
+  // every problem already collected with it, so the run that most needs a list —
+  // a database behind its migrations — is the one that prints none. Both reads
+  // resolve the table through `pg_class` now: a LEFT JOIN yields a null oid, the
+  // strict privilege functions answer null on it, and the missing table is
+  // reported like anything else.
+  it('reports a missing NARROWED table without losing the rest of the list', async () => {
+    const problems = await verifyRlsApplied(
+      fixtureSql({
+        missingTables: ['boqs'],
+        droppedPolicies: ['clients.org_isolation'],
+      }),
+    );
+    expect(problems).toHaveLength(2);
+    expect(problems[0]).toContain('policy clients.org_isolation');
+    expect(problems[1]).toBe(
+      '  - boqs is not in this database at all, so its grants cannot be checked. ' +
+        'Run the migrations first.',
+    );
+  });
+
+  it('reports a missing design_engagements the same way', async () => {
+    const problems = await verifyRlsApplied(fixtureSql({ missingTables: ['design_engagements'] }));
+    expect(problems).toHaveLength(1);
+    expect(problems[0]).toContain(
+      'design_engagements is not in this database at all, so nothing here says anything ' +
+        'about its UPDATE authority',
+    );
+  });
+
+  it('says so when the matrix returns no row for a table at all', async () => {
+    // A different failure from "the table is missing": the QUERY did not answer.
+    const problems = await verifyRlsApplied(fixtureSql({ narrowedRowsMissing: ['boqs'] }));
+    expect(problems).toHaveLength(1);
+    expect(problems[0]).toContain('boqs was not read back at all');
   });
 });
