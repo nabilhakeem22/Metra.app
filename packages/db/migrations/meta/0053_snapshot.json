@@ -1,5 +1,5 @@
 {
-  "id": "1e4bb239-a1f4-45b6-8e8d-d2f273ee7338",
+  "id": "39c4fad2-4afe-46a7-a95f-445784466295",
   "prevId": "8a841b73-205c-4e86-ae3d-73ed1937f747",
   "version": "7",
   "dialect": "postgresql",
@@ -593,6 +593,21 @@
             "id"
           ],
           "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "files_category_same_org_fk": {
+          "name": "files_category_same_org_fk",
+          "tableFrom": "files",
+          "tableTo": "document_categories",
+          "columnsFrom": [
+            "org_id",
+            "category_id"
+          ],
+          "columnsTo": [
+            "org_id",
+            "id"
+          ],
+          "onDelete": "set null",
           "onUpdate": "no action"
         }
       },

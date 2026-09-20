@@ -1,10 +1,14 @@
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { migrationCatalogue } from './migration-catalogue';
-import { declaredConstraints, declaredIndexes } from './schema-catalogue';
+import {
+  declaredCompositeSetNullFks,
+  declaredConstraints,
+  declaredIndexes,
+} from './schema-catalogue';
 
 // DOES A MIGRATION ACTUALLY CREATE WHAT THE SCHEMA DECLARES, UNDER THAT EXACT NAME?
 //
@@ -92,6 +96,70 @@ describe('every declared object is built by some migration, under that exact nam
     // Every real constraint in this schema is `<table>_<what>_<kind>`; a bare
     // word is prose that got read as SQL.
     for (const name of catalogue.constraints) expect(name).toMatch(/_/);
+  });
+});
+
+describe('0052 narrows exactly the composite set-null FKs the schema declares', () => {
+  // THE TWO CENSUSES THAT MUST AGREE, with no database between them.
+  //
+  //   * 0052's own `FROM (VALUES …) AS t(child, conname, child_col, parent)`
+  //     table — the twelve constraints the migration narrows, and the list
+  //     `composite-fk-cascade.dbtest.ts` counts against a real catalogue;
+  //   * `declaredCompositeSetNullFks()` — the FLOOR `assert-schema-applied` uses
+  //     on production.
+  //
+  // They were eleven and twelve for one wave, because `files.ts` declared no FK
+  // for `category_id` while every database held one (0040 wrote it by hand). The
+  // floor was therefore BELOW what the database had, and a silent un-narrowing of
+  // that twelfth would have passed the production-side gate. Wave 8 item 1 closed
+  // it in `files.ts`; this case is what refuses to let the two drift apart again,
+  // in EITHER direction — a thirteenth FK declared in `src/schema/` with no row in
+  // 0052, or a row in 0052 with no declaration.
+  const text = readFileSync(resolve(migrationsFolder, '0052_composite_fk_set_null_columns.sql'), 'utf8');
+
+  // COMPARED AS EDGES, NOT AS NAMES. 0052 spells six of its twelve in the
+  // pre-rename form (`boqs_source_file_same_org_fk`, the case-folded
+  // `variation_order_lines_costitem_…`, and so on) because that is what the
+  // catalogue held when it ran; 0053 renames them afterwards. A name comparison
+  // would therefore be red on a correct tree. `<child table>.<referencing
+  // column>` is the same edge under every spelling, and is what both files are
+  // actually about.
+  function narrowedBy0052(): string[] {
+    const table = /FROM \(VALUES([\s\S]*?)\) AS t\(child, conname, child_col, parent\)/.exec(text);
+    if (!table) {
+      throw new Error(
+        '0052 no longer carries a `FROM (VALUES …) AS t(child, conname, child_col, parent)` table',
+      );
+    }
+    const rows = [
+      ...table[1].matchAll(/\(\s*'([^']*)'\s*,\s*'[^']*'\s*,\s*'([^']*)'\s*,\s*'[^']*'\s*\)/g),
+    ];
+    if (rows.length === 0) throw new Error('0052 declares no foreign keys to narrow');
+    return rows.map((row) => `${row[1]}.${row[2]}`).sort();
+  }
+
+  /** The same edges, as `src/schema/` declares them. */
+  function declaredEdges(): string[] {
+    return [...declaredCompositeSetNullFks().values()]
+      .map((fk) => `${fk.table}.${fk.columns.join('+')}`)
+      .sort();
+  }
+
+  it('narrows exactly the edges the schema declares — twelve, both sides', () => {
+    expect(narrowedBy0052()).toHaveLength(12);
+    expect(declaredCompositeSetNullFks().size).toBe(12);
+    expect(narrowedBy0052()).toEqual(declaredEdges());
+  });
+
+  it('carries files.category_id on both sides', () => {
+    // The edge that was missing from the SCHEMA side until wave 8 item 1. Named
+    // rather than left to the set comparison, because a failure here should say
+    // which of the two gates slipped.
+    expect(narrowedBy0052()).toContain('files.category_id');
+    expect(declaredCompositeSetNullFks().get('files_category_same_org_fk')).toEqual({
+      table: 'files',
+      columns: ['category_id'],
+    });
   });
 });
 

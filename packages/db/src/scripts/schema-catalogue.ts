@@ -72,26 +72,55 @@ export function declaredConstraints(): Map<string, string> {
 }
 
 /**
+ * One composite `on delete set null` foreign key as `src/schema/` declares it:
+ * the table it is on, and the referencing columns that are NOT `org_id`.
+ *
+ * The columns are carried because a CONSTRAINT NAME is not a durable identity
+ * here — 0053 renamed ten of them and 0052 still spells six in the pre-rename
+ * form — while `(table, column)` is the same edge whatever anyone calls it. That
+ * is what `migration-catalogue.test.ts` compares 0052's narrowing table against.
+ */
+export interface CompositeSetNullFk {
+  table: string;
+  columns: string[];
+}
+
+/**
  * Every COMPOSITE `on delete set null` foreign key the CODE declares — every
- * `sameOrgFk(…, { onDelete: 'set null' })` — as constraint name -> its table.
+ * `sameOrgFk(…, { onDelete: 'set null' })` — as constraint name -> its edge.
  *
  * It exists to give `assert-schema-applied`'s composite set-null section a FLOOR.
  * That section reads the database and reports what it finds; against an empty
  * answer it printed "0 found, every one narrowed" and exited 0, which is the
- * shape of every gate that has no guard on the guard (wave 7 L3). Eleven are
- * declared here today; the database holds twelve, because 0040 created
- * `files_category_same_org_fk` and `files.ts` never declared it — so this is a
- * floor, one-directional like everything else in this file, never an equality.
+ * shape of every gate that has no guard on the guard (wave 7 L3).
+ *
+ * TWELVE today, and moving it there is what wave 8's first commit is for. It
+ * read eleven for one wave because 0040 hand-wrote `files_category_same_org_fk`
+ * without going through `sameOrgFk` and `files.ts` declared it nowhere — so the
+ * only thing asserting that twelfth stayed narrow was one dbtest count, and the
+ * production-side gate, with a floor of eleven, would not have noticed its loss.
+ * `files.ts` declares it now and this number followed the schema; no literal was
+ * edited here, and none is written down anywhere.
+ *
+ * STILL A FLOOR AND NOT AN EQUALITY, deliberately: this file is one-directional
+ * everywhere else, a composite set-null FK the database holds and the code does
+ * not declare is `assert-schema-applied`'s to REPORT rather than to fail on, and
+ * an equality would turn the next such discovery into a red gate on every
+ * database at once instead of a line in a report.
  */
-export function declaredCompositeSetNullFks(): Map<string, string> {
-  const declared = new Map<string, string>();
+export function declaredCompositeSetNullFks(): Map<string, CompositeSetNullFk> {
+  const declared = new Map<string, CompositeSetNullFk>();
   for (const value of Object.values(schema)) {
     if (!is(value, PgTable)) continue;
     const config = getTableConfig(value);
     for (const fk of config.foreignKeys) {
       if (fk.onDelete !== 'set null') continue;
-      if (fk.reference().columns.length < 2) continue;
-      declared.set(fk.getName(), config.name);
+      const referencing = fk.reference().columns;
+      if (referencing.length < 2) continue;
+      declared.set(fk.getName(), {
+        table: config.name,
+        columns: referencing.map((column) => column.name).filter((name) => name !== 'org_id'),
+      });
     }
   }
   return declared;

@@ -22,10 +22,12 @@ import { closeFixture, ctxFor, raw, seedOrg, teardown } from './fixture';
 // `boq-immutable.dbtest.ts` measured exactly that, and its last case has been
 // rewritten to the post-0052 truth; this file is the positive proof.
 //
-// 0052 narrows all twelve to `ON DELETE SET NULL (<x>_id)`. ELEVEN are declared
-// in `src/schema/`; the twelfth, `files_category_same_org_fk`, exists in the
-// database only (0040 created it, `files.ts` never declared it) and was found by
-// 0052's own straggler check failing the first CI run. The count assertion at
+// 0052 narrows all twelve to `ON DELETE SET NULL (<x>_id)`. ALL TWELVE are now
+// declared in `src/schema/`: the twelfth, `files_category_same_org_fk`, lived in
+// the database only for thirteen migrations (0040 created it, `files.ts` never
+// declared it) and was found by 0052's own straggler check failing the first CI
+// run — wave 8 item 1 declared it, which moved the floor in
+// `declaredCompositeSetNullFks()` from eleven to twelve. The count assertion at
 // the bottom of this file is what keeps that number honest. Two properties are
 // asserted here, and NEITHER is visible to `db:assert-snapshot` (snapshot format
 // v7 has no field for the column list) or to `assert-schema-applied` (it
@@ -329,9 +331,11 @@ describe('a composite set-null cascade nulls the reference and leaves org_id alo
     // stragglers". Derived rather than written as `12`, because the number is a
     // CENSUS, not a limit: the day a thirteenth composite set-null FK is added,
     // 0052 grows a row and this assertion follows it, instead of going red in a
-    // place that reads like a defect (wave 7 R10). Eleven of today's twelve are
-    // declared in `src/schema/`; the twelfth is `files_category_same_org_fk`,
-    // which 0040 created and no schema file declares - see 0052's header.
+    // place that reads like a defect (wave 7 R10). All twelve of today's twelve
+    // are declared in `src/schema/` since wave 8 item 1;
+    // `migration-catalogue.test.ts` asserts that this census and
+    // `declaredCompositeSetNullFks()` name the SAME twelve, with no database, so
+    // the two numbers cannot drift apart between deploys.
     const [narrowed] = await raw.query<{ n: number }>(
       `select count(*)::int as n
          from pg_constraint c

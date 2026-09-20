@@ -219,9 +219,15 @@ export async function runSchemaCheck(sql: CatalogueSql): Promise<number> {
 
   // THE FLOOR, and the reason it is here: this section reports what the database
   // HAS, so an empty answer read "0 found, every one narrowed" and exited 0 — a
-  // gate with no guard on the guard (wave 7 L3). The number is derived from
-  // `src/schema/`, never written down, and it is a floor rather than an equality
-  // because the database legitimately holds one MORE than the schema declares.
+  // gate with no guard on the guard (wave 7 L3). The number is DERIVED from
+  // `src/schema/` and never written down here: it read eleven while `files.ts`
+  // declared no FK for `category_id`, and became twelve the moment that
+  // declaration landed, with nothing in this file edited.
+  //
+  // A floor rather than an equality, still. `files_category_same_org_fk` is the
+  // worked example of why: for thirteen migrations the database held a composite
+  // set-null FK the code did not declare, and an equality would have failed this
+  // check on every database rather than reporting it.
   const declaredFks = declaredCompositeSetNullFks();
   const behind = compositeFks.length < declaredFks.size;
 

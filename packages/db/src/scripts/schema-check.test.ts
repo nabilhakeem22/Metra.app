@@ -1,6 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { declaredFunctions } from './rls-catalogue';
-import { declaredCompositeSetNullFks, declaredTables } from './schema-catalogue';
+import {
+  declaredCompositeSetNullFks,
+  declaredIndexes,
+  declaredTables,
+} from './schema-catalogue';
 import { runSchemaCheck, type CatalogueSql } from './schema-check';
 
 // F2: on the ONE run where the owner is being told the database is behind, the
@@ -39,27 +43,20 @@ const NARROWED: CompositeFk = {
 
 /**
  * A correctly narrowed database: one row per composite set-null FK `src/schema/`
- * declares, plus `files_category_same_org_fk`, which 0040 created and no schema
- * file declares. Twelve, as production will hold after 0052 — and derived, so the
- * floor added in L3 is satisfied by the fixture for the same reason it is
+ * declares. TWELVE — as production holds after 0052, and as the schema declares
+ * since `files.ts` picked up `files_category_same_org_fk` (wave 8 item 1). It was
+ * eleven declared plus that one appended by hand here, which is exactly the gap
+ * that commit closed; the append is gone because the schema now carries it.
+ * Derived, so the L3 floor is satisfied by this fixture for the same reason it is
  * satisfied by a real database.
  */
 function narrowedCatalogue(): CompositeFk[] {
-  const rows = [...declaredCompositeSetNullFks()].map(([name, child]) => ({
+  return [...declaredCompositeSetNullFks()].map(([name, fk]) => ({
     name,
-    child,
-    fk_cols: ['org_id', `${name}_col`],
-    set_cols: [`${name}_col`],
+    child: fk.table,
+    fk_cols: ['org_id', ...fk.columns],
+    set_cols: [...fk.columns],
   }));
-  return [
-    ...rows,
-    {
-      name: 'files_category_same_org_fk',
-      child: 'files',
-      fk_cols: ['org_id', 'category_id'],
-      set_cols: ['category_id'],
-    },
-  ];
 }
 
 /** A postgres.js stand-in that answers the four catalogue reads from fixtures. */
@@ -158,7 +155,7 @@ describe('runSchemaCheck', () => {
     expect(printed).toMatch(/functions — \d+ declared/);
     expect(sectionsPrinted()).toEqual([
       'assert-schema-applied: indexes — 111 declared, 111 NOT FOUND (report only, does not fail this check):',
-      'assert-schema-applied: constraints — 218 declared, 218 NOT FOUND (report only, does not fail this check):',
+      'assert-schema-applied: constraints — 219 declared, 219 NOT FOUND (report only, does not fail this check):',
       'assert-schema-applied: functions — 30 declared, 30 NOT FOUND (report only, does not fail this check):',
       'columns: BEHIND',
     ]);
@@ -196,7 +193,7 @@ describe('composite set-null foreign keys are a GATE, not a report (R6)', () => 
     const code = await runSchemaCheck(fixtureSql(completeCatalogues()));
     expect(code).toBe(0);
     expect(logged.join('\n')).toContain(
-      'composite set-null FKs — 12 found (11 declared in src/schema/), every one narrowed',
+      'composite set-null FKs — 12 found (12 declared in src/schema/), every one narrowed',
     );
   });
 
@@ -281,14 +278,33 @@ describe('the floor under the composite set-null gate (L3)', () => {
     );
   });
 
-  it('derives the floor from the schema, and the schema declares eleven', () => {
-    // Eleven, not twelve: the database also holds `files_category_same_org_fk`,
-    // which 0040 created and `files.ts` declares nowhere. That is why this is a
-    // FLOOR and not an equality.
+  it('derives the floor from the schema, and the schema declares TWELVE', () => {
+    // Twelve since wave 8 item 1. It was eleven for one wave, and the twelfth —
+    // `files_category_same_org_fk`, created by 0040 and declared by no schema
+    // file — is the reason this gate existed with a floor BELOW what every
+    // database actually held: a silent un-narrowing of that one would have been
+    // invisible to the production-side check. Derived from `src/schema/`, so
+    // deleting the declaration in `files.ts` reds this line and not a comment.
     const declared = declaredCompositeSetNullFks();
-    expect(declared.size).toBe(11);
-    expect(declared.get('boqs_engagement_same_org_fk')).toBe('boqs');
-    expect(declared.has('files_category_same_org_fk')).toBe(false);
+    expect(declared.size).toBe(12);
+    expect(declared.get('boqs_engagement_same_org_fk')).toEqual({
+      table: 'boqs',
+      columns: ['engagement_id'],
+    });
+    expect(declared.get('files_category_same_org_fk')).toEqual({
+      table: 'files',
+      columns: ['category_id'],
+    });
+  });
+
+  it('declares the twelfth WITHOUT asking for an index the database lacks', () => {
+    // `sameOrgFk` ships an `(org_id, <x>_id)` index with every FK it emits. On
+    // `files` that would be `files_category_idx`, which exists in no database and
+    // would therefore turn a pure declaration into pending DDL — and would be
+    // reported as missing by `assert-schema-applied` and by the migration
+    // catalogue for ever. `index: false` is why neither happens.
+    expect(declaredIndexes().has('files_category_idx')).toBe(false);
+    expect(declaredIndexes().has('files_org_category_idx')).toBe(true);
   });
 
   it('passes on the twelve a narrowed database holds', async () => {
@@ -297,6 +313,6 @@ describe('the floor under the composite set-null gate (L3)', () => {
       fixtureSql({ ...completeCatalogues(), compositeFks: narrowedCatalogue() }),
     );
     expect(code).toBe(0);
-    expect(logged.join('\n')).toContain('12 found (11 declared in src/schema/)');
+    expect(logged.join('\n')).toContain('12 found (12 declared in src/schema/)');
   });
 });

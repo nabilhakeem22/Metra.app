@@ -8,7 +8,9 @@ import {
   uuid,
   type AnyPgColumn,
 } from 'drizzle-orm/pg-core';
+import { documentCategories } from './document-categories';
 import { organizations } from './organizations';
+import { sameOrgFk } from './org-ref';
 import { orgScoped } from './org-scoped';
 
 /**
@@ -43,6 +45,26 @@ export const files = pgTable(
     // project / engagement". Without it that is a full scan of every file in
     // the database, filtered afterwards.
     index('files_org_entity_idx').on(t.orgId, t.entity, t.entityId),
+    // `files_category_same_org_fk` — (org_id, category_id) -> document_categories
+    // (org_id, id), ON DELETE SET NULL. 0040 hand-wrote it in exactly this shape
+    // WITHOUT going through `sameOrgFk`, so for thirteen migrations every database
+    // held a composite set-null FK that no schema file declared: absent from the
+    // drizzle snapshot, absent from `declaredConstraints()`, and invisible to
+    // `assert-schema-applied`, which is one-directional by design. It was found by
+    // 0052's own straggler check failing CI, not by a reader. Declaring it here is
+    // what moves the floor in `declaredCompositeSetNullFks()` from eleven to
+    // twelve, so a future `drizzle-kit generate` that dropped its narrowing would
+    // now be seen.
+    //
+    // `index: false` because this is a DECLARATION OF WHAT EXISTS, not a request
+    // for new DDL: the helper would otherwise emit `files_category_idx`, which no
+    // database has, and the partial `files_org_category_idx` below already answers
+    // every query that leads with (org_id, category_id). No migration is implied
+    // by this line.
+    ...sameOrgFk(t, 'category', documentCategories, {
+      onDelete: 'set null',
+      index: false,
+    }),
     // Live in the database since 0040 (filing by document category). PARTIAL:
     // category_id is null for every uncategorised file, and those are never the
     // rows this index is asked for. Declared here so a future `drizzle-kit
