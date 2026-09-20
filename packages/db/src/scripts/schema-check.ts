@@ -153,20 +153,61 @@ function narrowingProblem(fk: CompositeSetNullFk): string | undefined {
  * four sections it exists for, and a connection that cannot read a table must not
  * take the report down with it.
  */
-async function orphanOrgRowSection(sql: CatalogueSql): Promise<string[]> {
+/**
+ * A row count, whatever the driver made of it — or null when the answer is not a
+ * count at all. NEVER `Number(x)` on its own (wave 8 F7): `count(*)` is int8, a
+ * driver that hands int8 back as a STRING makes a strict `=== 0` guard dead
+ * ('0' is not 0), and `Number(null)` is 0, which would turn "the query answered
+ * nothing" into "there are no organizations". Both directions are named here so
+ * neither can be reached by accident.
+ */
+function asCount(value: unknown): number | null {
+  if (typeof value === 'number') return Number.isFinite(value) ? value : null;
+  if (typeof value === 'bigint') return Number(value);
+  if (typeof value === 'string' && value.trim() !== '') {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  return null;
+}
+
+type OrphanSection =
+  /** The read happened. `answered` is how many tables the DATABASE returned. */
+  | { kind: 'read'; answered: number; lines: string[] }
+  /** The read did not happen, or must not be trusted. Never a row count. */
+  | { kind: 'unavailable'; reason: string };
+
+async function orphanOrgRowSection(sql: CatalogueSql): Promise<OrphanSection> {
   const handle = sql as unknown as {
     unsafe: <T>(query: string) => Promise<T>;
   };
   const tables = orgScopedTableNames();
-  const [visible] = await handle.unsafe<Array<{ rows: number }>>(ORGANIZATIONS_VISIBLE_QUERY);
-  if (visible.rows === 0) {
-    return [
-      '  - this connection reads 0 rows from public.organizations, so every table ' +
-        'would report fully orphaned. Not reported — fix the privilege, then re-run.',
-    ];
+  const [visible] = await handle.unsafe<Array<{ rows: unknown }>>(ORGANIZATIONS_VISIBLE_QUERY);
+  if (!visible) {
+    return {
+      kind: 'unavailable',
+      reason: `${ORGANIZATIONS_VISIBLE_QUERY} returned no row at all`,
+    };
+  }
+  const organizations = asCount(visible.rows);
+  if (organizations === null) {
+    return {
+      kind: 'unavailable',
+      reason:
+        `${ORGANIZATIONS_VISIBLE_QUERY} answered ${JSON.stringify(visible.rows)}, ` +
+        'which is not a count',
+    };
+  }
+  if (organizations === 0) {
+    return {
+      kind: 'unavailable',
+      reason:
+        'this connection reads 0 rows from public.organizations, so every table would ' +
+        'report fully orphaned. Fix the privilege or the RLS on this role, then re-run',
+    };
   }
   const counts = await handle.unsafe<OrphanOrgRows[]>(orphanOrgRowsQuery(tables));
-  return orphanReportLines(counts);
+  return { kind: 'read', answered: counts.length, lines: orphanReportLines(counts) };
 }
 
 /** Print one report-only section. Returns its gap count, for the closing note. */
@@ -188,19 +229,39 @@ function report(title: string, declaredCount: number, gaps: string[]): number {
  * Print the orphan section. Its own printer because "declared / NOT FOUND" is the
  * wrong sentence for it: nothing is declared and nothing is missing — a row is
  * pointing at an organization that is not there.
+ *
+ * AND A FAILED READ HAS ITS OWN SENTENCE AGAIN (wave 8 F2). The first version
+ * funnelled every branch through one printer, so a REJECTED query, an
+ * unreadable `organizations` and an empty visibility row each printed
+ * "44 org-scoped table(s) read, 1 WITH ORPHANS" followed by the remediation
+ * paragraph telling the operator to go and find rows by org_id. It stated a
+ * connection problem as a data incident, over a count of tables nothing had
+ * read. An unavailable section now says only that it is unavailable, and names
+ * no number it does not have.
+ *
+ * The count on the READ branch is what the DATABASE ANSWERED (F6), not what
+ * `src/schema/` declares: a query that returned 40 rows for 44 declared tables
+ * must not print 44.
  */
-function reportOrphans(tableCount: number, lines: string[]): void {
-  if (lines.length === 0) {
+function reportOrphans(section: OrphanSection): void {
+  if (section.kind === 'unavailable') {
     console.log(
-      `assert-schema-applied: orphaned org rows — ${tableCount} org-scoped table(s) ` +
-        'read, none holds a row whose org_id names no organization.',
+      `assert-schema-applied: orphaned org rows — could not be read: ${section.reason}. ` +
+        'Nothing is reported about orphaned rows on this run.',
+    );
+    return;
+  }
+  if (section.lines.length === 0) {
+    console.log(
+      `assert-schema-applied: orphaned org rows — ${section.answered} org-scoped table(s) ` +
+        'answered, none holds a row whose org_id names no organization.',
     );
     return;
   }
   console.log(
-    `assert-schema-applied: orphaned org rows — ${tableCount} org-scoped table(s) ` +
-      `read, ${lines.length} WITH ORPHANS (report only, does not fail this check):\n` +
-      `${lines.join('\n')}\n` +
+    `assert-schema-applied: orphaned org rows — ${section.answered} org-scoped table(s) ` +
+      `answered, ${section.lines.length} WITH ORPHANS (report only, does not fail this ` +
+      `check):\n${section.lines.join('\n')}\n` +
       'Every org-scoped table has org_id -> organizations(id) ON DELETE RESTRICT, so ' +
       'this cannot happen in ordinary operation. The one window where it can is ' +
       "`db:purge-fixture-orgs`'s `session_replication_role = 'replica'`, which " +
@@ -275,13 +336,13 @@ export async function runSchemaCheck(sql: CatalogueSql): Promise<number> {
   // because it is the only section that reads user rows — a table this connection
   // cannot select from must not take down the report the owner is pasting into an
   // incident.
-  let orphanGaps: string[];
+  let orphans: OrphanSection;
   try {
-    orphanGaps = await orphanOrgRowSection(sql);
+    orphans = await orphanOrgRowSection(sql);
   } catch (error) {
-    orphanGaps = [`  - could not be read: ${(error as Error).message}`];
+    orphans = { kind: 'unavailable', reason: (error as Error).message };
   }
-  reportOrphans(orgScopedTableNames().length, orphanGaps);
+  reportOrphans(orphans);
 
   const compositeFks = await compositeSetNullFks(sql);
   const unnarrowed = compositeFks

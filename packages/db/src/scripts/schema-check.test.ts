@@ -39,6 +39,10 @@ interface Catalogues {
   organizationsVisible?: number;
   /** Make the orphan reads throw, as a table this connection cannot select from. */
   orphanReadFails?: string;
+  /** The visibility guard answers NO ROW at all. */
+  organizationsReturnsNoRow?: boolean;
+  /** The visibility guard answers something that is not a count (int8 as text). */
+  organizationsRawRows?: unknown;
 }
 
 /** One narrowed FK, as 0052 leaves it: one column, its own, never org_id. */
@@ -104,6 +108,10 @@ function fixtureSql(catalogues: Catalogues): CatalogueSql {
       );
     }
     if (query === ORGANIZATIONS_VISIBLE_QUERY) {
+      if (catalogues.organizationsReturnsNoRow === true) return Promise.resolve([]);
+      if (catalogues.organizationsRawRows !== undefined) {
+        return Promise.resolve([{ rows: catalogues.organizationsRawRows }]);
+      }
       return Promise.resolve([{ rows: catalogues.organizationsVisible ?? 7 }]);
     }
     const orphans = catalogues.orphanRows ?? {};
@@ -298,7 +306,7 @@ describe('the orphaned-org-rows section (wave 8 item 4)', () => {
     expect(code).toBe(0);
     expect(logged.join('\n')).toContain(
       `orphaned org rows — ${String(orgScopedTableNames().length)} org-scoped table(s) ` +
-        'read, none holds a row whose org_id names no organization.',
+        'answered, none holds a row whose org_id names no organization.',
     );
   });
 
@@ -325,9 +333,16 @@ describe('the orphaned-org-rows section (wave 8 item 4)', () => {
       fixtureSql({ ...completeCatalogues(), organizationsVisible: 0 }),
     );
     expect(code).toBe(0);
-    expect(logged.join('\n')).toContain(
-      'reads 0 rows from public.organizations, so every table would report fully orphaned',
+    const printed = logged.join('\n');
+    // Its OWN sentence: no table count, no "WITH ORPHANS", no remediation
+    // paragraph. It is a connection problem, not a data incident (F2).
+    expect(printed).toContain(
+      'orphaned org rows — could not be read: this connection reads 0 rows from ' +
+        'public.organizations, so every table would report fully orphaned',
     );
+    expect(printed).not.toContain('WITH ORPHANS');
+    expect(printed).not.toContain('org-scoped table(s) answered');
+    expect(printed).not.toContain('Find the rows by org_id');
   });
 
   it('a table it cannot read does not take the whole report down', async () => {
@@ -336,9 +351,55 @@ describe('the orphaned-org-rows section (wave 8 item 4)', () => {
       fixtureSql({ ...completeCatalogues(), orphanReadFails: 'boq_lines' }),
     );
     expect(code).toBe(0);
-    expect(logged.join('\n')).toContain('could not be read: permission denied for table boq_lines');
+    const printed = logged.join('\n');
+    expect(printed).toContain(
+      'orphaned org rows — could not be read: permission denied for table boq_lines',
+    );
+    // A REJECTED read used to print "44 org-scoped table(s) read, 1 WITH ORPHANS"
+    // and the remediation paragraph, over a count nothing had read (F2).
+    expect(printed).not.toContain('WITH ORPHANS');
+    expect(printed).not.toContain('org-scoped table(s) answered');
+    expect(printed).not.toContain('Find the rows by org_id');
     // And the four sections the owner came for still printed.
     expect(sectionsPrinted()).toHaveLength(4);
+  });
+
+  it('an EMPTY visibility result is unavailable, not a crash (F2)', async () => {
+    // `const [visible] = await …` over an empty result is `undefined`, and the
+    // first version read `visible.rows` off it — `Cannot read properties of
+    // undefined`, caught by the wrapper, and printed as "1 WITH ORPHANS".
+    captureConsole();
+    const code = await runSchemaCheck(
+      fixtureSql({ ...completeCatalogues(), organizationsReturnsNoRow: true }),
+    );
+    expect(code).toBe(0);
+    const printed = logged.join('\n');
+    expect(printed).toContain('orphaned org rows — could not be read:');
+    expect(printed).toContain('returned no row at all');
+    expect(printed).not.toContain('WITH ORPHANS');
+  });
+
+  it('counts organizations NUMERICALLY, so int8-as-a-string cannot pass (F7)', async () => {
+    // `count(*)` is int8. A driver that hands it back as '0' makes a strict
+    // `=== 0` guard dead: the guard passes, the orphan query then reports every
+    // table fully orphaned, and the operator is pointed at 44 innocent tables.
+    captureConsole();
+    const code = await runSchemaCheck(
+      fixtureSql({ ...completeCatalogues(), organizationsRawRows: '0' }),
+    );
+    expect(code).toBe(0);
+    expect(logged.join('\n')).toContain(
+      'this connection reads 0 rows from public.organizations',
+    );
+  });
+
+  it('a non-count answer is unavailable rather than NaN (F7)', async () => {
+    captureConsole();
+    const code = await runSchemaCheck(
+      fixtureSql({ ...completeCatalogues(), organizationsRawRows: null }),
+    );
+    expect(code).toBe(0);
+    expect(logged.join('\n')).toContain('which is not a count');
   });
 });
 
