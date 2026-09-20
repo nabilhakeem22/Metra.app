@@ -28,9 +28,17 @@
 //     or a primary key's `<table>_pkey`, is named by Postgres and never appears in
 //     the text. `declaredConstraints()` only returns NAMED checks, uniques and
 //     foreign keys, so the comparison stays honest.
-//   * ONE-DIRECTIONAL. Extra objects a migration creates and the schema does not
-//     declare are legitimate (partial indexes, operational indexes) and never
-//     reported.
+//   * ONE-DIRECTIONAL FOR WHAT EXISTS. Extra objects a migration creates and the
+//     schema does not declare are legitimate (partial indexes, operational
+//     indexes) and are never reported. What a migration REMOVES is a different
+//     question and is reported: `dropped` carries every index name a migration
+//     deleted and did not put back, and `migration-catalogue.test.ts` requires
+//     each one to be either declared or written down with a reason (wave 8 F8).
+//   * A DROPPED TABLE takes its indexes with it, which the replay now models,
+//     because `DROP INDEX` was not the only way one leaves: 0012 created
+//     `proposal_section_library_org_active_idx` and 0013 dropped its TABLE, so
+//     the catalogue carried a phantom index for forty migrations that nothing
+//     could report, surplus names being invisible by design.
 //   * PROSE IS NOT SQL, and this is the limit that was WRONG here until wave 7's
 //     loop 1. The text is run through `sql-text.ts` first, which removes comments
 //     AND the content of single-quoted literals, so an object named inside a
@@ -57,13 +65,25 @@ interface JournalEntry {
 export interface MigrationCatalogue {
   indexes: Set<string>;
   constraints: Set<string>;
+  /**
+   * Every index name a migration REMOVED and did not put back — by `DROP INDEX`,
+   * or by dropping the table it was on. Read by `migration-catalogue.test.ts`:
+   * an index the migrations delete and `src/schema/` does not declare is either
+   * a declaration somebody forgot to remove or a deliberate removal, and the
+   * difference has to be written down (wave 8 F8).
+   */
+  dropped: Set<string>;
 }
 
 /** An identifier: `"KeptAsIs"` or `folded_to_lower`, as Postgres resolves it. */
 const IDENTIFIER = String.raw`(?:"([^"]+)"|([A-Za-z_][\w$]*))`;
 
 const CREATE_INDEX = new RegExp(
-  String.raw`create\s+(?:unique\s+)?index\s+(?:concurrently\s+)?(?:if\s+not\s+exists\s+)?${IDENTIFIER}\s+on\b`,
+  String.raw`create\s+(?:unique\s+)?index\s+(?:concurrently\s+)?(?:if\s+not\s+exists\s+)?${IDENTIFIER}\s+on\s+(?:only\s+)?(?:public\.)?${IDENTIFIER}`,
+  'gi',
+);
+const DROP_TABLE = new RegExp(
+  String.raw`drop\s+table\s+(?:if\s+exists\s+)?(?:public\.)?${IDENTIFIER}`,
   'gi',
 );
 const DROP_INDEX = new RegExp(
@@ -97,17 +117,48 @@ function identifierAt(match: RegExpMatchArray, quoted: number): string | null {
 
 type Step = { at: number; apply: (catalogue: MigrationCatalogue) => void };
 
-function stepsIn(text: string): Step[] {
+function stepsIn(text: string, indexesByTable: Map<string, Set<string>>): Step[] {
   const steps: Step[] = [];
   const add = (at: number, apply: Step['apply']) => steps.push({ at, apply });
 
   for (const match of text.matchAll(CREATE_INDEX)) {
     const name = identifierAt(match, 1);
-    if (name) add(match.index, (c) => c.indexes.add(name));
+    const table = identifierAt(match, 3);
+    if (name) {
+      add(match.index, (c) => {
+        c.indexes.add(name);
+        c.dropped.delete(name);
+        if (table) {
+          const on = indexesByTable.get(table) ?? new Set<string>();
+          on.add(name);
+          indexesByTable.set(table, on);
+        }
+      });
+    }
   }
   for (const match of text.matchAll(DROP_INDEX)) {
     const name = identifierAt(match, 1);
-    if (name) add(match.index, (c) => c.indexes.delete(name));
+    if (name) {
+      add(match.index, (c) => {
+        c.indexes.delete(name);
+        c.dropped.add(name);
+      });
+    }
+  }
+  // A dropped TABLE takes its indexes with it. Without this the catalogue kept
+  // `proposal_section_library_org_active_idx` for ever — created by 0012, its
+  // table dropped by 0013 — a phantom that the one-directional comparison could
+  // never report because surplus names are never reported (wave 8 F8).
+  for (const match of text.matchAll(DROP_TABLE)) {
+    const table = identifierAt(match, 1);
+    if (!table) continue;
+    add(match.index, (c) => {
+      for (const name of indexesByTable.get(table) ?? []) {
+        c.indexes.delete(name);
+        c.dropped.add(name);
+      }
+      indexesByTable.delete(table);
+    });
   }
   for (const match of text.matchAll(RENAME_INDEX)) {
     const from = identifierAt(match, 1);
@@ -145,12 +196,19 @@ export function migrationCatalogue(migrationsFolder: string): MigrationCatalogue
   const journal = JSON.parse(
     readFileSync(resolve(migrationsFolder, 'meta/_journal.json'), 'utf8'),
   ) as { entries: JournalEntry[] };
-  const catalogue: MigrationCatalogue = { indexes: new Set(), constraints: new Set() };
+  const catalogue: MigrationCatalogue = {
+    indexes: new Set(),
+    constraints: new Set(),
+    dropped: new Set(),
+  };
+  // Which table each index was created on, carried ACROSS migrations: 0012
+  // creates the index and 0013 drops the table.
+  const indexesByTable = new Map<string, Set<string>>();
   for (const entry of journal.entries) {
     const text = scannableSql(
       readFileSync(resolve(migrationsFolder, `${entry.tag}.sql`), 'utf8'),
     );
-    for (const step of stepsIn(text)) step.apply(catalogue);
+    for (const step of stepsIn(text, indexesByTable)) step.apply(catalogue);
   }
   return catalogue;
 }

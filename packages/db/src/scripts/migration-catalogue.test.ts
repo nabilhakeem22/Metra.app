@@ -198,6 +198,97 @@ describe('0052 narrows exactly the composite set-null FKs the schema declares', 
   });
 });
 
+/**
+ * Indexes the migrations REMOVE and `src/schema/` does not declare — each with
+ * the reason it is not a defect.
+ *
+ * The gate this exists for (wave 8 F8): the catalogue comparison is
+ * one-directional, so an index that leaves the catalogue while a schema file
+ * still declares it is caught, and an index that leaves while NOTHING declares
+ * it was silent. Both are worth a sentence, and only one of them is a defect —
+ * so the answer is neither "report every drop" nor "report none", it is "a drop
+ * has to be written down".
+ *
+ * A name here is a decision somebody made, not a suppression. Adding one without
+ * a reason is the failure mode this replaces.
+ */
+const REMOVED_ON_PURPOSE = new Map<string, string>([
+  [
+    'proposal_section_library_org_active_idx',
+    '0012 created it; 0013 dropped the whole proposal_section_library table when ' +
+      'sections were unified. Nothing declares the table, so nothing declares its index.',
+  ],
+  [
+    'cost_items_org_category_idx',
+    '0013 dropped it with the category column it was on, when sections replaced the ' +
+      'free-text category.',
+  ],
+  // The six of wave 8 item 2. 0053 created them, 0054 drops them again, and the
+  // same commit dropped their declarations: each is answered by a wider index
+  // with the same leading columns, named in 0054's header.
+  ['boqs_project_idx', '0054 — duplicate of boqs_org_project_idx'],
+  ['boq_sections_boq_idx', '0054 — prefix of boq_sections_org_boq_sort_idx'],
+  ['boq_lines_boq_idx', '0054 — duplicate of boq_lines_org_boq_idx'],
+  ['boq_lines_section_idx', '0054 — prefix of boq_lines_org_section_sort_idx'],
+  [
+    'contract_sections_contract_idx',
+    '0054 — prefix of contract_sections_org_contract_sort_idx',
+  ],
+  ['project_stages_project_idx', '0054 — prefix of project_stages_org_project_sort_idx'],
+]);
+
+describe('an index the migrations REMOVE has to be written down (F8)', () => {
+  it('reports a drop that neither the schema declares nor this file explains', () => {
+    const declared = declaredIndexes();
+    const unexplained = [...catalogue.dropped]
+      .filter((name) => !declared.has(name) && !REMOVED_ON_PURPOSE.has(name))
+      .sort();
+    expect(
+      unexplained,
+      'A migration drops an index that no schema file declares and that nothing here ' +
+        'explains. Declare it, or add it to REMOVED_ON_PURPOSE with the reason — a ' +
+        'silent drop is how an index the application still needs disappears with ' +
+        'nobody reading a line about it.',
+    ).toEqual([]);
+  });
+
+  it('every allowlisted name is really dropped, and really undeclared', () => {
+    // The other direction: an entry that stops being true is dead configuration,
+    // and dead configuration is how an allowlist becomes a place to hide things.
+    const declared = declaredIndexes();
+    const stale = [...REMOVED_ON_PURPOSE.keys()]
+      .filter((name) => !catalogue.dropped.has(name) || declared.has(name))
+      .sort();
+    expect(stale).toEqual([]);
+    for (const reason of REMOVED_ON_PURPOSE.values()) {
+      expect(reason.length).toBeGreaterThan(20);
+    }
+  });
+
+  it('a dropped TABLE takes its indexes out of the catalogue', () => {
+    // `proposal_section_library_org_active_idx` sat in the catalogue for ever:
+    // 0012 created it, 0013 dropped its TABLE, and the replay only understood
+    // DROP INDEX. Surplus names are never reported, so it was invisible — and it
+    // made the index count three higher than the schema's for no reason.
+    expect(catalogue.indexes.has('proposal_section_library_org_active_idx')).toBe(false);
+    expect(catalogue.dropped.has('proposal_section_library_org_active_idx')).toBe(true);
+    const built = migrationCatalogue(
+      folderOf({
+        '0001_create': 'CREATE INDEX IF NOT EXISTS t_a_idx ON public.t (a);',
+        '0002_drop': 'DROP TABLE IF EXISTS public.t;',
+      }),
+    );
+    expect(built.indexes.has('t_a_idx')).toBe(false);
+    expect(built.dropped.has('t_a_idx')).toBe(true);
+  });
+
+  it('an index put BACK is not reported as dropped', () => {
+    // 0006 and 0049 each drop an index and create it again in the same file.
+    expect(catalogue.dropped.has('invitations_org_email_pending_idx')).toBe(false);
+    expect(catalogue.dropped.has('engagement_events_client_signal_unique')).toBe(false);
+  });
+});
+
 /** A throwaway migrations folder: a journal plus the given files, in order. */
 function folderOf(files: Record<string, string>): string {
   const folder = mkdtempSync(join(tmpdir(), 'metra-catalogue-'));
