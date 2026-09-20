@@ -76,7 +76,10 @@ export const boqs = pgTable(
     unique('boqs_org_id_number_unique').on(t.orgId, t.number),
     bilingualCheck('boqs', 'title'),
     ...sameOrgFk(t, 'client', clients, { onDelete: 'restrict' }),
-    ...sameOrgFk(t, 'project', projects, { onDelete: 'restrict' }),
+    // `index: false` — `boqs_org_project_idx` below IS the index this helper
+    // would emit, column for column, under a different name. 0053 created the
+    // duplicate `boqs_project_idx` and 0054 drops it again; see 0054's header.
+    ...sameOrgFk(t, 'project', projects, { onDelete: 'restrict', index: false }),
     ...sameOrgFk(t, 'engagement', designEngagements, { onDelete: 'set null' }),
     ...sameOrgFk(t, 'sourceFile', files, { onDelete: 'set null' }),
     index('boqs_org_project_idx').on(t.orgId, t.projectId),

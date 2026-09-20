@@ -87,6 +87,41 @@ describe('every declared object is built by some migration, under that exact nam
     expect(built.constraints.has('boqs_source_file_same_org_fk')).toBe(false);
   });
 
+  it('does not report an index whose DECLARATION was dropped with it (0054)', () => {
+    // 0054 drops six indexes 0053 created, and the same commit drops their six
+    // DECLARATIONS (`sameOrgFk(…, { index: false })`). Neither half is allowed to
+    // ship alone, and this is the half that proves the FIRST direction: the
+    // catalogue no longer builds them, the schema no longer declares them, and
+    // the comparison above therefore says nothing about them. If the declarations
+    // had been left behind, `creates every index src/schema/ declares` would be
+    // red with exactly these six names.
+    const dropped = [
+      'boqs_project_idx',
+      'boq_sections_boq_idx',
+      'boq_lines_boq_idx',
+      'boq_lines_section_idx',
+      'contract_sections_contract_idx',
+      'project_stages_project_idx',
+    ];
+    for (const name of dropped) {
+      expect(catalogue.indexes.has(name), `${name} is still built by a migration`).toBe(false);
+      expect(declaredIndexes().has(name), `${name} is still declared in src/schema/`).toBe(false);
+    }
+    // And the wider index each one leaned on is still both declared and built —
+    // which is the only thing that made dropping them safe.
+    for (const wider of [
+      'boqs_org_project_idx',
+      'boq_sections_org_boq_sort_idx',
+      'boq_lines_org_boq_idx',
+      'boq_lines_org_section_sort_idx',
+      'contract_sections_org_contract_sort_idx',
+      'project_stages_org_project_sort_idx',
+    ]) {
+      expect(catalogue.indexes.has(wider), `${wider} is not built by any migration`).toBe(true);
+      expect(declaredIndexes().has(wider), `${wider} is not declared in src/schema/`).toBe(true);
+    }
+  });
+
   it('carries no object that only a MESSAGE names', () => {
     // F5: `RAISE EXCEPTION '0053: constraint name(s) not renamed: %'` matched
     // `constraint <identifier>` inside the preserved literal and put a phantom
@@ -174,6 +209,41 @@ function folderOf(files: Record<string, string>): string {
   for (const [tag, sql] of Object.entries(files)) writeFileSync(join(folder, `${tag}.sql`), sql);
   return folder;
 }
+
+describe('a DROP with the declaration left behind is RED (0054, the other half)', () => {
+  // The direction the case on the real tree cannot show, because on the real tree
+  // both halves landed together. This is the shape of a half-done 0054: the
+  // migration drops the index, `src/schema/` still declares it, and the gate must
+  // name it rather than shrug. `missing()` is the same comparison the three cases
+  // above run against the real catalogue.
+  it('reports an index a migration dropped while the schema still declares it', () => {
+    const built = migrationCatalogue(
+      folderOf({
+        '0001_create': 'CREATE INDEX IF NOT EXISTS boqs_project_idx ON public.boqs (org_id, project_id);',
+        '0002_drop': `DO $$ BEGIN
+           DROP INDEX IF EXISTS public.boqs_project_idx;
+         END $$;`,
+      }),
+    );
+    expect(built.indexes.has('boqs_project_idx')).toBe(false);
+    expect(missing(new Map([['boqs_project_idx', 'boqs']]), built.indexes)).toEqual([
+      'boqs_project_idx (on boqs)',
+    ]);
+  });
+
+  it('reads a schema-qualified DROP inside a DO body, which is how 0054 spells it', () => {
+    // If the replay could not see `DROP INDEX IF EXISTS public.<name>` inside a
+    // `DO $$ … $$`, 0054 would be a no-op to this gate and the six names would sit
+    // in the catalogue for ever — green for the wrong reason.
+    const real = migrationCatalogue(migrationsFolder);
+    const dropText = readFileSync(
+      resolve(migrationsFolder, '0054_drop_redundant_indexes.sql'),
+      'utf8',
+    );
+    expect(dropText).toContain('DROP INDEX IF EXISTS public.boqs_project_idx;');
+    expect(real.indexes.has('boqs_project_idx')).toBe(false);
+  });
+});
 
 describe('a name inside a string literal is PROSE, and moves nothing', () => {
   it('cannot satisfy the check for an index no statement creates (F2)', () => {

@@ -32,7 +32,10 @@ export const boqSections = pgTable(
   (t) => [
     unique('boq_sections_org_id_id_unique').on(t.orgId, t.id),
     bilingualCheck('boq_sections', 'title'),
-    ...sameOrgFk(t, 'boq', boqs, { onDelete: 'cascade' }),
+    // `index: false` — `boq_sections_org_boq_sort_idx` below leads with the same
+    // two columns, so it answers everything `boq_sections_boq_idx` did. 0053
+    // created that one and 0054 drops it again; see 0054's header.
+    ...sameOrgFk(t, 'boq', boqs, { onDelete: 'cascade', index: false }),
     index('boq_sections_org_boq_sort_idx').on(t.orgId, t.boqId, t.sortOrder),
   ],
 );

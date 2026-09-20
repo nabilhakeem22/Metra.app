@@ -53,7 +53,10 @@ export const projectStages = pgTable(
       'project_stages_date_order',
       sql`end_date is null or start_date is null or end_date >= start_date`,
     ),
-    ...sameOrgFk(t, 'project', projects, { onDelete: 'cascade' }),
+    // `index: false` — `project_stages_org_project_sort_idx` below leads with the
+    // same two columns. 0053 created `project_stages_project_idx` and 0054 drops
+    // it again; see 0054's header.
+    ...sameOrgFk(t, 'project', projects, { onDelete: 'cascade', index: false }),
     index('project_stages_org_project_sort_idx').on(
       t.orgId,
       t.projectId,
