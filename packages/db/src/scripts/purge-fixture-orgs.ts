@@ -25,6 +25,7 @@ import {
   TRIGGER_GUARDED_TABLES,
   assertDeleteOrderCoversEveryOrgScopedTable,
   assertNoOrphanOrgRows,
+  reportPreExistingOrphans,
 } from './purge-fixture-orgs-tables';
 
 const ORGS_PER_TRANSACTION = 50;
@@ -97,6 +98,10 @@ async function reportPlan(
   );
   console.log('rows that would be deleted:');
   await reportPerTableCounts(sql, doomed.map((d) => d.orgId));
+  // Printed on BOTH paths, and the dry run is the point of it: an orphan this
+  // purge did not cause must be SEEN before anyone types --execute, and must
+  // never fail the run afterwards (wave 8 F3).
+  await reportPreExistingOrphans(sql);
 }
 
 async function main() {
@@ -130,7 +135,15 @@ async function main() {
     // replica-mode window suspends foreign keys as well as triggers, so a table
     // deleted in the wrong order leaves orphans and every count above still reads
     // as success. Throws, loudly, with the table and the row count.
-    await assertNoOrphanOrgRows(sql);
+    //
+    // SCOPED TO THE ORGS THIS RUN DELETED. Asking the global question here and
+    // throwing on it made one pre-existing orphan anywhere fail every later
+    // --execute, after the chunks had committed, over something the operator
+    // could neither cause nor undo (wave 8 F3). Those are reported by
+    // `reportPreExistingOrphans` in the plan above instead. Every doomed org is
+    // gone by now, so a surviving row carrying one of their ids IS an orphan and
+    // IS this run's doing.
+    await assertNoOrphanOrgRows(sql, doomed.map((d) => d.orgId));
     console.log('Purge complete. Run db:reindex-after-purge next.');
   } finally {
     await sql.end();

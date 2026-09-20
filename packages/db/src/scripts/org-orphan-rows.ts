@@ -52,6 +52,30 @@ export const ORGANIZATIONS_VISIBLE_QUERY =
 const IDENTIFIER = /^[a-z][a-z0-9_]*$/;
 
 /**
+ * WHOSE orphans. The distinction is the whole of wave 8 F3.
+ *
+ *   'these-orgs'  — only rows whose org_id is in the list the caller passes.
+ *                   This is the PURGE'S POST-CONDITION: "did MY deletes leave
+ *                   anything behind". It is the only version that may throw,
+ *                   because it is the only version that is about work this run
+ *                   did.
+ *   'every-org'   — every orphan in the database, whoever left it. REPORT ONLY,
+ *                   always: a row orphaned by something that happened months ago
+ *                   must never fail a purge that has already committed its own
+ *                   chunks, and the operator must be able to SEE it in the dry
+ *                   run, before executing anything.
+ *
+ * The first version of this file had only the global form and threw on it, which
+ * meant one pre-existing orphan anywhere made every later `--execute` fail after
+ * its work was committed — a failure the operator could do nothing about and
+ * that said nothing about the purge.
+ */
+export type OrphanScope = 'these-orgs' | 'every-org';
+
+/** The bind parameter the `these-orgs` form expects: a uuid[] of doomed orgs. */
+export const ORG_IDS_PARAMETER = '$1::uuid[]';
+
+/**
  * `select '<t>' as table_name, count(*) … union all …` over every named table.
  *
  * Refuses a table that is not an org-scoped table of the drizzle schema, so the
@@ -59,7 +83,10 @@ const IDENTIFIER = /^[a-z][a-z0-9_]*$/;
  * declares. Returns one row per table INCLUDING the zeroes, because "boqs: 0" is
  * the line that proves the table was actually asked about.
  */
-export function orphanOrgRowsQuery(tables: readonly string[]): string {
+export function orphanOrgRowsQuery(
+  tables: readonly string[],
+  scope: OrphanScope = 'every-org',
+): string {
   if (tables.length === 0) {
     throw new Error('orphanOrgRowsQuery: no tables — that would check nothing and report OK');
   }
@@ -75,11 +102,12 @@ export function orphanOrgRowsQuery(tables: readonly string[]): string {
       );
     }
   }
+  const scoped = scope === 'these-orgs' ? `org_id = any(${ORG_IDS_PARAMETER}) and ` : '';
   return `${tables
     .map(
       (table) =>
         `select '${table}' as table_name, count(*)::int as rows from public.${table} ` +
-        'where org_id not in (select id from public.organizations)',
+        `where ${scoped}org_id not in (select id from public.organizations)`,
     )
     .join('\n  union all\n')}\n  order by 1`;
 }

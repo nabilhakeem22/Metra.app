@@ -97,28 +97,77 @@ export async function assertDeleteOrderCoversEveryOrgScopedTable(
  * operator is told before `db:reindex-after-purge` and before anyone calls the
  * purge done.
  */
-export async function assertNoOrphanOrgRows(sql: PostgresJs): Promise<void> {
-  const [visible] = await sql.unsafe<Array<{ rows: number }>>(ORGANIZATIONS_VISIBLE_QUERY);
-  if (visible.rows === 0) {
+async function assertOrganizationsVisible(sql: PostgresJs): Promise<void> {
+  const [visible] = await sql.unsafe<Array<{ rows: unknown }>>(ORGANIZATIONS_VISIBLE_QUERY);
+  if (!visible || Number(visible.rows) === 0) {
     throw new Error(
-      'the orphan check cannot see public.organizations (0 rows). Every table would ' +
-        'report fully orphaned, so the check is refusing to report at all — this is a ' +
-        'privilege or RLS problem on this connection, not a purge failure.',
+      'the orphan check cannot see public.organizations (0 rows, or no row at all). ' +
+        'Every table would report fully orphaned, so the check is refusing to report at ' +
+        'all — a privilege or RLS problem on this connection, not a purge failure.',
     );
   }
-  const counts = await sql.unsafe<OrphanOrgRows[]>(orphanOrgRowsQuery(DELETE_ORDER));
+}
+
+export async function assertNoOrphanOrgRows(
+  sql: PostgresJs,
+  orgIds: readonly string[],
+): Promise<void> {
+  if (orgIds.length === 0) {
+    console.log('orphan check: this run deleted no organization, so there is nothing to check.');
+    return;
+  }
+  await assertOrganizationsVisible(sql);
+  const counts = await sql.unsafe<OrphanOrgRows[]>(
+    orphanOrgRowsQuery(DELETE_ORDER, 'these-orgs'),
+    [orgIds as string[]],
+  );
   const lines = orphanReportLines(counts);
   if (lines.length > 0) {
     throw new Error(
-      `the purge left ORPHANED rows — org_id pointing at an organization that no ` +
-        `longer exists:\n${lines.join('\n')}\n\n` +
+      `the purge left ORPHANED rows — org_id naming one of the ${String(orgIds.length)} ` +
+        `organization(s) IT deleted:\n${lines.join('\n')}\n\n` +
         'That means a table was deleted in the wrong order, or was deleted inside the ' +
         'replica-mode window where foreign keys are not enforced. The rows are still ' +
         'there; delete them by org_id before anything else touches this database.',
     );
   }
   console.log(
-    `orphan check: ${String(counts.length)} org-scoped table(s) read, 0 rows whose ` +
-      'org_id names no organization.',
+    `orphan check: ${String(counts.length)} org-scoped table(s) answered, 0 rows left ` +
+      `behind by the ${String(orgIds.length)} organization(s) this run deleted.`,
+  );
+}
+
+/**
+ * Orphans this run did NOT create — every org_id in the database naming no
+ * organization, whoever left it. REPORT ONLY, and printed in the DRY RUN, which
+ * is the one moment the operator can still act on it.
+ *
+ * Separate from the post-condition above, and separate on purpose (wave 8 F3).
+ * The first version asked the GLOBAL question and THREW on it, after the purge
+ * had already committed its chunks: one pre-existing orphan anywhere made every
+ * later `--execute` fail over something the operator could neither cause nor
+ * undo, and which said nothing at all about the purge.
+ */
+export async function reportPreExistingOrphans(sql: PostgresJs): Promise<void> {
+  let counts: OrphanOrgRows[];
+  try {
+    await assertOrganizationsVisible(sql);
+    counts = await sql.unsafe<OrphanOrgRows[]>(orphanOrgRowsQuery(DELETE_ORDER, 'every-org'));
+  } catch (error) {
+    console.log(`pre-existing orphans: could not be read: ${(error as Error).message}`);
+    return;
+  }
+  const lines = orphanReportLines(counts);
+  if (lines.length === 0) {
+    console.log(
+      `pre-existing orphans: ${String(counts.length)} org-scoped table(s) answered, none ` +
+        'holds a row whose org_id names no organization.',
+    );
+    return;
+  }
+  console.log(
+    `pre-existing orphans: ${String(lines.length)} table(s) ALREADY hold rows whose org_id ` +
+      'names no organization. This purge did not cause them and will not fail on ' +
+      `them:\n${lines.join('\n')}`,
   );
 }

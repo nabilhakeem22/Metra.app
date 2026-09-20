@@ -1,14 +1,18 @@
 import { describe, expect, it } from 'vitest';
 import {
   ORGANIZATIONS_VISIBLE_QUERY,
+  ORG_IDS_PARAMETER,
   orphanOrgRowsQuery,
   orphanReportLines,
   orphanedTables,
 } from './org-orphan-rows';
+import type { PostgresJs } from '../client';
 import {
   DELETE_ORDER,
   REMAINING_TABLES,
   TRIGGER_GUARDED_TABLES,
+  assertNoOrphanOrgRows,
+  reportPreExistingOrphans,
 } from './purge-fixture-orgs-tables';
 import { orgScopedTableNames } from './schema-catalogue';
 
@@ -120,6 +124,25 @@ describe('the orphan post-condition, as SQL text', () => {
     expect(() => orphanOrgRowsQuery([])).toThrow('that would check nothing and report OK');
   });
 
+  it('scopes the PURGE post-condition to the orgs that run deleted (F3)', () => {
+    // The global form asked "is there an orphan ANYWHERE", and the purge THREW on
+    // it after its chunks had committed: one pre-existing orphan made every later
+    // --execute fail over something the operator could neither cause nor undo.
+    const scoped = orphanOrgRowsQuery(DELETE_ORDER, 'these-orgs');
+    expect(scoped).toContain(`where org_id = any(${ORG_IDS_PARAMETER}) and org_id not in`);
+    expect(scoped.split(ORG_IDS_PARAMETER)).toHaveLength(DELETE_ORDER.length + 1);
+  });
+
+  it('keeps the GLOBAL form for the dry run, unfiltered and report-only', () => {
+    const global = orphanOrgRowsQuery(DELETE_ORDER, 'every-org');
+    expect(global).not.toContain(ORG_IDS_PARAMETER);
+    expect(global).toContain('where org_id not in (select id from public.organizations)');
+    // The default is the report-only form: a caller that forgets the argument
+    // gets the harmless question, never the one that throws on other people's
+    // rows.
+    expect(orphanOrgRowsQuery(DELETE_ORDER)).toBe(global);
+  });
+
   it('reports only the tables that actually hold an orphan', () => {
     const counts = [
       { table_name: 'boqs', rows: 0 },
@@ -131,5 +154,73 @@ describe('the orphan post-condition, as SQL text', () => {
       '  - boq_lines: 3 row(s) whose org_id names no organization',
     ]);
     expect(orphanReportLines(counts.filter((count) => count.rows === 0))).toEqual([]);
+  });
+});
+
+describe('the two orphan questions, as the purge actually asks them (F3)', () => {
+  // A fixture handle that records the SQL it was given and answers from a map.
+  // The call sites, not just the builder: swapping the scope argument back in
+  // `assertNoOrphanOrgRows` is exactly the regression F3 describes, and the
+  // builder's own cases cannot see it.
+  interface Asked {
+    query: string;
+    params: unknown[] | undefined;
+  }
+
+  function recordingSql(answers: Record<string, number>, organizations = 7) {
+    const asked: Asked[] = [];
+    const unsafe = (query: string, params?: unknown[]) => {
+      asked.push({ query, params });
+      if (query === ORGANIZATIONS_VISIBLE_QUERY) return Promise.resolve([{ rows: organizations }]);
+      return Promise.resolve(
+        DELETE_ORDER.map((table) => ({ table_name: table, rows: answers[table] ?? 0 })),
+      );
+    };
+    return { sql: { unsafe } as unknown as PostgresJs, asked };
+  }
+
+  const DOOMED = ['00000000-0000-4000-8000-0000000000a1'];
+
+  it('asks the SCOPED question, bound to the ids this run deleted', async () => {
+    const { sql, asked } = recordingSql({});
+    await assertNoOrphanOrgRows(sql, DOOMED);
+    const counts = asked[asked.length - 1];
+    expect(counts.query).toContain(`org_id = any(${ORG_IDS_PARAMETER})`);
+    expect(counts.params).toEqual([DOOMED]);
+  });
+
+  it('THROWS on a row left behind by an org it deleted', async () => {
+    const { sql } = recordingSql({ boq_lines: 2 });
+    await expect(assertNoOrphanOrgRows(sql, DOOMED)).rejects.toThrow(
+      'the purge left ORPHANED rows',
+    );
+  });
+
+  it('refuses to report when it cannot see organizations', async () => {
+    const { sql } = recordingSql({}, 0);
+    await expect(assertNoOrphanOrgRows(sql, DOOMED)).rejects.toThrow(
+      'cannot see public.organizations',
+    );
+  });
+
+  it('checks nothing when the run deleted nothing', async () => {
+    const { sql, asked } = recordingSql({});
+    await assertNoOrphanOrgRows(sql, []);
+    expect(asked).toEqual([]);
+  });
+
+  it('the dry-run report asks the GLOBAL question and never throws', async () => {
+    const { sql, asked } = recordingSql({ boq_lines: 2 });
+    await reportPreExistingOrphans(sql);
+    const counts = asked[asked.length - 1];
+    expect(counts.query).not.toContain(ORG_IDS_PARAMETER);
+    expect(counts.params).toBeUndefined();
+  });
+
+  it('a pre-existing orphan does not fail the run', async () => {
+    // The whole of F3: this used to be the same throwing call, reached AFTER the
+    // chunks had committed.
+    const { sql } = recordingSql({ files: 9 });
+    await expect(reportPreExistingOrphans(sql)).resolves.toBeUndefined();
   });
 });
