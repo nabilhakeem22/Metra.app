@@ -18,6 +18,18 @@
 // roles.sql's own header explaining why re-widening is forbidden. Prose cannot be
 // allowed to fail a gate, and — the direction that matters — prose cannot be
 // allowed to satisfy one.
+//
+// THE STATEMENT SPLITTER MOVED TO `roles-grants.ts` (wave 8 item 6), which asks
+// the same three questions of every table's grants rather than this one table's.
+// It is one definition of "does this statement name that table" and "does it
+// reach metra_app", for the same reason this file exists at all: two copies drift
+// silently. What stays HERE is the part that is only true of this table — the
+// COLUMN list, and the rule that a table-level UPDATE anywhere makes it cosmetic.
+import {
+  namesTable,
+  privilegeStatements,
+  reachesAppRole,
+} from './roles-grants';
 import { scannableSql } from './sql-text';
 
 /** The table whose UPDATE is narrowed to columns. */
@@ -31,49 +43,6 @@ const TABLE_LEVEL_REVOKE =
   /\brevoke\b[^;]*\bupdate\b[^;]*\bon\s+public\.design_engagements[^;]*;/gi;
 
 /**
- * One `GRANT <privileges> ON <targets> TO <grantees>`, split at the keywords that
- * separate its three parts — outside parentheses, so a column list cannot be
- * mistaken for the end of the privilege list.
- */
-interface GrantStatement {
-  privileges: string;
-  targets: string;
-  grantees: string;
-  text: string;
-}
-
-/** The index of `keyword` at paren depth 0, or -1. */
-function topLevelKeyword(statement: string, keyword: string): number {
-  const pattern = new RegExp(`\\b${keyword}\\b`, 'gi');
-  for (const match of statement.matchAll(pattern)) {
-    const before = statement.slice(0, match.index);
-    const depth = (before.match(/\(/g) ?? []).length - (before.match(/\)/g) ?? []).length;
-    if (depth === 0) return match.index;
-  }
-  return -1;
-}
-
-/** Every `grant … on … to …` in the file, as its three parts. */
-function grantStatements(sql: string): GrantStatement[] {
-  const parsed: GrantStatement[] = [];
-  for (const raw of scannableSql(sql).split(';')) {
-    const statement = raw.trim();
-    if (!/^grant\b/i.test(statement)) continue;
-    const on = topLevelKeyword(statement, 'on');
-    if (on === -1) continue; // `grant metra_app to postgres` — a role, not a privilege
-    const to = topLevelKeyword(statement.slice(on), 'to');
-    if (to === -1) continue;
-    parsed.push({
-      privileges: statement.slice('grant'.length, on),
-      targets: statement.slice(on + 'on'.length, on + to),
-      grantees: statement.slice(on + to + 'to'.length),
-      text: `${statement.replace(/\s+/g, ' ').trim()};`,
-    });
-  }
-  return parsed;
-}
-
-/**
  * Does this privilege list confer UPDATE on the WHOLE ROW?
  *
  * By SHAPE, which is what the first version of this guard only claimed to do
@@ -85,35 +54,6 @@ function grantStatements(sql: string): GrantStatement[] {
 function grantsWholeRowUpdate(privileges: string): boolean {
   const wholeRow = privileges.replace(/\b(?:all\s+privileges|all|update)\s*\([^)]*\)/gi, ' ');
   return /\b(?:all\s+privileges|all|update)\b/i.test(wholeRow);
-}
-
-/**
- * Does this target list include `design_engagements`, however it is spelled?
- *
- * The optional `TABLE` keyword, the optional schema qualification and either
- * identifier being quoted are all the same table, and all three walked past the
- * literal `on public.design_engagements` this used to require (M1). `ON ALL
- * TABLES IN SCHEMA public` is not the table by name and confers exactly the
- * privilege this guard is about, so it counts too.
- */
-function namesTheTable(targets: string): boolean {
-  const cleaned = targets
-    .replace(/"/g, '')
-    .replace(/\s+/g, ' ')
-    .replace(/\s*\.\s*/g, '.')
-    .trim()
-    .toLowerCase();
-  if (/\ball tables in schema\b/.test(cleaned)) return true;
-  return cleaned
-    .replace(/^table\s+/, '')
-    .split(',')
-    .map((name) => name.trim().replace(/^public\./, ''))
-    .includes(GRANTED_UPDATE_TABLE);
-}
-
-/** Does this grant reach metra_app? PUBLIC reaches every role, metra_app too. */
-function reachesAppRole(grantees: string): boolean {
-  return /\b(?:metra_app|public)\b/i.test(grantees.replace(/"/g, ''));
 }
 
 /**
@@ -141,14 +81,15 @@ export function grantedUpdateColumns(rolesSql: string): string[] {
  * column grant, so one of these makes the narrowing in roles.sql cosmetic.
  */
 export function tableLevelUpdateGrants(rolesSql: string): string[] {
-  return grantStatements(rolesSql)
+  return privilegeStatements(rolesSql)
     .filter(
-      (grant) =>
-        grantsWholeRowUpdate(grant.privileges) &&
-        namesTheTable(grant.targets) &&
-        reachesAppRole(grant.grantees),
+      (statement) =>
+        statement.verb === 'grant' &&
+        grantsWholeRowUpdate(statement.privileges) &&
+        namesTable(statement.targets, GRANTED_UPDATE_TABLE) &&
+        reachesAppRole(statement.grantees),
     )
-    .map((grant) => grant.text);
+    .map((statement) => statement.text);
 }
 
 /**

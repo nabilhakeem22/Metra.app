@@ -76,8 +76,15 @@ export const boqLines = pgTable(
     ),
     // A negative quantity is a de-scope in a variation order, never a BOQ line.
     check('boq_lines_qty_non_negative', sql`qty >= 0`),
-    ...sameOrgFk(t, 'boq', boqs, { onDelete: 'cascade' }),
-    ...sameOrgFk(t, 'section', boqSections, { onDelete: 'cascade' }),
+    // Both `index: false` — this table is the hot path of a replace-import, and
+    // the two indexes the helper would emit are already answered below:
+    // `boq_lines_org_boq_idx` is `boq_lines_boq_idx` column for column, and
+    // `boq_lines_org_section_sort_idx` leads with the same two columns as
+    // `boq_lines_section_idx`. 0053 created both duplicates and 0054 drops them
+    // again — three extra index entries per inserted row, on the path wave 6 also
+    // gave ~4,300 trigger calls per 2,000-line import. See 0054's header.
+    ...sameOrgFk(t, 'boq', boqs, { onDelete: 'cascade', index: false }),
+    ...sameOrgFk(t, 'section', boqSections, { onDelete: 'cascade', index: false }),
     ...sameOrgFk(t, 'costItem', costItems, { onDelete: 'set null' }),
     index('boq_lines_org_section_sort_idx').on(t.orgId, t.sectionId, t.sortOrder),
     index('boq_lines_org_boq_idx').on(t.orgId, t.boqId),

@@ -14,7 +14,7 @@ import { createSql } from '../client';
 import { MIGRATION_DATABASE_URL } from '../env';
 import { RLS_APPLY_ORDER } from '../rls/manifest';
 import { MIGRATION_LOCK_TIMEOUT, applyRlsTimeouts } from './lock-timeout';
-import { declaredCounts, verifyRlsApplied } from './verify-rls-applied';
+import { declaredCounts, verifiedGrantsSummary, verifyRlsApplied } from './verify-rls-applied';
 
 const here = dirname(fileURLToPath(import.meta.url)); // packages/db/src/scripts
 const rlsDir = resolve(here, '../rls');
@@ -61,20 +61,24 @@ async function main(): Promise<number> {
     const problems = await verifyRlsApplied(sql);
     if (problems.length > 0) {
       console.error(
-        `apply-rls: the run did NOT land — ${problems.length} declared object(s) ` +
-          'are missing from the database:\n' +
+        `apply-rls: the run did NOT land — ${problems.length} problem(s) between ` +
+          'what rls/ declares and what this database holds:\n' +
           `${problems.join('\n')}\n\n` +
-          'Every file above this line reported success, so this is either a file ' +
-          'that was applied against a different database than the one just read, ' +
-          'or an object whose CREATE was silently a no-op. Re-run apply-rls ' +
-          '(every statement under rls/ is idempotent) and, if it repeats, compare ' +
-          'rls/manifest.ts against what is on disk.',
+          'Every file above this line reported success, so a MISSING object is ' +
+          'either a file that was applied against a different database than the ' +
+          'one just read, or an object whose CREATE was silently a no-op. A ' +
+          'PRIVILEGE line is a different fault: a `revoke` converges only if it ' +
+          'RAN, and the narrowings in roles.sql exist for databases provisioned ' +
+          'before they were written. Re-run apply-rls (every statement under rls/ ' +
+          'is idempotent) and, if it repeats, compare rls/manifest.ts against what ' +
+          'is on disk.',
       );
       return 1;
     }
     console.log(
       `apply-rls: verified in the catalogues — ${declaredCounts()}, ` +
-        'RLS forced on all of them, role metra_app present.',
+        'RLS forced on all of them, role metra_app present.\n' +
+        `apply-rls: ${verifiedGrantsSummary()}`,
     );
     return 0;
   } finally {

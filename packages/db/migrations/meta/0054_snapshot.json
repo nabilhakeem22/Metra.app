@@ -1,6 +1,6 @@
 {
-  "id": "39c4fad2-4afe-46a7-a95f-445784466295",
-  "prevId": "8a841b73-205c-4e86-ae3d-73ed1937f747",
+  "id": "ed9ddce2-4c9a-47b3-9a77-9d506306874b",
+  "prevId": "39c4fad2-4afe-46a7-a95f-445784466295",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -2698,27 +2698,6 @@
         }
       },
       "indexes": {
-        "project_stages_project_idx": {
-          "name": "project_stages_project_idx",
-          "columns": [
-            {
-              "expression": "org_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "project_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
         "project_stages_org_project_sort_idx": {
           "name": "project_stages_org_project_sort_idx",
           "columns": [
@@ -4464,27 +4443,6 @@
         }
       },
       "indexes": {
-        "contract_sections_contract_idx": {
-          "name": "contract_sections_contract_idx",
-          "columns": [
-            {
-              "expression": "org_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "contract_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
         "contract_sections_org_contract_sort_idx": {
           "name": "contract_sections_org_contract_sort_idx",
           "columns": [
@@ -5215,27 +5173,6 @@
           "method": "btree",
           "with": {}
         },
-        "boqs_project_idx": {
-          "name": "boqs_project_idx",
-          "columns": [
-            {
-              "expression": "org_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "project_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
         "boqs_engagement_idx": {
           "name": "boqs_engagement_idx",
           "columns": [
@@ -5489,27 +5426,6 @@
         }
       },
       "indexes": {
-        "boq_sections_boq_idx": {
-          "name": "boq_sections_boq_idx",
-          "columns": [
-            {
-              "expression": "org_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "boq_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
         "boq_sections_org_boq_sort_idx": {
           "name": "boq_sections_org_boq_sort_idx",
           "columns": [
@@ -5725,48 +5641,6 @@
         }
       },
       "indexes": {
-        "boq_lines_boq_idx": {
-          "name": "boq_lines_boq_idx",
-          "columns": [
-            {
-              "expression": "org_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "boq_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "boq_lines_section_idx": {
-          "name": "boq_lines_section_idx",
-          "columns": [
-            {
-              "expression": "org_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "section_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
         "boq_lines_costItem_idx": {
           "name": "boq_lines_costItem_idx",
           "columns": [

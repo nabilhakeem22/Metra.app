@@ -1,10 +1,14 @@
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { migrationCatalogue } from './migration-catalogue';
-import { declaredConstraints, declaredIndexes } from './schema-catalogue';
+import {
+  declaredCompositeSetNullFks,
+  declaredConstraints,
+  declaredIndexes,
+} from './schema-catalogue';
 
 // DOES A MIGRATION ACTUALLY CREATE WHAT THE SCHEMA DECLARES, UNDER THAT EXACT NAME?
 //
@@ -83,6 +87,41 @@ describe('every declared object is built by some migration, under that exact nam
     expect(built.constraints.has('boqs_source_file_same_org_fk')).toBe(false);
   });
 
+  it('does not report an index whose DECLARATION was dropped with it (0054)', () => {
+    // 0054 drops six indexes 0053 created, and the same commit drops their six
+    // DECLARATIONS (`sameOrgFk(…, { index: false })`). Neither half is allowed to
+    // ship alone, and this is the half that proves the FIRST direction: the
+    // catalogue no longer builds them, the schema no longer declares them, and
+    // the comparison above therefore says nothing about them. If the declarations
+    // had been left behind, `creates every index src/schema/ declares` would be
+    // red with exactly these six names.
+    const dropped = [
+      'boqs_project_idx',
+      'boq_sections_boq_idx',
+      'boq_lines_boq_idx',
+      'boq_lines_section_idx',
+      'contract_sections_contract_idx',
+      'project_stages_project_idx',
+    ];
+    for (const name of dropped) {
+      expect(catalogue.indexes.has(name), `${name} is still built by a migration`).toBe(false);
+      expect(declaredIndexes().has(name), `${name} is still declared in src/schema/`).toBe(false);
+    }
+    // And the wider index each one leaned on is still both declared and built —
+    // which is the only thing that made dropping them safe.
+    for (const wider of [
+      'boqs_org_project_idx',
+      'boq_sections_org_boq_sort_idx',
+      'boq_lines_org_boq_idx',
+      'boq_lines_org_section_sort_idx',
+      'contract_sections_org_contract_sort_idx',
+      'project_stages_org_project_sort_idx',
+    ]) {
+      expect(catalogue.indexes.has(wider), `${wider} is not built by any migration`).toBe(true);
+      expect(declaredIndexes().has(wider), `${wider} is not declared in src/schema/`).toBe(true);
+    }
+  });
+
   it('carries no object that only a MESSAGE names', () => {
     // F5: `RAISE EXCEPTION '0053: constraint name(s) not renamed: %'` matched
     // `constraint <identifier>` inside the preserved literal and put a phantom
@@ -92,6 +131,161 @@ describe('every declared object is built by some migration, under that exact nam
     // Every real constraint in this schema is `<table>_<what>_<kind>`; a bare
     // word is prose that got read as SQL.
     for (const name of catalogue.constraints) expect(name).toMatch(/_/);
+  });
+});
+
+describe('0052 narrows exactly the composite set-null FKs the schema declares', () => {
+  // THE TWO CENSUSES THAT MUST AGREE, with no database between them.
+  //
+  //   * 0052's own `FROM (VALUES …) AS t(child, conname, child_col, parent)`
+  //     table — the twelve constraints the migration narrows, and the list
+  //     `composite-fk-cascade.dbtest.ts` counts against a real catalogue;
+  //   * `declaredCompositeSetNullFks()` — the FLOOR `assert-schema-applied` uses
+  //     on production.
+  //
+  // They were eleven and twelve for one wave, because `files.ts` declared no FK
+  // for `category_id` while every database held one (0040 wrote it by hand). The
+  // floor was therefore BELOW what the database had, and a silent un-narrowing of
+  // that twelfth would have passed the production-side gate. Wave 8 item 1 closed
+  // it in `files.ts`; this case is what refuses to let the two drift apart again,
+  // in EITHER direction — a thirteenth FK declared in `src/schema/` with no row in
+  // 0052, or a row in 0052 with no declaration.
+  const text = readFileSync(resolve(migrationsFolder, '0052_composite_fk_set_null_columns.sql'), 'utf8');
+
+  // COMPARED AS EDGES, NOT AS NAMES. 0052 spells six of its twelve in the
+  // pre-rename form (`boqs_source_file_same_org_fk`, the case-folded
+  // `variation_order_lines_costitem_…`, and so on) because that is what the
+  // catalogue held when it ran; 0053 renames them afterwards. A name comparison
+  // would therefore be red on a correct tree. `<child table>.<referencing
+  // column>` is the same edge under every spelling, and is what both files are
+  // actually about.
+  function narrowedBy0052(): string[] {
+    const table = /FROM \(VALUES([\s\S]*?)\) AS t\(child, conname, child_col, parent\)/.exec(text);
+    if (!table) {
+      throw new Error(
+        '0052 no longer carries a `FROM (VALUES …) AS t(child, conname, child_col, parent)` table',
+      );
+    }
+    const rows = [
+      ...table[1].matchAll(/\(\s*'([^']*)'\s*,\s*'[^']*'\s*,\s*'([^']*)'\s*,\s*'[^']*'\s*\)/g),
+    ];
+    if (rows.length === 0) throw new Error('0052 declares no foreign keys to narrow');
+    return rows.map((row) => `${row[1]}.${row[2]}`).sort();
+  }
+
+  /** The same edges, as `src/schema/` declares them. */
+  function declaredEdges(): string[] {
+    return [...declaredCompositeSetNullFks().values()]
+      .map((fk) => `${fk.table}.${fk.columns.join('+')}`)
+      .sort();
+  }
+
+  it('narrows exactly the edges the schema declares — twelve, both sides', () => {
+    expect(narrowedBy0052()).toHaveLength(12);
+    expect(declaredCompositeSetNullFks().size).toBe(12);
+    expect(narrowedBy0052()).toEqual(declaredEdges());
+  });
+
+  it('carries files.category_id on both sides', () => {
+    // The edge that was missing from the SCHEMA side until wave 8 item 1. Named
+    // rather than left to the set comparison, because a failure here should say
+    // which of the two gates slipped.
+    expect(narrowedBy0052()).toContain('files.category_id');
+    expect(declaredCompositeSetNullFks().get('files_category_same_org_fk')).toEqual({
+      table: 'files',
+      columns: ['category_id'],
+    });
+  });
+});
+
+/**
+ * Indexes the migrations REMOVE and `src/schema/` does not declare — each with
+ * the reason it is not a defect.
+ *
+ * The gate this exists for (wave 8 F8): the catalogue comparison is
+ * one-directional, so an index that leaves the catalogue while a schema file
+ * still declares it is caught, and an index that leaves while NOTHING declares
+ * it was silent. Both are worth a sentence, and only one of them is a defect —
+ * so the answer is neither "report every drop" nor "report none", it is "a drop
+ * has to be written down".
+ *
+ * A name here is a decision somebody made, not a suppression. Adding one without
+ * a reason is the failure mode this replaces.
+ */
+const REMOVED_ON_PURPOSE = new Map<string, string>([
+  [
+    'proposal_section_library_org_active_idx',
+    '0012 created it; 0013 dropped the whole proposal_section_library table when ' +
+      'sections were unified. Nothing declares the table, so nothing declares its index.',
+  ],
+  [
+    'cost_items_org_category_idx',
+    '0013 dropped it with the category column it was on, when sections replaced the ' +
+      'free-text category.',
+  ],
+  // The six of wave 8 item 2. 0053 created them, 0054 drops them again, and the
+  // same commit dropped their declarations: each is answered by a wider index
+  // with the same leading columns, named in 0054's header.
+  ['boqs_project_idx', '0054 — duplicate of boqs_org_project_idx'],
+  ['boq_sections_boq_idx', '0054 — prefix of boq_sections_org_boq_sort_idx'],
+  ['boq_lines_boq_idx', '0054 — duplicate of boq_lines_org_boq_idx'],
+  ['boq_lines_section_idx', '0054 — prefix of boq_lines_org_section_sort_idx'],
+  [
+    'contract_sections_contract_idx',
+    '0054 — prefix of contract_sections_org_contract_sort_idx',
+  ],
+  ['project_stages_project_idx', '0054 — prefix of project_stages_org_project_sort_idx'],
+]);
+
+describe('an index the migrations REMOVE has to be written down (F8)', () => {
+  it('reports a drop that neither the schema declares nor this file explains', () => {
+    const declared = declaredIndexes();
+    const unexplained = [...catalogue.dropped]
+      .filter((name) => !declared.has(name) && !REMOVED_ON_PURPOSE.has(name))
+      .sort();
+    expect(
+      unexplained,
+      'A migration drops an index that no schema file declares and that nothing here ' +
+        'explains. Declare it, or add it to REMOVED_ON_PURPOSE with the reason — a ' +
+        'silent drop is how an index the application still needs disappears with ' +
+        'nobody reading a line about it.',
+    ).toEqual([]);
+  });
+
+  it('every allowlisted name is really dropped, and really undeclared', () => {
+    // The other direction: an entry that stops being true is dead configuration,
+    // and dead configuration is how an allowlist becomes a place to hide things.
+    const declared = declaredIndexes();
+    const stale = [...REMOVED_ON_PURPOSE.keys()]
+      .filter((name) => !catalogue.dropped.has(name) || declared.has(name))
+      .sort();
+    expect(stale).toEqual([]);
+    for (const reason of REMOVED_ON_PURPOSE.values()) {
+      expect(reason.length).toBeGreaterThan(20);
+    }
+  });
+
+  it('a dropped TABLE takes its indexes out of the catalogue', () => {
+    // `proposal_section_library_org_active_idx` sat in the catalogue for ever:
+    // 0012 created it, 0013 dropped its TABLE, and the replay only understood
+    // DROP INDEX. Surplus names are never reported, so it was invisible — and it
+    // made the index count three higher than the schema's for no reason.
+    expect(catalogue.indexes.has('proposal_section_library_org_active_idx')).toBe(false);
+    expect(catalogue.dropped.has('proposal_section_library_org_active_idx')).toBe(true);
+    const built = migrationCatalogue(
+      folderOf({
+        '0001_create': 'CREATE INDEX IF NOT EXISTS t_a_idx ON public.t (a);',
+        '0002_drop': 'DROP TABLE IF EXISTS public.t;',
+      }),
+    );
+    expect(built.indexes.has('t_a_idx')).toBe(false);
+    expect(built.dropped.has('t_a_idx')).toBe(true);
+  });
+
+  it('an index put BACK is not reported as dropped', () => {
+    // 0006 and 0049 each drop an index and create it again in the same file.
+    expect(catalogue.dropped.has('invitations_org_email_pending_idx')).toBe(false);
+    expect(catalogue.dropped.has('engagement_events_client_signal_unique')).toBe(false);
   });
 });
 
@@ -106,6 +300,41 @@ function folderOf(files: Record<string, string>): string {
   for (const [tag, sql] of Object.entries(files)) writeFileSync(join(folder, `${tag}.sql`), sql);
   return folder;
 }
+
+describe('a DROP with the declaration left behind is RED (0054, the other half)', () => {
+  // The direction the case on the real tree cannot show, because on the real tree
+  // both halves landed together. This is the shape of a half-done 0054: the
+  // migration drops the index, `src/schema/` still declares it, and the gate must
+  // name it rather than shrug. `missing()` is the same comparison the three cases
+  // above run against the real catalogue.
+  it('reports an index a migration dropped while the schema still declares it', () => {
+    const built = migrationCatalogue(
+      folderOf({
+        '0001_create': 'CREATE INDEX IF NOT EXISTS boqs_project_idx ON public.boqs (org_id, project_id);',
+        '0002_drop': `DO $$ BEGIN
+           DROP INDEX IF EXISTS public.boqs_project_idx;
+         END $$;`,
+      }),
+    );
+    expect(built.indexes.has('boqs_project_idx')).toBe(false);
+    expect(missing(new Map([['boqs_project_idx', 'boqs']]), built.indexes)).toEqual([
+      'boqs_project_idx (on boqs)',
+    ]);
+  });
+
+  it('reads a schema-qualified DROP inside a DO body, which is how 0054 spells it', () => {
+    // If the replay could not see `DROP INDEX IF EXISTS public.<name>` inside a
+    // `DO $$ … $$`, 0054 would be a no-op to this gate and the six names would sit
+    // in the catalogue for ever — green for the wrong reason.
+    const real = migrationCatalogue(migrationsFolder);
+    const dropText = readFileSync(
+      resolve(migrationsFolder, '0054_drop_redundant_indexes.sql'),
+      'utf8',
+    );
+    expect(dropText).toContain('DROP INDEX IF EXISTS public.boqs_project_idx;');
+    expect(real.indexes.has('boqs_project_idx')).toBe(false);
+  });
+});
 
 describe('a name inside a string literal is PROSE, and moves nothing', () => {
   it('cannot satisfy the check for an index no statement creates (F2)', () => {

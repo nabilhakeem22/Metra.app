@@ -32,7 +32,10 @@ export const contractSections = pgTable(
   (t) => [
     unique('contract_sections_org_id_id_unique').on(t.orgId, t.id),
     bilingualCheck('contract_sections', 'title'),
-    ...sameOrgFk(t, 'contract', contracts, { onDelete: 'cascade' }),
+    // `index: false` — `contract_sections_org_contract_sort_idx` below leads with
+    // the same two columns. 0053 created `contract_sections_contract_idx` and
+    // 0054 drops it again; see 0054's header.
+    ...sameOrgFk(t, 'contract', contracts, { onDelete: 'cascade', index: false }),
     index('contract_sections_org_contract_sort_idx').on(
       t.orgId,
       t.contractId,

@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { createSql, type MemberRole } from '@metra/db';
 import type { OrgContext } from '@/lib/db/context';
+import { TEARDOWN_ORDER } from './teardown-tables';
 
 // Raw postgres (BYPASSRLS) connection for seed/teardown — bypasses the
 // membership-gated policy so we can fabricate orgs without a real session.
@@ -207,79 +208,6 @@ export const raw = {
   },
 };
 
-// Delete order is FK-safe on its own, but proposals/contracts/VOs are frozen once
-// they leave draft (immutability + child-draft triggers block even a BYPASSRLS
-// DELETE). We suppress those triggers SESSION-LOCALLY via
-// `SET LOCAL session_replication_role = 'replica'` inside a single transaction —
-// which disables user triggers for THIS session only and auto-resets on commit.
-// It never touches other sessions/tenants and takes no ACCESS EXCLUSIVE lock, so
-// it can't globally disable prod immutability or serialize concurrent test runs
-// (the bug of the old `ALTER TABLE ... DISABLE TRIGGER`, which is global).
-const TEARDOWN_TABLES_IN_FK_ORDER = [
-  // Contracts + VOs first: VOs reference contracts (restrict) and contracts
-  // reference proposals (restrict), so tear these down BEFORE proposals.
-  'variation_order_events',
-  'variation_order_lines',
-  'variation_orders',
-  'contract_events',
-  'contract_lines',
-  'contract_sections',
-  'contracts',
-  // Design engagements: the milestone schedule + transition ledger cascade from
-  // engagements; the engagement references clients + projects (restrict), so tear
-  // the children down first, then engagements, before clients/projects.
-  // client_payment_claims references payment_events (set null) + design_engagements
-  // (cascade) — delete it before both so no restrict/order surprise.
-  'client_payment_claims',
-  // document_categories: files reference it (ON DELETE SET NULL) and its org_id FK
-  // is RESTRICT, so it must go after files and before organizations.
-  'document_categories',
-  // engagement_document_comments cascades from BOTH design_engagements and
-  // engagement_artifacts, so the deletes below would clear it either way — listed
-  // explicitly so a future FK change surfaces here rather than as a restrict error.
-  'engagement_document_comments',
-  'payment_events',
-  'engagement_events',
-  'engagement_change_orders',
-  'engagement_artifacts',
-  'engagement_milestones',
-  'engagement_transitions',
-  'design_engagements',
-  // BOQs reference clients AND projects with RESTRICT, so the whole BOQ tree has
-  // to go before either of those. Lines and sections cascade from the BOQ, but
-  // they are listed explicitly so a future FK change surfaces here as a missing
-  // entry rather than as a restrict error halfway through a teardown.
-  'boq_lines',
-  'boq_sections',
-  'boqs',
-  'proposal_events',
-  'proposal_lines',
-  'proposal_sections',
-  'proposals',
-  'price_change_lines',
-  'price_changes',
-  'project_stages',
-  // projects reference clients (restrict) -> delete projects before clients.
-  'projects',
-  'project_types',
-  'stage_templates',
-  'activities',
-  'client_contacts',
-  'clients',
-  'cost_items',
-  // sections are referenced by cost_items (restrict) -> after cost_items.
-  'sections',
-  'notifications',
-  'automation_run_log',
-  'automation_settings',
-  'audit_log',
-  'invitations',
-  'api_keys',
-  // workspace_entitlements references organizations (restrict) -> before the org.
-  'workspace_entitlements',
-  'memberships',
-];
-
 export async function teardown(orgIds: string[]): Promise<void> {
   if (orgIds.length === 0) return;
   // One transaction on a single pinned connection so SET LOCAL applies to every
@@ -287,11 +215,11 @@ export async function teardown(orgIds: string[]): Promise<void> {
   await pg.begin(async (tx) => {
     await tx.unsafe(`set local session_replication_role = 'replica'`);
     for (const id of orgIds) {
-      for (const table of TEARDOWN_TABLES_IN_FK_ORDER) {
+      // TEARDOWN_ORDER ends with the polymorphic `files`, which every table that
+      // points at it has already been cleared from.
+      for (const table of TEARDOWN_ORDER) {
         await tx.unsafe(`delete from public.${table} where org_id = '${id}'`);
       }
-      // `files` is polymorphic (project + client entities) — clear both.
-      await tx.unsafe(`delete from public.files where org_id = '${id}'`);
       // Capture the owning account BEFORE dropping the org, then delete the org,
       // then the now-unreferenced account (accounts have no org_id; the FK is on
       // delete restrict, so the account must go AFTER its org).

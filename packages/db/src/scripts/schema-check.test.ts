@@ -1,6 +1,12 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { declaredFunctions } from './rls-catalogue';
-import { declaredCompositeSetNullFks, declaredTables } from './schema-catalogue';
+import { ORGANIZATIONS_VISIBLE_QUERY } from './org-orphan-rows';
+import {
+  declaredCompositeSetNullFks,
+  declaredIndexes,
+  declaredTables,
+  orgScopedTableNames,
+} from './schema-catalogue';
 import { runSchemaCheck, type CatalogueSql } from './schema-check';
 
 // F2: on the ONE run where the owner is being told the database is behind, the
@@ -27,6 +33,16 @@ interface Catalogues {
   functionNames?: Set<string>;
   /** The composite ON DELETE SET NULL foreign keys this database holds. */
   compositeFks?: CompositeFk[];
+  /** Orphaned rows this database holds, as table -> row count. */
+  orphanRows?: Record<string, number>;
+  /** Organizations this connection can SEE. Default: some. */
+  organizationsVisible?: number;
+  /** Make the orphan reads throw, as a table this connection cannot select from. */
+  orphanReadFails?: string;
+  /** The visibility guard answers NO ROW at all. */
+  organizationsReturnsNoRow?: boolean;
+  /** The visibility guard answers something that is not a count (int8 as text). */
+  organizationsRawRows?: unknown;
 }
 
 /** One narrowed FK, as 0052 leaves it: one column, its own, never org_id. */
@@ -39,27 +55,20 @@ const NARROWED: CompositeFk = {
 
 /**
  * A correctly narrowed database: one row per composite set-null FK `src/schema/`
- * declares, plus `files_category_same_org_fk`, which 0040 created and no schema
- * file declares. Twelve, as production will hold after 0052 — and derived, so the
- * floor added in L3 is satisfied by the fixture for the same reason it is
+ * declares. TWELVE — as production holds after 0052, and as the schema declares
+ * since `files.ts` picked up `files_category_same_org_fk` (wave 8 item 1). It was
+ * eleven declared plus that one appended by hand here, which is exactly the gap
+ * that commit closed; the append is gone because the schema now carries it.
+ * Derived, so the L3 floor is satisfied by this fixture for the same reason it is
  * satisfied by a real database.
  */
 function narrowedCatalogue(): CompositeFk[] {
-  const rows = [...declaredCompositeSetNullFks()].map(([name, child]) => ({
+  return [...declaredCompositeSetNullFks()].map(([name, fk]) => ({
     name,
-    child,
-    fk_cols: ['org_id', `${name}_col`],
-    set_cols: [`${name}_col`],
+    child: fk.table,
+    fk_cols: ['org_id', ...fk.columns],
+    set_cols: [...fk.columns],
   }));
-  return [
-    ...rows,
-    {
-      name: 'files_category_same_org_fk',
-      child: 'files',
-      fk_cols: ['org_id', 'category_id'],
-      set_cols: ['category_id'],
-    },
-  ];
 }
 
 /** A postgres.js stand-in that answers the four catalogue reads from fixtures. */
@@ -88,7 +97,29 @@ function fixtureSql(catalogues: Catalogues): CatalogueSql {
         : catalogues.functionNames;
     return Promise.resolve([...(names ?? [])].map((name) => ({ name })));
   };
-  return sql as unknown as CatalogueSql;
+  // `.unsafe`, for the one section that reads USER ROWS rather than a catalogue.
+  // It answers on the query text like the tagged templates do, so the real
+  // control flow — the organizations guard first, then the per-table counts — is
+  // the flow under test.
+  const unsafe = (query: string) => {
+    if (catalogues.orphanReadFails !== undefined) {
+      return Promise.reject(
+        new Error(`permission denied for table ${catalogues.orphanReadFails}`),
+      );
+    }
+    if (query === ORGANIZATIONS_VISIBLE_QUERY) {
+      if (catalogues.organizationsReturnsNoRow === true) return Promise.resolve([]);
+      if (catalogues.organizationsRawRows !== undefined) {
+        return Promise.resolve([{ rows: catalogues.organizationsRawRows }]);
+      }
+      return Promise.resolve([{ rows: catalogues.organizationsVisible ?? 7 }]);
+    }
+    const orphans = catalogues.orphanRows ?? {};
+    return Promise.resolve(
+      orgScopedTableNames().map((table) => ({ table_name: table, rows: orphans[table] ?? 0 })),
+    );
+  };
+  return Object.assign(sql, { unsafe }) as unknown as CatalogueSql;
 }
 
 /** Every catalogue complete, so only the case's own gap can be reported. */
@@ -157,8 +188,8 @@ describe('runSchemaCheck', () => {
     expect(printed).toMatch(/constraints — \d+ declared/);
     expect(printed).toMatch(/functions — \d+ declared/);
     expect(sectionsPrinted()).toEqual([
-      'assert-schema-applied: indexes — 111 declared, 111 NOT FOUND (report only, does not fail this check):',
-      'assert-schema-applied: constraints — 218 declared, 218 NOT FOUND (report only, does not fail this check):',
+      'assert-schema-applied: indexes — 105 declared, 105 NOT FOUND (report only, does not fail this check):',
+      'assert-schema-applied: constraints — 219 declared, 219 NOT FOUND (report only, does not fail this check):',
       'assert-schema-applied: functions — 30 declared, 30 NOT FOUND (report only, does not fail this check):',
       'columns: BEHIND',
     ]);
@@ -196,7 +227,7 @@ describe('composite set-null foreign keys are a GATE, not a report (R6)', () => 
     const code = await runSchemaCheck(fixtureSql(completeCatalogues()));
     expect(code).toBe(0);
     expect(logged.join('\n')).toContain(
-      'composite set-null FKs — 12 found (11 declared in src/schema/), every one narrowed',
+      'composite set-null FKs — 12 found (12 declared in src/schema/), every one narrowed',
     );
   });
 
@@ -264,6 +295,114 @@ describe('composite set-null foreign keys are a GATE, not a report (R6)', () => 
   });
 });
 
+describe('the orphaned-org-rows section (wave 8 item 4)', () => {
+  // The same post-condition `db:purge-fixture-orgs` throws on, asked here of
+  // whatever database the owner is pointing at. REPORT ONLY: an orphan is a data
+  // incident on an existing database, not a reason for this script to refuse to
+  // print the four sections it exists for.
+  it('says so, by name, when every org-scoped table is clean', async () => {
+    captureConsole();
+    const code = await runSchemaCheck(fixtureSql(completeCatalogues()));
+    expect(code).toBe(0);
+    expect(logged.join('\n')).toContain(
+      `orphaned org rows — ${String(orgScopedTableNames().length)} org-scoped table(s) ` +
+        'answered, none holds a row whose org_id names no organization.',
+    );
+  });
+
+  it('names the table and the count, and does NOT move the exit code', async () => {
+    captureConsole();
+    const code = await runSchemaCheck(
+      fixtureSql({ ...completeCatalogues(), orphanRows: { boq_lines: 3, files: 1 } }),
+    );
+    expect(code).toBe(0);
+    const printed = logged.join('\n');
+    expect(printed).toContain('2 WITH ORPHANS (report only, does not fail this check)');
+    expect(printed).toContain('- boq_lines: 3 row(s) whose org_id names no organization');
+    expect(printed).toContain('- files: 1 row(s) whose org_id names no organization');
+    // The one sentence that tells the reader where this can come from at all.
+    expect(printed).toContain("session_replication_role = 'replica'");
+  });
+
+  it('refuses to report at all when it cannot see organizations', async () => {
+    // Without this guard, a connection subject to RLS reads no organizations,
+    // `org_id not in ()` is true for every row, and all 44 tables report fully
+    // orphaned. A false ALARM pointing at 44 innocent tables.
+    captureConsole();
+    const code = await runSchemaCheck(
+      fixtureSql({ ...completeCatalogues(), organizationsVisible: 0 }),
+    );
+    expect(code).toBe(0);
+    const printed = logged.join('\n');
+    // Its OWN sentence: no table count, no "WITH ORPHANS", no remediation
+    // paragraph. It is a connection problem, not a data incident (F2).
+    expect(printed).toContain(
+      'orphaned org rows — could not be read: this connection reads 0 rows from ' +
+        'public.organizations, so every table would report fully orphaned',
+    );
+    expect(printed).not.toContain('WITH ORPHANS');
+    expect(printed).not.toContain('org-scoped table(s) answered');
+    expect(printed).not.toContain('Find the rows by org_id');
+  });
+
+  it('a table it cannot read does not take the whole report down', async () => {
+    captureConsole();
+    const code = await runSchemaCheck(
+      fixtureSql({ ...completeCatalogues(), orphanReadFails: 'boq_lines' }),
+    );
+    expect(code).toBe(0);
+    const printed = logged.join('\n');
+    expect(printed).toContain(
+      'orphaned org rows — could not be read: permission denied for table boq_lines',
+    );
+    // A REJECTED read used to print "44 org-scoped table(s) read, 1 WITH ORPHANS"
+    // and the remediation paragraph, over a count nothing had read (F2).
+    expect(printed).not.toContain('WITH ORPHANS');
+    expect(printed).not.toContain('org-scoped table(s) answered');
+    expect(printed).not.toContain('Find the rows by org_id');
+    // And the four sections the owner came for still printed.
+    expect(sectionsPrinted()).toHaveLength(4);
+  });
+
+  it('an EMPTY visibility result is unavailable, not a crash (F2)', async () => {
+    // `const [visible] = await …` over an empty result is `undefined`, and the
+    // first version read `visible.rows` off it — `Cannot read properties of
+    // undefined`, caught by the wrapper, and printed as "1 WITH ORPHANS".
+    captureConsole();
+    const code = await runSchemaCheck(
+      fixtureSql({ ...completeCatalogues(), organizationsReturnsNoRow: true }),
+    );
+    expect(code).toBe(0);
+    const printed = logged.join('\n');
+    expect(printed).toContain('orphaned org rows — could not be read:');
+    expect(printed).toContain('returned no row at all');
+    expect(printed).not.toContain('WITH ORPHANS');
+  });
+
+  it('counts organizations NUMERICALLY, so int8-as-a-string cannot pass (F7)', async () => {
+    // `count(*)` is int8. A driver that hands it back as '0' makes a strict
+    // `=== 0` guard dead: the guard passes, the orphan query then reports every
+    // table fully orphaned, and the operator is pointed at 44 innocent tables.
+    captureConsole();
+    const code = await runSchemaCheck(
+      fixtureSql({ ...completeCatalogues(), organizationsRawRows: '0' }),
+    );
+    expect(code).toBe(0);
+    expect(logged.join('\n')).toContain(
+      'this connection reads 0 rows from public.organizations',
+    );
+  });
+
+  it('a non-count answer is unavailable rather than NaN (F7)', async () => {
+    captureConsole();
+    const code = await runSchemaCheck(
+      fixtureSql({ ...completeCatalogues(), organizationsRawRows: null }),
+    );
+    expect(code).toBe(0);
+    expect(logged.join('\n')).toContain('which is not a count');
+  });
+});
+
 describe('the floor under the composite set-null gate (L3)', () => {
   // Every other guard shipped this wave carries a guard on the guard. This one
   // did not: a fixture answering `[]` printed "0 found, every one narrowed" and
@@ -281,14 +420,33 @@ describe('the floor under the composite set-null gate (L3)', () => {
     );
   });
 
-  it('derives the floor from the schema, and the schema declares eleven', () => {
-    // Eleven, not twelve: the database also holds `files_category_same_org_fk`,
-    // which 0040 created and `files.ts` declares nowhere. That is why this is a
-    // FLOOR and not an equality.
+  it('derives the floor from the schema, and the schema declares TWELVE', () => {
+    // Twelve since wave 8 item 1. It was eleven for one wave, and the twelfth —
+    // `files_category_same_org_fk`, created by 0040 and declared by no schema
+    // file — is the reason this gate existed with a floor BELOW what every
+    // database actually held: a silent un-narrowing of that one would have been
+    // invisible to the production-side check. Derived from `src/schema/`, so
+    // deleting the declaration in `files.ts` reds this line and not a comment.
     const declared = declaredCompositeSetNullFks();
-    expect(declared.size).toBe(11);
-    expect(declared.get('boqs_engagement_same_org_fk')).toBe('boqs');
-    expect(declared.has('files_category_same_org_fk')).toBe(false);
+    expect(declared.size).toBe(12);
+    expect(declared.get('boqs_engagement_same_org_fk')).toEqual({
+      table: 'boqs',
+      columns: ['engagement_id'],
+    });
+    expect(declared.get('files_category_same_org_fk')).toEqual({
+      table: 'files',
+      columns: ['category_id'],
+    });
+  });
+
+  it('declares the twelfth WITHOUT asking for an index the database lacks', () => {
+    // `sameOrgFk` ships an `(org_id, <x>_id)` index with every FK it emits. On
+    // `files` that would be `files_category_idx`, which exists in no database and
+    // would therefore turn a pure declaration into pending DDL — and would be
+    // reported as missing by `assert-schema-applied` and by the migration
+    // catalogue for ever. `index: false` is why neither happens.
+    expect(declaredIndexes().has('files_category_idx')).toBe(false);
+    expect(declaredIndexes().has('files_org_category_idx')).toBe(true);
   });
 
   it('passes on the twelve a narrowed database holds', async () => {
@@ -297,6 +455,6 @@ describe('the floor under the composite set-null gate (L3)', () => {
       fixtureSql({ ...completeCatalogues(), compositeFks: narrowedCatalogue() }),
     );
     expect(code).toBe(0);
-    expect(logged.join('\n')).toContain('12 found (11 declared in src/schema/)');
+    expect(logged.join('\n')).toContain('12 found (12 declared in src/schema/)');
   });
 });
