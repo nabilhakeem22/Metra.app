@@ -1,9 +1,11 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { declaredFunctions } from './rls-catalogue';
+import { ORGANIZATIONS_VISIBLE_QUERY } from './org-orphan-rows';
 import {
   declaredCompositeSetNullFks,
   declaredIndexes,
   declaredTables,
+  orgScopedTableNames,
 } from './schema-catalogue';
 import { runSchemaCheck, type CatalogueSql } from './schema-check';
 
@@ -31,6 +33,12 @@ interface Catalogues {
   functionNames?: Set<string>;
   /** The composite ON DELETE SET NULL foreign keys this database holds. */
   compositeFks?: CompositeFk[];
+  /** Orphaned rows this database holds, as table -> row count. */
+  orphanRows?: Record<string, number>;
+  /** Organizations this connection can SEE. Default: some. */
+  organizationsVisible?: number;
+  /** Make the orphan reads throw, as a table this connection cannot select from. */
+  orphanReadFails?: string;
 }
 
 /** One narrowed FK, as 0052 leaves it: one column, its own, never org_id. */
@@ -85,7 +93,25 @@ function fixtureSql(catalogues: Catalogues): CatalogueSql {
         : catalogues.functionNames;
     return Promise.resolve([...(names ?? [])].map((name) => ({ name })));
   };
-  return sql as unknown as CatalogueSql;
+  // `.unsafe`, for the one section that reads USER ROWS rather than a catalogue.
+  // It answers on the query text like the tagged templates do, so the real
+  // control flow — the organizations guard first, then the per-table counts — is
+  // the flow under test.
+  const unsafe = (query: string) => {
+    if (catalogues.orphanReadFails !== undefined) {
+      return Promise.reject(
+        new Error(`permission denied for table ${catalogues.orphanReadFails}`),
+      );
+    }
+    if (query === ORGANIZATIONS_VISIBLE_QUERY) {
+      return Promise.resolve([{ rows: catalogues.organizationsVisible ?? 7 }]);
+    }
+    const orphans = catalogues.orphanRows ?? {};
+    return Promise.resolve(
+      orgScopedTableNames().map((table) => ({ table_name: table, rows: orphans[table] ?? 0 })),
+    );
+  };
+  return Object.assign(sql, { unsafe }) as unknown as CatalogueSql;
 }
 
 /** Every catalogue complete, so only the case's own gap can be reported. */
@@ -258,6 +284,61 @@ describe('composite set-null foreign keys are a GATE, not a report (R6)', () => 
     );
     expect(code).toBe(1);
     expect(errored.join('\n')).toContain('a narrowed FK nulls exactly one column');
+  });
+});
+
+describe('the orphaned-org-rows section (wave 8 item 4)', () => {
+  // The same post-condition `db:purge-fixture-orgs` throws on, asked here of
+  // whatever database the owner is pointing at. REPORT ONLY: an orphan is a data
+  // incident on an existing database, not a reason for this script to refuse to
+  // print the four sections it exists for.
+  it('says so, by name, when every org-scoped table is clean', async () => {
+    captureConsole();
+    const code = await runSchemaCheck(fixtureSql(completeCatalogues()));
+    expect(code).toBe(0);
+    expect(logged.join('\n')).toContain(
+      `orphaned org rows — ${String(orgScopedTableNames().length)} org-scoped table(s) ` +
+        'read, none holds a row whose org_id names no organization.',
+    );
+  });
+
+  it('names the table and the count, and does NOT move the exit code', async () => {
+    captureConsole();
+    const code = await runSchemaCheck(
+      fixtureSql({ ...completeCatalogues(), orphanRows: { boq_lines: 3, files: 1 } }),
+    );
+    expect(code).toBe(0);
+    const printed = logged.join('\n');
+    expect(printed).toContain('2 WITH ORPHANS (report only, does not fail this check)');
+    expect(printed).toContain('- boq_lines: 3 row(s) whose org_id names no organization');
+    expect(printed).toContain('- files: 1 row(s) whose org_id names no organization');
+    // The one sentence that tells the reader where this can come from at all.
+    expect(printed).toContain("session_replication_role = 'replica'");
+  });
+
+  it('refuses to report at all when it cannot see organizations', async () => {
+    // Without this guard, a connection subject to RLS reads no organizations,
+    // `org_id not in ()` is true for every row, and all 44 tables report fully
+    // orphaned. A false ALARM pointing at 44 innocent tables.
+    captureConsole();
+    const code = await runSchemaCheck(
+      fixtureSql({ ...completeCatalogues(), organizationsVisible: 0 }),
+    );
+    expect(code).toBe(0);
+    expect(logged.join('\n')).toContain(
+      'reads 0 rows from public.organizations, so every table would report fully orphaned',
+    );
+  });
+
+  it('a table it cannot read does not take the whole report down', async () => {
+    captureConsole();
+    const code = await runSchemaCheck(
+      fixtureSql({ ...completeCatalogues(), orphanReadFails: 'boq_lines' }),
+    );
+    expect(code).toBe(0);
+    expect(logged.join('\n')).toContain('could not be read: permission denied for table boq_lines');
+    // And the four sections the owner came for still printed.
+    expect(sectionsPrinted()).toHaveLength(4);
   });
 });
 

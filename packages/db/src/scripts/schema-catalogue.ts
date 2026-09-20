@@ -37,6 +37,33 @@ export function declaredTables(): Map<string, Set<string>> {
   return declared;
 }
 
+/** The tenant key. A table that has it is org-scoped; there is no other rule. */
+const ORG_COLUMN = 'org_id';
+
+/**
+ * Every ORG-SCOPED table the code declares, sorted — every table carrying an
+ * `org_id` column, which is the same predicate the isolation gate and
+ * `assert-schema-applied`'s orphan section use.
+ *
+ * DERIVED, because the alternative has already failed once: the fixture's own
+ * teardown list was hand-maintained and silently lost the BOQ tables when 0041
+ * landed, and under `session_replication_role = 'replica'` a missing table
+ * ORPHANS rows instead of raising. A list nobody has to remember to edit cannot
+ * lose a table.
+ *
+ * What it cannot do is ORDER them. The purge's delete order is FK-driven and
+ * child-first; this answers "is every table covered", never "in what order".
+ */
+export function orgScopedTableNames(): string[] {
+  const names: string[] = [];
+  for (const value of Object.values(schema)) {
+    if (!is(value, PgTable)) continue;
+    const config = getTableConfig(value);
+    if (config.columns.some((column) => column.name === ORG_COLUMN)) names.push(config.name);
+  }
+  return names.sort();
+}
+
 /** Every index name the CODE declares, as index name -> the table it is on. */
 export function declaredIndexes(): Map<string, string> {
   const declared = new Map<string, string>();

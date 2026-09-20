@@ -24,6 +24,7 @@ import {
   REMAINING_TABLES,
   TRIGGER_GUARDED_TABLES,
   assertDeleteOrderCoversEveryOrgScopedTable,
+  assertNoOrphanOrgRows,
 } from './purge-fixture-orgs-tables';
 
 const ORGS_PER_TRANSACTION = 50;
@@ -125,6 +126,11 @@ async function main() {
       await purgeChunk(sql, chunk, realOrgs);
       console.log(`purged ${i + chunk.length}/${doomed.length} orgs`);
     }
+    // The post-condition, after the work and before anyone calls this done: the
+    // replica-mode window suspends foreign keys as well as triggers, so a table
+    // deleted in the wrong order leaves orphans and every count above still reads
+    // as success. Throws, loudly, with the table and the row count.
+    await assertNoOrphanOrgRows(sql);
     console.log('Purge complete. Run db:reindex-after-purge next.');
   } finally {
     await sql.end();

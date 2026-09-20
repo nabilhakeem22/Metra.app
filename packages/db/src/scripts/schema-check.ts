@@ -12,6 +12,12 @@
 // run that printed a single section. This orders it the other way round:
 // everything prints, THEN the exit code is returned.
 import type { createSql } from '../client';
+import {
+  ORGANIZATIONS_VISIBLE_QUERY,
+  orphanOrgRowsQuery,
+  orphanReportLines,
+  type OrphanOrgRows,
+} from './org-orphan-rows';
 import { declaredFunctions } from './rls-catalogue';
 import {
   declaredCompositeSetNullFks,
@@ -20,6 +26,7 @@ import {
   declaredTables,
   missingColumns,
   missingNames,
+  orgScopedTableNames,
 } from './schema-catalogue';
 
 /**
@@ -136,6 +143,32 @@ function narrowingProblem(fk: CompositeSetNullFk): string | undefined {
   return undefined;
 }
 
+/**
+ * Rows whose `org_id` names no organization, per org-scoped table. REPORT ONLY.
+ *
+ * The same question the purge asks as its post-condition, asked here of whatever
+ * database the owner is pointing at. It is the one section that reads USER ROWS
+ * rather than a catalogue, which is why it is wrapped: an orphan is a data
+ * incident to investigate, never a reason for this script to stop printing the
+ * four sections it exists for, and a connection that cannot read a table must not
+ * take the report down with it.
+ */
+async function orphanOrgRowSection(sql: CatalogueSql): Promise<string[]> {
+  const handle = sql as unknown as {
+    unsafe: <T>(query: string) => Promise<T>;
+  };
+  const tables = orgScopedTableNames();
+  const [visible] = await handle.unsafe<Array<{ rows: number }>>(ORGANIZATIONS_VISIBLE_QUERY);
+  if (visible.rows === 0) {
+    return [
+      '  - this connection reads 0 rows from public.organizations, so every table ' +
+        'would report fully orphaned. Not reported — fix the privilege, then re-run.',
+    ];
+  }
+  const counts = await handle.unsafe<OrphanOrgRows[]>(orphanOrgRowsQuery(tables));
+  return orphanReportLines(counts);
+}
+
 /** Print one report-only section. Returns its gap count, for the closing note. */
 function report(title: string, declaredCount: number, gaps: string[]): number {
   if (gaps.length === 0) {
@@ -149,6 +182,31 @@ function report(title: string, declaredCount: number, gaps: string[]): number {
       `NOT FOUND (report only, does not fail this check):\n${gaps.join('\n')}`,
   );
   return gaps.length;
+}
+
+/**
+ * Print the orphan section. Its own printer because "declared / NOT FOUND" is the
+ * wrong sentence for it: nothing is declared and nothing is missing — a row is
+ * pointing at an organization that is not there.
+ */
+function reportOrphans(tableCount: number, lines: string[]): void {
+  if (lines.length === 0) {
+    console.log(
+      `assert-schema-applied: orphaned org rows — ${tableCount} org-scoped table(s) ` +
+        'read, none holds a row whose org_id names no organization.',
+    );
+    return;
+  }
+  console.log(
+    `assert-schema-applied: orphaned org rows — ${tableCount} org-scoped table(s) ` +
+      `read, ${lines.length} WITH ORPHANS (report only, does not fail this check):\n` +
+      `${lines.join('\n')}\n` +
+      'Every org-scoped table has org_id -> organizations(id) ON DELETE RESTRICT, so ' +
+      'this cannot happen in ordinary operation. The one window where it can is ' +
+      "`db:purge-fixture-orgs`'s `session_replication_role = 'replica'`, which " +
+      'suspends foreign keys along with the immutability triggers. Find the rows by ' +
+      'org_id before anything else writes to this database.',
+  );
 }
 
 const DRIFT_NOTE =
@@ -210,6 +268,20 @@ export async function runSchemaCheck(sql: CatalogueSql): Promise<number> {
     report('constraints', constraints.size, constraintGaps) +
     report('functions', functions.size, functionGaps);
   if (total > 0) console.log(DRIFT_NOTE);
+
+  // The fifth section, report-only for the same reason the three above are: the
+  // exit code belongs to the two things that make the DEPLOYED CODE fail, and an
+  // orphaned row is a data incident on an existing database. It is wrapped
+  // because it is the only section that reads user rows — a table this connection
+  // cannot select from must not take down the report the owner is pasting into an
+  // incident.
+  let orphanGaps: string[];
+  try {
+    orphanGaps = await orphanOrgRowSection(sql);
+  } catch (error) {
+    orphanGaps = [`  - could not be read: ${(error as Error).message}`];
+  }
+  reportOrphans(orgScopedTableNames().length, orphanGaps);
 
   const compositeFks = await compositeSetNullFks(sql);
   const unnarrowed = compositeFks
