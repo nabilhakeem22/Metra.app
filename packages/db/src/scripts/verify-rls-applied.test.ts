@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 import { grantedUpdateColumns } from './design-engagement-grant';
 import {
   TABLE_PRIVILEGES,
+  granteesOf,
   tablePrivilegesFor,
   type TablePrivilege,
 } from './roles-grants';
@@ -367,5 +368,66 @@ describe('the five NARROWED tables, read back at the database (wave 8 item 6)', 
     // line per privilege). Counted rather than rounded, because "reports
     // everything" is the property.
     expect(problems).toHaveLength(7);
+  });
+});
+
+describe('REVOKE … FROM PUBLIC removes only the PUBLIC grant (F4)', () => {
+  // PostgreSQL keeps two ledgers: what a role was granted DIRECTLY, and what it
+  // holds through PUBLIC. A revoke touches only the one it names. The first
+  // version of `tablePrivilegesFor` collapsed them, and got the answer wrong in
+  // both directions — the two rows the wave-8 tester wrote out.
+  const GRANT = 'grant select, insert, update, delete on public.boqs to metra_app;';
+  const ALL_FOUR = ['delete', 'insert', 'select', 'update'];
+
+  it('leaves a DIRECT grant alone — the false-red row', () => {
+    // Modelled s,i,u before this fix; PostgreSQL says s,i,u,d. apply-rls would
+    // have exited non-zero on a CORRECT database.
+    const roles = `${GRANT}\nrevoke delete on public.boqs from public;`;
+    expect([...tablePrivilegesFor(roles, 'boqs')].sort()).toEqual(ALL_FOUR);
+  });
+
+  it('leaves a DIRECT grant alone through ALL TABLES IN SCHEMA — the outage row', () => {
+    // Modelled (none) before this fix. A correct database reported as having no
+    // grant at all is the direction that reads like a 42501 outage.
+    const roles = `${GRANT}\nrevoke all on all tables in schema public from public;`;
+    expect([...tablePrivilegesFor(roles, 'boqs')].sort()).toEqual(ALL_FOUR);
+  });
+
+  it('still removes what PUBLIC itself was granted', () => {
+    const roles =
+      'grant select, delete on public.boqs to public;\n' +
+      'revoke delete on public.boqs from public;';
+    expect([...tablePrivilegesFor(roles, 'boqs')].sort()).toEqual(['select']);
+  });
+
+  it('a PUBLIC grant reaches metra_app, and a DIRECT revoke does not undo it', () => {
+    // The mirror: `revoke … from metra_app` leaves the PUBLIC grant standing,
+    // and metra_app keeps the privilege through PUBLIC.
+    const roles =
+      'grant delete on public.boqs to public;\n' +
+      'revoke delete on public.boqs from metra_app;';
+    expect([...tablePrivilegesFor(roles, 'boqs')]).toEqual(['delete']);
+  });
+
+  it('a direct revoke still removes a direct grant', () => {
+    const roles = `${GRANT}\nrevoke delete on public.boqs from metra_app;`;
+    expect([...tablePrivilegesFor(roles, 'boqs')].sort()).toEqual(['insert', 'select', 'update']);
+  });
+
+  it('reads the grantees of a statement, both roles at once', () => {
+    expect(granteesOf(' metra_app, public ')).toEqual({ appRole: true, publicRole: true });
+    expect(granteesOf(' "metra_app" ')).toEqual({ appRole: true, publicRole: false });
+    expect(granteesOf(' reporting_role ')).toEqual({ appRole: false, publicRole: false });
+  });
+
+  it('does not change the answer for the real roles.sql', () => {
+    // Every `from public` revoke in roles.sql today is on a FUNCTION, so this fix
+    // must move nothing that is live. Pinned so it stays that way.
+    const roles = readFileSync(ROLES_SQL, 'utf8');
+    expect([...tablePrivilegesFor(roles, 'boqs')].sort()).toEqual(['insert', 'select', 'update']);
+    expect([...tablePrivilegesFor(roles, 'workspace_entitlements')].sort()).toEqual([
+      'insert',
+      'select',
+    ]);
   });
 });

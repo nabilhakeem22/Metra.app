@@ -146,25 +146,63 @@ export function reachesAppRole(grantees: string): boolean {
 }
 
 /**
- * The TABLE-LEVEL privileges `metra_app` ends up with on `table`, by replaying
- * every grant and revoke in roles.sql in file order.
+ * WHICH grantee a statement acts on. The distinction is wave 8 F4.
  *
- * This is what the database is compared against. It is NOT "what the file looks
- * like it says": a revoke below a grant removes, a grant below a revoke restores,
- * and reading either line on its own gives the wrong answer for five of the six
- * tables this is used on.
+ * For a GRANT, "reaches metra_app" is enough — a grant to PUBLIC confers on
+ * metra_app just as a direct grant does, and both widen. For a REVOKE it is NOT:
+ * PostgreSQL's `REVOKE … FROM PUBLIC` removes only the privileges PUBLIC was
+ * granted and leaves a direct grant to metra_app exactly where it was (and
+ * `REVOKE … FROM metra_app` likewise leaves the PUBLIC grant alone). Treating
+ * the two as one bucket got the answer wrong in BOTH directions:
+ *
+ *   grant s,i,u,d to metra_app;  revoke delete from public;
+ *       modelled s,i,u    ·  PostgreSQL s,i,u,d
+ *       -> apply-rls exits non-zero on a CORRECT database
+ *   grant s,i,u,d to metra_app;  revoke all on all tables in schema public from public;
+ *       modelled (none)   ·  PostgreSQL s,i,u,d
+ *       -> the outage direction: a correct database reported as having no grant
+ *
+ * Not live today — every `from public` revoke in roles.sql is on a FUNCTION —
+ * which is exactly why it had to be modelled correctly now rather than found by
+ * an operator on the night somebody adds the first one.
  */
+export interface Grantees {
+  /** The statement names metra_app itself. */
+  appRole: boolean;
+  /** The statement names PUBLIC. */
+  publicRole: boolean;
+}
+
+export function granteesOf(grantees: string): Grantees {
+  const cleaned = grantees.replace(/"/g, '');
+  return {
+    appRole: new RegExp(`\\b${APP_ROLE}\\b`, 'i').test(cleaned),
+    publicRole: /\bpublic\b/i.test(cleaned),
+  };
+}
+
 export function tablePrivilegesFor(rolesSql: string, table: string): Set<TablePrivilege> {
-  const held = new Set<TablePrivilege>();
+  // TWO LEDGERS, because PostgreSQL keeps two: what metra_app was granted
+  // DIRECTLY, and what it holds by being a member of PUBLIC. A revoke touches
+  // only the ledger it names. The effective set is their union — which is what
+  // `has_table_privilege` answers, and therefore what this must answer (F4).
+  const direct = new Set<TablePrivilege>();
+  const viaPublic = new Set<TablePrivilege>();
   for (const statement of privilegeStatements(rolesSql)) {
     if (!namesTable(statement.targets, table)) continue;
-    if (!reachesAppRole(statement.grantees)) continue;
+    const grantees = granteesOf(statement.grantees);
+    if (!grantees.appRole && !grantees.publicRole) continue;
     for (const privilege of tableLevelPrivilegesIn(statement.privileges)) {
-      if (statement.verb === 'grant') held.add(privilege);
-      else held.delete(privilege);
+      if (statement.verb === 'grant') {
+        if (grantees.appRole) direct.add(privilege);
+        if (grantees.publicRole) viaPublic.add(privilege);
+      } else {
+        if (grantees.appRole) direct.delete(privilege);
+        if (grantees.publicRole) viaPublic.delete(privilege);
+      }
     }
   }
-  return held;
+  return new Set<TablePrivilege>([...direct, ...viaPublic]);
 }
 
 /** `select, insert` — the granted set in a stable order, for a message. */
