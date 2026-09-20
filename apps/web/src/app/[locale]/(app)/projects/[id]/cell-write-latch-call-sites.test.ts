@@ -80,6 +80,15 @@ const PRODUCTION_CALL_SITES = [
   `${SHEET}/use-boq-writes.ts columns`,
 ];
 
+/**
+ * The call sites whose column list this scan does NOT read a length from,
+ * because it is forwarded. Pinned so "it is a pass-through" can never become the
+ * answer for a site nobody checked: a forward qualifies only when its parameter
+ * has no default AND the function declaring it is bound to the name `saveLine`,
+ * so its own callers are sites this scan reads.
+ */
+const FORWARDING_SITES = [`${SHEET}/use-boq-writes.ts`];
+
 interface CallSite {
   /** `<repo-relative path>:<line>`, 1-based, as an editor would jump to it. */
   where: string;
@@ -111,16 +120,52 @@ function callsSaveLine(node: ts.CallExpression): boolean {
   );
 }
 
-/** Is `name` a parameter of some function enclosing `node`? */
-function isEnclosingParameter(node: ts.Node, name: string): boolean {
+/** A parameter a forwarded identifier resolves to, and how to judge it. */
+interface EnclosingParameter {
+  parameter: ts.ParameterDeclaration;
+  /** The name the function declaring it is BOUND to, or null when it has none. */
+  boundAs: string | null;
+}
+
+/**
+ * The name a function is reachable by: `function saveLine(…)`,
+ * `saveLine(…) {…}` in an object, `saveLine: (…) => …`, `const saveLine = …`.
+ * An arrow with no binding at all answers null — and null is never a
+ * pass-through, because nothing can be said about who calls it.
+ */
+function functionBoundAs(fn: ts.SignatureDeclarationBase): string | null {
+  if (
+    (ts.isFunctionDeclaration(fn) || ts.isMethodDeclaration(fn)) &&
+    fn.name &&
+    ts.isIdentifier(fn.name)
+  ) {
+    return fn.name.text;
+  }
+  const owner = fn.parent as ts.Node | undefined;
+  if (!owner) return null;
+  if (ts.isPropertyAssignment(owner) && ts.isIdentifier(owner.name)) return owner.name.text;
+  if (ts.isVariableDeclaration(owner) && ts.isIdentifier(owner.name)) return owner.name.text;
+  if (ts.isPropertyDeclaration(owner) && ts.isIdentifier(owner.name)) return owner.name.text;
+  return null;
+}
+
+/** The parameter `name` resolves to in some function enclosing `node`. */
+function enclosingParameter(node: ts.Node, name: string): EnclosingParameter | null {
   for (let scope = node.parent; scope; scope = scope.parent) {
     if (!ts.isFunctionLike(scope)) continue;
-    const declared = scope.parameters.some(
-      (parameter) => ts.isIdentifier(parameter.name) && parameter.name.text === name,
+    const parameter = scope.parameters.find(
+      (candidate) => ts.isIdentifier(candidate.name) && candidate.name.text === name,
     );
-    if (declared) return true;
+    if (parameter) return { parameter, boundAs: functionBoundAs(scope) };
   }
-  return false;
+  return null;
+}
+
+/** An array literal whose length this scan can state. `null` if it cannot. */
+function readableLength(node: ts.Node): number | null {
+  if (!ts.isArrayLiteralExpression(node)) return null;
+  if (node.elements.some((element) => ts.isSpreadElement(element))) return null;
+  return node.elements.length;
 }
 
 const unreadable: string[] = [];
@@ -151,16 +196,55 @@ function callSitesIn(path: string): CallSite[] {
         isTest: /\.(test|dbtest)\.(tsx?|mts|cts)$/.test(relativePath),
       };
       if (last && ts.isArrayLiteralExpression(last)) {
-        if (last.elements.some((element) => ts.isSpreadElement(element))) {
+        const length = readableLength(last);
+        if (length === null) {
           unreadable.push(`${where}: ${argument} — a spread; its length is not derivable here`);
         } else {
-          site.columnCount = last.elements.length;
+          site.columnCount = length;
         }
         sites.push(site);
-      } else if (last && ts.isIdentifier(last) && isEnclosingParameter(node, last.text)) {
-        // A pass-through: the list came from this function's own caller, which is
-        // itself a call site this scan reads.
-        sites.push(site);
+      } else if (last && ts.isIdentifier(last)) {
+        // A FORWARD. It is a pass-through only on BOTH counts: the parameter has
+        // no DEFAULT (a default is a second value, supplied by nobody this scan
+        // reads), and the function declaring it is itself bound to the name
+        // `saveLine`, so its own callers are call sites this scan reads. Wave 8
+        // F1 walked straight through the first version of this branch, which
+        // asked only "is it a parameter": a two-column list carried as a
+        // parameter DEFAULT was recorded as a pass-through with columnCount null
+        // and was never compared to one.
+        const enclosing = enclosingParameter(node, last.text);
+        if (!enclosing) {
+          unreadable.push(
+            `${where}: ${argument} — not an array literal and not a forwarded parameter. ` +
+              'Inline the column list at the call site so its length can be read here.',
+          );
+        } else {
+          const initializer = enclosing.parameter.initializer;
+          if (initializer) {
+            const length = readableLength(initializer);
+            if (length === null) {
+              unreadable.push(
+                `${where}: ${argument} — the parameter it forwards has a DEFAULT this scan ` +
+                  'cannot read as a list of columns. Inline the column list at the call site.',
+              );
+            } else {
+              // The default IS a column list, so its length is one of the values
+              // this site can pass and the rule below must see it.
+              site.columnCount = length;
+              site.argument = `${last.text} = ${initializer.getText(source).replace(/\s+/g, ' ')}`;
+            }
+          }
+          if (enclosing.boundAs !== FUNCTION_NAME) {
+            unreadable.push(
+              `${where}: ${argument} — forwards a parameter of ` +
+                `${enclosing.boundAs ?? 'an unbound function'}, not of a \`${FUNCTION_NAME}\`. ` +
+                'A forward is only a pass-through when every caller is itself a scanned ' +
+                'call site; nothing here says who calls that function. Inline the column ' +
+                'list at the call site.',
+            );
+          }
+          sites.push(site);
+        }
       } else {
         unreadable.push(
           `${where}: ${argument} — not an array literal and not a forwarded parameter. ` +
@@ -181,7 +265,24 @@ describe('every saveLine call site passes at most ONE column (wave 7 L1)', () =>
     // A guard on the guard: a wrong root, a rename, or a walk that silently read
     // nothing would make every assertion below pass by checking an empty list.
     expect(callSites.length).toBeGreaterThan(3);
-    expect(unreadable).toEqual([]);
+  });
+
+  it('can state the length of every site it found — it never shrugs', () => {
+    // The rule the wave-8 tester broke (F1): a site this scan cannot resolve used
+    // to be recorded with `columnCount = null` and then EXCLUDED from the length
+    // rule below, so the only thing standing in front of a live two-column call
+    // was the text pin — and adding the new site to that pin made the suite
+    // green. Unresolvable is now its own failure, reported by file:line.
+    expect(
+      unreadable,
+      'A saveLine call site cannot be read, so nothing here says how many columns ' +
+        'it passes. That is not a pass — see wave 7 L1 and the message on each line.',
+    ).toEqual([]);
+    // And nothing survives as a pass-through unless it is one: every site is
+    // either a length this scan read, or the ONE forward whose callers it reads.
+    const unresolved = callSites.filter((site) => site.columnCount === null);
+    expect(unresolved.map((site) => site.where)).toHaveLength(FORWARDING_SITES.length);
+    expect(unresolved.map((site) => site.path).sort()).toEqual([...FORWARDING_SITES].sort());
   });
 
   it('reads the production call sites, and only those', () => {
