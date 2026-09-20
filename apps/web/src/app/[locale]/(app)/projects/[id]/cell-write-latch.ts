@@ -78,7 +78,13 @@
  * OVERLAP as well: fold the arriving write into the earliest entry it overlaps
  * rather than into the one whose key matches, and keep the queue in arrival
  * order. Not done here because it is a behaviour change with no caller to prove
- * it, and this wave's brief says so.
+ * it, and wave 7's brief says so.
+ *
+ * AND THAT PARAGRAPH IS NOT THE FENCE — `cell-write-latch-call-sites.test.ts` is.
+ * It parses every `saveLine(…)` call under `apps/web/src` with the TypeScript AST
+ * and reds on the first one that passes two columns, naming this file and the fix
+ * above in the failure. A comment does not survive the engineer who did not read
+ * it; wave 8 item 3 exists because wave 7 shipped only the comment.
  */
 
 /**
