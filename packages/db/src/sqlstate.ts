@@ -63,6 +63,26 @@ export type PostgresErrorField = 'code' | 'constraint_name';
  * nearest one, and bounded by node count rather than depth so a wide
  * `AggregateError` costs the same as a deep chain.
  */
+/**
+ * One property off one object, or undefined if reading it THREW.
+ *
+ * Every read in this module goes through here. A property on a thrown value can
+ * be an accessor, and an accessor can throw — a proxy, a class whose getter
+ * dereferences state the failure has already torn down, a hostile object off the
+ * wire. Every caller here runs INSIDE somebody's `catch`, so an exception raised
+ * while classifying a failure does not become a second failure: it escapes the
+ * catch that was handling the first one, and `mutateInOrg` returns a rejected
+ * promise instead of a coded `ActionResult`. The error boundary must not be able
+ * to throw.
+ */
+function readProperty(source: unknown, field: string): unknown {
+  try {
+    return (source as Record<string, unknown>)[field];
+  } catch {
+    return undefined;
+  }
+}
+
 function causeChain(error: unknown): Array<Record<string, unknown>> {
   const chain: Array<Record<string, unknown>> = [];
   const visited = new Set<unknown>();
@@ -75,7 +95,8 @@ function causeChain(error: unknown): Array<Record<string, unknown>> {
     if (visited.has(node)) continue;
     visited.add(node);
     chain.push(node as Record<string, unknown>);
-    const { cause, errors } = node as { cause?: unknown; errors?: unknown };
+    const cause = readProperty(node, 'cause');
+    const errors = readProperty(node, 'errors');
     if (cause !== undefined && cause !== null) pending.push(cause);
     if (Array.isArray(errors)) {
       // Bounded: an aggregate of ten thousand is not a reason to build a queue
@@ -111,7 +132,7 @@ function stringFieldOf(
   source: Record<string, unknown>,
   field: PostgresErrorField,
 ): string | undefined {
-  const value = source[field];
+  const value = readProperty(source, field);
   return typeof value === 'string' && value.length > 0 ? value : undefined;
 }
 

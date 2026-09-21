@@ -65,6 +65,18 @@ function isOrmQueryWrapper(e: unknown): boolean {
   return own('query') && own('params');
 }
 
+/** One field off a possibly-hostile object, or undefined if reading it threw. */
+function readField(
+  source: Record<string, unknown> | null | undefined,
+  field: string,
+): unknown {
+  try {
+    return source?.[field];
+  } catch {
+    return undefined;
+  }
+}
+
 /** The safe-to-log view of a caught value. Never returns the value itself. */
 export function loggableFailure(e: unknown): Record<string, string> {
   const driver = driverErrorOf(e);
@@ -77,7 +89,10 @@ export function loggableFailure(e: unknown): Record<string, string> {
   const source = driver ?? (e as Record<string, unknown> | null | undefined);
   const safe: Record<string, string> = {};
   for (const field of LOGGABLE_ERROR_FIELDS) {
-    const value = source?.[field];
+    // Through a guarded read for the same reason `sqlstate.ts` does: this runs
+    // inside somebody's `catch`, and a property that is an accessor can throw.
+    // A redactor that can raise turns a handled failure into an unhandled one.
+    const value = readField(source, field);
     if (typeof value === 'string' && value.length > 0) safe[field] = value;
   }
   // A thrown non-object would otherwise log as `{}`, which reads like a bug in

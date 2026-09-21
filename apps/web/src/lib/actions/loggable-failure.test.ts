@@ -44,6 +44,33 @@ describe('loggableFailure', () => {
     expect(loggableFailure(undefined)).toEqual({ thrown: 'undefined' });
   });
 
+  it('does not throw on a value whose properties throw when read (S6)', () => {
+    // It runs inside somebody's `catch`. An accessor that raises here escapes
+    // the catch that was handling the original failure, so a coded
+    // `ActionResult` becomes a rejected promise and the modal spins for ever.
+    const hostile: Record<string, unknown> = {};
+    for (const field of ['name', 'code', 'constraint_name', 'table_name', 'message']) {
+      Object.defineProperty(hostile, field, {
+        enumerable: true,
+        get() {
+          throw new Error(`reading ${field} exploded`);
+        },
+      });
+    }
+    expect(() => loggableFailure(hostile)).not.toThrow();
+    expect(loggableFailure(hostile)).toEqual({ thrown: 'object' });
+
+    const proxy = new Proxy(
+      {},
+      {
+        get() {
+          throw new Error('nope');
+        },
+      },
+    );
+    expect(() => loggableFailure(proxy)).not.toThrow();
+  });
+
   /**
    * The public token surfaces are the app's only unauthenticated entry point,
    * and the ONE argument they pass to a SECURITY DEFINER function is the share

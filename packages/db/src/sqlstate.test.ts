@@ -146,6 +146,60 @@ describe('sqlstateOf', () => {
       expect(sqlstateOf({ errors: 'boom', cause: { code: '23505' } })).toBe('23505');
     });
   });
+
+  describe('a property that THROWS when read (S6)', () => {
+    // Every read here happens inside somebody's `catch`. An accessor that raises
+    // while we classify a failure does not produce a second failure — it escapes
+    // the catch handling the first one, and `mutateInOrg` rejects instead of
+    // answering a coded ActionResult. The error boundary must not be throwable.
+    const throwing = (field: string, rest: Record<string, unknown> = {}) => {
+      const node: Record<string, unknown> = { ...rest };
+      Object.defineProperty(node, field, {
+        enumerable: true,
+        get() {
+          throw new Error(`reading ${field} exploded`);
+        },
+      });
+      return node;
+    };
+
+    it('does not escape when `code` throws', () => {
+      expect(() => sqlstateOf(throwing('code'))).not.toThrow();
+      expect(sqlstateOf(throwing('code'))).toBeUndefined();
+    });
+
+    it('keeps walking past the level whose `code` throws', () => {
+      expect(sqlstateOf(throwing('code', { cause: { code: '23505' } }))).toBe('23505');
+    });
+
+    it('does not escape when `cause` or `errors` throws', () => {
+      expect(() => sqlstateOf(throwing('cause', { code: '' }))).not.toThrow();
+      expect(sqlstateOf(throwing('cause', { code: '55P03' }))).toBe('55P03');
+      expect(sqlstateOf(throwing('errors', { code: '55P03' }))).toBe('55P03');
+    });
+
+    it('does not escape when `constraint_name` throws', () => {
+      const node = throwing('constraint_name', { code: '23505' });
+      expect(() => pgFieldOf(node, 'constraint_name')).not.toThrow();
+      expect(pgFieldOf(node, 'constraint_name')).toBeUndefined();
+      expect(driverRefusalOf(node)).toEqual({ code: '23505', constraintName: undefined });
+    });
+
+    it('does not escape a Proxy that throws on every read', () => {
+      const hostile = new Proxy(
+        {},
+        {
+          get() {
+            throw new Error('nope');
+          },
+        },
+      );
+      expect(() => sqlstateOf(hostile)).not.toThrow();
+      expect(sqlstateOf(hostile)).toBeUndefined();
+      expect(driverErrorOf(hostile)).toBeUndefined();
+      expect(driverRefusalOf(hostile)).toBeUndefined();
+    });
+  });
 });
 
 describe('pgFieldOf', () => {
