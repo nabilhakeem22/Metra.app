@@ -29,11 +29,12 @@
  */
 
 /**
- * How far down `cause` to look. The live chain is two levels
+ * How many errors to look at. The live chain is two levels
  * (DrizzleQueryError -> PostgresError); the rest is headroom for a future
- * wrapper, and a hard stop so a malformed chain cannot spin.
+ * wrapper or a small `AggregateError`, and a hard stop so a malformed graph
+ * cannot spin.
  */
-const MAX_CAUSE_DEPTH = 8;
+const MAX_ERROR_NODES = 8;
 
 /**
  * The fields a caller may ask for by name.
@@ -47,21 +48,40 @@ const MAX_CAUSE_DEPTH = 8;
 export type PostgresErrorField = 'code' | 'constraint_name';
 
 /**
- * The error and every `cause` beneath it, outermost first — objects only, each
- * visited at most once so a chain that points back at itself terminates.
+ * The error and every error beneath it, nearest first — objects only, each
+ * visited at most once so a graph that points back at itself terminates.
+ *
+ * `cause` AND `errors[]`. An error chain is not always a chain: Node raises an
+ * `AggregateError` when a connection attempt fails against several addresses
+ * (happy-eyeballs resolves one host to A and AAAA, and both are refused), and
+ * `Promise.any` does the same. The SQLSTATE or driver code is then on
+ * `errors[0]` and nothing is on `cause`, so a `cause`-only walk answers
+ * undefined — which on this codebase's money path means an ambiguous connection
+ * failure reads as a definite one and the cockpit drops a held idempotency key.
+ *
+ * Breadth-first, so "the outermost level that carries the field" still means the
+ * nearest one, and bounded by node count rather than depth so a wide
+ * `AggregateError` costs the same as a deep chain.
  */
 function causeChain(error: unknown): Array<Record<string, unknown>> {
   const chain: Array<Record<string, unknown>> = [];
   const visited = new Set<unknown>();
-  let node: unknown = error;
-  for (let depth = 0; depth < MAX_CAUSE_DEPTH; depth += 1) {
+  const pending: unknown[] = [error];
+  while (pending.length > 0 && chain.length < MAX_ERROR_NODES) {
+    const node = pending.shift();
     if (node === null || (typeof node !== 'object' && typeof node !== 'function')) {
-      break;
+      continue;
     }
-    if (visited.has(node)) break;
+    if (visited.has(node)) continue;
     visited.add(node);
     chain.push(node as Record<string, unknown>);
-    node = (node as { cause?: unknown }).cause;
+    const { cause, errors } = node as { cause?: unknown; errors?: unknown };
+    if (cause !== undefined && cause !== null) pending.push(cause);
+    if (Array.isArray(errors)) {
+      // Bounded: an aggregate of ten thousand is not a reason to build a queue
+      // of ten thousand when at most MAX_ERROR_NODES will ever be read.
+      for (const nested of errors.slice(0, MAX_ERROR_NODES)) pending.push(nested);
+    }
   }
   return chain;
 }

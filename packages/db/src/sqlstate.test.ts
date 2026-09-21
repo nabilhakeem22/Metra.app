@@ -83,11 +83,68 @@ describe('sqlstateOf', () => {
   });
 
   it('stops after a bounded number of levels', () => {
-    // 8 levels of headroom against a live chain of 2. A SQLSTATE buried deeper
+    // 8 nodes of headroom against a live chain of 2. A SQLSTATE buried deeper
     // than that is not a wrapped query error, it is a runaway.
     let deep: Record<string, unknown> = { code: '23505' };
     for (let i = 0; i < 20; i += 1) deep = { cause: deep };
     expect(sqlstateOf(deep)).toBeUndefined();
+  });
+
+  describe('an AggregateError is a chain too (S5)', () => {
+    // Node raises one when a connection attempt fails against SEVERAL addresses
+    // — happy-eyeballs resolves a host to A and AAAA and both are refused — and
+    // `Promise.any` does the same. The driver code is then on `errors[0]` and
+    // there is no `cause` at all, so a cause-only walk answered undefined and an
+    // AMBIGUOUS connection failure read as a definite one.
+
+    it('reads a code out of errors[]', () => {
+      const aggregate = new AggregateError(
+        [
+          Object.assign(new Error('connect ECONNREFUSED ::1:5432'), {
+            code: 'ECONNREFUSED',
+          }),
+          Object.assign(new Error('connect ECONNREFUSED 127.0.0.1:5432'), {
+            code: 'ECONNREFUSED',
+          }),
+        ],
+        'All connection attempts failed',
+      );
+      expect(sqlstateOf(aggregate)).toBe('ECONNREFUSED');
+    });
+
+    it('reads one out of an aggregate the ORM has wrapped', () => {
+      const aggregate = new AggregateError([
+        Object.assign(new Error('read ECONNRESET'), { code: 'ECONNRESET' }),
+      ]);
+      expect(
+        sqlstateOf(Object.assign(new Error('Failed query: …'), { cause: aggregate })),
+      ).toBe('ECONNRESET');
+    });
+
+    it('prefers the NEAREST level, cause before the members below it', () => {
+      const aggregate = new AggregateError([{ code: 'ECONNRESET' }]);
+      (aggregate as { cause?: unknown }).cause = { code: '57014' };
+      expect(sqlstateOf(aggregate)).toBe('57014');
+    });
+
+    it('terminates on an aggregate that contains itself', () => {
+      const aggregate = new AggregateError([] as unknown[]);
+      (aggregate.errors as unknown[]).push(aggregate);
+      expect(sqlstateOf(aggregate)).toBeUndefined();
+    });
+
+    it('does not walk a whole huge aggregate to answer', () => {
+      // The budget is on NODES, so a wide aggregate costs what a deep chain
+      // costs. The code is past the cut and is deliberately not found.
+      const members: unknown[] = Array.from({ length: 5000 }, () => ({}));
+      members.push({ code: '23505' });
+      expect(sqlstateOf(new AggregateError(members))).toBeUndefined();
+    });
+
+    it('ignores an `errors` property that is not an array', () => {
+      expect(sqlstateOf({ errors: { code: '23505' } })).toBeUndefined();
+      expect(sqlstateOf({ errors: 'boom', cause: { code: '23505' } })).toBe('23505');
+    });
   });
 });
 
