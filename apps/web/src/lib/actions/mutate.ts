@@ -154,14 +154,28 @@ function mutationFailureCode(
  * wrapped in a `DrizzleQueryError` whose `message` is `Failed query: <sql>
  * params: <the bound parameters>` — the row values, by another route. Walking
  * field by field would take `constraint_name` off the driver error and `message`
- * off the wrapper, and log exactly what this whitelist exists to keep out. When
- * nothing in the chain carries a SQLSTATE (a plain `Error`, a thrown string)
- * there is no driver error to prefer, and the thrown value is read directly, as
- * before.
+ * off the wrapper, and log exactly what this whitelist exists to keep out.
+ *
+ * AND WHEN THERE IS NO DRIVER ERROR, THE WRAPPER IS STILL NOT SAFE TO READ. The
+ * fallback used to hand the thrown value straight to the whitelist, which is
+ * right for a plain `Error` and wrong for a `DrizzleQueryError` whose cause
+ * carries no SQLSTATE — a dropped socket ("Network connection lost."), a driver
+ * error whose `code` is undefined, a chain the cycle guard stopped walking. Its
+ * `message` IS the bound parameters, so `{ name, message }` put the client's
+ * email, phone and name into Workers Logs on the one path nobody had a case
+ * for. `isOrmQueryWrapper` recognises it by the two own properties drizzle's
+ * constructor always sets, and that branch logs what it IS and nothing it
+ * carries.
  */
 function loggableFailure(e: unknown): Record<string, string> {
-  const source =
-    driverErrorOf(e) ?? (e as Record<string, unknown> | null | undefined);
+  const driver = driverErrorOf(e);
+  if (!driver && isOrmQueryWrapper(e)) {
+    const name = (e as { name?: unknown }).name;
+    return typeof name === 'string' && name.length > 0
+      ? { name, thrown: ORM_QUERY_WRAPPER }
+      : { thrown: ORM_QUERY_WRAPPER };
+  }
+  const source = driver ?? (e as Record<string, unknown> | null | undefined);
   const safe: Record<string, string> = {};
   for (const field of LOGGABLE_ERROR_FIELDS) {
     const value = source?.[field];
@@ -170,6 +184,25 @@ function loggableFailure(e: unknown): Record<string, string> {
   // A thrown non-object would otherwise log as `{}`, which reads like a bug in
   // this function rather than a fact about the failure.
   return Object.keys(safe).length > 0 ? safe : { thrown: typeof e };
+}
+
+/** What the log says instead of a wrapper's message. */
+const ORM_QUERY_WRAPPER = 'DrizzleQueryError';
+
+/**
+ * Is this the ORM's query wrapper rather than something worth reading fields off?
+ *
+ * By its two OWN properties, not by `instanceof` and not by `name`:
+ * `DrizzleQueryError`'s constructor sets `query`, `params` and `cause` and never
+ * touches `name`, so the thrown object reports itself as a plain 'Error' and an
+ * `instanceof` check would bind this file to a deep import of somebody else's
+ * package. Own properties only — a driver error that happens to inherit a
+ * `query` from a prototype is not this.
+ */
+function isOrmQueryWrapper(e: unknown): boolean {
+  if (e === null || typeof e !== 'object') return false;
+  const own = Object.prototype.hasOwnProperty.bind(e);
+  return own('query') && own('params');
 }
 
 const LOGGABLE_ERROR_FIELDS = [

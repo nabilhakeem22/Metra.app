@@ -1,3 +1,4 @@
+import { DrizzleQueryError } from 'drizzle-orm/errors';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { OrgContext } from '@/lib/db/context';
 import { withOrgContext } from '@/lib/db/context';
@@ -235,9 +236,9 @@ describe('mutateInOrg failure mapping', () => {
     logged.mockRestore();
   });
 
-  it('falls back to the thrown value when no level carries a SQLSTATE', async () => {
-    // A wrapper with nothing underneath is still worth a line — and it is the
-    // only case where the wrapper's own fields are what gets logged.
+  it('falls back to the thrown value when it is a PLAIN error with no SQLSTATE', async () => {
+    // Unchanged, and it is the only fallback shape whose own fields are safe to
+    // read: nobody put a query into a TypeError.
     const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
     await expect(
       rejectWith(Object.assign(new Error('socket hang up'), { name: 'TypeError' })),
@@ -247,6 +248,104 @@ describe('mutateInOrg failure mapping', () => {
       message: 'socket hang up',
     });
     logged.mockRestore();
+  });
+
+  describe('a DrizzleQueryError with no SQLSTATE under it (S1)', () => {
+    // THE FALLBACK LEAK. `driverErrorOf` protects the path where the cause
+    // carries a code; these are the paths where it does not, and until now they
+    // fell through to `{ name, message }` — and a DrizzleQueryError's message IS
+    // `Failed query: <sql>\nparams: <values>`. Built with the REAL constructor
+    // out of drizzle-orm, not a hand-made lookalike, so the marker this depends
+    // on is the one the library actually sets.
+    const QUERY =
+      'insert into "clients" ("org_id","email","phone","name_ar") values ($1,$2,$3,$4)';
+    const PARAMS = ['org-uuid', 'victim@example.com', '+201001234567', 'أحمد المصري'];
+
+    const loggedObject = (spy: ReturnType<typeof vi.spyOn>) =>
+      spy.mock.calls.at(-1)?.[1] as Record<string, string>;
+
+    /** Nothing a bound parameter, a row or a statement could have put there. */
+    function expectNoRowValues(spy: ReturnType<typeof vi.spyOn>) {
+      const printed = JSON.stringify(spy.mock.calls);
+      for (const leak of [...PARAMS, 'Failed query', 'insert into', 'params:']) {
+        expect(printed).not.toContain(leak);
+      }
+      expect(printed).not.toContain('already exists');
+    }
+
+    it('logs what it IS, not what it carries, when the cause has no code', async () => {
+      const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
+      // postgres.js raises this bare Error when the socket dies mid-statement.
+      const thrown = new DrizzleQueryError(
+        QUERY,
+        PARAMS,
+        new Error('Network connection lost.'),
+      );
+      await expect(rejectWith(thrown)).resolves.toEqual({
+        ok: false,
+        error: 'generic',
+      });
+      expect(loggedObject(logged)).toEqual({
+        name: 'Error',
+        thrown: 'DrizzleQueryError',
+      });
+      expectNoRowValues(logged);
+      logged.mockRestore();
+    });
+
+    it('does the same when the driver error carries `code: undefined`', async () => {
+      const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const cause = Object.assign(new Error('write CONNECTION_CLOSED'), {
+        code: undefined,
+        detail: 'Key (org_id, email)=(o, victim@example.com) already exists.',
+      });
+      await rejectWith(new DrizzleQueryError(QUERY, PARAMS, cause));
+      expect(loggedObject(logged)).toEqual({
+        name: 'Error',
+        thrown: 'DrizzleQueryError',
+      });
+      expect(loggedObject(logged)).not.toHaveProperty('detail');
+      expectNoRowValues(logged);
+      logged.mockRestore();
+    });
+
+    it('does the same when the cause chain is a CYCLE the walk had to abandon', async () => {
+      const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const thrown = new DrizzleQueryError(QUERY, PARAMS, new Error('looped'));
+      // The cause points back at the wrapper: the visited-set stops the walk
+      // before it ever reaches a SQLSTATE, so `driverErrorOf` answers undefined.
+      (thrown.cause as { cause?: unknown }).cause = thrown;
+      await rejectWith(thrown);
+      expect(loggedObject(logged)).toEqual({
+        name: 'Error',
+        thrown: 'DrizzleQueryError',
+      });
+      expectNoRowValues(logged);
+      logged.mockRestore();
+    });
+
+    it('still prefers the DRIVER error when the cause does carry a SQLSTATE', async () => {
+      // The guard must not swallow the useful case: a wrapped 23505 still logs
+      // the five whitelisted fields off the PostgresError beneath it.
+      const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const cause = Object.assign(new Error('duplicate key value'), {
+        name: 'PostgresError',
+        code: '23505',
+        constraint_name: 'clients_org_id_email_unique',
+        table_name: 'clients',
+        detail: 'Key (org_id, email)=(o, victim@example.com) already exists.',
+      });
+      await rejectWith(new DrizzleQueryError(QUERY, PARAMS, cause));
+      expect(loggedObject(logged)).toEqual({
+        name: 'PostgresError',
+        code: '23505',
+        constraint_name: 'clients_org_id_email_unique',
+        table_name: 'clients',
+        message: 'duplicate key value',
+      });
+      expectNoRowValues(logged);
+      logged.mockRestore();
+    });
   });
 
   it('says what it got when a non-object was thrown', async () => {
