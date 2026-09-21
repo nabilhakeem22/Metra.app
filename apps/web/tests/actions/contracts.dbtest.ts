@@ -1,3 +1,9 @@
+// These refusals are asserted as `.catch(sqlstateOf)` rather than
+// `.rejects.toMatchObject({ code })`: the statements run through the ORM, and
+// from drizzle-orm 0.44 the driver's error arrives wrapped, with the SQLSTATE
+// on `.cause`. A top-level `.code` read answers undefined and the assertion
+// stops testing the database.
+import { sqlstateOf } from '@metra/db/sqlstate';
 import { sql } from 'drizzle-orm';
 import { afterAll, describe, expect, it } from 'vitest';
 import { createClientCore } from '@/lib/clients/core';
@@ -142,8 +148,8 @@ describe('contract immutability + lifecycle (AC4, AC5, AC6)', () => {
     await expect(
       withOrgContext(ctx, (tx) =>
         tx.execute(sql`update public.contracts set original_value = '1' where id = ${contractId}`),
-      ),
-    ).rejects.toMatchObject({ code: 'MT100' });
+      ).catch(sqlstateOf),
+    ).resolves.toBe('MT100');
 
     // A raw UPDATE of a contract line is frozen (parent left draft).
     const [line] = await raw.query<{ id: string }>(
@@ -152,8 +158,8 @@ describe('contract immutability + lifecycle (AC4, AC5, AC6)', () => {
     await expect(
       withOrgContext(ctx, (tx) =>
         tx.execute(sql`update public.contract_lines set unit_price = '1' where id = ${line.id}`),
-      ),
-    ).rejects.toMatchObject({ code: 'MT100' });
+      ).catch(sqlstateOf),
+    ).resolves.toBe('MT100');
   });
 
   it('refuses RE-PARENTING a line OUT of an issued contract, not only INTO one', async () => {
@@ -187,8 +193,8 @@ describe('contract immutability + lifecycle (AC4, AC5, AC6)', () => {
         tx.execute(
           sql`update public.contract_lines set contract_id = ${draftContractId} where id = ${issuedLine.id}`,
         ),
-      ),
-    ).rejects.toMatchObject({ code: 'MT100' });
+      ).catch(sqlstateOf),
+    ).resolves.toBe('MT100');
 
     // The direction that always worked, so the OLD check cannot be mistaken for
     // having REPLACED the NEW one.
@@ -197,8 +203,8 @@ describe('contract immutability + lifecycle (AC4, AC5, AC6)', () => {
         tx.execute(
           sql`update public.contract_lines set contract_id = ${contractId} where id = ${draftLine.id}`,
         ),
-      ),
-    ).rejects.toMatchObject({ code: 'MT100' });
+      ).catch(sqlstateOf),
+    ).resolves.toBe('MT100');
 
     // The line is still where it was, and still counted by the issued contract.
     const [stillThere] = await raw.query<{ contract_id: string }>(

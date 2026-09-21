@@ -1,3 +1,4 @@
+import { sqlstateOf } from '@metra/db/sqlstate';
 import { sql } from 'drizzle-orm';
 import { afterAll, describe, expect, it } from 'vitest';
 import { commitImportCore, createBoqCore } from '@/lib/boqs/core';
@@ -53,13 +54,17 @@ interface Fixture {
   engagementId: string;
 }
 
-/** The SQLSTATE of a rejected statement, or null if it was accepted. */
-async function sqlstateOf(run: () => Promise<unknown>): Promise<string | null> {
+/**
+ * The SQLSTATE of a rejected statement, or null if it was accepted. Read
+ * through `sqlstateOf`: these statements run through the ORM, which from
+ * drizzle 0.44 wraps the driver's error and moves the code onto `.cause`.
+ */
+async function refusalSqlstate(run: () => Promise<unknown>): Promise<string | null> {
   try {
     await run();
     return null;
   } catch (error) {
-    return (error as { code?: string }).code ?? 'unknown';
+    return sqlstateOf(error) ?? 'unknown';
   }
 }
 
@@ -175,7 +180,7 @@ async function draftSibling(fixture: Fixture): Promise<{ boqId: string; lineId: 
 
 /** Freeze it exactly the way `boqs/issue.ts:134-143` does, as metra_app. */
 async function issue(fixture: Fixture): Promise<string | null> {
-  return sqlstateOf(() =>
+  return refusalSqlstate(() =>
     withOrgContext(fixture.ctx, (tx) =>
       tx.execute(
         sql.raw(
@@ -201,7 +206,7 @@ describe('a BOQ is frozen at the database once it is issued', () => {
   it('refuses an UPDATE of a line on an issued BOQ with MT100', async () => {
     const fixture = await setup();
     expect(await issue(fixture)).toBeNull();
-    const code = await sqlstateOf(() =>
+    const code = await refusalSqlstate(() =>
       withOrgContext(fixture.ctx, (tx) =>
         tx.execute(
           sql.raw(
@@ -229,7 +234,7 @@ describe('a BOQ is frozen at the database once it is issued', () => {
     expect(await issue(fixture)).toBeNull();
 
     // OUT of the issued BOQ, into a draft one. OLD's parent is what refuses.
-    const out = await sqlstateOf(() =>
+    const out = await refusalSqlstate(() =>
       withOrgContext(fixture.ctx, (tx) =>
         tx.execute(
           sql.raw(
@@ -249,7 +254,7 @@ describe('a BOQ is frozen at the database once it is issued', () => {
     // The direction that always worked, asserted so the OLD check cannot be
     // mistaken for having REPLACED the NEW one: the draft sibling's own line
     // cannot be moved INTO the issued BOQ either.
-    const into = await sqlstateOf(() =>
+    const into = await refusalSqlstate(() =>
       withOrgContext(fixture.ctx, (tx) =>
         tx.execute(
           sql.raw(
@@ -266,7 +271,7 @@ describe('a BOQ is frozen at the database once it is issued', () => {
     expect(await issue(fixture)).toBeNull();
 
     // As metra_app the GRANT is the first fence: roles.sql revokes delete.
-    const asApp = await sqlstateOf(() =>
+    const asApp = await refusalSqlstate(() =>
       withOrgContext(fixture.ctx, (tx) =>
         tx.execute(sql.raw(`delete from public.boqs where id = '${fixture.boqId}'`)),
       ),
@@ -276,7 +281,7 @@ describe('a BOQ is frozen at the database once it is issued', () => {
     // On the owning (BYPASSRLS) connection the grant does not apply and the
     // TRIGGER is what refuses. Two independent fences, and this is the one that
     // survives a future re-grant.
-    const asOwner = await sqlstateOf(() =>
+    const asOwner = await refusalSqlstate(() =>
       raw.query(`delete from public.boqs where id = '${fixture.boqId}'`),
     );
     expect(asOwner).toBe('MT100');
@@ -309,14 +314,14 @@ describe('a BOQ is frozen at the database once it is issued', () => {
     expect(await issue(fixture)).toBeNull();
 
     expect(
-      await sqlstateOf(() =>
+      await refusalSqlstate(() =>
         raw.query(
           `update public.boqs set engagement_id = null where id = '${fixture.boqId}'`,
         ),
       ),
     ).toBe('MT100');
     expect(
-      await sqlstateOf(() =>
+      await refusalSqlstate(() =>
         raw.query(
           `update public.boqs set source_file_id = null where id = '${fixture.boqId}'`,
         ),
@@ -327,7 +332,7 @@ describe('a BOQ is frozen at the database once it is issued', () => {
     // unconditionally, so a locked document's timestamp could be moved on its
     // own. It is now forgiven only when a named column actually went NULL.
     expect(
-      await sqlstateOf(() =>
+      await refusalSqlstate(() =>
         raw.query(`update public.boqs set updated_at = now() where id = '${fixture.boqId}'`),
       ),
     ).toBe('MT100');
@@ -357,7 +362,7 @@ describe('a BOQ is frozen at the database once it is issued', () => {
        values ('${fixture.ctx.orgId}', 'boq', null, '${fixture.ctx.orgId}/boq/other.xlsx', 'other.xlsx')
        returning id`,
     );
-    const code = await sqlstateOf(() =>
+    const code = await refusalSqlstate(() =>
       raw.query(
         `update public.boqs set source_file_id = '${other.id}' where id = '${fixture.boqId}'`,
       ),
@@ -388,11 +393,11 @@ describe('a BOQ is frozen at the database once it is issued', () => {
     // above is still MT100.
     const fixture = await setup();
 
-    const asDraft = await sqlstateOf(() =>
+    const asDraft = await refusalSqlstate(() =>
       raw.query(`delete from public.files where id = '${fixture.fileId}'`),
     );
     expect(await issue(fixture)).toBeNull();
-    const asIssued = await sqlstateOf(() =>
+    const asIssued = await refusalSqlstate(() =>
       raw.query(
         `delete from public.design_engagements where id = '${fixture.engagementId}'`,
       ),
