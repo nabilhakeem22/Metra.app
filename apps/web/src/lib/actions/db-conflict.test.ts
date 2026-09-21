@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { isAmbiguousDbOutcome } from './db-failure';
 import {
-  constraintNameOf,
   isImmutabilityViolation,
   isUniqueViolation,
   isUniqueViolationOf,
@@ -59,17 +58,30 @@ describe('isUniqueViolationOf', () => {
     ).toBe(false);
     expect(isUniqueViolationOf(null, CONSTRAINT)).toBe(false);
   });
-});
 
-describe('constraintNameOf', () => {
-  it('reads the server-supplied name, and nothing else', () => {
-    expect(constraintNameOf({ constraint_name: 'clients_org_id_phone_unique' })).toBe(
-      'clients_org_id_phone_unique',
-    );
-    expect(constraintNameOf({ code: '23505' })).toBeNull();
-    expect(constraintNameOf({ constraint_name: '' })).toBeNull();
-    expect(constraintNameOf(new Error('boom'))).toBeNull();
-    expect(constraintNameOf(null)).toBeNull();
+  it('refuses a code and a constraint name that came from DIFFERENT errors (S3)', () => {
+    // The pair has to describe ONE refusal. Two independent walks would each
+    // stop at the outermost node carrying THEIR field: the 23505 off the outer
+    // error, the constraint name off the inner one — and answer "the race you
+    // named" to a collision neither error reported. `driverRefusalOf` reads both
+    // off the node that carried the code, so the inner name is not in scope.
+    const mixedNodes = {
+      code: '23505',
+      cause: { code: '23514', constraint_name: CONSTRAINT },
+    };
+    expect(isUniqueViolationOf(mixedNodes, CONSTRAINT)).toBe(false);
+
+    // The mirror: the name on the OUTER node, the 23505 on the inner one.
+    const mirrored = {
+      constraint_name: CONSTRAINT,
+      cause: { code: '23505', constraint_name: 'some_other_index' },
+    };
+    expect(isUniqueViolationOf(mirrored, CONSTRAINT)).toBe(false);
+
+    // ...and the control: one node carrying both is still answered.
+    expect(
+      isUniqueViolationOf({ cause: { code: '23505', constraint_name: CONSTRAINT } }, CONSTRAINT),
+    ).toBe(true);
   });
 });
 
@@ -103,9 +115,6 @@ describe('a drizzle-wrapped driver error reads exactly like a bare one', () => {
   });
 
   it('sees the constraint name through the wrapper', () => {
-    expect(constraintNameOf(wrap({ code: '23505', constraint_name: CONSTRAINT }))).toBe(
-      CONSTRAINT,
-    );
     expect(
       isUniqueViolationOf(
         wrap({ code: '23505', constraint_name: CONSTRAINT }),
@@ -126,7 +135,7 @@ describe('a drizzle-wrapped driver error reads exactly like a bare one', () => {
   it('is false for the wrapper alone — it carries no SQLSTATE of its own', () => {
     expect(isUniqueViolation(wrap(undefined))).toBe(false);
     expect(isImmutabilityViolation(wrap(undefined))).toBe(false);
-    expect(constraintNameOf(wrap(undefined))).toBeNull();
+    expect(isUniqueViolationOf(wrap(undefined), CONSTRAINT)).toBe(false);
   });
 });
 

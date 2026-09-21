@@ -13,7 +13,7 @@
  * the error's SQLSTATE through `sqlstateOf`, which finds it whether postgres.js
  * threw it directly or drizzle wrapped it in a `DrizzleQueryError` first.
  */
-import { pgFieldOf, sqlstateOf } from '@metra/db/sqlstate';
+import { driverRefusalOf, sqlstateOf } from '@metra/db/sqlstate';
 
 /** Postgres unique/exclusion violation. */
 const UNIQUE_VIOLATION = '23505';
@@ -35,20 +35,6 @@ export function isUniqueViolation(error: unknown): boolean {
 }
 
 /**
- * The constraint a Postgres error names, or null.
- *
- * postgres.js copies every field of the server's ErrorResponse onto the thrown
- * error, `constraint_name` among them (snake_case, as the wire protocol spells
- * it). It is absent for an error the server did not attribute to a constraint,
- * and it is not something an attacker chooses: the server writes it. Read
- * through the same `cause` walk as the SQLSTATE, because drizzle wraps the whole
- * error, not just its code.
- */
-export function constraintNameOf(error: unknown): string | null {
-  return pgFieldOf(error, 'constraint_name') ?? null;
-}
-
-/**
  * SQLSTATE 23505 raised by ONE named constraint — the only 23505 a caller may
  * translate into its own sentence.
  *
@@ -59,9 +45,17 @@ export function constraintNameOf(error: unknown): string | null {
  * a contract NUMBER under its own unique index. Naming the constraint is what
  * keeps an unexpected collision in the unclassified tail, where it is logged,
  * instead of being answered "a contract already exists".
+ *
+ * BOTH READS COME OFF ONE OBJECT (`driverRefusalOf`). Asking twice — once for
+ * the code, once for the name — lets the two answers come from two different
+ * levels of the `cause` chain, and a pair that never described the same error
+ * is precisely the false "a contract already exists" this function exists to
+ * prevent. postgres.js writes `constraint_name` itself (snake_case, as the wire
+ * protocol spells it); it is not something a caller or an attacker chooses.
  */
 export function isUniqueViolationOf(error: unknown, constraint: string): boolean {
-  return isUniqueViolation(error) && constraintNameOf(error) === constraint;
+  const refusal = driverRefusalOf(error);
+  return refusal?.code === UNIQUE_VIOLATION && refusal.constraintName === constraint;
 }
 
 /**

@@ -80,10 +80,19 @@ export function pgFieldOf(
   field: PostgresErrorField,
 ): string | undefined {
   for (const node of causeChain(error)) {
-    const value = node[field];
-    if (typeof value === 'string' && value.length > 0) return value;
+    const value = stringFieldOf(node, field);
+    if (value !== undefined) return value;
   }
   return undefined;
+}
+
+/** One named field off ONE object, with the string discipline in one place. */
+function stringFieldOf(
+  source: Record<string, unknown>,
+  field: PostgresErrorField,
+): string | undefined {
+  const value = source[field];
+  return typeof value === 'string' && value.length > 0 ? value : undefined;
 }
 
 /**
@@ -108,8 +117,36 @@ export function sqlstateOf(error: unknown): string | undefined {
  */
 export function driverErrorOf(error: unknown): Record<string, unknown> | undefined {
   for (const node of causeChain(error)) {
-    const code = node.code;
-    if (typeof code === 'string' && code.length > 0) return node;
+    if (stringFieldOf(node, 'code') !== undefined) return node;
+  }
+  return undefined;
+}
+
+/** A SQLSTATE and the constraint the SAME error named, read together. */
+export interface DriverRefusal {
+  readonly code: string;
+  /** Undefined when the server attributed the error to no constraint. */
+  readonly constraintName: string | undefined;
+}
+
+/**
+ * The SQLSTATE and constraint name OFF ONE OBJECT — the only honest way to ask
+ * "was this 23505 raised by THIS constraint?".
+ *
+ * Two independent `pgFieldOf` walks can answer from two DIFFERENT levels of the
+ * chain, because each stops at the outermost node that carries its own field. A
+ * wrapper that carries a `code` over a cause that carries a `constraint_name` —
+ * a retry layer, a driver that annotates, a future ORM — would let the pair
+ * agree when neither error did, and the caller would answer "a contract already
+ * exists" to a collision on something else entirely. Returning the pair from
+ * one node makes that unexpressible rather than merely unlikely.
+ */
+export function driverRefusalOf(error: unknown): DriverRefusal | undefined {
+  for (const node of causeChain(error)) {
+    const code = stringFieldOf(node, 'code');
+    if (code !== undefined) {
+      return { code, constraintName: stringFieldOf(node, 'constraint_name') };
+    }
   }
   return undefined;
 }

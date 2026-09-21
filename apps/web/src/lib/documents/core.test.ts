@@ -77,10 +77,7 @@ vi.mock('@/lib/actions/mutate', async () => {
   };
 });
 
-import {
-  HttpDeadlineError,
-  STORAGE_CLEANUP_TIMEOUT_MS,
-} from '@/lib/http/deadlines';
+import { STORAGE_CLEANUP_TIMEOUT_MS } from '@/lib/http/deadlines';
 import { deleteDocumentCore, getDocumentUrlCore } from './core';
 import { DOCUMENT_ENTITIES } from './entities';
 

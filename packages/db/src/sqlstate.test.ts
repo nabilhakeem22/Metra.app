@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { driverErrorOf, pgFieldOf, sqlstateOf } from './sqlstate';
+import { driverErrorOf, driverRefusalOf, pgFieldOf, sqlstateOf } from './sqlstate';
 
 /** What postgres.js throws: every ErrorResponse field copied onto an Error. */
 function postgresError(fields: Record<string, unknown>): Error {
@@ -143,5 +143,52 @@ describe('driverErrorOf', () => {
     expect(driverErrorOf(new Error('boom'))).toBeUndefined();
     expect(driverErrorOf('just a string')).toBeUndefined();
     expect(driverErrorOf(null)).toBeUndefined();
+  });
+});
+
+describe('driverRefusalOf', () => {
+  const CONSTRAINT = 'contracts_org_id_source_proposal_unique';
+
+  it('reads the code and the constraint name off the SAME node', () => {
+    expect(
+      driverRefusalOf({ cause: { code: '23505', constraint_name: CONSTRAINT } }),
+    ).toEqual({ code: '23505', constraintName: CONSTRAINT });
+  });
+
+  it('never pairs a code from one node with a name from another', () => {
+    // Two independent `pgFieldOf` walks each stop at the OUTERMOST node holding
+    // their own field, so they can answer from two different errors and agree
+    // about a refusal neither one reported. This is that chain.
+    const mixedNodes = {
+      code: '23505',
+      cause: { code: '23514', constraint_name: CONSTRAINT },
+    };
+    expect(pgFieldOf(mixedNodes, 'code')).toBe('23505');
+    expect(pgFieldOf(mixedNodes, 'constraint_name')).toBe(CONSTRAINT); // the trap
+    expect(driverRefusalOf(mixedNodes)).toEqual({
+      code: '23505',
+      constraintName: undefined,
+    });
+  });
+
+  it('leaves constraintName undefined when the server named no constraint', () => {
+    expect(driverRefusalOf({ code: 'MT100' })).toEqual({
+      code: 'MT100',
+      constraintName: undefined,
+    });
+    expect(driverRefusalOf({ code: '23505', constraint_name: '' })).toEqual({
+      code: '23505',
+      constraintName: undefined,
+    });
+    expect(driverRefusalOf({ code: '23505', constraint_name: 7 })).toEqual({
+      code: '23505',
+      constraintName: undefined,
+    });
+  });
+
+  it('is undefined when nothing in the chain carries a SQLSTATE', () => {
+    expect(driverRefusalOf(new Error('boom'))).toBeUndefined();
+    expect(driverRefusalOf({ constraint_name: CONSTRAINT })).toBeUndefined();
+    expect(driverRefusalOf(null)).toBeUndefined();
   });
 });
