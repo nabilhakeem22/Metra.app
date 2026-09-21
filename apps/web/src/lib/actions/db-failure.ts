@@ -17,8 +17,13 @@
  *    reading its reply. The canonical ambiguous write.
  *
  * Pure and dependency-free so it is unit-testable without a database: it reads
- * only the `code` property postgres.js copies off the server's error response.
+ * the error's SQLSTATE through `sqlstateOf`, which finds it whether postgres.js
+ * threw it directly or drizzle wrapped it in a `DrizzleQueryError` first. Both
+ * shapes reach this function on the same path: the driver raises the class-08
+ * and lock-timeout errors itself, while a statement the ORM ran arrives wrapped.
  */
+import { sqlstateOf } from '@metra/db/sqlstate';
+
 const AMBIGUOUS_SQLSTATES: ReadonlySet<string> = new Set([
   '55P03',
   '57014',
@@ -44,8 +49,8 @@ const DRIVER_CONNECTION_CODES: ReadonlySet<string> = new Set([
 ]);
 
 export function isAmbiguousDbOutcome(error: unknown): boolean {
-  const code = (error as { code?: unknown } | null)?.code;
-  if (typeof code !== 'string') return false;
+  const code = sqlstateOf(error);
+  if (code === undefined) return false;
   return (
     AMBIGUOUS_SQLSTATES.has(code) ||
     DRIVER_CONNECTION_CODES.has(code) ||

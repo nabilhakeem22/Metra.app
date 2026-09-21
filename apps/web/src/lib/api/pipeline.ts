@@ -1,5 +1,6 @@
 import 'server-only';
 import { organizations } from '@metra/db';
+import { sqlstateOf } from '@metra/db/sqlstate';
 import { isCloudflareRuntime, cfExecutionContext } from '@/lib/cf/context';
 import { withOrgContext, type OrgContext } from '@/lib/db/context';
 import { canSeeMargin } from '@/lib/permissions/can';
@@ -42,8 +43,11 @@ const CURSOR_CAST_SQLSTATES = new Set([
 ]);
 
 function isCursorCastError(error: unknown): boolean {
-  const code = (error as { code?: unknown } | null)?.code;
-  return typeof code === 'string' && CURSOR_CAST_SQLSTATES.has(code);
+  // Through sqlstateOf: the cast is performed by a query the ORM ran, so from
+  // drizzle 0.44 the SQLSTATE arrives on `.cause` and a top-level read would
+  // answer a malformed cursor with a 500 instead of the documented 400.
+  const code = sqlstateOf(error);
+  return code !== undefined && CURSOR_CAST_SQLSTATES.has(code);
 }
 
 /** Best-effort, throttled last_used stamp — deferred past the response (CF only). */

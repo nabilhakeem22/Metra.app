@@ -10,8 +10,10 @@
  * stops an expected race writing a false defect line into the Worker log.
  *
  * Pure and dependency-free so it is unit-testable without a database: both read
- * only the `code` property postgres.js copies off the server's error response.
+ * the error's SQLSTATE through `sqlstateOf`, which finds it whether postgres.js
+ * threw it directly or drizzle wrapped it in a `DrizzleQueryError` first.
  */
+import { pgFieldOf, sqlstateOf } from '@metra/db/sqlstate';
 
 /** Postgres unique/exclusion violation. */
 const UNIQUE_VIOLATION = '23505';
@@ -23,18 +25,13 @@ const UNIQUE_VIOLATION = '23505';
  */
 const IMMUTABILITY_VIOLATION = 'MT100';
 
-function sqlStateOf(error: unknown): string | null {
-  const code = (error as { code?: unknown } | null)?.code;
-  return typeof code === 'string' ? code : null;
-}
-
 /**
  * SQLSTATE 23505 — a unique or exclusion constraint refused the write. A REAL
  * refusal, unlike db-failure's ambiguous class, so a caller that knows which
  * constraint it raced may name it (`contract_exists`, `code_taken`, …).
  */
 export function isUniqueViolation(error: unknown): boolean {
-  return sqlStateOf(error) === UNIQUE_VIOLATION;
+  return sqlstateOf(error) === UNIQUE_VIOLATION;
 }
 
 /**
@@ -43,11 +40,12 @@ export function isUniqueViolation(error: unknown): boolean {
  * postgres.js copies every field of the server's ErrorResponse onto the thrown
  * error, `constraint_name` among them (snake_case, as the wire protocol spells
  * it). It is absent for an error the server did not attribute to a constraint,
- * and it is not something an attacker chooses: the server writes it.
+ * and it is not something an attacker chooses: the server writes it. Read
+ * through the same `cause` walk as the SQLSTATE, because drizzle wraps the whole
+ * error, not just its code.
  */
 export function constraintNameOf(error: unknown): string | null {
-  const name = (error as { constraint_name?: unknown } | null)?.constraint_name;
-  return typeof name === 'string' && name.length > 0 ? name : null;
+  return pgFieldOf(error, 'constraint_name') ?? null;
 }
 
 /**
@@ -73,5 +71,5 @@ export function isUniqueViolationOf(error: unknown, constraint: string): boolean
  * defect.
  */
 export function isImmutabilityViolation(error: unknown): boolean {
-  return sqlStateOf(error) === IMMUTABILITY_VIOLATION;
+  return sqlstateOf(error) === IMMUTABILITY_VIOLATION;
 }

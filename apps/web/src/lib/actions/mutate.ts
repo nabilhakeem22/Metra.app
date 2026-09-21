@@ -1,4 +1,5 @@
 import type { MetraDb } from '@metra/db';
+import { driverErrorOf } from '@metra/db/sqlstate';
 import { eq } from 'drizzle-orm';
 import type { PgColumn, PgTable } from 'drizzle-orm/pg-core';
 import { recordAudit, type AuditEntry } from '@/lib/audit';
@@ -147,9 +148,20 @@ function mutationFailureCode(
  * answer "which constraint on which table refused, and with what SQLSTATE",
  * which is the whole diagnostic value of this line. Strings only, so a field
  * carrying a structured value cannot smuggle an object in.
+ *
+ * ALL FIVE ARE READ OFF ONE OBJECT: `driverErrorOf`, the level in the `cause`
+ * chain that the DRIVER threw. From drizzle 0.44 an ORM query's error arrives
+ * wrapped in a `DrizzleQueryError` whose `message` is `Failed query: <sql>
+ * params: <the bound parameters>` — the row values, by another route. Walking
+ * field by field would take `constraint_name` off the driver error and `message`
+ * off the wrapper, and log exactly what this whitelist exists to keep out. When
+ * nothing in the chain carries a SQLSTATE (a plain `Error`, a thrown string)
+ * there is no driver error to prefer, and the thrown value is read directly, as
+ * before.
  */
 function loggableFailure(e: unknown): Record<string, string> {
-  const source = e as Record<string, unknown> | null | undefined;
+  const source =
+    driverErrorOf(e) ?? (e as Record<string, unknown> | null | undefined);
   const safe: Record<string, string> = {};
   for (const field of LOGGABLE_ERROR_FIELDS) {
     const value = source?.[field];

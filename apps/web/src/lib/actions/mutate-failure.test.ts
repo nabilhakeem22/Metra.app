@@ -24,6 +24,22 @@ function rejectWith(thrown: unknown, opts: MutateOptions = {}) {
   return mutateInOrg(ctx, opts, async () => undefined);
 }
 
+/**
+ * What drizzle-orm >= 0.44 throws for a statement the ORM ran: the driver's
+ * error on `.cause`, under a wrapper whose message is the SQL and its bound
+ * PARAMETERS and which never sets its own `name`.
+ */
+function wrapped(driverError: Record<string, unknown>): Error {
+  return Object.assign(
+    new Error(
+      'Failed query: insert into public.clients (org_id, phone) values ($1, $2)\n' +
+        'params: org-uuid,01000000000',
+    ),
+    { query: 'insert into public.clients …', params: ['org-uuid', '01000000000'] },
+    { cause: driverError },
+  );
+}
+
 const CONTRACT_RACE: MutateOptions = {
   conflict: {
     constraint: 'contracts_org_id_source_proposal_unique',
@@ -161,6 +177,74 @@ describe('mutateInOrg failure mapping', () => {
     expect(logged).toHaveBeenCalledWith('mutateInOrg failed:', {
       code: '42703',
       message: 'column "nope" does not exist',
+    });
+    logged.mockRestore();
+  });
+
+  it('maps a drizzle-WRAPPED failure exactly as it maps a bare one', async () => {
+    // From drizzle-orm 0.44 a statement the ORM ran arrives as a wrapper with
+    // the driver's error on `.cause`. Every branch of this mapping has to see
+    // through it, or a lock timeout stops being `uncertain` and a named race
+    // stops being named.
+    await expect(rejectWith(wrapped({ code: '55P03' }))).resolves.toEqual({
+      ok: false,
+      error: 'uncertain',
+    });
+    await expect(
+      rejectWith(
+        wrapped({
+          code: '23505',
+          constraint_name: 'contracts_org_id_source_proposal_unique',
+        }),
+        CONTRACT_RACE,
+      ),
+    ).resolves.toEqual({ ok: false, error: 'contract_exists' });
+    await expect(
+      rejectWith(wrapped({ code: 'MT100' }), { immutableCode: 'proposal_not_draft' }),
+    ).resolves.toEqual({ ok: false, error: 'proposal_not_draft' });
+  });
+
+  it("logs the DRIVER error's whitelist, never the wrapper that carries the params", async () => {
+    // THE LEAK THIS CLOSES. A DrizzleQueryError never sets `name` (so it reads
+    // 'Error') and its `message` is `Failed query: <sql>\nparams: <the bound
+    // parameters>` — the colliding row's values by a second route. Reading the
+    // whitelist field by field down the chain would take `constraint_name` off
+    // the driver error and `message` off the wrapper, and write the phone
+    // number into the Worker log.
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
+    await expect(
+      rejectWith(
+        wrapped({
+          name: 'PostgresError',
+          code: '23505',
+          constraint_name: 'clients_org_id_phone_unique',
+          table_name: 'clients',
+          message: 'duplicate key value violates unique constraint',
+          detail: 'Key (org_id, phone)=(…, 01000000000) already exists.',
+        }),
+      ),
+    ).resolves.toEqual({ ok: false, error: 'generic' });
+    expect(logged).toHaveBeenCalledWith('mutateInOrg failed:', {
+      name: 'PostgresError',
+      code: '23505',
+      constraint_name: 'clients_org_id_phone_unique',
+      table_name: 'clients',
+      message: 'duplicate key value violates unique constraint',
+    });
+    expect(JSON.stringify(logged.mock.calls)).not.toContain('01000000000');
+    logged.mockRestore();
+  });
+
+  it('falls back to the thrown value when no level carries a SQLSTATE', async () => {
+    // A wrapper with nothing underneath is still worth a line — and it is the
+    // only case where the wrapper's own fields are what gets logged.
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
+    await expect(
+      rejectWith(Object.assign(new Error('socket hang up'), { name: 'TypeError' })),
+    ).resolves.toEqual({ ok: false, error: 'generic' });
+    expect(logged).toHaveBeenCalledWith('mutateInOrg failed:', {
+      name: 'TypeError',
+      message: 'socket hang up',
     });
     logged.mockRestore();
   });

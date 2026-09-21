@@ -85,6 +85,51 @@ describe('isImmutabilityViolation', () => {
   });
 });
 
+describe('a drizzle-wrapped driver error reads exactly like a bare one', () => {
+  // From drizzle-orm 0.44 every error raised by a query the ORM ran is
+  // re-thrown with the driver's error on `.cause`. These classifiers decide
+  // whether an immutability refusal is a sentence or a 500, and whether a 23505
+  // is the race the caller named — so the wrapper must be invisible to them.
+  const wrap = (driver: unknown) =>
+    Object.assign(
+      new Error('Failed query: update public.proposals set total = $1\nparams: 1'),
+      { cause: driver },
+    );
+  const CONSTRAINT = 'contracts_org_id_source_proposal_unique';
+
+  it('sees 23505 and MT100 through the wrapper', () => {
+    expect(isUniqueViolation(wrap({ code: '23505' }))).toBe(true);
+    expect(isImmutabilityViolation(wrap({ code: 'MT100' }))).toBe(true);
+  });
+
+  it('sees the constraint name through the wrapper', () => {
+    expect(constraintNameOf(wrap({ code: '23505', constraint_name: CONSTRAINT }))).toBe(
+      CONSTRAINT,
+    );
+    expect(
+      isUniqueViolationOf(
+        wrap({ code: '23505', constraint_name: CONSTRAINT }),
+        CONSTRAINT,
+      ),
+    ).toBe(true);
+  });
+
+  it('still refuses a wrapped 23505 raised by a DIFFERENT constraint', () => {
+    expect(
+      isUniqueViolationOf(
+        wrap({ code: '23505', constraint_name: 'contracts_org_id_number_unique' }),
+        CONSTRAINT,
+      ),
+    ).toBe(false);
+  });
+
+  it('is false for the wrapper alone — it carries no SQLSTATE of its own', () => {
+    expect(isUniqueViolation(wrap(undefined))).toBe(false);
+    expect(isImmutabilityViolation(wrap(undefined))).toBe(false);
+    expect(constraintNameOf(wrap(undefined))).toBeNull();
+  });
+});
+
 describe('a refusal is never confused with an ambiguous outcome', () => {
   it('55P03 stays AMBIGUOUS and reaches neither classifier', () => {
     // The ordering inside mutationFailureCode depends on this: a lock timeout
