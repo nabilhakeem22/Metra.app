@@ -77,10 +77,7 @@ vi.mock('@/lib/actions/mutate', async () => {
   };
 });
 
-import {
-  HttpDeadlineError,
-  STORAGE_CLEANUP_TIMEOUT_MS,
-} from '@/lib/http/deadlines';
+import { STORAGE_CLEANUP_TIMEOUT_MS } from '@/lib/http/deadlines';
 import { deleteDocumentCore, getDocumentUrlCore } from './core';
 import { DOCUMENT_ENTITIES } from './entities';
 
@@ -223,7 +220,11 @@ describe('deleteDocumentCore', () => {
       await expect(answer).resolves.toEqual({ ok: true });
       expect(console.warn).toHaveBeenCalledWith(
         'document object remove still running past the cleanup deadline',
-        expect.objectContaining({ error: expect.any(HttpDeadlineError) }),
+        // Redacted by `loggableFailure` (S2): the breadcrumb still names the
+        // error, as its whitelisted shape rather than the object itself.
+        expect.objectContaining({
+          error: { name: 'HttpDeadlineError', message: expect.any(String) },
+        }),
       );
       expect(console.error).not.toHaveBeenCalledWith(
         'document object remove failed',
@@ -278,7 +279,7 @@ describe('deleteDocumentCore', () => {
     expect(removeStoredObject).toHaveBeenCalled();
     expect(console.warn).toHaveBeenCalledWith(
       'discardStoredBytes: waitUntil unavailable',
-      expect.any(Error),
+      { name: 'Error', message: 'no execution context' },
     );
   });
 
@@ -303,7 +304,9 @@ describe('deleteDocumentCore', () => {
       await vi.advanceTimersByTimeAsync(1);
       expect(console.error).toHaveBeenCalledWith(
         'document object remove failed',
-        expect.objectContaining({ error: expect.any(Error) }),
+        expect.objectContaining({
+          error: { name: 'Error', message: 'storage 503 after the response' },
+        }),
       );
     } finally {
       vi.useRealTimers();

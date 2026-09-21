@@ -24,6 +24,12 @@ import {
   type MetraDb,
   type OrgContext,
 } from '@metra/db';
+// These refusals are asserted as `.catch(sqlstateOf)` rather than
+// `.rejects.toMatchObject({ code })`: the statements run through the ORM, and
+// from drizzle-orm 0.44 the driver's error arrives wrapped, with the SQLSTATE
+// on `.cause`. A top-level `.code` read answers undefined and the assertion
+// stops testing the database.
+import { sqlstateOf } from '@metra/db/sqlstate';
 import { sql } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
@@ -250,8 +256,8 @@ describe('projects composite same-org FK (§ clients+projects)', () => {
              values (gen_random_uuid(), '${ORG_A_ID}', 'XORG-${randomUUID()}', 'x', '${CLIENT_B_ID}', 'draft')`,
           ),
         ),
-      ),
-    ).rejects.toMatchObject({ code: '23503' });
+      ).catch(sqlstateOf),
+    ).resolves.toBe('23503');
   });
 
   it('references its OWN org client fine (control)', async () => {
@@ -277,8 +283,8 @@ describe('projects composite same-org FK (§ clients+projects)', () => {
              values (gen_random_uuid(), '${ORG_A_ID}', 90002, 'x', '${CLIENT_B_ID}', '${PROJECT_A_ID}')`,
           ),
         ),
-      ),
-    ).rejects.toMatchObject({ code: '23503' });
+      ).catch(sqlstateOf),
+    ).resolves.toBe('23503');
   });
 
   it('a contract cannot reference org B source_proposal_id (cross-org FK -> 23503)', async () => {
@@ -293,8 +299,8 @@ describe('projects composite same-org FK (§ clients+projects)', () => {
              values (gen_random_uuid(), '${ORG_A_ID}', 90003, 'x', '${PROPOSAL_B_ID}', '${CLIENT_A_ID}', '${PROJECT_A_ID}')`,
           ),
         ),
-      ),
-    ).rejects.toMatchObject({ code: '23503' });
+      ).catch(sqlstateOf),
+    ).resolves.toBe('23503');
   });
 });
 

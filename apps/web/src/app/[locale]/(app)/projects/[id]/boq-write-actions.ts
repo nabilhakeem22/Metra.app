@@ -20,6 +20,7 @@ import {
   type EditableLine,
   type RowEdits,
 } from './boq-sheet-columns';
+import { loggableFailure } from '@/lib/actions/loggable-failure';
 import type { CellWriteLatch } from './cell-write-latch';
 import type { BoqEditsApi } from './use-boq-edits';
 
@@ -120,7 +121,7 @@ export function saveLine(
             console.error(
               'boq line save failed before returning a result',
               { lineId: line.id, columns },
-              cause,
+              loggableFailure(cause),
             );
             toast({ title: context.sheetText('saveFailed'), variant: 'destructive' });
           }

@@ -2,6 +2,7 @@ import 'server-only';
 import { after } from 'next/server';
 import type { MetraDb, PostgresJs } from '@metra/db';
 import { cfExecutionContext, isCloudflareRuntime } from '@/lib/cf/context';
+import { loggableFailure } from '@/lib/actions/loggable-failure';
 import { createRuntimeConnection } from './client';
 
 /** The one postgres.js instance (+ drizzle handle) shared across a request. */
@@ -74,7 +75,10 @@ export function getRequestConnection(): RequestConn {
       ctx.waitUntil(sql.end({ timeout: 5 }));
     });
   } catch (err) {
-    console.warn('getRequestConnection: after() teardown unavailable', err);
+    console.warn(
+      'getRequestConnection: after() teardown unavailable',
+      loggableFailure(err),
+    );
   }
 
   return { db, sql };

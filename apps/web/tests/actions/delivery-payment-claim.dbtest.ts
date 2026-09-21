@@ -1,3 +1,4 @@
+import { sqlstateOf } from '@metra/db/sqlstate';
 import { afterAll, describe, expect, it } from 'vitest';
 import { createClientCore } from '@/lib/clients/core';
 import { listClients } from '@/lib/clients/queries';
@@ -476,7 +477,7 @@ describe('client_payment_claims_resolution — status and resolution agree (M5)'
       );
       return null;
     } catch (error) {
-      return (error as { code?: string }).code ?? 'unknown';
+      return sqlstateOf(error) ?? 'unknown';
     }
   }
 

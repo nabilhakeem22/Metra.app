@@ -1,3 +1,9 @@
+// These refusals are asserted as `.catch(sqlstateOf)` rather than
+// `.rejects.toMatchObject({ code })`: the statements run through the ORM, and
+// from drizzle-orm 0.44 the driver's error arrives wrapped, with the SQLSTATE
+// on `.cause`. A top-level `.code` read answers undefined and the assertion
+// stops testing the database.
+import { sqlstateOf } from '@metra/db/sqlstate';
 import { sql } from 'drizzle-orm';
 import { afterAll, describe, expect, it } from 'vitest';
 import { createClientCore } from '@/lib/clients/core';
@@ -153,8 +159,8 @@ describe('send + immutability (AC4, AC5)', () => {
     await expect(
       withOrgContext(ctx, (tx) =>
         tx.execute(sql`update public.proposals set total = '1' where id = ${id}`),
-      ),
-    ).rejects.toMatchObject({ code: 'MT100' });
+      ).catch(sqlstateOf),
+    ).resolves.toBe('MT100');
 
     // A raw INSERT of a section under the sent proposal is frozen.
     const [sec] = await raw.query<{ id: string }>(
@@ -165,15 +171,15 @@ describe('send + immutability (AC4, AC5)', () => {
         tx.execute(
           sql`update public.proposal_sections set title_en = 'x' where id = ${sec.id}`,
         ),
-      ),
-    ).rejects.toMatchObject({ code: 'MT100' });
+      ).catch(sqlstateOf),
+    ).resolves.toBe('MT100');
     await expect(
       withOrgContext(ctx, (tx) =>
         tx.execute(
           sql`delete from public.proposal_lines where section_id = ${sec.id}`,
         ),
-      ),
-    ).rejects.toMatchObject({ code: 'MT100' });
+      ).catch(sqlstateOf),
+    ).resolves.toBe('MT100');
   });
 
   it('refuses RE-PARENTING a section or a line OUT of a sent proposal, not only INTO one', async () => {
@@ -211,15 +217,15 @@ describe('send + immutability (AC4, AC5)', () => {
         tx.execute(
           sql`update public.proposal_sections set proposal_id = ${draftId} where id = ${sentSection.id}`,
         ),
-      ),
-    ).rejects.toMatchObject({ code: 'MT100' });
+      ).catch(sqlstateOf),
+    ).resolves.toBe('MT100');
     await expect(
       withOrgContext(ctx, (tx) =>
         tx.execute(
           sql`update public.proposal_lines set section_id = ${draftSections[0].id} where id = ${sentLine.id}`,
         ),
-      ),
-    ).rejects.toMatchObject({ code: 'MT100' });
+      ).catch(sqlstateOf),
+    ).resolves.toBe('MT100');
 
     // The direction that always worked, asserted so the OLD check cannot be
     // mistaken for having REPLACED the NEW one.
@@ -228,15 +234,15 @@ describe('send + immutability (AC4, AC5)', () => {
         tx.execute(
           sql`update public.proposal_sections set proposal_id = ${sentId} where id = ${draftSections[0].id}`,
         ),
-      ),
-    ).rejects.toMatchObject({ code: 'MT100' });
+      ).catch(sqlstateOf),
+    ).resolves.toBe('MT100');
     await expect(
       withOrgContext(ctx, (tx) =>
         tx.execute(
           sql`update public.proposal_lines set section_id = ${sentSection.id} where id = ${draftLine.id}`,
         ),
-      ),
-    ).rejects.toMatchObject({ code: 'MT100' });
+      ).catch(sqlstateOf),
+    ).resolves.toBe('MT100');
 
     // Nothing moved.
     const [stillSent] = await raw.query<{ proposal_id: string }>(

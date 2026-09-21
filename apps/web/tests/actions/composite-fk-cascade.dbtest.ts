@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { sqlstateOf } from '@metra/db/sqlstate';
 import { sql } from 'drizzle-orm';
 import { afterAll, describe, expect, it } from 'vitest';
 import { commitImportCore, createBoqCore } from '@/lib/boqs/core';
@@ -75,13 +76,17 @@ interface BoqRow {
   status: string;
 }
 
-/** The SQLSTATE of a rejected statement, or null if it was accepted. */
-async function sqlstateOf(run: () => Promise<unknown>): Promise<string | null> {
+/**
+ * The SQLSTATE of a rejected statement, or null if it was accepted. Read
+ * through `sqlstateOf`: these statements run through the ORM, which from
+ * drizzle 0.44 wraps the driver's error and moves the code onto `.cause`.
+ */
+async function refusalSqlstate(run: () => Promise<unknown>): Promise<string | null> {
   try {
     await run();
     return null;
   } catch (error) {
-    return (error as { code?: string }).code ?? 'unknown';
+    return sqlstateOf(error) ?? 'unknown';
   }
 }
 
@@ -154,7 +159,7 @@ async function setup(): Promise<Fixture> {
 
 /** Freeze it exactly the way `boqs/issue.ts:134-143` does, as metra_app. */
 async function issue(fixture: Fixture): Promise<string | null> {
-  return sqlstateOf(() =>
+  return refusalSqlstate(() =>
     withOrgContext(fixture.ctx, (tx) =>
       tx.execute(
         sql.raw(
@@ -201,7 +206,7 @@ describe('a composite set-null cascade nulls the reference and leaves org_id alo
     const fixture = await setup();
 
     expect(
-      await sqlstateOf(() =>
+      await refusalSqlstate(() =>
         raw.query(`delete from public.files where id = '${fixture.fileId}'`),
       ),
     ).toBeNull();
@@ -218,7 +223,7 @@ describe('a composite set-null cascade nulls the reference and leaves org_id alo
     const fixture = await setup();
 
     expect(
-      await sqlstateOf(() =>
+      await refusalSqlstate(() =>
         raw.query(
           `delete from public.design_engagements where id = '${fixture.engagementId}'`,
         ),
@@ -241,14 +246,14 @@ describe('a composite set-null cascade nulls the reference and leaves org_id alo
     expect(await issue(fixture)).toBeNull();
 
     expect(
-      await sqlstateOf(() =>
+      await refusalSqlstate(() =>
         raw.query(
           `delete from public.design_engagements where id = '${fixture.engagementId}'`,
         ),
       ),
     ).toBeNull();
     expect(
-      await sqlstateOf(() =>
+      await refusalSqlstate(() =>
         raw.query(`delete from public.files where id = '${fixture.fileId}'`),
       ),
     ).toBeNull();

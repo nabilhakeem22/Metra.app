@@ -9,16 +9,22 @@
 //     connection (RLS-bypass / cross-tenant leak). Reach org-scoped data only via
 //     withOrgContext()/withUserContext(); sanctioned base-connection uses are
 //     allowlisted inside the rule module.
+//   • `metra/no-raw-error-in-log` — bans handing a raw caught value to
+//     console.error/warn. A DrizzleQueryError prints the SQL and its BOUND
+//     PARAMETERS; a PostgresError prints the colliding row in `detail`. Wrap it
+//     in `loggableFailure()`.
 import js from '@eslint/js';
 import tseslint from 'typescript-eslint';
 import { noPhysicalInlineDirection } from './eslint-rules/no-physical-inline-direction.mjs';
 import { noBareTenantDb } from './eslint-rules/no-bare-tenant-db.mjs';
+import { noRawErrorInLog } from './eslint-rules/no-raw-error-in-log.mjs';
 import { noServerRegistryInClient } from './eslint-rules/no-server-registry-in-client.mjs';
 
 const metraPlugin = {
   rules: {
     'no-physical-inline-direction': noPhysicalInlineDirection,
     'no-bare-tenant-db': noBareTenantDb,
+    'no-raw-error-in-log': noRawErrorInLog,
     'no-server-registry-in-client': noServerRegistryInClient,
   },
 };
@@ -107,9 +113,25 @@ export default tseslint.config(
     },
   },
   {
-    // The test files themselves — the helpers exist for exactly these.
+    // THE RAW-ERROR LOG BAN, scoped to the app's own source.
+    //
+    // apps/web/src ONLY, because that is where the hazard is: `packages/db`'s
+    // scripts are operator CLIs run by a human against a database they already
+    // have, `scripts/**` likewise, and `workers/cron` is a separate wrangler
+    // project outside these globs. Widening it would turn a tenancy rule into a
+    // logging-style rule, and the first thing that happens then is somebody
+    // disables it.
+    files: ['apps/web/src/**/*.{ts,tsx}'],
+    rules: { 'metra/no-raw-error-in-log': 'error' },
+  },
+  {
+    // The test files themselves — the helpers exist for exactly these, and
+    // asserting on the RAW object is the whole job of `loggable-failure.test.ts`.
     files: ['**/*.test.ts', '**/*.test.tsx', '**/*.dbtest.ts', '**/src/test/**'],
-    rules: { 'no-restricted-imports': 'off' },
+    rules: {
+      'no-restricted-imports': 'off',
+      'metra/no-raw-error-in-log': 'off',
+    },
   },
   {
     // Node CLI scripts: plain ESM run by `node`, so they legitimately use the

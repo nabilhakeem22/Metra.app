@@ -11,6 +11,7 @@ import 'server-only';
 import { sql } from 'drizzle-orm';
 import { normalizeRawToken, readSdfJson } from '@/lib/share/sdf-call';
 import { hashShareToken } from '@/lib/share/token';
+import { loggableFailure } from '@/lib/actions/loggable-failure';
 import { shapeDelivery } from './delivery-shape';
 import type { DeliverySnapshot } from './row-guards';
 import type { PublicDelivery } from './types';
@@ -60,12 +61,23 @@ export type DeliveryReadResult =
  * load this, your link is still valid"; a token that resolves to nothing, and a
  * snapshot this build cannot shape, answer `not_found`.
  *
- * THE BREADCRUMB CARRIES THE ERROR. It used to carry only `hasSnapshot`, so a
- * transient database failure and an expired link produced the same dead page for
- * the client AND the same one-boolean log line for on-call — the two things
- * nobody can tell apart at 3am are exactly the two this catch covers. The error
- * object is server-side and token-free: the token never reaches this scope as
- * anything but the hash, and the snapshot's client data is not in the throw.
+ * THE BREADCRUMB CARRIES THE ERROR, REDACTED. It used to carry only
+ * `hasSnapshot`, so a transient database failure and an expired link produced
+ * the same dead page for the client AND the same one-boolean log line for
+ * on-call — the two things nobody can tell apart at 3am are exactly the two this
+ * catch covers.
+ *
+ * IT GOES THROUGH `loggableFailure`, AND THIS IS THE SITE THAT NEEDS IT MOST.
+ * The line above this one used to say the thrown error was "token-free", and on
+ * drizzle 0.36 it was. It is not any more: the SDF call is a parameterised
+ * `db.execute`, so from drizzle 0.44 the throw is a `DrizzleQueryError` whose
+ * `params` — and whose message — are the arguments this file passed, and the one
+ * argument it passes is `hashShareToken(token)`. Logging the raw error would
+ * write the share-link hash of an identified client into Workers Logs on every
+ * database blip, from the app's ONLY unauthenticated entry point. The whitelist
+ * copies five fields off the DRIVER error and never the wrapper's message or its
+ * params, so the hash does not travel. The raw token still never reaches this
+ * scope at all.
  */
 export async function getDeliveryByToken(
   rawToken: string,
@@ -80,7 +92,10 @@ export async function getDeliveryByToken(
     const delivery = shapeDelivery(snapshot);
     return delivery ? { status: 'ok', delivery } : { status: 'not_found' };
   } catch (error) {
-    console.error('delivery read failed', { hasSnapshot, error });
+    console.error('delivery read failed', {
+      hasSnapshot,
+      error: loggableFailure(error),
+    });
     return { status: 'read_failed' };
   }
 }

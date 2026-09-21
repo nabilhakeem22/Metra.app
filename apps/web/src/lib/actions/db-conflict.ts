@@ -10,8 +10,10 @@
  * stops an expected race writing a false defect line into the Worker log.
  *
  * Pure and dependency-free so it is unit-testable without a database: both read
- * only the `code` property postgres.js copies off the server's error response.
+ * the error's SQLSTATE through `sqlstateOf`, which finds it whether postgres.js
+ * threw it directly or drizzle wrapped it in a `DrizzleQueryError` first.
  */
+import { driverRefusalOf, sqlstateOf } from '@metra/db/sqlstate';
 
 /** Postgres unique/exclusion violation. */
 const UNIQUE_VIOLATION = '23505';
@@ -23,31 +25,13 @@ const UNIQUE_VIOLATION = '23505';
  */
 const IMMUTABILITY_VIOLATION = 'MT100';
 
-function sqlStateOf(error: unknown): string | null {
-  const code = (error as { code?: unknown } | null)?.code;
-  return typeof code === 'string' ? code : null;
-}
-
 /**
  * SQLSTATE 23505 — a unique or exclusion constraint refused the write. A REAL
  * refusal, unlike db-failure's ambiguous class, so a caller that knows which
  * constraint it raced may name it (`contract_exists`, `code_taken`, …).
  */
 export function isUniqueViolation(error: unknown): boolean {
-  return sqlStateOf(error) === UNIQUE_VIOLATION;
-}
-
-/**
- * The constraint a Postgres error names, or null.
- *
- * postgres.js copies every field of the server's ErrorResponse onto the thrown
- * error, `constraint_name` among them (snake_case, as the wire protocol spells
- * it). It is absent for an error the server did not attribute to a constraint,
- * and it is not something an attacker chooses: the server writes it.
- */
-export function constraintNameOf(error: unknown): string | null {
-  const name = (error as { constraint_name?: unknown } | null)?.constraint_name;
-  return typeof name === 'string' && name.length > 0 ? name : null;
+  return sqlstateOf(error) === UNIQUE_VIOLATION;
 }
 
 /**
@@ -61,9 +45,17 @@ export function constraintNameOf(error: unknown): string | null {
  * a contract NUMBER under its own unique index. Naming the constraint is what
  * keeps an unexpected collision in the unclassified tail, where it is logged,
  * instead of being answered "a contract already exists".
+ *
+ * BOTH READS COME OFF ONE OBJECT (`driverRefusalOf`). Asking twice — once for
+ * the code, once for the name — lets the two answers come from two different
+ * levels of the `cause` chain, and a pair that never described the same error
+ * is precisely the false "a contract already exists" this function exists to
+ * prevent. postgres.js writes `constraint_name` itself (snake_case, as the wire
+ * protocol spells it); it is not something a caller or an attacker chooses.
  */
 export function isUniqueViolationOf(error: unknown, constraint: string): boolean {
-  return isUniqueViolation(error) && constraintNameOf(error) === constraint;
+  const refusal = driverRefusalOf(error);
+  return refusal?.code === UNIQUE_VIOLATION && refusal.constraintName === constraint;
 }
 
 /**
@@ -73,5 +65,5 @@ export function isUniqueViolationOf(error: unknown, constraint: string): boolean
  * defect.
  */
 export function isImmutabilityViolation(error: unknown): boolean {
-  return sqlStateOf(error) === IMMUTABILITY_VIOLATION;
+  return sqlstateOf(error) === IMMUTABILITY_VIOLATION;
 }

@@ -7,7 +7,8 @@
   "exports": {
     ".": "./src/index.ts",
     "./schema": "./src/schema/index.ts",
-    "./client": "./src/client.ts"
+    "./client": "./src/client.ts",
+    "./sqlstate": "./src/sqlstate.ts"
   },
   "scripts": {
     "generate": "drizzle-kit generate",
@@ -23,7 +24,7 @@
     "test:isolation": "vitest run --config vitest.isolation.config.ts"
   },
   "dependencies": {
-    "drizzle-orm": "^0.36.4",
+    "drizzle-orm": "0.45.2",
     "postgres": "^3.4.5"
   },
   "devDependencies": {

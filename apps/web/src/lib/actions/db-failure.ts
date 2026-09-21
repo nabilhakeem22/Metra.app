@@ -17,8 +17,13 @@
  *    reading its reply. The canonical ambiguous write.
  *
  * Pure and dependency-free so it is unit-testable without a database: it reads
- * only the `code` property postgres.js copies off the server's error response.
+ * the error's SQLSTATE through `sqlstateOf`, which finds it whether postgres.js
+ * threw it directly or drizzle wrapped it in a `DrizzleQueryError` first. Both
+ * shapes reach this function on the same path: the driver raises the class-08
+ * and lock-timeout errors itself, while a statement the ORM ran arrives wrapped.
  */
+import { sqlstateOf } from '@metra/db/sqlstate';
+
 const AMBIGUOUS_SQLSTATES: ReadonlySet<string> = new Set([
   '55P03',
   '57014',
@@ -35,17 +40,42 @@ const CONNECTION_EXCEPTION_CLASS = '08';
  * postgres.js raises its own connection errors with these `code` values
  * (see node_modules/postgres/src/errors.js). They are the class-08 outcome in
  * practice, so they are ambiguous for exactly the same reason.
+ *
+ * THE LAST THREE ARE NODE'S, NOT THE DRIVER'S, and they are the ones that were
+ * missing. When the socket fails below postgres.js — a pooler recycling a
+ * backend, a Hyperdrive hop dropping — what surfaces is the libuv error verbatim
+ * (`ECONNRESET` mid-statement is the canonical ambiguous write), sometimes
+ * inside an `AggregateError` when one host resolved to several addresses. They
+ * are unlisted here today, so they fall to `generic`, and `generic` is NOT in
+ * DEFINITE_REFUSALS — which means the cockpit DROPS the held idempotency key and
+ * the retry mints a fresh one for an attempt that may have committed.
+ *
+ * `ECONNREFUSED` and a connect-phase `ETIMEDOUT` did not reach the server at
+ * all, so strictly they are definite failures. They are listed anyway, for the
+ * same reason `CONNECT_TIMEOUT` and the whole of class 08 (which includes 08001
+ * "unable to connect") already are: this module's job is to name what we cannot
+ * be SURE about, and Node does not tell us whether an `ETIMEDOUT` fired during
+ * the handshake or on a statement in flight. Holding a key that could have been
+ * released costs nothing; releasing one that should have been held is the
+ * double-apply the retry policy exists to prevent.
+ *
+ * NOT listed, deliberately: `MAX_PARAMETERS_EXCEEDED`. postgres.js raises it
+ * BEFORE sending anything, so nothing can have committed — it is a definite
+ * failure, and calling it ambiguous would only mislabel it.
  */
 const DRIVER_CONNECTION_CODES: ReadonlySet<string> = new Set([
   'CONNECTION_CLOSED',
   'CONNECTION_DESTROYED',
   'CONNECTION_ENDED',
   'CONNECT_TIMEOUT',
+  'ECONNRESET',
+  'ECONNREFUSED',
+  'ETIMEDOUT',
 ]);
 
 export function isAmbiguousDbOutcome(error: unknown): boolean {
-  const code = (error as { code?: unknown } | null)?.code;
-  if (typeof code !== 'string') return false;
+  const code = sqlstateOf(error);
+  if (code === undefined) return false;
   return (
     AMBIGUOUS_SQLSTATES.has(code) ||
     DRIVER_CONNECTION_CODES.has(code) ||

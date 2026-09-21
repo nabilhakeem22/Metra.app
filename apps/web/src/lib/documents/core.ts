@@ -15,6 +15,7 @@ import {
 } from '@/lib/http/deadlines';
 import { removeStoredObject } from '@/lib/storage/objects';
 import { getSignedUrl } from '@/lib/storage/signed-urls';
+import { loggableFailure } from '@/lib/actions/loggable-failure';
 import type { DocumentEntitySpec } from './entities';
 
 /**
@@ -73,7 +74,11 @@ export async function getDocumentUrlCore(
     });
     return { ok: true, url };
   } catch (error) {
-    console.error('document url mint failed', { fileId, entity: spec.entity, error });
+    console.error('document url mint failed', {
+      fileId,
+      entity: spec.entity,
+      error: loggableFailure(error),
+    });
     return err('generic');
   }
 }
@@ -173,7 +178,10 @@ async function discardStoredBytes(deleted: DeletedObject | undefined): Promise<v
   // still leaves its breadcrumb instead of becoming an unhandled rejection.
   const removal = removeStoredObject(deleted.bucket, deleted.objectKey).catch(
     (error: unknown) => {
-      console.error('document object remove failed', { ...deleted, error });
+      console.error('document object remove failed', {
+        ...deleted,
+        error: loggableFailure(error),
+      });
     },
   );
   keepAlivePastResponse(removal);
@@ -187,7 +195,7 @@ async function discardStoredBytes(deleted: DeletedObject | undefined): Promise<v
     console.warn('document object remove still running past the cleanup deadline', {
       ...deleted,
       deadlineMs: STORAGE_CLEANUP_TIMEOUT_MS,
-      error,
+      error: loggableFailure(error),
     });
   }
 }
@@ -205,6 +213,6 @@ function keepAlivePastResponse(work: Promise<unknown>): void {
   try {
     cfExecutionContext().waitUntil(work);
   } catch (error) {
-    console.warn('discardStoredBytes: waitUntil unavailable', error);
+    console.warn('discardStoredBytes: waitUntil unavailable', loggableFailure(error));
   }
 }

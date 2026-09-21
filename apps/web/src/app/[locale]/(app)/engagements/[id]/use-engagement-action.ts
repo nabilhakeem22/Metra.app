@@ -5,6 +5,7 @@ import { useRouter } from '@/i18n/routing';
 import type { ActionCode, ActionResult } from '@/lib/actions/result';
 import type { HeldKeyTrigger } from '@/lib/engagements/held-act';
 import { releasesKey } from '@/lib/engagements/retry-policy';
+import { loggableFailure } from '@/lib/actions/loggable-failure';
 import { useHeldKeys } from './use-held-keys';
 
 /**
@@ -129,7 +130,10 @@ export function useEngagementAction(
         // have reached Postgres and committed, and only the response was lost.
         // So the key is HELD here too; releasing it would hand the retry a fresh
         // identity and reopen exactly the double-apply this exists to close.
-        console.error('engagement action failed before returning a result', cause);
+        console.error(
+          'engagement action failed before returning a result',
+          loggableFailure(cause),
+        );
         setError('generic');
       } finally {
         inFlight.current = false;

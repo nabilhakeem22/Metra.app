@@ -10,6 +10,7 @@ import {
 } from '@/lib/auth/active-org';
 import { getSessionUser } from '@/lib/auth/session';
 import { withUserContext } from '@/lib/db/context';
+import { loggableFailure } from '@/lib/actions/loggable-failure';
 import { acceptInviteCore } from '../core';
 import { type ActionResult } from '@/lib/actions/result';
 
@@ -58,7 +59,7 @@ export async function acceptInvite(rawToken: string): Promise<ActionResult> {
     cookieStore.set(ACTIVE_ORG_COOKIE, inv.org_id, activeOrgCookieOptions());
     return res;
   } catch (e) {
-    console.error('acceptInvite failed:', e);
+    console.error('acceptInvite failed:', loggableFailure(e));
     return DECLINED;
   }
 }

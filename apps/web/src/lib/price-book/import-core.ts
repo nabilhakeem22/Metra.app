@@ -20,6 +20,7 @@ import {
   SpreadsheetError,
   type ParsedSheet,
 } from './parse';
+import { loggableFailure } from '@/lib/actions/loggable-failure';
 
 export async function parseCostImportCore(
   ctx: OrgContext,
@@ -40,7 +41,7 @@ export async function parseCostImportCore(
       }
       return err('invalid');
     }
-    console.error('parseCostImportCore failed:', e);
+    console.error('parseCostImportCore failed:', loggableFailure(e));
     return err('generic');
   }
 }

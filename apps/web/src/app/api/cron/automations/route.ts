@@ -2,6 +2,7 @@ import { timingSafeEqual } from 'node:crypto';
 import { NextResponse } from 'next/server';
 import { runDueAutomations } from '@/lib/automation/runner';
 import { runtimeSecret } from '@/lib/cf/secrets';
+import { loggableFailure } from '@/lib/actions/loggable-failure';
 
 // Session-less cron. Node-only (crypto + privileged DB); the i18n matcher skips
 // /api. The `metra-cron` Cloudflare Worker (workers/cron) is the only caller and
@@ -49,7 +50,7 @@ export async function GET(req: Request) {
   } catch (err) {
     // The runner is designed never to throw; this is the last-resort net so a
     // single bad tick returns 500 rather than crashing the function.
-    console.error('automation cron failed:', err);
+    console.error('automation cron failed:', loggableFailure(err));
     return NextResponse.json({ error: 'Automation run failed' }, { status: 500 });
   }
 }

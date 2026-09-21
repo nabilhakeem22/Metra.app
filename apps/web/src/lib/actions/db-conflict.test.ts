@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { isAmbiguousDbOutcome } from './db-failure';
 import {
-  constraintNameOf,
   isImmutabilityViolation,
   isUniqueViolation,
   isUniqueViolationOf,
@@ -59,17 +58,30 @@ describe('isUniqueViolationOf', () => {
     ).toBe(false);
     expect(isUniqueViolationOf(null, CONSTRAINT)).toBe(false);
   });
-});
 
-describe('constraintNameOf', () => {
-  it('reads the server-supplied name, and nothing else', () => {
-    expect(constraintNameOf({ constraint_name: 'clients_org_id_phone_unique' })).toBe(
-      'clients_org_id_phone_unique',
-    );
-    expect(constraintNameOf({ code: '23505' })).toBeNull();
-    expect(constraintNameOf({ constraint_name: '' })).toBeNull();
-    expect(constraintNameOf(new Error('boom'))).toBeNull();
-    expect(constraintNameOf(null)).toBeNull();
+  it('refuses a code and a constraint name that came from DIFFERENT errors (S3)', () => {
+    // The pair has to describe ONE refusal. Two independent walks would each
+    // stop at the outermost node carrying THEIR field: the 23505 off the outer
+    // error, the constraint name off the inner one — and answer "the race you
+    // named" to a collision neither error reported. `driverRefusalOf` reads both
+    // off the node that carried the code, so the inner name is not in scope.
+    const mixedNodes = {
+      code: '23505',
+      cause: { code: '23514', constraint_name: CONSTRAINT },
+    };
+    expect(isUniqueViolationOf(mixedNodes, CONSTRAINT)).toBe(false);
+
+    // The mirror: the name on the OUTER node, the 23505 on the inner one.
+    const mirrored = {
+      constraint_name: CONSTRAINT,
+      cause: { code: '23505', constraint_name: 'some_other_index' },
+    };
+    expect(isUniqueViolationOf(mirrored, CONSTRAINT)).toBe(false);
+
+    // ...and the control: one node carrying both is still answered.
+    expect(
+      isUniqueViolationOf({ cause: { code: '23505', constraint_name: CONSTRAINT } }, CONSTRAINT),
+    ).toBe(true);
   });
 });
 
@@ -82,6 +94,48 @@ describe('isImmutabilityViolation', () => {
     expect(isImmutabilityViolation({ code: '23505' })).toBe(false);
     expect(isImmutabilityViolation(new Error('boom'))).toBe(false);
     expect(isImmutabilityViolation(null)).toBe(false);
+  });
+});
+
+describe('a drizzle-wrapped driver error reads exactly like a bare one', () => {
+  // From drizzle-orm 0.44 every error raised by a query the ORM ran is
+  // re-thrown with the driver's error on `.cause`. These classifiers decide
+  // whether an immutability refusal is a sentence or a 500, and whether a 23505
+  // is the race the caller named — so the wrapper must be invisible to them.
+  const wrap = (driver: unknown) =>
+    Object.assign(
+      new Error('Failed query: update public.proposals set total = $1\nparams: 1'),
+      { cause: driver },
+    );
+  const CONSTRAINT = 'contracts_org_id_source_proposal_unique';
+
+  it('sees 23505 and MT100 through the wrapper', () => {
+    expect(isUniqueViolation(wrap({ code: '23505' }))).toBe(true);
+    expect(isImmutabilityViolation(wrap({ code: 'MT100' }))).toBe(true);
+  });
+
+  it('sees the constraint name through the wrapper', () => {
+    expect(
+      isUniqueViolationOf(
+        wrap({ code: '23505', constraint_name: CONSTRAINT }),
+        CONSTRAINT,
+      ),
+    ).toBe(true);
+  });
+
+  it('still refuses a wrapped 23505 raised by a DIFFERENT constraint', () => {
+    expect(
+      isUniqueViolationOf(
+        wrap({ code: '23505', constraint_name: 'contracts_org_id_number_unique' }),
+        CONSTRAINT,
+      ),
+    ).toBe(false);
+  });
+
+  it('is false for the wrapper alone — it carries no SQLSTATE of its own', () => {
+    expect(isUniqueViolation(wrap(undefined))).toBe(false);
+    expect(isImmutabilityViolation(wrap(undefined))).toBe(false);
+    expect(isUniqueViolationOf(wrap(undefined), CONSTRAINT)).toBe(false);
   });
 });
 

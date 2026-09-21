@@ -1,4 +1,5 @@
 import { getRequestConfig } from 'next-intl/server';
+import { loggableFailure } from '@/lib/actions/loggable-failure';
 import { LOCALES, routing, type Locale } from './routing';
 
 export default getRequestConfig(async ({ requestLocale }) => {
@@ -41,7 +42,7 @@ export default getRequestConfig(async ({ requestLocale }) => {
       ) {
         throw error;
       }
-      console.error(error);
+      console.error(loggableFailure(error));
     },
   };
 });

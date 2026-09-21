@@ -4,6 +4,7 @@
 // engine and executor are Step 2 — nothing here writes engagement_transitions or
 // moves state off `created`.
 import { clients, designEngagements, projects } from '@metra/db';
+import { driverRefusalOf } from '@metra/db/sqlstate';
 import { and, count, eq, inArray, ne } from 'drizzle-orm';
 import { fail, mutateInOrg, requireInOrg } from '@/lib/actions/mutate';
 import { err, type ActionResult } from '@/lib/actions/result';
@@ -30,15 +31,17 @@ const PROJECT_DELIVERY_CAP = 2;
 // race for the project's single active slot — map it to the friendly
 // `project_delivery_exists`. Any other 23505 (or a missing constraint name)
 // rethrows so it surfaces as `generic` rather than being silently misreported.
+// Both reads come off ONE object: this insert runs through the ORM, so from
+// drizzle 0.44 the SQLSTATE and the constraint name sit one level down the
+// `cause` chain — and asking for them separately would let them answer from two
+// different levels, pairing a code from one error with a name from another.
 const UNIQUE_VIOLATION = '23505';
 const ONE_ACTIVE_INDEX = 'design_engagements_one_active_per_project_uniq';
 
 function isActiveDeliveryConflict(e: unknown): boolean {
+  const refusal = driverRefusalOf(e);
   return (
-    typeof e === 'object' &&
-    e !== null &&
-    (e as { code?: string }).code === UNIQUE_VIOLATION &&
-    (e as { constraint_name?: string }).constraint_name === ONE_ACTIVE_INDEX
+    refusal?.code === UNIQUE_VIOLATION && refusal.constraintName === ONE_ACTIVE_INDEX
   );
 }
 
