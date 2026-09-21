@@ -3,6 +3,7 @@ import 'server-only';
 // copy is never cached, and a busy renderer is retryable rather than broken.
 import { NextResponse } from 'next/server';
 import { RendererBusyError } from '@/lib/pdf/render';
+import { loggableFailure } from '@/lib/actions/loggable-failure';
 
 /** Every non-PDF answer this route family gives, in one shape. */
 export const json = (error: string, status: number, headers?: HeadersInit) =>
@@ -25,9 +26,9 @@ export function renderFailure(cause: unknown, logLabel: string): Response {
   if (cause instanceof RendererBusyError) {
     // The renderer is at its concurrency cap after retries. A retryable 503 with
     // retry-after, not a 500 — the caller should back off, not give up.
-    console.error(`${logLabel} PDF renderer busy:`, cause);
+    console.error(`${logLabel} PDF renderer busy:`, loggableFailure(cause));
     return json('Renderer busy, try again', 503, { 'retry-after': '5' });
   }
-  console.error(`${logLabel} PDF render failed:`, cause);
+  console.error(`${logLabel} PDF render failed:`, loggableFailure(cause));
   return json('PDF generation failed', 500);
 }

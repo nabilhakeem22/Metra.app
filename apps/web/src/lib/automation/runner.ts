@@ -1,6 +1,7 @@
 import 'server-only';
 import { automationSettings, organizations } from '@metra/db';
 import { eq } from 'drizzle-orm';
+import { loggableFailure } from '@/lib/actions/loggable-failure';
 import { runExpireProposals } from './expire-proposals';
 import { runFollowupReminders } from './followup-reminders';
 import { runPortfolioDigest } from './portfolio-digest';
@@ -73,7 +74,7 @@ export async function runDueAutomations(
       } catch (err) {
         console.error(
           `automation "${core.key}" failed for org ${org.id}:`,
-          err,
+          loggableFailure(err),
         );
         results.push({ orgId: org.id, ...skipped(core.key) });
       }

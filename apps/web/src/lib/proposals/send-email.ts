@@ -14,6 +14,7 @@ import { withOrgContext, type OrgContext } from '@/lib/db/context';
 import { sendProposalEmail } from '@/lib/email/resend';
 import { formatMoney } from '@/lib/format/money';
 import { formatProposalNumber, proposalYear } from '@/lib/format/proposal-number';
+import { loggableFailure } from '@/lib/actions/loggable-failure';
 import { getProposalSendMeta } from './queries';
 
 export interface ProposalEmailOutcome {
@@ -67,7 +68,10 @@ export async function notifyClientOfSentProposal(
     });
     return { emailSent: sent.sent, emailSkippedNoAddress: false };
   } catch (err) {
-    console.error('sendProposal email step failed (send unaffected):', err);
+    console.error(
+      'sendProposal email step failed (send unaffected):',
+      loggableFailure(err),
+    );
     return { emailSent: false, emailSkippedNoAddress: false };
   }
 }

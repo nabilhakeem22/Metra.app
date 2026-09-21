@@ -1,5 +1,4 @@
 import type { MetraDb } from '@metra/db';
-import { driverErrorOf } from '@metra/db/sqlstate';
 import { eq } from 'drizzle-orm';
 import type { PgColumn, PgTable } from 'drizzle-orm/pg-core';
 import { recordAudit, type AuditEntry } from '@/lib/audit';
@@ -14,6 +13,7 @@ import { can } from '@/lib/permissions/can';
 import type { Capability, PermissionAction } from '@/lib/permissions/roles';
 import { isImmutabilityViolation, isUniqueViolationOf } from './db-conflict';
 import { isAmbiguousDbOutcome } from './db-failure';
+import { loggableFailure } from './loggable-failure';
 import { ActionError, type ActionCode, type ActionResult } from './result';
 
 import { fail } from './result';
@@ -128,90 +128,6 @@ function mutationFailureCode(
   console.error('mutateInOrg failed:', loggableFailure(e));
   return 'generic';
 }
-
-/**
- * The fields of an unclassified failure that may be written to the log — a
- * WHITELIST, never the error object.
- *
- * postgres.js builds its PostgresError by `Object.assign`-ing every field of the
- * server's ErrorResponse onto the error, and those fields are ENUMERABLE. One of
- * them is `detail`, and for a 23505 `detail` is the row: `Key (org_id, email)=
- * (…, someone@example.com) already exists.` Logging the error object therefore
- * logs whatever the colliding index is built on, and the index a future mutation
- * races is not something this line can know in advance. (`query` and
- * `parameters` are non-enumerable unless postgres.js debug is on, which it is
- * not — but that is a property of somebody else's library, which is the wrong
- * thing to depend on.)
- *
- * Five fields, all of them describing the SHAPE of the failure rather than the
- * row: `name`, `code`, `constraint_name`, `table_name`, `message`. Together they
- * answer "which constraint on which table refused, and with what SQLSTATE",
- * which is the whole diagnostic value of this line. Strings only, so a field
- * carrying a structured value cannot smuggle an object in.
- *
- * ALL FIVE ARE READ OFF ONE OBJECT: `driverErrorOf`, the level in the `cause`
- * chain that the DRIVER threw. From drizzle 0.44 an ORM query's error arrives
- * wrapped in a `DrizzleQueryError` whose `message` is `Failed query: <sql>
- * params: <the bound parameters>` — the row values, by another route. Walking
- * field by field would take `constraint_name` off the driver error and `message`
- * off the wrapper, and log exactly what this whitelist exists to keep out.
- *
- * AND WHEN THERE IS NO DRIVER ERROR, THE WRAPPER IS STILL NOT SAFE TO READ. The
- * fallback used to hand the thrown value straight to the whitelist, which is
- * right for a plain `Error` and wrong for a `DrizzleQueryError` whose cause
- * carries no SQLSTATE — a dropped socket ("Network connection lost."), a driver
- * error whose `code` is undefined, a chain the cycle guard stopped walking. Its
- * `message` IS the bound parameters, so `{ name, message }` put the client's
- * email, phone and name into Workers Logs on the one path nobody had a case
- * for. `isOrmQueryWrapper` recognises it by the two own properties drizzle's
- * constructor always sets, and that branch logs what it IS and nothing it
- * carries.
- */
-function loggableFailure(e: unknown): Record<string, string> {
-  const driver = driverErrorOf(e);
-  if (!driver && isOrmQueryWrapper(e)) {
-    const name = (e as { name?: unknown }).name;
-    return typeof name === 'string' && name.length > 0
-      ? { name, thrown: ORM_QUERY_WRAPPER }
-      : { thrown: ORM_QUERY_WRAPPER };
-  }
-  const source = driver ?? (e as Record<string, unknown> | null | undefined);
-  const safe: Record<string, string> = {};
-  for (const field of LOGGABLE_ERROR_FIELDS) {
-    const value = source?.[field];
-    if (typeof value === 'string' && value.length > 0) safe[field] = value;
-  }
-  // A thrown non-object would otherwise log as `{}`, which reads like a bug in
-  // this function rather than a fact about the failure.
-  return Object.keys(safe).length > 0 ? safe : { thrown: typeof e };
-}
-
-/** What the log says instead of a wrapper's message. */
-const ORM_QUERY_WRAPPER = 'DrizzleQueryError';
-
-/**
- * Is this the ORM's query wrapper rather than something worth reading fields off?
- *
- * By its two OWN properties, not by `instanceof` and not by `name`:
- * `DrizzleQueryError`'s constructor sets `query`, `params` and `cause` and never
- * touches `name`, so the thrown object reports itself as a plain 'Error' and an
- * `instanceof` check would bind this file to a deep import of somebody else's
- * package. Own properties only — a driver error that happens to inherit a
- * `query` from a prototype is not this.
- */
-function isOrmQueryWrapper(e: unknown): boolean {
-  if (e === null || typeof e !== 'object') return false;
-  const own = Object.prototype.hasOwnProperty.bind(e);
-  return own('query') && own('params');
-}
-
-const LOGGABLE_ERROR_FIELDS = [
-  'name',
-  'code',
-  'constraint_name',
-  'table_name',
-  'message',
-] as const;
 
 /**
  * The single row `id` names in THIS org, or a coded failure.

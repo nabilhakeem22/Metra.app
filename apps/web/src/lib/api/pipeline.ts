@@ -5,6 +5,7 @@ import { isCloudflareRuntime, cfExecutionContext } from '@/lib/cf/context';
 import { withOrgContext, type OrgContext } from '@/lib/db/context';
 import { canSeeMargin } from '@/lib/permissions/can';
 import { touchApiKey, API_KEY_PREFIX, type ApiPrincipal } from '@/lib/api-keys/resolve';
+import { loggableFailure } from '@/lib/actions/loggable-failure';
 import { admitApiCaller, bearerToken, type AdmissionOptions } from './admit';
 import { problemResponse } from './errors';
 import { InvalidCursorError } from './pagination';
@@ -72,7 +73,7 @@ function problemForThrown(error: unknown): Response {
       detail: 'The provided cursor is malformed.',
     });
   }
-  console.error('Public API request failed:', error);
+  console.error('Public API request failed:', loggableFailure(error));
   return problemResponse('internal');
 }
 

@@ -1,6 +1,7 @@
 import 'server-only';
 import { createHash } from 'node:crypto';
 import { cfEnv, isCloudflareRuntime } from '@/lib/cf/context';
+import { loggableFailure } from '@/lib/actions/loggable-failure';
 
 // Cloudflare Workers Rate Limiting bindings for the Public API (v1). Two buckets:
 //   API_RATE_LIMITER          100 requests / 60s per resolved KEY (post-auth).
@@ -86,7 +87,7 @@ async function consume(
     const { success } = await limiter.limit({ key });
     return success ? ALLOW : DENY;
   } catch (error) {
-    console.error('rate limiter error (failing open):', error);
+    console.error('rate limiter error (failing open):', loggableFailure(error));
     return ALLOW;
   }
 }

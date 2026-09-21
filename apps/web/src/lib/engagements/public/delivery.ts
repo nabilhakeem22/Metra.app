@@ -11,6 +11,7 @@ import 'server-only';
 import { sql } from 'drizzle-orm';
 import { normalizeRawToken, readSdfJson } from '@/lib/share/sdf-call';
 import { hashShareToken } from '@/lib/share/token';
+import { loggableFailure } from '@/lib/actions/loggable-failure';
 import { shapeDelivery } from './delivery-shape';
 import type { DeliverySnapshot } from './row-guards';
 import type { PublicDelivery } from './types';
@@ -80,7 +81,10 @@ export async function getDeliveryByToken(
     const delivery = shapeDelivery(snapshot);
     return delivery ? { status: 'ok', delivery } : { status: 'not_found' };
   } catch (error) {
-    console.error('delivery read failed', { hasSnapshot, error });
+    console.error('delivery read failed', {
+      hasSnapshot,
+      error: loggableFailure(error),
+    });
     return { status: 'read_failed' };
   }
 }

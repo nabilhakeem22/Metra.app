@@ -5,6 +5,7 @@ import { redirect } from 'next/navigation';
 import { err, ok, type ActionResult } from '@/lib/actions/result';
 import { withUserContext } from '@/lib/db/context';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
+import { loggableFailure } from '@/lib/actions/loggable-failure';
 import { getSessionUser } from './session';
 
 // Single source of the result type (A4). Re-exported for back-compat imports.
@@ -27,7 +28,7 @@ export async function resolvePostLoginPath(): Promise<string> {
     // This routing hint must NEVER block a successful sign-in. If the membership
     // probe fails, send the user to /dashboard and let requireOrg re-resolve the
     // real destination (it redirects to /onboarding when there is no membership).
-    console.error('resolvePostLoginPath failed:', err);
+    console.error('resolvePostLoginPath failed:', loggableFailure(err));
     return '/dashboard';
   }
 }

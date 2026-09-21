@@ -10,6 +10,7 @@ import {
   stageReminderEmailTemplate,
   type EmailContent,
 } from './templates/automation';
+import { loggableFailure } from '@/lib/actions/loggable-failure';
 import { inviteEmailTemplate } from './templates/invite';
 import { proposalSentEmailTemplate } from './templates/proposal-sent';
 
@@ -45,7 +46,7 @@ async function dispatchEmail(
     );
     return { sent: !res.error };
   } catch (err) {
-    console.error(`${label} failed:`, err);
+    console.error(`${label} failed:`, loggableFailure(err));
     return { sent: false };
   }
 }

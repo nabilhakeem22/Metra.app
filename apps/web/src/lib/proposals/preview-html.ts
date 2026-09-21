@@ -14,6 +14,7 @@ import type { ActionResult } from '@/lib/actions/result';
 import { withOrgContext, type OrgContext } from '@/lib/db/context';
 import { buildProposalHtml } from '@/lib/pdf/proposal-template';
 import { can, canSeeMargin } from '@/lib/permissions/can';
+import { loggableFailure } from '@/lib/actions/loggable-failure';
 import { getProposalForPdf } from './queries';
 
 /** The firm's branding and its margin policy, in one read. */
@@ -61,7 +62,7 @@ export async function renderProposalPreviewHtml(
     });
     return { ok: true, html };
   } catch (err) {
-    console.error('getProposalPreviewHtml failed:', err);
+    console.error('getProposalPreviewHtml failed:', loggableFailure(err));
     return { ok: false, error: 'generic' };
   }
 }

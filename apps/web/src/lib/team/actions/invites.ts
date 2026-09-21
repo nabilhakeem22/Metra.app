@@ -9,6 +9,7 @@ import { sendInviteEmail } from '@/lib/email/resend';
 import { canManageOrg } from '@/lib/permissions/can';
 import { isUniqueViolation } from '@/lib/actions/db-conflict';
 import { type ActionResult } from '@/lib/actions/result';
+import { loggableFailure } from '@/lib/actions/loggable-failure';
 import { getOrgMemberIdentities } from '../identities';
 import { isInvitableRole } from '../invitable';
 import {
@@ -98,7 +99,7 @@ export async function inviteMember(input: {
     ) {
       return { ok: false, error: 'pending_exists' };
     }
-    console.error('inviteMember failed:', e);
+    console.error('inviteMember failed:', loggableFailure(e));
     return { ok: false, error: 'invalid' };
   }
 
