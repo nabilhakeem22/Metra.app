@@ -25,7 +25,7 @@ import { useEngagementAction } from './use-engagement-action';
 // composition over data the page already loaded; logical CSS only (RTL mirrors).
 export function EngagementDetailClient({
   header,
-  boqSummary,
+  boqStep,
   feeSchedule,
   payments,
   artifacts,
@@ -79,7 +79,7 @@ export function EngagementDetailClient({
       <EngagementCommandCard
         engagementId={header.id}
         projectId={header.projectId}
-        boqSummary={boqSummary}
+        boqStep={boqStep}
         preview={gatePreview}
         state={header.state}
         allowances={{

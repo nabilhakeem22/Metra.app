@@ -89,7 +89,7 @@ export function EngagementCommandCard(props: EngagementCommandCardProps) {
           <>
             <CommandCardSteps
               engagementId={engagementId}
-              project={{ id: props.projectId, state, boqSummary: props.boqSummary }}
+              project={{ id: props.projectId, state, boqStep: props.boqStep }}
               ctas={ctas}
               copy={copy}
               canUpload={canUpload}

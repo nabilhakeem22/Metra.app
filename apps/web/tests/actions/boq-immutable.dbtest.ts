@@ -421,8 +421,9 @@ describe('a BOQ is frozen at the database once it is issued', () => {
     expect(row.source_file_id).toBeNull();
     expect(row.status).toBe('issued');
 
-    // THE MECHANISM, from the catalogue rather than from the behaviour: both
-    // constraints are still SET NULL (confdeltype = 'n') over TWO referencing
+    // THE MECHANISM, from the catalogue rather than from the behaviour: all three
+    // (engagement, source file and, since 0055, source proposal) are still
+    // SET NULL (confdeltype = 'n') over TWO referencing
     // columns, and the set-null list now names exactly ONE of them - never
     // org_id. Behaviour alone would also pass on a constraint re-created as
     // `on delete cascade`, which would delete issued BOQs outright.
@@ -446,7 +447,7 @@ describe('a BOQ is frozen at the database once it is issued', () => {
           and c.confdeltype = 'n'
         order by c.conname`,
     );
-    expect(fks.length).toBe(2);
+    expect(fks.length).toBe(3);
     for (const fk of fks) {
       expect(Number(fk.ncols)).toBe(2);
       expect(fk.cols).toContain('org_id');

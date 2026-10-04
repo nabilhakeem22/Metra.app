@@ -79,7 +79,7 @@ export default async function EngagementDetailPage({
       <EngagementDetailClient
         key={header.id}
         header={header}
-        boqSummary={data.boqSummary}
+        boqStep={data.boqStep}
         feeSchedule={data.feeSchedule}
         payments={data.payments}
         artifacts={data.artifacts}

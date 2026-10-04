@@ -17,6 +17,17 @@ export interface BoqStepSummary {
   total: string;
 }
 
+/** Everything the delivery's BOQ step renders from, assembled on the server. */
+export interface BoqStepData {
+  current: BoqStepSummary | null;
+  /** The engagement's BOQ working copy in the proposal builder, if opened. */
+  boqProposalId: string | null;
+  /** Every milestone is paid, so the portal releases a `boq` to the client. */
+  clientCanOpen: boolean;
+  /** May build and send it (proposals_build AND boq_build create). */
+  canBuild: boolean;
+}
+
 export type BoqStepAction =
   /** Nothing priced yet — lead with building or importing one. */
   | 'start'
@@ -38,7 +49,12 @@ export function boqStepAction(
   return summary.status === 'draft' ? 'issue' : 'done';
 }
 
-/** Where the step's button goes — always the project's BOQ tab. */
+/** The project's BOQ tab: the uploaded-sheet path, and where an issued BOQ is viewed. */
 export function boqStepHref(projectId: string): string {
   return `/projects/${projectId}?tab=boq`;
+}
+
+/** The BOQ working copy opens in the proposal builder, in BOQ mode. */
+export function boqProposalHref(proposalId: string): string {
+  return `/proposals/${proposalId}`;
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { boqStepAction, boqStepHref } from './step';
+import { boqProposalHref, boqStepAction, boqStepHref } from './step';
 
 describe('boqStepAction', () => {
   it('leads with building one when there is no BOQ', () => {
@@ -30,5 +30,11 @@ describe('boqStepAction', () => {
 describe('boqStepHref', () => {
   it('points at the project’s BOQ tab', () => {
     expect(boqStepHref('p1')).toBe('/projects/p1?tab=boq');
+  });
+});
+
+describe('boqProposalHref', () => {
+  it('opens the working copy in the proposal builder', () => {
+    expect(boqProposalHref('p1')).toBe('/proposals/p1');
   });
 });

@@ -1,7 +1,7 @@
 'use client';
 
 import { useLocale, useTranslations } from 'next-intl';
-import type { BoqStepSummary } from '@/lib/boqs/step';
+import type { BoqStepData } from '@/lib/boqs/step';
 import type { CommandCardCtas } from '@/lib/engagements/command-card-ctas';
 import type { EngagementGatePreview } from '@/lib/engagements/gate-preview';
 import type { DesignState } from '@/lib/engagements/states';
@@ -22,7 +22,7 @@ export function CommandCardSteps({
   checklist,
 }: {
   engagementId: string;
-  project: { id: string; state: DesignState; boqSummary: BoqStepSummary | null };
+  project: { id: string; state: DesignState; boqStep: BoqStepData };
   ctas: Pick<CommandCardCtas, 'dropzoneCategory' | 'dropzoneAtCapacity'>;
   copy: CommandCardCopy;
   canUpload: boolean;
@@ -39,7 +39,11 @@ export function CommandCardSteps({
   return (
     <>
       {project.state === 'boq' && (
-        <EngagementBoqStep projectId={project.id} summary={project.boqSummary} />
+        <EngagementBoqStep
+          engagementId={engagementId}
+          projectId={project.id}
+          step={project.boqStep}
+        />
       )}
 
       {ctas.dropzoneCategory && (

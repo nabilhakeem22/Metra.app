@@ -1,4 +1,4 @@
-import type { BoqStepSummary } from '@/lib/boqs/step';
+import type { BoqStepData } from '@/lib/boqs/step';
 import type { EngagementGatePreview } from '@/lib/engagements/gate-preview';
 import type { CommercialPulse } from '@/lib/engagements/pulse';
 import type {
@@ -44,7 +44,7 @@ export interface EngagementDetailProps {
    */
   transitions: EngagementTransitionRecord[];
   clientActivity: EngagementClientActivityRecord[];
-  boqSummary: BoqStepSummary | null;
+  boqStep: BoqStepData;
   nextActions: Trigger[];
   capabilities: PanelCapabilities;
   canUpload: boolean;

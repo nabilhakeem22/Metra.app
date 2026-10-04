@@ -1,4 +1,4 @@
-import type { BoqStepSummary } from '@/lib/boqs/step';
+import type { BoqStepData } from '@/lib/boqs/step';
 import type { EngagementGatePreview } from '@/lib/engagements/gate-preview';
 import type { EngagementClientActivityRecord } from '@/lib/engagements/queries/client-activity';
 import type { RevisionAllowances } from '@/lib/engagements/revision-allowance';
@@ -17,7 +17,7 @@ export interface EngagementCommandCardProps {
   engagementId: string;
   projectId: string;
   /** The project's BOQ, for the `boq` step's lead action. Null when none exists. */
-  boqSummary: BoqStepSummary | null;
+  boqStep: BoqStepData;
   preview: EngagementGatePreview;
   state: DesignState;
   /**
