@@ -1,11 +1,11 @@
 import 'server-only';
 import { boqs } from '@metra/db';
 import { eq } from 'drizzle-orm';
-import { loggableFailure } from '@/lib/actions/loggable-failure';
 import { mutateInOrg } from '@/lib/actions/mutate';
 import { err, type ActionCode, type ActionResult } from '@/lib/actions/result';
 import type { OrgContext } from '@/lib/db/context';
 import { withOrgContext } from '@/lib/db/context';
+import { renderFailureCode } from '@/lib/pdf/render-failure-code';
 import { can } from '@/lib/permissions/can';
 import { getBoqDetail, type BoqDetail } from '../queries';
 import { loadDocumentNames, type DocumentNames } from './document-names';
@@ -49,8 +49,7 @@ export async function issueBoqCore(
   try {
     file = await renderAndStoreClientBoqPdf(ctx, { ...source, locale: input.locale });
   } catch (e) {
-    console.error('BOQ issue render failed:', loggableFailure(e));
-    return err('generic');
+    return err(renderFailureCode(e, 'BOQ issue'));
   }
 
   return mutateInOrg(ctx, { capability: 'boq_build', action: 'update' }, async (tx) => {

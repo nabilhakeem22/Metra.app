@@ -1,10 +1,10 @@
 // "Send as BOQ": snapshot, map, render, then ONE write. PURE core — the
 // 'use server' wrapper in ../actions does the session work.
 import 'server-only';
-import { loggableFailure } from '@/lib/actions/loggable-failure';
-import { err, type ActionResult } from '@/lib/actions/result';
+import { err, type ActionCode, type ActionResult } from '@/lib/actions/result';
 import { renderAndStoreClientBoqPdf } from '@/lib/boqs/issue';
 import type { OrgContext } from '@/lib/db/context';
+import { renderFailureCode } from '@/lib/pdf/render-failure-code';
 import { can } from '@/lib/permissions/can';
 import { toBoqDetail } from '../detail';
 import { mapProposalToBoq, type MappedBoq } from '../map';
@@ -13,13 +13,14 @@ import { commitProposalBoqCore, type CommitProposalBoqInput } from './commit';
 
 type StoredFile = { fileId: string; label: string };
 
-/** The client PDF, numbered with the number the commit must allocate, or null. */
+/** The client PDF, numbered with the number the commit must allocate, or the
+ *  refusal code (`renderer_busy` when it is worth retrying). */
 async function renderClientCopy(
   ctx: OrgContext,
   snapshot: SendSnapshot,
   mapped: MappedBoq,
   locale: string,
-): Promise<StoredFile | null> {
+): Promise<StoredFile | ActionCode> {
   const { proposal } = snapshot;
   const preferred = locale.startsWith('ar') ? proposal.titleAr : proposal.titleEn;
   const detail = toBoqDetail(
@@ -41,8 +42,7 @@ async function renderClientCopy(
       year: snapshot.renderYear,
     });
   } catch (e) {
-    console.error('Send as BOQ render failed:', loggableFailure(e));
-    return null;
+    return renderFailureCode(e, 'Send as BOQ');
   }
 }
 
@@ -90,7 +90,7 @@ export async function sendProposalAsBoqCore(
   const mapped = mapProposalToBoq(snapshot.source, snapshot.proposal.discountPct);
 
   const file = await renderClientCopy(ctx, snapshot, mapped, input.locale);
-  if (!file) return err('generic');
+  if (typeof file === 'string') return err(file);
 
   const committed = await commitProposalBoqCore(ctx, commitInput(snapshot, mapped, file));
   if (!committed.ok || !committed.data) return { ok: false, error: committed.error ?? 'generic' };

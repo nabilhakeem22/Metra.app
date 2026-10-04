@@ -13,6 +13,7 @@ import { issueBoq } from '@/lib/boqs/actions';
 /** Refusals whose own catalog sentence tells the studio what to do next. */
 const SPEAKS_FOR_ITSELF: ReadonlySet<ActionCode | undefined> = new Set<ActionCode | undefined>([
   'boq_send_conflict',
+  'renderer_busy',
 ]);
 
 /**

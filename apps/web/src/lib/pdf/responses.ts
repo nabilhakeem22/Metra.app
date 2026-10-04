@@ -2,7 +2,7 @@ import 'server-only';
 // The responses a PDF route sends, and the two rules they carry: the internal
 // copy is never cached, and a busy renderer is retryable rather than broken.
 import { NextResponse } from 'next/server';
-import { RendererBusyError } from '@/lib/pdf/render';
+import { RendererBusyError } from '@/lib/pdf/renderer-busy';
 import { loggableFailure } from '@/lib/actions/loggable-failure';
 
 /** Every non-PDF answer this route family gives, in one shape. */

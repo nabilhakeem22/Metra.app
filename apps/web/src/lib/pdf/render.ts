@@ -1,6 +1,9 @@
 import 'server-only';
 import puppeteer from '@cloudflare/puppeteer';
 import { cfEnv } from '@/lib/cf/context';
+import { RendererBusyError } from './renderer-busy';
+
+export { RendererBusyError };
 
 // Renders HTML to a PDF buffer via Cloudflare Browser Rendering (the BROWSER
 // binding). Each Worker invocation launches and closes its own browser session:
@@ -16,13 +19,6 @@ const PAGE_TIMEOUT_MS = 20_000;
 const MAX_LAUNCH_ATTEMPTS = 3;
 const RETRY_BACKOFF_MS = 250;
 
-/** The renderer was busy (concurrency/429) after every retry — signal a 503. */
-export class RendererBusyError extends Error {
-  constructor(options?: { cause?: unknown }) {
-    super('renderer-busy', options);
-    this.name = 'RendererBusyError';
-  }
-}
 
 // A launch/render failure that reads like a concurrency or rate-limit cap (429),
 // as opposed to a genuine render error (bad HTML, page timeout). Only these are

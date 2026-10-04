@@ -536,6 +536,7 @@
     "boq_not_draft": "This BOQ is issued and can no longer be changed.",
     "boq_not_found": "That bill of quantities no longer exists.",
     "boq_send_conflict": "The BOQ changed while it was being sent or issued. Review it and try again.",
+    "renderer_busy": "The PDF service is busy right now, so nothing was sent or issued. Try again in a few seconds.",
     "proposal_is_boq": "This is the delivery's BOQ. Send it from the delivery page.",
     "line_not_found": "That line no longer exists. Refresh the sheet.",
     "section_not_found": "That section no longer exists. Refresh the sheet.",

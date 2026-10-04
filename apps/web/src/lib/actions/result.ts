@@ -43,6 +43,9 @@ export type ActionCode =
   | 'boq_not_found'
   | 'boq_not_draft'
   | 'boq_send_conflict'
+  // The PDF renderer is at its concurrency cap after retries: nothing was
+  // written, and the same click a few seconds later normally works.
+  | 'renderer_busy'
   | 'proposal_is_boq'
   | 'contract_not_draft'
   | 'contract_not_issued'

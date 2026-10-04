@@ -20,6 +20,7 @@ vi.mock('@/lib/boqs/issue', () => ({ renderAndStoreClientBoqPdf }));
 vi.mock('./commit', () => ({ commitProposalBoqCore }));
 
 const { sendProposalAsBoqCore } = await import('./send');
+const { RendererBusyError } = await import('@/lib/pdf/renderer-busy');
 
 const ctx = (role: OrgContext['role']) =>
   ({ orgId: 'org-1', userId: 'user-1', userEmail: 'a@b.c', role }) as OrgContext;
@@ -85,6 +86,14 @@ describe('sendProposalAsBoqCore', () => {
     renderAndStoreClientBoqPdf.mockRejectedValue(new Error('503 at the renderer cap'));
     const res = await sendProposalAsBoqCore(ctx('owner'), { proposalId: 'p1', locale: 'en' });
     expect(res).toEqual({ ok: false, error: 'generic' });
+    expect(commitProposalBoqCore).not.toHaveBeenCalled();
+  });
+
+  it('answers renderer_busy (retryable) and never commits when the renderer is at its cap', async () => {
+    loadSendSnapshot.mockResolvedValue(snapshot);
+    renderAndStoreClientBoqPdf.mockRejectedValue(new RendererBusyError());
+    const res = await sendProposalAsBoqCore(ctx('owner'), { proposalId: 'p1', locale: 'en' });
+    expect(res).toEqual({ ok: false, error: 'renderer_busy' });
     expect(commitProposalBoqCore).not.toHaveBeenCalled();
   });
 

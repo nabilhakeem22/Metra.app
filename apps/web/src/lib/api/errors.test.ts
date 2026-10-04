@@ -52,6 +52,7 @@ const ALL_CODES: ActionCode[] = [
   'boq_not_found',
   'boq_not_draft',
   'boq_send_conflict',
+  'renderer_busy',
   'proposal_is_boq',
   'contract_not_draft',
   'contract_not_issued',
