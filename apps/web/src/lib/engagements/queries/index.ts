@@ -10,4 +10,4 @@ export * from './money';
 export * from './artifacts';
 export * from './client-activity';
 export * from './payment-claims';
-export * from './payments-settled';
+export * from './boq-releasable';

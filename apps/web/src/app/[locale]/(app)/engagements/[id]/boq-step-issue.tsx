@@ -13,9 +13,12 @@ import { boqStepHref } from '@/lib/boqs/step';
 export function BoqStepIssue({
   projectId,
   lineCount,
+  clientCanOpen,
 }: {
   projectId: string;
   lineCount: number;
+  /** The portal's BOQ rule: says whether issuing hands it over openable. */
+  clientCanOpen: boolean;
 }) {
   const t = useTranslations('engagements.boqStep');
   return (
@@ -27,7 +30,7 @@ export function BoqStepIssue({
             {t('issueTitle')}
           </p>
           <p className="mt-0.5 text-[13px] text-[color:var(--text-muted)]">
-            {t('issueBody', { count: String(lineCount) })}
+            {t(clientCanOpen ? 'issueBodyOpen' : 'issueBody', { count: String(lineCount) })}
           </p>
         </div>
       </div>

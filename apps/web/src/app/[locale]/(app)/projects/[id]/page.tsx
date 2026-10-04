@@ -16,7 +16,6 @@ import { listProjectTypes } from '@/lib/project-types/queries';
 import { getProjectById, getProjectOverview } from '@/lib/projects/queries';
 import { pickLocale } from '@/lib/i18n/pick-locale';
 import { can } from '@/lib/permissions/can';
-import { getProjectBoq } from '@/lib/boqs/queries';
 import { listProposals } from '@/lib/proposals/queries';
 import { ActivityTab } from './activity-tab';
 import { DetailsTab } from './details-tab';
@@ -27,6 +26,7 @@ import { FinancialsTab } from './financials-tab';
 import { ProjectDeliveryPanel } from '../../engagements/project-delivery-panel';
 import { OverviewTab } from './overview-tab';
 import { BoqTab } from './boq-tab';
+import { loadBoqTab } from './boq-tab-data';
 import { ProfileTabs } from './profile-tabs';
 import { ProposalsTab } from './proposals-tab';
 import { PROJECT_TABS, type ProjectTab } from './tabs';
@@ -162,16 +162,7 @@ export default async function ProjectProfilePage({
             canBuild={can(ctx.role, 'proposals_build', 'create')}
           />
         )}
-        {tab === 'boq' && (
-          <BoqTab
-            projectId={id}
-            boq={await getProjectBoq(ctx, id, {
-              showCost: can(ctx.role, 'margin_pnl', 'read'),
-            })}
-            canBuild={can(ctx.role, 'boq_build', 'create')}
-            canSeeCost={can(ctx.role, 'margin_pnl', 'read')}
-          />
-        )}
+        {tab === 'boq' && <BoqTab projectId={id} {...await loadBoqTab(ctx, id)} />}
         {tab === 'documents' && (
           <DocumentsTab
             projectId={id}

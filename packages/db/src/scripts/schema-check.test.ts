@@ -190,7 +190,7 @@ describe('runSchemaCheck', () => {
     expect(sectionsPrinted()).toEqual([
       'assert-schema-applied: indexes — 106 declared, 106 NOT FOUND (report only, does not fail this check):',
       'assert-schema-applied: constraints — 224 declared, 224 NOT FOUND (report only, does not fail this check):',
-      'assert-schema-applied: functions — 30 declared, 30 NOT FOUND (report only, does not fail this check):',
+      'assert-schema-applied: functions — 32 declared, 32 NOT FOUND (report only, does not fail this check):',
       'columns: BEHIND',
     ]);
     expect(printed).toContain('REPORT ONLY');
@@ -202,17 +202,18 @@ describe('runSchemaCheck', () => {
       fixtureSql({ ...completeCatalogues(), functionNames: new Set(['app_nothing']) }),
     );
     expect(code).toBe(0);
-    expect(logged.join('\n')).toContain('functions — 30 declared, 30 NOT FOUND');
+    expect(logged.join('\n')).toContain('functions — 32 declared, 32 NOT FOUND');
   });
 });
 
 describe('the counts the deploy order asks the owner to compare', () => {
-  it('declares 30 RLS functions, not 29', () => {
+  it('declares 32 RLS functions', () => {
     // wave6-coder.md's handoff said 29 and instructed the lead to compare the
     // printed counts against it. A `create or replace function public.<name>`
     // grep over rls/ returns 30 with no duplicate name, so the handoff number
     // was one short. Pinned here so the next handoff copies a tested fact.
-    expect(declaredFunctions().size).toBe(30);
+    // 32 since BOQ as a proposal added app_boq_releasable and app_document_settled.
+    expect(declaredFunctions().size).toBe(32);
   });
 });
 

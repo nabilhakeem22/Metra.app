@@ -118,3 +118,18 @@ describe('EngagementBoqStep: done (AC16)', () => {
     expect(/[٠-٩۰-۹]/.test(container.textContent ?? '')).toBe(false);
   });
 });
+
+describe('EngagementBoqStep: issue (S1)', () => {
+  const draft = { ...sent, status: 'draft' };
+
+  it('says the client cannot open it yet when the BOQ rule does not release it', () => {
+    renderStep(step({ current: draft, clientCanOpen: false }));
+    expect(screen.getByText(/withheld until the design fee is paid/)).toBeTruthy();
+    expect(screen.queryByText(/open it right away/)).toBeNull();
+  });
+
+  it('says the client can open it right away when the rule releases it', () => {
+    renderStep(step({ current: draft, clientCanOpen: true }));
+    expect(screen.getByText(/open it right away/)).toBeTruthy();
+  });
+});

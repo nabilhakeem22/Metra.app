@@ -232,8 +232,9 @@ reachable via Supabase PostgREST RPC.
   `app_variation_respond_by_token`, `app_delivery_by_token` /
   `app_delivery_respond_by_token` / `app_delivery_claim_payment_by_token` /
   `app_delivery_document_by_token` / `app_delivery_document_comments_by_token` /
-  `app_delivery_comment_by_token`, plus `app_document_access` and
-  `app_engagement_payments_settled`. **These are the functions that must never
+  `app_delivery_comment_by_token`, plus `app_document_access`,
+  `app_engagement_payments_settled`, `app_boq_releasable` and
+  `app_document_settled`. **These are the functions that must never
   return a cost or margin column**, and they are the reason the portals can be
   unauthenticated at all.
 

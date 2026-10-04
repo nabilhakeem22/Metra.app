@@ -29,7 +29,13 @@ export function EngagementBoqStep({
     return <BoqStepDone projectId={projectId} step={step} current={step.current} />;
   }
   if (action === 'issue' && step.current) {
-    return <BoqStepIssue projectId={projectId} lineCount={step.current.lineCount} />;
+    return (
+      <BoqStepIssue
+        projectId={projectId}
+        lineCount={step.current.lineCount}
+        clientCanOpen={step.clientCanOpen}
+      />
+    );
   }
   return <BoqStepStart engagementId={engagementId} projectId={projectId} step={step} />;
 }

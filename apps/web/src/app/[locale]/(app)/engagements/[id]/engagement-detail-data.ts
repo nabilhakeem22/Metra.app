@@ -22,7 +22,7 @@ import {
   getEngagementHeader,
   getEngagementPaymentClaims,
   getEngagementPayments,
-  getEngagementPaymentsSettled,
+  getEngagementBoqReleasable,
   getEngagementTransitions,
   type EngagementTransitionRecord,
 } from '@/lib/engagements/queries';
@@ -39,7 +39,7 @@ export type EngagementDetailData = NonNullable<
  * each other and must not become eleven sequential waits.
  *
  * The BOQ summary is keyed on `header.projectId`, so it follows the header; it
- * joins the batch with the BOQ working copy and the settle rule, which become
+ * joins the batch with the BOQ working copy and the BOQ release rule, which become
  * `boqStep` (the delivery's BOQ step renders from nothing else).
  */
 export async function loadEngagementDetail(ctx: OrgContext, id: string) {
@@ -60,7 +60,7 @@ export async function loadEngagementDetail(ctx: OrgContext, id: string) {
     awaitingReplyCount,
     boqSummary,
     boqProposalId,
-    paymentsSettled,
+    boqReleasable,
   ] = await Promise.all([
     getEngagementFeeSchedule(ctx, id),
     getEngagementPayments(ctx, id),
@@ -78,7 +78,7 @@ export async function loadEngagementDetail(ctx: OrgContext, id: string) {
     countAwaitingReplyCore(ctx, id),
     getProjectBoqSummary(ctx, header.projectId),
     findEngagementBoqProposalId(ctx, id),
-    getEngagementPaymentsSettled(ctx, id),
+    getEngagementBoqReleasable(ctx, id),
   ]);
 
   return {
@@ -97,7 +97,7 @@ export async function loadEngagementDetail(ctx: OrgContext, id: string) {
     boqStep: {
       current: boqSummary,
       boqProposalId,
-      clientCanOpen: paymentsSettled,
+      clientCanOpen: boqReleasable,
       canBuild:
         can(ctx.role, 'proposals_build', 'create') && can(ctx.role, 'boq_build', 'create'),
     } satisfies BoqStepData,

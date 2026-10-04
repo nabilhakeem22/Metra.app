@@ -23,8 +23,9 @@ export interface FreezeIssueInput {
  *   4. hide every older visible `boq` artifact on the engagement.
  *
  * EVERY ISSUE PUBLISHES (Nabil's decision): there is no flag. The client still
- * cannot open it until the balance is paid, because `app_document_access`
- * withholds a `boq` until then; publishing only puts it in the delivery link.
+ * cannot open it until the engagement HAS a fee schedule and it is paid
+ * (`app_boq_releasable`, which the portal's `app_document_access` reads for a
+ * `boq`); publishing only puts it in the delivery link.
  * The artifact is what `boqPresent` counts, so the delivery guard is satisfied
  * without touching it.
  */

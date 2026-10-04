@@ -22,7 +22,8 @@ export interface BoqStepData {
   current: BoqStepSummary | null;
   /** The engagement's BOQ working copy in the proposal builder, if opened. */
   boqProposalId: string | null;
-  /** Every milestone is paid, so the portal releases a `boq` to the client. */
+  /** The portal releases a `boq` to the client now: a fee schedule exists and
+   *  every milestone of it is paid (`app_boq_releasable`). */
   clientCanOpen: boolean;
   /** May build and send it (proposals_build AND boq_build create). */
   canBuild: boolean;

@@ -16,7 +16,17 @@ import { issueBoq } from '@/lib/boqs/actions';
  * changing it afterwards means a new version rather than an edit. The dialog says
  * that, rather than asking "are you sure".
  */
-export function BoqIssue({ boqId, disabled }: { boqId: string; disabled: boolean }) {
+export function BoqIssue({
+  boqId,
+  disabled,
+  clientCanOpen,
+}: {
+  boqId: string;
+  disabled: boolean;
+  /** Whether the client can open it the moment it is published (the portal's
+   *  BOQ rule), so the confirm states what will actually happen. */
+  clientCanOpen: boolean;
+}) {
   const t = useTranslations('projects.profile.boq');
   const [pending, start] = useTransition();
   const { confirm, dialog } = useConfirm();
@@ -29,7 +39,7 @@ export function BoqIssue({ boqId, disabled }: { boqId: string; disabled: boolean
   async function onClick(): Promise<void> {
     const ok = await confirm({
       title: t('issueConfirmTitle'),
-      description: t('issueConfirmBody'),
+      description: clientCanOpen ? t('issueConfirmBodyOpen') : t('issueConfirmBody'),
       confirmLabel: t('issueConfirm'),
       cancelLabel: t('cancel'),
     });

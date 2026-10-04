@@ -21,12 +21,16 @@ export function BoqTab({
   boq,
   canBuild,
   canSeeCost,
+  clientCanOpenOnIssue,
 }: {
   projectId: string;
   boq: BoqDetail | null;
   canBuild: boolean;
   /** Gates the costed copy, which carries the firm's margin. */
   canSeeCost: boolean;
+  /** The portal's BOQ rule on the engagement an issue would deliver through:
+   *  decides which sentence the Issue confirm says. */
+  clientCanOpenOnIssue: boolean;
 }) {
   const t = useTranslations('projects.profile.boq');
 
@@ -48,7 +52,13 @@ export function BoqTab({
       actions={
         <>
           {canSeeCost && <BoqCostedCopy boqId={boq.id} number={boq.number} />}
-          {canEdit && <BoqIssue boqId={boq.id} disabled={boq.lineCount === 0} />}
+          {canEdit && (
+            <BoqIssue
+              boqId={boq.id}
+              disabled={boq.lineCount === 0}
+              clientCanOpen={clientCanOpenOnIssue}
+            />
+          )}
         </>
       }
     />

@@ -11,11 +11,12 @@ import { getBoqDetail, type BoqDetail } from '../queries';
 import { loadDocumentNames, type DocumentNames } from './document-names';
 import { freezeAndRecordIssue } from './freeze';
 import { renderAndStoreClientBoqPdf } from './render';
-import { soleActiveEngagement } from './sole-engagement';
+import { issueEngagementOf } from './sole-engagement';
 
 export { freezeAndRecordIssue, type FreezeIssueInput } from './freeze';
 export { loadDocumentNames, type DocumentNames } from './document-names';
 export { renderAndStoreClientBoqPdf } from './render';
+export { getBoqIssueReleasable } from './releasable';
 
 /**
  * Issue a BOQ from the sheet — the action that joins the structured document to
@@ -94,10 +95,8 @@ async function loadIssueSource(
   if (detail.lineCount === 0) return 'invalid';
 
   // An engagement is required: the artifact hangs off one, and it is how the
-  // client ever sees this document. Resolved here rather than at creation so a
-  // BOQ built before the engagement existed can still be issued.
-  const engagementId =
-    row.engagementId ?? (await soleActiveEngagement(ctx, row.projectId));
+  // client ever sees this document.
+  const engagementId = await issueEngagementOf(ctx, row);
   if (!engagementId) return 'engagement_not_found';
 
   const names = await loadDocumentNames(ctx, row);

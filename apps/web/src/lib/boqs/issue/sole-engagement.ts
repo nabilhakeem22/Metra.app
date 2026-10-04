@@ -26,3 +26,16 @@ export async function soleActiveEngagement(
   );
   return rows.length === 1 ? (rows[0]?.id ?? null) : null;
 }
+
+/**
+ * The engagement an issue of this BOQ delivers through: the one it is already
+ * attached to, else the project's sole active one. Resolved at issue time rather
+ * than at creation, so a BOQ built before the engagement existed can still be
+ * issued. Null means there is nobody to deliver it to.
+ */
+export async function issueEngagementOf(
+  ctx: OrgContext,
+  boq: { engagementId: string | null; projectId: string },
+): Promise<string | null> {
+  return boq.engagementId ?? (await soleActiveEngagement(ctx, boq.projectId));
+}

@@ -239,9 +239,9 @@ describe('everything else is unaffected', () => {
   });
 
   it('treats a schedule with NOTHING owed as settled from the start', async () => {
-    // An engagement whose milestones are all paid (or which has none) must not sit
-    // behind a gate forever — same absent-milestone-is-a-free-gate rule the money
-    // guards apply.
+    // An engagement whose milestones are all paid must not sit behind a gate
+    // forever. (One with NO milestones is settled for every kind EXCEPT a `boq`,
+    // which needs a fee schedule to exist: boq-release-rule.dbtest.ts.)
     const delivery = await seedDelivery('settled-early');
     await settleEverything(delivery);
     const boqId = await seedReleased(delivery, 'boq', 'Villa BOQ.xlsx');

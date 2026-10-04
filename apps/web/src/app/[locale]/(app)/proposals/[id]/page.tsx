@@ -2,7 +2,7 @@ import { getTranslations } from 'next-intl/server';
 import { notFound, redirect } from 'next/navigation';
 import { PageHeader } from '@/components/ui/page-header';
 import { requireOrg } from '@/lib/auth/require-org';
-import { getEngagementPaymentsSettled } from '@/lib/engagements/queries';
+import { getEngagementBoqReleasable } from '@/lib/engagements/queries';
 import { listCostItems } from '@/lib/price-book/queries';
 import { resolveSeeMargin } from '@/lib/org/queries';
 import { can } from '@/lib/permissions/can';
@@ -36,7 +36,7 @@ export default async function ProposalBuilderPage({
     detail.kind === 'boq' && detail.engagementId
       ? {
           engagementId: detail.engagementId,
-          clientCanOpenNow: await getEngagementPaymentsSettled(ctx, detail.engagementId),
+          clientCanOpenNow: await getEngagementBoqReleasable(ctx, detail.engagementId),
           canSend: can(ctx.role, 'boq_build', 'create'),
         }
       : null;
