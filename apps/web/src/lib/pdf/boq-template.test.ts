@@ -18,6 +18,7 @@ import { buildBoqHtml } from './boq-template';
 const detail = (over: Partial<BoqDetail> = {}): BoqDetail => ({
   id: 'b1',
   number: 7,
+  version: 1,
   title: 'Bill of Quantities',
   status: 'issued',
   source: 'imported',

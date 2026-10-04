@@ -9,21 +9,21 @@ describe('boqStepAction', () => {
   it('treats an EMPTY BOQ as no BOQ', () => {
     // An empty document satisfies nothing and there is nothing to issue, so it
     // must not sit in the cockpit looking like progress.
-    expect(boqStepAction({ id: 'b1', status: 'draft', lineCount: 0 })).toBe('start');
+    expect(boqStepAction({ status: 'draft', lineCount: 0 })).toBe('start');
   });
 
   it('leads with issuing once lines exist', () => {
-    expect(boqStepAction({ id: 'b1', status: 'draft', lineCount: 12 })).toBe('issue');
+    expect(boqStepAction({ status: 'draft', lineCount: 12 })).toBe('issue');
   });
 
   it('reports done once issued', () => {
-    expect(boqStepAction({ id: 'b1', status: 'issued', lineCount: 12 })).toBe('done');
+    expect(boqStepAction({ status: 'issued', lineCount: 12 })).toBe('done');
   });
 
   it('treats a superseded BOQ as done rather than re-offering issue', () => {
     // Superseded means a newer version took over; the step is not reopened by an
     // old document, and the guard is already satisfied by its artifact.
-    expect(boqStepAction({ id: 'b1', status: 'superseded', lineCount: 5 })).toBe('done');
+    expect(boqStepAction({ status: 'superseded', lineCount: 5 })).toBe('done');
   });
 });
 

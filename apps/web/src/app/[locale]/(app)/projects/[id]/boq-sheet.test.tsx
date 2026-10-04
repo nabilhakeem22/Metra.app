@@ -55,6 +55,7 @@ function boqFixture(): BoqDetail {
   return {
     id: 'boq-1',
     number: 2,
+    version: 1,
     title: 'BOQ',
     status: 'draft',
     source: 'manual',

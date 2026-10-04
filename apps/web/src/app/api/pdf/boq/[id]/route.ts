@@ -1,8 +1,7 @@
 import { boqs, clients, organizations, projects } from '@metra/db';
 import { eq } from 'drizzle-orm';
 import { MAX_BOQ_LINES } from '@/lib/boqs/core';
-import { getProjectBoq } from '@/lib/boqs/queries';
-import type { BoqDetail } from '@/lib/boqs/queries';
+import { getBoqDetail } from '@/lib/boqs/queries';
 import { withOrgContext, type OrgContext } from '@/lib/db/context';
 import { buildBoqHtml } from '@/lib/pdf/boq-template';
 import { pickBilingual } from '@/lib/pdf/html';
@@ -22,7 +21,7 @@ export const maxDuration = 30;
  * document with the cost and margin columns, for the studio's own use, rendered
  * on demand from whatever the draft currently says.
  *
- * THE GATE IS AT THE QUERY, NOT THE VIEW. `getProjectBoq({ showCost })` decides
+ * THE GATE IS AT THE QUERY, NOT THE VIEW. `getBoqDetail({ showCost })` decides
  * whether cost fields are fetched at all, so a margin-blind role never receives
  * the numbers in the first place — anything sent to a browser is readable
  * whatever the template chooses to render. The 403 in servePdfDocument, which
@@ -30,7 +29,6 @@ export const maxDuration = 30;
  */
 interface BoqPdfHeader {
   boqId: string;
-  projectId: string;
   createdAt: Date | string;
   clientName: (locale: string) => string;
   projectName: (locale: string) => string;
@@ -53,7 +51,6 @@ async function loadBoqHeader(
     tx
       .select({
         boqId: boqs.id,
-        projectId: boqs.projectId,
         createdAt: boqs.createdAt,
         clientAr: clients.nameAr,
         clientEn: clients.nameEn,
@@ -81,22 +78,11 @@ async function loadBoqHeader(
     },
     header: {
       boqId: row.boqId,
-      projectId: row.projectId,
       createdAt: row.createdAt,
       clientName: (locale) => pickBilingual(row.clientAr, row.clientEn, locale),
       projectName: (locale) => pickBilingual(row.projectAr, row.projectEn, locale),
     },
   };
-}
-
-/** The priced body, after the margin gate. `showCost` decides what is FETCHED. */
-async function loadBoqDetail(
-  ctx: OrgContext,
-  header: BoqPdfHeader,
-  showCost: boolean,
-): Promise<BoqDetail | null> {
-  const detail = await getProjectBoq(ctx, header.projectId, { showCost });
-  return detail && detail.id === header.boqId ? detail : null;
 }
 
 export async function GET(
@@ -109,7 +95,9 @@ export async function GET(
     logLabel: 'BOQ',
     maxLines: MAX_BOQ_LINES,
     loadHeader: loadBoqHeader,
-    load: (ctx, _boqId, showCost, header) => loadBoqDetail(ctx, header, showCost),
+    // The priced body, BY ID, after the margin gate: `showCost` decides what is
+    // FETCHED. A superseded version still renders; it is still a real document.
+    load: (ctx, boqId, showCost) => getBoqDetail(ctx, boqId, { showCost }),
     lineCount: (detail) => detail.lineCount,
     buildHtml: (detail, { locale, variant, org, header }) =>
       buildBoqHtml(detail, {

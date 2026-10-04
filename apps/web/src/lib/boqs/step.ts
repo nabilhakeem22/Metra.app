@@ -7,11 +7,14 @@
 // the card has to pick which to lead with rather than showing both equally and
 // making the studio decide what it is even looking at.
 
-/** Just enough about a project's BOQ to decide what to offer. */
+/** Just enough about a project's current BOQ to decide what to offer. */
 export interface BoqStepSummary {
   id: string;
   status: string;
   lineCount: number;
+  /** `BQ-YYYY-NNNN`, formatted on the SERVER (never in the browser). */
+  documentNumber: string;
+  total: string;
 }
 
 export type BoqStepAction =
@@ -28,7 +31,9 @@ export type BoqStepAction =
  * both resolve to `start` rather than leaving a half-made document looking like
  * progress.
  */
-export function boqStepAction(summary: BoqStepSummary | null): BoqStepAction {
+export function boqStepAction(
+  summary: Pick<BoqStepSummary, 'status' | 'lineCount'> | null,
+): BoqStepAction {
   if (!summary || summary.lineCount === 0) return 'start';
   return summary.status === 'draft' ? 'issue' : 'done';
 }
