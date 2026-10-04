@@ -42,7 +42,7 @@ import { closeFixture, ctxFor, raw, seedOrg, teardown } from './fixture';
 //      `on delete cascade`, which is a different and much worse thing.
 //
 // AND IT IS THE FIRST REAL TRAFFIC THROUGH BRANCH 2 OF `enforce_immutable_when`
-// (the fourth TG_ARGV, `engagement_id,source_file_id`). That branch is fenced to
+// (the fourth TG_ARGV, `engagement_id,source_file_id,source_proposal_id`). That branch is fenced to
 // `pg_trigger_depth() > 1`, so only a referential action can reach it - and
 // until 0052 no such action could complete, which is why wave 6 shipped it with
 // zero coverage in the admitting direction. The ISSUED cases below are that

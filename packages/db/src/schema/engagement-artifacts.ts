@@ -51,9 +51,12 @@ export const engagementArtifacts = pgTable(
       .defaultNow(),
     note: text('note'),
     // Client Deliverables, Step 1 — whether this artifact is released to the
-    // tokenized client portal. Defaults to false (hidden): visibility is only ever
-    // ADDED, either automatically by a release-carrying transition or by the
-    // per-file manual override. A `boq` is NEVER auto-shared (manual only).
+    // tokenized client portal. Defaults to false (hidden). It is set by a
+    // release-carrying transition, by the per-file manual override, or by issuing
+    // a BOQ. A `boq` is never released by a TRANSITION: issuing one (the sheet's
+    // Issue button or Send as BOQ) publishes it and hides the older visible `boq`
+    // artifacts, and `app_document_access` still withholds it until the balance
+    // is paid.
     clientVisible: boolean('client_visible').notNull().default(false),
   },
   (t) => [

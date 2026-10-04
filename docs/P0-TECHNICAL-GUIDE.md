@@ -492,7 +492,7 @@ raise MT100 and abort a delete that has nothing to do with immutability. Only a
 change **to NULL** is tolerated; writing a new non-null value into one of those
 columns is still MT100. Omit it and the trigger behaves exactly as it did before
 the argument existed. `trg_boqs_immutable` is the one trigger that passes it
-(`'engagement_id,source_file_id'`).
+(`'engagement_id,source_file_id,source_proposal_id'`).
 
 > **Open defect, found by `boq-immutable.dbtest.ts` and unrelated to the
 > trigger.** `sameOrgFk(..., { onDelete: 'set null' })` emits a COMPOSITE
