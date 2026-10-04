@@ -158,7 +158,7 @@ export async function buildBoqHtml(
       }
       <tr class="grand">
         <td>${t(locale, 'الإجمالي', 'Total')}</td>
-        <td class="num">${m(boq.total)} ${esc(boq.currency)}</td>
+        <td class="num">${m(boq.total)}</td>
       </tr>
     </tbody>
   </table>

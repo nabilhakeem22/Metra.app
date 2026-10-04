@@ -180,6 +180,14 @@ describe('the document body', () => {
     expect(withDiscount).toContain('15,990.00');
   });
 
+  it('prints the currency ONCE on the grand total (formatMoney already carries it)', async () => {
+    const en = await buildBoqHtml(detail(), opts);
+    expect(en).toContain('159,900.00 EGP');
+    expect(en).not.toContain('EGP EGP');
+    const ar = await buildBoqHtml(detail(), { ...opts, locale: 'ar-EG' });
+    expect(ar).not.toMatch(/ج.مs*EGP|EGPs*ج.م|ج.مs*ج.م/);
+  });
+
   it('carries no VAT or supervision — a BOQ prices the works only', async () => {
     const html = await buildBoqHtml(detail(), opts);
     expect(html).not.toMatch(/VAT|ضريبة|Supervision|إشراف/);
