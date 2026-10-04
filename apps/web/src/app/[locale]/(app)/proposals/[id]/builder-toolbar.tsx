@@ -17,6 +17,7 @@ export function BuilderToolbar({
   seeMargin,
   canSend,
   pending,
+  busy,
   onDelete,
   onSave,
   onSend,
@@ -26,7 +27,10 @@ export function BuilderToolbar({
   proposalId: string;
   seeMargin: boolean;
   canSend: boolean;
+  /** THIS toolbar's own save/send/delete is in flight (drives the spinner). */
   pending: boolean;
+  /** Anything in the builder is in flight: every control here is disabled. */
+  busy: boolean;
   onDelete: () => void;
   onSave: () => void;
   onSend: () => void;
@@ -38,12 +42,12 @@ export function BuilderToolbar({
   return (
     <div className="flex flex-wrap justify-end gap-2">
       {quote && (
-        <Button variant="ghost" onClick={onDelete} disabled={pending}>
+        <Button variant="ghost" onClick={onDelete} disabled={busy}>
           <Trash2 className="size-4" aria-hidden />
           {t('builder.delete')}
         </Button>
       )}
-      <Button variant="outline" onClick={onSave} disabled={pending}>
+      <Button variant="outline" onClick={onSave} disabled={busy}>
         {pending && <Loader2 className="size-4 animate-spin" aria-hidden />}
         {t('builder.save')}
       </Button>
@@ -52,10 +56,11 @@ export function BuilderToolbar({
         canSeeInternal={seeMargin}
         canSend={quote && canSend}
         downloadable={quote}
+        disabled={busy}
         isDraft
       />
       {quote && canSend && (
-        <Button onClick={onSend} disabled={pending}>
+        <Button onClick={onSend} disabled={busy}>
           <Send className="size-4" aria-hidden />
           {t('builder.send')}
         </Button>

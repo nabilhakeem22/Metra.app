@@ -2,49 +2,28 @@
 
 import { ArrowLeft, Info, Loader2 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
-import { useTransition } from 'react';
 import { Button } from '@/components/ui/button';
-import { toast } from '@/hooks/use-toast';
-import { useRouter } from '@/i18n/routing';
-import { resolveActionError } from '@/lib/actions/error-message';
-import { persistDraft } from './persist-draft';
-import type { ProposalDraftState } from './proposal-payload';
 
 /**
  * The top of the builder in BOQ mode: the way back to the delivery, and the one
- * sentence that explains what this document is. "Back to delivery" SAVES first
- * and sends nothing; if the save is refused the studio stays on the draft.
+ * sentence that explains what this document is. Back is `use-boq-back.ts`; this
+ * renders it, disabled whenever the builder is busy (a send in flight included).
  */
 export function BoqModeBar({
-  engagementId,
-  draftState,
+  onBack,
+  pending,
+  disabled,
 }: {
-  engagementId: string;
-  draftState: () => ProposalDraftState;
+  onBack: () => void;
+  /** THIS control's save is in flight. */
+  pending: boolean;
+  /** Anything in the builder is in flight. */
+  disabled: boolean;
 }) {
   const t = useTranslations('proposals.boqMode');
-  const te = useTranslations('errors');
-  const router = useRouter();
-  const [pending, start] = useTransition();
-
-  function back(): void {
-    start(async () => {
-      try {
-        const saved = await persistDraft(draftState());
-        if (saved.ok) {
-          router.push(`/engagements/${engagementId}`);
-          return;
-        }
-        toast({ title: resolveActionError(saved.error, te), variant: 'destructive' });
-      } catch {
-        toast({ title: resolveActionError('generic', te), variant: 'destructive' });
-      }
-    });
-  }
-
   return (
     <div className="space-y-3">
-      <Button variant="ghost" size="sm" onClick={back} disabled={pending}>
+      <Button variant="ghost" size="sm" onClick={onBack} disabled={disabled}>
         {pending ? (
           <Loader2 className="size-4 animate-spin" aria-hidden />
         ) : (

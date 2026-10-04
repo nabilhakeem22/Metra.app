@@ -26,6 +26,7 @@ export function PreviewModal({
   canSend = false,
   isDraft = false,
   downloadable = true,
+  disabled = false,
   className,
 }: {
   proposalId: string;
@@ -33,6 +34,8 @@ export function PreviewModal({
   canSend?: boolean;
   isDraft?: boolean;
   downloadable?: boolean;
+  /** The builder is busy (a save or a send in flight): the preview cannot open. */
+  disabled?: boolean;
   className?: string;
 }) {
   const t = useTranslations('proposals.preview');
@@ -75,7 +78,7 @@ export function PreviewModal({
   return (
     <DialogPrimitive.Root open={open} onOpenChange={setOpen}>
       <DialogPrimitive.Trigger asChild>
-        <Button variant="outline" size="sm" className={className}>
+        <Button variant="outline" size="sm" className={className} disabled={disabled}>
           <Eye className="size-4" aria-hidden />
           {t('open')}
         </Button>
