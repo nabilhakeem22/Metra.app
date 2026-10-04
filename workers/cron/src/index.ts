@@ -4,7 +4,11 @@
 // (apps/web/src/app/api/cron/automations); this worker is a thin scheduler.
 
 interface Env {
-  /** Origin of the deployed Next.js app, no trailing slash (a `vars` value). */
+  /** The `metra-web` Worker, bound in wrangler.jsonc. A plain fetch() of its
+   *  workers.dev URL is refused by Cloudflare (same zone) with a 404. */
+  APP: Fetcher;
+  /** Origin of the deployed Next.js app, no trailing slash (a `vars` value).
+   *  Still used to build the URL: the app reads the path and host from it. */
   APP_ORIGIN: string;
   /** Shared bearer secret; must match the app's CRON_SECRET (a Worker secret). */
   CRON_SECRET: string;
@@ -17,7 +21,7 @@ export default {
     _ctx: ExecutionContext,
   ): Promise<void> {
     const url = `${env.APP_ORIGIN}/api/cron/automations`;
-    const response = await fetch(url, {
+    const response = await env.APP.fetch(url, {
       headers: { Authorization: `Bearer ${env.CRON_SECRET}` },
     });
     // A wrong/absent bearer makes the route answer 401 and a bad tick 500.

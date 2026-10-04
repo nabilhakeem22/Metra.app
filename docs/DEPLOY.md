@@ -196,8 +196,11 @@ places or the cron stops being authorised — see below.
 `workers/cron` is **not** an npm workspace and is **not** deployed by
 `deploy.yml`. It has its own `wrangler.jsonc` and is deployed on its own.
 
-It calls the app over HTTP, so it needs to know where the app IS: its
-**`APP_ORIGIN`** var must point at the live app origin, and its `CRON_SECRET`
+It calls the app through a **service binding** (`APP` -> `metra-web` in its
+`wrangler.jsonc`), not over the public URL: Cloudflare refuses a Worker's
+`fetch()` to another Worker on the same workers.dev zone and answers **404**
+(error 1042). Its **`APP_ORIGIN`** var still builds the request URL and must
+point at the live app origin, and its `CRON_SECRET`
 must match the one on `metra-web`. Those are two separate Worker configurations
 holding one shared value and one pointer between them — if the app moves to a
 new domain, or `CRON_SECRET` is rotated on `metra-web` alone, the cron keeps
