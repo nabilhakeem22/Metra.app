@@ -19,9 +19,12 @@ export async function deleteDraftProposalCore(
         tx,
         proposals,
         input.id,
-        { status: proposals.status },
+        { status: proposals.status, kind: proposals.kind },
         'invalid',
       );
+      // The delivery's BOQ working copy is not deletable: it is where every
+      // version of the delivery's BOQ is edited from.
+      if (proposal.kind === 'boq') fail('proposal_is_boq');
       if (proposal.status !== 'draft') fail('proposal_not_draft');
 
       await tx.delete(proposals).where(eq(proposals.id, input.id));

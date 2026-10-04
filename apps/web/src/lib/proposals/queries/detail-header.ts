@@ -15,6 +15,8 @@ const PROPOSAL_HEADER_COLUMNS = {
   titleAr: proposals.titleAr,
   titleEn: proposals.titleEn,
   status: proposals.status,
+  kind: proposals.kind,
+  engagementId: proposals.engagementId,
   currency: proposals.currency,
   issueDate: proposals.issueDate,
   expiryDate: proposals.expiryDate,

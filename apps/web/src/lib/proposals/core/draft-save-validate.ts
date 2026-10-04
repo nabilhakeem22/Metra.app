@@ -5,7 +5,7 @@
 // THE RULE THAT SHAPES THIS FILE: an omitted header field means "leave it alone",
 // not "set it to zero". `undefined` is absence and `null` is "clear it", and
 // collapsing the two would let a lines-only save wipe the studio's terms.
-import { proposals } from '@metra/db';
+import { proposals, type ProposalKind } from '@metra/db';
 import { fail } from '@/lib/actions/mutate';
 import { readMoneyString } from '@/lib/money/read';
 import {
@@ -104,6 +104,15 @@ export function validateDraftHeader(
     termsAr: patched(header.termsAr, proposal.termsAr),
     termsEn: patched(header.termsEn, proposal.termsEn),
   };
+}
+
+/**
+ * A BOQ proposal is priced before VAT and supervision: both are added at the
+ * contract. Forced to zero HERE, server-side, whatever the browser sent, so the
+ * `proposals_boq_unpriced_draft` CHECK is never the first thing to say no.
+ */
+export function pricingForKind(kind: ProposalKind, header: ResolvedHeader): ResolvedHeader {
+  return kind === 'boq' ? { ...header, taxRate: '0', supervisionPct: '0' } : header;
 }
 
 /** R2 boundary caps — reject oversized payloads before doing any work. */

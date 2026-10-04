@@ -15,7 +15,9 @@ export function GET(
     if (!isUuid(id)) throw new NotFoundError();
     // The query strips cost/margin when the key's live role can't see margin.
     const detail = await getProposalWithLines(ctx, id, costVisible);
-    if (!detail) throw new NotFoundError();
+    // Public API v1's proposals are quotes: a delivery's BOQ working copy is
+    // not one, so it does not exist here.
+    if (!detail || detail.kind === 'boq') throw new NotFoundError();
     return serializeProposal(detail, costVisible);
   }, { capability: 'proposals_build', action: 'read' });
 }
