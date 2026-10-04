@@ -1,5 +1,5 @@
 -- 0055 — a delivery's BOQ is built in the proposal builder. SCHEMA ONLY: one new
--- enum type, three columns, constraints and one index. No data touched, no
+-- enum type, four columns, constraints and one index. No data touched, no
 -- policy, no grant, no apply-rls function referenced, no `ADD VALUE`.
 --
 -- WHAT IT ADDS.
@@ -9,6 +9,11 @@
 --     into a real `boqs` document by "Send as BOQ". It is never sent as an offer.
 --   * `boqs.source_proposal_id`: the working copy a sent BOQ was cut from.
 --     Provenance only, like `source_file_id`.
+--   * `boqs.source_revision`: WHICH revision of that working copy was sent (its
+--     `updated_at` as epoch-microsecond text, the token Send as BOQ fences on).
+--     It makes a send idempotent per revision: a replay of the same revision
+--     returns the BOQ already sent instead of issuing a second one. Null for an
+--     uploaded or hand-built BOQ. No backfill: every existing row is one of those.
 --
 -- THE CHECKS ARE THE SERVER-SIDE LOCK on the quote lifecycle. A `boq` proposal
 -- can hold no status but `draft`, no share token, no VAT and no supervision, so
@@ -52,3 +57,4 @@ ALTER TABLE "boqs" ADD CONSTRAINT "boqs_sourceProposal_same_org_fk"
   FOREIGN KEY ("org_id","source_proposal_id") REFERENCES "public"."proposals"("org_id","id")
   ON DELETE SET NULL ("source_proposal_id");
 CREATE INDEX "boqs_sourceProposal_idx" ON "boqs" USING btree ("org_id","source_proposal_id");
+ALTER TABLE "boqs" ADD COLUMN "source_revision" text;

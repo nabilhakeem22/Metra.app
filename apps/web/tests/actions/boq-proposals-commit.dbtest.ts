@@ -1,4 +1,6 @@
 import { afterAll, describe, expect, it, vi } from 'vitest';
+import { commitProposalBoqCore } from '@/lib/boq-proposals/core/commit';
+import { loadSendSnapshot } from '@/lib/boq-proposals/snapshot';
 import { createBoqCore } from '@/lib/boqs/core';
 import { getBoqDetail, getProjectBoq, getProjectBoqSummary } from '@/lib/boqs/queries';
 import { executeTransition } from '@/lib/engagements/executor';
@@ -11,6 +13,7 @@ import {
   boqProposalWith,
   commitFromSnapshot,
   engagementAtBoq,
+  fakePdf,
   rawEngagement,
   seedBoqOrg,
   TWO_SECTIONS,
@@ -204,6 +207,48 @@ describe('a second send is the next version (AC11)', () => {
     expect((await getProjectBoq(org.ctx, org.projectId, { showCost: false }))?.id).toBe(v2.id);
     expect((await getBoqDetail(org.ctx, v1.id, { showCost: false }))?.id).toBe(v1.id);
     expect(await proposalStatus(proposalId)).toBe('draft');
+  });
+});
+
+describe('Send as BOQ is idempotent per revision (R1)', () => {
+  it('a second commit of the SAME revision writes nothing and answers with the first BOQ', async () => {
+    const org = await seedBoqOrg(orgIds);
+    const engagementId = await rawEngagement(org);
+    const proposalId = await boqProposalWith(org.ctx, engagementId, TWO_SECTIONS);
+    let sentInput: Parameters<typeof commitProposalBoqCore>[1] | undefined;
+    const first = await commitFromSnapshot(org.ctx, org.orgId, proposalId, (input) => {
+      sentInput = input;
+    });
+    expect(first.result.ok).toBe(true);
+    const issueAudits = async () => {
+      const [row] = await raw.query<{ n: number }>(
+        `select count(*)::int as n from public.audit_log
+          where entity = 'proposal' and entity_id = '${proposalId}' and action = 'issue'`,
+      );
+      return Number(row.n);
+    };
+    expect(await issueAudits()).toBe(1);
+
+    // The replay carries its own freshly stored PDF, as a re-run render would,
+    // and a number that is now stale: the replay check runs before that fence.
+    const replay = await commitProposalBoqCore(org.ctx, {
+      ...sentInput!,
+      file: { fileId: await fakePdf(org.orgId, engagementId), label: 'BQ.pdf' },
+    });
+    expect(replay).toEqual({ ok: true, data: first.result.data });
+
+    expect(await boqRows(org.orgId)).toHaveLength(1);
+    expect(await boqArtifacts(engagementId)).toHaveLength(1);
+    expect(await issueAudits()).toBe(1);
+    const [stored] = await raw.query<{ source_revision: string }>(
+      `select source_revision from public.boqs where id = '${first.result.data!.boqId}'`,
+    );
+    expect(stored.source_revision).toBe(sentInput!.expectedRevision);
+
+    // The snapshot recognises it too, so a replayed send never reaches the render.
+    expect(await loadSendSnapshot(org.ctx, proposalId)).toEqual({
+      alreadySent: first.result.data,
+    });
   });
 });
 

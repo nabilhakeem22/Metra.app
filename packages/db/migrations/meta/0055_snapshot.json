@@ -1,5 +1,5 @@
 {
-  "id": "08051c13-e200-41e0-970e-bb8eef73b0c6",
+  "id": "82db2e7c-f6d3-4a29-aae3-9d161c87ecf0",
   "prevId": "ed9ddce2-4c9a-47b3-9a77-9d506306874b",
   "version": "7",
   "dialect": "postgresql",
@@ -5118,6 +5118,12 @@
         "source_proposal_id": {
           "name": "source_proposal_id",
           "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "source_revision": {
+          "name": "source_revision",
+          "type": "text",
           "primaryKey": false,
           "notNull": false
         },

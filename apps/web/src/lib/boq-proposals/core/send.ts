@@ -71,6 +71,10 @@ function commitInput(
  * leaves no draft BOQ behind; `metra_app` cannot delete one anyway. The commit's
  * fences turn any change between the snapshot and the write into
  * `boq_send_conflict`.
+ *
+ * A REPLAY RENDERS NOTHING: a revision that is already out is answered with the
+ * BOQ it produced, from the snapshot, before Chromium is touched (and again under
+ * the commit's lock, for a replay that races the first send).
  */
 export async function sendProposalAsBoqCore(
   ctx: OrgContext,
@@ -80,6 +84,9 @@ export async function sendProposalAsBoqCore(
 
   const snapshot = await loadSendSnapshot(ctx, input.proposalId);
   if (typeof snapshot === 'string') return err(snapshot);
+  if ('alreadySent' in snapshot) {
+    return { ok: true, data: { documentNumber: snapshot.alreadySent.documentNumber } };
+  }
   const mapped = mapProposalToBoq(snapshot.source, snapshot.proposal.discountPct);
 
   const file = await renderClientCopy(ctx, snapshot, mapped, input.locale);

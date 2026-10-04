@@ -66,6 +66,11 @@ export const boqs = pgTable(
     sourceFileId: uuid('source_file_id'),
     // The BOQ-kind proposal this BOQ was sent from, if any.
     sourceProposalId: uuid('source_proposal_id'),
+    // WHICH REVISION of that proposal was sent: its `updated_at` as epoch
+    // microseconds, text (the same token Send as BOQ fences on). Makes a send
+    // idempotent per revision: a replay of the same revision finds this BOQ and
+    // returns it instead of issuing a second one. Null for every other source.
+    sourceRevision: text('source_revision'),
     currency: text('currency').notNull().default('EGP'),
     issueDate: date('issue_date'),
     // Revision chain, following the proposal precedent.

@@ -18,6 +18,18 @@ import { buildProposalPayload, type ProposalDraftState } from './proposal-payloa
 const isolateLtr = (text: string) => `⁦${text}⁩`;
 
 /**
+ * Outcomes after which the studio cannot know what was sent: the send may have
+ * issued a BOQ (`uncertain`), another send or edit won the race
+ * (`boq_send_conflict`), or the action never answered (a throw). Retrying from
+ * here could issue a second version, so these go back to the delivery, freshly
+ * read, where the BOQ step shows what actually exists.
+ */
+const UNKNOWN_OUTCOME: ReadonlySet<ActionCode | undefined> = new Set<ActionCode | undefined>([
+  'uncertain',
+  'boq_send_conflict',
+]);
+
+/**
  * "Send as BOQ": one confirmation that states what is being sent, then save
  * and send in one transition, then back to the delivery with the BQ number.
  *
@@ -43,6 +55,30 @@ export function useSendAsBoq(options: {
     toast({ title: resolveActionError(code, te), variant: 'destructive' });
   };
 
+  const showRealState = (): void => {
+    router.refresh();
+    router.push(`/engagements/${options.engagementId}`);
+  };
+
+  /** The send itself, once the draft is saved. Never throws. */
+  async function sendSaved(): Promise<void> {
+    let sent: Awaited<ReturnType<typeof sendProposalAsBoq>>;
+    try {
+      sent = await sendProposalAsBoq(options.proposalId);
+    } catch {
+      refuse('generic');
+      showRealState();
+      return;
+    }
+    if (sent.ok && sent.data) {
+      toast({ title: t('sent', { documentNumber: sent.data.documentNumber }) });
+      router.push(`/engagements/${options.engagementId}`);
+      return;
+    }
+    refuse(sent.error);
+    if (UNKNOWN_OUTCOME.has(sent.error)) showRealState();
+  }
+
   function summary(): string {
     const { lineCount, sectionCount } = countSendable(
       buildProposalPayload(options.draftState()).sections,
@@ -66,22 +102,19 @@ export function useSendAsBoq(options: {
     });
     if (!confirmed) return;
     start(async () => {
+      // A save that fails or throws keeps the studio on its draft: nothing was
+      // sent, and leaving would drop edits that may not be stored.
       try {
         const saved = await persistDraft(options.draftState());
         if (!saved.ok) {
           refuse(saved.error);
           return;
         }
-        const sent = await sendProposalAsBoq(options.proposalId);
-        if (!sent.ok || !sent.data) {
-          refuse(sent.error);
-          return;
-        }
-        toast({ title: t('sent', { documentNumber: sent.data.documentNumber }) });
-        router.push(`/engagements/${options.engagementId}`);
       } catch {
         refuse('generic');
+        return;
       }
+      await sendSaved();
     });
   }
 

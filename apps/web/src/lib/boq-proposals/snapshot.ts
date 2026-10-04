@@ -9,14 +9,14 @@ import { isTerminal } from '@/lib/engagements/states';
 import { isUuid } from '@/lib/uuid';
 import { countSendable } from './count';
 import type { ProposalSourceSection } from './map';
+import { findSentRevision, type SentBoq } from './sent-revision';
 import { loadProposalSource } from './source';
 
 /** Everything Send as BOQ reads BEFORE it renders, with no write lock held. */
 export interface SendSnapshot {
   proposal: {
     id: string;
-    /** `updated_at` as epoch MICROSECONDS, as text from SQL. Compared as text:
-     *  a JS Date has milliseconds and would never match. */
+    /** `updated_at` as epoch MICROSECONDS, text from SQL (a Date has ms only). */
     revision: string;
     titleAr: string | null;
     titleEn: string | null;
@@ -33,6 +33,11 @@ export interface SendSnapshot {
   /** The UTC year at snapshot time; the PDF prints it in the number. */
   renderYear: number;
   names: DocumentNames;
+}
+
+/** This revision was already sent: the BOQ it produced. Nothing to render. */
+export interface AlreadySent {
+  alreadySent: SentBoq;
 }
 
 /** The SQL text form of a revision token, shared with the commit's re-read. */
@@ -95,10 +100,12 @@ async function peekNextBoqNumber(tx: MetraDb): Promise<number> {
 function readSnapshotRows(
   ctx: OrgContext,
   proposalId: string,
-): Promise<Omit<SendSnapshot, 'names' | 'renderYear'> | ActionCode> {
+): Promise<Omit<SendSnapshot, 'names' | 'renderYear'> | AlreadySent | ActionCode> {
   return withOrgContext(ctx, async (tx) => {
     const header = await readBoqProposal(tx, proposalId);
     if (!header) return 'invalid';
+    const sent = await findSentRevision(tx, proposalId, header.revision);
+    if (sent) return { alreadySent: sent };
     const engagement = await readActiveEngagement(tx, header.engagementId);
     if (typeof engagement === 'string') return engagement;
     const { engagementId: _linked, ...proposal } = header;
@@ -117,14 +124,16 @@ function readSnapshotRows(
  * `engagement_not_active`: the engagement is terminal.
  * `line_required` / `too_many_lines`: nothing, or too much, to send.
  * `invalid` also: a negative quantity, which a BOQ line cannot hold.
+ * `alreadySent`: this exact revision is already out (a replayed send), so the
+ * caller answers with that BOQ and renders nothing.
  */
 export async function loadSendSnapshot(
   ctx: OrgContext,
   proposalId: string,
-): Promise<SendSnapshot | ActionCode> {
+): Promise<SendSnapshot | AlreadySent | ActionCode> {
   if (!isUuid(proposalId)) return 'invalid';
   const rows = await readSnapshotRows(ctx, proposalId);
-  if (typeof rows === 'string') return rows;
+  if (typeof rows === 'string' || 'alreadySent' in rows) return rows;
 
   const { lineCount } = countSendable(rows.source);
   if (lineCount === 0) return 'line_required';

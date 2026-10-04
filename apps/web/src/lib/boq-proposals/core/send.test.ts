@@ -119,6 +119,16 @@ describe('sendProposalAsBoqCore', () => {
     expect(committed.mapped.sections[0].lines[0].unitCost).toBe('60');
   });
 
+  it('answers a replayed revision with the BOQ already sent, rendering and committing nothing', async () => {
+    loadSendSnapshot.mockResolvedValue({
+      alreadySent: { boqId: 'b1', documentNumber: 'BQ-2026-0014' },
+    });
+    const res = await sendProposalAsBoqCore(ctx('owner'), { proposalId: 'p1', locale: 'en' });
+    expect(res).toEqual({ ok: true, data: { documentNumber: 'BQ-2026-0014' } });
+    expect(renderAndStoreClientBoqPdf).not.toHaveBeenCalled();
+    expect(commitProposalBoqCore).not.toHaveBeenCalled();
+  });
+
   it('passes a commit conflict through as its code', async () => {
     loadSendSnapshot.mockResolvedValue(snapshot);
     renderAndStoreClientBoqPdf.mockResolvedValue({ fileId: 'f1', label: 'x.pdf' });

@@ -127,7 +127,9 @@ describe('useSendAsBoq', () => {
     expect(toasts.at(-1)?.title).toBe('BQ-2026-0014 sent to the client');
   });
 
-  it('a THROWN action toasts generic and clears the spinner', async () => {
+  it('a THROWN send toasts generic, clears the spinner and shows the delivery as it is (R1)', async () => {
+    // The send may or may not have issued a BOQ: retrying from the builder could
+    // issue a second one, so the studio is taken to the freshly read delivery.
     persist.persistDraft.mockResolvedValue({ ok: true });
     actions.sendProposalAsBoq.mockRejectedValue(new Error('network died'));
     renderWithIntl(<Harness />, { locale: 'en' });
@@ -135,6 +137,39 @@ describe('useSendAsBoq', () => {
     fireEvent.click(button);
     await waitFor(() => expect(toasts.at(-1)?.title).toBe(en('errors.generic')));
     await waitFor(() => expect(button.getAttribute('data-pending')).toBe('false'));
+    expect(router.refresh).toHaveBeenCalled();
+    expect(router.push).toHaveBeenCalledWith('/engagements/e-1');
+  });
+
+  it.each(['uncertain', 'boq_send_conflict'] as const)(
+    'after %s it toasts the code and shows the delivery as it is (R1)',
+    async (code) => {
+      persist.persistDraft.mockResolvedValue({ ok: true });
+      actions.sendProposalAsBoq.mockResolvedValue({ ok: false, error: code });
+      renderWithIntl(<Harness />, { locale: 'en' });
+      fireEvent.click(screen.getByRole('button'));
+      await waitFor(() => expect(router.push).toHaveBeenCalledWith('/engagements/e-1'));
+      expect(router.refresh).toHaveBeenCalled();
+      expect(toasts.at(-1)?.title).toBe(en(`errors.${code}`));
+    },
+  );
+
+  it('a plain refusal (nothing was sent) keeps the studio on the draft', async () => {
+    persist.persistDraft.mockResolvedValue({ ok: true });
+    actions.sendProposalAsBoq.mockResolvedValue({ ok: false, error: 'line_required' });
+    renderWithIntl(<Harness />, { locale: 'en' });
+    fireEvent.click(screen.getByRole('button'));
+    await waitFor(() => expect(toasts.at(-1)?.title).toBe(en('errors.line_required')));
+    expect(router.push).not.toHaveBeenCalled();
+    expect(router.refresh).not.toHaveBeenCalled();
+  });
+
+  it('a THROWN save keeps the studio on the draft and sends nothing', async () => {
+    persist.persistDraft.mockRejectedValue(new Error('network died'));
+    renderWithIntl(<Harness />, { locale: 'en' });
+    fireEvent.click(screen.getByRole('button'));
+    await waitFor(() => expect(toasts.at(-1)?.title).toBe(en('errors.generic')));
+    expect(actions.sendProposalAsBoq).not.toHaveBeenCalled();
     expect(router.push).not.toHaveBeenCalled();
   });
 });

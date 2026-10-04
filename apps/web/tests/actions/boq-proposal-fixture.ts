@@ -180,6 +180,7 @@ export async function commitFromSnapshot(
 ) {
   const snapshot = await loadSendSnapshot(ctx, proposalId);
   if (typeof snapshot === 'string') throw new Error(`snapshot refused: ${snapshot}`);
+  if ('alreadySent' in snapshot) throw new Error('snapshot says this revision is already sent');
   const mapped = mapProposalToBoq(snapshot.source, snapshot.proposal.discountPct);
   const { id, revision, ...header } = snapshot.proposal;
   const input = {
