@@ -23,10 +23,10 @@ export interface CurrentBoqRow {
  * the rule among drafts.
  */
 export async function selectCurrentProjectBoq(
-  db: MetraDb,
+  tx: MetraDb,
   projectId: string,
 ): Promise<CurrentBoqRow | null> {
-  const [row] = await db
+  const [row] = await tx
     .select({
       id: boqs.id,
       status: boqs.status,
@@ -47,8 +47,8 @@ export async function getProjectBoq(
   projectId: string,
   opts: { showCost: boolean },
 ): Promise<BoqDetail | null> {
-  return withOrgContext(ctx, async (db) => {
-    const current = await selectCurrentProjectBoq(db, projectId);
-    return current ? readBoqDetail(db, current.id, opts) : null;
+  return withOrgContext(ctx, async (tx) => {
+    const current = await selectCurrentProjectBoq(tx, projectId);
+    return current ? readBoqDetail(tx, current.id, opts) : null;
   });
 }

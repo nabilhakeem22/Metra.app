@@ -23,11 +23,11 @@ export async function getProjectBoqSummary(
   ctx: OrgContext,
   projectId: string,
 ): Promise<BoqStepSummary | null> {
-  return withOrgContext(ctx, async (db) => {
-    const boq = await selectCurrentProjectBoq(db, projectId);
+  return withOrgContext(ctx, async (tx) => {
+    const boq = await selectCurrentProjectBoq(tx, projectId);
     if (!boq) return null;
 
-    const [counted] = await db
+    const [counted] = await tx
       .select({ n: sql<number>`count(*)::int` })
       .from(boqLines)
       .where(eq(boqLines.boqId, boq.id));

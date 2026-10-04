@@ -178,7 +178,7 @@ async function draftSibling(fixture: Fixture): Promise<{ boqId: string; lineId: 
   return { boqId, lineId: line.id };
 }
 
-/** Freeze it exactly the way `boqs/issue.ts:134-143` does, as metra_app. */
+/** Freeze it the way `boqs/issue/freeze.ts` (markIssued) does, as metra_app. */
 async function issue(fixture: Fixture): Promise<string | null> {
   return refusalSqlstate(() =>
     withOrgContext(fixture.ctx, (tx) =>

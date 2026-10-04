@@ -1,0 +1,108 @@
+import 'server-only';
+import { boqs } from '@metra/db';
+import { eq } from 'drizzle-orm';
+import { loggableFailure } from '@/lib/actions/loggable-failure';
+import { mutateInOrg } from '@/lib/actions/mutate';
+import { err, type ActionCode, type ActionResult } from '@/lib/actions/result';
+import type { OrgContext } from '@/lib/db/context';
+import { withOrgContext } from '@/lib/db/context';
+import { can } from '@/lib/permissions/can';
+import { getBoqDetail, type BoqDetail } from '../queries';
+import { loadDocumentNames, type DocumentNames } from './document-names';
+import { freezeAndRecordIssue } from './freeze';
+import { renderAndStoreClientBoqPdf } from './render';
+import { soleActiveEngagement } from './sole-engagement';
+
+export { freezeAndRecordIssue, type FreezeIssueInput } from './freeze';
+export { loadDocumentNames, type DocumentNames } from './document-names';
+export { renderAndStoreClientBoqPdf } from './render';
+
+/**
+ * Issue a BOQ from the sheet — the action that joins the structured document to
+ * the delivery flow.
+ *
+ * Render first, write once: the CLIENT PDF is rendered and stored outside any
+ * transaction, then `freezeAndRecordIssue` freezes the BOQ, records the PDF as
+ * the engagement's `boq` artifact and publishes it to the client (withheld until
+ * the balance clears). Send as BOQ runs the same write half.
+ *
+ * FREEZING IS LOAD-BEARING. Once issued, the PDF in the client's hands and the
+ * rows in the database must never drift apart; a later change becomes a new
+ * version that supersedes, producing its own artifact.
+ */
+export async function issueBoqCore(
+  ctx: OrgContext,
+  input: { boqId: string; locale: string },
+): Promise<ActionResult & { data?: { artifactId: string; version: number } }> {
+  // Refused before the render, so a caller who may not issue never costs a
+  // Chromium run or leaves a stored file behind.
+  if (!can(ctx.role, 'boq_build', 'update')) return err('forbidden');
+
+  const source = await loadIssueSource(ctx, input.boqId);
+  if (typeof source === 'string') return err(source);
+
+  let file: { fileId: string; label: string };
+  try {
+    file = await renderAndStoreClientBoqPdf(ctx, { ...source, locale: input.locale });
+  } catch (e) {
+    console.error('BOQ issue render failed:', loggableFailure(e));
+    return err('generic');
+  }
+
+  return mutateInOrg(ctx, { capability: 'boq_build', action: 'update' }, (tx) =>
+    freezeAndRecordIssue(tx, ctx, {
+      boqId: input.boqId,
+      projectId: source.projectId,
+      engagementId: source.engagementId,
+      ...file,
+    }),
+  );
+}
+
+interface IssueSource {
+  detail: BoqDetail;
+  projectId: string;
+  engagementId: string;
+  names: DocumentNames;
+  year: number;
+}
+
+/** Everything the render needs, read before any write, or the refusal code. */
+async function loadIssueSource(
+  ctx: OrgContext,
+  boqId: string,
+): Promise<IssueSource | ActionCode> {
+  const [row] = await withOrgContext(ctx, (tx) =>
+    tx
+      .select({
+        status: boqs.status,
+        projectId: boqs.projectId,
+        engagementId: boqs.engagementId,
+        clientId: boqs.clientId,
+        createdAt: boqs.createdAt,
+      })
+      .from(boqs)
+      .where(eq(boqs.id, boqId))
+      .limit(1),
+  );
+  if (!row) return 'boq_not_found';
+  if (row.status !== 'draft') return 'boq_not_draft';
+
+  // The client copy never prints cost, so cost is not fetched for it.
+  const detail = await getBoqDetail(ctx, boqId, { showCost: false });
+  if (!detail) return 'boq_not_found';
+  if (detail.lineCount === 0) return 'invalid';
+
+  // An engagement is required: the artifact hangs off one, and it is how the
+  // client ever sees this document. Resolved here rather than at creation so a
+  // BOQ built before the engagement existed can still be issued.
+  const engagementId =
+    row.engagementId ?? (await soleActiveEngagement(ctx, row.projectId));
+  if (!engagementId) return 'engagement_not_found';
+
+  const names = await loadDocumentNames(ctx, row);
+  if (!names) return 'boq_not_found';
+
+  const year = new Date(row.createdAt).getUTCFullYear();
+  return { detail, projectId: row.projectId, engagementId, names, year };
+}

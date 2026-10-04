@@ -45,20 +45,20 @@ function groupLinesBySection(
  * anything sent to the client is readable whatever the UI chooses to render.
  */
 export async function readBoqDetail(
-  db: MetraDb,
+  tx: MetraDb,
   boqId: string,
   opts: { showCost: boolean },
 ): Promise<BoqDetail | null> {
-  const [boq] = await db.select().from(boqs).where(eq(boqs.id, boqId)).limit(1);
+  const [boq] = await tx.select().from(boqs).where(eq(boqs.id, boqId)).limit(1);
   if (!boq) return null;
 
-  const sectionRows = await db
+  const sectionRows = await tx
     .select()
     .from(boqSections)
     .where(eq(boqSections.boqId, boq.id))
     .orderBy(asc(boqSections.sortOrder));
 
-  const lineRows = await db
+  const lineRows = await tx
     .select()
     .from(boqLines)
     .where(eq(boqLines.boqId, boq.id))
@@ -97,5 +97,5 @@ export async function getBoqDetail(
   boqId: string,
   opts: { showCost: boolean },
 ): Promise<BoqDetail | null> {
-  return withOrgContext(ctx, (db) => readBoqDetail(db, boqId, opts));
+  return withOrgContext(ctx, (tx) => readBoqDetail(tx, boqId, opts));
 }

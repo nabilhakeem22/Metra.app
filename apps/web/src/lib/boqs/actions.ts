@@ -53,12 +53,12 @@ export async function commitBoqImport(input: {
 
 /**
  * Freeze the BOQ, render its PDF, and record it as the engagement's `boq`
- * artifact — which is what satisfies `boqPresent` and puts the document behind
- * the portal's payment gate.
+ * artifact, published to the client — which is what satisfies `boqPresent` and
+ * puts the document in the delivery link behind the portal's payment gate.
  */
 export async function issueBoq(
   boqId: string,
-): Promise<ActionResult & { data?: string }> {
+): Promise<ActionResult & { data?: { artifactId: string; version: number } }> {
   const ctx = await requireOrg();
   let locale = 'ar-EG';
   try {
