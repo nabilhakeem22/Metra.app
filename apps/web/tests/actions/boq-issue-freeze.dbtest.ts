@@ -227,7 +227,12 @@ describe('publishing is project-wide, like the supersede (F3)', () => {
     const v1 = await freeze(fixture, await draftBoq(fixture));
     expect(await visible(v1.data!.artifactId)).toBe(true);
 
-    // A second delivery (engagement) on the SAME project.
+    // The first delivery closes and a second one opens on the SAME project (one
+    // ACTIVE delivery per project is a database rule, so the first must close).
+    await raw.query(
+      `update public.design_engagements set state = 'closed_design_only'
+        where id = '${fixture.engagementId}'`,
+    );
     const [second] = await raw.query<{ id: string }>(
       `insert into public.design_engagements (org_id, number, client_id, project_id, title_en)
        select org_id, 2, client_id, project_id, 'Second delivery'
