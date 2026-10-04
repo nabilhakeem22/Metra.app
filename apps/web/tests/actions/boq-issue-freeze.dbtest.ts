@@ -1,4 +1,4 @@
-import { afterAll, describe, expect, it } from 'vitest';
+import { afterAll, describe, expect, it, vi } from 'vitest';
 import { mutateInOrg } from '@/lib/actions/mutate';
 import { commitImportCore, createBoqCore } from '@/lib/boqs/core';
 import { freezeAndRecordIssue } from '@/lib/boqs/issue';
@@ -17,6 +17,12 @@ import { closeFixture, ctxFor, raw, seedOrg, teardown } from './fixture';
 // What is asserted is the decision Nabil made for both paths: EVERY issue
 // publishes the new `boq` artifact and hides the older visible ones, and a second
 // BOQ on the project supersedes the first as the next version.
+
+// The barrel also exports the render half; nothing here renders, and the
+// runner has no Chromium, so the renderer is never loaded.
+vi.mock('@/lib/pdf/render', () => ({
+  renderPdf: () => Promise.reject(new Error('no renderer in the dbtest runner')),
+}));
 
 const orgIds: string[] = [];
 afterAll(async () => {
