@@ -6,12 +6,9 @@ import { toast } from '@/hooks/use-toast';
 import { useRouter } from '@/i18n/routing';
 import { resolveActionError } from '@/lib/actions/error-message';
 import type { ActionCode } from '@/lib/actions/result';
-import {
-  deleteDraftProposal,
-  saveProposalDraft,
-  sendProposal,
-} from '@/lib/proposals/actions';
-import { buildProposalPayload, type ProposalDraftState } from './proposal-payload';
+import { deleteDraftProposal, sendProposal } from '@/lib/proposals/actions';
+import { persistDraft } from './persist-draft';
+import type { ProposalDraftState } from './proposal-payload';
 
 // EVERY server write the proposal builder makes, and every toast it raises.
 
@@ -32,15 +29,6 @@ type ConfirmFn = (options: {
   variant: 'destructive';
 }) => Promise<boolean>;
 
-type SaveResult = Awaited<ReturnType<typeof saveProposalDraft>>;
-
-/** The draft, as the server takes it. The cast is the action's own input type. */
-function persist(state: ProposalDraftState): Promise<SaveResult> {
-  return saveProposalDraft(
-    buildProposalPayload(state) as Parameters<typeof saveProposalDraft>[0],
-  );
-}
-
 export function useBuilderActions(options: {
   draftState: () => ProposalDraftState;
   proposalId: string;
@@ -57,7 +45,7 @@ export function useBuilderActions(options: {
 
   function save(): void {
     startTransition(async () => {
-      const result = await persist(options.draftState());
+      const result = await persistDraft(options.draftState());
       if (result.ok) toast({ title: t('toast.saved') });
       else refuse(result.error as ActionCode);
     });
@@ -67,7 +55,7 @@ export function useBuilderActions(options: {
    *  would mail the client the version before the studio's last edit. */
   function onSend(): void {
     startTransition(async () => {
-      const saved = await persist(options.draftState());
+      const saved = await persistDraft(options.draftState());
       if (!saved.ok) {
         refuse(saved.error as ActionCode);
         return;

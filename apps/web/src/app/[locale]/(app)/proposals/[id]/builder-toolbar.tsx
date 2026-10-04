@@ -2,10 +2,17 @@
 
 import { Loader2, Send, Trash2 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
+import type { ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
 import { PreviewModal } from './preview-modal';
 
+/**
+ * `mode: 'boq'` is the delivery's BOQ working copy: no Delete, no quote Send, no
+ * PDF downloads in the preview (the BOQ PDF is produced when it is sent), and
+ * the BOQ's own action arrives as `children`.
+ */
 export function BuilderToolbar({
+  mode,
   proposalId,
   seeMargin,
   canSend,
@@ -13,7 +20,9 @@ export function BuilderToolbar({
   onDelete,
   onSave,
   onSend,
+  children,
 }: {
+  mode: 'quote' | 'boq';
   proposalId: string;
   seeMargin: boolean;
   canSend: boolean;
@@ -21,15 +30,19 @@ export function BuilderToolbar({
   onDelete: () => void;
   onSave: () => void;
   onSend: () => void;
+  children?: ReactNode;
 }) {
   const t = useTranslations('proposals');
+  const quote = mode === 'quote';
 
   return (
     <div className="flex flex-wrap justify-end gap-2">
-      <Button variant="ghost" onClick={onDelete} disabled={pending}>
-        <Trash2 className="size-4" aria-hidden />
-        {t('builder.delete')}
-      </Button>
+      {quote && (
+        <Button variant="ghost" onClick={onDelete} disabled={pending}>
+          <Trash2 className="size-4" aria-hidden />
+          {t('builder.delete')}
+        </Button>
+      )}
       <Button variant="outline" onClick={onSave} disabled={pending}>
         {pending && <Loader2 className="size-4 animate-spin" aria-hidden />}
         {t('builder.save')}
@@ -37,15 +50,17 @@ export function BuilderToolbar({
       <PreviewModal
         proposalId={proposalId}
         canSeeInternal={seeMargin}
-        canSend={canSend}
+        canSend={quote && canSend}
+        downloadable={quote}
         isDraft
       />
-      {canSend && (
+      {quote && canSend && (
         <Button onClick={onSend} disabled={pending}>
           <Send className="size-4" aria-hidden />
           {t('builder.send')}
         </Button>
       )}
+      {children}
     </div>
   );
 }

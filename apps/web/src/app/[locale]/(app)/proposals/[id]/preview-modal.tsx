@@ -1,79 +1,46 @@
 'use client';
 
 import * as DialogPrimitive from '@radix-ui/react-dialog';
-import { Eye, FileDown, Loader2, Send, X } from 'lucide-react';
+import { Eye, Loader2, X } from 'lucide-react';
 import { useTranslations } from 'next-intl';
-import { useCallback, useEffect, useState, useTransition } from 'react';
+import { useState, useTransition } from 'react';
 import { Button } from '@/components/ui/button';
 import { toast } from '@/hooks/use-toast';
 import { resolveActionError } from '@/lib/actions/error-message';
 import type { ActionCode } from '@/lib/actions/result';
-import {
-  getProposalPreviewHtml,
-  sendProposal,
-} from '@/lib/proposals/actions';
+import { sendProposal } from '@/lib/proposals/actions';
 import { cn } from '@/lib/utils';
-
-type Variant = 'client' | 'internal';
+import { PreviewFooter } from './preview-footer';
+import { usePreviewHtml, type PreviewVariant } from './use-preview-html';
 
 /**
- * In-app proposal preview. Renders the exact PDF HTML in a sandboxed iframe,
- * toggles Client/Internal (internal only when the caller may see margin), and
- * offers the matching PDF downloads plus Send (drafts only). The internal copy
- * is fetched through the margin-gated action, so a non-privileged caller can
- * never pull cost figures.
+ * In-app proposal preview. Renders the exact PDF HTML in a sandboxed iframe
+ * (./use-preview-html), toggles Client/Internal (internal only when the caller
+ * may see margin), and offers the matching PDF downloads plus Send (drafts only)
+ * in ./preview-footer. `downloadable={false}` is the BOQ working copy, which has
+ * no quotation PDF.
  */
 export function PreviewModal({
   proposalId,
   canSeeInternal,
   canSend = false,
   isDraft = false,
+  downloadable = true,
   className,
 }: {
   proposalId: string;
   canSeeInternal: boolean;
   canSend?: boolean;
   isDraft?: boolean;
+  downloadable?: boolean;
   className?: string;
 }) {
   const t = useTranslations('proposals.preview');
   const te = useTranslations('errors');
   const [open, setOpen] = useState(false);
-  const [variant, setVariant] = useState<Variant>('client');
-  const [html, setHtml] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [variant, setVariant] = useState<PreviewVariant>('client');
   const [sending, startSend] = useTransition();
-
-  const load = useCallback(
-    async (v: Variant) => {
-      setLoading(true);
-      setHtml(null);
-      try {
-        const res = await getProposalPreviewHtml(proposalId, v);
-        if (res.ok && res.html) {
-          setHtml(res.html);
-        } else {
-          toast({
-            title: resolveActionError(res.error as ActionCode, te),
-            variant: 'destructive',
-          });
-        }
-      } catch {
-        // Never leave the spinner hanging if the action rejects.
-        toast({
-          title: resolveActionError('generic', te),
-          variant: 'destructive',
-        });
-      } finally {
-        setLoading(false);
-      }
-    },
-    [proposalId, te],
-  );
-
-  useEffect(() => {
-    if (open) void load(variant);
-  }, [open, variant, load]);
+  const { html, loading } = usePreviewHtml(proposalId, open, variant);
 
   function onSend() {
     startSend(async () => {
@@ -90,7 +57,7 @@ export function PreviewModal({
     });
   }
 
-  const tab = (v: Variant, label: string) => (
+  const tab = (v: PreviewVariant, label: string) => (
     <button
       type="button"
       onClick={() => setVariant(v)}
@@ -153,40 +120,14 @@ export function PreviewModal({
             )}
           </div>
 
-          <div className="flex flex-wrap items-center justify-end gap-2 border-t px-4 py-2">
-            <a
-              href={`/api/pdf/proposals/${proposalId}?variant=client`}
-              target="_blank"
-              rel="noreferrer"
-            >
-              <Button variant="outline" size="sm">
-                <FileDown className="size-4" aria-hidden />
-                {t('download')}
-              </Button>
-            </a>
-            {canSeeInternal && (
-              <a
-                href={`/api/pdf/proposals/${proposalId}?variant=internal`}
-                target="_blank"
-                rel="noreferrer"
-              >
-                <Button variant="outline" size="sm">
-                  <FileDown className="size-4" aria-hidden />
-                  {t('downloadInternal')}
-                </Button>
-              </a>
-            )}
-            {canSend && isDraft && (
-              <Button size="sm" onClick={onSend} disabled={sending}>
-                {sending ? (
-                  <Loader2 className="size-4 animate-spin" aria-hidden />
-                ) : (
-                  <Send className="size-4" aria-hidden />
-                )}
-                {t('send')}
-              </Button>
-            )}
-          </div>
+          <PreviewFooter
+            proposalId={proposalId}
+            canSeeInternal={canSeeInternal}
+            downloadable={downloadable}
+            showSend={canSend && isDraft}
+            sending={sending}
+            onSend={onSend}
+          />
         </DialogPrimitive.Content>
       </DialogPrimitive.Portal>
     </DialogPrimitive.Root>

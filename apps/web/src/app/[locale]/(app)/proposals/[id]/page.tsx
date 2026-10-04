@@ -2,13 +2,14 @@ import { getTranslations } from 'next-intl/server';
 import { notFound, redirect } from 'next/navigation';
 import { PageHeader } from '@/components/ui/page-header';
 import { requireOrg } from '@/lib/auth/require-org';
+import { getEngagementPaymentsSettled } from '@/lib/engagements/queries';
 import { listCostItems } from '@/lib/price-book/queries';
 import { resolveSeeMargin } from '@/lib/org/queries';
 import { can } from '@/lib/permissions/can';
 import { getProposalWithLines } from '@/lib/proposals/queries';
 import { listSections } from '@/lib/sections/queries';
 import { formatProposalNumber, proposalYear } from '@/lib/format/proposal-number';
-import { ProposalBuilder } from './builder-client';
+import { ProposalBuilder, type BoqModeProps } from './builder-client';
 
 export default async function ProposalBuilderPage({
   params,
@@ -29,14 +30,30 @@ export default async function ProposalBuilderPage({
   const costItems = await listCostItems(ctx, { active: true });
   const sectionLibrary = await listSections(ctx);
 
+  // BOQ mode is decided HERE, from the row, never from the URL. Its Q- number is
+  // never rendered: the header is the document's name instead.
+  const boqMode: BoqModeProps | null =
+    detail.kind === 'boq' && detail.engagementId
+      ? {
+          engagementId: detail.engagementId,
+          clientCanOpenNow: await getEngagementPaymentsSettled(ctx, detail.engagementId),
+          canSend: can(ctx.role, 'boq_build', 'create'),
+        }
+      : null;
+
   return (
     <div className="space-y-6">
       <PageHeader
-        title={`${formatProposalNumber(detail.number, proposalYear(detail.issueDate, detail.createdAt))}`}
-        description={t('builder.title')}
+        title={
+          boqMode
+            ? t('boqMode.title')
+            : formatProposalNumber(detail.number, proposalYear(detail.issueDate, detail.createdAt))
+        }
+        description={boqMode ? undefined : t('builder.title')}
       />
       <ProposalBuilder
         detail={detail}
+        boqMode={boqMode}
         canSend={can(ctx.role, 'proposals_send', 'approve')}
         seeMargin={seeMargin}
         costItems={costItems.map((c) => ({
