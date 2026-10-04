@@ -111,8 +111,13 @@ async function insertArtifact(
   return artifact.id;
 }
 
+// Each freeze stores its own PDF, as the real issue path does, so a second
+// freeze of the same BOQ must not reuse the first one's object key.
+let freezeFileSeq = 0;
+
 async function freeze(fixture: Fixture, boqId: string) {
-  const fileId = await insertFile(fixture, `${boqId}.pdf`);
+  freezeFileSeq += 1;
+  const fileId = await insertFile(fixture, `${boqId}-${freezeFileSeq}.pdf`);
   return mutateInOrg(fixture.ctx, { capability: 'boq_build', action: 'update' }, (tx) =>
     freezeAndRecordIssue(tx, fixture.ctx, {
       boqId,
