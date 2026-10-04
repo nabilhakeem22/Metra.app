@@ -11,6 +11,7 @@ import { getBoqDetail, type BoqDetail } from '../queries';
 import { loadDocumentNames, type DocumentNames } from './document-names';
 import { freezeAndRecordIssue } from './freeze';
 import { renderAndStoreClientBoqPdf } from './render';
+import { boqRevision, fenceIssueRevision } from './revision';
 import { issueEngagementOf } from './sole-engagement';
 
 export { freezeAndRecordIssue, type FreezeIssueInput } from './freeze';
@@ -29,7 +30,9 @@ export { getBoqIssueReleasable } from './releasable';
  *
  * FREEZING IS LOAD-BEARING. Once issued, the PDF in the client's hands and the
  * rows in the database must never drift apart; a later change becomes a new
- * version that supersedes, producing its own artifact.
+ * version that supersedes, producing its own artifact. That is why the write
+ * opens with a CONTENT FENCE: the revision read before the render must still be
+ * the BOQ's revision under FOR UPDATE, or nothing is frozen (`boq_send_conflict`).
  */
 export async function issueBoqCore(
   ctx: OrgContext,
@@ -50,17 +53,21 @@ export async function issueBoqCore(
     return err('generic');
   }
 
-  return mutateInOrg(ctx, { capability: 'boq_build', action: 'update' }, (tx) =>
-    freezeAndRecordIssue(tx, ctx, {
+  return mutateInOrg(ctx, { capability: 'boq_build', action: 'update' }, async (tx) => {
+    await fenceIssueRevision(tx, input.boqId, source.revision);
+    return freezeAndRecordIssue(tx, ctx, {
       boqId: input.boqId,
       projectId: source.projectId,
       engagementId: source.engagementId,
       ...file,
-    }),
-  );
+    });
+  });
 }
 
 interface IssueSource {
+  /** The content revision the PDF is rendered from; read BEFORE the detail, so
+   *  an edit landing between the two reads can only cause a refusal. */
+  revision: string;
   detail: BoqDetail;
   projectId: string;
   engagementId: string;
@@ -81,6 +88,7 @@ async function loadIssueSource(
         engagementId: boqs.engagementId,
         clientId: boqs.clientId,
         createdAt: boqs.createdAt,
+        revision: boqRevision,
       })
       .from(boqs)
       .where(eq(boqs.id, boqId))
@@ -103,5 +111,5 @@ async function loadIssueSource(
   if (!names) return 'boq_not_found';
 
   const year = new Date(row.createdAt).getUTCFullYear();
-  return { detail, projectId: row.projectId, engagementId, names, year };
+  return { revision: row.revision, detail, projectId: row.projectId, engagementId, names, year };
 }

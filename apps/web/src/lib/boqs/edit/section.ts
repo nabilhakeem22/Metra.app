@@ -59,6 +59,9 @@ export async function addBoqSectionCore(
           sortOrder: maxSort + 1,
         })
         .returning({ id: boqSections.id });
+      // A new (even empty) section changes the document an issue would print,
+      // so it moves the BOQ's content revision like every line write does.
+      await tx.update(boqs).set({ updatedAt: sql`now()` }).where(eq(boqs.id, input.boqId));
       return row?.id;
     },
   );
