@@ -79,6 +79,19 @@ const opts = {
   year: 2026,
 };
 
+describe('the document number', () => {
+  it('prints BQ-YYYY-NNNN from the number and the year', async () => {
+    const html = await buildBoqHtml(detail(), opts);
+    expect(html).toContain('BQ-2026-0007');
+  });
+
+  it('prints numberLabel INSTEAD of the number (the builder preview)', async () => {
+    const html = await buildBoqHtml(detail(), { ...opts, numberLabel: 'DRAFT' });
+    expect(html).toContain('DRAFT');
+    expect(html).not.toContain('BQ-2026-0007');
+  });
+});
+
 describe('the client variant', () => {
   it('renders NO cost figure anywhere', async () => {
     // The safety property of this whole document. Swept from the rendered output

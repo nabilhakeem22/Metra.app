@@ -44,13 +44,16 @@ export async function buildBoqHtml(
     clientName: string;
     projectName: string;
     year: number;
+    /** Printed INSTEAD of the BQ number (the builder preview's DRAFT). Inserted
+     *  as-is, so it must already be escaped (`pickEscaped`). */
+    numberLabel?: string;
   },
 ): Promise<string> {
   const { locale, variant } = opts;
   const dir = dirFor(locale);
   const showCost = variant === 'internal';
   const m = (v: string) => formatMoney(v, locale);
-  const num = formatDocNumber('BQ', boq.number, opts.year);
+  const num = opts.numberLabel ?? formatDocNumber('BQ', boq.number, opts.year);
 
   const colCount = showCost ? 7 : 5;
 
