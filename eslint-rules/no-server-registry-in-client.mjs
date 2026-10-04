@@ -37,6 +37,8 @@
 export const BARRELS = new Set([
   '@/lib/boqs/core',
   '@/lib/boqs/edit',
+  '@/lib/boqs/issue',
+  '@/lib/boqs/queries',
   '@/lib/contracts/core',
   '@/lib/contracts/lifecycle',
   '@/lib/contracts/queries',
