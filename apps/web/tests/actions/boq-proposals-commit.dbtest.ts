@@ -125,6 +125,17 @@ describe('commitProposalBoqCore writes the BOQ (AC8, AC9, AC25)', () => {
     expect(Number(counts.lines)).toBe(mapped.lineCount);
     expect(mapped.sectionCount).toBe(3);
 
+    // R2: the sections go in as ONE insert and the lines are filed by returned
+    // index. A misfiled line would leave the document total right and the
+    // section subtotals wrong, so each section's re-summed subtotal is checked.
+    const sections = await raw.query<{ title_en: string; section_subtotal: string }>(
+      `select title_en, section_subtotal::text from public.boq_sections
+        where boq_id = '${boq.id}' order by sort_order`,
+    );
+    expect(sections.map((s) => [s.title_en, s.section_subtotal])).toEqual(
+      mapped.sections.map((s) => [s.titleEn, s.sectionSubtotal]),
+    );
+
     const [boardLine] = await raw.query<{ item_code: string | null; unit_cost: string }>(
       `select item_code, unit_cost::text from public.boq_lines
         where boq_id = '${boq.id}' and cost_item_id = '${costItem.id}'`,
