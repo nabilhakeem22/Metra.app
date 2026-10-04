@@ -1314,7 +1314,7 @@
       "send": "Send as BOQ",
       "confirmTitle": "Send this BOQ to the client?",
       "confirmSummary": "{lineCount, plural, one {{lines} line} other {{lines} lines}} in {sectionCount, plural, one {{sections} section} other {{sections} sections}}. Total before VAT: {total}.",
-      "gateLocked": "The client receives it in the delivery link but can open it only after the design balance is paid.",
+      "gateLocked": "The client receives it in the delivery link but can open it only once the design fee is agreed and paid.",
       "gateOpen": "The client receives it in the delivery link and can open it right away.",
       "confirm": "Send as BOQ",
       "cancel": "Keep editing",
@@ -2065,7 +2065,7 @@
       "continueCta": "Continue the BOQ",
       "uploadInstead": "Upload an Excel sheet instead",
       "chipOpen": "The client can open it",
-      "chipLocked": "Opens for the client once the design balance is paid",
+      "chipLocked": "Opens for the client once the design fee is agreed and paid",
       "viewBoq": "View BOQ",
       "editNewVersion": "Edit and send a new version"
     }

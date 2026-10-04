@@ -7,7 +7,7 @@ import {
   proposals,
   type MetraDb,
 } from '@metra/db';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import { fail } from '@/lib/actions/mutate';
 import { insertLinesInChunks } from '@/lib/lines/insert-chunked';
 import type { DocTotals } from '@/lib/aggregates/proposal-totals';
@@ -125,7 +125,9 @@ export async function persistDraftHeaderAndTotals(
       taxRate: header.taxRate,
       supervisionPct: header.supervisionPct,
       ...totalsColumns(totals),
-      updatedAt: new Date(),
+      // Database clock, not JS Date: the Send-as-BOQ revision is updated_at in
+      // microseconds, and a millisecond Date would let two saves share one.
+      updatedAt: sql`clock_timestamp()`,
     })
     .where(and(eq(proposals.id, proposalId), eq(proposals.status, 'draft')))
     .returning({ id: proposals.id });
