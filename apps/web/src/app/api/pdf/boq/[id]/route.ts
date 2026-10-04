@@ -108,7 +108,9 @@ export async function GET(
         projectName: header.projectName(locale),
         year: new Date(header.createdAt).getUTCFullYear(),
       }),
+    // The BOQ's identity, BQ-YYYY-NNNN (server-formatted from created_at), as
+    // the issued client copy is named.
     fileName: (detail, variant) =>
-      `boq-${detail.number}${variant === 'internal' ? '-internal' : ''}.pdf`,
+      `${detail.documentNumber}${variant === 'internal' ? '-internal' : ''}.pdf`,
   });
 }

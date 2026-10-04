@@ -49,7 +49,7 @@ export function BoqSheetHeader({
           </span>
         </p>
         <p className="mt-1 text-sm text-[color:var(--text-muted)]">
-          {t('documentLabel', { number: String(boq.number) })} ·{' '}
+          <span dir="ltr">{boq.documentNumber}</span> ·{' '}
           {t('lineCount', { count: visibleCount })}
         </p>
       </div>

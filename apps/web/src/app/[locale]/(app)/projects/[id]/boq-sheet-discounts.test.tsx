@@ -34,6 +34,7 @@ function boq(secondDiscount: string, secondTotal: string, subtotal: string): Boq
   return {
     id: 'boq-1',
     number: 7,
+    documentNumber: 'BQ-2026-0007',
     version: 1,
     title: 'BOQ',
     status: 'issued',
@@ -92,5 +93,13 @@ describe('the BOQ sheet and line discounts (F1)', () => {
     expect(band.getAttribute('colspan')).toBe('6');
     const total = screen.getByText(en('projects.profile.boq.total'), { selector: 'span' }).closest('td')!;
     expect(total.getAttribute('colspan')).toBe('6');
+  });
+});
+
+describe('the BOQ sheet names the BOQ by its document number (F5)', () => {
+  it('shows BQ-YYYY-NNNN, server-formatted, never the bare sequence number', () => {
+    const { container } = renderSheet(boq('0.0000', '1000.0000', '3000.0000'));
+    expect(container.textContent).toContain('BQ-2026-0007');
+    expect(container.textContent).not.toContain('BOQ 7');
   });
 });

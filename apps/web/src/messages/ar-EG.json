@@ -1107,7 +1107,6 @@
         "cancel": "إلغاء",
         "imported": "استوردنا {count} بند",
         "importFailed": "مقدرناش نقرأ الشيت ده",
-        "documentLabel": "المقايسة {number}",
         "lineCount": "{count, plural, zero {ولا بند} one {بند واحد} two {بندين} few {# بنود} many {# بند} other {# بند}}",
         "total": "الإجمالي",
         "provisional": "مبدئي",
@@ -1155,7 +1154,7 @@
         "discountPct": "نسبة الخصم",
         "keyboardHint": "زرار Tab بيحركك بالعرض · Enter بينزلك لتحت في العمود · Esc بيرجع الخلية زي ما كانت",
         "costedCopy": "نسخة بالتكاليف",
-        "costedCopyFor": "نسخة بالتكاليف من المقايسة {number}",
+        "costedCopyFor": "نسخة بالتكاليف من المقايسة {documentNumber}",
         "importErrors": {
           "unmapped_columns": "ناقص عمود: {value}",
           "description_empty": "الوصف فاضي",

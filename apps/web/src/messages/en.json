@@ -1107,7 +1107,6 @@
         "cancel": "Cancel",
         "imported": "Imported {count} lines",
         "importFailed": "Could not read that sheet",
-        "documentLabel": "BOQ {number}",
         "lineCount": "{count, plural, =0 {No lines} one {# line} other {# lines}}",
         "total": "Total",
         "provisional": "Provisional",
@@ -1155,7 +1154,7 @@
         "discountPct": "Discount percentage",
         "keyboardHint": "Tab moves across · Enter moves down the column · Esc reverts the cell",
         "costedCopy": "Costed copy",
-        "costedCopyFor": "Costed copy of BOQ {number}",
+        "costedCopyFor": "Costed copy of {documentNumber}",
         "importErrors": {
           "unmapped_columns": "Missing column: {value}",
           "description_empty": "Description is empty",

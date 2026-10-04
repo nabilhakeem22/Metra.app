@@ -81,7 +81,13 @@ describe('countSendable', () => {
 
 describe('toBoqDetail', () => {
   const mapped = mapProposalToBoq([section([line({ itemCode: '1.1' })])], '0');
-  const header = { number: 14, title: 'Bill of Quantities', currency: 'EGP', discountPct: '0' };
+  const header = {
+    number: 14,
+    year: 2026,
+    title: 'Bill of Quantities',
+    currency: 'EGP',
+    discountPct: '0',
+  };
 
   it('leaves cost and margin OFF the object when showCost is false', () => {
     const detail = toBoqDetail(mapped, header, { showCost: false });
@@ -97,6 +103,7 @@ describe('toBoqDetail', () => {
   it('carries cost when asked, synthetic ids, and the header number', () => {
     const detail = toBoqDetail(mapped, header, { showCost: true });
     expect(detail.number).toBe(14);
+    expect(detail.documentNumber).toBe('BQ-2026-0014');
     expect(detail.sections[0].id).toBe('s0');
     expect(detail.sections[0].lines[0].id).toBe('s0l0');
     expect(detail.sections[0].lines[0].unitCost).toBe('900');

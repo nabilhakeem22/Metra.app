@@ -67,6 +67,7 @@ export async function renderBoqProposalPreviewHtml(
     mapProposalToBoq(read.source, header.discountPct),
     {
       number: 0,
+      year: new Date().getUTCFullYear(),
       title: pickBilingual(header.titleAr, header.titleEn, input.locale),
       currency: header.currency,
       discountPct: header.discountPct,

@@ -31,6 +31,10 @@ export interface BoqSectionRow {
 export interface BoqDetail {
   id: string;
   number: number;
+  /** `BQ-YYYY-NNNN`, formatted on the SERVER from the UTC year of
+   *  `created_at` (the year the issued PDF prints): the BOQ's identity on
+   *  screen and in file names. Never re-formatted in the browser. */
+  documentNumber: string;
   /** Supersede ordering only (1, 2, 3 on the project). Never displayed: the
    *  BOQ's identity on screen is its document number, BQ-YYYY-NNNN. */
   version: number;

@@ -2,6 +2,7 @@
 // CLIENT-SAFE. Used to render the client copy BEFORE any row exists, so the
 // ids are synthetic and the number is the one the commit will allocate.
 import type { BoqDetail, BoqLineRow } from '@/lib/boqs/queries/types';
+import { formatDocNumber } from '@/lib/format/doc-number';
 import type { MappedBoq, MappedBoqLine } from './map';
 
 const pick = (ar: string | null, en: string | null) => ar ?? en ?? '';
@@ -33,12 +34,13 @@ function toLineRow(
  */
 export function toBoqDetail(
   mapped: MappedBoq,
-  header: { number: number; title: string; currency: string; discountPct: string },
+  header: { number: number; year: number; title: string; currency: string; discountPct: string },
   opts: { showCost: boolean },
 ): BoqDetail {
   return {
     id: 'unsent',
     number: header.number,
+    documentNumber: formatDocNumber('BQ', header.number, header.year),
     // Not a stored version yet; the commit computes it. Never displayed.
     version: 0,
     title: header.title,

@@ -27,6 +27,7 @@ async function renderClientCopy(
     mapped,
     {
       number: snapshot.nextBoqNumber,
+      year: snapshot.renderYear,
       title: preferred ?? proposal.titleAr ?? proposal.titleEn ?? '',
       currency: proposal.currency,
       discountPct: proposal.discountPct,

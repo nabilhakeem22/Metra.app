@@ -3,6 +3,7 @@ import { boqLines, boqSections, boqs, type MetraDb } from '@metra/db';
 import { asc, eq } from 'drizzle-orm';
 import type { OrgContext } from '@/lib/db/context';
 import { withOrgContext } from '@/lib/db/context';
+import { formatDocNumber } from '@/lib/format/doc-number';
 import type { BoqDetail, BoqLineRow } from './types';
 
 const pick = (ar: string | null, en: string | null) => ar ?? en ?? '';
@@ -69,6 +70,7 @@ export async function readBoqDetail(
   return {
     id: boq.id,
     number: boq.number,
+    documentNumber: formatDocNumber('BQ', boq.number, new Date(boq.createdAt).getUTCFullYear()),
     version: boq.version,
     title: pick(boq.titleAr, boq.titleEn),
     status: boq.status,

@@ -51,7 +51,7 @@ export function BoqTab({
       canEdit={canEdit}
       actions={
         <>
-          {canSeeCost && <BoqCostedCopy boqId={boq.id} number={boq.number} />}
+          {canSeeCost && <BoqCostedCopy boqId={boq.id} documentNumber={boq.documentNumber} />}
           {canEdit && (
             <BoqIssue
               boqId={boq.id}
