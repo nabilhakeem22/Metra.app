@@ -1,8 +1,9 @@
 import 'server-only';
-import { boqs, engagementArtifacts, type MetraDb } from '@metra/db';
+import { boqs, type MetraDb } from '@metra/db';
 import { and, eq, inArray, isNotNull, ne, sql } from 'drizzle-orm';
 import { fail } from '@/lib/actions/mutate';
 import type { OrgContext } from '@/lib/db/context';
+import { publishOnlyLatest, recordArtifact } from './publish';
 
 export interface FreezeIssueInput {
   boqId: string;
@@ -20,7 +21,8 @@ export interface FreezeIssueInput {
  *   1. supersede every other live BOQ on the project (the version chain),
  *   2. freeze this one: draft -> issued, stamped with its version,
  *   3. record the PDF as the engagement's `boq` artifact, VISIBLE to the client,
- *   4. hide every older visible `boq` artifact on the engagement.
+ *   4. hide every older visible `boq` artifact on EVERY engagement of the
+ *      project, since the supersede in step 1 is project-wide too.
  *
  * EVERY ISSUE PUBLISHES (Nabil's decision): there is no flag. The client still
  * cannot open it until the engagement HAS a fee schedule and it is paid
@@ -37,7 +39,7 @@ export async function freezeAndRecordIssue(
   const previousIssuedId = await supersedeOthers(tx, input);
   const version = await markIssued(tx, input, previousIssuedId);
   const artifactId = await recordArtifact(tx, ctx, input);
-  await publishOnlyLatest(tx, input.engagementId, artifactId);
+  await publishOnlyLatest(tx, input, artifactId);
   return { artifactId, version };
 }
 
@@ -103,49 +105,4 @@ async function markIssued(
     .returning({ id: boqs.id });
   if (frozen.length === 0) fail('boq_not_draft');
   return version;
-}
-
-/** The engagement's `boq` artifact for this PDF, shown to the client. */
-async function recordArtifact(
-  tx: MetraDb,
-  ctx: OrgContext,
-  input: FreezeIssueInput,
-): Promise<string> {
-  const [artifact] = await tx
-    .insert(engagementArtifacts)
-    .values({
-      orgId: ctx.orgId,
-      engagementId: input.engagementId,
-      kind: 'boq',
-      fileId: input.fileId,
-      label: input.label,
-      attestedBy: ctx.userId,
-      clientVisible: true,
-    })
-    .returning({ id: engagementArtifacts.id });
-  if (!artifact) fail('generic');
-  return artifact.id;
-}
-
-/**
- * Only the newest BOQ is in the delivery link: every OTHER visible `boq`
- * artifact (an earlier version, or a BOQ file shared by hand) is hidden, with
- * `updated_at` stamped as the portal's "shared on" date. Other kinds untouched.
- */
-async function publishOnlyLatest(
-  tx: MetraDb,
-  engagementId: string,
-  artifactId: string,
-): Promise<void> {
-  await tx
-    .update(engagementArtifacts)
-    .set({ clientVisible: false, updatedAt: new Date() })
-    .where(
-      and(
-        eq(engagementArtifacts.engagementId, engagementId),
-        eq(engagementArtifacts.kind, 'boq'),
-        eq(engagementArtifacts.clientVisible, true),
-        ne(engagementArtifacts.id, artifactId),
-      ),
-    );
 }

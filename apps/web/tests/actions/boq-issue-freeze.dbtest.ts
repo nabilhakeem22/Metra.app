@@ -220,3 +220,26 @@ describe('freezeAndRecordIssue', () => {
     expect(Number(count.n)).toBe(1);
   });
 });
+
+describe('publishing is project-wide, like the supersede (F3)', () => {
+  it('a BOQ issued through a second delivery hides the first delivery\'s BOQ too', async () => {
+    const fixture = await setup();
+    const v1 = await freeze(fixture, await draftBoq(fixture));
+    expect(await visible(v1.data!.artifactId)).toBe(true);
+
+    // A second delivery (engagement) on the SAME project.
+    const [second] = await raw.query<{ id: string }>(
+      `insert into public.design_engagements (org_id, number, client_id, project_id, title_en)
+       select org_id, 2, client_id, project_id, 'Second delivery'
+         from public.design_engagements where id = '${fixture.engagementId}'
+       returning id`,
+    );
+    const throughSecond = { ...fixture, engagementId: second.id };
+    const v2 = await freeze(throughSecond, await draftBoq(fixture));
+    expect(v2.ok).toBe(true);
+
+    // v1 is superseded project-wide, so it must not stay downloadable anywhere.
+    expect(await visible(v1.data!.artifactId)).toBe(false);
+    expect(await visible(v2.data!.artifactId)).toBe(true);
+  });
+});
