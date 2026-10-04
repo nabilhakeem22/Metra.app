@@ -1,5 +1,6 @@
 import { PDF_BRAND } from '@/lib/pdf/brand';
 import { dirFor } from '@/i18n/routing';
+import { formatDocNumber } from '@/lib/format/doc-number';
 import { formatMoney } from '@/lib/format/money';
 import { formatQuantity } from '@/lib/format/number';
 import type { BoqDetail } from '@/lib/boqs/queries';
@@ -16,11 +17,6 @@ const UNIT_LABEL: Record<string, [string, string]> = {
   lump_sum: ['مقطوعية', 'lump sum'],
   day: ['يوم', 'day'],
 };
-
-/** `BQ-2026-0007` — the same shape as a proposal or contract number. */
-export function formatBoqNumber(number: number, year: number): string {
-  return `BQ-${year}-${String(number).padStart(4, '0')}`;
-}
 
 /**
  * Bill of Quantities PDF — the document the client actually receives.
@@ -54,7 +50,7 @@ export async function buildBoqHtml(
   const dir = dirFor(locale);
   const showCost = variant === 'internal';
   const m = (v: string) => formatMoney(v, locale);
-  const num = formatBoqNumber(boq.number, opts.year);
+  const num = formatDocNumber('BQ', boq.number, opts.year);
 
   const colCount = showCost ? 7 : 5;
 

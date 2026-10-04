@@ -13,7 +13,7 @@ vi.mock('@/lib/cf/context', () => ({
   },
 }));
 import type { BoqDetail } from '@/lib/boqs/queries';
-import { buildBoqHtml, formatBoqNumber } from './boq-template';
+import { buildBoqHtml } from './boq-template';
 
 const detail = (over: Partial<BoqDetail> = {}): BoqDetail => ({
   id: 'b1',
@@ -77,13 +77,6 @@ const opts = {
   projectName: 'New Cairo apartment',
   year: 2026,
 };
-
-describe('formatBoqNumber', () => {
-  it('pads to the same shape as a proposal or contract number', () => {
-    expect(formatBoqNumber(7, 2026)).toBe('BQ-2026-0007');
-    expect(formatBoqNumber(1284, 2026)).toBe('BQ-2026-1284');
-  });
-});
 
 describe('the client variant', () => {
   it('renders NO cost figure anywhere', async () => {

@@ -12,7 +12,8 @@ import { fail, mutateInOrg, requireInOrg } from '@/lib/actions/mutate';
 import { err, type ActionResult } from '@/lib/actions/result';
 import type { OrgContext } from '@/lib/db/context';
 import { withOrgContext } from '@/lib/db/context';
-import { buildBoqHtml, formatBoqNumber } from '@/lib/pdf/boq-template';
+import { formatDocNumber } from '@/lib/format/doc-number';
+import { buildBoqHtml } from '@/lib/pdf/boq-template';
 import { renderPdf } from '@/lib/pdf/render';
 import { storeGeneratedFile } from '@/lib/storage/uploads';
 import { getProjectBoq } from './queries';
@@ -111,7 +112,7 @@ export async function issueBoqCore(
   });
 
   const pdf = await renderPdf(html);
-  const name = `${formatBoqNumber(detail.number, new Date(row.createdAt).getUTCFullYear())}.pdf`;
+  const name = `${formatDocNumber('BQ', detail.number, new Date(row.createdAt).getUTCFullYear())}.pdf`;
 
   const stored = await storeGeneratedFile(ctx, 'engagement', pdf, {
     originalName: name,

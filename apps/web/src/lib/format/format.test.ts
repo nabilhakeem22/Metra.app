@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { formatDate } from './date';
+import { formatDocNumber } from './doc-number';
 import { formatMoney } from './money';
 import { formatNumber, formatPercent, formatQuantity } from './number';
 
@@ -128,5 +129,12 @@ describe('formatDate — DD/MM/YYYY, Africa/Cairo', () => {
   it('uses Latin digits in Arabic locale', () => {
     const s = formatDate('2026-08-09T09:00:00Z', 'ar-EG');
     expect(ARABIC_INDIC.test(s)).toBe(false);
+  });
+});
+
+describe('formatDocNumber — BQ', () => {
+  it('pads a BOQ number to the same shape as a proposal or contract number', () => {
+    expect(formatDocNumber('BQ', 7, 2026)).toBe('BQ-2026-0007');
+    expect(formatDocNumber('BQ', 1284, 2026)).toBe('BQ-2026-1284');
   });
 });
