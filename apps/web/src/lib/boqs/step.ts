@@ -25,6 +25,9 @@ export interface BoqStepData {
   /** The portal releases a `boq` to the client now: a fee schedule exists and
    *  every milestone of it is paid (`app_boq_releasable`). */
   clientCanOpen: boolean;
+  /** The CURRENT BOQ's issued PDF is visible to the client on THIS engagement
+   *  (`isBoqSharedOnEngagement`). Only then does the done step say "sent". */
+  sharedWithClient: boolean;
   /** May build and send it (proposals_build AND boq_build create). */
   canBuild: boolean;
 }

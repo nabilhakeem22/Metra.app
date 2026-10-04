@@ -6,9 +6,6 @@ import 'server-only';
 // `page.tsx` is now the three things a route ought to be: authorise, load,
 // render. A plain server module: nothing here renders or decides layout.
 import type { MemberRole } from '@metra/db';
-import type { BoqStepData } from '@/lib/boqs/step';
-import { findEngagementBoqProposalId } from '@/lib/boq-proposals/queries';
-import { getProjectBoqSummary } from '@/lib/boqs/queries';
 import type { OrgContext } from '@/lib/db/context';
 import { countAwaitingReplyCore } from '@/lib/engagements/document-comments';
 import { getEngagementGatePreview } from '@/lib/engagements/gate-preview';
@@ -22,11 +19,11 @@ import {
   getEngagementHeader,
   getEngagementPaymentClaims,
   getEngagementPayments,
-  getEngagementBoqReleasable,
   getEngagementTransitions,
   type EngagementTransitionRecord,
 } from '@/lib/engagements/queries';
 import { can } from '@/lib/permissions/can';
+import { loadBoqStep } from './boq-step-data';
 import type { PanelCapabilities } from './engagement-panels';
 
 export type EngagementDetailData = NonNullable<
@@ -38,9 +35,9 @@ export type EngagementDetailData = NonNullable<
  * other read in ONE `Promise.all` — eleven round trips that do not depend on
  * each other and must not become eleven sequential waits.
  *
- * The BOQ summary is keyed on `header.projectId`, so it follows the header; it
- * joins the batch with the BOQ working copy and the BOQ release rule, which become
- * `boqStep` (the delivery's BOQ step renders from nothing else).
+ * The BOQ step (`boq-step-data.ts`) is keyed on `header.projectId`, so it
+ * follows the header; it joins the batch as one entry and is everything the
+ * delivery's BOQ step renders from.
  */
 export async function loadEngagementDetail(ctx: OrgContext, id: string) {
   const header = await getEngagementHeader(ctx, id);
@@ -58,9 +55,7 @@ export async function loadEngagementDetail(ctx: OrgContext, id: string) {
     gatePreview,
     shareStatus,
     awaitingReplyCount,
-    boqSummary,
-    boqProposalId,
-    boqReleasable,
+    boqStep,
   ] = await Promise.all([
     getEngagementFeeSchedule(ctx, id),
     getEngagementPayments(ctx, id),
@@ -76,9 +71,7 @@ export async function loadEngagementDetail(ctx: OrgContext, id: string) {
     // Derived from the append-only thread (a client message with no staff message
     // after it), so it falls when the studio REPLIES, not when it opens a thread.
     countAwaitingReplyCore(ctx, id),
-    getProjectBoqSummary(ctx, header.projectId),
-    findEngagementBoqProposalId(ctx, id),
-    getEngagementBoqReleasable(ctx, id),
+    loadBoqStep(ctx, { engagementId: id, projectId: header.projectId }),
   ]);
 
   return {
@@ -94,13 +87,7 @@ export async function loadEngagementDetail(ctx: OrgContext, id: string) {
     gatePreview,
     shareStatus,
     awaitingReplyCount,
-    boqStep: {
-      current: boqSummary,
-      boqProposalId,
-      clientCanOpen: boqReleasable,
-      canBuild:
-        can(ctx.role, 'proposals_build', 'create') && can(ctx.role, 'boq_build', 'create'),
-    } satisfies BoqStepData,
+    boqStep,
   };
 }
 

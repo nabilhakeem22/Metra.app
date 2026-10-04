@@ -8,7 +8,12 @@ import {
   updateBoqLineCore,
 } from '@/lib/boqs/edit';
 import { issueBoqCore } from '@/lib/boqs/issue';
-import type { BoqDetail } from '@/lib/boqs/queries';
+import {
+  getProjectBoqSummary,
+  isBoqSharedOnEngagement,
+  type BoqDetail,
+} from '@/lib/boqs/queries';
+import { formatDocNumber } from '@/lib/format/doc-number';
 import { mintDeliveryLinkCore } from '@/lib/engagements/share';
 import {
   engagementAtBoq,
@@ -43,16 +48,22 @@ afterAll(async () => {
 beforeEach(() => {
   render.duringRender = null;
   render.renderAndStoreClientBoqPdf.mockReset();
+  // Stores the file under the SAME name the real render does (BQ-YYYY-NNNN.pdf),
+  // which is what identifies the BOQ's PDF among the delivery's files.
   render.renderAndStoreClientBoqPdf.mockImplementation(
-    async (ctx: { orgId: string }, input: { detail: BoqDetail; engagementId: string }) => {
+    async (
+      ctx: { orgId: string },
+      input: { detail: BoqDetail; engagementId: string; year: number },
+    ) => {
       if (render.duringRender) await render.duringRender();
+      const label = `${formatDocNumber('BQ', input.detail.number, input.year)}.pdf`;
       const [file] = await raw.query<{ id: string }>(
         `insert into public.files (org_id, entity, entity_id, object_key, original_name)
          values ('${ctx.orgId}', 'engagement', '${input.engagementId}',
-                 '${ctx.orgId}/engagement/' || gen_random_uuid(), 'BQ.pdf')
+                 '${ctx.orgId}/engagement/' || gen_random_uuid(), '${label}')
          returning id`,
       );
-      return { fileId: file.id, label: `BQ-${input.detail.number}.pdf` };
+      return { fileId: file.id, label };
     },
   );
 });
@@ -185,5 +196,29 @@ describe('the sheet Issue fences the BOQ content (R4)', () => {
     before = await revision();
     expect((await deleteBoqLineCore(org.ctx, { lineId: line.id })).ok).toBe(true);
     expect(await revision()).not.toBe(before);
+  });
+});
+
+describe('is the current BOQ in the client delivery link? (F2)', () => {
+  it('yes once issued; no once its artifact is hidden, as a pre-publish BOQ was', async () => {
+    const org = await seedBoqOrg(orgIds);
+    const engagementId = await rawEngagement(org);
+    const boqId = await uploadedDraft(org, 'Sheet');
+    expect((await issueBoqCore(org.ctx, { boqId, locale: 'en' })).ok).toBe(true);
+    const summary = await getProjectBoqSummary(org.ctx, org.projectId);
+    const shared = () =>
+      isBoqSharedOnEngagement(org.ctx, {
+        engagementId,
+        documentNumber: summary!.documentNumber,
+      });
+    expect(await shared()).toBe(true);
+
+    // A BOQ issued before every issue published left its artifact hidden; no
+    // data is backfilled, so the step must read it as issued, not sent.
+    await raw.query(
+      `update public.engagement_artifacts set client_visible = false
+        where engagement_id = '${engagementId}' and kind = 'boq'`,
+    );
+    expect(await shared()).toBe(false);
   });
 });

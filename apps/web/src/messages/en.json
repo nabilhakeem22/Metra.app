@@ -2060,6 +2060,8 @@
       "issueBodyOpen": "{count} lines priced. Issuing freezes it and delivers it to the client, who can open it right away.",
       "issueCta": "Review and issue",
       "doneTitle": "{documentNumber} sent · {count, plural, one {{n} line} other {{n} lines}}",
+      "doneUnsharedTitle": "{documentNumber} issued, not shared with the client · {count, plural, one {{n} line} other {{n} lines}}",
+      "unsharedHint": "The client can't see it in this delivery's link.",
       "createCta": "Create the BOQ",
       "continueCta": "Continue the BOQ",
       "uploadInstead": "Upload an Excel sheet instead",

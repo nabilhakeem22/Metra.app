@@ -2060,6 +2060,8 @@
       "issueBodyOpen": "{count, plural, zero {مفيش بند مسعّر} one {بند واحد مسعّر} two {بندان مسعّران} few {# بنود مسعّرة} many {# بندًا مسعّرًا} other {# بند مسعّر}}. الإصدار بيثبت المقايسة ويسلّمها للعميل، ويقدر يفتحها على طول.",
       "issueCta": "مراجعة وإصدار",
       "doneTitle": "المقايسة {documentNumber} اتبعتت · {count, plural, zero {مفيش بند} one {بند واحد} two {بندين} few {{n} بنود} many {{n} بند} other {{n} بند}}",
+      "doneUnsharedTitle": "المقايسة {documentNumber} اتصدرت بس مش متشاركة مع العميل · {count, plural, zero {مفيش بند} one {بند واحد} two {بندين} few {{n} بنود} many {{n} بند} other {{n} بند}}",
+      "unsharedHint": "العميل مش شايفها في لينك التسليم ده.",
       "createCta": "اعمل المقايسة",
       "continueCta": "كمّل المقايسة",
       "uploadInstead": "ارفع شيت Excel بدل كده",

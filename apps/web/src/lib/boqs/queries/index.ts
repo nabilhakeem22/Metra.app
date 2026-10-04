@@ -5,3 +5,4 @@ export type { BoqDetail, BoqLineRow, BoqSectionRow } from './types';
 export { getBoqDetail, readBoqDetail } from './detail';
 export { getProjectBoq, selectCurrentProjectBoq, type CurrentBoqRow } from './current';
 export { getProjectBoqSummary } from './summary';
+export { isBoqSharedOnEngagement } from './shared';

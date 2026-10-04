@@ -35,6 +35,7 @@ const step = (over: Partial<BoqStepData> = {}): BoqStepData => ({
   current: null,
   boqProposalId: null,
   clientCanOpen: false,
+  sharedWithClient: true,
   canBuild: true,
   ...over,
 });
@@ -108,6 +109,15 @@ describe('EngagementBoqStep: done (AC16)', () => {
     renderStep(step({ current: sent, clientCanOpen: true }));
     expect(screen.getByText(en('engagements.boqStep.chipOpen'))).toBeTruthy();
     expect(screen.queryByText(en('engagements.boqStep.editNewVersion'))).toBeNull();
+  });
+
+  it('says "issued, not shared with the client", with no chip, when the client cannot see it (F2)', () => {
+    renderStep(step({ current: sent, sharedWithClient: false, clientCanOpen: true }));
+    expect(screen.getByText(/BQ-2026-0014 issued, not shared with the client/)).toBeTruthy();
+    expect(screen.getByText(en('engagements.boqStep.unsharedHint'))).toBeTruthy();
+    expect(screen.queryByText(/BQ-2026-0014 sent/)).toBeNull();
+    expect(screen.queryByText(en('engagements.boqStep.chipOpen'))).toBeNull();
+    expect(screen.queryByText(en('engagements.boqStep.chipLocked'))).toBeNull();
   });
 
   it('renders no Arabic-Indic digit in the Arabic done line', () => {
