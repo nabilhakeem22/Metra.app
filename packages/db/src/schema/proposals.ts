@@ -13,7 +13,8 @@ import {
 } from 'drizzle-orm/pg-core';
 import { bilingual, bilingualCheck, money } from './_helpers';
 import { clients } from './clients';
-import { proposalStatus } from './enums';
+import { designEngagements } from './design-engagements';
+import { proposalKind, proposalStatus } from './enums';
 import { organizations } from './organizations';
 import { orgScoped } from './org-scoped';
 import { sameOrgFk } from './org-ref';
@@ -25,6 +26,11 @@ import { projects } from './projects';
  * All money caches (subtotal…totalMargin) are SERVER-written from the pure totals
  * engine — never trusted from the client. Locked once `status<>'draft'` by the
  * enforce_immutable_when trigger.
+ *
+ * `kind = 'boq'` is a design engagement's BOQ working copy (one per engagement):
+ * built in the same editor, priced before VAT and supervision, never sent as an
+ * offer. The CHECKs below hold it to `draft` with no share token, no VAT and no
+ * supervision, so the quote lifecycle (send, accept, expire) can never reach it.
  */
 export const proposals = pgTable(
   'proposals',
@@ -38,6 +44,9 @@ export const proposals = pgTable(
     clientId: uuid('client_id').notNull(),
     projectId: uuid('project_id').notNull(),
     status: proposalStatus('status').notNull().default('draft'),
+    kind: proposalKind('kind').notNull().default('quote'),
+    // Set iff kind = 'boq': the engagement this BOQ working copy belongs to.
+    engagementId: uuid('engagement_id'),
     currency: text('currency').notNull().default('EGP'),
     issueDate: date('issue_date'),
     expiryDate: date('expiry_date'),
@@ -67,6 +76,14 @@ export const proposals = pgTable(
     unique('proposals_org_id_id_unique').on(t.orgId, t.id),
     unique('proposals_org_id_number_unique').on(t.orgId, t.number),
     unique('proposals_token_hash_unique').on(t.tokenHash),
+    // Not partial: quotes always carry a NULL engagement (CHECK below) and NULLs
+    // are distinct, so this is "one BOQ proposal per engagement".
+    unique('proposals_org_engagement_unique').on(t.orgId, t.engagementId),
+    check('proposals_engagement_iff_boq', sql`(kind = 'boq') = (engagement_id IS NOT NULL)`),
+    check(
+      'proposals_boq_unpriced_draft',
+      sql`kind = 'quote' OR (status = 'draft' AND token_hash IS NULL AND tax_rate = 0 AND supervision_pct = 0)`,
+    ),
     bilingualCheck('proposals', 'title'),
     check(
       'proposals_expiry_after_issue',
@@ -83,6 +100,11 @@ export const proposals = pgTable(
     check('proposals_tax_rate_range', sql`tax_rate >= 0 and tax_rate <= 100`),
     ...sameOrgFk(t, 'client', clients, { onDelete: 'restrict' }),
     ...sameOrgFk(t, 'project', projects, { onDelete: 'restrict' }),
+    // `index: false`: proposals_org_engagement_unique above is the index.
+    ...sameOrgFk(t, 'engagement', designEngagements, {
+      onDelete: 'cascade',
+      index: false,
+    }),
     // Self-reference: a superseding draft points at the proposal it replaced.
     ...sameOrgFk(
       t,

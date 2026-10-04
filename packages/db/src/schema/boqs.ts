@@ -17,6 +17,7 @@ import { organizations } from './organizations';
 import { orgScoped } from './org-scoped';
 import { sameOrgFk } from './org-ref';
 import { projects } from './projects';
+import { proposals } from './proposals';
 
 /**
  * Bill of Quantities (مقايسة) — the priced schedule of construction works.
@@ -26,12 +27,20 @@ import { projects } from './projects';
  * execution contract. That is why the totals are three figures
  * (`total = subtotal - discountAmount`) where a proposal's are eight.
  *
- * EVERY BOQ HAS LINES. A studio can type them, pull them from the price book, or
- * fill the downloaded template and upload it — but an uploaded sheet is an INPUT
- * METHOD, not a second kind of BOQ. `sourceFileId` keeps that sheet attached for
- * provenance (it is what the client was actually sent) while the lines remain the
- * record. Nothing downstream branches on how the lines arrived, which is what
- * keeps remeasurement from having a second, untrackable code path.
+ * EVERY BOQ HAS LINES. A studio can type them, pull them from the price book,
+ * fill the downloaded template and upload it, or build them in the proposal
+ * builder and "Send as BOQ" — but an uploaded sheet or a builder draft is an
+ * INPUT METHOD, not a second kind of BOQ. `sourceFileId` keeps an uploaded sheet
+ * attached for provenance (it is what the client was actually sent) and
+ * `sourceProposalId` names the builder working copy a sent BOQ was cut from,
+ * while the lines remain the record. Nothing downstream branches on how the lines
+ * arrived, which is what keeps remeasurement from having a second, untrackable
+ * code path.
+ *
+ * Both provenance FKs are declared `set null` here, and the DATABASE holds
+ * `ON DELETE SET NULL (<x>_id)` for each (0052 narrowed `source_file_id`; 0055
+ * created `source_proposal_id` narrowed). See `org-ref.ts` for why drizzle cannot
+ * spell the column list.
  *
  * `number` is a per-org int sequence rendered `BQ-YYYY-NNNN`, allocated under the
  * same advisory lock as proposal and contract numbers.
@@ -55,6 +64,8 @@ export const boqs = pgTable(
     source: boqSource('source').notNull().default('built'),
     // The spreadsheet or PDF the lines came from, if any.
     sourceFileId: uuid('source_file_id'),
+    // The BOQ-kind proposal this BOQ was sent from, if any.
+    sourceProposalId: uuid('source_proposal_id'),
     currency: text('currency').notNull().default('EGP'),
     issueDate: date('issue_date'),
     // Revision chain, following the proposal precedent.
@@ -82,6 +93,7 @@ export const boqs = pgTable(
     ...sameOrgFk(t, 'project', projects, { onDelete: 'restrict', index: false }),
     ...sameOrgFk(t, 'engagement', designEngagements, { onDelete: 'set null' }),
     ...sameOrgFk(t, 'sourceFile', files, { onDelete: 'set null' }),
+    ...sameOrgFk(t, 'sourceProposal', proposals, { onDelete: 'set null' }),
     index('boqs_org_project_idx').on(t.orgId, t.projectId),
     index('boqs_org_status_idx').on(t.orgId, t.status),
   ],

@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { sqlstateOf } from '@metra/db/sqlstate';
@@ -201,6 +201,29 @@ function narrowedByMigration0052(): number {
   return rows.length;
 }
 
+/**
+ * How many composite set-null FKs a LATER migration created already narrowed.
+ * 0052 cannot grow a row for them (its loop raises on a constraint that does not
+ * exist yet when it runs on a fresh database), so a new one is born with its
+ * column list instead: 0055's `boqs_sourceProposal_same_org_fk` is the first.
+ * Comment lines are dropped first, so a header that QUOTES the clause is not
+ * counted.
+ */
+function bornNarrowedAfter0052(): number {
+  const folder = dirname(MIGRATION_0052);
+  const bornNarrowed =
+    /alter\s+table\s+"?\w+"?\s+add\s+constraint\s+"?\w+"?\s+foreign\s+key\s*\(\s*"?org_id"?\s*,\s*"?(\w+)"?\s*\)[^;]*?on\s+delete\s+set\s+null\s*\(\s*"?(\w+)"?\s*\)/gi;
+  return readdirSync(folder)
+    .filter((name) => /^\d{4}_.*\.sql$/.test(name) && Number(name.slice(0, 4)) > 52)
+    .flatMap((name) => {
+      const text = readFileSync(resolve(folder, name), 'utf8')
+        .split('\n')
+        .filter((line) => !line.trimStart().startsWith('--'))
+        .join('\n');
+      return [...text.matchAll(bornNarrowed)].filter((match) => match[1] === match[2]);
+    }).length;
+}
+
 describe('a composite set-null cascade nulls the reference and leaves org_id alone', () => {
   it('deletes the source FILE of a DRAFT boq: source_file_id goes null, org_id and the other parent do not', async () => {
     const fixture = await setup();
@@ -295,7 +318,7 @@ describe('a composite set-null cascade nulls the reference and leaves org_id alo
           and c.confdeltype = 'n'
         order by c.conname`,
     );
-    expect(fks.length).toBe(2);
+    expect(fks.length).toBe(3);
     for (const fk of fks) {
       expect(fk.refcols).toContain('org_id');
       expect(fk.setcols).not.toBeNull();
@@ -305,6 +328,7 @@ describe('a composite set-null cascade nulls the reference and leaves org_id alo
     expect(fks.map((fk) => fk.setcols![0]).sort()).toEqual([
       'engagement_id',
       'source_file_id',
+      'source_proposal_id',
     ]);
   });
 
@@ -351,6 +375,6 @@ describe('a composite set-null cascade nulls the reference and leaves org_id alo
           and c.confdeltype = 'n'
           and array_length(c.conkey, 1) > 1`,
     );
-    expect(Number(narrowed.n)).toBe(narrowedByMigration0052());
+    expect(Number(narrowed.n)).toBe(narrowedByMigration0052() + bornNarrowedAfter0052());
   });
 });
