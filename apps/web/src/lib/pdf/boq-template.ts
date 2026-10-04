@@ -1,22 +1,11 @@
 import { PDF_BRAND } from '@/lib/pdf/brand';
 import { dirFor } from '@/i18n/routing';
 import { formatDocNumber } from '@/lib/format/doc-number';
-import { formatMoney } from '@/lib/format/money';
-import { formatQuantity } from '@/lib/format/number';
-import type { BoqDetail } from '@/lib/boqs/queries';
+import type { BoqDetail } from '@/lib/boqs/queries/types';
+import { hasLineDiscounts } from '@/lib/boqs/line-discounts';
 import { esc } from '@/lib/pdf/html';
+import { boqLinesTableHtml, boqTotalsHtml, type BoqLayout } from './boq-template-parts';
 import { fontFaceCss } from './template';
-
-const t = (locale: string, ar: string, en: string) =>
-  esc(locale.startsWith('ar') ? ar : en);
-
-const UNIT_LABEL: Record<string, [string, string]> = {
-  sqm: ['م²', 'm²'],
-  linear_meter: ['م.ط', 'm.l'],
-  pcs: ['عدد', 'pcs'],
-  lump_sum: ['مقطوعية', 'lump sum'],
-  day: ['يوم', 'day'],
-};
 
 /**
  * Bill of Quantities PDF — the document the client actually receives.
@@ -34,6 +23,11 @@ const UNIT_LABEL: Record<string, [string, string]> = {
  *
  * No tax and no supervision: a BOQ prices the works, and the commercial wrapper
  * is added when it becomes an execution contract.
+ *
+ * LINE DISCOUNTS APPEAR ONLY WHEN GIVEN: a discount % column, and totals that
+ * open with the gross and the line discounts, exactly when some line of THIS
+ * BOQ has one (`lib/boqs/line-discounts.ts`); otherwise the layout is unchanged.
+ * The two tables are `boq-template-parts.ts`.
  */
 export async function buildBoqHtml(
   boq: BoqDetail,
@@ -51,44 +45,12 @@ export async function buildBoqHtml(
 ): Promise<string> {
   const { locale, variant } = opts;
   const dir = dirFor(locale);
-  const showCost = variant === 'internal';
-  const m = (v: string) => formatMoney(v, locale);
   const num = opts.numberLabel ?? formatDocNumber('BQ', boq.number, opts.year);
-
-  const colCount = showCost ? 7 : 5;
-
-  const rows = boq.sections
-    .map((section) => {
-      const head = `<tr class="section"><td colspan="${colCount}">${esc(section.title)}</td></tr>`;
-      const lines = section.lines
-        .map((line) => {
-          const unit = UNIT_LABEL[line.unit] ?? [line.unit, line.unit];
-          const flag = line.provisional
-            ? ` <span class="prov">${t(locale, 'تقديري', 'provisional')}</span>`
-            : '';
-          const code = line.itemCode
-            ? `<span class="code">${esc(line.itemCode)}</span> `
-            : '';
-          return `<tr>
-            <td class="desc">${code}${esc(line.description)}${flag}</td>
-            <td>${t(locale, unit[0], unit[1])}</td>
-            <td class="num">${formatQuantity(line.qty, locale)}</td>
-            <td class="num">${m(line.unitPrice)}</td>
-            ${showCost ? `<td class="num">${m(line.unitCost ?? '0')}</td>` : ''}
-            ${showCost ? `<td class="num">${m(line.lineCost ?? '0')}</td>` : ''}
-            <td class="num">${m(line.lineTotal)}</td>
-          </tr>`;
-        })
-        .join('');
-      const subtotal = `<tr class="subtotal">
-        <td colspan="${colCount - 1}">${t(locale, 'إجمالي البند', 'Section subtotal')}</td>
-        <td class="num">${m(section.sectionSubtotal)}</td>
-      </tr>`;
-      return head + lines + subtotal;
-    })
-    .join('');
-
-  const hasDiscount = boq.discountAmount !== '0.0000' && boq.discountAmount !== '0';
+  const layout: BoqLayout = {
+    locale,
+    showCost: variant === 'internal',
+    showDiscount: hasLineDiscounts(boq.sections),
+  };
 
   return `<!doctype html>
 <html lang="${locale}" dir="${dir}">
@@ -124,44 +86,9 @@ export async function buildBoqHtml(
     <div>${esc(opts.clientName)} · ${esc(opts.projectName)}</div>
   </div>
 
-  <table dir="${dir}">
-    <thead>
-      <tr>
-        <th>${t(locale, 'الوصف', 'Description')}</th>
-        <th>${t(locale, 'الوحدة', 'Unit')}</th>
-        <th class="num">${t(locale, 'الكمية', 'Qty')}</th>
-        <th class="num">${t(locale, 'سعر الوحدة', 'Unit price')}</th>
-        ${showCost ? `<th class="num">${t(locale, 'تكلفة الوحدة', 'Unit cost')}</th>` : ''}
-        ${showCost ? `<th class="num">${t(locale, 'إجمالي التكلفة', 'Line cost')}</th>` : ''}
-        <th class="num">${t(locale, 'الإجمالي', 'Total')}</th>
-      </tr>
-    </thead>
-    <tbody>${rows}</tbody>
-  </table>
+  ${boqLinesTableHtml(boq, layout, dir)}
 
-  <table class="totals">
-    <tbody>
-      <tr>
-        <td>${t(locale, 'الإجمالي قبل الخصم', 'Subtotal')}</td>
-        <td class="num">${m(boq.subtotal)}</td>
-      </tr>
-      ${
-        hasDiscount
-          ? `<tr><td>${t(locale, 'الخصم', 'Discount')}</td><td class="num">-${m(boq.discountAmount)}</td></tr>`
-          : ''
-      }
-      ${
-        showCost
-          ? `<tr><td>${t(locale, 'إجمالي التكلفة', 'Total cost')}</td><td class="num">${m(boq.totalCost ?? '0')}</td></tr>
-             <tr><td>${t(locale, 'هامش الربح', 'Margin')}</td><td class="num">${m(boq.totalMargin ?? '0')}</td></tr>`
-          : ''
-      }
-      <tr class="grand">
-        <td>${t(locale, 'الإجمالي', 'Total')}</td>
-        <td class="num">${m(boq.total)}</td>
-      </tr>
-    </tbody>
-  </table>
+  ${boqTotalsHtml(boq, layout)}
 
   <div class="footer">${esc(opts.orgName)} · ${num}</div>
 </body>

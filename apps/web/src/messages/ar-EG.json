@@ -1116,6 +1116,7 @@
           "unit": "الوحدة",
           "qty": "الكمية",
           "rate": "الفئة",
+          "discount": "الخصم %",
           "total": "الإجمالي",
           "code": "الكود",
           "provisionalShort": "P"
@@ -1147,6 +1148,9 @@
         "allSaved": "كل التغييرات اتحفظت",
         "saveFailed": "التغيير ده ماتحفظش",
         "subtotal": "المجموع الفرعي",
+        "grossBeforeDiscounts": "قبل الخصومات",
+        "lineDiscounts": "خصومات البنود",
+        "subtotalAfterLineDiscounts": "الإجمالي بعد خصم البنود",
         "discount": "الخصم",
         "discountPct": "نسبة الخصم",
         "keyboardHint": "زرار Tab بيحركك بالعرض · Enter بينزلك لتحت في العمود · Esc بيرجع الخلية زي ما كانت",

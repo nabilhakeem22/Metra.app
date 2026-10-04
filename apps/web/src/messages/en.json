@@ -1116,6 +1116,7 @@
           "unit": "Unit",
           "qty": "Qty",
           "rate": "Rate",
+          "discount": "Disc. %",
           "total": "Total",
           "code": "Code",
           "provisionalShort": "P"
@@ -1147,6 +1148,9 @@
         "allSaved": "All changes saved",
         "saveFailed": "That change was not saved",
         "subtotal": "Subtotal",
+        "grossBeforeDiscounts": "Before discounts",
+        "lineDiscounts": "Line discounts",
+        "subtotalAfterLineDiscounts": "Subtotal after line discounts",
         "discount": "Discount",
         "discountPct": "Discount percentage",
         "keyboardHint": "Tab moves across · Enter moves down the column · Esc reverts the cell",

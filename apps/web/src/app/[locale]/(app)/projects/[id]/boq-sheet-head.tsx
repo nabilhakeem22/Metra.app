@@ -11,7 +11,14 @@ import { Th } from './boq-sheet-cells';
  * depend on, and what a per-cell width silently breaks the first time one row
  * renders a longer value.
  */
-export function BoqSheetHead({ canEdit }: { canEdit: boolean }) {
+export function BoqSheetHead({
+  canEdit,
+  discounted,
+}: {
+  canEdit: boolean;
+  /** Some line of this BOQ carries a discount: the read-only % column exists. */
+  discounted: boolean;
+}) {
   const t = useTranslations('projects.profile.boq');
   return (
     <>
@@ -21,6 +28,7 @@ export function BoqSheetHead({ canEdit }: { canEdit: boolean }) {
         <col style={{ width: 116 }} />
         <col style={{ width: 88 }} />
         <col style={{ width: 116 }} />
+        {discounted && <col style={{ width: 88 }} />}
         <col style={{ width: 132 }} />
         <col style={{ width: 48 }} />
         {canEdit && <col style={{ width: 44 }} />}
@@ -32,6 +40,7 @@ export function BoqSheetHead({ canEdit }: { canEdit: boolean }) {
           <Th>{t('col.unit')}</Th>
           <Th num>{t('col.qty')}</Th>
           <Th num>{t('col.rate')}</Th>
+          {discounted && <Th num>{t('col.discount')}</Th>}
           <Th num>{t('col.total')}</Th>
           <Th>{t('col.provisionalShort')}</Th>
           {canEdit && <Th> </Th>}

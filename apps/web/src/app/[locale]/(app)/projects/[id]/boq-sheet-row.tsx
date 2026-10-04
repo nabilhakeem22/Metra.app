@@ -1,6 +1,8 @@
 'use client';
 
+import { useLocale } from 'next-intl';
 import { memo } from 'react';
+import { formatPercent } from '@/lib/format/number';
 import { Td } from './boq-sheet-cells';
 import { amountOf, type EditableLine, type RowEdits } from './boq-sheet-columns';
 import type { BoqSheetRowApi } from './boq-sheet-row-api';
@@ -25,6 +27,23 @@ export interface BoqSheetRowProps {
   saving: boolean;
   /** SOME write on the sheet is in flight, so its controls are disabled. */
   pending: boolean;
+  /** This BOQ has line discounts, so every row shows its discount %. */
+  discounted: boolean;
+}
+
+/** The line's discount %, read-only: the sheet does not edit line discounts. */
+function BoqDiscountCell({ discountPct }: { discountPct: string }) {
+  const locale = useLocale();
+  return (
+    <Td num>
+      <span
+        className="block whitespace-nowrap p-3 text-end font-mono tabular-nums text-[color:var(--text-muted)]"
+        dir="ltr"
+      >
+        {formatPercent(discountPct, locale)}
+      </span>
+    </Td>
+  );
 }
 
 /**
@@ -45,6 +64,7 @@ export const BoqSheetRow = memo(function BoqSheetRow({
   typed,
   saving,
   pending,
+  discounted,
 }: BoqSheetRowProps) {
   return (
     <tr className="group border-b border-[color:var(--rule-soft)]">
@@ -53,6 +73,7 @@ export const BoqSheetRow = memo(function BoqSheetRow({
       <BoqUnitCell line={line} api={api} typed={typed} />
       <BoqNumberCell line={line} column="qty" api={api} typed={typed} />
       <BoqNumberCell line={line} column="unitPrice" api={api} typed={typed} />
+      {discounted && <BoqDiscountCell discountPct={line.discountPct} />}
       <Td num>
         <span
           className="block whitespace-nowrap p-3 text-end font-mono font-semibold tabular-nums text-[color:var(--text)]"

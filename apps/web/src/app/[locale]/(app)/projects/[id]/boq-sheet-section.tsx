@@ -3,7 +3,7 @@
 import { ChevronDown, Plus } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import type { BoqSectionRow } from '@/lib/boqs/queries';
-import type { CellEdits, EditableLine } from './boq-sheet-columns';
+import { leadingColumnCount, type CellEdits, type EditableLine } from './boq-sheet-columns';
 import { BoqSheetRow } from './boq-sheet-row';
 import type { BoqSheetRowApi } from './boq-sheet-row-api';
 
@@ -22,18 +22,21 @@ export function BoqSectionHeaderRow({
   section,
   collapsed,
   colCount,
+  discounted,
   money,
   onToggle,
 }: {
   section: BoqSectionRow;
   collapsed: boolean;
   colCount: number;
+  discounted: boolean;
   money: (value: string) => string;
   onToggle: () => void;
 }) {
+  const leading = leadingColumnCount(discounted);
   return (
     <tr>
-      <td colSpan={5} className={BAND}>
+      <td colSpan={leading} className={BAND}>
         <button
           type="button"
           onClick={onToggle}
@@ -60,7 +63,7 @@ export function BoqSectionHeaderRow({
       >
         {money(section.sectionSubtotal)}
       </td>
-      <td colSpan={colCount - 6} className={BAND} />
+      <td colSpan={colCount - leading - 1} className={BAND} />
     </tr>
   );
 }
@@ -70,6 +73,7 @@ export function BoqSectionBody({
   lines,
   collapsed,
   colCount,
+  discounted,
   searching,
   api,
   cells,
@@ -82,6 +86,8 @@ export function BoqSectionBody({
   lines: EditableLine[];
   collapsed: boolean;
   colCount: number;
+  /** This BOQ has line discounts: one more leading column. */
+  discounted: boolean;
   /** While a search is running the add-line row is hidden: a new blank line would
    *  not match the query and would appear to do nothing. */
   searching: boolean;
@@ -103,6 +109,7 @@ export function BoqSectionBody({
         section={section}
         collapsed={collapsed}
         colCount={colCount}
+        discounted={discounted}
         money={api.money}
         onToggle={onToggle}
       />
@@ -115,6 +122,7 @@ export function BoqSectionBody({
             typed={cells[line.id]}
             saving={savingIds.has(line.id)}
             pending={pending}
+            discounted={discounted}
           />
         ))}
       {api.canEdit && !collapsed && !searching && (
