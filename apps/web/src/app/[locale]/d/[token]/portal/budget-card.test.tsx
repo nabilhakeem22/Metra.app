@@ -10,6 +10,11 @@ vi.mock('../actions', () => actions);
 const ARABIC_INDIC = /[٠-٩۰-۹]/;
 const ROM = { low: '900000.0000', high: '1200000.0000' };
 
+/** The budget range's parts (figures, words, currency) in DOM order. */
+function rangeParts(container: HTMLElement): string[] {
+  return [...container.querySelectorAll('[data-part]')].map((part) => part.textContent ?? '');
+}
+
 function renderCard(rom: { low: string | null; high: string | null } | null, locale: TestLocale) {
   return renderWithIntl(<BudgetCard token="tok" rom={rom} />, { locale });
 }
@@ -24,22 +29,35 @@ describe('BudgetCard', () => {
     const text = container.textContent ?? '';
     expect(text).toContain(messageAt('en', 'delivery.budget.title'));
     expect(text).toContain(messageAt('en', 'delivery.budget.preparedBy'));
-    expect(text).toContain('900,000.00');
-    expect(text).toContain('1,200,000.00');
-    expect(text).toContain(messageAt('en', 'delivery.budget.to'));
     expect(text.match(/EGP/g)).toHaveLength(1);
+    expect(text).not.toContain('.00');
     expect(text).toContain(messageAt('en', 'delivery.budget.note'));
     expect(screen.getByRole('button', { name: messageAt('en', 'delivery.budget.acknowledge') })).toBeTruthy();
+    // English reads left to right: EGP 900,000 to 1,200,000.
+    expect(rangeParts(container)).toEqual([
+      'EGP',
+      '900,000',
+      messageAt('en', 'delivery.budget.to'),
+      '1,200,000',
+    ]);
   });
 
-  it('keeps the figures Latin and left-to-right in Arabic', () => {
+  it('orders the Arabic range for a right-to-left reader: low, to, high, then the currency', () => {
     const { container } = renderCard(ROM, 'ar-EG');
-    const text = container.textContent ?? '';
-    expect(text).toContain('900,000.00');
-    expect(text).toContain('ج.م');
-    expect(text).toContain(messageAt('ar-EG', 'delivery.budget.to'));
-    expect(ARABIC_INDIC.test(text)).toBe(false);
-    expect(container.querySelector('p[dir="ltr"]')?.textContent).toContain('1,200,000.00');
+    // The row follows the document direction (no forced ltr), so DOM order IS the
+    // right-to-left reading order, ending with ج.م at the far left.
+    const row = container.querySelector('[data-part]')?.parentElement as HTMLElement;
+    expect(row.hasAttribute('dir')).toBe(false);
+    expect(rangeParts(container)).toEqual([
+      '900,000',
+      messageAt('ar-EG', 'delivery.budget.to'),
+      '1,200,000',
+      'ج.م',
+    ]);
+    // Each figure is its own left-to-right isolate, Latin digits.
+    const figures = container.querySelectorAll('bdi[data-part="figure"]');
+    expect([...figures].map((figure) => figure.getAttribute('dir'))).toEqual(['ltr', 'ltr']);
+    expect(ARABIC_INDIC.test(container.textContent ?? '')).toBe(false);
   });
 
   it('records acknowledge_rom and shows the confirmed state instead of the button', async () => {
@@ -52,7 +70,7 @@ describe('BudgetCard', () => {
     expect(actions.recordDeliveryAction).toHaveBeenCalledWith('tok', 'acknowledge_rom');
     expect(screen.queryByRole('button')).toBeNull();
     // The range stays on screen after acknowledging.
-    expect(container.textContent).toContain('1,200,000.00');
+    expect(container.textContent).toContain('1,200,000');
   });
 
   it('paints the confirmed state with theme tokens, never a fixed light palette', async () => {
@@ -87,15 +105,29 @@ describe('BudgetCard', () => {
 
   it('shows a lone low bound as a "from" figure and a lone high bound as "up to"', () => {
     const low = renderCard({ low: '900000.0000', high: null }, 'en');
-    const fromPrefix = messageAt('en', 'delivery.budget.atLeast').replace('{amount}', '');
-    expect(low.container.textContent).toContain(fromPrefix.trim());
-    expect(low.container.textContent).toContain('900,000.00 EGP');
+    expect(rangeParts(low.container)).toEqual([
+      messageAt('en', 'delivery.budget.from'),
+      'EGP',
+      '900,000',
+    ]);
     low.unmount();
 
     const high = renderCard({ low: null, high: '1200000.0000' }, 'ar-EG');
-    const upToPrefix = messageAt('ar-EG', 'delivery.budget.atMost').replace('{amount}', '');
-    expect(high.container.textContent).toContain(upToPrefix.trim());
-    expect(high.container.textContent).toContain('1,200,000.00 ج.م');
+    expect(rangeParts(high.container)).toEqual([
+      messageAt('ar-EG', 'delivery.budget.upTo'),
+      '1,200,000',
+      'ج.م',
+    ]);
+  });
+
+  it('keeps 2 decimals on a bound that is not whole', () => {
+    const { container } = renderCard({ low: '900000.5000', high: '1200000.0000' }, 'en');
+    expect(rangeParts(container)).toEqual([
+      'EGP',
+      '900,000.50',
+      messageAt('en', 'delivery.budget.to'),
+      '1,200,000',
+    ]);
   });
 
   it('asks without a figure when no band is issued', () => {

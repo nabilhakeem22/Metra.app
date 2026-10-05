@@ -9,10 +9,10 @@ import {
   type PaymentRow,
 } from '@/lib/engagements/portal-payments';
 import { bidiIsolate } from '@/lib/format/bidi';
-import { formatMoney } from '@/lib/format/money';
 import { NextPayment } from './next-payment';
 import { PaymentClaimControl } from './payment-claim-control';
 import { PaymentScheduleRow } from './payment-schedule-row';
+import { formatPortalMoney } from './portal-money';
 import { useMilestoneLabel } from './use-milestone-label';
 import { usePaymentClaim } from './use-payment-claim';
 
@@ -77,7 +77,7 @@ export function PaymentsCard({
   const overview = derivePaymentsOverview(schedule);
   if (!overview) return null;
 
-  const money = (amount: string) => bidiIsolate(formatMoney(amount, locale));
+  const money = (amount: string) => bidiIsolate(formatPortalMoney(amount, locale));
   const claimControlFor = (row: PaymentRow, prominent: boolean) => (
     <PaymentClaimControl
       milestoneKind={row.milestoneKind}

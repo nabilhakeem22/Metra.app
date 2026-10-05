@@ -2145,8 +2145,8 @@
       "title": "Estimated budget",
       "preparedBy": "Prepared by your design team",
       "to": "to",
-      "atLeast": "From {amount}",
-      "atMost": "Up to {amount}",
+      "from": "From",
+      "upTo": "Up to",
       "note": "An early estimate of the cost of executing your design. The final price is set in the bill of quantities.",
       "acknowledge": "I acknowledge this budget",
       "acknowledged": "Acknowledged. Your design team has been notified."

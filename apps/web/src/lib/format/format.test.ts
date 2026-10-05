@@ -86,6 +86,29 @@ describe('formatMoneyAmount + moneySymbol — the figure and its label, apart', 
     expect(moneySymbol('ar-EG')).toBe('ج.م');
   });
 
+  it('trimWholeDecimals: a whole amount prints with no fraction', () => {
+    const trim = { trimWholeDecimals: true };
+    expect(formatMoney('120000.0000', 'en', trim)).toBe('120,000 EGP');
+    expect(formatMoney('120000.0000', 'ar-EG', trim)).toBe('120,000 ج.م');
+    expect(formatMoneyAmount('900000', 'en', trim)).toBe('900,000');
+    // Whole at 2 decimals: it rounds the way the 2-decimal figure would.
+    expect(formatMoneyAmount('20000.0040', 'en', trim)).toBe('20,000');
+    expect(formatMoneyAmount('20000.9960', 'en', trim)).toBe('20,001');
+    expect(formatMoneyAmount('0', 'en', trim)).toBe('0');
+  });
+
+  it('trimWholeDecimals: any other amount keeps exactly 2 decimals', () => {
+    const trim = { trimWholeDecimals: true };
+    expect(formatMoney('20000.5000', 'en', trim)).toBe('20,000.50 EGP');
+    expect(formatMoneyAmount('28000.0500', 'ar-EG', trim)).toBe('28,000.05');
+    expect(formatMoneyAmount(null, 'en', trim)).toBe('');
+  });
+
+  it('without the option a whole amount is unchanged: 2 decimals', () => {
+    expect(formatMoney('120000.0000', 'en')).toBe('120,000.00 EGP');
+    expect(formatMoneyAmount('900000', 'ar-EG')).toBe('900,000.00');
+  });
+
   it('returns "" for absent/invalid input, and normalizes negative zero', () => {
     expect(formatMoneyAmount(null, 'en')).toBe('');
     expect(formatMoneyAmount('  ', 'en')).toBe('');

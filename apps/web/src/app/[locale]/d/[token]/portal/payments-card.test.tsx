@@ -59,8 +59,8 @@ describe('PaymentsCard', () => {
     });
     const text = container.textContent ?? '';
     expect(text).toContain(messageAt('en', 'delivery.payments.title'));
-    expect(text).toContain('120,000.00 EGP');
-    expect(text).toContain('56,000.00 EGP');
+    expect(text).toContain('120,000 EGP');
+    expect(text).toContain('56,000 EGP');
     expect(screen.getByRole('progressbar').getAttribute('aria-valuenow')).toBe('46');
 
     const nextLabel = messageAt('en', 'delivery.payments.nextPayment').replace(
@@ -68,7 +68,7 @@ describe('PaymentsCard', () => {
       messageAt('en', 'delivery.payments.kind.gate_b'),
     );
     const nextBox = screen.getByText(nextLabel).parentElement as HTMLElement;
-    expect(nextBox.textContent).toContain('28,000.00 EGP');
+    expect(nextBox.textContent).toContain('28,000 EGP');
     expect(within(nextBox).getByRole('button', { name: messageAt('en', 'delivery.payments.claim') })).toBeTruthy();
   });
 
@@ -78,10 +78,33 @@ describe('PaymentsCard', () => {
     expect(rows).toHaveLength(3);
     expect(rows[0].textContent).toContain(messageAt('en', 'delivery.payments.kind.deposit'));
     expect(rows[0].textContent).toContain(messageAt('en', 'delivery.payments.state.paid'));
-    expect(rows[0].querySelector('.line-through')?.textContent).toBe('36,000.00');
-    expect(rows[1].textContent).toContain('20,000.00 EGP');
-    expect(rows[1].textContent).toContain('48,000.00 EGP');
+    expect(rows[0].querySelector('.line-through')?.textContent).toBe('36,000');
+    expect(rows[1].textContent).toContain('20,000 EGP');
+    expect(rows[1].textContent).toContain('48,000 EGP');
     expect(rows[2].textContent).toContain(messageAt('en', 'delivery.payments.state.later'));
+  });
+
+  it('prints whole amounts with no ".00" anywhere on the card', () => {
+    const { container } = renderCard(MIDWAY, {
+      claimableMilestones: [claimable('gate_b', '28000.0000')],
+    });
+    expect(container.textContent).not.toContain('.00');
+  });
+
+  it('keeps 2 decimals on amounts that are not whole', () => {
+    const { container } = renderCard(
+      [
+        milestone('deposit', '36000.0000', '36000.0000', 'paid'),
+        milestone('gate_b', '48000.0000', '20000.5000', 'partial'),
+      ],
+      null,
+    );
+    const rows = screen.getAllByRole('listitem');
+    expect(rows[1].textContent).toContain('20,000.50 EGP');
+    expect(rows[1].textContent).toContain('48,000 EGP');
+    // Paid of total and the remaining on the next payment carry the fraction too.
+    expect(container.textContent).toContain('56,000.50 EGP');
+    expect(container.textContent).toContain('27,999.50 EGP');
   });
 
   it('reads an untouched next milestone as due', () => {
@@ -141,7 +164,7 @@ describe('PaymentsCard', () => {
     const text = container.textContent ?? '';
     expect(text).toContain(messageAt('ar-EG', 'delivery.payments.settledTitle'));
     expect(text).toContain(messageAt('ar-EG', 'delivery.payments.settledBody'));
-    expect(text).toContain('120,000.00 ج.م');
+    expect(text).toContain('120,000 ج.م');
     expect(ARABIC_INDIC.test(text)).toBe(false);
     expect(screen.getByRole('progressbar').getAttribute('aria-valuenow')).toBe('100');
     expect(claimButtons('ar-EG')).toHaveLength(0);
@@ -154,10 +177,10 @@ describe('PaymentsCard', () => {
     }, 'ar-EG');
     const text = container.textContent ?? '';
     expect(text).toContain(messageAt('ar-EG', 'delivery.payments.kind.gate_b'));
-    expect(text).toContain('28,000.00 ج.م');
+    expect(text).toContain('28,000 ج.م');
     const partialLead = messageAt('ar-EG', 'delivery.payments.state.partial').split('{')[0].trim();
     expect(screen.getAllByRole('listitem')[1].textContent).toContain(partialLead);
-    expect(screen.getAllByRole('listitem')[1].textContent).toContain('48,000.00 ج.م');
+    expect(screen.getAllByRole('listitem')[1].textContent).toContain('48,000 ج.م');
     expect(claimButtons('ar-EG')).toHaveLength(1);
     expect(container.innerHTML).not.toMatch(/emerald|amber/);
   });

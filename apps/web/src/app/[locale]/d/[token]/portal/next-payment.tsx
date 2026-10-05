@@ -2,7 +2,7 @@
 
 import type { ReactNode } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
-import { formatMoney } from '@/lib/format/money';
+import { formatPortalMoney } from './portal-money';
 
 /**
  * The highlighted NEXT payment: which milestone, what remains on it, and the
@@ -27,7 +27,7 @@ export function NextPayment({
         {t('nextPayment', { milestone: label })}
       </p>
       <p className="text-xl font-extrabold tabular-nums text-foreground">
-        <span dir="ltr">{formatMoney(amountRemaining, locale)}</span>
+        <bdi>{formatPortalMoney(amountRemaining, locale)}</bdi>
       </p>
       {claimControl}
     </div>

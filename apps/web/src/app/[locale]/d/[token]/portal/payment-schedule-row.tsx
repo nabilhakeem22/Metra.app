@@ -5,8 +5,8 @@ import { Check, Circle } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
 import type { PaymentRow } from '@/lib/engagements/portal-payments';
 import { bidiIsolate } from '@/lib/format/bidi';
-import { formatMoney, formatMoneyAmount } from '@/lib/format/money';
 import { cn } from '@/lib/utils';
+import { formatPortalAmount, formatPortalMoney } from './portal-money';
 
 /** The round marker at the row's start: a tick when paid, a dot otherwise. */
 function RowMarker({ row }: { row: PaymentRow }) {
@@ -47,8 +47,8 @@ export function PaymentScheduleRow({
   const stateText =
     row.state === 'partial'
       ? t('partial', {
-          paid: bidiIsolate(formatMoney(row.amountCleared, locale)),
-          due: bidiIsolate(formatMoney(row.amountDue, locale)),
+          paid: bidiIsolate(formatPortalMoney(row.amountCleared, locale)),
+          due: bidiIsolate(formatPortalMoney(row.amountDue, locale)),
         })
       : t(row.state);
   const greyed = row.state === 'later';
@@ -76,7 +76,7 @@ export function PaymentScheduleRow({
           row.state === 'paid' && 'line-through',
         )}
       >
-        {formatMoneyAmount(row.amountDue, locale)}
+        {formatPortalAmount(row.amountDue, locale)}
       </span>
     </li>
   );

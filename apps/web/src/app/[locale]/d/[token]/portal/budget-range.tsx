@@ -2,39 +2,79 @@
 
 import { useLocale, useTranslations } from 'next-intl';
 import type { PublicDelivery } from '@/lib/engagements/public';
-import { bidiIsolate } from '@/lib/format/bidi';
-import { formatMoney, formatMoneyAmount, moneySymbol } from '@/lib/format/money';
+import { moneySymbol } from '@/lib/format/money';
+import { formatPortalAmount } from './portal-money';
 
-const FIGURE_CLASS = 'text-2xl font-extrabold tracking-tight tabular-nums';
-const LABEL_CLASS = 'text-sm font-semibold text-muted-foreground';
+type RangePart = { kind: 'figure' | 'word' | 'currency'; text: string };
+
+const PART_CLASS: Record<RangePart['kind'], string> = {
+  figure: 'text-2xl font-extrabold tracking-tight tabular-nums',
+  word: 'text-sm text-muted-foreground',
+  currency: 'text-sm font-semibold text-muted-foreground',
+};
 
 /**
- * The issued budget band, big. Both bounds: "EGP low to high" on one LEFT-TO-RIGHT
- * row in both languages (Latin digits, the currency label once), pinned to the
- * reading start. One bound only: a plain "From X" / "Up to X" sentence in the
- * locale's direction, the figure bidi-isolated. No bound (the band is not issued):
- * nothing.
+ * The parts of the band in reading order, with the currency label once, beside
+ * the figures: BEFORE the first one in English ("EGP 900,000 to 1,200,000"),
+ * AFTER the last one in Arabic, where the row reads right to left and so ends at
+ * the far left ("900,000 إلى 1,200,000 ج.م"). Null when no bound is issued.
+ */
+function rangeParts(
+  low: string,
+  high: string,
+  words: { to: string; from: string; upTo: string },
+  locale: string,
+): RangePart[] | null {
+  const figure = (text: string): RangePart => ({ kind: 'figure', text });
+  const word = (text: string): RangePart => ({ kind: 'word', text });
+  let parts: RangePart[];
+  if (low && high) parts = [figure(low), word(words.to), figure(high)];
+  else if (low) parts = [word(words.from), figure(low)];
+  else if (high) parts = [word(words.upTo), figure(high)];
+  else return null;
+
+  const currency: RangePart = { kind: 'currency', text: moneySymbol(locale) };
+  if (locale.startsWith('ar')) return [...parts, currency];
+  const firstFigure = parts.findIndex((part) => part.kind === 'figure');
+  return [...parts.slice(0, firstFigure), currency, ...parts.slice(firstFigure)];
+}
+
+/**
+ * The issued budget band, big. The row follows the document direction; each
+ * figure (and the currency label) is its own isolate, a figure forced
+ * left-to-right, so the digits stay Latin and in order inside a number while the
+ * parts read in the locale's order. A lone bound reads "From X" / "Up to X" on
+ * the same rule. No bound issued: nothing.
  */
 export function BudgetRange({ rom }: { rom: PublicDelivery['rom'] }) {
   const t = useTranslations('delivery.budget');
   const locale = useLocale();
-  const low = formatMoneyAmount(rom?.low, locale);
-  const high = formatMoneyAmount(rom?.high, locale);
+  const parts = rangeParts(
+    formatPortalAmount(rom?.low, locale),
+    formatPortalAmount(rom?.high, locale),
+    { to: t('to'), from: t('from'), upTo: t('upTo') },
+    locale,
+  );
+  if (!parts) return null;
 
-  if (low && high) {
-    return (
-      <p dir="ltr" className="flex flex-wrap items-baseline gap-2 rtl:justify-end">
-        <span className={LABEL_CLASS}>{moneySymbol(locale)}</span>
-        <span className={FIGURE_CLASS}>{low}</span>
-        <span className="text-sm text-muted-foreground">{t('to')}</span>
-        <span className={FIGURE_CLASS}>{high}</span>
-      </p>
-    );
-  }
-  if (!low && !high) return null;
-
-  const sentence = low
-    ? t('atLeast', { amount: bidiIsolate(formatMoney(rom?.low, locale)) })
-    : t('atMost', { amount: bidiIsolate(formatMoney(rom?.high, locale)) });
-  return <p className={FIGURE_CLASS}>{sentence}</p>;
+  return (
+    <p className="flex flex-wrap items-baseline gap-2">
+      {parts.map((part, index) =>
+        part.kind === 'word' ? (
+          <span key={index} data-part={part.kind} className={PART_CLASS.word}>
+            {part.text}
+          </span>
+        ) : (
+          <bdi
+            key={index}
+            data-part={part.kind}
+            dir={part.kind === 'figure' ? 'ltr' : undefined}
+            className={PART_CLASS[part.kind]}
+          >
+            {part.text}
+          </bdi>
+        ),
+      )}
+    </p>
+  );
 }
