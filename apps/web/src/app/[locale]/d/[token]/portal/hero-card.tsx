@@ -100,15 +100,15 @@ function ActionHero({ token, group }: { token: string; group: HeroGroup }) {
   if (confirmed) {
     const keys = CONFIRM_KEYS[confirmed];
     return (
-      <section className="rounded-2xl border border-emerald-200 bg-emerald-50 p-5 text-center shadow-sm">
+      <section className="rounded-2xl border border-[color:var(--success)]/30 bg-[color:var(--success-tint)] p-5 text-center shadow-sm">
         <CheckCircle2
-          className="mx-auto mb-3 size-11 text-emerald-600"
+          className="mx-auto mb-3 size-11 text-[color:var(--success)]"
           aria-hidden
         />
-        <h2 className="text-lg font-semibold text-emerald-900">
+        <h2 className="text-lg font-semibold text-foreground">
           {tGroup(keys.title)}
         </h2>
-        <p className="mx-auto mt-2 max-w-xs text-sm text-emerald-800">
+        <p className="mx-auto mt-2 max-w-xs text-sm text-muted-foreground">
           {tGroup(keys.body)}
         </p>
       </section>
@@ -178,14 +178,14 @@ function CalmHero({
   return (
     <section
       className={`space-y-2 rounded-2xl border bg-background p-5 shadow-sm ${
-        delivered ? 'border-emerald-200' : ''
+        delivered ? 'border-[color:var(--success)]/30' : ''
       }`}
     >
       {kind !== 'closed' && (
         <span
           className={`inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide ${
             delivered
-              ? 'bg-emerald-100 text-emerald-700'
+              ? 'bg-[color:var(--success-tint)] text-[color:var(--success)]'
               : 'bg-muted text-muted-foreground'
           }`}
         >
