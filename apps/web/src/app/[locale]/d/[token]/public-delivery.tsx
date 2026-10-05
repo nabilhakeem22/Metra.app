@@ -1,22 +1,22 @@
 'use client';
 
 import { useLocale, useTranslations } from 'next-intl';
-import { paymentGlance } from '@/lib/engagements/portal-hero';
 import type { DeliveryReadResult } from '@/lib/engagements/public';
+import { BudgetCard } from './portal/budget-card';
 import { DocumentsCard } from './portal/documents-card';
 import { FirmHeader } from './portal/firm-header';
 import { Greeting } from './portal/greeting';
-import { PaymentClaimCard } from './portal/payment-claim-card';
-import { PaymentGlanceCard } from './portal/payment-glance';
-import { RomAckCard } from './portal/rom-ack-card';
+import { PaymentsCard } from './portal/payments-card';
 import { PortalCommandCard } from './portal/command-card';
 
 /**
  * The session-less, mobile-first, firm-branded client portal — a guided single
- * column: firm header → greeting → journey tracker → the ONE thing that needs the
- * client now (hero) → an optional subordinate budget-ack → the released documents →
- * payment glance → what's-next → footer. Every derivation (journey position, hero) is computed
- * server-side and carries NO raw machine state; every figure is a client-DUE
+ * column: firm header → greeting → the command card (journey, the ONE thing that
+ * needs the client now, what's next) → an optional subordinate budget card → the
+ * payments card (a payment due is something the client acts on, so it sits above
+ * the documents) → the released documents → footer. Every derivation (journey
+ * position, hero) is computed server-side and carries NO raw machine state; the
+ * payments card's sums are exact scale-4 math. Every figure is a client-DUE
  * amount (no cost/margin ever reaches this surface). Bilingual, RTL-safe, Western
  * numerals, logical CSS only. A read that produced no delivery renders ONE OF TWO
  * notices, and which one matters: `not_found` is permanent and tells the client to
@@ -57,7 +57,6 @@ export function PublicDeliveryView({
   const firmName = pick(delivery.firm.nameAr, delivery.firm.nameEn) || 'Metra';
   const title = pick(delivery.titleAr, delivery.titleEn);
   const clientName = pick(delivery.client.nameAr, delivery.client.nameEn);
-  const glance = paymentGlance(delivery.paymentSchedule);
 
   return (
     <div className="client-portal min-h-screen">
@@ -71,14 +70,17 @@ export function PublicDeliveryView({
           stageLabel={delivery.stageLabel}
           stageNote={delivery.stageNote}
         />
-        {delivery.hero.showRomAck && <RomAckCard token={token} />}
+        {delivery.hero.showRomAck && <BudgetCard token={token} rom={delivery.rom} />}
+        <PaymentsCard
+          token={token}
+          schedule={delivery.paymentSchedule}
+          claim={delivery.paymentClaim}
+        />
         <DocumentsCard
           token={token}
           documents={delivery.documents}
           documentUnavailable={documentUnavailable}
         />
-        <PaymentGlanceCard glance={glance} />
-        <PaymentClaimCard token={token} claim={delivery.paymentClaim} />
         <footer className="pt-2 text-center text-xs text-muted-foreground">
           {t('poweredBy', { firm: firmName })}
         </footer>

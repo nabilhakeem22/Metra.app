@@ -2138,54 +2138,34 @@
         "acknowledgedBody": "Thank you — your design project is complete."
       }
     },
-    "glance": {
-      "title": "Payment",
-      "depositPaid": "Deposit received",
-      "next": "Next: {amount}",
-      "allSettled": "All payments settled"
-    },
     "whatsNext": {
       "eyebrow": "Up next"
     },
     "budget": {
       "title": "Estimated budget",
-      "hint": "A rough range for the construction budget, shared for your planning.",
-      "range": "{low} – {high}"
+      "preparedBy": "Prepared by your design team",
+      "to": "to",
+      "atLeast": "From {amount}",
+      "atMost": "Up to {amount}",
+      "note": "An early estimate of the cost of executing your design. The final price is set in the bill of quantities.",
+      "acknowledge": "I acknowledge this budget",
+      "acknowledged": "Acknowledged. Your design team has been notified."
     },
     "payments": {
-      "title": "Payment schedule",
-      "total": "Total"
-    },
-    "milestone": {
-      "deposit": "Deposit",
-      "gate_a": "First installment",
-      "gate_b": "Second installment",
-      "balance": "Final payment"
-    },
-    "status": {
-      "paid": "Paid",
-      "partial": "Partly paid",
-      "due": "Due"
-    },
-    "actions": {
-      "romTitle": "Estimated budget",
-      "notePlaceholder": "Add a note (optional)",
-      "approveDesign": "Approve design",
-      "acknowledgeRom": "Acknowledge budget",
-      "confirmedAcknowledged": "Acknowledged — the studio has been notified.",
-      "error": {
-        "token_invalid": "This link is no longer available. Please contact your design team.",
-        "token_expired": "This link has expired. Please contact your design team.",
-        "not_active": "This delivery is closed. Please contact your design team.",
-        "wrong_state": "This action isn't available right now. Please refresh the page.",
-        "generic": "Something went wrong. Please try again."
-      }
-    },
-    "claim": {
       "title": "Payments",
-      "markPaid": "I've paid this",
-      "recordedPending": "Recorded — pending studio confirmation",
-      "note": "Marking a payment lets your design team know. They confirm it on their side.",
+      "designFee": "Design fee {amount}",
+      "paidOf": "{paid} paid of {total}",
+      "nextPayment": "Next payment · {milestone}, remaining",
+      "claim": "I've made this payment",
+      "awaitingConfirmation": "Waiting for your design team to confirm",
+      "settledTitle": "All payments settled",
+      "settledBody": "Thank you. Nothing is due.",
+      "state": {
+        "paid": "Paid",
+        "partial": "Partly paid · {paid} of {due}",
+        "due": "Due",
+        "later": "Later"
+      },
       "kind": {
         "deposit": "Deposit",
         "gate_a": "Concept payment",
@@ -2197,6 +2177,16 @@
         "token_expired": "This link has expired. Please contact your design team.",
         "not_active": "This delivery is closed. Please contact your design team.",
         "wrong_state": "This payment isn't available to mark right now. Please refresh the page.",
+        "generic": "Something went wrong. Please try again."
+      }
+    },
+    "actions": {
+      "notePlaceholder": "Add a note (optional)",
+      "error": {
+        "token_invalid": "This link is no longer available. Please contact your design team.",
+        "token_expired": "This link has expired. Please contact your design team.",
+        "not_active": "This delivery is closed. Please contact your design team.",
+        "wrong_state": "This action isn't available right now. Please refresh the page.",
         "generic": "Something went wrong. Please try again."
       }
     },

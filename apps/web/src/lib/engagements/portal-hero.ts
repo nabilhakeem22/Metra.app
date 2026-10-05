@@ -4,11 +4,7 @@
 // the portal renders — never the raw machine state name reaches the client. Both
 // the server read path (`public.ts`, which reuses CLIENT_ACTION_VERBS as its verb
 // whitelist) and a colocated unit test import from here.
-//
-// The `import type` below is erased at compile time — it only borrows the DUE-only
-// milestone shape, so this stays a pure module (no server-only runtime is pulled).
 import type { DesignState } from './states';
-import type { PublicDeliveryMilestone } from './public';
 
 /**
  * The SIX client-facing verb tokens the SDF may emit — the exhaustive whitelist.
@@ -81,32 +77,3 @@ export function deriveHero(
   return { kind: 'inProgress', showRomAck };
 }
 
-/** The at-a-glance payment summary — DUE amounts only, never cost. */
-export interface PaymentGlance {
-  /** The deposit milestone is fully paid. */
-  depositPaid: boolean;
-  /** The first not-fully-paid milestone (partial or due), or null when settled. */
-  nextDue: { milestone_kind: string; amount_due: string } | null;
-  /** Every milestone in the schedule is paid (and there is at least one). */
-  allSettled: boolean;
-}
-
-/**
- * Reduce the DUE-only payment schedule to the calm money glance the portal shows:
- * a "deposit received" chip and the next amount coming up. Cost-free by
- * construction — the schedule the SDF returns carries only client-DUE amounts.
- */
-export function paymentGlance(
-  schedule: PublicDeliveryMilestone[],
-): PaymentGlance {
-  const rows = Array.isArray(schedule) ? schedule : [];
-  const depositPaid = rows.some(
-    (row) => row.milestone_kind === 'deposit' && row.status === 'paid',
-  );
-  const nextUnsettled = rows.find((row) => row.status !== 'paid') ?? null;
-  const nextDue = nextUnsettled
-    ? { milestone_kind: nextUnsettled.milestone_kind, amount_due: nextUnsettled.amount_due }
-    : null;
-  const allSettled = rows.length > 0 && rows.every((row) => row.status === 'paid');
-  return { depositPaid, nextDue, allSettled };
-}
