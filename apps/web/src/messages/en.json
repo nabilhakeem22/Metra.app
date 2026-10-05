@@ -2073,18 +2073,18 @@
   "delivery": {
     "share": {
       "title": "Share with client",
-      "notSharedHint": "Create a private link the client can open to follow this delivery — no login needed.",
-      "sharedHint": "A private link is active. The link itself is never stored, so it cannot be shown again — reveal a new one to get a fresh link you can send.",
+      "notSharedHint": "Create a private link the client can open to follow this delivery. No login needed.",
+      "sharedHint": "A private link is active. The link itself is never stored, so it cannot be shown again. Reveal a new one to get a fresh link you can send.",
       "shareCta": "Share with client",
       "copyLink": "Copy link",
       "copied": "Copied",
-      "revealOnce": "Copy this link now — it won't be shown again.",
+      "revealOnce": "Copy this link now. It won't be shown again.",
       "rotate": "Reveal a new link",
       "revoke": "Revoke",
       "error": "Something went wrong. Please try again.",
       "statusActive": "Link active",
       "statusNotShared": "Not shared yet",
-      "unreadBadge": "New link — copy it",
+      "unreadBadge": "New link: copy it",
       "rotateHint": "Revealing a new link stops the current one working."
     },
     "notFound": {
@@ -2109,7 +2109,7 @@
       "readyTag": "Ready for you",
       "inProgressTag": "In progress",
       "deliveredTag": "Delivered",
-      "reassurance": "Nothing to do right now — we'll message you the moment there's an update.",
+      "reassurance": "Nothing to do right now. We'll message you the moment there's an update.",
       "concept": {
         "headline": "Your concept design is ready",
         "body": "Your designer shared the first layout and look for your space. Take a look and let them know what you think.",
@@ -2135,57 +2135,37 @@
         "body": "Confirm you've received your design package and we'll wrap things up.",
         "acknowledge": "Confirm handover",
         "acknowledgedTitle": "Handover confirmed 🎉",
-        "acknowledgedBody": "Thank you — your design project is complete."
+        "acknowledgedBody": "Thank you. Your design project is complete."
       }
-    },
-    "glance": {
-      "title": "Payment",
-      "depositPaid": "Deposit received",
-      "next": "Next: {amount}",
-      "allSettled": "All payments settled"
     },
     "whatsNext": {
       "eyebrow": "Up next"
     },
     "budget": {
       "title": "Estimated budget",
-      "hint": "A rough range for the construction budget, shared for your planning.",
-      "range": "{low} – {high}"
+      "preparedBy": "Prepared by your design team",
+      "to": "to",
+      "from": "From",
+      "upTo": "Up to",
+      "note": "An early estimate of the cost of executing your design. The final price is set in the bill of quantities.",
+      "acknowledge": "I acknowledge this budget",
+      "acknowledged": "Acknowledged. Your design team has been notified."
     },
     "payments": {
-      "title": "Payment schedule",
-      "total": "Total"
-    },
-    "milestone": {
-      "deposit": "Deposit",
-      "gate_a": "First installment",
-      "gate_b": "Second installment",
-      "balance": "Final payment"
-    },
-    "status": {
-      "paid": "Paid",
-      "partial": "Partly paid",
-      "due": "Due"
-    },
-    "actions": {
-      "romTitle": "Estimated budget",
-      "notePlaceholder": "Add a note (optional)",
-      "approveDesign": "Approve design",
-      "acknowledgeRom": "Acknowledge budget",
-      "confirmedAcknowledged": "Acknowledged — the studio has been notified.",
-      "error": {
-        "token_invalid": "This link is no longer available. Please contact your design team.",
-        "token_expired": "This link has expired. Please contact your design team.",
-        "not_active": "This delivery is closed. Please contact your design team.",
-        "wrong_state": "This action isn't available right now. Please refresh the page.",
-        "generic": "Something went wrong. Please try again."
-      }
-    },
-    "claim": {
       "title": "Payments",
-      "markPaid": "I've paid this",
-      "recordedPending": "Recorded — pending studio confirmation",
-      "note": "Marking a payment lets your design team know. They confirm it on their side.",
+      "designFee": "Design fee {amount}",
+      "paidOf": "{paid} paid of {total}",
+      "nextPayment": "Next payment · {milestone}, remaining",
+      "claim": "I've made this payment",
+      "awaitingConfirmation": "Waiting for your design team to confirm",
+      "settledTitle": "All payments settled",
+      "settledBody": "Thank you. Nothing is due.",
+      "state": {
+        "paid": "Paid",
+        "partial": "Partly paid · {paid} of {due}",
+        "due": "Due",
+        "later": "Later"
+      },
       "kind": {
         "deposit": "Deposit",
         "gate_a": "Concept payment",
@@ -2200,11 +2180,21 @@
         "generic": "Something went wrong. Please try again."
       }
     },
+    "actions": {
+      "notePlaceholder": "Add a note (optional)",
+      "error": {
+        "token_invalid": "This link is no longer available. Please contact your design team.",
+        "token_expired": "This link has expired. Please contact your design team.",
+        "not_active": "This delivery is closed. Please contact your design team.",
+        "wrong_state": "This action isn't available right now. Please refresh the page.",
+        "generic": "Something went wrong. Please try again."
+      }
+    },
     "poweredBy": "Shared securely by {firm}",
     "documents": {
       "title": "Your documents",
       "subtitle": "Shared by your design team",
-      "empty": "Nothing shared yet — your designer will add your drawings and visuals here.",
+      "empty": "Nothing shared yet. Your designer will add your drawings and visuals here.",
       "unavailable": "That file isn't available. Please contact your design team.",
       "download": "Download",
       "sharedOn": "Shared {date}",
@@ -2228,7 +2218,7 @@
       "send": "Send",
       "you": "You",
       "studio": "Your design team",
-      "advisory": "A question here doesn't request changes — use the buttons above for that.",
+      "advisory": "A question here doesn't request changes. Use the buttons above for that.",
       "error": {
         "generic": "That didn't send. Please try again.",
         "empty": "Write a message first.",

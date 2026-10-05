@@ -18,8 +18,8 @@ import { WhatsNext } from './whats-next';
  *   2. the one thing now — the hero's single CTA (or its calm in-progress state)
  *   3. what happens next — one quiet line, directly under the action
  *
- * Everything else — documents, payments, the claim — stays below, exactly as it
- * was. This is a re-layout, not a new engine: the same three components, the same
+ * Everything else (the budget card, the payments card, the documents) stays below.
+ * This is a re-layout, not a new engine: the same three components, the same
  * props, the same server actions behind them.
  */
 export function PortalCommandCard({

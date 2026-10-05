@@ -1,18 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  CLIENT_ACTION_VERBS,
-  deriveHero,
-  paymentGlance,
-} from './portal-hero';
-import type { PublicDeliveryMilestone } from './public';
-
-function milestone(
-  milestone_kind: string,
-  status: PublicDeliveryMilestone['status'],
-  amount_due = '10000.0000',
-): PublicDeliveryMilestone {
-  return { milestone_kind, basis: 'x', amount_due, amount_cleared: '0', status };
-}
+import { CLIENT_ACTION_VERBS, deriveHero } from './portal-hero';
 
 describe('CLIENT_ACTION_VERBS', () => {
   it('is exactly the six client-facing verbs', () => {
@@ -90,33 +77,3 @@ describe('deriveHero', () => {
   });
 });
 
-describe('paymentGlance', () => {
-  it('reports an empty schedule as nothing due, not settled', () => {
-    expect(paymentGlance([])).toEqual({ depositPaid: false, nextDue: null, allSettled: false });
-  });
-
-  it('flags a paid deposit and the next unsettled milestone', () => {
-    const glance = paymentGlance([
-      milestone('deposit', 'paid'),
-      milestone('gate_a', 'due', '20000.0000'),
-      milestone('balance', 'due', '5000.0000'),
-    ]);
-    expect(glance.depositPaid).toBe(true);
-    expect(glance.nextDue).toEqual({ milestone_kind: 'gate_a', amount_due: '20000.0000' });
-    expect(glance.allSettled).toBe(false);
-  });
-
-  it('treats a partial milestone as the next due', () => {
-    const glance = paymentGlance([
-      milestone('deposit', 'paid'),
-      milestone('gate_a', 'partial', '15000.0000'),
-    ]);
-    expect(glance.nextDue?.milestone_kind).toBe('gate_a');
-  });
-
-  it('reports allSettled when every milestone is paid', () => {
-    const glance = paymentGlance([milestone('deposit', 'paid'), milestone('balance', 'paid')]);
-    expect(glance.allSettled).toBe(true);
-    expect(glance.nextDue).toBeNull();
-  });
-});
