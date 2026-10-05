@@ -46,6 +46,11 @@ async function sectionAggregates(
  * Recompute every section subtotal and the document total from the lines as they
  * now stand. Called inside the same transaction as any line change, so a total
  * can never be stale with respect to the lines it sums.
+ *
+ * It also RE-STAMPS `updated_at`, which is the BOQ's content revision: the
+ * sheet's Issue renders the PDF outside any transaction and refuses to freeze if
+ * the revision moved meanwhile (`issue/revision.ts`). Every line write, the
+ * discount and the import come through here; a section add stamps it directly.
  */
 export async function recomputeBoqTotals(
   tx: Tx,
@@ -73,6 +78,7 @@ export async function recomputeBoqTotals(
       total: doc.total,
       totalCost: doc.totalCost,
       totalMargin: doc.totalMargin,
+      updatedAt: sql`now()`,
     })
     .where(eq(boqs.id, boqId));
 }

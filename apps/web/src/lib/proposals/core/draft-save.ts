@@ -15,7 +15,11 @@ import { canSeeMargin } from '@/lib/permissions/can';
 import type { SaveDraftInput } from './types';
 import { computeTotalsWithinCap } from './draft-save-caps';
 import { loadCostItemMap } from './draft-save-cost-items';
-import { enforceLineCaps, validateDraftHeader } from './draft-save-validate';
+import {
+  enforceLineCaps,
+  pricingForKind,
+  validateDraftHeader,
+} from './draft-save-validate';
 import { resolveDraftLines } from './draft-save-resolve';
 import {
   persistDraftHeaderAndTotals,
@@ -102,7 +106,10 @@ export async function saveProposalDraftCore(
     async (tx, audit) => {
       const proposal = await loadDraftProposal(tx, input.id);
       const seeMargin = await loadMarginVisibility(tx, ctx);
-      const header = validateDraftHeader(proposal, input.header ?? {});
+      const header = pricingForKind(
+        proposal.kind,
+        validateDraftHeader(proposal, input.header ?? {}),
+      );
       enforceLineCaps(input.sections);
 
       const costSnapshot = await loadCostSnapshot(tx, input.id);

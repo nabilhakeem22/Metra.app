@@ -316,6 +316,13 @@ grant execute on function public.app_engagement_payments_settled(uuid) to metra_
 revoke execute on function public.app_engagement_payments_settled(uuid) from public;
 grant execute on function public.app_document_access(public.engagement_artifact_kind, boolean, text) to metra_app;
 revoke execute on function public.app_document_access(public.engagement_artifact_kind, boolean, text) from public;
+-- BOQ as a proposal: the BOQ's own release rule and the per-kind dispatcher the
+-- two portal callers read. Same reason as the settled test: each takes a bare
+-- engagement id and would otherwise let an anon-key holder probe payment state.
+grant execute on function public.app_boq_releasable(uuid) to metra_app;
+revoke execute on function public.app_boq_releasable(uuid) from public;
+grant execute on function public.app_document_settled(public.engagement_artifact_kind, uuid) to metra_app;
+revoke execute on function public.app_document_settled(public.engagement_artifact_kind, uuid) from public;
 
 do $$
 declare
@@ -415,6 +422,14 @@ begin
       );
       execute format(
         'revoke execute on function public.app_document_access(public.engagement_artifact_kind, boolean, text) from %I',
+        r
+      );
+      execute format(
+        'revoke execute on function public.app_boq_releasable(uuid) from %I',
+        r
+      );
+      execute format(
+        'revoke execute on function public.app_document_settled(public.engagement_artifact_kind, uuid) from %I',
         r
       );
     end if;

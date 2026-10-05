@@ -12,6 +12,8 @@ import 'server-only';
 import { organizations } from '@metra/db';
 import type { ActionResult } from '@/lib/actions/result';
 import { withOrgContext, type OrgContext } from '@/lib/db/context';
+import { renderBoqProposalPreviewHtml } from '@/lib/boq-proposals/preview';
+import { pickBilingual } from '@/lib/pdf/html';
 import { buildProposalHtml } from '@/lib/pdf/proposal-template';
 import { can, canSeeMargin } from '@/lib/permissions/can';
 import { loggableFailure } from '@/lib/actions/loggable-failure';
@@ -53,9 +55,20 @@ export async function renderProposalPreviewHtml(
     }
     const detail = await getProposalForPdf(ctx, id, variant === 'internal');
     if (!detail) return { ok: false, error: 'invalid' };
+    const locale = org?.defaultLocale ?? 'ar-EG';
+
+    // The delivery's BOQ working copy previews as the BOQ it will become.
+    if (detail.kind === 'boq') {
+      return renderBoqProposalPreviewHtml(ctx, {
+        proposalId: id,
+        variant,
+        locale,
+        orgName: pickBilingual(org?.nameAr ?? null, org?.nameEn ?? null, locale),
+      });
+    }
 
     const html = await buildProposalHtml(detail, {
-      locale: org?.defaultLocale ?? 'ar-EG',
+      locale,
       variant,
       orgNameAr: org?.nameAr ?? null,
       orgNameEn: org?.nameEn ?? null,

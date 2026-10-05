@@ -386,6 +386,13 @@
       "when": 1789925441202,
       "tag": "0054_drop_redundant_indexes",
       "breakpoints": true
+    },
+    {
+      "idx": 55,
+      "version": "7",
+      "when": 1791130131311,
+      "tag": "0055_boq_proposals",
+      "breakpoints": true
     }
   ]
 }

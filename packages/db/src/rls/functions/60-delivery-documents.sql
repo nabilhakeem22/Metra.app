@@ -46,7 +46,7 @@ as $$
     -- the same indistinguishable failure as a forged id, and 'preview' is served
     -- as a downscaled rendition with no download filename.
     'access', public.app_document_access(
-      a.kind, public.app_engagement_payments_settled(de.id), f.original_name
+      a.kind, public.app_document_settled(a.kind, de.id), f.original_name
     )
   )
   from public.design_engagements de

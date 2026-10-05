@@ -29,7 +29,13 @@ async function sendDraftProposal(
   const gated = await tx
     .update(proposals)
     .set({ status: 'sent', tokenHash, shareExpiresAt, updatedAt: new Date() })
-    .where(and(eq(proposals.id, proposalId), eq(proposals.status, 'draft')))
+    .where(
+      and(
+        eq(proposals.id, proposalId),
+        eq(proposals.status, 'draft'),
+        eq(proposals.kind, 'quote'),
+      ),
+    )
     .returning({ id: proposals.id, clientId: proposals.clientId });
   if (!gated[0]) fail('proposal_not_draft');
   return { clientId: gated[0].clientId };
@@ -58,6 +64,21 @@ async function recordSentEvent(
   });
 }
 
+/**
+ * A BOQ-kind proposal is the delivery's BOQ working copy and is sent from the
+ * delivery page as a BOQ, never as a quote. Refused by name here; the admission
+ * UPDATE below also requires `kind = 'quote'`, and the DB CHECK is the third
+ * lock. A missing id is left to the admission gate, as before.
+ */
+async function refuseBoqProposal(tx: MetraDb, proposalId: string): Promise<void> {
+  const [row] = await tx
+    .select({ kind: proposals.kind })
+    .from(proposals)
+    .where(eq(proposals.id, proposalId))
+    .limit(1);
+  if (row?.kind === 'boq') fail('proposal_is_boq');
+}
+
 export async function sendProposalCore(
   ctx: OrgContext,
   input: { id: string },
@@ -66,6 +87,7 @@ export async function sendProposalCore(
     ctx,
     { capability: 'proposals_send', action: 'approve' },
     async (tx, audit) => {
+      await refuseBoqProposal(tx, input.id);
       const { raw, hash } = mintShareToken();
       const { clientId } = await sendDraftProposal(
         tx,

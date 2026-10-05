@@ -3,7 +3,9 @@
 import type { ReactNode } from 'react';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import type { BoqDetail } from '@/lib/boqs/queries';
+import { hasLineDiscounts } from '@/lib/boqs/line-discounts';
 import { BoqSheetFooter, BoqSheetHeader } from './boq-sheet-chrome';
+import { sheetColumnCount } from './boq-sheet-columns';
 import { BoqSheetHead } from './boq-sheet-head';
 import { countVisibleLines, searchNeedle, visibleLines } from './boq-sheet-search';
 import { BoqSectionBody } from './boq-sheet-section';
@@ -41,7 +43,10 @@ export function BoqSheet({
   const rowApi = useBoqRowApi({ canEdit, edits, writes, gridRef });
 
   const needle = searchNeedle(query);
-  const colCount = canEdit ? 8 : 7;
+  // Line discounts are shown only when the studio gave one (owner decision): the
+  // discount column exists for THIS BOQ only if some line carries a discount.
+  const discounted = useMemo(() => hasLineDiscounts(boq.sections), [boq]);
+  const colCount = sheetColumnCount(discounted, canEdit);
 
   const toggleSection = useCallback((sectionId: string): void => {
     setCollapsed((previous) => {
@@ -86,7 +91,7 @@ export function BoqSheet({
           ref={gridRef}
           className="w-full min-w-[880px] border-separate border-spacing-0 text-sm"
         >
-          <BoqSheetHead canEdit={canEdit} />
+          <BoqSheetHead canEdit={canEdit} discounted={discounted} />
 
           {bodies.map(({ section, lines }) => (
             <BoqSectionBody
@@ -95,6 +100,7 @@ export function BoqSheet({
               lines={lines}
               collapsed={collapsed.has(section.id)}
               colCount={colCount}
+              discounted={discounted}
               searching={needle !== ''}
               api={rowApi}
               cells={edits.cells}
@@ -108,6 +114,7 @@ export function BoqSheet({
             boq={boq}
             canEdit={canEdit}
             colCount={colCount}
+            discounted={discounted}
             money={rowApi.money}
             discount={edits.discount}
             onDiscountChange={edits.setDiscount}

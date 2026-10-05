@@ -232,8 +232,9 @@ reachable via Supabase PostgREST RPC.
   `app_variation_respond_by_token`, `app_delivery_by_token` /
   `app_delivery_respond_by_token` / `app_delivery_claim_payment_by_token` /
   `app_delivery_document_by_token` / `app_delivery_document_comments_by_token` /
-  `app_delivery_comment_by_token`, plus `app_document_access` and
-  `app_engagement_payments_settled`. **These are the functions that must never
+  `app_delivery_comment_by_token`, plus `app_document_access`,
+  `app_engagement_payments_settled`, `app_boq_releasable` and
+  `app_document_settled`. **These are the functions that must never
   return a cost or margin column**, and they are the reason the portals can be
   unauthenticated at all.
 
@@ -492,7 +493,7 @@ raise MT100 and abort a delete that has nothing to do with immutability. Only a
 change **to NULL** is tolerated; writing a new non-null value into one of those
 columns is still MT100. Omit it and the trigger behaves exactly as it did before
 the argument existed. `trg_boqs_immutable` is the one trigger that passes it
-(`'engagement_id,source_file_id'`).
+(`'engagement_id,source_file_id,source_proposal_id'`).
 
 > **Open defect, found by `boq-immutable.dbtest.ts` and unrelated to the
 > trigger.** `sameOrgFk(..., { onDelete: 'set null' })` emits a COMPOSITE

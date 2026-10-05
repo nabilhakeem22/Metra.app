@@ -30,6 +30,8 @@ function boq(sections: BoqSectionRow[]): BoqDetail {
   return {
     id: 'boq-1',
     number: 1,
+    documentNumber: 'BQ-2026-0001',
+    version: 1,
     title: 'BOQ',
     status: 'draft',
     source: 'manual',

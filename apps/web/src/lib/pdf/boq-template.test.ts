@@ -13,11 +13,13 @@ vi.mock('@/lib/cf/context', () => ({
   },
 }));
 import type { BoqDetail } from '@/lib/boqs/queries';
-import { buildBoqHtml, formatBoqNumber } from './boq-template';
+import { buildBoqHtml } from './boq-template';
 
 const detail = (over: Partial<BoqDetail> = {}): BoqDetail => ({
   id: 'b1',
   number: 7,
+  documentNumber: 'BQ-2026-0007',
+  version: 1,
   title: 'Bill of Quantities',
   status: 'issued',
   source: 'imported',
@@ -78,10 +80,16 @@ const opts = {
   year: 2026,
 };
 
-describe('formatBoqNumber', () => {
-  it('pads to the same shape as a proposal or contract number', () => {
-    expect(formatBoqNumber(7, 2026)).toBe('BQ-2026-0007');
-    expect(formatBoqNumber(1284, 2026)).toBe('BQ-2026-1284');
+describe('the document number', () => {
+  it('prints BQ-YYYY-NNNN from the number and the year', async () => {
+    const html = await buildBoqHtml(detail(), opts);
+    expect(html).toContain('BQ-2026-0007');
+  });
+
+  it('prints numberLabel INSTEAD of the number (the builder preview)', async () => {
+    const html = await buildBoqHtml(detail(), { ...opts, numberLabel: 'DRAFT' });
+    expect(html).toContain('DRAFT');
+    expect(html).not.toContain('BQ-2026-0007');
   });
 });
 
@@ -173,6 +181,14 @@ describe('the document body', () => {
     expect(withDiscount).toContain('15,990.00');
   });
 
+  it('prints the currency ONCE on the grand total (formatMoney already carries it)', async () => {
+    const en = await buildBoqHtml(detail(), opts);
+    expect(en).toContain('159,900.00 EGP');
+    expect(en).not.toContain('EGP EGP');
+    const ar = await buildBoqHtml(detail(), { ...opts, locale: 'ar-EG' });
+    expect(ar).not.toMatch(/ج.مs*EGP|EGPs*ج.م|ج.مs*ج.م/);
+  });
+
   it('carries no VAT or supervision — a BOQ prices the works only', async () => {
     const html = await buildBoqHtml(detail(), opts);
     expect(html).not.toMatch(/VAT|ضريبة|Supervision|إشراف/);
@@ -182,5 +198,101 @@ describe('the document body', () => {
     const html = await buildBoqHtml(detail({ title: '<script>x</script>' }), opts);
     expect(html).not.toContain('<script>x</script>');
     expect(html).toContain('&lt;script&gt;');
+  });
+});
+
+describe('line discounts appear ONLY when the studio gives one (F1)', () => {
+  // Line 2 at 10% off: 45 x 220 = 9,900.00 gross, 990.00 off, 8,910.00 stored.
+  // Then a 10% document discount on the 158,910.00 subtotal.
+  const discounted = (over: Partial<BoqDetail> = {}): BoqDetail => {
+    const base = detail();
+    const [first, second] = base.sections[0].lines;
+    return {
+      ...base,
+      discountPct: '10',
+      subtotal: '158910.0000',
+      discountAmount: '15891.0000',
+      total: '143019.0000',
+      sections: [
+        {
+          ...base.sections[0],
+          sectionSubtotal: '158910.0000',
+          lines: [first, { ...second, discountPct: '10.0000', lineTotal: '8910.0000' }],
+        },
+      ],
+      ...over,
+    };
+  };
+
+  /** label -> amount in piastres, read off the PRINTED totals table. */
+  function printedTotals(html: string): Map<string, bigint> {
+    const table = /<table class="totals">([\s\S]*?)<\/table>/.exec(html)?.[1] ?? '';
+    const rows = [...table.matchAll(/<td>([^<]+)<\/td>\s*<td class="num">([^<]+)<\/td>/g)];
+    return new Map(
+      rows.map(([, label, value]) => {
+        const digits = value.replace(/[^\d.-]/g, '');
+        const [whole, fraction = '00'] = digits.split('.');
+        const piastres = BigInt(whole.replace('-', '')) * 100n + BigInt(fraction.padEnd(2, '0'));
+        return [label.trim(), digits.startsWith('-') ? -piastres : piastres];
+      }),
+    );
+  }
+
+  for (const variant of ['client', 'internal'] as const) {
+    it(`${variant}: no discounted line means no discount column and no line-discount row`, async () => {
+      const html = await buildBoqHtml(detail(), { ...opts, variant });
+      expect(html).not.toContain('Discount %');
+      expect(html).not.toContain('Line discounts');
+      expect(html).not.toContain('0.00%');
+      expect(html).toContain('Subtotal');
+    });
+
+    it(`${variant}: a discounted line adds the % column for EVERY line and the totals rows`, async () => {
+      const html = await buildBoqHtml(discounted(), { ...opts, variant });
+      expect(html).toContain('Discount %');
+      expect(html).toContain('10.00%');
+      expect(html).toContain('0.00%');
+      expect(html).toContain('Total before discounts');
+      expect(html).toContain('Line discounts');
+      expect(html).toContain('Overall discount');
+      // The section band spans the new column too, cost columns or not.
+      expect(html).toContain(
+        `<tr class="section"><td colspan="${variant === 'internal' ? 8 : 6}">`,
+      );
+    });
+  }
+
+  it('the printed totals subtract step by step to the printed total', async () => {
+    const totals = printedTotals(await buildBoqHtml(discounted(), opts));
+    const gross = totals.get('Total before discounts')!;
+    const lineOff = totals.get('Line discounts')!;
+    const subtotal = totals.get('Subtotal after line discounts')!;
+    const overallOff = totals.get('Overall discount')!;
+    const total = totals.get('Total')!;
+    expect(gross).toBe(15990000n);
+    expect(lineOff).toBe(-99000n);
+    expect(gross + lineOff).toBe(subtotal);
+    expect(subtotal + overallOff).toBe(total);
+    expect(total).toBe(14301900n);
+  });
+
+  it('with line discounts but no document discount, there is no overall-discount row', async () => {
+    const html = await buildBoqHtml(
+      discounted({ discountPct: '0', discountAmount: '0.0000', total: '158910.0000' }),
+      opts,
+    );
+    const totals = printedTotals(html);
+    expect(totals.has('Overall discount')).toBe(false);
+    expect(totals.get('Total before discounts')! + totals.get('Line discounts')!).toBe(
+      totals.get('Total')!,
+    );
+  });
+
+  it('says the same thing in Arabic', async () => {
+    const html = await buildBoqHtml(discounted(), { ...opts, locale: 'ar-EG' });
+    expect(html).toContain('نسبة الخصم');
+    expect(html).toContain('خصومات البنود');
+    expect(html).toContain('الخصم الإجمالي');
+    expect(/[٠-٩۰-۹]/.test(html)).toBe(false);
   });
 });

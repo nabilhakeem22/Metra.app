@@ -112,6 +112,10 @@ export const ACTION_CODE_PROBLEM: Record<ActionCode, ApiProblemKind> = {
   proposal_not_accepted: 'bad-request',
   boq_not_found: 'not-found',
   boq_not_draft: 'bad-request',
+  boq_send_conflict: 'bad-request',
+  // Retryable: the caller should back off and repeat, as for a rate limit.
+  renderer_busy: 'rate-limited',
+  proposal_is_boq: 'bad-request',
   contract_not_draft: 'bad-request',
   contract_not_issued: 'bad-request',
   contract_not_signable: 'bad-request',

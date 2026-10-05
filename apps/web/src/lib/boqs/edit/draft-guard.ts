@@ -3,7 +3,7 @@ import 'server-only';
 // refuses anything that is not `draft`. Hiding the inputs on an issued document is
 // a courtesy to the studio; this is the part that actually holds, because once
 // issued the PDF in the client's hands and the rows in this table must never drift
-// apart (see ../issue.ts).
+// apart (see ../issue/index.ts).
 import { boqLines, boqs } from '@metra/db';
 import { eq } from 'drizzle-orm';
 import { fail, mutateInOrg } from '@/lib/actions/mutate';

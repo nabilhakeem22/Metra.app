@@ -188,9 +188,9 @@ describe('runSchemaCheck', () => {
     expect(printed).toMatch(/constraints — \d+ declared/);
     expect(printed).toMatch(/functions — \d+ declared/);
     expect(sectionsPrinted()).toEqual([
-      'assert-schema-applied: indexes — 105 declared, 105 NOT FOUND (report only, does not fail this check):',
-      'assert-schema-applied: constraints — 219 declared, 219 NOT FOUND (report only, does not fail this check):',
-      'assert-schema-applied: functions — 30 declared, 30 NOT FOUND (report only, does not fail this check):',
+      'assert-schema-applied: indexes — 106 declared, 106 NOT FOUND (report only, does not fail this check):',
+      'assert-schema-applied: constraints — 224 declared, 224 NOT FOUND (report only, does not fail this check):',
+      'assert-schema-applied: functions — 32 declared, 32 NOT FOUND (report only, does not fail this check):',
       'columns: BEHIND',
     ]);
     expect(printed).toContain('REPORT ONLY');
@@ -202,17 +202,18 @@ describe('runSchemaCheck', () => {
       fixtureSql({ ...completeCatalogues(), functionNames: new Set(['app_nothing']) }),
     );
     expect(code).toBe(0);
-    expect(logged.join('\n')).toContain('functions — 30 declared, 30 NOT FOUND');
+    expect(logged.join('\n')).toContain('functions — 32 declared, 32 NOT FOUND');
   });
 });
 
 describe('the counts the deploy order asks the owner to compare', () => {
-  it('declares 30 RLS functions, not 29', () => {
+  it('declares 32 RLS functions', () => {
     // wave6-coder.md's handoff said 29 and instructed the lead to compare the
     // printed counts against it. A `create or replace function public.<name>`
     // grep over rls/ returns 30 with no duplicate name, so the handoff number
     // was one short. Pinned here so the next handoff copies a tested fact.
-    expect(declaredFunctions().size).toBe(30);
+    // 32 since BOQ as a proposal added app_boq_releasable and app_document_settled.
+    expect(declaredFunctions().size).toBe(32);
   });
 });
 
@@ -227,7 +228,7 @@ describe('composite set-null foreign keys are a GATE, not a report (R6)', () => 
     const code = await runSchemaCheck(fixtureSql(completeCatalogues()));
     expect(code).toBe(0);
     expect(logged.join('\n')).toContain(
-      'composite set-null FKs — 12 found (12 declared in src/schema/), every one narrowed',
+      'composite set-null FKs — 13 found (13 declared in src/schema/), every one narrowed',
     );
   });
 
@@ -420,7 +421,7 @@ describe('the floor under the composite set-null gate (L3)', () => {
     );
   });
 
-  it('derives the floor from the schema, and the schema declares TWELVE', () => {
+  it('derives the floor from the schema, and the schema declares THIRTEEN', () => {
     // Twelve since wave 8 item 1. It was eleven for one wave, and the twelfth —
     // `files_category_same_org_fk`, created by 0040 and declared by no schema
     // file — is the reason this gate existed with a floor BELOW what every
@@ -428,7 +429,7 @@ describe('the floor under the composite set-null gate (L3)', () => {
     // invisible to the production-side check. Derived from `src/schema/`, so
     // deleting the declaration in `files.ts` reds this line and not a comment.
     const declared = declaredCompositeSetNullFks();
-    expect(declared.size).toBe(12);
+    expect(declared.size).toBe(13);
     expect(declared.get('boqs_engagement_same_org_fk')).toEqual({
       table: 'boqs',
       columns: ['engagement_id'],
@@ -449,12 +450,12 @@ describe('the floor under the composite set-null gate (L3)', () => {
     expect(declaredIndexes().has('files_org_category_idx')).toBe(true);
   });
 
-  it('passes on the twelve a narrowed database holds', async () => {
+  it('passes on the thirteen a narrowed database holds', async () => {
     captureConsole();
     const code = await runSchemaCheck(
       fixtureSql({ ...completeCatalogues(), compositeFks: narrowedCatalogue() }),
     );
     expect(code).toBe(0);
-    expect(logged.join('\n')).toContain('12 found (12 declared in src/schema/)');
+    expect(logged.join('\n')).toContain('13 found (13 declared in src/schema/)');
   });
 });

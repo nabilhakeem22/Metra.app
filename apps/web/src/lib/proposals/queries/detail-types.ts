@@ -9,7 +9,7 @@
 // the loader OMITS them entirely unless the caller may see margin. A field that
 // is absent cannot be rendered by accident, serialized into an API response, or
 // read off a client payload.
-import type { ProposalStatus } from '@metra/db';
+import type { ProposalKind, ProposalStatus } from '@metra/db';
 
 export interface ProposalDetailLine {
   id: string;
@@ -46,6 +46,10 @@ export interface ProposalDetail {
   titleAr: string | null;
   titleEn: string | null;
   status: ProposalStatus;
+  /** `boq` = the delivery's BOQ working copy (see `engagementId`). */
+  kind: ProposalKind;
+  /** Set iff `kind === 'boq'`. */
+  engagementId: string | null;
   currency: string;
   issueDate: string | null;
   expiryDate: string | null;

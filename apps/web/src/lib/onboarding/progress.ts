@@ -42,10 +42,11 @@ export async function getOnboardingProgress(
         exists(select 1 from public.cost_items) as has_cost_item,
         exists(select 1 from public.clients) as has_client,
         exists(select 1 from public.projects) as has_project,
-        exists(select 1 from public.proposals) as has_proposal,
+        exists(select 1 from public.proposals where kind = 'quote') as has_proposal,
         exists(
           select 1 from public.proposals
-          where status in ('sent','accepted','rejected','expired','superseded')
+          where kind = 'quote'
+            and status in ('sent','accepted','rejected','expired','superseded')
         ) as has_sent_proposal
     `),
   )) as unknown as ProgressRow[] | undefined;

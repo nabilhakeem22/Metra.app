@@ -8,6 +8,7 @@ import { formatMoney } from '@/lib/format/money';
 import { pickLocale } from '@/lib/i18n/pick-locale';
 import { formatProposalNumber, proposalYear } from '@/lib/format/proposal-number';
 import type { ProposalListRow } from '@/lib/proposals/queries';
+import { ProposalKindTag } from '../../proposals/proposal-kind-tag';
 
 export async function ProposalsTab({
   projectId,
@@ -47,9 +48,13 @@ export async function ProposalsTab({
                 {proposals.map((p) => (
                   <tr key={p.id} className="border-b last:border-0">
                     <td className="px-4 py-2 font-mono text-xs" dir="ltr">
-                      {formatProposalNumber(
-                        p.number,
-                        proposalYear(p.issueDate, new Date(p.createdAt)),
+                      {p.kind === 'boq' ? (
+                        <ProposalKindTag />
+                      ) : (
+                        formatProposalNumber(
+                          p.number,
+                          proposalYear(p.issueDate, new Date(p.createdAt)),
+                        )
                       )}
                     </td>
                     <td className="px-4 py-2">

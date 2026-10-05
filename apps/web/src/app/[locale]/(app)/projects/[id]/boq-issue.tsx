@@ -6,7 +6,15 @@ import { useTransition } from 'react';
 import { Button } from '@/components/ui/button';
 import { useConfirm } from '@/components/ui/confirm-dialog';
 import { toast } from '@/hooks/use-toast';
+import { resolveActionError } from '@/lib/actions/error-message';
+import type { ActionCode } from '@/lib/actions/result';
 import { issueBoq } from '@/lib/boqs/actions';
+
+/** Refusals whose own catalog sentence tells the studio what to do next. */
+const SPEAKS_FOR_ITSELF: ReadonlySet<ActionCode | undefined> = new Set<ActionCode | undefined>([
+  'boq_send_conflict',
+  'renderer_busy',
+]);
 
 /**
  * Issue the BOQ: freeze it, render its PDF, and hand that PDF to the engagement
@@ -16,9 +24,25 @@ import { issueBoq } from '@/lib/boqs/actions';
  * changing it afterwards means a new version rather than an edit. The dialog says
  * that, rather than asking "are you sure".
  */
-export function BoqIssue({ boqId, disabled }: { boqId: string; disabled: boolean }) {
+export function BoqIssue({
+  boqId,
+  disabled,
+  clientCanOpen,
+}: {
+  boqId: string;
+  disabled: boolean;
+  /** Whether the client can open it the moment it is published (the portal's
+   *  BOQ rule), so the confirm states what will actually happen. */
+  clientCanOpen: boolean;
+}) {
   const t = useTranslations('projects.profile.boq');
+  const te = useTranslations('errors');
   const [pending, start] = useTransition();
+
+  const failureMessage = (code: ActionCode | undefined): string => {
+    if (code === 'engagement_not_found') return t('issueNoEngagement');
+    return SPEAKS_FOR_ITSELF.has(code) ? resolveActionError(code, te) : t('issueFailed');
+  };
   const { confirm, dialog } = useConfirm();
 
   // The confirm is awaited OUTSIDE the transition, and only the server action is
@@ -29,7 +53,7 @@ export function BoqIssue({ boqId, disabled }: { boqId: string; disabled: boolean
   async function onClick(): Promise<void> {
     const ok = await confirm({
       title: t('issueConfirmTitle'),
-      description: t('issueConfirmBody'),
+      description: clientCanOpen ? t('issueConfirmBodyOpen') : t('issueConfirmBody'),
       confirmLabel: t('issueConfirm'),
       cancelLabel: t('cancel'),
     });
@@ -42,13 +66,7 @@ export function BoqIssue({ boqId, disabled }: { boqId: string; disabled: boolean
           toast({ title: t('issued') });
           return;
         }
-        toast({
-          title:
-            res.error === 'engagement_not_found'
-              ? t('issueNoEngagement')
-              : t('issueFailed'),
-          variant: 'destructive',
-        });
+        toast({ title: failureMessage(res.error), variant: 'destructive' });
       } catch {
         toast({ title: t('issueFailed'), variant: 'destructive' });
       }

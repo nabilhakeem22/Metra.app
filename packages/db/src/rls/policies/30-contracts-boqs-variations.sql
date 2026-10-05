@@ -199,11 +199,14 @@ create trigger trg_variation_order_lines_parent_draft
 -- this was enforced only in TypeScript, at seven call sites, and a BOQ that has
 -- been issued to a client is evidence.
 --
--- THE FOURTH ARGUMENT names the two columns the DATABASE nulls out by itself:
--- boqs.engagement_id and boqs.source_file_id are both declared `on delete set
--- null` (schema/boqs.ts:79-82), so Postgres's referential action UPDATES the BOQ
--- row and without that argument it would raise MT100 on a delete that has
--- nothing to do with immutability.
+-- THE FOURTH ARGUMENT names the three columns the DATABASE nulls out by itself:
+-- boqs.engagement_id, boqs.source_file_id and boqs.source_proposal_id are all
+-- declared `on delete set null` (schema/boqs.ts), so Postgres's referential
+-- action UPDATES the BOQ row and without that argument it would raise MT100 on a
+-- delete that has nothing to do with immutability. `source_proposal_id` (0055)
+-- is reached when a design engagement is deleted: the delete cascades to the
+-- engagement's BOQ-kind proposal, and that proposal's delete nulls the
+-- provenance link on every BOQ sent from it, issued or superseded alike.
 --
 -- THAT CASCADE ONLY BECAME POSSIBLE WITH MIGRATION 0052. Both FKs are COMPOSITE,
 -- (org_id, x_id) -> target(org_id, id), and `ON DELETE SET NULL` with no column
@@ -213,7 +216,7 @@ create trigger trg_variation_order_lines_parent_draft
 -- such FKs to `ON DELETE SET NULL (x_id)`, so the fourth argument now carries
 -- real traffic rather than standing ready for it.
 --
--- draft -> issued is UNAFFECTED: boqs/issue.ts updates `where status = 'draft'`,
+-- draft -> issued is UNAFFECTED: boqs/issue/freeze.ts updates `where status = 'draft'`,
 -- so at BEFORE UPDATE the OLD row is still draft and the not-locked branch
 -- returns NEW untouched.
 drop trigger if exists trg_boqs_immutable on public.boqs;
@@ -221,7 +224,7 @@ create trigger trg_boqs_immutable
   before update or delete on public.boqs
   for each row
   execute function public.enforce_immutable_when(
-    'status', 'issued,superseded', 'superseded', 'engagement_id,source_file_id'
+    'status', 'issued,superseded', 'superseded', 'engagement_id,source_file_id,source_proposal_id'
   );
 
 -- Sections + lines can only be mutated while their parent BOQ is 'draft'.

@@ -4,6 +4,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { migrationCatalogue } from './migration-catalogue';
+import { scannableSql } from './sql-text';
 import {
   declaredCompositeSetNullFks,
   declaredConstraints,
@@ -173,6 +174,30 @@ describe('0052 narrows exactly the composite set-null FKs the schema declares', 
     return rows.map((row) => `${row[1]}.${row[2]}`).sort();
   }
 
+  /**
+   * Edges a LATER migration created already narrowed. 0052 cannot grow a row for
+   * them: its loop RAISES on a constraint that does not exist yet, and on a fresh
+   * database every FK added after it does not exist when it runs. So a new
+   * composite set-null FK is born with its column list (0055's
+   * `boqs_sourceProposal_same_org_fk` is the first) and is counted here instead.
+   */
+  function narrowedAtCreation(): string[] {
+    const journal = JSON.parse(
+      readFileSync(resolve(migrationsFolder, 'meta/_journal.json'), 'utf8'),
+    ) as { entries: Array<{ idx: number; tag: string }> };
+    const bornNarrowed =
+      /alter\s+table\s+"?(\w+)"?\s+add\s+constraint\s+"?\w+"?\s+foreign\s+key\s*\(\s*"?org_id"?\s*,\s*"?(\w+)"?\s*\)[^;]*?on\s+delete\s+set\s+null\s*\(\s*"?(\w+)"?\s*\)/gi;
+    return journal.entries
+      .filter((entry) => entry.idx > 52)
+      .flatMap((entry) => [
+        ...scannableSql(
+          readFileSync(resolve(migrationsFolder, `${entry.tag}.sql`), 'utf8'),
+        ).matchAll(bornNarrowed),
+      ])
+      .filter((match) => match[2] === match[3])
+      .map((match) => `${match[1]}.${match[2]}`);
+  }
+
   /** The same edges, as `src/schema/` declares them. */
   function declaredEdges(): string[] {
     return [...declaredCompositeSetNullFks().values()]
@@ -180,10 +205,11 @@ describe('0052 narrows exactly the composite set-null FKs the schema declares', 
       .sort();
   }
 
-  it('narrows exactly the edges the schema declares — twelve, both sides', () => {
+  it('narrows exactly the edges the schema declares — 0052 plus the ones born narrowed', () => {
     expect(narrowedBy0052()).toHaveLength(12);
-    expect(declaredCompositeSetNullFks().size).toBe(12);
-    expect(narrowedBy0052()).toEqual(declaredEdges());
+    expect(narrowedAtCreation()).toEqual(['boqs.source_proposal_id']);
+    expect(declaredCompositeSetNullFks().size).toBe(13);
+    expect([...narrowedBy0052(), ...narrowedAtCreation()].sort()).toEqual(declaredEdges());
   });
 
   it('carries files.category_id on both sides', () => {

@@ -84,3 +84,18 @@ export function amountOf(line: EditableLine, typed: RowEdits | undefined): strin
     discountPct: line.discountPct,
   }).lineTotal;
 }
+
+/**
+ * How many columns come BEFORE the Amount column: code, description, unit, qty
+ * and rate, plus the read-only discount % column when this BOQ has line
+ * discounts (`hasLineDiscounts`). Section bands and totals rows span exactly
+ * these, so their figure lands in the Amount column with the line totals.
+ */
+export function leadingColumnCount(discounted: boolean): number {
+  return discounted ? 6 : 5;
+}
+
+/** Every column of the sheet: the leading ones, Amount, P, and the row actions. */
+export function sheetColumnCount(discounted: boolean, canEdit: boolean): number {
+  return leadingColumnCount(discounted) + 2 + (canEdit ? 1 : 0);
+}

@@ -17,7 +17,12 @@ export async function GET(
     capability: 'proposals_build',
     logLabel: 'Proposal',
     maxLines: MAX_TOTAL_LINES,
-    load: (ctx, proposalId, showCost) => getProposalForPdf(ctx, proposalId, showCost),
+    // A BOQ-kind proposal never renders as a quotation: it is a 404 here, and
+    // its only document is the BOQ it is sent as.
+    load: async (ctx, proposalId, showCost) => {
+      const detail = await getProposalForPdf(ctx, proposalId, showCost);
+      return detail?.kind === 'boq' ? null : detail;
+    },
     lineCount: (detail) => detail.sections.reduce((n, s) => n + s.lines.length, 0),
     buildHtml: (detail, { locale, variant, org }) =>
       buildProposalHtml(detail, {

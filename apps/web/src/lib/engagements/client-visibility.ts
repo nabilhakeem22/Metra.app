@@ -1,7 +1,9 @@
 // Client Deliverables, Step 1 — the per-file MANUAL override behind auto-share.
 // Auto-share (the executor's `clientRelease` branch) is only shippable with an
-// undo, and some deliverables are manual-only by policy: a `boq` is never
-// auto-released, so this is the ONLY way one ever reaches the client portal.
+// undo. A `boq` is never released by a TRANSITION; issuing a BOQ, from the sheet
+// or Send as BOQ, publishes it and hides the older ones
+// (`lib/boqs/issue/freeze.ts`). The per-file override below still works on any
+// artifact, a `boq` included.
 //
 // Self-contained `*Core(ctx, input) -> ActionResult` (API-ready), gated on the §2.2
 // `engagements_design` / `update` cell, exactly like the transition executor's

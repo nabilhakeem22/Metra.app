@@ -23,6 +23,8 @@ function detail(): ProposalDetail {
     titleAr: 'تشطيب مكتب',
     titleEn: 'Office fit-out',
     status: 'draft',
+    kind: 'quote',
+    engagementId: null,
     currency: 'EGP',
     issueDate: '2026-03-01',
     expiryDate: null,

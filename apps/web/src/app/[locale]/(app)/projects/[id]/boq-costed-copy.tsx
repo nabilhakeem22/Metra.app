@@ -19,10 +19,11 @@ import { Button } from '@/components/ui/button';
  */
 export function BoqCostedCopy({
   boqId,
-  number,
+  documentNumber,
 }: {
   boqId: string;
-  number: number;
+  /** `BQ-YYYY-NNNN`, server-formatted (`BoqDetail.documentNumber`). */
+  documentNumber: string;
 }) {
   const t = useTranslations('projects.profile.boq');
   return (
@@ -31,7 +32,7 @@ export function BoqCostedCopy({
         href={`/api/pdf/boq/${boqId}?variant=internal`}
         target="_blank"
         rel="noopener noreferrer"
-        aria-label={t('costedCopyFor', { number: String(number) })}
+        aria-label={t('costedCopyFor', { documentNumber })}
       >
         <FileDown className="size-4" aria-hidden />
         {t('costedCopy')}

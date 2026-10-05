@@ -8,7 +8,7 @@ import {
   projects,
   proposals,
 } from '@metra/db';
-import { desc, eq, getTableColumns, sql, type SQL } from 'drizzle-orm';
+import { and, desc, eq, getTableColumns, sql, type SQL } from 'drizzle-orm';
 import type { AnyPgColumn } from 'drizzle-orm/pg-core';
 import { withOrgContext, type OrgContext } from '@/lib/db/context';
 import type { ProjectWithType } from '@/lib/projects/queries';
@@ -142,7 +142,13 @@ export function listProposalsPage(
         cursorTs: cursorTsExpr(proposals.createdAt),
       })
       .from(proposals)
-      .where(keysetAfter(proposals.createdAt, proposals.id, cursor))
+      // Quotes only: a delivery's BOQ working copy is not a v1 proposal.
+      .where(
+        and(
+          eq(proposals.kind, 'quote'),
+          keysetAfter(proposals.createdAt, proposals.id, cursor),
+        ),
+      )
       .orderBy(desc(proposals.createdAt), desc(proposals.id))
       .limit(limit + 1),
   );

@@ -7,11 +7,29 @@
 // the card has to pick which to lead with rather than showing both equally and
 // making the studio decide what it is even looking at.
 
-/** Just enough about a project's BOQ to decide what to offer. */
+/** Just enough about a project's current BOQ to decide what to offer. */
 export interface BoqStepSummary {
   id: string;
   status: string;
   lineCount: number;
+  /** `BQ-YYYY-NNNN`, formatted on the SERVER (never in the browser). */
+  documentNumber: string;
+  total: string;
+}
+
+/** Everything the delivery's BOQ step renders from, assembled on the server. */
+export interface BoqStepData {
+  current: BoqStepSummary | null;
+  /** The engagement's BOQ working copy in the proposal builder, if opened. */
+  boqProposalId: string | null;
+  /** The portal releases a `boq` to the client now: a fee schedule exists and
+   *  every milestone of it is paid (`app_boq_releasable`). */
+  clientCanOpen: boolean;
+  /** The CURRENT BOQ's issued PDF is visible to the client on THIS engagement
+   *  (`isBoqSharedOnEngagement`). Only then does the done step say "sent". */
+  sharedWithClient: boolean;
+  /** May build and send it (proposals_build AND boq_build create). */
+  canBuild: boolean;
 }
 
 export type BoqStepAction =
@@ -28,12 +46,19 @@ export type BoqStepAction =
  * both resolve to `start` rather than leaving a half-made document looking like
  * progress.
  */
-export function boqStepAction(summary: BoqStepSummary | null): BoqStepAction {
+export function boqStepAction(
+  summary: Pick<BoqStepSummary, 'status' | 'lineCount'> | null,
+): BoqStepAction {
   if (!summary || summary.lineCount === 0) return 'start';
   return summary.status === 'draft' ? 'issue' : 'done';
 }
 
-/** Where the step's button goes — always the project's BOQ tab. */
+/** The project's BOQ tab: the uploaded-sheet path, and where an issued BOQ is viewed. */
 export function boqStepHref(projectId: string): string {
   return `/projects/${projectId}?tab=boq`;
+}
+
+/** The BOQ working copy opens in the proposal builder, in BOQ mode. */
+export function boqProposalHref(proposalId: string): string {
+  return `/proposals/${proposalId}`;
 }

@@ -4,13 +4,8 @@ import 'server-only';
 // Split out of `page.tsx`, whose component was 181 lines — over the 120 the
 // wave-5 gate asked for, and GROWN from 175 by the wave it was measured in.
 // `page.tsx` is now the three things a route ought to be: authorise, load,
-// render. Nothing here renders and nothing here decides layout.
-//
-// A plain server module, not 'use client' and not a component: the page names
-// what it is assembling, exactly as `engagement-detail-props.ts` lets it name
-// what it is handing on.
+// render. A plain server module: nothing here renders or decides layout.
 import type { MemberRole } from '@metra/db';
-import { getProjectBoqSummary } from '@/lib/boqs/queries';
 import type { OrgContext } from '@/lib/db/context';
 import { countAwaitingReplyCore } from '@/lib/engagements/document-comments';
 import { getEngagementGatePreview } from '@/lib/engagements/gate-preview';
@@ -28,6 +23,7 @@ import {
   type EngagementTransitionRecord,
 } from '@/lib/engagements/queries';
 import { can } from '@/lib/permissions/can';
+import { loadBoqStep } from './boq-step-data';
 import type { PanelCapabilities } from './engagement-panels';
 
 export type EngagementDetailData = NonNullable<
@@ -39,9 +35,9 @@ export type EngagementDetailData = NonNullable<
  * other read in ONE `Promise.all` — eleven round trips that do not depend on
  * each other and must not become eleven sequential waits.
  *
- * The BOQ summary is the one read that CANNOT join that batch: it is keyed on
- * `header.projectId`, so it has to follow the header. It used to be awaited
- * inline in the page's JSX, which is a sequential read hidden inside a render.
+ * The BOQ step (`boq-step-data.ts`) is keyed on `header.projectId`, so it
+ * follows the header; it joins the batch as one entry and is everything the
+ * delivery's BOQ step renders from.
  */
 export async function loadEngagementDetail(ctx: OrgContext, id: string) {
   const header = await getEngagementHeader(ctx, id);
@@ -59,7 +55,7 @@ export async function loadEngagementDetail(ctx: OrgContext, id: string) {
     gatePreview,
     shareStatus,
     awaitingReplyCount,
-    boqSummary,
+    boqStep,
   ] = await Promise.all([
     getEngagementFeeSchedule(ctx, id),
     getEngagementPayments(ctx, id),
@@ -75,7 +71,7 @@ export async function loadEngagementDetail(ctx: OrgContext, id: string) {
     // Derived from the append-only thread (a client message with no staff message
     // after it), so it falls when the studio REPLIES, not when it opens a thread.
     countAwaitingReplyCore(ctx, id),
-    getProjectBoqSummary(ctx, header.projectId),
+    loadBoqStep(ctx, { engagementId: id, projectId: header.projectId }),
   ]);
 
   return {
@@ -91,7 +87,7 @@ export async function loadEngagementDetail(ctx: OrgContext, id: string) {
     gatePreview,
     shareStatus,
     awaitingReplyCount,
-    boqSummary,
+    boqStep,
   };
 }
 

@@ -143,6 +143,8 @@ export function getClientOverview(
         and(
           eq(proposals.clientId, clientId),
           inArray(proposals.status, ['draft', 'sent']),
+          // A BOQ working copy is a draft forever and is not an offer.
+          eq(proposals.kind, 'quote'),
         ),
       );
 

@@ -3,6 +3,7 @@ import {
   clients,
   projects,
   proposals,
+  type ProposalKind,
   type ProposalStatus,
 } from '@metra/db';
 import { and, desc, eq, ilike, or, type SQL } from 'drizzle-orm';
@@ -15,6 +16,8 @@ export interface ProposalListRow {
   titleAr: string | null;
   titleEn: string | null;
   status: ProposalStatus;
+  /** A `boq` row renders a BOQ tag in place of its Q- number. */
+  kind: ProposalKind;
   total: string;
   currency: string;
   issueDate: string | null;
@@ -41,6 +44,7 @@ const PROPOSAL_LIST_COLUMNS = {
   titleAr: proposals.titleAr,
   titleEn: proposals.titleEn,
   status: proposals.status,
+  kind: proposals.kind,
   total: proposals.total,
   currency: proposals.currency,
   issueDate: proposals.issueDate,

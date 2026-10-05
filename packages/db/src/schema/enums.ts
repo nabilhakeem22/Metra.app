@@ -81,6 +81,16 @@ export const PROPOSAL_STATUSES = [
 
 export const proposalStatus = pgEnum('proposal_status', PROPOSAL_STATUSES);
 
+/**
+ * What a proposal row IS. `quote` is the offer the client accepts or rejects;
+ * `boq` is a delivery's BOQ working copy, built in the same editor, which never
+ * leaves `draft` and is sent by turning it into a `boqs` document. Order is a
+ * contract.
+ */
+export const PROPOSAL_KINDS = ['quote', 'boq'] as const;
+
+export const proposalKind = pgEnum('proposal_kind', PROPOSAL_KINDS);
+
 /** P1 Slice 4 — client classification. Order is a contract; labels localized. */
 export const CLIENT_TYPES = ['individual', 'company', 'consultant'] as const;
 
@@ -353,6 +363,7 @@ export type CostItemCategory = (typeof COST_ITEM_CATEGORIES)[number];
 export type CostItemUnit = (typeof COST_ITEM_UNITS)[number];
 export type ProjectStatus = (typeof PROJECT_STATUSES)[number];
 export type ProposalStatus = (typeof PROPOSAL_STATUSES)[number];
+export type ProposalKind = (typeof PROPOSAL_KINDS)[number];
 export type ClientType = (typeof CLIENT_TYPES)[number];
 export type ContractStatus = (typeof CONTRACT_STATUSES)[number];
 export type BoqStatus = (typeof BOQ_STATUSES)[number];

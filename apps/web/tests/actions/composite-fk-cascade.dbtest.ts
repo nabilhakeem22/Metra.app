@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { sqlstateOf } from '@metra/db/sqlstate';
@@ -42,7 +42,7 @@ import { closeFixture, ctxFor, raw, seedOrg, teardown } from './fixture';
 //      `on delete cascade`, which is a different and much worse thing.
 //
 // AND IT IS THE FIRST REAL TRAFFIC THROUGH BRANCH 2 OF `enforce_immutable_when`
-// (the fourth TG_ARGV, `engagement_id,source_file_id`). That branch is fenced to
+// (the fourth TG_ARGV, `engagement_id,source_file_id,source_proposal_id`). That branch is fenced to
 // `pg_trigger_depth() > 1`, so only a referential action can reach it - and
 // until 0052 no such action could complete, which is why wave 6 shipped it with
 // zero coverage in the admitting direction. The ISSUED cases below are that
@@ -157,7 +157,7 @@ async function setup(): Promise<Fixture> {
   return { ctx, orgId, boqId, fileId: file.id, engagementId: engagement.id };
 }
 
-/** Freeze it exactly the way `boqs/issue.ts:134-143` does, as metra_app. */
+/** Freeze it the way `boqs/issue/freeze.ts` (markIssued) does, as metra_app. */
 async function issue(fixture: Fixture): Promise<string | null> {
   return refusalSqlstate(() =>
     withOrgContext(fixture.ctx, (tx) =>
@@ -199,6 +199,29 @@ function narrowedByMigration0052(): number {
   const rows = [...table[1].matchAll(/\(\s*'[^']+'\s*,\s*'[^']+'\s*,\s*'[^']+'\s*,\s*'[^']+'\s*\)/g)];
   if (rows.length === 0) throw new Error('0052 declares no foreign keys to narrow');
   return rows.length;
+}
+
+/**
+ * How many composite set-null FKs a LATER migration created already narrowed.
+ * 0052 cannot grow a row for them (its loop raises on a constraint that does not
+ * exist yet when it runs on a fresh database), so a new one is born with its
+ * column list instead: 0055's `boqs_sourceProposal_same_org_fk` is the first.
+ * Comment lines are dropped first, so a header that QUOTES the clause is not
+ * counted.
+ */
+function bornNarrowedAfter0052(): number {
+  const folder = dirname(MIGRATION_0052);
+  const bornNarrowed =
+    /alter\s+table\s+"?\w+"?\s+add\s+constraint\s+"?\w+"?\s+foreign\s+key\s*\(\s*"?org_id"?\s*,\s*"?(\w+)"?\s*\)[^;]*?on\s+delete\s+set\s+null\s*\(\s*"?(\w+)"?\s*\)/gi;
+  return readdirSync(folder)
+    .filter((name) => /^\d{4}_.*\.sql$/.test(name) && Number(name.slice(0, 4)) > 52)
+    .flatMap((name) => {
+      const text = readFileSync(resolve(folder, name), 'utf8')
+        .split('\n')
+        .filter((line) => !line.trimStart().startsWith('--'))
+        .join('\n');
+      return [...text.matchAll(bornNarrowed)].filter((match) => match[1] === match[2]);
+    }).length;
 }
 
 describe('a composite set-null cascade nulls the reference and leaves org_id alone', () => {
@@ -295,7 +318,7 @@ describe('a composite set-null cascade nulls the reference and leaves org_id alo
           and c.confdeltype = 'n'
         order by c.conname`,
     );
-    expect(fks.length).toBe(2);
+    expect(fks.length).toBe(3);
     for (const fk of fks) {
       expect(fk.refcols).toContain('org_id');
       expect(fk.setcols).not.toBeNull();
@@ -305,6 +328,7 @@ describe('a composite set-null cascade nulls the reference and leaves org_id alo
     expect(fks.map((fk) => fk.setcols![0]).sort()).toEqual([
       'engagement_id',
       'source_file_id',
+      'source_proposal_id',
     ]);
   });
 
@@ -351,6 +375,6 @@ describe('a composite set-null cascade nulls the reference and leaves org_id alo
           and c.confdeltype = 'n'
           and array_length(c.conkey, 1) > 1`,
     );
-    expect(Number(narrowed.n)).toBe(narrowedByMigration0052());
+    expect(Number(narrowed.n)).toBe(narrowedByMigration0052() + bornNarrowedAfter0052());
   });
 });

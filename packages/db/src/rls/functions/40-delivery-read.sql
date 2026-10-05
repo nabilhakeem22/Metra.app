@@ -55,6 +55,60 @@ as $$
   );
 $$;
 
+-- BOQ as a proposal: may the client open this engagement's BOQ? STRICTER than
+-- `app_engagement_payments_settled`, on purpose: the engagement must HAVE a fee
+-- schedule (at least one milestone) AND it must be settled.
+--
+-- Why not the free-gate rule above: every BOQ issue publishes its artifact,
+-- including a BOQ issued while the engagement is still at `created` with no fee
+-- schedule yet. Under "no milestones = settled" that BOQ, the document the studio
+-- is paid for, would be downloadable the moment it is issued. Nothing has been
+-- agreed, so nothing has been paid for, so it is withheld.
+--
+-- `app_engagement_payments_settled` itself is unchanged: its free-gate rule still
+-- governs every other gated deliverable and the money guards.
+--
+-- SECURITY DEFINER + empty search_path, takes a bare engagement id, and is
+-- REVOKED from public in roles.sql, for the same reason as the function above.
+-- Defined AFTER it: a `language sql` body is validated at CREATE time.
+create or replace function public.app_boq_releasable(
+  p_engagement_id uuid
+)
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select exists (
+    select 1
+    from public.engagement_milestones m
+    where m.engagement_id = p_engagement_id
+  )
+  and public.app_engagement_payments_settled(p_engagement_id);
+$$;
+
+-- Is the payment condition for releasing ONE document of this kind met? A `boq`
+-- reads its own rule above; every other kind reads the settled test. The single
+-- place the portal list and the download resolver turn (kind, engagement) into
+-- the `p_settled` argument of `app_document_access`, so the two can never
+-- disagree. Same lockdown as the two functions it calls (roles.sql).
+create or replace function public.app_document_settled(
+  p_kind public.engagement_artifact_kind,
+  p_engagement_id uuid
+)
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select case
+    when p_kind = 'boq' then public.app_boq_releasable(p_engagement_id)
+    else public.app_engagement_payments_settled(p_engagement_id)
+  end;
+$$;
+
 -- Client Deliverables Step 3 — what a client may do with ONE released document,
 -- given whether the engagement's payments are settled. The single declaration of
 -- the rule; both the portal list and the download route read it, so the button the
@@ -62,7 +116,9 @@ $$;
 --
 --   'withheld' — the BOQ before the money is in. It carries the firm's own rates
 --                and the execution cost; it is the thing the studio is paid for, so
---                it is not listed as retrievable at all until settled.
+--                it is not listed as retrievable at all until settled. For a
+--                `boq`, "settled" also requires a fee schedule to exist: the
+--                callers pass `app_document_settled`, not the bare settled test.
 --   'preview'  — the approved 3D render before the money is in. The client SEES the
 --                design (a downscaled, non-deliverable rendition) but cannot pull
 --                the full-resolution file.
@@ -355,7 +411,7 @@ as $$
             -- here (not in TS) so the portal's button and the download route's
             -- enforcement read ONE rule.
             'access', public.app_document_access(
-              a.kind, public.app_engagement_payments_settled(de.id), f.original_name
+              a.kind, public.app_document_settled(a.kind, de.id), f.original_name
             )
           ) as d
         from public.engagement_artifacts a
