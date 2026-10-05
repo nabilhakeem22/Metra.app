@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { formatDate } from './date';
 import { formatDocNumber } from './doc-number';
-import { formatMoney } from './money';
+import { formatMoney, formatMoneyAmount, moneySymbol } from './money';
 import { formatNumber, formatPercent, formatQuantity } from './number';
 
 const ARABIC_INDIC = /[٠-٩۰-۹]/;
@@ -62,6 +62,35 @@ describe('formatMoney', () => {
     expect(formatMoney(undefined, 'ar-EG')).toBe('');
     expect(formatMoney('not-a-number', 'en')).toBe('');
     expect(formatMoney(Number.NaN, 'en')).toBe('');
+  });
+});
+
+describe('formatMoneyAmount + moneySymbol — the figure and its label, apart', () => {
+  it('prints the formatMoney figure without the label, Latin digits', () => {
+    expect(formatMoneyAmount('900000.0000', 'en')).toBe('900,000.00');
+    const s = formatMoneyAmount('900000.0000', 'ar-EG');
+    expect(s).toBe('900,000.00');
+    expect(ARABIC_INDIC.test(s)).toBe(false);
+  });
+
+  it('recomposes to exactly what formatMoney prints', () => {
+    for (const locale of ['en', 'ar-EG']) {
+      expect(`${formatMoneyAmount('1234.5', locale)} ${moneySymbol(locale)}`).toBe(
+        formatMoney('1234.5', locale),
+      );
+    }
+  });
+
+  it('labels EGP in English and ج.م in Arabic', () => {
+    expect(moneySymbol('en')).toBe('EGP');
+    expect(moneySymbol('ar-EG')).toBe('ج.م');
+  });
+
+  it('returns "" for absent/invalid input, and normalizes negative zero', () => {
+    expect(formatMoneyAmount(null, 'en')).toBe('');
+    expect(formatMoneyAmount('  ', 'en')).toBe('');
+    expect(formatMoneyAmount('abc', 'ar-EG')).toBe('');
+    expect(formatMoneyAmount('-0', 'en')).toBe('0.00');
   });
 });
 
