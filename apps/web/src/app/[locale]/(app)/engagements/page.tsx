@@ -8,7 +8,12 @@ import { can } from '@/lib/permissions/can';
 import { listProjects } from '@/lib/projects/queries';
 import { EngagementsClient } from './engagements-client';
 
-export default async function EngagementsPage() {
+export default async function EngagementsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ new?: string }>;
+}) {
+  const { new: openCreate } = await searchParams;
   const ctx = await requireOrg();
   // Gate the read on the engagements_design read capability in the CALLER (RLS is
   // the second factor) — consistent with the other internal list pages.
@@ -36,6 +41,7 @@ export default async function EngagementsPage() {
         clientOptions={clientOptions}
         projectOptions={projectOptions}
         canCreate={canCreate}
+        openCreateOnArrival={openCreate === '1'}
       />
     </div>
   );

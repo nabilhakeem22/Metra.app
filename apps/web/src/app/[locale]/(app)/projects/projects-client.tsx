@@ -2,10 +2,11 @@
 
 import { FolderKanban, Plus } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
-import { useEffect, useMemo, useState, useTransition } from 'react';
+import { useMemo, useState, useTransition } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
+import { useOpenOnArrival } from '@/hooks/use-open-on-arrival';
 import { toast } from '@/hooks/use-toast';
 import { resolveActionError } from '@/lib/actions/error-message';
 import type { ActionCode } from '@/lib/actions/result';
@@ -22,6 +23,8 @@ export interface ProjectsClientProps {
   canManage: boolean;
   /** When arriving from a client profile's "new project" CTA. */
   initialNewClientId?: string;
+  /** Reached through `/projects?new=1`: open the new-project form once. */
+  openCreateOnArrival: boolean;
 }
 
 export function ProjectsClient({
@@ -29,6 +32,7 @@ export function ProjectsClient({
   clientOptions,
   canManage,
   initialNewClientId,
+  openCreateOnArrival,
 }: ProjectsClientProps) {
   const t = useTranslations('projects');
   const te = useTranslations('errors');
@@ -41,14 +45,9 @@ export function ProjectsClient({
   const [editing, setEditing] = useState<ProjectListItem | null>(null);
   const [pending, startTransition] = useTransition();
 
-  // Arrived from a client profile's "new project for this client" CTA: open the
-  // new-project form once, with that client preselected.
-  useEffect(() => {
-    if (canManage && initialNewClientId) {
-      setEditing(null);
-      setFormOpen(true);
-    }
-  }, [canManage, initialNewClientId]);
+  // Arrived from a client profile's "new project for this client" CTA (that
+  // client preselected) or from `?new=1`: open the new-project form once.
+  useOpenOnArrival(canManage && (Boolean(initialNewClientId) || openCreateOnArrival), openNew);
 
   const filtered = useMemo(() => {
     const needle = q.trim().toLowerCase();

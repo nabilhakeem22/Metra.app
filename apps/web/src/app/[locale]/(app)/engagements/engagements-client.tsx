@@ -6,6 +6,7 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
+import { useOpenOnArrival } from '@/hooks/use-open-on-arrival';
 import { Link } from '@/i18n/routing';
 import { docYear, formatDocNumber } from '@/lib/format/doc-number';
 import { pickLocale } from '@/lib/i18n/pick-locale';
@@ -22,15 +23,19 @@ export function EngagementsClient({
   clientOptions,
   projectOptions,
   canCreate,
+  openCreateOnArrival,
 }: {
   items: EngagementListRow[];
   clientOptions: ClientOption[];
   projectOptions: ProjectOption[];
   canCreate: boolean;
+  /** Reached through `/engagements?new=1`: open the create sheet once. */
+  openCreateOnArrival: boolean;
 }) {
   const t = useTranslations('engagements');
   const locale = useLocale();
   const [creating, setCreating] = useState(false);
+  useOpenOnArrival(canCreate && openCreateOnArrival, () => setCreating(true));
 
   const newButton = canCreate && (
     <Button onClick={() => setCreating(true)}>

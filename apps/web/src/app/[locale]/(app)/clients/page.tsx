@@ -7,7 +7,12 @@ import { can } from '@/lib/permissions/can';
 import { ClientsClient } from './clients-client';
 import type { ClientRow } from './types';
 
-export default async function ClientsPage() {
+export default async function ClientsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ new?: string }>;
+}) {
+  const { new: openCreate } = await searchParams;
   const ctx = await requireOrg();
   // Read gate: the client role has no `clients` access -> 404.
   if (!can(ctx.role, 'clients', 'read')) notFound();
@@ -35,7 +40,11 @@ export default async function ClientsPage() {
   return (
     <div className="space-y-6">
       <PageHeader title={t('title')} description={t('subtitle')} />
-      <ClientsClient items={items} canManage={canManage} />
+      <ClientsClient
+        items={items}
+        canManage={canManage}
+        openCreateOnArrival={openCreate === '1'}
+      />
     </div>
   );
 }

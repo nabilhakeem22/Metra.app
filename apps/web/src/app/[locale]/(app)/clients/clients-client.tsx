@@ -6,6 +6,7 @@ import { useMemo, useState, useTransition } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
+import { useOpenOnArrival } from '@/hooks/use-open-on-arrival';
 import { toast } from '@/hooks/use-toast';
 import { resolveActionError } from '@/lib/actions/error-message';
 import type { ActionCode } from '@/lib/actions/result';
@@ -19,12 +20,14 @@ import type { ClientRow } from './types';
 export interface ClientsClientProps {
   items: ClientRow[];
   canManage: boolean;
+  /** Reached through `/clients?new=1`: open the new-client form once. */
+  openCreateOnArrival: boolean;
 }
 
 /** 'all' for both filters, so the list opens showing everything. */
 const NO_FILTER: ClientFilter = { query: '', status: 'all', city: 'all' };
 
-export function ClientsClient({ items, canManage }: ClientsClientProps) {
+export function ClientsClient({ items, canManage, openCreateOnArrival }: ClientsClientProps) {
   const t = useTranslations('clients');
   const te = useTranslations('errors');
   const locale = useLocale();
@@ -41,6 +44,7 @@ export function ClientsClient({ items, canManage }: ClientsClientProps) {
     setEditing(null);
     setFormOpen(true);
   }
+  useOpenOnArrival(canManage && openCreateOnArrival, openNew);
 
   function toggleActive(item: ClientRow) {
     startTransition(async () => {

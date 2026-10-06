@@ -11,9 +11,9 @@ import type { ClientOption, ProjectListItem } from './types';
 export default async function ProjectsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ newFor?: string }>;
+  searchParams: Promise<{ newFor?: string; new?: string }>;
 }) {
-  const { newFor } = await searchParams;
+  const { newFor, new: openCreate } = await searchParams;
   const ctx = await requireOrg();
   if (!can(ctx.role, 'projects', 'read')) notFound();
 
@@ -57,6 +57,7 @@ export default async function ProjectsPage({
         clientOptions={options}
         canManage={canManage}
         initialNewClientId={newFor}
+        openCreateOnArrival={openCreate === '1'}
       />
     </div>
   );
