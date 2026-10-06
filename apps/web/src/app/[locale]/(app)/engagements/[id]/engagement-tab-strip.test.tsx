@@ -23,6 +23,7 @@ function renderStrip(overrides: Partial<EngagementTabStripProps> = {}) {
       awaitingReplyCount={0}
       budget={null}
       pending={false}
+      closed={false}
       {...overrides}
     />,
   );
@@ -77,11 +78,21 @@ describe('EngagementTabStrip — the count badges', () => {
     expect(tabButton('files').textContent).not.toContain(badge);
   });
 
-  test('awaitingReplyCount badges Files', () => {
+  test('awaitingReplyCount badges Files with its own wording, not the payments one', () => {
     renderStrip({ awaitingReplyCount: 3 });
     expect(tabButton('files').textContent).toContain(
+      ar('engagements.questionsBadge').replace('{n}', '3'),
+    );
+    expect(tabButton('files').textContent).not.toContain(
       ar('engagements.paymentsBadge').replace('{n}', '3'),
     );
+  });
+
+  test('a closed delivery wears no badge at all', () => {
+    renderStrip({ closed: true, paymentClaimCount: 2, awaitingReplyCount: 3, budget: 'draft' });
+    for (const tab of ENGAGEMENT_TABS) {
+      expect(tabButton(tab).textContent).toBe(ar(`engagements.panels.${tab}`));
+    }
   });
 
   test('a count of zero raises no badge at all', () => {

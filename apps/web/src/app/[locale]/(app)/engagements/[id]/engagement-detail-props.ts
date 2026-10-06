@@ -50,6 +50,7 @@ export interface EngagementDetailProps {
   capabilities: PanelCapabilities;
   canUpload: boolean;
   canShare: boolean;
+  canStartQuotation: boolean;
   gatePreview: EngagementGatePreview;
   canAdvance: boolean;
   canResolveClaims: boolean;

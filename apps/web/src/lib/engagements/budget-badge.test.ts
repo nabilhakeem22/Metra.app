@@ -6,7 +6,13 @@ const ISSUED_AT = new Date('2026-06-01T10:00:00.000Z');
 const SUPERSEDED_AT = new Date('2026-05-01T10:00:00.000Z');
 
 function header(overrides: Partial<BudgetBadgeHeader> = {}): BudgetBadgeHeader {
-  return { romLow: '100000.0000', romHigh: '140000.0000', romIssuedAt: null, ...overrides };
+  return {
+    state: 'design_proposal',
+    romLow: '100000.0000',
+    romHigh: '140000.0000',
+    romIssuedAt: null,
+    ...overrides,
+  };
 }
 
 function acknowledgement(at: Date | null): AcknowledgementEvent {
@@ -14,6 +20,13 @@ function acknowledgement(at: Date | null): AcknowledgementEvent {
 }
 
 describe('resolveBudgetBadge', () => {
+  test('a closed delivery wears no budget badge, drafted or issued', () => {
+    for (const state of ['execution', 'closed_design_only', 'abandoned'] as const) {
+      expect(resolveBudgetBadge(header({ state }), [])).toBeNull();
+      expect(resolveBudgetBadge(header({ state, romIssuedAt: ISSUED_AT }), [])).toBeNull();
+    }
+  });
+
   test('both bounds set and never issued is a DRAFT', () => {
     expect(resolveBudgetBadge(header(), [])).toBe('draft');
   });

@@ -1517,10 +1517,10 @@
       "budgetAwaitingAckBadge": "awaiting acknowledgement"
     },
     "paymentsBadge": "{n} due",
+    "questionsBadge": "{n} to answer",
     "asBuiltDue": "As-built due",
     "created": "Created",
     "designFee": "Design fee",
-    "renderManifest": "Render baseline",
     "conceptLocked": "Concept locked",
     "form": {
       "newTitle": "New delivery",
@@ -1704,7 +1704,6 @@
       "clientNote": "What the client asked for",
       "nudge": "Nudge client",
       "nudgeHint": "Reveal the client link so you can follow up.",
-      "closedHeadline": "This delivery is closed",
       "clientLinkActive": "Client link active",
       "clientLinkInactive": "Not shared",
       "moreLabel": "More actions",
@@ -1749,6 +1748,21 @@
       },
       "claim": {
         "note": "Confirming records the payment, and moves the delivery on if this is the payment it was waiting for."
+      },
+      "closed": {
+        "execution": {
+          "headline": "Closed: the client is building with you",
+          "hint": "The design is done. Price the build from the BOQ when you're ready.",
+          "viewBoq": "View BOQ",
+          "startQuotation": "Start a quotation"
+        },
+        "closed_design_only": {
+          "headline": "Closed: design-only handover complete",
+          "hint": "The client confirmed receipt of the handover pack."
+        },
+        "abandoned": {
+          "headline": "This delivery was abandoned"
+        }
       }
     },
     "spine": {

@@ -33,6 +33,8 @@ export interface EngagementCommandCardProps {
   /** May this role confirm or dismiss a client payment claim (`engagements_finance` create)? */
   canResolveClaims: boolean;
   canShare: boolean;
+  /** May this role start a quotation (`proposals_build` create)? Linked from the execution ending. */
+  canStartQuotation: boolean;
   canUpload: boolean;
   canSetOffPlan: boolean;
   offPlan: boolean;

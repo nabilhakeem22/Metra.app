@@ -1,4 +1,5 @@
 import { acknowledgesIssuance, type AcknowledgementEvent } from './rom-ack';
+import { isTerminal, type DesignState } from './states';
 
 /**
  * Which badge the Budget tab wears, if any.
@@ -16,8 +17,10 @@ import { acknowledgesIssuance, type AcknowledgementEvent } from './rom-ack';
  */
 export type BudgetBadge = 'draft' | 'awaitingAck' | null;
 
-/** Only the three header fields the question needs. */
+/** Only the four header fields the question needs. */
 export interface BudgetBadgeHeader {
+  /** A closed delivery wears no budget badge: there is nothing left to issue. */
+  state: DesignState;
   romLow: string | null;
   romHigh: string | null;
   romIssuedAt: Date | null;
@@ -27,6 +30,7 @@ export function resolveBudgetBadge(
   header: BudgetBadgeHeader,
   events: readonly AcknowledgementEvent[],
 ): BudgetBadge {
+  if (isTerminal(header.state)) return null;
   // A band must EXIST to be a draft: without one there is nothing drafted, and a
   // permanent "draft" badge on every young engagement says nothing at all.
   if (header.romLow !== null && header.romHigh !== null && header.romIssuedAt === null) {

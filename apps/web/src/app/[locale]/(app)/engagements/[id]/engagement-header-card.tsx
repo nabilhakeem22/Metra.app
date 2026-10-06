@@ -111,15 +111,6 @@ export function EngagementHeaderCard({
                 {chip.label}
               </span>
             ))}
-            {header.renderManifestHash && (
-              <span
-                className="rounded-[var(--r-pill)] bg-[color:var(--track)] px-2.5 py-0.5 font-mono text-[11.5px] font-semibold text-[color:var(--text-muted)]"
-                dir="ltr"
-                title={header.renderManifestHash}
-              >
-                {t('renderManifest')}: {header.renderManifestHash.slice(0, 10)}
-              </span>
-            )}
           </div>
         )}
       </div>

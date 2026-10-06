@@ -8,6 +8,7 @@ import { resolveBudgetBadge } from '@/lib/engagements/budget-badge';
 import { secondaryTriggersOf } from '@/lib/engagements/forward-trigger';
 import { landedKeysOf } from '@/lib/engagements/held-key';
 import { countConceptOptions } from '@/lib/engagements/concept-options';
+import { isTerminal } from '@/lib/engagements/states';
 import { EngagementCommandCard } from './engagement-command-card';
 import type { EngagementDetailProps } from './engagement-detail-props';
 import { EngagementPanels } from './engagement-panels';
@@ -38,6 +39,7 @@ export function EngagementDetailClient({
   capabilities,
   canUpload,
   canShare,
+  canStartQuotation,
   gatePreview,
   canAdvance,
   canResolveClaims,
@@ -93,6 +95,7 @@ export function EngagementDetailClient({
         canRecordPayment={capabilities.recordPayment}
         canResolveClaims={canResolveClaims}
         canShare={canShare}
+        canStartQuotation={canStartQuotation}
         canUpload={canUpload}
         canSetOffPlan={capabilities.setRom}
         offPlan={header.offPlan}
@@ -118,6 +121,7 @@ export function EngagementDetailClient({
         paymentClaimCount={paymentClaims.length}
         awaitingReplyCount={awaitingReplyCount}
         budget={budgetBadge}
+        closed={isTerminal(header.state)}
         pending={pending}
       />
 

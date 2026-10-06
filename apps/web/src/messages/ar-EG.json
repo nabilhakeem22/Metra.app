@@ -1517,10 +1517,10 @@
       "budgetAwaitingAckBadge": "مستني إقرار العميل"
     },
     "paymentsBadge": "مستحق {n}",
+    "questionsBadge": "{n} محتاج رد",
     "asBuiltDue": "التصميم النهائي مستحق",
     "created": "تم الإنشاء",
     "designFee": "أتعاب التصميم",
-    "renderManifest": "أساس الرندرة",
     "conceptLocked": "تم اعتماد الفكرة",
     "form": {
       "newTitle": "تسليم جديد",
@@ -1704,7 +1704,6 @@
       "clientNote": "اللي العميل طلبه",
       "nudge": "فكّر العميل",
       "nudgeHint": "أظهر لينك العميل عشان تقدر تتابع معاه.",
-      "closedHeadline": "التسليم ده مُغلق",
       "clientLinkActive": "رابط العميل شغال",
       "clientLinkInactive": "مش متشارك",
       "moreLabel": "إجراءات أكتر",
@@ -1749,6 +1748,21 @@
       },
       "claim": {
         "note": "التأكيد بيسجل الدفعة، وبينقل التسليم لو دي الدفعة اللي كان مستنيها."
+      },
+      "closed": {
+        "execution": {
+          "headline": "اتقفل: العميل هينفّذ معاك",
+          "hint": "التصميم خلص. سعّر التنفيذ من المقايسة لما تكون جاهز.",
+          "viewBoq": "اعرض المقايسة",
+          "startQuotation": "ابدأ عرض سعر"
+        },
+        "closed_design_only": {
+          "headline": "اتقفل: تسليم التصميم خلص",
+          "hint": "العميل أكد استلام حزمة التسليم."
+        },
+        "abandoned": {
+          "headline": "التسليم ده اتلغى"
+        }
       }
     },
     "spine": {

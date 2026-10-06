@@ -94,6 +94,7 @@ export default async function EngagementDetailPage({
         capabilities={engagementCapabilities(ctx.role, header.state)}
         canUpload={can(ctx.role, 'engagements_design', 'create')}
         canShare={canShare}
+        canStartQuotation={can(ctx.role, 'proposals_build', 'create')}
         gatePreview={gatePreview}
         canAdvance={canAdvance}
         canResolveClaims={canResolveClaims}

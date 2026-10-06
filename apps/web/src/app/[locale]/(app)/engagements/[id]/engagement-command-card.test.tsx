@@ -75,6 +75,7 @@ function props(overrides: Partial<EngagementCommandCardProps> = {}): EngagementC
     canRecordPayment: true,
     canResolveClaims: true,
     canShare: true,
+    canStartQuotation: true,
     canUpload: true,
     canSetOffPlan: false,
     offPlan: false,
@@ -215,5 +216,46 @@ describe('a pending client payment claim is the card ONE action', () => {
       />,
     );
     expect(button('engagements.paymentClaims.confirm')).toBeNull();
+  });
+});
+
+describe('a closed delivery', () => {
+  const closedPreview: EngagementGatePreview = {
+    primaryTrigger: null,
+    endingChoices: [],
+    items: [],
+    allClear: true,
+  };
+  const closedProps = (state: EngagementCommandCardProps['state'], extra = {}) =>
+    props({ state, preview: closedPreview, secondaryTriggers: [], ...extra });
+  const link = (key: string) => screen.queryByRole('link', { name: ar(key) });
+
+  test('at execution: its own headline, View BOQ and Start a quotation, no nudge footer', () => {
+    renderWithIntl(<EngagementCommandCard {...closedProps('execution')} />);
+    expect(screen.getByText(ar('engagements.command.closed.execution.headline'))).toBeTruthy();
+    expect(link('engagements.command.closed.execution.viewBoq')?.getAttribute('href')).toContain(
+      '/projects/p-1?tab=boq',
+    );
+    expect(
+      link('engagements.command.closed.execution.startQuotation')?.getAttribute('href'),
+    ).toContain('/proposals/new?projectId=p-1');
+    expect(screen.queryByRole('button', { name: ar('engagements.command.nudge') })).toBeNull();
+  });
+
+  test('Start a quotation needs proposals_build create', () => {
+    renderWithIntl(<EngagementCommandCard {...closedProps('execution', { canStartQuotation: false })} />);
+    expect(link('engagements.command.closed.execution.viewBoq')).not.toBeNull();
+    expect(link('engagements.command.closed.execution.startQuotation')).toBeNull();
+  });
+
+  test('closed_design_only and abandoned say how they ended, with no links', () => {
+    const { unmount } = renderWithIntl(<EngagementCommandCard {...closedProps('closed_design_only')} />);
+    expect(
+      screen.getByText(ar('engagements.command.closed.closed_design_only.headline')),
+    ).toBeTruthy();
+    expect(screen.queryAllByRole('link')).toHaveLength(0);
+    unmount();
+    renderWithIntl(<EngagementCommandCard {...closedProps('abandoned')} />);
+    expect(screen.getByText(ar('engagements.command.closed.abandoned.headline'))).toBeTruthy();
   });
 });

@@ -20,6 +20,8 @@ export interface EngagementTabStripProps {
   budget: BudgetBadge;
   /** True while a write is in flight. See the comment on `disabled` below. */
   pending: boolean;
+  /** A closed delivery wears no badges: nothing in it is waiting on the studio. */
+  closed: boolean;
 }
 
 /** A tab wears a badge when it holds something ADDRESSED TO the studio. */
@@ -27,6 +29,7 @@ function badgeCountFor(
   tab: EngagementTab,
   props: EngagementTabStripProps,
 ): number {
+  if (props.closed) return 0;
   if (tab === 'payments') return props.paymentClaimCount;
   if (tab === 'files') return props.awaitingReplyCount;
   return 0;
@@ -51,7 +54,7 @@ export function EngagementTabStrip(props: EngagementTabStripProps) {
         // the client has not yet acknowledged is unissued work sitting in that
         // tab, and saying so is worth more than saying "1".
         const budgetState =
-          tab !== 'budget' || props.budget === null
+          tab !== 'budget' || props.budget === null || props.closed
             ? null
             : t(
                 props.budget === 'draft'
@@ -89,7 +92,7 @@ export function EngagementTabStrip(props: EngagementTabStripProps) {
                 className="inline-flex items-center rounded-[var(--r-pill)] bg-[color:var(--warn-tint)] px-1.5 py-0.5 text-[10px] font-semibold text-[color:var(--warn)]"
                 dir="ltr"
               >
-                {t('paymentsBadge', { n: badgeCount })}
+                {t(tab === 'files' ? 'questionsBadge' : 'paymentsBadge', { n: badgeCount })}
               </span>
             )}
           </button>

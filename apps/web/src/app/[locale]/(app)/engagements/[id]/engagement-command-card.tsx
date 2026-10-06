@@ -4,6 +4,7 @@ import { useTranslations } from 'next-intl';
 import { useState } from 'react';
 import { CommandCardAction } from './command-card-action';
 import { CommandCardClaims } from './command-card-claims';
+import { CommandCardClosedLinks } from './command-card-closed-links';
 import { useCommandCardCopy } from './command-card-copy';
 import { CommandCardForms } from './command-card-forms';
 import { CommandCardHeadline } from './command-card-headline';
@@ -65,6 +66,14 @@ export function EngagementCommandCard(props: EngagementCommandCardProps) {
           clientActivity={props.clientActivity}
           awaitingReplyCount={props.awaitingReplyCount}
         />
+
+        {closed && (
+          <CommandCardClosedLinks
+            state={state}
+            projectId={props.projectId}
+            canStartQuotation={props.canStartQuotation}
+          />
+        )}
 
         {!closed && (
           <>
@@ -132,7 +141,8 @@ export function EngagementCommandCard(props: EngagementCommandCardProps) {
         )}
       </div>
 
-      {canShare && <CommandCardShareFooter onNudge={onNudge} />}
+      {/* A closed delivery has nobody left to nudge. */}
+      {canShare && !closed && <CommandCardShareFooter onNudge={onNudge} />}
     </section>
   );
 }
