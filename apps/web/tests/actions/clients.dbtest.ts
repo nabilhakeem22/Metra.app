@@ -177,3 +177,39 @@ describe('phone is required forward-only', () => {
     expect(Number(row.retention_pct)).toBe(10);
   });
 });
+
+describe('createClientCore writes the first contact (round A1)', () => {
+  async function contactsOf(clientId: string) {
+    return raw.query<{ name: string; phone: string | null; email: string | null; is_primary: boolean }>(
+      `select name, phone, email, is_primary from public.client_contacts where client_id = '${clientId}'`,
+    );
+  }
+
+  it('a contact name on the client form becomes ONE primary contact with the same phone/email', async () => {
+    const { orgId, ownerIds } = await seedOrg({ owners: 1 });
+    orgIds.push(orgId);
+    const ctx = ctxFor(orgId, ownerIds[0], 'owner');
+    const res = await createClientCore(ctx, {
+      nameEn: 'Acme',
+      contactName: 'Mona Adel',
+      phone: '01000000000',
+      email: 'mona@example.com',
+    });
+    expect(res.ok).toBe(true);
+    expect(await contactsOf(res.data!)).toEqual([
+      { name: 'Mona Adel', phone: '01000000000', email: 'mona@example.com', is_primary: true },
+    ]);
+    // The client row still keeps its own copy.
+    const [client] = await listClients(ctx, {});
+    expect(client.contactName).toBe('Mona Adel');
+  });
+
+  it('without a contact name no contact row is written', async () => {
+    const { orgId, ownerIds } = await seedOrg({ owners: 1 });
+    orgIds.push(orgId);
+    const ctx = ctxFor(orgId, ownerIds[0], 'owner');
+    const res = await createClientCore(ctx, { nameEn: 'Acme', phone: '01000000000' });
+    expect(res.ok).toBe(true);
+    expect(await contactsOf(res.data!)).toEqual([]);
+  });
+});

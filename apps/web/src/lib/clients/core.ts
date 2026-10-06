@@ -1,14 +1,15 @@
 // PURE client cores — no next/*, no cookies. Take an OrgContext + input; the
 // 'use server' wrappers in ./actions do the session/requireOrg work and delegate.
 // Exercised directly by tests/actions/clients.dbtest.ts.
-import { CLIENT_TYPES, clients, type ClientType } from '@metra/db';
+import { clients, type ClientType } from '@metra/db';
 import { eq } from 'drizzle-orm';
 import { fail, mutateInOrg, requireInOrg } from '@/lib/actions/mutate';
 import { err, type ActionResult } from '@/lib/actions/result';
 import { appendSystemActivity } from '@/lib/activities/core';
 import type { OrgContext } from '@/lib/db/context';
-import { clean } from '@/lib/validation/text';
+import { insertClientContactInTx } from '@/lib/client-contacts/insert';
 import { normalizePercent } from '@/lib/validation/percent';
+import { normalized, validType, withinLimits } from './validation';
 
 export interface ClientInput {
   nameEn?: string | null;
@@ -24,57 +25,6 @@ export interface ClientInput {
   advancePct?: string | null;
   retentionPct?: string | null;
   notes?: string | null;
-}
-
-// Boundary length caps (defense-in-depth), mirroring org/core profileWithinLimits.
-const LIMITS = {
-  name: 200,
-  contactName: 200,
-  email: 254,
-  phone: 40,
-  city: 120,
-  country: 120,
-  address: 300,
-  taxReg: 64,
-  notes: 2000,
-} as const;
-
-type NormalizedClient = ReturnType<typeof normalized>;
-
-function normalized(input: ClientInput) {
-  return {
-    nameEn: clean(input.nameEn),
-    nameAr: clean(input.nameAr),
-    type: input.type ?? undefined,
-    contactName: clean(input.contactName),
-    email: clean(input.email),
-    phone: clean(input.phone),
-    city: clean(input.city),
-    country: clean(input.country),
-    address: clean(input.address),
-    taxRegistrationNumber: clean(input.taxRegistrationNumber),
-    notes: clean(input.notes),
-  };
-}
-
-function withinLimits(v: NormalizedClient): boolean {
-  const ok = (s: string | null, max: number) => (s?.length ?? 0) <= max;
-  return (
-    ok(v.nameEn, LIMITS.name) &&
-    ok(v.nameAr, LIMITS.name) &&
-    ok(v.contactName, LIMITS.contactName) &&
-    ok(v.email, LIMITS.email) &&
-    ok(v.phone, LIMITS.phone) &&
-    ok(v.city, LIMITS.city) &&
-    ok(v.country, LIMITS.country) &&
-    ok(v.address, LIMITS.address) &&
-    ok(v.taxRegistrationNumber, LIMITS.taxReg) &&
-    ok(v.notes, LIMITS.notes)
-  );
-}
-
-function validType(t: ClientType | undefined): boolean {
-  return t === undefined || CLIENT_TYPES.includes(t);
 }
 
 export async function createClientCore(
@@ -99,6 +49,20 @@ export async function createClientCore(
         .insert(clients)
         .values({ orgId: ctx.orgId, ...v, advancePct, retentionPct })
         .returning({ id: clients.id });
+      // The contact typed on the client form is ALSO the client's first contact,
+      // in the same transaction (the contact limits equal the client's, so this
+      // adds no new failure). The client row keeps its own copy as before.
+      if (v.contactName) {
+        await insertClientContactInTx(tx, ctx, audit, {
+          clientId: row.id,
+          name: v.contactName,
+          role: null,
+          phone: v.phone,
+          email: v.email,
+          whatsapp: null,
+          isPrimary: true,
+        });
+      }
       await appendSystemActivity(tx, ctx, {
         entityType: 'client',
         entityId: row.id,

@@ -8,6 +8,7 @@ import { err, type ActionResult } from '@/lib/actions/result';
 import type { OrgContext } from '@/lib/db/context';
 import { clean } from '@/lib/validation/text';
 import { isUuid } from '@/lib/uuid';
+import { insertClientContactInTx } from './insert';
 
 const LIMITS = {
   name: 200,
@@ -66,40 +67,15 @@ export async function createContactCore(
       // fails with a coded error for an id that is absent or another tenant's.
       await requireInOrg(tx, clients, input.clientId, { id: clients.id }, 'invalid');
 
-      // A new primary demotes any existing primary first (avoids two-primary).
-      if (makePrimary) {
-        await tx
-          .update(clientContacts)
-          .set({ isPrimary: false, updatedAt: new Date() })
-          .where(
-            and(
-              eq(clientContacts.clientId, input.clientId),
-              eq(clientContacts.isPrimary, true),
-            ),
-          );
-      }
-
-      const [row] = await tx
-        .insert(clientContacts)
-        .values({
-          orgId: ctx.orgId,
-          clientId: input.clientId,
-          name,
-          role: v.role,
-          phone: v.phone,
-          email: v.email,
-          whatsapp: v.whatsapp,
-          isPrimary: makePrimary,
-        })
-        .returning({ id: clientContacts.id });
-      await audit({
-        entity: 'client_contact',
-        entityId: row.id,
-        action: 'create',
-        before: null,
-        after: { client_id: input.clientId, name },
+      return insertClientContactInTx(tx, ctx, audit, {
+        clientId: input.clientId,
+        name,
+        role: v.role,
+        phone: v.phone,
+        email: v.email,
+        whatsapp: v.whatsapp,
+        isPrimary: makePrimary,
       });
-      return row.id;
     },
   );
 }
