@@ -393,6 +393,13 @@
       "when": 1791130131311,
       "tag": "0055_boq_proposals",
       "breakpoints": true
+    },
+    {
+      "idx": 56,
+      "version": "7",
+      "when": 1791323400835,
+      "tag": "0056_round_b_client_signals",
+      "breakpoints": true
     }
   ]
 }

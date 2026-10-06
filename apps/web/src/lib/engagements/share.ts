@@ -97,6 +97,8 @@ export async function rotateDeliveryLinkCore(
 /**
  * Revoke the share link: clear token_hash so the raw token 404s at the portal. No
  * raw token is returned. `engagement_not_found` if the delivery is foreign/absent.
+ * token_nonce is cleared with it: a nonce without a hash is a re-derivable link
+ * that no longer exists, and 0056's CHECK refuses one.
  */
 export async function revokeDeliveryLinkCore(
   ctx: OrgContext,
@@ -108,7 +110,12 @@ export async function revokeDeliveryLinkCore(
     async (tx, audit) => {
       const updated = await tx
         .update(designEngagements)
-        .set({ tokenHash: null, shareExpiresAt: null, updatedAt: new Date() })
+        .set({
+          tokenHash: null,
+          tokenNonce: null,
+          shareExpiresAt: null,
+          updatedAt: new Date(),
+        })
         .where(eq(designEngagements.id, engagementId))
         .returning({ id: designEngagements.id });
       if (!updated[0]) fail('engagement_not_found');

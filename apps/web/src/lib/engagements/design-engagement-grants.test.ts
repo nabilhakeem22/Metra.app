@@ -585,7 +585,7 @@ describe('design_engagements column grants match what the app writes', () => {
     // it drifted is the whole diagnosis. `missing` is a 42501 waiting to happen;
     // `surplus` is authority nothing uses.
     expect({ missing, surplus }).toEqual({ missing: [], surplus: [] });
-    expect(granted.size).toBe(15);
+    expect(granted.size).toBe(16);
   });
 
   it('keeps the table-level UPDATE revoked, so the column list is not cosmetic', () => {

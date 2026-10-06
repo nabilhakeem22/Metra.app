@@ -1,6 +1,7 @@
 import { sql } from 'drizzle-orm';
 import {
   boolean,
+  check,
   date,
   index,
   pgTable,
@@ -12,6 +13,7 @@ import {
   type AnyPgColumn,
 } from 'drizzle-orm/pg-core';
 import { designEngagements } from './design-engagements';
+import { engagementArtifacts } from './engagement-artifacts';
 import { engagementEventKind } from './enums';
 import { money } from './_helpers';
 import { organizations } from './organizations';
@@ -100,13 +102,28 @@ export const engagementEvents = pgTable(
      * query someone might forget to write.
      */
     supersedesEventId: uuid('supersedes_event_id'),
-    decidedAt: timestamp('decided_at', { withTimezone: true })
+    /**
+     * WHICH concept option the client chose (0056): the `concept_option`
+     * artifact a `concept_approval` names. Only a concept approval may carry it
+     * (CHECK), and the composite FK is same-org. NULL on every other kind and on
+     * an approval that named no option (the plain "approve concept" verb).
+     */
+    chosenArtifactId: uuid('chosen_artifact_id'),
+    decidedAt:timestamp('decided_at', { withTimezone: true })
       .notNull()
       .defaultNow(),
   },
   (t) => [
     unique('engagement_events_org_id_id_unique').on(t.orgId, t.id),
     ...sameOrgFk(t, 'engagement', designEngagements, { onDelete: 'cascade' }),
+    // NO ACTION, not RESTRICT: deleting a delivery cascades to its events AND its
+    // artifacts in one statement, and NO ACTION checks at the END of that
+    // statement, when the referencing event is already gone.
+    ...sameOrgFk(t, 'chosenArtifact', engagementArtifacts, { onDelete: 'no action' }),
+    check(
+      'engagement_events_chosen_artifact_only_concept',
+      sql`chosen_artifact_id is null or kind::text = 'concept_approval'`,
+    ),
     index('engagement_events_org_engagement_kind_idx').on(
       t.orgId,
       t.engagementId,

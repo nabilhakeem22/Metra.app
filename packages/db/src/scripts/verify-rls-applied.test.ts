@@ -207,7 +207,7 @@ describe('verifyRlsApplied', () => {
   });
 
   it('prints the declared counts a green run reports', () => {
-    expect(declaredCounts()).toBe('46 tables, 46 policies, 12 triggers, 32 functions');
+    expect(declaredCounts()).toBe('46 tables, 46 policies, 12 triggers, 34 functions');
   });
 
   it('prints what the GRANT half checked, so a shrinking read-back is visible', () => {
@@ -215,7 +215,7 @@ describe('verifyRlsApplied', () => {
     // grant was fifteen columns or the whole row. The counts are the evidence, so
     // they belong in the output rather than only in the source.
     expect(verifiedGrantsSummary()).toBe(
-      'grants verified — design_engagements update narrowed to 15 columns with no ' +
+      'grants verified — design_engagements update narrowed to 16 columns with no ' +
         'table-level update, and 5 narrowed table(s) (boqs, document_categories, ' +
         'engagement_document_comments, engagement_milestones, workspace_entitlements) ' +
         'holding exactly what rls/roles.sql leaves them.',

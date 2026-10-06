@@ -135,6 +135,9 @@ $$;
 -- backstop for an UNAUTHENTICATED write path — the edge rate-limit binding is the
 -- first line, but it is per-IP and this is not. Exceeding it returns 'too_many',
 -- which the portal shows as a plain "try again later", never as an error.
+--
+-- Round B (0056): a written message also refreshes design_engagements.updated_at.
+-- Signature and return type are unchanged.
 create or replace function public.app_delivery_comment_by_token(
   p_hash text,
   p_document_id uuid,
@@ -199,6 +202,10 @@ begin
     nullif(left(coalesce(p_ua, ''), 512), ''),
     v_body
   );
+  -- Round B: a client act refreshes the delivery's updated_at, so the studio's
+  -- newest-first lists surface it (the same touch as the respond and claim
+  -- functions in 50-delivery-write.sql).
+  update public.design_engagements set updated_at = now() where id = eid;
   return 'ok';
 end
 $$;

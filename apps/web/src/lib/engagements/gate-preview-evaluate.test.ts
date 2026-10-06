@@ -34,6 +34,7 @@ function engagement(state: DesignState, designFee: string | null): DesignEngagem
     renderManifestHash: null,
     rendersReadyAt: null,
     tokenHash: null,
+    tokenNonce: null,
     shareExpiresAt: null,
   };
 }

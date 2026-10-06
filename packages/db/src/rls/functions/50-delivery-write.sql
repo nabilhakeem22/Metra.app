@@ -27,6 +27,21 @@
 -- A client rom_acknowledgement is the SAME kind the internal romAcknowledged guard
 -- reads, so a portal ROM ack satisfies Gate B exactly like the staff-recorded one —
 -- no new guard is introduced.
+--
+-- Round B (0056). A DESIGN decision answers ONE render issuance, the
+-- engagement's `renders_ready_at`, which every `rendersReady` re-stamps after a
+-- revision. The row records that instant in `acknowledged_issue_at` (the column
+-- 0049 introduced for the same idea on the ROM band), so after a revision the
+-- client is asked to approve again. A legacy design decision with no stamp still
+-- counts for the current round when it was made at or after `renders_ready_at`;
+-- one made before it belongs to an earlier round. With no `renders_ready_at` at
+-- all (legacy), the decision is one per delivery, as before. The same predicate
+-- is in app_delivery_by_token's `client_actions` and in the studio's TS rule
+-- (lib/engagements/client-review.ts), so the three cannot disagree.
+--
+-- Every successful write also refreshes `design_engagements.updated_at`, so the
+-- studio's newest-first lists surface the delivery the client just acted on.
+-- Signature and return type are unchanged since Phase 2.
 create or replace function public.app_delivery_respond_by_token(
   p_hash text,
   p_action text,
@@ -50,6 +65,7 @@ declare
   rl        numeric;
   rh        numeric;
   ri        timestamptz;
+  rr        timestamptz;
   ok_state  boolean;
 begin
   -- Map the client-facing verb to the ledger event kind (unknown verb -> invalid).
@@ -64,17 +80,23 @@ begin
   end::public.engagement_event_kind;
   if v_kind is null then return 'invalid'; end if;
 
-  -- acknowledge_rom ALONE takes the row lock, and takes it BEFORE the read: its
-  -- precondition is that the band is issued, and a concurrent setEngagementRom
-  -- clears rom_issued_at, so an unlocked read could witness the client's consent
-  -- to a band that stopped existing between the check and the INSERT. The other
-  -- verbs gate on `state`, which the engagement's own transitions serialise.
-  if p_action = 'acknowledge_rom' then
+  -- The row lock, taken BEFORE the read, for acknowledge_rom and for every
+  -- DECISION verb. acknowledge_rom: its precondition is that the band is issued,
+  -- and a concurrent setEngagementRom clears rom_issued_at, so an unlocked read
+  -- could witness the client's consent to a band that stopped existing between
+  -- the check and the INSERT. The decisions: approve and request-changes are
+  -- two KINDS, so the partial unique indexes cannot stop one of each landing in
+  -- the same round from two tabs; serialising on the delivery row makes the
+  -- `already` pre-check below see the first one. It also pins renders_ready_at
+  -- for the duration, so the round a decision records is the round it checked.
+  -- acknowledge_handoff gates only on `state`, which the transitions serialise.
+  if p_action <> 'acknowledge_handoff' then
     perform 1 from public.design_engagements where token_hash = p_hash for update;
   end if;
 
-  select state, share_expires_at, id, org_id, rom_low, rom_high, rom_issued_at
-    into st, exp, eid, oid, rl, rh, ri
+  select state, share_expires_at, id, org_id, rom_low, rom_high, rom_issued_at,
+         renders_ready_at
+    into st, exp, eid, oid, rl, rh, ri, rr
     from public.design_engagements
     where token_hash = p_hash;
   if not found then return 'invalid'; end if;
@@ -111,8 +133,17 @@ begin
       and case
         when v_kind in ('concept_approval', 'concept_change_request')
           then ee.kind in ('concept_approval', 'concept_change_request')
+        -- Round B: a design decision is per RENDER ISSUANCE. A decision stamped
+        -- with this round's instant repeats; so does a legacy unstamped one made
+        -- at or after it. With no issuance at all both sides are NULL and the
+        -- first branch keeps the old one-per-delivery rule.
         when v_kind in ('design_approval', 'design_change_request')
           then ee.kind in ('design_approval', 'design_change_request')
+           and (
+             ee.acknowledged_issue_at is not distinct from rr
+             or (ee.acknowledged_issue_at is null and rr is not null
+                 and ee.decided_at >= rr)
+           )
         -- 0049: a ROM acknowledgement is per ISSUANCE, not per engagement. Only
         -- an acknowledgement of THIS issuance instant is a repeat; one against a
         -- superseded band (or a legacy NULL) leaves the verb open.
@@ -133,14 +164,19 @@ begin
         left(p_note, 2000),
         case when v_kind = 'rom_acknowledgement' then rl else null end,
         case when v_kind = 'rom_acknowledgement' then rh else null end,
-        -- 0049: WHICH issuance this answers. `ri` was read under the row lock
-        -- taken above, so it is the same instant the precondition checked.
-        case when v_kind = 'rom_acknowledgement' then ri else null end
+        -- 0049: WHICH issuance this answers. `ri` and `rr` were read under the
+        -- row lock taken above, so each is the instant the pre-check compared.
+        case
+          when v_kind = 'rom_acknowledgement' then ri
+          when v_kind in ('design_approval', 'design_change_request') then rr
+          else null
+        end
       );
   exception when unique_violation then
     return 'already';
   end;
 
+  update public.design_engagements set updated_at = now() where id = eid;
   return 'ok';
 end
 $$;
@@ -249,6 +285,237 @@ begin
     return 'already';
   end;
 
+  -- Round B: a client act refreshes the delivery's updated_at (see the respond
+  -- function above). Only on a real insert: `already` returned before this.
+  update public.design_engagements set updated_at = now() where id = eid;
   return 'ok';
+end
+$$;
+
+-- Round B (0056) — the client CHOOSES one concept option, by share token.
+-- SECURITY DEFINER (the token IS the auth; no session), the same posture as
+-- app_delivery_respond_by_token: it appends ONE client `concept_approval` that
+-- names the chosen `concept_option` artifact in `chosen_artifact_id`, moves no
+-- state, adds no guard and touches no money. The studio still advances.
+--
+-- It is the respond function's `approve_concept` with a pointer, so it shares
+-- that verb's decision group: ONE client concept decision per delivery. A prior
+-- client approval OR change request answers `already`, and so does a concurrent
+-- double submit (the row lock below serialises the pre-check, and the 0049
+-- partial unique index on (engagement_id, kind) for unstamped client rows is
+-- the backstop).
+--
+-- The artifact must be an OPTION THE CLIENT CAN SEE on THIS delivery: same
+-- engagement, same org, kind `concept_option`, released (`client_visible`), and
+-- carrying a file. Anything else (another delivery's artifact, a render, a
+-- hidden option, a forged uuid) answers `wrong_state`, never a different code,
+-- so the function is no oracle for which artifact ids exist. Codes:
+--   ok | already | expired | not_active | wrong_state | invalid
+create or replace function public.app_delivery_choose_concept_by_token(
+  p_hash text,
+  p_artifact_id uuid,
+  p_note text,
+  p_name text,
+  p_ip text,
+  p_ua text
+)
+returns text
+language plpgsql
+volatile
+security definer
+set search_path = ''
+as $$
+declare
+  st   text;
+  exp  timestamptz;
+  eid  uuid;
+  oid  uuid;
+begin
+  -- Locked BEFORE the checks: the state and the decision pre-check must still
+  -- hold at the INSERT.
+  select state, share_expires_at, id, org_id
+    into st, exp, eid, oid
+    from public.design_engagements
+    where token_hash = p_hash
+    for update;
+  if not found then return 'invalid'; end if;
+  if exp is not null and exp <= now() then return 'expired'; end if;
+  if st in ('closed_design_only', 'execution', 'abandoned') then
+    return 'not_active';
+  end if;
+  if st <> 'concept_review' then return 'wrong_state'; end if;
+
+  if not exists (
+    select 1
+      from public.engagement_artifacts a
+      join public.files f on f.id = a.file_id and f.org_id = a.org_id
+     where a.id = p_artifact_id
+       and a.engagement_id = eid
+       and a.org_id = oid
+       and a.kind = 'concept_option'
+       and a.client_visible
+  ) then
+    return 'wrong_state';
+  end if;
+
+  if exists (
+    select 1 from public.engagement_events ee
+    where ee.engagement_id = eid and ee.actor_channel = 'client'
+      and ee.kind in ('concept_approval', 'concept_change_request')
+  ) then
+    return 'already';
+  end if;
+
+  begin
+    insert into public.engagement_events
+      (id, org_id, engagement_id, kind, actor_channel, actor_name, actor_ip,
+       actor_user_agent, note, chosen_artifact_id)
+      values (
+        gen_random_uuid(), oid, eid, 'concept_approval', 'client', p_name, p_ip,
+        p_ua, left(p_note, 2000), p_artifact_id
+      );
+  exception when unique_violation then
+    return 'already';
+  end;
+
+  update public.design_engagements set updated_at = now() where id = eid;
+  return 'ok';
+end
+$$;
+
+-- Round B (0056) — tell the STUDIO that the client just acted, by share token.
+-- Called by the portal action AFTER one of the write functions above answered
+-- `ok`. SECURITY DEFINER because the client has no session, and because the
+-- notifications SELECT policy is recipient-scoped: collapsing a repeat into
+-- another member's unread row is impossible from the app's own role.
+--
+-- p_body_key  the notification's message key; must match ^client_[a-z_]{1,60}$.
+-- p_params    a JSON object merged UNDER the delivery's own number, year and
+--             titles (which always win), or null.
+-- p_roles     a JSON array of member_role labels. The app computes it from the
+--             permission matrix at call time; nothing here hard-codes who
+--             hears about what. The `client` role is never notified.
+--
+-- DEDUPE: ONE UNREAD notification per (recipient, delivery, body key). A repeat
+-- while that row is unread bumps `params.count` and moves `created_at` to now
+-- (so it rises to the top of the feed) instead of adding a row; once the
+-- recipient has read it, the next act inserts a fresh one. A transaction-scoped
+-- advisory lock per (recipient, delivery, body key) makes two concurrent acts
+-- land one row with count 2, not two rows.
+--
+-- RETURNS null when the key or the role list is malformed, when p_params is not
+-- an object, or when no LIVE link matches (the same share_expires_at rule as
+-- app_delivery_by_token). Otherwise:
+--   { engagement_id, locale (the studio's default_locale), notified_count (rows
+--     inserted or bumped), new_recipients (user ids that got a NEW row, the only
+--     ones the app emails) }
+-- It reads and returns no money and no pricing column.
+create or replace function public.app_delivery_notify_studio_by_token(
+  p_hash text,
+  p_body_key text,
+  p_params jsonb,
+  p_roles jsonb
+)
+returns jsonb
+language plpgsql
+volatile
+security definer
+set search_path = ''
+as $$
+declare
+  v_engagement_id   uuid;
+  v_org_id          uuid;
+  v_locale          text;
+  v_base            jsonb;
+  v_member          record;
+  v_existing_id     uuid;
+  v_existing_params jsonb;
+  v_count           integer;
+  v_notified        integer := 0;
+  v_new_recipients  jsonb := '[]'::jsonb;
+begin
+  if p_body_key is null or p_body_key !~ '^client_[a-z_]{1,60}$' then
+    return null;
+  end if;
+  if p_roles is null or jsonb_typeof(p_roles) <> 'array' then return null; end if;
+  if p_params is not null and jsonb_typeof(p_params) <> 'object' then
+    return null;
+  end if;
+
+  -- The delivery's own identity always overrides a same-named caller param.
+  -- The year is read in UTC, the clock the Worker formats DE numbers with.
+  select de.id, de.org_id, o.default_locale,
+         coalesce(p_params, '{}'::jsonb) || jsonb_build_object(
+           'number', de.number,
+           'year', extract(year from de.created_at at time zone 'UTC')::int,
+           'titleAr', de.title_ar,
+           'titleEn', de.title_en
+         )
+    into v_engagement_id, v_org_id, v_locale, v_base
+    from public.design_engagements de
+    join public.organizations o on o.id = de.org_id
+   where de.token_hash = p_hash
+     and (de.share_expires_at is null or de.share_expires_at > now());
+  if not found then return null; end if;
+
+  for v_member in
+    select m.user_id
+      from public.memberships m
+     where m.org_id = v_org_id
+       and m.role::text in (select jsonb_array_elements_text(p_roles))
+       and m.role::text <> 'client'
+     order by m.user_id
+  loop
+    perform pg_advisory_xact_lock(hashtextextended(
+      'notification:' || v_member.user_id::text || ':' || v_engagement_id::text
+        || ':' || p_body_key,
+      0
+    ));
+
+    -- FOR UPDATE re-checks `read_at is null` if the recipient is marking the
+    -- row read right now: a row read meanwhile is not bumped, a new one lands.
+    select n.id, n.params
+      into v_existing_id, v_existing_params
+      from public.notifications n
+     where n.org_id = v_org_id
+       and n.recipient_user_id = v_member.user_id
+       and n.kind = 'client_responded'
+       and n.entity_type = 'engagement'
+       and n.entity_id = v_engagement_id
+       and n.body_key = p_body_key
+       and n.read_at is null
+     order by n.created_at desc
+     limit 1
+     for update;
+
+    if found then
+      v_count := case
+        when jsonb_typeof(v_existing_params -> 'count') = 'number'
+          then floor((v_existing_params ->> 'count')::numeric)::integer
+        else 1
+      end;
+      update public.notifications
+         set params = v_base || jsonb_build_object('count', v_count + 1),
+             created_at = now(),
+             updated_at = now()
+       where id = v_existing_id;
+    else
+      insert into public.notifications
+        (org_id, recipient_user_id, kind, entity_type, entity_id, body_key, params)
+        values (
+          v_org_id, v_member.user_id, 'client_responded', 'engagement',
+          v_engagement_id, p_body_key, v_base || jsonb_build_object('count', 1)
+        );
+      v_new_recipients := v_new_recipients || jsonb_build_array(v_member.user_id);
+    end if;
+    v_notified := v_notified + 1;
+  end loop;
+
+  return jsonb_build_object(
+    'engagement_id', v_engagement_id,
+    'locale', v_locale,
+    'notified_count', v_notified,
+    'new_recipients', v_new_recipients
+  );
 end
 $$;

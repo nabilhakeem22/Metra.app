@@ -182,6 +182,7 @@ function engagement(): DesignEngagement {
     renderManifestHash: null,
     rendersReadyAt: null,
     tokenHash: null,
+    tokenNonce: null,
     shareExpiresAt: null,
   };
 }

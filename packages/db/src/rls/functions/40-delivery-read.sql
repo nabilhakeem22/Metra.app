@@ -182,9 +182,21 @@ $$;
 --     `attested_by` and files.original_name/size_bytes are NOT exposed — an
 --     internal label or filename can itself be sensitive. `files` is joined only to
 --     prove a downloadable object exists; no column of it is returned.
+--   concept_options (Round B, 0056): id and a 1-based `position` for each
+--     released, file-bearing `concept_option` of this delivery, numbered by
+--     (attested_at, id). The portal shows position 1..4 as option A..D, and the
+--     studio's TS (concept-options.ts) numbers the same rows the same way.
+--   concept_choice_id (Round B, 0056): engagement_events.chosen_artifact_id of
+--     the newest CLIENT concept_approval, null when none or when that approval
+--     named no option. An id the client was already shown in concept_options.
+--
+-- READ, NEVER RETURNED: design_engagements.renders_ready_at (Round B). The
+--   design decision verbs in `client_actions` answer ONE render issuance, so
+--   the predicate compares the client's design decisions against it; the value
+--   itself does not cross the wire.
 --
 -- PHYSICALLY OMITTED (never referenced): design_engagements.render_manifest_hash,
---   renders_ready_at, revision_count, free_revision_n, design_revision_count,
+--   revision_count, free_revision_n, design_revision_count,
 --   free_design_revision_n, as_built_due,
 --   concept_locked_at, token_hash, updated_at, org_id, client_id, project_id;
 --   payment_events.method/reference/note/recorded_by/idempotency_key; every
@@ -287,6 +299,12 @@ as $$
               and e.kind in ('concept_approval', 'concept_change_request')
           )
         union all
+        -- Round B: a design decision answers ONE render issuance. Only a
+        -- decision stamped with the current renders_ready_at, or a legacy
+        -- unstamped one made at or after it, closes the pair, so a revision
+        -- re-offers it. With no issuance at all, both sides are NULL and the
+        -- first branch keeps the old one-per-delivery rule. The same predicate
+        -- as app_delivery_respond_by_token's pre-check.
         select 'approve_design', 3
         where de.state = 'final_approval'
           and not exists (
@@ -294,6 +312,12 @@ as $$
             where e.engagement_id = de.id
               and e.actor_channel = 'client'
               and e.kind in ('design_approval', 'design_change_request')
+              and (
+                e.acknowledged_issue_at is not distinct from de.renders_ready_at
+                or (e.acknowledged_issue_at is null
+                    and de.renders_ready_at is not null
+                    and e.decided_at >= de.renders_ready_at)
+              )
           )
         union all
         select 'request_design_changes', 4
@@ -303,6 +327,12 @@ as $$
             where e.engagement_id = de.id
               and e.actor_channel = 'client'
               and e.kind in ('design_approval', 'design_change_request')
+              and (
+                e.acknowledged_issue_at is not distinct from de.renders_ready_at
+                or (e.acknowledged_issue_at is null
+                    and de.renders_ready_at is not null
+                    and e.decided_at >= de.renders_ready_at)
+              )
           )
         union all
         select 'acknowledge_rom', 5
@@ -420,7 +450,38 @@ as $$
         order by a.attested_at desc
         limit 200
       ) dx
-    ), '[]'::jsonb)
+    ), '[]'::jsonb),
+    -- Round B — the concept options the client may CHOOSE between: released,
+    -- file-bearing `concept_option` artifacts of this delivery, numbered
+    -- 1, 2, 3 ... by (attested_at, id). Only the id and the number cross the
+    -- wire; the label and the file name stay internal, as for `documents`.
+    'concept_options', coalesce((
+      select jsonb_agg(
+        jsonb_build_object('id', opt.id, 'position', opt.option_position)
+        order by opt.option_position
+      )
+      from (
+        select a.id,
+          row_number() over (order by a.attested_at, a.id) as option_position
+        from public.engagement_artifacts a
+        join public.files f on f.id = a.file_id and f.org_id = a.org_id
+        where a.engagement_id = de.id
+          and a.org_id = de.org_id
+          and a.client_visible
+          and a.kind = 'concept_option'
+      ) opt
+    ), '[]'::jsonb),
+    -- Round B — which option the client chose: the newest CLIENT concept
+    -- approval's pointer, null when there is none or it named no option.
+    'concept_choice_id', (
+      select e.chosen_artifact_id
+      from public.engagement_events e
+      where e.engagement_id = de.id
+        and e.actor_channel = 'client'
+        and e.kind = 'concept_approval'
+      order by e.decided_at desc
+      limit 1
+    )
   )
   from public.design_engagements de
   join public.organizations o on o.id = de.org_id

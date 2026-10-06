@@ -33,7 +33,8 @@ import { projects } from './projects';
  * CONCEPT revision allowance and `revisionCount` tracks its consumption;
  * `freeDesignRevisionN`/`designRevisionCount` are the SEPARATE 3D revision pair
  * (same default) — the two allowances never draw on each other. `tokenHash` is the
- * sha256 of a future client share token (Step 2+), unique when set.
+ * sha256 of the client share token, unique when set; `tokenNonce` (0056) is the
+ * value that token is re-derived from, only ever present beside a hash.
  */
 export const designEngagements = pgTable(
   'design_engagements',
@@ -74,6 +75,12 @@ export const designEngagements = pgTable(
     renderManifestHash: text('render_manifest_hash'),
     rendersReadyAt: timestamp('renders_ready_at', { withTimezone: true }),
     tokenHash: text('token_hash'),
+    // The per-link random value the raw share token is re-derived from (with the
+    // Worker secret SHARE_LINK_SECRET), so a reminder can carry the link the
+    // client already holds. NULL for a link minted without the secret, for every
+    // link minted before 0056, and whenever there is no link: the CHECK below
+    // refuses a nonce without a hash, so a revoke must clear both.
+    tokenNonce: text('token_nonce'),
     shareExpiresAt: timestamp('share_expires_at', { withTimezone: true }),
   },
   (t) => [
@@ -84,6 +91,10 @@ export const designEngagements = pgTable(
     check(
       'design_engagements_rom_range',
       sql`rom_high is null or rom_low is null or rom_high >= rom_low`,
+    ),
+    check(
+      'design_engagements_token_nonce_needs_hash',
+      sql`token_nonce is null or token_hash is not null`,
     ),
     ...sameOrgFk(t, 'client', clients, { onDelete: 'restrict' }),
     ...sameOrgFk(t, 'project', projects, { onDelete: 'restrict' }),

@@ -63,7 +63,7 @@ grant select, insert, update, delete on public.variation_order_lines to metra_ap
 -- Design Engagements (Step 1): the engagement record is mutable (create + Step 2
 -- state transitions); the transition ledger is append-only (granted below).
 --
--- UPDATE IS COLUMN-LEVEL, and the list is the fifteen DERIVED columns the app
+-- UPDATE IS COLUMN-LEVEL, and the list is the sixteen DERIVED columns the app
 -- actually writes after the row exists — nothing else. `design_engagements` is
 -- the widest mutable table in the machine and most of it is CONTRACTUAL: the
 -- client, the project, the number, the two free-revision ALLOWANCES
@@ -84,6 +84,12 @@ grant select, insert, update, delete on public.variation_order_lines to metra_ap
 -- `design_revision_count` IS in the list and `free_revision_n` /
 -- `free_design_revision_n` are NOT — the first is written live by
 -- `revisions.ts`'s counter factory, the other two are never updated at all.
+--
+-- `token_nonce` (0056) is written by the share-link lifecycle beside
+-- `token_hash`: revoke clears it (the 0056 CHECK refuses a nonce without a
+-- hash), and the re-derivable mint/rotate of Round B sets it. It is granted
+-- in the same apply-rls run that creates the Round B functions, so the owner's
+-- one database step covers the app code that follows it.
 --
 -- The REVOKE removes the earlier table-level UPDATE on already-provisioned
 -- databases; on a fresh one it is a no-op. It must come BEFORE the column grant
@@ -113,6 +119,7 @@ grant update (
   rom_high,
   rom_issued_at,
   token_hash,
+  token_nonce,
   share_expires_at,
   updated_at
 ) on public.design_engagements to metra_app;
@@ -307,6 +314,15 @@ grant execute on function public.app_delivery_document_comments_by_token(text, u
 revoke execute on function public.app_delivery_document_comments_by_token(text, uuid) from public;
 grant execute on function public.app_delivery_comment_by_token(text, uuid, text, text, text, text) to metra_app;
 revoke execute on function public.app_delivery_comment_by_token(text, uuid, text, text, text, text) from public;
+-- Round B (0056): the client's concept choice and the studio notifier. Same
+-- treatment and the same reasons: the choice takes caller-supplied
+-- p_name/p_ip/p_ua written into the append-only ledger, and the notifier writes
+-- notification rows for every member of the delivery's org, so a direct RPC
+-- with the anon key would be a way to spam a studio.
+grant execute on function public.app_delivery_choose_concept_by_token(text, uuid, text, text, text, text) to metra_app;
+revoke execute on function public.app_delivery_choose_concept_by_token(text, uuid, text, text, text, text) from public;
+grant execute on function public.app_delivery_notify_studio_by_token(text, text, jsonb, jsonb) to metra_app;
+revoke execute on function public.app_delivery_notify_studio_by_token(text, text, jsonb, jsonb) from public;
 -- Client Deliverables Step 3 — the payment-settled test and the document-access
 -- rule the portal list and the download route both read. Not token-resolved (their
 -- callers have already proven the token), so they are locked down here for the same
@@ -414,6 +430,14 @@ begin
       );
       execute format(
         'revoke execute on function public.app_delivery_comment_by_token(text, uuid, text, text, text, text) from %I',
+        r
+      );
+      execute format(
+        'revoke execute on function public.app_delivery_choose_concept_by_token(text, uuid, text, text, text, text) from %I',
+        r
+      );
+      execute format(
+        'revoke execute on function public.app_delivery_notify_studio_by_token(text, text, jsonb, jsonb) from %I',
         r
       );
       execute format(
