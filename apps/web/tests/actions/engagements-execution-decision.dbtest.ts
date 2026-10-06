@@ -202,7 +202,11 @@ describe('execution decision — the balance gates BOTH exits (owner-locked)', (
     expect(await stateOf(b.engagementId)).toBe('design_only_handoff');
   });
 
-  it('pay-and-advance: a wrong payment kind is payment_kind_mismatch, NO receipt written', async () => {
+  // Round A1 (owner decision D1): the endings are an explicit choice, never the
+  // side effect of logging a payment. These two cases used to pin that
+  // pay-and-advance fired chooseExecution; they now pin that it refuses BEFORE
+  // writing, whatever the payment kind, and that the explicit path still works.
+  it('pay-and-advance refuses an ending trigger before any kind check, NO receipt written', async () => {
     const { ctx, engagementId } = await setupExecutionDecision(WITH_BALANCE, '20000');
 
     const res = await logPaymentAndAdvanceCore(ctx, engagementId, {
@@ -212,7 +216,7 @@ describe('execution decision — the balance gates BOTH exits (owner-locked)', (
     });
     expect(res).toEqual({
       ok: false,
-      error: 'payment_kind_mismatch',
+      error: 'ending_requires_explicit_choice',
       paymentRecorded: false,
     });
     // Rejected BEFORE recording: only the walk's own 20k gate_b receipt exists.
@@ -220,26 +224,35 @@ describe('execution decision — the balance gates BOTH exits (owner-locked)', (
     expect(await stateOf(engagementId)).toBe('execution_decision');
   });
 
-  it('pay-and-advance accepts kind balance with chooseExecution (MONEY_GUARD_MILESTONE wiring)', async () => {
+  it('logging the balance never picks an ending; the explicit chooseExecution then does', async () => {
     const { ctx, engagementId } = await setupExecutionDecision(WITH_BALANCE, '20000');
 
-    const res = await logPaymentAndAdvanceCore(ctx, engagementId, {
+    const refused = await logPaymentAndAdvanceCore(ctx, engagementId, {
       paymentKind: 'balance',
       amount: '30000',
       advanceTrigger: 'chooseExecution',
     });
-    expect(res.ok).toBe(true);
-    expect(res.paymentRecorded).toBe(true);
-    expect(await paymentCount(engagementId, 'balance')).toBe(1);
+    expect(refused).toMatchObject({ ok: false, error: 'ending_requires_explicit_choice' });
+    expect(await paymentCount(engagementId, 'balance')).toBe(0);
+
+    // The card's record-only path, then the studio's explicit choice.
+    expect(
+      (await recordPaymentCore(ctx, { engagementId, kind: 'balance', amount: '30000' })).ok,
+    ).toBe(true);
+    expect(await stateOf(engagementId)).toBe('execution_decision');
+    expect((await executeTransition(ctx, { engagementId, trigger: 'chooseExecution' })).ok).toBe(
+      true,
+    );
     expect(await stateOf(engagementId)).toBe('execution');
   });
 
-  it('gate preview: primaryTrigger is chooseExecution; chooseDesignOnly sits in the legal secondary set', async () => {
+  it('gate preview: no forward trigger, both endings offered, the balance gate checked', async () => {
     const { ctx, engagementId } = await setupExecutionDecision(WITH_BALANCE, '20000');
 
     const preview = await getEngagementGatePreview(ctx, engagementId);
-    // Advance auto-proposes the execution continuation (owner decision)…
-    expect(preview.primaryTrigger).toBe('chooseExecution');
+    // Nothing is auto-proposed: the studio chooses the ending (owner decision D1).
+    expect(preview.primaryTrigger).toBeNull();
+    expect(preview.endingChoices).toEqual(['chooseDesignOnly', 'chooseExecution']);
     expect(preview.items).toEqual([
       {
         guard: 'balanceCleared',
@@ -248,11 +261,8 @@ describe('execution decision — the balance gates BOTH exits (owner-locked)', (
         amountDue: '30000.0000',
       },
     ]);
-
-    // …while the design-only close stays offered as a legal secondary trigger.
-    const secondary = legalTriggersFrom('execution_decision').filter(
-      (trigger) => trigger !== preview.primaryTrigger,
+    expect(legalTriggersFrom('execution_decision')).toEqual(
+      expect.arrayContaining(['chooseDesignOnly', 'chooseExecution']),
     );
-    expect(secondary).toContain('chooseDesignOnly');
   });
 });
