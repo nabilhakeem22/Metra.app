@@ -58,10 +58,12 @@ export function secondaryTriggersOf(
  * `requestRevision` self-loop, `approveDesign` over the `flagAsBuiltVariance`
  * detour, and the change_triage reconciliation back to final_approval — while a
  * terminal (or not-yet-wired) state yields null. Ties resolve to registry order.
+ * The ENDINGS are excluded too, so `execution_decision` (a choice) yields null:
+ * nothing may pick an ending on the studio's behalf.
  */
 export function resolveForwardTrigger(state: DesignState): Trigger | null {
   const candidates = legalTriggersFrom(state).filter(
-    (trigger) => !NON_FORWARD_TRIGGERS.has(trigger),
+    (trigger) => !NON_FORWARD_TRIGGERS.has(trigger) && !ENDING_TRIGGERS.has(trigger),
   );
   if (candidates.length === 0) return null;
 

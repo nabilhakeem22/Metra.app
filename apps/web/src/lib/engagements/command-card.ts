@@ -13,7 +13,7 @@
 import type { EngagementGatePreview } from './gate-preview';
 import type { GuardKey } from './guards';
 import type { DesignState } from './states';
-import { TRANSITIONS } from './transitions';
+import { TRANSITIONS, type Trigger } from './transitions';
 import { PAYLOAD_TRIGGERS } from './ui';
 
 /**
@@ -39,7 +39,7 @@ export type CommandCardMode = 'closed' | 'ready' | 'blockedStudio' | 'blockedCli
 /** The single action-surface view the cockpit command card renders. */
 export interface CommandCardView {
   mode: CommandCardMode;
-  /** The state Advance would move to (only in 'ready'); null otherwise. */
+  /** The state Advance would move to (only in 'ready' with a forward trigger); null otherwise. */
   nextPhaseState: DesignState | null;
   /** Advance is offered ONLY in the all-clear 'ready' mode AND the role may fire it. */
   advanceEnabled: boolean;
@@ -51,26 +51,59 @@ export interface CommandCardView {
   primaryBlocker: GuardKey | null;
   /** Show the "nudge client" affordance (only when the client is the sole blocker). */
   showNudge: boolean;
+  /** The endings the card offers as equal choices (set in every non-closed mode). */
+  endingChoices: Trigger[];
+  /** The ending buttons are enabled ONLY in 'ready' AND the role may fire them. */
+  endingsEnabled: boolean;
+}
+
+type CommandCardPreview = Pick<EngagementGatePreview, 'primaryTrigger' | 'endingChoices' | 'items'>;
+
+/** Every move forward the card may offer: the forward trigger, or the endings. */
+export function forwardMovesOf(
+  preview: Pick<EngagementGatePreview, 'primaryTrigger' | 'endingChoices'>,
+): Trigger[] {
+  return preview.primaryTrigger ? [preview.primaryTrigger] : [...preview.endingChoices];
+}
+
+function blockedView(
+  mode: 'blockedStudio' | 'blockedClient',
+  unmetGuards: GuardKey[],
+  primaryBlocker: GuardKey,
+  endingChoices: Trigger[],
+): CommandCardView {
+  return {
+    mode,
+    nextPhaseState: null,
+    advanceEnabled: false,
+    advanceNeedsForm: false,
+    blockingGuards: unmetGuards,
+    primaryBlocker,
+    showNudge: mode === 'blockedClient',
+    endingChoices,
+    endingsEnabled: false,
+  };
 }
 
 /**
  * Derive the command-card view from the server gate preview. Rules:
- * - terminal, or no forward trigger → 'closed' (no Advance, no nudge).
- * - all forward guards met → 'ready' (Advance enabled iff the role may fire it;
- *   `advanceNeedsForm` = the forward trigger carries a payload).
- * - ≥1 unmet guard that is NOT client-actionable → 'blockedStudio' (Advance
- *   disabled; `primaryBlocker` = the first such studio guard).
- * - all unmet guards are client-actionable → 'blockedClient' (Advance disabled,
- *   nudge shown; `primaryBlocker` = the first unmet guard).
- * `advanceEnabled` is false in every non-'ready' mode.
+ * - terminal, or neither a forward trigger nor an ending → 'closed'.
+ * - all forward guards met → 'ready' (Advance enabled iff there is a forward
+ *   trigger and the role may fire it; at a choice state the endings are enabled
+ *   instead, and Advance stays off).
+ * - ≥1 unmet guard that is NOT client-actionable → 'blockedStudio'
+ *   (`primaryBlocker` = the first such studio guard).
+ * - all unmet guards are client-actionable → 'blockedClient' (nudge shown;
+ *   `primaryBlocker` = the first unmet guard).
+ * `advanceEnabled` and `endingsEnabled` are false in every non-'ready' mode.
  */
 export function deriveCommandCard(
-  preview: EngagementGatePreview,
+  preview: CommandCardPreview,
   opts: { canAdvance: boolean; isTerminal: boolean },
 ): CommandCardView {
-  const { primaryTrigger, items } = preview;
+  const { primaryTrigger, endingChoices, items } = preview;
 
-  if (opts.isTerminal || primaryTrigger === null) {
+  if (opts.isTerminal || (primaryTrigger === null && endingChoices.length === 0)) {
     return {
       mode: 'closed',
       nextPhaseState: null,
@@ -79,6 +112,8 @@ export function deriveCommandCard(
       blockingGuards: [],
       primaryBlocker: null,
       showNudge: false,
+      endingChoices: [],
+      endingsEnabled: false,
     };
   }
 
@@ -87,39 +122,23 @@ export function deriveCommandCard(
   if (unmetGuards.length === 0) {
     return {
       mode: 'ready',
-      nextPhaseState: TRANSITIONS[primaryTrigger].to,
-      advanceEnabled: opts.canAdvance,
-      advanceNeedsForm: PAYLOAD_TRIGGERS.has(primaryTrigger),
+      nextPhaseState: primaryTrigger ? TRANSITIONS[primaryTrigger].to : null,
+      advanceEnabled: opts.canAdvance && primaryTrigger !== null,
+      advanceNeedsForm: primaryTrigger !== null && PAYLOAD_TRIGGERS.has(primaryTrigger),
       blockingGuards: [],
       primaryBlocker: null,
       showNudge: false,
+      endingChoices,
+      endingsEnabled: opts.canAdvance && endingChoices.length > 0,
     };
   }
 
   const studioBlockers = unmetGuards.filter(
     (guard) => !CLIENT_ACTIONABLE_GUARDS.has(guard),
   );
-
   if (studioBlockers.length > 0) {
-    return {
-      mode: 'blockedStudio',
-      nextPhaseState: null,
-      advanceEnabled: false,
-      advanceNeedsForm: false,
-      blockingGuards: unmetGuards,
-      primaryBlocker: studioBlockers[0],
-      showNudge: false,
-    };
+    return blockedView('blockedStudio', unmetGuards, studioBlockers[0], endingChoices);
   }
-
   // Every unmet guard is client-actionable — the studio is done; nudge the client.
-  return {
-    mode: 'blockedClient',
-    nextPhaseState: null,
-    advanceEnabled: false,
-    advanceNeedsForm: false,
-    blockingGuards: unmetGuards,
-    primaryBlocker: unmetGuards[0],
-    showNudge: true,
-  };
+  return blockedView('blockedClient', unmetGuards, unmetGuards[0], endingChoices);
 }

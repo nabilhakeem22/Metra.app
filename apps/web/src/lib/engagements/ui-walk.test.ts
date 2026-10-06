@@ -14,7 +14,7 @@ import { CATEGORY_WRITE_KIND } from './deliverable-files';
 // precisely so this test can call the same function `gate-preview` calls; a
 // replica here could drift and hand back exactly the false confidence this file
 // exists to prevent.
-import { resolveForwardTrigger } from './forward-trigger';
+import { endingChoicesFrom, resolveForwardTrigger } from './forward-trigger';
 import { GUARDS, type GuardFacts, type GuardKey } from './guards';
 import { inlineDropzoneCategory } from './inline-dropzone-category';
 import {
@@ -417,9 +417,11 @@ describe('the whole state space is accounted for', () => {
       const terminal = isTerminal(state);
       const trigger = resolveForwardTrigger(state);
       const declared = STATES_INTENTIONALLY_WITHOUT_FORWARD_TRIGGER.has(state);
+      // A choice state offers its endings as explicit buttons instead of Advance.
+      const offersEndings = endingChoicesFrom(state).length > 0;
 
       expect(
-        terminal || trigger !== null || declared,
+        terminal || trigger !== null || offersEndings || declared,
         `State "${state}" is not terminal, resolves NO forward trigger, and is not listed in STATES_INTENTIONALLY_WITHOUT_FORWARD_TRIGGER. The cockpit would render a card with no next action and no way out. Wire a forward transition or declare the dead end on purpose.`,
       ).toBe(true);
     });

@@ -2,6 +2,7 @@ import { getLocale } from 'next-intl/server';
 import { notFound } from 'next/navigation';
 import { requireOrg } from '@/lib/auth/require-org';
 import { pickLocale } from '@/lib/i18n/pick-locale';
+import { forwardMovesOf } from '@/lib/engagements/command-card';
 import { computeCommercialPulse } from '@/lib/engagements/pulse';
 import { canRunTrigger, legalTriggersFrom } from '@/lib/engagements/ui';
 import { can } from '@/lib/permissions/can';
@@ -47,10 +48,12 @@ export default async function EngagementDetailPage({
   // The studio resolves client payment claims from the §2.2 `engagements_finance`
   // create cell (the same cell that records a payment); the panel is hidden otherwise.
   const canResolveClaims = can(ctx.role, 'engagements_finance', 'create');
-  // May this role fire the hero's forward-advance trigger? (The server action
-  // re-checks — this only decides whether to OFFER the CTA.)
+  // May this role fire the card's forward moves (the forward trigger, or both
+  // endings at the choice)? The server action re-checks; this only decides
+  // whether to OFFER them.
+  const forwardMoves = forwardMovesOf(gatePreview);
   const canAdvance =
-    gatePreview.primaryTrigger !== null && canRunTrigger(ctx.role, gatePreview.primaryTrigger);
+    forwardMoves.length > 0 && forwardMoves.every((trigger) => canRunTrigger(ctx.role, trigger));
 
   return (
     <div className="space-y-6">

@@ -6,7 +6,13 @@ import { CONCEPT_OPTION_MAX } from './concept-options';
 function preview(
   overrides: Partial<EngagementGatePreview> = {},
 ): EngagementGatePreview {
-  return { primaryTrigger: 'confirmAndPayDeposit', items: [], allClear: false, ...overrides };
+  return {
+    primaryTrigger: 'confirmAndPayDeposit',
+    endingChoices: [],
+    items: [],
+    allClear: false,
+    ...overrides,
+  };
 }
 
 const DEPOSIT_DUE: EngagementGatePreview['items'][number] = {

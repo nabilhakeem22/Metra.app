@@ -3,6 +3,7 @@ import {
   ENDING_TRIGGERS,
   endingChoicesFrom,
   isEndingTrigger,
+  resolveForwardTrigger,
   secondaryTriggersOf,
 } from './forward-trigger';
 import { DESIGN_STATES } from './states';
@@ -49,5 +50,18 @@ describe('secondaryTriggersOf', () => {
     expect(
       secondaryTriggersOf(['optionsReady', 'designChangeRaised', 'abandon'], 'optionsReady'),
     ).toEqual(['designChangeRaised', 'abandon']);
+  });
+});
+
+describe('resolveForwardTrigger never picks an ending', () => {
+  it('is null at execution_decision', () => {
+    expect(resolveForwardTrigger('execution_decision')).toBeNull();
+  });
+
+  it('returns neither ending for any of the 16 states', () => {
+    for (const state of DESIGN_STATES) {
+      const trigger = resolveForwardTrigger(state);
+      expect(trigger === null || !isEndingTrigger(trigger), state).toBe(true);
+    }
   });
 });

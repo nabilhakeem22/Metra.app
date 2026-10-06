@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { deriveCommandCard } from './command-card';
+import { deriveCommandCard, forwardMovesOf } from './command-card';
 import type { EngagementGatePreview, GateChecklistItem } from './gate-preview';
 import type { GuardKey } from './guards';
 import type { Trigger } from './transitions';
@@ -12,7 +12,18 @@ function preview(
   primaryTrigger: Trigger | null,
   items: GateChecklistItem[],
 ): EngagementGatePreview {
-  return { primaryTrigger, items, allClear: items.every((i) => i.ok) };
+  return { primaryTrigger, endingChoices: [], items, allClear: items.every((i) => i.ok) };
+}
+
+/** The execution_decision preview: no forward trigger, the two endings, the balance gate. */
+function choicePreview(balanceCleared: boolean): EngagementGatePreview {
+  const items = [item('balanceCleared', balanceCleared, balanceCleared ? null : '2000.0000')];
+  return {
+    primaryTrigger: null,
+    endingChoices: ['chooseDesignOnly', 'chooseExecution'],
+    items,
+    allClear: balanceCleared,
+  };
 }
 
 describe('deriveCommandCard', () => {
@@ -135,5 +146,47 @@ describe('deriveCommandCard', () => {
       expect(view.mode).not.toBe('ready');
       expect(view.blockingGuards.length).toBeGreaterThan(0);
     }
+  });
+});
+
+describe('deriveCommandCard at the execution_decision choice', () => {
+  it('is ready with the endings enabled and Advance off once the balance clears', () => {
+    const view = deriveCommandCard(choicePreview(true), { canAdvance: true, isTerminal: false });
+    expect(view.mode).toBe('ready');
+    expect(view.advanceEnabled).toBe(false);
+    expect(view.advanceNeedsForm).toBe(false);
+    expect(view.endingsEnabled).toBe(true);
+    expect(view.nextPhaseState).toBeNull();
+    expect(view.endingChoices).toEqual(['chooseDesignOnly', 'chooseExecution']);
+  });
+
+  it('keeps the endings disabled for a role that may not fire them', () => {
+    const view = deriveCommandCard(choicePreview(true), { canAdvance: false, isTerminal: false });
+    expect(view.endingsEnabled).toBe(false);
+  });
+
+  it('is blockedClient (not closed) while the balance is unpaid, endings off', () => {
+    const view = deriveCommandCard(choicePreview(false), { canAdvance: true, isTerminal: false });
+    expect(view.mode).toBe('blockedClient');
+    expect(view.endingsEnabled).toBe(false);
+    expect(view.endingChoices).toEqual(['chooseDesignOnly', 'chooseExecution']);
+  });
+
+  it('is closed at a terminal state even with endings in the preview', () => {
+    const view = deriveCommandCard(choicePreview(true), { canAdvance: true, isTerminal: true });
+    expect(view.mode).toBe('closed');
+    expect(view.endingChoices).toEqual([]);
+  });
+});
+
+describe('forwardMovesOf', () => {
+  it('is the forward trigger when there is one, else the endings', () => {
+    expect(forwardMovesOf({ primaryTrigger: 'rendersReady', endingChoices: [] })).toEqual([
+      'rendersReady',
+    ]);
+    expect(
+      forwardMovesOf({ primaryTrigger: null, endingChoices: ['chooseDesignOnly', 'chooseExecution'] }),
+    ).toEqual(['chooseDesignOnly', 'chooseExecution']);
+    expect(forwardMovesOf({ primaryTrigger: null, endingChoices: [] })).toEqual([]);
   });
 });
