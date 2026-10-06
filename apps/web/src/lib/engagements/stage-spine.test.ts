@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { DESIGN_STATES, type DesignState } from './states';
-import { SPINE_NODES, SPINE_STAGES, spinePosition } from './stage-spine';
+import { SPINE_NODES, SPINE_STAGES, spineStageKeyOf, spinePosition } from './stage-spine';
 import { TRANSITIONS } from './transitions';
 import type { GuardKey } from './guards';
 
@@ -141,6 +141,15 @@ describe('spinePosition', () => {
     expect(spinePosition('abandoned')).toMatchObject({ closed: true, atGate: null });
     for (const state of ['closed_design_only', 'execution'] as const) {
       expect(spinePosition(state)).toMatchObject({ allComplete: true, atGate: null });
+    }
+  });
+});
+
+describe('spineStageKeyOf', () => {
+  it('names a spine stage for every state, the one spinePosition indexes', () => {
+    for (const state of DESIGN_STATES) {
+      expect(SPINE_STAGES).toContain(spineStageKeyOf(state));
+      expect(SPINE_STAGES.indexOf(spineStageKeyOf(state))).toBe(spinePosition(state).index);
     }
   });
 });

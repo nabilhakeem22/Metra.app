@@ -42,6 +42,7 @@ export default async function EngagementsPage({
         projectOptions={projectOptions}
         canCreate={canCreate}
         openCreateOnArrival={openCreate === '1'}
+        nowIso={new Date().toISOString()}
       />
     </div>
   );

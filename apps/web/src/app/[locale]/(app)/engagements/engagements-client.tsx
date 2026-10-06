@@ -1,22 +1,19 @@
 'use client';
 
 import { Compass, Plus } from 'lucide-react';
-import { useLocale, useTranslations } from 'next-intl';
+import { useTranslations } from 'next-intl';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { useOpenOnArrival } from '@/hooks/use-open-on-arrival';
-import { Link } from '@/i18n/routing';
-import { docYear, formatDocNumber } from '@/lib/format/doc-number';
-import { pickLocale } from '@/lib/i18n/pick-locale';
 import type { ClientOption } from '@/lib/clients/queries';
 import type { EngagementListRow } from '@/lib/engagements/queries';
 import {
   EngagementCreateForm,
   type ProjectOption,
 } from './engagement-create-form';
-import { StateBadge } from './state-badge';
+import { EngagementsList } from './engagements-list';
 
 export function EngagementsClient({
   items,
@@ -24,6 +21,7 @@ export function EngagementsClient({
   projectOptions,
   canCreate,
   openCreateOnArrival,
+  nowIso,
 }: {
   items: EngagementListRow[];
   clientOptions: ClientOption[];
@@ -31,16 +29,17 @@ export function EngagementsClient({
   canCreate: boolean;
   /** Reached through `/engagements?new=1`: open the create sheet once. */
   openCreateOnArrival: boolean;
+  /** The server's "now", so every row's age and the hydrated page agree. */
+  nowIso: string;
 }) {
   const t = useTranslations('engagements');
-  const locale = useLocale();
   const [creating, setCreating] = useState(false);
   useOpenOnArrival(canCreate && openCreateOnArrival, () => setCreating(true));
 
   const newButton = canCreate && (
     <Button onClick={() => setCreating(true)}>
       <Plus className="size-4" aria-hidden />
-      {t('new')}
+      {t('startDelivery')}
     </Button>
   );
 
@@ -62,54 +61,7 @@ export function EngagementsClient({
       ) : (
         <Card>
           <CardContent className="p-0">
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b text-xs text-muted-foreground">
-                    <th className="px-4 py-2 text-start font-medium">{t('number')}</th>
-                    <th className="px-4 py-2 text-start font-medium">{t('engagement')}</th>
-                    <th className="px-4 py-2 text-start font-medium">{t('client')}</th>
-                    <th className="px-4 py-2 text-start font-medium">{t('project')}</th>
-                    <th className="px-4 py-2 text-start font-medium">{t('state.created')}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {items.map((e) => (
-                    <tr key={e.id} className="border-b last:border-0 hover:bg-muted/40">
-                      <td className="px-4 py-2 font-mono text-xs" dir="ltr">
-                        <Link
-                          href={`/engagements/${e.id}`}
-                          className="text-primary hover:underline"
-                        >
-                          {formatDocNumber('DE', e.number, docYear(null, e.createdAt))}
-                        </Link>
-                      </td>
-                      <td className="px-4 py-2">
-                        {pickLocale({ nameAr: e.titleAr, nameEn: e.titleEn }, 'name', locale)
-                          .value || '—'}
-                      </td>
-                      <td className="px-4 py-2 text-muted-foreground">
-                        {pickLocale(
-                          { nameAr: e.clientNameAr, nameEn: e.clientNameEn },
-                          'name',
-                          locale,
-                        ).value || '—'}
-                      </td>
-                      <td className="px-4 py-2 text-muted-foreground">
-                        {pickLocale(
-                          { nameAr: e.projectNameAr, nameEn: e.projectNameEn },
-                          'name',
-                          locale,
-                        ).value || '—'}
-                      </td>
-                      <td className="px-4 py-2">
-                        <StateBadge state={e.state} showStage />
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <EngagementsList items={items} now={new Date(nowIso)} />
           </CardContent>
         </Card>
       )}

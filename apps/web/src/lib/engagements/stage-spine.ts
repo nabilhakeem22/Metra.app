@@ -90,6 +90,11 @@ const STATE_STAGE: Record<DesignState, SpineStageKey> = {
   abandoned: 'proposal',
 };
 
+/** The spine stage a machine state sits in, by name (the list and the badge say it in words). */
+export function spineStageKeyOf(state: DesignState): SpineStageKey {
+  return STATE_STAGE[state];
+}
+
 /** Where the studio is on the spine. */
 export interface SpinePosition {
   /** 0-based index into `SPINE_STAGES`. */

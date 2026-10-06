@@ -262,11 +262,7 @@
     "deliveries": {
       "title": "Deliveries in flight",
       "viewAll": "View all",
-      "empty": "Nothing in flight. Every delivery is either finished or not started yet.",
-      "waitingClient": "Waiting on the client",
-      "waitingStudio": "Yours to move",
-      "today": "today",
-      "sinceDays": "{count, plural, one {{n} day} other {{n} days}}"
+      "empty": "Nothing in flight. Every delivery is either finished or not started yet."
     }
   },
   "team": {
@@ -1502,12 +1498,11 @@
     "title": "Deliveries",
     "subtitle": "Design deliveries from brief to sign-off.",
     "empty": "No deliveries yet. Create one to start the design flow.",
-    "new": "New delivery",
+    "startDelivery": "Start delivery",
     "engagement": "Delivery",
     "number": "Number",
     "client": "Client",
     "project": "Project",
-    "stage": "Stage {n}",
     "backToList": "Back to deliveries",
     "offPlan": {
       "existing": "Existing unit",
@@ -2102,6 +2097,21 @@
       "chipLocked": "Opens for the client once the design fee is agreed and paid",
       "viewBoq": "View BOQ",
       "editNewVersion": "Edit and send a new version"
+    },
+    "list": {
+      "status": "Status",
+      "whoseMove": "Whose move",
+      "lastChange": "Last change"
+    },
+    "age": {
+      "today": "today",
+      "sinceDays": "{count, plural, one {{n} day} other {{n} days}}"
+    },
+    "whoseMove": {
+      "studio": "Your move",
+      "client": "Waiting on the client",
+      "confirmPayment": "Payment to confirm",
+      "closed": "Closed"
     }
   },
   "delivery": {

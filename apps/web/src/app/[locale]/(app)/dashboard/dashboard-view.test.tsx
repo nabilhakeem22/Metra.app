@@ -36,6 +36,7 @@ function delivery(id: string): DashboardDelivery {
     projectNameEn: 'Maadi Flat',
     projectNameAr: null,
     updatedAt: '2026-06-01T00:00:00.000Z',
+    whoseMove: 'client',
   };
 }
 

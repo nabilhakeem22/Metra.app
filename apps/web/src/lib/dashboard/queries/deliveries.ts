@@ -5,8 +5,10 @@ import 'server-only';
 import { clients, designEngagements, projects } from '@metra/db';
 import { asc, eq, notInArray, sql } from 'drizzle-orm';
 import { withOrgContext, type OrgContext } from '@/lib/db/context';
+import { loadWhoseMovesInTx } from '@/lib/engagements/queries/whose-move';
 import type { DesignState } from '@/lib/engagements/states';
 import { TERMINAL_STATES } from '@/lib/engagements/states';
+import type { WhoseMove } from '@/lib/engagements/whose-move';
 
 /** The three off-ramps, as the array drizzle's `notInArray` wants. */
 const TERMINAL = [...TERMINAL_STATES];
@@ -28,6 +30,8 @@ export interface DashboardDelivery {
   projectNameAr: string | null;
   /** Last write of any kind. ISO. */
   updatedAt: string;
+  /** Whose move it is, by the delivery page's own rule (not guessed from the state name). */
+  whoseMove: WhoseMove;
 }
 
 /**
@@ -64,7 +68,13 @@ export function listDashboardDeliveries(
       .where(notInArray(designEngagements.state, TERMINAL))
       .orderBy(asc(designEngagements.updatedAt))
       .limit(limit);
-    return rows.map((r) => ({ ...r, updatedAt: r.updatedAt.toISOString() }));
+    // A constant ≤ 7 reads for the whole capped list, in the same transaction.
+    const moves = await loadWhoseMovesInTx(tx, ctx.role, rows);
+    return rows.map((r) => ({
+      ...r,
+      updatedAt: r.updatedAt.toISOString(),
+      whoseMove: moves.get(r.id) ?? 'studio',
+    }));
   });
 }
 
