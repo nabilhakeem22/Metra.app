@@ -87,20 +87,20 @@ export function ProjectDeliveryPanel({
             aria-hidden
           />
           <div className="min-w-0">
-            <p className="text-xs text-muted-foreground">{t('heading')}</p>
+            <p className="text-caption text-muted-foreground">{t('heading')}</p>
             {delivery ? (
               <div className="mt-1 flex flex-wrap items-center gap-2">
-                <span className="font-mono text-sm" dir="ltr">
+                <span className="font-mono text-body" dir="ltr">
                   {formatDocNumber('DE', delivery.number, docYear(null, delivery.createdAt))}
                 </span>
-                {title && <span className="truncate text-sm">{title}</span>}
+                {title && <span className="truncate text-body">{title}</span>}
                 <StateBadge state={delivery.state} showStage />
               </div>
             ) : (
-              <p className="mt-1 text-sm text-muted-foreground">{t('none')}</p>
+              <p className="mt-1 text-body text-muted-foreground">{t('none')}</p>
             )}
             {atLimit && (
-              <p className="mt-1 text-xs text-muted-foreground">{t('atLimit')}</p>
+              <p className="mt-1 text-caption text-muted-foreground">{t('atLimit')}</p>
             )}
           </div>
         </div>

@@ -55,14 +55,14 @@ export function EngagementDetailClient(props: EngagementDetailProps) {
 
   return (
     <div className="space-y-4">
-      <Link href="/engagements" className="text-sm text-primary hover:underline">
+      <Link href="/engagements" className="text-body text-primary hover:underline">
         {t('backToList')}
       </Link>
 
       <EngagementCommandCard {...commandCardPropsOf(props, { pending, runAction })} />
 
       {error && (
-        <p className="text-sm text-destructive" role="alert">
+        <p className="text-body text-destructive" role="alert">
           {resolveActionError(error, te)}
         </p>
       )}

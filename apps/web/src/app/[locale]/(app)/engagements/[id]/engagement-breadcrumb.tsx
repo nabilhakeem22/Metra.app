@@ -23,7 +23,7 @@ export async function EngagementBreadcrumb({
   return (
     <nav
       aria-label="breadcrumb"
-      className="flex flex-wrap items-center gap-1.5 text-sm text-muted-foreground"
+      className="flex flex-wrap items-center gap-1.5 text-body text-muted-foreground"
     >
       <Link href="/clients" className="hover:text-foreground">
         {tb('clients')}

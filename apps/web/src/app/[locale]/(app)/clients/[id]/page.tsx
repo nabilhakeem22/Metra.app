@@ -89,16 +89,16 @@ export default async function ClientProfilePage({
       <div className="space-y-1">
         <Link
           href="/clients"
-          className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+          className="inline-flex items-center gap-1 text-body text-muted-foreground hover:text-foreground"
         >
           <ArrowLeft className="size-3" aria-hidden />
           {t('back')}
         </Link>
-        <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight">
+        <h1 className="flex items-center gap-2 text-heading font-bold">
           <span aria-hidden className="h-5 w-[3px] rounded-full bg-brand" />
           {name}
         </h1>
-        <p className="text-sm text-muted-foreground">{tt(client.type)}</p>
+        <p className="text-body text-muted-foreground">{tt(client.type)}</p>
       </div>
 
       <ProfileTabs clientId={id} active={tab} />

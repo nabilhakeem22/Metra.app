@@ -42,13 +42,13 @@ export function BoqSheetHeader({
         <p className="flex items-center gap-2 font-bold text-[color:var(--text)]">
           <span dir="auto">{boq.title}</span>
           <span
-            className="rounded-pill px-2 py-1 text-[11px] font-semibold uppercase"
+            className="rounded-pill px-2 py-1 text-caption font-semibold uppercase"
             style={issued ? ISSUED_PILL : DRAFT_PILL}
           >
             {issued ? t('statusIssued') : t('statusDraft')}
           </span>
         </p>
-        <p className="mt-1 text-sm text-[color:var(--text-muted)]">
+        <p className="mt-1 text-body text-[color:var(--text-muted)]">
           <span dir="ltr">{boq.documentNumber}</span> ·{' '}
           {t('lineCount', { count: visibleCount })}
         </p>
@@ -63,7 +63,7 @@ export function BoqSheetHeader({
             onChange={(event) => onQueryChange(event.target.value)}
             placeholder={t('find')}
             aria-label={t('find')}
-            className="w-full border-0 bg-transparent p-0 text-sm text-[color:var(--text)] outline-none"
+            className="w-full border-0 bg-transparent p-0 text-body text-[color:var(--text)] outline-none"
           />
         </label>
         {actions}
@@ -89,7 +89,7 @@ export function BoqSheetFooter({
   const t = useTranslations('projects.profile.boq');
   const saving = savingCount > 0;
   return (
-    <div className="flex flex-wrap items-center gap-3 border-t border-[color:var(--rule)] p-3 text-[13px]">
+    <div className="flex flex-wrap items-center gap-3 border-t border-[color:var(--rule)] p-3 text-small">
       <button
         type="button"
         onClick={onAddSection}
@@ -109,7 +109,7 @@ export function BoqSheetFooter({
         />
         {saving ? t('saving') : t('allSaved')}
       </span>
-      <span className="ms-auto text-xs text-[color:var(--text-faint)]">
+      <span className="ms-auto text-caption text-[color:var(--text-faint)]">
         {t('keyboardHint')}
       </span>
     </div>

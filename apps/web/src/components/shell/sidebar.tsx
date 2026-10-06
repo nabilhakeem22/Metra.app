@@ -34,7 +34,7 @@ const ACTIVE_ITEM_STYLE: CSSProperties = {
 
 // Base geometry shared by every nav row (link, disabled, action, disclosure).
 const ITEM_CLASS =
-  'group flex items-center gap-[10px] rounded-[13px] px-[11px] py-[9px] text-sm outline-none focus-ring-brand transition-colors motion-reduce:transition-none';
+  'group flex items-center gap-[10px] rounded-item px-[11px] py-[9px] text-body outline-none focus-ring-brand transition-colors motion-reduce:transition-none';
 
 export function Sidebar({
   onNavigate,
@@ -49,7 +49,7 @@ export function Sidebar({
 
   return (
     <aside
-      className={cn('glass flex h-full flex-col', className)}
+      className={cn('glass flex h-full flex-col rounded-frame', className)}
       style={{
         inlineSize: 'var(--sidebar-w)',
         flex: 'none',
@@ -72,8 +72,7 @@ export function Sidebar({
           <div key={group.groupKey} className="flex flex-col gap-[3px]">
             {group.labelKey && (
               <span
-                className="px-[11px] pb-1 text-[11px] font-bold uppercase"
-                style={{ letterSpacing: '.04em', color: 'var(--text-faint)' }}
+                className="px-[11px] pb-1 text-caption font-bold uppercase tracking-[0.04em] text-[color:var(--text-faint)]"
               >
                 {nav(group.labelKey)}
               </span>
@@ -99,7 +98,7 @@ export function Sidebar({
                 const icon = (
                   <span
                     className={cn(
-                      'inline-flex size-[22px] shrink-0 items-center justify-center rounded-[7px]',
+                      'inline-flex size-[22px] shrink-0 items-center justify-center rounded-full',
                       active && 'bg-[color:var(--brand-tint)]',
                     )}
                   >
@@ -203,7 +202,7 @@ export function Sidebar({
                         <Icon width={17} height={17} className="shrink-0" aria-hidden />
                         <span className="flex-1 truncate">{nav(item.key)}</span>
                         <span
-                          className="rounded-full px-2 py-0.5 text-[10px] font-medium"
+                          className="rounded-pill px-2 py-0.5 text-caption font-medium"
                           style={{
                             background: 'var(--track)',
                             color: 'var(--text-faint)',

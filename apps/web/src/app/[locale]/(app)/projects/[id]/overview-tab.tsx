@@ -39,8 +39,8 @@ export async function OverviewTab({
   const Stat = ({ label, value }: { label: string; value: string }) => (
     <Card>
       <CardContent className="py-4">
-        <p className="text-xs text-muted-foreground">{label}</p>
-        <p className="mt-1 text-2xl font-semibold" dir="ltr">
+        <p className="text-caption text-muted-foreground">{label}</p>
+        <p className="mt-1 text-heading font-semibold" dir="ltr">
           {value}
         </p>
       </CardContent>
@@ -53,8 +53,8 @@ export async function OverviewTab({
         <Stat label={t('status')} value={ts(overview.status)} />
         <Card>
           <CardContent className="py-4">
-            <p className="text-xs text-muted-foreground">{t('currentStage')}</p>
-            <p className="mt-1 text-lg font-semibold">{curName}</p>
+            <p className="text-caption text-muted-foreground">{t('currentStage')}</p>
+            <p className="mt-1 text-title font-semibold">{curName}</p>
           </CardContent>
         </Card>
         <Stat label={t('progress')} value={formatPercent(overview.overallProgress, locale)} />
@@ -66,8 +66,8 @@ export async function OverviewTab({
 
       <Card>
         <CardContent className="py-4">
-          <p className="text-xs text-muted-foreground">{t('stages')}</p>
-          <p className="mt-1 text-sm">
+          <p className="text-caption text-muted-foreground">{t('stages')}</p>
+          <p className="mt-1 text-body">
             {t('stagesDone', {
               done: overview.doneStages,
               total: overview.totalStages,
@@ -78,7 +78,7 @@ export async function OverviewTab({
 
       <Card>
         <CardContent className="p-0">
-          <h2 className="border-b px-4 py-2.5 text-sm font-semibold">
+          <h2 className="border-b px-4 py-2.5 text-body font-semibold">
             {t('recentActivity')}
           </h2>
           {overview.recentActivity.length === 0 ? (
@@ -90,10 +90,10 @@ export async function OverviewTab({
               {overview.recentActivity.map((a) => (
                 <li
                   key={a.id}
-                  className="flex items-center justify-between px-4 py-2.5 text-sm"
+                  className="flex items-center justify-between px-4 py-2.5 text-body"
                 >
                   <span>{tk(a.kind)}</span>
-                  <span className="text-xs text-muted-foreground" dir="ltr">
+                  <span className="text-caption text-muted-foreground" dir="ltr">
                     {formatDate(a.createdAt, locale)}
                   </span>
                 </li>

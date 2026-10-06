@@ -38,7 +38,7 @@ export function AuthShell({ children, showValueProp, className }: AuthShellProps
       <div
         className={cn(
           // Commit to elevation (shadow), not a border + wide shadow together.
-          'grid w-full max-w-4xl overflow-hidden rounded-2xl bg-card shadow-card',
+          'grid w-full max-w-4xl overflow-hidden rounded-panel bg-card shadow-card',
           showValueProp && 'lg:grid-cols-2',
           className,
         )}
@@ -57,12 +57,12 @@ export function AuthShell({ children, showValueProp, className }: AuthShellProps
               tone="reverse"
               className="text-primary-foreground"
             />
-            <p className="text-balance text-[26px] font-semibold leading-snug tracking-[-0.02em]">
+            <p className="text-balance text-heading font-semibold leading-snug">
               {home('tagline')}
             </p>
             {/* ONE supporting line, not two. The concrete promise earns the
                 space; the abstract restatement of it does not. */}
-            <p className="text-[15px] leading-relaxed text-primary-foreground/85">
+            <p className="text-body leading-relaxed text-primary-foreground/85">
               {home('intro')}
             </p>
           </div>

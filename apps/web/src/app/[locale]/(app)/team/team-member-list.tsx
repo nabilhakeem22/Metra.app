@@ -53,19 +53,19 @@ export function TeamMemberList({
             return (
               <div
                 key={m.membershipId}
-                className="flex flex-wrap items-center justify-between gap-3 rounded-xl border p-3"
+                className="flex flex-wrap items-center justify-between gap-3 rounded-item border p-3"
               >
                 <div className="min-w-0">
-                  <p className="truncate text-sm font-medium">
+                  <p className="truncate text-body font-medium">
                     {m.fullName || m.email || t('unknownUser')}
                     {isSelf && (
-                      <span className="ms-2 rounded-full bg-muted px-2 py-0.5 text-[10px] text-muted-foreground">
+                      <span className="ms-2 rounded-pill bg-muted px-2 py-0.5 text-caption text-muted-foreground">
                         {t('you')}
                       </span>
                     )}
                   </p>
                   {m.email && m.fullName && (
-                    <p className="truncate text-xs text-muted-foreground" dir="ltr">
+                    <p className="truncate text-caption text-muted-foreground" dir="ltr">
                       {m.email}
                     </p>
                   )}
@@ -91,7 +91,7 @@ export function TeamMemberList({
                       </SelectContent>
                     </Select>
                   ) : (
-                    <span className="rounded-full bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary">
+                    <span className="rounded-pill bg-primary/10 px-2.5 py-1 text-caption font-medium text-primary">
                       {roleLabel(m.role)}
                     </span>
                   )}
@@ -113,7 +113,7 @@ export function TeamMemberList({
           })
         )}
         {!canManage && (
-          <p className="pt-1 text-xs text-muted-foreground">{t('readonly')}</p>
+          <p className="pt-1 text-caption text-muted-foreground">{t('readonly')}</p>
         )}
       </CardContent>
     </Card>

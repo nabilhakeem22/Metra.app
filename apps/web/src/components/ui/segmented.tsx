@@ -43,7 +43,7 @@ export function Segmented<T extends string>({
             aria-pressed={isActive}
             onClick={() => onValueChange(option.value)}
             className={cn(
-              'rounded-full px-[14px] py-[6px] text-[13px] outline-none focus-ring-brand transition-colors motion-reduce:transition-none',
+              'rounded-pill px-[14px] py-[6px] text-small outline-none focus-ring-brand transition-colors motion-reduce:transition-none',
               isActive
                 ? 'font-bold text-[color:var(--text)]'
                 : 'font-medium text-[color:var(--text-muted)]',

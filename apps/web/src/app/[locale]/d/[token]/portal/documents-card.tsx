@@ -46,34 +46,34 @@ export function DocumentsCard({
   const locale = useLocale();
 
   return (
-    <section className="space-y-3 rounded-2xl border bg-background p-4 shadow-sm">
+    <section className="space-y-3 rounded-panel border bg-background p-4 shadow-sm">
       <div>
-        <h2 className="text-sm font-semibold">{t('title')}</h2>
-        <p className="text-xs text-muted-foreground">{t('subtitle')}</p>
+        <h2 className="text-body font-semibold">{t('title')}</h2>
+        <p className="text-caption text-muted-foreground">{t('subtitle')}</p>
       </div>
 
       {documentUnavailable && (
-        <p className="rounded-lg bg-destructive/10 px-3 py-2 text-xs text-destructive" role="alert">
+        <p className="rounded-item bg-destructive/10 px-3 py-2 text-caption text-destructive" role="alert">
           {t('unavailable')}
         </p>
       )}
 
       {documents.length === 0 ? (
-        <p className="text-xs text-muted-foreground">{t('empty')}</p>
+        <p className="text-caption text-muted-foreground">{t('empty')}</p>
       ) : (
         <ul className="space-y-2">
           {documents.map((releasedDocument) => (
             <li
               key={releasedDocument.id}
-              className="flex flex-wrap items-center gap-2 rounded-xl border p-3"
+              className="flex flex-wrap items-center gap-2 rounded-item border p-3"
             >
               <FileText className="size-4 shrink-0 text-muted-foreground" aria-hidden />
               <div className="min-w-0">
-                <p className="truncate text-sm font-medium">
+                <p className="truncate text-body font-medium">
                   {t(`category.${releasedDocument.category}`)}
                 </p>
                 {releasedDocument.sharedAt && (
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-caption text-muted-foreground">
                     {t('sharedOn', {
                       date: bidiIsolate(formatDate(releasedDocument.sharedAt, locale)),
                     })}
@@ -83,7 +83,7 @@ export function DocumentsCard({
               {releasedDocument.access === 'withheld' ? (
                 // No link at all — and the route refuses this id independently, so
                 // an old URL is just as dead as the missing button.
-                <span className="ms-auto inline-flex items-center gap-1.5 rounded-lg border border-dashed px-3 py-1.5 text-xs font-medium text-muted-foreground">
+                <span className="ms-auto inline-flex items-center gap-1.5 rounded-pill border border-dashed px-3 py-1.5 text-caption font-medium text-muted-foreground">
                   <Lock className="size-3.5" aria-hidden />
                   {t('afterPayment')}
                 </span>
@@ -92,7 +92,7 @@ export function DocumentsCard({
                   href={`/${locale}/d/${encodeURIComponent(token)}/documents/${releasedDocument.id}`}
                   rel="noopener"
                   target={releasedDocument.access === 'preview' ? '_blank' : undefined}
-                  className="ms-auto inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-semibold hover:bg-muted"
+                  className="ms-auto inline-flex items-center gap-1.5 rounded-pill border px-3 py-1.5 text-caption font-semibold hover:bg-muted"
                 >
                   {releasedDocument.access === 'preview' ? (
                     <>

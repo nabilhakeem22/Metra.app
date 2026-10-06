@@ -34,10 +34,10 @@ export function ImportWizardUploadStep({
           const f = e.target.files?.[0];
           if (f) onFile(f);
         }}
-        className="block w-full text-sm file:me-3 file:rounded-md file:border-0 file:bg-muted file:px-3 file:py-2 file:text-sm"
+        className="block w-full text-body file:me-3 file:rounded-pill file:border-0 file:bg-muted file:px-3 file:py-2 file:text-body"
       />
       {pending && (
-        <p className="flex items-center gap-2 text-sm text-muted-foreground">
+        <p className="flex items-center gap-2 text-body text-muted-foreground">
           <Loader2 className="size-4 animate-spin" aria-hidden />
         </p>
       )}

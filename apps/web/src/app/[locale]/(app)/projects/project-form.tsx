@@ -102,7 +102,7 @@ export function ProjectForm({
         </SheetDescription>
 
         {clientOptions.length === 0 ? (
-          <div className="mt-4 space-y-2 rounded-md border bg-muted/40 p-3 text-sm text-muted-foreground">
+          <div className="mt-4 space-y-2 rounded-item border bg-muted/40 p-3 text-body text-muted-foreground">
             <p>{t('form.noClients')}</p>
             {canAddClient && (
               <Button asChild size="sm" variant="outline">

@@ -65,13 +65,13 @@ export function ContractDetailClient({
   return (
     <div className="space-y-4">
       {error && (
-        <p className="text-sm text-destructive" role="alert">
+        <p className="text-body text-destructive" role="alert">
           {error}
         </p>
       )}
       {link && (
         <Card>
-          <CardContent className="flex items-center gap-2 py-3 text-sm">
+          <CardContent className="flex items-center gap-2 py-3 text-body">
             <span className="text-muted-foreground">{t('shareLink')}:</span>
             <code className="flex-1 truncate" dir="ltr">
               {link}
@@ -93,7 +93,7 @@ export function ContractDetailClient({
             key={tb}
             type="button"
             onClick={() => setTab(tb)}
-            className={`border-b-2 px-3 py-2 text-sm ${
+            className={`border-b-2 px-3 py-2 text-body ${
               tab === tb
                 ? 'border-primary font-medium'
                 : 'border-transparent text-muted-foreground'

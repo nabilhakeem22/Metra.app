@@ -53,7 +53,7 @@ export function ApiKeysTable({
           <EmptyState title={t('empty')} description={t('emptyDesc')} />
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="w-full text-body">
               <thead>
                 <tr className="border-b text-start text-muted-foreground">
                   <th className="py-2 text-start font-medium">

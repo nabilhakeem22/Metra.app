@@ -100,15 +100,15 @@ function ActionHero({ token, group }: { token: string; group: HeroGroup }) {
   if (confirmed) {
     const keys = CONFIRM_KEYS[confirmed];
     return (
-      <section className="rounded-2xl border border-[color:var(--success)]/30 bg-[color:var(--success-tint)] p-5 text-center shadow-sm">
+      <section className="rounded-panel border border-[color:var(--success)]/30 bg-[color:var(--success-tint)] p-5 text-center shadow-sm">
         <CheckCircle2
           className="mx-auto mb-3 size-11 text-[color:var(--success)]"
           aria-hidden
         />
-        <h2 className="text-lg font-semibold text-foreground">
+        <h2 className="text-title font-semibold text-foreground">
           {tGroup(keys.title)}
         </h2>
-        <p className="mx-auto mt-2 max-w-xs text-sm text-muted-foreground">
+        <p className="mx-auto mt-2 max-w-xs text-body text-muted-foreground">
           {tGroup(keys.body)}
         </p>
       </section>
@@ -116,20 +116,20 @@ function ActionHero({ token, group }: { token: string; group: HeroGroup }) {
   }
 
   return (
-    <section className="space-y-3 rounded-2xl border-2 border-primary/25 bg-background p-5 shadow-md">
-      <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide text-primary">
+    <section className="space-y-3 rounded-panel border-2 border-primary/25 bg-background p-5 shadow-md">
+      <span className="inline-flex items-center gap-1.5 rounded-pill bg-primary/10 px-2.5 py-1 text-caption font-bold uppercase tracking-wide text-primary">
         <span aria-hidden>●</span>
         {tHero('readyTag')}
       </span>
-      <h2 className="text-xl font-semibold tracking-tight">{tGroup('headline')}</h2>
-      <p className="text-sm text-muted-foreground">{tGroup('body')}</p>
+      <h2 className="text-heading font-semibold">{tGroup('headline')}</h2>
+      <p className="text-body text-muted-foreground">{tGroup('body')}</p>
       <textarea
         value={note}
         onChange={(event) => setNote(event.target.value)}
         maxLength={2000}
         rows={2}
         placeholder={tActions('notePlaceholder')}
-        className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm outline-none focus-visible:ring-1 focus-visible:ring-ring"
+        className="w-full rounded-item border border-input bg-background px-3 py-2 text-body shadow-sm outline-none focus-visible:ring-1 focus-visible:ring-ring"
       />
       <div className="flex flex-col gap-2">
         {buttons.map((button) => (
@@ -147,7 +147,7 @@ function ActionHero({ token, group }: { token: string; group: HeroGroup }) {
         ))}
       </div>
       {error && (
-        <p className="text-sm text-destructive" role="alert">
+        <p className="text-body text-destructive" role="alert">
           {tActions(`error.${error}`)}
         </p>
       )}
@@ -177,13 +177,13 @@ function CalmHero({
 
   return (
     <section
-      className={`space-y-2 rounded-2xl border bg-background p-5 shadow-sm ${
+      className={`space-y-2 rounded-panel border bg-background p-5 shadow-sm ${
         delivered ? 'border-[color:var(--success)]/30' : ''
       }`}
     >
       {kind !== 'closed' && (
         <span
-          className={`inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide ${
+          className={`inline-flex items-center rounded-pill px-2.5 py-1 text-caption font-bold uppercase tracking-wide ${
             delivered
               ? 'bg-[color:var(--success-tint)] text-[color:var(--success)]'
               : 'bg-muted text-muted-foreground'
@@ -192,8 +192,8 @@ function CalmHero({
           {delivered ? t('deliveredTag') : t('inProgressTag')}
         </span>
       )}
-      <h2 className="text-xl font-semibold tracking-tight">{headline}</h2>
-      <p className="text-sm text-muted-foreground">{body}</p>
+      <h2 className="text-heading font-semibold">{headline}</h2>
+      <p className="text-body text-muted-foreground">{body}</p>
     </section>
   );
 }

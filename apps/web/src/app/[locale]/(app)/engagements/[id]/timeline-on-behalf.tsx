@@ -96,11 +96,11 @@ export function OnBehalfPanelBox({
 }) {
   const tpa = useTranslations('engagements.panelActions');
   return (
-    <div className="mb-4 space-y-2.5 rounded-[var(--r-item)] border border-[color:var(--danger)] p-3.5">
+    <div className="mb-4 space-y-2.5 rounded-item border border-[color:var(--danger)] p-3.5">
       {/* Stated where the decision is made, not in a tooltip: this logs an
           acknowledgement AS the client, and the studio should read that sentence
           before the fields, every time. */}
-      <p className="text-[12.5px] text-[color:var(--text)]">{tpa('onBehalfNote')}</p>
+      <p className="text-small text-[color:var(--text)]">{tpa('onBehalfNote')}</p>
       {panel === 'rom' ? (
         <RomAckPanel
           engagementId={engagementId}

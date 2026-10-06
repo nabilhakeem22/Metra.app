@@ -33,7 +33,7 @@ export function WhatsNext({
     // reads as a dead end, and a "what happens next" card five sections down the
     // page does not do that job.
     return (
-      <p className="flex items-baseline gap-1.5 text-[12.5px] text-muted-foreground">
+      <p className="flex items-baseline gap-1.5 text-small text-muted-foreground">
         <ArrowRight className="size-3.5 shrink-0 translate-y-0.5 rtl:rotate-180" aria-hidden />
         <span>
           {t('whatsNext.eyebrow')} · <span className="font-semibold text-foreground">{tJourney(nextMilestone.key)}</span>
@@ -43,18 +43,18 @@ export function WhatsNext({
   }
 
   return (
-    <section className="flex items-center gap-3 rounded-2xl border bg-muted/40 p-4">
+    <section className="flex items-center gap-3 rounded-panel border bg-muted/40 p-4">
       <div
-        className="flex size-9 shrink-0 items-center justify-center rounded-lg border bg-background text-muted-foreground"
+        className="flex size-9 shrink-0 items-center justify-center rounded-item border bg-background text-muted-foreground"
         aria-hidden
       >
         <ArrowRight className="size-4" />
       </div>
       <div className="min-w-0">
-        <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+        <p className="text-caption font-semibold uppercase tracking-wide text-muted-foreground">
           {t('whatsNext.eyebrow')}
         </p>
-        <p className="mt-0.5 truncate text-sm font-semibold">
+        <p className="mt-0.5 truncate text-body font-semibold">
           {tJourney(nextMilestone.key)}
         </p>
       </div>

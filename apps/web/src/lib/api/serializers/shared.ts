@@ -28,7 +28,7 @@ export function toApiMoney(scale4: string | null | undefined): string {
 }
 
 /**
- * A quantity as a clean numeric string — rounded to at most 2 decimals and with
+ * A quantity as a clean numeric string, rounding to at most 2 decimals and with
  * trailing-zero noise trimmed ("1.0000" -> "1", "1.5000" -> "1.5", "2.2500" ->
  * "2.25"). Reuses toApiMoney's exact 2-decimal rounding, then drops the trailing
  * zeros a count/quantity shouldn't carry. Never trims the stored precision.

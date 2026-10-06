@@ -28,8 +28,8 @@ function SettledNote() {
         <Check className="size-4" />
       </span>
       <div>
-        <p className="text-sm font-semibold">{t('settledTitle')}</p>
-        <p className="text-xs text-muted-foreground">{t('settledBody')}</p>
+        <p className="text-body font-semibold">{t('settledTitle')}</p>
+        <p className="text-caption text-muted-foreground">{t('settledBody')}</p>
       </div>
     </div>
   );
@@ -90,15 +90,15 @@ export function PaymentsCard({
   const nextClaim = next ? paymentClaimState(claim, next.milestoneKind, submission.claimedKinds) : null;
 
   return (
-    <section className="space-y-3 rounded-2xl border bg-background p-4 shadow-sm">
+    <section className="space-y-3 rounded-panel border bg-background p-4 shadow-sm">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h2 className="text-sm font-semibold">{t('title')}</h2>
-        <span className="text-xs text-muted-foreground">{t('designFee', { amount: money(overview.total) })}</span>
+        <h2 className="text-body font-semibold">{t('title')}</h2>
+        <span className="text-caption text-muted-foreground">{t('designFee', { amount: money(overview.total) })}</span>
       </div>
       <PaidMeter percentPaid={overview.percentPaid} label={t('title')} />
       {next ? (
         <>
-          <p className="text-xs text-muted-foreground">
+          <p className="text-caption text-muted-foreground">
             {t('paidOf', { paid: money(overview.paid), total: money(overview.total) })}
           </p>
           <NextPayment

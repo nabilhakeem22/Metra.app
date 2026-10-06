@@ -11,9 +11,9 @@ function RevealedLink({ share }: { share: DeliveryShareApi }) {
   if (!share.link) return null;
   return (
     <div className="space-y-1.5">
-      <div className="flex items-center gap-2 rounded-md border bg-background px-2 py-1.5">
+      <div className="flex items-center gap-2 rounded-item border bg-background px-2 py-1.5">
         <Link2 className="size-4 shrink-0 text-muted-foreground" aria-hidden />
-        <code className="flex-1 truncate text-xs" dir="ltr">
+        <code className="flex-1 truncate text-caption" dir="ltr">
           {share.link}
         </code>
         <Button size="sm" variant="outline" onClick={share.copy}>
@@ -21,7 +21,7 @@ function RevealedLink({ share }: { share: DeliveryShareApi }) {
           {share.copied ? t('copied') : t('copyLink')}
         </Button>
       </div>
-      <p className="text-xs text-muted-foreground">{t('revealOnce')}</p>
+      <p className="text-caption text-muted-foreground">{t('revealOnce')}</p>
     </div>
   );
 }
@@ -68,12 +68,12 @@ export function ShareLinkPanel({ share }: { share: DeliveryShareApi }) {
   const t = useTranslations('delivery.share');
   return (
     <div className="space-y-3 px-4 pb-4">
-      <p className="text-sm text-muted-foreground">
+      <p className="text-body text-muted-foreground">
         {share.shared ? t('sharedHint') : t('notSharedHint')}
       </p>
 
       {share.error && (
-        <p className="text-sm text-destructive" role="alert">
+        <p className="text-body text-destructive" role="alert">
           {t('error')}
         </p>
       )}
@@ -81,7 +81,7 @@ export function ShareLinkPanel({ share }: { share: DeliveryShareApi }) {
       <RevealedLink share={share} />
       <ShareActions share={share} />
 
-      {share.shared && <p className="text-xs text-muted-foreground">{t('rotateHint')}</p>}
+      {share.shared && <p className="text-caption text-muted-foreground">{t('rotateHint')}</p>}
     </div>
   );
 }

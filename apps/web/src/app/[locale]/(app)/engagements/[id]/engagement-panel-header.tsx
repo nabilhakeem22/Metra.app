@@ -49,11 +49,11 @@ export function PanelHeader({
     <div className="border-b border-[color:var(--rule)]">
       <div className="flex flex-wrap items-center gap-3 px-4 py-3.5">
         <div className="min-w-0">
-          <p className="text-[15px] font-semibold leading-tight tracking-[var(--tracking-title)]">
+          <p className="text-body font-semibold leading-tight tracking-[var(--tracking-title)]">
             {title}
           </p>
           {sub && (
-            <p className="mt-0.5 text-[12.5px] text-[color:var(--text-muted)]">{sub}</p>
+            <p className="mt-0.5 text-small text-[color:var(--text-muted)]">{sub}</p>
           )}
         </div>
         {actions && (
@@ -64,7 +64,7 @@ export function PanelHeader({
       </div>
       {reason && (
         <p
-          className="border-t border-[color:var(--rule)] px-4 py-2.5 text-[12.5px] text-[color:var(--text-muted)]"
+          className="border-t border-[color:var(--rule)] px-4 py-2.5 text-small text-[color:var(--text-muted)]"
           style={{ background: 'var(--track)' }}
         >
           {reason}

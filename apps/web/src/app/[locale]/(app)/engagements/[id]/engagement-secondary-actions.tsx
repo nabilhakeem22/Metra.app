@@ -81,7 +81,7 @@ export function EngagementSecondaryActions({
 
   return (
     <div className="mt-5 space-y-3 border-t border-[color:var(--rule)] pt-4">
-      <p className="font-mono text-[11px] font-semibold uppercase tracking-[0.1em] text-[color:var(--text-faint)]">
+      <p className="font-mono text-caption font-semibold uppercase tracking-[0.1em] text-[color:var(--text-faint)]">
         {tcmd('moreLabel')}
       </p>
       <div className="flex flex-wrap gap-2">
@@ -101,12 +101,12 @@ export function EngagementSecondaryActions({
 
       {confirmingAbandon && (
         <div
-          className="space-y-2 rounded-[var(--r-item)] border border-[color:var(--warn-tint)] bg-[color:var(--track)] p-4"
+          className="space-y-2 rounded-item border border-[color:var(--warn-tint)] bg-[color:var(--track)] p-4"
           role="alertdialog"
           aria-label={tcmd('abandonConfirmTitle')}
         >
-          <p className="text-[13px] font-semibold">{tcmd('abandonConfirmTitle')}</p>
-          <p className="text-[12.5px] text-[color:var(--text-muted)]">
+          <p className="text-small font-semibold">{tcmd('abandonConfirmTitle')}</p>
+          <p className="text-small text-[color:var(--text-muted)]">
             {tcmd('abandonConfirmHint')}
           </p>
           <div className="flex flex-wrap gap-2 pt-1">

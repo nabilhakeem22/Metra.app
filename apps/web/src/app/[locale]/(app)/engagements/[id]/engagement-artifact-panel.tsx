@@ -67,7 +67,7 @@ export function ArtifactPanel({
   }
 
   return (
-    <div className="space-y-3 rounded-[var(--r-item)] border border-[color:var(--rule)] bg-[color:var(--track)] p-4">
+    <div className="space-y-3 rounded-item border border-[color:var(--rule)] bg-[color:var(--track)] p-4">
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div className="space-y-1.5">
           <Label htmlFor="art-kind">{t('kind')}</Label>

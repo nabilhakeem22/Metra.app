@@ -39,29 +39,29 @@ export function BudgetCard({ token, rom }: { token: string; rom: PublicDelivery[
   }
 
   return (
-    <section className="space-y-3 rounded-2xl border bg-background p-4 shadow-sm">
+    <section className="space-y-3 rounded-panel border bg-background p-4 shadow-sm">
       <div>
-        <h2 className="text-sm font-semibold">{t('title')}</h2>
-        <p className="text-xs text-muted-foreground">{t('preparedBy')}</p>
+        <h2 className="text-body font-semibold">{t('title')}</h2>
+        <p className="text-caption text-muted-foreground">{t('preparedBy')}</p>
       </div>
       <BudgetRange rom={rom} />
       {confirmed ? (
         <p
           role="status"
-          className="flex items-center gap-2 rounded-xl bg-[color:var(--success-tint)] px-3 py-2.5 text-sm font-semibold text-[color:var(--success)]"
+          className="flex items-center gap-2 rounded-item bg-[color:var(--success-tint)] px-3 py-2.5 text-body font-semibold text-[color:var(--success)]"
         >
           <Check className="size-4 shrink-0" aria-hidden />
           {t('acknowledged')}
         </p>
       ) : (
         <>
-          <p className="text-xs text-muted-foreground">{t('note')}</p>
+          <p className="text-caption text-muted-foreground">{t('note')}</p>
           <Button className="w-full" disabled={pending} onClick={acknowledge}>
             {pending && <Loader2 className="size-4 animate-spin" aria-hidden />}
             {t('acknowledge')}
           </Button>
           {error && (
-            <p className="text-sm text-destructive" role="alert">
+            <p className="text-body text-destructive" role="alert">
               {tActions(`error.${error}`)}
             </p>
           )}

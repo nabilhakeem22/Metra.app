@@ -29,7 +29,7 @@ export function DeliveryRibbon({ position }: { position: SpinePosition }) {
           return (
             <span
               key={node.key}
-              className="block h-1 w-[9px] rounded-sm"
+              className="block h-1 w-[9px] rounded-none"
               style={{
                 background:
                   done || here ? 'hsl(var(--brand))' : 'var(--rule)',
@@ -46,7 +46,7 @@ export function DeliveryRibbon({ position }: { position: SpinePosition }) {
         return (
           <span
             key={node.key}
-            className="block h-[9px] w-1 rounded-[1px]"
+            className="block h-[9px] w-1 rounded-full"
             style={{
               background: at
                 ? 'var(--warn)'

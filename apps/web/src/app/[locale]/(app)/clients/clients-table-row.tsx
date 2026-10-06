@@ -9,8 +9,8 @@ import type { ClientRow } from './types';
 
 const CELL = 'px-4 py-2 text-muted-foreground';
 const ACTIVE_PILL =
-  'rounded-full bg-[color:var(--success-tint)] px-2 py-0.5 text-xs text-[color:var(--success)]';
-const INACTIVE_PILL = 'rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground';
+  'rounded-pill bg-[color:var(--success-tint)] px-2 py-0.5 text-caption text-[color:var(--success)]';
+const INACTIVE_PILL = 'rounded-pill bg-muted px-2 py-0.5 text-caption text-muted-foreground';
 
 export interface ClientsTableHandlers {
   onEdit: (client: ClientRow) => void;
@@ -84,7 +84,7 @@ export function ClientTableRow({
         <span dir="ltr" className="block">
           {client.email || '—'}
         </span>
-        <span dir="ltr" className="block text-xs">
+        <span dir="ltr" className="block text-caption">
           {client.phone || '—'}
         </span>
       </td>

@@ -41,7 +41,7 @@ export function LoginRequestStep({
       <div
         role="radiogroup"
         aria-label={t('channelLabel')}
-        className="inline-flex gap-1 rounded-[var(--r-pill)] bg-[color:var(--track)] p-1"
+        className="inline-flex gap-1 rounded-pill bg-[color:var(--track)] p-1"
       >
         {(['email', 'phone'] as const).map((option) => (
           <button
@@ -50,7 +50,7 @@ export function LoginRequestStep({
             role="radio"
             aria-checked={channel === option}
             onClick={() => switchChannel(option)}
-            className={`rounded-[var(--r-pill)] px-3.5 py-1.5 text-[13px] transition-colors ${
+            className={`rounded-pill px-3.5 py-1.5 text-small transition-colors ${
               channel === option
                 ? 'bg-card font-bold text-[color:var(--text)] shadow-sm'
                 : 'font-medium text-[color:var(--text-muted)] hover:text-[color:var(--text)]'
@@ -88,7 +88,7 @@ export function LoginRequestStep({
           }}
         />
         {channel === 'phone' && (
-          <p className="text-sm text-muted-foreground">{t('phoneHint')}</p>
+          <p className="text-body text-muted-foreground">{t('phoneHint')}</p>
         )}
       </div>
 

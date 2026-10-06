@@ -111,7 +111,7 @@ export function SettingsClient({
   return (
     <div className="space-y-6">
       {!canManage && (
-        <p className="rounded-xl border bg-muted/40 p-3 text-sm text-muted-foreground">
+        <p className="rounded-item border bg-muted/40 p-3 text-body text-muted-foreground">
           {t('readonly')}
         </p>
       )}

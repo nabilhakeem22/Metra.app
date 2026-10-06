@@ -94,15 +94,15 @@ export function CoachmarkCard({
       aria-modal="true"
       aria-labelledby={titleId}
       tabIndex={-1}
-      className="fixed z-[62] w-72 max-w-[calc(100vw-2rem)] rounded-xl border bg-card p-4 shadow-lg focus:outline-none"
+      className="fixed z-[62] w-72 max-w-[calc(100vw-2rem)] rounded-panel border bg-card p-4 shadow-lg focus:outline-none"
       style={position}
     >
-      <p id={titleId} className="text-sm font-semibold">
+      <p id={titleId} className="text-body font-semibold">
         {t(step.titleKey)}
       </p>
-      <p className="mt-1 text-sm text-muted-foreground">{t(step.bodyKey)}</p>
+      <p className="mt-1 text-body text-muted-foreground">{t(step.bodyKey)}</p>
       <div className="mt-3 flex items-center justify-between gap-2">
-        <span className="text-xs text-muted-foreground">
+        <span className="text-caption text-muted-foreground">
           {t('tour.stepOf', { current: index + 1, total })}
         </span>
         <div className="flex items-center gap-2">

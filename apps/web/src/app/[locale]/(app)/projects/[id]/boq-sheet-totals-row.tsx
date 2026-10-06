@@ -47,7 +47,7 @@ export function BoqTotalsRow({
       <td
         colSpan={leading}
         style={cell}
-        className={`p-3 font-mono text-[11px] font-bold uppercase tracking-[0.09em] ${grand ? 'text-[color:var(--text)]' : 'text-[color:var(--text-faint)]'}`}
+        className={`p-3 font-mono text-caption font-bold uppercase tracking-[0.09em] ${grand ? 'text-[color:var(--text)]' : 'text-[color:var(--text-faint)]'}`}
       >
         {/* Pinned inside its spanning cell for the same reason as the section
             title — a totals row whose label has scrolled away is a bare number. */}
@@ -62,7 +62,7 @@ export function BoqTotalsRow({
       <td
         style={cell}
         dir="ltr"
-        className={`whitespace-nowrap p-3 text-end font-mono font-bold tabular-nums text-[color:var(--text)] ${grand ? 'text-[18px]' : 'text-sm'}`}
+        className={`whitespace-nowrap p-3 text-end font-mono font-bold tabular-nums text-[color:var(--text)] ${grand ? 'text-title' : 'text-body'}`}
       >
         {value}
       </td>

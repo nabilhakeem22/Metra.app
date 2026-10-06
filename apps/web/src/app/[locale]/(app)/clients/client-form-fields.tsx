@@ -74,11 +74,11 @@ export function ClientFormFields({
           {field('nameEn', t('form.nameEn'), { hint: th('name'), required: true })}
           {field('nameAr', t('form.nameAr'), { dir: 'rtl', hint: th('name'), required: true })}
         </div>
-        <p className="text-xs text-muted-foreground">{t('form.nameRequired')}</p>
+        <p className="text-caption text-muted-foreground">{t('form.nameRequired')}</p>
       </div>
       <div className="space-y-2">
         {field('contactName', t('form.contactName'), { dir: 'auto', hint: th('contactName') })}
-        {isCreate && <p className="text-xs text-muted-foreground">{t('form.contactNote')}</p>}
+        {isCreate && <p className="text-caption text-muted-foreground">{t('form.contactNote')}</p>}
       </div>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         {field('email', t('form.email'), { hint: th('email') })}
@@ -94,7 +94,7 @@ export function ClientFormFields({
         aria-expanded={more.open}
         aria-controls="cl-more-details"
         onClick={more.toggle}
-        className="text-[12.5px] font-semibold text-brand-ink hover:underline"
+        className="text-small font-semibold text-brand-ink hover:underline"
       >
         {more.open ? '−' : '+'} {t('form.moreDetails')}
       </button>

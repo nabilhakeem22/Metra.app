@@ -13,7 +13,40 @@ const config: Config = {
       padding: '1.5rem',
       screens: { '2xl': '1400px' },
     },
+    // THEME-LEVEL, not extend: these REPLACE Tailwind's scales, so text-xs ..
+    // text-9xl, bare `rounded` and rounded-sm .. rounded-3xl generate no CSS.
+    // The values live in globals.css (RTL and touch overrides sit beside them);
+    // `metra/design-tokens-only` fails lint on any off-scale class. Weight is
+    // not part of a token: callers add font-semibold / font-bold.
+    fontSize: {
+      caption: ['var(--fs-caption)', { lineHeight: 'var(--lh-caption)' }],
+      small: ['var(--fs-small)', { lineHeight: 'var(--lh-small)' }],
+      body: ['var(--fs-body)', { lineHeight: 'var(--lh-body)' }],
+      title: [
+        'var(--fs-title)',
+        { lineHeight: 'var(--lh-title)', letterSpacing: 'var(--tracking-title)' },
+      ],
+      heading: [
+        'var(--fs-heading)',
+        { lineHeight: 'var(--lh-heading)', letterSpacing: 'var(--tracking-title)' },
+      ],
+      display: [
+        'var(--fs-display)',
+        { lineHeight: 'var(--lh-display)', letterSpacing: 'var(--tracking-display)' },
+      ],
+    },
+    borderRadius: {
+      none: '0',
+      item: 'var(--r-item)',
+      panel: 'var(--r-panel)',
+      frame: 'var(--r-frame)',
+      pill: 'var(--r-pill)',
+      full: '9999px',
+    },
     extend: {
+      // Touch devices: `coarse:min-h-11` gives a 44px target where a finger is
+      // the pointer, without growing the desktop layout.
+      screens: { coarse: { raw: '(pointer: coarse)' } },
       fontFamily: {
         sans: ['var(--font-sans)', 'system-ui', 'sans-serif'],
         manrope: ['var(--font-manrope)'],
@@ -72,19 +105,6 @@ const config: Config = {
         // Theme-aware: resolves to the light or dark glass shadow per data-theme.
         glass: 'var(--glass-shadow), var(--glass-inner)',
         'brand-glow': 'var(--brand-glow)',
-      },
-      borderRadius: {
-        '2xl': 'calc(var(--radius) + 0.25rem)',
-        xl: 'var(--radius)',
-        lg: 'calc(var(--radius) - 0.25rem)',
-        md: 'calc(var(--radius) - 0.5rem)',
-        sm: 'calc(var(--radius) - 0.625rem)',
-        frame: '26px',
-        panel: '20px',
-        bar: '18px',
-        item: '13px',
-        icon: '11px',
-        pill: '999px',
       },
     },
   },

@@ -29,7 +29,7 @@ export function PaymentClaimControl({
 
   if (claimState.kind === 'pending') {
     return (
-      <p role="status" className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+      <p role="status" className="flex items-center gap-1.5 text-caption font-medium text-muted-foreground">
         <Clock className="size-3.5 shrink-0" aria-hidden />
         {t('awaitingConfirmation')}
       </p>
@@ -51,7 +51,7 @@ export function PaymentClaimControl({
         {t('claim')}
       </Button>
       {failure && (
-        <p className="text-xs text-destructive" role="alert">
+        <p className="text-caption text-destructive" role="alert">
           {t(`error.${failure}`)}
         </p>
       )}

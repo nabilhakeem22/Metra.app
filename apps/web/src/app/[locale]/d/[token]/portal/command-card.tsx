@@ -36,7 +36,7 @@ export function PortalCommandCard({
   stageNote: PortalLabel;
 }) {
   return (
-    <section className="space-y-4 rounded-2xl border bg-background p-4 shadow-sm">
+    <section className="space-y-4 rounded-panel border bg-background p-4 shadow-sm">
       <JourneyTracker milestone={milestone} bare />
       <HeroCard
         token={token}

@@ -12,8 +12,8 @@ export async function OverviewTab({ overview }: { overview: ClientOverview }) {
   const Stat = ({ label, value }: { label: string; value: string }) => (
     <Card>
       <CardContent className="py-4">
-        <p className="text-xs text-muted-foreground">{label}</p>
-        <p className="mt-1 text-2xl font-semibold" dir="ltr">
+        <p className="text-caption text-muted-foreground">{label}</p>
+        <p className="mt-1 text-heading font-semibold" dir="ltr">
           {value}
         </p>
       </CardContent>
@@ -36,7 +36,7 @@ export async function OverviewTab({ overview }: { overview: ClientOverview }) {
 
       <Card>
         <CardContent className="p-0">
-          <h2 className="border-b px-4 py-2.5 text-sm font-semibold">
+          <h2 className="border-b px-4 py-2.5 text-body font-semibold">
             {t('recentActivity')}
           </h2>
           {overview.recentActivity.length === 0 ? (
@@ -48,10 +48,10 @@ export async function OverviewTab({ overview }: { overview: ClientOverview }) {
               {overview.recentActivity.map((a) => (
                 <li
                   key={a.id}
-                  className="flex items-center justify-between px-4 py-2.5 text-sm"
+                  className="flex items-center justify-between px-4 py-2.5 text-body"
                 >
                   <ActivityLabel kind={a.kind} />
-                  <span className="text-xs text-muted-foreground" dir="ltr">
+                  <span className="text-caption text-muted-foreground" dir="ltr">
                     {formatDate(a.createdAt, locale)}
                   </span>
                 </li>

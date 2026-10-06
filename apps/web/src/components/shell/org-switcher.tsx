@@ -77,7 +77,7 @@ export function OrgSwitcher({
           // .glass blur recipe, so it doesn't nest blur inside the sidebar).
           className="glass-field flex w-full items-center justify-between gap-2 px-[10px] py-[8px] outline-none focus-ring-brand disabled:opacity-60"
         >
-          <span className="truncate text-[13px] font-semibold text-[color:var(--text)]">
+          <span className="truncate text-small font-semibold text-[color:var(--text)]">
             {active ? nameOf(active) : t('workspaceUnnamed')}
           </span>
           <ChevronsUpDown
@@ -89,10 +89,10 @@ export function OrgSwitcher({
       <DropdownMenuContent align="start" className="w-56">
         {accountName && (
           <div className="px-2 py-1.5">
-            <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+            <p className="text-caption font-medium uppercase tracking-wide text-muted-foreground">
               {t('account')}
             </p>
-            <p className="truncate text-sm font-medium text-muted-foreground">
+            <p className="truncate text-body font-medium text-muted-foreground">
               {accountName}
             </p>
           </div>

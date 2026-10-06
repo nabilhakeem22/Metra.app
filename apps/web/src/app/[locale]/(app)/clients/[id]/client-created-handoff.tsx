@@ -52,7 +52,7 @@ export function ClientCreatedHandoff({
       <CardContent className="flex flex-wrap items-center gap-3 py-4">
         <div className="flex min-w-0 flex-1 items-center gap-3">
           <FolderPlus className="size-5 shrink-0 text-muted-foreground" aria-hidden />
-          <p className="min-w-0 text-sm font-medium">
+          <p className="min-w-0 text-body font-medium">
             {t('client.title', { name: clientName })}
           </p>
         </div>

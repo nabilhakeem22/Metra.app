@@ -31,7 +31,7 @@ export function EngagementOffPlanToggle({
   return (
     <div className="mt-4 border-t border-[color:var(--rule)] pt-4">
       <div
-        className="inline-flex overflow-hidden rounded-[var(--r-item)] border border-[color:var(--rule)]"
+        className="inline-flex overflow-hidden rounded-item border border-[color:var(--rule)]"
         role="group"
       >
         <button
@@ -39,7 +39,7 @@ export function EngagementOffPlanToggle({
           aria-pressed={!offPlan}
           disabled={pending}
           onClick={() => set(false)}
-          className={`px-3 py-1.5 text-[12.5px] font-semibold disabled:cursor-not-allowed ${
+          className={`px-3 py-1.5 text-small font-semibold disabled:cursor-not-allowed ${
             !offPlan
               ? 'bg-brand-tint text-brand-ink'
               : 'bg-card text-[color:var(--text-muted)] hover:bg-[color:var(--track)]'
@@ -52,7 +52,7 @@ export function EngagementOffPlanToggle({
           aria-pressed={offPlan}
           disabled={pending}
           onClick={() => set(true)}
-          className={`border-s border-[color:var(--rule)] px-3 py-1.5 text-[12.5px] font-semibold disabled:cursor-not-allowed ${
+          className={`border-s border-[color:var(--rule)] px-3 py-1.5 text-small font-semibold disabled:cursor-not-allowed ${
             offPlan
               ? 'bg-brand-tint text-brand-ink'
               : 'bg-card text-[color:var(--text-muted)] hover:bg-[color:var(--track)]'
@@ -61,7 +61,7 @@ export function EngagementOffPlanToggle({
           {t('offPlan')}
         </button>
       </div>
-      <p className="mt-2 text-[12px] text-[color:var(--text-muted)]">{t('hint')}</p>
+      <p className="mt-2 text-caption text-[color:var(--text-muted)]">{t('hint')}</p>
     </div>
   );
 }

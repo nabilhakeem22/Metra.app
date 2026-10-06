@@ -34,7 +34,7 @@ export function ArtifactVisibilityControl({
   return (
     <span className="inline-flex items-center gap-1">
       <span
-        className={`inline-flex items-center gap-1 rounded-[var(--r-icon)] px-2 py-0.5 text-[11px] font-semibold ${
+        className={`inline-flex items-center gap-1 rounded-item px-2 py-0.5 text-caption font-semibold ${
           visible
             ? 'bg-brand-tint text-brand-ink'
             : 'bg-[color:var(--rule)] text-[color:var(--text-muted)]'
@@ -53,7 +53,7 @@ export function ArtifactVisibilityControl({
           type="button"
           onClick={() => visibility.toggle(artifactId, !visible)}
           disabled={saving}
-          className="inline-flex items-center gap-1 rounded-[var(--r-icon)] px-2 py-1 text-[12px] font-semibold text-[color:var(--text-muted)] hover:bg-brand-tint hover:text-brand-ink disabled:cursor-not-allowed disabled:opacity-60"
+          className="inline-flex items-center gap-1 rounded-item px-2 py-1 text-caption font-semibold text-[color:var(--text-muted)] hover:bg-brand-tint hover:text-brand-ink disabled:cursor-not-allowed disabled:opacity-60"
         >
           {saving && <Loader2 className="size-3.5 animate-spin" aria-hidden />}
           {saving ? t('saving') : visible ? t('hide') : t('show')}

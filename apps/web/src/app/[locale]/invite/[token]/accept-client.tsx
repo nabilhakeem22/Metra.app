@@ -32,10 +32,10 @@ export function AcceptInvite({ token }: { token: string }) {
   if (already) {
     return (
       <div className="space-y-3">
-        <h1 className="text-2xl font-bold tracking-tight">
+        <h1 className="text-heading font-bold">
           {t('alreadyTitle')}
         </h1>
-        <p className="text-sm text-muted-foreground">{t('alreadyBody')}</p>
+        <p className="text-body text-muted-foreground">{t('alreadyBody')}</p>
         <Button asChild>
           <Link href="/dashboard">{t('backToDashboard')}</Link>
         </Button>
@@ -46,10 +46,10 @@ export function AcceptInvite({ token }: { token: string }) {
   if (declined) {
     return (
       <div className="space-y-3">
-        <h1 className="text-2xl font-bold tracking-tight">
+        <h1 className="text-heading font-bold">
           {t('declinedTitle')}
         </h1>
-        <p className="text-sm text-muted-foreground">{t('declinedBody')}</p>
+        <p className="text-body text-muted-foreground">{t('declinedBody')}</p>
         <Button asChild variant="outline">
           <Link href="/dashboard">{t('backToDashboard')}</Link>
         </Button>
@@ -59,8 +59,8 @@ export function AcceptInvite({ token }: { token: string }) {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-2xl font-bold tracking-tight">{t('title')}</h1>
-      <p className="text-sm text-muted-foreground">{t('body')}</p>
+      <h1 className="text-heading font-bold">{t('title')}</h1>
+      <p className="text-body text-muted-foreground">{t('body')}</p>
       <Button className="w-full" onClick={accept} disabled={isPending}>
         {isPending && <Loader2 className="size-4 animate-spin" aria-hidden />}
         {t('acceptButton')}

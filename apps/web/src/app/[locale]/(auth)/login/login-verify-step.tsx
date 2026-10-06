@@ -45,7 +45,7 @@ export function LoginVerifyStep({
           {t('codeSentTitle')}
           <FieldHint hint={th('otp')} />
         </p>
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+        <div className="flex items-center gap-2 text-body text-muted-foreground">
           <span dir="ltr" className="truncate">
             {identifier}
           </span>
@@ -81,7 +81,7 @@ export function LoginVerifyStep({
         {verifying ? t('verifying') : t('verify')}
       </Button>
 
-      <div className="text-center text-sm text-muted-foreground">
+      <div className="text-center text-body text-muted-foreground">
         {countdown.remaining > 0 ? (
           <span>{t('resendIn', { time: countdown.formatted })}</span>
         ) : (

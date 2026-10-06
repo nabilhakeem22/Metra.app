@@ -18,7 +18,7 @@ const SelectGroup = SelectPrimitive.Group;
 const SelectValue = SelectPrimitive.Value;
 
 // The field. Matches the glass Input: flat --glass fill + hairline at --r-item,
-// h-10/px-3/text-sm, brand focus-visible ring, subtle --track hover bump. The
+// h-10/px-3/body size, brand focus-visible ring, subtle --track hover bump. The
 // chevron sits on the inline-end (flex order) so it flips in RTL automatically.
 const SelectTrigger = React.forwardRef<
   React.ElementRef<typeof SelectPrimitive.Trigger>,
@@ -27,7 +27,7 @@ const SelectTrigger = React.forwardRef<
   <SelectPrimitive.Trigger
     ref={ref}
     className={cn(
-      'glass-field flex h-10 w-full items-center justify-between gap-2 px-3 py-2 text-sm outline-none',
+      'glass-field flex h-10 w-full items-center justify-between gap-2 px-3 py-2 text-body outline-none',
       'focus-ring-brand focus-visible:border-[color:hsl(var(--brand))]',
       'hover:bg-[color:var(--track)]',
       'data-[placeholder]:text-[color:var(--text-faint)]',
@@ -95,7 +95,7 @@ const SelectContent = React.forwardRef<
       ref={ref}
       position={position}
       className={cn(
-        'relative z-50 max-h-[--radix-select-content-available-height] min-w-[8rem] overflow-hidden rounded-item border border-[color:var(--rule)] bg-popover text-popover-foreground shadow-[var(--glass-shadow)]',
+        'relative z-50 max-h-[--radix-select-content-available-height] min-w-[8rem] overflow-hidden rounded-panel border border-[color:var(--rule)] bg-popover text-popover-foreground shadow-[var(--glass-shadow)]',
         'data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 motion-reduce:animate-none',
         'data-[side=bottom]:slide-in-from-top-2 data-[side=top]:slide-in-from-bottom-2',
         position === 'popper' &&
@@ -126,7 +126,7 @@ const SelectLabel = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <SelectPrimitive.Label
     ref={ref}
-    className={cn('px-2.5 py-1.5 text-xs font-medium text-muted-foreground', className)}
+    className={cn('px-2.5 py-1.5 text-caption font-medium text-muted-foreground', className)}
     {...props}
   />
 ));
@@ -142,7 +142,7 @@ const SelectItem = React.forwardRef<
   <SelectPrimitive.Item
     ref={ref}
     className={cn(
-      'relative flex w-full cursor-pointer select-none items-center justify-between gap-2 rounded-item px-2.5 py-2 text-sm text-[color:var(--text)] outline-none transition-colors',
+      'relative flex w-full cursor-pointer select-none items-center justify-between gap-2 rounded-item px-2.5 py-2 text-body text-[color:var(--text)] outline-none transition-colors',
       'data-[highlighted]:bg-[color:var(--track)]',
       'data-[state=checked]:bg-brand-tint data-[state=checked]:text-brand-ink',
       'data-[disabled]:pointer-events-none data-[disabled]:opacity-50',

@@ -5,7 +5,7 @@ import type { BudgetBadge } from '@/lib/engagements/budget-badge';
 import { ENGAGEMENT_TABS, type EngagementTab } from './tabs';
 
 const TAB_BASE =
-  'inline-flex items-center gap-1.5 rounded-[10px] px-3.5 py-1.5 text-[13px] transition-colors disabled:cursor-not-allowed disabled:opacity-60';
+  'inline-flex items-center gap-1.5 rounded-item px-3.5 py-1.5 text-small transition-colors disabled:cursor-not-allowed disabled:opacity-60';
 const TAB_ACTIVE = 'bg-card font-bold text-[color:var(--text)] shadow-sm';
 const TAB_IDLE =
   'font-medium text-[color:var(--text-muted)] hover:text-[color:var(--text)]';
@@ -45,7 +45,7 @@ export function EngagementTabStrip(props: EngagementTabStripProps) {
   const tp = useTranslations('engagements.panels');
   return (
     <div
-      className="flex flex-wrap gap-1 rounded-[var(--r-item)] p-1"
+      className="flex flex-wrap gap-1 rounded-item p-1"
       style={{ background: 'var(--track)' }}
       role="tablist"
     >
@@ -83,13 +83,13 @@ export function EngagementTabStrip(props: EngagementTabStripProps) {
           >
             {tp(tab)}
             {budgetState && (
-              <span className="font-mono text-[9.5px] font-bold uppercase tracking-[0.06em] text-[color:var(--warn)]">
+              <span className="font-mono text-caption font-bold uppercase tracking-[0.06em] text-[color:var(--warn)]">
                 {budgetState}
               </span>
             )}
             {badgeCount > 0 && (
               <span
-                className="inline-flex items-center rounded-[var(--r-pill)] bg-[color:var(--warn-tint)] px-1.5 py-0.5 text-[10px] font-semibold text-[color:var(--warn)]"
+                className="inline-flex items-center rounded-pill bg-[color:var(--warn-tint)] px-1.5 py-0.5 text-caption font-semibold text-[color:var(--warn)]"
                 dir="ltr"
               >
                 {t(tab === 'files' ? 'questionsBadge' : 'paymentsBadge', { n: badgeCount })}

@@ -16,7 +16,7 @@ export function DashboardRangeFilter({ active }: { active: RangeMonths }) {
 
   return (
     <div
-      className="inline-flex rounded-[var(--r-pill)] border border-[color:var(--rule)] p-0.5"
+      className="inline-flex rounded-pill border border-[color:var(--rule)] p-0.5"
       role="group"
       aria-label={t('label')}
     >
@@ -28,7 +28,7 @@ export function DashboardRangeFilter({ active }: { active: RangeMonths }) {
             type="button"
             aria-pressed={isActive}
             onClick={() => router.replace(`${pathname}?range=${months}`)}
-            className={`rounded-[var(--r-pill)] px-3 py-1 text-xs font-medium transition-colors ${
+            className={`rounded-pill px-3 py-1 text-caption font-medium transition-colors ${
               isActive
                 ? 'bg-brand-tint text-brand-ink'
                 : 'text-muted-foreground hover:text-foreground'

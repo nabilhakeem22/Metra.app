@@ -48,7 +48,7 @@ export function RetractButton({
         type="button"
         onClick={() => setOpen(true)}
         disabled={pending}
-        className="inline-flex items-center gap-1 text-[11px] font-semibold text-[color:var(--text-muted)] hover:text-[color:var(--danger)] disabled:opacity-60"
+        className="inline-flex items-center gap-1 text-caption font-semibold text-[color:var(--text-muted)] hover:text-[color:var(--danger)] disabled:opacity-60"
       >
         <Undo2 className="size-3" aria-hidden />
         {t('retract')}
@@ -58,11 +58,11 @@ export function RetractButton({
 
   return (
     <div
-      className="mt-2 space-y-2 rounded-[var(--r-item)] border border-[color:var(--danger)] p-3"
+      className="mt-2 space-y-2 rounded-item border border-[color:var(--danger)] p-3"
       role="alertdialog"
       aria-label={t('retractTitle')}
     >
-      <p className="text-[12px] text-[color:var(--text)]">{t('retractHint')}</p>
+      <p className="text-caption text-[color:var(--text)]">{t('retractHint')}</p>
       <div className="space-y-1.5">
         <Label htmlFor={`retract-${eventId}`}>{t('retractReason')}</Label>
         <Input

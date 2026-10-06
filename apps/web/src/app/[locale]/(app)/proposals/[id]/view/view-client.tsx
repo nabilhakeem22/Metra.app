@@ -80,10 +80,10 @@ export function ProposalView({
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2">
-        <span className="rounded-full bg-muted px-2 py-0.5 text-xs">
+        <span className="rounded-pill bg-muted px-2 py-0.5 text-caption">
           {t(`statuses.${detail.status}`)}
         </span>
-        <span className="text-sm text-muted-foreground">
+        <span className="text-body text-muted-foreground">
           {t('view.version', { n: detail.version })}
         </span>
         <div className="ms-auto flex flex-wrap gap-2">
@@ -128,12 +128,12 @@ export function ProposalView({
         <Card key={s.id}>
           <CardContent className="p-0">
             <div className="flex items-center justify-between border-b px-4 py-2">
-              <h2 className="text-sm font-semibold">{loc(s.titleAr, s.titleEn)}</h2>
-              <span className="text-sm" dir="ltr">
+              <h2 className="text-body font-semibold">{loc(s.titleAr, s.titleEn)}</h2>
+              <span className="text-body" dir="ltr">
                 {money(s.sectionSubtotal)}
               </span>
             </div>
-            <table className="w-full text-sm">
+            <table className="w-full text-body">
               <tbody>
                 {s.lines.map((l) => (
                   <tr key={l.id} className="border-b last:border-0">
@@ -152,7 +152,7 @@ export function ProposalView({
       ))}
 
       <Card>
-        <CardContent className="ms-auto max-w-xs space-y-1 py-4 text-sm" dir="ltr">
+        <CardContent className="ms-auto max-w-xs space-y-1 py-4 text-body" dir="ltr">
           <Row label={t('p.subtotal')} value={money(detail.subtotal)} />
           <Row label={t('p.discount')} value={money(detail.discountAmount)} />
           <Row label={t('p.tax')} value={money(detail.taxAmount)} />

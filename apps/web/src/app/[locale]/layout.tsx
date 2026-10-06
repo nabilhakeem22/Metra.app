@@ -16,6 +16,9 @@ const manrope = Manrope({
   display: 'swap',
 });
 
+// Loaded weights = used weights. The app uses normal / medium / semibold /
+// bold (lint bans the rest). Tajawal ships no 600, so semibold resolves to the
+// real 700 face by CSS weight matching, never a synthesized bold.
 const tajawal = Tajawal({
   subsets: ['arabic', 'latin'],
   weight: ['400', '500', '700'],

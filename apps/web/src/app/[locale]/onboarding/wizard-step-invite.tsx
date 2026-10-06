@@ -13,14 +13,14 @@ export function WizardStepInvite({
   return (
     <div className="space-y-4">
       <div className="space-y-1">
-        <h1 className="text-2xl font-bold tracking-tight">
+        <h1 className="text-heading font-bold">
           {t('step4Title')}
         </h1>
-        <p className="text-sm text-muted-foreground">{t('inviteHint')}</p>
+        <p className="text-body text-muted-foreground">{t('inviteHint')}</p>
       </div>
-      <div className="flex items-start gap-3 rounded-xl border border-dashed p-4">
+      <div className="flex items-start gap-3 rounded-item border border-dashed p-4">
         <Check className="mt-0.5 size-5 shrink-0 text-muted-foreground" aria-hidden />
-        <p className="text-sm text-muted-foreground">
+        <p className="text-body text-muted-foreground">
           {t('inviteComingSoon')}
         </p>
       </div>

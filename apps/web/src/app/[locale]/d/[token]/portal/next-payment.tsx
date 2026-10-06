@@ -22,11 +22,11 @@ export function NextPayment({
   const t = useTranslations('delivery.payments');
   const locale = useLocale();
   return (
-    <div className="flex flex-col gap-2.5 rounded-xl bg-[color:var(--warn-tint)] p-3">
-      <p className="text-sm font-bold text-[color:var(--warn)]">
+    <div className="flex flex-col gap-2.5 rounded-item bg-[color:var(--warn-tint)] p-3">
+      <p className="text-body font-bold text-[color:var(--warn)]">
         {t('nextPayment', { milestone: label })}
       </p>
-      <p className="text-xl font-extrabold tabular-nums text-foreground">
+      <p className="text-heading font-bold tabular-nums text-foreground">
         <bdi>{formatPortalMoney(amountRemaining, locale)}</bdi>
       </p>
       {claimControl}

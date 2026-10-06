@@ -73,7 +73,7 @@ export function ContractsClient({
       </div>
 
       {error && (
-        <p className="text-sm text-destructive" role="alert">
+        <p className="text-body text-destructive" role="alert">
           {error}
         </p>
       )}
@@ -81,16 +81,16 @@ export function ContractsClient({
       {picking && (
         <Card>
           <CardContent className="space-y-2 py-4">
-            <p className="text-sm font-medium">{t('generateFromProposal')}</p>
+            <p className="text-body font-medium">{t('generateFromProposal')}</p>
             {generatable.map((p) => (
               <div
                 key={p.id}
                 className="flex items-center justify-between border-b py-2 last:border-0"
               >
-                <span className="font-mono text-xs" dir="ltr">
+                <span className="font-mono text-caption" dir="ltr">
                   {formatProposalNumber(p.number, proposalYear(p.issueDate, p.createdAt))}
                 </span>
-                <span className="flex-1 px-3 text-sm">
+                <span className="flex-1 px-3 text-body">
                   {pickLocale({ nameAr: p.titleAr, nameEn: p.titleEn }, 'name', locale).value}
                 </span>
                 <Button size="sm" disabled={pending} onClick={() => generate(p.id)}>
@@ -120,9 +120,9 @@ export function ContractsClient({
         <Card>
           <CardContent className="p-0">
             <div className="overflow-x-auto">
-              <table className="w-full text-sm">
+              <table className="w-full text-body">
                 <thead>
-                  <tr className="border-b text-xs text-muted-foreground">
+                  <tr className="border-b text-caption text-muted-foreground">
                     <th className="px-4 py-2 text-start font-medium">{t('number')}</th>
                     <th className="px-4 py-2 text-start font-medium">{t('client')}</th>
                     <th className="px-4 py-2 text-start font-medium">{t('project')}</th>
@@ -133,7 +133,7 @@ export function ContractsClient({
                 <tbody>
                   {items.map((c) => (
                     <tr key={c.id} className="border-b last:border-0 hover:bg-muted/40">
-                      <td className="px-4 py-2 font-mono text-xs" dir="ltr">
+                      <td className="px-4 py-2 font-mono text-caption" dir="ltr">
                         <Link href={`/contracts/${c.id}`} className="text-primary hover:underline">
                           {formatDocNumber('C', c.number, docYear(null, c.createdAt))}
                         </Link>
@@ -145,7 +145,7 @@ export function ContractsClient({
                         {pickLocale({ nameAr: c.projectNameAr, nameEn: c.projectNameEn }, 'name', locale).value || '—'}
                       </td>
                       <td className="px-4 py-2">
-                        <span className={`rounded-full px-2 py-0.5 text-xs ${STATUS_STYLE[c.status] ?? 'bg-muted'}`}>
+                        <span className={`rounded-pill px-2 py-0.5 text-caption ${STATUS_STYLE[c.status] ?? 'bg-muted'}`}>
                           {t(`status.${c.status}`)}
                         </span>
                       </td>

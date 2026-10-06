@@ -37,7 +37,7 @@ export interface CommandCardActionProps {
 /** One quiet explanatory line under the action row. */
 function ActionNote({ children }: { children: string }) {
   return (
-    <p className="mt-3.5 flex items-baseline gap-1.5 text-[12.5px] text-[color:var(--text-muted)]">
+    <p className="mt-3.5 flex items-baseline gap-1.5 text-small text-[color:var(--text-muted)]">
       <span aria-hidden>◆</span>
       <span>{children}</span>
     </p>
@@ -64,7 +64,7 @@ export function CommandCardAction(props: CommandCardActionProps) {
           end. Only in 'ready': naming the next phase while the move is still
           blocked would promise something the button cannot do. */}
       {view.mode === 'ready' && view.nextPhaseState && (
-        <p className="mt-2.5 text-center text-[12.5px] text-[color:var(--text-muted)]">
+        <p className="mt-2.5 text-center text-small text-[color:var(--text-muted)]">
           {tcmd('advanceLeadsTo', { phase: t(`state.${view.nextPhaseState}`) })}
         </p>
       )}

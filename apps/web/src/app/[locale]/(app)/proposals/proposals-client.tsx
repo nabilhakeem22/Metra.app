@@ -81,9 +81,9 @@ export function ProposalsClient({
       <Card>
         <CardContent className="p-0">
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="w-full text-body">
               <thead>
-                <tr className="border-b text-xs text-muted-foreground">
+                <tr className="border-b text-caption text-muted-foreground">
                   <th className="px-4 py-2 text-start font-medium">{t('table.number')}</th>
                   <th className="px-4 py-2 text-start font-medium">{t('table.title')}</th>
                   <th className="px-4 py-2 text-start font-medium">{t('table.client')}</th>

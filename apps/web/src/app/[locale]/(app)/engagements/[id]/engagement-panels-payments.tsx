@@ -11,7 +11,7 @@ export function PaymentsPanel({ payments }: { payments: EngagementPayment[] }) {
   const locale = useLocale();
   if (payments.length === 0) return <Empty text={t('payments.empty')} />;
   return (
-    <table className="w-full text-sm">
+    <table className="w-full text-body">
       <thead>
         <tr className={HEAD_ROW}>
           <th className="py-2 text-start font-medium">{t('payments.kind')}</th>

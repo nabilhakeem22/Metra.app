@@ -96,7 +96,7 @@ export function PaymentsTab({
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div>
-      <p className="mb-2 font-mono text-[11px] font-semibold uppercase tracking-[0.1em] text-[color:var(--text-muted)]">
+      <p className="mb-2 font-mono text-caption font-semibold uppercase tracking-[0.1em] text-[color:var(--text-muted)]">
         {title}
       </p>
       {children}
@@ -108,7 +108,7 @@ function FeeSchedule({ feeSchedule }: { feeSchedule: EngagementFeeSchedule }) {
   const t = useTranslations('engagements');
   const locale = useLocale();
   return (
-    <div className="text-[13px]">
+    <div className="text-small">
       <div className="flex items-center justify-between border-b border-dashed border-[color:var(--rule)] py-2.5">
         <span className="text-[color:var(--text-muted)]">{t('fee.designFee')}</span>
         <span className={MONEY} dir="ltr">
@@ -125,7 +125,7 @@ function FeeSchedule({ feeSchedule }: { feeSchedule: EngagementFeeSchedule }) {
               className="flex items-center gap-2 border-b border-dashed border-[color:var(--rule)] py-2.5 last:border-0"
             >
               <span>{t(`milestoneKind.${m.kind}`)}</span>
-              <span className="text-[11px] text-[color:var(--text-faint)]">
+              <span className="text-caption text-[color:var(--text-faint)]">
                 {t(`milestoneBasis.${m.basis}`)}
               </span>
               <span className={`ms-auto ${MONEY}`} dir="ltr">

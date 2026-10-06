@@ -116,13 +116,13 @@ export function BulkUpdateDialog({
           </div>
 
           <div className="space-y-2">
-            <span className="inline-flex items-center text-sm font-medium">
+            <span className="inline-flex items-center text-body font-medium">
               {t('bulk.target')}
               <FieldHint hint={th('target')} />
             </span>
             <div className="flex gap-4">
               {(['cost', 'price', 'both'] as Target[]).map((tg) => (
-                <label key={tg} className="flex items-center gap-2 text-sm">
+                <label key={tg} className="flex items-center gap-2 text-body">
                   <input
                     type="radio"
                     name="bulk-target"

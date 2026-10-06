@@ -102,9 +102,9 @@ export function ContactsList({
             <EmptyState title={t('empty')} />
           </div>
         ) : (
-          <table className="w-full text-sm">
+          <table className="w-full text-body">
             <thead>
-              <tr className="border-b text-xs text-muted-foreground">
+              <tr className="border-b text-caption text-muted-foreground">
                 {COLUMNS.map((column) => (
                   <th key={column} className="px-4 py-2 text-start font-medium">
                     {t(column)}
@@ -120,7 +120,7 @@ export function ContactsList({
                     <span className="inline-flex items-center gap-2">
                       {contact.name}
                       {contact.isPrimary && (
-                        <span className="bg-primary/10 px-1.5 py-0.5 text-xs text-primary">
+                        <span className="bg-primary/10 px-1.5 py-0.5 text-caption text-primary">
                           {t('primary')}
                         </span>
                       )}

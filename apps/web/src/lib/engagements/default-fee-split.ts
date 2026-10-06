@@ -83,7 +83,7 @@ function percentOfHundredths(hundredths: bigint): string {
 }
 
 /**
- * Each amount as a share of the fee, in hundredths of a percent, rounded half up
+ * Each amount as a share of the fee, in hundredths of a percent, rounding half up
  * in BigInt (never float). The residual that makes the shares sum to exactly
  * 100% goes to the LARGEST share (the last of equals, in due order): it is never
  * more than a few hundredths, so the largest row can always absorb it without

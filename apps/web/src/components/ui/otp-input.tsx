@@ -114,7 +114,7 @@ export function OtpInput({
           maxLength={1}
           autoFocus={autoFocus && i === 0}
           aria-label={`digit ${i + 1} of ${length}`}
-          className="size-12 rounded-xl border border-input bg-background text-center text-lg font-semibold tabular-nums outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
+          className="size-12 rounded-item border border-input bg-background text-center text-title font-semibold tabular-nums outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
         />
       ))}
     </div>

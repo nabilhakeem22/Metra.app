@@ -30,13 +30,30 @@
     --tracking-num: -0.02em; /* tabular figures */
     /* Arabic (Tajawal) never gets negative tracking. LH 1.3 head / 1.8 body. */
 
-    /* Radii (squircle scale) */
-    --r-frame: 26px; /* app viewport / window */
-    --r-panel: 20px; /* cards, sidebar slab */
-    --r-bar: 18px; /* top bar */
-    --r-item: 13px; /* nav item, input, small tile */
-    --r-icon: 11px; /* 34px icon button */
-    --r-pill: 999px; /* all buttons, chips, segmented */
+    /* Type scale: the ONLY six text sizes (Tailwind text-caption .. text-display
+       read these). The --fs-/--lh- prefix is load-bearing: --text-body is a
+       COLOUR below, so a size var must never be named after the token. */
+    --fs-caption: 12px;
+    --lh-caption: 16px;
+    --fs-small: 13px;
+    --lh-small: 18px;
+    --fs-body: 14px;
+    --lh-body: 20px;
+    --fs-title: 17px;
+    --lh-title: 24px;
+    --fs-heading: 21px;
+    --lh-heading: 28px;
+    --fs-display: 28px;
+    --lh-display: 34px;
+
+    /* Radii: the ONLY four corner sizes (plus none / full). */
+    --r-item: 12px; /* input, tab, menu item, small tile, icon button */
+    --r-panel: 20px; /* card, dialog, sheet, popover, menu content */
+    --r-frame: 26px; /* app shell: sidebar slab, top bar */
+    --r-pill: 999px; /* buttons, chips, badges */
+
+    /* Form-field text size. 16px on touch so iOS never zooms into a field. */
+    --field-fs: 14px;
 
     /* Blur */
     --glass-blur: blur(30px) saturate(180%);
@@ -48,8 +65,12 @@
     --pad-panel: 16px 20px;
     --sidebar-w: 232px;
 
-    /* shadcn radius scale anchor (kept from the prior theme). */
-    --radius: 0.625rem;
+  }
+
+  @media (pointer: coarse) {
+    :root {
+      --field-fs: 16px;
+    }
   }
 
   /* ========== Clear Light (2a) — Cobalt ========== */
@@ -310,11 +331,18 @@
   html[dir='rtl'] {
     --font-sans: var(--font-arabic);
     /* Arabic (Tajawal) NEVER takes negative tracking. Zeroing the two display
-       trackings here makes every .text-display / .text-title utility RTL-safe
+       trackings here makes the title / heading / display type tokens RTL-safe
        automatically; figure tracking (--tracking-num) stays — numerals are
        Western and rendered LTR. */
     --tracking-display: 0;
     --tracking-title: 0;
+    /* Arabic runs small: caption and small take one more pixel, and display
+       gets a looser line for the taller Tajawal ascenders. */
+    --fs-caption: 13px;
+    --lh-caption: 18px;
+    --fs-small: 14px;
+    --lh-small: 20px;
+    --lh-display: 36px;
   }
 
   /* Arabic runs small and tall: body one step up (16px) with generous leading;
@@ -322,10 +350,6 @@
   html[dir='rtl'] body {
     font-size: 16px;
     line-height: 1.8;
-  }
-  html[dir='rtl'] .text-display,
-  html[dir='rtl'] .text-title {
-    line-height: 1.3;
   }
 
   * {
@@ -545,6 +569,7 @@
     background: var(--field-bg);
     border: 1px solid var(--field-border);
     border-radius: var(--r-item);
+    font-size: var(--field-fs);
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25);
     color: var(--text);
     transition:
@@ -559,14 +584,14 @@
     color: var(--text-faint);
   }
 
-  /* Flat glass ICON BUTTON — 34px, --r-icon, fill + hairline (no nested blur). */
+  /* Flat glass ICON BUTTON: 34px, --r-item, fill + hairline (no nested blur). */
   .glass-icon-btn {
     display: inline-flex;
     align-items: center;
     justify-content: center;
     inline-size: 34px;
     block-size: 34px;
-    border-radius: var(--r-icon);
+    border-radius: var(--r-item);
     background: var(--glass);
     border: 1px solid var(--glass-hairline);
     color: var(--text-muted);
@@ -586,24 +611,6 @@
   .tabular {
     font-variant-numeric: tabular-nums;
     letter-spacing: var(--tracking-num);
-  }
-
-  /* ---- Type scale (LTR trackings; RTL zeroes display/title trackings above) ---- */
-  .text-display {
-    font-weight: 700;
-    letter-spacing: var(--tracking-display);
-    line-height: 1.05;
-  }
-  .text-title {
-    font-weight: 700;
-    letter-spacing: var(--tracking-title);
-  }
-  .text-meta {
-    font-family: var(--font-mono);
-    font-size: 10px;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    color: var(--text-faint);
   }
 
   /* Brand focus ring, visible over glass: 2px --brand at 2px offset. Pair with

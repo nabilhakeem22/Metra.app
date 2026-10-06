@@ -37,10 +37,10 @@ export function EngagementHeroChecklist({
         return (
           <li
             key={item.guard}
-            className="flex items-center gap-3 py-2 text-[13.5px]"
+            className="flex items-center gap-3 py-2 text-small"
           >
             <span
-              className={`grid h-[22px] w-[22px] shrink-0 place-items-center rounded-full text-xs font-extrabold ${
+              className={`grid h-[22px] w-[22px] shrink-0 place-items-center rounded-full text-caption font-bold ${
                 item.ok
                   ? 'bg-[color:var(--success-tint)] text-[color:var(--success)]'
                   : 'border-[1.5px] border-[color:var(--warn-tint)] bg-[color:var(--warn-tint)] text-[color:var(--warn)]'
@@ -61,7 +61,7 @@ export function EngagementHeroChecklist({
                 {tg(item.guard)}
               </span>
               {item.amountDue && (
-                <span className="mt-0.5 flex items-baseline gap-1.5 text-[11.5px]">
+                <span className="mt-0.5 flex items-baseline gap-1.5 text-caption">
                   <span className="text-[color:var(--text-faint)]">
                     {th('dueLabel')}
                   </span>
@@ -83,7 +83,7 @@ export function EngagementHeroChecklist({
               <button
                 type="button"
                 onClick={onNudge}
-                className="ms-auto shrink-0 rounded-[var(--r-pill)] border border-[color:var(--brand-tint-border)] bg-brand-tint px-2.5 py-1 text-[12px] font-semibold text-brand-ink"
+                className="ms-auto shrink-0 rounded-pill border border-[color:var(--brand-tint-border)] bg-brand-tint px-2.5 py-1 text-caption font-semibold text-brand-ink"
               >
                 {nudgeLabel}
               </button>

@@ -85,7 +85,7 @@ export function BoqStart({ projectId }: { projectId: string }) {
     <div className="glass space-y-4 p-5">
       <div>
         <p className="font-semibold text-[color:var(--text)]">{t('startTitle')}</p>
-        <p className="text-sm text-[color:var(--text-muted)]">{t('startBody')}</p>
+        <p className="text-body text-[color:var(--text-muted)]">{t('startBody')}</p>
       </div>
 
       <div className="flex flex-wrap gap-2">
@@ -126,12 +126,12 @@ export function BoqStart({ projectId }: { projectId: string }) {
 
       {preview && (
         <div className="space-y-3 rounded-item border border-[color:var(--rule)] p-4">
-          <p className="text-sm font-semibold text-[color:var(--text)]">
+          <p className="text-body font-semibold text-[color:var(--text)]">
             {t('previewTitle', { count: String(preview.lines?.length ?? 0) })}
           </p>
 
           {preview.notes?.map((note) => (
-            <p key={note} className="text-xs text-[color:var(--text-muted)]">
+            <p key={note} className="text-caption text-[color:var(--text-muted)]">
               {t(`importNotes.${note}`)}
             </p>
           ))}
@@ -139,12 +139,12 @@ export function BoqStart({ projectId }: { projectId: string }) {
           {preview.problems && preview.problems.length > 0 && (
             <div className="space-y-1">
               <p
-                className="text-xs font-semibold"
+                className="text-caption font-semibold"
                 style={{ color: 'var(--danger)' }}
               >
                 {t('previewProblems', { count: String(preview.problems.length) })}
               </p>
-              <ul className="max-h-40 space-y-0.5 overflow-y-auto text-xs text-[color:var(--text-muted)]">
+              <ul className="max-h-40 space-y-0.5 overflow-y-auto text-caption text-[color:var(--text-muted)]">
                 {preview.problems.slice(0, 20).map((p) => (
                   <li key={p.rowNumber}>
                     {t('rowLabel', { row: String(p.rowNumber) })} —{' '}

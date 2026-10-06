@@ -43,11 +43,11 @@ export async function ProposalsTab({
               <EmptyState title={t('empty')} />
             </div>
           ) : (
-            <table className="w-full text-sm">
+            <table className="w-full text-body">
               <tbody>
                 {proposals.map((p) => (
                   <tr key={p.id} className="border-b last:border-0">
-                    <td className="px-4 py-2 font-mono text-xs" dir="ltr">
+                    <td className="px-4 py-2 font-mono text-caption" dir="ltr">
                       {p.kind === 'boq' ? (
                         <ProposalKindTag />
                       ) : (

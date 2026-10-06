@@ -30,10 +30,10 @@ export function FeeSplitRows({
 
   return (
     <div className="space-y-2">
-      <p className="text-xs font-medium text-muted-foreground">{t('milestones')}</p>
+      <p className="text-caption font-medium text-muted-foreground">{t('milestones')}</p>
       {rows.map((row, index) => (
         <div key={row.kind} className="flex items-center gap-2">
-          <span className="w-40 shrink-0 text-sm">{tk(row.kind)}</span>
+          <span className="w-40 shrink-0 text-body">{tk(row.kind)}</span>
           <Input
             dir="ltr"
             inputMode="decimal"

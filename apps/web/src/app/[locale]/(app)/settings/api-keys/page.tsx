@@ -19,7 +19,7 @@ export default async function ApiKeysPage() {
       {canManage ? (
         <ApiKeysClient initialKeys={keys} />
       ) : (
-        <p className="rounded-xl border bg-muted/40 p-3 text-sm text-muted-foreground">
+        <p className="rounded-item border bg-muted/40 p-3 text-body text-muted-foreground">
           {t('forbidden')}
         </p>
       )}

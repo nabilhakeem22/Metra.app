@@ -106,19 +106,19 @@ export function NotificationBell({
 
       {open && (
         <div
-          className="absolute z-50 mt-2 w-[min(21rem,calc(100vw-2rem))] overflow-hidden rounded-[var(--r-panel)] border border-[color:var(--rule)] bg-card shadow-lg"
+          className="absolute z-50 mt-2 w-[min(21rem,calc(100vw-2rem))] overflow-hidden rounded-panel border border-[color:var(--rule)] bg-card shadow-lg"
           style={{ insetInlineEnd: 0 }}
           role="menu"
           aria-label={t('title')}
         >
           <div className="flex items-center justify-between gap-2 border-b border-[color:var(--rule)] px-3 py-2">
-            <p className="text-sm font-semibold">{t('title')}</p>
+            <p className="text-body font-semibold">{t('title')}</p>
             {hasUnread && (
               <button
                 type="button"
                 disabled={pending}
                 onClick={() => run(markAllNotificationsRead)}
-                className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground disabled:opacity-60"
+                className="inline-flex items-center gap-1 text-caption text-muted-foreground hover:text-foreground disabled:opacity-60"
               >
                 {pending ? (
                   <Loader2 className="size-3 animate-spin" aria-hidden />
@@ -131,7 +131,7 @@ export function NotificationBell({
           </div>
 
           {items.length === 0 ? (
-            <p className="px-3 py-6 text-center text-sm text-muted-foreground">
+            <p className="px-3 py-6 text-center text-body text-muted-foreground">
               {t('empty')}
             </p>
           ) : (
@@ -150,11 +150,11 @@ export function NotificationBell({
                       aria-hidden
                     />
                     <div className="min-w-0">
-                      <p className="text-xs font-medium">{tk(item.kind)}</p>
+                      <p className="text-caption font-medium">{tk(item.kind)}</p>
                       {body && (
-                        <p className="mt-0.5 text-xs text-muted-foreground">{body}</p>
+                        <p className="mt-0.5 text-caption text-muted-foreground">{body}</p>
                       )}
-                      <p className="mt-0.5 text-[11px] text-muted-foreground" dir="ltr">
+                      <p className="mt-0.5 text-caption text-muted-foreground" dir="ltr">
                         {formatDate(item.createdAt, locale)}
                       </p>
                     </div>
@@ -196,7 +196,7 @@ export function NotificationBell({
           <Link
             href="/notifications"
             onClick={() => setOpen(false)}
-            className="block border-t border-[color:var(--rule)] px-3 py-2 text-center text-xs font-medium text-brand-ink hover:bg-muted/50"
+            className="block border-t border-[color:var(--rule)] px-3 py-2 text-center text-caption font-medium text-brand-ink hover:bg-muted/50"
           >
             {t('viewAll')}
           </Link>

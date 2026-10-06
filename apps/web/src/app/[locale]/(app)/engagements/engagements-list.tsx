@@ -27,7 +27,7 @@ export function EngagementsList({ items, now }: { items: EngagementListRow[]; no
   return (
     <div>
       <div
-        className={`${ROW_GRID} hidden border-b px-4 py-2 text-xs font-medium text-muted-foreground sm:grid`}
+        className={`${ROW_GRID} hidden border-b px-4 py-2 text-caption font-medium text-muted-foreground sm:grid`}
       >
         <span>{t('engagement')}</span>
         <span>{t('list.status')}</span>
@@ -39,13 +39,13 @@ export function EngagementsList({ items, now }: { items: EngagementListRow[]; no
           <li key={row.id} className="border-b last:border-0">
             <Link
               href={`/engagements/${row.id}`}
-              className={`${ROW_GRID} px-4 py-3 text-sm hover:bg-muted/40 focus-visible:bg-muted/40`}
+              className={`${ROW_GRID} px-4 py-3 text-body hover:bg-muted/40 focus-visible:bg-muted/40`}
             >
               <span className="min-w-0">
                 <span className="block truncate font-semibold">
                   <bdi>{nameOf(row.titleAr, row.titleEn)}</bdi>
                 </span>
-                <span className="block truncate text-xs text-muted-foreground">
+                <span className="block truncate text-caption text-muted-foreground">
                   <span className="font-mono" dir="ltr">
                     {formatDocNumber('DE', row.number, docYear(null, row.createdAt))}
                   </span>

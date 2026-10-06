@@ -69,20 +69,20 @@ export function DocumentCategoriesCard({
     <Card>
       <CardContent className="space-y-4 py-5">
         <div>
-          <h2 className="text-sm font-semibold">{t('title')}</h2>
-          <p className="mt-1 text-xs text-muted-foreground">{t('subtitle')}</p>
+          <h2 className="text-body font-semibold">{t('title')}</h2>
+          <p className="mt-1 text-caption text-muted-foreground">{t('subtitle')}</p>
         </div>
 
-        <ul className="divide-y rounded-md border">
+        <ul className="divide-y rounded-panel border">
           {categories.map((c) => (
             <li key={c.id} className="flex flex-wrap items-center gap-2 px-3 py-2">
               <span
-                className={`flex-1 text-sm ${c.active ? '' : 'text-muted-foreground line-through'}`}
+                className={`flex-1 text-body ${c.active ? '' : 'text-muted-foreground line-through'}`}
               >
                 {pickLocale({ nameAr: c.nameAr, nameEn: c.nameEn }, 'name', locale).value}
               </span>
               {!c.active && (
-                <span className="text-xs text-muted-foreground">{t('retired')}</span>
+                <span className="text-caption text-muted-foreground">{t('retired')}</span>
               )}
               <Button
                 type="button"
@@ -150,7 +150,7 @@ export function DocumentCategoriesCard({
             {t('add')}
           </Button>
         </div>
-        <p className="text-xs text-muted-foreground">{t('retireNote')}</p>
+        <p className="text-caption text-muted-foreground">{t('retireNote')}</p>
       </CardContent>
     </Card>
   );

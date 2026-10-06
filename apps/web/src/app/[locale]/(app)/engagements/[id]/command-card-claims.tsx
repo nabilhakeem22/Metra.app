@@ -87,20 +87,20 @@ export function CommandCardClaims({
         {claims.map((claim) => (
           <li
             key={claim.id}
-            className="space-y-2 rounded-[var(--r-item)] border border-[color:var(--rule)] bg-[color:var(--track)] p-3"
+            className="space-y-2 rounded-item border border-[color:var(--rule)] bg-[color:var(--track)] p-3"
           >
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <span className="text-sm font-medium">{tk(claim.milestoneKind)}</span>
-              <span dir="ltr" className="text-sm tabular-nums text-[color:var(--text-muted)]">
+              <span className="text-body font-medium">{tk(claim.milestoneKind)}</span>
+              <span dir="ltr" className="text-body tabular-nums text-[color:var(--text-muted)]">
                 {formatMoney(claim.claimedAmount, locale)}
               </span>
             </div>
             {claim.actorName && (
-              <p className="text-xs text-[color:var(--text-muted)]">
+              <p className="text-caption text-[color:var(--text-muted)]">
                 {t('claimedBy', { name: claim.actorName })}
               </p>
             )}
-            {claim.note && <p className="text-xs text-[color:var(--text-muted)]">{claim.note}</p>}
+            {claim.note && <p className="text-caption text-[color:var(--text-muted)]">{claim.note}</p>}
             <div className="space-y-1.5">
               <Label htmlFor={`claim-amount-${claim.id}`}>{t('amount')}</Label>
               <Input
@@ -134,7 +134,7 @@ export function CommandCardClaims({
           </li>
         ))}
       </ul>
-      <p className="text-[12.5px] text-[color:var(--text-muted)]">{tcmd('claim.note')}</p>
+      <p className="text-small text-[color:var(--text-muted)]">{tcmd('claim.note')}</p>
       {dialog}
     </div>
   );

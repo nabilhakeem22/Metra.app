@@ -79,7 +79,7 @@ export function PaymentForm({
   const submit = () => submitPayment({ amount, method, reference });
 
   return (
-    <div className="mt-4 space-y-3 rounded-[var(--r-item)] border border-[color:var(--rule)] bg-[color:var(--track)] p-4">
+    <div className="mt-4 space-y-3 rounded-item border border-[color:var(--rule)] bg-[color:var(--track)] p-4">
       <div className="space-y-1.5">
         <Label htmlFor="hero-pay-amount">{tc('amount')}</Label>
         <Input
@@ -116,7 +116,7 @@ export function PaymentForm({
         <button
           type="button"
           onClick={() => setDetailsOpen(true)}
-          className="text-[12.5px] font-semibold text-brand-ink hover:underline"
+          className="text-small font-semibold text-brand-ink hover:underline"
         >
           + {tc('addDetails')}
         </button>

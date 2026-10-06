@@ -54,11 +54,11 @@ export function SettingsVisibilityCard({
             disabled={disabled}
           />
           <span>
-            <span className="flex items-center text-sm font-medium">
+            <span className="flex items-center text-body font-medium">
               {t('hideMarginLabel')}
               <FieldHint hint={th('hideMarginFromPm')} />
             </span>
-            <span className="block text-xs text-muted-foreground">
+            <span className="block text-caption text-muted-foreground">
               {t('hideMarginDesc')}
             </span>
           </span>
@@ -73,10 +73,10 @@ export function SettingsVisibilityCard({
             disabled={disabled}
           />
           <span>
-            <span className="block text-sm font-medium">
+            <span className="block text-body font-medium">
               {t('restrictDashLabel')}
             </span>
-            <span className="block text-xs text-muted-foreground">
+            <span className="block text-caption text-muted-foreground">
               {t('restrictDashDesc')}
             </span>
           </span>

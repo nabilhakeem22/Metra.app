@@ -83,8 +83,8 @@ export function EngagementFeeForm({
   return (
     // Flat tray (opaque --track fill, no .glass) so opening the fee form inside
     // the glass "next actions" Card never nests backdrop-filter.
-    <div className="space-y-4 rounded-[var(--r-item)] border border-[color:var(--rule)] bg-[color:var(--track)] p-4">
-      <p className="text-sm font-medium">{t('title')}</p>
+    <div className="space-y-4 rounded-item border border-[color:var(--rule)] bg-[color:var(--track)] p-4">
+      <p className="text-body font-medium">{t('title')}</p>
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div className="space-y-1.5">
@@ -116,11 +116,11 @@ export function EngagementFeeForm({
       </div>
 
       {prefill?.source === 'lastUsed' && (
-        <p className="text-xs text-muted-foreground">{t('prefilledFromLast')}</p>
+        <p className="text-caption text-muted-foreground">{t('prefilledFromLast')}</p>
       )}
       <FeeSplitRows rows={rows} onChange={setRow} onAdd={addRow} onRemove={removeRow} />
 
-      <div className="space-y-1 text-sm" aria-live="polite">
+      <div className="space-y-1 text-body" aria-live="polite">
         {summary.target !== null && (
           <p className={`tabular-nums ${summary.balanced ? '' : 'text-[color:var(--warn)]'}`}>
             {basis === 'percent'
@@ -131,8 +131,8 @@ export function EngagementFeeForm({
                 })}
           </p>
         )}
-        {!summary.hasFee && <p className="text-xs text-muted-foreground">{t('needsFee')}</p>}
-        {!summary.hasDeposit && <p className="text-xs text-muted-foreground">{t('needsDeposit')}</p>}
+        {!summary.hasFee && <p className="text-caption text-muted-foreground">{t('needsFee')}</p>}
+        {!summary.hasDeposit && <p className="text-caption text-muted-foreground">{t('needsDeposit')}</p>}
       </div>
 
       <div className="flex justify-end gap-2">

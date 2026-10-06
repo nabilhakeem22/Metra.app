@@ -65,15 +65,15 @@ export function PublicVariationView({
   return (
     <div className="mx-auto max-w-3xl space-y-4 p-4 md:p-8">
       <header className="space-y-1">
-        <h1 className="text-xl font-semibold">
+        <h1 className="text-heading font-semibold">
           {pick(variation.org.name_ar, variation.org.name_en) || 'Metra'}
         </h1>
-        <p className="text-sm text-muted-foreground" dir="ltr">
+        <p className="text-body text-muted-foreground" dir="ltr">
           {t('variation')} · {num}
         </p>
         <p className="font-medium">{pick(variation.title_ar, variation.title_en)}</p>
         {(variation.reason_ar || variation.reason_en) && (
-          <p className="text-sm text-muted-foreground">
+          <p className="text-body text-muted-foreground">
             {pick(variation.reason_ar, variation.reason_en)}
           </p>
         )}
@@ -81,7 +81,7 @@ export function PublicVariationView({
 
       <Card>
         <CardContent className="p-0">
-          <table className="w-full text-sm">
+          <table className="w-full text-body">
             <tbody>
               {variation.lines.map((l) => (
                 <tr key={l.id} className="border-b last:border-0">
@@ -99,7 +99,7 @@ export function PublicVariationView({
       </Card>
 
       <Card>
-        <CardContent className="ms-auto max-w-xs py-4 text-sm" dir="ltr">
+        <CardContent className="ms-auto max-w-xs py-4 text-body" dir="ltr">
           <div className="flex justify-between font-semibold">
             <span className="text-muted-foreground">{t('netDelta')}</span>
             <span>{m(variation.net_delta)}</span>
@@ -116,7 +116,7 @@ export function PublicVariationView({
       ) : (
         <Card>
           <CardContent className="space-y-3 py-4">
-            <p className="text-sm text-muted-foreground">{t('client.intro')}</p>
+            <p className="text-body text-muted-foreground">{t('client.intro')}</p>
             <Input
               placeholder={t('client.nameLabel')}
               value={name}

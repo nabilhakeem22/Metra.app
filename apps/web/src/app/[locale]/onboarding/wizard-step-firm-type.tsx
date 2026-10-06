@@ -27,10 +27,10 @@ export function WizardStepFirmType({
   return (
     <div className="space-y-4">
       <div className="space-y-1">
-        <h1 className="text-2xl font-bold tracking-tight">
+        <h1 className="text-heading font-bold">
           {t('step2Title')}
         </h1>
-        <p className="text-sm text-muted-foreground">{t('firmTypeHint')}</p>
+        <p className="text-body text-muted-foreground">{t('firmTypeHint')}</p>
       </div>
       <div
         role="radiogroup"
@@ -72,14 +72,14 @@ export function WizardStepFirmType({
               </span>
               <span className="min-w-0 flex-1 space-y-1">
                 <span className="flex items-center gap-2">
-                  <span className="text-sm font-semibold text-[color:var(--text)]">
+                  <span className="text-body font-semibold text-[color:var(--text)]">
                     {t(copy.label)}
                   </span>
                   {!def.available && (
                     <Badge variant="default">{t('firmTypeComingSoon')}</Badge>
                   )}
                 </span>
-                <span className="block text-sm text-muted-foreground">
+                <span className="block text-body text-muted-foreground">
                   {t(copy.desc)}
                 </span>
               </span>

@@ -65,10 +65,10 @@ export function PublicProposalView({
   return (
     <div className="mx-auto max-w-3xl space-y-4 p-4 md:p-8">
       <header className="space-y-1">
-        <h1 className="text-xl font-semibold">
+        <h1 className="text-heading font-semibold">
           {pick(proposal.org.name_ar, proposal.org.name_en) || 'Metra'}
         </h1>
-        <p className="text-sm text-muted-foreground" dir="ltr">
+        <p className="text-body text-muted-foreground" dir="ltr">
           {t('p.quotation')} · {num}
         </p>
         <p className="font-medium">{pick(proposal.title_ar, proposal.title_en)}</p>
@@ -78,10 +78,10 @@ export function PublicProposalView({
         <Card key={s.id}>
           <CardContent className="p-0">
             <div className="flex items-center justify-between border-b px-4 py-2">
-              <h2 className="text-sm font-semibold">{pick(s.title_ar, s.title_en)}</h2>
-              <span className="text-sm" dir="ltr">{m(s.section_subtotal)}</span>
+              <h2 className="text-body font-semibold">{pick(s.title_ar, s.title_en)}</h2>
+              <span className="text-body" dir="ltr">{m(s.section_subtotal)}</span>
             </div>
-            <table className="w-full text-sm">
+            <table className="w-full text-body">
               <tbody>
                 {s.lines.map((l) => (
                   <tr key={l.id} className="border-b last:border-0">
@@ -100,7 +100,7 @@ export function PublicProposalView({
       ))}
 
       <Card>
-        <CardContent className="ms-auto max-w-xs space-y-1 py-4 text-sm" dir="ltr">
+        <CardContent className="ms-auto max-w-xs space-y-1 py-4 text-body" dir="ltr">
           <Row label={t('p.subtotal')} value={m(proposal.subtotal)} />
           <Row label={t('p.discount')} value={m(proposal.discount_amount)} />
           <Row label={`${t('p.tax')} (${formatPercent(proposal.tax_rate, locale)})`} value={m(proposal.tax_amount)} />

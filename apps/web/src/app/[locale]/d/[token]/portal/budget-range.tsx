@@ -8,9 +8,9 @@ import { formatPortalAmount } from './portal-money';
 type RangePart = { kind: 'figure' | 'word' | 'currency'; text: string };
 
 const PART_CLASS: Record<RangePart['kind'], string> = {
-  figure: 'text-2xl font-extrabold tracking-tight tabular-nums',
-  word: 'text-sm text-muted-foreground',
-  currency: 'text-sm font-semibold text-muted-foreground',
+  figure: 'text-heading font-bold tabular-nums',
+  word: 'text-body text-muted-foreground',
+  currency: 'text-body font-semibold text-muted-foreground',
 };
 
 /**

@@ -62,7 +62,7 @@ export function ActivityTab({
               onChange={(e) => setNote(e.target.value)}
               placeholder={t('notePlaceholder')}
               rows={3}
-              className="w-full glass-field outline-none focus-ring-brand focus-visible:border-[color:hsl(var(--brand))] p-2 text-sm"
+              className="w-full glass-field outline-none focus-ring-brand focus-visible:border-[color:hsl(var(--brand))] p-2 text-body"
               aria-label={t('add')}
             />
             <div className="flex justify-end">
@@ -86,7 +86,7 @@ export function ActivityTab({
               {entries.map((e) => (
                 <li key={e.id} className="px-4 py-3">
                   <div className="flex items-center justify-between gap-2">
-                    <span className="flex items-center gap-2 text-sm font-medium">
+                    <span className="flex items-center gap-2 text-body font-medium">
                       {/* A quiet marker, not a colour: an audit row is a record of
                           a change, an activity row is something someone said. */}
                       {e.source === 'audit' && (
@@ -97,12 +97,12 @@ export function ActivityTab({
                       )}
                       {t(`kinds.${e.labelKey}`)}
                     </span>
-                    <span className="text-xs text-muted-foreground" dir="ltr">
+                    <span className="text-caption text-muted-foreground" dir="ltr">
                       {formatDate(e.at, locale)}
                     </span>
                   </div>
                   {e.note && (
-                    <p className="mt-1 whitespace-pre-wrap text-sm text-muted-foreground">
+                    <p className="mt-1 whitespace-pre-wrap text-body text-muted-foreground">
                       {e.note}
                     </p>
                   )}

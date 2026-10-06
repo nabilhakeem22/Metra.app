@@ -78,7 +78,7 @@ export function EngagementPanels({
   runAction: RunAction;
 }) {
   return (
-    <section className="overflow-hidden rounded-[var(--r-panel)] border border-[color:var(--rule)] bg-card text-[color:var(--text)] shadow-sm">
+    <section className="overflow-hidden rounded-panel border border-[color:var(--rule)] bg-card text-[color:var(--text)] shadow-sm">
       {tab === 'files' && (
         <FilesTab
           engagementId={engagementId}

@@ -95,23 +95,23 @@ export function BudgetTab({
 
         {/* The CURRENT band, stated once and large. Everything below it is what
             it used to be. */}
-        <div className="flex flex-wrap items-baseline gap-3 rounded-[var(--r-item)] border border-[color:var(--rule)] bg-[color:var(--track)] px-4 py-3.5">
-          <span className="text-[12.5px] text-[color:var(--text-muted)]">
+        <div className="flex flex-wrap items-baseline gap-3 rounded-item border border-[color:var(--rule)] bg-[color:var(--track)] px-4 py-3.5">
+          <span className="text-small text-[color:var(--text-muted)]">
             {t('rom.range')}
           </span>
           {hasRange ? (
             // A range is ONE value, formatted as one unit — never two numbers with
             // a hyphen glued between them, which mirrors wrong in RTL.
-            <span className="ms-auto font-mono text-[16px] tabular-nums" dir="ltr">
+            <span className="ms-auto font-mono text-title tabular-nums" dir="ltr">
               {`${formatMoney(header.romLow, locale)} – ${formatMoney(header.romHigh, locale)}`}
             </span>
           ) : (
-            <span className="ms-auto text-[13px] text-[color:var(--text-muted)]">{t('rom.notSet')}</span>
+            <span className="ms-auto text-small text-[color:var(--text-muted)]">{t('rom.notSet')}</span>
           )}
         </div>
 
         <div>
-          <p className="mb-2 font-mono text-[11px] font-semibold uppercase tracking-[0.1em] text-[color:var(--text-muted)]">
+          <p className="mb-2 font-mono text-caption font-semibold uppercase tracking-[0.1em] text-[color:var(--text-muted)]">
             {tp('budgetHistory')}
           </p>
           {entries.length === 0 ? (
@@ -123,17 +123,17 @@ export function BudgetTab({
                   key={entry.id}
                   className="flex flex-wrap items-baseline gap-x-3 gap-y-1 border-b border-dashed border-[color:var(--rule)] py-2.5 last:border-0"
                 >
-                  <span className="text-[13px] font-medium">
+                  <span className="text-small font-medium">
                     {t(`eventKind.${entry.kind}`)}
                   </span>
                   <span
-                    className="font-mono text-[11px] text-[color:var(--text-faint)]"
+                    className="font-mono text-caption text-[color:var(--text-faint)]"
                     dir="ltr"
                   >
                     {formatDate(entry.at, locale)}
                   </span>
                   <span
-                    className="ms-auto font-mono text-[13px] tabular-nums"
+                    className="ms-auto font-mono text-small tabular-nums"
                     dir="ltr"
                   >
                     {`${formatMoney(entry.low, locale)} – ${formatMoney(entry.high, locale)}`}

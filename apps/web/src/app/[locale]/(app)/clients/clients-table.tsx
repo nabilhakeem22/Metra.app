@@ -31,9 +31,9 @@ export function ClientsTable({
     <Card>
       <CardContent className="p-0">
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="w-full text-body">
             <thead>
-              <tr className="border-b text-xs text-muted-foreground">
+              <tr className="border-b text-caption text-muted-foreground">
                 {COLUMNS.map((column) => (
                   <th key={column} className="px-4 py-2 text-start font-medium">
                     {t(`table.${column}`)}

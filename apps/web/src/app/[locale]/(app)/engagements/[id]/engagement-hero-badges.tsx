@@ -36,7 +36,7 @@ export function EngagementHeroBadges({
   return (
     <div className="mb-3.5 flex flex-wrap gap-2">
       {stallDays !== null && (
-        <span className="inline-flex items-center gap-1.5 rounded-full bg-[color:var(--warn-tint)] px-2.5 py-1 text-xs font-semibold text-[color:var(--warn)]">
+        <span className="inline-flex items-center gap-1.5 rounded-pill bg-[color:var(--warn-tint)] px-2.5 py-1 text-caption font-semibold text-[color:var(--warn)]">
           <span aria-hidden>⏱</span>
           {t(`state.${state}`)}
           <span className="font-mono font-medium tabular-nums" dir="ltr">
@@ -44,7 +44,7 @@ export function EngagementHeroBadges({
           </span>
         </span>
       )}
-      <span className="inline-flex items-center gap-1.5 rounded-full bg-[color:var(--track)] px-2.5 py-1 text-xs font-semibold text-[color:var(--text-muted)]">
+      <span className="inline-flex items-center gap-1.5 rounded-pill bg-[color:var(--track)] px-2.5 py-1 text-caption font-semibold text-[color:var(--text-muted)]">
         <span className="font-mono font-medium tabular-nums" dir="ltr">
           {revisionTrigger === 'designChangeRaised'
             ? th('designRevision', { n: count, free })

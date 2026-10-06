@@ -18,11 +18,11 @@ export function Greeting({
   return (
     <div className="space-y-1 px-1">
       {clientName && (
-        <p className="text-sm text-muted-foreground">
+        <p className="text-body text-muted-foreground">
           {t('greeting', { name: clientName })}
         </p>
       )}
-      {title && <h1 className="text-xl font-semibold tracking-tight">{title}</h1>}
+      {title && <h1 className="text-heading font-semibold">{title}</h1>}
     </div>
   );
 }

@@ -59,7 +59,7 @@ export function EngagementInlineDropzone({
   if (atCapacity) {
     return (
       <div
-        className="mb-4 flex w-full items-center justify-center gap-2 rounded-[var(--r-item)] border border-dashed border-[color:var(--rule)] bg-[color:var(--track)] px-4 py-5 text-[13px] font-semibold text-[color:var(--text-muted)]"
+        className="mb-4 flex w-full items-center justify-center gap-2 rounded-item border border-dashed border-[color:var(--rule)] bg-[color:var(--track)] px-4 py-5 text-small font-semibold text-[color:var(--text-muted)]"
         aria-disabled="true"
       >
         <span>{t('conceptOptionCap')}</span>
@@ -106,7 +106,7 @@ export function EngagementInlineDropzone({
         onDrop={onDrop}
         disabled={pending}
         data-dragging={dragging || undefined}
-        className={`flex w-full items-center justify-center gap-2 rounded-[var(--r-item)] border border-[color:var(--brand-tint-border)] px-4 py-5 text-[13px] font-semibold text-brand-ink transition-colors hover:bg-[color:var(--track)] disabled:cursor-not-allowed disabled:opacity-60 ${
+        className={`flex w-full items-center justify-center gap-2 rounded-item border border-[color:var(--brand-tint-border)] px-4 py-5 text-small font-semibold text-brand-ink transition-colors hover:bg-[color:var(--track)] disabled:cursor-not-allowed disabled:opacity-60 ${
           dragging ? 'border-solid bg-[color:var(--track)]' : 'border-dashed bg-brand-tint'
         }`}
       >

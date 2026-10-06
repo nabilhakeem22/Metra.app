@@ -73,7 +73,7 @@ export function EngagementCreateFields({
             />
           </div>
         </div>
-        <p className="text-xs text-muted-foreground">{t('titleHint')}</p>
+        <p className="text-caption text-muted-foreground">{t('titleHint')}</p>
         <FieldError message={fieldErrors.title} />
       </div>
 
@@ -103,7 +103,7 @@ export function EngagementCreateFields({
         />
       )}
 
-      <label className="flex items-center gap-2 text-sm">
+      <label className="flex items-center gap-2 text-body">
         <input
           type="checkbox"
           checked={values.offPlan}

@@ -67,10 +67,10 @@ export function SettingsProfileCard({
             <img
               src={logoPreview}
               alt=""
-              className="size-12 rounded-xl border object-cover"
+              className="size-12 rounded-item border object-cover"
             />
           ) : (
-            <div className="flex size-12 items-center justify-center rounded-xl bg-muted text-muted-foreground">
+            <div className="flex size-12 items-center justify-center rounded-item bg-muted text-muted-foreground">
               <Upload className="size-5" aria-hidden />
             </div>
           )}
@@ -84,7 +84,7 @@ export function SettingsProfileCard({
           />
           <Label
             htmlFor="logo"
-            className="inline-flex h-9 cursor-pointer items-center rounded-md border border-input px-3 text-sm font-medium hover:bg-muted aria-disabled:pointer-events-none aria-disabled:opacity-50"
+            className="inline-flex h-9 cursor-pointer items-center rounded-pill border border-input px-3 text-body font-medium hover:bg-muted aria-disabled:pointer-events-none aria-disabled:opacity-50"
             aria-disabled={disabled || uploading}
           >
             {uploading && <Loader2 className="me-2 size-4 animate-spin" aria-hidden />}

@@ -42,8 +42,8 @@ export function JourneyTracker({
   const states = stepStates(milestone);
 
   return (
-    <section className={bare ? "" : "rounded-2xl border bg-muted/40 p-4"}>
-      <p className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+    <section className={bare ? "" : "rounded-panel border bg-muted/40 p-4"}>
+      <p className="mb-3 text-caption font-semibold uppercase tracking-wider text-muted-foreground">
         {t('eyebrow')}
       </p>
       <ol className="flex items-start">
@@ -64,7 +64,7 @@ export function JourneyTracker({
                 />
               )}
               <span
-                className={`relative z-10 flex size-6 items-center justify-center rounded-full border-2 text-[11px] font-bold ${
+                className={`relative z-10 flex size-6 items-center justify-center rounded-full border-2 text-caption font-bold ${
                   state === 'done'
                     ? 'border-primary bg-primary text-primary-foreground'
                     : state === 'now'
@@ -79,7 +79,7 @@ export function JourneyTracker({
                 )}
               </span>
               <span
-                className={`text-[10px] font-semibold leading-tight ${
+                className={`text-caption font-semibold leading-tight ${
                   active ? 'text-foreground' : 'text-muted-foreground'
                 }`}
               >

@@ -47,14 +47,14 @@ export function useConfirm(): {
     >
       <AlertDialog.Portal>
         <AlertDialog.Overlay className="fixed inset-0 z-50 bg-foreground/40 backdrop-blur-sm data-[state=open]:animate-in data-[state=open]:fade-in-0 motion-reduce:animate-none" />
-        <AlertDialog.Content className="fixed inset-x-4 top-1/2 z-50 mx-auto max-w-md -translate-y-1/2 rounded-2xl border bg-card p-6 text-start shadow-card outline-none data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 motion-reduce:animate-none">
+        <AlertDialog.Content className="fixed inset-x-4 top-1/2 z-50 mx-auto max-w-md -translate-y-1/2 rounded-panel border bg-card p-6 text-start shadow-card outline-none data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 motion-reduce:animate-none">
         {opts && (
           <>
-            <AlertDialog.Title className="text-lg font-semibold">
+            <AlertDialog.Title className="text-title font-semibold">
               {opts.title}
             </AlertDialog.Title>
             {opts.description && (
-              <AlertDialog.Description className="mt-1 text-sm text-muted-foreground">
+              <AlertDialog.Description className="mt-1 text-body text-muted-foreground">
                 {opts.description}
               </AlertDialog.Description>
             )}

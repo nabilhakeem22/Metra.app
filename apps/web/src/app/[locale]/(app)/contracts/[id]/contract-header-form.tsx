@@ -76,7 +76,7 @@ export function ContractHeaderForm({ detail }: { detail: ContractDetail }) {
     label: string,
     type: 'text' | 'date' | 'number' = 'text',
   ) => (
-    <label className="flex flex-col gap-1 text-sm">
+    <label className="flex flex-col gap-1 text-body">
       <span className="text-muted-foreground">{label}</span>
       <Input
         type={type}
@@ -90,9 +90,9 @@ export function ContractHeaderForm({ detail }: { detail: ContractDetail }) {
   return (
     <Card>
       <CardContent className="space-y-3 py-4">
-        <h2 className="text-sm font-semibold">{t('contract')}</h2>
+        <h2 className="text-body font-semibold">{t('contract')}</h2>
         {error && (
-          <p className="text-sm text-destructive" role="alert">
+          <p className="text-body text-destructive" role="alert">
             {error}
           </p>
         )}
@@ -112,7 +112,7 @@ export function ContractHeaderForm({ detail }: { detail: ContractDetail }) {
             {pending && <Loader2 className="size-4 animate-spin" aria-hidden />}
             {t('saveDraft')}
           </Button>
-          {saved && <span className="text-sm text-[color:var(--success)]">{t('saved')}</span>}
+          {saved && <span className="text-body text-[color:var(--success)]">{t('saved')}</span>}
         </div>
       </CardContent>
     </Card>

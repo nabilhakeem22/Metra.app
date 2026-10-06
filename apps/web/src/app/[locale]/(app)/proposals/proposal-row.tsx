@@ -31,7 +31,7 @@ export function ProposalRow({ row }: { row: ProposalListRow }) {
 
   return (
     <tr className="border-b last:border-0 hover:bg-muted/40">
-      <td className="px-4 py-2 font-mono text-xs" dir="ltr">
+      <td className="px-4 py-2 font-mono text-caption" dir="ltr">
         <Link href={href} className="text-primary hover:underline">
           {row.kind === 'boq' ? (
             <ProposalKindTag />
@@ -44,7 +44,7 @@ export function ProposalRow({ row }: { row: ProposalListRow }) {
       <td className="px-4 py-2 text-muted-foreground">{clientName || '—'}</td>
       <td className="px-4 py-2">
         <span
-          className={`rounded-full px-2 py-0.5 text-xs ${STATUS_STYLE[row.status] ?? 'bg-muted'}`}
+          className={`rounded-pill px-2 py-0.5 text-caption ${STATUS_STYLE[row.status] ?? 'bg-muted'}`}
         >
           {t(`statuses.${row.status}`)}
         </span>

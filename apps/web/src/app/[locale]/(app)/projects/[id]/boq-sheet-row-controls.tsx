@@ -49,7 +49,7 @@ export function BoqProvisionalCell({
             title={t('provisional')}
             disabled={pending}
             onClick={() => api.saveLine(line, { provisional: !line.provisional }, [])}
-            className="inline-flex size-6 items-center justify-center rounded-[8px] border font-mono text-[10px] font-bold"
+            className="inline-flex size-6 items-center justify-center rounded-item border font-mono text-caption font-bold"
             style={line.provisional ? PROVISIONAL_ON : PROVISIONAL_OFF}
           >
             P
@@ -57,7 +57,7 @@ export function BoqProvisionalCell({
         ) : (
           line.provisional && (
             <span
-              className="rounded-pill px-2 py-0.5 text-[10px] font-semibold"
+              className="rounded-pill px-2 py-0.5 text-caption font-semibold"
               style={{ background: 'var(--warn-tint)', color: 'var(--warn)' }}
             >
               {t('provisional')}
@@ -99,7 +99,7 @@ export function BoqRowActionsCell({
             disabled={pending}
             aria-label={t('deleteLine')}
             title={t('deleteLine')}
-            className="rounded-[8px] p-1 text-[color:var(--text-faint)] hover:text-[color:var(--danger)]"
+            className="rounded-item p-1 text-[color:var(--text-faint)] hover:text-[color:var(--danger)]"
           >
             <Trash2 className="size-4" aria-hidden />
           </button>

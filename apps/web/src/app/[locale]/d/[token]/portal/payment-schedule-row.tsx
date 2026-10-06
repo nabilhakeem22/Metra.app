@@ -57,10 +57,10 @@ export function PaymentScheduleRow({
     <li className="grid grid-cols-[1.5rem_1fr_auto] items-center gap-2.5 border-t py-2.5 first:border-t-0">
       <RowMarker row={row} />
       <div className="min-w-0 space-y-1">
-        <p className={cn('text-sm font-semibold', greyed && 'text-muted-foreground')}>{label}</p>
+        <p className={cn('text-body font-semibold', greyed && 'text-muted-foreground')}>{label}</p>
         <p
           className={cn(
-            'text-xs text-muted-foreground',
+            'text-caption text-muted-foreground',
             row.isNext && 'font-semibold text-[color:var(--warn)]',
           )}
         >
@@ -71,7 +71,7 @@ export function PaymentScheduleRow({
       <span
         dir="ltr"
         className={cn(
-          'text-sm font-bold tabular-nums',
+          'text-body font-bold tabular-nums',
           (greyed || row.state === 'paid') && 'text-muted-foreground',
           row.state === 'paid' && 'line-through',
         )}

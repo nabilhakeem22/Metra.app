@@ -34,7 +34,7 @@ export function ArtifactsPanel({
   const visibility = useClientVisibility();
   if (artifacts.length === 0) return <Empty text={t('artifacts.empty')} />;
   return (
-    <table className="w-full text-sm">
+    <table className="w-full text-body">
       <thead>
         <tr className={HEAD_ROW}>
           <th className="py-2 text-start font-medium">{t('artifacts.kind')}</th>

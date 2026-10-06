@@ -56,7 +56,7 @@ export function AdvanceOrReshare(props: CommandCardActionProps) {
     // other role sees who decides instead of buttons it may not press.
     if (props.view.mode === 'ready' && !props.view.endingsEnabled) {
       return (
-        <p className="text-[13px] text-[color:var(--text-muted)]">{tcmd('ending.decidedBy')}</p>
+        <p className="text-small text-[color:var(--text-muted)]">{tcmd('ending.decidedBy')}</p>
       );
     }
     return (

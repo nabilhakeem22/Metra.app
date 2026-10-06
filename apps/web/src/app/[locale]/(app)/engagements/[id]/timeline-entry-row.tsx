@@ -7,7 +7,7 @@ import { RetractButton } from './engagement-retract-button';
 import type { TimelineEntry } from './timeline-entries';
 
 const PROVENANCE_BLOCK =
-  'mt-1.5 border-s-2 border-[color:var(--danger)] ps-2 font-mono text-[11px] leading-relaxed';
+  'mt-1.5 border-s-2 border-[color:var(--danger)] ps-2 font-mono text-caption leading-relaxed';
 
 /**
  * THE PROVENANCE BLOCK. What the on-behalf chip asserts, spelled out: that the
@@ -52,7 +52,7 @@ export function TimelineEntryRow({
   const t = useTranslations('engagements');
   const locale = useLocale();
   return (
-    <li className="relative ps-5 pb-3.5 text-[12.5px] last:pb-0">
+    <li className="relative ps-5 pb-3.5 text-small last:pb-0">
       <span
         className="absolute top-1 inline-block h-2 w-2 rounded-full bg-brand"
         style={{ insetInlineStart: '2px' }}
@@ -80,12 +80,12 @@ export function TimelineEntryRow({
             typed themselves -- the data layer always could, and until now this
             page could not. */}
         {entry.onBehalf && (
-          <span className="inline-flex items-center rounded-[var(--r-pill)] border border-[color:var(--danger)] px-2 py-0.5 font-mono text-[9.5px] font-bold uppercase tracking-[0.06em] text-[color:var(--danger)]">
+          <span className="inline-flex items-center rounded-pill border border-[color:var(--danger)] px-2 py-0.5 font-mono text-caption font-bold uppercase tracking-[0.06em] text-[color:var(--danger)]">
             {t('timeline.onBehalfChip')}
           </span>
         )}
       </div>
-      <div className="font-mono text-[11px] text-[color:var(--text-faint)]" dir="ltr">
+      <div className="font-mono text-caption text-[color:var(--text-faint)]" dir="ltr">
         {formatDate(entry.at, locale)}
       </div>
 
@@ -119,7 +119,7 @@ export function TimelineEntryRow({
           — quoted, secondary, and rendered as PLAIN TEXT: React escapes it, so
           user-authored input can never inject markup here. */}
       {entry.note && (
-        <p className="mt-1 whitespace-pre-line break-words border-s-2 border-[color:var(--rule)] ps-2 text-[12px] text-[color:var(--text-muted)]">
+        <p className="mt-1 whitespace-pre-line break-words border-s-2 border-[color:var(--rule)] ps-2 text-caption text-[color:var(--text-muted)]">
           {t('noteQuote', { note: entry.note })}
         </p>
       )}

@@ -48,17 +48,17 @@ export function PriceBookTable({
         <Card key={group.section.id}>
           <CardContent className="p-0">
             <div className="flex items-center justify-between border-b px-4 py-2.5">
-              <h2 className="text-sm font-semibold">
+              <h2 className="text-body font-semibold">
                 {sectionName(group.section)}
               </h2>
-              <span className="text-xs text-muted-foreground">
+              <span className="text-caption text-muted-foreground">
                 {t('itemsCount', { count: group.rows.length })}
               </span>
             </div>
             <div className="overflow-x-auto">
-              <table className="w-full text-sm">
+              <table className="w-full text-body">
                 <thead>
-                  <tr className="border-b text-xs text-muted-foreground">
+                  <tr className="border-b text-caption text-muted-foreground">
                     <th className="px-4 py-2 text-start font-medium">
                       {t('table.code')}
                     </th>
@@ -92,7 +92,7 @@ export function PriceBookTable({
                         key={item.id}
                         className="border-b last:border-0 hover:bg-muted/40"
                       >
-                        <td className="px-4 py-2 font-mono text-xs" dir="ltr">
+                        <td className="px-4 py-2 font-mono text-caption" dir="ltr">
                           {item.code}
                         </td>
                         <td className="px-4 py-2">{name}</td>
@@ -109,8 +109,8 @@ export function PriceBookTable({
                           <span
                             className={
                               item.active
-                                ? 'rounded-full bg-[color:var(--success-tint)] px-2 py-0.5 text-xs text-[color:var(--success)]'
-                                : 'rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground'
+                                ? 'rounded-pill bg-[color:var(--success-tint)] px-2 py-0.5 text-caption text-[color:var(--success)]'
+                                : 'rounded-pill bg-muted px-2 py-0.5 text-caption text-muted-foreground'
                             }
                           >
                             {t(item.active ? 'status.active' : 'status.inactive')}

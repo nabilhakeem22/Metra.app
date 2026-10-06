@@ -25,8 +25,8 @@ export function ImportWizardPreviewStep({
 }) {
   return (
     <div className="space-y-3">
-      <div className="max-h-80 overflow-y-auto rounded-md border">
-        <table className="w-full text-sm">
+      <div className="max-h-80 overflow-y-auto rounded-panel border">
+        <table className="w-full text-body">
           <thead className="sticky top-0 bg-muted">
             <tr>
               <th className="px-2 py-1.5 text-start">

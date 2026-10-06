@@ -31,7 +31,7 @@ export function BoqModeBar({
         )}
         {t('back')}
       </Button>
-      <div className="flex items-start gap-2.5 rounded-[var(--r-panel)] border border-[color:var(--brand-tint-border)] bg-[color:var(--brand-tint)] px-4 py-3 text-[13.5px] text-[color:var(--text)]">
+      <div className="flex items-start gap-2.5 rounded-panel border border-[color:var(--brand-tint-border)] bg-[color:var(--brand-tint)] px-4 py-3 text-small text-[color:var(--text)]">
         <Info className="mt-0.5 size-4 shrink-0 text-brand-ink" aria-hidden />
         <p>{t('banner')}</p>
       </div>

@@ -47,7 +47,7 @@ export function NotificationsClient({ items }: { items: FeedItem[] }) {
 
   if (items.length === 0) {
     return (
-      <p className="rounded-xl border bg-muted/40 p-6 text-center text-sm text-muted-foreground">
+      <p className="rounded-panel border bg-muted/40 p-6 text-center text-body text-muted-foreground">
         {t('empty')}
       </p>
     );
@@ -64,7 +64,7 @@ export function NotificationsClient({ items }: { items: FeedItem[] }) {
         </div>
       )}
 
-      <ul className="divide-y rounded-xl border bg-card">
+      <ul className="divide-y rounded-panel border bg-card">
         {items.map((item) => {
 
           const href = notificationHref(item);
@@ -72,7 +72,7 @@ export function NotificationsClient({ items }: { items: FeedItem[] }) {
           return (
             <li
               key={item.id}
-              className="flex items-start gap-3 p-4 first:rounded-t-xl last:rounded-b-xl"
+              className="flex items-start gap-3 p-4 first:rounded-t-panel last:rounded-b-panel"
             >
               <span
                 className={
@@ -83,18 +83,18 @@ export function NotificationsClient({ items }: { items: FeedItem[] }) {
                 aria-hidden
               />
               <div className="min-w-0 flex-1">
-                <p className="text-sm font-medium">{tk(item.kind)}</p>
+                <p className="text-body font-medium">{tk(item.kind)}</p>
                 {href ? (
                   <Link
                     href={href}
-                    className="text-sm text-muted-foreground hover:underline"
+                    className="text-body text-muted-foreground hover:underline"
                   >
                     {text}
                   </Link>
                 ) : (
-                  <p className="text-sm text-muted-foreground">{text}</p>
+                  <p className="text-body text-muted-foreground">{text}</p>
                 )}
-                <p className="mt-1 text-xs text-muted-foreground">
+                <p className="mt-1 text-caption text-muted-foreground">
                   {formatDate(item.createdAt, locale)}
                 </p>
               </div>

@@ -28,9 +28,9 @@ export function PageHeader({
     >
       <div className="space-y-1">
         {breadcrumb && (
-          <div className="text-sm text-muted-foreground">{breadcrumb}</div>
+          <div className="text-body text-muted-foreground">{breadcrumb}</div>
         )}
-        <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight">
+        <h1 className="flex items-center gap-2 text-heading font-bold">
           <span
             aria-hidden
             className="h-5 w-[3px] rounded-full bg-brand"
@@ -38,7 +38,7 @@ export function PageHeader({
           {title}
         </h1>
         {description && (
-          <p className="text-sm text-muted-foreground">{description}</p>
+          <p className="text-body text-muted-foreground">{description}</p>
         )}
       </div>
       {action && <div className="shrink-0">{action}</div>}

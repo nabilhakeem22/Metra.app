@@ -32,7 +32,7 @@ function CoachmarkHighlight({
       <div
         aria-hidden
         className={cn(
-          'fixed z-[61] rounded-lg border-2 border-primary',
+          'fixed z-[61] rounded-item border-2 border-primary',
           animated && 'transition-all',
         )}
         style={{

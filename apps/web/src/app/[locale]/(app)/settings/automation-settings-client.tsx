@@ -105,8 +105,8 @@ export function AutomationSettingsClient({
         disabled={disabled}
       />
       <span>
-        <span className="block text-sm font-medium">{label}</span>
-        <span className="block text-xs text-muted-foreground">{desc}</span>
+        <span className="block text-body font-medium">{label}</span>
+        <span className="block text-caption text-muted-foreground">{desc}</span>
       </span>
     </label>
   );

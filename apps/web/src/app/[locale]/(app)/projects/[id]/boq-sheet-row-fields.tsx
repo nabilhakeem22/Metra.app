@@ -14,10 +14,10 @@ import type { BoqSheetRowApi } from './boq-sheet-row-api';
 // Each takes the row's own uncommitted edits (`typed`) rather than reaching into
 // a shared api for them, which is what lets the row be memoised.
 
-const READ_ONLY_CODE = 'block p-3 font-mono text-[13px] text-[color:var(--text-muted)]';
+const READ_ONLY_CODE = 'block p-3 font-mono text-small text-[color:var(--text-muted)]';
 const READ_ONLY_NUMBER = 'block whitespace-nowrap p-3 text-end font-mono tabular-nums';
 const UNIT_SELECT =
-  'w-full cursor-pointer rounded-[8px] border border-transparent bg-transparent p-3 text-sm text-[color:var(--text)] hover:bg-[color:var(--track)] focus:border-[color:hsl(var(--brand))] focus:outline-none';
+  'w-full cursor-pointer rounded-item border border-transparent bg-transparent p-3 text-body text-[color:var(--text)] hover:bg-[color:var(--track)] focus:border-[color:hsl(var(--brand))] focus:outline-none';
 
 export interface BoqFieldProps {
   line: EditableLine;

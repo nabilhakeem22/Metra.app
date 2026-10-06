@@ -16,7 +16,7 @@ export function UploadQueueList({ queue }: { queue: UploadQueueItem[] }) {
   const t = useTranslations('engagements.files.status');
   if (queue.length === 0) return null;
   return (
-    <ul className="mt-2 space-y-1 text-xs" aria-live="polite">
+    <ul className="mt-2 space-y-1 text-caption" aria-live="polite">
       {queue.map((item) => (
         <li key={item.key} className="flex flex-wrap items-baseline gap-x-2">
           <span className="min-w-0 truncate" dir="auto">

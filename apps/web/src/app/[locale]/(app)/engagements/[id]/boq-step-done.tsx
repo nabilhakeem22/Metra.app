@@ -18,7 +18,7 @@ function BoqClientChip({ clientCanOpen }: { clientCanOpen: boolean }) {
   const ChipIcon = clientCanOpen ? LockOpen : Lock;
   return (
     <span
-      className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[12px] font-medium"
+      className="inline-flex items-center gap-1 rounded-pill border px-2 py-0.5 text-caption font-medium"
       style={
         clientCanOpen
           ? { color: 'var(--success)', borderColor: 'var(--success)' }
@@ -55,14 +55,14 @@ export function BoqStepDone({
   const StateIcon = shared ? CheckCircle2 : EyeOff;
 
   return (
-    <div className="mb-4 rounded-[var(--r-panel)] border border-[color:var(--rule)] bg-[color:var(--track)] px-3.5 py-3">
+    <div className="mb-4 rounded-panel border border-[color:var(--rule)] bg-[color:var(--track)] px-3.5 py-3">
       <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1.5">
         <StateIcon
           className="size-4 shrink-0"
           style={{ color: shared ? 'var(--success)' : 'var(--warn)' }}
           aria-hidden
         />
-        <p className="text-[13.5px] text-[color:var(--text)]">
+        <p className="text-small text-[color:var(--text)]">
           {t(shared ? 'doneTitle' : 'doneUnsharedTitle', {
             documentNumber: current.documentNumber,
             count: current.lineCount,
@@ -70,7 +70,7 @@ export function BoqStepDone({
           })}
         </p>
         <span
-          className="font-mono text-[13px] tabular-nums text-[color:var(--text)]"
+          className="font-mono text-small tabular-nums text-[color:var(--text)]"
           dir="ltr"
           style={{ textAlign: 'end' }}
         >
@@ -79,21 +79,21 @@ export function BoqStepDone({
         {shared && <BoqClientChip clientCanOpen={step.clientCanOpen} />}
       </div>
       {!shared && (
-        <p className="mt-1 ps-[26px] text-[12.5px] text-[color:var(--text-muted)]">
+        <p className="mt-1 ps-[26px] text-small text-[color:var(--text-muted)]">
           {t('unsharedHint')}
         </p>
       )}
       <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 ps-[26px]">
         <Link
           href={boqStepHref(projectId)}
-          className="text-[13px] font-semibold text-brand-ink hover:underline"
+          className="text-small font-semibold text-brand-ink hover:underline"
         >
           {t('viewBoq')}
         </Link>
         {step.boqProposalId && step.canBuild && (
           <Link
             href={boqProposalHref(step.boqProposalId)}
-            className="text-[13px] font-semibold text-brand-ink hover:underline"
+            className="text-small font-semibold text-brand-ink hover:underline"
           >
             {t('editNewVersion')}
           </Link>

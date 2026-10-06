@@ -95,7 +95,7 @@ export function ProposalCreateForm({
     <Card>
       <CardContent className="space-y-4 py-4">
         {missing ? (
-          <p className="text-sm text-muted-foreground">{t('create.needFirst')}</p>
+          <p className="text-body text-muted-foreground">{t('create.needFirst')}</p>
         ) : (
           <>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">

@@ -39,20 +39,20 @@ export function TeamPendingList({
           pending.map((p) => (
             <div
               key={p.id}
-              className="flex flex-wrap items-center justify-between gap-3 rounded-xl border p-3"
+              className="flex flex-wrap items-center justify-between gap-3 rounded-item border p-3"
             >
               <div className="min-w-0">
-                <p className="flex items-center gap-2 truncate text-sm font-medium">
+                <p className="flex items-center gap-2 truncate text-body font-medium">
                   <span dir="ltr" className="truncate">
                     {p.email}
                   </span>
                   {p.expired && (
-                    <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+                    <span className="shrink-0 rounded-pill bg-muted px-2 py-0.5 text-caption font-medium text-muted-foreground">
                       {t('expired')}
                     </span>
                   )}
                 </p>
-                <p className="text-xs text-muted-foreground">
+                <p className="text-caption text-muted-foreground">
                   {roleLabel(p.role)} · {t('expiresOn')}{' '}
                   {formatDate(p.expiresAt, locale)}
                 </p>

@@ -46,11 +46,11 @@ export async function ProjectsTab({
               <EmptyState title={t('empty')} />
             </div>
           ) : (
-            <table className="w-full text-sm">
+            <table className="w-full text-body">
               <tbody>
                 {projects.map((p) => (
                   <tr key={p.id} className="border-b last:border-0">
-                    <td className="px-4 py-2 font-mono text-xs" dir="ltr">
+                    <td className="px-4 py-2 font-mono text-caption" dir="ltr">
                       {p.code}
                     </td>
                     <td className="px-4 py-2">
@@ -73,7 +73,7 @@ export async function ProjectsTab({
                         {deliveries?.[p.id] ? (
                           <StateBadge state={deliveries[p.id]!.state} />
                         ) : (
-                          <span className="text-xs text-muted-foreground">
+                          <span className="text-caption text-muted-foreground">
                             {t('noDelivery')}
                           </span>
                         )}

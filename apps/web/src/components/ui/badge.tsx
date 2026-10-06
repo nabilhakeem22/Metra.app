@@ -2,11 +2,11 @@ import { cva, type VariantProps } from 'class-variance-authority';
 import * as React from 'react';
 import { cn } from '@/lib/utils';
 
-// Glass UI chip/badge: pill (--r-pill), 11px. The neutral chip uses --track; the
+// Glass UI chip/badge: pill (--r-pill), caption size. The neutral chip uses --track; the
 // brand "eyebrow" uses the brand tint/ink; semantic states (done/warn/danger)
 // map to the semantic tokens, NEVER the brand accent.
 const badgeVariants = cva(
-  'inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-0.5 text-[11px] font-medium',
+  'inline-flex items-center gap-1.5 whitespace-nowrap rounded-pill px-2.5 py-0.5 text-caption font-medium',
   {
     variants: {
       variant: {

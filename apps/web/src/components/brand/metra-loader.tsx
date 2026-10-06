@@ -41,7 +41,7 @@ export function MetraLoader({ className }: { className?: string }) {
     >
       <div className="relative flex items-center justify-center">
         <div
-          className="metra-halo absolute size-[132px] rounded-[40px]"
+          className="metra-halo absolute size-[132px] rounded-full"
           style={{
             background:
               'radial-gradient(circle, var(--halo) 0%, transparent 70%)',
@@ -63,12 +63,12 @@ export function MetraLoader({ className }: { className?: string }) {
       </svg>
 
       <div
-        className="h-[3px] w-[148px] overflow-hidden rounded-[2px]"
+        className="h-[3px] w-[148px] overflow-hidden rounded-full"
         style={{ background: 'var(--track)' }}
         aria-hidden
       >
         <div
-          className="metra-bar h-full w-[32%] rounded-[2px]"
+          className="metra-bar h-full w-[32%] rounded-full"
           style={{ background: 'hsl(var(--brand))' }}
         />
       </div>

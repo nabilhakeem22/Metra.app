@@ -16,7 +16,7 @@ export function WhoseMoveChip({ whoseMove }: { whoseMove: WhoseMove }) {
   const t = useTranslations('engagements.whoseMove');
   return (
     <span
-      className={`inline-block whitespace-nowrap rounded-pill px-2 py-1 text-[11.5px] font-bold ${CHIP_TONE[whoseMove]}`}
+      className={`inline-block whitespace-nowrap rounded-pill px-2 py-1 text-caption font-bold ${CHIP_TONE[whoseMove]}`}
     >
       {t(whoseMove)}
     </span>

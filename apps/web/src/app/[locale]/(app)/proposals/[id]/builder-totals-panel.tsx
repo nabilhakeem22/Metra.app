@@ -43,19 +43,19 @@ export function BuilderTotalsPanel({
     <Card>
       <CardContent className="space-y-2 py-4">
         <div className="flex flex-wrap items-center gap-3">
-          <label className="flex items-center gap-1.5 text-sm">
+          <label className="flex items-center gap-1.5 text-body">
             {t('builder.discountPct')}
             <FieldHint hint={th('discountPct')} />
             <Input dir="ltr" inputMode="decimal" value={discountPct} onChange={(e) => onDiscountPctChange(e.target.value)} className={`${inp} w-20`} />
           </label>
           {quote && (
             <>
-              <label className="flex items-center gap-1.5 text-sm">
+              <label className="flex items-center gap-1.5 text-body">
                 {t('builder.taxRate')}
                 <FieldHint hint={th('taxRate')} />
                 <Input dir="ltr" inputMode="decimal" value={taxRate} onChange={(e) => onTaxRateChange(e.target.value)} className={`${inp} w-20`} />
               </label>
-              <label className="flex items-center gap-1.5 text-sm">
+              <label className="flex items-center gap-1.5 text-body">
                 {t('builder.supervisionPct')}
                 <FieldHint hint={th('supervisionPct')} />
                 <Input dir="ltr" inputMode="decimal" value={supervisionPct} onChange={(e) => onSupervisionPctChange(e.target.value)} className={`${inp} w-20`} />
@@ -63,7 +63,7 @@ export function BuilderTotalsPanel({
             </>
           )}
         </div>
-        <div className="ms-auto max-w-xs space-y-1 text-sm" dir="ltr">
+        <div className="ms-auto max-w-xs space-y-1 text-body" dir="ltr">
           <Row label={t('builder.subtotal')} value={formatMoney(doc.subtotal, locale)} />
           <Row label={t('builder.docDiscount')} value={formatMoney(doc.discountAmount, locale)} />
           {quote && (
@@ -83,7 +83,7 @@ export function BuilderTotalsPanel({
               <Row label={t('builder.margin')} value={formatMoney(doc.totalMargin, locale)} />
             </>
           ) : (
-            <p className="text-xs text-muted-foreground">{t('builder.marginHidden')}</p>
+            <p className="text-caption text-muted-foreground">{t('builder.marginHidden')}</p>
           )}
         </div>
       </CardContent>

@@ -14,7 +14,7 @@ import { cn } from '@/lib/utils';
 // secondary/outline glass look is a FLAT fill (--glass-btn) + hairline, matching
 // how the shell's org-switcher / icon buttons already avoid nested blur.
 const buttonVariants = cva(
-  'inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-full text-sm font-semibold outline-none focus-ring-brand transition-[background,border-color,box-shadow,transform,color] duration-[160ms] ease-[cubic-bezier(.2,.8,.2,1)] motion-reduce:transition-none disabled:pointer-events-none',
+  'inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-pill text-body font-semibold outline-none focus-ring-brand transition-[background,border-color,box-shadow,transform,color] duration-[160ms] ease-[cubic-bezier(.2,.8,.2,1)] motion-reduce:transition-none disabled:pointer-events-none',
   {
     variants: {
       variant: {
@@ -39,7 +39,7 @@ const buttonVariants = cva(
       },
       size: {
         default: 'px-[18px] py-[10px]',
-        sm: 'px-[14px] py-[8px] text-[13px]',
+        sm: 'px-[14px] py-[8px] text-small',
         lg: 'px-[20px] py-[11px]', // page-CTA
         icon: 'size-10 p-0',
       },

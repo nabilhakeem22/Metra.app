@@ -53,13 +53,13 @@ export async function DeliveriesPanel({
       <div className="flex flex-wrap items-center gap-3 border-b border-[color:var(--rule)] p-4">
         <h2 className="flex items-center gap-2 font-bold text-[color:var(--text)]">
           {t('title')}
-          <span className="rounded-pill bg-[color:var(--brand-tint)] px-2 py-1 font-mono text-[11px] font-bold text-[color:var(--brand-ink)]">
+          <span className="rounded-pill bg-[color:var(--brand-tint)] px-2 py-1 font-mono text-caption font-bold text-[color:var(--brand-ink)]">
             {totalActive}
           </span>
         </h2>
         <Link
           href="/engagements"
-          className="ms-auto inline-flex items-center gap-1 text-sm font-semibold text-[color:var(--brand-ink)] hover:underline"
+          className="ms-auto inline-flex items-center gap-1 text-body font-semibold text-[color:var(--brand-ink)] hover:underline"
         >
           {t('viewAll')}
           <ArrowRight className="size-3.5 rtl:-scale-x-100" aria-hidden />
@@ -93,7 +93,7 @@ export async function DeliveriesPanel({
                     <span className="block truncate font-bold text-[color:var(--text)]">
                       <bdi>{client || '—'}</bdi>
                     </span>
-                    <span className="block truncate text-[13px] text-[color:var(--text-muted)]">
+                    <span className="block truncate text-small text-[color:var(--text-muted)]">
                       <bdi>{project || '—'}</bdi>
                     </span>
                   </span>
@@ -102,7 +102,7 @@ export async function DeliveriesPanel({
                       whose-move chip and the age still show there. */}
                   <span className="hidden sm:block">
                     <DeliveryRibbon position={pos} />
-                    <span className="mt-1 block whitespace-nowrap font-mono text-[11px] text-[color:var(--text-faint)]">
+                    <span className="mt-1 block whitespace-nowrap font-mono text-caption text-[color:var(--text-faint)]">
                       {spine(spineStageKeyOf(d.state))}
                       {pos.atGate ? ` · ${spine(pos.atGate)}` : ''}
                     </span>

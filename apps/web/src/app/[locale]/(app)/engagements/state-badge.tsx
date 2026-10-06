@@ -37,7 +37,7 @@ export function StateBadge({
     <span className="inline-flex items-center gap-2">
       <Badge variant={STATE_VARIANT[state] ?? 'brand'}>{t(`state.${state}`)}</Badge>
       {showStage && !position.closed && (
-        <span className="text-xs text-[color:var(--text-muted)]">
+        <span className="text-caption text-[color:var(--text-muted)]">
           {spine(spineStageKeyOf(state as DesignState))}
           {position.atGate ? ` · ${spine(position.atGate)}` : ''}
         </span>

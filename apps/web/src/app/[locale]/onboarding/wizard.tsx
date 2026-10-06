@@ -127,7 +127,7 @@ export function OnboardingWizard() {
   return (
     <div className="space-y-6">
       <div className="space-y-2">
-        <p className="text-sm font-medium text-muted-foreground">
+        <p className="text-body font-medium text-muted-foreground">
           {t('stepOf', { current: step, total: STEPS })}
         </p>
         <div className="flex gap-1.5" aria-hidden>
@@ -169,7 +169,7 @@ export function OnboardingWizard() {
 
       {step === 4 && <WizardStepInvite t={t} />}
 
-      {error && <p className="text-sm text-destructive">{error}</p>}
+      {error && <p className="text-body text-destructive">{error}</p>}
 
       <div className="flex items-center justify-between gap-2">
         <Button

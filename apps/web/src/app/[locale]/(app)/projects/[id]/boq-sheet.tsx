@@ -74,7 +74,7 @@ export function BoqSheet({
   const visibleCount = useMemo(() => countVisibleLines(boq, needle), [boq, needle]);
 
   return (
-    <div className="overflow-hidden rounded-[var(--r-panel,20px)] border border-[color:var(--rule)] bg-card shadow-sm">
+    <div className="overflow-hidden rounded-panel border border-[color:var(--rule)] bg-card shadow-sm">
       <BoqSheetHeader
         boq={boq}
         visibleCount={visibleCount}
@@ -89,7 +89,7 @@ export function BoqSheet({
       <div className="max-h-[min(58vh,520px)] overflow-auto">
         <table
           ref={gridRef}
-          className="w-full min-w-[880px] border-separate border-spacing-0 text-sm"
+          className="w-full min-w-[880px] border-separate border-spacing-0 text-body"
         >
           <BoqSheetHead canEdit={canEdit} discounted={discounted} />
 

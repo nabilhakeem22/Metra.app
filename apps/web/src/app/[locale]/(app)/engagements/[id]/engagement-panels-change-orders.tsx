@@ -15,7 +15,7 @@ export function ChangeOrdersPanel({
   const locale = useLocale();
   if (changeOrders.length === 0) return <Empty text={t('changeOrders.empty')} />;
   return (
-    <table className="w-full text-sm">
+    <table className="w-full text-body">
       <thead>
         <tr className={HEAD_ROW}>
           <th className="py-2 text-end font-medium">{t('changeOrders.amount')}</th>

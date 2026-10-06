@@ -68,7 +68,7 @@ export function ProjectsClientToolbar({
           ))}
         </SelectContent>
       </Select>
-      <label className="flex items-center gap-2 text-sm">
+      <label className="flex items-center gap-2 text-body">
         <input
           type="checkbox"
           checked={activeOnly}

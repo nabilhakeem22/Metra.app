@@ -65,7 +65,7 @@ export function PreviewModal({
       type="button"
       onClick={() => setVariant(v)}
       className={cn(
-        'border-b-2 px-3 py-1.5 text-sm transition-colors',
+        'border-b-2 px-3 py-1.5 text-body transition-colors',
         variant === v
           ? 'border-primary font-medium text-foreground'
           : 'border-transparent text-muted-foreground hover:text-foreground',
@@ -87,7 +87,7 @@ export function PreviewModal({
         <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-foreground/40 backdrop-blur-sm data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 motion-reduce:animate-none" />
         <DialogPrimitive.Content className="fixed inset-0 z-50 m-auto flex h-[90vh] w-[min(56rem,92vw)] flex-col border bg-card shadow-card outline-none data-[state=open]:animate-in data-[state=open]:fade-in-0 motion-reduce:animate-none">
           <div className="flex items-center gap-2 border-b px-4 py-2">
-            <DialogPrimitive.Title className="text-sm font-semibold">
+            <DialogPrimitive.Title className="text-body font-semibold">
               {t('title')}
             </DialogPrimitive.Title>
             <div className="ms-4 flex items-center gap-1">
@@ -108,7 +108,7 @@ export function PreviewModal({
 
           <div className="relative flex-1 overflow-hidden bg-muted">
             {loading && (
-              <div className="absolute inset-0 flex items-center justify-center text-sm text-muted-foreground">
+              <div className="absolute inset-0 flex items-center justify-center text-body text-muted-foreground">
                 <Loader2 className="me-2 size-4 animate-spin" aria-hidden />
                 {t('loading')}
               </div>

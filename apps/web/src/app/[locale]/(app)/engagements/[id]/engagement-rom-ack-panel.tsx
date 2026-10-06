@@ -52,7 +52,7 @@ export function RomAckPanel({
   }
 
   return (
-    <div className="space-y-3 rounded-[var(--r-item)] border border-[color:var(--rule)] bg-[color:var(--track)] p-4">
+    <div className="space-y-3 rounded-item border border-[color:var(--rule)] bg-[color:var(--track)] p-4">
       {/* THE TWO DATES, and how. `decidedAt` records when this was typed; this
           records when the client actually said it. A record dated today for a
           call last Thursday is the weakest possible evidence, and a reader six
@@ -90,7 +90,7 @@ export function RomAckPanel({
         <button
           type="button"
           onClick={() => setNoteOpen(true)}
-          className="text-[12.5px] font-semibold text-brand-ink hover:underline"
+          className="text-small font-semibold text-brand-ink hover:underline"
         >
           + {t('addNote')}
         </button>

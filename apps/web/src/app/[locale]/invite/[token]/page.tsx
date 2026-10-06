@@ -24,10 +24,10 @@ export default async function InvitePage({
     return (
       <AuthShell>
         <div className="space-y-4">
-          <h1 className="text-2xl font-bold tracking-tight">
+          <h1 className="text-heading font-bold">
             {t('signInTitle')}
           </h1>
-          <p className="text-sm text-muted-foreground">{t('signInBody')}</p>
+          <p className="text-body text-muted-foreground">{t('signInBody')}</p>
           <Button asChild className="w-full">
             <Link href="/login">{t('signInButton')}</Link>
           </Button>

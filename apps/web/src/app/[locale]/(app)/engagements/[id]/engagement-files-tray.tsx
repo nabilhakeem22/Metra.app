@@ -71,12 +71,12 @@ export function EngagementFilesTray({
   }
 
   return (
-    <section className="overflow-hidden rounded-[var(--r-panel)] border border-[color:var(--rule)] bg-card text-[color:var(--text)] shadow-sm">
+    <section className="overflow-hidden rounded-panel border border-[color:var(--rule)] bg-card text-[color:var(--text)] shadow-sm">
       <header className="flex items-center justify-between border-b border-[color:var(--rule)] px-4 py-3">
-        <h3 className="m-0 font-mono text-[11px] font-semibold uppercase tracking-[0.1em] text-[color:var(--text-muted)]">
+        <h3 className="m-0 font-mono text-caption font-semibold uppercase tracking-[0.1em] text-[color:var(--text-muted)]">
           {t('title')}
         </h3>
-        <span className="text-[11px] text-[color:var(--text-muted)]">
+        <span className="text-caption text-[color:var(--text-muted)]">
           {t('latestApproved')}
         </span>
       </header>
@@ -90,14 +90,14 @@ export function EngagementFilesTray({
           return (
             <div
               key={row.category}
-              className="flex items-center gap-[11px] rounded-[var(--r-item)] border border-[color:var(--rule)] bg-card px-3 py-2.5"
+              className="flex items-center gap-[11px] rounded-item border border-[color:var(--rule)] bg-card px-3 py-2.5"
             >
-              <span className="grid h-[30px] w-[30px] shrink-0 place-items-center rounded-[var(--r-icon)] bg-brand-tint font-mono text-[13px] font-semibold text-brand-ink">
+              <span className="grid h-[30px] w-[30px] shrink-0 place-items-center rounded-item bg-brand-tint font-mono text-small font-semibold text-brand-ink">
                 {t(`badge.${row.category}`)}
               </span>
               <div className="min-w-0">
-                <div className="truncate text-[13px] font-semibold">{name}</div>
-                <div className="text-[11px] text-[color:var(--text-muted)]">
+                <div className="truncate text-small font-semibold">{name}</div>
+                <div className="text-caption text-[color:var(--text-muted)]">
                   {hasArtifact
                     ? t('approvedMeta', { n: row.version })
                     : t('notAvailable')}
@@ -119,7 +119,7 @@ export function EngagementFilesTray({
                     type="button"
                     onClick={() => download(fileId)}
                     disabled={pending}
-                    className="inline-flex items-center gap-1 rounded-[var(--r-icon)] px-2 py-1 text-[12px] font-semibold text-brand-ink hover:bg-brand-tint disabled:cursor-not-allowed disabled:opacity-60"
+                    className="inline-flex items-center gap-1 rounded-item px-2 py-1 text-caption font-semibold text-brand-ink hover:bg-brand-tint disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     <Download className="size-3.5" aria-hidden />
                     {t(CATEGORY_ACTION[row.category])}
@@ -143,7 +143,7 @@ export function EngagementFilesTray({
                       type="button"
                       onClick={() => inputRefs.current[row.category]?.click()}
                       disabled={pending}
-                      className="inline-flex items-center gap-1 rounded-[var(--r-icon)] px-2 py-1 text-[12px] font-semibold text-[color:var(--text-muted)] hover:bg-brand-tint hover:text-brand-ink disabled:cursor-not-allowed disabled:opacity-60"
+                      className="inline-flex items-center gap-1 rounded-item px-2 py-1 text-caption font-semibold text-[color:var(--text-muted)] hover:bg-brand-tint hover:text-brand-ink disabled:cursor-not-allowed disabled:opacity-60"
                     >
                       {pending ? (
                         <Loader2 className="size-3.5 animate-spin" aria-hidden />
@@ -156,7 +156,7 @@ export function EngagementFilesTray({
                 ) : (
                   !fileId && (
                     <span
-                      className="inline-flex items-center gap-1 cursor-not-allowed text-[12px] font-semibold text-[color:var(--text-faint)]"
+                      className="inline-flex items-center gap-1 cursor-not-allowed text-caption font-semibold text-[color:var(--text-faint)]"
                       aria-disabled="true"
                       title={t('notAvailable')}
                     >

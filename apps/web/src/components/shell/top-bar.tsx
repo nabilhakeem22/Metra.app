@@ -40,9 +40,12 @@ export function TopBar({
       // no z-index) painted page content straight over it. Raising the whole header
       // above the content fixes it for any future popover here too. Kept BELOW the
       // z-50 dialog/sheet layer and the z-100 toasts, so overlays still win.
-      className={cn('glass relative z-30 flex items-center gap-2', className)}
-      // .glass sets --r-panel; the bar uses the slightly tighter --r-bar.
-      style={{ borderRadius: 'var(--r-bar)', padding: '10px 16px' }}
+      // .glass sets --r-panel; app-shell chrome takes the frame radius.
+      className={cn(
+        'glass relative z-30 flex items-center gap-2 rounded-frame',
+        className,
+      )}
+      style={{ padding: '10px 16px' }}
     >
       {/* Hamburger opens the sidebar drawer below lg; the fixed slab replaces it
           at lg+. Glass icon button (fill + hairline only — no nested blur). */}

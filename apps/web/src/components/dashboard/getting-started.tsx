@@ -68,14 +68,14 @@ export function GettingStarted({
         <button
           type="button"
           onClick={dismiss}
-          className="shrink-0 text-sm font-medium text-muted-foreground hover:text-foreground"
+          className="shrink-0 text-body font-medium text-muted-foreground hover:text-foreground"
         >
           {t('dismiss')}
         </button>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="space-y-1">
-          <p className="text-xs font-medium text-muted-foreground">
+          <p className="text-caption font-medium text-muted-foreground">
             {t('progress', { percent: result.percent })}
           </p>
           <div className="h-1.5 overflow-hidden rounded-full bg-muted">
@@ -104,7 +104,7 @@ export function GettingStarted({
               </span>
               <p
                 className={cn(
-                  'flex-1 text-sm font-medium',
+                  'flex-1 text-body font-medium',
                   item.done && 'text-muted-foreground line-through',
                 )}
               >

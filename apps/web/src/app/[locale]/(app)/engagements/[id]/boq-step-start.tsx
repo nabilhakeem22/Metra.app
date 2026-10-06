@@ -26,14 +26,14 @@ export function BoqStepStart({
   const { open, pending } = useOpenBoqProposal(engagementId);
 
   return (
-    <div className="mb-4 rounded-[var(--r-panel)] border border-[color:var(--brand-tint-border)] bg-[color:var(--brand-tint)] px-4 py-3.5">
+    <div className="mb-4 rounded-panel border border-[color:var(--brand-tint-border)] bg-[color:var(--brand-tint)] px-4 py-3.5">
       <div className="flex items-start gap-3">
         <Table2 className="mt-0.5 size-4 shrink-0 text-brand-ink" aria-hidden />
         <div className="min-w-0 flex-1">
-          <p className="text-[14px] font-semibold text-[color:var(--text)]">
+          <p className="text-body font-semibold text-[color:var(--text)]">
             {t('startTitle')}
           </p>
-          <p className="mt-0.5 text-[13px] text-[color:var(--text-muted)]">
+          <p className="mt-0.5 text-small text-[color:var(--text-muted)]">
             {t('startBody')}
           </p>
         </div>
@@ -59,7 +59,7 @@ export function BoqStepStart({
           )}
           <Link
             href={boqStepHref(projectId)}
-            className="text-[13px] font-medium text-brand-ink hover:underline"
+            className="text-small font-medium text-brand-ink hover:underline"
           >
             {t('uploadInstead')}
           </Link>

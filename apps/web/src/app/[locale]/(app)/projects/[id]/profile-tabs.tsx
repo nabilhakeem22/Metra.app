@@ -59,7 +59,7 @@ export function ProfileTabs({
             tabIndex={selected ? 0 : -1}
             onKeyDown={(e) => onKeyDown(e, i)}
             className={cn(
-              'border-b-2 px-3 py-2 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+              'border-b-2 px-3 py-2 text-body transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
               selected
                 ? 'border-primary font-medium text-foreground'
                 : 'border-transparent text-muted-foreground hover:text-foreground',

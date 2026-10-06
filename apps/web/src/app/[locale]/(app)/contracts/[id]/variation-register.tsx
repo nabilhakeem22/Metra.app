@@ -119,7 +119,7 @@ export function VariationRegister({
   return (
     <div className="space-y-4">
       {error && (
-        <p className="text-sm text-destructive" role="alert">
+        <p className="text-body text-destructive" role="alert">
           {error}
         </p>
       )}
@@ -149,27 +149,27 @@ export function VariationRegister({
 
       {variations.length === 0 ? (
         <Card>
-          <CardContent className="py-6 text-center text-sm text-muted-foreground">
+          <CardContent className="py-6 text-center text-body text-muted-foreground">
             {tv('empty')}
           </CardContent>
         </Card>
       ) : (
         <Card>
           <CardContent className="overflow-x-auto p-0">
-            <table className="w-full text-sm">
+            <table className="w-full text-body">
               <tbody>
                 {variations.map((v) => {
                   const statusKey = variationStatusKey(v);
                   return (
                   <tr key={v.id} className="border-b last:border-0">
-                    <td className="px-4 py-2 font-mono text-xs" dir="ltr">
+                    <td className="px-4 py-2 font-mono text-caption" dir="ltr">
                       {formatDocNumber('VO', v.number, docYear(null, v.createdAt))}
                     </td>
                     <td className="px-4 py-2">
                       {pickLocale({ nameAr: v.titleAr, nameEn: v.titleEn }, 'name', locale).value}
                     </td>
                     <td className="px-4 py-2">
-                      <span className={`rounded-full px-2 py-0.5 text-xs ${VO_STATUS_STYLE[statusKey] ?? 'bg-muted'}`}>
+                      <span className={`rounded-pill px-2 py-0.5 text-caption ${VO_STATUS_STYLE[statusKey] ?? 'bg-muted'}`}>
                         {tv(`status.${statusKey}`)}
                       </span>
                     </td>

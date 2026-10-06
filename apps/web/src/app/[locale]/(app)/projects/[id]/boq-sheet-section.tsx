@@ -14,7 +14,7 @@ import type { BoqSheetRowApi } from './boq-sheet-row-api';
 
 /** The dashed 'add' affordance, shared by the add-line and add-section buttons. */
 export const BOQ_ADD_BUTTON_CLASS =
-  'inline-flex items-center gap-2 rounded-pill border border-dashed border-[color:var(--rule)] px-4 py-2 text-[13px] font-semibold text-[color:var(--brand-ink)] hover:border-[color:hsl(var(--brand))] hover:bg-[color:var(--brand-tint)]';
+  'inline-flex items-center gap-2 rounded-pill border border-dashed border-[color:var(--rule)] px-4 py-2 text-small font-semibold text-[color:var(--brand-ink)] hover:border-[color:hsl(var(--brand))] hover:bg-[color:var(--brand-tint)]';
 
 const BAND = 'border-y border-[color:var(--rule)] bg-[color:var(--track)]';
 
@@ -52,13 +52,13 @@ export function BoqSectionHeaderRow({
             aria-hidden
           />
           <span dir="auto">{section.title}</span>
-          <span className="font-mono text-[11px] font-semibold text-[color:var(--text-faint)]">
+          <span className="font-mono text-caption font-semibold text-[color:var(--text-faint)]">
             {section.lines.length}
           </span>
         </button>
       </td>
       <td
-        className={`${BAND} whitespace-nowrap p-3 text-end font-mono text-[13px] font-bold tabular-nums text-[color:var(--text-muted)]`}
+        className={`${BAND} whitespace-nowrap p-3 text-end font-mono text-small font-bold tabular-nums text-[color:var(--text-muted)]`}
         dir="ltr"
       >
         {money(section.sectionSubtotal)}

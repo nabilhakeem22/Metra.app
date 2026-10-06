@@ -113,11 +113,11 @@ export function LoginForm() {
     <AuthShell showValueProp>
       <div className="space-y-6">
         <div className="space-y-1">
-          <h1 className="text-2xl font-bold tracking-tight">
+          <h1 className="text-heading font-bold">
             {mode === 'signup' ? t('signUpTitle') : t('signInTitle')}
           </h1>
           {phase === 'request' && (
-            <p className="text-sm text-muted-foreground">
+            <p className="text-body text-muted-foreground">
               {mode === 'signup' ? t('signUpSubtitle') : t('signInSubtitle')}
             </p>
           )}
@@ -155,12 +155,12 @@ export function LoginForm() {
         <p
           role="status"
           aria-live="polite"
-          className="min-h-[1.25rem] text-sm text-destructive"
+          className="min-h-[1.25rem] text-body text-destructive"
         >
           {error}
         </p>
 
-        <p className="text-center text-sm text-muted-foreground">
+        <p className="text-center text-body text-muted-foreground">
           {mode === 'signup' ? (
             <>
               {t('switchToSignInPrompt')}{' '}

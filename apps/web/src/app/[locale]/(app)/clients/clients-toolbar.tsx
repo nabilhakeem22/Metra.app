@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import type { ClientFilter, ClientStatusFilter } from './client-filters';
 
-const SELECT_CLASS = 'h-9 rounded-md border bg-background px-2 text-sm';
+const SELECT_CLASS = 'h-9 rounded-item border bg-background px-2 text-body';
 
 /** The search box, the two filters, and the New button. */
 export function ClientsToolbar({

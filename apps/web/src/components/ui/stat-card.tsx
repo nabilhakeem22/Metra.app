@@ -48,7 +48,7 @@ export function StatCard({
       <div className="flex items-start justify-between gap-3">
         <p
           className={cn(
-            'text-sm font-medium',
+            'text-body font-medium',
             isGradient ? 'text-current/90' : 'text-muted-foreground',
           )}
         >
@@ -70,7 +70,7 @@ export function StatCard({
 
       <p
         className={cn(
-          'tabular mt-3 text-3xl font-bold',
+          'tabular mt-3 text-display font-bold',
           isGradient ? 'text-current' : 'text-foreground',
         )}
       >
@@ -80,7 +80,7 @@ export function StatCard({
       {hint && (
         <p
           className={cn(
-            'mt-1 text-xs',
+            'mt-1 text-caption',
             isGradient ? 'text-current/80' : 'text-muted-foreground',
           )}
         >

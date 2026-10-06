@@ -19,7 +19,7 @@ export function DeliveriesPanelEmpty({ empty }: { empty: DeliveriesEmptyState })
   const t = useTranslations('dashboard');
   return (
     <div className="flex flex-col items-center gap-3 p-8 text-center">
-      <p className="text-sm text-[color:var(--text-muted)]">
+      <p className="text-body text-[color:var(--text-muted)]">
         {t(`deliveries.${REASON_KEY[empty.reason]}`)}
       </p>
       {empty.cta && (

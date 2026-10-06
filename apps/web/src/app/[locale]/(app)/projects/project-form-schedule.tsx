@@ -48,7 +48,7 @@ export function ProjectScheduleFields({
         </div>
       </div>
       {/* Spec: dates are for tracking, and the end date is not a commitment. */}
-      <p className="-mt-2 text-xs text-muted-foreground">{t('form.endDateNote')}</p>
+      <p className="-mt-2 text-caption text-muted-foreground">{t('form.endDateNote')}</p>
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div className="space-y-2">

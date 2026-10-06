@@ -106,7 +106,7 @@ export function EngagementStageSpine({ state }: { state: DesignState }) {
                 }`}
               />
               <span
-                className={`whitespace-nowrap font-mono text-[10px] font-bold uppercase leading-tight tracking-[0.06em] ${
+                className={`whitespace-nowrap font-mono text-caption font-bold uppercase leading-tight tracking-[0.06em] ${
                   here ? 'text-[color:var(--warn)]' : 'text-[color:var(--text-faint)]'
                 }`}
               >
@@ -150,7 +150,7 @@ export function EngagementStageSpine({ state }: { state: DesignState }) {
                   aria-hidden
                 />
               )}
-              <span className="truncate text-[11px] leading-tight">
+              <span className="truncate text-caption leading-tight">
                 {t(node.key)}
               </span>
             </span>

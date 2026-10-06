@@ -19,8 +19,8 @@ export function BuilderShareLink({
   return (
     <Card>
       <CardContent className="flex flex-wrap items-center gap-2 py-3">
-        <span className="text-sm font-medium">{t('view.shareTitle')}:</span>
-        <Input readOnly dir="ltr" value={link} className="max-w-md text-xs" />
+        <span className="text-body font-medium">{t('view.shareTitle')}:</span>
+        <Input readOnly dir="ltr" value={link} className="max-w-md text-caption" />
         <Button
           variant="outline"
           size="sm"

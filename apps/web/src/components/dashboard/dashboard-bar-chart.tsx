@@ -64,7 +64,7 @@ export function DashboardBarChart({
       <Card>
         <CardContent className="space-y-3 py-4">
           <ChartHeader title={title} series={series} />
-          <p className="py-8 text-center text-sm text-muted-foreground">{emptyLabel}</p>
+          <p className="py-8 text-center text-body text-muted-foreground">{emptyLabel}</p>
         </CardContent>
       </Card>
     );
@@ -97,15 +97,15 @@ export function DashboardBarChart({
                   {/* `bg-card`, not `bg-[color:var(--card)]`: --card holds HSL
                       COMPONENTS for shadcn, so the raw var is not a valid colour and
                       the tooltip rendered transparent with the bar showing through. */}
-                  <div className="whitespace-nowrap rounded-[var(--r-item)] border border-[color:var(--rule)] bg-card px-2 py-1.5 text-start shadow-md">
-                  <p className="text-[11px] font-semibold">{column.label}</p>
+                  <div className="whitespace-nowrap rounded-item border border-[color:var(--rule)] bg-card px-2 py-1.5 text-start shadow-md">
+                  <p className="text-caption font-semibold">{column.label}</p>
                   {column.segments.map((segment) => (
                     <p
                       key={segment.key}
-                      className="flex items-center gap-1.5 text-[11px] text-muted-foreground"
+                      className="flex items-center gap-1.5 text-caption text-muted-foreground"
                     >
                       <span
-                        className="size-2 rounded-[2px]"
+                        className="size-2 rounded-full"
                         style={{
                           background: `var(${series.find((s) => s.key === segment.key)?.token ?? '--rule'})`,
                         }}
@@ -117,7 +117,7 @@ export function DashboardBarChart({
                       </span>
                     </p>
                   ))}
-                  <p className="mt-0.5 flex items-center gap-3 border-t border-[color:var(--rule)] pt-0.5 text-[11px] font-semibold">
+                  <p className="mt-0.5 flex items-center gap-3 border-t border-[color:var(--rule)] pt-0.5 text-caption font-semibold">
                     {totalLabel}
                     <span className="ms-auto tabular-nums" dir="ltr">
                       {total}
@@ -132,7 +132,7 @@ export function DashboardBarChart({
                     PERCENTAGES, and a percentage height resolves against a definite
                     parent. Without it this container is content-sized, every segment
                     computes to zero, and the chart renders no bars at all. */}
-                <div className="flex h-full w-full flex-col-reverse overflow-hidden rounded-[3px] transition-opacity group-hover:opacity-90">
+                <div className="flex h-full w-full flex-col-reverse overflow-hidden rounded-item transition-opacity group-hover:opacity-90">
                   {column.segments.map((segment) => {
                     const value = Math.max(0, segment.value);
                     if (value === 0) return null;
@@ -171,7 +171,7 @@ export function DashboardBarChart({
             label carries its own `dir` instead, which keeps the text itself
             correct without reversing the order. */}
         <div
-          className="grid gap-2 text-center text-[10px] text-muted-foreground"
+          className="grid gap-2 text-center text-caption text-muted-foreground"
           style={{ gridTemplateColumns: `repeat(${columns.length}, minmax(0, 1fr))` }}
           aria-hidden
         >
@@ -190,15 +190,15 @@ export function DashboardBarChart({
 function ChartHeader({ title, series }: { title: string; series: ChartSeries[] }) {
   return (
     <div className="flex flex-wrap items-baseline justify-between gap-2">
-      <p className="text-sm font-semibold">{title}</p>
+      <p className="text-body font-semibold">{title}</p>
       <ul className="flex flex-wrap items-center gap-3">
         {series.map((s) => (
           <li
             key={s.key}
-            className="flex items-center gap-1.5 text-xs text-muted-foreground"
+            className="flex items-center gap-1.5 text-caption text-muted-foreground"
           >
             <span
-              className="size-2.5 rounded-[2px]"
+              className="size-2.5 rounded-full"
               style={{ background: `var(${s.token})` }}
               aria-hidden
             />

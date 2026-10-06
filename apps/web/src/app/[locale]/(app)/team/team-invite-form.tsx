@@ -105,12 +105,12 @@ export function TeamInviteForm({
         </div>
 
         {lastLink && (
-          <div className="space-y-1 rounded-xl border bg-muted/40 p-3">
-            <p className="text-xs font-medium text-muted-foreground">
+          <div className="space-y-1 rounded-item border bg-muted/40 p-3">
+            <p className="text-caption font-medium text-muted-foreground">
               {t('inviteLink')}
             </p>
             <div className="flex items-center gap-2">
-              <Input readOnly dir="ltr" value={lastLink} className="text-xs" />
+              <Input readOnly dir="ltr" value={lastLink} className="text-caption" />
               <Button
                 type="button"
                 variant="outline"

@@ -16,23 +16,23 @@ export function WizardStepConfirm({
   return (
     <div className="space-y-4">
       <div className="space-y-1">
-        <h1 className="text-2xl font-bold tracking-tight">
+        <h1 className="text-heading font-bold">
           {t('step3Title')}
         </h1>
-        <p className="text-sm text-muted-foreground">{t('confirmHint')}</p>
+        <p className="text-body text-muted-foreground">{t('confirmHint')}</p>
       </div>
-      <dl className="divide-y rounded-xl border">
+      <dl className="divide-y rounded-panel border">
         <div className="flex items-center justify-between p-3">
-          <dt className="text-sm text-muted-foreground">
+          <dt className="text-body text-muted-foreground">
             {t('confirmLanguage')}
           </dt>
-          <dd className="text-sm font-medium">{home('localeName')}</dd>
+          <dd className="text-body font-medium">{home('localeName')}</dd>
         </div>
         <div className="flex items-center justify-between p-3">
-          <dt className="text-sm text-muted-foreground">
+          <dt className="text-body text-muted-foreground">
             {t('confirmCurrency')}
           </dt>
-          <dd className="text-sm font-medium">{t('currencyEgp')}</dd>
+          <dd className="text-body font-medium">{t('currencyEgp')}</dd>
         </div>
       </dl>
       <input type="hidden" value={locale} readOnly />

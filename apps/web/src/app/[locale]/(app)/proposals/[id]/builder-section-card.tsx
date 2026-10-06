@@ -111,9 +111,9 @@ export function BuilderSectionCard({
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="w-full text-body">
             <thead>
-              <tr className="text-xs text-muted-foreground">
+              <tr className="text-caption text-muted-foreground">
                 <th className="px-1 py-1 text-start font-medium">{t('builder.description')}</th>
                 <th className="px-1 py-1 font-medium">
                   <span className="inline-flex items-center">
@@ -189,7 +189,7 @@ export function BuilderSectionCard({
               </Select>
             )}
           </div>
-          <span className="text-sm font-medium" dir="ltr">
+          <span className="text-body font-medium" dir="ltr">
             {t('builder.sectionSubtotal')}: {formatMoney(st.sectionSubtotal, locale)}
           </span>
         </div>

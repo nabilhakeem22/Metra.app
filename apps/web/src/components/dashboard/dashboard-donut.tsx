@@ -57,8 +57,8 @@ export function DashboardDonut({
     return (
       <Card>
         <CardContent className="space-y-3 py-4">
-          <h3 className="text-sm font-semibold">{title}</h3>
-          <p className="py-8 text-center text-sm text-muted-foreground">{emptyLabel}</p>
+          <h3 className="text-body font-semibold">{title}</h3>
+          <p className="py-8 text-center text-body text-muted-foreground">{emptyLabel}</p>
         </CardContent>
       </Card>
     );
@@ -105,7 +105,7 @@ export function DashboardDonut({
   return (
     <Card>
       <CardContent className="space-y-3 py-4">
-        <h3 className="text-sm font-semibold">{title}</h3>
+        <h3 className="text-body font-semibold">{title}</h3>
 
         <div className="relative" role="group" aria-label={summary}>
           <svg
@@ -131,12 +131,12 @@ export function DashboardDonut({
               shrink on a narrow card while the surrounding UI stayed put. */}
           <div className="pointer-events-none absolute inset-x-0 bottom-[6%] flex flex-col items-center">
             <span
-              className="font-mono text-[26px] font-bold leading-none tabular-nums text-[color:var(--text)]"
+              className="font-mono text-display font-bold leading-none tabular-nums text-[color:var(--text)]"
               dir="ltr"
             >
               {total}
             </span>
-            <span className="mt-1 font-mono text-[10px] font-semibold uppercase tracking-[0.1em] text-[color:var(--text-faint)]">
+            <span className="mt-1 font-mono text-caption font-semibold uppercase tracking-[0.1em] text-[color:var(--text-faint)]">
               {totalLabel}
             </span>
           </div>
@@ -149,9 +149,9 @@ export function DashboardDonut({
           {series.map((s) => {
             const value = slices.find((x) => x.key === s.key)?.value ?? 0;
             return (
-              <li key={s.key} className="flex items-baseline gap-1.5 text-[11.5px]">
+              <li key={s.key} className="flex items-baseline gap-1.5 text-caption">
                 <span
-                  className="size-2 shrink-0 translate-y-[-1px] rounded-[2px]"
+                  className="size-2 shrink-0 translate-y-[-1px] rounded-full"
                   style={{ background: `var(${s.token})` }}
                   aria-hidden
                 />

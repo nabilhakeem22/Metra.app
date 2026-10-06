@@ -34,8 +34,8 @@ export function ContractOverview({
   return (
     <div className="space-y-4">
       <Card>
-        <CardContent className="flex flex-wrap items-center gap-3 py-4 text-sm">
-          <span className={`rounded-full px-2 py-0.5 text-xs`}>
+        <CardContent className="flex flex-wrap items-center gap-3 py-4 text-body">
+          <span className={`rounded-pill px-2 py-0.5 text-caption`}>
             {t(`status.${detail.status}`)}
           </span>
           <span className="text-muted-foreground">
@@ -76,12 +76,12 @@ export function ContractOverview({
         <Card key={s.id}>
           <CardContent className="p-0">
             <div className="flex items-center justify-between border-b px-4 py-2">
-              <h2 className="text-sm font-semibold">{pick(s.titleAr, s.titleEn)}</h2>
-              <span className="text-sm" dir="ltr">
+              <h2 className="text-body font-semibold">{pick(s.titleAr, s.titleEn)}</h2>
+              <span className="text-body" dir="ltr">
                 {m(s.sectionSubtotal)}
               </span>
             </div>
-            <table className="w-full text-sm">
+            <table className="w-full text-body">
               <tbody>
                 {s.lines.map((l) => (
                   <tr key={l.id} className="border-b last:border-0">

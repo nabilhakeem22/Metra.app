@@ -19,7 +19,7 @@ const Card = React.forwardRef<HTMLDivElement, CardProps>(
       ref={ref}
       className={cn(
         flat
-          ? 'rounded-[var(--r-panel)] border border-[color:var(--rule)] bg-card text-[color:var(--text)] shadow-sm'
+          ? 'rounded-panel border border-[color:var(--rule)] bg-card text-[color:var(--text)] shadow-sm'
           : 'glass text-[color:var(--text)]',
         className,
       )}
@@ -45,14 +45,14 @@ const CardHeader = React.forwardRef<
 ));
 CardHeader.displayName = 'CardHeader';
 
-// Title 17px/700 — text-title carries the Latin tracking and is RTL-safe.
+// Title: the text-title token (17px, Latin tracking, zeroed in RTL) at 700.
 const CardTitle = React.forwardRef<
   HTMLHeadingElement,
   React.HTMLAttributes<HTMLHeadingElement>
 >(({ className, ...props }, ref) => (
   <h3
     ref={ref}
-    className={cn('text-title text-[17px] text-[color:var(--text)]', className)}
+    className={cn('text-title font-bold text-[color:var(--text)]', className)}
     {...props}
   />
 ));
@@ -64,7 +64,7 @@ const CardDescription = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <p
     ref={ref}
-    className={cn('text-sm text-[color:var(--text-muted)]', className)}
+    className={cn('text-body text-[color:var(--text-muted)]', className)}
     {...props}
   />
 ));

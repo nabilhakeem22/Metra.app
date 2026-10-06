@@ -76,7 +76,7 @@ export function FilesTab({
           canUpload={canUpload}
         />
         <div>
-          <p className="mb-2 font-mono text-[11px] font-semibold uppercase tracking-[0.1em] text-[color:var(--text-muted)]">
+          <p className="mb-2 font-mono text-caption font-semibold uppercase tracking-[0.1em] text-[color:var(--text-muted)]">
             {t('panels.artifacts')}
           </p>
           {/* `canUpload` is the §2.2 engagements_design/create cell; for THIS

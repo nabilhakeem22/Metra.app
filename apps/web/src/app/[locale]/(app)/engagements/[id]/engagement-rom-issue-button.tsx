@@ -25,7 +25,7 @@ export function RomIssueButton({
   const tpa = useTranslations('engagements.panelActions');
   return (
     <div className="flex flex-wrap items-center justify-between gap-2">
-      <p className="text-[12.5px] text-[color:var(--text-muted)]">
+      <p className="text-small text-[color:var(--text-muted)]">
         {tpa('issueRomHint')}
       </p>
       <Button

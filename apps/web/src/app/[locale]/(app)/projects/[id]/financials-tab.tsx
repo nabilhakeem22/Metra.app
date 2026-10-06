@@ -21,8 +21,8 @@ export async function FinancialsTab({
   const Stat = ({ label, value }: { label: string; value: string }) => (
     <Card>
       <CardContent className="py-4">
-        <p className="text-xs text-muted-foreground">{label}</p>
-        <p className="mt-1 text-2xl font-semibold" dir="ltr">
+        <p className="text-caption text-muted-foreground">{label}</p>
+        <p className="mt-1 text-heading font-semibold" dir="ltr">
           {value}
         </p>
       </CardContent>
@@ -32,8 +32,8 @@ export async function FinancialsTab({
   const Locked = ({ label }: { label: string }) => (
     <Card>
       <CardContent className="py-4">
-        <p className="text-xs text-muted-foreground">{label}</p>
-        <p className="mt-1 inline-flex items-center gap-1.5 text-sm text-muted-foreground">
+        <p className="text-caption text-muted-foreground">{label}</p>
+        <p className="mt-1 inline-flex items-center gap-1.5 text-body text-muted-foreground">
           <Lock className="size-4" aria-hidden />
           {t('lockedTitle')}
         </p>
@@ -64,11 +64,11 @@ export async function FinancialsTab({
         <Locked label={t('margin')} />
       </div>
       {contractCount > 0 && (
-        <p className="text-xs text-muted-foreground">
+        <p className="text-caption text-muted-foreground">
           {t('derivedFrom', { n: contractCount })}
         </p>
       )}
-      <p className="text-sm text-muted-foreground">{t('lockedBody')}</p>
+      <p className="text-body text-muted-foreground">{t('lockedBody')}</p>
     </div>
   );
 }

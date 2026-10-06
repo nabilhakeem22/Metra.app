@@ -26,18 +26,18 @@ function ClientNoteCallout({
   if (!clientNote) return null;
   const clientNoteDate = formatDate(clientNote.decidedAt, locale);
   return (
-    <div className="mb-4 rounded-[var(--r-panel)] border border-[color:var(--rule)] bg-[color:var(--track)] px-3 py-2.5">
-      <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[color:var(--text-faint)]">
+    <div className="mb-4 rounded-panel border border-[color:var(--rule)] bg-[color:var(--track)] px-3 py-2.5">
+      <p className="text-caption font-semibold uppercase tracking-[0.08em] text-[color:var(--text-faint)]">
         {tcmd('clientNote')}
       </p>
       {/* Clamped to 4 lines: a long client note must never push the primary
           Advance CTA below the fold — the whole point of this card is one
           unmissable next action. The full text is always in the Timeline. */}
-      <p className="mt-1 line-clamp-4 whitespace-pre-line break-words text-[13.5px] text-[color:var(--text)]">
+      <p className="mt-1 line-clamp-4 whitespace-pre-line break-words text-small text-[color:var(--text)]">
         {t('noteQuote', { note: clientNote.note })}
       </p>
       {(clientNote.actorName || clientNoteDate) && (
-        <p className="mt-1 text-[11.5px] text-[color:var(--text-faint)]">
+        <p className="mt-1 text-caption text-[color:var(--text-faint)]">
           {clientNote.actorName && (
             <span>{t('clientActivity.by', { name: clientNote.actorName })}</span>
           )}
@@ -72,15 +72,15 @@ export function CommandCardHeadline({
           action — it is a different, healthy one — so it gets its own label rather
           than no label at all, which left the headline floating. */}
       {!closed && (
-        <p className="mb-1.5 font-mono text-[10.5px] font-bold uppercase tracking-[0.14em] text-[color:var(--text-faint)]">
+        <p className="mb-1.5 font-mono text-caption font-bold uppercase tracking-[0.14em] text-[color:var(--text-faint)]">
           {copy.actor === 'client' ? tcmd('pill.waitingClient') : tcmd('nextAction')}
         </p>
       )}
-      <h2 className="mb-1 text-[22px] font-semibold leading-tight tracking-[var(--tracking-title)] text-balance">
+      <h2 className="mb-1 text-heading font-semibold leading-tight text-balance">
         {copy.headline}
       </h2>
       {copy.hint && (
-        <p className="mb-4 text-[13.5px] text-[color:var(--text-muted)]">{copy.hint}</p>
+        <p className="mb-4 text-small text-[color:var(--text-muted)]">{copy.hint}</p>
       )}
 
       <ClientNoteCallout clientActivity={clientActivity} />
@@ -89,7 +89,7 @@ export function CommandCardHeadline({
           lives on the document itself, in Files. Advisory: it never blocks the
           advance, so it must never look like it does. */}
       {!closed && awaitingReplyCount > 0 && (
-        <p className="mb-4 text-[13px] text-[color:var(--text-muted)]">
+        <p className="mb-4 text-small text-[color:var(--text-muted)]">
           {tcmd('awaitingReply', { n: awaitingReplyCount })}
         </p>
       )}

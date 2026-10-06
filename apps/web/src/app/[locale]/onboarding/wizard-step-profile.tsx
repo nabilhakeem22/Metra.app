@@ -45,10 +45,10 @@ export function WizardStepProfile({
   return (
     <div className="space-y-4">
       <div className="space-y-1">
-        <h1 className="text-2xl font-bold tracking-tight">
+        <h1 className="text-heading font-bold">
           {t('step1Title')}
         </h1>
-        <p className="text-sm text-muted-foreground">{t('hint')}</p>
+        <p className="text-body text-muted-foreground">{t('hint')}</p>
       </div>
 
       <div className="space-y-2">
@@ -102,10 +102,10 @@ export function WizardStepProfile({
             <img
               src={logoPreview}
               alt=""
-              className="size-12 rounded-xl border object-cover"
+              className="size-12 rounded-item border object-cover"
             />
           ) : (
-            <div className="flex size-12 items-center justify-center rounded-xl bg-muted text-muted-foreground">
+            <div className="flex size-12 items-center justify-center rounded-item bg-muted text-muted-foreground">
               <Upload className="size-5" aria-hidden />
             </div>
           )}
@@ -118,7 +118,7 @@ export function WizardStepProfile({
           />
           <Label
             htmlFor="logo"
-            className="inline-flex h-9 cursor-pointer items-center rounded-md border border-input px-3 text-sm font-medium hover:bg-muted"
+            className="inline-flex h-9 cursor-pointer items-center rounded-pill border border-input px-3 text-body font-medium hover:bg-muted"
           >
             {t('logoChoose')}
           </Label>

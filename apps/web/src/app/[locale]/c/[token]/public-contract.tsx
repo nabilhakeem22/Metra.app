@@ -60,10 +60,10 @@ export function PublicContractView({
   return (
     <div className="mx-auto max-w-3xl space-y-4 p-4 md:p-8">
       <header className="space-y-1">
-        <h1 className="text-xl font-semibold">
+        <h1 className="text-heading font-semibold">
           {pick(contract.org.name_ar, contract.org.name_en) || 'Metra'}
         </h1>
-        <p className="text-sm text-muted-foreground" dir="ltr">
+        <p className="text-body text-muted-foreground" dir="ltr">
           {t('contract')} · {num}
         </p>
         <p className="font-medium">{pick(contract.title_ar, contract.title_en)}</p>
@@ -73,10 +73,10 @@ export function PublicContractView({
         <Card key={s.id}>
           <CardContent className="p-0">
             <div className="flex items-center justify-between border-b px-4 py-2">
-              <h2 className="text-sm font-semibold">{pick(s.title_ar, s.title_en)}</h2>
-              <span className="text-sm" dir="ltr">{m(s.section_subtotal)}</span>
+              <h2 className="text-body font-semibold">{pick(s.title_ar, s.title_en)}</h2>
+              <span className="text-body" dir="ltr">{m(s.section_subtotal)}</span>
             </div>
-            <table className="w-full text-sm">
+            <table className="w-full text-body">
               <tbody>
                 {s.lines.map((l) => (
                   <tr key={l.id} className="border-b last:border-0">
@@ -95,7 +95,7 @@ export function PublicContractView({
       ))}
 
       <Card>
-        <CardContent className="ms-auto max-w-xs space-y-1 py-4 text-sm" dir="ltr">
+        <CardContent className="ms-auto max-w-xs space-y-1 py-4 text-body" dir="ltr">
           <Row label={t('originalValue')} value={m(contract.total)} bold />
           <Row label={t('header.advancePct')} value={formatPercent(contract.advance_pct, locale)} />
           <Row label={t('header.retentionPct')} value={formatPercent(contract.retention_pct, locale)} />
@@ -111,7 +111,7 @@ export function PublicContractView({
       ) : (
         <Card>
           <CardContent className="space-y-3 py-4">
-            <p className="text-sm text-muted-foreground">{t('ack.intro')}</p>
+            <p className="text-body text-muted-foreground">{t('ack.intro')}</p>
             <Input
               placeholder={t('ack.nameLabel')}
               value={name}
@@ -127,7 +127,7 @@ export function PublicContractView({
                 {t('ack.button')}
               </Button>
             </div>
-            <p className="text-center text-xs text-muted-foreground">
+            <p className="text-center text-caption text-muted-foreground">
               {t('ack.notSignature')}
             </p>
           </CardContent>

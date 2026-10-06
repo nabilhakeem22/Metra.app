@@ -45,9 +45,9 @@ export function ProjectsClientTable({
     <Card>
       <CardContent className="p-0">
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="w-full text-body">
             <thead>
-              <tr className="border-b text-xs text-muted-foreground">
+              <tr className="border-b text-caption text-muted-foreground">
                 <th className="px-4 py-2 text-start font-medium">{t('table.code')}</th>
                 <th className="px-4 py-2 text-start font-medium">{t('table.name')}</th>
                 <th className="px-4 py-2 text-start font-medium">{t('table.client')}</th>
@@ -73,7 +73,7 @@ export function ProjectsClientTable({
                     key={p.id}
                     className={`border-b last:border-0 hover:bg-muted/40 ${p.active ? '' : 'opacity-60'}`}
                   >
-                    <td className="px-4 py-2 font-mono text-xs" dir="ltr">
+                    <td className="px-4 py-2 font-mono text-caption" dir="ltr">
                       {p.code}
                     </td>
                     <td className="px-4 py-2">
@@ -81,7 +81,7 @@ export function ProjectsClientTable({
                         {name}
                       </Link>
                       {!p.active && (
-                        <span className="ms-2 rounded-full bg-muted px-2 py-0.5 text-[10px] text-muted-foreground">
+                        <span className="ms-2 rounded-pill bg-muted px-2 py-0.5 text-caption text-muted-foreground">
                           {t('archived')}
                         </span>
                       )}
@@ -91,7 +91,7 @@ export function ProjectsClientTable({
                     </td>
                     <td className="px-4 py-2">
                       <span
-                        className={`rounded-full px-2 py-0.5 text-xs ${STATUS_STYLE[p.status] ?? 'bg-muted text-muted-foreground'}`}
+                        className={`rounded-pill px-2 py-0.5 text-caption ${STATUS_STYLE[p.status] ?? 'bg-muted text-muted-foreground'}`}
                       >
                         {t(`statuses.${p.status}`)}
                       </span>

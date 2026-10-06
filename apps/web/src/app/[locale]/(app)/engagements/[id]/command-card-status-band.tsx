@@ -44,11 +44,11 @@ export function CommandCardStatusBand({
       {chrome.showPaymentPill && (
         <div className="mt-3.5 flex flex-wrap items-center gap-2.5">
           <span
-            className={`inline-flex items-center rounded-[var(--r-pill)] px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.08em] ${chrome.pillClass}`}
+            className={`inline-flex items-center rounded-pill px-2.5 py-1 text-caption font-semibold uppercase tracking-[0.08em] ${chrome.pillClass}`}
           >
             {tcmd(`pill.${chrome.pillKey}`)}
           </span>
-          <span className="text-[12.5px] text-[color:var(--text-muted)]">
+          <span className="text-small text-[color:var(--text-muted)]">
             {tcmd('move.studio')}
           </span>
         </div>
@@ -73,7 +73,7 @@ export function CommandCardShareFooter({ onNudge }: { onNudge: () => void }) {
       <button
         type="button"
         onClick={onNudge}
-        className="inline-flex items-center gap-1.5 text-[12.5px] font-semibold text-brand-ink hover:underline"
+        className="inline-flex items-center gap-1.5 text-small font-semibold text-brand-ink hover:underline"
       >
         <Link2 className="size-3.5" aria-hidden />
         {tcmd('nudge')}

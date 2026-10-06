@@ -14,7 +14,7 @@ type StickyColumn = 'code' | 'description';
 const STICKY_OFFSET: Record<StickyColumn, number> = { code: 0, description: 72 };
 
 const CELL_INPUT_CLASS =
-  'w-full rounded-[8px] border border-transparent bg-transparent p-3 text-sm text-[color:var(--text)] outline-none hover:bg-[color:var(--track)] focus:border-[color:hsl(var(--brand))] focus:bg-[color:var(--field-bg)]';
+  'w-full rounded-item border border-transparent bg-transparent p-3 text-body text-[color:var(--text)] outline-none hover:bg-[color:var(--track)] focus:border-[color:hsl(var(--brand))] focus:bg-[color:var(--field-bg)]';
 
 export function Th({
   children,
@@ -28,7 +28,7 @@ export function Th({
   return (
     <th
       scope="col"
-      className={`sticky top-0 whitespace-nowrap bg-[color:var(--thead)] p-3 font-mono text-[11px] font-bold uppercase tracking-[0.09em] text-[color:var(--thead-ink)] ${num ? 'text-end' : 'text-start'}`}
+      className={`sticky top-0 whitespace-nowrap bg-[color:var(--thead)] p-3 font-mono text-caption font-bold uppercase tracking-[0.09em] text-[color:var(--thead-ink)] ${num ? 'text-end' : 'text-start'}`}
       style={{
         zIndex: sticky ? 4 : 3,
         borderBottom: '1px solid var(--thead-rule)',

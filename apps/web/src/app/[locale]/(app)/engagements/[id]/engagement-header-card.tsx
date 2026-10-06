@@ -83,12 +83,12 @@ export function EngagementHeaderCard({
         {/* Breadcrumb + document number on one mono line: where you are, and which
             record this is. The number was a bordered pill of its own; here it earns
             less weight than the client's name, which is what a studio scans for. */}
-        <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.1em] text-[color:var(--text-faint)]">
+        <p className="font-mono text-caption font-semibold uppercase tracking-[0.1em] text-[color:var(--text-faint)]">
           <span>{tc('crumb')}</span>
           <span aria-hidden> / </span>
           <span dir="ltr">{docNumber}</span>
         </p>
-        <h1 className="mt-1 text-[20px] font-extrabold leading-tight tracking-[var(--tracking-title)] text-[color:var(--text)] text-balance">
+        <h1 className="mt-1 text-heading font-bold leading-tight text-[color:var(--text)] text-balance">
           {client}
           {/* `·` not an em dash: — is not Arabic punctuation, and this line
               renders in ar-EG (scripts/i18n/style-guide.md rule 6). */}
@@ -100,7 +100,7 @@ export function EngagementHeaderCard({
             {chips.map((chip) => (
               <span
                 key={chip.key}
-                className={`rounded-[var(--r-pill)] px-2.5 py-0.5 text-[11.5px] font-semibold ${
+                className={`rounded-pill px-2.5 py-0.5 text-caption font-semibold ${
                   chip.tone === 'warn'
                     ? 'bg-[color:var(--warn-tint)] text-[color:var(--warn)]'
                     : chip.tone === 'brand'
@@ -120,7 +120,7 @@ export function EngagementHeaderCard({
           lives on the command card, and two of them would be the duplication this
           whole restructure exists to remove. */}
       <span
-        className={`inline-flex shrink-0 items-center gap-1.5 rounded-[var(--r-pill)] px-3 py-1.5 text-[12.5px] font-semibold ${
+        className={`inline-flex shrink-0 items-center gap-1.5 rounded-pill px-3 py-1.5 text-small font-semibold ${
           shared
             ? 'border border-[color:var(--success)] bg-[color:var(--success-tint)] text-[color:var(--success)]'
             : 'border border-[color:var(--rule)] bg-[color:var(--track)] text-[color:var(--text-muted)]'

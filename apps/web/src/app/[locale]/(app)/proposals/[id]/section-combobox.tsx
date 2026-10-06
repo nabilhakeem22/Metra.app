@@ -141,7 +141,7 @@ export function SectionCombobox({
         <ul
           id={listId}
           role="listbox"
-          className="absolute start-0 z-20 mt-1 max-h-56 w-full overflow-auto border border-border bg-popover py-1 text-sm shadow-card"
+          className="absolute start-0 z-20 mt-1 max-h-56 w-full overflow-auto border border-border bg-popover py-1 text-body shadow-card"
         >
           {filtered.map((o, i) => (
             <li key={o.id} role="option" aria-selected={i === active}>

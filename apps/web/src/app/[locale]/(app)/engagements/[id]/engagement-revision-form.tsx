@@ -74,8 +74,8 @@ export function EngagementRevisionForm({
   }
 
   return (
-    <div className="space-y-3 rounded-[var(--r-item)] border border-[color:var(--rule)] bg-[color:var(--track)] p-4">
-      <p className="text-sm font-medium">
+    <div className="space-y-3 rounded-item border border-[color:var(--rule)] bg-[color:var(--track)] p-4">
+      <p className="text-body font-medium">
         {isDesignChange ? t('designChangeTitle') : t('title')}
       </p>
       <div className="space-y-1.5">
@@ -93,7 +93,7 @@ export function EngagementRevisionForm({
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
           />
-          <p className="text-xs text-muted-foreground">{t('hint')}</p>
+          <p className="text-caption text-muted-foreground">{t('hint')}</p>
         </div>
       )}
       <div className="flex justify-end gap-2">

@@ -54,16 +54,16 @@ export function DeliveryShareLink({
           className="flex w-full items-center gap-2 px-4 py-3 text-start"
         >
           <Share2 className="size-4 shrink-0 text-primary" aria-hidden />
-          <h2 className="text-sm font-semibold">{t('title')}</h2>
+          <h2 className="text-body font-semibold">{t('title')}</h2>
           <span
-            className="rounded-pill px-2 py-0.5 text-[11px] font-semibold"
+            className="rounded-pill px-2 py-0.5 text-caption font-semibold"
             style={share.shared ? ACTIVE_PILL : IDLE_PILL}
           >
             {share.shared ? t('statusActive') : t('statusNotShared')}
           </span>
           {/* A revealed link is the one thing you must not scroll past. */}
           {share.link && !share.open && (
-            <span className="text-xs font-semibold text-[color:var(--warn)]">
+            <span className="text-caption font-semibold text-[color:var(--warn)]">
               {t('unreadBadge')}
             </span>
           )}

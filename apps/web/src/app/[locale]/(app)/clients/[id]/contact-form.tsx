@@ -64,7 +64,7 @@ export function ContactForm({
   return (
     <Card>
       <CardContent className="space-y-3 py-4">
-        <h3 className="text-sm font-semibold">{draft.id ? t('editTitle') : t('newTitle')}</h3>
+        <h3 className="text-body font-semibold">{draft.id ? t('editTitle') : t('newTitle')}</h3>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           {TEXT_FIELDS.map((field) => (
             <div key={field.key} className="space-y-2">
@@ -82,7 +82,7 @@ export function ContactForm({
           {/* Only on CREATE: an existing contact is promoted with its own action,
               which is also the only one that demotes the current primary. */}
           {!draft.id && (
-            <label className="flex items-center gap-2 self-end text-sm">
+            <label className="flex items-center gap-2 self-end text-body">
               <input
                 type="checkbox"
                 checked={draft.isPrimary}

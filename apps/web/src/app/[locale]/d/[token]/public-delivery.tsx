@@ -42,8 +42,8 @@ export function PublicDeliveryView({
     return (
       <div className="client-portal flex min-h-screen items-center justify-center p-6 text-center">
         <div className="max-w-sm space-y-2">
-          <p className="text-lg font-semibold">{t(notice + '.title')}</p>
-          <p className="text-sm text-muted-foreground">{t(notice + '.body')}</p>
+          <p className="text-title font-semibold">{t(notice + '.title')}</p>
+          <p className="text-body text-muted-foreground">{t(notice + '.body')}</p>
         </div>
       </div>
     );
@@ -81,7 +81,7 @@ export function PublicDeliveryView({
           documents={delivery.documents}
           documentUnavailable={documentUnavailable}
         />
-        <footer className="pt-2 text-center text-xs text-muted-foreground">
+        <footer className="pt-2 text-center text-caption text-muted-foreground">
           {t('poweredBy', { firm: firmName })}
         </footer>
       </div>

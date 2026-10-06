@@ -162,7 +162,7 @@ export function DetailsFields({
           id="p-description"
           rows={3}
           aria-describedby="p-description-hint"
-          className="w-full glass-field outline-none focus-ring-brand focus-visible:border-[color:hsl(var(--brand))] p-2 text-sm"
+          className="w-full glass-field outline-none focus-ring-brand focus-visible:border-[color:hsl(var(--brand))] p-2 text-body"
           value={form.description}
           onChange={(e) => set('description')(e.target.value)}
           disabled={!canManage || pending}

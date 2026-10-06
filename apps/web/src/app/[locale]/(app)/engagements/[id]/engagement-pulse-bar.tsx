@@ -24,21 +24,21 @@ export function EngagementPulseBar({ pulse }: { pulse: CommercialPulse }) {
   const fillWidth = Math.min(Math.max(collectedPct, 0), 100);
 
   return (
-    <section className="grid grid-cols-1 gap-px overflow-hidden rounded-[var(--r-panel)] border border-[color:var(--rule)] bg-[color:var(--rule)] text-[color:var(--text)] shadow-sm sm:grid-cols-[1fr_1fr_1.6fr]">
+    <section className="grid grid-cols-1 gap-px overflow-hidden rounded-panel border border-[color:var(--rule)] bg-[color:var(--rule)] text-[color:var(--text)] shadow-sm sm:grid-cols-[1fr_1fr_1.6fr]">
       <div className="bg-card px-[18px] py-[14px]">
-        <div className="mb-1.5 font-mono text-[11px] font-semibold uppercase tracking-[0.1em] text-[color:var(--text-muted)]">
+        <div className="mb-1.5 font-mono text-caption font-semibold uppercase tracking-[0.1em] text-[color:var(--text-muted)]">
           {t('contractTotal')}
         </div>
-        <div className="text-[21px] font-semibold leading-tight tabular" dir="ltr">
+        <div className="text-heading font-semibold leading-tight tabular" dir="ltr">
           {formatMoney(contractTotal, locale)}
         </div>
       </div>
 
       <div className="bg-card px-[18px] py-[14px]">
-        <div className="mb-1.5 font-mono text-[11px] font-semibold uppercase tracking-[0.1em] text-[color:var(--text-muted)]">
+        <div className="mb-1.5 font-mono text-caption font-semibold uppercase tracking-[0.1em] text-[color:var(--text-muted)]">
           {t('collected')}
         </div>
-        <div className="text-[21px] font-semibold leading-tight tabular" dir="ltr">
+        <div className="text-heading font-semibold leading-tight tabular" dir="ltr">
           {formatMoney(collected, locale)}
         </div>
         {/* The percent + progress bar sit directly under the figure, on one
@@ -51,7 +51,7 @@ export function EngagementPulseBar({ pulse }: { pulse: CommercialPulse }) {
             />
           </div>
           <span
-            className="shrink-0 font-mono text-[12px] tabular-nums text-[color:var(--text-muted)]"
+            className="shrink-0 font-mono text-caption tabular-nums text-[color:var(--text-muted)]"
             dir="ltr"
           >
             {collectedPct}%
@@ -60,20 +60,20 @@ export function EngagementPulseBar({ pulse }: { pulse: CommercialPulse }) {
       </div>
 
       <div className="bg-brand-tint px-[18px] py-[14px]">
-        <div className="mb-1.5 font-mono text-[11px] font-semibold uppercase tracking-[0.1em] text-brand-ink">
+        <div className="mb-1.5 font-mono text-caption font-semibold uppercase tracking-[0.1em] text-brand-ink">
           {t('pendingGate')}
         </div>
         {pendingGate ? (
           <>
             {/* Amount on its own line (tabular, dir=ltr); the "due" qualifier
                 gets its own caption line so it never crowds the number. */}
-            <div className="text-[21px] font-semibold leading-tight tabular" dir="ltr">
+            <div className="text-heading font-semibold leading-tight tabular" dir="ltr">
               {formatMoney(pendingGate.amountDue, locale)}
             </div>
-            <div className="mt-0.5 text-[12px] font-medium text-brand-ink">
+            <div className="mt-0.5 text-caption font-medium text-brand-ink">
               {t('due')}
             </div>
-            <div className="mt-1 text-[13px] text-brand-ink">
+            <div className="mt-1 text-small text-brand-ink">
               {pendingGate.unlocksPhaseKey
                 ? t('unlocks', {
                     gate: tk(pendingGate.gate),
@@ -84,10 +84,10 @@ export function EngagementPulseBar({ pulse }: { pulse: CommercialPulse }) {
           </>
         ) : (
           <>
-            <div className="text-[21px] font-semibold text-brand-ink">
+            <div className="text-heading font-semibold text-brand-ink">
               {t('noneOutstanding')}
             </div>
-            <div className="mt-1 text-[13px] text-[color:var(--text-muted)]">
+            <div className="mt-1 text-small text-[color:var(--text-muted)]">
               {t('allSettled')}
             </div>
           </>

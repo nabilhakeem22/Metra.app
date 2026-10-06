@@ -119,7 +119,7 @@ export function DocumentsTab({
               onChange={(e) => setCategoryId(e.target.value)}
               aria-label={t('category')}
               disabled={pending}
-              className="h-9 rounded-md border bg-background px-2 text-sm"
+              className="h-9 rounded-item border bg-background px-2 text-body"
             >
               <option value="">{t('uncategorised')}</option>
               {categories.map((c) => (
@@ -155,7 +155,7 @@ export function DocumentsTab({
             <div className="divide-y">
               {groupByCategory(documents).map((group) => (
                 <section key={group.categoryId ?? 'uncategorised'}>
-                  <p className="bg-muted/40 px-4 py-1.5 text-xs font-semibold text-muted-foreground">
+                  <p className="bg-muted/40 px-4 py-1.5 text-caption font-semibold text-muted-foreground">
                     {group.categoryId
                       ? pickLocale(
                           { nameAr: group.nameAr, nameEn: group.nameEn },
@@ -168,10 +168,10 @@ export function DocumentsTab({
                     {group.documents.map((d) => (
                 <li key={d.id} className="flex items-center gap-3 px-4 py-3">
                   <FileText className="size-4 text-muted-foreground" aria-hidden />
-                  <span className="flex-1 truncate text-sm">
+                  <span className="flex-1 truncate text-body">
                     {d.originalName ?? d.id}
                   </span>
-                  <span className="text-xs text-muted-foreground" dir="ltr">
+                  <span className="text-caption text-muted-foreground" dir="ltr">
                     {formatDate(d.createdAt, locale)}
                   </span>
                   <Button
