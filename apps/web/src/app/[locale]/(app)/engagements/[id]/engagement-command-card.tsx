@@ -2,6 +2,7 @@
 
 import { useTranslations } from 'next-intl';
 import { CommandCardActRegion } from './command-card-act-region';
+import { CommandCardClosedClaims } from './command-card-closed-claims';
 import { CommandCardClosedLinks } from './command-card-closed-links';
 import { useCommandCardCopy } from './command-card-copy';
 import { CommandCardHeadline } from './command-card-headline';
@@ -61,6 +62,14 @@ export function EngagementCommandCard(props: EngagementCommandCardProps) {
             state={state}
             projectId={props.projectId}
             canStartQuotation={props.canStartQuotation}
+          />
+        )}
+
+        {closed && props.canResolveClaims && (
+          <CommandCardClosedClaims
+            claims={props.paymentClaims}
+            pending={pending}
+            runAction={props.runAction}
           />
         )}
 

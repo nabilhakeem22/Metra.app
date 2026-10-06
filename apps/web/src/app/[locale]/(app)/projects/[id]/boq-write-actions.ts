@@ -5,7 +5,6 @@ import type { TransitionStartFunction } from 'react';
 import {
   addBoqLine,
   addBoqSection,
-  deleteBoqLine,
   setBoqDiscount,
   updateBoqLine,
 } from '@/lib/boqs/actions';
@@ -46,7 +45,7 @@ export interface WriteContext {
   errorText: (key: string) => string;
 }
 
-function refuse(context: WriteContext, code: ActionCode | undefined): void {
+export function refuse(context: WriteContext, code: ActionCode | undefined): void {
   toast({
     title: resolveActionError(code, context.errorText),
     variant: 'destructive',
@@ -197,9 +196,3 @@ export function discountBlur(context: WriteContext, typed: string): void {
   });
 }
 
-export function deleteLine(context: WriteContext, lineId: string): void {
-  context.start(async () => {
-    const result = await deleteBoqLine({ lineId });
-    if (!result.ok) refuse(context, result.error);
-  });
-}

@@ -144,10 +144,7 @@
     "menu": "Menu",
     "userMenu": "User menu",
     "role": "Role",
-    "locale": "Language",
-    "viewTabs": "View",
-    "overview": "Overview",
-    "activity": "Activity"
+    "locale": "Language"
   },
   "login": {
     "signInTitle": "Sign in",
@@ -382,7 +379,16 @@
       "retire": "Retire",
       "restore": "Restore",
       "retired": "Retired",
-      "retireNote": "Retiring a category hides it from the upload list. Documents already filed under it stay where they are."
+      "retireNote": "Retiring a category hides it from the upload list. Documents already filed under it stay where they are.",
+      "confirmRetire": {
+        "title": "Retire this category?",
+        "body": "It disappears from the upload list. Documents already filed under it stay where they are, and you can restore it any time.",
+        "confirm": "Retire"
+      },
+      "toast": {
+        "retired": "Category retired",
+        "restored": "Category restored"
+      }
     }
   },
   "apiKeys": {
@@ -558,7 +564,11 @@
   },
   "common": {
     "untranslated": "untranslated",
-    "hint": "More info"
+    "hint": "More info",
+    "cancel": "Cancel",
+    "undo": "Undo",
+    "moreActions": "More actions",
+    "cannotUndo": "This can't be undone."
   },
   "hints": {
     "proposal": {
@@ -760,6 +770,11 @@
       "starterExists": "Starter items are already present",
       "sectionAdded": "Section added",
       "importFailed": "Import failed"
+    },
+    "confirmDeactivate": {
+      "title": "Deactivate this item?",
+      "body": "It stops showing up when you add lines. Proposals that already use it keep it, and you can activate it again any time.",
+      "confirm": "Deactivate"
     }
   },
   "clients": {
@@ -873,7 +888,13 @@
         "editTitle": "Edit contact",
         "save": "Save",
         "cancel": "Cancel",
-        "primaryOnCreate": "Set as primary"
+        "primaryOnCreate": "Set as primary",
+        "confirmDelete": {
+          "title": "Delete this contact?",
+          "body": "They are removed from this client's contacts.",
+          "confirm": "Delete"
+        },
+        "deleted": "Contact deleted"
       },
       "projects": {
         "title": "Projects",
@@ -902,7 +923,12 @@
         "uploaded": "Document uploaded",
         "deleted": "Document deleted",
         "category": "Category",
-        "uncategorised": "Uncategorised"
+        "uncategorised": "Uncategorised",
+        "confirmDelete": {
+          "title": "Delete this document?",
+          "body": "The file is removed from this client.",
+          "confirm": "Delete"
+        }
       },
       "activity": {
         "title": "Activity",
@@ -927,6 +953,11 @@
     "filter": {
       "allStatuses": "All statuses",
       "allCities": "All cities"
+    },
+    "confirmDeactivate": {
+      "title": "Deactivate this client?",
+      "body": "They leave the active list and the pickers. Their projects and documents stay as they are, and you can activate them again any time.",
+      "confirm": "Deactivate"
     }
   },
   "projects": {
@@ -1077,7 +1108,12 @@
         "uploaded": "Document uploaded",
         "deleted": "Document deleted",
         "category": "Category",
-        "uncategorised": "Uncategorised"
+        "uncategorised": "Uncategorised",
+        "confirmDelete": {
+          "title": "Delete this document?",
+          "body": "The file is removed from this project.",
+          "confirm": "Delete"
+        }
       },
       "activity": {
         "title": "Activity",
@@ -1177,8 +1213,14 @@
         "importNotes": {
           "semicolon_separated": "Read as semicolon-separated.",
           "tab_separated": "Read as tab-separated."
-        }
+        },
+        "lineDeleted": "Line removed"
       }
+    },
+    "confirmDeactivate": {
+      "title": "Deactivate this project?",
+      "body": "It leaves the active list. Its deliveries, BOQs and documents stay as they are, and you can activate it again any time.",
+      "confirm": "Deactivate"
     }
   },
   "proposals": {
@@ -1265,7 +1307,8 @@
       "moveUp": "Move up",
       "moveDown": "Move down",
       "termsEn": "Terms (EN)",
-      "termsAr": "Terms (AR)"
+      "termsAr": "Terms (AR)",
+      "deleteBody": "This draft and all its lines are deleted. This can't be undone."
     },
     "preview": {
       "open": "Preview",
@@ -1972,7 +2015,8 @@
       "evidence": "How",
       "evidencePlaceholder": "Phone call, WhatsApp, signed on paper…",
       "alreadyRecorded": "That payment was already recorded",
-      "alreadyRecordedHint": "No second row was written to the ledger. The saved amount is the first one."
+      "alreadyRecordedHint": "No second row was written to the ledger. The saved amount is the first one.",
+      "claimPending": "The client says they already paid this one. Confirm or dismiss their claim first, so it isn't counted twice."
     },
     "handoffAck": {
       "title": "Record handoff receipt",
@@ -1990,7 +2034,9 @@
       "claimedBy": "Marked paid by {name}",
       "amount": "Amount to record",
       "confirm": "Confirm the client's payment",
-      "dismiss": "Dismiss"
+      "dismiss": "Dismiss",
+      "closedTitle": "A payment the client reported",
+      "closedHint": "This delivery is closed, so the payment can't be recorded here. Dismiss the claim to clear it."
     },
     "artifactKind": {
       "survey": "Survey",
@@ -2098,7 +2144,17 @@
       "statusActive": "Link active",
       "statusNotShared": "Not shared yet",
       "unreadBadge": "New link: copy it",
-      "rotateHint": "Revealing a new link stops the current one working."
+      "rotateHint": "Revealing a new link stops the current one working.",
+      "moreActions": "Link actions",
+      "confirmRotate": {
+        "title": "Reveal a new link?",
+        "body": "The link the client has now stops working. You send them the new one."
+      },
+      "confirmRevoke": {
+        "title": "Revoke the client link?",
+        "body": "The client can no longer open this delivery with it. Sharing again creates a new link.",
+        "confirm": "Revoke link"
+      }
     },
     "notFound": {
       "title": "This link is no longer available",

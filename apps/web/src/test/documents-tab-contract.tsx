@@ -1,5 +1,6 @@
 import { expect, test, vi, type Mock } from 'vitest';
 import { fireEvent, screen, waitFor, type RenderResult } from '@testing-library/react';
+import { openMenu } from './open-menu';
 import { messageAt } from './render-with-intl';
 import type { CapturedToast } from './doubles';
 
@@ -21,6 +22,12 @@ export interface DocumentsTabContract {
   actions: { deleteDocument: Mock; getDocumentUrl: Mock };
   /** The array the caller's `vi.mock('@/hooks/use-toast')` factory pushes into. */
   toasts: CapturedToast[];
+  /**
+   * The titles the caller's `vi.mock('@/hooks/undo-toast')` factory pushes into.
+   * That mock sets `UNDO_WINDOW_MS: 0`: the window itself is
+   * use-undoable-removal's to test, so here the delete commits at once.
+   */
+  undoToasts: string[];
   /** The caller's doubled router, so "did it refresh" is answerable. */
   router: { refresh: Mock };
 }
@@ -37,8 +44,19 @@ function clickDownload(contract: DocumentsTabContract): void {
   fireEvent.click(screen.getByRole('button', { name: ar(`${contract.namespace}.download`) }));
 }
 
-function clickDelete(contract: DocumentsTabContract): void {
-  fireEvent.click(screen.getByRole('button', { name: ar(`${contract.namespace}.delete`) }));
+/** Delete lives in the row menu and asks first; this opens it and chooses Delete. */
+function chooseDelete(contract: DocumentsTabContract): void {
+  expect(screen.queryByRole('button', { name: ar(`${contract.namespace}.delete`) })).toBeNull();
+  openMenu(ar('common.moreActions'));
+  fireEvent.click(screen.getByRole('menuitem', { name: ar(`${contract.namespace}.delete`) }));
+}
+
+async function confirmDelete(contract: DocumentsTabContract): Promise<void> {
+  chooseDelete(contract);
+  expect(contract.actions.deleteDocument).not.toHaveBeenCalled();
+  fireEvent.click(
+    await screen.findByRole('button', { name: ar(`${contract.namespace}.confirmDelete.confirm`) }),
+  );
 }
 
 /**
@@ -94,7 +112,7 @@ async function deleteRefusalIsToldAndLeavesTheRow(
   contract.actions.deleteDocument.mockResolvedValue({ ok: false, error: 'uncertain' });
   contract.renderTab();
 
-  clickDelete(contract);
+  await confirmDelete(contract);
 
   await waitFor(() => {
     expect(contract.toasts).toHaveLength(1);
@@ -103,24 +121,45 @@ async function deleteRefusalIsToldAndLeavesTheRow(
     title: ar('errors.uncertain'),
     variant: 'destructive',
   });
-  expect(screen.getByText(contract.documentName)).toBeTruthy();
+  await waitFor(() => {
+    expect(screen.getByText(contract.documentName)).toBeTruthy();
+  });
   expect(contract.actions.deleteDocument).toHaveBeenCalledTimes(1);
 }
 
-/** A successful delete toasts the TAB'S OWN `deleted` key, not a shared one. */
-async function deleteSuccessToastsTheNamespacesOwnKey(
+/**
+ * A confirmed delete hides the row and offers Undo under the TAB'S OWN `deleted`
+ * key, not a shared one; once it lands the page refreshes. No error toast.
+ */
+async function deleteSuccessOffersUndoUnderTheNamespacesOwnKey(
   contract: DocumentsTabContract,
 ): Promise<void> {
   contract.actions.deleteDocument.mockResolvedValue({ ok: true });
   contract.renderTab();
 
-  clickDelete(contract);
+  await confirmDelete(contract);
 
   await waitFor(() => {
-    expect(contract.toasts).toHaveLength(1);
+    expect(contract.router.refresh).toHaveBeenCalled();
   });
-  expect(lastToast(contract.toasts)).toEqual({ title: ar(`${contract.namespace}.deleted`) });
-  expect(contract.router.refresh).toHaveBeenCalled();
+  expect(contract.undoToasts).toEqual([ar(`${contract.namespace}.deleted`)]);
+  expect(contract.toasts).toHaveLength(0);
+  expect(contract.actions.deleteDocument).toHaveBeenCalledTimes(1);
+  expect(screen.queryByText(contract.documentName)).toBeNull();
+}
+
+/** Cancel (and Escape, the same Radix dismiss) deletes nothing. */
+async function cancelDeletesNothing(contract: DocumentsTabContract): Promise<void> {
+  contract.renderTab();
+
+  chooseDelete(contract);
+  fireEvent.click(await screen.findByRole('button', { name: ar('common.cancel') }));
+
+  await waitFor(() => {
+    expect(screen.queryByRole('alertdialog')).toBeNull();
+  });
+  expect(contract.actions.deleteDocument).not.toHaveBeenCalled();
+  expect(screen.getByText(contract.documentName)).toBeTruthy();
 }
 
 /** Declares this contract's `test()` blocks inside the caller's `describe`. */
@@ -134,6 +173,8 @@ export function assertDocumentsTabFailureToasts(contract: DocumentsTabContract):
   test(`a refused delete toasts the coded refusal and LEAVES the row on screen`, () =>
     deleteRefusalIsToldAndLeavesTheRow(contract));
 
-  test(`a successful delete toasts ${contract.namespace}.deleted and refreshes`, () =>
-    deleteSuccessToastsTheNamespacesOwnKey(contract));
+  test(`a confirmed delete offers Undo as ${contract.namespace}.deleted, then refreshes`, () =>
+    deleteSuccessOffersUndoUnderTheNamespacesOwnKey(contract));
+
+  test(`cancelling the confirm deletes nothing`, () => cancelDeletesNothing(contract));
 }

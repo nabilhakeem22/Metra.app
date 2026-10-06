@@ -1,11 +1,11 @@
 'use client';
 
 import { useLocale, useTranslations } from 'next-intl';
-import { useMemo, useState, useTransition } from 'react';
+import { useMemo, useState } from 'react';
+import { deactivationCopy, useActiveToggle } from '@/hooks/use-active-toggle';
 import { useOpenOnArrival } from '@/hooks/use-open-on-arrival';
 import { toast } from '@/hooks/use-toast';
 import { resolveActionError } from '@/lib/actions/error-message';
-import type { ActionCode } from '@/lib/actions/result';
 import { formatDate } from '@/lib/format/date';
 import { setProjectActive } from '@/lib/projects/actions';
 import { ProjectForm } from './project-form';
@@ -36,6 +36,7 @@ export function ProjectsClient({
 }: ProjectsClientProps) {
   const t = useTranslations('projects');
   const te = useTranslations('errors');
+  const tc = useTranslations('common');
   const locale = useLocale();
 
   const [q, setQ] = useState('');
@@ -43,7 +44,6 @@ export function ProjectsClient({
   const [activeOnly, setActiveOnly] = useState(false);
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<ProjectListItem | null>(null);
-  const [pending, startTransition] = useTransition();
 
   // Arrived from a client profile's "new project for this client" CTA (that
   // client preselected) or from `?new=1`: open the new-project form once.
@@ -67,19 +67,12 @@ export function ProjectsClient({
     setFormOpen(true);
   }
 
-  function toggleActive(item: ProjectListItem) {
-    startTransition(async () => {
-      const res = await setProjectActive(item.id, !item.active);
-      toast(
-        res.ok
-          ? { title: t(item.active ? 'toast.deactivated' : 'toast.activated') }
-          : {
-              title: resolveActionError(res.error as ActionCode, te),
-              variant: 'destructive',
-            },
-      );
-    });
-  }
+  const activeToggle = useActiveToggle({
+    setActive: setProjectActive,
+    copy: deactivationCopy(t, tc),
+    onError: (result) =>
+      toast({ title: resolveActionError(result.error, te), variant: 'destructive' }),
+  });
 
   const dateRange = (p: ProjectListItem): string => {
     const s = p.startDate ? formatDate(p.startDate, locale) : '';
@@ -98,11 +91,17 @@ export function ProjectsClient({
       canAddClient={canAddClient}
     />
   );
+  const dialogs = (
+    <>
+      {form}
+      {activeToggle.dialog}
+    </>
+  );
 
   if (items.length === 0) {
     return (
       <>
-        {form}
+        {dialogs}
         <ProjectsEmptyState
           hasClients={clientOptions.length > 0}
           canManage={canManage}
@@ -115,7 +114,7 @@ export function ProjectsClient({
 
   return (
     <div className="space-y-4">
-      {form}
+      {dialogs}
 
       <ProjectsClientToolbar
         t={t}
@@ -132,14 +131,15 @@ export function ProjectsClient({
 
       <ProjectsClientTable
         t={t}
+        moreActionsLabel={tc('moreActions')}
         locale={locale}
         filtered={filtered}
         canManage={canManage}
-        pending={pending}
+        pending={activeToggle.pending}
         dateRange={dateRange}
         setEditing={setEditing}
         setFormOpen={setFormOpen}
-        toggleActive={toggleActive}
+        toggleActive={(project) => void activeToggle.toggle(project)}
       />
     </div>
   );

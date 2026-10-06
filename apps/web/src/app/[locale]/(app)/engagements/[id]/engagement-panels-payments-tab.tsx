@@ -3,6 +3,7 @@
 import { Banknote } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
 import { useState } from 'react';
+import type { MilestoneKind } from '@metra/db';
 import { Button } from '@/components/ui/button';
 import type { CommercialPulse } from '@/lib/engagements/pulse';
 import type {
@@ -32,6 +33,7 @@ export function PaymentsTab({
   engagementId,
   feeSchedule,
   payments,
+  claimedMilestones,
   pulse,
   canRecordPayment,
   pending,
@@ -40,6 +42,8 @@ export function PaymentsTab({
   engagementId: string;
   feeSchedule: EngagementFeeSchedule;
   payments: EngagementPayment[];
+  /** Milestones with a client payment claim still pending. */
+  claimedMilestones: readonly MilestoneKind[];
   pulse: CommercialPulse;
   canRecordPayment: boolean;
   pending: boolean;
@@ -74,6 +78,7 @@ export function PaymentsTab({
         {payOpen && (
           <PaymentPanel
             engagementId={engagementId}
+            claimedMilestones={claimedMilestones}
             pending={pending}
             runAction={runAction}
             onDone={() => setPayOpen(false)}

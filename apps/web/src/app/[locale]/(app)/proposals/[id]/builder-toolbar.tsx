@@ -4,6 +4,7 @@ import { Loader2, Send, Trash2 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import type { ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
+import { OverflowMenu } from '@/components/ui/overflow-menu';
 import { PreviewModal } from './preview-modal';
 
 /**
@@ -37,16 +38,11 @@ export function BuilderToolbar({
   children?: ReactNode;
 }) {
   const t = useTranslations('proposals');
+  const tc = useTranslations('common');
   const quote = mode === 'quote';
 
   return (
     <div className="flex flex-wrap justify-end gap-2">
-      {quote && (
-        <Button variant="ghost" onClick={onDelete} disabled={busy}>
-          <Trash2 className="size-4" aria-hidden />
-          {t('builder.delete')}
-        </Button>
-      )}
       <Button variant="secondary" onClick={onSave} disabled={busy}>
         {pending && <Loader2 className="size-4 animate-spin" aria-hidden />}
         {t('builder.save')}
@@ -66,6 +62,22 @@ export function BuilderToolbar({
         </Button>
       )}
       {children}
+      {/* Deleting the draft lives in the toolbar's menu, behind its confirm. */}
+      {quote && (
+        <OverflowMenu
+          label={tc('moreActions')}
+          disabled={busy}
+          actions={[
+            {
+              key: 'delete',
+              label: t('builder.delete'),
+              icon: Trash2,
+              destructive: true,
+              onSelect: onDelete,
+            },
+          ]}
+        />
+      )}
     </div>
   );
 }

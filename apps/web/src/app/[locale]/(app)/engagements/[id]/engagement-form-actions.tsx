@@ -23,19 +23,28 @@ export function FormActions({
   onCancel,
   saveLabel,
   cancelLabel,
+  saveDisabled = false,
 }: {
   pending: boolean;
   onSave: () => void;
   onCancel: () => void;
   saveLabel: string;
   cancelLabel: string;
+  /** The form itself says saving cannot work yet (it shows why beside it). */
+  saveDisabled?: boolean;
 }) {
   return (
     <div className="flex justify-end gap-2">
       <Button type="button" variant="secondary" size="sm" onClick={onCancel}>
         {cancelLabel}
       </Button>
-      <Button variant="default" type="button" size="sm" onClick={onSave} disabled={pending}>
+      <Button
+        variant="default"
+        type="button"
+        size="sm"
+        onClick={onSave}
+        disabled={pending || saveDisabled}
+      >
         {pending && <Loader2 className="size-4 animate-spin" aria-hidden />}
         {saveLabel}
       </Button>

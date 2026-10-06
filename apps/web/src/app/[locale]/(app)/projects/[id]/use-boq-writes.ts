@@ -2,6 +2,8 @@
 
 import { useMemo, useRef, useTransition } from 'react';
 import { useTranslations } from 'next-intl';
+import { useUndoableRemoval } from '@/hooks/use-undoable-removal';
+import { deleteBoqLine } from '@/lib/boqs/actions';
 import type { BoqLinePatch } from '@/lib/boqs/edit-input';
 import type { BoqDetail } from '@/lib/boqs/queries';
 import type { Column, EditableLine } from './boq-sheet-columns';
@@ -9,8 +11,8 @@ import {
   addLine,
   addSection,
   cellBlur,
-  deleteLine,
   discountBlur,
+  refuse,
   saveLine,
   type WriteContext,
 } from './boq-write-actions';
@@ -32,6 +34,8 @@ export interface BoqWriteHandlers {
 
 export interface BoqWritesApi extends BoqWriteHandlers {
   pending: boolean;
+  /** Lines deleted inside their Undo window: hidden, not yet gone. */
+  hiddenLineIds: ReadonlySet<string>;
 }
 
 /**
@@ -56,10 +60,20 @@ export function useBoqWrites(options: {
 }): BoqWritesApi {
   const sheetText = useTranslations('projects.profile.boq');
   const errorText = useTranslations('errors');
+  const commonText = useTranslations('common');
   const [pending, start] = useTransition();
   const latch = useRef(createCellWriteLatch()).current;
   const context = useRef<WriteContext>({ ...options, start, latch, sheetText, errorText });
   context.current = { ...options, start, latch, sheetText, errorText };
+  // A line delete is an EDITOR action: no confirm per row (a 500-line BOQ would
+  // be a wall of dialogs), but it waits out the Undo window before it is real.
+  const lineRemoval = useUndoableRemoval({
+    commit: (lineId) => deleteBoqLine({ lineId }),
+    messages: { removed: sheetText('lineDeleted'), undo: commonText('undo') },
+    onFailed: (result) => refuse(context.current, result.error),
+  });
+  const removeLine = useRef(lineRemoval.remove);
+  removeLine.current = lineRemoval.remove;
 
   const handlers = useMemo<BoqWriteHandlers>(
     () => ({
@@ -68,12 +82,12 @@ export function useBoqWrites(options: {
       onAddLine: (sectionId) => addLine(context.current, sectionId),
       onAddSection: () => addSection(context.current),
       onDiscountBlur: (typed) => discountBlur(context.current, typed),
-      onDeleteLine: (lineId) => deleteLine(context.current, lineId),
+      onDeleteLine: (lineId) => removeLine.current(lineId),
     }),
     [],
   );
 
   // `pending` changes identity here on purpose: it is not part of the stable row
   // api, it travels to the rows as its own prop. See boq-sheet-row-api.ts.
-  return { pending, ...handlers };
+  return { pending, hiddenLineIds: lineRemoval.hiddenIds, ...handlers };
 }

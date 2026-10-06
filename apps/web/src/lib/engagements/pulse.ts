@@ -27,9 +27,10 @@ const GATE_ORDER: readonly GateKind[] = ['deposit', 'gate_a', 'gate_b', 'balance
  * Each paying gate mapped to the wired trigger whose money guard clears it. Used
  * ONLY to derive the phase the gate unlocks (see {@link gateUnlocksPhase}) — the
  * pulse never fires these triggers. `balance` gates BOTH execution-decision
- * exits; `chooseExecution` is the auto-proposed primary, so it stands for the
- * pair here (its origin sits in the LAST phase, so the gate unlocks no further
- * phase — `gateUnlocksPhase` yields null).
+ * exits, which are two equal, explicit choices (an owner, admin or PM picks one;
+ * neither is proposed). `chooseExecution` stands for the pair here only because
+ * both share one origin: it sits in the LAST phase, so the gate unlocks no
+ * further phase and `gateUnlocksPhase` yields null for either.
  */
 const GATE_TRIGGER: Record<GateKind, Trigger> = {
   deposit: 'confirmAndPayDeposit',

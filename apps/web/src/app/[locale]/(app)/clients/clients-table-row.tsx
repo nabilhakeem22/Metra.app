@@ -1,8 +1,9 @@
 'use client';
 
-import { Pencil, Power } from 'lucide-react';
+import { Pencil } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
+import { OverflowMenu } from '@/components/ui/overflow-menu';
 import { Link } from '@/i18n/routing';
 import { pickLocale } from '@/lib/i18n/pick-locale';
 import type { ClientRow } from './types';
@@ -27,6 +28,7 @@ function ClientRowActions({
   handlers: ClientsTableHandlers;
 }) {
   const t = useTranslations('clients');
+  const tc = useTranslations('common');
   return (
     <td className="px-4 py-2">
       <div className="flex items-center justify-end gap-1">
@@ -39,16 +41,18 @@ function ClientRowActions({
         >
           <Pencil className="size-4" aria-hidden />
         </Button>
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          onClick={() => handlers.onToggleActive(client)}
+        <OverflowMenu
+          label={tc('moreActions')}
           disabled={pending}
-          aria-label={t(client.active ? 'actions.deactivate' : 'actions.activate')}
-        >
-          <Power className="size-4" aria-hidden />
-        </Button>
+          actions={[
+            {
+              key: 'active',
+              label: t(client.active ? 'actions.deactivate' : 'actions.activate'),
+              destructive: client.active,
+              onSelect: () => handlers.onToggleActive(client),
+            },
+          ]}
+        />
       </div>
     </td>
   );

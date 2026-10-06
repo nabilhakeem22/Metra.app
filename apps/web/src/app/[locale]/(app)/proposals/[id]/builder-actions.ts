@@ -73,7 +73,7 @@ export function useBuilderActions(options: {
   async function onDelete(): Promise<void> {
     const confirmed = await options.confirm({
       title: t('actions.delete'),
-      description: t('builder.delete'),
+      description: t('builder.deleteBody'),
       confirmLabel: t('actions.delete'),
       cancelLabel: t('create.cancel'),
       variant: 'destructive',

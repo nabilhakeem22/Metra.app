@@ -7,15 +7,14 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { OverflowMenu } from '@/components/ui/overflow-menu';
 import { toast } from '@/hooks/use-toast';
 import { useRouter } from '@/i18n/routing';
 import { resolveActionError } from '@/lib/actions/error-message';
 import type { ActionCode } from '@/lib/actions/result';
-import {
-  createDocumentCategory,
-  updateDocumentCategory,
-} from '@/lib/document-categories/actions';
+import { createDocumentCategory } from '@/lib/document-categories/actions';
 import { pickLocale } from '@/lib/i18n/pick-locale';
+import { useCategoryRetirement } from './use-category-retirement';
 
 export interface DocumentCategoryRow {
   id: string;
@@ -40,6 +39,7 @@ export function DocumentCategoriesCard({
 }) {
   const t = useTranslations('settings.documentCategories');
   const te = useTranslations('errors');
+  const tc = useTranslations('common');
   const locale = useLocale();
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -65,8 +65,11 @@ export function DocumentCategoriesCard({
     });
   }
 
+  const retirement = useCategoryRetirement(categories);
+
   return (
     <Card>
+      {retirement.dialog}
       <CardContent className="space-y-4 py-5">
         <div>
           <h2 className="text-body font-semibold">{t('title')}</h2>
@@ -84,24 +87,18 @@ export function DocumentCategoriesCard({
               {!c.active && (
                 <span className="text-caption text-muted-foreground">{t('retired')}</span>
               )}
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                disabled={pending}
-                onClick={() =>
-                  run(() =>
-                    updateDocumentCategory({
-                      id: c.id,
-                      nameEn: c.nameEn,
-                      nameAr: c.nameAr,
-                      active: !c.active,
-                    }),
-                  )
-                }
-              >
-                {t(c.active ? 'retire' : 'restore')}
-              </Button>
+              <OverflowMenu
+                label={tc('moreActions')}
+                disabled={pending || retirement.pending}
+                actions={[
+                  {
+                    key: 'active',
+                    label: t(c.active ? 'retire' : 'restore'),
+                    destructive: c.active,
+                    onSelect: () => void retirement.toggle(c),
+                  },
+                ]}
+              />
             </li>
           ))}
         </ul>

@@ -1,10 +1,10 @@
 'use client';
 
-import { RefreshCw } from 'lucide-react';
+import { RefreshCw, X } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
-import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
+import { OverflowMenu } from '@/components/ui/overflow-menu';
 import { formatDate } from '@/lib/format/date';
 import type { MemberRole } from '@/lib/permissions/roles';
 import type { Pending } from './team-types';
@@ -23,6 +23,7 @@ export function TeamPendingList({
   onRevoke: (id: string) => void;
 }) {
   const t = useTranslations('team');
+  const tc = useTranslations('common');
   const roles = useTranslations('roles');
   const locale = useLocale();
   const roleLabel = (role: MemberRole) => roles(`${role}.label`);
@@ -58,29 +59,29 @@ export function TeamPendingList({
                 </p>
               </div>
               {canManage && (
-                <div className="flex items-center gap-1">
-                  {!p.expired && (
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      size="sm"
-                      onClick={() => onResend(p.id)}
-                      disabled={isPending}
-                    >
-                      <RefreshCw className="size-4" aria-hidden />
-                      {t('resend')}
-                    </Button>
-                  )}
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => onRevoke(p.id)}
-                    disabled={isPending}
-                  >
-                    {t('revoke')}
-                  </Button>
-                </div>
+                <OverflowMenu
+                  label={tc('moreActions')}
+                  disabled={isPending}
+                  actions={[
+                    ...(p.expired
+                      ? []
+                      : [
+                          {
+                            key: 'resend',
+                            label: t('resend'),
+                            icon: RefreshCw,
+                            onSelect: () => onResend(p.id),
+                          },
+                        ]),
+                    {
+                      key: 'revoke',
+                      label: t('revoke'),
+                      icon: X,
+                      destructive: true,
+                      onSelect: () => onRevoke(p.id),
+                    },
+                  ]}
+                />
               )}
             </div>
           ))

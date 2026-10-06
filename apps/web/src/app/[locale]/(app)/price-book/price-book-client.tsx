@@ -55,6 +55,7 @@ export function PriceBookClient({ items, sections, canManage }: PriceBookClientP
         existingCodes={items.map((item) => item.code)}
         sections={sections}
       />
+      {actions.confirmDialog}
     </>
   );
 

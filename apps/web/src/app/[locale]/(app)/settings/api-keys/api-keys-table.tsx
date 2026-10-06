@@ -1,7 +1,7 @@
 'use client';
 
-import type { useTranslations } from 'next-intl';
-import { Button } from '@/components/ui/button';
+import { Ban } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 import {
   Card,
   CardContent,
@@ -10,6 +10,7 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
+import { OverflowMenu } from '@/components/ui/overflow-menu';
 import type { ApiKeyListRow } from '@/lib/api-keys/queries';
 
 // Western numerals in both locales (§4.1): ISO slice never emits Arabic-Indic
@@ -42,6 +43,7 @@ export function ApiKeysTable({
   revoke: (key: ApiKeyListRow) => Promise<void>;
   revoking: boolean;
 }) {
+  const tc = useTranslations('common');
   return (
     <Card>
       <CardHeader>
@@ -96,16 +98,19 @@ export function ApiKeysTable({
                       <td className="py-2">{t(`status.${status}`)}</td>
                       <td className="py-2 text-end">
                         {status === 'active' && (
-                          <Button
-                            variant="secondary"
-                            size="sm"
+                          <OverflowMenu
+                            label={tc('moreActions')}
                             disabled={revoking}
-                            onClick={() => {
-                              void revoke(key);
-                            }}
-                          >
-                            {t('revoke')}
-                          </Button>
+                            actions={[
+                              {
+                                key: 'revoke',
+                                label: t('revoke'),
+                                icon: Ban,
+                                destructive: true,
+                                onSelect: () => void revoke(key),
+                              },
+                            ]}
+                          />
                         )}
                       </td>
                     </tr>

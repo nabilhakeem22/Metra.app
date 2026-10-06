@@ -2,9 +2,9 @@
 
 import { Trash2 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
-import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
+import { OverflowMenu } from '@/components/ui/overflow-menu';
 import {
   Select,
   SelectContent,
@@ -33,6 +33,7 @@ export function TeamMemberList({
   onRemove: (userId: string, label: string) => void;
 }) {
   const t = useTranslations('team');
+  const tc = useTranslations('common');
   const roles = useTranslations('roles');
   const roleLabel = (role: MemberRole) => roles(`${role}.label`);
 
@@ -96,16 +97,19 @@ export function TeamMemberList({
                     </span>
                   )}
                   {canEditThis && !isSelf && (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => onRemove(m.userId, label)}
+                    <OverflowMenu
+                      label={tc('moreActions')}
                       disabled={isPending}
-                      aria-label={t('remove')}
-                    >
-                      <Trash2 className="size-4" aria-hidden />
-                    </Button>
+                      actions={[
+                        {
+                          key: 'remove',
+                          label: t('remove'),
+                          icon: Trash2,
+                          destructive: true,
+                          onSelect: () => onRemove(m.userId, label),
+                        },
+                      ]}
+                    />
                   )}
                 </div>
               </div>

@@ -1,6 +1,7 @@
 'use client';
 
 import { useTranslations } from 'next-intl';
+import type { MilestoneKind } from '@metra/db';
 import type { CommercialPulse } from '@/lib/engagements/pulse';
 import type {
   EngagementArtifactRecord,
@@ -44,6 +45,8 @@ export interface PanelData {
   transitions: EngagementTransitionRecord[];
   clientActivity: EngagementClientActivityRecord[];
   pulse: CommercialPulse;
+  /** Milestones with a client payment claim still pending (the manual log waits on it). */
+  claimedMilestones: readonly MilestoneKind[];
 }
 
 /** What the signed-in role may write into these records. */
@@ -109,6 +112,7 @@ export function EngagementPanels({
           engagementId={engagementId}
           feeSchedule={data.feeSchedule}
           payments={data.payments}
+          claimedMilestones={data.claimedMilestones}
           pulse={data.pulse}
           canRecordPayment={capabilities.recordPayment}
           pending={pending}

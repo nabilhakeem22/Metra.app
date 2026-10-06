@@ -1,70 +1,20 @@
 'use client';
 
-import { Pencil, Star, Trash2 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { useTransition } from 'react';
 import type { ClientContact } from '@metra/db';
-import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { useConfirm } from '@/components/ui/confirm-dialog';
 import { EmptyState } from '@/components/ui/empty-state';
 import { toast } from '@/hooks/use-toast';
+import { useUndoableRemoval } from '@/hooks/use-undoable-removal';
 import { useRouter } from '@/i18n/routing';
 import { resolveActionError } from '@/lib/actions/error-message';
 import type { ActionCode } from '@/lib/actions/result';
 import { deleteContact, setPrimaryContact } from '@/lib/client-contacts/actions';
+import { ContactRowActions } from './contact-row-actions';
 
 const COLUMNS = ['name', 'role', 'phone', 'email'] as const;
-
-function ContactRowActions({
-  contact,
-  onEdit,
-  run,
-  pending,
-}: {
-  contact: ClientContact;
-  onEdit: (contact: ClientContact) => void;
-  run: (action: () => Promise<{ ok: boolean; error?: ActionCode }>) => void;
-  pending: boolean;
-}) {
-  const t = useTranslations('clients.profile.contacts');
-  return (
-    <td className="px-4 py-2">
-      <div className="flex items-center justify-end gap-1">
-        {!contact.isPrimary && (
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            aria-label={t('setAsPrimary')}
-            disabled={pending}
-            onClick={() => run(() => setPrimaryContact(contact.id))}
-          >
-            <Star className="size-4" aria-hidden />
-          </Button>
-        )}
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          aria-label={t('editTitle')}
-          onClick={() => onEdit(contact)}
-        >
-          <Pencil className="size-4" aria-hidden />
-        </Button>
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          aria-label={t('delete')}
-          disabled={pending}
-          onClick={() => run(() => deleteContact(contact.id))}
-        >
-          <Trash2 className="size-4" aria-hidden />
-        </Button>
-      </div>
-    </td>
-  );
-}
 
 export function ContactsList({
   contacts,
@@ -76,28 +26,47 @@ export function ContactsList({
   onEdit: (contact: ClientContact) => void;
 }) {
   const t = useTranslations('clients.profile.contacts');
+  const tc = useTranslations('common');
   const te = useTranslations('errors');
   const router = useRouter();
   const [pending, startTransition] = useTransition();
+  const { confirm, dialog } = useConfirm();
+  const refuse = (result: { error?: ActionCode }) =>
+    toast({ title: resolveActionError(result.error, te), variant: 'destructive' });
+  // Confirmed, then held for the Undo window before the delete really runs.
+  const removal = useUndoableRemoval({
+    commit: deleteContact,
+    messages: { removed: t('deleted'), undo: tc('undo') },
+    onCommitted: () => router.refresh(),
+    onFailed: refuse,
+  });
 
-  /** Promote and delete both answer the same way: refresh, or say why not. */
-  function run(action: () => Promise<{ ok: boolean; error?: ActionCode }>): void {
+  function setPrimary(contact: ClientContact): void {
     startTransition(async () => {
-      const result = await action();
+      const result = await setPrimaryContact(contact.id);
       if (result.ok) router.refresh();
-      else {
-        toast({
-          title: resolveActionError(result.error as ActionCode, te),
-          variant: 'destructive',
-        });
-      }
+      else refuse(result);
     });
   }
 
+  async function requestDelete(contact: ClientContact): Promise<void> {
+    const confirmed = await confirm({
+      title: t('confirmDelete.title'),
+      description: t('confirmDelete.body'),
+      confirmLabel: t('confirmDelete.confirm'),
+      cancelLabel: tc('cancel'),
+      variant: 'destructive',
+    });
+    if (confirmed) removal.remove(contact.id);
+  }
+
+  const shown = contacts.filter((contact) => !removal.hiddenIds.has(contact.id));
+
   return (
     <Card>
+      {dialog}
       <CardContent className="p-0">
-        {contacts.length === 0 ? (
+        {shown.length === 0 ? (
           <div className="py-4">
             <EmptyState title={t('empty')} />
           </div>
@@ -114,7 +83,7 @@ export function ContactsList({
               </tr>
             </thead>
             <tbody>
-              {contacts.map((contact) => (
+              {shown.map((contact) => (
                 <tr key={contact.id} className="border-b last:border-0">
                   <td className="px-4 py-2">
                     <span className="inline-flex items-center gap-2">
@@ -133,7 +102,8 @@ export function ContactsList({
                     <ContactRowActions
                       contact={contact}
                       onEdit={onEdit}
-                      run={run}
+                      onSetPrimary={setPrimary}
+                      onDelete={(target) => void requestDelete(target)}
                       pending={pending}
                     />
                   )}

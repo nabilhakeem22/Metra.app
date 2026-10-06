@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { act, fireEvent, screen } from '@testing-library/react';
+import type { MilestoneKind } from '@metra/db';
 import { messageAt, renderWithIntl } from '@/test/render-with-intl';
 import { PaymentPanel } from './engagement-payment-panel';
 import { useEngagementAction } from './use-engagement-action';
@@ -50,7 +51,13 @@ let minted = 0;
  * where the key it sends comes from. A panel handed a stub would prove nothing —
  * the defect being pinned here is precisely that the panel used to mint its own.
  */
-function PanelProbe({ landedKeys }: { landedKeys?: ReadonlySet<string> }) {
+function PanelProbe({
+  landedKeys,
+  claimedMilestones = [],
+}: {
+  landedKeys?: ReadonlySet<string>;
+  claimedMilestones?: MilestoneKind[];
+}) {
   const { pending, runAction } = useEngagementAction({
     engagementId: 'e-1',
     landedKeys,
@@ -59,6 +66,7 @@ function PanelProbe({ landedKeys }: { landedKeys?: ReadonlySet<string> }) {
   return (
     <PaymentPanel
       engagementId="e-1"
+      claimedMilestones={claimedMilestones}
       pending={pending}
       runAction={runAction}
       onDone={() => {}}
@@ -345,5 +353,29 @@ describe('PaymentPanel — a replayed payment is SAID, not silently reported as 
     expect(payments[0]!.key).toBe(payments[1]!.key);
     expect(toasts).toHaveLength(1);
     expect(toasts[0]!.title).toBe(ar('engagements.controls.alreadyRecorded'));
+  });
+});
+
+/**
+ * A milestone the client says they paid is answered on the delivery (confirm or
+ * dismiss the claim); a hand-logged payment for it would count the money twice,
+ * and the server refuses it with `claim_pending_for_milestone`. The form says so
+ * before Save instead of letting the studio meet that as an error.
+ */
+describe('PaymentPanel: a milestone with a pending client claim', () => {
+  test('Save is disabled with the reason, and nothing is sent', async () => {
+    renderWithIntl(<PanelProbe claimedMilestones={['deposit']} />);
+    expect(screen.getByText(ar('engagements.controls.claimPending'))).toBeTruthy();
+    const save = screen.getByRole('button', { name: ar('engagements.controls.save') });
+    expect((save as HTMLButtonElement).disabled).toBe(true);
+    await record('50000');
+    expect(actions.recordPayment).not.toHaveBeenCalled();
+  });
+
+  test('a milestone with no claim records as usual', async () => {
+    renderWithIntl(<PanelProbe claimedMilestones={['gate_a']} />);
+    expect(screen.queryByText(ar('engagements.controls.claimPending'))).toBeNull();
+    await record('50000');
+    expect(actions.recordPayment).toHaveBeenCalledTimes(1);
   });
 });

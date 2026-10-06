@@ -1,10 +1,11 @@
 'use client';
 
-import { Pencil, Power } from 'lucide-react';
+import { Pencil } from 'lucide-react';
 import type { useTranslations } from 'next-intl';
 import type { Dispatch, SetStateAction } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { OverflowMenu } from '@/components/ui/overflow-menu';
 import { StatusChip } from '@/components/ui/status-chip';
 import { Link } from '@/i18n/routing';
 import { pickLocale } from '@/lib/i18n/pick-locale';
@@ -16,6 +17,7 @@ import type { ProjectListItem } from './types';
 // through the passed setters/handlers.
 export function ProjectsClientTable({
   t,
+  moreActionsLabel,
   locale,
   filtered,
   canManage,
@@ -26,6 +28,8 @@ export function ProjectsClientTable({
   toggleActive,
 }: {
   t: ReturnType<typeof useTranslations<'projects'>>;
+  /** `common.moreActions`: the row menu's accessible name. */
+  moreActionsLabel: string;
   locale: string;
   filtered: ProjectListItem[];
   canManage: boolean;
@@ -107,18 +111,18 @@ export function ProjectsClientTable({
                           >
                             <Pencil className="size-4" aria-hidden />
                           </Button>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => toggleActive(p)}
+                          <OverflowMenu
+                            label={moreActionsLabel}
                             disabled={pending}
-                            aria-label={t(
-                              p.active ? 'actions.deactivate' : 'actions.activate',
-                            )}
-                          >
-                            <Power className="size-4" aria-hidden />
-                          </Button>
+                            actions={[
+                              {
+                                key: 'active',
+                                label: t(p.active ? 'actions.deactivate' : 'actions.activate'),
+                                destructive: p.active,
+                                onSelect: () => toggleActive(p),
+                              },
+                            ]}
+                          />
                         </div>
                       </td>
                     )}

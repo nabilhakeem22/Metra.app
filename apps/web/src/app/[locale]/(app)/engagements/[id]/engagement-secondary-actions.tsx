@@ -1,8 +1,11 @@
 'use client';
 
+import { Ban } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { useConfirm } from '@/components/ui/confirm-dialog';
+import { OverflowMenu } from '@/components/ui/overflow-menu';
 import type { ActionResult } from '@/lib/actions/result';
 import {
   isRevisionTrigger,
@@ -23,11 +26,11 @@ type PayloadFormTrigger = RevisionTrigger;
 // permitted trigger that is NOT the forward-advance one (the Advance button owns
 // that). Folds in the retired `engagement-next-actions.tsx` — rejectDesign,
 // requestRevision, designChangeRaised (revise & re-issue the 3D), attest/flag
-// as-built, etc. — as small outline buttons so no legal trigger is dropped. A
-// payload trigger opens its existing form; `abandon` is confirm-gated (first click
-// reveals an inline title/hint + Confirm/Cancel; only Confirm fires — abandoning is
-// terminal and irreversible); every other trigger fires directly through the shared
-// `trigger-actions` map.
+// as-built, etc., as small secondary buttons so no legal trigger is dropped. A
+// payload trigger opens its existing form; every other trigger fires directly
+// through the shared `trigger-actions` map. `abandon` is the exception: it is
+// terminal and irreversible, so it is not a button at all but the destructive
+// item of a menu at the end of the row, and it fires only after a confirm.
 export function EngagementSecondaryActions({
   engagementId,
   triggers,
@@ -49,34 +52,32 @@ export function EngagementSecondaryActions({
 }) {
   const tcmd = useTranslations('engagements.command');
   const tt = useTranslations('engagements.trigger');
+  const tc = useTranslations('common');
   const [openForm, setOpenForm] = useState<PayloadFormTrigger | null>(null);
-  const [confirmingAbandon, setConfirmingAbandon] = useState(false);
+  const { confirm, dialog } = useConfirm();
 
   if (triggers.length === 0) return null;
+  const buttonTriggers = triggers.filter((trigger) => trigger !== 'abandon');
 
   function onClick(trigger: Trigger) {
     if (triggerNeedsForm(trigger)) {
       setOpenForm(trigger as PayloadFormTrigger);
       return;
     }
-    // Abandon is terminal: the first click only reveals the inline confirm —
-    // nothing fires until the Confirm button below is pressed.
-    if (trigger === 'abandon') {
-      setConfirmingAbandon((open) => !open);
-      return;
-    }
     const fn = DIRECT_TRIGGER_ACTIONS[trigger];
     if (fn) runAction((idempotencyKey) => fn(engagementId, idempotencyKey), trigger);
   }
 
-  function fireAbandon() {
-    const fn = DIRECT_TRIGGER_ACTIONS.abandon;
-    if (!fn) return;
-    runAction(async () => {
-      const res = await fn(engagementId);
-      if (res.ok) setConfirmingAbandon(false);
-      return res;
+  async function confirmAbandon() {
+    const confirmed = await confirm({
+      title: tcmd('abandonConfirmTitle'),
+      description: tcmd('abandonConfirmHint'),
+      confirmLabel: tcmd('abandonConfirmCta'),
+      cancelLabel: tcmd('abandonConfirmCancel'),
+      variant: 'destructive',
     });
+    const fn = DIRECT_TRIGGER_ACTIONS.abandon;
+    if (confirmed && fn) runAction(() => fn(engagementId));
   }
 
   return (
@@ -84,8 +85,9 @@ export function EngagementSecondaryActions({
       <p className="font-mono text-caption font-semibold uppercase tracking-[0.1em] text-[color:var(--text-faint)]">
         {tcmd('moreLabel')}
       </p>
-      <div className="flex flex-wrap gap-2">
-        {triggers.map((trigger) => (
+      {dialog}
+      <div className="flex flex-wrap items-center gap-2">
+        {buttonTriggers.map((trigger) => (
           <Button
             key={trigger}
             type="button"
@@ -97,40 +99,22 @@ export function EngagementSecondaryActions({
             {tt(trigger)}
           </Button>
         ))}
+        {triggers.includes('abandon') && (
+          <OverflowMenu
+            label={tc('moreActions')}
+            disabled={pending}
+            actions={[
+              {
+                key: 'abandon',
+                label: tt('abandon'),
+                icon: Ban,
+                destructive: true,
+                onSelect: () => void confirmAbandon(),
+              },
+            ]}
+          />
+        )}
       </div>
-
-      {confirmingAbandon && (
-        <div
-          className="space-y-2 rounded-item border border-[color:var(--warn-tint)] bg-[color:var(--track)] p-4"
-          role="alertdialog"
-          aria-label={tcmd('abandonConfirmTitle')}
-        >
-          <p className="text-small font-semibold">{tcmd('abandonConfirmTitle')}</p>
-          <p className="text-small text-[color:var(--text-muted)]">
-            {tcmd('abandonConfirmHint')}
-          </p>
-          <div className="flex flex-wrap gap-2 pt-1">
-            <Button
-              type="button"
-              variant="destructive"
-              size="sm"
-              disabled={pending}
-              onClick={fireAbandon}
-            >
-              {tcmd('abandonConfirmCta')}
-            </Button>
-            <Button
-              type="button"
-              variant="secondary"
-              size="sm"
-              disabled={pending}
-              onClick={() => setConfirmingAbandon(false)}
-            >
-              {tcmd('abandonConfirmCancel')}
-            </Button>
-          </div>
-        </div>
-      )}
 
       {/* One form for BOTH revision edges — the concept self-loop and the 3D
           revision loop — keyed by the trigger so switching between them resets

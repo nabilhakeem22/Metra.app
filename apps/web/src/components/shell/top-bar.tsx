@@ -9,7 +9,6 @@ import type { MemberRole } from '@/lib/permissions/roles';
 import { cn } from '@/lib/utils';
 import { LocaleSwitch } from './locale-switch';
 import { NotificationBell } from './notification-bell';
-import { SegmentedTabs } from './segmented-tabs';
 import { UserMenu } from './user-menu';
 
 export interface TopBarProps {
@@ -57,10 +56,6 @@ export function TopBar({
       >
         <Menu width={17} height={17} aria-hidden />
       </IconButton>
-
-      <div className="hidden sm:block">
-        <SegmentedTabs />
-      </div>
 
       <div
         className="flex items-center gap-[6px]"

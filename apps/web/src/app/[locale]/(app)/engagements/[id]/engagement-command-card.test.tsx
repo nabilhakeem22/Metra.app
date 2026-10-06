@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import { act, fireEvent, screen, within } from '@testing-library/react';
 import type { EngagementGatePreview } from '@/lib/engagements/gate-preview';
+import { openMenu } from '@/test/open-menu';
 import { messageAt, renderWithIntl } from '@/test/render-with-intl';
 import type { EngagementCommandCardProps } from './command-card-props';
 import { EngagementCommandCard } from './engagement-command-card';
@@ -27,6 +28,7 @@ const actions = vi.hoisted(() => ({
   logPaymentAndAdvance: vi.fn(),
   confirmPaymentClaim: vi.fn(),
   dismissPaymentClaim: vi.fn(),
+  abandon: vi.fn(),
 }));
 vi.mock('@/lib/engagements/actions', () => actions);
 const toasts = vi.hoisted(() => [] as { title?: string; description?: string }[]);
@@ -40,6 +42,7 @@ vi.mock('./trigger-actions', () => ({
   DIRECT_TRIGGER_ACTIONS: {
     chooseDesignOnly: actions.chooseDesignOnly,
     chooseExecution: actions.chooseExecution,
+    abandon: actions.abandon,
   },
 }));
 
@@ -103,6 +106,11 @@ function props(overrides: Partial<EngagementCommandCardProps> = {}): EngagementC
 
 const button = (key: string) => screen.queryByRole('button', { name: ar(key) });
 
+async function waitForDialogToClose(): Promise<void> {
+  await act(async () => {});
+  expect(screen.queryByRole('alertdialog')).toBeNull();
+}
+
 describe('the ending choice at execution_decision', () => {
   test('balance cleared: two equal ending buttons and no Advance', () => {
     renderWithIntl(<EngagementCommandCard {...props()} />);
@@ -154,11 +162,37 @@ describe('the ending choice at execution_decision', () => {
     expect(actions.chooseExecution).not.toHaveBeenCalled();
   });
 
-  test('More actions lists Abandon and neither ending', () => {
+  test('More actions keeps Abandon in its menu and lists neither ending', () => {
     renderWithIntl(<EngagementCommandCard {...props()} />);
-    expect(button('engagements.trigger.abandon')).not.toBeNull();
+    expect(button('engagements.trigger.abandon')).toBeNull();
     expect(button('engagements.trigger.chooseDesignOnly')).toBeNull();
     expect(button('engagements.trigger.chooseExecution')).toBeNull();
+    openMenu(ar('common.moreActions'));
+    expect(screen.getByRole('menuitem', { name: ar('engagements.trigger.abandon') })).toBeTruthy();
+  });
+
+  test('Abandon fires only after its confirm; Cancel fires nothing', async () => {
+    actions.abandon.mockResolvedValue({ ok: true });
+    renderWithIntl(<EngagementCommandCard {...props()} />);
+    const chooseAbandon = () => {
+      openMenu(ar('common.moreActions'));
+      fireEvent.click(screen.getByRole('menuitem', { name: ar('engagements.trigger.abandon') }));
+    };
+
+    chooseAbandon();
+    fireEvent.click(
+      await screen.findByRole('button', { name: ar('engagements.command.abandonConfirmCancel') }),
+    );
+    await waitForDialogToClose();
+    expect(actions.abandon).not.toHaveBeenCalled();
+
+    chooseAbandon();
+    fireEvent.click(
+      await screen.findByRole('button', { name: ar('engagements.command.abandonConfirmCta') }),
+    );
+    await act(async () => {});
+    expect(actions.abandon).toHaveBeenCalledTimes(1);
+    expect(actions.abandon).toHaveBeenCalledWith('e-1');
   });
 
   test('balance unpaid: Log payment (record only), no endings, no Advance', () => {
@@ -272,6 +306,40 @@ describe('a closed delivery', () => {
     unmount();
     renderWithIntl(<EngagementCommandCard {...closedProps('abandoned')} />);
     expect(screen.getByText(ar('engagements.command.closed.abandoned.headline'))).toBeTruthy();
+  });
+
+  // A claim the client sent before the delivery closed has no other way off
+  // the page: the payment can no longer be recorded, but it can be dismissed.
+  const pendingClaim = {
+    id: 'claim-1',
+    milestoneKind: 'balance' as const,
+    claimedAmount: '30000.0000',
+    note: null,
+    actorName: 'Client',
+    createdAt: '2026-06-01T00:00:00.000Z',
+  };
+
+  test('a pending claim on a closed delivery can be dismissed, and nothing else', async () => {
+    actions.dismissPaymentClaim.mockResolvedValue({ ok: true });
+    renderWithIntl(
+      <EngagementCommandCard
+        {...closedProps('closed_design_only', { paymentClaims: [pendingClaim] })}
+      />,
+    );
+    expect(screen.getByText(ar('engagements.paymentClaims.closedHint'))).toBeTruthy();
+    expect(button('engagements.paymentClaims.confirm')).toBeNull();
+    fireEvent.click(button('engagements.paymentClaims.dismiss')!);
+    await act(async () => {});
+    expect(actions.dismissPaymentClaim).toHaveBeenCalledWith({ claimId: 'claim-1' });
+  });
+
+  test('a role that cannot resolve claims does not get the Dismiss', () => {
+    renderWithIntl(
+      <EngagementCommandCard
+        {...closedProps('execution', { paymentClaims: [pendingClaim], canResolveClaims: false })}
+      />,
+    );
+    expect(button('engagements.paymentClaims.dismiss')).toBeNull();
   });
 });
 

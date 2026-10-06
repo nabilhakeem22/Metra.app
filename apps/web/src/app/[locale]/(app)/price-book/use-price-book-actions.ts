@@ -1,7 +1,8 @@
 'use client';
 
-import { useTransition } from 'react';
+import { useTransition, type ReactNode } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
+import { deactivationCopy, useActiveToggle } from '@/hooks/use-active-toggle';
 import { toast } from '@/hooks/use-toast';
 import { useRouter } from '@/i18n/routing';
 import { resolveActionError } from '@/lib/actions/error-message';
@@ -14,6 +15,8 @@ import type { PriceBookItem } from './types';
 
 export interface PriceBookActionsApi {
   pending: boolean;
+  /** The deactivate confirm; rendered once by the page. */
+  confirmDialog: ReactNode;
   addNewSection: (name: string, onAdded: () => void) => void;
   toggleActive: (item: PriceBookItem) => void;
   loadStarter: () => void;
@@ -22,6 +25,7 @@ export interface PriceBookActionsApi {
 export function usePriceBookActions(): PriceBookActionsApi {
   const t = useTranslations('priceBook');
   const te = useTranslations('errors');
+  const tc = useTranslations('common');
   const locale = useLocale();
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -48,15 +52,15 @@ export function usePriceBookActions(): PriceBookActionsApi {
     });
   }
 
+  const activeToggle = useActiveToggle({
+    setActive: setCostItemActive,
+    copy: deactivationCopy(t, tc),
+    onError: (result) => refuse(result.error),
+  });
+
+  /** Deactivating is confirmed and undoable; activating runs at once. */
   function toggleActive(item: PriceBookItem): void {
-    startTransition(async () => {
-      const result = await setCostItemActive(item.id, !item.active);
-      if (result.ok) {
-        toast({ title: t(item.active ? 'toast.deactivated' : 'toast.activated') });
-      } else {
-        refuse(result.error as ActionCode);
-      }
-    });
+    void activeToggle.toggle(item);
   }
 
   /** Loading the starter catalogue twice is not an error — it is a no-op, and the
@@ -76,5 +80,11 @@ export function usePriceBookActions(): PriceBookActionsApi {
     });
   }
 
-  return { pending, addNewSection, toggleActive, loadStarter };
+  return {
+    pending: pending || activeToggle.pending,
+    confirmDialog: activeToggle.dialog,
+    addNewSection,
+    toggleActive,
+    loadStarter,
+  };
 }

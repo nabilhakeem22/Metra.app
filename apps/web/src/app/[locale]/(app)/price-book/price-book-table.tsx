@@ -1,10 +1,11 @@
 'use client';
 
-import { Pencil, Power } from 'lucide-react';
+import { Pencil } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
+import { OverflowMenu } from '@/components/ui/overflow-menu';
 import { formatMoney } from '@/lib/format/money';
 import { pickLocale } from '@/lib/i18n/pick-locale';
 import type { PriceBookItem, SectionOption } from './types';
@@ -28,6 +29,7 @@ export function PriceBookTable({
   onToggleActive: (item: PriceBookItem) => void;
 }) {
   const t = useTranslations('priceBook');
+  const tc = useTranslations('common');
   const locale = useLocale();
   const sectionName = (s: SectionOption) =>
     pickLocale({ nameAr: s.nameAr, nameEn: s.nameEn }, 'name', locale).value;
@@ -128,20 +130,20 @@ export function PriceBookTable({
                               >
                                 <Pencil className="size-4" aria-hidden />
                               </Button>
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => onToggleActive(item)}
+                              <OverflowMenu
+                                label={tc('moreActions')}
                                 disabled={pending}
-                                aria-label={t(
-                                  item.active
-                                    ? 'actions.deactivate'
-                                    : 'actions.activate',
-                                )}
-                              >
-                                <Power className="size-4" aria-hidden />
-                              </Button>
+                                actions={[
+                                  {
+                                    key: 'active',
+                                    label: t(
+                                      item.active ? 'actions.deactivate' : 'actions.activate',
+                                    ),
+                                    destructive: item.active,
+                                    onSelect: () => onToggleActive(item),
+                                  },
+                                ]}
+                              />
                             </div>
                           </td>
                         )}

@@ -19,6 +19,14 @@ vi.mock('@/hooks/use-toast', () => ({
   },
 }));
 
+const undoToasts = vi.hoisted(() => [] as string[]);
+vi.mock('@/hooks/undo-toast', () => ({
+  UNDO_WINDOW_MS: 0,
+  showUndoToast: (options: { title: string }) => {
+    undoToasts.push(options.title);
+  },
+}));
+
 const router = vi.hoisted(() => ({
   push: vi.fn(),
   replace: vi.fn(),
@@ -49,6 +57,7 @@ const documents: EntityDocument[] = [
 
 beforeEach(() => {
   toasts.length = 0;
+  undoToasts.length = 0;
   router.refresh.mockClear();
   actions.deleteProjectDocument.mockReset();
   actions.getProjectDocumentUrl.mockReset();
@@ -73,6 +82,7 @@ describe("projects/[id] DocumentsTab — wave 3's F1 toasts", () => {
       getDocumentUrl: actions.getProjectDocumentUrl,
     },
     toasts,
+    undoToasts,
     router,
   });
 });

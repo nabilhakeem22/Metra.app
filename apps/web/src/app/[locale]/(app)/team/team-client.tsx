@@ -37,6 +37,7 @@ export function TeamClient({
 }: TeamClientProps) {
   const t = useTranslations('team');
   const te = useTranslations('errors');
+  const tc = useTranslations('common');
   const { confirm, dialog } = useConfirm();
   const [isPending, startTransition] = useTransition();
 
@@ -79,7 +80,9 @@ export function TeamClient({
   async function onRevoke(id: string) {
     const ok = await confirm({
       title: t('confirmRevokeTitle'),
-      description: t('confirmRevokeDesc'),
+      // No undo: revoking is a security act, and an undo that delayed it would
+      // leave the link live while the studio believed it dead.
+      description: `${t('confirmRevokeDesc')} ${tc('cannotUndo')}`,
       confirmLabel: t('revoke'),
       cancelLabel: t('cancel'),
       variant: 'destructive',
@@ -109,7 +112,7 @@ export function TeamClient({
   async function onRemove(userId: string, label: string) {
     const ok = await confirm({
       title: t('confirmRemoveTitle'),
-      description: t('confirmRemoveDesc', { name: label }),
+      description: `${t('confirmRemoveDesc', { name: label })} ${tc('cannotUndo')}`,
       confirmLabel: t('remove'),
       cancelLabel: t('cancel'),
       variant: 'destructive',

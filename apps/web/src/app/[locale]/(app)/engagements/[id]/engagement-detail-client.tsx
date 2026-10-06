@@ -94,6 +94,7 @@ export function EngagementDetailClient(props: EngagementDetailProps) {
           transitions,
           clientActivity,
           pulse,
+          claimedMilestones: paymentClaims.map((claim) => claim.milestoneKind),
         }}
       />
     </div>

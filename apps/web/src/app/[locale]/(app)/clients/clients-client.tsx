@@ -2,14 +2,14 @@
 
 import { Building2, Plus } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
-import { useMemo, useState, useTransition } from 'react';
+import { useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
+import { deactivationCopy, useActiveToggle } from '@/hooks/use-active-toggle';
 import { useOpenOnArrival } from '@/hooks/use-open-on-arrival';
 import { toast } from '@/hooks/use-toast';
 import { resolveActionError } from '@/lib/actions/error-message';
-import type { ActionCode } from '@/lib/actions/result';
 import { setClientActive } from '@/lib/clients/actions';
 import { cityOptions, filterClients, type ClientFilter } from './client-filters';
 import { ClientForm } from './client-form';
@@ -30,12 +30,12 @@ const NO_FILTER: ClientFilter = { query: '', status: 'all', city: 'all' };
 export function ClientsClient({ items, canManage, openCreateOnArrival }: ClientsClientProps) {
   const t = useTranslations('clients');
   const te = useTranslations('errors');
+  const tc = useTranslations('common');
   const locale = useLocale();
 
   const [filter, setFilter] = useState<ClientFilter>(NO_FILTER);
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<ClientRow | null>(null);
-  const [pending, startTransition] = useTransition();
 
   const cities = useMemo(() => cityOptions(items, locale), [items, locale]);
   const filtered = useMemo(() => filterClients(items, filter), [items, filter]);
@@ -46,22 +46,18 @@ export function ClientsClient({ items, canManage, openCreateOnArrival }: Clients
   }
   useOpenOnArrival(canManage && openCreateOnArrival, openNew);
 
-  function toggleActive(item: ClientRow) {
-    startTransition(async () => {
-      const result = await setClientActive(item.id, !item.active);
-      toast(
-        result.ok
-          ? { title: t(item.active ? 'toast.deactivated' : 'toast.activated') }
-          : {
-              title: resolveActionError(result.error as ActionCode, te),
-              variant: 'destructive',
-            },
-      );
-    });
-  }
+  const activeToggle = useActiveToggle({
+    setActive: setClientActive,
+    copy: deactivationCopy(t, tc),
+    onError: (result) =>
+      toast({ title: resolveActionError(result.error, te), variant: 'destructive' }),
+  });
 
   const form = canManage && (
-    <ClientForm open={formOpen} onOpenChange={setFormOpen} item={editing} />
+    <>
+      <ClientForm open={formOpen} onOpenChange={setFormOpen} item={editing} />
+      {activeToggle.dialog}
+    </>
   );
 
   if (items.length === 0) {
@@ -104,13 +100,13 @@ export function ClientsClient({ items, canManage, openCreateOnArrival }: Clients
       <ClientsTable
         clients={filtered}
         canManage={canManage}
-        pending={pending}
+        pending={activeToggle.pending}
         handlers={{
           onEdit: (client) => {
             setEditing(client);
             setFormOpen(true);
           },
-          onToggleActive: toggleActive,
+          onToggleActive: (client) => void activeToggle.toggle(client),
         }}
       />
     </div>

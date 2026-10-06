@@ -2,7 +2,7 @@
 
 import { useTranslations } from 'next-intl';
 import { useState } from 'react';
-import type { PaymentEventKind } from '@metra/db';
+import type { MilestoneKind, PaymentEventKind } from '@metra/db';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -51,11 +51,18 @@ const PAYMENT_KINDS: PaymentEventKind[] = [
  */
 export function PaymentPanel({
   engagementId,
+  claimedMilestones,
   pending,
   runAction,
   onDone,
 }: {
   engagementId: string;
+  /**
+   * Milestones the client has reported paying and the studio has not answered.
+   * The server refuses a hand-logged payment for one (`claim_pending_for_milestone`,
+   * it would count the same money twice), so the form says so before Save.
+   */
+  claimedMilestones: readonly MilestoneKind[];
   pending: boolean;
   runAction: RunAction;
   onDone: () => void;
@@ -64,6 +71,7 @@ export function PaymentPanel({
   const tk = useTranslations('engagements.paymentKind');
   const [payKind, setPayKind] = useState<PaymentEventKind>('deposit');
   const [payAmount, setPayAmount] = useState('');
+  const claimPending = (claimedMilestones as readonly PaymentEventKind[]).includes(payKind);
 
   function save() {
     // THE REQUEST, minus its key: one object, used twice. The three fields this
@@ -133,12 +141,16 @@ export function PaymentPanel({
           />
         </div>
       </div>
+      {claimPending && (
+        <p className="text-small text-[color:var(--text-muted)]">{t('claimPending')}</p>
+      )}
       <FormActions
         pending={pending}
         onCancel={onDone}
         onSave={save}
         saveLabel={t('save')}
         cancelLabel={t('cancel')}
+        saveDisabled={claimPending}
       />
     </div>
   );

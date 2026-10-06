@@ -6,6 +6,7 @@ import { useRef, useState, useTransition, type ChangeEvent } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
+import { OverflowMenu } from '@/components/ui/overflow-menu';
 import { toast } from '@/hooks/use-toast';
 import { useRouter } from '@/i18n/routing';
 import { resolveActionError } from '@/lib/actions/error-message';
@@ -17,6 +18,7 @@ import {
 } from '@/lib/documents/actions';
 import type { EntityDocument } from '@/lib/documents/queries';
 import { groupByCategory } from '@/components/documents/document-groups';
+import { useDocumentDeletion } from '@/components/documents/use-document-deletion';
 import { formatDate } from '@/lib/format/date';
 import { pickLocale } from '@/lib/i18n/pick-locale';
 
@@ -34,6 +36,7 @@ export function DocumentsTab({
 }) {
   const t = useTranslations('clients.profile.documents');
   const te = useTranslations('errors');
+  const tc = useTranslations('common');
   const locale = useLocale();
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -87,24 +90,12 @@ export function DocumentsTab({
     });
   }
 
-  function onDelete(id: string) {
-    startTransition(async () => {
-      const res = await deleteClientDocument(id);
-      if (res.ok) {
-        toast({ title: t('deleted') });
-        router.refresh();
-        return;
-      }
-      // Every coded refusal is SHOWN, `uncertain` above all: the row may or may
-      // not be gone, so the studio is told to refresh and check rather than left
-      // watching a file that did not react to being deleted.
-      toast({ title: resolveActionError(res.error, te), variant: 'destructive' });
-      router.refresh();
-    });
-  }
+  const deletion = useDocumentDeletion({ deleteDocument: deleteClientDocument, t });
+  const shown = documents.filter((document) => !deletion.hiddenIds.has(document.id));
 
   return (
     <div className="space-y-4">
+      {deletion.dialog}
       {canManage && (
         <div>
           <input
@@ -148,13 +139,13 @@ export function DocumentsTab({
 
       <Card>
         <CardContent className="p-0">
-          {documents.length === 0 ? (
+          {shown.length === 0 ? (
             <div className="py-4">
               <EmptyState title={t('empty')} />
             </div>
           ) : (
             <div className="divide-y">
-              {groupByCategory(documents).map((group) => (
+              {groupByCategory(shown).map((group) => (
                 <section key={group.categoryId ?? 'uncategorised'}>
                   <p className="bg-muted/40 px-4 py-1.5 text-caption font-semibold text-muted-foreground">
                     {group.categoryId
@@ -186,16 +177,19 @@ export function DocumentsTab({
                     <Download className="size-4" aria-hidden />
                   </Button>
                   {canManage && (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      aria-label={t('delete')}
-                      onClick={() => onDelete(d.id)}
+                    <OverflowMenu
+                      label={tc('moreActions')}
                       disabled={pending}
-                    >
-                      <Trash2 className="size-4" aria-hidden />
-                    </Button>
+                      actions={[
+                        {
+                          key: 'delete',
+                          label: t('delete'),
+                          icon: Trash2,
+                          destructive: true,
+                          onSelect: () => void deletion.requestDelete(d.id),
+                        },
+                      ]}
+                    />
                   )}
                     </li>
                     ))}

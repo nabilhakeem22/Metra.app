@@ -63,13 +63,14 @@ export function BoqSheet({
    * object, so a fresh array per keystroke would hand every memoised row a new
    * `line` and defeat the memo entirely.
    */
+  const hiddenLineIds = writes.hiddenLineIds;
   const bodies = useMemo(
     () =>
       boq.sections.map((section) => ({
         section,
-        lines: visibleLines(section, needle),
+        lines: visibleLines(section, needle).filter((line) => !hiddenLineIds.has(line.id)),
       })),
-    [boq, needle],
+    [boq, needle, hiddenLineIds],
   );
   const visibleCount = useMemo(() => countVisibleLines(boq, needle), [boq, needle]);
 
