@@ -1,9 +1,8 @@
 'use client';
 
 import { useTranslations } from 'next-intl';
-import { FieldHint } from '@/components/ui/field-hint';
+import { FormField } from '@/components/ui/form-field';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 
 export interface ClientFormState {
   nameEn: string;
@@ -31,12 +30,15 @@ export function ClientFormFields({
   set,
   isCreate,
   more,
+  errors,
 }: {
   form: ClientFormState;
   set: (key: keyof ClientFormState) => (value: string) => void;
   isCreate: boolean;
   /** The "More details" disclosure, owned by the sheet (it decides the initial state). */
   more: { open: boolean; toggle: () => void };
+  /** A refusal resolved to text, under the field it is about. */
+  errors: { name?: string; phone?: string };
 }) {
   const t = useTranslations('clients');
   const th = useTranslations('hints.client');
@@ -44,35 +46,45 @@ export function ClientFormFields({
   const field = (
     key: keyof ClientFormState,
     label: string,
-    options: { dir?: FieldDir; hint?: string; required?: boolean } = {},
+    options: {
+      dir?: FieldDir;
+      hint?: string;
+      required?: boolean;
+      error?: string;
+      /** The id of an error said under ANOTHER field that is about this one too. */
+      sharedErrorId?: string;
+    } = {},
   ) => (
-    <div className="space-y-2">
-      <Label htmlFor={`cl-${key}`} className="flex items-center">
-        {label}
-        {options.required && (
-          <span className="ms-1 text-[color:var(--danger)]" aria-hidden>
-            *
-          </span>
-        )}
-        {options.hint && <FieldHint id={`cl-${key}-hint`} hint={options.hint} />}
-      </Label>
+    <FormField
+      id={`cl-${key}`}
+      label={label}
+      required={options.required}
+      hint={options.hint}
+      error={options.error}
+    >
       <Input
-        id={`cl-${key}`}
         dir={options.dir ?? 'ltr'}
-        aria-required={options.required || undefined}
-        aria-describedby={options.hint ? `cl-${key}-hint` : undefined}
+        aria-invalid={options.sharedErrorId ? true : undefined}
+        aria-describedby={options.sharedErrorId}
         value={form[key]}
         onChange={(event) => set(key)(event.target.value)}
       />
-    </div>
+    </FormField>
   );
 
   return (
     <>
       <div className="space-y-2">
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          {field('nameEn', t('form.nameEn'), { hint: th('name'), required: true })}
-          {field('nameAr', t('form.nameAr'), { dir: 'rtl', hint: th('name'), required: true })}
+          {/* One name is enough, so a missing name is said once, under the first,
+              and marks both. */}
+          {field('nameEn', t('form.nameEn'), { hint: th('name'), required: true, error: errors.name })}
+          {field('nameAr', t('form.nameAr'), {
+            dir: 'rtl',
+            hint: th('name'),
+            required: true,
+            sharedErrorId: errors.name ? 'cl-nameEn-error' : undefined,
+          })}
         </div>
         <p className="text-caption text-muted-foreground">{t('form.nameRequired')}</p>
       </div>
@@ -82,7 +94,7 @@ export function ClientFormFields({
       </div>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         {field('email', t('form.email'), { hint: th('email') })}
-        {field('phone', t('form.phone'), { hint: th('phone'), required: true })}
+        {field('phone', t('form.phone'), { hint: th('phone'), required: true, error: errors.phone })}
       </div>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         {field('city', t('form.city'), { dir: 'auto', hint: th('city') })}

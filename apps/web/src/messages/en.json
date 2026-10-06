@@ -568,6 +568,7 @@
     "hint": "More info",
     "cancel": "Cancel",
     "close": "Close",
+    "required": "required",
     "undo": "Undo",
     "moreActions": "More actions",
     "cannotUndo": "This can't be undone."

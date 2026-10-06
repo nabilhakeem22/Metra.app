@@ -1,15 +1,15 @@
 'use client';
 
-import { Loader2 } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
 import { useEffect, useState, useTransition } from 'react';
 import { Button } from '@/components/ui/button';
-import { Sheet, SheetContent, SheetDescription, SheetTitle } from '@/components/ui/sheet';
+import { FormSheet } from '@/components/ui/form-sheet';
 import { toast } from '@/hooks/use-toast';
 import { Link } from '@/i18n/routing';
 import { resolveActionError } from '@/lib/actions/error-message';
 import type { ActionCode } from '@/lib/actions/result';
 import { createProject, updateProject } from '@/lib/projects/actions';
+import { projectFieldFor, type ProjectFormField } from './project-form-errors';
 import { ProjectFormFields } from './project-form-fields';
 import {
   canSaveProject,
@@ -43,15 +43,18 @@ export function ProjectForm({
   const t = useTranslations('projects');
   const th = useTranslations('hints.project');
   const te = useTranslations('errors');
+  const tc = useTranslations('common');
   const locale = useLocale();
   const defaultCountry = t('form.countryDefault');
   const [form, setForm] = useState<ProjectFormState>(() =>
     emptyProjectForm(clientOptions, undefined, '', defaultCountry),
   );
+  const [error, setError] = useState<{ code: ActionCode; field: ProjectFormField } | null>(null);
   const [pending, startTransition] = useTransition();
 
   useEffect(() => {
     if (!open) return;
+    setError(null);
     setForm(
       item
         ? projectFormOf(item)
@@ -65,8 +68,11 @@ export function ProjectForm({
       const locationEdited = prev.locationEdited || key === 'city' || key === 'country';
       return { ...prev, [key]: value, locationEdited };
     });
+  const messageFor = (field: ProjectFormField) =>
+    error?.field === field ? resolveActionError(error.code, te) : undefined;
 
   function submit() {
+    setError(null);
     startTransition(async () => {
       const payload = {
         ...(form.code ? { code: form.code } : {}),
@@ -80,69 +86,64 @@ export function ProjectForm({
         address: form.address || null,
         notes: form.notes || null,
       };
-      // A new project is created ACTIVE by the server; only an edit sends a status.
-      const res = item
-        ? await updateProject({ id: item.id, ...payload, status: form.status })
-        : await createProject(payload);
-      if (res.ok) {
-        toast({ title: t(item ? 'toast.updated' : 'toast.created') });
-        onOpenChange(false);
-      } else {
-        toast({ title: resolveActionError(res.error as ActionCode, te), variant: 'destructive' });
+      try {
+        // A new project is created ACTIVE by the server; only an edit sends a status.
+        const res = item
+          ? await updateProject({ id: item.id, ...payload, status: form.status })
+          : await createProject(payload);
+        if (res.ok) {
+          toast({ title: t(item ? 'toast.updated' : 'toast.created') });
+          onOpenChange(false);
+          return;
+        }
+        const code = (res.error as ActionCode) ?? 'generic';
+        setError({ code, field: projectFieldFor(code) });
+      } catch {
+        setError({ code: 'generic', field: 'form' });
       }
     });
   }
 
+  const noClients = clientOptions.length === 0;
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="w-full overflow-y-auto sm:max-w-md">
-        <SheetTitle>{t(item ? 'form.editTitle' : 'form.newTitle')}</SheetTitle>
-        <SheetDescription className="sr-only">
-          {t(item ? 'form.editTitle' : 'form.newTitle')}
-        </SheetDescription>
-
-        {clientOptions.length === 0 ? (
-          <div className="mt-4 space-y-2 rounded-item border bg-muted/40 p-3 text-body text-muted-foreground">
-            <p>{t('form.noClients')}</p>
-            {canAddClient && (
-              <Button asChild size="sm" variant="secondary">
-                <Link href="/clients?new=1">{t('empty.addClient')}</Link>
-              </Button>
-            )}
-          </div>
-        ) : (
-          <div className="mt-4 space-y-4">
-            <ProjectFormFields
-              t={t}
-              th={th}
-              locale={locale}
-              form={form}
-              set={set}
-              clientOptions={clientOptions}
-            />
-
-            <div className="flex justify-end gap-2 pt-2">
-              <Button
-                type="button"
-                variant="secondary"
-                onClick={() => onOpenChange(false)}
-                disabled={pending}
-              >
-                {t('form.cancel')}
-              </Button>
-              <Button
-                variant="default"
-                type="button"
-                onClick={submit}
-                disabled={pending || !canSaveProject(form, !item)}
-              >
-                {pending && <Loader2 className="size-4 animate-spin" aria-hidden />}
-                {t('form.save')}
-              </Button>
-            </div>
-          </div>
-        )}
-      </SheetContent>
-    </Sheet>
+    <FormSheet
+      open={open}
+      onOpenChange={onOpenChange}
+      title={t(item ? 'form.editTitle' : 'form.newTitle')}
+      onSubmit={submit}
+      submitLabel={t('form.save')}
+      cancelLabel={t('form.cancel')}
+      closeLabel={tc('close')}
+      pending={pending}
+      canSubmit={!noClients && canSaveProject(form, !item)}
+      formError={messageFor('form')}
+    >
+      {noClients ? (
+        <div className="space-y-2 rounded-item border bg-muted/40 p-3 text-body text-muted-foreground">
+          <p>{t('form.noClients')}</p>
+          {canAddClient && (
+            <Button asChild size="sm" variant="secondary">
+              <Link href="/clients?new=1">{t('empty.addClient')}</Link>
+            </Button>
+          )}
+        </div>
+      ) : (
+        <ProjectFormFields
+          t={t}
+          th={th}
+          locale={locale}
+          form={form}
+          set={set}
+          clientOptions={clientOptions}
+          errors={{
+            name: messageFor('name'),
+            code: messageFor('code'),
+            client: messageFor('client'),
+            startDate: messageFor('startDate'),
+            endDate: messageFor('endDate'),
+          }}
+        />
+      )}
+    </FormSheet>
   );
 }

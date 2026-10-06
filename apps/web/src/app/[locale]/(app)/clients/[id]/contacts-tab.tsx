@@ -1,7 +1,10 @@
 'use client';
 
+import { Plus } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 import { useState } from 'react';
 import type { ClientContact } from '@metra/db';
+import { Button } from '@/components/ui/button';
 import {
   EMPTY_CONTACT_DRAFT,
   draftFromContact,
@@ -11,11 +14,8 @@ import { ContactForm } from './contact-form';
 import { ContactsList } from './contacts-list';
 
 /**
- * The client's contacts — COMPOSITION.
- *
- * ONE draft is shared between the list and the form: clicking the pencil on a row
- * fills the form below rather than opening a dialog, so the studio can see the
- * other contacts while editing one of them.
+ * The client's contacts: COMPOSITION. The list, and one form sheet shared by
+ * "Add contact" and each row's edit, both of which fill the same draft.
  */
 export function ContactsTab({
   clientId,
@@ -26,18 +26,40 @@ export function ContactsTab({
   contacts: ClientContact[];
   canManage: boolean;
 }) {
+  const t = useTranslations('clients.profile.contacts');
   const [draft, setDraft] = useState<ContactDraft>(EMPTY_CONTACT_DRAFT);
+  const [formOpen, setFormOpen] = useState(false);
+
+  function openWith(next: ContactDraft): void {
+    setDraft(next);
+    setFormOpen(true);
+  }
 
   return (
     <div className="space-y-4">
+      {canManage && (
+        <div className="flex justify-end">
+          <Button type="button" variant="secondary" onClick={() => openWith(EMPTY_CONTACT_DRAFT)}>
+            <Plus className="size-4" aria-hidden />
+            {t('add')}
+          </Button>
+        </div>
+      )}
+
       <ContactsList
         contacts={contacts}
         canManage={canManage}
-        onEdit={(contact) => setDraft(draftFromContact(contact))}
+        onEdit={(contact) => openWith(draftFromContact(contact))}
       />
 
       {canManage && (
-        <ContactForm clientId={clientId} draft={draft} onDraftChange={setDraft} />
+        <ContactForm
+          clientId={clientId}
+          open={formOpen}
+          onOpenChange={setFormOpen}
+          draft={draft}
+          onDraftChange={setDraft}
+        />
       )}
     </div>
   );
