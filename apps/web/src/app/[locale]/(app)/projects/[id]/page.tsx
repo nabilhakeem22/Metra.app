@@ -87,7 +87,7 @@ export default async function ProjectProfilePage({
           href="/projects"
           className="inline-flex items-center gap-1 text-body text-muted-foreground hover:text-foreground"
         >
-          <ArrowLeft className="size-3" aria-hidden />
+          <ArrowLeft className="size-3 rtl:-scale-x-100" aria-hidden />
           {t('back')}
         </Link>
         <h1 className="flex items-center gap-2 text-heading font-bold">

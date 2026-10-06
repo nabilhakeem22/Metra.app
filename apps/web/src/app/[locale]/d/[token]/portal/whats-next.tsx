@@ -48,7 +48,7 @@ export function WhatsNext({
         className="flex size-9 shrink-0 items-center justify-center rounded-item border bg-background text-muted-foreground"
         aria-hidden
       >
-        <ArrowRight className="size-4" />
+        <ArrowRight className="size-4 rtl:-scale-x-100" aria-hidden />
       </div>
       <div className="min-w-0">
         <p className="text-caption font-semibold text-muted-foreground ltr:uppercase ltr:tracking-wide">

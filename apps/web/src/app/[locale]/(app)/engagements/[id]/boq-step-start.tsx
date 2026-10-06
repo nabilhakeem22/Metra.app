@@ -44,7 +44,7 @@ export function BoqStepStart({
             <Button variant="default" asChild>
               <Link href={boqProposalHref(step.boqProposalId)}>
                 {t('continueCta')}
-                <ArrowRight className="size-4" aria-hidden />
+                <ArrowRight className="size-4 rtl:-scale-x-100" aria-hidden />
               </Link>
             </Button>
           ) : (
@@ -52,7 +52,7 @@ export function BoqStepStart({
               {pending ? (
                 <Loader2 className="size-4 animate-spin" aria-hidden />
               ) : (
-                <ArrowRight className="size-4" aria-hidden />
+                <ArrowRight className="size-4 rtl:-scale-x-100" aria-hidden />
               )}
               {t('createCta')}
             </Button>

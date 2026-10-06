@@ -140,7 +140,7 @@ export function EngagementStageSpine({ state }: { state: DesignState }) {
                 without reading a single word. A muted (abandoned) engagement takes
                 dots throughout: none of it is "reached" any more. */}
             <span
-              className={`flex min-w-0 items-center gap-1.5 ${labelClass(status)}`}
+              className={`flex min-w-0 items-start gap-1.5 ${labelClass(status)}`}
             >
               {status === 'done' || status === 'current' ? (
                 <Icon className="size-[13px] shrink-0" aria-hidden />
@@ -150,7 +150,9 @@ export function EngagementStageSpine({ state }: { state: DesignState }) {
                   aria-hidden
                 />
               )}
-              <span className="truncate text-caption leading-tight">
+              {/* Wraps to two lines rather than truncating: an Arabic stage name
+                  is longer, and a clipped one is a name nobody can read. */}
+              <span className="line-clamp-2 min-w-0 text-caption leading-tight" title={t(node.key)}>
                 {t(node.key)}
               </span>
             </span>

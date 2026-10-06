@@ -54,7 +54,7 @@ export function LoginVerifyStep({
             onClick={changeIdentifier}
             className="inline-flex items-center gap-1 font-medium text-primary hover:underline"
           >
-            <ArrowLeft className="size-3" aria-hidden />
+            <ArrowLeft className="size-3 rtl:-scale-x-100" aria-hidden />
             {t('changeEmail')}
           </button>
         </div>
