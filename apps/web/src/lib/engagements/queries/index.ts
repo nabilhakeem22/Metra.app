@@ -11,3 +11,4 @@ export * from './artifacts';
 export * from './client-activity';
 export * from './payment-claims';
 export * from './boq-releasable';
+export * from './whose-move';
