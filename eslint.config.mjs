@@ -13,12 +13,16 @@
 //     console.error/warn. A DrizzleQueryError prints the SQL and its BOUND
 //     PARAMETERS; a PostgresError prints the colliding row in `detail`. Wrap it
 //     in `loggableFailure()`.
+//   • `metra/design-tokens-only`: the design system's six type sizes, four
+//     radii, semantic colours and four font weights; any other size, radius,
+//     palette colour or weight class (or inline style) fails. apps/web/src only.
 import js from '@eslint/js';
 import tseslint from 'typescript-eslint';
 import { noPhysicalInlineDirection } from './eslint-rules/no-physical-inline-direction.mjs';
 import { noBareTenantDb } from './eslint-rules/no-bare-tenant-db.mjs';
 import { noRawErrorInLog } from './eslint-rules/no-raw-error-in-log.mjs';
 import { noServerRegistryInClient } from './eslint-rules/no-server-registry-in-client.mjs';
+import { designTokensOnly } from './eslint-rules/design-tokens-only.mjs';
 
 const metraPlugin = {
   rules: {
@@ -26,6 +30,7 @@ const metraPlugin = {
     'no-bare-tenant-db': noBareTenantDb,
     'no-raw-error-in-log': noRawErrorInLog,
     'no-server-registry-in-client': noServerRegistryInClient,
+    'design-tokens-only': designTokensOnly,
   },
 };
 
@@ -123,6 +128,20 @@ export default tseslint.config(
     // disables it.
     files: ['apps/web/src/**/*.{ts,tsx}'],
     rules: { 'metra/no-raw-error-in-log': 'error' },
+  },
+  {
+    // THE DESIGN-TOKEN GATE, on the app's own source. PDF and email templates
+    // carry their own print/inline styling (branding is out of bounds there),
+    // and tests may name a banned class on purpose.
+    files: ['apps/web/src/**/*.{ts,tsx}'],
+    ignores: [
+      'apps/web/src/lib/pdf/**',
+      'apps/web/src/lib/email/**',
+      '**/*.test.ts',
+      '**/*.test.tsx',
+      'apps/web/src/test/**',
+    ],
+    rules: { 'metra/design-tokens-only': 'error' },
   },
   {
     // The test files themselves — the helpers exist for exactly these, and

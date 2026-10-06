@@ -26,11 +26,11 @@ export function DeliveryAgeLabel({
   const stale = !closed && isStale(days);
   return (
     <span
-      className="whitespace-nowrap text-end text-xs tabular-nums"
-      style={{
-        color: stale ? 'var(--danger)' : 'var(--text-muted)',
-        fontWeight: stale ? 700 : 400,
-      }}
+      className={`whitespace-nowrap text-end text-caption tabular-nums ${
+        stale
+          ? 'font-bold text-[color:var(--warn)]'
+          : 'text-[color:var(--text-muted)]'
+      }`}
     >
       {days === 0
         ? t('today')
