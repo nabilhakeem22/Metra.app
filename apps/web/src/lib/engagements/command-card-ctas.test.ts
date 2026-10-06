@@ -43,7 +43,6 @@ const BASE: CtaOptions = {
   conceptOptionCount: 0,
   pendingClaimCount: 0,
   canResolveClaims: true,
-  awaitingClientReview: false,
   offlineApprovalEnabled: false,
 };
 
@@ -224,11 +223,23 @@ describe('resolveCommandCardCtas while the client owes the review', () => {
   const atConceptReview = preview({ primaryTrigger: 'selectConcept', items: [GATE_A_DUE] });
 
   test('the money button records only: it never pays AND advances past the review', () => {
-    const ctas = resolve(atConceptReview, {
-      state: 'concept_review',
-      mode: 'blockedClient',
+    const ctas = resolve(
+      { ...atConceptReview, awaitingClientReview: true },
+      { state: 'concept_review', mode: 'blockedClient' },
+    );
+    expect(ctas.payCta).toBe('recordOnly');
+  });
+
+  test('a studio blocker beside the wait (F3) still never offers pay-and-advance', () => {
+    const atFinalApproval = preview({
+      primaryTrigger: 'approveDesign',
       awaitingClientReview: true,
+      items: [
+        NON_MONEY_UNMET,
+        { guard: 'gateBInstallmentCleared', ok: false, code: 'gate_b_not_cleared', amountDue: '5000.0000' },
+      ],
     });
+    const ctas = resolve(atFinalApproval, { state: 'final_approval', mode: 'blockedStudio' });
     expect(ctas.payCta).toBe('recordOnly');
   });
 

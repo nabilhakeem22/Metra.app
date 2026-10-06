@@ -33,6 +33,8 @@ export interface CommandCardActionProps {
     runAction: RunAction;
     /** `advanceNeedsForm` edges carry a payload, so Advance opens a form instead. */
     openFeeForm: () => void;
+    /** When the review round under answer began (ISO): the offline approval's date floor. */
+    reviewRoundStartedAt: string;
   };
 }
 

@@ -118,17 +118,25 @@ export async function confirmPaymentClaimAndAdvanceCore(
     paymentRecorded: true,
   } as const;
 
+  // The claim's gate first: the review read below is a transaction of its own,
+  // spent only when this payment could move the delivery at all.
   let gate: ClaimGate | undefined;
-  let reviewHold: ActionCode | null = null;
   try {
     gate = await loadClaimGate(ctx, input.claimId);
-    if (gate) reviewHold = await clientReviewHold(ctx, gate.engagementId);
   } catch (error) {
     console.error('confirmPaymentClaimAndAdvance read failed:', loggableFailure(error));
     return { ...recorded, advanced: false, waitingOn: 'generic' };
   }
   const advanceTrigger = gate ? triggerPaidBy(ctx, gate) : null;
   if (!gate || advanceTrigger === null) return { ...recorded, advanced: false };
+
+  let reviewHold: ActionCode | null;
+  try {
+    reviewHold = await clientReviewHold(ctx, gate.engagementId);
+  } catch (error) {
+    console.error('confirmPaymentClaimAndAdvance review read failed:', loggableFailure(error));
+    return { ...recorded, advanced: false, waitingOn: 'generic' };
+  }
   if (reviewHold !== null) return { ...recorded, advanced: false, waitingOn: reviewHold };
 
   const advance = await executeTransition(ctx, {

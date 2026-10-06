@@ -4,6 +4,7 @@
 import type { ActionCode } from '@/lib/actions/result';
 import { countConceptOptions } from '@/lib/engagements/concept-options';
 import { secondaryTriggersOf } from '@/lib/engagements/forward-trigger';
+import { reviewRoundStartedAt } from '@/lib/engagements/review-round';
 import type { EngagementCommandCardProps } from './command-card-props';
 import type { EngagementDetailProps } from './engagement-detail-props';
 import { revealDeliveryShareLink } from './share-anchor';
@@ -28,6 +29,15 @@ export function commandCardPropsOf(
     },
     status: detail.status,
     canAdvance: detail.canAdvance,
+    canRecordOfflineApproval: detail.canRecordOfflineApproval,
+    reviewRoundStartedAt: reviewRoundStartedAt({
+      state: header.state,
+      rendersReadyAt: header.rendersReadyAt,
+      enteredConceptReviewAt:
+        detail.transitions.find((transition) => transition.toState === 'concept_review')
+          ?.decidedAt ?? null,
+      createdAt: header.createdAt,
+    }).toISOString(),
     canRecordPayment: detail.capabilities.recordPayment,
     canResolveClaims: detail.canResolveClaims,
     canShare: detail.canShare,

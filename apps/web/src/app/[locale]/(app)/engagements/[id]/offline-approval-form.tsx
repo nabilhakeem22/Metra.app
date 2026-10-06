@@ -14,6 +14,8 @@ import {
   isOfflineApprovalChannel,
   type OfflineApprovalChannel,
 } from '@/lib/engagements/offline-approval';
+import { offlineApprovalBounds } from '@/lib/engagements/review-round';
+import { MAX_NOTE_CHARS } from '@/lib/validation/text';
 import { FormActions } from './engagement-form-actions';
 import type { RunAction } from './use-engagement-action';
 
@@ -31,18 +33,22 @@ export function isOfflineApprovalTrigger(trigger: string | null): trigger is Off
 
 /**
  * "Client approved offline": HOW the client approved (required), WHEN when it
- * was not today, and an optional note. Saving fires the same transition as
+ * was not today (within the round, by Cairo day), and an optional note capped
+ * at the server's length. Saving fires the same transition as
  * Advance, so every guard still runs; Cancel fires nothing.
  */
 export function OfflineApprovalForm({
   engagementId,
   trigger,
+  reviewRoundStartedAt,
   pending,
   runAction,
   onCancel,
 }: {
   engagementId: string;
   trigger: OfflineApprovalTrigger;
+  /** When the review round under answer began (ISO): the earliest day allowed. */
+  reviewRoundStartedAt: string;
   pending: boolean;
   runAction: RunAction;
   onCancel: () => void;
@@ -51,8 +57,8 @@ export function OfflineApprovalForm({
   const [channel, setChannel] = useState<OfflineApprovalChannel | ''>('');
   const [occurredOn, setOccurredOn] = useState('');
   const [note, setNote] = useState('');
-  // Today in UTC: the calendar day the server validates against.
-  const today = new Date().toISOString().slice(0, 10);
+  // The same Cairo days the server enforces: not before the round, not after today.
+  const bounds = offlineApprovalBounds(new Date(reviewRoundStartedAt), new Date());
 
   function save() {
     if (channel === '') return;
@@ -94,7 +100,8 @@ export function OfflineApprovalForm({
             id="offline-approval-date"
             type="date"
             dir="ltr"
-            max={today}
+            min={bounds.earliest}
+            max={bounds.latest}
             value={occurredOn}
             onChange={(event) => setOccurredOn(event.target.value)}
           />
@@ -104,6 +111,7 @@ export function OfflineApprovalForm({
         <Label htmlFor="offline-approval-note">{t('note')}</Label>
         <Textarea
           id="offline-approval-note"
+          maxLength={MAX_NOTE_CHARS}
           value={note}
           onChange={(event) => setNote(event.target.value)}
         />

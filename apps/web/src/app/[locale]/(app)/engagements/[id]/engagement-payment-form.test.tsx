@@ -352,4 +352,18 @@ describe('PaymentForm — a replayed payment is SAID, not silently reported as s
 
     expect(toasts).toEqual([]);
   });
+
+  test('recorded but held for the client review: says the payment is recorded and why it did not advance', async () => {
+    renderWithIntl(<FormProbe />);
+    actions.logPaymentAndAdvance.mockResolvedValue({ ok: true, waitingOn: 'client_review_pending' });
+
+    await record('50000');
+
+    expect(toasts).toEqual([
+      {
+        title: ar('engagements.command.claim.recorded'),
+        description: ar('errors.client_review_pending'),
+      },
+    ]);
+  });
 });

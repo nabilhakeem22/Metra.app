@@ -16,8 +16,9 @@ import { DeliveryRibbon } from './delivery-ribbon';
  *
  * NOT the Deliveries table. That table is a REGISTER — it leads with a document
  * number and sorts newest-first, which is right for something you search. This
- * panel has one job: say which delivery needs the studio today. So it sorts by
- * longest untouched (done in the query), leads with the client rather than
+ * panel has one job: say which delivery needs the studio today. So it sorts the
+ * studio's moves first, then by longest untouched (done in the query,
+ * lib/dashboard/triage-order.ts), leads with the client rather than
  * `DE-2026-0014`, and shows the delivery's status by the delivery page's own
  * rule (`delivery-status.ts`), so the two can never disagree.
  *

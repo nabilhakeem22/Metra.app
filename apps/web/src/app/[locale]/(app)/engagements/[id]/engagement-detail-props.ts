@@ -55,6 +55,8 @@ export interface EngagementDetailProps {
   canStartQuotation: boolean;
   gatePreview: EngagementGatePreview;
   canAdvance: boolean;
+  /** May this role record "Client approved offline" (owner, admin, project manager)? */
+  canRecordOfflineApproval: boolean;
   /** The fee form's opening split, read only while the delivery is `created`. */
   feeSplitPrefill: FeeSplitPrefill | null;
   canResolveClaims: boolean;

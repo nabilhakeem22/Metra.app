@@ -76,13 +76,17 @@ const OCCURRED_ON_RE = /^\d{4}-\d{2}-\d{2}$/;
  * the previous day — an honest "today" would look like the future.
  */
 export function isValidOccurredOn(value: string, todayIso: string): boolean {
+  return isCalendarDay(value) && value <= todayIso;
+}
+
+/** A bare `YYYY-MM-DD` that names a day the calendar has. */
+export function isCalendarDay(value: string): boolean {
   if (!OCCURRED_ON_RE.test(value)) return false;
   // `new Date('2026-02-31')` yields 2026-03-03, so round-trip it to catch a day
   // the calendar does not have.
   const parsed = new Date(`${value}T00:00:00Z`);
   if (Number.isNaN(parsed.getTime())) return false;
-  if (parsed.toISOString().slice(0, 10) !== value) return false;
-  return value <= todayIso;
+  return parsed.toISOString().slice(0, 10) === value;
 }
 
 /** The client generated this themselves, through their delivery link. */

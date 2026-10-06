@@ -132,8 +132,10 @@ export function useUndoableRemoval(options: UndoableRemovalOptions): {
       mounted.current = false;
       window.removeEventListener('pagehide', onPageHide);
       document.removeEventListener('visibilitychange', onVisibility);
-      unregister();
-      void flush();
+      // Commit what is pending, and stay registered until those deletes have
+      // answered: sign-out, Issue and the costed copy on the NEXT screen must
+      // still wait for a delete this screen sent on its way out.
+      void flush().finally(unregister);
     };
   }, [flush]);
 

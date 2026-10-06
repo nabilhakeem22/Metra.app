@@ -33,6 +33,10 @@ export interface EngagementCommandCardProps {
   /** The delivery's status; decides the card's colour family (stripe + border). */
   status: DeliveryStatus;
   canAdvance: boolean;
+  /** May this role record "Client approved offline" (owner, admin, project manager)? */
+  canRecordOfflineApproval: boolean;
+  /** When the review round under answer began (ISO): the floor of an offline approval's date. */
+  reviewRoundStartedAt: string;
   canRecordPayment: boolean;
   /** May this role confirm or dismiss a client payment claim (`engagements_finance` create)? */
   canResolveClaims: boolean;

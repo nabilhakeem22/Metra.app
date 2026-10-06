@@ -2,7 +2,8 @@
 
 import { useTranslations } from 'next-intl';
 import { toast } from '@/hooks/use-toast';
-import type { ActionResult } from '@/lib/actions/result';
+import { resolveActionError } from '@/lib/actions/error-message';
+import type { ActionCode, ActionResult } from '@/lib/actions/result';
 import type { PayCtaMode } from '@/lib/engagements/command-card-ctas';
 import { logPaymentAndAdvance, recordPayment } from '@/lib/engagements/actions';
 import type { EngagementGatePreview } from '@/lib/engagements/gate-preview';
@@ -46,11 +47,16 @@ export function usePaymentFormSubmit(options: {
   onDone: () => void;
 }): (fields: PaymentFormFields) => void {
   const tc = useTranslations('engagements.controls');
+  const tcmd = useTranslations('engagements.command');
+  const te = useTranslations('errors');
   const { engagementId, paymentKind, mode, advanceTrigger, runAction, onDone } = options;
 
-  function settle(res: ActionResult): ActionResult {
+  function settle(res: ActionResult & { waitingOn?: ActionCode }): ActionResult {
     if (res.ok && res.already) {
       toast({ title: tc('alreadyRecorded'), description: tc('alreadyRecordedHint') });
+    } else if (res.ok && res.waitingOn) {
+      // Recorded, not advanced: say so, and what the delivery still waits on.
+      toast({ title: tcmd('claim.recorded'), description: resolveActionError(res.waitingOn, te) });
     }
     if (res.ok) onDone();
     return res;

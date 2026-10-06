@@ -24,6 +24,7 @@ export function deriveCommandCardModel(props: EngagementCommandCardProps): Comma
   const view = deriveCommandCard(props.preview, {
     canAdvance: props.canAdvance,
     isTerminal: isTerminal(props.state),
+    canRecordOfflineApproval: props.canRecordOfflineApproval,
   });
   const closed = view.mode === 'closed';
   const chrome = resolveCommandCardChrome(props.status);
@@ -37,7 +38,6 @@ export function deriveCommandCardModel(props: EngagementCommandCardProps): Comma
     conceptOptionCount: props.conceptOptionCount,
     pendingClaimCount: props.paymentClaims.length,
     canResolveClaims: props.canResolveClaims,
-    awaitingClientReview: view.awaitingClientReview,
     offlineApprovalEnabled: view.offlineApprovalEnabled,
   });
   return { view, closed, chrome, ctas };

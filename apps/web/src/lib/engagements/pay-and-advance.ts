@@ -10,10 +10,12 @@
 // `*Core(ctx,input)` (API-ready) so its thin server-action wrapper only resolves
 // the org context + revalidates.
 import type { PaymentEventKind } from '@metra/db';
-import type { ActionResult } from '@/lib/actions/result';
+import { loggableFailure } from '@/lib/actions/loggable-failure';
+import type { ActionCode, ActionResult } from '@/lib/actions/result';
 import type { OrgContext } from '@/lib/db/context';
 import { executeTransition } from './executor';
 import { isEndingTrigger } from './forward-trigger';
+import { getEngagementGatePreview } from './gate-preview';
 import { MONEY_GUARD_MILESTONE, moneyGuardOf } from './guards';
 import { recordPaymentCore } from './payments';
 import type { Trigger } from './transitions';
@@ -45,6 +47,8 @@ export interface LogPaymentAndAdvanceInput {
  */
 export type LogPaymentAndAdvanceResult = ActionResult & {
   paymentRecorded: boolean;
+  /** Recorded, not advanced: what the delivery still waits on (the client's review). */
+  waitingOn?: ActionCode;
 };
 
 /**
@@ -84,6 +88,19 @@ export async function logPaymentAndAdvanceCore(
   });
   if (!recorded.ok) return { ...recorded, paymentRecorded: false };
 
+  // Never past a review the client has not answered, whatever card sent this:
+  // the payment stands, the delivery waits for the client (or for an approval
+  // the studio records as taken offline), as confirm-claim-and-advance does.
+  const already = recorded.already === true;
+  try {
+    if ((await getEngagementGatePreview(ctx, engagementId)).awaitingClientReview) {
+      return { ok: true, already, paymentRecorded: true, waitingOn: 'client_review_pending' };
+    }
+  } catch (error) {
+    console.error('logPaymentAndAdvance review read failed:', loggableFailure(error));
+    return { ok: false, error: 'generic', already, paymentRecorded: true };
+  }
+
   // Falls through even on an idempotent hit (`recorded.already`): the guard
   // re-checks and the advance is a no-op (or the still-valid forward move) — the
   // machine converges on retry.
@@ -97,5 +114,5 @@ export async function logPaymentAndAdvanceCore(
   // original was merely handed back. `executeTransition` never sets `already` —
   // a replayed attempt returns a plain `ok` on purpose (executor/index.ts) — so
   // there is no second meaning for this flag to collide with here.
-  return { ...advanced, already: recorded.already === true, paymentRecorded: true };
+  return { ...advanced, already, paymentRecorded: true };
 }

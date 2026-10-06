@@ -60,7 +60,7 @@ export interface CommandCardView {
   endingsEnabled: boolean;
   /** A review stage whose current round the client has not answered (client-review.ts). */
   awaitingClientReview: boolean;
-  /** Offer "Client approved offline": guards met, waiting, and the role may advance. */
+  /** Offer "Client approved offline": guards met, waiting, and the role may stand in for the client. */
   offlineApprovalEnabled: boolean;
 }
 
@@ -81,7 +81,8 @@ export function forwardMovesOf(
  * - terminal, or neither a forward trigger nor an ending → 'closed'.
  * - all forward guards met but the client has not answered the review round
  *   (`awaitingClientReview`) → 'blockedClient' with no blocker, waiting on the
- *   client; the offline approval is offered when the role may advance.
+ *   client; the offline approval is offered when the role may advance AND is
+ *   an offline-approval decider (owner, admin, project manager).
  * - all forward guards met otherwise → 'ready' (Advance enabled iff there is a
  *   forward trigger and the role may fire it; at a choice state the endings are
  *   enabled instead, and Advance stays off).
@@ -93,7 +94,15 @@ export function forwardMovesOf(
  */
 export function deriveCommandCard(
   preview: CommandCardPreview,
-  opts: { canAdvance: boolean; isTerminal: boolean },
+  opts: {
+    canAdvance: boolean;
+    isTerminal: boolean;
+    /**
+     * Owner, admin or project manager: may stand in for the client's review
+     * answer. Absent means no (fails closed).
+     */
+    canRecordOfflineApproval?: boolean;
+  },
 ): CommandCardView {
   const { primaryTrigger, endingChoices, items, awaitingClientReview } = preview;
 
@@ -107,7 +116,8 @@ export function deriveCommandCard(
     if (awaitingClientReview) {
       return awaitingClientView({
         endingChoices,
-        offlineApprovalEnabled: opts.canAdvance && primaryTrigger !== null,
+        offlineApprovalEnabled:
+          opts.canAdvance && opts.canRecordOfflineApproval === true && primaryTrigger !== null,
       });
     }
     return readyView({

@@ -66,20 +66,17 @@ export interface CommandCardCtas {
  * payment, and a second, manual record would double the ledger.
  */
 function resolvePayCta(
-  preview: Pick<EngagementGatePreview, 'primaryTrigger' | 'endingChoices'>,
-  options: {
-    canRecordPayment: boolean;
-    canAdvance: boolean;
-    pendingClaimCount: number;
-    awaitingClientReview: boolean;
-  },
+  preview: Pick<EngagementGatePreview, 'primaryTrigger' | 'endingChoices' | 'awaitingClientReview'>,
+  options: { canRecordPayment: boolean; canAdvance: boolean; pendingClaimCount: number },
   hasPaymentGate: boolean,
 ): PayCtaMode {
   if (options.pendingClaimCount > 0 || !hasPaymentGate || !options.canRecordPayment) {
     return null;
   }
   if (preview.primaryTrigger) {
-    if (options.awaitingClientReview) return 'recordOnly';
+    // Read off the PREVIEW, not the view: the view only flags the wait in
+    // blockedClient, and a studio blocker beside it must not reopen pay-and-advance.
+    if (preview.awaitingClientReview) return 'recordOnly';
     return options.canAdvance ? 'payAndAdvance' : null;
   }
   return preview.endingChoices.length > 0 ? 'recordOnly' : null;
@@ -97,8 +94,6 @@ export function resolveCommandCardCtas(
     conceptOptionCount: number;
     pendingClaimCount: number;
     canResolveClaims: boolean;
-    /** From the view: the client still owes the review round (no advancing pay). */
-    awaitingClientReview: boolean;
     offlineApprovalEnabled: boolean;
   },
 ): CommandCardCtas {

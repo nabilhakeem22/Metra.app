@@ -86,6 +86,8 @@ function props(overrides: Partial<EngagementCommandCardProps> = {}): EngagementC
     allowances: { revisionCount: 0, freeRevisionN: 3, designRevisionCount: 0, freeDesignRevisionN: 3 },
     status: { kind: 'yourMove' },
     canAdvance: true,
+    canRecordOfflineApproval: true,
+    reviewRoundStartedAt: '2026-06-01T07:00:00.000Z',
     canRecordPayment: true,
     canResolveClaims: true,
     canShare: true,
@@ -548,6 +550,22 @@ describe('waiting for the client to answer the review', () => {
   test('a role that may not advance is not offered the offline approval', () => {
     renderWaiting({ canAdvance: false });
     expect(offlineButton()).toBeNull();
+  });
+
+  test('a site engineer (may advance, may not stand in) reads who records it instead', () => {
+    renderWaiting({ canRecordOfflineApproval: false });
+    expect(offlineButton()).toBeNull();
+    expect(screen.getByText(ar('engagements.offlineApproval.decidedBy'))).toBeTruthy();
+  });
+
+  test('the form offers only the days the server accepts, and caps the note', () => {
+    renderWaiting();
+    fireEvent.click(offlineButton()!);
+    const date = screen.getByLabelText(ar('engagements.offlineApproval.occurredOn')) as HTMLInputElement;
+    expect(date.min).toBe('2026-06-01');
+    expect(date.max).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    const note = screen.getByLabelText(ar('engagements.offlineApproval.note')) as HTMLTextAreaElement;
+    expect(note.maxLength).toBe(2000);
   });
 
   test('Cancel in the form fires nothing', () => {

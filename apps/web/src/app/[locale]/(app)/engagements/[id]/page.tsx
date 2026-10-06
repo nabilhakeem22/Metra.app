@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 import { requireOrg } from '@/lib/auth/require-org';
 import { pickLocale } from '@/lib/i18n/pick-locale';
 import { forwardMovesOf } from '@/lib/engagements/command-card';
+import { mayRecordOfflineApproval } from '@/lib/engagements/offline-approval';
 import { computeCommercialPulse } from '@/lib/engagements/pulse';
 import { canRunTrigger, legalTriggersFrom } from '@/lib/engagements/ui';
 import { can } from '@/lib/permissions/can';
@@ -90,6 +91,7 @@ export default async function EngagementDetailPage({
         canStartQuotation={can(ctx.role, 'proposals_build', 'create')}
         gatePreview={gatePreview}
         canAdvance={canAdvance}
+        canRecordOfflineApproval={mayRecordOfflineApproval(ctx.role)}
         feeSplitPrefill={data.feeSplitPrefill}
         canResolveClaims={canResolveClaims}
         status={status}

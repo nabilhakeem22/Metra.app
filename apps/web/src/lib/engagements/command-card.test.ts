@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
+import { MEMBER_ROLES } from '@/lib/permissions/roles';
 import { deriveCommandCard, forwardMovesOf } from './command-card';
+import { mayRecordOfflineApproval } from './offline-approval';
+import { canRunTrigger } from './ui';
 import type { EngagementGatePreview, GateChecklistItem } from './gate-preview';
 import type { GuardKey } from './guards';
 import type { Trigger } from './transitions';
@@ -164,7 +167,11 @@ describe('deriveCommandCard while the client owes the review', () => {
     preview('selectConcept', [item('gateAInstallmentCleared', true)], awaiting);
 
   it('every guard met, no client answer: waiting on the client, no Advance', () => {
-    const view = deriveCommandCard(metAtConceptReview(true), { canAdvance: true, isTerminal: false });
+    const view = deriveCommandCard(metAtConceptReview(true), {
+      canAdvance: true,
+      isTerminal: false,
+      canRecordOfflineApproval: true,
+    });
     expect(view).toMatchObject({
       mode: 'blockedClient',
       advanceEnabled: false,
@@ -177,8 +184,31 @@ describe('deriveCommandCard while the client owes the review', () => {
   });
 
   it('offers the offline approval only to a role that may advance', () => {
-    const view = deriveCommandCard(metAtConceptReview(true), { canAdvance: false, isTerminal: false });
+    const view = deriveCommandCard(metAtConceptReview(true), {
+      canAdvance: false,
+      isTerminal: false,
+      canRecordOfflineApproval: true,
+    });
     expect(view.mode).toBe('blockedClient');
+    expect(view.offlineApprovalEnabled).toBe(false);
+  });
+
+  it.each([...MEMBER_ROLES])(
+    'role %s: offered only to owner, admin and project manager (owner decision)',
+    (role) => {
+      const view = deriveCommandCard(metAtConceptReview(true), {
+        canAdvance: canRunTrigger(role, 'selectConcept'),
+        isTerminal: false,
+        canRecordOfflineApproval: mayRecordOfflineApproval(role),
+      });
+      expect(view.offlineApprovalEnabled).toBe(
+        role === 'owner' || role === 'admin' || role === 'project_manager',
+      );
+    },
+  );
+
+  it('the option left out means no (fails closed)', () => {
+    const view = deriveCommandCard(metAtConceptReview(true), { canAdvance: true, isTerminal: false });
     expect(view.offlineApprovalEnabled).toBe(false);
   });
 

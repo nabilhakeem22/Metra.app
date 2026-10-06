@@ -76,6 +76,10 @@ export function AdvanceOrReshare(props: CommandCardActionProps) {
         engagementId={props.advance.engagementId}
         trigger={props.advance.preview.primaryTrigger}
         offlineApproval={props.ctas.offlineApproval}
+        reviewAnswerOnly={
+          props.view.awaitingClientReview && props.view.blockingGuards.length === 0
+        }
+        reviewRoundStartedAt={props.advance.reviewRoundStartedAt}
         canShare={props.canShare}
         pending={props.pending}
         onNudge={props.onNudge}

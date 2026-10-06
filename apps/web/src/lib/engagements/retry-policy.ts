@@ -58,6 +58,8 @@ export const DEFINITE_REFUSALS: ReadonlySet<ActionCode> = new Set<ActionCode>([
   'handoff_not_acknowledged',
   'client_review_pending',
   // Input the side-effect refused, rolling the whole transition back.
+  'offline_approval_date_out_of_range',
+  'offline_approval_note_too_long',
   'design_fee_required',
   'milestone_split_invalid',
   'milestone_kind_duplicate',

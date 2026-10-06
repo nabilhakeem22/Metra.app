@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import type { ReactNode } from 'react';
 import { AppShell } from '@/components/shell/app-shell';
+import { loggableFailure } from '@/lib/actions/loggable-failure';
 import { requireOrg } from '@/lib/auth/require-org';
 import { getSessionUser } from '@/lib/auth/session';
 import { countUnread, listNotifications } from '@/lib/notifications/queries';
@@ -23,13 +24,21 @@ export default async function AppLayout({
   if (ctx.role === 'client') notFound();
   // One round of reads, in parallel. The bell's dropdown is fed from here rather
   // than fetching on open: the panel costs no extra request and can never be
-  // staler than the page it sits on.
-  const [user, orgs, unreadCount, recentNotifications] = await Promise.all([
+  // staler than the page it sits on. The bell is not worth the shell: a failed
+  // notification read shows an empty bell, never an error page.
+  const [user, orgs, bell] = await Promise.all([
     getSessionUser(),
     listCurrentUserOrgs(ctx.userId),
-    countUnread(ctx),
-    listNotifications(ctx, { limit: 8 }),
+    Promise.allSettled([countUnread(ctx), listNotifications(ctx, { limit: 8 })]),
   ]);
+  const [unreadRead, recentRead] = bell;
+  for (const read of bell) {
+    if (read.status === 'rejected') {
+      console.error('app shell: notification read failed', loggableFailure(read.reason));
+    }
+  }
+  const unreadCount = unreadRead.status === 'fulfilled' ? unreadRead.value : 0;
+  const recentNotifications = recentRead.status === 'fulfilled' ? recentRead.value : [];
   const onboarding = readOnboarding(user?.user_metadata);
 
   return (
