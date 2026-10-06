@@ -63,6 +63,7 @@ export function BudgetTab({
         actions={
           canSetRom && (
             <Button
+              variant="secondary"
               type="button"
               size="sm"
               disabled={pending}

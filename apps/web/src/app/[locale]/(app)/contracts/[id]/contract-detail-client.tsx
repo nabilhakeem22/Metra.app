@@ -78,7 +78,7 @@ export function ContractDetailClient({
             </code>
             <Button
               size="sm"
-              variant="outline"
+              variant="secondary"
               onClick={() => navigator.clipboard?.writeText(link)}
             >
               {t('copyLink')}

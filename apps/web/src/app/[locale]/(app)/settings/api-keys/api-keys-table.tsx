@@ -97,7 +97,7 @@ export function ApiKeysTable({
                       <td className="py-2 text-end">
                         {status === 'active' && (
                           <Button
-                            variant="outline"
+                            variant="secondary"
                             size="sm"
                             disabled={revoking}
                             onClick={() => {

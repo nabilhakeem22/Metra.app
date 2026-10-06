@@ -31,7 +31,7 @@ export async function ProjectsTab({
       {canManage && (
         <div>
           <Link href={`/projects?newFor=${clientId}`}>
-            <Button type="button" variant="outline">
+            <Button type="button" variant="secondary">
               <Plus className="size-4" aria-hidden />
               {t('newForClient')}
             </Button>

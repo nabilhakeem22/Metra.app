@@ -160,7 +160,7 @@ export function BoqStart({ projectId }: { projectId: string }) {
           )}
 
           <div className="flex gap-2">
-            <Button onClick={onCommit} disabled={pending || !preview.lines?.length}>
+            <Button variant="default" onClick={onCommit} disabled={pending || !preview.lines?.length}>
               {t('commitImport')}
             </Button>
             <Button variant="ghost" onClick={() => setPreview(null)} disabled={pending}>

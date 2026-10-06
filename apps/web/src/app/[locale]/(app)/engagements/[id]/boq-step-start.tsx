@@ -41,14 +41,14 @@ export function BoqStepStart({
       {step.canBuild && (
         <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2">
           {step.boqProposalId ? (
-            <Button asChild>
+            <Button variant="default" asChild>
               <Link href={boqProposalHref(step.boqProposalId)}>
                 {t('continueCta')}
                 <ArrowRight className="size-4" aria-hidden />
               </Link>
             </Button>
           ) : (
-            <Button disabled={pending} onClick={open}>
+            <Button variant="default" disabled={pending} onClick={open}>
               {pending ? (
                 <Loader2 className="size-4 animate-spin" aria-hidden />
               ) : (

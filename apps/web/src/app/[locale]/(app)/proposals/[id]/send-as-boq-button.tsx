@@ -20,7 +20,7 @@ export function SendAsBoqButton({
 }) {
   const t = useTranslations('proposals.boqMode');
   return (
-    <Button onClick={onSend} disabled={disabled || lineCount === 0}>
+    <Button variant="secondary" onClick={onSend} disabled={disabled || lineCount === 0}>
       {pending ? (
         <Loader2 className="size-4 animate-spin" aria-hidden />
       ) : (

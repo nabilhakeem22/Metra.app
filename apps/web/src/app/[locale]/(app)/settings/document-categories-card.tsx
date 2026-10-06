@@ -126,6 +126,7 @@ export function DocumentCategoriesCard({
             />
           </div>
           <Button
+            variant="secondary"
             type="button"
             disabled={pending || (!newAr.trim() && !newEn.trim())}
             onClick={() =>

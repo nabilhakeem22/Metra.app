@@ -23,11 +23,11 @@ export function CommandCardClosedLinks({
   if (state !== 'execution') return null;
   return (
     <div className="flex flex-wrap gap-2">
-      <Button asChild variant="outline">
+      <Button asChild variant="secondary">
         <Link href={`/projects/${projectId}?tab=boq`}>{tclosed('viewBoq')}</Link>
       </Button>
       {canStartQuotation && (
-        <Button asChild>
+        <Button variant="default" asChild>
           <Link href={`/proposals/new?projectId=${projectId}`}>{tclosed('startQuotation')}</Link>
         </Button>
       )}

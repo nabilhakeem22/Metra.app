@@ -123,7 +123,7 @@ export function PublicProposalView({
               onChange={(e) => setName(e.target.value)}
             />
             <div className="flex justify-center gap-3">
-              <Button onClick={() => respond('accept')} disabled={pending}>
+              <Button variant="default" onClick={() => respond('accept')} disabled={pending}>
                 {pending ? (
                   <Loader2 className="size-4 animate-spin" aria-hidden />
                 ) : (
@@ -131,7 +131,7 @@ export function PublicProposalView({
                 )}
                 {t('p.accept')}
               </Button>
-              <Button variant="outline" onClick={() => respond('reject')} disabled={pending}>
+              <Button variant="secondary" onClick={() => respond('reject')} disabled={pending}>
                 <X className="size-4" aria-hidden />
                 {t('p.reject')}
               </Button>

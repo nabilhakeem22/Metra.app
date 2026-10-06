@@ -78,7 +78,7 @@ export function PreviewModal({
   return (
     <DialogPrimitive.Root open={open} onOpenChange={setOpen}>
       <DialogPrimitive.Trigger asChild>
-        <Button variant="outline" size="sm" className={className} disabled={disabled}>
+        <Button variant="secondary" size="sm" className={className} disabled={disabled}>
           <Eye className="size-4" aria-hidden />
           {t('open')}
         </Button>

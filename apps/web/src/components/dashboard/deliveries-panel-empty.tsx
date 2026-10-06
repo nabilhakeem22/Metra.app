@@ -23,7 +23,7 @@ export function DeliveriesPanelEmpty({ empty }: { empty: DeliveriesEmptyState })
         {t(`deliveries.${REASON_KEY[empty.reason]}`)}
       </p>
       {empty.cta && (
-        <Button asChild>
+        <Button variant="secondary" asChild>
           <Link href={empty.cta.href}>{t(empty.cta.messageKey)}</Link>
         </Button>
       )}

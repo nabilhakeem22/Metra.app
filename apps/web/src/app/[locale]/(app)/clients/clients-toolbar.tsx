@@ -64,7 +64,7 @@ export function ClientsToolbar({
         ))}
       </select>
       {canManage && (
-        <Button data-tour="clients-new" className="ms-auto" onClick={onNew}>
+        <Button variant="default" data-tour="clients-new" className="ms-auto" onClick={onNew}>
           <Plus className="size-4" aria-hidden />
           {t('actions.new')}
         </Button>

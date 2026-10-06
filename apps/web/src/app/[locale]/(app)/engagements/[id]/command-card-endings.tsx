@@ -48,6 +48,7 @@ export function CommandCardEndings({
       <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
         {endings.map((trigger) => (
           <Button
+            variant="secondary"
             key={trigger}
             type="button"
             className="w-full"

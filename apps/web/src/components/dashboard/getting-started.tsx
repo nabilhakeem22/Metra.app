@@ -123,7 +123,7 @@ export function GettingStarted({
                       {t('launch')}
                     </Button>
                   )}
-                  <Button asChild variant="outline" size="sm">
+                  <Button asChild variant="secondary" size="sm">
                     <Link href={item.href}>{t('open')}</Link>
                   </Button>
                 </div>

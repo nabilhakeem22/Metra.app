@@ -108,13 +108,14 @@ export function EngagementCreateForm({
         <div className="flex justify-end gap-2 pt-2">
           <Button
             type="button"
-            variant="outline"
+            variant="secondary"
             onClick={() => onOpenChange(false)}
             disabled={form.pending}
           >
             {t('cancel')}
           </Button>
           <Button
+            variant="default"
             type="button"
             onClick={form.submit}
             disabled={form.pending || !canSubmitDelivery(form.values)}

@@ -53,7 +53,7 @@ export function CommandCardAction(props: CommandCardActionProps) {
     <>
       <div className="flex flex-col gap-2.5">
         {ctas.payCta && (
-          <Button type="button" className="w-full" disabled={pending} onClick={props.onTogglePay}>
+          <Button variant="default" type="button" className="w-full" disabled={pending} onClick={props.onTogglePay}>
             {ctas.payCta === 'recordOnly' ? th('logPayment') : th('logPaymentAdvance')}
           </Button>
         )}

@@ -133,6 +133,7 @@ export function DocumentThreadPanel({
                   {t('advisory')}
                 </p>
                 <Button
+                  variant="secondary"
                   size="sm"
                   disabled={thread.sending || !thread.draft.trim()}
                   onClick={thread.send}

@@ -118,7 +118,7 @@ export function PublicContractView({
               onChange={(e) => setName(e.target.value)}
             />
             <div className="flex justify-center">
-              <Button onClick={acknowledge} disabled={pending || !name.trim()}>
+              <Button variant="default" onClick={acknowledge} disabled={pending || !name.trim()}>
                 {pending ? (
                   <Loader2 className="size-4 animate-spin" aria-hidden />
                 ) : (

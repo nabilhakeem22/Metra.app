@@ -123,11 +123,11 @@ export function VariationCreateForm({
               </button>
             </div>
           ))}
-          <Button size="sm" variant="outline" onClick={onAddLine}>
+          <Button size="sm" variant="secondary" onClick={onAddLine}>
             <Plus className="size-4" aria-hidden />
           </Button>
         </div>
-        <Button size="sm" disabled={saving || !title.trim()} onClick={onSave}>
+        <Button variant="default" size="sm" disabled={saving || !title.trim()} onClick={onSave}>
           {saving && <Loader2 className="size-4 animate-spin" aria-hidden />}
           {tv('saveDraft')}
         </Button>

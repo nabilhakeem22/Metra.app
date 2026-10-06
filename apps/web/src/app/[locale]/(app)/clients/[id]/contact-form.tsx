@@ -98,14 +98,14 @@ export function ContactForm({
           {draft.id && (
             <Button
               type="button"
-              variant="outline"
+              variant="secondary"
               onClick={() => onDraftChange(EMPTY_CONTACT_DRAFT)}
               disabled={pending}
             >
               {t('cancel')}
             </Button>
           )}
-          <Button type="button" onClick={submit} disabled={pending || !validateDraft(draft)}>
+          <Button variant="default" type="button" onClick={submit} disabled={pending || !validateDraft(draft)}>
             {pending && <Loader2 className="size-4 animate-spin" aria-hidden />}
             {draft.id ? t('save') : t('add')}
           </Button>

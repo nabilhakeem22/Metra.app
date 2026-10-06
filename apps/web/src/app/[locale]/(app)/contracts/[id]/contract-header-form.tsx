@@ -108,7 +108,7 @@ export function ContractHeaderForm({ detail }: { detail: ContractDetail }) {
         {field('termsEn', th('terms'))}
         {field('termsAr', th('terms'))}
         <div className="flex items-center gap-2">
-          <Button size="sm" disabled={pending} onClick={save}>
+          <Button variant="secondary" size="sm" disabled={pending} onClick={save}>
             {pending && <Loader2 className="size-4 animate-spin" aria-hidden />}
             {t('saveDraft')}
           </Button>

@@ -85,7 +85,7 @@ function DashboardIdentityHeader({ identity }: { identity: DashboardIdentity }) 
         <p className="text-body text-[color:var(--text-muted)]">{d('welcomeBack')}</p>
       </div>
       <div className="shrink-0">
-        <Button asChild size="lg">
+        <Button variant="default" asChild size="lg">
           <Link href={identity.primaryCta.href}>{d(identity.primaryCta.messageKey)}</Link>
         </Button>
       </div>

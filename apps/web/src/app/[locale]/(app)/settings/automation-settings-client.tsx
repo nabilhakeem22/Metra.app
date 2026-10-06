@@ -198,7 +198,7 @@ export function AutomationSettingsClient({
         )}
 
         {canManage && (
-          <Button onClick={save} disabled={saving}>
+          <Button variant="secondary" onClick={save} disabled={saving}>
             {saving && <Loader2 className="size-4 animate-spin" aria-hidden />}
             {ts('save')}
           </Button>

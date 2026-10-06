@@ -94,7 +94,7 @@ export function TeamInviteForm({
               </SelectContent>
             </Select>
           </div>
-          <Button onClick={onSubmit} disabled={isPending || email.trim() === ''}>
+          <Button variant="default" onClick={onSubmit} disabled={isPending || email.trim() === ''}>
             {isPending ? (
               <Loader2 className="size-4 animate-spin" aria-hidden />
             ) : (
@@ -113,7 +113,7 @@ export function TeamInviteForm({
               <Input readOnly dir="ltr" value={lastLink} className="text-caption" />
               <Button
                 type="button"
-                variant="outline"
+                variant="secondary"
                 size="icon"
                 onClick={() => onCopy(lastLink)}
                 aria-label={t('copyLink')}

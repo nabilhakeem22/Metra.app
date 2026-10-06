@@ -116,6 +116,7 @@ export function CommandCardClaims({
             </div>
             <div className="flex flex-wrap gap-2">
               <Button
+                variant="default"
                 type="button"
                 disabled={pending}
                 onClick={() => void confirmClaim(claim)}

@@ -57,6 +57,7 @@ export function PaymentsTab({
         actions={
           canRecordPayment && (
             <Button
+              variant="secondary"
               type="button"
               size="sm"
               disabled={pending}

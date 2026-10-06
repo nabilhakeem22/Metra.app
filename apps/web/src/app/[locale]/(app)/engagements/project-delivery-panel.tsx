@@ -107,7 +107,7 @@ export function ProjectDeliveryPanel({
 
         <div className="flex flex-wrap items-center gap-2">
           {delivery && (
-            <Button asChild variant={highlighted ? 'default' : 'outline'}>
+            <Button asChild variant={highlighted ? 'default' : 'secondary'}>
               <Link href={`/engagements/${delivery.id}`}>
                 {t('open')}
                 <ArrowRight className="size-4 rtl:-scale-x-100" aria-hidden />
@@ -115,7 +115,7 @@ export function ProjectDeliveryPanel({
             </Button>
           )}
           {canCreate && (
-            <Button onClick={() => setCreating(true)}>
+            <Button variant={delivery ? 'secondary' : 'default'} onClick={() => setCreating(true)}>
               <Plus className="size-4" aria-hidden />
               {delivery ? t('extend') : tStart('startDelivery')}
             </Button>

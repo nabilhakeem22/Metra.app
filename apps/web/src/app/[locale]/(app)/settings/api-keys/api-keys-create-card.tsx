@@ -48,7 +48,7 @@ export function ApiKeysCreateCard({
               placeholder={t('labelPlaceholder')}
               className="max-w-xs"
             />
-            <Button onClick={create} disabled={minting || !label.trim()}>
+            <Button variant="default" onClick={create} disabled={minting || !label.trim()}>
               {minting ? (
                 <Loader2 className="size-4 animate-spin" aria-hidden />
               ) : (

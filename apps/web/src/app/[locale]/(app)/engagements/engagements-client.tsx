@@ -44,7 +44,7 @@ export function EngagementsClient({
   useOpenOnArrival(canCreate && openCreateOnArrival, () => setCreating(true));
 
   const newButton = canCreate && (
-    <Button onClick={() => setCreating(true)}>
+    <Button variant="default" onClick={() => setCreating(true)}>
       <Plus className="size-4" aria-hidden />
       {t('startDelivery')}
     </Button>

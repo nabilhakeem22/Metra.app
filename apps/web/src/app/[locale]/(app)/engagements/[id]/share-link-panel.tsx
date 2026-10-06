@@ -16,7 +16,7 @@ function RevealedLink({ share }: { share: DeliveryShareApi }) {
         <code className="flex-1 truncate text-caption" dir="ltr">
           {share.link}
         </code>
-        <Button size="sm" variant="outline" onClick={share.copy}>
+        <Button size="sm" variant="secondary" onClick={share.copy}>
           <Copy className="size-3.5" aria-hidden />
           {share.copied ? t('copied') : t('copyLink')}
         </Button>
@@ -35,7 +35,7 @@ function ShareActions({ share }: { share: DeliveryShareApi }) {
   return (
     <div className="flex flex-wrap gap-2">
       {!share.shared && !share.link && (
-        <Button size="sm" disabled={share.pending} onClick={share.share}>
+        <Button variant="secondary" size="sm" disabled={share.pending} onClick={share.share}>
           {spinner ?? <Share2 className="size-4" aria-hidden />}
           {t('shareCta')}
         </Button>
@@ -43,7 +43,7 @@ function ShareActions({ share }: { share: DeliveryShareApi }) {
 
       {share.shared && (
         <>
-          <Button size="sm" variant="outline" disabled={share.pending} onClick={share.rotate}>
+          <Button size="sm" variant="secondary" disabled={share.pending} onClick={share.rotate}>
             {spinner ?? <RefreshCw className="size-4" aria-hidden />}
             {t('rotate')}
           </Button>

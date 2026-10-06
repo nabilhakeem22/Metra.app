@@ -155,10 +155,10 @@ export function ProposalCreateForm({
             </div>
 
             <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => router.push('/proposals')} disabled={pending}>
+              <Button variant="secondary" onClick={() => router.push('/proposals')} disabled={pending}>
                 {t('create.cancel')}
               </Button>
-              <Button onClick={submit} disabled={pending}>
+              <Button variant="default" onClick={submit} disabled={pending}>
                 {pending && <Loader2 className="size-4 animate-spin" aria-hidden />}
                 {t('create.submit')}
               </Button>

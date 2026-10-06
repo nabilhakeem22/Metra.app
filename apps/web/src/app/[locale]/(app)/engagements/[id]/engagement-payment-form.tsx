@@ -122,10 +122,10 @@ export function PaymentForm({
         </button>
       )}
       <div className="flex justify-end gap-2">
-        <Button type="button" variant="outline" size="sm" onClick={onDone} disabled={pending}>
+        <Button type="button" variant="secondary" size="sm" onClick={onDone} disabled={pending}>
           {tc('cancel')}
         </Button>
-        <Button type="button" size="sm" onClick={submit} disabled={pending}>
+        <Button variant="default" type="button" size="sm" onClick={submit} disabled={pending}>
           {pending && <Loader2 className="size-4 animate-spin" aria-hidden />}
           {mode === 'recordOnly' ? th('logPayment') : th('logPaymentAdvance')}
         </Button>

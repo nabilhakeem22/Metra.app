@@ -41,7 +41,7 @@ export function PaymentClaimControl({
   return (
     <div className="flex flex-col gap-1.5">
       <Button
-        variant={prominent ? 'outline' : 'ghost'}
+        variant={prominent ? 'secondary' : 'ghost'}
         size={prominent ? 'default' : 'sm'}
         className={prominent ? 'w-full' : 'self-start'}
         disabled={submission.pending}

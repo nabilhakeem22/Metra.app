@@ -75,7 +75,7 @@ export function BoqIssue({
 
   return (
     <>
-      <Button disabled={disabled || pending} onClick={() => { void onClick(); }}>
+      <Button variant="default" disabled={disabled || pending} onClick={() => { void onClick(); }}>
         {pending ? (
           <Loader2 className="size-4 animate-spin" aria-hidden />
         ) : (

@@ -102,7 +102,7 @@ export function ProposalBuilder({
           />
         ))}
 
-        <Button variant="outline" onClick={draft.addSection}>
+        <Button variant="secondary" onClick={draft.addSection}>
           <Plus className="size-4" aria-hidden />
           {t('builder.addSection')}
         </Button>

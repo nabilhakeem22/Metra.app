@@ -104,7 +104,7 @@ export function PriceBookToolbar({
               aria-label={t('addSection')}
             />
             <Button
-              variant="outline"
+              variant="secondary"
               onClick={onAddSection}
               disabled={pending || newSection.trim() === ''}
             >
@@ -112,15 +112,15 @@ export function PriceBookToolbar({
               {t('addSection')}
             </Button>
           </div>
-          <Button variant="outline" onClick={onBulkUpdate}>
+          <Button variant="secondary" onClick={onBulkUpdate}>
             <Percent className="size-4" aria-hidden />
             {t('actions.bulkUpdate')}
           </Button>
-          <Button variant="outline" onClick={onImport}>
+          <Button variant="secondary" onClick={onImport}>
             <Upload className="size-4" aria-hidden />
             {t('actions.import')}
           </Button>
-          <Button data-tour="price-book-new" onClick={onNew}>
+          <Button variant="default" data-tour="price-book-new" onClick={onNew}>
             <Plus className="size-4" aria-hidden />
             {t('actions.new')}
           </Button>

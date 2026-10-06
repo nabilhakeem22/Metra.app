@@ -105,7 +105,7 @@ export function ProjectForm({
           <div className="mt-4 space-y-2 rounded-item border bg-muted/40 p-3 text-body text-muted-foreground">
             <p>{t('form.noClients')}</p>
             {canAddClient && (
-              <Button asChild size="sm" variant="outline">
+              <Button asChild size="sm" variant="secondary">
                 <Link href="/clients?new=1">{t('empty.addClient')}</Link>
               </Button>
             )}
@@ -124,13 +124,14 @@ export function ProjectForm({
             <div className="flex justify-end gap-2 pt-2">
               <Button
                 type="button"
-                variant="outline"
+                variant="secondary"
                 onClick={() => onOpenChange(false)}
                 disabled={pending}
               >
                 {t('form.cancel')}
               </Button>
               <Button
+                variant="default"
                 type="button"
                 onClick={submit}
                 disabled={pending || !canSaveProject(form, !item)}

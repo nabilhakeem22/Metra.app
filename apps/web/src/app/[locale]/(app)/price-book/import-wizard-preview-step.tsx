@@ -69,13 +69,14 @@ export function ImportWizardPreviewStep({
       <div className="flex justify-between pt-2">
         <Button
           type="button"
-          variant="outline"
+          variant="secondary"
           onClick={onBack}
           disabled={pending}
         >
           {t('import.back')}
         </Button>
         <Button
+          variant="default"
           type="button"
           onClick={runImport}
           disabled={pending || validCount === 0}

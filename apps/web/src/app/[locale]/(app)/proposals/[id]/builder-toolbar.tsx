@@ -47,7 +47,7 @@ export function BuilderToolbar({
           {t('builder.delete')}
         </Button>
       )}
-      <Button variant="outline" onClick={onSave} disabled={busy}>
+      <Button variant="secondary" onClick={onSave} disabled={busy}>
         {pending && <Loader2 className="size-4 animate-spin" aria-hidden />}
         {t('builder.save')}
       </Button>
@@ -60,7 +60,7 @@ export function BuilderToolbar({
         isDraft
       />
       {quote && canSend && (
-        <Button onClick={onSend} disabled={busy}>
+        <Button variant="default" onClick={onSend} disabled={busy}>
           <Send className="size-4" aria-hidden />
           {t('builder.send')}
         </Button>

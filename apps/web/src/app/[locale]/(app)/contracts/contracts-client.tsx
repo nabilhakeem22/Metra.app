@@ -55,7 +55,7 @@ export function ContractsClient({
   }
 
   const generateButton = canManage && generatable.length > 0 && (
-    <Button onClick={() => setPicking((v) => !v)}>
+    <Button variant="default" onClick={() => setPicking((v) => !v)}>
       <Plus className="size-4" aria-hidden />
       {t('generate')}
     </Button>
@@ -88,7 +88,7 @@ export function ContractsClient({
                 <span className="flex-1 px-3 text-body">
                   {pickLocale({ nameAr: p.titleAr, nameEn: p.titleEn }, 'name', locale).value}
                 </span>
-                <Button size="sm" disabled={pending} onClick={() => generate(p.id)}>
+                <Button variant="secondary" size="sm" disabled={pending} onClick={() => generate(p.id)}>
                   {pending ? (
                     <Loader2 className="size-4 animate-spin" aria-hidden />
                   ) : null}

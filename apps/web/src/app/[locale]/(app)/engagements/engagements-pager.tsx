@@ -18,12 +18,12 @@ export function EngagementsPager({
       {isFirstPage ? (
         <span />
       ) : (
-        <Button asChild variant="outline" size="sm">
+        <Button asChild variant="secondary" size="sm">
           <Link href="/engagements">{t('newest')}</Link>
         </Button>
       )}
       {nextBefore !== null && (
-        <Button asChild variant="outline" size="sm">
+        <Button asChild variant="secondary" size="sm">
           <Link href={`/engagements?before=${nextBefore}`}>{t('older')}</Link>
         </Button>
       )}

@@ -27,14 +27,14 @@ export function ProjectsEmptyState({
   let action;
   if (canManage && hasClients) {
     action = (
-      <Button data-tour="projects-new" onClick={onNew}>
+      <Button variant="default" data-tour="projects-new" onClick={onNew}>
         <Plus className="size-4" aria-hidden />
         {t('actions.new')}
       </Button>
     );
   } else if (!hasClients && canAddClient) {
     action = (
-      <Button asChild>
+      <Button variant="default" asChild>
         <Link href="/clients?new=1">{t('empty.addClient')}</Link>
       </Button>
     );

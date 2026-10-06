@@ -71,6 +71,7 @@ export function LoginVerifyStep({
       />
 
       <Button
+        variant="default"
         className="h-11 w-full"
         onClick={() => verify()}
         disabled={busy || code.length < otpLength}

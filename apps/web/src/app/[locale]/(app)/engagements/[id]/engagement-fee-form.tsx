@@ -136,10 +136,10 @@ export function EngagementFeeForm({
       </div>
 
       <div className="flex justify-end gap-2">
-        <Button type="button" variant="outline" onClick={onCancel} disabled={pending}>
+        <Button type="button" variant="secondary" onClick={onCancel} disabled={pending}>
           {tc('cancel')}
         </Button>
-        <Button type="button" onClick={submit} disabled={pending || !summary.canSubmit}>
+        <Button variant="default" type="button" onClick={submit} disabled={pending || !summary.canSubmit}>
           {pending && <Loader2 className="size-4 animate-spin" aria-hidden />}
           {t('submit')}
         </Button>

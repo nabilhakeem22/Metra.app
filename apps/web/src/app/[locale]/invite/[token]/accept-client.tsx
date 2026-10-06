@@ -36,7 +36,7 @@ export function AcceptInvite({ token }: { token: string }) {
           {t('alreadyTitle')}
         </h1>
         <p className="text-body text-muted-foreground">{t('alreadyBody')}</p>
-        <Button asChild>
+        <Button variant="default" asChild>
           <Link href="/dashboard">{t('backToDashboard')}</Link>
         </Button>
       </div>
@@ -50,7 +50,7 @@ export function AcceptInvite({ token }: { token: string }) {
           {t('declinedTitle')}
         </h1>
         <p className="text-body text-muted-foreground">{t('declinedBody')}</p>
-        <Button asChild variant="outline">
+        <Button asChild variant="secondary">
           <Link href="/dashboard">{t('backToDashboard')}</Link>
         </Button>
       </div>
@@ -61,7 +61,7 @@ export function AcceptInvite({ token }: { token: string }) {
     <div className="space-y-4">
       <h1 className="text-heading font-bold">{t('title')}</h1>
       <p className="text-body text-muted-foreground">{t('body')}</p>
-      <Button className="w-full" onClick={accept} disabled={isPending}>
+      <Button variant="default" className="w-full" onClick={accept} disabled={isPending}>
         {isPending && <Loader2 className="size-4 animate-spin" aria-hidden />}
         {t('acceptButton')}
       </Button>

@@ -89,7 +89,7 @@ export function DetailsTypeField({
           />
           <Button
             type="button"
-            variant="outline"
+            variant="secondary"
             size="sm"
             onClick={onAddType}
             disabled={pending || newType.trim() === ''}

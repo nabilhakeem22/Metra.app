@@ -56,7 +56,7 @@ export function BudgetCard({ token, rom }: { token: string; rom: PublicDelivery[
       ) : (
         <>
           <p className="text-caption text-muted-foreground">{t('note')}</p>
-          <Button className="w-full" disabled={pending} onClick={acknowledge}>
+          <Button variant="default" className="w-full" disabled={pending} onClick={acknowledge}>
             {pending && <Loader2 className="size-4 animate-spin" aria-hidden />}
             {t('acknowledge')}
           </Button>

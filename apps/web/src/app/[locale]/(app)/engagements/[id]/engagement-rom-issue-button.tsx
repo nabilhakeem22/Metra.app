@@ -29,6 +29,7 @@ export function RomIssueButton({
         {tpa('issueRomHint')}
       </p>
       <Button
+        variant="secondary"
         type="button"
         size="sm"
         disabled={pending}

@@ -22,7 +22,7 @@ export function BuilderShareLink({
         <span className="text-body font-medium">{t('view.shareTitle')}:</span>
         <Input readOnly dir="ltr" value={link} className="max-w-md text-caption" />
         <Button
-          variant="outline"
+          variant="secondary"
           size="sm"
           onClick={() => {
             void navigator.clipboard?.writeText(link);

@@ -143,7 +143,7 @@ export function SettingsProfileCard({
         </div>
 
         {canManage && (
-          <Button onClick={saveProfile} disabled={savingProfile}>
+          <Button variant="default" onClick={saveProfile} disabled={savingProfile}>
             {savingProfile && (
               <Loader2 className="size-4 animate-spin" aria-hidden />
             )}

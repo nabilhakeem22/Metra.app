@@ -35,7 +35,7 @@ export function BoqStepIssue({
         </div>
       </div>
       <div className="mt-3">
-        <Button asChild>
+        <Button variant="default" asChild>
           <Link href={boqStepHref(projectId)}>
             {t('issueCta')}
             <ArrowRight className="size-4" aria-hidden />

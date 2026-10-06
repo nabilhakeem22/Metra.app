@@ -52,7 +52,7 @@ export function OnBehalfActions({
         <Button
           type="button"
           size="sm"
-          variant="outline"
+          variant="secondary"
           className={DANGER_BUTTON}
           disabled={pending || availability.romAckBlocked}
           onClick={() => onToggle('rom')}
@@ -66,7 +66,7 @@ export function OnBehalfActions({
         <Button
           type="button"
           size="sm"
-          variant="outline"
+          variant="secondary"
           className="border-[color:var(--danger)] text-[color:var(--danger)]"
           disabled={pending}
           onClick={() => onToggle('handoff')}

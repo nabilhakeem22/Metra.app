@@ -48,7 +48,7 @@ export function ContractOverview({
           )}
           <div className="ms-auto flex gap-2">
             {canIssue && detail.status === 'draft' && (
-              <Button size="sm" disabled={pending} onClick={onIssue}>
+              <Button variant="default" size="sm" disabled={pending} onClick={onIssue}>
                 {pending && <Loader2 className="size-4 animate-spin" aria-hidden />}
                 {t('issue')}
               </Button>
@@ -57,7 +57,7 @@ export function ContractOverview({
               (detail.status === 'issued' || detail.status === 'signed') && (
                 <Button
                   size="sm"
-                  variant="outline"
+                  variant="secondary"
                   disabled={pending}
                   onClick={onTerminate}
                 >

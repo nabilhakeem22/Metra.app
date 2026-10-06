@@ -55,7 +55,7 @@ export function FeeSplitRows({
       {addable.length > 0 && (
         <div className="flex flex-wrap gap-2 pt-1">
           {addable.map((kind) => (
-            <Button key={kind} type="button" variant="outline" size="sm" onClick={() => onAdd(kind)}>
+            <Button key={kind} type="button" variant="secondary" size="sm" onClick={() => onAdd(kind)}>
               {t('addNamed', { name: tk(kind) })}
             </Button>
           ))}

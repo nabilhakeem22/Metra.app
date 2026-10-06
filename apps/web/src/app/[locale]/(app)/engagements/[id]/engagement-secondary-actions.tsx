@@ -89,7 +89,7 @@ export function EngagementSecondaryActions({
           <Button
             key={trigger}
             type="button"
-            variant="outline"
+            variant="secondary"
             size="sm"
             disabled={pending}
             onClick={() => onClick(trigger)}
@@ -121,7 +121,7 @@ export function EngagementSecondaryActions({
             </Button>
             <Button
               type="button"
-              variant="outline"
+              variant="secondary"
               size="sm"
               disabled={pending}
               onClick={() => setConfirmingAbandon(false)}

@@ -74,7 +74,7 @@ export function RetractButton({
       <div className="flex flex-wrap gap-2">
         <Button
           type="button"
-          variant="destructive"
+          variant="default"
           size="sm"
           disabled={pending || reason.trim().length === 0}
           onClick={() =>
@@ -93,7 +93,7 @@ export function RetractButton({
         </Button>
         <Button
           type="button"
-          variant="outline"
+          variant="secondary"
           size="sm"
           onClick={() => setOpen(false)}
         >

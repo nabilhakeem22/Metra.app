@@ -178,7 +178,7 @@ export function DetailsFields({
 
       {canManage && (
         <div className="flex justify-end">
-          <Button type="button" onClick={submit} disabled={pending}>
+          <Button variant="default" type="button" onClick={submit} disabled={pending}>
             {pending && <Loader2 className="size-4 animate-spin" aria-hidden />}
             {tp('save')}
           </Button>

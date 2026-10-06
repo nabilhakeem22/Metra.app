@@ -32,10 +32,10 @@ export function FormActions({
 }) {
   return (
     <div className="flex justify-end gap-2">
-      <Button type="button" variant="outline" size="sm" onClick={onCancel}>
+      <Button type="button" variant="secondary" size="sm" onClick={onCancel}>
         {cancelLabel}
       </Button>
-      <Button type="button" size="sm" onClick={onSave} disabled={pending}>
+      <Button variant="default" type="button" size="sm" onClick={onSave} disabled={pending}>
         {pending && <Loader2 className="size-4 animate-spin" aria-hidden />}
         {saveLabel}
       </Button>

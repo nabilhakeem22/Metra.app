@@ -28,7 +28,7 @@ export default async function InvitePage({
             {t('signInTitle')}
           </h1>
           <p className="text-body text-muted-foreground">{t('signInBody')}</p>
-          <Button asChild className="w-full">
+          <Button variant="default" asChild className="w-full">
             <Link href="/login">{t('signInButton')}</Link>
           </Button>
         </div>

@@ -60,7 +60,7 @@ export function useConfirm(): {
             )}
             <div className="mt-6 flex justify-end gap-2">
               <AlertDialog.Cancel asChild>
-                <Button variant="outline" onClick={() => settle(false)}>
+                <Button variant="secondary" onClick={() => settle(false)}>
                   {opts.cancelLabel}
                 </Button>
               </AlertDialog.Cancel>

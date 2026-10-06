@@ -27,7 +27,7 @@ export function BoqCostedCopy({
 }) {
   const t = useTranslations('projects.profile.boq');
   return (
-    <Button variant="outline" size="sm" asChild>
+    <Button variant="secondary" size="sm" asChild>
       <a
         href={`/api/pdf/boq/${boqId}?variant=internal`}
         target="_blank"

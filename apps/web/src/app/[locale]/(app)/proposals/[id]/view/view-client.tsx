@@ -89,32 +89,32 @@ export function ProposalView({
         <div className="ms-auto flex flex-wrap gap-2">
           <PreviewModal proposalId={detail.id} canSeeInternal={seeMargin} />
           <a href={`/api/pdf/proposals/${detail.id}`} target="_blank" rel="noreferrer">
-            <Button variant="outline" size="sm">
+            <Button variant="secondary" size="sm">
               <FileDown className="size-4" aria-hidden />
               PDF
             </Button>
           </a>
           {canExpire && detail.status === 'sent' && (
-            <Button variant="outline" size="sm" onClick={onExpire} disabled={pending}>
+            <Button variant="secondary" size="sm" onClick={onExpire} disabled={pending}>
               {t('actions.expire')}
             </Button>
           )}
           {canSupersede && detail.status !== 'draft' && (
-            <Button size="sm" onClick={onSupersede} disabled={pending}>
+            <Button variant="secondary" size="sm" onClick={onSupersede} disabled={pending}>
               {pending && <Loader2 className="size-4 animate-spin" aria-hidden />}
               {t('actions.createV2')}
             </Button>
           )}
           {existingContractId ? (
             <Link href={`/contracts/${existingContractId}`}>
-              <Button variant="outline" size="sm">
+              <Button variant="secondary" size="sm">
                 <FileSignature className="size-4" aria-hidden />
                 {tc('contract')}
               </Button>
             </Link>
           ) : (
             canGenerateContract && (
-              <Button size="sm" onClick={onGenerateContract} disabled={pending}>
+              <Button variant="default" size="sm" onClick={onGenerateContract} disabled={pending}>
                 {pending && <Loader2 className="size-4 animate-spin" aria-hidden />}
                 <FileSignature className="size-4" aria-hidden />
                 {tc('generate')}

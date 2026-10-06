@@ -76,7 +76,7 @@ export function ClientsClient({ items, canManage, openCreateOnArrival }: Clients
               description={t('empty.description')}
               action={
                 canManage ? (
-                  <Button data-tour="clients-new" onClick={openNew}>
+                  <Button variant="default" data-tour="clients-new" onClick={openNew}>
                     <Plus className="size-4" aria-hidden />
                     {t('actions.new')}
                   </Button>

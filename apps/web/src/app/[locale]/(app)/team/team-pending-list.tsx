@@ -62,7 +62,7 @@ export function TeamPendingList({
                   {!p.expired && (
                     <Button
                       type="button"
-                      variant="outline"
+                      variant="secondary"
                       size="sm"
                       onClick={() => onResend(p.id)}
                       disabled={isPending}

@@ -83,7 +83,7 @@ export function SettingsVisibilityCard({
         </label>
 
         {canManage && (
-          <Button onClick={saveSettings} disabled={savingSettings}>
+          <Button variant="secondary" onClick={saveSettings} disabled={savingSettings}>
             {savingSettings && (
               <Loader2 className="size-4 animate-spin" aria-hidden />
             )}

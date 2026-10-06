@@ -66,7 +66,7 @@ export function ActivityTab({
               aria-label={t('add')}
             />
             <div className="flex justify-end">
-              <Button type="button" onClick={submit} disabled={pending || !note.trim()}>
+              <Button variant="default" type="button" onClick={submit} disabled={pending || !note.trim()}>
                 {pending && <Loader2 className="size-4 animate-spin" aria-hidden />}
                 {t('add')}
               </Button>

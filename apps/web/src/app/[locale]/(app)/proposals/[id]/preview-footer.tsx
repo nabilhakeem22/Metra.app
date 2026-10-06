@@ -31,7 +31,7 @@ export function PreviewFooter({
     <div className="flex flex-wrap items-center justify-end gap-2 border-t px-4 py-2">
       {downloadable && (
         <a href={`/api/pdf/proposals/${proposalId}?variant=client`} target="_blank" rel="noreferrer">
-          <Button variant="outline" size="sm">
+          <Button variant="secondary" size="sm">
             <FileDown className="size-4" aria-hidden />
             {t('download')}
           </Button>
@@ -39,14 +39,14 @@ export function PreviewFooter({
       )}
       {downloadable && canSeeInternal && (
         <a href={`/api/pdf/proposals/${proposalId}?variant=internal`} target="_blank" rel="noreferrer">
-          <Button variant="outline" size="sm">
+          <Button variant="secondary" size="sm">
             <FileDown className="size-4" aria-hidden />
             {t('downloadInternal')}
           </Button>
         </a>
       )}
       {showSend && (
-        <Button size="sm" onClick={onSend} disabled={sending}>
+        <Button variant="default" size="sm" onClick={onSend} disabled={sending}>
           {sending ? (
             <Loader2 className="size-4 animate-spin" aria-hidden />
           ) : (

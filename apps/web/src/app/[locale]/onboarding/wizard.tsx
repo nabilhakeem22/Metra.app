@@ -183,6 +183,7 @@ export function OnboardingWizard() {
 
         {step < STEPS ? (
           <Button
+            variant="default"
             type="button"
             className="h-11"
             onClick={next}
@@ -192,6 +193,7 @@ export function OnboardingWizard() {
           </Button>
         ) : (
           <Button
+            variant="default"
             type="button"
             className="h-11"
             onClick={finish}

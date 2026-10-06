@@ -57,10 +57,10 @@ export function ClientCreatedHandoff({
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Button type="button" onClick={() => setCreating(true)}>
+          <Button variant="default" type="button" onClick={() => setCreating(true)}>
             {t('client.confirm')}
           </Button>
-          <Button type="button" variant="outline" onClick={() => setVisible(false)}>
+          <Button type="button" variant="secondary" onClick={() => setVisible(false)}>
             {t('dismiss')}
           </Button>
         </div>

@@ -20,7 +20,7 @@ export function NeedFirst({ message, href, cta }: { message: string; href?: stri
     <div className="space-y-2 rounded-item border bg-muted/40 p-3 text-body text-muted-foreground">
       <p>{message}</p>
       {href && (
-        <Button asChild size="sm" variant="outline">
+        <Button asChild size="sm" variant="secondary">
           <Link href={href}>{cta}</Link>
         </Button>
       )}

@@ -57,7 +57,7 @@ export function NotificationsClient({ items }: { items: FeedItem[] }) {
     <div className="space-y-4">
       {hasUnread && (
         <div className="flex justify-end">
-          <Button variant="outline" size="sm" onClick={markAll} disabled={pending}>
+          <Button variant="secondary" size="sm" onClick={markAll} disabled={pending}>
             <CheckCheck className="size-4" aria-hidden />
             {t('markAll')}
           </Button>

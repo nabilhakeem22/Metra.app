@@ -140,13 +140,13 @@ export function CostItemForm({
           <div className="flex justify-end gap-2 pt-2">
             <Button
               type="button"
-              variant="outline"
+              variant="secondary"
               onClick={() => onOpenChange(false)}
               disabled={pending}
             >
               {t('form.cancel')}
             </Button>
-            <Button type="button" onClick={submit} disabled={pending}>
+            <Button variant="default" type="button" onClick={submit} disabled={pending}>
               {pending && <Loader2 className="size-4 animate-spin" aria-hidden />}
               {t('form.save')}
             </Button>

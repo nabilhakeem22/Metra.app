@@ -28,7 +28,7 @@ export async function ProposalsTab({
       {canBuild && (
         <div>
           <Link href={`/proposals/new?projectId=${projectId}`}>
-            <Button type="button" variant="outline">
+            <Button type="button" variant="secondary">
               <Plus className="size-4" aria-hidden />
               {t('newForProject')}
             </Button>

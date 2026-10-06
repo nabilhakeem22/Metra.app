@@ -40,7 +40,7 @@ export function ApiKeysRawDialog({
               {rawKey}
             </code>
             <Button
-              variant="outline"
+              variant="secondary"
               size="sm"
               onClick={copyRaw}
               aria-label={t('copy')}
@@ -50,7 +50,7 @@ export function ApiKeysRawDialog({
           </div>
           <div className="mt-6 flex justify-end">
             <AlertDialog.Action asChild>
-              <Button onClick={() => setRawKey(null)}>{t('done')}</Button>
+              <Button variant="default" onClick={() => setRawKey(null)}>{t('done')}</Button>
             </AlertDialog.Action>
           </div>
         </AlertDialog.Content>

@@ -115,7 +115,7 @@ export function VariationRegister({
       )}
       <div className="flex items-center">
         {canOpenNew && (
-          <Button size="sm" className="ms-auto" onClick={() => setCreating((v) => !v)}>
+          <Button variant="secondary" size="sm" className="ms-auto" onClick={() => setCreating((v) => !v)}>
             <Plus className="size-4" aria-hidden />
             {tv('create')}
           </Button>
@@ -171,7 +171,7 @@ export function VariationRegister({
                       {canPriceVariation && v.status === 'draft' && (
                         <Button
                           size="sm"
-                          variant="outline"
+                          variant="secondary"
                           disabled={pending}
                           onClick={() => act(() => internalApproveVariation(v.id))}
                         >
@@ -180,6 +180,7 @@ export function VariationRegister({
                       )}
                       {canPriceVariation && v.status === 'internal_approved' && (
                         <Button
+                          variant="secondary"
                           size="sm"
                           disabled={pending}
                           onClick={() => act(() => issueVariation(v.id))}

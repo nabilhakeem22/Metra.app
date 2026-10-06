@@ -35,11 +35,11 @@ export function PriceBookEmpty({
           action={
             canManage ? (
               <div className="flex flex-wrap justify-center gap-2">
-                <Button data-tour="price-book-new" onClick={onLoadStarter} disabled={pending}>
+                <Button variant="default" data-tour="price-book-new" onClick={onLoadStarter} disabled={pending}>
                   {pending && <Loader2 className="size-4 animate-spin" aria-hidden />}
                   {t('empty.loadStarter')}
                 </Button>
-                <Button variant="outline" onClick={onImport}>
+                <Button variant="secondary" onClick={onImport}>
                   <Upload className="size-4" aria-hidden />
                   {t('empty.importExcel')}
                 </Button>

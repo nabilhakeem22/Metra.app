@@ -110,11 +110,11 @@ export function CoachmarkCard({
             {t('tour.skip')}
           </Button>
           {index > 0 && (
-            <Button type="button" variant="outline" size="sm" onClick={controls.prev}>
+            <Button type="button" variant="secondary" size="sm" onClick={controls.prev}>
               {t('tour.back')}
             </Button>
           )}
-          <Button type="button" size="sm" onClick={controls.next}>
+          <Button variant="default" type="button" size="sm" onClick={controls.next}>
             {isLast ? t('tour.done') : t('tour.next')}
           </Button>
         </div>

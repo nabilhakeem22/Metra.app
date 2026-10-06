@@ -49,6 +49,7 @@ export function FilesTab({
         actions={
           canRecordArtifact && (
             <Button
+              variant="secondary"
               type="button"
               size="sm"
               disabled={pending}

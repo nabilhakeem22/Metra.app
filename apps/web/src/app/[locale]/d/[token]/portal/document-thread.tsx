@@ -121,6 +121,7 @@ export function DocumentThread({
             <div className="flex items-center justify-between gap-2">
               <p className="text-caption text-muted-foreground">{t('advisory')}</p>
               <Button
+                variant="secondary"
                 size="sm"
                 disabled={thread.sending || !thread.draft.trim()}
                 onClick={thread.send}

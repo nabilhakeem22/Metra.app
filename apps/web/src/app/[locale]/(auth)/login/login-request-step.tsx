@@ -93,6 +93,7 @@ export function LoginRequestStep({
       </div>
 
       <Button
+        variant="default"
         className="h-11 w-full"
         onClick={send}
         disabled={busy || identifier.trim().length === 0}

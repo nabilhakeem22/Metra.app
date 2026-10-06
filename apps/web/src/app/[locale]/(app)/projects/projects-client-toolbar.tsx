@@ -77,7 +77,7 @@ export function ProjectsClientToolbar({
         {t('activeOnly')}
       </label>
       {canManage && clientOptions.length > 0 && (
-        <Button data-tour="projects-new" className="ms-auto" onClick={openNew}>
+        <Button variant="default" data-tour="projects-new" className="ms-auto" onClick={openNew}>
           <Plus className="size-4" aria-hidden />
           {t('actions.new')}
         </Button>

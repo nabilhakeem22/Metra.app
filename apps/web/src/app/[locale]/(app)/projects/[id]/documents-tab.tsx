@@ -131,7 +131,7 @@ export function DocumentsTab({
           )}
           <Button
             type="button"
-            variant="outline"
+            variant="secondary"
             onClick={() => inputRef.current?.click()}
             disabled={pending}
           >

@@ -63,10 +63,10 @@ export function ImportWizardMapStep({
       ))}
 
       <div className="flex justify-between pt-2">
-        <Button type="button" variant="outline" onClick={reset}>
+        <Button type="button" variant="secondary" onClick={reset}>
           {t('import.back')}
         </Button>
-        <Button type="button" onClick={onPreview} disabled={!mappingReady}>
+        <Button variant="default" type="button" onClick={onPreview} disabled={!mappingReady}>
           {t('import.preview')}
         </Button>
       </div>

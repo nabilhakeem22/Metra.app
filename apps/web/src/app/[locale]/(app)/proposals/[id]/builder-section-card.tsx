@@ -164,7 +164,7 @@ export function BuilderSectionCard({
 
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex flex-wrap items-center gap-2">
-            <Button variant="outline" size="sm" onClick={() => addLine(si)}>
+            <Button variant="secondary" size="sm" onClick={() => addLine(si)}>
               <Plus className="size-4" aria-hidden />
               {t('builder.addLine')}
             </Button>

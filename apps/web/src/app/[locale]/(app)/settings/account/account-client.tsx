@@ -97,7 +97,7 @@ export function AccountClient({
               </SelectContent>
             </Select>
           </div>
-          <Button onClick={save} disabled={saving}>
+          <Button variant="default" onClick={save} disabled={saving}>
             {saving && <Loader2 className="size-4 animate-spin" aria-hidden />}
             {t('save')}
           </Button>
@@ -110,7 +110,7 @@ export function AccountClient({
         </CardHeader>
         <CardContent>
           <form action={signOut}>
-            <Button type="submit" variant="outline">
+            <Button type="submit" variant="secondary">
               <LogOut className="size-4" aria-hidden />
               {t('signOut')}
             </Button>
