@@ -166,6 +166,7 @@ export const ACTION_CODE_PROBLEM: Record<ActionCode, ApiProblemKind> = {
   off_plan_locked: 'bad-request',
   flow_not_enabled: 'forbidden',
   payment_kind_mismatch: 'bad-request',
+  ending_requires_explicit_choice: 'bad-request',
   firm_type_unavailable: 'bad-request',
   project_delivery_exists: 'conflict',
   project_delivery_limit_reached: 'conflict',

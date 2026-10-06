@@ -97,6 +97,7 @@ const ALL_CODES: ActionCode[] = [
   'off_plan_locked',
   'flow_not_enabled',
   'payment_kind_mismatch',
+  'ending_requires_explicit_choice',
   'firm_type_unavailable',
   'project_delivery_exists',
   'project_delivery_limit_reached',

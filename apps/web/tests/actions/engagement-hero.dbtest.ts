@@ -53,6 +53,13 @@ async function gateAPaymentCount(engagementId: string): Promise<number> {
   return Number(row.n);
 }
 
+async function paymentCount(engagementId: string): Promise<number> {
+  const [row] = await raw.query<{ n: number }>(
+    `select count(*)::int as n from public.payment_events where engagement_id = '${engagementId}'`,
+  );
+  return Number(row.n);
+}
+
 async function setEnabledFlows(orgId: string, flows: string): Promise<void> {
   // BYPASSRLS raw update of the seeded entitlement row (the fixture seeds
   // `{interior}`), mirroring entitlements.dbtest — never an UPDATE under metra_app.
@@ -277,4 +284,30 @@ describe('logPaymentAndAdvanceCore — sequential record-then-advance', () => {
     expect(await gateAPaymentCount(engagementId)).toBe(0);
     expect(await stateOf(engagementId)).toBe('concept_review');
   });
+});
+
+describe('logPaymentAndAdvanceCore — never picks an ending', () => {
+  for (const ending of ['chooseExecution', 'chooseDesignOnly'] as const) {
+    it(`refuses ${ending} as the advance trigger, writing no payment`, async () => {
+      const { ctx, engagementId } = await seedEngagement();
+      // Force the choice state (BYPASSRLS), as the terminal case above does.
+      await raw.query(
+        `update public.design_engagements set state = 'execution_decision' where id = '${engagementId}'`,
+      );
+      const before = await paymentCount(engagementId);
+
+      const res = await logPaymentAndAdvanceCore(ctx, engagementId, {
+        paymentKind: 'balance',
+        amount: '30000',
+        advanceTrigger: ending,
+      });
+      expect(res).toMatchObject({
+        ok: false,
+        error: 'ending_requires_explicit_choice',
+        paymentRecorded: false,
+      });
+      expect(await paymentCount(engagementId)).toBe(before);
+      expect(await stateOf(engagementId)).toBe('execution_decision');
+    });
+  }
 });

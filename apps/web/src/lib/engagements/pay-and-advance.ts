@@ -13,6 +13,7 @@ import type { PaymentEventKind } from '@metra/db';
 import type { ActionResult } from '@/lib/actions/result';
 import type { OrgContext } from '@/lib/db/context';
 import { executeTransition } from './executor';
+import { isEndingTrigger } from './forward-trigger';
 import { MONEY_GUARD_MILESTONE, moneyGuardOf } from './guards';
 import { recordPaymentCore } from './payments';
 import type { Trigger } from './transitions';
@@ -57,6 +58,11 @@ export async function logPaymentAndAdvanceCore(
   engagementId: string,
   input: LogPaymentAndAdvanceInput,
 ): Promise<LogPaymentAndAdvanceResult> {
+  // An ENDING is the studio's explicit choice, never the side effect of logging
+  // a payment. Refused before anything is written.
+  if (isEndingTrigger(input.advanceTrigger)) {
+    return { ok: false, error: 'ending_requires_explicit_choice', paymentRecorded: false };
+  }
   // The advance trigger must be a money gate, and the recorded payment's kind
   // must match the milestone that gate clears — else this combined action would
   // append a payment of the wrong kind (which never counts toward the guard) and

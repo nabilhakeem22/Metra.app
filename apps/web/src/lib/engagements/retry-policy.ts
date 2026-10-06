@@ -60,6 +60,7 @@ export const DEFINITE_REFUSALS: ReadonlySet<ActionCode> = new Set<ActionCode>([
   'milestone_kind_duplicate',
   'payment_amount_invalid',
   'payment_kind_mismatch',
+  'ending_requires_explicit_choice',
   'revision_co_amount_required',
   'rom_range_invalid',
   'rom_not_set',
