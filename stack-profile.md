@@ -31,7 +31,7 @@ contractors (quote → contract → مستخلص invoicing; project & cost contr
 
 | Layer | Choice |
 |---|---|
-| Frontend | Next.js 15 (App Router) · React 19 · TypeScript strict · Tailwind (logical properties only) · shadcn/ui + Radix · next-intl · next-themes · IBM Plex Sans + Plex Sans Arabic via `next/font` |
+| Frontend | Next.js 15 (App Router) · React 19 · TypeScript strict · Tailwind (logical properties only) · shadcn/ui + Radix · next-intl · next-themes · Manrope (Latin) + Tajawal (Arabic) via `next/font` |
 | Backend | Next.js server actions + route handlers (Node runtime); no separate backend |
 | Database | PostgreSQL 17 (Supabase, region eu-west-1) · Drizzle ORM |
 | Storage / files | Supabase Storage — private `metra-files` bucket, signed URLs |
