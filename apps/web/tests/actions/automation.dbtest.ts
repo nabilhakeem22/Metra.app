@@ -83,7 +83,10 @@ async function statusOf(id: string): Promise<string> {
 async function depsFor(ctx: OrgContext, now: Date): Promise<AutomationDeps> {
   const settings = await getAutomationSettings(ctx);
   if (!settings) throw new Error('missing automation settings');
-  return { ctx, settings, now, locale: 'en', appUrl: '' };
+  // The DB suite never reaches Supabase auth: every recipient has no address,
+  // so the cores do their DB work and skip the send.
+  const lookupRecipientEmail = async () => ({ status: 'no-address' as const });
+  return { ctx, settings, now, locale: 'en', appUrl: '', lookupRecipientEmail };
 }
 
 /** A UTC instant whose Cairo wall-clock hour is 7 (DST-safe scan). */

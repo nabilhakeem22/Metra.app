@@ -8,7 +8,7 @@ import {
 } from './clock';
 import { claimPeriod } from './claim';
 import { digestData, orgOwnerAdminIds } from './due-work';
-import { resolveUserEmail } from './recipients';
+import { countEmailOutcome, emailRecipient } from './email-delivery';
 import type { AutomationDeps, AutomationResult } from './types';
 import { withOrgContext } from '@/lib/db/context';
 import { sendDigestEmail } from '@/lib/email/resend';
@@ -25,7 +25,7 @@ const EXPIRING_SOON_DAYS = 7;
 export async function runPortfolioDigest(
   deps: AutomationDeps,
 ): Promise<AutomationResult> {
-  const { ctx, settings, now, locale, appUrl } = deps;
+  const { ctx, settings, now, locale, appUrl, lookupRecipientEmail } = deps;
   const result: AutomationResult = {
     automation: 'digest',
     ran: false,
@@ -67,16 +67,15 @@ export async function runPortfolioDigest(
   result.ran = true;
 
   for (const o of won.owners) {
-    const email = await resolveUserEmail(o.userId);
-    if (!email) continue;
-    const { sent } = await sendDigestEmail({
-      to: email,
-      ...won.data,
-      dashboardUrl: `${appUrl}/${locale}/dashboard`,
-      locale,
-    });
-    if (sent) result.emailsSent += 1;
-    else result.emailsFailed += 1;
+    const outcome = await emailRecipient(lookupRecipientEmail, o.userId, (to) =>
+      sendDigestEmail({
+        to,
+        ...won.data,
+        dashboardUrl: `${appUrl}/${locale}/dashboard`,
+        locale,
+      }),
+    );
+    countEmailOutcome(result, outcome);
   }
 
   return result;

@@ -2,7 +2,7 @@ import 'server-only';
 import { daysBetween, todayInCairo, weekPeriodKey } from './clock';
 import { claimPeriod } from './claim';
 import { dueForFollowup } from './due-work';
-import { resolveUserEmail } from './recipients';
+import { countEmailOutcome, emailRecipient } from './email-delivery';
 import type { AutomationDeps, AutomationResult } from './types';
 import { withOrgContext } from '@/lib/db/context';
 import { sendFollowupReminderEmail } from '@/lib/email/resend';
@@ -19,7 +19,7 @@ import { insertNotification } from '@/lib/notifications/core';
 export async function runFollowupReminders(
   deps: AutomationDeps,
 ): Promise<AutomationResult> {
-  const { ctx, settings, now, locale, appUrl } = deps;
+  const { ctx, settings, now, locale, appUrl, lookupRecipientEmail } = deps;
   const result: AutomationResult = {
     automation: 'followup',
     ran: false,
@@ -61,17 +61,16 @@ export async function runFollowupReminders(
     });
     if (!won) continue;
 
-    const email = await resolveUserEmail(recipient);
-    if (!email) continue;
-    const { sent } = await sendFollowupReminderEmail({
-      to: email,
-      proposalNumber: String(c.number),
-      days: age,
-      reviewUrl: `${appUrl}/${locale}/proposals/${c.id}`,
-      locale,
-    });
-    if (sent) result.emailsSent += 1;
-    else result.emailsFailed += 1;
+    const outcome = await emailRecipient(lookupRecipientEmail, recipient, (to) =>
+      sendFollowupReminderEmail({
+        to,
+        proposalNumber: String(c.number),
+        days: age,
+        reviewUrl: `${appUrl}/${locale}/proposals/${c.id}`,
+        locale,
+      }),
+    );
+    countEmailOutcome(result, outcome);
   }
 
   return result;

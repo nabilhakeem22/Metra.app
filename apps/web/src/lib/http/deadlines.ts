@@ -34,6 +34,15 @@ export const STORAGE_CLEANUP_TIMEOUT_MS = 3_000;
  */
 export const EMAIL_TIMEOUT_MS = 5_000;
 
+/**
+ * One Supabase auth admin lookup (`getUserById`) on the automation tick. A
+ * healthy one is a single small GET; past eight seconds the honest answer is
+ * "no address this tick", because the tick is serving every org and a hung auth
+ * origin otherwise stalls all of them. Below the admin client's own
+ * `STORAGE_TIMEOUT_MS` fetch abort, so this decides first.
+ */
+export const AUTH_LOOKUP_TIMEOUT_MS = 8_000;
+
 /** A third-party origin took longer than we are willing to wait. */
 export class HttpDeadlineError extends Error {
   constructor(
