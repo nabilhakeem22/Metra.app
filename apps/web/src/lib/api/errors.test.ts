@@ -102,6 +102,8 @@ const ALL_CODES: ActionCode[] = [
   'project_delivery_exists',
   'project_delivery_limit_reached',
   'claim_not_found',
+  'claim_already_settled',
+  'claim_pending_for_milestone',
   'file_too_large',
   'line_not_found',
   'section_not_found',

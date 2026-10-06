@@ -3,9 +3,14 @@
 import { useLocale, useTranslations } from 'next-intl';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { useConfirm } from '@/components/ui/confirm-dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { toast } from '@/hooks/use-toast';
+import { resolveActionError } from '@/lib/actions/error-message';
 import { confirmPaymentClaim, dismissPaymentClaim } from '@/lib/engagements/actions';
+import { claimAdvancesTo } from '@/lib/engagements/claim-advance';
+import type { EngagementGatePreview } from '@/lib/engagements/gate-preview';
 import type { EngagementPaymentClaimRecord } from '@/lib/engagements/queries';
 import { formatMoney } from '@/lib/format/money';
 import type { RunAction } from './use-engagement-action';
@@ -25,20 +30,56 @@ function editablePrefill(scale4: string): string {
  */
 export function CommandCardClaims({
   claims,
+  preview,
+  canAdvance,
   pending,
   runAction,
 }: {
   claims: EngagementPaymentClaimRecord[];
+  /** The gate, so a confirm that would ALSO move the delivery asks first. */
+  preview: Pick<EngagementGatePreview, 'primaryTrigger' | 'items'>;
+  canAdvance: boolean;
   pending: boolean;
   runAction: RunAction;
 }) {
   const t = useTranslations('engagements.paymentClaims');
   const tk = useTranslations('engagements.paymentKind');
   const tcmd = useTranslations('engagements.command');
+  const tstate = useTranslations('engagements.state');
+  const te = useTranslations('errors');
   const locale = useLocale();
+  const { confirm, dialog } = useConfirm();
   const [amounts, setAmounts] = useState<Record<string, string>>(() =>
     Object.fromEntries(claims.map((claim) => [claim.id, editablePrefill(claim.claimedAmount)])),
   );
+
+  /** Confirm one claim. When it would also change the stage, say so and ask first. */
+  async function confirmClaim(claim: EngagementPaymentClaimRecord): Promise<void> {
+    const amount = (amounts[claim.id] ?? '').trim();
+    const nextState = claimAdvancesTo(preview, claim.milestoneKind, amount, canAdvance);
+    if (nextState) {
+      const proceed = await confirm({
+        title: tcmd('claim.advanceTitle', { amount: formatMoney(amount, locale) }),
+        description: tcmd('claim.advanceBody', { phase: tstate(nextState) }),
+        confirmLabel: t('confirm'),
+        cancelLabel: tcmd('claim.cancel'),
+      });
+      if (!proceed) return;
+    }
+    runAction(async () => {
+      const res = await confirmPaymentClaim({ claimId: claim.id, amount });
+      // The payment is recorded even when the delivery could not move yet: say so,
+      // and name what it is still waiting for, rather than raising an error.
+      if (res.ok) {
+        toast({
+          title: tcmd('claim.recorded'),
+          description:
+            !res.advanced && res.waitingOn ? resolveActionError(res.waitingOn, te) : undefined,
+        });
+      }
+      return res;
+    });
+  }
 
   return (
     <div className="space-y-3">
@@ -77,14 +118,7 @@ export function CommandCardClaims({
               <Button
                 type="button"
                 disabled={pending}
-                onClick={() =>
-                  runAction(() =>
-                    confirmPaymentClaim({
-                      claimId: claim.id,
-                      amount: (amounts[claim.id] ?? '').trim(),
-                    }),
-                  )
-                }
+                onClick={() => void confirmClaim(claim)}
               >
                 {t('confirm')}
               </Button>
@@ -101,6 +135,7 @@ export function CommandCardClaims({
         ))}
       </ul>
       <p className="text-[12.5px] text-[color:var(--text-muted)]">{tcmd('claim.note')}</p>
+      {dialog}
     </div>
   );
 }

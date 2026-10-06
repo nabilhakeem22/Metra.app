@@ -284,25 +284,50 @@ describe('client payment claim — org isolation (AC5)', () => {
   });
 });
 
-describe('client payment claim — firm is never blocked by a pending claim (AC6)', () => {
-  it('with a pending claim present, recordPayment still records + a legal transition still fires', async () => {
-    const { ctx, engagementId, token } = await seedClaimDelivery('never-blocked');
+// Round A1 fix (R1): this block used to pin that a hand-logged payment for the
+// SAME milestone still records while the client's claim is pending. That is the
+// double-count: the claim, once confirmed, writes the money a second time. A
+// pending claim now blocks a manual payment for its milestone only.
+describe('client payment claim — a pending claim holds its own milestone only', () => {
+  it('recordPayment for the claimed milestone is claim_pending_for_milestone, writes nothing', async () => {
+    const { ctx, engagementId, token } = await seedClaimDelivery('pending-blocks');
     await claimPaymentByToken(token, { milestoneKind: 'deposit' });
 
-    // The firm records the real deposit payment directly — no new guard blocks it.
-    const pay = await recordPaymentCore(ctx, {
-      engagementId,
-      kind: 'deposit',
-      amount: '30000',
-    });
-    expect(pay.ok).toBe(true);
+    const pay = await recordPaymentCore(ctx, { engagementId, kind: 'deposit', amount: '30000' });
+    expect(pay).toEqual({ ok: false, error: 'claim_pending_for_milestone' });
+    expect(await paymentRows(engagementId)).toHaveLength(0);
 
-    // And a legal state transition (confirmAndPayDeposit) still fires.
-    const advance = await executeTransition(ctx, {
-      engagementId,
-      trigger: 'confirmAndPayDeposit',
-    });
+    // Another milestone is not held.
+    expect((await recordPaymentCore(ctx, { engagementId, kind: 'gate_b', amount: '100' })).ok).toBe(true);
+  });
+
+  it('once the claim is confirmed, the legal transition fires', async () => {
+    const { ctx, engagementId, token } = await seedClaimDelivery('never-blocked');
+    await claimPaymentByToken(token, { milestoneKind: 'deposit' });
+    const [claim] = await claimRows(engagementId);
+    expect((await confirmPaymentClaimCore(ctx, { claimId: claim.id, amount: '30000' })).ok).toBe(true);
+    const advance = await executeTransition(ctx, { engagementId, trigger: 'confirmAndPayDeposit' });
     expect(advance.ok).toBe(true);
+  });
+});
+
+describe('confirmPaymentClaimCore — never counts the same money twice (R1)', () => {
+  it('a milestone already paid in full is claim_already_settled; no second row; Dismiss still works', async () => {
+    const { ctx, engagementId, token } = await seedClaimDelivery('already-settled');
+    await claimPaymentByToken(token, { milestoneKind: 'deposit' });
+    const [claim] = await claimRows(engagementId);
+    // The deposit reached the ledger by another path (BYPASSRLS raw insert: the
+    // app paths now refuse while the claim is pending).
+    await raw.query(
+      `insert into public.payment_events (org_id, engagement_id, kind, amount, recorded_by)
+       values ('${ctx.orgId}', '${engagementId}', 'deposit', 30000, '${ctx.userId}')`,
+    );
+
+    const res = await confirmPaymentClaimCore(ctx, { claimId: claim.id, amount: '30000' });
+    expect(res).toEqual({ ok: false, error: 'claim_already_settled' });
+    expect(await paymentRows(engagementId)).toHaveLength(1);
+    expect((await claimRows(engagementId))[0].status).toBe('pending');
+    expect((await dismissPaymentClaimCore(ctx, { claimId: claim.id })).ok).toBe(true);
   });
 });
 
@@ -593,5 +618,53 @@ describe('confirmPaymentClaimAndAdvanceCore (round A1)', () => {
     });
     expect(await paymentRows(a.engagementId)).toHaveLength(0);
     expect(await stateOf(a.engagementId)).toBe('design_proposal');
+  });
+});
+
+describe('confirmPaymentClaimAndAdvanceCore — results and fences (round A1 fix)', () => {
+  it('a short amount records the payment and reports what is still waiting, as ok', async () => {
+    const { ctx, engagementId, token } = await seedClaimDelivery('confirm-short');
+    await toConceptReview(ctx, engagementId);
+    await claimPaymentByToken(token, { milestoneKind: 'gate_a' });
+    const [claim] = (await claimRows(engagementId)).filter((row) => row.milestone_kind === 'gate_a');
+
+    const res = await confirmPaymentClaimAndAdvanceCore(ctx, { claimId: claim.id, amount: '19999' });
+    expect(res).toMatchObject({
+      ok: true,
+      paymentRecorded: true,
+      advanced: false,
+      waitingOn: 'gate_a_not_cleared',
+    });
+    expect(await stateOf(engagementId)).toBe('concept_review');
+  });
+
+  it('a repeated confirm converges: ok and already, no stale advance error', async () => {
+    const { ctx, engagementId, token } = await seedClaimDelivery('confirm-twice');
+    await toConceptReview(ctx, engagementId);
+    await claimPaymentByToken(token, { milestoneKind: 'gate_a' });
+    const [claim] = (await claimRows(engagementId)).filter((row) => row.milestone_kind === 'gate_a');
+    const input = { claimId: claim.id, amount: claim.claimed_amount };
+
+    expect(await confirmPaymentClaimAndAdvanceCore(ctx, input)).toMatchObject({ ok: true, advanced: true });
+    const again = await confirmPaymentClaimAndAdvanceCore(ctx, input);
+    expect(again).toMatchObject({ ok: true, already: true, paymentRecorded: true, advanced: false });
+    expect(again.waitingOn).toBeUndefined();
+    expect(await stateOf(engagementId)).toBe('negotiation');
+  });
+
+  it('refuses a role without finance create, and a non-UUID claim id, before any read', async () => {
+    const { orgId, memberIds } = await seedOrg({ owners: 1, members: [{ role: 'viewer' }] });
+    orgIds.push(orgId);
+    const viewer = ctxFor(orgId, memberIds[0], 'viewer');
+    expect(
+      await confirmPaymentClaimAndAdvanceCore(viewer, {
+        claimId: '33333333-3333-4333-8333-333333333333',
+        amount: '1',
+      }),
+    ).toEqual({ ok: false, error: 'forbidden', paymentRecorded: false, advanced: false });
+    const owner = ctxFor(orgId, memberIds[0], 'owner');
+    expect(
+      await confirmPaymentClaimAndAdvanceCore(owner, { claimId: 'not-a-uuid', amount: '1' }),
+    ).toEqual({ ok: false, error: 'invalid', paymentRecorded: false, advanced: false });
   });
 });

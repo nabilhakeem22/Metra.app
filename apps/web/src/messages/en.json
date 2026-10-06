@@ -505,6 +505,8 @@
     "milestone_kind_duplicate": "Each milestone type can appear only once",
     "payment_amount_invalid": "Enter a payment amount greater than zero",
     "claim_not_found": "This payment claim is no longer available",
+    "claim_already_settled": "This payment is already recorded in full. Dismiss the client's claim instead.",
+    "claim_pending_for_milestone": "The client says they paid this one. Confirm or dismiss their claim on the delivery first.",
     "deposit_not_cleared": "The deposit has not been fully paid yet",
     "gate_a_not_cleared": "The Gate A installment has not been fully paid yet",
     "gate_b_not_cleared": "The Gate B installment has not been fully paid yet",
@@ -1694,7 +1696,11 @@
         }
       },
       "claim": {
-        "note": "Confirming records the payment, and moves the delivery on if this is the payment it was waiting for."
+        "note": "Confirming records the payment, and moves the delivery on if this is the payment it was waiting for.",
+        "advanceTitle": "Confirm {amount}?",
+        "advanceBody": "This records the payment and moves the delivery to {phase}.",
+        "cancel": "Not yet",
+        "recorded": "Payment recorded"
       },
       "closed": {
         "execution": {

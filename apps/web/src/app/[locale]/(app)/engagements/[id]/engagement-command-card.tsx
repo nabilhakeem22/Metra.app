@@ -1,12 +1,9 @@
 'use client';
 
 import { useTranslations } from 'next-intl';
-import { useState } from 'react';
-import { CommandCardAction } from './command-card-action';
-import { CommandCardClaims } from './command-card-claims';
+import { CommandCardActRegion } from './command-card-act-region';
 import { CommandCardClosedLinks } from './command-card-closed-links';
 import { useCommandCardCopy } from './command-card-copy';
-import { CommandCardForms } from './command-card-forms';
 import { CommandCardHeadline } from './command-card-headline';
 import { deriveCommandCardModel } from './command-card-model';
 import type { EngagementCommandCardProps } from './command-card-props';
@@ -37,8 +34,6 @@ export function EngagementCommandCard(props: EngagementCommandCardProps) {
   const { engagementId, preview, state, pending, canShare, canUpload, onNudge } = props;
   const t = useTranslations('engagements');
   const th = useTranslations('engagements.hero');
-  const [feeOpen, setFeeOpen] = useState(false);
-  const [payOpen, setPayOpen] = useState(false);
   const { view, closed, chrome, ctas } = deriveCommandCardModel(props);
   const copy = useCommandCardCopy({ state, view, closed });
 
@@ -90,45 +85,7 @@ export function EngagementCommandCard(props: EngagementCommandCardProps) {
               }}
             />
 
-            {ctas.confirmClaims ? (
-              <CommandCardClaims
-                claims={props.paymentClaims}
-                pending={pending}
-                runAction={props.runAction}
-              />
-            ) : (
-              <CommandCardAction
-                view={view}
-                ctas={ctas}
-                waitingOnClient={chrome.waitingOnClient}
-                canShare={canShare}
-                pending={pending}
-                onNudge={onNudge}
-                onTogglePay={() => setPayOpen((open) => !open)}
-                advance={{
-                  engagementId,
-                  preview,
-                  runAction: props.runAction,
-                  openFeeForm: () => setFeeOpen((open) => !open),
-                }}
-              />
-            )}
-
-            <CommandCardForms
-              engagementId={engagementId}
-              preview={preview}
-              view={view}
-              ctas={ctas}
-              open={{ fee: feeOpen, pay: payOpen }}
-              offPlan={{ enabled: props.offPlan, canSet: props.canSetOffPlan }}
-              feeSplitPrefill={props.feeSplitPrefill}
-              pending={pending}
-              handlers={{
-                runAction: props.runAction,
-                closeFee: () => setFeeOpen(false),
-                closePay: () => setPayOpen(false),
-              }}
-            />
+            <CommandCardActRegion card={props} model={{ view, chrome, ctas }} />
 
             {/* 3. FOOTER — client link + the "more actions" secondary controls. */}
             <EngagementSecondaryActions

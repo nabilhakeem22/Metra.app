@@ -171,6 +171,8 @@ export const ACTION_CODE_PROBLEM: Record<ActionCode, ApiProblemKind> = {
   project_delivery_exists: 'conflict',
   project_delivery_limit_reached: 'conflict',
   claim_not_found: 'bad-request',
+  claim_already_settled: 'conflict',
+  claim_pending_for_milestone: 'conflict',
   file_too_large: 'bad-request',
   // Editing a draft BOQ line by line.
   line_not_found: 'not-found',

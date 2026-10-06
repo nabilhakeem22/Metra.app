@@ -12,10 +12,10 @@
 // gate and the order. `recordPaymentCore` was 142 lines with all three inlined —
 // over the 120 the wave-5 gate asked for, on the path three testers spent two
 // waves failing to break.
-import { designEngagements } from '@metra/db';
-import { fail, mutateInOrg, requireInOrg } from '@/lib/actions/mutate';
+import { fail, mutateInOrg } from '@/lib/actions/mutate';
 import type { ActionResult } from '@/lib/actions/result';
 import type { OrgContext } from '@/lib/db/context';
+import { hasPendingClaim, isMilestoneKind, lockEngagementForMoney } from './milestone-settlement';
 import { isTerminal } from './states';
 import { appendKeyedPayment, appendPayment, auditPayment } from './payment-append';
 import { normalizePayment, type RawPaymentFields } from './payment-input';
@@ -61,15 +61,20 @@ export async function recordPaymentCore(
     ctx,
     { capability: 'engagements_finance', action: 'create', flow: 'interior' },
     async (tx, audit) => {
-      const engagement = await requireInOrg(
-        tx,
-        designEngagements,
-        input.engagementId,
-        { id: designEngagements.id, state: designEngagements.state },
-        'engagement_not_found',
-      );
+      // The engagement row is LOCKED (as the claim confirm locks it), so this and a
+      // confirm of the client's claim for the same milestone serialise.
+      const engagement = await lockEngagementForMoney(tx, input.engagementId);
       // No recording a payment against a finished engagement (abandoned / closed).
       if (isTerminal(engagement.state)) fail('engagement_not_active');
+      // The client says they paid this milestone and the studio has not answered:
+      // a second, hand-logged row would count the same money twice. Confirm or
+      // dismiss the claim first.
+      if (
+        isMilestoneKind(payment.kind) &&
+        (await hasPendingClaim(tx, input.engagementId, payment.kind))
+      ) {
+        fail('claim_pending_for_milestone');
+      }
 
       if (payment.idempotencyKey !== null) {
         const keyed = await appendKeyedPayment(

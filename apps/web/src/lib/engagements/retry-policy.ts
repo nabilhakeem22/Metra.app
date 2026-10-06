@@ -33,6 +33,8 @@ export const DEFINITE_REFUSALS: ReadonlySet<ActionCode> = new Set<ActionCode>([
   'engagement_state_conflict',
   'event_not_found',
   'claim_not_found',
+  'claim_already_settled',
+  'claim_pending_for_milestone',
   'boq_not_found',
   'already_corrected',
   'off_plan_locked',

@@ -9,9 +9,9 @@ import 'server-only';
 // (RLS scopes the read) so a caller can never resolve a foreign org's claim. Money
 // is validated with exact scale-4 BigInt (never parseFloat) — the studio may EDIT
 // the amount at confirm time, so it is re-validated here, not trusted from the claim.
-import { clientPaymentClaims, designEngagements, paymentEvents } from '@metra/db';
+import { clientPaymentClaims, paymentEvents } from '@metra/db';
 import { and, eq, sql } from 'drizzle-orm';
-import { fail, mutateInOrg, requireInOrg } from '@/lib/actions/mutate';
+import { fail, mutateInOrg } from '@/lib/actions/mutate';
 import type { ActionResult } from '@/lib/actions/result';
 import { MONEY_RE, formatMoney4, parseMoney4 } from '@/lib/aggregates/proposal-totals';
 import type { OrgContext } from '@/lib/db/context';
@@ -19,6 +19,7 @@ import type { OrgContext } from '@/lib/db/context';
 // predicate, so a claim made while active can't record money after the engagement
 // went terminal — mirroring recordPaymentCore.
 import { isTerminal } from '@/lib/engagements/states';
+import { lockEngagementForMoney, milestoneOutstanding4 } from './milestone-settlement';
 
 export interface ConfirmPaymentClaimInput {
   claimId: string;
@@ -34,8 +35,9 @@ export interface ConfirmPaymentClaimInput {
  * confirm/dismiss serializes on the row BEFORE any money is written; resolve status
  * (`claim_not_found` if absent/foreign/dismissed; an ALREADY-confirmed claim is an
  * idempotent no-op returning its existing payment id with `already: true`, no second
- * row); assert the engagement is not terminal (`engagement_not_active`, mirroring
- * recordPaymentCore) BEFORE inserting; INSERT one `payment_events` row (kind = the
+ * row); lock the engagement row and assert it is not terminal (`engagement_not_active`,
+ * mirroring recordPaymentCore) and that the milestone still has money outstanding
+ * (`claim_already_settled` when it was already paid in full) BEFORE inserting; INSERT one `payment_events` row (kind = the
  * claim's milestone, `recorded_by = ctx.userId`, `idempotency_key = claimId`); then
  * UPDATE the claim -> confirmed guarded on status='pending' with `.returning()` — if
  * it matches 0 rows the row changed under us, so THROW to roll back the payment
@@ -92,15 +94,22 @@ export async function confirmPaymentClaimCore(
       if (claim.status !== 'pending') fail('claim_not_found');
 
       // Terminal guard (mirrors recordPaymentCore): never record money once the
-      // engagement finished, even if the claim was made while it was active.
-      const engagement = await requireInOrg(
-        tx,
-        designEngagements,
-        claim.engagementId,
-        { state: designEngagements.state },
-        'engagement_not_found',
-      );
+      // engagement finished, even if the claim was made while it was active. The
+      // engagement row is LOCKED, as recordPaymentCore locks it, so a hand-logged
+      // payment for the same milestone and this confirm serialise.
+      const engagement = await lockEngagementForMoney(tx, claim.engagementId);
       if (isTerminal(engagement.state)) fail('engagement_not_active');
+
+      // Already paid in full (the studio logged it by hand, or another path did):
+      // confirming would write a SECOND ledger row for money received once. The
+      // studio dismisses the claim instead.
+      const outstanding = await milestoneOutstanding4(
+        tx,
+        claim.engagementId,
+        engagement.designFee,
+        claim.milestoneKind,
+      );
+      if (outstanding !== null && outstanding <= 0n) fail('claim_already_settled');
 
       // Record the real payment, keyed so a raced / replayed confirm dedups to
       // the first-written payment (no second ledger row).

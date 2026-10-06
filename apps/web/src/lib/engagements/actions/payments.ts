@@ -1,7 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import type { ActionResult } from '@/lib/actions/result';
+import type { ActionCode, ActionResult } from '@/lib/actions/result';
 import { requireOrg } from '@/lib/auth/require-org';
 import {
   logPaymentAndAdvanceCore,
@@ -63,7 +63,7 @@ export async function logPaymentAndAdvance(
  */
 export async function confirmPaymentClaim(
   input: ConfirmPaymentClaimInput,
-): Promise<ActionResult & { data?: string }> {
+): Promise<ActionResult & { data?: string; advanced?: boolean; waitingOn?: ActionCode }> {
   const ctx = await requireOrg();
   const { paymentRecorded, ...result } = await confirmPaymentClaimAndAdvanceCore(ctx, input);
   if (paymentRecorded) revalidatePath('/', 'layout');

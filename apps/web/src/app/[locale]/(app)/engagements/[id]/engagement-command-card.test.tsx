@@ -29,6 +29,12 @@ const actions = vi.hoisted(() => ({
   dismissPaymentClaim: vi.fn(),
 }));
 vi.mock('@/lib/engagements/actions', () => actions);
+const toasts = vi.hoisted(() => [] as { title?: string; description?: string }[]);
+vi.mock('@/hooks/use-toast', () => ({
+  toast: (raised: { title?: string; description?: string }) => {
+    toasts.push(raised);
+  },
+}));
 vi.mock('@/lib/boq-proposals/actions', () => ({ openBoqProposal: vi.fn() }));
 vi.mock('./trigger-actions', () => ({
   DIRECT_TRIGGER_ACTIONS: {
@@ -39,6 +45,7 @@ vi.mock('./trigger-actions', () => ({
 
 afterEach(() => {
   for (const fn of Object.values(actions)) fn.mockReset();
+  toasts.length = 0;
 });
 
 const ar = (path: string) => messageAt('ar-EG', path);
@@ -258,5 +265,64 @@ describe('a closed delivery', () => {
     unmount();
     renderWithIntl(<EngagementCommandCard {...closedProps('abandoned')} />);
     expect(screen.getByText(ar('engagements.command.closed.abandoned.headline'))).toBeTruthy();
+  });
+});
+
+describe('a claim confirm that would also move the delivery asks first (S2)', () => {
+  const gateAClaim = {
+    id: 'c-2',
+    milestoneKind: 'gate_a' as const,
+    claimedAmount: '20000.0000',
+    note: null,
+    actorName: null,
+    createdAt: new Date('2026-06-01T00:00:00Z'),
+  };
+  const conceptReview: EngagementGatePreview = {
+    primaryTrigger: 'selectConcept',
+    endingChoices: [],
+    items: [
+      { guard: 'gateAInstallmentCleared', ok: false, code: 'gate_a_not_cleared', amountDue: '20000.0000' },
+    ],
+    allClear: false,
+  };
+  const render = () =>
+    renderWithIntl(
+      <EngagementCommandCard
+        {...props({ state: 'concept_review', preview: conceptReview, paymentClaims: [gateAClaim] })}
+      />,
+    );
+
+  test('the dialog names the next stage; Not yet confirms nothing', async () => {
+    render();
+    fireEvent.click(button('engagements.paymentClaims.confirm')!);
+    const dialog = await screen.findByRole('alertdialog');
+    expect(dialog.textContent).toContain(ar('engagements.state.negotiation'));
+    await act(async () => {
+      fireEvent.click(
+        within(dialog).getByRole('button', { name: ar('engagements.command.claim.cancel') }),
+      );
+    });
+    expect(actions.confirmPaymentClaim).not.toHaveBeenCalled();
+  });
+
+  test('confirming in the dialog records it; a refused advance reads "payment recorded" plus why', async () => {
+    actions.confirmPaymentClaim.mockResolvedValue({
+      ok: true,
+      advanced: false,
+      waitingOn: 'gate_a_not_cleared',
+    });
+    render();
+    fireEvent.click(button('engagements.paymentClaims.confirm')!);
+    const dialog = await screen.findByRole('alertdialog');
+    await act(async () => {
+      fireEvent.click(
+        within(dialog).getByRole('button', { name: ar('engagements.paymentClaims.confirm') }),
+      );
+    });
+    expect(actions.confirmPaymentClaim).toHaveBeenCalledWith({ claimId: 'c-2', amount: '20000' });
+    expect(toasts.at(-1)).toEqual({
+      title: ar('engagements.command.claim.recorded'),
+      description: ar('errors.gate_a_not_cleared'),
+    });
   });
 });
