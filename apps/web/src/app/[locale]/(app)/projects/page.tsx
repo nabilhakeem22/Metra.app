@@ -45,6 +45,8 @@ export default async function ProjectsPage({
     id: c.id,
     nameEn: c.nameEn,
     nameAr: c.nameAr,
+    city: c.city,
+    country: c.country,
   }));
 
   const canManage = can(ctx.role, 'projects', 'create');
@@ -56,6 +58,7 @@ export default async function ProjectsPage({
         items={items}
         clientOptions={options}
         canManage={canManage}
+        canAddClient={can(ctx.role, 'clients', 'create')}
         initialNewClientId={newFor}
         openCreateOnArrival={openCreate === '1'}
       />

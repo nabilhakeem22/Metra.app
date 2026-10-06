@@ -22,4 +22,7 @@ export interface ClientOption {
   id: string;
   nameEn: string | null;
   nameAr: string | null;
+  /** The client's location, which a new project for it starts with. */
+  city: string | null;
+  country: string | null;
 }

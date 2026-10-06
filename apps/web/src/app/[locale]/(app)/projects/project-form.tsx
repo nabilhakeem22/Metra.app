@@ -3,19 +3,22 @@
 import { Loader2 } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
 import { useEffect, useState, useTransition } from 'react';
-import type { ProjectStatus } from '@metra/db';
 import { Button } from '@/components/ui/button';
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetTitle,
-} from '@/components/ui/sheet';
+import { Sheet, SheetContent, SheetDescription, SheetTitle } from '@/components/ui/sheet';
 import { toast } from '@/hooks/use-toast';
+import { Link } from '@/i18n/routing';
 import { resolveActionError } from '@/lib/actions/error-message';
 import type { ActionCode } from '@/lib/actions/result';
 import { createProject, updateProject } from '@/lib/projects/actions';
 import { ProjectFormFields } from './project-form-fields';
+import {
+  canSaveProject,
+  emptyProjectForm,
+  projectFormOf,
+  todayIsoLocal,
+  withClient,
+  type ProjectFormState,
+} from './project-form-state';
 import type { ClientOption, ProjectListItem } from './types';
 
 export interface ProjectFormProps {
@@ -25,43 +28,8 @@ export interface ProjectFormProps {
   clientOptions: ClientOption[];
   /** Preselected client for a NEW project (e.g. opened from a client profile). */
   defaultClientId?: string;
-}
-
-export interface ProjectFormState {
-  code: string;
-  country: string;
-  nameEn: string;
-  nameAr: string;
-  clientId: string;
-  status: ProjectStatus;
-  startDate: string;
-  endDate: string;
-  city: string;
-  address: string;
-  notes: string;
-}
-
-function emptyState(
-  clientOptions: ClientOption[],
-  defaultClientId?: string,
-): ProjectFormState {
-  const preselected =
-    defaultClientId && clientOptions.some((c) => c.id === defaultClientId)
-      ? defaultClientId
-      : (clientOptions[0]?.id ?? '');
-  return {
-    code: '',
-    country: '',
-    nameEn: '',
-    nameAr: '',
-    clientId: preselected,
-    status: 'draft',
-    startDate: '',
-    endDate: '',
-    city: '',
-    address: '',
-    notes: '',
-  };
+  /** May this role add a client (the no-clients state links to it)? */
+  canAddClient?: boolean;
 }
 
 export function ProjectForm({
@@ -70,37 +38,33 @@ export function ProjectForm({
   item,
   clientOptions,
   defaultClientId,
+  canAddClient = false,
 }: ProjectFormProps) {
   const t = useTranslations('projects');
   const th = useTranslations('hints.project');
   const te = useTranslations('errors');
   const locale = useLocale();
-  const [form, setForm] = useState<ProjectFormState>(emptyState(clientOptions));
+  const defaultCountry = t('form.countryDefault');
+  const [form, setForm] = useState<ProjectFormState>(() =>
+    emptyProjectForm(clientOptions, undefined, '', defaultCountry),
+  );
   const [pending, startTransition] = useTransition();
 
   useEffect(() => {
     if (!open) return;
     setForm(
       item
-        ? {
-            code: item.code,
-            country: item.country ?? '',
-            nameEn: item.nameEn ?? '',
-            nameAr: item.nameAr ?? '',
-            clientId: item.clientId,
-            status: item.status,
-            startDate: item.startDate ?? '',
-            endDate: item.endDate ?? '',
-            city: item.city ?? '',
-            address: item.address ?? '',
-            notes: item.notes ?? '',
-          }
-        : emptyState(clientOptions, defaultClientId),
+        ? projectFormOf(item)
+        : emptyProjectForm(clientOptions, defaultClientId, todayIsoLocal(new Date()), defaultCountry),
     );
-  }, [open, item, clientOptions, defaultClientId]);
+  }, [open, item, clientOptions, defaultClientId, defaultCountry]);
 
-  const set = (k: keyof ProjectFormState) => (v: string) =>
-    setForm((f) => ({ ...f, [k]: v }));
+  const set = (key: keyof ProjectFormState) => (value: string) =>
+    setForm((prev) => {
+      if (key === 'clientId') return withClient(prev, value, clientOptions, defaultCountry);
+      const locationEdited = prev.locationEdited || key === 'city' || key === 'country';
+      return { ...prev, [key]: value, locationEdited };
+    });
 
   function submit() {
     startTransition(async () => {
@@ -109,7 +73,6 @@ export function ProjectForm({
         nameEn: form.nameEn || null,
         nameAr: form.nameAr || null,
         clientId: form.clientId,
-        status: form.status,
         startDate: form.startDate || null,
         endDate: form.endDate || null,
         city: form.city || null,
@@ -117,22 +80,18 @@ export function ProjectForm({
         address: form.address || null,
         notes: form.notes || null,
       };
+      // A new project is created ACTIVE by the server; only an edit sends a status.
       const res = item
-        ? await updateProject({ id: item.id, ...payload })
+        ? await updateProject({ id: item.id, ...payload, status: form.status })
         : await createProject(payload);
       if (res.ok) {
         toast({ title: t(item ? 'toast.updated' : 'toast.created') });
         onOpenChange(false);
       } else {
-        toast({
-          title: resolveActionError(res.error as ActionCode, te),
-          variant: 'destructive',
-        });
+        toast({ title: resolveActionError(res.error as ActionCode, te), variant: 'destructive' });
       }
     });
   }
-
-  const noClients = clientOptions.length === 0;
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -142,10 +101,15 @@ export function ProjectForm({
           {t(item ? 'form.editTitle' : 'form.newTitle')}
         </SheetDescription>
 
-        {noClients ? (
-          <p className="mt-4 rounded-md border bg-muted/40 p-3 text-sm text-muted-foreground">
-            {t('form.noClients')}
-          </p>
+        {clientOptions.length === 0 ? (
+          <div className="mt-4 space-y-2 rounded-md border bg-muted/40 p-3 text-sm text-muted-foreground">
+            <p>{t('form.noClients')}</p>
+            {canAddClient && (
+              <Button asChild size="sm" variant="outline">
+                <Link href="/clients?new=1">{t('empty.addClient')}</Link>
+              </Button>
+            )}
+          </div>
         ) : (
           <div className="mt-4 space-y-4">
             <ProjectFormFields
@@ -166,10 +130,12 @@ export function ProjectForm({
               >
                 {t('form.cancel')}
               </Button>
-              <Button type="button" onClick={submit} disabled={pending}>
-                {pending && (
-                  <Loader2 className="size-4 animate-spin" aria-hidden />
-                )}
+              <Button
+                type="button"
+                onClick={submit}
+                disabled={pending || !canSaveProject(form, !item)}
+              >
+                {pending && <Loader2 className="size-4 animate-spin" aria-hidden />}
                 {t('form.save')}
               </Button>
             </div>

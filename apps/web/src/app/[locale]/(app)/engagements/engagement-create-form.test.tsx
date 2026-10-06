@@ -23,7 +23,7 @@ const actions = vi.hoisted(() => ({ createEngagement: vi.fn() }));
 vi.mock('@/lib/engagements/actions', () => actions);
 
 const en = (path: string) => messageAt('en', path);
-const CLIENTS = [{ id: 'c-1', nameEn: 'Acme', nameAr: null }];
+const CLIENTS = [{ id: 'c-1', nameEn: 'Acme', nameAr: null, city: null, country: null }];
 const PROJECTS = [{ id: 'p-1', nameEn: 'Tower', nameAr: 'البرج', clientId: 'c-1' }];
 
 describe('EngagementCreateForm', () => {

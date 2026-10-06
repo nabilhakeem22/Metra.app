@@ -13,10 +13,12 @@ import {
 } from '@/components/ui/select';
 import { pickLocale } from '@/lib/i18n/pick-locale';
 import { PROJECT_STATUSES } from '@/lib/projects/statuses';
-import type { ProjectFormState } from './project-form';
+import { ProjectScheduleFields } from './project-form-schedule';
+import type { ProjectFormState } from './project-form-state';
 import type { ClientOption } from './types';
 
-// The project field groups (code · names · client · status · dates · city). All
+// The project field groups (code · names · client · status; the dates and the
+// location are `project-form-schedule.tsx`). All
 // form state and mutations live in the parent (ProjectForm); this child is
 // presentational, driven by `form` and the curried `set` updater.
 export function ProjectFormFields({
@@ -31,7 +33,7 @@ export function ProjectFormFields({
   th: ReturnType<typeof useTranslations<'hints.project'>>;
   locale: string;
   form: ProjectFormState;
-  set: (k: keyof ProjectFormState) => (v: string) => void;
+  set: (k: Exclude<keyof ProjectFormState, 'locationEdited'>) => (v: string) => void;
   clientOptions: ClientOption[];
 }) {
   return (
@@ -82,8 +84,8 @@ export function ProjectFormFields({
           <FieldHint id="pr-client-hint" hint={th('client')} />
         </Label>
         <Select value={form.clientId} onValueChange={(v) => set('clientId')(v)}>
-          <SelectTrigger id="pr-client" aria-describedby="pr-client-hint">
-            <SelectValue />
+          <SelectTrigger id="pr-client" aria-describedby="pr-client-hint" aria-required="true">
+            <SelectValue placeholder={t('form.clientPlaceholder')} />
           </SelectTrigger>
           <SelectContent>
             {clientOptions.map((c) => (
@@ -99,6 +101,8 @@ export function ProjectFormFields({
         </Select>
       </div>
 
+      {/* Status is an EDIT field: a new project is created active. */}
+      {form.code !== '' && (
       <div className="space-y-2">
         <Label htmlFor="pr-status" className="flex items-center">
           {t('form.status')}
@@ -117,64 +121,9 @@ export function ProjectFormFields({
           </SelectContent>
         </Select>
       </div>
+      )}
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <div className="space-y-2">
-          <Label htmlFor="pr-start">
-            {t('form.startDate')}
-            <span className="ms-1 text-[color:var(--danger)]" aria-hidden>
-              *
-            </span>
-          </Label>
-          <Input
-            id="pr-start"
-            type="date"
-            dir="ltr"
-            required
-            aria-required
-            value={form.startDate}
-            onChange={(e) => set('startDate')(e.target.value)}
-          />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="pr-end">
-            {t('form.endDate')}
-            <span className="ms-1 text-[color:var(--danger)]" aria-hidden>
-              *
-            </span>
-          </Label>
-          <Input
-            id="pr-end"
-            type="date"
-            dir="ltr"
-            required
-            aria-required
-            value={form.endDate}
-            onChange={(e) => set('endDate')(e.target.value)}
-          />
-        </div>
-      </div>
-      {/* Spec: dates are for tracking, and the end date is not a commitment. */}
-      <p className="-mt-2 text-xs text-muted-foreground">{t('form.endDateNote')}</p>
-
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <div className="space-y-2">
-          <Label htmlFor="pr-city">{t('form.city')}</Label>
-          <Input
-            id="pr-city"
-            value={form.city}
-            onChange={(e) => set('city')(e.target.value)}
-          />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="pr-country">{t('form.country')}</Label>
-          <Input
-            id="pr-country"
-            value={form.country}
-            onChange={(e) => set('country')(e.target.value)}
-          />
-        </div>
-      </div>
+      <ProjectScheduleFields t={t} form={form} set={set} />
     </>
   );
 }

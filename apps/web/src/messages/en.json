@@ -949,7 +949,8 @@
     "empty": {
       "title": "No projects yet",
       "description": "Create your first project and link it to a client.",
-      "needClient": "Add an active client first — projects must belong to one."
+      "needClient": "Add an active client first. Every project belongs to one.",
+      "addClient": "Add a client"
     },
     "actions": {
       "new": "New project",
@@ -964,6 +965,7 @@
       "nameEn": "Name (English)",
       "nameAr": "Name (Arabic)",
       "client": "Client",
+      "clientPlaceholder": "Choose a client",
       "status": "Status",
       "startDate": "Start date",
       "endDate": "End date",
@@ -974,7 +976,8 @@
       "cancel": "Cancel",
       "noClients": "You need an active client before creating a project.",
       "country": "Country",
-      "endDateNote": "You can extend the end date later — these dates are for tracking."
+      "countryDefault": "Egypt",
+      "endDateNote": "The end date is optional. You can set or extend it later."
     },
     "toast": {
       "created": "Project created",

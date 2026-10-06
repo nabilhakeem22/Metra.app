@@ -1,11 +1,7 @@
 'use client';
 
-import { FolderKanban, Plus } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
 import { useMemo, useState, useTransition } from 'react';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
-import { EmptyState } from '@/components/ui/empty-state';
 import { useOpenOnArrival } from '@/hooks/use-open-on-arrival';
 import { toast } from '@/hooks/use-toast';
 import { resolveActionError } from '@/lib/actions/error-message';
@@ -15,12 +11,15 @@ import { setProjectActive } from '@/lib/projects/actions';
 import { ProjectForm } from './project-form';
 import { ProjectsClientTable } from './projects-client-table';
 import { ProjectsClientToolbar } from './projects-client-toolbar';
+import { ProjectsEmptyState } from './projects-empty-state';
 import type { ClientOption, ProjectListItem } from './types';
 
 export interface ProjectsClientProps {
   items: ProjectListItem[];
   clientOptions: ClientOption[];
   canManage: boolean;
+  /** May this role add a client (the no-clients states link to it)? */
+  canAddClient: boolean;
   /** When arriving from a client profile's "new project" CTA. */
   initialNewClientId?: string;
   /** Reached through `/projects?new=1`: open the new-project form once. */
@@ -31,6 +30,7 @@ export function ProjectsClient({
   items,
   clientOptions,
   canManage,
+  canAddClient,
   initialNewClientId,
   openCreateOnArrival,
 }: ProjectsClientProps) {
@@ -95,6 +95,7 @@ export function ProjectsClient({
       item={editing}
       clientOptions={clientOptions}
       defaultClientId={initialNewClientId}
+      canAddClient={canAddClient}
     />
   );
 
@@ -102,24 +103,12 @@ export function ProjectsClient({
     return (
       <>
         {form}
-        <Card>
-          <CardContent className="py-4">
-            <EmptyState
-              icon={<FolderKanban className="size-6" aria-hidden />}
-              title={t('empty.title')}
-              description={t('empty.description')}
-              hint={clientOptions.length === 0 ? t('empty.needClient') : undefined}
-              action={
-                canManage && clientOptions.length > 0 ? (
-                  <Button data-tour="projects-new" onClick={openNew}>
-                    <Plus className="size-4" aria-hidden />
-                    {t('actions.new')}
-                  </Button>
-                ) : undefined
-              }
-            />
-          </CardContent>
-        </Card>
+        <ProjectsEmptyState
+          hasClients={clientOptions.length > 0}
+          canManage={canManage}
+          canAddClient={canAddClient}
+          onNew={openNew}
+        />
       </>
     );
   }
