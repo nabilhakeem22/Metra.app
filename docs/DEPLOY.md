@@ -436,8 +436,9 @@ changed and new functions and one trigger under `rls/`.
 
 1. **You run PR-B9's database step on production FIRST** (steps 1 to 5 below):
    `db:migrate`, then `db:apply-rls`, then the checks.
-2. **Only then** do `validate/round-b-w1` (Wave 1, which contains B3) and
-   `validate/round-b-db` (PR-B9) merge, in that order or together.
+2. **Only then** does `validate/round-b-combined` merge. It is PR-B9
+   (`validate/round-b-db`) and Wave 1 (`validate/round-b-w1`, which contains
+   B3) merged into one branch and validated together by CI.
 3. PR-B10 to PR-B12 merge after that.
 
 Why, one sentence each:
@@ -480,8 +481,8 @@ PR changes no dependency, so the installed `node_modules` serve as they are.
 ```powershell
 cd C:\Users\HP\merta-main
 git fetch origin
-git switch --detach origin/validate/round-b-db
-git log --oneline -1    # must be the head SHA named in the PR, with green CI
+git switch --detach origin/validate/round-b-combined
+git log --oneline -1    # must be the SHA the lead gave you for this run, with green CI
 ```
 
 **2. Read-only, before** (Supabase SQL editor). Note the three numbers:
@@ -651,10 +652,12 @@ a reminder is sent. **Do not rotate it casually** (see *Rotating a secret*).
 
 **6. Afterwards: merge, in this order, then return the checkout to main.**
 
-1. Merge `validate/round-b-w1` (Wave 1) and `validate/round-b-db` (PR-B9), in
-   that order or together, now that the database step is done (the order and
-   its reasons are at the top of this section).
-2. Tell the lead the step is done; PR-B10 to PR-B12 may merge after it.
+1. **Stop and do not merge** if any output in steps 3 or 4 differs from what
+   is written there. Tell the lead what you saw instead.
+2. Otherwise tell the lead the step is done. The lead merges
+   `validate/round-b-combined` (the order and its reasons are at the top of
+   this section). Merging deploys automatically: wait for the Deploy workflow
+   to go green before the live checks. PR-B10 to PR-B12 merge after that.
 3. Put the production checkout back on main:
 
 ```powershell
