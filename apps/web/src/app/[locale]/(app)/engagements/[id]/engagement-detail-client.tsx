@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { Link } from '@/i18n/routing';
 import { resolveActionError } from '@/lib/actions/error-message';
 import { resolveBudgetBadge } from '@/lib/engagements/budget-badge';
+import { secondaryTriggersOf } from '@/lib/engagements/forward-trigger';
 import { landedKeysOf } from '@/lib/engagements/held-key';
 import { countConceptOptions } from '@/lib/engagements/concept-options';
 import { EngagementCommandCard } from './engagement-command-card';
@@ -39,6 +40,7 @@ export function EngagementDetailClient({
   canShare,
   gatePreview,
   canAdvance,
+  canResolveClaims,
   stallDays,
   pulse,
   paymentClaimCount,
@@ -54,12 +56,10 @@ export function EngagementDetailClient({
     // ledgers: a transition writes one, and so does a payment.
     landedKeys: landedKeysOf(transitions, payments),
   });
-  // The Advance button owns the forward-advance trigger; every OTHER legal,
-  // permitted trigger becomes a low-emphasis secondary control (no legal trigger
-  // is dropped — Advance ∪ secondary = the capability-filtered legal set).
-  const secondaryTriggers = nextActions.filter(
-    (trigger) => trigger !== gatePreview.primaryTrigger,
-  );
+  // The Advance button owns the forward-advance trigger and the ending buttons
+  // own the endings; every OTHER legal, permitted trigger becomes a low-emphasis
+  // secondary control.
+  const secondaryTriggers = secondaryTriggersOf(nextActions, gatePreview.primaryTrigger);
 
   // Derived from data the page already holds; the rule itself lives in
   // lib/engagements/budget-badge.ts, where it can be tested.
@@ -91,6 +91,7 @@ export function EngagementDetailClient({
         stallDays={stallDays}
         canAdvance={canAdvance}
         canRecordPayment={capabilities.recordPayment}
+        canResolveClaims={canResolveClaims}
         canShare={canShare}
         canUpload={canUpload}
         canSetOffPlan={capabilities.setRom}

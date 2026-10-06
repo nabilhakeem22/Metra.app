@@ -39,6 +39,8 @@ const BASE: CtaOptions = {
   mode: 'blockedStudio',
   closed: false,
   conceptOptionCount: 0,
+  pendingClaimCount: 0,
+  canResolveClaims: true,
 };
 
 const resolve = (
@@ -49,42 +51,97 @@ const resolve = (
 describe('resolveCommandCardCtas — the pay-and-advance path', () => {
   test('a blocking money gate with a shortfall offers the pay CTA and its kind', () => {
     const ctas = resolve(preview({ items: [DEPOSIT_DUE] }));
-    expect(ctas.showPayCta).toBe(true);
+    expect(ctas.payCta).toBe('payAndAdvance');
     expect(ctas.paymentKind).toBe('deposit');
     expect(ctas.paymentItem?.amountDue).toBe('25000.0000');
   });
 
   test('an unmet NON-money guard is not a payment gate', () => {
     const ctas = resolve(preview({ items: [NON_MONEY_UNMET] }));
-    expect(ctas.showPayCta).toBe(false);
+    expect(ctas.payCta).toBeNull();
     expect(ctas.paymentItem).toBeUndefined();
   });
 
   test('a money guard that is already OK offers nothing', () => {
     const ctas = resolve(preview({ items: [{ ...DEPOSIT_DUE, ok: true }] }));
-    expect(ctas.showPayCta).toBe(false);
+    expect(ctas.payCta).toBeNull();
   });
 
   test('a money guard with NO amountDue offers nothing — there is nothing to pre-fill', () => {
     const ctas = resolve(preview({ items: [{ ...DEPOSIT_DUE, amountDue: null }] }));
-    expect(ctas.showPayCta).toBe(false);
+    expect(ctas.payCta).toBeNull();
   });
 
   test('without the finance capability the CTA is withheld, but the item is still found', () => {
     const ctas = resolve(preview({ items: [DEPOSIT_DUE] }), { canRecordPayment: false });
-    expect(ctas.showPayCta).toBe(false);
+    expect(ctas.payCta).toBeNull();
     expect(ctas.paymentItem).toBeDefined();
   });
 
   test('without canAdvance the pay-AND-ADVANCE CTA is withheld', () => {
-    expect(resolve(preview({ items: [DEPOSIT_DUE] }), { canAdvance: false }).showPayCta).toBe(
-      false,
-    );
+    expect(resolve(preview({ items: [DEPOSIT_DUE] }), { canAdvance: false }).payCta).toBeNull();
   });
 
   test('with no forward trigger there is nothing to advance to', () => {
     const ctas = resolve(preview({ items: [DEPOSIT_DUE], primaryTrigger: null }));
-    expect(ctas.showPayCta).toBe(false);
+    expect(ctas.payCta).toBeNull();
+  });
+});
+
+const BALANCE_DUE: EngagementGatePreview['items'][number] = {
+  guard: 'balanceCleared',
+  ok: false,
+  code: 'balance_not_cleared',
+  amountDue: '30000.0000',
+};
+
+const CHOICE = preview({
+  primaryTrigger: null,
+  endingChoices: ['chooseDesignOnly', 'chooseExecution'],
+  items: [BALANCE_DUE],
+});
+
+describe('resolveCommandCardCtas — the choice state and pending claims', () => {
+  test('at the ending choice the money button only records', () => {
+    const ctas = resolve(CHOICE, { state: 'execution_decision', mode: 'blockedClient' });
+    expect(ctas.payCta).toBe('recordOnly');
+    expect(ctas.paymentKind).toBe('balance');
+  });
+
+  test('record-only still needs the finance capability', () => {
+    expect(
+      resolve(CHOICE, { state: 'execution_decision', canRecordPayment: false }).payCta,
+    ).toBeNull();
+  });
+
+  test('a pending claim hides the money button, at the choice and elsewhere', () => {
+    expect(resolve(CHOICE, { pendingClaimCount: 1 }).payCta).toBeNull();
+    expect(resolve(preview({ items: [DEPOSIT_DUE] }), { pendingClaimCount: 1 }).payCta).toBeNull();
+  });
+
+  test('confirmClaims needs a live card, a pending claim and the resolve right', () => {
+    expect(resolve(preview(), { pendingClaimCount: 1 }).confirmClaims).toBe(true);
+    expect(resolve(preview(), { pendingClaimCount: 0 }).confirmClaims).toBe(false);
+    expect(
+      resolve(preview(), { pendingClaimCount: 1, canResolveClaims: false }).confirmClaims,
+    ).toBe(false);
+    expect(resolve(preview(), { pendingClaimCount: 1, closed: true }).confirmClaims).toBe(false);
+  });
+});
+
+describe('resolveCommandCardCtas — dropzoneRemaining', () => {
+  test('counts the concept options still allowed, never below zero', () => {
+    expect(resolve(preview(), { state: 'layout', conceptOptionCount: 2 }).dropzoneRemaining).toBe(
+      CONCEPT_OPTION_MAX - 2,
+    );
+    expect(
+      resolve(preview(), { state: 'layout', conceptOptionCount: CONCEPT_OPTION_MAX + 1 })
+        .dropzoneRemaining,
+    ).toBe(0);
+  });
+
+  test('is null for an uncapped category', () => {
+    expect(resolve(preview(), { state: 'design_3d' }).dropzoneRemaining).toBeNull();
   });
 });
 

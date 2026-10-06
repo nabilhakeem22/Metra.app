@@ -1633,8 +1633,10 @@
       "designRevision": "3D revision {n} of {free}",
       "dueLabel": "Due",
       "logPaymentAdvance": "Log payment & advance",
+      "logPayment": "Log payment",
       "advance": "Advance to the next stage",
       "payNote": "Logging the payment advances the delivery automatically — the client is never shown the amount.",
+      "payNoteRecordOnly": "Logging the balance only records it. Choose how the delivery ends once it clears.",
       "closed": {
         "headline": "This delivery is closed",
         "hint": "No further action is needed — the design lifecycle has ended."
@@ -1729,7 +1731,22 @@
       "reshare": "Reveal & re-share the client link",
       "crumb": "Delivery",
       "startedOn": "Started {date}",
-      "feeChip": "Design fee {amount}"
+      "feeChip": "Design fee {amount}",
+      "ending": {
+        "headline": "Choose how this delivery ends",
+        "hint": "Record the client's decision. Both endings are final.",
+        "cancel": "Not yet",
+        "chooseDesignOnly": {
+          "cta": "Design-only handover",
+          "confirmTitle": "Hand over the design only?",
+          "confirmBody": "The shop drawings are released to the client and the delivery moves to handover. This can't be undone."
+        },
+        "chooseExecution": {
+          "cta": "Client will build",
+          "confirmTitle": "Close this delivery for execution?",
+          "confirmBody": "The design delivery closes and the job moves to execution. This can't be undone."
+        }
+      }
     },
     "spine": {
       "proposal": "Proposal",

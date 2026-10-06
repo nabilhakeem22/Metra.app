@@ -4,6 +4,7 @@ import { Link2, Loader2 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
 import type { CommandCardActionProps } from './command-card-action';
+import { CommandCardEndings } from './command-card-endings';
 import { DIRECT_TRIGGER_ACTIONS } from './trigger-actions';
 
 /** Dispatch the forward trigger, or open the form the edge needs first. */
@@ -42,11 +43,25 @@ function fireAdvance(props: CommandCardActionProps): void {
  *
  * It STAYS, disabled, in the blocked states with no dropzone: there nothing else
  * on the card names the forward move.
+ *
+ * At a CHOICE state there is no forward move to advance: the two endings take
+ * Advance's place, once the client no longer holds the move.
  */
 export function AdvanceOrReshare(props: CommandCardActionProps) {
   const th = useTranslations('engagements.hero');
   const tcmd = useTranslations('engagements.command');
   if (props.ctas.actOnCard) return null;
+  if (props.view.endingChoices.length > 0 && !props.waitingOnClient) {
+    return (
+      <CommandCardEndings
+        engagementId={props.advance.engagementId}
+        endings={props.view.endingChoices}
+        enabled={props.view.endingsEnabled}
+        pending={props.pending}
+        runAction={props.advance.runAction}
+      />
+    );
+  }
   if (props.waitingOnClient) {
     return (
       props.canShare && (
@@ -68,7 +83,7 @@ export function AdvanceOrReshare(props: CommandCardActionProps) {
       type="button"
       // When Advance is blocked it must READ as disabled — a flat subdued fill,
       // never the brand CTA that looks clickable.
-      variant={props.view.advanceEnabled && !props.ctas.showPayCta ? 'default' : 'secondary'}
+      variant={props.view.advanceEnabled && props.ctas.payCta === null ? 'default' : 'secondary'}
       className="w-full"
       disabled={!props.view.advanceEnabled || props.pending}
       onClick={() => fireAdvance(props)}

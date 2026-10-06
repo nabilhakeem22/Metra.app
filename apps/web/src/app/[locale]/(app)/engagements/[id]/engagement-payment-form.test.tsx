@@ -58,6 +58,7 @@ function FormProbe() {
       engagementId="e-1"
       paymentKind="deposit"
       defaultAmount="50000"
+      mode="payAndAdvance"
       advanceTrigger="confirmAndPayDeposit"
       pending={pending}
       runAction={runAction}

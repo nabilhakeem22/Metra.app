@@ -98,6 +98,7 @@ export default async function EngagementDetailPage({
         canShare={canShare}
         gatePreview={gatePreview}
         canAdvance={canAdvance}
+        canResolveClaims={canResolveClaims}
         stallDays={stallDaysSince(transitions)}
         // A pure read-model over the fee schedule + payments already loaded (no
         // extra round trip). Serialized scale-4 strings + an integer percent.

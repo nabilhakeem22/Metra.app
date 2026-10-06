@@ -51,6 +51,7 @@ export interface EngagementDetailProps {
   canShare: boolean;
   gatePreview: EngagementGatePreview;
   canAdvance: boolean;
+  canResolveClaims: boolean;
   stallDays: number | null;
   pulse: CommercialPulse;
   paymentClaimCount: number;

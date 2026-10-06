@@ -6,17 +6,15 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { toast } from '@/hooks/use-toast';
-import { logPaymentAndAdvance } from '@/lib/engagements/actions';
+import type { PayCtaMode } from '@/lib/engagements/command-card-ctas';
 import type { EngagementGatePreview } from '@/lib/engagements/gate-preview';
-import { PAY_AND_ADVANCE_HELD_TRIGGER, actOf } from '@/lib/engagements/held-act';
-import type { LogPaymentAndAdvanceInput } from '@/lib/engagements/pay-and-advance';
 // Leaf import (guards/trigger-money-gate), not the barrel — the barrel also pulls
 // GUARDS from ./registry into this client chunk (heavy, cycle-prone, can init a
 // binding as undefined at render). The leaf is the pure MONEY_GUARD_MILESTONE map
 // and the trigger lookup beside it.
 import { MONEY_GUARD_MILESTONE } from '@/lib/engagements/guards/trigger-money-gate';
 import type { RunAction } from './use-engagement-action';
+import { usePaymentFormSubmit } from './use-payment-form-submit';
 
 /**
  * The hero's combined "Log payment & advance". Owns the amount, method and
@@ -36,11 +34,16 @@ import type { RunAction } from './use-engagement-action';
  * could not say what happened, released the moment the server says it worked or
  * definitely refused. The remount keeps doing its own job (re-deriving the
  * prefill from the smaller due); it is no longer what makes the key honest.
+ *
+ * `mode` is the card's money button: `payAndAdvance`, or `recordOnly` at the
+ * ending choice, where logging the balance must never pick an ending. The submit
+ * for both lives in `use-payment-form-submit.ts`.
  */
 export function PaymentForm({
   engagementId,
   paymentKind,
   defaultAmount,
+  mode,
   advanceTrigger,
   pending,
   runAction,
@@ -49,6 +52,7 @@ export function PaymentForm({
   engagementId: string;
   paymentKind: NonNullable<(typeof MONEY_GUARD_MILESTONE)[keyof typeof MONEY_GUARD_MILESTONE]>;
   defaultAmount: string;
+  mode: Exclude<PayCtaMode, null>;
   advanceTrigger: EngagementGatePreview['primaryTrigger'];
   pending: boolean;
   runAction: RunAction;
@@ -64,36 +68,15 @@ export function PaymentForm({
   // an unopened disclosure just leaves them empty (trimmed to null below).
   const [detailsOpen, setDetailsOpen] = useState(false);
 
-  function submit() {
-    if (!advanceTrigger) return;
-    // THE REQUEST, minus its key: one object, used twice. `actOf` is typed
-    // against the same shape, so a field added to the request and forgotten in
-    // the fingerprint does not compile.
-    const submitted = {
-      paymentKind,
-      amount: amount.trim(),
-      method: method.trim() || null,
-      reference: reference.trim() || null,
-      advanceTrigger,
-    };
-    runAction(
-      async (idempotencyKey) => {
-        const res = await logPaymentAndAdvance(engagementId, { ...submitted, idempotencyKey });
-        // `already` here is THE PAYMENT'S, threaded out of
-        // `logPaymentAndAdvanceCore`: the ledger was not appended, the original
-        // row was handed back, and the advance then re-ran against it. Without
-        // this the combined control reported that identically to a fresh write
-        // — which is the exact moment a studio needs to be told otherwise.
-        if (res.ok && res.already) {
-          toast({ title: tc('alreadyRecorded'), description: tc('alreadyRecordedHint') });
-        }
-        if (res.ok) onDone();
-        return res;
-      },
-      PAY_AND_ADVANCE_HELD_TRIGGER,
-      actOf<Omit<LogPaymentAndAdvanceInput, 'idempotencyKey'>>(submitted),
-    );
-  }
+  const submitPayment = usePaymentFormSubmit({
+    engagementId,
+    paymentKind,
+    mode,
+    advanceTrigger,
+    runAction,
+    onDone,
+  });
+  const submit = () => submitPayment({ amount, method, reference });
 
   return (
     <div className="mt-4 space-y-3 rounded-[var(--r-item)] border border-[color:var(--rule)] bg-[color:var(--track)] p-4">
@@ -144,7 +127,7 @@ export function PaymentForm({
         </Button>
         <Button type="button" size="sm" onClick={submit} disabled={pending}>
           {pending && <Loader2 className="size-4 animate-spin" aria-hidden />}
-          {th('logPaymentAdvance')}
+          {mode === 'recordOnly' ? th('logPayment') : th('logPaymentAdvance')}
         </Button>
       </div>
     </div>

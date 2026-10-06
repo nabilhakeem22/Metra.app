@@ -9,14 +9,15 @@ import { PaymentForm } from './engagement-payment-form';
 import type { RunAction } from './use-engagement-action';
 
 // The three inputs the command card can open under its action row: the design-fee
-// form, the pay-and-advance form, and the off-plan toggle. Each is closed by
+// form, the payment form (pay-and-advance, or record-only at the ending choice),
+// and the off-plan toggle. Each is closed by
 // default — the card's premise is ONE unmissable next action, not a form stack.
 
 export interface CommandCardFormsProps {
   engagementId: string;
   preview: EngagementGatePreview;
   view: CommandCardView;
-  ctas: Pick<CommandCardCtas, 'showPayCta' | 'paymentKind' | 'paymentItem' | 'atProposal'>;
+  ctas: Pick<CommandCardCtas, 'payCta' | 'paymentKind' | 'paymentItem' | 'atProposal'>;
   open: { fee: boolean; pay: boolean };
   offPlan: { enabled: boolean; canSet: boolean };
   pending: boolean;
@@ -50,11 +51,11 @@ export function CommandCardForms({
         </div>
       )}
 
-      {ctas.showPayCta &&
+      {ctas.payCta &&
         open.pay &&
         ctas.paymentKind &&
         ctas.paymentItem?.amountDue &&
-        preview.primaryTrigger && (
+        (ctas.payCta === 'recordOnly' || preview.primaryTrigger) && (
           // key = the current shortfall: when a SHORT payment persists and the
           // server checklist revalidates to a reduced due, this key changes and
           // React REMOUNTS the form — re-deriving the pre-filled amount from the
@@ -65,6 +66,7 @@ export function CommandCardForms({
             engagementId={engagementId}
             paymentKind={ctas.paymentKind}
             defaultAmount={ctas.paymentItem.amountDue}
+            mode={ctas.payCta}
             advanceTrigger={preview.primaryTrigger}
             pending={pending}
             runAction={handlers.runAction}

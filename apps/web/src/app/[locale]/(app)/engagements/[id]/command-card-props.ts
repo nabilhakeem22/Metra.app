@@ -29,6 +29,8 @@ export interface EngagementCommandCardProps {
   stallDays: number | null;
   canAdvance: boolean;
   canRecordPayment: boolean;
+  /** May this role confirm or dismiss a client payment claim (`engagements_finance` create)? */
+  canResolveClaims: boolean;
   canShare: boolean;
   canUpload: boolean;
   canSetOffPlan: boolean;

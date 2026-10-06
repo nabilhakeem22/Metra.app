@@ -2,12 +2,11 @@
 
 import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
-import type { ActionResult } from '@/lib/actions/result';
 import type { CommandCardView } from '@/lib/engagements/command-card';
 import type { CommandCardCtas } from '@/lib/engagements/command-card-ctas';
 import type { EngagementGatePreview } from '@/lib/engagements/gate-preview';
-import type { Trigger } from '@/lib/engagements/transitions';
 import { AdvanceOrReshare } from './command-card-advance';
+import type { RunAction } from './use-engagement-action';
 
 /**
  * THE one action, full width, plus the three quiet lines under it.
@@ -18,7 +17,7 @@ import { AdvanceOrReshare } from './command-card-advance';
  */
 export interface CommandCardActionProps {
   view: CommandCardView;
-  ctas: Pick<CommandCardCtas, 'showPayCta' | 'actOnCard'>;
+  ctas: Pick<CommandCardCtas, 'payCta' | 'actOnCard'>;
   /** From the chrome: every unmet guard is one the CLIENT clears. */
   waitingOnClient: boolean;
   canShare: boolean;
@@ -29,10 +28,7 @@ export interface CommandCardActionProps {
   advance: {
     engagementId: string;
     preview: EngagementGatePreview;
-    runAction: (
-      fn: (idempotencyKey: string) => Promise<ActionResult>,
-      trigger?: Trigger,
-    ) => void;
+    runAction: RunAction;
     /** `advanceNeedsForm` edges carry a payload, so Advance opens a form instead. */
     openFeeForm: () => void;
   };
@@ -56,9 +52,9 @@ export function CommandCardAction(props: CommandCardActionProps) {
   return (
     <>
       <div className="flex flex-col gap-2.5">
-        {ctas.showPayCta && (
+        {ctas.payCta && (
           <Button type="button" className="w-full" disabled={pending} onClick={props.onTogglePay}>
-            {th('logPaymentAdvance')}
+            {ctas.payCta === 'recordOnly' ? th('logPayment') : th('logPaymentAdvance')}
           </Button>
         )}
         <AdvanceOrReshare {...props} />
@@ -80,7 +76,11 @@ export function CommandCardAction(props: CommandCardActionProps) {
         <ActionNote>{tcmd('nudgeHint')}</ActionNote>
       )}
 
-      {ctas.showPayCta && <ActionNote>{th('payNote')}</ActionNote>}
+      {ctas.payCta && (
+        <ActionNote>
+          {ctas.payCta === 'recordOnly' ? th('payNoteRecordOnly') : th('payNote')}
+        </ActionNote>
+      )}
     </>
   );
 }

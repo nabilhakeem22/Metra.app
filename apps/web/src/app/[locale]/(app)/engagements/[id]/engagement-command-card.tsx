@@ -2,14 +2,11 @@
 
 import { useTranslations } from 'next-intl';
 import { useState } from 'react';
-import { deriveCommandCard } from '@/lib/engagements/command-card';
-import { resolveCommandCardChrome } from '@/lib/engagements/command-card-chrome';
-import { resolveCommandCardCtas } from '@/lib/engagements/command-card-ctas';
-import { isTerminal } from '@/lib/engagements/states';
 import { CommandCardAction } from './command-card-action';
 import { useCommandCardCopy } from './command-card-copy';
 import { CommandCardForms } from './command-card-forms';
 import { CommandCardHeadline } from './command-card-headline';
+import { deriveCommandCardModel } from './command-card-model';
 import type { EngagementCommandCardProps } from './command-card-props';
 import {
   CommandCardAccentStripe,
@@ -24,7 +21,7 @@ import { EngagementSecondaryActions } from './engagement-secondary-actions';
 // COMPOSITION ONLY: each numbered section is the file named after it
 // (command-card-{status-band,headline,steps,action,forms}.tsx), and which chrome
 // the card wears and which controls it offers are pure, tested functions in
-// lib/engagements/command-card-{chrome,ctas}.ts.
+// lib/engagements/command-card-{chrome,ctas}.ts, wired in command-card-model.ts.
 //
 // It derives a machine-truthful view from the server gate preview
 // (`deriveCommandCard`): the headline reflects what ACTUALLY blocks Advance — the
@@ -40,24 +37,7 @@ export function EngagementCommandCard(props: EngagementCommandCardProps) {
   const th = useTranslations('engagements.hero');
   const [feeOpen, setFeeOpen] = useState(false);
   const [payOpen, setPayOpen] = useState(false);
-  const view = deriveCommandCard(preview, {
-    canAdvance: props.canAdvance,
-    isTerminal: isTerminal(state),
-  });
-  const closed = view.mode === 'closed';
-  const chrome = resolveCommandCardChrome({
-    mode: view.mode,
-    paymentClaimCount: props.paymentClaimCount,
-  });
-  const ctas = resolveCommandCardCtas(preview, {
-    canRecordPayment: props.canRecordPayment,
-    canAdvance: props.canAdvance,
-    canUpload,
-    state,
-    mode: view.mode,
-    closed,
-    conceptOptionCount: props.conceptOptionCount,
-  });
+  const { view, closed, chrome, ctas } = deriveCommandCardModel(props);
   const copy = useCommandCardCopy({ state, view, closed });
 
   return (

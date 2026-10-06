@@ -40,12 +40,19 @@ export function useCommandCardCopy(options: {
   // registry returns null there too, then the two BLOCKED modes (where a row is
   // guaranteed), and `ready` last. No optional chaining — a null here would be a
   // bug in the registry, not a case to render around.
+  // At the ending choice there is no next phase to name: the studio records
+  // the client's decision between two final endings.
+  const choosingEnding = !closed && view.mode === 'ready' && view.endingChoices.length > 0;
   const headline = closed
     ? tcmd('closedHeadline')
     : stageAction
       ? tsa(`${stageAction.actor}.${stageAction.key}.headline`)
-      : tcmd('readyHeadline', { phase: t(`state.${view.nextPhaseState ?? state}`) });
-  const hint = stageAction
+      : choosingEnding
+        ? tcmd('ending.headline')
+        : tcmd('readyHeadline', { phase: t(`state.${view.nextPhaseState ?? state}`) });
+  const hint = choosingEnding
+    ? tcmd('ending.hint')
+    : stageAction
     ? // Names who is waiting and what unlocks, one clause each. It still does NOT
       // name the blocking guard: the checklist below lists that exact guard
       // verbatim with an unmet marker, and a third copy of the same sentence is
