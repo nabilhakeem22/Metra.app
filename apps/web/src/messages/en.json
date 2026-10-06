@@ -15,7 +15,7 @@
   "landing": {
     "seo": {
       "title": "Project & cost control for interior-design studios",
-      "description": "Metra runs interior-design studios through every stage of a fit-out — proposals, approvals, payment gates, and handoff — with every pound traceable from quote to invoice. Bilingual and EGP-native."
+      "description": "Metra runs interior-design studios through every stage of a fit-out (proposals, approvals, payment gates, and handoff) with every pound traceable from quote to invoice. Bilingual and EGP-native."
     },
     "nav": {
       "primaryLabel": "Primary",
@@ -27,9 +27,9 @@
     },
     "hero": {
       "eyebrow": "For interior-design studios",
-      "headline": "Every interior project, from concept to <accent>handoff</accent> — under control.",
-      "lede": "Metra runs your studio through each stage of a fit-out — proposals, design approvals, payment gates, and handoff — while keeping every pound traceable from the line you quoted to the line you invoiced.",
-      "ctaPrimary": "Get started — free",
+      "headline": "Every interior project, from concept to <accent>handoff</accent>, under control.",
+      "lede": "Metra runs your studio through each stage of a fit-out (proposals, design approvals, payment gates, and handoff) while keeping every pound traceable from the line you quoted to the line you invoiced.",
+      "ctaPrimary": "Get started, free",
       "ctaSecondary": "See how it works",
       "note": "No credit card · Arabic & English · set up in minutes",
       "card": {
@@ -40,46 +40,46 @@
         "contractTotalLabel": "Contract total",
         "depositLabel": "Signing deposit",
         "depositStatus": "Cleared",
-        "gateLabel": "Gate A — concept",
+        "gateLabel": "Gate A: concept",
         "gateStatus": "Due",
         "marginLabel": "Margin"
       }
     },
     "trust": {
-      "line": "Built for interior-design and fit-out studios — bilingual, EGP-native, and made for how the region actually works."
+      "line": "Built for interior-design and fit-out studios: bilingual, EGP-native, and made for how the region actually works."
     },
     "problem": {
       "eyebrow": "The problem",
       "title": "Great design, leaking margins.",
-      "lede": "Interior projects lose money in the gaps — between the quote and the invoice, the concept and the sign-off, the site and the schedule. Spreadsheets and chat threads can't hold a whole fit-out together.",
-      "value1Title": "One place, one flow",
-      "value1Desc": "— every project moves through the same clear stages, so nothing stalls unseen.",
-      "value2Title": "Money in view the whole way",
-      "value2Desc": "— quote-to-invoice traceability and live margin on every job.",
-      "value3Title": "Client sign-offs that gate the work",
-      "value3Desc": "— approvals and payments unlock the next phase, on the record.",
+      "lede": "Interior projects lose money in the gaps: between the quote and the invoice, the concept and the sign-off, the site and the schedule. Spreadsheets and chat threads can't hold a whole fit-out together.",
+      "value1Title": "One place, one flow:",
+      "value1Desc": "every project moves through the same clear stages, so nothing stalls unseen.",
+      "value2Title": "Money in view the whole way:",
+      "value2Desc": "quote-to-invoice traceability and live margin on every job.",
+      "value3Title": "Client sign-offs that gate the work:",
+      "value3Desc": "approvals and payments unlock the next phase, on the record.",
       "cardLabel": "Every pound accounted for",
-      "cardCaption": "Revised contract value, tracked against billed-to-date — to four decimals.",
+      "cardCaption": "Revised contract value, tracked against billed-to-date, to four decimals.",
       "cardProgressLabel": "Where each project stands",
       "cardStages": "Proposal & survey → Concept → 3D & approvals → Handoff."
     },
     "features": {
       "eyebrow": "What you get",
       "title": "Everything a studio needs to run a fit-out.",
-      "subtitle": "From the first proposal to the final handoff — one system, built for interior work.",
+      "subtitle": "From the first proposal to the final handoff: one system, built for interior work.",
       "flowTitle": "A guided project flow",
       "flowDesc": "Lead → concept → design approval → payment gates → handoff. Every project follows the same clear path, so you always know exactly where each one stands.",
       "costTitle": "Cost & margin control",
-      "costDesc": "Every line is traceable from the quote you sent to the invoice you raised. See your true margin on each project in real time — no surprises at closeout.",
+      "costDesc": "Every line is traceable from the quote you sent to the invoice you raised. See your true margin on each project in real time, with no surprises at closeout.",
       "proposalsTitle": "Proposals & approvals",
-      "proposalsDesc": "Send client-ready proposals, collect sign-offs, and tie payment gates to each stage — so the design only advances when the client and the money say go.",
+      "proposalsDesc": "Send client-ready proposals, collect sign-offs, and tie payment gates to each stage, so the design only advances when the client and the money say go.",
       "bilingualTitle": "Arabic & English, done right",
-      "bilingualDesc": "Full right-to-left Arabic and English, EGP-native figures, and a bilingual client experience — not an afterthought bolted on the end."
+      "bilingualDesc": "Full right-to-left Arabic and English, EGP-native figures, and a bilingual client experience, not an afterthought bolted on the end."
     },
     "how": {
       "eyebrow": "How it works",
       "title": "Four stages, start to finish.",
-      "subtitle": "The same rhythm on every project — so your team, and your client, always know what's next.",
+      "subtitle": "The same rhythm on every project, so your team, and your client, always know what's next.",
       "step1Title": "Propose",
       "step1Desc": "Build the proposal from your price book, send it, and collect the signing deposit.",
       "step2Title": "Design & approve",
@@ -92,23 +92,23 @@
     "pricing": {
       "eyebrow": "Pricing",
       "title": "Simple, while we're early.",
-      "subtitle": "One plan, everything included. Free for pilot studios during early access — no card, no lock-in.",
+      "subtitle": "One plan, everything included. Free for pilot studios during early access: no card, no lock-in.",
       "badge": "Early access",
       "planName": "Studio",
       "amount": "Free",
       "amountNote": "· during pilot",
-      "sub": "Then simple per-studio pricing — we'll talk before anything changes.",
+      "sub": "Then simple per-studio pricing. We'll talk before anything changes.",
       "feature1": "The full guided project flow",
       "feature2": "Proposals, approvals & payment gates",
       "feature3": "Cost & margin tracking to 4 decimals",
       "feature4": "Your whole team, one workspace",
       "feature5": "Arabic & English, RTL",
-      "cta": "Get started — free"
+      "cta": "Get started, free"
     },
     "final": {
       "title": "Run your next fit-out on Metra.",
-      "lede": "Set up your studio in minutes and take your next project from concept to handoff — with the numbers under control.",
-      "ctaPrimary": "Get started — free",
+      "lede": "Set up your studio in minutes and take your next project from concept to handoff, with the numbers under control.",
+      "ctaPrimary": "Get started, free",
       "ctaSecondary": "Sign in"
     },
     "footer": {
@@ -148,9 +148,9 @@
   },
   "login": {
     "signInTitle": "Sign in",
-    "signInSubtitle": "Welcome back — enter your email or phone and we'll send a sign-in code.",
+    "signInSubtitle": "Welcome back. Enter your email or phone and we'll send a sign-in code.",
     "signUpTitle": "Create your account",
-    "signUpSubtitle": "Set up your studio in minutes — enter your email or phone and we'll send a code to get started.",
+    "signUpSubtitle": "Set up your studio in minutes. Enter your email or phone and we'll send a code to get started.",
     "switchToSignUpPrompt": "New to Metra?",
     "switchToSignUpLink": "Create an account",
     "switchToSignInPrompt": "Already have an account?",
@@ -206,8 +206,8 @@
     "confirmCurrency": "Currency",
     "currencyEgp": "Egyptian Pound (EGP)",
     "inviteHint": "Invite teammates to collaborate. You can do this now or later.",
-    "inviteComingSoon": "Team invites arrive next — skip for now.",
-    "valueProp": "From the first quote to the final invoice — every line accounted for.",
+    "inviteComingSoon": "Team invites arrive next. Skip for now.",
+    "valueProp": "From the first quote to the final invoice, every line accounted for.",
     "title": "Get started",
     "subtitle": "A few steps to set up your firm.",
     "dismiss": "Dismiss",
@@ -215,7 +215,7 @@
     "launch": "Show me",
     "open": "Open",
     "readOnlyTitle": "You're all set",
-    "readOnlyBody": "Your role has read-only access — nothing to set up here.",
+    "readOnlyBody": "Your role has read-only access. Nothing to set up here.",
     "items": {
       "completeProfile": "Complete your company profile",
       "addClient": "Add your first client",
@@ -401,7 +401,7 @@
     "labelPlaceholder": "e.g. Reporting integration",
     "create": "Create key",
     "listTitle": "Your keys",
-    "listSubtitle": "Only the prefix is stored — the full key can't be shown again.",
+    "listSubtitle": "Only the prefix is stored. The full key can't be shown again.",
     "empty": "No API keys yet",
     "emptyDesc": "Create a key to start using the Public API.",
     "columnLabel": "Label",
@@ -422,7 +422,7 @@
     "revokeConfirmTitle": "Revoke this key?",
     "revokeConfirmBody": "Requests using \"{label}\" will stop working immediately. This cannot be undone.",
     "rawKeyTitle": "Copy your API key",
-    "rawKeyWarning": "This is the only time the full key is shown. Store it securely — you won't be able to see it again.",
+    "rawKeyWarning": "This is the only time the full key is shown. Store it securely: you won't be able to see it again.",
     "copy": "Copy",
     "copied": "Copied to clipboard",
     "copyFailed": "Couldn't copy. Select and copy the key manually.",
@@ -502,9 +502,9 @@
     "engagement_client_required": "Select a client",
     "engagement_project_required": "Select a project",
     "engagement_not_found": "This delivery could not be found",
-    "engagement_not_active": "This delivery is closed — no payments can be recorded",
+    "engagement_not_active": "This delivery is closed. No payments can be recorded",
     "illegal_trigger": "This action isn't allowed from the current stage",
-    "engagement_state_conflict": "This delivery was just updated — reload and try again",
+    "engagement_state_conflict": "This delivery was just updated. Reload and try again",
     "guard_scope_inputs_missing": "Add a title, client, and project before continuing",
     "design_fee_required": "Enter a design fee greater than zero",
     "milestone_split_invalid": "The milestone schedule must include a deposit and add up correctly",
@@ -520,7 +520,7 @@
     "as_built_not_reconciled": "Reconcile the as-built variance before approving the design",
     "spatial_base_missing": "Record a survey (or a developer CAD set for off-plan) before continuing",
     "concept_options_out_of_range": "Upload 2 to 4 concept options to continue",
-    "revision_co_amount_required": "This revision is beyond the free allowance — enter a change-order amount greater than zero",
+    "revision_co_amount_required": "This revision is beyond the free allowance. Enter a change-order amount greater than zero",
     "revision_cos_outstanding": "Settle the outstanding revision change orders before moving on",
     "renders_missing": "Add at least one approved render to continue",
     "as_built_not_due": "As-built drawings are not due for this delivery",
@@ -529,7 +529,7 @@
     "balance_not_cleared": "The final balance has not been fully paid yet",
     "handoff_not_acknowledged": "The recipient must acknowledge the handoff before closing",
     "handoff_not_open": "The design-only handoff isn't open at this stage",
-    "rom_range_invalid": "Enter a valid low–high build-cost range",
+    "rom_range_invalid": "Enter a valid build-cost range, low to high",
     "rom_not_set": "Enter the build-cost range before recording the client's acknowledgement",
     "rom_not_issued": "The range must be issued to the client before an acknowledgement can be recorded",
     "off_plan_locked": "Off-plan can only be changed before the deposit is paid.",
@@ -641,7 +641,7 @@
   },
   "priceBook": {
     "title": "Price Book",
-    "subtitle": "Your catalogue of cost items — costs, prices, and bulk updates.",
+    "subtitle": "Your catalogue of cost items: costs, prices, and bulk updates.",
     "search": "Search code or name",
     "allCategories": "All sections",
     "addSection": "Add section",
@@ -731,7 +731,7 @@
       "map": "Map columns",
       "preview": "Preview",
       "mapDescription": "Match each column in your file to a field.",
-      "none": "— Not mapped —",
+      "none": "(Not mapped)",
       "fields": {
         "code": "Code",
         "nameEn": "Name (English)",
@@ -1052,7 +1052,7 @@
         "contracted": "Contracted value",
         "recentActivity": "Recent activity",
         "noActivity": "No activity yet.",
-        "noStage": "—"
+        "noStage": "None"
       },
       "details": {
         "title": "Project details",
@@ -1138,7 +1138,7 @@
         "emptyTitle": "No bill of quantities yet",
         "emptyBody": "The BOQ is the priced schedule of works this project is built and measured against.",
         "startTitle": "Start the BOQ",
-        "startBody": "Download the template — it already carries your price book, so you only type quantities — then upload it back. Rows you leave without a quantity are skipped.",
+        "startBody": "Download the template (it already carries your price book, so you only type quantities), then upload it back. Rows you leave without a quantity are skipped.",
         "downloadTemplate": "Download template",
         "uploadSheet": "Upload filled sheet",
         "previewTitle": "{count} lines ready to import",
@@ -1303,7 +1303,7 @@
       "margin": "Margin",
       "cost": "Cost",
       "marginHidden": "Margin is hidden for your role",
-      "empty": "No sections yet — add one to start.",
+      "empty": "No sections yet. Add one to start.",
       "moveUp": "Move up",
       "moveDown": "Move down",
       "termsEn": "Terms (EN)",
@@ -1381,7 +1381,7 @@
     "stepOf": "Step {current} of {total}",
     "welcome": {
       "title": "Welcome to Metra",
-      "body": "A quick tour of your workspace. Follow the checklist to set up your firm — you can replay this anytime from the “?” menu."
+      "body": "A quick tour of your workspace. Follow the checklist to set up your firm. You can replay this anytime from the “?” menu."
     },
     "clients": {
       "title": "Add your clients",
@@ -1393,7 +1393,7 @@
     },
     "priceBook": {
       "title": "Build your price book",
-      "body": "Your catalogue of cost items with costs and prices — reused across proposals."
+      "body": "Your catalogue of cost items with costs and prices, reused across proposals."
     },
     "proposals": {
       "title": "Send proposals",
@@ -1666,7 +1666,7 @@
       "romAcknowledged": "Budget range acknowledged",
       "asBuiltReconciled": "As-built reconciled",
       "spatialBaseReady": "Survey or base plan ready",
-      "optionsReady": "Concept options ready (2–4)",
+      "optionsReady": "Concept options ready (2 to 4)",
       "revisionCosSettled": "Revision charges settled",
       "rendersPresent": "Approved render ready",
       "asBuiltDueOpen": "As-built check open",
@@ -1682,7 +1682,7 @@
       "logPaymentAdvance": "Log payment & advance",
       "logPayment": "Log payment",
       "advance": "Advance to the next stage",
-      "payNote": "Logging the payment advances the delivery automatically — the client is never shown the amount.",
+      "payNote": "Logging the payment advances the delivery automatically. The client is never shown the amount.",
       "payNoteRecordOnly": "Logging the balance only records it. Choose how the delivery ends once it clears."
     },
     "nextActions": {
@@ -1691,7 +1691,7 @@
     },
     "command": {
       "readyHeadline": "Ready to advance to {phase}",
-      "readyHint": "Everything checks out — advance when you're ready.",
+      "readyHint": "Everything checks out. Advance when you're ready.",
       "clientNote": "What the client asked for",
       "nudge": "Nudge client",
       "nudgeHint": "Reveal the client link so you can follow up.",
@@ -1699,7 +1699,7 @@
       "clientLinkInactive": "Not shared",
       "moreLabel": "More actions",
       "abandonConfirmTitle": "Abandon this delivery?",
-      "abandonConfirmHint": "This permanently closes the delivery — no further stages, payments or files can be recorded. It cannot be undone.",
+      "abandonConfirmHint": "This permanently closes the delivery: no further stages, payments or files can be recorded. It cannot be undone.",
       "abandonConfirmCta": "Abandon delivery",
       "abandonConfirmCancel": "Keep working",
       "pill": {
@@ -1774,11 +1774,11 @@
       "addDeliverable": "Add a deliverable",
       "logPayment": "Log a payment",
       "onBehalf": "Record on the client's behalf",
-      "onBehalfNote": "Logs an acknowledgement as the client, in this timeline. Use it only for one they gave you directly — a call, a message, a signature on paper.",
+      "onBehalfNote": "Logs an acknowledgement as the client, in this timeline. Use it only for one they gave you directly: a call, a message, a signature on paper.",
       "setRange": "Set the range",
       "reviseRange": "Revise the range",
-      "rangeNote": "An indicative build cost — not a quote, and not the design fee.",
-      "onBehalfBlocked": "Set a build-cost range first — there is nothing for the client to acknowledge yet.",
+      "rangeNote": "An indicative build cost, not a quote, and not the design fee.",
+      "onBehalfBlocked": "Set a build-cost range first. There is nothing for the client to acknowledge yet.",
       "onBehalfBlockedUnissued": "Issue the range to the client first. They cannot acknowledge a band they have not seen.",
       "issueRom": "Issue to client",
       "issueRomHint": "The client sees the range only after you issue it."
@@ -1853,7 +1853,7 @@
         },
         "fallback": {
           "headline": "Waiting on the client",
-          "sub": "Nothing is blocked on you here — the checklist below shows what they still owe."
+          "sub": "Nothing is blocked on you here. The checklist below shows what they still owe."
         }
       }
     },
@@ -1990,7 +1990,7 @@
       "confirmedOn": "Confirmed {date}",
       "retract": "Retract",
       "retractTitle": "Retract this record",
-      "retractHint": "This cannot be undone. The record stays on the ledger, struck through, with your reason beside it — and stops counting toward any gate it opened.",
+      "retractHint": "This cannot be undone. The record stays on the ledger, struck through, with your reason beside it, and stops counting toward any gate it opened.",
       "retractReason": "Why",
       "retractConfirm": "Retract it",
       "retracted": "Retracted"
@@ -2115,7 +2115,7 @@
     },
     "list": {
       "status": "Status",
-      "whoseMove": "Whose move",
+      "stage": "Stage",
       "lastChange": "Last change",
       "older": "Older deliveries",
       "newest": "Newest deliveries",

@@ -131,12 +131,44 @@ function defaultsFor(variant: ToastInput['variant']): Pick<ToastInput, 'duration
   return variant === 'destructive' ? { duration: Infinity } : { type: 'background' };
 }
 
-export function toast({ onClose, ...props }: ToastInput) {
-  const id = genId();
-  if (onClose) closeHandlers.set(id, onClose);
+function handleFor(id: string) {
   const update = (next: Partial<ToasterToast>) =>
     dispatch({ type: 'UPDATE_TOAST', toast: { ...next, id } });
   const dismiss = () => dispatch({ type: 'DISMISS_TOAST', toastId: id });
+  return { id, dismiss, update };
+}
+
+const isPlainText = (value: React.ReactNode): boolean =>
+  value === undefined || typeof value === 'string';
+
+/**
+ * The error toast already on screen that says exactly the same thing, if any.
+ * An error stays until dismissed, so the same refusal five times would
+ * otherwise stack five identical toasts. Only plain-text errors without an
+ * action or a close handler collapse: anything carrying behaviour is its own.
+ */
+function openTwinOf(input: ToastInput): ToasterToast | undefined {
+  if (input.variant !== 'destructive' || input.action || input.onClose) return undefined;
+  if (!isPlainText(input.title) || !isPlainText(input.description)) return undefined;
+  return memoryState.toasts.find(
+    (shown) =>
+      shown.open &&
+      !shown.action &&
+      !closeHandlers.has(shown.id) &&
+      shown.variant === input.variant &&
+      shown.title === input.title &&
+      shown.description === input.description,
+  );
+}
+
+export function toast(input: ToastInput) {
+  const twin = openTwinOf(input);
+  if (twin) return handleFor(twin.id);
+
+  const { onClose, ...props } = input;
+  const id = genId();
+  if (onClose) closeHandlers.set(id, onClose);
+  const { dismiss, update } = handleFor(id);
 
   dispatch({
     type: 'ADD_TOAST',

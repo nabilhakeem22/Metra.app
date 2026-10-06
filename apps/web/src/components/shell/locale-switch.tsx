@@ -2,6 +2,7 @@
 
 import { useLocale } from 'next-intl';
 import { usePathname, useRouter } from '@/i18n/routing';
+import { moneySymbol } from '@/lib/format/money';
 
 // Autonyms — always shown in the language's own script (used for the a11y label
 // describing the language you switch TO).
@@ -11,16 +12,12 @@ const LOCALE_AUTONYM: Record<string, string> = {
 };
 
 // The current locale's short badge + the currency symbol the money formatter
-// already uses for that locale (EGP / ج.م). Clicking toggles the locale — same
-// behaviour as before, reskinned to the top bar's glass pill.
+// already uses for that locale (EGP / ج.م). Clicking toggles the locale; the
+// pill is the top bar's glass pill.
 const LOCALE_SHORT: Record<string, string> = {
   en: 'EN',
   'ar-EG': 'ع',
 };
-
-function currencySymbol(locale: string): string {
-  return locale.startsWith('ar') ? 'ج.م' : 'EGP';
-}
 
 export function LocaleSwitch({ className }: { className?: string }) {
   const locale = useLocale();
@@ -49,7 +46,8 @@ export function LocaleSwitch({ className }: { className?: string }) {
       <span aria-hidden style={{ color: 'var(--text-muted)' }}>
         ·
       </span>
-      <span className="tabular">{currencySymbol(locale)}</span>
+      {/* A label, not a figure: no tabular tracking, which pinches Arabic. */}
+      <span>{moneySymbol(locale)}</span>
     </button>
   );
 }

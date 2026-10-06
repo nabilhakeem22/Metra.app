@@ -107,6 +107,34 @@ describe('useUndoableRemoval: the Undo toast is the only clock', () => {
     expect(hasPendingRemovals()).toBe(false);
   });
 
+  test('a delete already sent holds the app-wide flush until the server answers', async () => {
+    let answer!: (result: ActionResult) => void;
+    const commit = vi.fn(() => new Promise<ActionResult>((resolve) => (answer = resolve)));
+    const hook = renderHook(() =>
+      useUndoableRemoval({
+        commit,
+        messages: { removed: 'Removed', undo: 'Undo' },
+        onFailed: () => {},
+      }),
+    );
+    act(() => hook.result.current.remove('row-1'));
+    act(() => toastDouble.onExpire?.());
+    expect(commit).toHaveBeenCalledTimes(1);
+    expect(hasPendingRemovals()).toBe(true);
+
+    let flushed = false;
+    const flushing = flushPendingRemovals().then((landed) => (flushed = landed));
+    await act(async () => {});
+    expect(flushed).toBe(false);
+    expect(hasPendingRemovals()).toBe(true);
+
+    await act(async () => answer({ ok: true }));
+    await flushing;
+    expect(flushed).toBe(true);
+    expect(commit).toHaveBeenCalledTimes(1);
+    expect(hasPendingRemovals()).toBe(false);
+  });
+
   test('a refused delete brings the row back and reports it', async () => {
     const refused: ActionResult = { ok: false, error: 'forbidden' };
     const { hook, onFailed, onCommitted } = setup(refused);

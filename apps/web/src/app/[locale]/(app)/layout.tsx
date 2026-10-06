@@ -21,17 +21,16 @@ export default async function AppLayout({
   // The 'client' role belongs to the P4 client portal, not the internal shell —
   // deny it the whole (app) area (defense-in-depth beyond per-page read gates).
   if (ctx.role === 'client') notFound();
-  const user = await getSessionUser();
-  const onboarding = readOnboarding(user?.user_metadata);
-
-  const orgs = await listCurrentUserOrgs(ctx.userId);
-  // The bell's dropdown is fed from here rather than fetching on open: this layout
-  // is a server component that was already counting unread, so the panel costs no
-  // extra request and can never be staler than the page it sits on.
-  const [unreadCount, recentNotifications] = await Promise.all([
+  // One round of reads, in parallel. The bell's dropdown is fed from here rather
+  // than fetching on open: the panel costs no extra request and can never be
+  // staler than the page it sits on.
+  const [user, orgs, unreadCount, recentNotifications] = await Promise.all([
+    getSessionUser(),
+    listCurrentUserOrgs(ctx.userId),
     countUnread(ctx),
     listNotifications(ctx, { limit: 8 }),
   ]);
+  const onboarding = readOnboarding(user?.user_metadata);
 
   return (
     <AppShell

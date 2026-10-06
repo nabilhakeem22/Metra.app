@@ -16,8 +16,8 @@ const ROW_GRID =
 /**
  * The deliveries register. EACH ROW IS ONE LINK (one tab stop, the whole row is
  * the target), mirroring the dashboard's deliveries panel: it says what the
- * delivery is, where it stands in words, whose move it is (the delivery page's
- * own rule) and how long since it last changed.
+ * delivery is, its stage in words, its status (the delivery page's own rule:
+ * whose move it is) and how long since it last changed.
  */
 export function EngagementsList({ items, now }: { items: EngagementListRow[]; now: Date }) {
   const t = useTranslations('engagements');
@@ -31,8 +31,8 @@ export function EngagementsList({ items, now }: { items: EngagementListRow[]; no
         className={`${ROW_GRID} hidden border-b px-4 py-2 text-caption font-medium text-muted-foreground sm:grid`}
       >
         <span>{t('engagement')}</span>
+        <span>{t('list.stage')}</span>
         <span>{t('list.status')}</span>
-        <span>{t('list.whoseMove')}</span>
         <span className="text-end">{t('list.lastChange')}</span>
       </div>
       <ul>

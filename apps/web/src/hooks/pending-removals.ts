@@ -1,4 +1,5 @@
-// Every deferred delete still waiting for its Undo toast to close, app-wide.
+// Every deferred delete still waiting for its Undo toast to close, or already
+// sent and not yet answered by the server, app-wide.
 // A whole-document action (issuing a BOQ, opening its costed copy) and signing
 // out must not run while one is pending: the server would see a document the
 // studio already changed, or the delete would arrive without a session. They
@@ -26,7 +27,8 @@ export function hasPendingRemovals(): boolean {
 }
 
 /**
- * Commit every pending delete now and wait for the server to answer each.
+ * Commit every pending delete now and wait for the server to answer each,
+ * including the deletes that were already on their way.
  * False when any was refused: that row is back on screen with its error, so a
  * whole-document action should stop rather than run on a document that still
  * holds it.

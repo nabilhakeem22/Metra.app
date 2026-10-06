@@ -11,6 +11,13 @@ import { toast } from '@/hooks/use-toast';
  */
 const UNDO_WINDOW_MS = 5000;
 
+/**
+ * The longest an Undo toast may stay, paused or not. Radix pauses its timer for
+ * as long as the toast is hovered, focused or the window is blurred, so without
+ * a cap a parked pointer would keep a delete pending for ever.
+ */
+export const UNDO_HARD_CAP_MS = 30_000;
+
 export interface UndoToastHandle {
   /** Close the toast now. Its `onExpire` runs unless Undo was pressed. */
   dismiss: () => void;
@@ -20,8 +27,8 @@ export interface UndoToastHandle {
  * A toast that says what just happened and offers to take it back.
  *
  * `onExpire` is the toast's single clock: it runs once when the toast leaves for
- * any reason OTHER than Undo (its timer, its close button, a swipe, Escape,
- * `dismiss()`, or eviction by the toast limit). Once it has run the toast is
+ * any reason OTHER than Undo (its timer, the UNDO_HARD_CAP_MS cap, its close
+ * button, a swipe, Escape, `dismiss()`, or eviction by the toast limit). Once it has run the toast is
  * gone, so Undo can never be pressed after the thing it would undo has started.
  */
 export function showUndoToast(options: {
@@ -47,8 +54,12 @@ export function showUndoToast(options: {
       </ToastAction>
     ),
     onClose: () => {
+      clearTimeout(hardCap);
       if (!undone) options.onExpire?.();
     },
   });
+  // Read by onClose, which can only run after this line: a toast never closes
+  // inside the call that shows it.
+  const hardCap = setTimeout(dismiss, UNDO_HARD_CAP_MS);
   return { dismiss };
 }

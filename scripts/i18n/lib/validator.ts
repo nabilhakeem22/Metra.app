@@ -92,10 +92,20 @@ export function validate(targetPath: string, strict: boolean): Report {
     }
   }
 
-  // Per-value checks only for keys present in both.
   for (const key of enKeys) {
-    if (!arKeySet.has(key)) continue;
     const enValue = en[key];
+
+    // Em/en dash in the English source, on EVERY key (present in ar or not):
+    // the house style rewrites it as a comma, colon, period, brackets or "to".
+    if (EM_DASH.test(enValue)) {
+      addFinding(report.fatal, 'em dash (en)', {
+        key,
+        detail: 'en value contains — or –',
+      });
+    }
+
+    // Per-value checks only for keys present in both.
+    if (!arKeySet.has(key)) continue;
     const arValue = ar[key];
 
     // 2. Empty / whitespace-only.
