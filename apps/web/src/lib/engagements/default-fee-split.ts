@@ -85,13 +85,18 @@ function percentOfHundredths(hundredths: bigint): string {
 /**
  * Each amount as a share of the fee, in hundredths of a percent, rounded half up
  * in BigInt (never float). The residual that makes the shares sum to exactly
- * 100% goes to the LAST row (due order) that has an amount.
+ * 100% goes to the LARGEST share (the last of equals, in due order): it is never
+ * more than a few hundredths, so the largest row can always absorb it without
+ * going negative, which a small last row could not.
  */
 function percentsOfAmounts(amounts4: bigint[], fee4: bigint): bigint[] {
   const shares = amounts4.map((amount4) => (amount4 * 10000n * 2n + fee4) / (2n * fee4));
   const residual = 10000n - shares.reduce((sum, share) => sum + share, 0n);
-  const lastWithAmount = amounts4.map((amount4) => amount4 > 0n).lastIndexOf(true);
-  if (lastWithAmount >= 0) shares[lastWithAmount] += residual;
+  let largest = 0;
+  shares.forEach((share, index) => {
+    if (share >= shares[largest]) largest = index;
+  });
+  if (shares.length > 0) shares[largest] += residual;
   return shares;
 }
 

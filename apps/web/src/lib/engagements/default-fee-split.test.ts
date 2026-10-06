@@ -141,6 +141,23 @@ describe('deriveFeeSplitPrefill', () => {
     ]);
   });
 
+  it('the residual never makes a row negative: 3333.5/3333.5/3332.5/0.5 of 10000', () => {
+    const prefill = deriveFeeSplitPrefill({
+      designFee: '10000.0000',
+      milestones: [
+        { kind: 'deposit', basis: 'amount', value: '3333.5' },
+        { kind: 'gate_a', basis: 'amount', value: '3333.5' },
+        { kind: 'gate_b', basis: 'amount', value: '3332.5' },
+        { kind: 'balance', basis: 'amount', value: '0.5' },
+      ],
+    });
+    const values = prefill.rows.map((row) => row.value);
+    expect(values).toEqual(['33.34', '33.32', '33.33', '0.01']);
+    for (const value of values) expect(Number(value)).toBeGreaterThanOrEqual(0);
+    const hundredths = values.map((value) => Math.round(Number(value) * 100));
+    expect(hundredths.reduce((sum, part) => sum + part, 0)).toBe(10000);
+  });
+
   it('the residual skips a trailing zero row', () => {
     expect(valuesOf(deriveFeeSplitPrefill(amounts('3.0000', ['1', '2', '0'])))).toEqual([
       '33.33',

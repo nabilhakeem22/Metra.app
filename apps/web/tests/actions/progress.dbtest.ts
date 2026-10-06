@@ -1,6 +1,6 @@
 import type { Organization } from '@metra/db';
 import { afterAll, describe, expect, it } from 'vitest';
-import { createClientCore } from '@/lib/clients/core';
+import { createClientCore, setClientActiveCore } from '@/lib/clients/core';
 import { listClients } from '@/lib/clients/queries';
 import { createEngagementCore } from '@/lib/engagements/core';
 import { getOnboardingProgress } from '@/lib/onboarding/progress';
@@ -93,5 +93,16 @@ describe('getOnboardingProgress — in-org rows only', () => {
     expect(p.teamInvited).toBe(true); // 2 members
     expect(p.hasProposal).toBe(true);
     expect(p.hasSentProposal).toBe(false); // still draft
+  });
+
+  it('a deactivated client does not count: the ladder still asks for a client', async () => {
+    const { orgId, ownerIds } = await seedOrg({ owners: 1 });
+    orgIds.push(orgId);
+    const ctx = ctxFor(orgId, ownerIds[0], 'owner');
+    await createClientCore(ctx, { phone: '01000000000', nameEn: 'C' });
+    const [client] = await listClients(ctx, {});
+    expect((await getOnboardingProgress(ctx, orgNoCity)).hasClient).toBe(true);
+    expect((await setClientActiveCore(ctx, { id: client.id, active: false })).ok).toBe(true);
+    expect((await getOnboardingProgress(ctx, orgNoCity)).hasClient).toBe(false);
   });
 });

@@ -31,7 +31,9 @@ interface ProgressRow {
  * One RLS-scoped round-trip: a batched `exists(...)` per module table. Because
  * every subquery runs under withOrgContext, a flag is true iff a real row exists
  * in THIS org — another org's rows never flip it. `teamInvited` ticks on send
- * (a live pending invite) as well as on accept.
+ * (a live pending invite) as well as on accept. A client or project counts only
+ * while ACTIVE, matching the pickers the setup ladder sends the studio to (a
+ * deactivated client cannot be chosen for a project or a delivery).
  */
 export async function getOnboardingProgress(
   ctx: OrgContext,
@@ -43,8 +45,8 @@ export async function getOnboardingProgress(
         (select count(*)::int from public.memberships) as member_count,
         exists(select 1 from public.invitations where status = 'pending') as pending,
         exists(select 1 from public.cost_items) as has_cost_item,
-        exists(select 1 from public.clients) as has_client,
-        exists(select 1 from public.projects) as has_project,
+        exists(select 1 from public.clients where active) as has_client,
+        exists(select 1 from public.projects where active) as has_project,
         exists(select 1 from public.design_engagements) as has_engagement,
         exists(select 1 from public.proposals where kind = 'quote') as has_proposal,
         exists(
