@@ -89,6 +89,18 @@ export interface ToastInput {
   variant?: ToastProps['variant'];
   action?: ToastActionElement;
   duration?: number;
+  type?: ToastProps['type'];
+}
+
+/**
+ * How a toast speaks to assistive tech and how long it stays, by kind. An
+ * ERROR stays until it is dismissed: a refusal that vanishes in five seconds
+ * is one a slow reader or a screen-reader user never gets to. Everything else
+ * is announced politely (`background`), never interrupting what is being read.
+ * A caller's explicit `duration` / `type` still wins.
+ */
+function defaultsFor(variant: ToastInput['variant']): Pick<ToastInput, 'duration' | 'type'> {
+  return variant === 'destructive' ? { duration: Infinity } : { type: 'background' };
 }
 
 export function toast({ ...props }: ToastInput) {
@@ -100,6 +112,7 @@ export function toast({ ...props }: ToastInput) {
   dispatch({
     type: 'ADD_TOAST',
     toast: {
+      ...defaultsFor(props.variant),
       ...props,
       id,
       open: true,
