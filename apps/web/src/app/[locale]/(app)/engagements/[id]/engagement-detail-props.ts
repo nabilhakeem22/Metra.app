@@ -1,6 +1,7 @@
 import type { BoqStepData } from '@/lib/boqs/step';
 import type { FeeSplitPrefill } from '@/lib/engagements/default-fee-split';
 import type { EngagementGatePreview } from '@/lib/engagements/gate-preview';
+import type { DeliveryStatus } from '@/lib/engagements/delivery-status';
 import type { CommercialPulse } from '@/lib/engagements/pulse';
 import type {
   EngagementArtifactRecord,
@@ -57,7 +58,8 @@ export interface EngagementDetailProps {
   /** The fee form's opening split, read only while the delivery is `created`. */
   feeSplitPrefill: FeeSplitPrefill | null;
   canResolveClaims: boolean;
-  stallDays: number | null;
+  /** The one delivery status the header chip and the command card's colour read. */
+  status: DeliveryStatus;
   pulse: CommercialPulse;
   /** The PENDING client payment claims (empty for a role without finance read). */
   paymentClaims: EngagementPaymentClaimRecord[];

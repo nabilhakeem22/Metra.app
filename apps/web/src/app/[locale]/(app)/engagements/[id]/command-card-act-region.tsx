@@ -17,9 +17,9 @@ export function CommandCardActRegion({
   model,
 }: {
   card: EngagementCommandCardProps;
-  model: Pick<CommandCardModel, 'view' | 'chrome' | 'ctas'>;
+  model: Pick<CommandCardModel, 'view' | 'ctas'>;
 }) {
-  const { view, chrome, ctas } = model;
+  const { view, ctas } = model;
   const [feeOpen, setFeeOpen] = useState(false);
   const [payOpen, setPayOpen] = useState(false);
   return (
@@ -36,7 +36,7 @@ export function CommandCardActRegion({
         <CommandCardAction
           view={view}
           ctas={ctas}
-          waitingOnClient={chrome.waitingOnClient}
+          waitingOnClient={view.mode === 'blockedClient'}
           canShare={card.canShare}
           pending={card.pending}
           onNudge={card.onNudge}

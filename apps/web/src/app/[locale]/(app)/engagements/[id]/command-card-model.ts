@@ -26,10 +26,7 @@ export function deriveCommandCardModel(props: EngagementCommandCardProps): Comma
     isTerminal: isTerminal(props.state),
   });
   const closed = view.mode === 'closed';
-  const chrome = resolveCommandCardChrome({
-    mode: view.mode,
-    paymentClaimCount: props.paymentClaims.length,
-  });
+  const chrome = resolveCommandCardChrome(props.status);
   const ctas = resolveCommandCardCtas(props.preview, {
     canRecordPayment: props.canRecordPayment,
     canAdvance: props.canAdvance,

@@ -9,9 +9,9 @@ import { can } from '@/lib/permissions/can';
 import { EngagementBreadcrumb } from './engagement-breadcrumb';
 import { EngagementDetailClient } from './engagement-detail-client';
 import {
+  deliveryStatusOf,
   engagementCapabilities,
   loadEngagementDetail,
-  stallDaysSince,
 } from './engagement-detail-data';
 import { EngagementHeaderCard } from './engagement-header-card';
 import { DELIVERY_SHARE_ANCHOR_ID } from './share-anchor';
@@ -53,6 +53,12 @@ export default async function EngagementDetailPage({
   const forwardMoves = forwardMovesOf(gatePreview);
   const canAdvance =
     forwardMoves.length > 0 && forwardMoves.every((trigger) => canRunTrigger(ctx.role, trigger));
+  const status = deliveryStatusOf({
+    header,
+    gatePreview,
+    pendingClaimCount: paymentClaims.length,
+    now: new Date(),
+  });
 
   return (
     <div className="space-y-6">
@@ -62,7 +68,7 @@ export default async function EngagementDetailPage({
         projectId={header.projectId}
         projectName={projectName}
       />
-      <EngagementHeaderCard header={header} shared={shareStatus.shared} />
+      <EngagementHeaderCard header={header} shared={shareStatus.shared} status={status} />
       {canShare && (
         <div id={DELIVERY_SHARE_ANCHOR_ID} tabIndex={-1} className="scroll-mt-4 outline-none">
           <DeliveryShareLink
@@ -99,7 +105,7 @@ export default async function EngagementDetailPage({
         canAdvance={canAdvance}
         feeSplitPrefill={data.feeSplitPrefill}
         canResolveClaims={canResolveClaims}
-        stallDays={stallDaysSince(transitions)}
+        status={status}
         // A pure read-model over the fee schedule + payments already loaded (no
         // extra round trip). Serialized scale-4 strings + an integer percent.
         pulse={computeCommercialPulse({

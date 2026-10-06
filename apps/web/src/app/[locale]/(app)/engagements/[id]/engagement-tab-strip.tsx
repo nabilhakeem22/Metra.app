@@ -1,6 +1,7 @@
 'use client';
 
 import { useTranslations } from 'next-intl';
+import { StatusChip } from '@/components/ui/status-chip';
 import type { BudgetBadge } from '@/lib/engagements/budget-badge';
 import { ENGAGEMENT_TABS, type EngagementTab } from './tabs';
 
@@ -54,13 +55,7 @@ export function EngagementTabStrip(props: EngagementTabStripProps) {
         // the client has not yet acknowledged is unissued work sitting in that
         // tab, and saying so is worth more than saying "1".
         const budgetState =
-          tab !== 'budget' || props.budget === null || props.closed
-            ? null
-            : t(
-                props.budget === 'draft'
-                  ? 'offPlan.budgetDraftBadge'
-                  : 'offPlan.budgetAwaitingAckBadge',
-              );
+          tab !== 'budget' || props.budget === null || props.closed ? null : props.budget;
         const badgeCount = badgeCountFor(tab, props);
         const active = props.tab === tab;
         return (
@@ -83,17 +78,21 @@ export function EngagementTabStrip(props: EngagementTabStripProps) {
           >
             {tp(tab)}
             {budgetState && (
-              <span className="font-mono text-caption font-bold uppercase tracking-[0.06em] text-[color:var(--warn)]">
-                {budgetState}
-              </span>
+              <StatusChip
+                tone={budgetState === 'draft' ? 'draft' : 'waiting'}
+                label={t(
+                  budgetState === 'draft'
+                    ? 'offPlan.budgetDraftBadge'
+                    : 'offPlan.budgetAwaitingAckBadge',
+                )}
+              />
             )}
+            {/* Something addressed TO the studio: its move. */}
             {badgeCount > 0 && (
-              <span
-                className="inline-flex items-center rounded-pill bg-[color:var(--warn-tint)] px-1.5 py-0.5 text-caption font-semibold text-[color:var(--warn)]"
-                dir="ltr"
-              >
-                {t(tab === 'files' ? 'questionsBadge' : 'paymentsBadge', { n: badgeCount })}
-              </span>
+              <StatusChip
+                tone="yourMove"
+                label={t(tab === 'files' ? 'questionsBadge' : 'paymentsBadge', { n: badgeCount })}
+              />
             )}
           </button>
         );

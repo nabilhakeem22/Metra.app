@@ -1,6 +1,5 @@
 import { describe, expect, test } from 'vitest';
 import type { CommandCardMode } from './command-card';
-import { derivePillKey, type CommandCardPillKey } from './command-card-chrome';
 import type { GateChecklistItem } from './gate-preview';
 import type { Trigger } from './transitions';
 import { resolveWhoseMove, whoseMoveOfMode, type WhoseMove } from './whose-move';
@@ -19,17 +18,6 @@ describe('whoseMoveOfMode — 4 modes x claims 0/1', () => {
 
   test.each(table)('%s + %i claims -> %s', (mode, claims, expected) => {
     expect(whoseMoveOfMode(mode, claims)).toBe(expected);
-  });
-
-  // The list/dashboard chip and the cockpit pill must say the same thing.
-  const PILL_FOR: Record<WhoseMove, CommandCardPillKey[]> = {
-    studio: ['ready', 'studio'],
-    client: ['waitingClient'],
-    confirmPayment: ['paymentToConfirm'],
-    closed: ['closed'],
-  };
-  test.each(table)('%s + %i claims: the cockpit pill agrees', (mode, claims, expected) => {
-    expect(PILL_FOR[expected]).toContain(derivePillKey(mode, claims));
   });
 });
 

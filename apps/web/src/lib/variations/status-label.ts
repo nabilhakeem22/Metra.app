@@ -3,6 +3,9 @@
 // it and carry no derivation of its own.
 import type { VariationStatus } from '@metra/db';
 
+/** A variation's DB status, with a cascade rejection told apart (see below). */
+export type VariationStatusKey = VariationStatus | 'rejected_on_termination';
+
 /**
  * The message key under `variations.status` for one register row.
  *
@@ -21,7 +24,7 @@ import type { VariationStatus } from '@metra/db';
 export function variationStatusKey(row: {
   status: VariationStatus;
   rejectionChannel: string | null;
-}): string {
+}): VariationStatusKey {
   if (row.status === 'rejected' && row.rejectionChannel === 'staff') {
     return 'rejected_on_termination';
   }

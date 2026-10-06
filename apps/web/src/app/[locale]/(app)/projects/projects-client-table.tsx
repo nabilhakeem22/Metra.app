@@ -5,17 +5,11 @@ import type { useTranslations } from 'next-intl';
 import type { Dispatch, SetStateAction } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { StatusChip } from '@/components/ui/status-chip';
 import { Link } from '@/i18n/routing';
 import { pickLocale } from '@/lib/i18n/pick-locale';
+import { PROJECT_STATUS_TONE } from '@/lib/ui/record-status-tones';
 import type { ProjectListItem } from './types';
-
-const STATUS_STYLE: Record<string, string> = {
-  draft: 'bg-muted text-muted-foreground',
-  active: 'bg-[color:var(--success-tint)] text-[color:var(--success)]',
-  on_hold: 'bg-[color:var(--warn-tint)] text-[color:var(--warn)]',
-  completed: 'bg-[color:var(--brand-tint)] text-[color:var(--brand-ink)]',
-  cancelled: 'bg-destructive/10 text-destructive',
-};
 
 // The projects list table. All list/filter/mutation state lives in the parent
 // (ProjectsClient); this child renders `filtered` rows and forwards row actions
@@ -90,11 +84,10 @@ export function ProjectsClientTable({
                       {clientName || '—'}
                     </td>
                     <td className="px-4 py-2">
-                      <span
-                        className={`rounded-pill px-2 py-0.5 text-caption ${STATUS_STYLE[p.status] ?? 'bg-muted text-muted-foreground'}`}
-                      >
-                        {t(`statuses.${p.status}`)}
-                      </span>
+                      <StatusChip
+                        tone={PROJECT_STATUS_TONE[p.status]}
+                        label={t(`statuses.${p.status}`)}
+                      />
                     </td>
                     <td className="px-4 py-2 text-muted-foreground" dir="ltr">
                       {dateRange(p)}

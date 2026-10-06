@@ -26,13 +26,13 @@ import { EngagementSecondaryActions } from './engagement-secondary-actions';
 // (`deriveCommandCard`): the headline reflects what ACTUALLY blocks Advance — the
 // real unmet forward guards. The client's advisory approval NEVER gates Advance.
 //
-// EACH FACT APPEARS ONCE. Whose move it is = the pill (never also a second line);
-// what blocks Advance = the checklist row, marked ● unmet (never also a hint
-// interpolation or a note under the button). The hint POINTS at the checklist and
-// does not restate it; a second rendering of either is a regression.
+// EACH FACT APPEARS ONCE. Whose move it is = the header's status chip (the card
+// only wears its colour); what blocks Advance = the checklist row, marked ● unmet
+// (never also a hint interpolation or a note under the button). The hint POINTS
+// at the checklist and does not restate it; a second rendering of either is a
+// regression.
 export function EngagementCommandCard(props: EngagementCommandCardProps) {
   const { engagementId, preview, state, pending, canShare, canUpload, onNudge } = props;
-  const t = useTranslations('engagements');
   const th = useTranslations('engagements.hero');
   const { view, closed, chrome, ctas } = deriveCommandCardModel(props);
   const copy = useCommandCardCopy({ state, view, closed });
@@ -42,17 +42,11 @@ export function EngagementCommandCard(props: EngagementCommandCardProps) {
       className={`glass relative overflow-hidden p-0 text-[color:var(--text)] ${chrome.borderClass}`}
     >
       <CommandCardAccentStripe className={chrome.stripeClass} />
-      <CommandCardStatusBand state={state} chrome={chrome} />
+      <CommandCardStatusBand state={state} />
 
       <div className="px-5 pb-5 pt-5 sm:px-6">
         {!closed && (
-          <EngagementHeroBadges
-            t={t}
-            th={th}
-            state={state}
-            stallDays={props.stallDays}
-            allowances={props.allowances}
-          />
+          <EngagementHeroBadges th={th} state={state} allowances={props.allowances} />
         )}
 
         <CommandCardHeadline
@@ -85,7 +79,7 @@ export function EngagementCommandCard(props: EngagementCommandCardProps) {
               }}
             />
 
-            <CommandCardActRegion card={props} model={{ view, chrome, ctas }} />
+            <CommandCardActRegion card={props} model={{ view, ctas }} />
 
             {/* 3. FOOTER — client link + the "more actions" secondary controls. */}
             <EngagementSecondaryActions

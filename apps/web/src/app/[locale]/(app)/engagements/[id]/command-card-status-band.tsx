@@ -2,14 +2,12 @@
 
 import { Link2 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
-import type { CommandCardChrome } from '@/lib/engagements/command-card-chrome';
 import type { DesignState } from '@/lib/engagements/states';
 import { EngagementStageSpine } from './engagement-stage-spine';
 
 /**
- * The accent stripe — 4px on the inline-START, so it mirrors to the inline-END in
- * ar-EG RTL. Mode-driven colour, and the only thing that still carries the mode
- * once the pill is suppressed everywhere but `paymentToConfirm`.
+ * The accent stripe: 4px on the inline-START, so it mirrors to the inline-END in
+ * ar-EG RTL. Its colour is the delivery status's (command-card-chrome.ts).
  */
 export function CommandCardAccentStripe({ className }: { className: string }) {
   return (
@@ -22,41 +20,20 @@ export function CommandCardAccentStripe({ className }: { className: string }) {
 }
 
 /**
- * 1. WHERE WE ARE — ribbon, status and whose-move in ONE tinted band.
- *
- * Grouping them is the point: two stacked strips read as two separate facts,
- * when they are one answer to "where is this".
+ * 1. WHERE WE ARE: the stage ribbon in one tinted band. Whose move it is lives
+ * in the header's status chip, and the card wears its colour; it is never said
+ * a second time here.
  */
-export function CommandCardStatusBand({
-  state,
-  chrome,
-}: {
-  state: DesignState;
-  chrome: Pick<CommandCardChrome, 'showPaymentPill' | 'pillKey' | 'pillClass'>;
-}) {
-  const tcmd = useTranslations('engagements.command');
+export function CommandCardStatusBand({ state }: { state: DesignState }) {
   return (
     <div
       className="border-b border-[color:var(--rule)] px-5 pb-4 pt-5 sm:px-6"
       style={{ background: 'var(--track)' }}
     >
       <EngagementStageSpine state={state} />
-      {chrome.showPaymentPill && (
-        <div className="mt-3.5 flex flex-wrap items-center gap-2.5">
-          <span
-            className={`inline-flex items-center rounded-pill px-2.5 py-1 text-caption font-semibold uppercase tracking-[0.08em] ${chrome.pillClass}`}
-          >
-            {tcmd(`pill.${chrome.pillKey}`)}
-          </span>
-          <span className="text-small text-[color:var(--text-muted)]">
-            {tcmd('move.studio')}
-          </span>
-        </div>
-      )}
     </div>
   );
 }
-
 
 /**
  * 4. QUIET FOOTER — present, never shouting. Its own band rather than a rule

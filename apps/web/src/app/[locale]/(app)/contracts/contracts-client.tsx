@@ -6,6 +6,7 @@ import { useState, useTransition } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
+import { StatusChip } from '@/components/ui/status-chip';
 import { Link, useRouter } from '@/i18n/routing';
 import { docYear, formatDocNumber } from '@/lib/format/doc-number';
 import { formatMoney } from '@/lib/format/money';
@@ -13,13 +14,7 @@ import { formatProposalNumber, proposalYear } from '@/lib/format/proposal-number
 import { pickLocale } from '@/lib/i18n/pick-locale';
 import { generateContract } from '@/lib/contracts/actions';
 import type { ContractListRow } from '@/lib/contracts/queries';
-
-const STATUS_STYLE: Record<string, string> = {
-  draft: 'bg-muted text-muted-foreground',
-  issued: 'bg-[color:var(--brand-tint)] text-[color:var(--brand-ink)]',
-  signed: 'bg-[color:var(--success-tint)] text-[color:var(--success)]',
-  terminated: 'bg-destructive/10 text-destructive',
-};
+import { CONTRACT_STATUS_TONE } from '@/lib/ui/record-status-tones';
 
 interface Generatable {
   id: string;
@@ -145,9 +140,10 @@ export function ContractsClient({
                         {pickLocale({ nameAr: c.projectNameAr, nameEn: c.projectNameEn }, 'name', locale).value || '—'}
                       </td>
                       <td className="px-4 py-2">
-                        <span className={`rounded-pill px-2 py-0.5 text-caption ${STATUS_STYLE[c.status] ?? 'bg-muted'}`}>
-                          {t(`status.${c.status}`)}
-                        </span>
+                        <StatusChip
+                          tone={CONTRACT_STATUS_TONE[c.status]}
+                          label={t(`status.${c.status}`)}
+                        />
                       </td>
                       <td className="px-4 py-2 text-end" dir="ltr">
                         {formatMoney(c.originalValue, locale)}

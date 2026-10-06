@@ -25,7 +25,7 @@ export function commandCardPropsOf(
       designRevisionCount: header.designRevisionCount,
       freeDesignRevisionN: header.freeDesignRevisionN,
     },
-    stallDays: detail.stallDays,
+    status: detail.status,
     canAdvance: detail.canAdvance,
     canRecordPayment: detail.capabilities.recordPayment,
     canResolveClaims: detail.canResolveClaims,

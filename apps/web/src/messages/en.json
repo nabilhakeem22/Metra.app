@@ -1633,7 +1633,6 @@
       "handoffAcknowledged": "Handoff acknowledged"
     },
     "hero": {
-      "day": "Day {n}",
       "revision": "Revision {n} of {free}",
       "designRevision": "3D revision {n} of {free}",
       "dueLabel": "Due",
@@ -1661,17 +1660,10 @@
       "abandonConfirmCta": "Abandon delivery",
       "abandonConfirmCancel": "Keep working",
       "pill": {
-        "ready": "Ready to advance",
-        "studio": "Your move",
         "waitingClient": "Waiting on client",
-        "paymentToConfirm": "Payment to confirm",
-        "closed": "Closed",
         "crumb": "Deliveries",
         "feeChip": "Design fee {amount}",
         "startedOn": "Started {date}"
-      },
-      "move": {
-        "studio": "Your move"
       },
       "awaitingReply": "{n, plural, one {# client question is waiting on your reply, in Files.} other {# client questions are waiting on your reply, in Files.}}",
       "nextAction": "Next action",
@@ -2082,11 +2074,13 @@
       "today": "today",
       "sinceDays": "{count, plural, one {{n} day} other {{n} days}}"
     },
-    "whoseMove": {
-      "studio": "Your move",
-      "client": "Waiting on the client",
+    "status": {
+      "yourMove": "Your move",
       "confirmPayment": "Payment to confirm",
-      "closed": "Closed"
+      "waitingClient": "Waiting on client",
+      "stalled": "Stalled",
+      "delivered": "Delivered",
+      "abandoned": "Abandoned"
     }
   },
   "delivery": {

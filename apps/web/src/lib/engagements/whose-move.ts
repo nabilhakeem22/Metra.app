@@ -1,5 +1,5 @@
 // Design-Engagement Machine — WHOSE MOVE is it? PURE and CLIENT-SAFE: one rule,
-// read by the cockpit pill, the deliveries list and the dashboard, so the three
+// read by the delivery page, the deliveries list and the dashboard, so the three
 // can never disagree about the same delivery. It is a re-projection of the
 // command card's own mode (`deriveCommandCard`) plus the pending client payment
 // claims, not a per-state table kept by hand.

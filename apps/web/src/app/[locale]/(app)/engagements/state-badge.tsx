@@ -2,23 +2,14 @@
 
 import { useTranslations } from 'next-intl';
 import type { DesignEngagementState } from '@metra/db';
-import { Badge, type BadgeProps } from '@/components/ui/badge';
+import { StatusChip } from '@/components/ui/status-chip';
 import { spinePosition, spineStageKeyOf } from '@/lib/engagements/stage-spine';
 import type { DesignState } from '@/lib/engagements/states';
+import { DESIGN_STATE_TONE } from '@/lib/ui/record-status-tones';
 
-// Status families map to the glass semantic tokens via the Badge variants (NOT
-// raw emerald/amber/blue utilities): neutral for in-flight, brand for the active
-// design push, success for a good terminal outcome, danger for abandoned, warn
-// for the change-triage detour. Any state without an explicit entry falls back
-// to the brand ("active") variant. Mirrors the contracts status badge.
-const STATE_VARIANT: Partial<Record<DesignEngagementState, BadgeProps['variant']>> =
-  {
-    created: 'default',
-    closed_design_only: 'success',
-    execution: 'success',
-    abandoned: 'danger',
-    change_triage: 'warn',
-  };
+// The machine state as a chip, on the shared StatusChip tones: a new delivery is
+// a draft, both endings are done, everything in flight (and abandoned) is
+// neutral. Whose move it is, and for how long, is the delivery status chip's job.
 
 export function StateBadge({
   state,
@@ -35,7 +26,7 @@ export function StateBadge({
   const position = spinePosition(state as DesignState);
   return (
     <span className="inline-flex items-center gap-2">
-      <Badge variant={STATE_VARIANT[state] ?? 'brand'}>{t(`state.${state}`)}</Badge>
+      <StatusChip tone={DESIGN_STATE_TONE[state as DesignState]} label={t(`state.${state}`)} />
       {showStage && !position.closed && (
         <span className="text-caption text-[color:var(--text-muted)]">
           {spine(spineStageKeyOf(state as DesignState))}

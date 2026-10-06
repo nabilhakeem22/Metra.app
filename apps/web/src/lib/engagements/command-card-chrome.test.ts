@@ -1,103 +1,41 @@
 import { describe, expect, test } from 'vitest';
-import type { CommandCardMode } from './command-card';
-import {
-  derivePillKey,
-  resolveCommandCardChrome,
-  type CommandCardPillKey,
-} from './command-card-chrome';
+import { resolveCommandCardChrome } from './command-card-chrome';
+import type { DeliveryStatus } from './delivery-status';
 
-const MODES: CommandCardMode[] = ['closed', 'ready', 'blockedStudio', 'blockedClient'];
+const BRAND = { stripeClass: 'bg-brand', borderClass: 'border-[color:var(--brand-tint-border)]' };
+const NEUTRAL = { stripeClass: 'bg-[color:var(--rule)]', borderClass: 'border-[color:var(--rule)]' };
+const WARN = { stripeClass: 'bg-[color:var(--warn)]', borderClass: 'border-[color:var(--warn-tint)]' };
+const SUCCESS = {
+  stripeClass: 'bg-[color:var(--success)]',
+  borderClass: 'border-[color:var(--success-tint)]',
+};
 
-describe('derivePillKey — the pill table, 4 modes x claim-count 0 and 2', () => {
-  const table: [CommandCardMode, number, CommandCardPillKey][] = [
-    ['closed', 0, 'closed'],
-    ['closed', 2, 'closed'],
-    ['ready', 0, 'ready'],
-    ['blockedStudio', 0, 'studio'],
-    ['blockedClient', 0, 'waitingClient'],
-    // A claim sits with the STUDIO in every live mode, so the card must say so:
-    // never "waiting on the client", and never a plain "ready".
-    ['ready', 2, 'paymentToConfirm'],
-    ['blockedStudio', 2, 'paymentToConfirm'],
-    ['blockedClient', 2, 'paymentToConfirm'],
+describe('resolveCommandCardChrome: one colour family per delivery status', () => {
+  const table: [DeliveryStatus, typeof BRAND][] = [
+    [{ kind: 'yourMove' }, BRAND],
+    [{ kind: 'confirmPayment' }, BRAND],
+    [{ kind: 'waitingClient', days: 3 }, NEUTRAL],
+    [{ kind: 'stalled', days: 9 }, WARN],
+    [{ kind: 'delivered' }, SUCCESS],
+    [{ kind: 'abandoned' }, NEUTRAL],
   ];
 
-  test.each(table)('%s + %i claims -> %s', (mode, claims, expected) => {
-    expect(derivePillKey(mode, claims)).toBe(expected);
+  test.each(table)('%o', (status, expected) => {
+    expect(resolveCommandCardChrome(status)).toEqual(expected);
   });
 
-  test('only closed ignores the claim count', () => {
-    for (const mode of MODES) {
-      const sensitive = derivePillKey(mode, 0) !== derivePillKey(mode, 5);
-      expect(sensitive).toBe(mode !== 'closed');
-    }
-  });
-});
-
-describe('resolveCommandCardChrome — the four class families', () => {
-  const chromeFor = (mode: CommandCardMode, paymentClaimCount = 0) =>
-    resolveCommandCardChrome({ mode, paymentClaimCount });
-
-  test('closed is NEUTRAL', () => {
-    const chrome = chromeFor('closed');
-    expect(chrome.accent).toBe('neutral');
-    expect(chrome.stripeClass).toBe('bg-[color:var(--rule)]');
-    expect(chrome.borderClass).toBe('border-[color:var(--rule)]');
-  });
-
-  test('ready is BRAND', () => {
-    const chrome = chromeFor('ready');
-    expect(chrome.accent).toBe('brand');
-    expect(chrome.stripeClass).toBe('bg-brand');
-    expect(chrome.pillClass).toBe('bg-brand-tint text-brand-ink');
-  });
-
-  test('both blocked modes are WARN — attention, not failure', () => {
-    for (const mode of ['blockedStudio', 'blockedClient'] as const) {
-      expect(chromeFor(mode).accent).toBe('warn');
-      expect(chromeFor(mode).stripeClass).toBe('bg-[color:var(--warn)]');
-    }
-  });
-
-  test('every mode gets all four class families, none empty', () => {
-    for (const mode of MODES) {
-      const chrome = chromeFor(mode);
-      expect(chrome.stripeClass).not.toBe('');
-      expect(chrome.pillClass).not.toBe('');
-      expect(chrome.borderClass).not.toBe('');
-    }
+  test('your move and waiting on the client never share a colour', () => {
+    expect(resolveCommandCardChrome({ kind: 'yourMove' })).not.toEqual(
+      resolveCommandCardChrome({ kind: 'waitingClient', days: 0 }),
+    );
   });
 
   // Logical CSS only (metra/no-physical-inline-direction): nothing here may name
   // left or right, because this card mirrors wholesale in ar-EG.
-  test('no class family names a physical direction', () => {
-    for (const mode of MODES) {
-      const chrome = chromeFor(mode);
-      const classes = `${chrome.stripeClass} ${chrome.pillClass} ${chrome.borderClass}`;
-      expect(classes).not.toMatch(/\b(left|right)\b/);
-    }
-  });
-});
-
-describe('resolveCommandCardChrome — the pill and the waiting flag', () => {
-  test('the pill renders ONLY for paymentToConfirm', () => {
-    for (const mode of MODES) {
-      // Every live mode with a pending claim (the C4 whose-move rule).
-      const expected = mode !== 'closed';
-      expect(resolveCommandCardChrome({ mode, paymentClaimCount: 2 }).showPaymentPill).toBe(
-        expected,
-      );
-      expect(resolveCommandCardChrome({ mode, paymentClaimCount: 0 }).showPaymentPill).toBe(
-        false,
-      );
-    }
-  });
-
-  test('waitingOnClient is exactly the blockedClient mode', () => {
-    for (const mode of MODES) {
-      expect(resolveCommandCardChrome({ mode, paymentClaimCount: 0 }).waitingOnClient).toBe(
-        mode === 'blockedClient',
-      );
+  test('no class names a physical direction or the danger colour', () => {
+    for (const [status] of table) {
+      const { stripeClass, borderClass } = resolveCommandCardChrome(status);
+      expect(`${stripeClass} ${borderClass}`).not.toMatch(/\b(left|right)\b|danger|destructive/);
     }
   });
 });

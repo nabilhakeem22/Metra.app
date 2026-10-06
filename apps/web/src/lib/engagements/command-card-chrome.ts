@@ -1,109 +1,34 @@
-import type { CommandCardMode } from './command-card';
-import { whoseMoveOfMode } from './whose-move';
+import type { StatusTone } from '@/lib/ui/status-tone';
+import { deliveryStatusTone, type DeliveryStatus } from './delivery-status';
 
-// The command card's CHROME, as a pure function of its mode. No React, no
-// `server-only`, no db: which colour family the card wears and which pill it
-// shows is a product rule, and a rule spelled out as four nested ternaries inside
-// a 515-line component is one nobody can test and everybody edits.
-
-/** Mode-driven accent: amber for the blocked attention states, brand for ready,
- *  neutral for closed — expressed through the app's semantic tokens so both
- *  themes and RTL stay correct. */
-type CommandCardAccent = 'neutral' | 'brand' | 'warn';
+// The command card's CHROME, as a pure function of the delivery's status. No
+// React, no `server-only`, no db: which colour family the card wears is a
+// product rule, and it is the SAME status the header chip, the deliveries list
+// and the dashboard say in words. Blocked on the studio and waiting on the
+// client used to wear the same amber; now brand means "your move", neutral means
+// "waiting", amber only "stalled" and green "delivered".
 
 export interface CommandCardChrome {
-  accent: CommandCardAccent;
+  /** The 4px accent stripe on the inline-start edge. */
   stripeClass: string;
-  pillClass: string;
   borderClass: string;
-  /**
-   * ONE highlighted statement of where things stand, not two. In every mode but
-   * one the pill and the headline two lines below say the same thing —
-   * identically for blockedClient ("Waiting on the client" / "Waiting on the
-   * client"), near enough for the others — and the headline is the better of the
-   * pair because it also names the phase. So the pill renders ONLY for
-   * `paymentToConfirm`, where it names a TASK the headline does not: the headline
-   * there reads "waiting on the client" while a claim actually sits with the
-   * studio. The mode's colour is not lost with it — the accent stripe and the
-   * border still carry it.
-   */
-  showPaymentPill: boolean;
-  /** The key under `engagements.command.pill`. */
-  pillKey: CommandCardPillKey;
-  /** True when every unmet guard is one the CLIENT clears, so there is no studio action. */
-  waitingOnClient: boolean;
 }
 
-export type CommandCardPillKey =
-  | 'closed'
-  | 'ready'
-  | 'studio'
-  | 'paymentToConfirm'
-  | 'waitingClient';
-
-const MODE_PILL: Record<CommandCardMode, CommandCardPillKey> = {
-  closed: 'closed',
-  ready: 'ready',
-  blockedStudio: 'studio',
-  blockedClient: 'waitingClient',
+const CHROME_BY_TONE: Record<StatusTone, CommandCardChrome> = {
+  yourMove: { stripeClass: 'bg-brand', borderClass: 'border-[color:var(--brand-tint-border)]' },
+  waiting: { stripeClass: 'bg-[color:var(--rule)]', borderClass: 'border-[color:var(--rule)]' },
+  neutral: { stripeClass: 'bg-[color:var(--rule)]', borderClass: 'border-[color:var(--rule)]' },
+  draft: { stripeClass: 'bg-[color:var(--rule)]', borderClass: 'border-[color:var(--rule)]' },
+  stalled: {
+    stripeClass: 'bg-[color:var(--warn)]',
+    borderClass: 'border-[color:var(--warn-tint)]',
+  },
+  done: {
+    stripeClass: 'bg-[color:var(--success)]',
+    borderClass: 'border-[color:var(--success-tint)]',
+  },
 };
 
-/**
- * The human status pill, pure from the command view + the pending
- * client-payment-claim count. It reads the SAME whose-move rule as the deliveries
- * list and the dashboard: a pending claim reads "payment to confirm" in every
- * live mode (the studio's move to record it), never "waiting on the client".
- */
-export function derivePillKey(
-  mode: CommandCardMode,
-  paymentClaimCount: number,
-): CommandCardPillKey {
-  switch (whoseMoveOfMode(mode, paymentClaimCount)) {
-    case 'closed':
-      return 'closed';
-    case 'confirmPayment':
-      return 'paymentToConfirm';
-    default:
-      return MODE_PILL[mode];
-  }
-}
-
-function accentFor(mode: CommandCardMode): CommandCardAccent {
-  if (mode === 'closed') return 'neutral';
-  return mode === 'ready' ? 'brand' : 'warn';
-}
-
-const STRIPE: Record<CommandCardAccent, string> = {
-  warn: 'bg-[color:var(--warn)]',
-  brand: 'bg-brand',
-  neutral: 'bg-[color:var(--rule)]',
-};
-
-const PILL: Record<CommandCardAccent, string> = {
-  warn: 'bg-[color:var(--warn-tint)] text-[color:var(--warn)]',
-  brand: 'bg-brand-tint text-brand-ink',
-  neutral: 'bg-[color:var(--track)] text-[color:var(--text-muted)]',
-};
-
-const BORDER: Record<CommandCardAccent, string> = {
-  warn: 'border-[color:var(--warn-tint)]',
-  brand: 'border-[color:var(--brand-tint-border)]',
-  neutral: 'border-[color:var(--rule)]',
-};
-
-export function resolveCommandCardChrome(options: {
-  mode: CommandCardMode;
-  paymentClaimCount: number;
-}): CommandCardChrome {
-  const accent = accentFor(options.mode);
-  const pillKey = derivePillKey(options.mode, options.paymentClaimCount);
-  return {
-    accent,
-    stripeClass: STRIPE[accent],
-    pillClass: PILL[accent],
-    borderClass: BORDER[accent],
-    showPaymentPill: pillKey === 'paymentToConfirm',
-    pillKey,
-    waitingOnClient: options.mode === 'blockedClient',
-  };
+export function resolveCommandCardChrome(status: DeliveryStatus): CommandCardChrome {
+  return CHROME_BY_TONE[deliveryStatusTone(status)];
 }

@@ -53,10 +53,44 @@ describe('EngagementsList', () => {
     expect(container.textContent).toContain(messageAt('en', 'engagements.spine.handover'));
   });
 
-  test('each row carries its whose-move chip and its age', () => {
+  test('each row carries its status chip, by the one delivery-status rule', () => {
+    const statusRows = [
+      row('e-1', { whoseMove: 'studio' }),
+      row('e-2', { state: 'concept_review', whoseMove: 'client' }),
+      row('e-3', { state: 'layout', whoseMove: 'client', updatedAt: '2026-06-01T00:00:00.000Z' }),
+      row('e-4', { whoseMove: 'confirmPayment' }),
+      row('e-5', { state: 'execution', whoseMove: 'closed' }),
+      row('e-6', { state: 'abandoned', whoseMove: 'closed' }),
+    ];
+    const { container } = renderWithIntl(<EngagementsList items={statusRows} now={NOW} />, {
+      locale: 'en',
+    });
+    const status = (kind: string) => messageAt('en', `engagements.status.${kind}`);
+    // The third cell of each row link is the delivery status (the second, the
+    // machine state, is a StatusChip too).
+    const chips = [...container.querySelectorAll('a')].map(
+      (link) => link.children[2].querySelector('[data-tone]') as HTMLElement,
+    );
+    expect(chips.map((chip) => chip.getAttribute('data-tone'))).toEqual([
+      'yourMove',
+      'waiting',
+      'stalled',
+      'yourMove',
+      'done',
+      'neutral',
+    ]);
+    expect(chips.map((chip) => chip.textContent)).toEqual([
+      status('yourMove'),
+      `${status('waitingClient')}·5 days`,
+      `${status('stalled')}·14 days`,
+      status('confirmPayment'),
+      status('delivered'),
+      status('abandoned'),
+    ]);
+  });
+
+  test('each row carries its age', () => {
     renderWithIntl(<EngagementsList items={rows} now={NOW} />, { locale: 'en' });
-    expect(screen.getByText(messageAt('en', 'engagements.whoseMove.studio'))).toBeTruthy();
-    expect(screen.getByText(messageAt('en', 'engagements.whoseMove.client'))).toBeTruthy();
     expect(screen.getAllByText('5 days')).toHaveLength(3);
   });
 });

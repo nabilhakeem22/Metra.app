@@ -2,6 +2,8 @@
 
 import { Link2 } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
+import { DeliveryStatusChip } from '@/components/engagements/delivery-status-chip';
+import type { DeliveryStatus } from '@/lib/engagements/delivery-status';
 import type { EngagementHeader } from '@/lib/engagements/queries';
 import { formatDate } from '@/lib/format/date';
 import { docYear, formatDocNumber } from '@/lib/format/doc-number';
@@ -27,9 +29,12 @@ import { pickLocale } from '@/lib/i18n/pick-locale';
 export function EngagementHeaderCard({
   header,
   shared,
+  status,
 }: {
   header: EngagementHeader;
   shared: boolean;
+  /** The delivery's status: the same chip the deliveries list and dashboard show. */
+  status: DeliveryStatus;
 }) {
   const t = useTranslations('engagements');
   const tc = useTranslations('engagements.command');
@@ -95,24 +100,23 @@ export function EngagementHeaderCard({
           <span aria-hidden> · </span>
           <span className="font-bold">{project}</span>
         </h1>
-        {chips.length > 0 && (
-          <div className="mt-2 flex flex-wrap gap-1.5">
-            {chips.map((chip) => (
-              <span
-                key={chip.key}
-                className={`rounded-pill px-2.5 py-0.5 text-caption font-semibold ${
-                  chip.tone === 'warn'
-                    ? 'bg-[color:var(--warn-tint)] text-[color:var(--warn)]'
-                    : chip.tone === 'brand'
-                      ? 'bg-brand-tint text-brand-ink'
-                      : 'bg-[color:var(--track)] text-[color:var(--text-muted)]'
-                }`}
-              >
-                {chip.label}
-              </span>
-            ))}
-          </div>
-        )}
+        <div className="mt-2 flex flex-wrap items-center gap-1.5">
+          <DeliveryStatusChip status={status} />
+          {chips.map((chip) => (
+            <span
+              key={chip.key}
+              className={`rounded-pill px-2.5 py-0.5 text-caption font-semibold ${
+                chip.tone === 'warn'
+                  ? 'bg-[color:var(--warn-tint)] text-[color:var(--warn)]'
+                  : chip.tone === 'brand'
+                    ? 'bg-brand-tint text-brand-ink'
+                    : 'bg-[color:var(--track)] text-[color:var(--text-muted)]'
+              }`}
+            >
+              {chip.label}
+            </span>
+          ))}
+        </div>
       </div>
 
       {/* The share state keeps its own corner, as the mockup draws it. It stays a

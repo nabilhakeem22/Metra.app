@@ -3,7 +3,7 @@ import en from '@/messages/en.json';
 import ar from '@/messages/ar-EG.json';
 import { ENDING_TRIGGERS } from './forward-trigger';
 import { TERMINAL_STATES } from './states';
-import type { WhoseMove } from './whose-move';
+import type { DeliveryStatusKind } from './delivery-status';
 
 // Keys the UI builds at runtime (`t(\`kinds.${x}\`)`). Parity passes when a key is
 // absent from BOTH catalogs, and the browser then throws MISSING_MESSAGE, so each
@@ -32,12 +32,14 @@ function expectInBothCatalogs(path: string): void {
   }
 }
 
-/** Total over the union, so a new WhoseMove fails to compile until it is listed. */
-const WHOSE_MOVES: Record<WhoseMove, true> = {
-  studio: true,
-  client: true,
+/** Total over the union, so a new status fails to compile until it is listed. */
+const DELIVERY_STATUSES: Record<DeliveryStatusKind, true> = {
+  yourMove: true,
   confirmPayment: true,
-  closed: true,
+  waitingClient: true,
+  stalled: true,
+  delivered: true,
+  abandoned: true,
 };
 
 describe('dynamic engagement copy keys exist in both catalogs', () => {
@@ -51,7 +53,7 @@ describe('dynamic engagement copy keys exist in both catalogs', () => {
     expectInBothCatalogs(`engagements.command.closed.${state}.headline`);
   });
 
-  it.each(Object.keys(WHOSE_MOVES))('whose move %s', (whoseMove) => {
-    expectInBothCatalogs(`engagements.whoseMove.${whoseMove}`);
+  it.each(Object.keys(DELIVERY_STATUSES))('delivery status %s', (kind) => {
+    expectInBothCatalogs(`engagements.status.${kind}`);
   });
 });

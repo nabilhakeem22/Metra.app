@@ -77,7 +77,7 @@ function props(overrides: Partial<EngagementCommandCardProps> = {}): EngagementC
     preview: choicePreview(true),
     state: 'execution_decision',
     allowances: { revisionCount: 0, freeRevisionN: 3, designRevisionCount: 0, freeDesignRevisionN: 3 },
-    stallDays: null,
+    status: { kind: 'yourMove' },
     canAdvance: true,
     canRecordPayment: true,
     canResolveClaims: true,

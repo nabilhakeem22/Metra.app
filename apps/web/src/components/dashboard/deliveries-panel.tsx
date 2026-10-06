@@ -2,9 +2,10 @@ import { ArrowRight } from 'lucide-react';
 import { getTranslations } from 'next-intl/server';
 import { Link } from '@/i18n/routing';
 import { DeliveryAgeLabel } from '@/components/engagements/delivery-age-label';
-import { WhoseMoveChip } from '@/components/engagements/whose-move-chip';
+import { DeliveryStatusChip } from '@/components/engagements/delivery-status-chip';
 import type { DashboardDelivery } from '@/lib/dashboard/queries';
 import type { DeliveriesEmptyState } from '@/lib/dashboard/setup-step';
+import { deliveryStatusAsOf } from '@/lib/engagements/delivery-status';
 import { spineStageKeyOf, spinePosition } from '@/lib/engagements/stage-spine';
 import { pickLocale } from '@/lib/i18n/pick-locale';
 import { DeliveriesPanelEmpty } from './deliveries-panel-empty';
@@ -17,8 +18,8 @@ import { DeliveryRibbon } from './delivery-ribbon';
  * number and sorts newest-first, which is right for something you search. This
  * panel has one job: say which delivery needs the studio today. So it sorts by
  * longest untouched (done in the query), leads with the client rather than
- * `DE-2026-0014`, and shows whose move it is by the delivery page's own rule
- * (`whose-move.ts`), so the two can never disagree.
+ * `DE-2026-0014`, and shows the delivery's status by the delivery page's own
+ * rule (`delivery-status.ts`), so the two can never disagree.
  *
  * The stage ribbon is the delivery page's own spine compressed to row height —
  * the same eight stages and two gates, read from the same `spinePosition`. A
@@ -99,7 +100,7 @@ export async function DeliveriesPanel({
                   </span>
 
                   {/* The spine, compressed. Hidden on the narrowest screens: the
-                      whose-move chip and the age still show there. */}
+                      status chip and the age still show there. */}
                   <span className="hidden sm:block">
                     <DeliveryRibbon position={pos} />
                     <span className="mt-1 block whitespace-nowrap font-mono text-caption text-[color:var(--text-faint)]">
@@ -108,10 +109,10 @@ export async function DeliveriesPanel({
                     </span>
                   </span>
 
-                  {/* Whose move, by the delivery page's own rule. Shown on phones
-                      too: it is the one fact this panel exists to say. */}
+                  {/* The delivery's status, by the delivery page's own rule. Shown
+                      on phones too: it is the one fact this panel exists to say. */}
                   <span>
-                    <WhoseMoveChip whoseMove={d.whoseMove} />
+                    <DeliveryStatusChip status={deliveryStatusAsOf(d, now)} />
                   </span>
 
                   <span className="text-end">

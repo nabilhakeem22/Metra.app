@@ -9,7 +9,12 @@ import type { MemberRole } from '@metra/db';
 import type { OrgContext } from '@/lib/db/context';
 import { deriveFeeSplitPrefill } from '@/lib/engagements/default-fee-split';
 import { countAwaitingReplyCore } from '@/lib/engagements/document-comments';
-import { getEngagementGatePreview } from '@/lib/engagements/gate-preview';
+import { daysSince } from '@/lib/engagements/delivery-age';
+import { resolveDeliveryStatus, type DeliveryStatus } from '@/lib/engagements/delivery-status';
+import {
+  getEngagementGatePreview,
+  type EngagementGatePreview,
+} from '@/lib/engagements/gate-preview';
 import {
   getDeliveryShareStatus,
   getEngagementArtifacts,
@@ -22,8 +27,9 @@ import {
   getEngagementPayments,
   getEngagementTransitions,
   getLastUsedFeeSchedule,
-  type EngagementTransitionRecord,
+  type EngagementHeader,
 } from '@/lib/engagements/queries';
+import { resolveWhoseMove } from '@/lib/engagements/whose-move';
 import { can } from '@/lib/permissions/can';
 import { loadBoqStep } from './boq-step-data';
 import type { PanelCapabilities } from './engagement-panels';
@@ -128,17 +134,22 @@ export function engagementCapabilities(
 }
 
 /**
- * Days since the newest transition (transitions are newest-first). Computed on
- * the SERVER so the hero renders a stable value with no Date/hydration drift and
- * no Arabic-Indic digits.
+ * The delivery's status, by the SAME rule the deliveries list and the dashboard
+ * read: whose move it is from the gate preview and the pending claims, aged from
+ * `updatedAt`. Computed on the SERVER so the header renders one stable value.
+ * `pendingClaimCount` is the page's own claims read, which applies the same
+ * finance-read gate as the list's batch count, so both agree for every role.
  */
-export function stallDaysSince(
-  transitions: EngagementTransitionRecord[],
-): number | null {
-  const latest = transitions[0]?.decidedAt ?? null;
-  if (!latest) return null;
-  return Math.max(
-    0,
-    Math.floor((Date.now() - new Date(latest).getTime()) / 86_400_000),
-  );
+export function deliveryStatusOf(input: {
+  header: EngagementHeader;
+  gatePreview: EngagementGatePreview;
+  pendingClaimCount: number;
+  now: Date;
+}): DeliveryStatus {
+  const { header, gatePreview, pendingClaimCount, now } = input;
+  return resolveDeliveryStatus({
+    state: header.state,
+    whoseMove: resolveWhoseMove({ state: header.state, preview: gatePreview, pendingClaimCount }),
+    daysSinceChange: daysSince(header.updatedAt, now),
+  });
 }

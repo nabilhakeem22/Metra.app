@@ -1,5 +1,6 @@
 import type { BoqStepData } from '@/lib/boqs/step';
 import type { FeeSplitPrefill } from '@/lib/engagements/default-fee-split';
+import type { DeliveryStatus } from '@/lib/engagements/delivery-status';
 import type { EngagementGatePreview } from '@/lib/engagements/gate-preview';
 import type { EngagementPaymentClaimRecord } from '@/lib/engagements/queries';
 import type { EngagementClientActivityRecord } from '@/lib/engagements/queries/client-activity';
@@ -28,7 +29,8 @@ export interface EngagementCommandCardProps {
    * whichever pair the CURRENT state can spend, so it never contradicts the form.
    */
   allowances: RevisionAllowances;
-  stallDays: number | null;
+  /** The delivery's status; decides the card's colour family (stripe + border). */
+  status: DeliveryStatus;
   canAdvance: boolean;
   canRecordPayment: boolean;
   /** May this role confirm or dismiss a client payment claim (`engagements_finance` create)? */

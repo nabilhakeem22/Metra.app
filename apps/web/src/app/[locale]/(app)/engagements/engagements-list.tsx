@@ -2,8 +2,9 @@
 
 import { useLocale, useTranslations } from 'next-intl';
 import { DeliveryAgeLabel } from '@/components/engagements/delivery-age-label';
-import { WhoseMoveChip } from '@/components/engagements/whose-move-chip';
+import { DeliveryStatusChip } from '@/components/engagements/delivery-status-chip';
 import { Link } from '@/i18n/routing';
+import { deliveryStatusAsOf } from '@/lib/engagements/delivery-status';
 import type { EngagementListRow } from '@/lib/engagements/queries';
 import { docYear, formatDocNumber } from '@/lib/format/doc-number';
 import { pickLocale } from '@/lib/i18n/pick-locale';
@@ -59,7 +60,7 @@ export function EngagementsList({ items, now }: { items: EngagementListRow[]; no
                 <StateBadge state={row.state} showStage />
               </span>
               <span>
-                <WhoseMoveChip whoseMove={row.whoseMove} />
+                <DeliveryStatusChip status={deliveryStatusAsOf(row, now)} />
               </span>
               <span className="text-end">
                 <DeliveryAgeLabel

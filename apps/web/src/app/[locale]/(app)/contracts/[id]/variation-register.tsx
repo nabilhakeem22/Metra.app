@@ -5,6 +5,7 @@ import { useLocale, useTranslations } from 'next-intl';
 import { useState, useTransition } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { StatusChip } from '@/components/ui/status-chip';
 import { useRouter } from '@/i18n/routing';
 import { docYear, formatDocNumber } from '@/lib/format/doc-number';
 import { pickLocale } from '@/lib/i18n/pick-locale';
@@ -17,6 +18,7 @@ import {
 import type { VariationListRow } from '@/lib/variations/queries';
 // A PURE leaf, not the queries barrel: this is a 'use client' module and the
 // derivation it needs is one function over two fields.
+import { VARIATION_STATUS_TONE } from '@/lib/ui/record-status-tones';
 import { variationStatusKey } from '@/lib/variations/status-label';
 import type {
   BaselineLine,
@@ -24,18 +26,6 @@ import type {
   DraftVoLine,
 } from './contract-vo-types';
 import { VariationCreateForm } from './variation-create-form';
-
-const VO_STATUS_STYLE: Record<string, string> = {
-  draft: 'bg-muted text-muted-foreground',
-  internal_approved: 'bg-[color:var(--warn-tint)] text-[color:var(--warn)]',
-  issued: 'bg-[color:var(--brand-tint)] text-[color:var(--brand-ink)]',
-  approved: 'bg-[color:var(--success-tint)] text-[color:var(--success)]',
-  rejected: 'bg-destructive/10 text-destructive',
-  // MUTED, deliberately not the destructive red: a variation the TERMINATION
-  // CASCADE closed is bookkeeping, and painting it like a client's refusal
-  // tells the studio a negotiation went wrong when none happened.
-  rejected_on_termination: 'bg-muted text-muted-foreground',
-};
 
 export function VariationRegister({
   contractId,
@@ -169,9 +159,10 @@ export function VariationRegister({
                       {pickLocale({ nameAr: v.titleAr, nameEn: v.titleEn }, 'name', locale).value}
                     </td>
                     <td className="px-4 py-2">
-                      <span className={`rounded-pill px-2 py-0.5 text-caption ${VO_STATUS_STYLE[statusKey] ?? 'bg-muted'}`}>
-                        {tv(`status.${statusKey}`)}
-                      </span>
+                      <StatusChip
+                        tone={VARIATION_STATUS_TONE[statusKey]}
+                        label={tv(`status.${statusKey}`)}
+                      />
                     </td>
                     <td className="px-4 py-2 text-end" dir="ltr">
                       {m(v.netDelta)}

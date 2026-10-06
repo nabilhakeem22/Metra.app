@@ -2,9 +2,9 @@ import { cva, type VariantProps } from 'class-variance-authority';
 import * as React from 'react';
 import { cn } from '@/lib/utils';
 
-// Glass UI chip/badge: pill (--r-pill), caption size. The neutral chip uses --track; the
-// brand "eyebrow" uses the brand tint/ink; semantic states (done/warn/danger)
-// map to the semantic tokens, NEVER the brand accent.
+// Glass UI tag: pill (--r-pill), caption size. A LABEL, not a status: the
+// neutral tag uses --track, the brand "eyebrow" the brand tint/ink. A status
+// (done, waiting, stalled ...) is a StatusChip, never a Badge.
 const badgeVariants = cva(
   'inline-flex items-center gap-1.5 whitespace-nowrap rounded-pill px-2.5 py-0.5 text-caption font-medium',
   {
@@ -13,10 +13,6 @@ const badgeVariants = cva(
         default: 'bg-[color:var(--track)] text-[color:var(--text-muted)]',
         brand:
           'border border-[color:var(--brand-tint-border)] bg-[color:var(--brand-tint)] font-semibold text-[color:var(--brand-ink)]',
-        success:
-          'bg-[color:var(--success-tint)] text-[color:var(--success)]',
-        warn: 'bg-[color:var(--warn-tint)] text-[color:var(--warn)]',
-        danger: 'bg-[color:var(--danger-tint)] text-[color:var(--danger)]',
       },
     },
     defaultVariants: { variant: 'default' },
@@ -25,28 +21,13 @@ const badgeVariants = cva(
 
 export interface BadgeProps
   extends React.HTMLAttributes<HTMLSpanElement>,
-    VariantProps<typeof badgeVariants> {
-  /** Show a small leading status dot in the current text colour. */
-  dot?: boolean;
-}
+    VariantProps<typeof badgeVariants> {}
 
 const Badge = React.forwardRef<HTMLSpanElement, BadgeProps>(
-  ({ className, variant, dot = false, children, ...props }, ref) => (
-    <span
-      ref={ref}
-      className={cn(badgeVariants({ variant }), className)}
-      {...props}
-    >
-      {dot && (
-        <span
-          className="size-1.5 shrink-0 rounded-full bg-current"
-          aria-hidden
-        />
-      )}
-      {children}
-    </span>
+  ({ className, variant, ...props }, ref) => (
+    <span ref={ref} className={cn(badgeVariants({ variant }), className)} {...props} />
   ),
 );
 Badge.displayName = 'Badge';
 
-export { Badge, badgeVariants };
+export { Badge };

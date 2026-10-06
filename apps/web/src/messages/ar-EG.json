@@ -1633,7 +1633,6 @@
       "handoffAcknowledged": "تم تأكيد التسليم"
     },
     "hero": {
-      "day": "اليوم {n}",
       "revision": "التعديل {n} من {free}",
       "designRevision": "تعديل الـ 3D رقم {n} من {free}",
       "dueLabel": "مستحق",
@@ -1661,17 +1660,10 @@
       "abandonConfirmCta": "إلغاء التسليم",
       "abandonConfirmCancel": "كمل شغل",
       "pill": {
-        "ready": "جاهز للتقدم",
-        "studio": "دورك دلوقتي",
         "waitingClient": "مستني العميل",
-        "paymentToConfirm": "دفعة محتاجة تأكيد",
-        "closed": "مقفول",
         "crumb": "التسليمات",
         "feeChip": "أتعاب التصميم {amount}",
         "startedOn": "بدأ في {date}"
-      },
-      "move": {
-        "studio": "دورك دلوقتي"
       },
       "awaitingReply": "{n, plural, zero {مفيش أسئلة من العميل مستنية ردك في الملفات.} one {في سؤال واحد من العميل مستني ردك في الملفات.} two {في سؤالين من العميل مستنيين ردك في الملفات.} few {في # أسئلة من العميل مستنية ردك في الملفات.} many {في # سؤال من العميل مستنيين ردك في الملفات.} other {في # سؤال من العميل مستنيين ردك في الملفات.}}",
       "nextAction": "الخطوة الجاية",
@@ -2082,11 +2074,13 @@
       "today": "النهارده",
       "sinceDays": "{count, plural, zero {ولا يوم} one {يوم} two {يومين} few {{n} أيام} many {{n} يوم} other {{n} يوم}}"
     },
-    "whoseMove": {
-      "studio": "دورك",
-      "client": "مستنيين العميل",
+    "status": {
+      "yourMove": "دورك",
       "confirmPayment": "دفعة محتاجة تأكيد",
-      "closed": "مقفول"
+      "waitingClient": "مستنيين العميل",
+      "stalled": "واقف",
+      "delivered": "اتسلّم",
+      "abandoned": "اتلغى"
     }
   },
   "delivery": {
