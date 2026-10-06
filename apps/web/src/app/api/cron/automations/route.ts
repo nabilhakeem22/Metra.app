@@ -13,9 +13,11 @@ import { loggableFailure } from '@/lib/actions/loggable-failure';
 // that wall-clock hour reliably across Egypt's DST shift (UTC+2 <-> UTC+3). A
 // daily UTC cron would drift off 07:00 Cairo for half the year. Each automation
 // still claims its own period, so extra ticks are no-ops, not duplicates.
+// No `maxDuration`: that is a Vercel setting OpenNext/Cloudflare ignores. The
+// tick runs inside the cron Worker's service-binding call, so that Worker's
+// 15-minute Cron Trigger limit is the real ceiling (docs/DEPLOY.md, cron section).
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
-export const maxDuration = 60;
 
 /**
  * Constant-time bearer check against CRON_SECRET. False if the secret is unset —

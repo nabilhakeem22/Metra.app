@@ -10,7 +10,14 @@ vi.mock('server-only', () => ({}));
 vi.mock('@/lib/automation/runner', () => ({
   runDueAutomations: vi.fn(async () => ({
     ranAt: '2026-01-01T00:00:00.000Z',
+    orgsTotal: 0,
     orgsProcessed: 0,
+    orgsSkipped: 0,
+    orgsFailed: 0,
+    coreFailures: 0,
+    emailsSent: 0,
+    emailsFailed: 0,
+    durationMs: 0,
     results: [],
   })),
 }));
@@ -61,6 +68,6 @@ describe('cron automations auth', () => {
     const res = await call(`Bearer ${SECRET}`);
     expect(res.status).toBe(200);
     const body = await res.json();
-    expect(body).toMatchObject({ orgsProcessed: 0, results: [] });
+    expect(body).toMatchObject({ orgsTotal: 0, orgsProcessed: 0, durationMs: 0, results: [] });
   });
 });
