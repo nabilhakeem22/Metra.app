@@ -5,26 +5,13 @@
 // moves state off `created`.
 import { clients, designEngagements, projects } from '@metra/db';
 import { driverRefusalOf } from '@metra/db/sqlstate';
-import { and, count, eq, inArray, ne } from 'drizzle-orm';
 import { fail, mutateInOrg, requireInOrg } from '@/lib/actions/mutate';
 import { err, type ActionResult } from '@/lib/actions/result';
 import { allocateNumber } from '@/lib/db/allocate-number';
 import type { OrgContext } from '@/lib/db/context';
 import { clean } from '@/lib/validation/text';
-import { ACTIVE_STATES } from './states';
 import { isUuid } from '@/lib/uuid';
-
-// The non-terminal (in-flight) states a Delivery can occupy — materialized once for
-// the one-delivery-per-project guard's `state IN (…)` probe. A Delivery in a
-// TERMINAL state (closed_design_only / execution / abandoned) has left its Project
-// and does NOT block a fresh start.
-const ACTIVE_ENGAGEMENT_STATES = [...ACTIVE_STATES];
-
-// Lifetime cap: a Project may hold at most TWO NON-abandoned deliveries over its
-// life (the original + one extension). Abandoned deliveries are ignored by the
-// count (owner decision) — a project with 1 real + N abandoned rows can still
-// start its extension.
-const PROJECT_DELIVERY_CAP = 2;
+import { assertProjectHasDeliverySlot } from './delivery-slot';
 
 // Postgres unique-violation SQLSTATE + the one-active-delivery backstop index
 // (migration 0032). A 23505 on THIS named index means a concurrent create won the
@@ -54,9 +41,11 @@ export interface CreateEngagementInput {
 }
 
 /**
- * Create a design engagement in state `created`. Title is bilingual (at least one
- * of ar/en); client + project must both resolve in-org (RLS scopes the reads and
- * the composite same-org FKs are the hard guard). Allocates the per-org DE number
+ * Create a design engagement in state `created`. Title is bilingual; when both are
+ * left empty the delivery takes its project's names (the form says so), and
+ * `engagement_title_required` is returned only when the project has none either.
+ * Client + project must both resolve in-org (RLS scopes the reads and the
+ * composite same-org FKs are the hard guard). Allocates the per-org DE number
  * under an advisory lock so concurrent creates never collide on
  * unique(org_id, number). Returns the new engagement id.
  */
@@ -66,9 +55,8 @@ export async function createEngagementCore(
 ): Promise<ActionResult> {
   const clientId = input.clientId?.trim();
   const projectId = input.projectId?.trim();
-  const titleAr = clean(input.titleAr);
-  const titleEn = clean(input.titleEn);
-  if (!titleAr && !titleEn) return err('engagement_title_required');
+  const typedTitleAr = clean(input.titleAr);
+  const typedTitleEn = clean(input.titleEn);
   if (!clientId || !isUuid(clientId)) {
     return err('engagement_client_required');
   }
@@ -83,48 +71,19 @@ export async function createEngagementCore(
       // Existence assertions, not reads: the call IS the check, and it fails with
       // a coded error if the id belongs to another tenant or to nothing.
       await requireInOrg(tx, clients, clientId, { id: clients.id }, 'engagement_client_required');
-      await requireInOrg(
+      const project = await requireInOrg(
         tx,
         projects,
         projectId,
-        { id: projects.id },
+        { id: projects.id, nameAr: projects.nameAr, nameEn: projects.nameEn },
         'engagement_project_required',
       );
+      const typedAnyTitle = Boolean(typedTitleAr || typedTitleEn);
+      const titleAr = typedAnyTitle ? typedTitleAr : clean(project.nameAr);
+      const titleEn = typedAnyTitle ? typedTitleEn : clean(project.nameEn);
+      if (!titleAr && !titleEn) fail('engagement_title_required');
 
-      // One-delivery-per-project guard (Slice C2): a Project may hold at most one
-      // in-flight Delivery. If a non-terminal row already exists for this project,
-      // refuse before allocating a number so nothing is written. TERMINAL deliveries
-      // (closed_design_only / execution / abandoned) do not block a fresh start.
-      // Code-level guard, RLS-scoped — no DB constraint.
-      const [existing] = await tx
-        .select({ id: designEngagements.id })
-        .from(designEngagements)
-        .where(
-          and(
-            eq(designEngagements.projectId, projectId),
-            inArray(designEngagements.state, ACTIVE_ENGAGEMENT_STATES),
-          ),
-        )
-        .limit(1);
-      if (existing) fail('project_delivery_exists');
-
-      // Lifetime cap (Slice C2-hardening): at most TWO NON-abandoned deliveries per
-      // project (original + one extension). Abandoned rows do NOT count toward the
-      // cap (owner decision — predicate `state <> 'abandoned'`), so a project with 1
-      // real + N abandoned deliveries can still start its extension. Checked BEFORE
-      // allocating a number so a rejected create writes nothing and spends none.
-      const [{ value: countedDeliveries }] = await tx
-        .select({ value: count() })
-        .from(designEngagements)
-        .where(
-          and(
-            eq(designEngagements.projectId, projectId),
-            ne(designEngagements.state, 'abandoned'),
-          ),
-        );
-      if (countedDeliveries >= PROJECT_DELIVERY_CAP) {
-        fail('project_delivery_limit_reached');
-      }
+      await assertProjectHasDeliverySlot(tx, projectId);
 
       const number = await allocateNumber(
         tx,

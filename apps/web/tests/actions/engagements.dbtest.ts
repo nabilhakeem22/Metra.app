@@ -131,11 +131,31 @@ describe('createEngagementCore (Design-Engagement Machine, Step 1)', () => {
     ).toEqual({ ok: false, error: 'engagement_project_required' });
   });
 
-  it('rejects a header with neither title present', async () => {
+  // Round A1: a delivery with no title of its own takes its project's names
+  // (this case used to pin `engagement_title_required`; the form now says
+  // "leave empty to use the project name"). The code is still returned when the
+  // project has no name either, which a project row cannot be created without.
+  it('stores the project names when both titles are left empty', async () => {
     const { ctx, clientId, projectId } = await setup();
-    expect(
-      await createEngagementCore(ctx, { titleAr: '  ', clientId, projectId }),
-    ).toEqual({ ok: false, error: 'engagement_title_required' });
+    const created = await createEngagementCore(ctx, { titleAr: '  ', clientId, projectId });
+    expect(created.ok).toBe(true);
+    const [row] = await raw.query<{ title_ar: string | null; title_en: string | null }>(
+      `select title_ar, title_en from public.design_engagements where id = '${(created as { data?: string }).data}'`,
+    );
+    const [project] = await raw.query<{ name_ar: string | null; name_en: string | null }>(
+      `select name_ar, name_en from public.projects where id = '${projectId}'`,
+    );
+    expect(row).toEqual({ title_ar: project.name_ar, title_en: project.name_en });
+    expect(row.title_en).toBe('Tower');
+  });
+
+  it('keeps a typed title and does not borrow the other language from the project', async () => {
+    const { ctx, clientId, projectId } = await setup();
+    const created = await createEngagementCore(ctx, { titleAr: 'تشطيب', clientId, projectId });
+    const [row] = await raw.query<{ title_ar: string | null; title_en: string | null }>(
+      `select title_ar, title_en from public.design_engagements where id = '${(created as { data?: string }).data}'`,
+    );
+    expect(row).toEqual({ title_ar: 'تشطيب', title_en: null });
   });
 
   it('cross-org: org A cannot see org B engagement', async () => {
