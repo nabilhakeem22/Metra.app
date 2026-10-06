@@ -11,17 +11,19 @@ import { EngagementsClient } from './engagements-client';
 export default async function EngagementsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ new?: string }>;
+  searchParams: Promise<{ new?: string; before?: string }>;
 }) {
-  const { new: openCreate } = await searchParams;
+  const { new: openCreate, before } = await searchParams;
+  // The keyset cursor of an older page; anything else reads the newest page.
+  const beforeNumber = before && /^\d+$/.test(before) ? Number(before) : undefined;
   const ctx = await requireOrg();
   // Gate the read on the engagements_design read capability in the CALLER (RLS is
   // the second factor) — consistent with the other internal list pages.
   if (!can(ctx.role, 'engagements_design', 'read')) notFound();
 
   const t = await getTranslations('engagements');
-  const [rows, clientOptions, projects] = await Promise.all([
-    listEngagements(ctx),
+  const [page, clientOptions, projects] = await Promise.all([
+    listEngagements(ctx, { before: beforeNumber }),
     getClientOptions(ctx),
     listProjects(ctx, { active: true }),
   ]);
@@ -37,7 +39,8 @@ export default async function EngagementsPage({
     <div className="space-y-6">
       <PageHeader title={t('title')} description={t('subtitle')} />
       <EngagementsClient
-        items={rows}
+        items={page.rows}
+        paging={{ nextBefore: page.nextBefore, isFirstPage: beforeNumber === undefined }}
         clientOptions={clientOptions}
         projectOptions={projectOptions}
         canCreate={canCreate}

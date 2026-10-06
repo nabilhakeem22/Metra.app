@@ -8,7 +8,12 @@ import { withOrgContext, type OrgContext } from '@/lib/db/context';
 import { createEngagementCore } from '@/lib/engagements/core';
 import { executeTransition } from '@/lib/engagements/executor';
 import { getEngagementGatePreview } from '@/lib/engagements/gate-preview';
-import { getEngagementPaymentClaims, loadWhoseMovesInTx } from '@/lib/engagements/queries';
+import {
+  getEngagementPaymentClaims,
+  listEngagements,
+  loadWhoseMovesInTx,
+} from '@/lib/engagements/queries';
+import { recordPaymentCore } from '@/lib/engagements/payments';
 import { claimPaymentByToken } from '@/lib/engagements/public';
 import { mintDeliveryLinkCore } from '@/lib/engagements/share';
 import type { DesignState } from '@/lib/engagements/states';
@@ -75,6 +80,11 @@ describe('loadWhoseMovesInTx agrees with the cockpit, delivery by delivery', () 
 
     // design_proposal with the deposit unpaid -> waiting on the client.
     const waiting = await seedDelivery(ctx, client.id, `WAIT-${tag}`);
+    // The same state with the deposit PAID -> the studio's move. Two live
+    // engagements in one batch, differing only in their payments, prove the
+    // facts are grouped per engagement and not pooled.
+    const paid = await seedDelivery(ctx, client.id, `PAID-${tag}`);
+    expect((await recordPaymentCore(ctx, { engagementId: paid, kind: 'deposit', amount: '30000' })).ok).toBe(true);
     // execution_decision with the balance unpaid AND a pending client claim.
     const claimed = await seedDelivery(ctx, client.id, `CLAIM-${tag}`);
     await forceState(claimed, 'execution_decision');
@@ -85,7 +95,7 @@ describe('loadWhoseMovesInTx agrees with the cockpit, delivery by delivery', () 
     await forceState(closed, 'execution');
 
     const subjects = await Promise.all(
-      [waiting, claimed, closed].map(async (id) => {
+      [waiting, paid, claimed, closed].map(async (id) => {
         const [row] = await raw.query<{ state: DesignState }>(
           `select state from public.design_engagements where id = '${id}'`,
         );
@@ -104,6 +114,7 @@ describe('loadWhoseMovesInTx agrees with the cockpit, delivery by delivery', () 
       expect(batch.get(subject.id), subject.state).toBe(single);
     }
     expect(batch.get(waiting)).toBe('client');
+    expect(batch.get(paid)).toBe('studio');
     expect(batch.get(claimed)).toBe('confirmPayment');
     expect(batch.get(closed)).toBe('closed');
   });
@@ -114,5 +125,26 @@ describe('loadWhoseMovesInTx agrees with the cockpit, delivery by delivery', () 
     const ctx = ctxFor(orgId, ownerIds[0], 'owner');
     const moves = await withOrgContext(ctx, (tx) => loadWhoseMovesInTx(tx, ctx.role, []));
     expect(moves.size).toBe(0);
+  });
+});
+
+describe('listEngagements pages by keyset, newest first', () => {
+  it('pages without repeating or skipping a row, each with its whose-move', async () => {
+    const { orgId, ownerIds } = await seedOrg({ owners: 1 });
+    orgIds.push(orgId);
+    const ctx = ctxFor(orgId, ownerIds[0], 'owner');
+    await createClientCore(ctx, { phone: '01000000000', nameEn: 'Acme' });
+    const [client] = await listClients(ctx, {});
+    const tag = orgId.slice(0, 6);
+    const ids = [];
+    for (const code of ['A', 'B', 'C']) ids.push(await seedDelivery(ctx, client.id, `${code}-${tag}`));
+
+    const first = await listEngagements(ctx, { size: 2 });
+    expect(first.rows.map((row) => row.id)).toEqual([ids[2], ids[1]]);
+    expect(first.nextBefore).toBe(first.rows[1].number);
+    const second = await listEngagements(ctx, { size: 2, before: first.nextBefore! });
+    expect(second.rows.map((row) => row.id)).toEqual([ids[0]]);
+    expect(second.nextBefore).toBeNull();
+    for (const row of [...first.rows, ...second.rows]) expect(row.whoseMove).toBe('client');
   });
 });

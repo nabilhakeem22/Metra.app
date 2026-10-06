@@ -5,7 +5,11 @@
 import {
   type MetraDb,
   type DesignEngagement,
+  type EngagementArtifact,
+  type EngagementChangeOrder,
   type EngagementEvent,
+  type EngagementMilestone,
+  type PaymentEvent,
   designEngagements,
   engagementArtifacts,
   engagementChangeOrders,
@@ -17,6 +21,20 @@ import { eq } from 'drizzle-orm';
 import { fail } from '@/lib/actions/result';
 import { liveEvents } from '../event-provenance';
 import type { GuardFacts } from '../guards';
+
+/**
+ * The executor's facts are the FULL rows: the guards read the narrowed
+ * `GuardFacts` view of them, and the client-release step reads the artifacts'
+ * other columns.
+ */
+export interface LoadedGuardFacts extends GuardFacts {
+  engagement: DesignEngagement;
+  milestones: EngagementMilestone[];
+  payments: PaymentEvent[];
+  artifacts: EngagementArtifact[];
+  changeOrders: EngagementChangeOrder[];
+  events: EngagementEvent[];
+}
 import type { TransitionRun } from './index';
 
 /**
@@ -48,7 +66,7 @@ export async function loadEngagementForTransition(
 export async function loadGuardFacts(
   tx: MetraDb,
   engagement: DesignEngagement,
-): Promise<GuardFacts> {
+): Promise<LoadedGuardFacts> {
   const engagementId = engagement.id;
   const milestones = await tx
     .select()

@@ -14,9 +14,11 @@ import {
   type ProjectOption,
 } from './engagement-create-form';
 import { EngagementsList } from './engagements-list';
+import { EngagementsPager } from './engagements-pager';
 
 export function EngagementsClient({
   items,
+  paging,
   clientOptions,
   projectOptions,
   canCreate,
@@ -25,6 +27,8 @@ export function EngagementsClient({
   nowIso,
 }: {
   items: EngagementListRow[];
+  /** Where the list stands in the keyset pages. */
+  paging: { nextBefore: number | null; isFirstPage: boolean };
   clientOptions: ClientOption[];
   projectOptions: ProjectOption[];
   canCreate: boolean;
@@ -50,7 +54,7 @@ export function EngagementsClient({
     <div className="space-y-4">
       {newButton && <div className="flex"><div className="ms-auto">{newButton}</div></div>}
 
-      {items.length === 0 ? (
+      {items.length === 0 && paging.isFirstPage ? (
         <Card>
           <CardContent className="py-4">
             <EmptyState
@@ -67,6 +71,9 @@ export function EngagementsClient({
             <EngagementsList items={items} now={new Date(nowIso)} />
           </CardContent>
         </Card>
+      )}
+      {(paging.nextBefore !== null || !paging.isFirstPage) && (
+        <EngagementsPager nextBefore={paging.nextBefore} isFirstPage={paging.isFirstPage} />
       )}
 
       {canCreate && (

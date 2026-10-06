@@ -7,9 +7,8 @@
 // `guards/readiness.ts` renamed (wave 4); scope and the artifact gates moved to
 // their own leaves, and the fail-closed sentinel was deleted: no edge used it,
 // and GuardKey no longer HAS a value for an edge to route through.
-import type { EngagementEvent } from '@metra/db';
 import { acknowledgesIssuance } from '../rom-ack';
-import { pass, type GuardFacts, type GuardResult } from './facts';
+import { pass, type GuardEvent, type GuardFacts, type GuardResult } from './facts';
 
 /** A numeric(18,4) string in a comparable form: no leading zeros, no trailing
  *  fractional zeros, so '1800000' and '1800000.0000' are the same amount. */
@@ -20,7 +19,7 @@ function normalizedAmount(value: string): string {
 
 /** Do both bounds of a snapshotted range equal the engagement's current band? */
 function matchesCurrentBand(
-  event: EngagementEvent,
+  event: GuardEvent,
   romLow: string | null,
   romHigh: string | null,
 ): boolean {
@@ -68,7 +67,7 @@ export function romAcknowledged(facts: GuardFacts): GuardResult {
  * `createdAt`, then `id` — the deterministic total order the latest-attestation
  * gate reads. Descending, so the freshest event sorts to index 0.
  */
-function byDecidedDescending(a: EngagementEvent, b: EngagementEvent): number {
+function byDecidedDescending(a: GuardEvent, b: GuardEvent): number {
   const decided = b.decidedAt.getTime() - a.decidedAt.getTime();
   if (decided !== 0) return decided;
   const created = b.createdAt.getTime() - a.createdAt.getTime();

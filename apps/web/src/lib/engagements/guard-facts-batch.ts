@@ -1,8 +1,9 @@
 import 'server-only';
 // Design-Engagement Machine — the guard facts of MANY engagements at once, for
 // the deliveries list and the dashboard. The same six reads as the executor's
-// `loadGuardFacts`, each issued ONCE for the whole batch (`IN (...)`), so the
-// query count is constant however many rows the list shows. Sequential on the
+// `loadGuardFacts`, each issued ONCE for the whole batch (`IN (...)`) and
+// narrowed to the guard-read columns, so the query count is constant however
+// many rows the page shows. Sequential on the
 // caller's single transaction, as `loadGuardFacts` is. The result feeds the
 // SAME pure `evaluateGatePreview` the cockpit reads, so the list cannot drift
 // from the delivery page; a fact a future guard reads must be added here too
@@ -19,6 +20,37 @@ import {
 import { inArray } from 'drizzle-orm';
 import { liveEvents } from './event-provenance';
 import type { GuardFacts } from './guards';
+
+// ONLY the columns a guard reads (`GuardFacts` names them), never the evidence
+// a client left on a row (IP, user agent, notes, hashes): this read runs for
+// every visible delivery on the list and the dashboard.
+const GUARD_ENGAGEMENT_COLUMNS = {
+  id: designEngagements.id,
+  state: designEngagements.state,
+  designFee: designEngagements.designFee,
+  offPlan: designEngagements.offPlan,
+  asBuiltDue: designEngagements.asBuiltDue,
+  romLow: designEngagements.romLow,
+  romHigh: designEngagements.romHigh,
+  romIssuedAt: designEngagements.romIssuedAt,
+  titleAr: designEngagements.titleAr,
+  titleEn: designEngagements.titleEn,
+  clientId: designEngagements.clientId,
+  projectId: designEngagements.projectId,
+};
+
+const GUARD_EVENT_COLUMNS = {
+  engagementId: engagementEvents.engagementId,
+  id: engagementEvents.id,
+  kind: engagementEvents.kind,
+  supersedesEventId: engagementEvents.supersedesEventId,
+  decidedAt: engagementEvents.decidedAt,
+  createdAt: engagementEvents.createdAt,
+  hasVariance: engagementEvents.hasVariance,
+  acknowledgedIssueAt: engagementEvents.acknowledgedIssueAt,
+  rangeLow: engagementEvents.rangeLow,
+  rangeHigh: engagementEvents.rangeHigh,
+};
 
 /** Group rows by their engagement id, keeping each group in read order. */
 function groupByEngagement<Row extends { engagementId: string }>(
@@ -47,28 +79,53 @@ export async function loadGuardFactsBatch(
   const ids = [...engagementIds];
 
   const engagements = await tx
-    .select()
+    .select(GUARD_ENGAGEMENT_COLUMNS)
     .from(designEngagements)
     .where(inArray(designEngagements.id, ids));
   const milestones = groupByEngagement(
-    await tx.select().from(engagementMilestones).where(inArray(engagementMilestones.engagementId, ids)),
+    await tx
+      .select({
+        engagementId: engagementMilestones.engagementId,
+        kind: engagementMilestones.kind,
+        basis: engagementMilestones.basis,
+        value: engagementMilestones.value,
+      })
+      .from(engagementMilestones)
+      .where(inArray(engagementMilestones.engagementId, ids)),
   );
   const payments = groupByEngagement(
-    await tx.select().from(paymentEvents).where(inArray(paymentEvents.engagementId, ids)),
+    await tx
+      .select({
+        engagementId: paymentEvents.engagementId,
+        kind: paymentEvents.kind,
+        amount: paymentEvents.amount,
+      })
+      .from(paymentEvents)
+      .where(inArray(paymentEvents.engagementId, ids)),
   );
   const artifacts = groupByEngagement(
-    await tx.select().from(engagementArtifacts).where(inArray(engagementArtifacts.engagementId, ids)),
+    await tx
+      .select({ engagementId: engagementArtifacts.engagementId, kind: engagementArtifacts.kind })
+      .from(engagementArtifacts)
+      .where(inArray(engagementArtifacts.engagementId, ids)),
   );
   const changeOrders = groupByEngagement(
     await tx
-      .select()
+      .select({
+        engagementId: engagementChangeOrders.engagementId,
+        status: engagementChangeOrders.status,
+        amount: engagementChangeOrders.amount,
+      })
       .from(engagementChangeOrders)
       .where(inArray(engagementChangeOrders.engagementId, ids)),
   );
   // LIVE events only, decided per engagement: a correction retracts a row on
   // its own engagement's ledger.
   const events = groupByEngagement(
-    await tx.select().from(engagementEvents).where(inArray(engagementEvents.engagementId, ids)),
+    await tx
+      .select(GUARD_EVENT_COLUMNS)
+      .from(engagementEvents)
+      .where(inArray(engagementEvents.engagementId, ids)),
   );
 
   for (const engagement of engagements) {

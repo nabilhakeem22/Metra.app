@@ -2073,7 +2073,10 @@
     "list": {
       "status": "Status",
       "whoseMove": "Whose move",
-      "lastChange": "Last change"
+      "lastChange": "Last change",
+      "older": "Older deliveries",
+      "newest": "Newest deliveries",
+      "pages": "Delivery pages"
     },
     "age": {
       "today": "today",
