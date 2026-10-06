@@ -532,7 +532,7 @@
     "project_delivery_exists": "This project already has an active delivery. Open it to continue.",
     "project_delivery_limit_reached": "This project has already used its two deliveries. Create a new project to start another.",
     "phone_required": "A phone number is required.",
-    "dates_required": "Start and end dates are required.",
+    "start_date_required": "Add a start date.",
     "project_limit_reached": "Your plan has no project seats left. Contact us to add more.",
     "event_not_found": "That record is not on this engagement.",
     "already_corrected": "That record has already been retracted.",

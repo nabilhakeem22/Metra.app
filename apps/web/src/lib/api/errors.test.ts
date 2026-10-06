@@ -17,7 +17,7 @@ const ALL_CODES: ActionCode[] = [
   'uncertain',
   'name_required',
   'phone_required',
-  'dates_required',
+  'start_date_required',
   'project_limit_reached',
   'last_owner',
   'owner_immutable',

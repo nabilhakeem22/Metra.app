@@ -19,7 +19,8 @@ export interface ProjectInput {
   nameAr?: string | null;
   clientId: string;
   typeId?: string | null;
-  status: ProjectStatus;
+  /** Optional on CREATE (a new project is `active`); update must send one. */
+  status?: ProjectStatus;
   description?: string | null;
   advancePct?: string | null;
   retentionPct?: string | null;
@@ -69,7 +70,7 @@ export interface Validated {
 // Shared field validation -> a coded error or the normalized row.
 export function validate(
   input: ProjectInput,
-  opts: { requireCode?: boolean; requireDates?: boolean } = {},
+  opts: { requireCode?: boolean; requireStartDate?: boolean } = {},
 ): ActionResult | Validated {
   // Codes are AUTO-GENERATED on create (the form no longer offers the field), so an
   // absent code is normal there. Update still requires one: it is editing a row that
@@ -94,10 +95,11 @@ export function validate(
 
   const startDate = clean(input.startDate);
   const endDate = clean(input.endDate);
-  // Required on CREATE only. 301 of the 307 projects already in production have
-  // neither date; demanding them on update would make almost every existing project
-  // uneditable. Same forward-only shape as the client phone rule.
-  if (opts.requireDates && (!startDate || !endDate)) return err('dates_required');
+  // The START date is required on CREATE only; the end date is optional (it can
+  // be set or extended later). 301 of the 307 projects already in production have
+  // neither date, so demanding one on update would make almost every existing
+  // project uneditable. Same forward-only shape as the client phone rule.
+  if (opts.requireStartDate && !startDate) return err('start_date_required');
   // Compare chronologically (not lexically) so non-zero-padded dates still order.
   if (startDate && endDate) {
     const s = new Date(startDate).getTime();

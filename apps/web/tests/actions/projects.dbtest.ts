@@ -221,17 +221,22 @@ describe('auto-generated project codes', () => {
   });
 });
 
-describe('dates are required forward-only', () => {
-  it('refuses to CREATE without both dates', async () => {
+describe('the start date is required forward-only (round A1: the end date is optional)', () => {
+  it('refuses to CREATE without a start date, and creates without an end date', async () => {
     const { ctx, clientId } = await orgWithClient();
     const { startDate: _s, endDate: _e, ...noDates } = baseProject(clientId);
     expect(await createProjectCore(ctx, noDates)).toEqual({
       ok: false,
-      error: 'dates_required',
+      error: 'start_date_required',
     });
-    expect(await createProjectCore(ctx, { ...noDates, startDate: '2026-01-01' })).toEqual(
-      { ok: false, error: 'dates_required' },
-    );
+    expect((await createProjectCore(ctx, { ...noDates, startDate: '2026-01-01' })).ok).toBe(true);
+  });
+
+  it('creates an ACTIVE project when the caller sends no status', async () => {
+    const { ctx, clientId } = await orgWithClient();
+    const { status: _status, ...noStatus } = baseProject(clientId);
+    expect((await createProjectCore(ctx, noStatus)).ok).toBe(true);
+    expect((await listProjects(ctx, {}))[0].status).toBe('active');
   });
 
   it('still lets a LEGACY dateless project be edited', async () => {

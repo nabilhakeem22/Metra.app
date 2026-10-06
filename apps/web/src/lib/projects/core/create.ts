@@ -17,7 +17,9 @@ export async function createProjectCore(
   ctx: OrgContext,
   input: ProjectInput,
 ): Promise<ActionResult & { data?: string }> {
-  const v = validate(input, { requireDates: true });
+  // A new project is ACTIVE unless the caller says otherwise: the create form
+  // no longer asks (status gates no behaviour; it feeds the counts).
+  const v = validate({ ...input, status: input.status ?? 'active' }, { requireStartDate: true });
   if (isErr(v)) return v;
 
   return mutateInOrg(
