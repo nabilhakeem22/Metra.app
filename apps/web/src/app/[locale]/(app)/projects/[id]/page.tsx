@@ -120,7 +120,7 @@ export default async function ProjectProfilePage({
         id={`panel-${tab}`}
         aria-labelledby={`tab-${tab}`}
         tabIndex={0}
-        className="focus:outline-none"
+        className="rounded-panel outline-none focus-ring-brand"
       >
         {tab === 'overview' && (
           <OverviewTab overview={await getProjectOverview(ctx, id)} />

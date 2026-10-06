@@ -17,7 +17,7 @@ import type { BoqSheetRowApi } from './boq-sheet-row-api';
 const READ_ONLY_CODE = 'block p-3 text-small text-[color:var(--text-muted)] ltr:font-mono';
 const READ_ONLY_NUMBER = 'block whitespace-nowrap p-3 text-end font-mono tabular-nums';
 const UNIT_SELECT =
-  'w-full cursor-pointer rounded-item border border-transparent bg-transparent p-3 text-body text-[color:var(--text)] hover:bg-[color:var(--track)] focus:border-[color:hsl(var(--brand))] focus:outline-none';
+  'w-full cursor-pointer rounded-item border border-transparent bg-transparent p-3 text-body text-[color:var(--text)] hover:bg-[color:var(--track)] outline-none focus-visible:border-[color:hsl(var(--brand))]';
 
 export interface BoqFieldProps {
   line: EditableLine;

@@ -108,7 +108,7 @@ export default async function ClientProfilePage({
         id={`panel-${tab}`}
         aria-labelledby={`tab-${tab}`}
         tabIndex={0}
-        className="focus:outline-none"
+        className="rounded-panel outline-none focus-ring-brand"
       >
         {tab === 'overview' && (
           <OverviewTab overview={await getClientOverview(ctx, id)} />

@@ -367,6 +367,15 @@
     font-family: var(--font-sans);
   }
 
+  /* THE FOCUS FLOOR. Anything focusable that styles nothing of its own still
+     shows where the keyboard is. Tailwind `outline-none` (a transparent 2px
+     outline) is a utility and wins over this base rule, so every element that
+     uses it must bring its own: `focus-ring-brand` or a `focus-visible:` style. */
+  :focus-visible {
+    outline: 2px solid hsl(var(--ring));
+    outline-offset: 2px;
+  }
+
   /* Themed browser surfaces (commit to the world). */
   html {
     caret-color: hsl(var(--primary));

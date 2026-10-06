@@ -63,7 +63,7 @@ export function BoqSheetHeader({
             onChange={(event) => onQueryChange(event.target.value)}
             placeholder={t('find')}
             aria-label={t('find')}
-            className="w-full border-0 bg-transparent p-0 text-body text-[color:var(--text)] outline-none"
+            className="w-full border-0 bg-transparent p-0 text-body text-[color:var(--text)] outline-none focus-ring-brand"
           />
         </label>
         {actions}
