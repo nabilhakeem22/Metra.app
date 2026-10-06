@@ -4,6 +4,7 @@ import { Undo2 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { useConfirm } from '@/components/ui/confirm-dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import type { ActionResult } from '@/lib/actions/result';
@@ -12,10 +13,11 @@ import { recordEventCorrection } from '@/lib/engagements/actions';
 /**
  * Retract one ledger row.
  *
- * TWO CLICKS, AND A REASON. The first reveals the form; only the second writes.
- * The pattern is the `abandon` trigger's, and for the same reason: this appends
- * to a ledger that grants INSERT and SELECT and nothing else, so the retraction
- * is itself permanent. There is no undoing an undo.
+ * A REASON, THEN A CONFIRM. The first click reveals the reason field; Retract
+ * then asks through ConfirmDialog (the one place the destructive button lives),
+ * as `abandon` does, and only its confirm writes: this appends to a ledger that
+ * grants INSERT and SELECT and nothing else, so the retraction is itself
+ * permanent. There is no undoing an undo.
  *
  * The reason is REQUIRED, not optional — the server rejects a blank one. A
  * retraction with no stated cause is just a disappearance, and the entire reason
@@ -39,8 +41,26 @@ export function RetractButton({
 }) {
   const t = useTranslations('engagements.timeline');
   const tc = useTranslations('engagements.controls');
+  const tcommon = useTranslations('common');
   const [open, setOpen] = useState(false);
   const [reason, setReason] = useState('');
+  const { confirm, dialog } = useConfirm();
+
+  async function retract(): Promise<void> {
+    const confirmed = await confirm({
+      title: t('retractTitle'),
+      description: t('retractHint'),
+      confirmLabel: t('retractConfirm'),
+      cancelLabel: tcommon('cancel'),
+      variant: 'destructive',
+    });
+    if (!confirmed) return;
+    runAction(async () => {
+      const res = await recordEventCorrection({ engagementId, eventId, reason });
+      if (res.ok) setOpen(false);
+      return res;
+    });
+  }
 
   if (!open) {
     return (
@@ -58,11 +78,11 @@ export function RetractButton({
 
   return (
     <div
-      className="mt-2 space-y-2 rounded-item border border-[color:var(--danger)] p-3"
-      role="alertdialog"
+      className="mt-2 space-y-2 rounded-item border border-[color:var(--rule)] p-3"
+      role="group"
       aria-label={t('retractTitle')}
     >
-      <p className="text-caption text-[color:var(--text)]">{t('retractHint')}</p>
+      {dialog}
       <div className="space-y-1.5">
         <Label htmlFor={`retract-${eventId}`}>{t('retractReason')}</Label>
         <Input
@@ -74,20 +94,10 @@ export function RetractButton({
       <div className="flex flex-wrap gap-2">
         <Button
           type="button"
-          variant="default"
+          variant="secondary"
           size="sm"
           disabled={pending || reason.trim().length === 0}
-          onClick={() =>
-            runAction(async () => {
-              const res = await recordEventCorrection({
-                engagementId,
-                eventId,
-                reason,
-              });
-              if (res.ok) setOpen(false);
-              return res;
-            })
-          }
+          onClick={() => void retract()}
         >
           {t('retractConfirm')}
         </Button>

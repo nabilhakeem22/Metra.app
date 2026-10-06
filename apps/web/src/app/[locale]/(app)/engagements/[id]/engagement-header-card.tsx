@@ -3,12 +3,14 @@
 import { Link2 } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
 import { DeliveryStatusChip } from '@/components/engagements/delivery-status-chip';
+import { StatusChip } from '@/components/ui/status-chip';
 import type { DeliveryStatus } from '@/lib/engagements/delivery-status';
 import type { EngagementHeader } from '@/lib/engagements/queries';
 import { formatDate } from '@/lib/format/date';
 import { docYear, formatDocNumber } from '@/lib/format/doc-number';
 import { formatMoney } from '@/lib/format/money';
 import { pickLocale } from '@/lib/i18n/pick-locale';
+import type { StatusTone } from '@/lib/ui/status-tone';
 import { SectionLabel } from '@/components/ui/section-label';
 
 // The cockpit HEADER — breadcrumb and document number on a quiet mono line, the
@@ -57,19 +59,16 @@ export function EngagementHeaderCard({
     ? tc('feeChip', { amount: formatMoney(header.designFee, locale) })
     : null;
 
+  // On the StatusChip tones, beside the status chip itself, so the row speaks
+  // one colour language: brand is the status chip's alone ("your move"). A
+  // locked concept is a finished step (done). "As-built due" is a fact with no
+  // date behind it, not an overdue task, so it is neutral, like the rest.
+  type Chip = { key: string; label: string; tone: StatusTone };
   const flags = [
-    header.offPlan && { key: 'offPlan', label: t('offPlan.offPlan'), tone: 'muted' as const },
-    header.asBuiltDue && {
-      key: 'asBuiltDue',
-      label: t('asBuiltDue'),
-      tone: 'warn' as const,
-    },
-    header.conceptLockedAt && {
-      key: 'conceptLocked',
-      label: t('conceptLocked'),
-      tone: 'brand' as const,
-    },
-  ].filter(Boolean) as { key: string; label: string; tone: 'muted' | 'warn' | 'brand' }[];
+    header.offPlan && { key: 'offPlan', label: t('offPlan.offPlan'), tone: 'neutral' },
+    header.asBuiltDue && { key: 'asBuiltDue', label: t('asBuiltDue'), tone: 'neutral' },
+    header.conceptLockedAt && { key: 'conceptLocked', label: t('conceptLocked'), tone: 'done' },
+  ].filter(Boolean) as Chip[];
 
   // The chips the mockup draws that this product does NOT model, and so are not
   // invented here: the delivery BRANCH ("Design + execution") is not decided until
@@ -78,10 +77,10 @@ export function EngagementHeaderCard({
   // source. The real flags take their place -- off-plan, as-built due, concept
   // locked -- which are true and which the mockup had no way to know about.
   const chips = [
-    feeLabel && { key: 'fee', label: feeLabel, tone: 'muted' as const },
-    { key: 'started', label: tc('startedOn', { date: started }), tone: 'muted' as const },
+    feeLabel && { key: 'fee', label: feeLabel, tone: 'neutral' },
+    { key: 'started', label: tc('startedOn', { date: started }), tone: 'neutral' },
     ...flags,
-  ].filter(Boolean) as { key: string; label: string; tone: 'muted' | 'warn' | 'brand' }[];
+  ].filter(Boolean) as Chip[];
 
   return (
     <header className="flex flex-wrap items-start gap-x-4 gap-y-3">
@@ -104,18 +103,7 @@ export function EngagementHeaderCard({
         <div className="mt-2 flex flex-wrap items-center gap-1.5">
           <DeliveryStatusChip status={status} />
           {chips.map((chip) => (
-            <span
-              key={chip.key}
-              className={`rounded-pill px-2.5 py-0.5 text-caption font-semibold ${
-                chip.tone === 'warn'
-                  ? 'bg-[color:var(--warn-tint)] text-[color:var(--warn)]'
-                  : chip.tone === 'brand'
-                    ? 'bg-brand-tint text-brand-ink'
-                    : 'bg-[color:var(--track)] text-[color:var(--text-muted)]'
-              }`}
-            >
-              {chip.label}
-            </span>
+            <StatusChip key={chip.key} tone={chip.tone} label={chip.label} />
           ))}
         </div>
       </div>
