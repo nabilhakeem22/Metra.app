@@ -117,7 +117,7 @@
     }
   },
   "meta": {
-    "title": "Project and cost control for fit-out contractors",
+    "title": "Run your interior design studio, from proposal to handover",
     "description": "Every pound of a project's value, traceable from the line you quoted to the line you invoiced.",
     "siteName": "Metra"
   },
@@ -1550,7 +1550,7 @@
       "delivery": "Delivery"
     },
     "state": {
-      "created": "Created",
+      "created": "New",
       "design_proposal": "Design proposal",
       "survey": "Survey",
       "layout": "Layout",
@@ -1639,63 +1639,7 @@
       "logPayment": "Log payment",
       "advance": "Advance to the next stage",
       "payNote": "Logging the payment advances the delivery automatically — the client is never shown the amount.",
-      "payNoteRecordOnly": "Logging the balance only records it. Choose how the delivery ends once it clears.",
-      "closed": {
-        "headline": "This delivery is closed",
-        "hint": "No further action is needed — the design lifecycle has ended."
-      },
-      "created": {
-        "headline": "Put a design fee in front of the client",
-        "hint": "Set the fee and its milestone split to open the delivery."
-      },
-      "design_proposal": {
-        "headline": "Collect the signing deposit to start work",
-        "hint": "Once the deposit clears, the survey stage unlocks."
-      },
-      "survey": {
-        "headline": "Capture the site's spatial base",
-        "hint": "Record the measured survey — or the developer CAD set for off-plan — to move to layout."
-      },
-      "layout": {
-        "headline": "Share concept options with the client",
-        "hint": "Record 2 to 4 concept options, then advance to the concept review."
-      },
-      "concept_review": {
-        "headline": "Collect the Gate A installment & lock the concept",
-        "hint": "Once the client picks a concept and the Gate A payment clears, the 3D phase opens."
-      },
-      "negotiation": {
-        "headline": "Settle any revision charges & confirm the concept",
-        "hint": "Clear outstanding revision change orders to lock the concept and start 3D design."
-      },
-      "design_3d": {
-        "headline": "Publish the approved render set",
-        "hint": "Mark at least one approved render to capture the baseline and reach final approval."
-      },
-      "final_approval": {
-        "headline": "Close Gate B & approve the design",
-        "hint": "The budget range must be acknowledged, the as-built reconciled, and the Gate B installment cleared."
-      },
-      "change_triage": {
-        "headline": "Reconcile the as-built variance",
-        "hint": "Attest a clean as-built to return the delivery to final approval."
-      },
-      "shop_drawings": {
-        "headline": "Draft the shop drawings",
-        "hint": "Upload the production drawings — once at least one is recorded, the delivery advances to the BOQ."
-      },
-      "boq": {
-        "headline": "Build the bill of quantities",
-        "hint": "Compile and record the BOQ to open the execution decision."
-      },
-      "execution_decision": {
-        "headline": "Settle the balance & choose how this ends",
-        "hint": "Once the balance clears, Advance continues into full execution — or use \"Close as design-only\" below to hand the design off and close."
-      },
-      "design_only_handoff": {
-        "headline": "Await the recipient's acknowledgement",
-        "hint": "The design-only package is out — once the recipient acknowledges receipt (via their link, or recorded on their behalf), close the delivery."
-      }
+      "payNoteRecordOnly": "Logging the balance only records it. Choose how the delivery ends once it clears."
     },
     "nextActions": {
       "title": "Next actions",
@@ -1720,7 +1664,7 @@
         "waitingClient": "Waiting on client",
         "paymentToConfirm": "Payment to confirm",
         "closed": "Closed",
-        "crumb": "Engagements",
+        "crumb": "Deliveries",
         "feeChip": "Design fee {amount}",
         "startedOn": "Started {date}"
       },
@@ -1805,11 +1749,11 @@
         },
         "survey": {
           "headline": "Upload the site survey",
-          "sub": "Every drawing after this is measured against it. Uploading it opens the layout stage."
+          "sub": "Every drawing after this is measured against it. Once it's recorded, advance to the layout stage."
         },
         "layout": {
           "headline": "Attach the concept options",
-          "sub": "Two to four options for the client to choose between. Attaching them sends the concept package."
+          "sub": "Two to four options for the client to choose between. Once they're attached, advance to concept review."
         },
         "design_3d": {
           "headline": "Upload the 3D renders",
@@ -2103,7 +2047,7 @@
     },
     "boqStep": {
       "startTitle": "Price the works in Metra",
-      "startBody": "Build the BOQ from your price book, or fill the template and upload it. A priced schedule can be measured against on site and turned into the execution contract; a file cannot.",
+      "startBody": "Build the BOQ from your price book, or fill the template and upload it. A priced schedule can be measured against on site; a file cannot.",
       "issueTitle": "The BOQ is ready to issue",
       "issueBody": "{count} lines priced. Issuing freezes it and delivers it to the client, withheld until the design fee is paid.",
       "issueBodyOpen": "{count} lines priced. Issuing freezes it and delivers it to the client, who can open it right away.",
