@@ -7,6 +7,7 @@ import 'server-only';
 // render. A plain server module: nothing here renders or decides layout.
 import type { MemberRole } from '@metra/db';
 import type { OrgContext } from '@/lib/db/context';
+import { deriveFeeSplitPrefill } from '@/lib/engagements/default-fee-split';
 import { countAwaitingReplyCore } from '@/lib/engagements/document-comments';
 import { getEngagementGatePreview } from '@/lib/engagements/gate-preview';
 import {
@@ -20,6 +21,7 @@ import {
   getEngagementPaymentClaims,
   getEngagementPayments,
   getEngagementTransitions,
+  getLastUsedFeeSchedule,
   type EngagementTransitionRecord,
 } from '@/lib/engagements/queries';
 import { can } from '@/lib/permissions/can';
@@ -56,6 +58,7 @@ export async function loadEngagementDetail(ctx: OrgContext, id: string) {
     shareStatus,
     awaitingReplyCount,
     boqStep,
+    feeSplitPrefill,
   ] = await Promise.all([
     getEngagementFeeSchedule(ctx, id),
     getEngagementPayments(ctx, id),
@@ -72,6 +75,10 @@ export async function loadEngagementDetail(ctx: OrgContext, id: string) {
     // after it), so it falls when the studio REPLIES, not when it opens a thread.
     countAwaitingReplyCore(ctx, id),
     loadBoqStep(ctx, { engagementId: id, projectId: header.projectId }),
+    // The fee form only exists at `created`, so the org's last split is read only then.
+    header.state === 'created'
+      ? getLastUsedFeeSchedule(ctx).then(deriveFeeSplitPrefill)
+      : Promise.resolve(null),
   ]);
 
   return {
@@ -88,6 +95,7 @@ export async function loadEngagementDetail(ctx: OrgContext, id: string) {
     shareStatus,
     awaitingReplyCount,
     boqStep,
+    feeSplitPrefill,
   };
 }
 

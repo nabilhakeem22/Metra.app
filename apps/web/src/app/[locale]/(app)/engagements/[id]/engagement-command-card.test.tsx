@@ -79,6 +79,7 @@ function props(overrides: Partial<EngagementCommandCardProps> = {}): EngagementC
     canUpload: true,
     canSetOffPlan: false,
     offPlan: false,
+    feeSplitPrefill: null,
     paymentClaims: [],
     awaitingReplyCount: 0,
     conceptOptionCount: 0,

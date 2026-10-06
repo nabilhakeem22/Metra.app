@@ -97,6 +97,7 @@ export default async function EngagementDetailPage({
         canStartQuotation={can(ctx.role, 'proposals_build', 'create')}
         gatePreview={gatePreview}
         canAdvance={canAdvance}
+        feeSplitPrefill={data.feeSplitPrefill}
         canResolveClaims={canResolveClaims}
         stallDays={stallDaysSince(transitions)}
         // A pure read-model over the fee schedule + payments already loaded (no

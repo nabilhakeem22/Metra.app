@@ -1880,7 +1880,12 @@
       "kind": "Milestone",
       "value": "Value",
       "submit": "Submit fee schedule",
-      "addNamed": "Add {name}"
+      "addNamed": "Add {name}",
+      "totalPercent": "Total {total}% of 100%",
+      "totalAmount": "Total {total} of {target}",
+      "needsFee": "Enter the design fee first.",
+      "needsDeposit": "The deposit needs a value.",
+      "prefilledFromLast": "Pre-filled from your last split."
     },
     "revisionForm": {
       "title": "Request revision",

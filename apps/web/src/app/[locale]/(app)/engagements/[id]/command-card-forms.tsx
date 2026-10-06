@@ -2,6 +2,7 @@
 
 import type { CommandCardView } from '@/lib/engagements/command-card';
 import type { CommandCardCtas } from '@/lib/engagements/command-card-ctas';
+import type { FeeSplitPrefill } from '@/lib/engagements/default-fee-split';
 import type { EngagementGatePreview } from '@/lib/engagements/gate-preview';
 import { EngagementFeeForm } from './engagement-fee-form';
 import { EngagementOffPlanToggle } from './engagement-off-plan-toggle';
@@ -20,6 +21,8 @@ export interface CommandCardFormsProps {
   ctas: Pick<CommandCardCtas, 'payCta' | 'paymentKind' | 'paymentItem' | 'atProposal'>;
   open: { fee: boolean; pay: boolean };
   offPlan: { enabled: boolean; canSet: boolean };
+  /** The fee form's opening split (the studio's last, or 50/30/20). */
+  feeSplitPrefill: FeeSplitPrefill | null;
   pending: boolean;
   handlers: {
     runAction: RunAction;
@@ -35,6 +38,7 @@ export function CommandCardForms({
   ctas,
   open,
   offPlan,
+  feeSplitPrefill,
   pending,
   handlers,
 }: CommandCardFormsProps) {
@@ -44,6 +48,7 @@ export function CommandCardForms({
         <div className="mt-4">
           <EngagementFeeForm
             engagementId={engagementId}
+            prefill={feeSplitPrefill}
             pending={pending}
             onSubmit={(fn) => handlers.runAction(fn)}
             onCancel={handlers.closeFee}

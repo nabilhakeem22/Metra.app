@@ -5,15 +5,13 @@ import { useState } from 'react';
 import { Link } from '@/i18n/routing';
 import { resolveActionError } from '@/lib/actions/error-message';
 import { resolveBudgetBadge } from '@/lib/engagements/budget-badge';
-import { secondaryTriggersOf } from '@/lib/engagements/forward-trigger';
 import { landedKeysOf } from '@/lib/engagements/held-key';
-import { countConceptOptions } from '@/lib/engagements/concept-options';
 import { isTerminal } from '@/lib/engagements/states';
+import { commandCardPropsOf } from './command-card-props-of';
 import { EngagementCommandCard } from './engagement-command-card';
 import type { EngagementDetailProps } from './engagement-detail-props';
 import { EngagementPanels } from './engagement-panels';
 import { EngagementTabStrip } from './engagement-tab-strip';
-import { revealDeliveryShareLink } from './share-anchor';
 import type { EngagementTab } from './tabs';
 import { useEngagementAction } from './use-engagement-action';
 
@@ -25,29 +23,22 @@ import { useEngagementAction } from './use-engagement-action';
 // choices an inch under a card whose whole premise is naming ONE next move. Each
 // of those four now lives in the header of the tab holding its record. Pure
 // composition over data the page already loaded; logical CSS only (RTL mirrors).
-export function EngagementDetailClient({
-  header,
-  boqStep,
-  feeSchedule,
-  payments,
-  artifacts,
-  events,
-  changeOrders,
-  transitions,
-  clientActivity,
-  nextActions,
-  capabilities,
-  canUpload,
-  canShare,
-  canStartQuotation,
-  gatePreview,
-  canAdvance,
-  canResolveClaims,
-  stallDays,
-  pulse,
-  paymentClaims,
-  awaitingReplyCount,
-}: EngagementDetailProps) {
+export function EngagementDetailClient(props: EngagementDetailProps) {
+  const {
+    header,
+    feeSchedule,
+    payments,
+    artifacts,
+    events,
+    changeOrders,
+    transitions,
+    clientActivity,
+    capabilities,
+    canUpload,
+    pulse,
+    paymentClaims,
+    awaitingReplyCount,
+  } = props;
   const t = useTranslations('engagements');
   const te = useTranslations('errors');
   const [tab, setTab] = useState<EngagementTab>('files');
@@ -58,19 +49,9 @@ export function EngagementDetailClient({
     // ledgers: a transition writes one, and so does a payment.
     landedKeys: landedKeysOf(transitions, payments),
   });
-  // The Advance button owns the forward-advance trigger and the ending buttons
-  // own the endings; every OTHER legal, permitted trigger becomes a low-emphasis
-  // secondary control.
-  const secondaryTriggers = secondaryTriggersOf(nextActions, gatePreview.primaryTrigger);
-
   // Derived from data the page already holds; the rule itself lives in
   // lib/engagements/budget-badge.ts, where it can be tested.
   const budgetBadge = resolveBudgetBadge(header, events);
-
-  // Pure derivation over the artifacts the page already loaded (no extra read).
-  // The command card needs it to stop offering a 5th concept-option upload —
-  // artifacts are append-only, so overshooting the guard's cap is unrecoverable.
-  const conceptOptionCount = countConceptOptions(artifacts);
 
   return (
     <div className="space-y-4">
@@ -78,36 +59,7 @@ export function EngagementDetailClient({
         {t('backToList')}
       </Link>
 
-      <EngagementCommandCard
-        engagementId={header.id}
-        projectId={header.projectId}
-        boqStep={boqStep}
-        preview={gatePreview}
-        state={header.state}
-        allowances={{
-          revisionCount: header.revisionCount,
-          freeRevisionN: header.freeRevisionN,
-          designRevisionCount: header.designRevisionCount,
-          freeDesignRevisionN: header.freeDesignRevisionN,
-        }}
-        stallDays={stallDays}
-        canAdvance={canAdvance}
-        canRecordPayment={capabilities.recordPayment}
-        canResolveClaims={canResolveClaims}
-        canShare={canShare}
-        canStartQuotation={canStartQuotation}
-        canUpload={canUpload}
-        canSetOffPlan={capabilities.setRom}
-        offPlan={header.offPlan}
-        paymentClaims={paymentClaims}
-        awaitingReplyCount={awaitingReplyCount}
-        conceptOptionCount={conceptOptionCount}
-        clientActivity={clientActivity}
-        secondaryTriggers={secondaryTriggers}
-        pending={pending}
-        runAction={runAction}
-        onNudge={revealDeliveryShareLink}
-      />
+      <EngagementCommandCard {...commandCardPropsOf(props, { pending, runAction })} />
 
       {error && (
         <p className="text-sm text-destructive" role="alert">

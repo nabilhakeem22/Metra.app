@@ -11,12 +11,13 @@ import {
 } from '@/lib/engagements/revision-allowance';
 import type { Trigger } from '@/lib/engagements/transitions';
 import { triggerNeedsForm } from '@/lib/engagements/ui';
-import { EngagementFeeForm } from './engagement-fee-form';
 import { EngagementRevisionForm } from './engagement-revision-form';
 import { DIRECT_TRIGGER_ACTIONS } from './trigger-actions';
 
-/** The three payload triggers — each opens a form here instead of firing. */
-type PayloadFormTrigger = 'submitDesignFee' | RevisionTrigger;
+/** The payload triggers that can be secondary — each opens a form here instead of
+ *  firing. `submitDesignFee` is not one: it is only legal from `created`, where it
+ *  is always the card's forward move. */
+type PayloadFormTrigger = RevisionTrigger;
 
 // The command card's LOW-EMPHASIS secondary controls: every legal, capability-
 // permitted trigger that is NOT the forward-advance one (the Advance button owns
@@ -129,15 +130,6 @@ export function EngagementSecondaryActions({
             </Button>
           </div>
         </div>
-      )}
-
-      {openForm === 'submitDesignFee' && (
-        <EngagementFeeForm
-          engagementId={engagementId}
-          pending={pending}
-          onSubmit={(fn) => runAction(fn)}
-          onCancel={() => setOpenForm(null)}
-        />
       )}
 
       {/* One form for BOTH revision edges — the concept self-loop and the 3D

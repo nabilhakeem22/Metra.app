@@ -1,4 +1,5 @@
 import type { BoqStepData } from '@/lib/boqs/step';
+import type { FeeSplitPrefill } from '@/lib/engagements/default-fee-split';
 import type { EngagementGatePreview } from '@/lib/engagements/gate-preview';
 import type { CommercialPulse } from '@/lib/engagements/pulse';
 import type {
@@ -53,6 +54,8 @@ export interface EngagementDetailProps {
   canStartQuotation: boolean;
   gatePreview: EngagementGatePreview;
   canAdvance: boolean;
+  /** The fee form's opening split, read only while the delivery is `created`. */
+  feeSplitPrefill: FeeSplitPrefill | null;
   canResolveClaims: boolean;
   stallDays: number | null;
   pulse: CommercialPulse;

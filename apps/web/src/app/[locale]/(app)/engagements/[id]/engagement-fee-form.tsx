@@ -1,7 +1,7 @@
 'use client';
 
 import { Loader2 } from 'lucide-react';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import { useState } from 'react';
 import type { MilestoneBasis, MilestoneKind } from '@metra/db';
 import { Button } from '@/components/ui/button';
@@ -18,68 +18,65 @@ import type { ActionResult } from '@/lib/actions/result';
 import { submitDesignFee } from '@/lib/engagements/actions';
 import {
   DEFAULT_MILESTONE_KINDS,
-  OPTIONAL_MILESTONE_KINDS,
   byDueOrder,
+  type FeeSplitPrefill,
 } from '@/lib/engagements/default-fee-split';
+import { summarizeFeeSplit } from '@/lib/engagements/fee-split-total';
+import { formatMoney } from '@/lib/format/money';
+import { FeeSplitRows, type FeeSplitRow } from './fee-split-rows';
 
 // Enum values declared locally (typed by the type-only @metra/db import) — a
-// client component must never import a runtime @metra/db value. The milestone
-// ordering + the three-payment default come from the pure leaf, shared with its
-// test so the form and the rule cannot drift.
+// client component must never import a runtime @metra/db value.
 const MILESTONE_BASES: MilestoneBasis[] = ['percent', 'amount'];
 
-interface Row {
-  kind: MilestoneKind;
-  value: string;
+/** "100.0000" -> "100": the percent total as a person reads it (Latin digits). */
+function plainPercent(scale4: string): string {
+  return scale4.replace(/\.?0+$/, '');
 }
 
+/**
+ * The design fee and its payment split. Opens on the studio's LAST split (in
+ * percent) or 50/30/20, shows a live total, and keeps Submit disabled until the
+ * split is one the server accepts: a fee, a deposit, and 100% (or the fee, on
+ * the amount basis).
+ */
 export function EngagementFeeForm({
   engagementId,
+  prefill,
   pending,
   onSubmit,
   onCancel,
 }: {
   engagementId: string;
+  /** The opening split; null opens the three default rows empty. */
+  prefill: FeeSplitPrefill | null;
   pending: boolean;
   onSubmit: (fn: () => Promise<ActionResult>) => void;
   onCancel: () => void;
 }) {
   const t = useTranslations('engagements.feeForm');
   const tc = useTranslations('engagements.controls');
-  const tk = useTranslations('engagements.milestoneKind');
   const tb = useTranslations('engagements.milestoneBasis');
+  const locale = useLocale();
   const [designFee, setDesignFee] = useState('');
   const [basis, setBasis] = useState<MilestoneBasis>('percent');
-  // Opens on the THREE-payment default (deposit / after the design is confirmed /
-  // final). Gate A stays addable below for a studio that also bills at concept.
-  const [rows, setRows] = useState<Row[]>(
-    DEFAULT_MILESTONE_KINDS.map((kind) => ({ kind, value: '' })),
+  const [rows, setRows] = useState<FeeSplitRow[]>(
+    () => prefill?.rows ?? DEFAULT_MILESTONE_KINDS.map((kind) => ({ kind, value: '' })),
   );
+  const summary = summarizeFeeSplit({ basis, designFee, rows });
 
-  function setRow(index: number, value: string) {
-    setRows((prev) => prev.map((r, i) => (i === index ? { ...r, value } : r)));
-  }
-
+  const setRow = (index: number, value: string) =>
+    setRows((prev) => prev.map((row, i) => (i === index ? { ...row, value } : row)));
   /** Add one optional milestone, kept in due order rather than click order. */
-  function addRow(kind: MilestoneKind) {
-    setRows((prev) =>
-      [...prev, { kind, value: '' }].sort((a, b) => byDueOrder(a.kind, b.kind)),
-    );
-  }
-
-  function removeRow(kind: MilestoneKind) {
-    setRows((prev) => prev.filter((r) => r.kind !== kind));
-  }
-
-  // Only milestones NOT already on the schedule can be added.
-  const addable = OPTIONAL_MILESTONE_KINDS.filter(
-    (kind) => !rows.some((r) => r.kind === kind),
-  );
+  const addRow = (kind: MilestoneKind) =>
+    setRows((prev) => [...prev, { kind, value: '' }].sort((a, b) => byDueOrder(a.kind, b.kind)));
+  const removeRow = (kind: MilestoneKind) =>
+    setRows((prev) => prev.filter((row) => row.kind !== kind));
 
   function submit() {
     const milestones = rows
-      .filter((r) => r.value.trim() !== '')
-      .map((r) => ({ kind: r.kind, basis, value: r.value.trim() }));
+      .filter((row) => row.value.trim() !== '')
+      .map((row) => ({ kind: row.kind, basis, value: row.value.trim() }));
     onSubmit(() => submitDesignFee(engagementId, { designFee: designFee.trim(), milestones }));
   }
 
@@ -98,22 +95,19 @@ export function EngagementFeeForm({
             inputMode="decimal"
             className="tabular-nums"
             value={designFee}
-            onChange={(e) => setDesignFee(e.target.value)}
+            onChange={(event) => setDesignFee(event.target.value)}
           />
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="fee-basis">{t('basis')}</Label>
-          <Select
-            value={basis}
-            onValueChange={(v) => setBasis(v as MilestoneBasis)}
-          >
+          <Select value={basis} onValueChange={(value) => setBasis(value as MilestoneBasis)}>
             <SelectTrigger id="fee-basis">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {MILESTONE_BASES.map((b) => (
-                <SelectItem key={b} value={b}>
-                  {tb(b)}
+              {MILESTONE_BASES.map((option) => (
+                <SelectItem key={option} value={option}>
+                  {tb(option)}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -121,56 +115,31 @@ export function EngagementFeeForm({
         </div>
       </div>
 
-      <div className="space-y-2">
-        <p className="text-xs font-medium text-muted-foreground">{t('milestones')}</p>
-        {rows.map((row, index) => (
-          <div key={row.kind} className="flex items-center gap-2">
-            <span className="w-40 shrink-0 text-sm">{tk(row.kind)}</span>
-            <Input
-              dir="ltr"
-              inputMode="decimal"
-              className="tabular-nums"
-              aria-label={`${tk(row.kind)} ${t('value')}`}
-              value={row.value}
-              onChange={(e) => setRow(index, e.target.value)}
-            />
-            {/* Only an ADDED milestone can be removed — the three defaults are the
-                schedule the product recommends, and dropping one silently would
-                turn its gate free without the studio meaning it. */}
-            {!DEFAULT_MILESTONE_KINDS.includes(row.kind) && (
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={() => removeRow(row.kind)}
-              >
-                {t('remove')}
-              </Button>
-            )}
-          </div>
-        ))}
-        {addable.length > 0 && (
-          <div className="flex flex-wrap gap-2 pt-1">
-            {addable.map((kind) => (
-              <Button
-                key={kind}
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => addRow(kind)}
-              >
-                {t('addNamed', { name: tk(kind) })}
-              </Button>
-            ))}
-          </div>
+      {prefill?.source === 'lastUsed' && (
+        <p className="text-xs text-muted-foreground">{t('prefilledFromLast')}</p>
+      )}
+      <FeeSplitRows rows={rows} onChange={setRow} onAdd={addRow} onRemove={removeRow} />
+
+      <div className="space-y-1 text-sm" aria-live="polite">
+        {summary.target !== null && (
+          <p className={`tabular-nums ${summary.balanced ? '' : 'text-[color:var(--warn)]'}`}>
+            {basis === 'percent'
+              ? t('totalPercent', { total: plainPercent(summary.total) })
+              : t('totalAmount', {
+                  total: formatMoney(summary.total, locale),
+                  target: formatMoney(summary.target, locale),
+                })}
+          </p>
         )}
+        {!summary.hasFee && <p className="text-xs text-muted-foreground">{t('needsFee')}</p>}
+        {!summary.hasDeposit && <p className="text-xs text-muted-foreground">{t('needsDeposit')}</p>}
       </div>
 
       <div className="flex justify-end gap-2">
         <Button type="button" variant="outline" onClick={onCancel} disabled={pending}>
           {tc('cancel')}
         </Button>
-        <Button type="button" onClick={submit} disabled={pending}>
+        <Button type="button" onClick={submit} disabled={pending || !summary.canSubmit}>
           {pending && <Loader2 className="size-4 animate-spin" aria-hidden />}
           {t('submit')}
         </Button>

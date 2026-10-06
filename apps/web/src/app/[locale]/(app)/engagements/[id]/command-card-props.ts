@@ -1,4 +1,5 @@
 import type { BoqStepData } from '@/lib/boqs/step';
+import type { FeeSplitPrefill } from '@/lib/engagements/default-fee-split';
 import type { EngagementGatePreview } from '@/lib/engagements/gate-preview';
 import type { EngagementPaymentClaimRecord } from '@/lib/engagements/queries';
 import type { EngagementClientActivityRecord } from '@/lib/engagements/queries/client-activity';
@@ -38,6 +39,8 @@ export interface EngagementCommandCardProps {
   canUpload: boolean;
   canSetOffPlan: boolean;
   offPlan: boolean;
+  /** The fee form's opening split at `created`; null elsewhere. */
+  feeSplitPrefill: FeeSplitPrefill | null;
   /** The PENDING client payment claims; while any exists, confirming one is the card's one action. */
   paymentClaims: EngagementPaymentClaimRecord[];
   /** Client Deliverables Step 2 — client questions on documents still awaiting a

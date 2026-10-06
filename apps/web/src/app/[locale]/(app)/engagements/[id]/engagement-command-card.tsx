@@ -121,6 +121,7 @@ export function EngagementCommandCard(props: EngagementCommandCardProps) {
               ctas={ctas}
               open={{ fee: feeOpen, pay: payOpen }}
               offPlan={{ enabled: props.offPlan, canSet: props.canSetOffPlan }}
+              feeSplitPrefill={props.feeSplitPrefill}
               pending={pending}
               handlers={{
                 runAction: props.runAction,

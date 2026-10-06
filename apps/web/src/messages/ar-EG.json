@@ -1872,15 +1872,20 @@
       }
     },
     "feeForm": {
-      "title": "إرسال مقايسة التصميم",
-      "designFee": "مقايسة التصميم",
+      "title": "سجّل أتعاب التصميم",
+      "designFee": "أتعاب التصميم",
       "basis": "الأساس",
       "milestones": "الدفعة",
       "remove": "حذف",
       "kind": "دفعة",
       "value": "القيمة",
       "submit": "إرسال جدول الدفعات",
-      "addNamed": "إضافة {name}"
+      "addNamed": "إضافة {name}",
+      "totalPercent": "الإجمالي {total}% من 100%",
+      "totalAmount": "الإجمالي {total} من {target}",
+      "needsFee": "اكتب أتعاب التصميم الأول.",
+      "needsDeposit": "العربون محتاج قيمة.",
+      "prefilledFromLast": "متعبّي من آخر تقسيم استخدمته."
     },
     "revisionForm": {
       "title": "طلب تعديل",
