@@ -87,6 +87,7 @@ const ALL_CODES: ActionCode[] = [
   'boq_missing',
   'balance_not_cleared',
   'handoff_not_acknowledged',
+  'client_review_pending',
   'handoff_not_open',
   'rom_range_invalid',
   'rom_not_set',

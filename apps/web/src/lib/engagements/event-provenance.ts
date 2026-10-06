@@ -90,16 +90,27 @@ export function isClientGenerated(actorChannel: string): boolean {
   return actorChannel === CLIENT_CHANNEL;
 }
 
+/** The approvals the studio may record as given to it OFFLINE by the client. */
+const OFFLINE_APPROVAL_KINDS: ReadonlySet<EngagementEventKind> = new Set<EngagementEventKind>([
+  'concept_approval',
+  'design_approval',
+]);
+
 /**
- * The studio recorded this AS the client — an acknowledgement they took on a
- * call, in a message, or on paper.
+ * The studio recorded this FOR the client: an acknowledgement they took on a
+ * call, in a message, or on paper, or an approval the client gave them directly
+ * ("Client approved offline", which always carries its channel in `evidence`).
+ * The studio's own Advance writes an approval with no evidence and is not marked.
  *
  * This is the one thing a reader six months into a dispute has to be able to see,
  * so it is computed from the row rather than inferred from how the row looks.
  */
-export function isRecordedOnBehalf(
-  kind: EngagementEventKind,
-  actorChannel: string,
-): boolean {
-  return !isClientGenerated(actorChannel) && ON_BEHALF_KINDS.has(kind);
+export function isRecordedForClient(event: {
+  kind: EngagementEventKind;
+  actorChannel: string;
+  evidence: string | null;
+}): boolean {
+  if (isClientGenerated(event.actorChannel)) return false;
+  if (ON_BEHALF_KINDS.has(event.kind)) return true;
+  return OFFLINE_APPROVAL_KINDS.has(event.kind) && event.evidence !== null;
 }

@@ -19,7 +19,7 @@ import type { RunAction } from './use-engagement-action';
  */
 export interface CommandCardActionProps {
   view: CommandCardView;
-  ctas: Pick<CommandCardCtas, 'payCta' | 'actOnCard'>;
+  ctas: Pick<CommandCardCtas, 'payCta' | 'actOnCard' | 'offlineApproval'>;
   /** From the chrome: every unmet guard is one the CLIENT clears. */
   waitingOnClient: boolean;
   canShare: boolean;

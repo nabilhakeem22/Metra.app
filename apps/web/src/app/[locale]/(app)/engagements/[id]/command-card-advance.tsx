@@ -1,10 +1,11 @@
 'use client';
 
-import { Link2, Loader2 } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
 import type { CommandCardActionProps } from './command-card-action';
 import { CommandCardEndings } from './command-card-endings';
+import { CommandCardWaitingClient } from './command-card-waiting-client';
 import { DIRECT_TRIGGER_ACTIONS } from './trigger-actions';
 
 /** Dispatch the forward trigger, or open the form the edge needs first. */
@@ -26,9 +27,9 @@ function fireAdvance(props: CommandCardActionProps): void {
 }
 
 /**
- * WAITING ON THE CLIENT: the ADVANCE is dead machinery — nothing the studio does
- * enables it, only the client acting does — so it is replaced by the one move they
- * can still make on this card.
+ * WAITING ON THE CLIENT: the ADVANCE is dead machinery (nothing the studio does
+ * enables it, only the client acting does), so it is replaced by what the studio
+ * can still do on this card (command-card-waiting-client.tsx).
  *
  * Note what is NOT hidden: logging a payment. A money guard is client-actionable
  * AND studio-recordable, so a studio that took the transfer offline can settle it
@@ -71,18 +72,15 @@ export function AdvanceOrReshare(props: CommandCardActionProps) {
   }
   if (props.waitingOnClient) {
     return (
-      props.canShare && (
-        <Button
-          type="button"
-          variant="secondary"
-          className="w-full"
-          disabled={props.pending}
-          onClick={props.onNudge}
-        >
-          <Link2 className="size-4" aria-hidden />
-          {tcmd('reshare')}
-        </Button>
-      )
+      <CommandCardWaitingClient
+        engagementId={props.advance.engagementId}
+        trigger={props.advance.preview.primaryTrigger}
+        offlineApproval={props.ctas.offlineApproval}
+        canShare={props.canShare}
+        pending={props.pending}
+        onNudge={props.onNudge}
+        runAction={props.advance.runAction}
+      />
     );
   }
   // When Advance is blocked it must READ as disabled: a flat subdued fill, never

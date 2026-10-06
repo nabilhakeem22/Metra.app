@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import en from '@/messages/en.json';
 import ar from '@/messages/ar-EG.json';
+import { CLIENT_REVIEW_KINDS } from './client-review';
 import { ENDING_TRIGGERS } from './forward-trigger';
+import { OFFLINE_APPROVAL_CHANNELS } from './offline-approval';
 import { TERMINAL_STATES } from './states';
 import type { DeliveryStatusKind } from './delivery-status';
 
@@ -55,5 +57,15 @@ describe('dynamic engagement copy keys exist in both catalogs', () => {
 
   it.each(Object.keys(DELIVERY_STATUSES))('delivery status %s', (kind) => {
     expectInBothCatalogs(`engagements.status.${kind}`);
+  });
+
+  it.each(Object.keys(CLIENT_REVIEW_KINDS))('waiting on the client review at %s', (state) => {
+    for (const field of ['headline', 'sub']) {
+      expectInBothCatalogs(`engagements.command.waitingClient.${state}.${field}`);
+    }
+  });
+
+  it.each([...OFFLINE_APPROVAL_CHANNELS])('offline approval channel %s', (channel) => {
+    expectInBothCatalogs(`engagements.offlineApproval.channel.${channel}`);
   });
 });

@@ -56,6 +56,7 @@ export const DEFINITE_REFUSALS: ReadonlySet<ActionCode> = new Set<ActionCode>([
   'shop_drawings_missing',
   'boq_missing',
   'handoff_not_acknowledged',
+  'client_review_pending',
   // Input the side-effect refused, rolling the whole transition back.
   'design_fee_required',
   'milestone_split_invalid',

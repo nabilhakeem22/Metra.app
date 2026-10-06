@@ -15,6 +15,7 @@ import { sql } from 'drizzle-orm';
 import { fail, mutateInOrg, requireInOrg } from '@/lib/actions/mutate';
 import { err, type ActionResult } from '@/lib/actions/result';
 import { isValidOccurredOn } from './event-provenance';
+import type { OfflineApproval } from './offline-approval';
 import type { OrgContext } from '@/lib/db/context';
 import {
   MAX_LABEL_CHARS,
@@ -25,20 +26,35 @@ import {
 import { isTerminal } from './states';
 
 /**
+ * The provenance columns of a staff approval row: none for the studio's own
+ * Advance, the channel, date and note for one taken offline from the client.
+ * Which concept option they chose is recorded once the column exists (wave 3);
+ * until then a choice is refused rather than silently dropped.
+ */
+function offlineProvenance(offline: OfflineApproval | null) {
+  if (offline === null) return {};
+  if (offline.chosenArtifactId !== null) fail('invalid');
+  return { evidence: offline.channel, occurredOn: offline.occurredOn, note: offline.note };
+}
+
+/**
  * Append ONE `concept_approval` row to the append-only engagement approvals ledger
  * for `engagementId`. `decidedAt` defaults to now() at the database; `actorUserId`
- * is the internal actor from the request context.
+ * is the internal actor from the request context. `offline` is the approval the
+ * client gave the studio directly ("Client approved offline"), else null.
  */
 export async function recordConceptApproval(
   tx: MetraDb,
   ctx: OrgContext,
   engagementId: string,
+  offline: OfflineApproval | null,
 ): Promise<void> {
   await tx.insert(engagementEvents).values({
     orgId: ctx.orgId,
     engagementId,
     kind: 'concept_approval',
     actorUserId: ctx.userId,
+    ...offlineProvenance(offline),
   });
 }
 
@@ -48,17 +64,20 @@ export async function recordConceptApproval(
  * MUST be called with the executor's `tx` so this witness commits ATOMICALLY with
  * the final_approval -> shop_drawings state move, or not at all. `decidedAt`
  * defaults to now() at the database; `actorUserId` is the internal actor.
+ * `offline` as for {@link recordConceptApproval}.
  */
 export async function recordDesignApproval(
   tx: MetraDb,
   ctx: OrgContext,
   engagementId: string,
+  offline: OfflineApproval | null,
 ): Promise<void> {
   await tx.insert(engagementEvents).values({
     orgId: ctx.orgId,
     engagementId,
     kind: 'design_approval',
     actorUserId: ctx.userId,
+    ...offlineProvenance(offline),
   });
 }
 

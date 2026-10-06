@@ -11,8 +11,16 @@ function item(guard: GuardKey, ok: boolean, amountDue: string | null = null): Ga
 function preview(
   primaryTrigger: Trigger | null,
   items: GateChecklistItem[],
+  awaitingClientReview = false,
 ): EngagementGatePreview {
-  return { primaryTrigger, endingChoices: [], items, allClear: items.every((i) => i.ok) };
+  return {
+    primaryTrigger,
+    endingChoices: [],
+    items,
+    allClear: items.every((i) => i.ok),
+    awaitingClientReview,
+    clientDecision: null,
+  };
 }
 
 /** The execution_decision preview: no forward trigger, the two endings, the balance gate. */
@@ -23,6 +31,8 @@ function choicePreview(balanceCleared: boolean): EngagementGatePreview {
     endingChoices: ['chooseDesignOnly', 'chooseExecution'],
     items,
     allClear: balanceCleared,
+    awaitingClientReview: false,
+    clientDecision: null,
   };
 }
 
@@ -121,11 +131,11 @@ describe('deriveCommandCard', () => {
   });
 
   it('never reports a blocked mode without an unmet item for the checklist to show', () => {
-    // The card no longer repeats the blocker in a note under Advance — it relies
+    // The card no longer repeats the blocker in a note under Advance: it relies
     // on the CHECKLIST (rendered only when `items.length > 0`) naming it. That is
-    // safe because a blocked mode is derived FROM unmet items: with no items the
-    // view is 'ready', never blocked. If this invariant ever breaks, a blocked
-    // card could show no blocker at all.
+    // safe because a guard-blocked mode is derived FROM unmet items: with no items
+    // the view is 'ready', never blocked. The one blocked mode without an unmet
+    // guard is the client review, and its headline names what is awaited.
     const noItems = deriveCommandCard(preview('rendersReady', []), {
       canAdvance: true,
       isTerminal: false,
@@ -146,6 +156,57 @@ describe('deriveCommandCard', () => {
       expect(view.mode).not.toBe('ready');
       expect(view.blockingGuards.length).toBeGreaterThan(0);
     }
+  });
+});
+
+describe('deriveCommandCard while the client owes the review', () => {
+  const metAtConceptReview = (awaiting: boolean) =>
+    preview('selectConcept', [item('gateAInstallmentCleared', true)], awaiting);
+
+  it('every guard met, no client answer: waiting on the client, no Advance', () => {
+    const view = deriveCommandCard(metAtConceptReview(true), { canAdvance: true, isTerminal: false });
+    expect(view).toMatchObject({
+      mode: 'blockedClient',
+      advanceEnabled: false,
+      showNudge: true,
+      primaryBlocker: null,
+      endingsEnabled: false,
+      awaitingClientReview: true,
+      offlineApprovalEnabled: true,
+    });
+  });
+
+  it('offers the offline approval only to a role that may advance', () => {
+    const view = deriveCommandCard(metAtConceptReview(true), { canAdvance: false, isTerminal: false });
+    expect(view.mode).toBe('blockedClient');
+    expect(view.offlineApprovalEnabled).toBe(false);
+  });
+
+  it('once the client has answered, the card is ready again', () => {
+    const view = deriveCommandCard(metAtConceptReview(false), { canAdvance: true, isTerminal: false });
+    expect(view.mode).toBe('ready');
+    expect(view.awaitingClientReview).toBe(false);
+  });
+
+  it('a client money guard unmet as well: blockedClient as before, flagged, no offline approval yet', () => {
+    const view = deriveCommandCard(
+      preview('selectConcept', [item('gateAInstallmentCleared', false, '20000.0000')], true),
+      { canAdvance: true, isTerminal: false },
+    );
+    expect(view.mode).toBe('blockedClient');
+    expect(view.primaryBlocker).toBe('gateAInstallmentCleared');
+    expect(view.awaitingClientReview).toBe(true);
+    expect(view.offlineApprovalEnabled).toBe(false);
+  });
+
+  it('a studio blocker wins, and neither flag is set', () => {
+    const view = deriveCommandCard(
+      preview('approveDesign', [item('romAcknowledged', false)], true),
+      { canAdvance: true, isTerminal: false },
+    );
+    expect(view.mode).toBe('blockedStudio');
+    expect(view.awaitingClientReview).toBe(false);
+    expect(view.offlineApprovalEnabled).toBe(false);
   });
 });
 

@@ -37,6 +37,8 @@ export function deriveCommandCardModel(props: EngagementCommandCardProps): Comma
     conceptOptionCount: props.conceptOptionCount,
     pendingClaimCount: props.paymentClaims.length,
     canResolveClaims: props.canResolveClaims,
+    awaitingClientReview: view.awaitingClientReview,
+    offlineApprovalEnabled: view.offlineApprovalEnabled,
   });
   return { view, closed, chrome, ctas };
 }

@@ -37,7 +37,7 @@ export function CommandCardClaims({
 }: {
   claims: EngagementPaymentClaimRecord[];
   /** The gate, so a confirm that would ALSO move the delivery asks first. */
-  preview: Pick<EngagementGatePreview, 'primaryTrigger' | 'items'>;
+  preview: Pick<EngagementGatePreview, 'primaryTrigger' | 'items' | 'awaitingClientReview'>;
   canAdvance: boolean;
   pending: boolean;
   runAction: RunAction;

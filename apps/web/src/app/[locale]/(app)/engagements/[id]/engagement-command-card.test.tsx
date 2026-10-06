@@ -29,6 +29,8 @@ const actions = vi.hoisted(() => ({
   confirmPaymentClaim: vi.fn(),
   dismissPaymentClaim: vi.fn(),
   abandon: vi.fn(),
+  recordOfflineConceptApproval: vi.fn(),
+  recordOfflineDesignApproval: vi.fn(),
 }));
 vi.mock('@/lib/engagements/actions', () => actions);
 const toasts = vi.hoisted(() => [] as { title?: string; description?: string }[]);
@@ -69,6 +71,8 @@ function choicePreview(balanceCleared: boolean): EngagementGatePreview {
       },
     ],
     allClear: balanceCleared,
+    awaitingClientReview: false,
+    clientDecision: null,
   };
 }
 
@@ -275,6 +279,8 @@ describe('a closed delivery', () => {
     endingChoices: [],
     items: [],
     allClear: true,
+    awaitingClientReview: false,
+    clientDecision: null,
   };
   const closedProps = (state: EngagementCommandCardProps['state'], extra = {}) =>
     props({ state, preview: closedPreview, secondaryTriggers: [], ...extra });
@@ -376,6 +382,8 @@ describe('a claim confirm that would also move the delivery asks first (S2)', ()
       { guard: 'gateAInstallmentCleared', ok: false, code: 'gate_a_not_cleared', amountDue: '20000.0000' },
     ],
     allClear: false,
+    awaitingClientReview: false,
+    clientDecision: null,
   };
   const render = () =>
     renderWithIntl(
@@ -425,6 +433,8 @@ describe('the act sits above the checklist, with one primary action', () => {
     endingChoices: [],
     items: [{ guard: 'gateAInstallmentCleared', ok: true, code: null, amountDue: null }],
     allClear: true,
+    awaitingClientReview: false,
+    clientDecision: null,
   };
   const primaries = (container: HTMLElement) => container.querySelectorAll('[data-primary-action]');
 
@@ -474,7 +484,14 @@ describe('the act sits above the checklist, with one primary action', () => {
   });
 
   test('a closed delivery has no primary action', () => {
-    const closed: EngagementGatePreview = { primaryTrigger: null, endingChoices: [], items: [], allClear: true };
+    const closed: EngagementGatePreview = {
+      primaryTrigger: null,
+      endingChoices: [],
+      items: [],
+      allClear: true,
+      awaitingClientReview: false,
+      clientDecision: null,
+    };
     const { container } = renderWithIntl(
       <EngagementCommandCard {...props({ state: 'abandoned', preview: closed, secondaryTriggers: [] })} />,
     );
@@ -496,5 +513,100 @@ describe('the act sits above the checklist, with one primary action', () => {
         Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
     expect(alert.compareDocumentPosition(checklistRow) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+});
+
+describe('waiting for the client to answer the review', () => {
+  const waitingPreview = (awaitingClientReview: boolean): EngagementGatePreview => ({
+    primaryTrigger: 'selectConcept',
+    endingChoices: [],
+    items: [{ guard: 'gateAInstallmentCleared', ok: true, code: null, amountDue: null }],
+    allClear: true,
+    awaitingClientReview,
+    clientDecision: null,
+  });
+  const renderWaiting = (overrides: Partial<EngagementCommandCardProps> = {}) =>
+    renderWithIntl(
+      <EngagementCommandCard
+        {...props({ state: 'concept_review', preview: waitingPreview(true), ...overrides })}
+      />,
+    );
+  const offlineButton = () => button('engagements.offlineApproval.open');
+
+  test('the card says it waits for the client, with no Advance and no pay-and-advance', () => {
+    const { container } = renderWaiting();
+    expect(
+      screen.getByText(ar('engagements.command.waitingClient.concept_review.headline')),
+    ).toBeTruthy();
+    expect(button('engagements.hero.advance')).toBeNull();
+    expect(button('engagements.hero.logPaymentAdvance')).toBeNull();
+    expect(offlineButton()).not.toBeNull();
+    expect(button('engagements.command.reshare')).not.toBeNull();
+    expect(container.querySelectorAll('[data-primary-action]')).toHaveLength(0);
+  });
+
+  test('a role that may not advance is not offered the offline approval', () => {
+    renderWaiting({ canAdvance: false });
+    expect(offlineButton()).toBeNull();
+  });
+
+  test('Cancel in the form fires nothing', () => {
+    renderWaiting();
+    fireEvent.click(offlineButton()!);
+    fireEvent.click(button('engagements.offlineApproval.cancel')!);
+    expect(actions.recordOfflineConceptApproval).not.toHaveBeenCalled();
+    expect(offlineButton()).not.toBeNull();
+  });
+
+  test('saving needs a channel, then sends the offline approval with it', async () => {
+    actions.recordOfflineConceptApproval.mockResolvedValue({ ok: true });
+    renderWaiting();
+    fireEvent.click(offlineButton()!);
+    const save = button('engagements.offlineApproval.save') as HTMLButtonElement;
+    expect(save.disabled).toBe(true);
+    fireEvent.change(screen.getByLabelText(ar('engagements.offlineApproval.channelLabel')), {
+      target: { value: 'whatsapp' },
+    });
+    fireEvent.change(screen.getByLabelText(ar('engagements.offlineApproval.note')), {
+      target: { value: '  Approved option B  ' },
+    });
+    await act(async () => {
+      fireEvent.click(save);
+    });
+    expect(actions.recordOfflineConceptApproval).toHaveBeenCalledWith('e-1', {
+      channel: 'whatsapp',
+      occurredOn: null,
+      note: 'Approved option B',
+    });
+    expect(actions.recordOfflineDesignApproval).not.toHaveBeenCalled();
+  });
+
+  test('at final_approval the form records the design approval', async () => {
+    actions.recordOfflineDesignApproval.mockResolvedValue({ ok: true });
+    renderWaiting({
+      state: 'final_approval',
+      preview: { ...waitingPreview(true), primaryTrigger: 'approveDesign', items: [] },
+    });
+    expect(
+      screen.getByText(ar('engagements.command.waitingClient.final_approval.headline')),
+    ).toBeTruthy();
+    fireEvent.click(offlineButton()!);
+    fireEvent.change(screen.getByLabelText(ar('engagements.offlineApproval.channelLabel')), {
+      target: { value: 'phone' },
+    });
+    await act(async () => {
+      fireEvent.click(button('engagements.offlineApproval.save')!);
+    });
+    expect(actions.recordOfflineDesignApproval).toHaveBeenCalledWith('e-1', {
+      channel: 'phone',
+      occurredOn: null,
+      note: null,
+    });
+  });
+
+  test('once the client has answered, Advance is back', () => {
+    renderWaiting({ preview: waitingPreview(false) });
+    expect(button('engagements.hero.advance')).not.toBeNull();
+    expect(offlineButton()).toBeNull();
   });
 });

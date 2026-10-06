@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import type { EngagementEventKind } from '@metra/db';
-import { findLatestClientChangeRequestNote } from './client-activity-note';
+import {
+  currentChangeRequestNote,
+  findLatestClientChangeRequestNote,
+} from './client-activity-note';
 import type { EngagementClientActivityRecord } from './queries/client-activity';
 
 function entry(
@@ -109,5 +112,30 @@ describe('findLatestClientChangeRequestNote', () => {
       entry('concept_change_request', 'undated ask', 'not-a-date'),
     ]);
     expect(found?.note).toBe('undated ask');
+  });
+});
+
+describe('currentChangeRequestNote', () => {
+  const round1 = entry('design_change_request', 'swap the flooring', '2026-03-01T10:00:00Z');
+
+  it('at final_approval, a note from an earlier round is not shown', () => {
+    expect(
+      currentChangeRequestNote([round1], { state: 'final_approval', clientDecision: null }),
+    ).toBeNull();
+  });
+
+  it('at final_approval, the note IS shown when it is the decision of this round', () => {
+    expect(
+      currentChangeRequestNote([round1], {
+        state: 'final_approval',
+        clientDecision: { decidedAt: '2026-03-01T10:00:00.000Z' },
+      })?.note,
+    ).toBe('swap the flooring');
+  });
+
+  it('while the studio revises (design_3d) the latest brief stands', () => {
+    expect(currentChangeRequestNote([round1], { state: 'design_3d', clientDecision: null })?.note).toBe(
+      'swap the flooring',
+    );
   });
 });

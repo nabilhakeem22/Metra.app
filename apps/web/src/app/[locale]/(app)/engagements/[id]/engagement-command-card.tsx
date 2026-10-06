@@ -51,6 +51,7 @@ export function EngagementCommandCard(props: EngagementCommandCardProps) {
           closed={closed}
           copy={copy}
           clientActivity={props.clientActivity}
+          review={{ state, clientDecision: preview.clientDecision }}
           awaitingReplyCount={props.awaitingReplyCount}
         />
 

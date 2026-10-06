@@ -1,8 +1,10 @@
 'use client';
 
 import { useLocale, useTranslations } from 'next-intl';
-import { findLatestClientChangeRequestNote } from '@/lib/engagements/client-activity-note';
+import { currentChangeRequestNote } from '@/lib/engagements/client-activity-note';
+import type { ClientDecisionSummary } from '@/lib/engagements/gate-preview';
 import type { EngagementClientActivityRecord } from '@/lib/engagements/queries/client-activity';
+import type { DesignState } from '@/lib/engagements/states';
 import { formatDate } from '@/lib/format/date';
 import type { CommandCardCopy } from './command-card-copy';
 import { SectionLabel } from '@/components/ui/section-label';
@@ -14,16 +16,19 @@ import { SectionLabel } from '@/components/ui/section-label';
  */
 function ClientNoteCallout({
   clientActivity,
+  review,
 }: {
   clientActivity: EngagementClientActivityRecord[];
+  review: { state: DesignState; clientDecision: ClientDecisionSummary | null };
 }) {
   const t = useTranslations('engagements');
   const tcmd = useTranslations('engagements.command');
   const locale = useLocale();
   // The brief for the revision the studio is about to make. It belongs next to
   // the headline, not buried in the timeline tab. Null when the client has asked
-  // for nothing (or asked with no words), and never an approval's note.
-  const clientNote = findLatestClientChangeRequestNote(clientActivity);
+  // for nothing (or asked with no words), never an approval's note, and at a
+  // review stage never a note from an earlier round.
+  const clientNote = currentChangeRequestNote(clientActivity, review);
   if (!clientNote) return null;
   const clientNoteDate = formatDate(clientNote.decidedAt, locale);
   return (
@@ -57,11 +62,14 @@ export function CommandCardHeadline({
   closed,
   copy,
   clientActivity,
+  review,
   awaitingReplyCount,
 }: {
   closed: boolean;
   copy: CommandCardCopy;
   clientActivity: EngagementClientActivityRecord[];
+  /** The stage and the client's decision on its current round (gate preview). */
+  review: { state: DesignState; clientDecision: ClientDecisionSummary | null };
   awaitingReplyCount: number;
 }) {
   const tcmd = useTranslations('engagements.command');
@@ -82,7 +90,7 @@ export function CommandCardHeadline({
         <p className="mb-4 text-small text-[color:var(--text-muted)]">{copy.hint}</p>
       )}
 
-      <ClientNoteCallout clientActivity={clientActivity} />
+      <ClientNoteCallout clientActivity={clientActivity} review={review} />
 
       {/* Client questions waiting on an answer. ONE line, no button — the reply
           lives on the document itself, in Files. Advisory: it never blocks the

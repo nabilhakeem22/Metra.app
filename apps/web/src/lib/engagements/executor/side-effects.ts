@@ -13,6 +13,7 @@ import { recordConceptApproval, recordDesignApproval } from '../approvals';
 import { insertAsBuiltAttestation } from '../attestations';
 import { settleConceptAndLock } from '../concept';
 import { generateFeeSchedule } from '../fee-schedule';
+import { parseOfflineApproval, type OfflineApproval } from '../offline-approval';
 import { captureRenderManifest } from '../renders';
 import { isRevisionTrigger } from '../revision-allowance';
 import { applyRevision, resetRevisionsOnReject } from '../revisions';
@@ -35,6 +36,19 @@ interface SideEffectContext {
 }
 
 type SideEffectHandler = (context: SideEffectContext) => Promise<void>;
+
+/**
+ * The offline approval an approval edge's payload carries: none (the studio's
+ * own Advance), or a valid one. A malformed payload refuses the whole
+ * transition (`invalid`) rather than recording an approval without its
+ * provenance. "Today" is the UTC day, as the ROM acknowledgement compares it.
+ */
+function offlineApprovalOf(payload: unknown): OfflineApproval | null {
+  if (payload === undefined || payload === null) return null;
+  return (
+    parseOfflineApproval(payload, new Date().toISOString().slice(0, 10)) ?? fail('invalid')
+  );
+}
 
 /** Keyed by SideEffectKey: a key with no handler does not compile. Module-private
  *  — `applySideEffect` below is the ONLY way to reach a handler, which is what
@@ -60,8 +74,10 @@ const SIDE_EFFECTS: Record<SideEffectKey, SideEffectHandler> = {
   // selectConcept (Step 7): the Gate-A installment already cleared (guard), so
   // the concept selection is witnessed by ONE append-only approvals row,
   // committed atomically with the concept_review -> negotiation move.
-  recordConceptApproval: ({ tx, ctx, engagement }) =>
-    recordConceptApproval(tx, ctx, engagement.id),
+  // A payload means the studio is recording an approval the client gave it
+  // directly ("Client approved offline"): the guards above ran all the same.
+  recordConceptApproval: ({ tx, ctx, engagement, payload }) =>
+    recordConceptApproval(tx, ctx, engagement.id, offlineApprovalOf(payload)),
 
   // requestRevision (Step 8, self-loop) / designChangeRaised (the 3D loop):
   // increment the FIRING EDGE's revision counter — the two allowances are
@@ -106,8 +122,8 @@ const SIDE_EFFECTS: Record<SideEffectKey, SideEffectHandler> = {
   // Gate-B installment guards have all passed, so witness the design sign-off
   // with ONE append-only `design_approval` event. Atomic with the
   // final_approval -> shop_drawings move.
-  recordDesignApproval: ({ tx, ctx, engagement }) =>
-    recordDesignApproval(tx, ctx, engagement.id),
+  recordDesignApproval: ({ tx, ctx, engagement, payload }) =>
+    recordDesignApproval(tx, ctx, engagement.id, offlineApprovalOf(payload)),
 
   // rejectDesign (Step 14, Gate B): bounce back to negotiation and refill the
   // free-revision allowance (revision_count -> 0, concept_locked_at -> null).

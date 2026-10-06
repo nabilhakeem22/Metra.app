@@ -44,6 +44,7 @@ export function TimelineFeed({
         actorName
           ? `${t(`eventKind.${kind}`)} · ${t('clientActivity.by', { name: actorName })}`
           : t(`eventKind.${kind}`),
+      offlineChannel: (channel) => t(`offlineApproval.channel.${channel}`),
     },
   );
 

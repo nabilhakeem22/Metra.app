@@ -2,6 +2,7 @@ import type { DesignEngagement, EngagementMilestone } from '@metra/db';
 import { describe, expect, it } from 'vitest';
 import { evaluateGatePreview } from './gate-preview-evaluate';
 import type { GuardFacts } from './guards';
+import type { GuardEvent } from './guards/facts';
 import type { DesignState } from './states';
 
 const ENGAGEMENT_ID = '11111111-1111-4111-8111-111111111111';
@@ -90,6 +91,50 @@ describe('evaluateGatePreview', () => {
       endingChoices: [],
       items: [],
       allClear: true,
+      awaitingClientReview: false,
+      clientDecision: null,
     });
+  });
+});
+
+function clientEvent(kind: GuardEvent['kind'], decidedAt: Date): GuardEvent {
+  return {
+    id: '77777777-7777-4777-8777-777777777777',
+    kind,
+    actorChannel: 'client',
+    supersedesEventId: null,
+    decidedAt,
+    createdAt: decidedAt,
+    hasVariance: null,
+    acknowledgedIssueAt: null,
+    rangeLow: null,
+    rangeHigh: null,
+  };
+}
+
+describe('evaluateGatePreview: the client review', () => {
+  it('concept_review, every guard met, no client decision: waiting on the client', () => {
+    const preview = evaluateGatePreview(facts('concept_review', []));
+    expect(preview.allClear).toBe(true);
+    expect(preview.awaitingClientReview).toBe(true);
+    expect(preview.clientDecision).toBeNull();
+  });
+
+  it('once the client answers, the wait ends and the decision is carried', () => {
+    const decidedAt = new Date('2026-02-01T09:00:00Z');
+    const preview = evaluateGatePreview({
+      ...facts('concept_review', []),
+      events: [clientEvent('concept_change_request', decidedAt)],
+    });
+    expect(preview.awaitingClientReview).toBe(false);
+    expect(preview.clientDecision).toEqual({
+      kind: 'concept_change_request',
+      decidedAt: decidedAt.toISOString(),
+      chosenArtifactId: null,
+    });
+  });
+
+  it('outside a review stage nothing waits on a client review', () => {
+    expect(evaluateGatePreview(facts('boq', [])).awaitingClientReview).toBe(false);
   });
 });

@@ -528,6 +528,7 @@
     "boq_missing": "Record the bill of quantities to continue",
     "balance_not_cleared": "The final balance has not been fully paid yet",
     "handoff_not_acknowledged": "The recipient must acknowledge the handoff before closing",
+    "client_review_pending": "The client has not answered the review yet",
     "handoff_not_open": "The design-only handoff isn't open at this stage",
     "rom_range_invalid": "Enter a valid build-cost range, low to high",
     "rom_not_set": "Enter the build-cost range before recording the client's acknowledgement",
@@ -1709,6 +1710,16 @@
       "nextAction": "Next action",
       "advanceLeadsTo": "This moves the job to {phase}.",
       "reshare": "Reveal & re-share the client link",
+      "waitingClient": {
+        "concept_review": {
+          "headline": "Waiting for the client to choose a concept",
+          "sub": "Everything else is in place. The next stage opens when they answer on their link, or when you record an approval they gave you directly."
+        },
+        "final_approval": {
+          "headline": "Waiting for the client to approve the design",
+          "sub": "Everything else is in place. Shop drawings open when they answer on their link, or when you record an approval they gave you directly."
+        }
+      },
       "crumbLabel": "Where this delivery sits",
       "startedOn": "Started {date}",
       "feeChip": "Design fee {amount}",
@@ -1982,7 +1993,7 @@
     "timeline": {
       "empty": "No activity yet.",
       "arrow": "{from} → {to}",
-      "onBehalfChip": "On behalf",
+      "onBehalfChip": "Recorded for the client",
       "recordedBy": "Recorded by the studio",
       "confirmedOn": "Confirmed {date}",
       "retract": "Retract",
@@ -2129,6 +2140,23 @@
       "stalled": "Stalled",
       "delivered": "Delivered",
       "abandoned": "Abandoned"
+    },
+    "offlineApproval": {
+      "open": "Client approved offline",
+      "formHint": "Record an approval the client gave you directly. It moves the delivery exactly as Advance would, and the timeline marks it as recorded for the client.",
+      "channelLabel": "How did they approve?",
+      "channelPlaceholder": "Choose one",
+      "channel": {
+        "phone": "By phone",
+        "whatsapp": "On WhatsApp",
+        "in_person": "In person",
+        "email": "By email",
+        "other": "Another way"
+      },
+      "occurredOn": "When (if not today)",
+      "note": "Note (optional)",
+      "save": "Record the approval",
+      "cancel": "Cancel"
     }
   },
   "delivery": {

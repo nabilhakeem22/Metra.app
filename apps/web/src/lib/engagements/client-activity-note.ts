@@ -1,13 +1,14 @@
 // Design-Engagement Machine — the cockpit's "what the client actually asked for"
 // derivation. PURE and CLIENT-SAFE: no 'use client', no runtime `@metra/db` or
-// server-only import (both imports below are `import type`, fully erased at
-// compile time), no side effects. It re-projects the client-activity feed the
+// server-only import, no side effects. It re-projects the client-activity feed the
 // page already loaded into the ONE note the studio needs while it revises.
 //
 // Only a CHANGE REQUEST carries actionable instructions — an approval's note is
 // commentary and must never be surfaced as the brief for the next revision.
 import type { EngagementEventKind } from '@metra/db';
+import { isClientReviewState } from './client-review';
 import type { EngagementClientActivityRecord } from './queries/client-activity';
+import type { DesignState } from './states';
 
 /**
  * The client-channel event kinds that carry a revision brief. Approvals and the
@@ -67,4 +68,23 @@ export function findLatestClientChangeRequestNote(
   }
 
   return latest;
+}
+
+/**
+ * The change-request note the card shows NOW. At a review stage only the
+ * client's decision on the CURRENT round counts (client-review.ts): a note from
+ * an earlier render issuance is history, not this round's brief, so it is
+ * shown only when it IS the current decision. Anywhere else (the studio
+ * revising) the latest brief stands.
+ */
+export function currentChangeRequestNote(
+  clientActivity: readonly EngagementClientActivityRecord[],
+  review: { state: DesignState; clientDecision: { decidedAt: string } | null },
+): ClientChangeRequestNote | null {
+  const latest = findLatestClientChangeRequestNote(clientActivity);
+  if (latest === null || !isClientReviewState(review.state)) return latest;
+  if (review.clientDecision === null) return null;
+  const answersThisRound =
+    decidedAtTime(latest.decidedAt) === new Date(review.clientDecision.decidedAt).getTime();
+  return answersThisRound ? latest : null;
 }

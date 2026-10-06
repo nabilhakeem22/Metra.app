@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { ENGAGEMENT_EVENT_KINDS, type EngagementEventKind } from '@metra/db';
 import {
   isClientGenerated,
-  isRecordedOnBehalf,
+  isRecordedForClient,
   isValidOccurredOn,
   liveEvents,
   ON_BEHALF_KINDS,
@@ -100,36 +100,45 @@ describe('liveEvents', () => {
   });
 });
 
-describe('isRecordedOnBehalf', () => {
+describe('isRecordedForClient', () => {
+  const recorded = (kind: EngagementEventKind, actorChannel: string, evidence: string | null = null) =>
+    isRecordedForClient({ kind, actorChannel, evidence });
+
   it('marks a staff-recorded acknowledgement', () => {
     // The whole point: these two are the client's acts, so a staff-channel row
     // for either is the studio asserting somebody else acted.
-    expect(isRecordedOnBehalf('rom_acknowledgement', 'staff')).toBe(true);
-    expect(isRecordedOnBehalf('handoff_acknowledgement', 'staff')).toBe(true);
+    expect(recorded('rom_acknowledgement', 'staff')).toBe(true);
+    expect(recorded('handoff_acknowledgement', 'staff')).toBe(true);
   });
 
   it('does NOT mark the same kinds when the client generated them', () => {
     // Identical kind, opposite meaning. This is the distinction the Timeline was
     // failing to draw, and drawing it backwards would be worse than not at all.
-    expect(isRecordedOnBehalf('rom_acknowledgement', 'client')).toBe(false);
-    expect(isRecordedOnBehalf('handoff_acknowledgement', 'client')).toBe(false);
+    expect(recorded('rom_acknowledgement', 'client')).toBe(false);
+    expect(recorded('handoff_acknowledgement', 'client')).toBe(false);
+    expect(recorded('design_approval', 'client', 'phone')).toBe(false);
+  });
+
+  it('marks an approval the client gave offline (its channel is the evidence)', () => {
+    expect(recorded('concept_approval', 'staff', 'phone')).toBe(true);
+    expect(recorded('design_approval', 'staff', 'whatsapp')).toBe(true);
   });
 
   it('never marks the studio recording its own work', () => {
-    // A band issued, an as-built attested, a design approved — all genuinely the
-    // studio's acts. Marking them would cry wolf and devalue the real marker.
+    // A band issued, an as-built attested, a design approved by Advance: all
+    // genuinely the studio's acts. Marking them would cry wolf.
     for (const kind of ENGAGEMENT_EVENT_KINDS) {
       if (ON_BEHALF_KINDS.has(kind)) continue;
-      expect(isRecordedOnBehalf(kind, 'staff'), kind).toBe(false);
+      expect(recorded(kind, 'staff'), kind).toBe(false);
     }
   });
 
   it('treats any non-client channel as staff', () => {
     // `actor_channel` is a text column with a 'staff' default, not an enum. An
-    // unexpected value must fail SAFE — toward marking, never toward silently
+    // unexpected value must fail SAFE: toward marking, never toward silently
     // presenting a studio record as the client's own.
-    expect(isRecordedOnBehalf('rom_acknowledgement', '')).toBe(true);
-    expect(isRecordedOnBehalf('rom_acknowledgement', 'system')).toBe(true);
+    expect(recorded('rom_acknowledgement', '')).toBe(true);
+    expect(recorded('rom_acknowledgement', 'system')).toBe(true);
   });
 });
 

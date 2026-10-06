@@ -5,8 +5,12 @@ import type {
 } from '@/lib/engagements/queries';
 import {
   isClientGenerated,
-  isRecordedOnBehalf,
+  isRecordedForClient,
 } from '@/lib/engagements/event-provenance';
+import {
+  offlineApprovalChannelOf,
+  type OfflineApprovalChannel,
+} from '@/lib/engagements/offline-approval';
 
 // WHAT THE TIMELINE SHOWS, and in what order. PURE and server-safe: no React, no
 // db. Merging three record streams into one ledger, deciding which rows are
@@ -19,7 +23,7 @@ export interface TimelineEntry {
   at: string | Date;
   label: string;
   note: string | null;
-  /** The studio asserting somebody ELSE acted. */
+  /** The studio recording what the CLIENT did (an acknowledgement, an offline approval). */
   onBehalf: boolean;
   occurredOn: string | Date | null;
   evidence: string | null;
@@ -28,11 +32,13 @@ export interface TimelineEntry {
   retraction: EngagementEventRecord | null;
 }
 
-/** The three sentences the feed needs from the catalogue, as functions. */
+/** The sentences the feed needs from the catalogue, as functions. */
 export interface TimelineLabels {
   transition(fromState: string | null, toState: string | null): string;
   eventKind(kind: string): string;
   clientActivity(kind: string, actorName: string | null): string;
+  /** "By phone", "On WhatsApp"...: how the client gave an offline approval. */
+  offlineChannel(channel: OfflineApprovalChannel): string;
 }
 
 export interface TimelineInput {
@@ -82,6 +88,12 @@ function transitionEntry(
   };
 }
 
+/** An offline approval's channel code, in the reader's language; other evidence as typed. */
+function evidenceOf(event: EngagementEventRecord, labels: TimelineLabels): string | null {
+  const channel = offlineApprovalChannelOf(event);
+  return channel ? labels.offlineChannel(channel) : event.evidence;
+}
+
 function eventEntry(
   event: EngagementEventRecord,
   labels: TimelineLabels,
@@ -92,9 +104,9 @@ function eventEntry(
     at: event.decidedAt,
     label: labels.eventKind(event.kind),
     note: trimmedNote(event.note),
-    onBehalf: isRecordedOnBehalf(event.kind, event.actorChannel),
+    onBehalf: isRecordedForClient(event),
     occurredOn: event.occurredOn,
-    evidence: event.evidence,
+    evidence: evidenceOf(event, labels),
     eventId: event.id,
     retraction: retractions.get(event.id) ?? null,
   };
