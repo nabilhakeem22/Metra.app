@@ -22,7 +22,7 @@ vi.mock('resend', () => ({
 }));
 
 import { EMAIL_TIMEOUT_MS } from '@/lib/http/deadlines';
-import { sendProposalEmail } from './resend';
+import { sendDigestEmail, sendProposalEmail } from './resend';
 
 const input = {
   to: 'client@example.com',
@@ -81,5 +81,28 @@ describe('sendProposalEmail', () => {
 
     send.mockRejectedValue(new Error('network'));
     await expect(sendProposalEmail(input)).resolves.toEqual({ sent: false });
+  });
+});
+
+describe('automation senders', () => {
+  it('share the same deadline, so a hung Resend cannot stall the cron tick', async () => {
+    // The hourly tick serves every org; a send that never answers must become a
+    // failed email for that one recipient, not a tick that waits for ever.
+    send.mockReturnValue(new Promise(() => {}));
+    const pending = sendDigestEmail({
+      to: 'owner@studio.example',
+      activeProjects: 1,
+      awaitingResponse: 0,
+      expiringSoon: 0,
+      overdueStages: 0,
+      dashboardUrl: 'https://metra.app/en/dashboard',
+      locale: 'en',
+    });
+    await vi.advanceTimersByTimeAsync(EMAIL_TIMEOUT_MS);
+    await expect(pending).resolves.toEqual({ sent: false });
+    expect(console.error).toHaveBeenCalledWith(
+      'sendDigestEmail failed:',
+      expect.objectContaining({ name: 'HttpDeadlineError' }),
+    );
   });
 });

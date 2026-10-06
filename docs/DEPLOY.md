@@ -207,6 +207,33 @@ new domain, or `CRON_SECRET` is rotated on `metra-web` alone, the cron keeps
 running and every call it makes is rejected. Nothing in the app surfaces that:
 the symptom is automations silently not firing.
 
+### How long one tick may take, and how many orgs fit
+
+| limit | value | source |
+|---|---|---|
+| one tick, wall clock | **15 minutes** | the cron Worker's Cron Trigger limit. The route runs inside its service-binding call, so this is the ceiling; an HTTP-triggered Worker alone has none while the caller stays connected |
+| `maxDuration` | **none** | a route segment option OpenNext on Cloudflare ignores; deliberately not exported by the route |
+| open connections per invocation | **6** | Cloudflare; past six, new connections queue until one closes |
+| orgs worked on at once | **`ORG_CONCURRENCY` = 3** | `lib/automation/runner.ts`. Each org's four cores stay sequential: one DB socket (of the request pool's `max: 5`) plus one outbound call (Supabase auth or Resend) per org, so 3 orgs = 6 connections |
+| one recipient lookup / one email | **8 s / 5 s** | `AUTH_LOOKUP_TIMEOUT_MS` / `EMAIL_TIMEOUT_MS` in `lib/http/deadlines.ts`; past that the email counts as failed and the tick moves on. Lookups are memoised per user for the tick |
+
+**Measured** (Oct 5, `automation_run_log` timestamps): about **5.3 s per org**,
+strictly sequential — 6 orgs from 21:01:03 to 21:01:29 UTC. The cost is DB round
+trips to eu-west-1, not CPU. So the ceiling per tick is roughly
+`15 × 60 × N / 5`: about **180 orgs** sequential (before), about **540 orgs** at
+N = 3. The 540 is an estimate that assumes three concurrent orgs each still take
+~5 s; confirm it from `automation_run_log` after a deploy.
+
+Orgs run in `id` order, so a tick that is cut off always drops the HIGHEST ids.
+The expiry and follow-up cores catch up on the next hourly tick; the digest and
+stage reminders are gated to 07:00 Cairo, so an org cut off at that hour misses
+that day's (or week's) send.
+
+Every tick logs one line, counts only (no ids, no addresses):
+`automation tick: orgs= processed= skipped= failed= coreFailures= emailsSent= emailsFailed= durationMs=`.
+The route returns the same figures as JSON. Read it with
+`npx wrangler tail metra-web`.
+
 ## Migrations
 
 Migrations are hand-authored, additive, and applied as ONE transaction by

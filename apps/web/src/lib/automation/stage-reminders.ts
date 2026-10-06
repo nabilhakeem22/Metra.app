@@ -2,7 +2,7 @@ import 'server-only';
 import { addDays, cairoHour, todayInCairo } from './clock';
 import { claimPeriod } from './claim';
 import { orgOwnerAdminIds, overdueStages, upcomingStages } from './due-work';
-import { resolveUserEmail } from './recipients';
+import { countEmailOutcome, emailRecipient } from './email-delivery';
 import type { AutomationDeps, AutomationResult } from './types';
 import { withOrgContext } from '@/lib/db/context';
 import { sendStageReminderEmail } from '@/lib/email/resend';
@@ -19,7 +19,7 @@ const UPCOMING_HORIZON_DAYS = 7;
 export async function runStageReminders(
   deps: AutomationDeps,
 ): Promise<AutomationResult> {
-  const { ctx, settings, now, locale, appUrl } = deps;
+  const { ctx, settings, now, locale, appUrl, lookupRecipientEmail } = deps;
   const result: AutomationResult = {
     automation: 'stage',
     ran: false,
@@ -63,17 +63,16 @@ export async function runStageReminders(
   result.ran = true;
 
   for (const o of won.owners) {
-    const email = await resolveUserEmail(o.userId);
-    if (!email) continue;
-    const { sent } = await sendStageReminderEmail({
-      to: email,
-      overdueCount: won.overdueCount,
-      upcomingCount: won.upcomingCount,
-      projectsUrl: `${appUrl}/${locale}/projects`,
-      locale,
-    });
-    if (sent) result.emailsSent += 1;
-    else result.emailsFailed += 1;
+    const outcome = await emailRecipient(lookupRecipientEmail, o.userId, (to) =>
+      sendStageReminderEmail({
+        to,
+        overdueCount: won.overdueCount,
+        upcomingCount: won.upcomingCount,
+        projectsUrl: `${appUrl}/${locale}/projects`,
+        locale,
+      }),
+    );
+    countEmailOutcome(result, outcome);
   }
 
   return result;
