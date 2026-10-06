@@ -4,8 +4,10 @@ import { Link } from '@/i18n/routing';
 import { DeliveryAgeLabel } from '@/components/engagements/delivery-age-label';
 import { WhoseMoveChip } from '@/components/engagements/whose-move-chip';
 import type { DashboardDelivery } from '@/lib/dashboard/queries';
+import type { DeliveriesEmptyState } from '@/lib/dashboard/setup-step';
 import { spineStageKeyOf, spinePosition } from '@/lib/engagements/stage-spine';
 import { pickLocale } from '@/lib/i18n/pick-locale';
+import { DeliveriesPanelEmpty } from './deliveries-panel-empty';
 import { DeliveryRibbon } from './delivery-ribbon';
 
 /**
@@ -30,12 +32,15 @@ import { DeliveryRibbon } from './delivery-ribbon';
 export async function DeliveriesPanel({
   deliveries,
   totalActive,
+  empty,
   locale,
   now,
 }: {
   deliveries: DashboardDelivery[];
   /** Everything in flight, so the header can say what the cap is hiding. */
   totalActive: number;
+  /** What to say, and where to point, when nothing is in flight. */
+  empty: DeliveriesEmptyState;
   locale: string;
   /** Passed in so the server renders one consistent "today" for every row. */
   now: Date;
@@ -62,9 +67,7 @@ export async function DeliveriesPanel({
       </div>
 
       {deliveries.length === 0 ? (
-        <p className="p-8 text-center text-sm text-[color:var(--text-muted)]">
-          {t('empty')}
-        </p>
+        <DeliveriesPanelEmpty empty={empty} />
       ) : (
         <ul>
           {deliveries.map((d) => {

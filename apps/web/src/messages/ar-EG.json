@@ -232,6 +232,9 @@
     "welcomeBack": "أهلاً بيك من تاني",
     "dismiss": "إخفاء",
     "ctaCompleteProfile": "كمّل ملف الشركة",
+    "ctaAddClient": "ضيف عميل",
+    "ctaAddProject": "ضيف مشروع",
+    "ctaStartDelivery": "ابدأ التسليم",
     "ctaInviteTeam": "ابعت دعوة لفريقك",
     "ctaManageTeam": "إدارة الفريق",
     "cards": {
@@ -262,7 +265,10 @@
     "deliveries": {
       "title": "تسليمات تحت التنفيذ",
       "viewAll": "عرض الكل",
-      "empty": "مفيش تسليمات تحت التنفيذ دلوقتي. كل التسليمات يا إما خلصت يا إما لسه مابدأتش."
+      "emptyNoClient": "ضيف عميل عشان تبدأ أول تسليم.",
+      "emptyNoProject": "ضيف مشروع للعميل، وبعدين ابدأ التسليم بتاعه.",
+      "emptyNoDelivery": "لسه مفيش تسليم بدأ.",
+      "emptyAllClosed": "كل التسليمات اتقفلت."
     }
   },
   "team": {

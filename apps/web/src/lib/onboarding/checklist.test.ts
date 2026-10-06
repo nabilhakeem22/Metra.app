@@ -8,6 +8,7 @@ const NONE: OnboardingProgress = {
   hasCostItem: false,
   hasClient: false,
   hasProject: false,
+  hasEngagement: false,
   hasProposal: false,
   hasSentProposal: false,
 };

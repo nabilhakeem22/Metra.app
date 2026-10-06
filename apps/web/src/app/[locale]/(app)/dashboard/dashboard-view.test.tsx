@@ -70,7 +70,11 @@ function renderView(overrides: Partial<DashboardViewProps> = {}) {
         dismissed: false,
       }}
       firm={null}
-      deliveries={{ rows: [delivery('d-1'), delivery('d-2')], totalActive: 17 }}
+      deliveries={{
+        rows: [delivery('d-1'), delivery('d-2')],
+        totalActive: 17,
+        empty: { reason: 'allClosed', cta: null },
+      }}
       locale="en"
       now={TEST_NOW}
       {...overrides}

@@ -12,6 +12,7 @@ import { clientColumns, projectColumns } from '@/lib/dashboard/chart-columns';
 import { loadDashboardFigures } from '@/lib/dashboard/load-dashboard';
 import { pickPrimaryCta } from '@/lib/dashboard/primary-cta';
 import { parseRange } from '@/lib/dashboard/range';
+import { deliveriesEmptyState } from '@/lib/dashboard/setup-step';
 import { DashboardView } from './dashboard-view';
 
 // LOADING ONLY. Every figure this page shows is assembled here and handed to
@@ -58,10 +59,7 @@ export default async function DashboardPage({
       identity={{
         role: ctx.role,
         orgName: pickLocale(org, 'name', locale),
-        primaryCta: pickPrimaryCta(ctx.role, {
-          profileComplete: progress.profileComplete,
-          teamInvited: progress.teamInvited,
-        }),
+        primaryCta: pickPrimaryCta(ctx.role, progress),
       }}
       onboarding={{
         checklist: buildChecklist(progress, ctx.role, org.hideMarginFromPm),
@@ -83,7 +81,12 @@ export default async function DashboardPage({
           canSeeTeam: figures.canSeeTeam,
         }
       }
-      deliveries={figures.deliveries}
+      deliveries={
+        figures.deliveries && {
+          ...figures.deliveries,
+          empty: deliveriesEmptyState(ctx.role, progress),
+        }
+      }
       locale={locale}
       now={new Date()}
     />

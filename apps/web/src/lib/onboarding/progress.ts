@@ -10,6 +10,8 @@ export interface OnboardingProgress {
   hasCostItem: boolean;
   hasClient: boolean;
   hasProject: boolean;
+  /** A delivery ever started (any state), so the setup ladder can stop asking. */
+  hasEngagement: boolean;
   hasProposal: boolean;
   hasSentProposal: boolean;
 }
@@ -20,6 +22,7 @@ interface ProgressRow {
   has_cost_item: boolean;
   has_client: boolean;
   has_project: boolean;
+  has_engagement: boolean;
   has_proposal: boolean;
   has_sent_proposal: boolean;
 }
@@ -42,6 +45,7 @@ export async function getOnboardingProgress(
         exists(select 1 from public.cost_items) as has_cost_item,
         exists(select 1 from public.clients) as has_client,
         exists(select 1 from public.projects) as has_project,
+        exists(select 1 from public.design_engagements) as has_engagement,
         exists(select 1 from public.proposals where kind = 'quote') as has_proposal,
         exists(
           select 1 from public.proposals
@@ -61,6 +65,7 @@ export async function getOnboardingProgress(
     hasCostItem: Boolean(r?.has_cost_item),
     hasClient: Boolean(r?.has_client),
     hasProject: Boolean(r?.has_project),
+    hasEngagement: Boolean(r?.has_engagement),
     hasProposal: Boolean(r?.has_proposal),
     hasSentProposal: Boolean(r?.has_sent_proposal),
   };

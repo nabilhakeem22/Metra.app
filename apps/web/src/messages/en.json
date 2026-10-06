@@ -232,6 +232,9 @@
     "welcomeBack": "Welcome back",
     "dismiss": "Dismiss",
     "ctaCompleteProfile": "Complete company profile",
+    "ctaAddClient": "Add a client",
+    "ctaAddProject": "Add a project",
+    "ctaStartDelivery": "Start delivery",
     "ctaInviteTeam": "Invite your team",
     "ctaManageTeam": "Manage your team",
     "cards": {
@@ -262,7 +265,10 @@
     "deliveries": {
       "title": "Deliveries in flight",
       "viewAll": "View all",
-      "empty": "Nothing in flight. Every delivery is either finished or not started yet."
+      "emptyNoClient": "Add a client to start your first delivery.",
+      "emptyNoProject": "Add a project for your client, then start its delivery.",
+      "emptyNoDelivery": "No delivery started yet.",
+      "emptyAllClosed": "Every delivery is closed."
     }
   },
   "team": {

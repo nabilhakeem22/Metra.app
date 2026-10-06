@@ -2,6 +2,7 @@ import type { Organization } from '@metra/db';
 import { afterAll, describe, expect, it } from 'vitest';
 import { createClientCore } from '@/lib/clients/core';
 import { listClients } from '@/lib/clients/queries';
+import { createEngagementCore } from '@/lib/engagements/core';
 import { getOnboardingProgress } from '@/lib/onboarding/progress';
 import { createCostItemCore } from '@/lib/price-book/core';
 import { createProjectCore } from '@/lib/projects/core';
@@ -39,6 +40,9 @@ describe('getOnboardingProgress — in-org rows only', () => {
     const [client] = await listClients(ctx, {});
     await createProjectCore(ctx, { startDate: '2026-01-01', endDate: '2026-06-30', code: 'P', nameEn: 'Proj', clientId: client.id, status: 'active' });
     const [project] = await listProjects(ctx, {});
+    expect(
+      (await createEngagementCore(ctx, { titleEn: 'D', clientId: client.id, projectId: project.id })).ok,
+    ).toBe(true);
     await createCostItemCore(ctx, { code: 'CI', nameEn: 'Item', sectionId: await raw.sectionId(orgId), unit: 'sqm', defaultUnitCost: '1', defaultUnitPrice: '2' });
     const propId = ((await createProposalCore(ctx, { clientId: client.id, projectId: project.id })) as { data?: string }).data!;
     await saveProposalDraftCore(ctx, { id: propId, sections: [{ titleEn: 'S', lines: [{ descriptionEn: 'x', qty: '1', unit: 'sqm', unitCost: '0', unitPrice: '1', discountPct: '0' }] }] });
@@ -51,6 +55,7 @@ describe('getOnboardingProgress — in-org rows only', () => {
       teamInvited: true, // pending invite
       hasClient: true,
       hasProject: true,
+      hasEngagement: true,
       hasCostItem: true,
       hasProposal: true,
       hasSentProposal: true,
@@ -66,6 +71,7 @@ describe('getOnboardingProgress — in-org rows only', () => {
       teamInvited: false,
       hasClient: false,
       hasProject: false,
+      hasEngagement: false,
       hasCostItem: false,
       hasProposal: false,
       hasSentProposal: false,

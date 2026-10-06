@@ -8,6 +8,7 @@ import type { ChartColumn } from '@/lib/dashboard/chart-columns';
 import type { DashboardCounts } from '@/lib/dashboard/queries/counts';
 import type { DashboardDelivery } from '@/lib/dashboard/queries';
 import type { RangeMonths } from '@/lib/dashboard/range';
+import type { DeliveriesEmptyState } from '@/lib/dashboard/setup-step';
 import type { ChecklistResult } from '@/lib/onboarding/checklist';
 import type { MemberRole } from '@/lib/permissions/roles';
 import { DashboardCharts } from './dashboard-charts';
@@ -43,6 +44,8 @@ export interface DashboardDeliveriesBlock {
   rows: DashboardDelivery[];
   /** The TRUE count of in-flight deliveries, not rows.length. */
   totalActive: number;
+  /** What the panel says, and links to, when nothing is in flight. */
+  empty: DeliveriesEmptyState;
 }
 
 export interface DashboardViewProps {
@@ -114,6 +117,7 @@ export function DashboardView({
         <DeliveriesPanel
           deliveries={deliveries.rows}
           totalActive={deliveries.totalActive}
+          empty={deliveries.empty}
           locale={locale}
           now={now}
         />
