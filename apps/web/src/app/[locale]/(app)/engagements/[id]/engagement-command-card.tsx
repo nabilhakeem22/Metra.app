@@ -3,6 +3,7 @@
 import { useTranslations } from 'next-intl';
 import { useState } from 'react';
 import { CommandCardAction } from './command-card-action';
+import { CommandCardClaims } from './command-card-claims';
 import { useCommandCardCopy } from './command-card-copy';
 import { CommandCardForms } from './command-card-forms';
 import { CommandCardHeadline } from './command-card-headline';
@@ -80,21 +81,29 @@ export function EngagementCommandCard(props: EngagementCommandCardProps) {
               }}
             />
 
-            <CommandCardAction
-              view={view}
-              ctas={ctas}
-              waitingOnClient={chrome.waitingOnClient}
-              canShare={canShare}
-              pending={pending}
-              onNudge={onNudge}
-              onTogglePay={() => setPayOpen((open) => !open)}
-              advance={{
-                engagementId,
-                preview,
-                runAction: props.runAction,
-                openFeeForm: () => setFeeOpen((open) => !open),
-              }}
-            />
+            {ctas.confirmClaims ? (
+              <CommandCardClaims
+                claims={props.paymentClaims}
+                pending={pending}
+                runAction={props.runAction}
+              />
+            ) : (
+              <CommandCardAction
+                view={view}
+                ctas={ctas}
+                waitingOnClient={chrome.waitingOnClient}
+                canShare={canShare}
+                pending={pending}
+                onNudge={onNudge}
+                onTogglePay={() => setPayOpen((open) => !open)}
+                advance={{
+                  engagementId,
+                  preview,
+                  runAction: props.runAction,
+                  openFeeForm: () => setFeeOpen((open) => !open),
+                }}
+              />
+            )}
 
             <CommandCardForms
               engagementId={engagementId}

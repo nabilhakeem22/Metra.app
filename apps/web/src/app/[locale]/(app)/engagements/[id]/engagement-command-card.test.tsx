@@ -78,7 +78,7 @@ function props(overrides: Partial<EngagementCommandCardProps> = {}): EngagementC
     canUpload: true,
     canSetOffPlan: false,
     offPlan: false,
-    paymentClaimCount: 0,
+    paymentClaims: [],
     awaitingReplyCount: 0,
     conceptOptionCount: 0,
     clientActivity: [],
@@ -168,5 +168,52 @@ describe('the ending choice at execution_decision', () => {
       amount: '30000.0000',
     });
     expect(actions.logPaymentAndAdvance).not.toHaveBeenCalled();
+  });
+});
+
+describe('a pending client payment claim is the card ONE action', () => {
+  const claim = {
+    id: 'c-1',
+    milestoneKind: 'balance' as const,
+    claimedAmount: '30000.0000',
+    note: null,
+    actorName: null,
+    createdAt: new Date('2026-06-01T00:00:00Z'),
+  };
+
+  test('the claim form shows, with Dismiss, and no Advance, Log payment or endings', () => {
+    renderWithIntl(
+      <EngagementCommandCard {...props({ preview: choicePreview(false), paymentClaims: [claim] })} />,
+    );
+    expect(button('engagements.paymentClaims.confirm')).not.toBeNull();
+    expect(button('engagements.paymentClaims.dismiss')).not.toBeNull();
+    expect(button('engagements.hero.advance')).toBeNull();
+    expect(button('engagements.hero.logPayment')).toBeNull();
+    expect(button('engagements.hero.logPaymentAdvance')).toBeNull();
+    expect(button('engagements.command.ending.chooseDesignOnly.cta')).toBeNull();
+    expect(button('engagements.command.ending.chooseExecution.cta')).toBeNull();
+  });
+
+  test('confirming sends the edited amount for that claim', async () => {
+    actions.confirmPaymentClaim.mockResolvedValue({ ok: true });
+    renderWithIntl(
+      <EngagementCommandCard {...props({ preview: choicePreview(false), paymentClaims: [claim] })} />,
+    );
+    fireEvent.change(screen.getByLabelText(ar('engagements.paymentClaims.amount')), {
+      target: { value: '29000' },
+    });
+    await act(async () => {
+      fireEvent.click(button('engagements.paymentClaims.confirm')!);
+    });
+    expect(actions.confirmPaymentClaim).toHaveBeenCalledWith({ claimId: 'c-1', amount: '29000' });
+  });
+
+  test('a role that cannot resolve claims does not get the claim form', () => {
+    renderWithIntl(
+      <EngagementCommandCard
+        {...props({ preview: choicePreview(false), paymentClaims: [claim], canResolveClaims: false })}
+      />,
+    );
+    expect(button('engagements.paymentClaims.confirm')).toBeNull();
   });
 });

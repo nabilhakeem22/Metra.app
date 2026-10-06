@@ -28,7 +28,7 @@ export function deriveCommandCardModel(props: EngagementCommandCardProps): Comma
   const closed = view.mode === 'closed';
   const chrome = resolveCommandCardChrome({
     mode: view.mode,
-    paymentClaimCount: props.paymentClaimCount,
+    paymentClaimCount: props.paymentClaims.length,
   });
   const ctas = resolveCommandCardCtas(props.preview, {
     canRecordPayment: props.canRecordPayment,
@@ -38,7 +38,7 @@ export function deriveCommandCardModel(props: EngagementCommandCardProps): Comma
     mode: view.mode,
     closed,
     conceptOptionCount: props.conceptOptionCount,
-    pendingClaimCount: props.paymentClaimCount,
+    pendingClaimCount: props.paymentClaims.length,
     canResolveClaims: props.canResolveClaims,
   });
   return { view, closed, chrome, ctas };

@@ -1,5 +1,6 @@
 import type { BoqStepData } from '@/lib/boqs/step';
 import type { EngagementGatePreview } from '@/lib/engagements/gate-preview';
+import type { EngagementPaymentClaimRecord } from '@/lib/engagements/queries';
 import type { EngagementClientActivityRecord } from '@/lib/engagements/queries/client-activity';
 import type { RevisionAllowances } from '@/lib/engagements/revision-allowance';
 import type { DesignState } from '@/lib/engagements/states';
@@ -35,7 +36,8 @@ export interface EngagementCommandCardProps {
   canUpload: boolean;
   canSetOffPlan: boolean;
   offPlan: boolean;
-  paymentClaimCount: number;
+  /** The PENDING client payment claims; while any exists, confirming one is the card's one action. */
+  paymentClaims: EngagementPaymentClaimRecord[];
   /** Client Deliverables Step 2 — client questions on documents still awaiting a
    *  studio reply. Rendered as ONE quiet line, never a second CTA: answering is
    *  advisory and must not compete with the card's single next action. */

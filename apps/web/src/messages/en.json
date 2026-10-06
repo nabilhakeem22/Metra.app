@@ -1746,6 +1746,9 @@
           "confirmTitle": "Close this delivery for execution?",
           "confirmBody": "The design delivery closes and the job moves to execution. This can't be undone."
         }
+      },
+      "claim": {
+        "note": "Confirming records the payment, and moves the delivery on if this is the payment it was waiting for."
       }
     },
     "spine": {
@@ -2011,10 +2014,9 @@
       "revision_co": "Revision change order"
     },
     "paymentClaims": {
-      "title": "Client payment claims ({count})",
       "claimedBy": "Marked paid by {name}",
       "amount": "Amount to record",
-      "confirm": "Confirm & record",
+      "confirm": "Confirm the client's payment",
       "dismiss": "Dismiss"
     },
     "artifactKind": {

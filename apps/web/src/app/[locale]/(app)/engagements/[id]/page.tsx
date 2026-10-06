@@ -14,7 +14,6 @@ import {
   stallDaysSince,
 } from './engagement-detail-data';
 import { EngagementHeaderCard } from './engagement-header-card';
-import { PaymentClaimsPanel } from './payment-claims-panel';
 import { DELIVERY_SHARE_ANCHOR_ID } from './share-anchor';
 import { DeliveryShareLink } from './share-link';
 
@@ -46,7 +45,7 @@ export default async function EngagementDetailPage({
   // Owner/admin only — the §2.2 `engagements_issue` cell that mints client links.
   const canShare = can(ctx.role, 'engagements_issue', 'approve');
   // The studio resolves client payment claims from the §2.2 `engagements_finance`
-  // create cell (the same cell that records a payment); the panel is hidden otherwise.
+  // create cell (the same cell that records a payment); the card offers it only then.
   const canResolveClaims = can(ctx.role, 'engagements_finance', 'create');
   // May this role fire the card's forward moves (the forward trigger, or both
   // endings at the choice)? The server action re-checks; this only decides
@@ -64,7 +63,6 @@ export default async function EngagementDetailPage({
         projectName={projectName}
       />
       <EngagementHeaderCard header={header} shared={shareStatus.shared} />
-      {canResolveClaims && <PaymentClaimsPanel claims={paymentClaims} />}
       {canShare && (
         <div id={DELIVERY_SHARE_ANCHOR_ID} tabIndex={-1} className="scroll-mt-4 outline-none">
           <DeliveryShareLink
@@ -107,7 +105,7 @@ export default async function EngagementDetailPage({
           payments: data.payments,
           state: header.state,
         })}
-        paymentClaimCount={paymentClaims.length}
+        paymentClaims={paymentClaims}
         awaitingReplyCount={data.awaitingReplyCount}
       />
     </div>

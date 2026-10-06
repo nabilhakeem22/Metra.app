@@ -9,6 +9,7 @@ import type {
   EngagementFeeSchedule,
   EngagementHeader,
   EngagementPayment,
+  EngagementPaymentClaimRecord,
   EngagementTransitionRecord,
 } from '@/lib/engagements/queries';
 import type { Trigger } from '@/lib/engagements/transitions';
@@ -54,7 +55,8 @@ export interface EngagementDetailProps {
   canResolveClaims: boolean;
   stallDays: number | null;
   pulse: CommercialPulse;
-  paymentClaimCount: number;
+  /** The PENDING client payment claims (empty for a role without finance read). */
+  paymentClaims: EngagementPaymentClaimRecord[];
   /** Client Deliverables Step 2 — client questions still awaiting a studio reply,
    *  across every document on this engagement. Feeds the command card's quiet
    *  one-line prompt and the Files tab badge. */

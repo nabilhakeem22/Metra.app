@@ -43,7 +43,7 @@ export function EngagementDetailClient({
   canResolveClaims,
   stallDays,
   pulse,
-  paymentClaimCount,
+  paymentClaims,
   awaitingReplyCount,
 }: EngagementDetailProps) {
   const t = useTranslations('engagements');
@@ -96,7 +96,7 @@ export function EngagementDetailClient({
         canUpload={canUpload}
         canSetOffPlan={capabilities.setRom}
         offPlan={header.offPlan}
-        paymentClaimCount={paymentClaimCount}
+        paymentClaims={paymentClaims}
         awaitingReplyCount={awaitingReplyCount}
         conceptOptionCount={conceptOptionCount}
         clientActivity={clientActivity}
@@ -115,7 +115,7 @@ export function EngagementDetailClient({
       <EngagementTabStrip
         tab={tab}
         onSelect={setTab}
-        paymentClaimCount={paymentClaimCount}
+        paymentClaimCount={paymentClaims.length}
         awaitingReplyCount={awaitingReplyCount}
         budget={budgetBadge}
         pending={pending}
