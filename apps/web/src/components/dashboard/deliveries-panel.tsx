@@ -73,6 +73,8 @@ export async function DeliveriesPanel({
         <ul>
           {deliveries.map((d) => {
             const pos = spinePosition(d.state);
+            // ONE status per row: the chip and the age colour read the same one.
+            const status = deliveryStatusAsOf(d, now);
             const client = pickLocale(
               { nameAr: d.clientNameAr, nameEn: d.clientNameEn },
               'name',
@@ -112,11 +114,11 @@ export async function DeliveriesPanel({
                   {/* The delivery's status, by the delivery page's own rule. Shown
                       on phones too: it is the one fact this panel exists to say. */}
                   <span>
-                    <DeliveryStatusChip status={deliveryStatusAsOf(d, now)} />
+                    <DeliveryStatusChip status={status} />
                   </span>
 
                   <span className="text-end">
-                    <DeliveryAgeLabel updatedAt={d.updatedAt} now={now} />
+                    <DeliveryAgeLabel updatedAt={d.updatedAt} now={now} status={status} />
                   </span>
                 </Link>
               </li>

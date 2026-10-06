@@ -36,42 +36,42 @@ export function EngagementsList({ items, now }: { items: EngagementListRow[]; no
         <span className="text-end">{t('list.lastChange')}</span>
       </div>
       <ul>
-        {items.map((row) => (
-          <li key={row.id} className="border-b last:border-0">
-            <Link
-              href={`/engagements/${row.id}`}
-              className={`${ROW_GRID} px-4 py-3 text-body hover:bg-muted/40 focus-visible:bg-muted/40`}
-            >
-              <span className="min-w-0">
-                <span className="block truncate font-semibold">
-                  <bdi>{nameOf(row.titleAr, row.titleEn)}</bdi>
-                </span>
-                <span className="block truncate text-caption text-muted-foreground">
-                  <span className="font-mono" dir="ltr">
-                    {formatDocNumber('DE', row.number, docYear(null, row.createdAt))}
+        {items.map((row) => {
+          // ONE status per row: the chip and the age colour read the same one.
+          const status = deliveryStatusAsOf(row, now);
+          return (
+            <li key={row.id} className="border-b last:border-0">
+              <Link
+                href={`/engagements/${row.id}`}
+                className={`${ROW_GRID} px-4 py-3 text-body hover:bg-muted/40 focus-visible:bg-muted/40`}
+              >
+                <span className="min-w-0">
+                  <span className="block truncate font-semibold">
+                    <bdi>{nameOf(row.titleAr, row.titleEn)}</bdi>
                   </span>
-                  <span aria-hidden> · </span>
-                  <span dir="auto">{nameOf(row.clientNameAr, row.clientNameEn)}</span>
-                  <span aria-hidden> · </span>
-                  <span dir="auto">{nameOf(row.projectNameAr, row.projectNameEn)}</span>
+                  <span className="block truncate text-caption text-muted-foreground">
+                    <span className="font-mono" dir="ltr">
+                      {formatDocNumber('DE', row.number, docYear(null, row.createdAt))}
+                    </span>
+                    <span aria-hidden> · </span>
+                    <span dir="auto">{nameOf(row.clientNameAr, row.clientNameEn)}</span>
+                    <span aria-hidden> · </span>
+                    <span dir="auto">{nameOf(row.projectNameAr, row.projectNameEn)}</span>
+                  </span>
                 </span>
-              </span>
-              <span className="min-w-0">
-                <StateBadge state={row.state} showStage />
-              </span>
-              <span>
-                <DeliveryStatusChip status={deliveryStatusAsOf(row, now)} />
-              </span>
-              <span className="text-end">
-                <DeliveryAgeLabel
-                  updatedAt={row.updatedAt}
-                  now={now}
-                  closed={row.whoseMove === 'closed'}
-                />
-              </span>
-            </Link>
-          </li>
-        ))}
+                <span className="min-w-0">
+                  <StateBadge state={row.state} showStage />
+                </span>
+                <span>
+                  <DeliveryStatusChip status={status} />
+                </span>
+                <span className="text-end">
+                  <DeliveryAgeLabel updatedAt={row.updatedAt} now={now} status={status} />
+                </span>
+              </Link>
+            </li>
+          );
+        })}
       </ul>
     </div>
   );
