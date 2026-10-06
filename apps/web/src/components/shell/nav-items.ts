@@ -2,6 +2,7 @@ import {
   BookText,
   Building2,
   Calculator,
+  Compass,
   FileSignature,
   FileText,
   FolderKanban,
@@ -44,6 +45,12 @@ export const NAV_GROUPS: NavGroup[] = [
         href: '/projects',
         icon: FolderKanban,
         capability: 'projects',
+      },
+      {
+        key: 'deliveries',
+        href: '/engagements',
+        icon: Compass,
+        capability: 'engagements_design',
       },
       {
         key: 'priceBook',

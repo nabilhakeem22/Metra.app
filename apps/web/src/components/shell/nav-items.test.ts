@@ -15,4 +15,12 @@ describe('sidebar nav capabilities', () => {
       .map((i) => i.key);
     expect(ungated).toEqual(['dashboard', 'settings']);
   });
+
+  it('Deliveries sits directly after Projects, gated on engagements_design', () => {
+    const main = NAV_GROUPS[0].items.map((i) => i.key);
+    expect(main.indexOf('deliveries')).toBe(main.indexOf('projects') + 1);
+    const deliveries = allItems.find((i) => i.key === 'deliveries');
+    expect(deliveries?.href).toBe('/engagements');
+    expect(deliveries?.capability).toBe('engagements_design');
+  });
 });

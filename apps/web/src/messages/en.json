@@ -124,6 +124,7 @@
   "nav": {
     "dashboard": "Dashboard",
     "projects": "Projects",
+    "deliveries": "Deliveries",
     "proposals": "Proposals",
     "contracts": "Contracts",
     "costing": "Costing",
