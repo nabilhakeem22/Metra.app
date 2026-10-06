@@ -1,4 +1,5 @@
 import { Skeleton } from '@/components/ui/skeleton';
+import { SkeletonRoot } from './skeleton-root';
 
 /**
  * Route-level loading shapes.
@@ -16,7 +17,7 @@ import { Skeleton } from '@/components/ui/skeleton';
  */
 
 /** Title + subtitle, matching the PageHeader every page opens with. */
-function HeaderSkeleton() {
+export function HeaderSkeleton() {
   return (
     <div className="space-y-2">
       <Skeleton className="h-7 w-56" />
@@ -25,10 +26,10 @@ function HeaderSkeleton() {
   );
 }
 
-/** Generic: a page header over one glass panel. Dashboard, settings, team. */
+/** Generic: a page header over one glass panel. The (app) segment's fallback. */
 export function PageSkeleton() {
   return (
-    <div className="space-y-6">
+    <SkeletonRoot>
       <HeaderSkeleton />
       <div className="glass space-y-4 p-5">
         <Skeleton className="h-5 w-40" />
@@ -36,14 +37,14 @@ export function PageSkeleton() {
         <Skeleton className="h-4 w-11/12" />
         <Skeleton className="h-4 w-9/12" />
       </div>
-    </div>
+    </SkeletonRoot>
   );
 }
 
 /** Index pages: header, a filter toolbar, then table rows. */
 export function ListSkeleton() {
   return (
-    <div className="space-y-6">
+    <SkeletonRoot>
       <HeaderSkeleton />
       <div className="flex flex-wrap gap-2">
         <Skeleton className="h-9 w-64 max-w-full rounded-pill" />
@@ -58,14 +59,14 @@ export function ListSkeleton() {
           </div>
         ))}
       </div>
-    </div>
+    </SkeletonRoot>
   );
 }
 
 /** Detail pages: header, the tab row, then the active panel. */
 export function DetailSkeleton() {
   return (
-    <div className="space-y-6">
+    <SkeletonRoot>
       <HeaderSkeleton />
       <div className="flex gap-2">
         {Array.from({ length: 4 }, (_, i) => (
@@ -87,6 +88,6 @@ export function DetailSkeleton() {
           <Skeleton className="h-24 w-full" />
         </div>
       </div>
-    </div>
+    </SkeletonRoot>
   );
 }
