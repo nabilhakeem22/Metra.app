@@ -13,6 +13,7 @@ import { recordConceptApproval, recordDesignApproval } from '../approvals';
 import { insertAsBuiltAttestation } from '../attestations';
 import { settleConceptAndLock } from '../concept';
 import { generateFeeSchedule } from '../fee-schedule';
+import { readOfflineApproval } from '../offline-approval-input';
 import { captureRenderManifest } from '../renders';
 import { isRevisionTrigger } from '../revision-allowance';
 import { applyRevision, resetRevisionsOnReject } from '../revisions';
@@ -60,8 +61,15 @@ const SIDE_EFFECTS: Record<SideEffectKey, SideEffectHandler> = {
   // selectConcept (Step 7): the Gate-A installment already cleared (guard), so
   // the concept selection is witnessed by ONE append-only approvals row,
   // committed atomically with the concept_review -> negotiation move.
-  recordConceptApproval: ({ tx, ctx, engagement }) =>
-    recordConceptApproval(tx, ctx, engagement.id),
+  // A payload means the studio is recording an approval the client gave it
+  // directly ("Client approved offline"): the guards above ran all the same.
+  recordConceptApproval: async ({ tx, ctx, engagement, payload }) =>
+    recordConceptApproval(
+      tx,
+      ctx,
+      engagement.id,
+      await readOfflineApproval({ tx, ctx, engagement, payload }),
+    ),
 
   // requestRevision (Step 8, self-loop) / designChangeRaised (the 3D loop):
   // increment the FIRING EDGE's revision counter — the two allowances are
@@ -106,8 +114,13 @@ const SIDE_EFFECTS: Record<SideEffectKey, SideEffectHandler> = {
   // Gate-B installment guards have all passed, so witness the design sign-off
   // with ONE append-only `design_approval` event. Atomic with the
   // final_approval -> shop_drawings move.
-  recordDesignApproval: ({ tx, ctx, engagement }) =>
-    recordDesignApproval(tx, ctx, engagement.id),
+  recordDesignApproval: async ({ tx, ctx, engagement, payload }) =>
+    recordDesignApproval(
+      tx,
+      ctx,
+      engagement.id,
+      await readOfflineApproval({ tx, ctx, engagement, payload }),
+    ),
 
   // rejectDesign (Step 14, Gate B): bounce back to negotiation and refill the
   // free-revision allowance (revision_count -> 0, concept_locked_at -> null).

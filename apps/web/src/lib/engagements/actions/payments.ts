@@ -42,7 +42,7 @@ export async function recordPayment(
 export async function logPaymentAndAdvance(
   engagementId: string,
   input: LogPaymentAndAdvanceInput,
-): Promise<ActionResult> {
+): Promise<ActionResult & { waitingOn?: ActionCode }> {
   const ctx = await requireOrg();
   const { paymentRecorded, ...result } = await logPaymentAndAdvanceCore(
     ctx,

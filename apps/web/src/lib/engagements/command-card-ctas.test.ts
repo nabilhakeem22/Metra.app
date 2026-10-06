@@ -11,6 +11,8 @@ function preview(
     endingChoices: [],
     items: [],
     allClear: false,
+    awaitingClientReview: false,
+    clientDecision: null,
     ...overrides,
   };
 }
@@ -41,6 +43,7 @@ const BASE: CtaOptions = {
   conceptOptionCount: 0,
   pendingClaimCount: 0,
   canResolveClaims: true,
+  offlineApprovalEnabled: false,
 };
 
 const resolve = (
@@ -207,5 +210,46 @@ describe('resolveCommandCardCtas — the off-plan toggle', () => {
 
   test('a CLOSED engagement never offers it, whatever state it is parked in', () => {
     expect(resolve(preview(), { state: 'created', closed: true }).atProposal).toBe(false);
+  });
+});
+
+describe('resolveCommandCardCtas while the client owes the review', () => {
+  const GATE_A_DUE: EngagementGatePreview['items'][number] = {
+    guard: 'gateAInstallmentCleared',
+    ok: false,
+    code: 'gate_a_not_cleared',
+    amountDue: '20000.0000',
+  };
+  const atConceptReview = preview({ primaryTrigger: 'selectConcept', items: [GATE_A_DUE] });
+
+  test('the money button records only: it never pays AND advances past the review', () => {
+    const ctas = resolve(
+      { ...atConceptReview, awaitingClientReview: true },
+      { state: 'concept_review', mode: 'blockedClient' },
+    );
+    expect(ctas.payCta).toBe('recordOnly');
+  });
+
+  test('a studio blocker beside the wait (F3) still never offers pay-and-advance', () => {
+    const atFinalApproval = preview({
+      primaryTrigger: 'approveDesign',
+      awaitingClientReview: true,
+      items: [
+        NON_MONEY_UNMET,
+        { guard: 'gateBInstallmentCleared', ok: false, code: 'gate_b_not_cleared', amountDue: '5000.0000' },
+      ],
+    });
+    const ctas = resolve(atFinalApproval, { state: 'final_approval', mode: 'blockedStudio' });
+    expect(ctas.payCta).toBe('recordOnly');
+  });
+
+  test('without the wait the same gate pays and advances', () => {
+    const ctas = resolve(atConceptReview, { state: 'concept_review', mode: 'blockedClient' });
+    expect(ctas.payCta).toBe('payAndAdvance');
+  });
+
+  test('the offline approval follows the view', () => {
+    expect(resolve(preview(), { offlineApprovalEnabled: true }).offlineApproval).toBe(true);
+    expect(resolve(preview(), { offlineApprovalEnabled: false }).offlineApproval).toBe(false);
   });
 });

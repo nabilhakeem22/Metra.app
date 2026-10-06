@@ -4,15 +4,14 @@ import { SkeletonRoot } from './skeleton-root';
 const SPINE_SEGMENTS = 8;
 
 /**
- * The delivery page, in its own shape: the breadcrumb, the header card with its
- * status chip, the command card (a tinted band with the 8-stage spine, then a
+ * The delivery page, in its own shape: the header card (its trail, name and
+ * status chip), the command card (a tinted band with the 8-stage spine, then a
  * headline and the one action), the tab strip and one panel. A generic detail
  * placeholder here made the page jump when it arrived.
  */
 export function DeliverySkeleton() {
   return (
     <SkeletonRoot>
-      <Skeleton className="h-3 w-48" />
       <div className="space-y-2">
         <Skeleton className="h-3 w-40" />
         <Skeleton className="h-7 w-72 max-w-full" />

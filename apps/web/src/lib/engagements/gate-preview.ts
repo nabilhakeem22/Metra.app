@@ -15,7 +15,11 @@ import {
 } from './gate-preview-evaluate';
 import { isTerminal } from './states';
 
-export type { EngagementGatePreview, GateChecklistItem } from './gate-preview-evaluate';
+export type {
+  ClientDecisionSummary,
+  EngagementGatePreview,
+  GateChecklistItem,
+} from './gate-preview-evaluate';
 
 /**
  * Build the gate preview for one engagement. RLS-scoped: a foreign/absent id

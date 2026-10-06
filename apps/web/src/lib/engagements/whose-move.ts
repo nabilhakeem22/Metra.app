@@ -22,7 +22,10 @@ export function whoseMoveOfMode(mode: CommandCardMode, pendingClaimCount: number
 
 export interface WhoseMoveInput {
   state: DesignState;
-  preview: Pick<EngagementGatePreview, 'primaryTrigger' | 'endingChoices' | 'items'>;
+  preview: Pick<
+    EngagementGatePreview,
+    'primaryTrigger' | 'endingChoices' | 'items' | 'awaitingClientReview'
+  >;
   pendingClaimCount: number;
 }
 

@@ -48,6 +48,10 @@ export function useCommandCardCopy(options: {
   // bug in the registry, not a case to render around. At the ending choice
   // there is no next phase to name: the studio records the client's decision.
   const choosingEnding = !closed && view.mode === 'ready' && view.endingChoices.length > 0;
+  // Every guard met, only the client's answer to the review missing: say exactly
+  // that, rather than the stage's general "with the client" line.
+  const waitingOnReview =
+    !closed && view.awaitingClientReview && view.blockingGuards.length === 0;
   const headline = closed
     ? // A card is closed only at a terminal state (the UI walk pins that every
       // live state has a forward move or the endings), so the state-name
@@ -55,14 +59,18 @@ export function useCommandCardCopy(options: {
       isTerminal(state)
       ? tcmd(`closed.${state}.headline`)
       : t(`state.${state}`)
-    : stageAction
-      ? tsa(`${stageAction.actor}.${stageAction.key}.headline`)
-      : choosingEnding
-        ? tcmd('ending.headline')
-        : tcmd('readyHeadline', { phase: t(`state.${view.nextPhaseState ?? state}`) });
+    : waitingOnReview
+      ? tcmd(`waitingClient.${state}.headline`)
+      : stageAction
+        ? tsa(`${stageAction.actor}.${stageAction.key}.headline`)
+        : choosingEnding
+          ? tcmd('ending.headline')
+          : tcmd('readyHeadline', { phase: t(`state.${view.nextPhaseState ?? state}`) });
   let hint: string | null = null;
   if (closed) {
     if (CLOSED_WITH_HINT.has(state)) hint = tcmd(`closed.${state}.hint`);
+  } else if (waitingOnReview) {
+    hint = tcmd(`waitingClient.${state}.sub`);
   } else if (choosingEnding) {
     hint = tcmd('ending.hint');
   } else if (stageAction) {

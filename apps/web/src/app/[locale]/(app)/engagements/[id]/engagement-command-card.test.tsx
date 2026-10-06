@@ -29,6 +29,8 @@ const actions = vi.hoisted(() => ({
   confirmPaymentClaim: vi.fn(),
   dismissPaymentClaim: vi.fn(),
   abandon: vi.fn(),
+  recordOfflineConceptApproval: vi.fn(),
+  recordOfflineDesignApproval: vi.fn(),
 }));
 vi.mock('@/lib/engagements/actions', () => actions);
 const toasts = vi.hoisted(() => [] as { title?: string; description?: string }[]);
@@ -69,6 +71,8 @@ function choicePreview(balanceCleared: boolean): EngagementGatePreview {
       },
     ],
     allClear: balanceCleared,
+    awaitingClientReview: false,
+    clientDecision: null,
   };
 }
 
@@ -82,6 +86,8 @@ function props(overrides: Partial<EngagementCommandCardProps> = {}): EngagementC
     allowances: { revisionCount: 0, freeRevisionN: 3, designRevisionCount: 0, freeDesignRevisionN: 3 },
     status: { kind: 'yourMove' },
     canAdvance: true,
+    canRecordOfflineApproval: true,
+    reviewRoundStartedAt: '2026-06-01T07:00:00.000Z',
     canRecordPayment: true,
     canResolveClaims: true,
     canShare: true,
@@ -99,6 +105,7 @@ function props(overrides: Partial<EngagementCommandCardProps> = {}): EngagementC
     runAction: (fn) => {
       void fn('00000001-0000-4000-8000-000000000000');
     },
+    actionError: null,
     onNudge: () => {},
     ...overrides,
   };
@@ -274,6 +281,8 @@ describe('a closed delivery', () => {
     endingChoices: [],
     items: [],
     allClear: true,
+    awaitingClientReview: false,
+    clientDecision: null,
   };
   const closedProps = (state: EngagementCommandCardProps['state'], extra = {}) =>
     props({ state, preview: closedPreview, secondaryTriggers: [], ...extra });
@@ -375,6 +384,8 @@ describe('a claim confirm that would also move the delivery asks first (S2)', ()
       { guard: 'gateAInstallmentCleared', ok: false, code: 'gate_a_not_cleared', amountDue: '20000.0000' },
     ],
     allClear: false,
+    awaitingClientReview: false,
+    clientDecision: null,
   };
   const render = () =>
     renderWithIntl(
@@ -415,5 +426,205 @@ describe('a claim confirm that would also move the delivery asks first (S2)', ()
       title: ar('engagements.command.claim.recorded'),
       description: ar('errors.gate_a_not_cleared'),
     });
+  });
+});
+
+describe('the act sits above the checklist, with one primary action', () => {
+  const readyPreview: EngagementGatePreview = {
+    primaryTrigger: 'selectConcept',
+    endingChoices: [],
+    items: [{ guard: 'gateAInstallmentCleared', ok: true, code: null, amountDue: null }],
+    allClear: true,
+    awaitingClientReview: false,
+    clientDecision: null,
+  };
+  const primaries = (container: HTMLElement) => container.querySelectorAll('[data-primary-action]');
+
+  test('Advance precedes the checklist in DOM order and is the one primary action', () => {
+    const { container } = renderWithIntl(
+      <EngagementCommandCard {...props({ state: 'concept_review', preview: readyPreview })} />,
+    );
+    const advance = button('engagements.hero.advance')!;
+    const checklistRow = screen.getByText(ar('engagements.guard.gateAInstallmentCleared'));
+    expect(
+      advance.compareDocumentPosition(checklistRow) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect([...primaries(container)]).toEqual([advance]);
+  });
+
+  test('the two equal endings: the first one is the primary anchor', () => {
+    const { container } = renderWithIntl(<EngagementCommandCard {...props()} />);
+    expect([...primaries(container)]).toEqual([
+      button('engagements.command.ending.chooseDesignOnly.cta'),
+    ]);
+  });
+
+  test('a balance to log: the pay opener is the primary action', () => {
+    const { container } = renderWithIntl(
+      <EngagementCommandCard {...props({ preview: choicePreview(false) })} />,
+    );
+    expect([...primaries(container)]).toEqual([button('engagements.hero.logPayment')]);
+  });
+
+  test('two pending claims: only the first confirm is the primary action', () => {
+    const claim = (id: string) => ({
+      id,
+      milestoneKind: 'balance' as const,
+      claimedAmount: '15000.0000',
+      note: null,
+      actorName: null,
+      createdAt: new Date('2026-06-01T00:00:00Z'),
+    });
+    const { container } = renderWithIntl(
+      <EngagementCommandCard
+        {...props({ preview: choicePreview(false), paymentClaims: [claim('c-1'), claim('c-2')] })}
+      />,
+    );
+    const confirms = screen.getAllByRole('button', { name: ar('engagements.paymentClaims.confirm') });
+    expect(confirms).toHaveLength(2);
+    expect([...primaries(container)]).toEqual([confirms[0]]);
+  });
+
+  test('a closed delivery has no primary action', () => {
+    const closed: EngagementGatePreview = {
+      primaryTrigger: null,
+      endingChoices: [],
+      items: [],
+      allClear: true,
+      awaitingClientReview: false,
+      clientDecision: null,
+    };
+    const { container } = renderWithIntl(
+      <EngagementCommandCard {...props({ state: 'abandoned', preview: closed, secondaryTriggers: [] })} />,
+    );
+    expect(primaries(container)).toHaveLength(0);
+  });
+
+  test('a refused action is said inside the card, right under the act', () => {
+    const { container } = renderWithIntl(
+      <EngagementCommandCard
+        {...props({ state: 'concept_review', preview: readyPreview, actionError: 'gate_a_not_cleared' })}
+      />,
+    );
+    const alert = screen.getByRole('alert');
+    expect(alert.textContent).toBe(ar('errors.gate_a_not_cleared'));
+    expect(container.querySelector('section')!.contains(alert)).toBe(true);
+    const checklistRow = screen.getByText(ar('engagements.guard.gateAInstallmentCleared'));
+    expect(
+      button('engagements.hero.advance')!.compareDocumentPosition(alert) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(alert.compareDocumentPosition(checklistRow) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+});
+
+describe('waiting for the client to answer the review', () => {
+  const waitingPreview = (awaitingClientReview: boolean): EngagementGatePreview => ({
+    primaryTrigger: 'selectConcept',
+    endingChoices: [],
+    items: [{ guard: 'gateAInstallmentCleared', ok: true, code: null, amountDue: null }],
+    allClear: true,
+    awaitingClientReview,
+    clientDecision: null,
+  });
+  const renderWaiting = (overrides: Partial<EngagementCommandCardProps> = {}) =>
+    renderWithIntl(
+      <EngagementCommandCard
+        {...props({ state: 'concept_review', preview: waitingPreview(true), ...overrides })}
+      />,
+    );
+  const offlineButton = () => button('engagements.offlineApproval.open');
+
+  test('the card says it waits for the client, with no Advance and no pay-and-advance', () => {
+    const { container } = renderWaiting();
+    expect(
+      screen.getByText(ar('engagements.command.waitingClient.concept_review.headline')),
+    ).toBeTruthy();
+    expect(button('engagements.hero.advance')).toBeNull();
+    expect(button('engagements.hero.logPaymentAdvance')).toBeNull();
+    expect(offlineButton()).not.toBeNull();
+    expect(button('engagements.command.reshare')).not.toBeNull();
+    expect(container.querySelectorAll('[data-primary-action]')).toHaveLength(0);
+  });
+
+  test('a role that may not advance is not offered the offline approval', () => {
+    renderWaiting({ canAdvance: false });
+    expect(offlineButton()).toBeNull();
+  });
+
+  test('a site engineer (may advance, may not stand in) reads who records it instead', () => {
+    renderWaiting({ canRecordOfflineApproval: false });
+    expect(offlineButton()).toBeNull();
+    expect(screen.getByText(ar('engagements.offlineApproval.decidedBy'))).toBeTruthy();
+  });
+
+  test('the form offers only the days the server accepts, and caps the note', () => {
+    renderWaiting();
+    fireEvent.click(offlineButton()!);
+    const date = screen.getByLabelText(ar('engagements.offlineApproval.occurredOn')) as HTMLInputElement;
+    expect(date.min).toBe('2026-06-01');
+    expect(date.max).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    const note = screen.getByLabelText(ar('engagements.offlineApproval.note')) as HTMLTextAreaElement;
+    expect(note.maxLength).toBe(2000);
+  });
+
+  test('Cancel in the form fires nothing', () => {
+    renderWaiting();
+    fireEvent.click(offlineButton()!);
+    fireEvent.click(button('engagements.offlineApproval.cancel')!);
+    expect(actions.recordOfflineConceptApproval).not.toHaveBeenCalled();
+    expect(offlineButton()).not.toBeNull();
+  });
+
+  test('saving needs a channel, then sends the offline approval with it', async () => {
+    actions.recordOfflineConceptApproval.mockResolvedValue({ ok: true });
+    renderWaiting();
+    fireEvent.click(offlineButton()!);
+    const save = button('engagements.offlineApproval.save') as HTMLButtonElement;
+    expect(save.disabled).toBe(true);
+    fireEvent.change(screen.getByLabelText(ar('engagements.offlineApproval.channelLabel')), {
+      target: { value: 'whatsapp' },
+    });
+    fireEvent.change(screen.getByLabelText(ar('engagements.offlineApproval.note')), {
+      target: { value: '  Approved option B  ' },
+    });
+    await act(async () => {
+      fireEvent.click(save);
+    });
+    expect(actions.recordOfflineConceptApproval).toHaveBeenCalledWith('e-1', {
+      channel: 'whatsapp',
+      occurredOn: null,
+      note: 'Approved option B',
+    });
+    expect(actions.recordOfflineDesignApproval).not.toHaveBeenCalled();
+  });
+
+  test('at final_approval the form records the design approval', async () => {
+    actions.recordOfflineDesignApproval.mockResolvedValue({ ok: true });
+    renderWaiting({
+      state: 'final_approval',
+      preview: { ...waitingPreview(true), primaryTrigger: 'approveDesign', items: [] },
+    });
+    expect(
+      screen.getByText(ar('engagements.command.waitingClient.final_approval.headline')),
+    ).toBeTruthy();
+    fireEvent.click(offlineButton()!);
+    fireEvent.change(screen.getByLabelText(ar('engagements.offlineApproval.channelLabel')), {
+      target: { value: 'phone' },
+    });
+    await act(async () => {
+      fireEvent.click(button('engagements.offlineApproval.save')!);
+    });
+    expect(actions.recordOfflineDesignApproval).toHaveBeenCalledWith('e-1', {
+      channel: 'phone',
+      occurredOn: null,
+      note: null,
+    });
+  });
+
+  test('once the client has answered, Advance is back', () => {
+    renderWaiting({ preview: waitingPreview(false) });
+    expect(button('engagements.hero.advance')).not.toBeNull();
+    expect(offlineButton()).toBeNull();
   });
 });

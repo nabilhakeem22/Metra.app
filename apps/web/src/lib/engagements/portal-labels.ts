@@ -1,6 +1,6 @@
 // Client-portal (P1) stage vocabulary. PURE and SERVER-SAFE: no `@metra/db`
 // runtime value, no 'use client'. The session-less delivery portal renders these
-// CLIENT-FRIENDLY stage labels — it must NEVER surface the raw machine enum
+// CLIENT-FRIENDLY stage labels; it must NEVER surface the raw machine enum
 // (`design_3d`, `boq`, …) to the end client. The `import type` below is erased at
 // compile time; it only pins this map to the `DesignState` union so a new state
 // can never be added without a portal label (the `Record` is exhaustive, so `tsc`
@@ -15,7 +15,7 @@ export interface PortalLabel {
 
 /**
  * The prominent, client-appropriate stage label for EVERY machine state. Written
- * for the end client's eyes — reassuring, jargon-free, and never the internal
+ * for the end client's eyes: reassuring, jargon-free, and never the internal
  * trigger/gate language. Owner-approved table; the rest filled from the plan.
  */
 export const PORTAL_STAGE_LABEL: Record<DesignState, PortalLabel> = {
@@ -56,7 +56,7 @@ export const PORTAL_STAGE_LABEL: Record<DesignState, PortalLabel> = {
 };
 
 /**
- * A short, read-only "what's happening / what's next" line for the client — one
+ * A short, read-only "what's happening / what's next" line for the client: one
  * calm sentence per stage. P1 is read-only: this NEVER instructs the client to
  * act (no accept/pay buttons yet). Kept client-appropriate; never leaks internal
  * gates, cost, or the machine trigger names.
@@ -67,8 +67,8 @@ export const PORTAL_STAGE_NOTE: Record<DesignState, PortalLabel> = {
     ar: 'فريق التصميم يجهّز مشروعك الآن.',
   },
   design_proposal: {
-    en: 'Your design proposal is ready — your team will walk you through the next step.',
-    ar: 'عرض التصميم جاهز — سيوضح لك الفريق الخطوة التالية.',
+    en: 'Your design proposal is ready. Your team will walk you through the next step.',
+    ar: 'عرض التصميم جاهز، وسيوضح لك الفريق الخطوة التالية.',
   },
   survey: {
     en: 'We are capturing accurate measurements of your space.',

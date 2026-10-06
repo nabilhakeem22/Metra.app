@@ -15,6 +15,8 @@ import { executeTransition } from '@/lib/engagements/executor';
 import { getEngagementGatePreview } from '@/lib/engagements/gate-preview';
 import { logPaymentAndAdvanceCore } from '@/lib/engagements/pay-and-advance';
 import { recordPaymentCore } from '@/lib/engagements/payments';
+import { recordDeliveryActionByToken } from '@/lib/engagements/public';
+import { mintDeliveryLinkCore } from '@/lib/engagements/share';
 import type { GenerateFeeSchedulePayload } from '@/lib/engagements/transitions';
 import { createProjectCore } from '@/lib/projects/core';
 import { listProjects } from '@/lib/projects/queries';
@@ -204,11 +206,21 @@ describe('getEngagementGatePreview — a non-money guard carries no amountDue', 
   });
 });
 
+/** The client answers the concept review on their link (round B soft block). */
+async function clientApprovesConcept(ctx: OrgContext, engagementId: string): Promise<void> {
+  const minted = await mintDeliveryLinkCore(ctx, engagementId);
+  expect(minted.ok).toBe(true);
+  expect(await recordDeliveryActionByToken(minted.data!, { action: 'approve_concept' })).toMatchObject({
+    ok: true,
+  });
+}
+
 describe('logPaymentAndAdvanceCore — sequential record-then-advance', () => {
   it('happy path: records the gate_a payment AND advances to negotiation', async () => {
     const { ctx, engagementId } = await seedEngagement();
     await toSurvey(ctx, engagementId);
     await toConceptReview(ctx, engagementId);
+    await clientApprovesConcept(ctx, engagementId);
 
     const res = await logPaymentAndAdvanceCore(ctx, engagementId, {
       paymentKind: 'gate_a',
@@ -221,10 +233,30 @@ describe('logPaymentAndAdvanceCore — sequential record-then-advance', () => {
     expect(await gateAPaymentCount(engagementId)).toBe(1);
   });
 
+  it('the client has not answered the review: the payment stands, the delivery waits (F3)', async () => {
+    const { ctx, engagementId } = await seedEngagement();
+    await toSurvey(ctx, engagementId);
+    await toConceptReview(ctx, engagementId);
+
+    const res = await logPaymentAndAdvanceCore(ctx, engagementId, {
+      paymentKind: 'gate_a',
+      amount: '20000',
+      advanceTrigger: 'selectConcept',
+    });
+    expect(res).toMatchObject({
+      ok: true,
+      paymentRecorded: true,
+      waitingOn: 'client_review_pending',
+    });
+    expect(await gateAPaymentCount(engagementId)).toBe(1);
+    expect(await stateOf(engagementId)).toBe('concept_review');
+  });
+
   it('fails safe: a SHORT payment persists but the state does NOT advance', async () => {
     const { ctx, engagementId } = await seedEngagement();
     await toSurvey(ctx, engagementId);
     await toConceptReview(ctx, engagementId);
+    await clientApprovesConcept(ctx, engagementId);
 
     const res = await logPaymentAndAdvanceCore(ctx, engagementId, {
       paymentKind: 'gate_a',

@@ -43,11 +43,28 @@ describe('EngagementsList', () => {
     ]);
   });
 
-  test('the status column is headed "Status", and no row says "Stage N"', () => {
+  test.each(['en', 'ar-EG'] as const)(
+    '%s: the columns read Delivery, Stage, Status, Last change; "Whose move" nowhere',
+    (locale) => {
+      const { container } = renderWithIntl(<EngagementsList items={rows} now={NOW} />, { locale });
+      const headers = [...container.firstElementChild!.firstElementChild!.children].map(
+        (cell) => cell.textContent,
+      );
+      expect(headers).toEqual([
+        messageAt(locale, 'engagements.engagement'),
+        messageAt(locale, 'engagements.list.stage'),
+        messageAt(locale, 'engagements.list.status'),
+        messageAt(locale, 'engagements.list.lastChange'),
+      ]);
+      expect(headers[2]).toBe(locale === 'en' ? 'Status' : 'الحالة');
+      expect(container.textContent).not.toMatch(/Whose move|الدور على مين/);
+    },
+  );
+
+  test('no row says "Stage N"', () => {
     const { container } = renderWithIntl(<EngagementsList items={rows} now={NOW} />, {
       locale: 'en',
     });
-    expect(screen.getByText(messageAt('en', 'engagements.list.status'))).toBeTruthy();
     expect(container.textContent).not.toMatch(/Stage \d/);
     // The stage is said in words from the spine (execution_decision -> Handover).
     expect(container.textContent).toContain(messageAt('en', 'engagements.spine.handover'));

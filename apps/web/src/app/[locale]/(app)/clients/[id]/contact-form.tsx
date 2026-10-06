@@ -1,25 +1,18 @@
 'use client';
 
-import { Loader2 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
-import { useTransition } from 'react';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
+import { useEffect, useState, useTransition } from 'react';
+import { FormField } from '@/components/ui/form-field';
+import { FormSheet } from '@/components/ui/form-sheet';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { toast } from '@/hooks/use-toast';
 import { useRouter } from '@/i18n/routing';
 import { resolveActionError } from '@/lib/actions/error-message';
 import type { ActionCode } from '@/lib/actions/result';
 import { createContact, updateContact } from '@/lib/client-contacts/actions';
-import {
-  EMPTY_CONTACT_DRAFT,
-  contactPayload,
-  validateDraft,
-  type ContactDraft,
-} from './contact-draft';
+import { contactFieldFor, type ContactFormField } from './contact-form-errors';
+import { contactPayload, validateDraft, type ContactDraft } from './contact-draft';
 
-/** The four boxes that differ only in their key and their direction. */
+/** The boxes that differ only in their key and their direction. */
 const TEXT_FIELDS = [
   { key: 'name', ltr: false },
   { key: 'role', ltr: false },
@@ -28,89 +21,95 @@ const TEXT_FIELDS = [
   { key: 'whatsapp', ltr: true },
 ] as const;
 
+/** Add or edit one contact, in the app's form sheet. The tab owns the draft. */
 export function ContactForm({
   clientId,
+  open,
+  onOpenChange,
   draft,
   onDraftChange,
 }: {
   clientId: string;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
   draft: ContactDraft;
   onDraftChange: (draft: ContactDraft) => void;
 }) {
   const t = useTranslations('clients.profile.contacts');
   const te = useTranslations('errors');
+  const tc = useTranslations('common');
   const router = useRouter();
   const [pending, startTransition] = useTransition();
+  const [error, setError] = useState<{ code: ActionCode; field: ContactFormField } | null>(null);
+
+  useEffect(() => {
+    if (open) setError(null);
+  }, [open]);
+
+  const messageFor = (field: ContactFormField) =>
+    error?.field === field ? resolveActionError(error.code, te) : undefined;
 
   function submit() {
-    if (!validateDraft(draft)) return;
+    setError(null);
     startTransition(async () => {
       const payload = contactPayload(draft);
-      const result = draft.id
-        ? await updateContact({ id: draft.id, ...payload })
-        : await createContact({ clientId, ...payload, isPrimary: draft.isPrimary });
-      if (result.ok) {
-        onDraftChange(EMPTY_CONTACT_DRAFT);
-        router.refresh();
-      } else {
-        toast({
-          title: resolveActionError(result.error as ActionCode, te),
-          variant: 'destructive',
-        });
+      try {
+        const result = draft.id
+          ? await updateContact({ id: draft.id, ...payload })
+          : await createContact({ clientId, ...payload, isPrimary: draft.isPrimary });
+        if (result.ok) {
+          onOpenChange(false);
+          router.refresh();
+          return;
+        }
+        const code = (result.error as ActionCode) ?? 'generic';
+        setError({ code, field: contactFieldFor(code) });
+      } catch {
+        setError({ code: 'generic', field: 'form' });
       }
     });
   }
 
   return (
-    <Card>
-      <CardContent className="space-y-3 py-4">
-        <h3 className="text-body font-semibold">{draft.id ? t('editTitle') : t('newTitle')}</h3>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          {TEXT_FIELDS.map((field) => (
-            <div key={field.key} className="space-y-2">
-              <Label htmlFor={`ct-${field.key}`}>{t(field.key)}</Label>
-              <Input
-                id={`ct-${field.key}`}
-                dir={field.ltr ? 'ltr' : undefined}
-                value={draft[field.key]}
-                onChange={(event) =>
-                  onDraftChange({ ...draft, [field.key]: event.target.value })
-                }
-              />
-            </div>
-          ))}
-          {/* Only on CREATE: an existing contact is promoted with its own action,
-              which is also the only one that demotes the current primary. */}
-          {!draft.id && (
-            <label className="flex items-center gap-2 self-end text-body">
-              <input
-                type="checkbox"
-                checked={draft.isPrimary}
-                onChange={(event) =>
-                  onDraftChange({ ...draft, isPrimary: event.target.checked })
-                }
-              />
-              {t('primaryOnCreate')}
-            </label>
-          )}
-        </div>
-        <div className="flex justify-end gap-2">
-          {draft.id && (
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={() => onDraftChange(EMPTY_CONTACT_DRAFT)}
-              disabled={pending}
-            >
-              {t('cancel')}
-            </Button>
-          )}
-          <Button variant="default" type="button" onClick={submit} disabled={pending || !validateDraft(draft)}>
-            {pending && <Loader2 className="size-4 animate-spin" aria-hidden />}
-            {draft.id ? t('save') : t('add')}
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
+    <FormSheet
+      open={open}
+      onOpenChange={onOpenChange}
+      title={draft.id ? t('editTitle') : t('newTitle')}
+      onSubmit={submit}
+      submitLabel={draft.id ? t('save') : t('add')}
+      cancelLabel={t('cancel')}
+      closeLabel={tc('close')}
+      pending={pending}
+      canSubmit={validateDraft(draft)}
+      formError={messageFor('form')}
+    >
+      {TEXT_FIELDS.map((field) => (
+        <FormField
+          key={field.key}
+          id={`ct-${field.key}`}
+          label={t(field.key)}
+          required={field.key === 'name'}
+          error={field.key === 'name' ? messageFor('name') : undefined}
+        >
+          <Input
+            dir={field.ltr ? 'ltr' : 'auto'}
+            value={draft[field.key]}
+            onChange={(event) => onDraftChange({ ...draft, [field.key]: event.target.value })}
+          />
+        </FormField>
+      ))}
+      {/* Only on CREATE: an existing contact is promoted with its own action,
+          which is also the only one that demotes the current primary. */}
+      {!draft.id && (
+        <label className="flex items-center gap-2 text-body">
+          <input
+            type="checkbox"
+            checked={draft.isPrimary}
+            onChange={(event) => onDraftChange({ ...draft, isPrimary: event.target.checked })}
+          />
+          {t('primaryOnCreate')}
+        </label>
+      )}
+    </FormSheet>
   );
 }

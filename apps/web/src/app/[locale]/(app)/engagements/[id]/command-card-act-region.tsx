@@ -46,6 +46,7 @@ export function CommandCardActRegion({
             preview: card.preview,
             runAction: card.runAction,
             openFeeForm: () => setFeeOpen((open) => !open),
+            reviewRoundStartedAt: card.reviewRoundStartedAt,
           }}
         />
       )}

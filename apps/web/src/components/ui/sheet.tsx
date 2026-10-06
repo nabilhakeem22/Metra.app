@@ -4,8 +4,8 @@ import * as DialogPrimitive from '@radix-ui/react-dialog';
 import * as React from 'react';
 import { cn } from '@/lib/utils';
 
-// Drawer/sheet anchored to the inline-start edge (start-0), never left/right —
-// so it flips automatically in RTL.
+// Drawer/sheet anchored to an inline edge (start-0 by default, end-0 for the
+// form sheets), never left/right, so it flips automatically in RTL.
 const Sheet = DialogPrimitive.Root;
 const SheetTrigger = DialogPrimitive.Trigger;
 const SheetClose = DialogPrimitive.Close;
@@ -26,16 +26,25 @@ const SheetOverlay = React.forwardRef<
 ));
 SheetOverlay.displayName = 'SheetOverlay';
 
+/** The edge the sheet slides from. Logical: `start` is the left in LTR, the right in RTL. */
+type SheetSide = 'start' | 'end';
+
+const SIDE_CLASS: Record<SheetSide, string> = {
+  start: 'start-0 rounded-e-panel border-e',
+  end: 'end-0 rounded-s-panel border-s',
+};
+
 const SheetContent = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Content>,
-  React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content>
->(({ className, children, ...props }, ref) => (
+  React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content> & { side?: SheetSide }
+>(({ className, children, side = 'start', ...props }, ref) => (
   <SheetPortal>
     <SheetOverlay />
     <DialogPrimitive.Content
       ref={ref}
       className={cn(
-        'fixed inset-y-0 start-0 z-50 flex h-full w-72 flex-col rounded-e-panel border-e bg-card p-4 shadow-card outline-none',
+        'fixed inset-y-0 z-50 flex h-full w-72 flex-col bg-card p-4 shadow-card outline-none',
+        SIDE_CLASS[side],
         'data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 motion-reduce:animate-none',
         className,
       )}

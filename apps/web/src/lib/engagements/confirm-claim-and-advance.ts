@@ -17,6 +17,7 @@ import { withOrgContext, type OrgContext } from '@/lib/db/context';
 import { can } from '@/lib/permissions/can';
 import { isUuid } from '@/lib/uuid';
 import { executeTransition } from './executor';
+import { getEngagementGatePreview } from './gate-preview';
 import { isEndingTrigger, resolveForwardTrigger } from './forward-trigger';
 import { MONEY_GUARD_MILESTONE, moneyGuardOf } from './guards';
 import { confirmPaymentClaimCore, type ConfirmPaymentClaimInput } from './payment-claims';
@@ -75,11 +76,26 @@ function triggerPaidBy(ctx: OrgContext, gate: ClaimGate): Trigger | null {
 }
 
 /**
+ * The one IMPLICIT advance never moves past a review the client has not
+ * answered: the studio confirms the money, and the delivery keeps waiting for
+ * the client (or for an approval the studio records as taken offline). Null
+ * when nothing holds it. While a guard is still unmet too, that guard is the
+ * truer reason (a short payment says so), and the advance is not attempted.
+ */
+async function clientReviewHold(ctx: OrgContext, engagementId: string): Promise<ActionCode | null> {
+  const preview = await getEngagementGatePreview(ctx, engagementId);
+  if (!preview.awaitingClientReview) return null;
+  return preview.items.find((item) => !item.ok)?.code ?? 'client_review_pending';
+}
+
+/**
  * Confirm a pending client payment claim, then advance if it pays the forward
  * gate of the state the delivery is in AFTER the confirm. The gate is read
  * fresh once the payment has committed, so a retry (`already`) or a concurrent
  * confirm never fires a stale trigger: it converges on whatever the forward
- * move now is, like `logPaymentAndAdvance`. Never an ending. Never throws.
+ * move now is, like `logPaymentAndAdvance`. Never an ending, never past a review
+ * the client has not answered (`waitingOn: 'client_review_pending'`). Never
+ * throws.
  */
 export async function confirmPaymentClaimAndAdvanceCore(
   ctx: OrgContext,
@@ -102,6 +118,8 @@ export async function confirmPaymentClaimAndAdvanceCore(
     paymentRecorded: true,
   } as const;
 
+  // The claim's gate first: the review read below is a transaction of its own,
+  // spent only when this payment could move the delivery at all.
   let gate: ClaimGate | undefined;
   try {
     gate = await loadClaimGate(ctx, input.claimId);
@@ -111,6 +129,15 @@ export async function confirmPaymentClaimAndAdvanceCore(
   }
   const advanceTrigger = gate ? triggerPaidBy(ctx, gate) : null;
   if (!gate || advanceTrigger === null) return { ...recorded, advanced: false };
+
+  let reviewHold: ActionCode | null;
+  try {
+    reviewHold = await clientReviewHold(ctx, gate.engagementId);
+  } catch (error) {
+    console.error('confirmPaymentClaimAndAdvance review read failed:', loggableFailure(error));
+    return { ...recorded, advanced: false, waitingOn: 'generic' };
+  }
+  if (reviewHold !== null) return { ...recorded, advanced: false, waitingOn: reviewHold };
 
   const advance = await executeTransition(ctx, {
     engagementId: gate.engagementId,

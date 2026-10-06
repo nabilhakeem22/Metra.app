@@ -2,11 +2,11 @@
 
 import { useLocale, useTranslations } from 'next-intl';
 import type { ReactNode } from 'react';
+import { FormField } from '@/components/ui/form-field';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { SelectControl } from '@/components/ui/select-control';
 import type { ClientOption } from '@/lib/clients/queries';
 import { pickLocale } from '@/lib/i18n/pick-locale';
-import { FieldError, RequiredSelect } from './delivery-form-parts';
 import type { ProjectOption } from './engagement-create-validation';
 
 export interface DeliveryFormValues {
@@ -53,54 +53,56 @@ export function EngagementCreateFields({
   return (
     <>
       <div className="space-y-2">
+        {/* One title is enough, so a refused title is said once, under the
+            first, and marks both. */}
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <div className="space-y-2">
-            <Label htmlFor="eng-titleEn">{t('titleEn')}</Label>
+          <FormField id="eng-titleEn" label={t('titleEn')} error={fieldErrors.title}>
             <Input
-              id="eng-titleEn"
               dir="ltr"
               value={values.titleEn}
               onChange={(event) => onChange.titleEn(event.target.value)}
             />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="eng-titleAr">{t('titleAr')}</Label>
+          </FormField>
+          <FormField id="eng-titleAr" label={t('titleAr')}>
             <Input
-              id="eng-titleAr"
               dir="rtl"
+              aria-invalid={fieldErrors.title ? true : undefined}
+              aria-describedby={fieldErrors.title ? 'eng-titleEn-error' : undefined}
               value={values.titleAr}
               onChange={(event) => onChange.titleAr(event.target.value)}
             />
-          </div>
+          </FormField>
         </div>
         <p className="text-caption text-muted-foreground">{t('titleHint')}</p>
-        <FieldError message={fieldErrors.title} />
       </div>
 
       {!locked && (
-        <RequiredSelect
-          id="eng-client"
-          label={t('client')}
-          placeholder={t('chooseClient')}
-          value={values.clientId}
-          onChange={onChange.clientId}
-          options={clientOptions.map((client) => ({ id: client.id, name: nameOf(client) }))}
-          error={fieldErrors.client}
-        />
+        <FormField id="eng-client" label={t('client')} required error={fieldErrors.client}>
+          <SelectControl
+            value={values.clientId}
+            onValueChange={onChange.clientId}
+            placeholder={t('chooseClient')}
+            options={clientOptions.map((client) => ({ value: client.id, label: nameOf(client) }))}
+          />
+        </FormField>
       )}
 
       {!locked && (
-        <RequiredSelect
-          id="eng-project"
-          label={t('project')}
-          placeholder={t('chooseProject')}
-          value={values.projectId}
-          onChange={onChange.projectId}
-          options={projectsForClient.map((project) => ({ id: project.id, name: nameOf(project) }))}
-          disabled={values.clientId === ''}
-          hint={projectHint}
-          error={fieldErrors.project}
-        />
+        <div className="space-y-2">
+          <FormField id="eng-project" label={t('project')} required error={fieldErrors.project}>
+            <SelectControl
+              value={values.projectId}
+              onValueChange={onChange.projectId}
+              placeholder={t('chooseProject')}
+              disabled={values.clientId === ''}
+              options={projectsForClient.map((project) => ({
+                value: project.id,
+                label: nameOf(project),
+              }))}
+            />
+          </FormField>
+          {projectHint}
+        </div>
       )}
 
       <label className="flex items-center gap-2 text-body">

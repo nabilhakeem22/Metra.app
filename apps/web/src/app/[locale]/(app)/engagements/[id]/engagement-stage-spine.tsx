@@ -45,8 +45,12 @@ const STAGE_ICON: Record<SpineStageKey, typeof FileText> = {
 // engagement through the homeowner's simplification with Gate A and Gate B
 // nowhere on the page.
 //
-// Stages flex to share the row; gate markers do NOT — they are `flex: none` so
-// they read as thin dividers between segments rather than as stages of their own.
+// Stages flex to share the row from their own content width; gate markers do
+// NOT: they are `flex: none` so they read as thin dividers between segments
+// rather than as stages of their own. From md up a stage never shrinks below
+// its one-line label (`min-w-max`): where the band is narrower than the labels
+// (Arabic needs about 870px) it scrolls sideways instead of letting the labels
+// run into each other.
 // The row scrolls horizontally on a narrow screen rather than crushing ten labels
 // into illegibility. Logical CSS only, so the whole spine mirrors in ar-EG RTL
 // without a second layout.
@@ -129,7 +133,8 @@ export function EngagementStageSpine({ state }: { state: DesignState }) {
         return (
           <li
             key={node.key}
-            className="flex min-w-[52px] flex-1 flex-col gap-1.5"
+            data-spine-stage
+            className="flex min-w-[52px] flex-[1_1_auto] flex-col gap-1.5 md:min-w-max"
             aria-current={status === 'current' ? 'step' : undefined}
           >
             <span className={`h-1 rounded-full ${barClass(status)}`} aria-hidden />
@@ -150,9 +155,16 @@ export function EngagementStageSpine({ state }: { state: DesignState }) {
                   aria-hidden
                 />
               )}
-              {/* Wraps to two lines rather than truncating: an Arabic stage name
-                  is longer, and a clipped one is a name nobody can read. */}
-              <span className="line-clamp-2 min-w-0 text-caption leading-tight" title={t(node.key)}>
+              {/* One line from md up: each stage takes the width its own name
+                  needs (flex basis auto), so a long Arabic name is not squeezed
+                  into the same share as "BOQ". On a phone it may wrap to two
+                  lines rather than truncate: a clipped name is one nobody can
+                  read. The type size never shrinks to make it fit. */}
+              <span
+                data-spine-label
+                className="line-clamp-2 min-w-0 text-caption leading-tight md:line-clamp-none md:whitespace-nowrap"
+                title={t(node.key)}
+              >
                 {t(node.key)}
               </span>
             </span>

@@ -1,19 +1,13 @@
 'use client';
 
-import { Loader2 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { useEffect, useState, useTransition } from 'react';
-import { Button } from '@/components/ui/button';
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetTitle,
-} from '@/components/ui/sheet';
+import { FormSheet } from '@/components/ui/form-sheet';
 import { toast } from '@/hooks/use-toast';
 import { resolveActionError } from '@/lib/actions/error-message';
 import type { ActionCode } from '@/lib/actions/result';
 import { createClient, updateClient } from '@/lib/clients/actions';
+import { clientFieldFor, type ClientFormField } from './client-form-errors';
 import { ClientFormFields, type ClientFormState } from './client-form-fields';
 import type { ClientRow } from './types';
 
@@ -39,12 +33,15 @@ const EMPTY: ClientFormState = {
 export function ClientForm({ open, onOpenChange, item }: ClientFormProps) {
   const t = useTranslations('clients');
   const te = useTranslations('errors');
+  const tc = useTranslations('common');
   const [form, setForm] = useState<ClientFormState>(EMPTY);
   const [moreOpen, setMoreOpen] = useState(false);
+  const [error, setError] = useState<{ code: ActionCode; field: ClientFormField } | null>(null);
   const [pending, startTransition] = useTransition();
 
   useEffect(() => {
     if (!open) return;
+    setError(null);
     // "More details" starts open only for an edited client that has any of them.
     setMoreOpen(Boolean(item && (item.taxRegistrationNumber || item.address || item.notes)));
     setForm(
@@ -67,8 +64,11 @@ export function ClientForm({ open, onOpenChange, item }: ClientFormProps) {
 
   const set = (k: keyof ClientFormState) => (v: string) =>
     setForm((f) => ({ ...f, [k]: v }));
+  const messageFor = (field: ClientFormField) =>
+    error?.field === field ? resolveActionError(error.code, te) : undefined;
 
   function submit() {
+    setError(null);
     startTransition(async () => {
       const payload = {
         nameEn: form.nameEn || null,
@@ -82,53 +82,43 @@ export function ClientForm({ open, onOpenChange, item }: ClientFormProps) {
         taxRegistrationNumber: form.taxRegistrationNumber || null,
         notes: form.notes || null,
       };
-      const res = item
-        ? await updateClient({ id: item.id, ...payload })
-        : await createClient(payload);
-      if (res.ok) {
-        toast({ title: t(item ? 'toast.updated' : 'toast.created') });
-        onOpenChange(false);
-      } else {
-        toast({
-          title: resolveActionError(res.error as ActionCode, te),
-          variant: 'destructive',
-        });
+      try {
+        const res = item
+          ? await updateClient({ id: item.id, ...payload })
+          : await createClient(payload);
+        if (res.ok) {
+          toast({ title: t(item ? 'toast.updated' : 'toast.created') });
+          onOpenChange(false);
+          return;
+        }
+        const code = (res.error as ActionCode) ?? 'generic';
+        setError({ code, field: clientFieldFor(code) });
+      } catch {
+        setError({ code: 'generic', field: 'form' });
       }
     });
   }
 
+  const title = t(item ? 'form.editTitle' : 'form.newTitle');
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="w-full overflow-y-auto sm:max-w-md">
-        <SheetTitle>{t(item ? 'form.editTitle' : 'form.newTitle')}</SheetTitle>
-        <SheetDescription className="sr-only">
-          {t(item ? 'form.editTitle' : 'form.newTitle')}
-        </SheetDescription>
-
-        <div className="mt-4 space-y-4">
-          <ClientFormFields
-            form={form}
-            set={set}
-            isCreate={!item}
-            more={{ open: moreOpen, toggle: () => setMoreOpen((wasOpen) => !wasOpen) }}
-          />
-
-          <div className="flex justify-end gap-2 pt-2">
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={() => onOpenChange(false)}
-              disabled={pending}
-            >
-              {t('form.cancel')}
-            </Button>
-            <Button variant="default" type="button" onClick={submit} disabled={pending}>
-              {pending && <Loader2 className="size-4 animate-spin" aria-hidden />}
-              {t('form.save')}
-            </Button>
-          </div>
-        </div>
-      </SheetContent>
-    </Sheet>
+    <FormSheet
+      open={open}
+      onOpenChange={onOpenChange}
+      title={title}
+      onSubmit={submit}
+      submitLabel={t('form.save')}
+      cancelLabel={t('form.cancel')}
+      closeLabel={tc('close')}
+      pending={pending}
+      formError={messageFor('form')}
+    >
+      <ClientFormFields
+        form={form}
+        set={set}
+        isCreate={!item}
+        more={{ open: moreOpen, toggle: () => setMoreOpen((wasOpen) => !wasOpen) }}
+        errors={{ name: messageFor('name'), phone: messageFor('phone') }}
+      />
+    </FormSheet>
   );
 }

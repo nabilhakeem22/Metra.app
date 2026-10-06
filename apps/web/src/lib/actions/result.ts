@@ -80,6 +80,12 @@ export type ActionCode =
   | 'boq_missing'
   | 'balance_not_cleared'
   | 'handoff_not_acknowledged'
+  // The client has not answered the review round (client-review.ts): a payment
+  // was recorded, the implicit advance waits for them.
+  | 'client_review_pending'
+  // "Client approved offline" input a retry can never fix (offline-approval.ts).
+  | 'offline_approval_date_out_of_range'
+  | 'offline_approval_note_too_long'
   | 'handoff_not_open'
   | 'rom_range_invalid'
   | 'rom_not_set'

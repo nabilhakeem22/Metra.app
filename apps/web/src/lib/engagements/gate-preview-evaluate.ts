@@ -7,6 +7,11 @@
 // Never imported by a client file: it pulls the whole guard engine.
 import type { ActionCode } from '@/lib/actions/result';
 import { formatMoney4 } from '@/lib/aggregates/proposal-totals';
+import {
+  currentRoundClientDecision,
+  isAwaitingClientReview,
+  type ClientReviewEvent,
+} from './client-review';
 import { endingChoicesFrom, resolveForwardTrigger } from './forward-trigger';
 import {
   GUARDS,
@@ -15,6 +20,7 @@ import {
   type GuardFacts,
   type GuardKey,
 } from './guards';
+import type { EngagementEventKind } from '@metra/db';
 import { TRANSITIONS, type Trigger } from './transitions';
 
 /** One guard of the forward trigger, evaluated individually for the hero. */
@@ -36,6 +42,20 @@ export interface EngagementGatePreview {
   /** The guards of `primaryTrigger`, else of the first ending (all endings share them). */
   items: GateChecklistItem[];
   allClear: boolean;
+  /**
+   * A review stage (concept_review, final_approval) whose current round the
+   * client has not answered (`client-review.ts`). Advisory: no guard reads it,
+   * but the card waits for the client instead of offering Advance.
+   */
+  awaitingClientReview: boolean;
+  /** The client's decision answering the current round, if any (ISO instant). */
+  clientDecision: ClientDecisionSummary | null;
+}
+
+export interface ClientDecisionSummary {
+  kind: EngagementEventKind;
+  decidedAt: string;
+  chosenArtifactId: string | null;
 }
 
 /** The preview of an engagement that is absent or has nowhere to go. */
@@ -44,7 +64,19 @@ export const EMPTY_GATE_PREVIEW: EngagementGatePreview = {
   endingChoices: [],
   items: [],
   allClear: true,
+  awaitingClientReview: false,
+  clientDecision: null,
 };
+
+/** The current round's client decision, as the card shows it. */
+function summarize(decision: ClientReviewEvent | null): ClientDecisionSummary | null {
+  if (!decision) return null;
+  return {
+    kind: decision.kind,
+    decidedAt: decision.decidedAt.toISOString(),
+    chosenArtifactId: decision.chosenArtifactId ?? null,
+  };
+}
 
 function evaluateGuard(facts: GuardFacts, guard: GuardKey): GateChecklistItem {
   const verdict = GUARDS[guard](facts);
@@ -71,10 +103,17 @@ export function evaluateGatePreview(facts: GuardFacts): EngagementGatePreview {
   const items = TRANSITIONS[checkedTrigger].guards.map((guard) =>
     evaluateGuard(facts, guard),
   );
+  const review = {
+    state,
+    rendersReadyAt: facts.engagement.rendersReadyAt,
+    events: facts.events,
+  };
   return {
     primaryTrigger,
     endingChoices,
     items,
     allClear: items.every((item) => item.ok),
+    awaitingClientReview: isAwaitingClientReview(review),
+    clientDecision: summarize(currentRoundClientDecision(review)),
   };
 }

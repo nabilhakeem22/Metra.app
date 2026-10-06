@@ -1,9 +1,7 @@
 'use client';
 
-import { Loader2 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
-import { Button } from '@/components/ui/button';
-import { Sheet, SheetContent, SheetDescription, SheetTitle } from '@/components/ui/sheet';
+import { FormSheet } from '@/components/ui/form-sheet';
 import { resolveActionError } from '@/lib/actions/error-message';
 import type { ClientOption } from '@/lib/clients/queries';
 import { NeedFirst } from './delivery-form-parts';
@@ -52,6 +50,7 @@ export function EngagementCreateForm({
   const t = useTranslations('engagements.form');
   const te = useTranslations('errors');
   const tStart = useTranslations('engagements');
+  const tc = useTranslations('common');
   const form = useDeliveryForm({
     open,
     projectOptions,
@@ -82,59 +81,40 @@ export function EngagementCreateForm({
     body = needProject;
   } else {
     body = (
-      <div className="mt-4 space-y-4">
-        {messageFor('form') && (
-          <p className="text-body text-destructive" role="alert">
-            {messageFor('form')}
-          </p>
-        )}
-        <EngagementCreateFields
-          values={form.values}
-          onChange={form.onChange}
-          locked={form.locked}
-          clientOptions={clientOptions}
-          projectsForClient={form.projectsForClient}
-          fieldErrors={{
-            title: messageFor('title'),
-            client: messageFor('client'),
-            project: messageFor('project'),
-          }}
-          projectHint={
-            form.values.clientId !== '' && form.projectsForClient.length === 0
-              ? needProject
-              : undefined
-          }
-        />
-        <div className="flex justify-end gap-2 pt-2">
-          <Button
-            type="button"
-            variant="secondary"
-            onClick={() => onOpenChange(false)}
-            disabled={form.pending}
-          >
-            {t('cancel')}
-          </Button>
-          <Button
-            variant="default"
-            type="button"
-            onClick={form.submit}
-            disabled={form.pending || !canSubmitDelivery(form.values)}
-          >
-            {form.pending && <Loader2 className="size-4 animate-spin" aria-hidden />}
-            {tStart('startDelivery')}
-          </Button>
-        </div>
-      </div>
+      <EngagementCreateFields
+        values={form.values}
+        onChange={form.onChange}
+        locked={form.locked}
+        clientOptions={clientOptions}
+        projectsForClient={form.projectsForClient}
+        fieldErrors={{
+          title: messageFor('title'),
+          client: messageFor('client'),
+          project: messageFor('project'),
+        }}
+        projectHint={
+          form.values.clientId !== '' && form.projectsForClient.length === 0
+            ? needProject
+            : undefined
+        }
+      />
     );
   }
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="w-full overflow-y-auto sm:max-w-md">
-        <SheetTitle>{tStart('startDelivery')}</SheetTitle>
-        <SheetDescription className="sr-only">{tStart('startDelivery')}</SheetDescription>
-        {body}
-      </SheetContent>
-    </Sheet>
+    <FormSheet
+      open={open}
+      onOpenChange={onOpenChange}
+      title={tStart('startDelivery')}
+      onSubmit={form.submit}
+      submitLabel={tStart('startDelivery')}
+      cancelLabel={t('cancel')}
+      closeLabel={tc('close')}
+      pending={form.pending}
+      canSubmit={canSubmitDelivery(form.values)}
+      formError={messageFor('form')}
+    >
+      {body}
+    </FormSheet>
   );
 }

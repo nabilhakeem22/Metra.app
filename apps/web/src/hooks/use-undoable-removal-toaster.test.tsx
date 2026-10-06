@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { Toaster } from '@/components/ui/toaster';
 import type { ActionResult } from '@/lib/actions/result';
+import { UNDO_HARD_CAP_MS } from './undo-toast';
 import { useToast } from './use-toast';
 import { useUndoableRemoval } from './use-undoable-removal';
 
@@ -93,14 +94,17 @@ describe('the Undo toast and the delete share one clock', () => {
     expect(screen.queryByText('row-a')).not.toBeNull();
   });
 
-  test('a blurred window holds the delete with its toast; nothing commits behind it', async () => {
+  test('a blurred window holds the delete with its toast until the hard cap, then commits once', async () => {
     const commit = setup();
     fireEvent.click(screen.getByText('del-b'));
     await act(async () => vi.advanceTimersByTime(1000));
     fireEvent.blur(window);
-    await act(async () => vi.advanceTimersByTime(60_000));
+    await act(async () => vi.advanceTimersByTime(UNDO_HARD_CAP_MS - 1000 - 1));
     expect(commit).not.toHaveBeenCalled();
     expect(undoButtons()).toHaveLength(1);
+    await act(async () => vi.advanceTimersByTime(1));
+    expect(commit).toHaveBeenCalledTimes(1);
+    expect(undoButtons()).toHaveLength(0);
   });
 
   test('leaving the screen commits and takes the Undo toast with it', async () => {

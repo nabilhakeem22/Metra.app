@@ -3,6 +3,7 @@
 // preview. This pins that the two agree, delivery by delivery, for the same role.
 import { afterAll, describe, expect, it } from 'vitest';
 import { createClientCore } from '@/lib/clients/core';
+import { listDashboardDeliveries } from '@/lib/dashboard/queries';
 import { listClients } from '@/lib/clients/queries';
 import { withOrgContext, type OrgContext } from '@/lib/db/context';
 import { createEngagementCore } from '@/lib/engagements/core';
@@ -146,5 +147,28 @@ describe('listEngagements pages by keyset, newest first', () => {
     expect(second.rows.map((row) => row.id)).toEqual([ids[0]]);
     expect(second.nextBefore).toBeNull();
     for (const row of [...first.rows, ...second.rows]) expect(row.whoseMove).toBe('client');
+  });
+});
+
+describe('listDashboardDeliveries puts the studio moves first', () => {
+  it('a newer delivery that is the studio move comes before an older one waiting on the client', async () => {
+    const { orgId, ownerIds } = await seedOrg({ owners: 1 });
+    orgIds.push(orgId);
+    const ctx = ctxFor(orgId, ownerIds[0], 'owner');
+    await createClientCore(ctx, { phone: '01000000000', nameEn: 'Acme' });
+    const [client] = await listClients(ctx, {});
+    const tag = orgId.slice(0, 6);
+
+    // Seeded first, so the longest untouched: the deposit is unpaid (client's move).
+    const waiting = await seedDelivery(ctx, client.id, `OLD-${tag}`);
+    // Seeded second, deposit paid: the studio's move.
+    const studio = await seedDelivery(ctx, client.id, `NEW-${tag}`);
+    expect((await recordPaymentCore(ctx, { engagementId: studio, kind: 'deposit', amount: '30000' })).ok).toBe(true);
+
+    const rows = await listDashboardDeliveries(ctx, 6);
+    expect(rows.map((row) => [row.id, row.whoseMove])).toEqual([
+      [studio, 'studio'],
+      [waiting, 'client'],
+    ]);
   });
 });

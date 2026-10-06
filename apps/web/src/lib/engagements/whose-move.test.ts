@@ -33,6 +33,7 @@ describe('resolveWhoseMove', () => {
     primaryTrigger: null,
     endingChoices: ENDINGS,
     items: [balance(balanceCleared)],
+    awaitingClientReview: false,
   });
 
   test('execution_decision with the balance cleared is the studio move', () => {
@@ -57,9 +58,24 @@ describe('resolveWhoseMove', () => {
     expect(
       resolveWhoseMove({
         state: 'execution',
-        preview: { primaryTrigger: null, endingChoices: [], items: [] },
+        preview: { primaryTrigger: null, endingChoices: [], items: [], awaitingClientReview: false },
         pendingClaimCount: 1,
       }),
     ).toBe('closed');
+  });
+
+  test('a review stage with every guard met but no client answer waits on the client', () => {
+    const conceptReview = (awaitingClientReview: boolean) => ({
+      primaryTrigger: 'selectConcept' as const,
+      endingChoices: [],
+      items: [{ guard: 'gateAInstallmentCleared' as const, ok: true, code: null, amountDue: null }],
+      awaitingClientReview,
+    });
+    expect(
+      resolveWhoseMove({ state: 'concept_review', preview: conceptReview(true), pendingClaimCount: 0 }),
+    ).toBe('client');
+    expect(
+      resolveWhoseMove({ state: 'concept_review', preview: conceptReview(false), pendingClaimCount: 0 }),
+    ).toBe('studio');
   });
 });

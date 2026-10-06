@@ -15,6 +15,7 @@ const LABELS: TimelineLabels = {
   eventKind: (kind) => `kind:${kind}`,
   clientActivity: (kind, actorName) =>
     actorName ? `kind:${kind} by ${actorName}` : `kind:${kind}`,
+  offlineChannel: (channel) => `channel:${channel}`,
 };
 
 function transition(
@@ -179,6 +180,19 @@ describe('buildTimelineEntries — the on-behalf marker', () => {
     expect(entries[0]?.onBehalf).toBe(true);
     expect(entries[0]?.occurredOn).toBe('2026-05-30');
     expect(entries[0]?.evidence).toBe('confirmed by phone');
+  });
+
+  test('an approval the client gave offline is marked, its channel in the reader’s words', () => {
+    const entries = build({
+      events: [event({ kind: 'design_approval', evidence: 'phone', occurredOn: '2026-05-30', note: 'Yes' })],
+    });
+    expect(entries[0]?.onBehalf).toBe(true);
+    expect(entries[0]?.evidence).toBe('channel:phone');
+    expect(entries[0]?.occurredOn).toBe('2026-05-30');
+  });
+
+  test('the studio approving by Advance is not marked', () => {
+    expect(build({ events: [event({ kind: 'design_approval' })] })[0]?.onBehalf).toBe(false);
   });
 
   test('a transition and a client-activity row are never on-behalf', () => {

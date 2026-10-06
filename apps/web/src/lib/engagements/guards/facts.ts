@@ -24,6 +24,7 @@ export type GuardEngagement = Pick<
   | 'romLow'
   | 'romHigh'
   | 'romIssuedAt'
+  | 'rendersReadyAt'
   | 'titleAr'
   | 'titleEn'
   | 'clientId'
@@ -37,6 +38,7 @@ export type GuardEvent = Pick<
   EngagementEvent,
   | 'id'
   | 'kind'
+  | 'actorChannel'
   | 'supersedesEventId'
   | 'decidedAt'
   | 'createdAt'

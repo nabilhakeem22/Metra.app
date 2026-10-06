@@ -40,6 +40,8 @@ export function useUndoableRemoval(options: UndoableRemovalOptions): {
 } {
   const [hiddenIds, setHiddenIds] = useState<ReadonlySet<string>>(new Set());
   const pending = useRef(new Map<string, UndoToastHandle>());
+  // Deletes sent to the server and not yet answered.
+  const inFlight = useRef(new Map<string, Promise<boolean>>());
   const mounted = useRef(true);
   // The latest options, so a toast that closes after a re-render commits with
   // the caller's current callbacks rather than the ones it was armed with.
@@ -56,13 +58,8 @@ export function useUndoableRemoval(options: UndoableRemovalOptions): {
     });
   }, []);
 
-  const commit = useCallback(
+  const sendDelete = useCallback(
     async (id: string): Promise<boolean> => {
-      const toastHandle = pending.current.get(id);
-      if (!toastHandle) return true;
-      pending.current.delete(id);
-      // Close the toast in the same step: no Undo may outlive the decision.
-      toastHandle.dismiss();
       const result = await latest.current.commit(id).catch(() => FAILED);
       if (result.ok) {
         latest.current.onCommitted?.();
@@ -75,8 +72,27 @@ export function useUndoableRemoval(options: UndoableRemovalOptions): {
     [setHidden],
   );
 
+  const commit = useCallback(
+    (id: string): Promise<boolean> => {
+      const toastHandle = pending.current.get(id);
+      if (!toastHandle) return inFlight.current.get(id) ?? Promise.resolve(true);
+      pending.current.delete(id);
+      // Close the toast in the same step: no Undo may outlive the decision.
+      toastHandle.dismiss();
+      const landed = sendDelete(id).finally(() => inFlight.current.delete(id));
+      inFlight.current.set(id, landed);
+      return landed;
+    },
+    [sendDelete],
+  );
+
+  // Waits for every delete already sent too, so a whole-document action never
+  // starts while the server is still answering one.
   const flush = useCallback(async () => {
-    const landed = await Promise.all([...pending.current.keys()].map(commit));
+    const landed = await Promise.all([
+      ...[...pending.current.keys()].map(commit),
+      ...inFlight.current.values(),
+    ]);
     return landed.every(Boolean);
   }, [commit]);
 
@@ -108,13 +124,18 @@ export function useUndoableRemoval(options: UndoableRemovalOptions): {
     };
     window.addEventListener('pagehide', onPageHide);
     document.addEventListener('visibilitychange', onVisibility);
-    const unregister = registerPendingRemovals(flush, () => pending.current.size);
+    const unregister = registerPendingRemovals(
+      flush,
+      () => pending.current.size + inFlight.current.size,
+    );
     return () => {
       mounted.current = false;
       window.removeEventListener('pagehide', onPageHide);
       document.removeEventListener('visibilitychange', onVisibility);
-      unregister();
-      void flush();
+      // Commit what is pending, and stay registered until those deletes have
+      // answered: sign-out, Issue and the costed copy on the NEXT screen must
+      // still wait for a delete this screen sent on its way out.
+      void flush().finally(unregister);
     };
   }, [flush]);
 

@@ -8,9 +8,10 @@ const gateA = (ok: boolean, amountDue: string | null): GateChecklistItem => ({
   code: ok ? null : 'gate_a_not_cleared',
   amountDue,
 });
-const atConceptReview = (items: GateChecklistItem[]) => ({
+const atConceptReview = (items: GateChecklistItem[], awaitingClientReview = false) => ({
   primaryTrigger: 'selectConcept' as const,
   items,
+  awaitingClientReview,
 });
 
 describe('claimAdvancesTo', () => {
@@ -28,8 +29,15 @@ describe('claimAdvancesTo', () => {
     expect(claimAdvancesTo(preview, 'gate_a', '1,5', true)).toBeNull();
   });
 
+  it('a client who has not answered the review: the confirm only records', () => {
+    expect(
+      claimAdvancesTo(atConceptReview([gateA(false, '20000.0000')], true), 'gate_a', '20000', true),
+    ).toBeNull();
+  });
+
   it('another unmet guard means the confirm only records', () => {
     const preview = {
+      awaitingClientReview: false,
       primaryTrigger: 'approveDesign' as const,
       items: [
         { guard: 'romAcknowledged' as const, ok: false, code: 'rom_not_acknowledged' as const, amountDue: null },
@@ -41,7 +49,7 @@ describe('claimAdvancesTo', () => {
 
   it('never at the ending choice (no forward trigger)', () => {
     expect(
-      claimAdvancesTo({ primaryTrigger: null, items: [] }, 'balance', '30000', true),
+      claimAdvancesTo({ primaryTrigger: null, items: [], awaitingClientReview: false }, 'balance', '30000', true),
     ).toBeNull();
   });
 });

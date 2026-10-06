@@ -1,10 +1,17 @@
 import { describe, expect, test, vi } from 'vitest';
-import { fireEvent, screen } from '@testing-library/react';
+import { act, fireEvent, screen } from '@testing-library/react';
 import { messageAt, renderWithIntl } from '@/test/render-with-intl';
 import { ClientForm } from './client-form';
 import type { ClientRow } from './types';
 
-vi.mock('@/lib/clients/actions', () => ({ createClient: vi.fn(), updateClient: vi.fn() }));
+const actions = vi.hoisted(() => ({ createClient: vi.fn(), updateClient: vi.fn() }));
+vi.mock('@/lib/clients/actions', () => actions);
+const toasts = vi.hoisted(() => [] as { variant?: string }[]);
+vi.mock('@/hooks/use-toast', () => ({
+  toast: (raised: { variant?: string }) => {
+    toasts.push(raised);
+  },
+}));
 
 const en = (path: string) => messageAt('en', path);
 const input = (key: string) => document.getElementById(`cl-${key}`) as HTMLInputElement | null;
@@ -46,5 +53,41 @@ describe('ClientForm', () => {
     renderWithIntl(<ClientForm open onOpenChange={() => {}} item={item} />, { locale: 'en' });
     expect(input('address')?.value).toBe('5 Nile St');
     expect(screen.queryByText(en('clients.form.contactNote'))).toBeNull();
+  });
+});
+
+describe('ClientForm refusals', () => {
+  test('name_required is said under the name, marks both names invalid, and raises no toast', async () => {
+    actions.createClient.mockResolvedValue({ ok: false, error: 'name_required' });
+    renderWithIntl(<ClientForm open onOpenChange={() => {}} />, { locale: 'en' });
+    await act(async () => {
+      fireEvent.submit(input('nameEn')!.closest('form')!);
+    });
+    const message = document.getElementById('cl-nameEn-error');
+    expect(message?.textContent).toBe(en('errors.name_required'));
+    expect(input('nameEn')?.getAttribute('aria-invalid')).toBe('true');
+    expect(input('nameEn')?.getAttribute('aria-describedby')).toContain('cl-nameEn-error');
+    expect(input('nameAr')?.getAttribute('aria-invalid')).toBe('true');
+    expect(input('nameAr')?.getAttribute('aria-describedby')).toContain('cl-nameEn-error');
+    expect(toasts.filter((raised) => raised.variant === 'destructive')).toHaveLength(0);
+  });
+
+  test('phone_required is said under the phone', async () => {
+    actions.createClient.mockResolvedValue({ ok: false, error: 'phone_required' });
+    renderWithIntl(<ClientForm open onOpenChange={() => {}} />, { locale: 'en' });
+    await act(async () => {
+      fireEvent.submit(input('phone')!.closest('form')!);
+    });
+    expect(document.getElementById('cl-phone-error')?.textContent).toBe(en('errors.phone_required'));
+    expect(input('phone')?.getAttribute('aria-invalid')).toBe('true');
+  });
+
+  test('a refusal no field owns is said above the footer', async () => {
+    actions.createClient.mockResolvedValue({ ok: false, error: 'forbidden' });
+    renderWithIntl(<ClientForm open onOpenChange={() => {}} />, { locale: 'en' });
+    await act(async () => {
+      fireEvent.submit(input('nameEn')!.closest('form')!);
+    });
+    expect(screen.getByRole('alert').textContent).toBe(en('errors.forbidden'));
   });
 });

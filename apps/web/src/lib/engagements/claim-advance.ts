@@ -13,16 +13,17 @@ import { TRANSITIONS } from './transitions';
 /**
  * The state the delivery would move to, or null when the confirm only records
  * the payment: the claim does not pay the forward gate, another guard is still
- * unmet, the amount is short of what is due, or the role may not advance.
+ * unmet, the amount is short of what is due, the role may not advance, or the
+ * client has not answered the review round yet (the server holds the move too).
  */
 export function claimAdvancesTo(
-  preview: Pick<EngagementGatePreview, 'primaryTrigger' | 'items'>,
+  preview: Pick<EngagementGatePreview, 'primaryTrigger' | 'items' | 'awaitingClientReview'>,
   milestoneKind: MilestoneKind,
   amount: string,
   canAdvance: boolean,
 ): DesignState | null {
   const trigger = preview.primaryTrigger;
-  if (!trigger || !canAdvance) return null;
+  if (!trigger || !canAdvance || preview.awaitingClientReview) return null;
   const moneyGuard = moneyGuardOf(trigger);
   if (!moneyGuard || MONEY_GUARD_MILESTONE[moneyGuard] !== milestoneKind) return null;
   if (preview.items.some((item) => item.guard !== moneyGuard && !item.ok)) return null;

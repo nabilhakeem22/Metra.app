@@ -3,23 +3,26 @@
 import { Link2 } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
 import { DeliveryStatusChip } from '@/components/engagements/delivery-status-chip';
+import { OverflowMenu } from '@/components/ui/overflow-menu';
 import { StatusChip } from '@/components/ui/status-chip';
 import type { DeliveryStatus } from '@/lib/engagements/delivery-status';
 import type { EngagementHeader } from '@/lib/engagements/queries';
 import { formatDate } from '@/lib/format/date';
 import { docYear, formatDocNumber } from '@/lib/format/doc-number';
 import { formatMoney } from '@/lib/format/money';
-import { pickLocale } from '@/lib/i18n/pick-locale';
 import type { StatusTone } from '@/lib/ui/status-tone';
-import { SectionLabel } from '@/components/ui/section-label';
+import { ClientLinkDialog } from './client-link-dialog';
+import { EngagementHeaderCrumbs, type HeaderCrumbs } from './engagement-header-crumbs';
+import { revealDeliveryShareLink } from './share-anchor';
 
-// The cockpit HEADER — breadcrumb and document number on a quiet mono line, the
-// engagement named at display weight, then a chip row of what is true about it,
-// with the share state pinned to the inline-END.
+// The cockpit HEADER. Row 1: the trail (Deliveries / client / project) ending in
+// the document number, on a quiet mono line. Row 2: the delivery named at heading
+// weight, with the client-link state and the page's menu at the inline-END.
+// Row 3: a chip row of what is true about it.
 //
-// The number moved OUT of a bordered pill and into the breadcrumb. It was
-// competing with the client's name for first read, and the client's name is what
-// a studio actually scans a list of engagements for.
+// The trail lives here rather than on a row of its own above the card, and the
+// client link lives in the menu rather than in a bar under it: both used to push
+// the command card, the thing the studio came to act on, down the page.
 //
 // Every chip is derived from data this product HOLDS. The design mockup this
 // follows also drew a delivery-branch chip and an assignee, and neither is built:
@@ -27,28 +30,28 @@ import { SectionLabel } from '@/components/ui/section-label';
 // the mockup illustrates) and there is no assignee column on `design_engagements`.
 // Inventing them would put two confident falsehoods at the top of the page.
 //
-// `shared` reuses the page's existing delivery share status — no new query.
+// `shared` reuses the page's existing delivery share status (no new query).
 // Logical CSS only (inline-start/end) so it mirrors in ar-EG RTL.
 export function EngagementHeaderCard({
   header,
-  shared,
   status,
+  shared,
+  canShare,
+  crumbs,
 }: {
   header: EngagementHeader;
-  shared: boolean;
   /** The delivery's status: the same chip the deliveries list and dashboard show. */
   status: DeliveryStatus;
+  shared: boolean;
+  /** Owner/admin (`engagements_issue` approve): the menu and its client link. */
+  canShare: boolean;
+  crumbs: HeaderCrumbs;
 }) {
   const t = useTranslations('engagements');
   const tc = useTranslations('engagements.command');
+  const tcommon = useTranslations('common');
   const locale = useLocale();
 
-  const client =
-    pickLocale({ nameAr: header.clientNameAr, nameEn: header.clientNameEn }, 'name', locale)
-      .value || '—';
-  const project =
-    pickLocale({ nameAr: header.projectNameAr, nameEn: header.projectNameEn }, 'name', locale)
-      .value || '—';
   const docNumber = formatDocNumber(
     'DE',
     header.number,
@@ -83,45 +86,49 @@ export function EngagementHeaderCard({
   ].filter(Boolean) as Chip[];
 
   return (
-    <header className="flex flex-wrap items-start gap-x-4 gap-y-3">
-      <div className="min-w-0 flex-1">
-        {/* Breadcrumb + document number on one mono line: where you are, and which
-            record this is. The number was a bordered pill of its own; here it earns
-            less weight than the client's name, which is what a studio scans for. */}
-        <SectionLabel>
-          <span>{tc('crumb')}</span>
-          <span aria-hidden> / </span>
-          <span dir="ltr">{docNumber}</span>
-        </SectionLabel>
-        <h1 className="mt-1 text-heading font-bold leading-tight text-[color:var(--text)] text-balance">
-          {client}
-          {/* `·` not an em dash: — is not Arabic punctuation, and this line
+    <header>
+      <EngagementHeaderCrumbs crumbs={crumbs} docNumber={docNumber} />
+
+      <div className="mt-1 flex flex-wrap items-start gap-x-4 gap-y-2">
+        <h1 className="min-w-0 flex-1 text-heading font-bold leading-tight text-[color:var(--text)] text-balance">
+          {crumbs.clientName}
+          {/* `·` not a dash: a dash is not Arabic punctuation, and this line
               renders in ar-EG (scripts/i18n/style-guide.md rule 6). */}
           <span aria-hidden> · </span>
-          <span className="font-bold">{project}</span>
+          <span className="font-bold">{crumbs.projectName}</span>
         </h1>
-        <div className="mt-2 flex flex-wrap items-center gap-1.5">
-          <DeliveryStatusChip status={status} />
-          {chips.map((chip) => (
-            <StatusChip key={chip.key} tone={chip.tone} label={chip.label} />
-          ))}
+        {/* The link's state stays a STATUS; what you can do with it is in the
+            menu beside it. */}
+        <div className="flex shrink-0 items-center gap-2">
+          <StatusChip
+            tone={shared ? 'done' : 'neutral'}
+            label={shared ? tc('clientLinkActive') : tc('clientLinkInactive')}
+          />
+          {canShare && (
+            <>
+              <OverflowMenu
+                label={tcommon('moreActions')}
+                actions={[
+                  {
+                    key: 'clientLink',
+                    label: tc('clientLink'),
+                    icon: Link2,
+                    onSelect: revealDeliveryShareLink,
+                  },
+                ]}
+              />
+              <ClientLinkDialog engagementId={header.id} initialShared={shared} />
+            </>
+          )}
         </div>
       </div>
 
-      {/* The share state keeps its own corner, as the mockup draws it. It stays a
-          STATUS rather than becoming a button: the control that reveals the link
-          lives on the command card, and two of them would be the duplication this
-          whole restructure exists to remove. */}
-      <span
-        className={`inline-flex shrink-0 items-center gap-1.5 rounded-pill px-3 py-1.5 text-small font-semibold ${
-          shared
-            ? 'border border-[color:var(--success)] bg-[color:var(--success-tint)] text-[color:var(--success)]'
-            : 'border border-[color:var(--rule)] bg-[color:var(--track)] text-[color:var(--text-muted)]'
-        }`}
-      >
-        {shared && <Link2 className="size-3.5" aria-hidden />}
-        {shared ? tc('clientLinkActive') : tc('clientLinkInactive')}
-      </span>
+      <div className="mt-2 flex flex-wrap items-center gap-1.5">
+        <DeliveryStatusChip status={status} />
+        {chips.map((chip) => (
+          <StatusChip key={chip.key} tone={chip.tone} label={chip.label} />
+        ))}
+      </div>
     </header>
   );
 }

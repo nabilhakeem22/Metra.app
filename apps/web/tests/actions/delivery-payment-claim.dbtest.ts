@@ -12,7 +12,7 @@ import {
 } from '@/lib/engagements/payment-claims';
 import { recordPaymentCore } from '@/lib/engagements/payments';
 import { getEngagementPaymentClaims } from '@/lib/engagements/queries';
-import { claimPaymentByToken } from '@/lib/engagements/public';
+import { claimPaymentByToken, recordDeliveryActionByToken } from '@/lib/engagements/public';
 import { mintDeliveryLinkCore } from '@/lib/engagements/share';
 import { createProjectCore } from '@/lib/projects/core';
 import { listProjects } from '@/lib/projects/queries';
@@ -612,10 +612,18 @@ async function stateOf(engagementId: string): Promise<string> {
   return row.state;
 }
 
+/** The client answers the concept review on their link (round B soft block). */
+async function clientApprovesConcept(token: string): Promise<void> {
+  expect(await recordDeliveryActionByToken(token, { action: 'approve_concept' })).toMatchObject({
+    ok: true,
+  });
+}
+
 describe('confirmPaymentClaimAndAdvanceCore (round A1)', () => {
-  it('a full gate_a claim confirmed at concept_review ends in negotiation', async () => {
+  it('a full gate_a claim confirmed at concept_review ends in negotiation once the client chose', async () => {
     const { ctx, engagementId, token } = await seedClaimDelivery('confirm-advance');
     await toConceptReview(ctx, engagementId);
+    await clientApprovesConcept(token);
     await claimPaymentByToken(token, { milestoneKind: 'gate_a' });
     const [claim] = (await claimRows(engagementId)).filter((row) => row.milestone_kind === 'gate_a');
 
@@ -689,6 +697,7 @@ describe('confirmPaymentClaimAndAdvanceCore — results and fences (round A1 fix
   it('a repeated confirm converges: ok and already, no stale advance error', async () => {
     const { ctx, engagementId, token } = await seedClaimDelivery('confirm-twice');
     await toConceptReview(ctx, engagementId);
+    await clientApprovesConcept(token);
     await claimPaymentByToken(token, { milestoneKind: 'gate_a' });
     const [claim] = (await claimRows(engagementId)).filter((row) => row.milestone_kind === 'gate_a');
     const input = { claimId: claim.id, amount: claim.claimed_amount };
@@ -698,6 +707,26 @@ describe('confirmPaymentClaimAndAdvanceCore — results and fences (round A1 fix
     expect(again).toMatchObject({ ok: true, already: true, paymentRecorded: true, advanced: false });
     expect(again.waitingOn).toBeUndefined();
     expect(await stateOf(engagementId)).toBe('negotiation');
+  });
+
+  it('a full gate_a claim with NO client decision records the payment and waits for the client', async () => {
+    const { ctx, engagementId, token } = await seedClaimDelivery('confirm-review-pending');
+    await toConceptReview(ctx, engagementId);
+    await claimPaymentByToken(token, { milestoneKind: 'gate_a' });
+    const [claim] = (await claimRows(engagementId)).filter((row) => row.milestone_kind === 'gate_a');
+
+    const res = await confirmPaymentClaimAndAdvanceCore(ctx, {
+      claimId: claim.id,
+      amount: claim.claimed_amount,
+    });
+    expect(res).toMatchObject({
+      ok: true,
+      paymentRecorded: true,
+      advanced: false,
+      waitingOn: 'client_review_pending',
+    });
+    expect(await stateOf(engagementId)).toBe('concept_review');
+    expect((await paymentRows(engagementId)).filter((row) => row.kind === 'gate_a')).toHaveLength(1);
   });
 
   it('refuses a role without finance create, and a non-UUID claim id, before any read', async () => {

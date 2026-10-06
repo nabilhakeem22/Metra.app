@@ -3,10 +3,10 @@ import { notFound } from 'next/navigation';
 import { requireOrg } from '@/lib/auth/require-org';
 import { pickLocale } from '@/lib/i18n/pick-locale';
 import { forwardMovesOf } from '@/lib/engagements/command-card';
+import { mayRecordOfflineApproval } from '@/lib/engagements/offline-approval';
 import { computeCommercialPulse } from '@/lib/engagements/pulse';
 import { canRunTrigger, legalTriggersFrom } from '@/lib/engagements/ui';
 import { can } from '@/lib/permissions/can';
-import { EngagementBreadcrumb } from './engagement-breadcrumb';
 import { EngagementDetailClient } from './engagement-detail-client';
 import {
   deliveryStatusOf,
@@ -14,13 +14,10 @@ import {
   loadEngagementDetail,
 } from './engagement-detail-data';
 import { EngagementHeaderCard } from './engagement-header-card';
-import { DELIVERY_SHARE_ANCHOR_ID } from './share-anchor';
-import { DeliveryShareLink } from './share-link';
 
-// AUTHORISE, LOAD, RENDER — and nothing else. The twelve reads and the two
-// derivations that need no read are `engagement-detail-data.ts`; the trail is
-// `engagement-breadcrumb.tsx`. This function was 181 lines, and had GROWN from
-// 175 in the very wave that measured it.
+// AUTHORISE, LOAD, RENDER, and nothing else. The twelve reads and the two
+// derivations that need no read are `engagement-detail-data.ts`; the header
+// (trail, client link) is `engagement-header-card.tsx`.
 export default async function EngagementDetailPage({
   params,
 }: {
@@ -62,22 +59,13 @@ export default async function EngagementDetailPage({
 
   return (
     <div className="space-y-6">
-      <EngagementBreadcrumb
-        clientId={header.clientId}
-        clientName={clientName}
-        projectId={header.projectId}
-        projectName={projectName}
+      <EngagementHeaderCard
+        header={header}
+        status={status}
+        shared={shareStatus.shared}
+        canShare={canShare}
+        crumbs={{ clientId: header.clientId, clientName, projectId: header.projectId, projectName }}
       />
-      <EngagementHeaderCard header={header} shared={shareStatus.shared} status={status} />
-      {canShare && (
-        <div id={DELIVERY_SHARE_ANCHOR_ID} tabIndex={-1} className="scroll-mt-4 outline-none">
-          <DeliveryShareLink
-            engagementId={id}
-            initialShared={shareStatus.shared}
-            canShare={canShare}
-          />
-        </div>
-      )}
       {/* KEYED ON THE ENGAGEMENT. Without it a soft navigation between two
           engagements re-renders the same element type at the same position and
           React keeps the subtree alive, so the cockpit's client state — the open
@@ -103,6 +91,7 @@ export default async function EngagementDetailPage({
         canStartQuotation={can(ctx.role, 'proposals_build', 'create')}
         gatePreview={gatePreview}
         canAdvance={canAdvance}
+        canRecordOfflineApproval={mayRecordOfflineApproval(ctx.role)}
         feeSplitPrefill={data.feeSplitPrefill}
         canResolveClaims={canResolveClaims}
         status={status}

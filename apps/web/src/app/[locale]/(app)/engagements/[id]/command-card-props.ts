@@ -1,3 +1,4 @@
+import type { ActionCode } from '@/lib/actions/result';
 import type { BoqStepData } from '@/lib/boqs/step';
 import type { FeeSplitPrefill } from '@/lib/engagements/default-fee-split';
 import type { DeliveryStatus } from '@/lib/engagements/delivery-status';
@@ -32,6 +33,10 @@ export interface EngagementCommandCardProps {
   /** The delivery's status; decides the card's colour family (stripe + border). */
   status: DeliveryStatus;
   canAdvance: boolean;
+  /** May this role record "Client approved offline" (owner, admin, project manager)? */
+  canRecordOfflineApproval: boolean;
+  /** When the review round under answer began (ISO): the floor of an offline approval's date. */
+  reviewRoundStartedAt: string;
   canRecordPayment: boolean;
   /** May this role confirm or dismiss a client payment claim (`engagements_finance` create)? */
   canResolveClaims: boolean;
@@ -57,5 +62,7 @@ export interface EngagementCommandCardProps {
   /** Runs one server action with the idempotency key held for that act (0050).
    *  Ignore the argument on an edge that does not need one. */
   runAction: RunAction;
+  /** The last card action's refusal, shown inside the card under the action. */
+  actionError: ActionCode | null;
   onNudge: () => void;
 }

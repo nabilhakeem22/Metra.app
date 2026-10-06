@@ -1,8 +1,10 @@
 // The command card's props, assembled from what the page loaded. A plain module
 // (no React, no 'use client'): the cockpit body composes the card, this names
 // how each of its props is derived, so the body stays a composition.
+import type { ActionCode } from '@/lib/actions/result';
 import { countConceptOptions } from '@/lib/engagements/concept-options';
 import { secondaryTriggersOf } from '@/lib/engagements/forward-trigger';
+import { reviewRoundStartedAt } from '@/lib/engagements/review-round';
 import type { EngagementCommandCardProps } from './command-card-props';
 import type { EngagementDetailProps } from './engagement-detail-props';
 import { revealDeliveryShareLink } from './share-anchor';
@@ -10,7 +12,7 @@ import type { RunAction } from './use-engagement-action';
 
 export function commandCardPropsOf(
   detail: EngagementDetailProps,
-  action: { pending: boolean; runAction: RunAction },
+  action: { pending: boolean; runAction: RunAction; actionError: ActionCode | null },
 ): EngagementCommandCardProps {
   const { header } = detail;
   return {
@@ -27,6 +29,15 @@ export function commandCardPropsOf(
     },
     status: detail.status,
     canAdvance: detail.canAdvance,
+    canRecordOfflineApproval: detail.canRecordOfflineApproval,
+    reviewRoundStartedAt: reviewRoundStartedAt({
+      state: header.state,
+      rendersReadyAt: header.rendersReadyAt,
+      enteredConceptReviewAt:
+        detail.transitions.find((transition) => transition.toState === 'concept_review')
+          ?.decidedAt ?? null,
+      createdAt: header.createdAt,
+    }).toISOString(),
     canRecordPayment: detail.capabilities.recordPayment,
     canResolveClaims: detail.canResolveClaims,
     canShare: detail.canShare,
@@ -48,6 +59,7 @@ export function commandCardPropsOf(
     secondaryTriggers: secondaryTriggersOf(detail.nextActions, detail.gatePreview.primaryTrigger),
     pending: action.pending,
     runAction: action.runAction,
+    actionError: action.actionError,
     onNudge: revealDeliveryShareLink,
   };
 }

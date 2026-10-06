@@ -21,8 +21,9 @@ type MilestoneKind = (typeof MONEY_GUARD_MILESTONE)[keyof typeof MONEY_GUARD_MIL
 
 /**
  * The card's money button. `payAndAdvance` records the payment then fires the
- * forward trigger; `recordOnly` (at a choice state, where there is no forward
- * trigger) records it and never advances: the endings stay the studio's choice.
+ * forward trigger; `recordOnly` records it and never advances: at a choice state
+ * (the endings stay the studio's choice), and while the client still owes the
+ * review (the delivery waits for their answer, or an offline approval).
  */
 export type PayCtaMode = 'payAndAdvance' | 'recordOnly' | null;
 
@@ -56,6 +57,8 @@ export interface CommandCardCtas {
    * that says what you are working toward is better than no button at all.
    */
   actOnCard: boolean;
+  /** Offer "Client approved offline" (CommandCardView.offlineApprovalEnabled). */
+  offlineApproval: boolean;
 }
 
 /**
@@ -63,14 +66,19 @@ export interface CommandCardCtas {
  * payment, and a second, manual record would double the ledger.
  */
 function resolvePayCta(
-  preview: Pick<EngagementGatePreview, 'primaryTrigger' | 'endingChoices'>,
+  preview: Pick<EngagementGatePreview, 'primaryTrigger' | 'endingChoices' | 'awaitingClientReview'>,
   options: { canRecordPayment: boolean; canAdvance: boolean; pendingClaimCount: number },
   hasPaymentGate: boolean,
 ): PayCtaMode {
   if (options.pendingClaimCount > 0 || !hasPaymentGate || !options.canRecordPayment) {
     return null;
   }
-  if (preview.primaryTrigger) return options.canAdvance ? 'payAndAdvance' : null;
+  if (preview.primaryTrigger) {
+    // Read off the PREVIEW, not the view: the view only flags the wait in
+    // blockedClient, and a studio blocker beside it must not reopen pay-and-advance.
+    if (preview.awaitingClientReview) return 'recordOnly';
+    return options.canAdvance ? 'payAndAdvance' : null;
+  }
   return preview.endingChoices.length > 0 ? 'recordOnly' : null;
 }
 
@@ -86,6 +94,7 @@ export function resolveCommandCardCtas(
     conceptOptionCount: number;
     pendingClaimCount: number;
     canResolveClaims: boolean;
+    offlineApprovalEnabled: boolean;
   },
 ): CommandCardCtas {
   // `amountDue` is only set on a blocking payment gate (see gate-preview).
@@ -117,5 +126,6 @@ export function resolveCommandCardCtas(
       dropzoneCategory !== null &&
       options.canUpload &&
       !dropzoneAtCapacity,
+    offlineApproval: options.offlineApprovalEnabled,
   };
 }

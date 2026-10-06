@@ -14,6 +14,12 @@ import { messageAt, renderWithIntl } from '@/test/render-with-intl';
 vi.mock('next-intl/server', () => ({
   getTranslations: async (namespace: string) => (key: string) => `${namespace}.${key}`,
 }));
+// The header's client-link dialog imports the share server actions.
+vi.mock('@/lib/engagements/actions', () => ({
+  shareDeliveryLink: vi.fn(),
+  rotateDeliveryLink: vi.fn(),
+  revokeDeliveryLink: vi.fn(),
+}));
 
 const NOW = new Date('2026-06-15T12:00:00.000Z');
 const STATUS_KINDS = ['yourMove', 'confirmPayment', 'waitingClient', 'stalled', 'delivered', 'abandoned'];
@@ -81,6 +87,8 @@ async function chipsOnEverySurface(whoseMove: WhoseMove, updatedAt: string) {
       header={header}
       shared={false}
       status={deliveryStatusAsOf({ ...header, whoseMove }, NOW)}
+      canShare={false}
+      crumbs={{ clientId: 'c-1', clientName: 'Acme', projectId: 'p-1', projectName: 'Tower' }}
     />,
     { locale: 'en' },
   );

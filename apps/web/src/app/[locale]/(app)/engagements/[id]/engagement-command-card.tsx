@@ -2,17 +2,14 @@
 
 import { useTranslations } from 'next-intl';
 import { CommandCardActRegion } from './command-card-act-region';
+import { CommandCardActionError } from './command-card-action-error';
 import { CommandCardClosedClaims } from './command-card-closed-claims';
 import { CommandCardClosedLinks } from './command-card-closed-links';
 import { useCommandCardCopy } from './command-card-copy';
 import { CommandCardHeadline } from './command-card-headline';
 import { deriveCommandCardModel } from './command-card-model';
 import type { EngagementCommandCardProps } from './command-card-props';
-import {
-  CommandCardAccentStripe,
-  CommandCardShareFooter,
-  CommandCardStatusBand,
-} from './command-card-status-band';
+import { CommandCardAccentStripe, CommandCardStatusBand } from './command-card-status-band';
 import { CommandCardSteps } from './command-card-steps';
 import { EngagementHeroBadges } from './engagement-hero-badges';
 import { EngagementSecondaryActions } from './engagement-secondary-actions';
@@ -54,6 +51,7 @@ export function EngagementCommandCard(props: EngagementCommandCardProps) {
           closed={closed}
           copy={copy}
           clientActivity={props.clientActivity}
+          review={{ state, clientDecision: preview.clientDecision }}
           awaitingReplyCount={props.awaitingReplyCount}
         />
 
@@ -73,8 +71,17 @@ export function EngagementCommandCard(props: EngagementCommandCardProps) {
           />
         )}
 
+        {closed && <CommandCardActionError error={props.actionError} />}
+
         {!closed && (
           <>
+            {/* 2. THE ACT first, then what stands behind it: the move the studio
+                came here to make sits above the fold, the checklist explains it. */}
+            <div className="mb-5">
+              <CommandCardActRegion card={props} model={{ view, ctas }} />
+              <CommandCardActionError error={props.actionError} />
+            </div>
+
             <CommandCardSteps
               engagementId={engagementId}
               project={{ id: props.projectId, state, boqStep: props.boqStep }}
@@ -88,9 +95,7 @@ export function EngagementCommandCard(props: EngagementCommandCardProps) {
               }}
             />
 
-            <CommandCardActRegion card={props} model={{ view, ctas }} />
-
-            {/* 3. FOOTER — client link + the "more actions" secondary controls. */}
+            {/* 3. The "more actions" secondary controls. */}
             <EngagementSecondaryActions
               engagementId={engagementId}
               triggers={props.secondaryTriggers}
@@ -101,9 +106,6 @@ export function EngagementCommandCard(props: EngagementCommandCardProps) {
           </>
         )}
       </div>
-
-      {/* A closed delivery has nobody left to nudge. */}
-      {canShare && !closed && <CommandCardShareFooter onNudge={onNudge} />}
     </section>
   );
 }

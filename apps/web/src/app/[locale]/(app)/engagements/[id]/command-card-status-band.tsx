@@ -1,7 +1,5 @@
 'use client';
 
-import { Link2 } from 'lucide-react';
-import { useTranslations } from 'next-intl';
 import type { DesignState } from '@/lib/engagements/states';
 import { EngagementStageSpine } from './engagement-stage-spine';
 
@@ -31,30 +29,6 @@ export function CommandCardStatusBand({ state }: { state: DesignState }) {
       style={{ background: 'var(--track)' }}
     >
       <EngagementStageSpine state={state} />
-    </div>
-  );
-}
-
-/**
- * 4. QUIET FOOTER — present, never shouting. Its own band rather than a rule
- * inside the body, so the card reads as three regions: where we are, the one
- * action, and everything reachable from here.
- */
-export function CommandCardShareFooter({ onNudge }: { onNudge: () => void }) {
-  const tcmd = useTranslations('engagements.command');
-  return (
-    <div
-      className="flex items-center gap-4 border-t border-[color:var(--rule)] px-5 py-3 sm:px-6"
-      style={{ background: 'var(--track)' }}
-    >
-      <button
-        type="button"
-        onClick={onNudge}
-        className="inline-flex items-center gap-1.5 text-small font-semibold text-brand-ink hover:underline"
-      >
-        <Link2 className="size-3.5" aria-hidden />
-        {tcmd('nudge')}
-      </button>
     </div>
   );
 }
