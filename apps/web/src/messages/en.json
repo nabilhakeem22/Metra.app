@@ -803,8 +803,10 @@
       "editTitle": "Edit client",
       "nameEn": "Name (English)",
       "nameAr": "Name (Arabic)",
+      "nameRequired": "Enter the name in Arabic or English.",
       "type": "Type",
       "contactName": "Contact name",
+      "contactNote": "Saved as the client's first contact.",
       "email": "Email",
       "phone": "Phone",
       "city": "City",
@@ -813,6 +815,7 @@
       "advancePct": "Advance %",
       "retentionPct": "Retention %",
       "notes": "Notes",
+      "moreDetails": "More details",
       "save": "Save",
       "cancel": "Cancel",
       "country": "Country"

@@ -105,17 +105,23 @@ export function DetailsTab({
   const field = (
     k: keyof FormState,
     label: string,
-    opts?: { dir?: 'ltr' | 'rtl'; hint?: string; inputMode?: 'decimal' },
+    opts?: { dir?: 'ltr' | 'rtl' | 'auto'; hint?: string; inputMode?: 'decimal'; required?: boolean },
   ) => (
     <div className="space-y-2">
       <Label htmlFor={`d-${k}`} className="flex items-center">
         {label}
+        {opts?.required && (
+          <span className="ms-1 text-[color:var(--danger)]" aria-hidden>
+            *
+          </span>
+        )}
         {opts?.hint && <FieldHint id={`d-${k}-hint`} hint={opts.hint} />}
       </Label>
       <Input
         id={`d-${k}`}
         dir={opts?.dir ?? 'ltr'}
         inputMode={opts?.inputMode}
+        aria-required={opts?.required || undefined}
         aria-describedby={opts?.hint ? `d-${k}-hint` : undefined}
         value={form[k]}
         onChange={(e) => set(k)(e.target.value)}
@@ -128,8 +134,8 @@ export function DetailsTab({
     <Card>
       <CardContent className="space-y-4 py-4">
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          {field('nameEn', t('form.nameEn'), { hint: th('name') })}
-          {field('nameAr', t('form.nameAr'), { dir: 'rtl', hint: th('name') })}
+          {field('nameEn', t('form.nameEn'), { hint: th('name'), required: true })}
+          {field('nameAr', t('form.nameAr'), { dir: 'rtl', hint: th('name'), required: true })}
         </div>
 
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -155,7 +161,7 @@ export function DetailsTab({
               </SelectContent>
             </Select>
           </div>
-          {field('contactName', t('form.contactName'), { hint: th('contactName') })}
+          {field('contactName', t('form.contactName'), { dir: 'auto', hint: th('contactName') })}
         </div>
 
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -163,16 +169,16 @@ export function DetailsTab({
           {field('phone', t('form.phone'), { hint: th('phone') })}
         </div>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          {field('city', t('form.city'), { hint: th('city') })}
-          {field('country', t('form.country'))}
+          {field('city', t('form.city'), { dir: 'auto', hint: th('city') })}
+          {field('country', t('form.country'), { dir: 'auto' })}
         </div>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          {field('address', t('form.address'), { hint: th('address') })}
+          {field('address', t('form.address'), { dir: 'auto', hint: th('address') })}
           {/* Advance / retention are NOT edited here any more: they are derived from
               the client's committed contracts and shown on the Financials tab. */}
           {field('taxRegistrationNumber', t('form.taxCode'), { hint: th('taxRegistrationNumber') })}
         </div>
-        {field('notes', t('form.notes'))}
+        {field('notes', t('form.notes'), { dir: 'auto' })}
 
         {canManage && (
           <div className="flex justify-end">
