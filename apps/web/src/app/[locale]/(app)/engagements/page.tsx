@@ -41,6 +41,10 @@ export default async function EngagementsPage({
         clientOptions={clientOptions}
         projectOptions={projectOptions}
         canCreate={canCreate}
+        setupLinks={{
+          canAddClient: can(ctx.role, 'clients', 'create'),
+          canAddProject: can(ctx.role, 'projects', 'create'),
+        }}
         openCreateOnArrival={openCreate === '1'}
         nowIso={new Date().toISOString()}
       />

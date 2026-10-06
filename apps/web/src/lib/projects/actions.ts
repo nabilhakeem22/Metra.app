@@ -24,7 +24,7 @@ export async function createProject(input: ProjectInput): Promise<ActionResult> 
   } catch {
     /* default locale */
   }
-  redirect(`/${locale}/projects/${res.data}?created=1`);
+  redirect(`/${locale}/projects/${res.data}`);
 }
 
 export async function updateProject(

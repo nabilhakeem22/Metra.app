@@ -20,6 +20,7 @@ export function EngagementsClient({
   clientOptions,
   projectOptions,
   canCreate,
+  setupLinks,
   openCreateOnArrival,
   nowIso,
 }: {
@@ -27,6 +28,8 @@ export function EngagementsClient({
   clientOptions: ClientOption[];
   projectOptions: ProjectOption[];
   canCreate: boolean;
+  /** May this role add the client / project a delivery needs (the form's empty states)? */
+  setupLinks: { canAddClient: boolean; canAddProject: boolean };
   /** Reached through `/engagements?new=1`: open the create sheet once. */
   openCreateOnArrival: boolean;
   /** The server's "now", so every row's age and the hydrated page agree. */
@@ -72,6 +75,7 @@ export function EngagementsClient({
           onOpenChange={setCreating}
           clientOptions={clientOptions}
           projectOptions={projectOptions}
+          setupLinks={setupLinks}
         />
       )}
     </div>

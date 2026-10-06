@@ -927,13 +927,6 @@
   "projects": {
     "title": "Projects",
     "subtitle": "Your fit-out jobs, each tied to a client.",
-    "handoff": {
-      "project": {
-        "title": "Start the delivery for this project?",
-        "confirm": "Start delivery"
-      },
-      "dismiss": "Not now"
-    },
     "search": "Search code or name",
     "allStatuses": "All statuses",
     "activeOnly": "Active only",
@@ -1525,24 +1518,26 @@
     "designFee": "Design fee",
     "conceptLocked": "Concept locked",
     "form": {
-      "newTitle": "New delivery",
       "titleEn": "Title (English)",
       "titleAr": "Title (Arabic)",
+      "titleHint": "Leave empty to use the project name.",
       "client": "Client",
+      "chooseClient": "Choose a client",
       "project": "Project",
+      "chooseProject": "Choose a project",
       "offPlan": "Off-plan (developer-built shell)",
-      "noClients": "Add a client and a project before creating a delivery.",
-      "cancel": "Cancel",
-      "create": "Create delivery"
+      "needClient": "Add a client before starting a delivery.",
+      "needProject": "Add a project for this client before starting a delivery.",
+      "addClient": "Add a client",
+      "addProject": "Add a project",
+      "cancel": "Cancel"
     },
     "projectPanel": {
       "heading": "Design delivery",
       "open": "Open delivery",
-      "start": "Start delivery",
       "extend": "Start extension",
       "atLimit": "This project has used both of its deliveries. Create a new project to start another.",
-      "none": "No delivery started for this project yet.",
-      "startProject": "Start the project"
+      "none": "No delivery started for this project yet."
     },
     "breadcrumb": {
       "clients": "Clients",

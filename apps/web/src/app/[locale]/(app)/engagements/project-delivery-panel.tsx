@@ -34,6 +34,7 @@ export function ProjectDeliveryPanel({
   deliveryCount,
   clientId,
   projectId,
+  projectName,
   canStartDelivery,
   highlighted = false,
 }: {
@@ -41,6 +42,8 @@ export function ProjectDeliveryPanel({
   deliveryCount: number;
   clientId: string;
   projectId: string;
+  /** The project's names: an untitled delivery takes them (the form prefills them). */
+  projectName: { nameEn: string | null; nameAr: string | null };
   canStartDelivery: boolean;
   /** Spec: on the project page this panel sits above the tabs as THE entry point to
    *  the design process, so it is given brand emphasis. Elsewhere it stays a plain
@@ -48,6 +51,7 @@ export function ProjectDeliveryPanel({
   highlighted?: boolean;
 }) {
   const t = useTranslations('engagements.projectPanel');
+  const tStart = useTranslations('engagements');
   const locale = useLocale();
   const [creating, setCreating] = useState(false);
 
@@ -113,7 +117,7 @@ export function ProjectDeliveryPanel({
           {canCreate && (
             <Button onClick={() => setCreating(true)}>
               <Plus className="size-4" aria-hidden />
-              {delivery ? t('extend') : t('startProject')}
+              {delivery ? t('extend') : tStart('startDelivery')}
             </Button>
           )}
         </div>
@@ -127,6 +131,7 @@ export function ProjectDeliveryPanel({
           projectOptions={[]}
           lockedClientId={clientId}
           lockedProjectId={projectId}
+          lockedProjectName={projectName}
         />
       )}
     </Card>
