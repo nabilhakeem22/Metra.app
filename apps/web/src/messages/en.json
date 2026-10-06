@@ -2036,7 +2036,12 @@
       "confirm": "Confirm the client's payment",
       "dismiss": "Dismiss",
       "closedTitle": "A payment the client reported",
-      "closedHint": "This delivery is closed, so the payment can't be recorded here. Dismiss the claim to clear it."
+      "closedHint": "This delivery is closed, so the payment can't be recorded here. Dismiss the claim to clear it.",
+      "closedDismissConfirm": {
+        "title": "Dismiss the client's payment report?",
+        "body": "The client reported paying {milestone} ({amount}). Dismissing it removes the report from this delivery, and the client cannot send it again because the delivery is closed.",
+        "confirm": "Dismiss the report"
+      }
     },
     "artifactKind": {
       "survey": "Survey",

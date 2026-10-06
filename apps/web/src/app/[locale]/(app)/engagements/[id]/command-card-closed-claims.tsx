@@ -2,6 +2,7 @@
 
 import { useLocale, useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
+import { useConfirm } from '@/components/ui/confirm-dialog';
 import { dismissPaymentClaim } from '@/lib/engagements/actions';
 import type { EngagementPaymentClaimRecord } from '@/lib/engagements/queries';
 import { formatMoney } from '@/lib/format/money';
@@ -13,6 +14,10 @@ import type { RunAction } from './use-engagement-action';
  * thing left is to dismiss the claim: the existing dismiss action, which writes
  * no ledger row and works whatever state the delivery is in. Without this the
  * claim had no way off the page once the delivery closed.
+ *
+ * Behind a confirm, unlike the open-delivery dismiss: there the client can send
+ * the claim again, here the portal refuses a closed delivery, so a dismissed
+ * claim cannot come back.
  */
 export function CommandCardClosedClaims({
   claims,
@@ -25,10 +30,27 @@ export function CommandCardClosedClaims({
 }) {
   const t = useTranslations('engagements.paymentClaims');
   const tk = useTranslations('engagements.paymentKind');
+  const tc = useTranslations('common');
   const locale = useLocale();
+  const { confirm, dialog } = useConfirm();
   if (claims.length === 0) return null;
+
+  async function dismiss(claim: EngagementPaymentClaimRecord): Promise<void> {
+    const confirmed = await confirm({
+      title: t('closedDismissConfirm.title'),
+      description: `${t('closedDismissConfirm.body', {
+        milestone: tk(claim.milestoneKind),
+        amount: formatMoney(claim.claimedAmount, locale),
+      })} ${tc('cannotUndo')}`,
+      confirmLabel: t('closedDismissConfirm.confirm'),
+      cancelLabel: tc('cancel'),
+      variant: 'destructive',
+    });
+    if (confirmed) runAction(() => dismissPaymentClaim({ claimId: claim.id }));
+  }
   return (
     <div className="mt-4 space-y-2 rounded-item border border-[color:var(--rule)] bg-[color:var(--track)] p-3">
+      {dialog}
       <p className="text-small font-semibold">{t('closedTitle')}</p>
       <p className="text-small text-[color:var(--text-muted)]">{t('closedHint')}</p>
       <ul className="space-y-2">
@@ -44,7 +66,7 @@ export function CommandCardClosedClaims({
               size="sm"
               className="ms-auto"
               disabled={pending}
-              onClick={() => runAction(() => dismissPaymentClaim({ claimId: claim.id }))}
+              onClick={() => void dismiss(claim)}
             >
               {t('dismiss')}
             </Button>

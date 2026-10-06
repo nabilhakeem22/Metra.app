@@ -481,6 +481,54 @@ describe('dismissPaymentClaimCore (AC8)', () => {
     });
     expect(confirmDismissed).toEqual({ ok: false, error: 'claim_not_found' });
   });
+
+  // Round A2 put Dismiss on a CLOSED delivery's card, the one place a pending
+  // claim had no other way off the page. These pin the same fences confirm has.
+  it("a foreign org's claim reads as claim_not_found; A's claim stays pending", async () => {
+    const a = await seedClaimDelivery('dismiss-iso');
+    await claimPaymentByToken(a.token, { milestoneKind: 'deposit' });
+    const [claimA] = await claimRows(a.engagementId);
+    const { orgId: orgB, ownerIds: ownersB } = await seedOrg({ owners: 1 });
+    orgIds.push(orgB);
+
+    const res = await dismissPaymentClaimCore(ctxFor(orgB, ownersB[0], 'owner'), {
+      claimId: claimA.id,
+    });
+    expect(res).toEqual({ ok: false, error: 'claim_not_found' });
+    const [after] = await claimRows(a.engagementId);
+    expect(after.status).toBe('pending');
+    expect(after.resolved_by).toBeNull();
+  });
+
+  it('a role without finance update is refused and the claim stays pending', async () => {
+    const { ctx, engagementId, token } = await seedClaimDelivery('dismiss-viewer');
+    await claimPaymentByToken(token, { milestoneKind: 'deposit' });
+    const [claim] = await claimRows(engagementId);
+
+    const res = await dismissPaymentClaimCore({ ...ctx, role: 'viewer' }, { claimId: claim.id });
+    expect(res).toEqual({ ok: false, error: 'forbidden' });
+    const [after] = await claimRows(engagementId);
+    expect(after.status).toBe('pending');
+  });
+
+  it.each(['closed_design_only', 'execution', 'abandoned'])(
+    'on a %s delivery: dismissed, audited, and no payment row written',
+    async (closedState) => {
+      const { ctx, engagementId, token } = await seedClaimDelivery(`dismiss-${closedState}`);
+      await claimPaymentByToken(token, { milestoneKind: 'deposit' });
+      const [claim] = await claimRows(engagementId);
+      await forceState(engagementId, closedState);
+      const auditBefore = await raw.count('audit_log', ctx.orgId);
+
+      const res = await dismissPaymentClaimCore(ctx, { claimId: claim.id });
+      expect(res.ok).toBe(true);
+      const [after] = await claimRows(engagementId);
+      expect(after.status).toBe('dismissed');
+      expect(after.resolved_by).toBe(ctx.userId);
+      expect(await paymentRows(engagementId)).toHaveLength(0);
+      expect(await raw.count('audit_log', ctx.orgId)).toBe(auditBefore + 1);
+    },
+  );
 });
 
 describe('client_payment_claims_resolution — status and resolution agree (M5)', () => {

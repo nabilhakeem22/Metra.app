@@ -319,7 +319,7 @@ describe('a closed delivery', () => {
     createdAt: '2026-06-01T00:00:00.000Z',
   };
 
-  test('a pending claim on a closed delivery can be dismissed, and nothing else', async () => {
+  test('a pending claim on a closed delivery can be dismissed, only after a confirm', async () => {
     actions.dismissPaymentClaim.mockResolvedValue({ ok: true });
     renderWithIntl(
       <EngagementCommandCard
@@ -328,8 +328,24 @@ describe('a closed delivery', () => {
     );
     expect(screen.getByText(ar('engagements.paymentClaims.closedHint'))).toBeTruthy();
     expect(button('engagements.paymentClaims.confirm')).toBeNull();
+
+    // Cancel: nothing is dismissed.
     fireEvent.click(button('engagements.paymentClaims.dismiss')!);
+    const dialog = await screen.findByRole('alertdialog');
+    expect(dialog.textContent).toContain(ar('common.cannotUndo'));
+    fireEvent.click(within(dialog).getByRole('button', { name: ar('common.cancel') }));
+    await waitForDialogToClose();
+    expect(actions.dismissPaymentClaim).not.toHaveBeenCalled();
+
+    // Confirm: dismissed once.
+    fireEvent.click(button('engagements.paymentClaims.dismiss')!);
+    fireEvent.click(
+      await screen.findByRole('button', {
+        name: ar('engagements.paymentClaims.closedDismissConfirm.confirm'),
+      }),
+    );
     await act(async () => {});
+    expect(actions.dismissPaymentClaim).toHaveBeenCalledTimes(1);
     expect(actions.dismissPaymentClaim).toHaveBeenCalledWith({ claimId: 'claim-1' });
   });
 
