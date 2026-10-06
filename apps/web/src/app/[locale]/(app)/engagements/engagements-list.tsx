@@ -42,8 +42,8 @@ export function EngagementsList({ items, now }: { items: EngagementListRow[]; no
               className={`${ROW_GRID} px-4 py-3 text-sm hover:bg-muted/40 focus-visible:bg-muted/40`}
             >
               <span className="min-w-0">
-                <span className="block truncate font-semibold" dir="auto">
-                  {nameOf(row.titleAr, row.titleEn)}
+                <span className="block truncate font-semibold">
+                  <bdi>{nameOf(row.titleAr, row.titleEn)}</bdi>
                 </span>
                 <span className="block truncate text-xs text-muted-foreground">
                   <span className="font-mono" dir="ltr">
@@ -62,7 +62,11 @@ export function EngagementsList({ items, now }: { items: EngagementListRow[]; no
                 <WhoseMoveChip whoseMove={row.whoseMove} />
               </span>
               <span className="text-end">
-                <DeliveryAgeLabel updatedAt={row.updatedAt} now={now} />
+                <DeliveryAgeLabel
+                  updatedAt={row.updatedAt}
+                  now={now}
+                  closed={row.whoseMove === 'closed'}
+                />
               </span>
             </Link>
           </li>

@@ -8,16 +8,25 @@ import { formatNumber } from '@/lib/format/number';
 /**
  * How long a delivery has sat since its last change. `now` is passed in so a
  * page renders one consistent "today" for every row (and the server and the
- * browser agree on it).
+ * browser agree on it). A closed delivery is never called out as stale: it is
+ * finished, not stuck.
  */
-export function DeliveryAgeLabel({ updatedAt, now }: { updatedAt: string; now: Date }) {
+export function DeliveryAgeLabel({
+  updatedAt,
+  now,
+  closed = false,
+}: {
+  updatedAt: string;
+  now: Date;
+  closed?: boolean;
+}) {
   const t = useTranslations('engagements.age');
   const locale = useLocale();
   const days = daysSince(updatedAt, now);
-  const stale = isStale(days);
+  const stale = !closed && isStale(days);
   return (
     <span
-      className="whitespace-nowrap text-end font-mono text-xs"
+      className="whitespace-nowrap text-end text-xs tabular-nums"
       style={{
         color: stale ? 'var(--danger)' : 'var(--text-muted)',
         fontWeight: stale ? 700 : 400,

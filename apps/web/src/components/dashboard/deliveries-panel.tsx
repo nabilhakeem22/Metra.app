@@ -90,14 +90,11 @@ export async function DeliveriesPanel({
                   className="grid grid-cols-[1fr_auto] items-center gap-x-4 gap-y-2 p-4 hover:bg-[color:var(--track)] sm:grid-cols-[1fr_132px_auto_96px]"
                 >
                   <span className="min-w-0">
-                    <span className="block truncate font-bold text-[color:var(--text)]" dir="auto">
-                      {client || '—'}
+                    <span className="block truncate font-bold text-[color:var(--text)]">
+                      <bdi>{client || '—'}</bdi>
                     </span>
-                    <span
-                      className="block truncate text-[13px] text-[color:var(--text-muted)]"
-                      dir="auto"
-                    >
-                      {project || '—'}
+                    <span className="block truncate text-[13px] text-[color:var(--text-muted)]">
+                      <bdi>{project || '—'}</bdi>
                     </span>
                   </span>
 
