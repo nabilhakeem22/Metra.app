@@ -635,6 +635,13 @@
     letter-spacing: var(--tracking-num);
   }
 
+  /* A raw form control that is not a .glass-field (a grid cell, a bare native
+     select) takes the field size: 14px with a mouse, 16px on touch, where any
+     smaller field makes iOS zoom the page in on focus. */
+  .field-text {
+    font-size: var(--field-fs);
+  }
+
   /* Brand focus ring, visible over glass: 2px --brand at 2px offset. Pair with
      Tailwind `outline-none` (which sets a transparent 2px/offset-2 outline).
      --brand is an H S% L% triplet (Tailwind bridge), so wrap it in hsl(). */

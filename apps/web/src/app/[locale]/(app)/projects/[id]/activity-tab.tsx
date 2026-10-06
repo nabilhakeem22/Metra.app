@@ -13,6 +13,7 @@ import type { ActionCode } from '@/lib/actions/result';
 import { addActivity } from '@/lib/activities/actions';
 import type { LogEntry } from '@/lib/logs/entries';
 import { formatDate } from '@/lib/format/date';
+import { Textarea } from '@/components/ui/textarea';
 
 export function ActivityTab({
   projectId,
@@ -57,12 +58,12 @@ export function ActivityTab({
       {canActivity && (
         <Card>
           <CardContent className="space-y-2 py-4">
-            <textarea
+            <Textarea
               value={note}
               onChange={(e) => setNote(e.target.value)}
               placeholder={t('notePlaceholder')}
               rows={3}
-              className="w-full glass-field outline-none focus-ring-brand focus-visible:border-[color:hsl(var(--brand))] p-2 text-body"
+              dir="auto"
               aria-label={t('add')}
             />
             <div className="flex justify-end">

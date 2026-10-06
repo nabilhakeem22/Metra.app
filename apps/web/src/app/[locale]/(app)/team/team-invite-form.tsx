@@ -110,7 +110,7 @@ export function TeamInviteForm({
               {t('inviteLink')}
             </p>
             <div className="flex items-center gap-2">
-              <Input readOnly dir="ltr" value={lastLink} className="text-caption" />
+              <Input readOnly dir="ltr" value={lastLink} />
               <Button
                 type="button"
                 variant="secondary"

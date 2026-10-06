@@ -14,7 +14,7 @@ type StickyColumn = 'code' | 'description';
 const STICKY_OFFSET: Record<StickyColumn, number> = { code: 0, description: 72 };
 
 const CELL_INPUT_CLASS =
-  'w-full rounded-item border border-transparent bg-transparent p-3 text-body text-[color:var(--text)] outline-none hover:bg-[color:var(--track)] focus-visible:border-[color:hsl(var(--brand))] focus-visible:bg-[color:var(--field-bg)]';
+  'w-full rounded-item border border-transparent bg-transparent p-3 field-text text-[color:var(--text)] outline-none hover:bg-[color:var(--track)] focus-visible:border-[color:hsl(var(--brand))] focus-visible:bg-[color:var(--field-bg)]';
 
 export function Th({
   children,

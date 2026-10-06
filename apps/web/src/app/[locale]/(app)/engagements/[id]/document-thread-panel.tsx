@@ -12,6 +12,7 @@ import type { StudioDocumentComment } from '@/lib/engagements/document-comments'
 import { useDocumentThread } from '@/lib/engagements/use-document-thread';
 import { bidiIsolate } from '@/lib/format/bidi';
 import { formatDate } from '@/lib/format/date';
+import { Textarea } from '@/components/ui/textarea';
 
 /** Mirrors the SDF cap and the table's CHECK. Enforced here so the studio sees the
  *  limit while typing rather than after a rejected send. */
@@ -119,14 +120,15 @@ export function DocumentThreadPanel({
               <label htmlFor={`reply-${artifactId}`} className="sr-only">
                 {t('placeholder')}
               </label>
-              <textarea
+              <Textarea
                 id={`reply-${artifactId}`}
                 value={thread.draft}
                 maxLength={BODY_MAX}
                 onChange={(event) => thread.setDraft(event.target.value)}
                 placeholder={t('placeholder')}
                 rows={2}
-                className="w-full resize-y rounded-item border border-[color:var(--rule)] bg-card p-2 text-caption focus:outline-none focus:ring-2 focus:ring-ring"
+                dir="auto"
+                className="resize-y"
               />
               <div className="flex items-center justify-between gap-2">
                 <p className="text-caption text-[color:var(--text-muted)]">

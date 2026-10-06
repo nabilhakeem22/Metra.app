@@ -18,7 +18,7 @@ const SelectGroup = SelectPrimitive.Group;
 const SelectValue = SelectPrimitive.Value;
 
 // The field. Matches the glass Input: flat --glass fill + hairline at --r-item,
-// h-10/px-3/body size, brand focus-visible ring, subtle --track hover bump. The
+// h-10/px-3, the field font size, brand focus-visible ring, --track hover bump. The
 // chevron sits on the inline-end (flex order) so it flips in RTL automatically.
 const SelectTrigger = React.forwardRef<
   React.ElementRef<typeof SelectPrimitive.Trigger>,
@@ -27,7 +27,7 @@ const SelectTrigger = React.forwardRef<
   <SelectPrimitive.Trigger
     ref={ref}
     className={cn(
-      'glass-field flex h-10 w-full items-center justify-between gap-2 px-3 py-2 text-body',
+      'glass-field flex h-10 w-full items-center justify-between gap-2 px-3 py-2',
       'outline-none focus-ring-brand focus-visible:border-[color:hsl(var(--brand))]',
       'hover:bg-[color:var(--track)]',
       'data-[placeholder]:text-[color:var(--text-faint)]',

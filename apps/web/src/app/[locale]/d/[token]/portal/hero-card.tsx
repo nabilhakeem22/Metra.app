@@ -10,6 +10,7 @@ import {
 } from '@/lib/engagements/portal-labels';
 import type { HeroGroup, HeroView } from '@/lib/engagements/portal-hero';
 import { recordDeliveryAction } from '../actions';
+import { Textarea } from '@/components/ui/textarea';
 
 /** The confirmation an acted-on button resolves to (names the next phase). */
 type HeroOutcome = 'approved' | 'changes' | 'acknowledged';
@@ -123,13 +124,13 @@ function ActionHero({ token, group }: { token: string; group: HeroGroup }) {
       </span>
       <h2 className="text-heading font-semibold">{tGroup('headline')}</h2>
       <p className="text-body text-muted-foreground">{tGroup('body')}</p>
-      <textarea
+      <Textarea
         value={note}
         onChange={(event) => setNote(event.target.value)}
         maxLength={2000}
         rows={2}
+        dir="auto"
         placeholder={tActions('notePlaceholder')}
-        className="w-full rounded-item border border-input bg-background px-3 py-2 text-body shadow-sm outline-none focus-visible:ring-1 focus-visible:ring-ring"
       />
       <div className="flex flex-col gap-2">
         {buttons.map((button) => (

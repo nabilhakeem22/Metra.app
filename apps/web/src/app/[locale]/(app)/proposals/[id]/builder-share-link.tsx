@@ -20,7 +20,7 @@ export function BuilderShareLink({
     <Card>
       <CardContent className="flex flex-wrap items-center gap-2 py-3">
         <span className="text-body font-medium">{t('view.shareTitle')}:</span>
-        <Input readOnly dir="ltr" value={link} className="max-w-md text-caption" />
+        <Input readOnly dir="ltr" value={link} className="max-w-md" />
         <Button
           variant="secondary"
           size="sm"

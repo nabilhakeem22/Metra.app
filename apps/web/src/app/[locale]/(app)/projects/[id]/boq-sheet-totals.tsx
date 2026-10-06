@@ -25,7 +25,7 @@ function DiscountEditor({
         aria-label={t('discountPct')}
         dir="ltr"
         inputMode="decimal"
-        className="w-12 rounded-item border border-transparent bg-transparent p-1 text-end font-mono text-body tabular-nums text-[color:var(--text)] outline-none hover:bg-[color:var(--track)] focus-visible:border-[color:hsl(var(--brand))]"
+        className="w-12 rounded-item border border-transparent bg-transparent p-1 text-end font-mono field-text tabular-nums text-[color:var(--text)] outline-none hover:bg-[color:var(--track)] focus-visible:border-[color:hsl(var(--brand))]"
       />
       <span aria-hidden="true">%</span>
     </>

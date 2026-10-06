@@ -9,6 +9,7 @@ import { useDocumentThread } from '@/lib/engagements/use-document-thread';
 import { bidiIsolate } from '@/lib/format/bidi';
 import { formatDate } from '@/lib/format/date';
 import { addDeliveryComment, loadDeliveryDocumentComments } from '../actions';
+import { Textarea } from '@/components/ui/textarea';
 
 /** Hard cap, mirrored from the SDF and the table's CHECK. Enforced here only so the
  *  client sees the limit while typing rather than after a rejected send. */
@@ -109,14 +110,15 @@ export function DocumentThread({
             <label htmlFor={`comment-${documentId}`} className="sr-only">
               {t('placeholder')}
             </label>
-            <textarea
+            <Textarea
               id={`comment-${documentId}`}
               value={thread.draft}
               maxLength={BODY_MAX}
               onChange={(event) => thread.setDraft(event.target.value)}
               placeholder={t('placeholder')}
               rows={2}
-              className="w-full resize-y rounded-item border bg-background p-2 text-caption shadow-sm focus:outline-none focus:ring-2 focus:ring-ring"
+              dir="auto"
+              className="resize-y"
             />
             <div className="flex items-center justify-between gap-2">
               <p className="text-caption text-muted-foreground">{t('advisory')}</p>

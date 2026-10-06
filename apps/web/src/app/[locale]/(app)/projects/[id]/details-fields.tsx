@@ -17,6 +17,7 @@ import { pickLocale } from '@/lib/i18n/pick-locale';
 import { PROJECT_STATUSES } from '@/lib/projects/statuses';
 import type { DetailsOption, FormState } from './details-tab';
 import { DetailsTypeField } from './details-type-field';
+import { Textarea } from '@/components/ui/textarea';
 
 // The project details field groups (code · client · names · type · status ·
 // percentages · description · location · notes + save). All form state and
@@ -158,11 +159,11 @@ export function DetailsFields({
           {tp('description')}
           <FieldHint id="p-description-hint" hint={th('description')} />
         </Label>
-        <textarea
+        <Textarea
           id="p-description"
           rows={3}
+          dir="auto"
           aria-describedby="p-description-hint"
-          className="w-full glass-field outline-none focus-ring-brand focus-visible:border-[color:hsl(var(--brand))] p-2 text-body"
           value={form.description}
           onChange={(e) => set('description')(e.target.value)}
           disabled={!canManage || pending}

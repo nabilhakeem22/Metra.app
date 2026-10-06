@@ -111,7 +111,7 @@ export function DocumentsTab({
               onChange={(e) => setCategoryId(e.target.value)}
               aria-label={t('category')}
               disabled={pending}
-              className="h-9 rounded-item border bg-background px-2 text-body"
+              className="h-9 rounded-item border bg-background px-2 field-text"
             >
               <option value="">{t('uncategorised')}</option>
               {categories.map((c) => (
