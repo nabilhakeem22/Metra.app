@@ -86,10 +86,12 @@ grant select, insert, update, delete on public.variation_order_lines to metra_ap
 -- `revisions.ts`'s counter factory, the other two are never updated at all.
 --
 -- `token_nonce` (0056) is written by the share-link lifecycle beside
--- `token_hash`: revoke clears it (the 0056 CHECK refuses a nonce without a
--- hash), and the re-derivable mint/rotate of Round B sets it. It is granted
--- in the same apply-rls run that creates the Round B functions, so the owner's
--- one database step covers the app code that follows it.
+-- `token_hash`: revoke clears it explicitly, and the re-derivable mint/rotate
+-- of Round B sets it. It is granted in the same apply-rls run that creates the
+-- Round B functions, so the owner's one database step covers the app code that
+-- follows it. Writers that do NOT name it (older builds) are covered by
+-- trg_design_engagements_token_nonce, which needs no grant: a trigger's own
+-- assignment to NEW is not checked against the caller's column privileges.
 --
 -- The REVOKE removes the earlier table-level UPDATE on already-provisioned
 -- databases; on a fresh one it is a no-op. It must come BEFORE the column grant
@@ -208,6 +210,11 @@ grant execute on function public.enforce_immutable_when() to metra_app;
 -- S1 (Epic A2): organizations.account_id immutability trigger fn.
 grant execute on function public.enforce_account_id_immutable() to metra_app;
 
+-- Round B (0056): the share-link nonce trigger fn. Symmetry only, like the
+-- child-draft guards below: EXECUTE on a trigger function is checked when the
+-- trigger is created, not when it fires.
+grant execute on function public.clear_token_nonce_on_hash_change() to metra_app;
+
 -- Proposals (P1 Slice 3): child-draft guard trigger fn + public token SDFs. The
 -- token functions run on the PUBLIC accept path (no session) via the base
 -- connection role (which executes them as their OWNER, so the revokes below cannot
@@ -318,7 +325,10 @@ revoke execute on function public.app_delivery_comment_by_token(text, uuid, text
 -- treatment and the same reasons: the choice takes caller-supplied
 -- p_name/p_ip/p_ua written into the append-only ledger, and the notifier writes
 -- notification rows for every member of the delivery's org, so a direct RPC
--- with the anon key would be a way to spam a studio.
+-- with the anon key would be a way to spam a studio. 50-delivery-write.sql
+-- already applies the same revokes and grant right after each CREATE, in the
+-- same transaction, so there is no window while apply-rls runs; they are
+-- repeated here so this file stays the complete privilege model.
 grant execute on function public.app_delivery_choose_concept_by_token(text, uuid, text, text, text, text) to metra_app;
 revoke execute on function public.app_delivery_choose_concept_by_token(text, uuid, text, text, text, text) from public;
 grant execute on function public.app_delivery_notify_studio_by_token(text, text, jsonb, jsonb) to metra_app;

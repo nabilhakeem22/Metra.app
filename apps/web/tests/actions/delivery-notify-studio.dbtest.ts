@@ -122,7 +122,7 @@ describe('notify studio: recipients by role, in the delivery org only', () => {
     const rows = await notificationsOf(studio.orgId);
     expect(recipientsOf(rows)).toEqual(expected);
     const [identity] = await raw.query<{ number: number; year: number }>(
-      `select number, extract(year from created_at at time zone 'UTC')::int as year
+      `select number, extract(year from created_at at time zone 'Africa/Cairo')::int as year
          from public.design_engagements where id = '${studio.engagementId}'`,
     );
     for (const row of rows) {
@@ -308,6 +308,56 @@ describe('notify studio: malformed input and dead links answer null, write nothi
     expect((await notify(studio.hash, 'client_commented', '["owner"]', null))!.notified_count).toBe(
       1,
     );
+  });
+
+  it('accepts only the nine client-act keys (S3)', async () => {
+    const studio = await seedStudio('notify-allowlist');
+    // Well-formed client_* keys that are NOT one of the nine: refused.
+    for (const key of ['client_ok', 'client_hello', 'client_concept_approvedx']) {
+      expect(await notify(studio.hash, key, '["owner"]')).toBeNull();
+    }
+    expect(await notificationsOf(studio.orgId)).toEqual([]);
+    const allowed = [
+      'client_concept_approved',
+      'client_concept_chosen',
+      'client_concept_changes_requested',
+      'client_design_approved',
+      'client_design_changes_requested',
+      'client_budget_acknowledged',
+      'client_handover_acknowledged',
+      'client_payment_claimed',
+      'client_commented',
+    ];
+    for (const key of allowed) {
+      expect((await notify(studio.hash, key, '["owner"]'))!.notified_count).toBe(1);
+    }
+    const rows = await notificationsOf(studio.orgId);
+    expect(rows.map((row) => row.body_key).sort()).toEqual([...allowed].sort());
+  });
+
+  it('refuses params over 2048 bytes and treats JSON null as no params (S3, F5)', async () => {
+    const studio = await seedStudio('notify-params-size');
+    const oversized = JSON.stringify({ note: 'x'.repeat(2100) });
+    expect(await notify(studio.hash, 'client_commented', '["owner"]', oversized)).toBeNull();
+    expect(await notificationsOf(studio.orgId)).toEqual([]);
+
+    // JSON.stringify(null) is what a TS caller sends for "no params".
+    const result = await notify(studio.hash, 'client_commented', '["owner"]', 'null');
+    expect(result!.notified_count).toBe(1);
+    const [row] = await notificationsOf(studio.orgId);
+    expect(Object.keys(row.params).sort()).toEqual(['count', 'number', 'titleAr', 'titleEn', 'year']);
+  });
+
+  it("dates the DE number in the studio's local year (Africa/Cairo, L2)", async () => {
+    const studio = await seedStudio('notify-year');
+    // 23:30 UTC on 31 December is 01:30 on 1 January in Cairo.
+    await raw.query(
+      `update public.design_engagements set created_at = '2026-12-31T23:30:00Z'
+        where id = '${studio.engagementId}'`,
+    );
+    await notify(studio.hash, 'client_commented', '["owner"]');
+    const [row] = await notificationsOf(studio.orgId);
+    expect(row.params.year).toBe(2027);
   });
 
   it('answers null for an unknown, expired or revoked link', async () => {

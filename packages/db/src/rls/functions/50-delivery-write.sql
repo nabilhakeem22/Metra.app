@@ -127,9 +127,19 @@ begin
   -- ROM/handoff acks are per-kind. This pre-check + the partial UNIQUE index
   -- (0033, keyed on the decision group) make a concurrent double-click land
   -- exactly one row.
+  --
+  -- Round B: only a LIVE client event repeats. One the studio retracted (an
+  -- event_correction points at it) answers nothing, exactly as liveEvents()
+  -- drops it in the studio's TS rule. A retracted row can still hold the unique
+  -- slot this insert would take; the insert then hits unique_violation and
+  -- answers `already`, and app_delivery_by_token does not offer that verb.
   if exists (
     select 1 from public.engagement_events ee
     where ee.engagement_id = eid and ee.actor_channel = 'client'
+      and not exists (
+        select 1 from public.engagement_events c
+        where c.org_id = ee.org_id and c.supersedes_event_id = ee.id
+      )
       and case
         when v_kind in ('concept_approval', 'concept_change_request')
           then ee.kind in ('concept_approval', 'concept_change_request')
@@ -299,18 +309,28 @@ $$;
 -- state, adds no guard and touches no money. The studio still advances.
 --
 -- It is the respond function's `approve_concept` with a pointer, so it shares
--- that verb's decision group: ONE client concept decision per delivery. A prior
--- client approval OR change request answers `already`, and so does a concurrent
--- double submit (the row lock below serialises the pre-check, and the 0049
--- partial unique index on (engagement_id, kind) for unstamped client rows is
--- the backstop).
+-- that verb's decision group: ONE live client concept decision per delivery.
+-- A live (not retracted) client approval or change request answers `already`,
+-- and so does a retracted client concept approval, because it still holds the
+-- write's slot in the 0049 unique index on (engagement_id, kind) for unstamped
+-- client rows (app_delivery_by_token stops offering the verb for the same
+-- reason). That check runs BEFORE the option is looked at, so a stale double
+-- submit answers `already` even after the studio hid the option. The row lock
+-- serialises the check and the insert; the unique index is the backstop.
 --
--- The artifact must be an OPTION THE CLIENT CAN SEE on THIS delivery: same
--- engagement, same org, kind `concept_option`, released (`client_visible`), and
--- carrying a file. Anything else (another delivery's artifact, a render, a
--- hidden option, a forged uuid) answers `wrong_state`, never a different code,
--- so the function is no oracle for which artifact ids exist. Codes:
---   ok | already | expired | not_active | wrong_state | invalid
+-- THE OPTION must be one the client can see on THIS delivery: same engagement,
+-- same org, kind `concept_option`, released (`client_visible`), carrying a
+-- file, and at a position of 1 to 4. Positions rank EVERY concept option the
+-- delivery ever recorded by (attested_at, id), visible or not, so hiding one
+-- never renumbers another (app_delivery_by_token returns the same position).
+-- Anything else (another delivery's artifact, a render, a hidden option, a
+-- forged uuid) answers `wrong_state`, never a different code, so the function
+-- is no oracle for which artifact ids exist.
+--
+-- THE CALLER'S name/ip/ua are capped exactly like app_delivery_comment_by_token
+-- (120 / 45 / 512): this function is the trust boundary for what reaches the
+-- append-only ledger. Codes: ok | already | expired | not_active | wrong_state |
+-- invalid
 create or replace function public.app_delivery_choose_concept_by_token(
   p_hash text,
   p_artifact_id uuid,
@@ -345,25 +365,39 @@ begin
   end if;
   if st <> 'concept_review' then return 'wrong_state'; end if;
 
-  if not exists (
-    select 1
-      from public.engagement_artifacts a
-      join public.files f on f.id = a.file_id and f.org_id = a.org_id
-     where a.id = p_artifact_id
-       and a.engagement_id = eid
-       and a.org_id = oid
-       and a.kind = 'concept_option'
-       and a.client_visible
-  ) then
-    return 'wrong_state';
-  end if;
-
   if exists (
     select 1 from public.engagement_events ee
     where ee.engagement_id = eid and ee.actor_channel = 'client'
       and ee.kind in ('concept_approval', 'concept_change_request')
+      and (
+        -- the slot this insert would take (retracted or not)
+        (ee.kind = 'concept_approval' and ee.acknowledged_issue_at is null)
+        -- or any LIVE decision: nothing retracts it (liveEvents() in TS)
+        or not exists (
+          select 1 from public.engagement_events c
+          where c.org_id = ee.org_id and c.supersedes_event_id = ee.id
+        )
+      )
   ) then
     return 'already';
+  end if;
+
+  if not exists (
+    select 1
+      from (
+        select a.id, a.org_id, a.file_id, a.client_visible,
+               row_number() over (order by a.attested_at, a.id) as option_position
+          from public.engagement_artifacts a
+         where a.engagement_id = eid
+           and a.org_id = oid
+           and a.kind = 'concept_option'
+      ) opt
+      join public.files f on f.id = opt.file_id and f.org_id = opt.org_id
+     where opt.id = p_artifact_id
+       and opt.client_visible
+       and opt.option_position <= 4
+  ) then
+    return 'wrong_state';
   end if;
 
   begin
@@ -371,8 +405,11 @@ begin
       (id, org_id, engagement_id, kind, actor_channel, actor_name, actor_ip,
        actor_user_agent, note, chosen_artifact_id)
       values (
-        gen_random_uuid(), oid, eid, 'concept_approval', 'client', p_name, p_ip,
-        p_ua, left(p_note, 2000), p_artifact_id
+        gen_random_uuid(), oid, eid, 'concept_approval', 'client',
+        nullif(left(btrim(coalesce(p_name, '')), 120), ''),
+        nullif(left(coalesce(p_ip, ''), 45), ''),
+        nullif(left(coalesce(p_ua, ''), 512), ''),
+        left(p_note, 2000), p_artifact_id
       );
   exception when unique_violation then
     return 'already';
@@ -383,18 +420,54 @@ begin
 end
 $$;
 
+-- Closed in the SAME implicit transaction as the CREATE above. A new function
+-- is executable by PUBLIC (and, on Supabase, by the API roles through default
+-- privileges) from the moment it exists; roles.sql revokes that too, but it
+-- runs three files later, in its own transaction. This leaves no window. The
+-- metra_app grant is guarded because on a fresh database roles.sql, which
+-- creates that role, has not run yet.
+revoke all on function public.app_delivery_choose_concept_by_token(text, uuid, text, text, text, text) from public;
+do $$
+declare
+  r text;
+begin
+  foreach r in array array['anon', 'authenticated', 'service_role'] loop
+    if exists (select 1 from pg_roles where rolname = r) then
+      execute format(
+        'revoke all on function public.app_delivery_choose_concept_by_token(text, uuid, text, text, text, text) from %I',
+        r
+      );
+    end if;
+  end loop;
+  if exists (select 1 from pg_roles where rolname = 'metra_app') then
+    grant execute on function public.app_delivery_choose_concept_by_token(text, uuid, text, text, text, text) to metra_app;
+  end if;
+end
+$$;
+
 -- Round B (0056) — tell the STUDIO that the client just acted, by share token.
--- Called by the portal action AFTER one of the write functions above answered
--- `ok`. SECURITY DEFINER because the client has no session, and because the
+-- SECURITY DEFINER because the client has no session, and because the
 -- notifications SELECT policy is recipient-scoped: collapsing a repeat into
 -- another member's unread row is impossible from the app's own role.
 --
--- p_body_key  the notification's message key; must match ^client_[a-z_]{1,60}$.
--- p_params    a JSON object merged UNDER the delivery's own number, year and
---             titles (which always win), or null.
+-- p_body_key  one of the NINE client-act keys listed in v_allowed below (the
+--             message keys PR-B7 renders); anything else answers null.
+-- p_params    a JSON object of at most 2048 bytes, merged UNDER the delivery's
+--             own number, year and titles (which always win). SQL NULL and JSON
+--             `null` both mean "no extra params".
 -- p_roles     a JSON array of member_role labels. The app computes it from the
 --             permission matrix at call time; nothing here hard-codes who
 --             hears about what. The `client` role is never notified.
+--
+-- THE CALLER CONTRACT (PR-B10). This function trusts its caller for WHAT
+-- happened, so the caller must:
+--   * build the key, the role list and the params from a SERVER-SIDE map keyed
+--     on the act it just performed, never from request input;
+--   * call it only AFTER the client's write function returned `ok` (never on
+--     `already` or a refusal);
+--   * never return `new_recipients` or `locale` to the portal (they are the
+--     studio's member ids and setting); the portal learns only whether
+--     notified_count > 0.
 --
 -- DEDUPE: ONE UNREAD notification per (recipient, delivery, body key). A repeat
 -- while that row is unread bumps `params.count` and moves `created_at` to now
@@ -403,8 +476,12 @@ $$;
 -- advisory lock per (recipient, delivery, body key) makes two concurrent acts
 -- land one row with count 2, not two rows.
 --
--- RETURNS null when the key or the role list is malformed, when p_params is not
--- an object, or when no LIVE link matches (the same share_expires_at rule as
+-- THE YEAR in the params is the delivery's creation year in Africa/Cairo, the
+-- studio's local time, which is the year the app's DE-YYYY-NNNN shows its users
+-- (docYear() formats in the browser's local time).
+--
+-- RETURNS null when the key, the role list or the params are malformed or too
+-- large, or when no LIVE link matches (the same share_expires_at rule as
 -- app_delivery_by_token). Otherwise:
 --   { engagement_id, locale (the studio's default_locale), notified_count (rows
 --     inserted or bumped), new_recipients (user ids that got a NEW row, the only
@@ -423,6 +500,18 @@ security definer
 set search_path = ''
 as $$
 declare
+  v_allowed constant text[] := array[
+    'client_concept_approved',
+    'client_concept_chosen',
+    'client_concept_changes_requested',
+    'client_design_approved',
+    'client_design_changes_requested',
+    'client_budget_acknowledged',
+    'client_handover_acknowledged',
+    'client_payment_claimed',
+    'client_commented'
+  ];
+  v_params          jsonb;
   v_engagement_id   uuid;
   v_org_id          uuid;
   v_locale          text;
@@ -434,20 +523,23 @@ declare
   v_notified        integer := 0;
   v_new_recipients  jsonb := '[]'::jsonb;
 begin
-  if p_body_key is null or p_body_key !~ '^client_[a-z_]{1,60}$' then
+  if p_body_key is null or not (p_body_key = any (v_allowed)) then
     return null;
   end if;
   if p_roles is null or jsonb_typeof(p_roles) <> 'array' then return null; end if;
-  if p_params is not null and jsonb_typeof(p_params) <> 'object' then
+  if p_params is null or jsonb_typeof(p_params) = 'null' then
+    v_params := '{}'::jsonb;
+  elsif jsonb_typeof(p_params) <> 'object' or octet_length(p_params::text) > 2048 then
     return null;
+  else
+    v_params := p_params;
   end if;
 
   -- The delivery's own identity always overrides a same-named caller param.
-  -- The year is read in UTC, the clock the Worker formats DE numbers with.
   select de.id, de.org_id, o.default_locale,
-         coalesce(p_params, '{}'::jsonb) || jsonb_build_object(
+         v_params || jsonb_build_object(
            'number', de.number,
-           'year', extract(year from de.created_at at time zone 'UTC')::int,
+           'year', extract(year from de.created_at at time zone 'Africa/Cairo')::int,
            'titleAr', de.title_ar,
            'titleEn', de.title_en
          )
@@ -517,5 +609,50 @@ begin
     'notified_count', v_notified,
     'new_recipients', v_new_recipients
   );
+end
+$$;
+
+-- Same-transaction lockdown as the choice function above, for the same reason.
+revoke all on function public.app_delivery_notify_studio_by_token(text, text, jsonb, jsonb) from public;
+do $$
+declare
+  r text;
+begin
+  foreach r in array array['anon', 'authenticated', 'service_role'] loop
+    if exists (select 1 from pg_roles where rolname = r) then
+      execute format(
+        'revoke all on function public.app_delivery_notify_studio_by_token(text, text, jsonb, jsonb) from %I',
+        r
+      );
+    end if;
+  end loop;
+  if exists (select 1 from pg_roles where rolname = 'metra_app') then
+    grant execute on function public.app_delivery_notify_studio_by_token(text, text, jsonb, jsonb) to metra_app;
+  end if;
+end
+$$;
+
+-- Round B (0056) — a share link's nonce never outlives its hash. The trigger
+-- (policies/40-engagements.sql, trg_design_engagements_token_nonce) runs this
+-- BEFORE every UPDATE of design_engagements: when token_hash changes (to a new
+-- link or to NULL) and the statement did not set token_nonce itself, the old
+-- nonce is cleared. So code that has never heard of the nonce (a build from
+-- before Round B, a Worker rolled back past it, a hand-written fix) can rotate
+-- or revoke without tripping design_engagements_token_nonce_needs_hash, and a
+-- rotated link is never left paired with the nonce of the link it replaced.
+-- A writer that sets the nonce in the same statement (the Round B mint and
+-- rotate) keeps the value it wrote. Invoker rights, empty search_path: it only
+-- edits the row being written.
+create or replace function public.clear_token_nonce_on_hash_change()
+returns trigger
+language plpgsql
+set search_path = ''
+as $$
+begin
+  if NEW.token_hash is distinct from OLD.token_hash
+     and NEW.token_nonce is not distinct from OLD.token_nonce then
+    NEW.token_nonce := null;
+  end if;
+  return NEW;
 end
 $$;

@@ -25,6 +25,17 @@ create policy org_isolation on public.design_engagements
     and public.app_is_current_org_member()
   );
 
+-- Round B (0056): a share link's nonce never outlives its hash. Any UPDATE that
+-- changes token_hash without setting token_nonce clears the old nonce (see
+-- clear_token_nonce_on_hash_change in functions/50-delivery-write.sql), so a
+-- writer that predates the column, a rolled-back Worker included, can rotate
+-- or revoke a link without tripping design_engagements_token_nonce_needs_hash.
+drop trigger if exists trg_design_engagements_token_nonce on public.design_engagements;
+create trigger trg_design_engagements_token_nonce
+  before update on public.design_engagements
+  for each row
+  execute function public.clear_token_nonce_on_hash_change();
+
 -- engagement_transitions (append-only via grants; org-isolated + membership-gated)
 alter table public.engagement_transitions enable row level security;
 alter table public.engagement_transitions force  row level security;

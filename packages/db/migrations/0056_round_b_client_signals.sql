@@ -36,15 +36,24 @@
 -- DOUBLE-QUOTED so Postgres keeps them (0053's header: unquoted camelCase folds
 -- to lower case and `migration-catalogue.test.ts` goes red).
 --
--- LOCKS. Each ADD COLUMN is metadata-only (nullable, no default). The
--- design_engagements CHECK scans that table under ACCESS EXCLUSIVE (one row per
--- delivery). On engagement_events the FK validates an all-NULL column (no
--- lookups), the CHECK scans the ledger, and the index build holds SHARE (writes
--- wait, reads continue) for one pass over it. The ledger is small (tens of rows
--- per delivery), so the whole file is well inside the migrator's 3 s
--- lock_timeout, which each block re-asserts so a long reader makes it fail fast
--- with 55P03 instead of queueing every writer behind it. Re-runnable: every
--- statement is IF NOT EXISTS or guarded by pg_constraint.
+-- LOCKS. Each ADD COLUMN is metadata-only (nullable, no default) but takes
+-- ACCESS EXCLUSIVE on its table, and `db:migrate` runs the batch as ONE
+-- transaction, so BOTH design_engagements and engagement_events are closed to
+-- reads and writes until the batch commits. Inside that window: the
+-- design_engagements CHECK scans that table (one row per delivery); on
+-- engagement_events the FK validates an all-NULL column (no lookups) and also
+-- takes SHARE ROW EXCLUSIVE on engagement_artifacts (writes to artifacts wait,
+-- reads continue), the CHECK scans the ledger, and the index build makes one
+-- pass over it. The tables are small (tens of ledger rows per delivery), so the
+-- whole file is well inside the migrator's 3 s lock_timeout, which each block
+-- re-asserts so a long reader makes it fail fast with 55P03 instead of queueing
+-- every writer behind it. Re-runnable: every statement is IF NOT EXISTS or
+-- guarded by pg_constraint.
+--
+-- THE TRIGGER that clears a stale token_nonce whenever token_hash changes
+-- (trg_design_engagements_token_nonce) is NOT here: triggers live with their
+-- table's policies in rls/policies/40-engagements.sql and are applied by
+-- `db:apply-rls`. Until it runs, no row has a nonce, so the CHECK cannot trip.
 DO $$
 BEGIN
   PERFORM set_config('lock_timeout', '3s', true);

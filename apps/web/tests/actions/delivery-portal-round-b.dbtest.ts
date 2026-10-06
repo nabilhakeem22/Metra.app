@@ -3,7 +3,7 @@ import { afterAll, describe, expect, it } from 'vitest';
 import { executeTransition } from '@/lib/engagements/executor';
 import { claimPaymentByToken, recordDeliveryActionByToken } from '@/lib/engagements/public';
 import { addDeliveryCommentByToken } from '@/lib/engagements/public-comments';
-import { revokeDeliveryLinkCore } from '@/lib/engagements/share';
+import { revokeDeliveryLinkCore, rotateDeliveryLinkCore } from '@/lib/engagements/share';
 import { deliveryOrNull } from './delivery-read';
 import { closeFixture, raw, teardown } from './fixture';
 import {
@@ -24,7 +24,10 @@ import {
 //   * a client DESIGN decision answers ONE render issuance (AC 30, 31);
 //   * every `ok` client act refreshes the delivery's updated_at, an `already`
 //     does not (AC 32);
-//   * the client can choose ONE visible concept option (AC 33);
+//   * the client can choose ONE visible concept option (AC 33), at a STABLE
+//     position 1..4, with the caller's name/ip/ua capped (F4, L3, S2);
+//   * a decision the studio retracted answers nothing, read and write alike (L1);
+//   * a nonce never outlives its hash, whatever code writes the row (S4);
 //   * 0056's constraints exist and bite, and the functions the deployed app
 //     calls kept their signatures (AC 35 + backward compatibility).
 
@@ -400,6 +403,177 @@ describe('the client chooses ONE concept option (AC 33)', () => {
   });
 });
 
+/** Retract an event the way the studio's correction path does: a new row pointing at it. */
+async function retract(orgId: string, engagementId: string, eventId: string): Promise<void> {
+  await raw.query(
+    `insert into public.engagement_events (org_id, engagement_id, kind, supersedes_event_id)
+     values ('${orgId}', '${engagementId}', 'event_correction', '${eventId}')`,
+  );
+}
+
+async function latestClientEventId(engagementId: string, kind: string): Promise<string> {
+  const [row] = await raw.query<{ id: string }>(
+    `select id from public.engagement_events
+      where engagement_id = '${engagementId}' and actor_channel = 'client' and kind = '${kind}'
+      order by decided_at desc limit 1`,
+  );
+  return row.id;
+}
+
+/** Pin an artifact's attestation instant, so positions are deterministic. */
+async function attestAt(artifactId: string, instant: string): Promise<void> {
+  await raw.query(
+    `update public.engagement_artifacts set attested_at = '${instant}' where id = '${artifactId}'`,
+  );
+}
+
+describe('concept option positions are STABLE and capped at 4 (F4, L3)', () => {
+  it('ranks every option ever recorded, so hiding one never renumbers another', async () => {
+    const d = await seedRoundBDelivery(orgIds, 'stable-positions');
+    await forceState(d.engagementId, 'concept_review');
+    const first = await seedArtifact(d, 'concept_option');
+    const second = await seedArtifact(d, 'concept_option');
+    const third = await seedArtifact(d, 'concept_option');
+    await attestAt(first, '2026-01-01T00:00:00Z');
+    await attestAt(second, '2026-01-02T00:00:00Z');
+    await attestAt(third, '2026-01-03T00:00:00Z');
+
+    expect(await chooseConcept(d.hash, third)).toBe('ok');
+    // The studio hides option 1 and then the chosen option itself.
+    await raw.query(
+      `update public.engagement_artifacts set client_visible = false
+        where id in ('${first}', '${third}')`,
+    );
+    const snapshot = await snapshotOf(d.hash);
+    expect(snapshot!.concept_options).toEqual([{ id: second, position: 2 }]);
+    // The choice still resolves to the letter the client saw (C).
+    expect(snapshot!.concept_choice_id).toBe(third);
+    expect(snapshot!.concept_choice_position).toBe(3);
+    // A stale double submit answers `already` before the option is looked at.
+    expect(await chooseConcept(d.hash, third)).toBe('already');
+  });
+
+  it('never lists or accepts a position above 4', async () => {
+    const d = await seedRoundBDelivery(orgIds, 'position-cap');
+    await forceState(d.engagementId, 'concept_review');
+    const options: string[] = [];
+    for (let index = 0; index < 4; index += 1) {
+      options.push(await seedArtifact(d, 'concept_option'));
+    }
+    // The app stops at 4 (CONCEPT_OPTION_MAX); a fifth row can still exist in
+    // the table, written outside the app, and must never become choosable.
+    const [fifth] = await raw.query<{ id: string }>(
+      `insert into public.engagement_artifacts
+         (org_id, engagement_id, kind, attested_by, file_id, client_visible, attested_at)
+       select org_id, engagement_id, kind, attested_by, file_id, true, now() + interval '1 day'
+         from public.engagement_artifacts where id = '${options[0]}'
+       returning id`,
+    );
+    const snapshot = await snapshotOf(d.hash);
+    expect((snapshot!.concept_options as Array<{ position: number }>).map((o) => o.position)).toEqual([
+      1, 2, 3, 4,
+    ]);
+    expect(await chooseConcept(d.hash, fifth.id)).toBe('wrong_state');
+    expect(await conceptApprovals(d.engagementId)).toEqual([]);
+  });
+});
+
+describe('the choice caps what the client sends, like the comment function (S2)', () => {
+  it('stores at most 120 / 45 / 512 characters of name / ip / user agent, trimmed', async () => {
+    const d = await seedRoundBDelivery(orgIds, 'choose-caps');
+    await forceState(d.engagementId, 'concept_review');
+    const option = await seedArtifact(d, 'concept_option');
+    const [result] = await raw.query<{ code: string }>(
+      `select public.app_delivery_choose_concept_by_token(
+         '${d.hash}', '${option}'::uuid, null,
+         '   ${'n'.repeat(300)}', '${'i'.repeat(100)}', '${'u'.repeat(900)}'
+       ) as code`,
+    );
+    expect(result.code).toBe('ok');
+    const [row] = await raw.query<{ name: number; ip: number; agent: number }>(
+      `select length(actor_name) as name, length(actor_ip) as ip, length(actor_user_agent) as agent
+         from public.engagement_events where engagement_id = '${d.engagementId}'`,
+    );
+    expect(row).toEqual({ name: 120, ip: 45, agent: 512 });
+
+    const blank = await seedRoundBDelivery(orgIds, 'choose-caps-blank');
+    await forceState(blank.engagementId, 'concept_review');
+    const blankOption = await seedArtifact(blank, 'concept_option');
+    await raw.query(
+      `select public.app_delivery_choose_concept_by_token(
+         '${blank.hash}', '${blankOption}'::uuid, null, '   ', '', '') as code`,
+    );
+    const [empty] = await raw.query<{ name: string | null; ip: string | null; agent: string | null }>(
+      `select actor_name as name, actor_ip as ip, actor_user_agent as agent
+         from public.engagement_events where engagement_id = '${blank.engagementId}'`,
+    );
+    expect(empty).toEqual({ name: null, ip: null, agent: null });
+  });
+});
+
+describe('a retracted client decision answers nothing, as liveEvents() in TS (L1)', () => {
+  it('design: the retracted verb stays closed (its slot is taken), the other re-opens', async () => {
+    const d = await seedRoundBDelivery(orgIds, 'retract-design');
+    await forceState(d.engagementId, 'final_approval');
+    await stampRenders(d.engagementId, `now() - interval '1 hour'`);
+    expect(
+      await recordDeliveryActionByToken(d.token, { action: 'request_design_changes' }),
+    ).toEqual({ ok: true });
+    await retract(
+      d.orgId,
+      d.engagementId,
+      await latestClientEventId(d.engagementId, 'design_change_request'),
+    );
+
+    expect(await clientActionsOf(d.hash)).toEqual(['approve_design']);
+    // Read and write agree on the closed verb...
+    expect(
+      await recordDeliveryActionByToken(d.token, { action: 'request_design_changes' }),
+    ).toEqual({ ok: true, code: 'already' });
+    // ...and on the open one.
+    expect(await recordDeliveryActionByToken(d.token, { action: 'approve_design' })).toEqual({
+      ok: true,
+    });
+    expect(await clientActionsOf(d.hash)).toEqual([]);
+  });
+
+  it('a retracted legacy design decision no longer closes the round', async () => {
+    const d = await seedRoundBDelivery(orgIds, 'retract-legacy');
+    await forceState(d.engagementId, 'final_approval');
+    await stampRenders(d.engagementId, `now() - interval '1 day'`);
+    await insertLegacyDesignDecision(d.orgId, d.engagementId, `now() - interval '1 hour'`);
+    expect(await clientActionsOf(d.hash)).toEqual([]);
+    await retract(d.orgId, d.engagementId, await latestClientEventId(d.engagementId, 'design_approval'));
+
+    expect(await clientActionsOf(d.hash)).toEqual(['approve_design', 'request_design_changes']);
+    expect(await recordDeliveryActionByToken(d.token, { action: 'approve_design' })).toEqual({
+      ok: true,
+    });
+  });
+
+  it('concept: a retracted choice is no longer the choice, and changes can be asked', async () => {
+    const d = await seedRoundBDelivery(orgIds, 'retract-concept');
+    await forceState(d.engagementId, 'concept_review');
+    const option = await seedArtifact(d, 'concept_option');
+    expect(await chooseConcept(d.hash, option)).toBe('ok');
+    await retract(d.orgId, d.engagementId, await latestClientEventId(d.engagementId, 'concept_approval'));
+
+    const snapshot = await snapshotOf(d.hash);
+    expect(snapshot!.concept_choice_id).toBeNull();
+    expect(snapshot!.concept_choice_position).toBeNull();
+    expect(snapshot!.client_actions).toEqual(['request_concept_changes']);
+    // The approval slot is still taken by the retracted row: both writes agree.
+    expect(await chooseConcept(d.hash, option)).toBe('already');
+    expect(await recordDeliveryActionByToken(d.token, { action: 'approve_concept' })).toEqual({
+      ok: true,
+      code: 'already',
+    });
+    expect(
+      await recordDeliveryActionByToken(d.token, { action: 'request_concept_changes' }),
+    ).toEqual({ ok: true });
+  });
+});
+
 describe('0056 constraints exist and bite (AC 33, 35)', () => {
   it('creates the three named constraints, the index and both columns', async () => {
     const [constraints] = await raw.query<{ n: number }>(
@@ -461,26 +635,97 @@ describe('0056 constraints exist and bite (AC 33, 35)', () => {
     expect(sqlstateOf(failure)).toBe('23503');
   });
 
-  it('refuses a nonce without a hash (23514), and revoke clears both', async () => {
+  it('refuses a statement that sets a nonce with no hash (23514)', async () => {
     const d = await seedRoundBDelivery(orgIds, 'nonce-check');
-    await raw.query(
-      `update public.design_engagements set token_nonce = 'nonce-value'
-        where id = '${d.engagementId}'`,
-    );
     const failure = await raw
       .query(
-        `update public.design_engagements set token_hash = null where id = '${d.engagementId}'`,
+        `update public.design_engagements set token_hash = null, token_nonce = 'nonce-value'
+          where id = '${d.engagementId}'`,
       )
       .catch((error: unknown) => error);
     expect(sqlstateOf(failure)).toBe('23514');
 
     // The app's revoke (through RLS, as metra_app) clears both in one write.
     expect((await revokeDeliveryLinkCore(d.ctx, d.engagementId)).ok).toBe(true);
-    const [row] = await raw.query<{ token_hash: string | null; token_nonce: string | null }>(
-      `select token_hash, token_nonce from public.design_engagements
+    expect(await linkColumns(d.engagementId)).toEqual({ token_hash: null, token_nonce: null });
+  });
+});
+
+async function linkColumns(engagementId: string) {
+  const [row] = await raw.query<{ token_hash: string | null; token_nonce: string | null }>(
+    `select token_hash, token_nonce from public.design_engagements where id = '${engagementId}'`,
+  );
+  return row;
+}
+
+describe('a nonce never outlives its hash (trg_design_engagements_token_nonce, S4)', () => {
+  // The statements below are exactly what main (pre-Round-B) and any Worker
+  // rolled back past this batch send: they change token_hash and never name
+  // token_nonce. Without the trigger the revoke would fail the CHECK with 23514
+  // once a nonce exists, and the rotate would pair the new hash with the old
+  // link's nonce.
+  it('the pre-Round-B revoke clears the nonce instead of failing', async () => {
+    const d = await seedRoundBDelivery(orgIds, 'trigger-revoke');
+    await raw.query(
+      `update public.design_engagements set token_nonce = 'n1' where id = '${d.engagementId}'`,
+    );
+    await raw.query(
+      `update public.design_engagements set token_hash = null, share_expires_at = null,
+              updated_at = now()
         where id = '${d.engagementId}'`,
     );
-    expect(row).toEqual({ token_hash: null, token_nonce: null });
+    expect(await linkColumns(d.engagementId)).toEqual({ token_hash: null, token_nonce: null });
+  });
+
+  it('the pre-Round-B rotate drops the old nonce; a writer that sets one keeps it', async () => {
+    const d = await seedRoundBDelivery(orgIds, 'trigger-rotate');
+    await raw.query(
+      `update public.design_engagements set token_nonce = 'n1' where id = '${d.engagementId}'`,
+    );
+    await raw.query(
+      `update public.design_engagements set token_hash = 'rotated-hash-1'
+        where id = '${d.engagementId}'`,
+    );
+    expect(await linkColumns(d.engagementId)).toEqual({
+      token_hash: 'rotated-hash-1',
+      token_nonce: null,
+    });
+
+    // The Round B mint/rotate writes both in one statement: the nonce stays.
+    await raw.query(
+      `update public.design_engagements set token_hash = 'rotated-hash-2', token_nonce = 'n2'
+        where id = '${d.engagementId}'`,
+    );
+    // An update that does not touch the hash leaves the nonce alone.
+    await raw.query(
+      `update public.design_engagements set updated_at = now() where id = '${d.engagementId}'`,
+    );
+    expect(await linkColumns(d.engagementId)).toEqual({
+      token_hash: 'rotated-hash-2',
+      token_nonce: 'n2',
+    });
+  });
+
+  it('the app rotate (as metra_app, through RLS) also drops a stale nonce', async () => {
+    const d = await seedRoundBDelivery(orgIds, 'trigger-app-rotate');
+    await raw.query(
+      `update public.design_engagements set token_nonce = 'n1' where id = '${d.engagementId}'`,
+    );
+    expect((await rotateDeliveryLinkCore(d.ctx, d.engagementId)).ok).toBe(true);
+    const row = await linkColumns(d.engagementId);
+    expect(row.token_hash).not.toBe(d.hash);
+    expect(row.token_nonce).toBeNull();
+  });
+
+  it('exists as a BEFORE UPDATE row trigger on design_engagements', async () => {
+    const rows = await raw.query<{ timing_before: boolean; for_row: boolean; on_update: boolean }>(
+      `select (t.tgtype & 2) <> 0 as timing_before, (t.tgtype & 1) <> 0 as for_row,
+              (t.tgtype & 16) <> 0 as on_update
+         from pg_trigger t join pg_class c on c.oid = t.tgrelid
+        where c.relname = 'design_engagements'
+          and t.tgname = 'trg_design_engagements_token_nonce' and not t.tgisinternal`,
+    );
+    expect(rows).toEqual([{ timing_before: true, for_row: true, on_update: true }]);
   });
 });
 

@@ -100,9 +100,9 @@ live there, never in a migration).
 `pg_class`, `pg_policies`, `pg_trigger`, `pg_proc` and `pg_roles` on the same
 connection and exits **1** listing anything the manifest declares that the
 database does not have: every schema table RLS-enabled **and** forced, all 46
-policies, all 12 triggers, all 34 functions, and `metra_app` present and neither
+policies, all 13 triggers, all 35 functions, and `metra_app` present and neither
 LOGIN nor BYPASSRLS. A green run ends with `apply-rls: verified in the
-catalogues — 46 tables, 46 policies, 12 triggers, 34 functions, ...`. Before
+catalogues — 46 tables, 46 policies, 13 triggers, 35 functions, ...`. Before
 this, the only post-condition was that no statement threw — which says a file
 RAN, not that its objects exist. Indexes and constraints are deliberately **not**
 checked here: they carry the 0017 case-fold drift and would be red on every
@@ -430,18 +430,30 @@ and code deployed before it never sends one.
 ### 0056 and the Round B database step (PR-B9): owner runbook
 
 PR-B9 is a database batch: migration `0056_round_b_client_signals.sql` plus
-changed and new functions under `rls/`. **Run it against production BEFORE
-PR-B9 is merged**, then merge, then let PR-B10 to PR-B12 merge. The order is
-not a preference:
+changed and new functions and one trigger under `rls/`.
 
-- **Merged first = an outage.** PR-B9's drizzle schema names the two new
-  columns, and Drizzle full-row selects list every column, so code deployed
-  before the migration fails with 42703 on every engagement read (the same
-  failure as *Deploying before migrating* above).
-- **Applied first = safe.** The live code never names the new columns, and
-  every function it calls keeps its exact argument list and return type
-  (pinned by `delivery-portal-round-b.dbtest.ts`). The live portal simply gains
-  two behaviours early, listed under *What you will notice* below.
+**THE ORDER (do not change it):**
+
+1. **You run PR-B9's database step on production FIRST** (steps 1 to 5 below):
+   `db:migrate`, then `db:apply-rls`, then the checks.
+2. **Only then** do `validate/round-b-w1` (Wave 1, which contains B3) and
+   `validate/round-b-db` (PR-B9) merge, in that order or together.
+3. PR-B10 to PR-B12 merge after that.
+
+Why, one sentence each:
+
+- **Wave 1 before the database step strands deliveries:** B3's studio card
+  treats a client design decision from an EARLIER render round as not
+  answering the current one, while the portal's pre-B9 SQL still counts it,
+  so the card says "Waiting for the client" and the client has no button
+  (only "Client approved offline" gets the delivery out).
+- **PR-B9's code before the migration is an outage:** its drizzle schema names
+  the two new columns and Drizzle full-row selects list every column, so every
+  engagement read fails with 42703 (*Deploying before migrating* above).
+- **The database step before any of that code is safe:** the live code never
+  names the new columns, and every function it calls keeps its exact argument
+  list and return type (pinned by `delivery-portal-round-b.dbtest.ts`); the live
+  portal only gains the behaviours listed under *What you will notice*.
 
 **What it changes.** Additive only; no row is updated or backfilled.
 
@@ -453,12 +465,13 @@ not a preference:
 | `engagement_events_chosenArtifact_same_org_fk` | FK `(org_id, chosen_artifact_id)` to `engagement_artifacts (org_id, id)`, ON DELETE NO ACTION |
 | `engagement_events_chosen_artifact_only_concept` | CHECK `chosen_artifact_id IS NULL OR kind::text = 'concept_approval'` |
 | `engagement_events_chosenArtifact_idx` | index on `(org_id, chosen_artifact_id)` |
-| `app_delivery_respond_by_token` | same signature; a design decision now answers one render issuance (`renders_ready_at`), decision verbs take the row lock, an `ok` refreshes `updated_at` |
+| `trg_design_engagements_token_nonce` + `clear_token_nonce_on_hash_change()` | NEW BEFORE UPDATE trigger: an update that changes `token_hash` without setting `token_nonce` clears the old nonce, so older code (and a rolled-back Worker) can rotate or revoke without tripping the CHECK |
+| `app_delivery_respond_by_token` | same signature; a design decision answers one render issuance (`renders_ready_at`); decisions the studio retracted are ignored; decision verbs take the row lock; an `ok` refreshes `updated_at` |
 | `app_delivery_claim_payment_by_token`, `app_delivery_comment_by_token` | same signatures; an `ok` refreshes `updated_at` |
-| `app_delivery_by_token` | same signature; per-round design verbs; new keys `concept_options`, `concept_choice_id` |
+| `app_delivery_by_token` | same signature; per-round design verbs, retracted decisions ignored; new keys `concept_options` (stable positions 1 to 4), `concept_choice_id`, `concept_choice_position` |
 | `app_delivery_choose_concept_by_token(text, uuid, text, text, text, text)` | NEW, returns `text` |
-| `app_delivery_notify_studio_by_token(text, text, jsonb, jsonb)` | NEW, returns `jsonb` |
-| `roles.sql` | EXECUTE on both new functions to `metra_app` only (revoked from `public`, `anon`, `authenticated`, `service_role`); `token_nonce` added to the column-level UPDATE grant on `design_engagements` (16 columns) |
+| `app_delivery_notify_studio_by_token(text, text, jsonb, jsonb)` | NEW, returns `jsonb`; accepts only the nine client-act message keys and params up to 2048 bytes |
+| grants | both new functions: EXECUTE for `metra_app` only, revoked from `public`, `anon`, `authenticated`, `service_role` in the same transaction that creates them (and again in `roles.sql`); `token_nonce` added to the column-level UPDATE grant on `design_engagements` (16 columns) |
 
 **1. Put the PR-B9 code in the production checkout.** The branch is checked
 out in another worktree, so detach onto it rather than switching to it. This
@@ -471,14 +484,19 @@ git switch --detach origin/validate/round-b-db
 git log --oneline -1    # must be the head SHA named in the PR, with green CI
 ```
 
-**2. Read-only, before: how big the locked tables are, and which deliveries the
-portal will start asking again** (run in the Supabase SQL editor):
+**2. Read-only, before** (Supabase SQL editor). Note the three numbers:
 
 ```sql
-select (select count(*) from design_engagements) as deliveries,
-       (select count(*) from engagement_events)  as ledger_rows;
+-- (a) migrations recorded so far, and the newest one's stamp
+select count(*) as migrations, max(created_at) as newest
+from drizzle.__drizzle_migrations;
 
--- Deliveries at final_approval whose client decided on an EARLIER render
+-- (b) how big the tables the migration locks are
+select (select count(*) from design_engagements)   as deliveries,
+       (select count(*) from engagement_events)    as ledger_rows,
+       (select count(*) from engagement_artifacts) as artifacts;
+
+-- (c) deliveries at final_approval whose client decided on an EARLIER render
 -- issuance (the studio revised after the decision). After step 3 the portal
 -- offers "approve design" to these clients again. Expected: small, often 0.
 select count(*) from design_engagements de
@@ -506,25 +524,39 @@ npm run db:apply-rls
 npm run assert-schema-applied -w @metra/db
 ```
 
-Expected: `db:migrate` applies one migration (0056). `db:apply-rls` ends with
-`apply-rls: verified in the catalogues — 46 tables, 46 policies, 12 triggers,
-34 functions, ...` and `design_engagements update narrowed to 16 columns`.
-`assert-schema-applied` exits 0. If `db:apply-rls` is run BEFORE `db:migrate`
-it stops at `40-delivery-read.sql` with 42703 (that function's SQL body is
-checked against the columns when it is created): nothing is broken, run
-`db:migrate` and then `db:apply-rls` again. Every statement in both is
-re-runnable, and a 55P03 from either is a lock wait that gave up: re-run at a
-quieter moment.
+Expected:
 
-**Locks.** `db:migrate` runs 0056 as one transaction and holds ACCESS
-EXCLUSIVE on `design_engagements` and `engagement_events` until it commits:
-two metadata-only column adds, one scan of each table for the CHECKs, an FK
-validation over an all-NULL column, and one index build (SHARE on
-`engagement_events`). With the row counts from step 2 in the low thousands this
-is well under a second, comparable to 0049 and 0050's ~630 ms, against the
-migrator's 3 s `lock_timeout`; delivery pages opened in that window wait, they
-do not fail. `db:apply-rls` is the same run as always (functions replace
-without table locks; the policy files are the 33 s worst case described above).
+- `db:migrate` exits 0. It does not print a count, so re-run query (a) from
+  step 2: `migrations` is exactly one higher and `newest` is `1791323400835`
+  (0056's journal stamp).
+- `db:apply-rls` ends with `apply-rls: verified in the catalogues — 46 tables,
+  46 policies, 13 triggers, 35 functions, ...` and `design_engagements update
+  narrowed to 16 columns`.
+- `assert-schema-applied` exits 0.
+
+If `db:apply-rls` is run BEFORE `db:migrate`, it stops at
+`40-delivery-read.sql` with 42703 (that function's SQL body is checked against
+the columns when it is created). Nothing is broken: run `db:migrate` and then
+`db:apply-rls` again. Every statement in both is re-runnable, and a 55P03 from
+either is a lock wait that gave up: re-run at a quieter moment.
+
+**Locks.** `db:migrate` runs 0056 as ONE transaction:
+
+- It holds ACCESS EXCLUSIVE on `design_engagements` and `engagement_events`
+  from the first ADD COLUMN until it commits, so reads AND writes of both
+  tables wait for the whole batch, not only for the scans.
+- Inside that window: one scan of each table for the CHECKs, an FK validation
+  over an all-NULL column, and one index build.
+- The FK also takes SHARE ROW EXCLUSIVE on `engagement_artifacts`: uploads and
+  artifact edits wait, artifact reads continue.
+- With the row counts from step 2 (b) in the low thousands this is well under a
+  second, comparable to 0049 and 0050's measured ~630 ms, against the
+  migrator's 3 s `lock_timeout`. It is an estimate, not a production
+  measurement. Delivery pages opened in that window wait; they do not fail.
+
+`db:apply-rls` is the same run as always: the functions replace without table
+locks; the new trigger's `drop trigger` and `create trigger` briefly lock
+`design_engagements`; the policy files are the 33 s worst case described above.
 
 **4. Read-only, after: expected results.**
 
@@ -543,6 +575,11 @@ where conname in ('engagement_events_chosenArtifact_same_org_fk',
 select indexdef from pg_indexes
 where schemaname = 'public' and indexname = 'engagement_events_chosenArtifact_idx';
 
+-- 1 row: trg_design_engagements_token_nonce | design_engagements | t
+select t.tgname, c.relname, t.tgenabled <> 'D' as enabled
+from pg_trigger t join pg_class c on c.oid = t.tgrelid
+where t.tgname = 'trg_design_engagements_token_nonce' and not t.tgisinternal;
+
 -- 6 rows, one per function (no overload was added). The four existing ones
 -- show exactly the arguments and results they had before this step:
 --   app_delivery_by_token               p_hash text -> jsonb
@@ -559,21 +596,32 @@ where n.nspname = 'public'
                     'app_delivery_notify_studio_by_token')
 order by 1;
 
--- true, false, true
-select has_function_privilege('metra_app',
-         'public.app_delivery_notify_studio_by_token(text, text, jsonb, jsonb)', 'execute'),
-       has_function_privilege('anon',
-         'public.app_delivery_choose_concept_by_token(text, uuid, text, text, text, text)', 'execute'),
-       has_column_privilege('metra_app', 'public.design_engagements', 'token_nonce', 'UPDATE');
+-- 2 rows, each: metra_app = true, public_grants = 0, anon = false,
+-- authenticated = false, service_role = false
+select f.sig,
+       has_function_privilege('metra_app', f.sig, 'execute') as metra_app,
+       (select count(*) from aclexplode(coalesce(p.proacl, acldefault('f', p.proowner))) a
+         where a.grantee = 0) as public_grants,
+       has_function_privilege('anon', f.sig, 'execute') as anon,
+       has_function_privilege('authenticated', f.sig, 'execute') as authenticated,
+       has_function_privilege('service_role', f.sig, 'execute') as service_role
+from (values
+  ('public.app_delivery_choose_concept_by_token(text, uuid, text, text, text, text)'),
+  ('public.app_delivery_notify_studio_by_token(text, text, jsonb, jsonb)')
+) as f(sig)
+join pg_proc p on p.oid = f.sig::regprocedure;
+
+-- true
+select has_column_privilege('metra_app', 'public.design_engagements', 'token_nonce', 'UPDATE');
 
 -- 0 and 0: nothing was backfilled
 select (select count(*) from design_engagements where token_nonce is not null) as nonces,
        (select count(*) from engagement_events where chosen_artifact_id is not null) as choices;
 ```
 
-**5. Set `SHARE_LINK_SECRET` on the Worker.** At least 32 random bytes. Piped
-straight into wrangler, so the value is never printed, never typed and never in
-shell history:
+**5. Set `SHARE_LINK_SECRET` on the Worker.** At least 32 random bytes, piped
+straight into wrangler, so the value is never printed, never typed and never
+in shell history (wrangler deploys from `apps/web`; any checkout works):
 
 ```powershell
 cd C:\Users\HP\merta-main\apps\web
@@ -581,10 +629,12 @@ node -e "process.stdout.write(require('crypto').randomBytes(48).toString('base64
 npx wrangler secret list    # lists the NAME SHARE_LINK_SECRET, never a value
 ```
 
-For local development give `apps/web/.env.local` its OWN value (never the
-production one; `.env*` is gitignored and must stay uncommitted):
+For local development, give the DEV checkout (`C:\Users\HP\merta`, not
+`merta-main`) its OWN value in `apps/web/.env.local`, never the production one.
+`.env*` is gitignored and must stay uncommitted:
 
 ```powershell
+cd C:\Users\HP\merta\apps\web
 node -e "require('fs').appendFileSync('.env.local', '\nSHARE_LINK_SECRET=' + require('crypto').randomBytes(48).toString('base64url') + '\n')"
 ```
 
@@ -599,7 +649,13 @@ without the secret is again not re-derivable. Links minted before PR-B11 have no
 nonce whatever you do, so each needs one confirmed replacement the first time
 a reminder is sent. **Do not rotate it casually** (see *Rotating a secret*).
 
-**6. Merge PR-B9, then return the checkout to main.**
+**6. Afterwards: merge, in this order, then return the checkout to main.**
+
+1. Merge `validate/round-b-w1` (Wave 1) and `validate/round-b-db` (PR-B9), in
+   that order or together, now that the database step is done (the order and
+   its reasons are at the top of this section).
+2. Tell the lead the step is done; PR-B10 to PR-B12 may merge after it.
+3. Put the production checkout back on main:
 
 ```powershell
 cd C:\Users\HP\merta-main
@@ -607,14 +663,12 @@ git fetch origin
 git switch --detach origin/main
 ```
 
-Then tell the lead the step is done; PR-B10 to PR-B12 may merge after it.
-
 **What you will notice between step 3 and the next deploy.** The deployed app
 is unchanged, but the database already behaves the Round B way:
 
-- the client of each delivery counted in step 2 is offered "approve design"
-  again on the link they already have, because their decision answered an
-  earlier render issuance;
+- the client of each delivery counted in step 2 (c) is offered "approve
+  design" again on the link they already have, because their decision answered
+  an earlier render issuance;
 - a client act (approve, request changes, acknowledge, claim a payment,
   comment) now refreshes the delivery's `updated_at`, so the dashboard's
   oldest-first delivery panel ("since it moved") treats that delivery as just
@@ -622,14 +676,26 @@ is unchanged, but the database already behaves the Round B way:
 - nothing is notified yet: the notifier exists but nothing calls it until
   PR-B10 is deployed.
 
-**Undo, if ever needed.** The live code does not depend on any of this, so
-there is nothing to undo for it. The two new functions can be dropped
-(`drop function public.app_delivery_choose_concept_by_token(text, uuid, text,
-text, text, text); drop function public.app_delivery_notify_studio_by_token(text,
-text, jsonb, jsonb);`) and the four changed ones restored by running
-`db:apply-rls` from the previous `main`. The columns, constraints and index
-are harmless when unused and should stay: dropping a column is the one
-non-additive change this file never makes.
+**Undo, if ever needed.** Undo the CODE, never the database:
+
+1. **Roll the Worker back** with `npx wrangler rollback metra-web` (see
+   *Rolling back* below). Every Worker version, before or after Round B, works
+   on the Round B database: older code never names the new columns, and the
+   trigger clears a stale nonce when older code rotates or revokes a link.
+2. **Leave the database as it is.** Do NOT run `db:apply-rls` from an older
+   `main` while any PR-B9-or-later code is serving: that run re-grants the
+   15-column UPDATE list without `token_nonce`, and every revoke (and, after
+   PR-B11, every mint and rotate) from the serving code then fails with 42501.
+   It is only harmless once the serving Worker is older than PR-B9 again, and
+   even then it buys nothing: the old functions it restores would bring back
+   the studio and portal disagreement described at the top of this section if
+   Wave 1 is still deployed.
+3. If the two new functions must go regardless (only after step 1 has put a
+   pre-PR-B10 Worker in place, since PR-B10 and PR-B12 call them):
+   `drop function public.app_delivery_choose_concept_by_token(text, uuid, text,
+   text, text, text); drop function public.app_delivery_notify_studio_by_token(text,
+   text, jsonb, jsonb);`. The columns, constraints, index and trigger stay:
+   dropping a column is the one non-additive change this file never makes.
 
 ## Rolling back
 
@@ -655,6 +721,14 @@ database step exists:
   report that introduced it.
 - **Worker secrets.** `wrangler rollback` restores code, not secrets. A rotated
   secret stays rotated.
+
+**Round B (0056) specifically:** roll back the Worker and leave the database
+alone. Any Worker version runs on the Round B database (the nonce trigger
+covers older code's rotate and revoke). Running `db:apply-rls` from an older
+`main` is NOT an undo while PR-B9-or-later code serves: it drops `token_nonce`
+from the UPDATE grant and that code's revoke fails with 42501. The order, and
+the one case where dropping the two new functions is allowed, are under *0056
+and the Round B database step*, "Undo, if ever needed".
 
 After rolling back, hit an authenticated page and watch `npx wrangler tail
 metra-web` for `42501` (a missing grant), `MT100` (an immutability trigger) and

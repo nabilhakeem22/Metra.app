@@ -182,13 +182,28 @@ $$;
 --     `attested_by` and files.original_name/size_bytes are NOT exposed — an
 --     internal label or filename can itself be sensitive. `files` is joined only to
 --     prove a downloadable object exists; no column of it is returned.
---   concept_options (Round B, 0056): id and a 1-based `position` for each
---     released, file-bearing `concept_option` of this delivery, numbered by
---     (attested_at, id). The portal shows position 1..4 as option A..D, and the
---     studio's TS (concept-options.ts) numbers the same rows the same way.
---   concept_choice_id (Round B, 0056): engagement_events.chosen_artifact_id of
---     the newest CLIENT concept_approval, null when none or when that approval
---     named no option. An id the client was already shown in concept_options.
+--   concept_options (Round B, 0056): id and a STABLE 1-based `position` for
+--     each released, file-bearing `concept_option` of this delivery at
+--     position 1..4 (option A..D). The position ranks EVERY concept option the
+--     delivery ever recorded, visible or not, by (attested_at, id), so hiding
+--     an option never renumbers another, and app_delivery_choose_concept_by_token
+--     accepts exactly these. attested_at is never rewritten and artifacts are
+--     never deleted, so a position never changes. Consumers (PR-B12, portal and
+--     studio) must use THIS position and never re-rank in JS: attested_at has
+--     microseconds and a JS Date keeps milliseconds, so two options attested in
+--     the same millisecond can sort differently there.
+--   concept_choice_id + concept_choice_position (Round B, 0056): the option
+--     named by the newest LIVE (not retracted) CLIENT concept_approval, and its
+--     stable position, both null when there is none or it named no option. The
+--     position is returned separately because the studio may hide the chosen
+--     option afterwards, which drops it from concept_options; "you chose option
+--     C" must still read from here.
+--
+-- RETRACTED CLIENT DECISIONS (an event_correction points at them) answer
+--   nothing here, exactly as liveEvents() drops them in the studio's TS rule.
+--   A retracted row still holds the 0049 unique slot of its kind, so the ONE
+--   verb whose insert would collide with it is not offered (the write would
+--   answer `already`); the other verb of the pair stays open.
 --
 -- READ, NEVER RETURNED: design_engagements.renders_ready_at (Round B). The
 --   design decision verbs in `client_actions` answer ONE render issuance, so
@@ -198,7 +213,8 @@ $$;
 -- PHYSICALLY OMITTED (never referenced): design_engagements.render_manifest_hash,
 --   revision_count, free_revision_n, design_revision_count,
 --   free_design_revision_n, as_built_due,
---   concept_locked_at, token_hash, updated_at, org_id, client_id, project_id;
+--   concept_locked_at, token_hash, token_nonce, updated_at, org_id, client_id,
+--   project_id;
 --   payment_events.method/reference/note/recorded_by/idempotency_key; every
 --   proposal/contract/cost_item cost column (unit_cost/line_cost/total_cost/
 --   *_margin/supervision/BOQ build cost) — none are in this query's tables and
@@ -281,6 +297,13 @@ as $$
     'client_actions', (
       select coalesce(jsonb_agg(action order by ord), '[]'::jsonb)
       from (
+        -- Round B: a verb is offered while (1) no LIVE client decision of its
+        -- pair answers the current round, and (2) no client row of the verb's
+        -- OWN kind holds the unique slot its insert would take. (1) ignores a
+        -- decision the studio retracted (an event_correction points at it),
+        -- as liveEvents() does in TS; (2) counts it, because it still holds
+        -- the 0049 index slot and the write would answer `already`. Exactly
+        -- the outcome app_delivery_respond_by_token produces.
         select 'approve_concept' as action, 1 as ord
         where de.state = 'concept_review'
           and not exists (
@@ -288,6 +311,13 @@ as $$
             where e.engagement_id = de.id
               and e.actor_channel = 'client'
               and e.kind in ('concept_approval', 'concept_change_request')
+              and (
+                (e.kind = 'concept_approval' and e.acknowledged_issue_at is null)
+                or not exists (
+                  select 1 from public.engagement_events x
+                  where x.org_id = e.org_id and x.supersedes_event_id = e.id
+                )
+              )
           )
         union all
         select 'request_concept_changes', 2
@@ -297,14 +327,22 @@ as $$
             where e.engagement_id = de.id
               and e.actor_channel = 'client'
               and e.kind in ('concept_approval', 'concept_change_request')
+              and (
+                (e.kind = 'concept_change_request' and e.acknowledged_issue_at is null)
+                or not exists (
+                  select 1 from public.engagement_events x
+                  where x.org_id = e.org_id and x.supersedes_event_id = e.id
+                )
+              )
           )
         union all
-        -- Round B: a design decision answers ONE render issuance. Only a
-        -- decision stamped with the current renders_ready_at, or a legacy
+        -- Round B: a design decision answers ONE render issuance. Only a live
+        -- decision stamped with the current renders_ready_at, or a live legacy
         -- unstamped one made at or after it, closes the pair, so a revision
         -- re-offers it. With no issuance at all, both sides are NULL and the
         -- first branch keeps the old one-per-delivery rule. The same predicate
-        -- as app_delivery_respond_by_token's pre-check.
+        -- as app_delivery_respond_by_token's pre-check. The slot of a design
+        -- verb is its kind stamped with the current renders_ready_at.
         select 'approve_design', 3
         where de.state = 'final_approval'
           and not exists (
@@ -313,10 +351,20 @@ as $$
               and e.actor_channel = 'client'
               and e.kind in ('design_approval', 'design_change_request')
               and (
-                e.acknowledged_issue_at is not distinct from de.renders_ready_at
-                or (e.acknowledged_issue_at is null
-                    and de.renders_ready_at is not null
-                    and e.decided_at >= de.renders_ready_at)
+                (e.kind = 'design_approval'
+                 and e.acknowledged_issue_at is not distinct from de.renders_ready_at)
+                or (
+                  not exists (
+                    select 1 from public.engagement_events x
+                    where x.org_id = e.org_id and x.supersedes_event_id = e.id
+                  )
+                  and (
+                    e.acknowledged_issue_at is not distinct from de.renders_ready_at
+                    or (e.acknowledged_issue_at is null
+                        and de.renders_ready_at is not null
+                        and e.decided_at >= de.renders_ready_at)
+                  )
+                )
               )
           )
         union all
@@ -328,10 +376,20 @@ as $$
               and e.actor_channel = 'client'
               and e.kind in ('design_approval', 'design_change_request')
               and (
-                e.acknowledged_issue_at is not distinct from de.renders_ready_at
-                or (e.acknowledged_issue_at is null
-                    and de.renders_ready_at is not null
-                    and e.decided_at >= de.renders_ready_at)
+                (e.kind = 'design_change_request'
+                 and e.acknowledged_issue_at is not distinct from de.renders_ready_at)
+                or (
+                  not exists (
+                    select 1 from public.engagement_events x
+                    where x.org_id = e.org_id and x.supersedes_event_id = e.id
+                  )
+                  and (
+                    e.acknowledged_issue_at is not distinct from de.renders_ready_at
+                    or (e.acknowledged_issue_at is null
+                        and de.renders_ready_at is not null
+                        and e.decided_at >= de.renders_ready_at)
+                  )
+                )
               )
           )
         union all
@@ -452,40 +510,62 @@ as $$
       ) dx
     ), '[]'::jsonb),
     -- Round B — the concept options the client may CHOOSE between: released,
-    -- file-bearing `concept_option` artifacts of this delivery, numbered
-    -- 1, 2, 3 ... by (attested_at, id). Only the id and the number cross the
-    -- wire; the label and the file name stay internal, as for `documents`.
+    -- file-bearing `concept_option` artifacts of this delivery at a STABLE
+    -- position 1..4. The position ranks every concept option the delivery
+    -- ever recorded (visible or not) by (attested_at, id), so hiding one never
+    -- renumbers another. Only the id and the number cross the wire; the label
+    -- and the file name stay internal, as for `documents`.
     'concept_options', coalesce((
       select jsonb_agg(
         jsonb_build_object('id', opt.id, 'position', opt.option_position)
         order by opt.option_position
       )
       from (
-        select a.id,
+        select a.id, a.org_id, a.file_id, a.client_visible,
           row_number() over (order by a.attested_at, a.id) as option_position
         from public.engagement_artifacts a
-        join public.files f on f.id = a.file_id and f.org_id = a.org_id
         where a.engagement_id = de.id
           and a.org_id = de.org_id
-          and a.client_visible
           and a.kind = 'concept_option'
       ) opt
+      join public.files f on f.id = opt.file_id and f.org_id = opt.org_id
+      where opt.client_visible and opt.option_position <= 4
     ), '[]'::jsonb),
-    -- Round B — which option the client chose: the newest CLIENT concept
-    -- approval's pointer, null when there is none or it named no option.
-    'concept_choice_id', (
-      select e.chosen_artifact_id
-      from public.engagement_events e
-      where e.engagement_id = de.id
-        and e.actor_channel = 'client'
-        and e.kind = 'concept_approval'
-      order by e.decided_at desc
-      limit 1
-    )
+    -- Round B — which option the client chose, and its stable position: from
+    -- the newest LIVE client concept approval (one the studio retracted with an
+    -- event_correction answers nothing). Both null when there is none or it
+    -- named no option. The position survives the studio hiding the option.
+    'concept_choice_id', choice.chosen_artifact_id,
+    'concept_choice_position', choice.option_position
   )
   from public.design_engagements de
   join public.organizations o on o.id = de.org_id
   join public.clients c on c.id = de.client_id
+  left join lateral (
+    select e.chosen_artifact_id,
+      (
+        select ranked.option_position
+        from (
+          select a.id,
+            row_number() over (order by a.attested_at, a.id) as option_position
+          from public.engagement_artifacts a
+          where a.engagement_id = de.id
+            and a.org_id = de.org_id
+            and a.kind = 'concept_option'
+        ) ranked
+        where ranked.id = e.chosen_artifact_id
+      ) as option_position
+    from public.engagement_events e
+    where e.engagement_id = de.id
+      and e.actor_channel = 'client'
+      and e.kind = 'concept_approval'
+      and not exists (
+        select 1 from public.engagement_events x
+        where x.org_id = e.org_id and x.supersedes_event_id = e.id
+      )
+    order by e.decided_at desc
+    limit 1
+  ) choice on true
   where de.token_hash = p_hash
     and (de.share_expires_at is null or de.share_expires_at > now());
 $$;
