@@ -566,6 +566,7 @@
     "untranslated": "untranslated",
     "hint": "More info",
     "cancel": "Cancel",
+    "close": "Close",
     "undo": "Undo",
     "moreActions": "More actions",
     "cannotUndo": "This can't be undone."
@@ -1554,7 +1555,6 @@
     "number": "Number",
     "client": "Client",
     "project": "Project",
-    "backToList": "Back to deliveries",
     "offPlan": {
       "existing": "Existing unit",
       "offPlan": "Off-plan",
@@ -1589,10 +1589,6 @@
       "extend": "Start extension",
       "atLimit": "This project has used both of its deliveries. Create a new project to start another.",
       "none": "No delivery started for this project yet."
-    },
-    "breadcrumb": {
-      "clients": "Clients",
-      "delivery": "Delivery"
     },
     "state": {
       "created": "New",
@@ -1697,6 +1693,7 @@
       "nudgeHint": "Reveal the client link so you can follow up.",
       "clientLinkActive": "Client link active",
       "clientLinkInactive": "Not shared",
+      "clientLink": "Client link",
       "moreLabel": "More actions",
       "abandonConfirmTitle": "Abandon this delivery?",
       "abandonConfirmHint": "This permanently closes the delivery: no further stages, payments or files can be recorded. It cannot be undone.",
@@ -1712,7 +1709,7 @@
       "nextAction": "Next action",
       "advanceLeadsTo": "This moves the job to {phase}.",
       "reshare": "Reveal & re-share the client link",
-      "crumb": "Delivery",
+      "crumbLabel": "Where this delivery sits",
       "startedOn": "Started {date}",
       "feeChip": "Design fee {amount}",
       "ending": {
@@ -2146,9 +2143,6 @@
       "rotate": "Reveal a new link",
       "revoke": "Revoke",
       "error": "Something went wrong. Please try again.",
-      "statusActive": "Link active",
-      "statusNotShared": "Not shared yet",
-      "unreadBadge": "New link: copy it",
       "rotateHint": "Revealing a new link stops the current one working.",
       "moreActions": "Link actions",
       "confirmRotate": {

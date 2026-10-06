@@ -1,6 +1,7 @@
 // The command card's props, assembled from what the page loaded. A plain module
 // (no React, no 'use client'): the cockpit body composes the card, this names
 // how each of its props is derived, so the body stays a composition.
+import type { ActionCode } from '@/lib/actions/result';
 import { countConceptOptions } from '@/lib/engagements/concept-options';
 import { secondaryTriggersOf } from '@/lib/engagements/forward-trigger';
 import type { EngagementCommandCardProps } from './command-card-props';
@@ -10,7 +11,7 @@ import type { RunAction } from './use-engagement-action';
 
 export function commandCardPropsOf(
   detail: EngagementDetailProps,
-  action: { pending: boolean; runAction: RunAction },
+  action: { pending: boolean; runAction: RunAction; actionError: ActionCode | null },
 ): EngagementCommandCardProps {
   const { header } = detail;
   return {
@@ -48,6 +49,7 @@ export function commandCardPropsOf(
     secondaryTriggers: secondaryTriggersOf(detail.nextActions, detail.gatePreview.primaryTrigger),
     pending: action.pending,
     runAction: action.runAction,
+    actionError: action.actionError,
     onNudge: revealDeliveryShareLink,
   };
 }

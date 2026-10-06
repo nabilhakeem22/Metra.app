@@ -1,17 +1,16 @@
 'use client';
 
-import { useEffect, useState, useTransition } from 'react';
+import { useState, useTransition } from 'react';
 import { useRouter } from '@/i18n/routing';
 import {
   revokeDeliveryLink,
   rotateDeliveryLink,
   shareDeliveryLink,
 } from '@/lib/engagements/actions';
-import { DELIVERY_SHARE_ANCHOR_ID, DELIVERY_SHARE_OPEN_EVENT } from './share-anchor';
 
 /**
- * The state of the cockpit's "share with client" control, and the three writes
- * that change it.
+ * The state of the cockpit's client-link dialog (`open`), and the three writes
+ * that change the link.
  *
  * THE RAW TOKEN IS SHOWN ONCE AND IS THEN UNRECOVERABLE. Only its sha256 hash is
  * persisted (share.ts) — for this portal the token IS the client's
@@ -48,18 +47,6 @@ export function useDeliveryShare(options: {
   const [error, setError] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
 
-  // The command card's "reveal the client link" scrolls here and asks to open.
-  // Both sides name the SAME two constants, from share-anchor.ts — which is also
-  // where `revealDeliveryShareLink` (the dispatcher) lives, so a rename cannot
-  // leave this listener subscribed to a string nobody fires.
-  useEffect(() => {
-    const anchor = document.getElementById(DELIVERY_SHARE_ANCHOR_ID);
-    if (!anchor) return;
-    const onOpen = () => setOpen(true);
-    anchor.addEventListener(DELIVERY_SHARE_OPEN_EVENT, onOpen);
-    return () => anchor.removeEventListener(DELIVERY_SHARE_OPEN_EVENT, onOpen);
-  }, []);
-
   function run(
     action: () => Promise<ShareResult>,
     onOk: (link?: string) => void,
@@ -73,14 +60,14 @@ export function useDeliveryShare(options: {
         router.refresh();
       } else {
         setError(result.error ?? 'generic');
-        // A refusal belongs on screen, not folded away behind a closed row.
+        // A refusal belongs on screen, not behind a closed dialog.
         setOpen(true);
       }
     });
   }
 
-  /** A freshly revealed token inside a closed box is the one state where folding
-   *  actually costs the studio something, so a reveal always opens. */
+  /** A freshly revealed token behind a closed dialog is shown once and lost, so
+   *  a reveal always opens it. */
   function reveal(revealed?: string): void {
     setLink(revealed ?? null);
     setOpen(true);

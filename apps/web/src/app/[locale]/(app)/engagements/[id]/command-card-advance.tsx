@@ -37,9 +37,9 @@ function fireAdvance(props: CommandCardActionProps): void {
  *
  * Advance is hidden in TWO situations, for the same reason: it cannot move and
  * something better already occupies its place. Here that is the re-share button.
- * The other is `actOnCard` — the studio is blocked and the dropzone above IS the
- * act, worded from the same registry row as the headline, so a second dead button
- * for the same move is exactly the duplication Option D removes.
+ * The other is `actOnCard`: the studio is blocked and the dropzone under it IS
+ * the act, worded from the same registry row as the headline, so a second dead
+ * button for the same move is exactly the duplication Option D removes.
  *
  * It STAYS, disabled, in the blocked states with no dropzone: there nothing else
  * on the card names the forward move.
@@ -85,12 +85,14 @@ export function AdvanceOrReshare(props: CommandCardActionProps) {
       )
     );
   }
+  // When Advance is blocked it must READ as disabled: a flat subdued fill, never
+  // the brand CTA that looks clickable. Only the filled one is the primary action.
+  const filled = props.view.advanceEnabled && props.ctas.payCta === null;
   return (
     <Button
       type="button"
-      // When Advance is blocked it must READ as disabled — a flat subdued fill,
-      // never the brand CTA that looks clickable.
-      variant={props.view.advanceEnabled && props.ctas.payCta === null ? 'default' : 'secondary'}
+      variant={filled ? 'default' : 'secondary'}
+      data-primary-action={filled ? '' : undefined}
       className="w-full"
       disabled={!props.view.advanceEnabled || props.pending}
       onClick={() => fireAdvance(props)}

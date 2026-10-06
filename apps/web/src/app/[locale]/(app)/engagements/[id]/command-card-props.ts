@@ -1,3 +1,4 @@
+import type { ActionCode } from '@/lib/actions/result';
 import type { BoqStepData } from '@/lib/boqs/step';
 import type { FeeSplitPrefill } from '@/lib/engagements/default-fee-split';
 import type { DeliveryStatus } from '@/lib/engagements/delivery-status';
@@ -57,5 +58,7 @@ export interface EngagementCommandCardProps {
   /** Runs one server action with the idempotency key held for that act (0050).
    *  Ignore the argument on an edge that does not need one. */
   runAction: RunAction;
+  /** The last card action's refusal, shown inside the card under the action. */
+  actionError: ActionCode | null;
   onNudge: () => void;
 }

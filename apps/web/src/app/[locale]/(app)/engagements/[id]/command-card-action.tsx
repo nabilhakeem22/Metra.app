@@ -9,7 +9,9 @@ import { AdvanceOrReshare } from './command-card-advance';
 import type { RunAction } from './use-engagement-action';
 
 /**
- * THE one action, full width, plus the three quiet lines under it.
+ * THE one action, full width, plus the three quiet lines under it. The one
+ * FILLED control of the act region carries `data-primary-action` (the live
+ * above-the-fold check measures it): here the pay opener, else Advance.
  *
  * An inline row of equal buttons makes the reader choose; a single wide CTA with
  * the secondary beneath it does not. Payment comes FIRST when it is due, because
@@ -53,7 +55,14 @@ export function CommandCardAction(props: CommandCardActionProps) {
     <>
       <div className="flex flex-col gap-2.5">
         {ctas.payCta && (
-          <Button variant="default" type="button" className="w-full" disabled={pending} onClick={props.onTogglePay}>
+          <Button
+            variant="default"
+            type="button"
+            className="w-full"
+            data-primary-action=""
+            disabled={pending}
+            onClick={props.onTogglePay}
+          >
             {ctas.payCta === 'recordOnly' ? th('logPayment') : th('logPaymentAdvance')}
           </Button>
         )}

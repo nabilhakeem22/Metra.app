@@ -84,7 +84,7 @@ export function CommandCardClaims({
   return (
     <div className="space-y-3">
       <ul className="space-y-3">
-        {claims.map((claim) => (
+        {claims.map((claim, index) => (
           <li
             key={claim.id}
             className="space-y-2 rounded-item border border-[color:var(--rule)] bg-[color:var(--track)] p-3"
@@ -118,6 +118,8 @@ export function CommandCardClaims({
               <Button
                 variant="default"
                 type="button"
+                // One primary anchor per page: the first claim's confirm.
+                data-primary-action={index === 0 ? '' : undefined}
                 disabled={pending}
                 onClick={() => void confirmClaim(claim)}
               >

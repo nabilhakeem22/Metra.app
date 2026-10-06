@@ -46,11 +46,14 @@ export function CommandCardEndings({
   return (
     <>
       <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
-        {endings.map((trigger) => (
+        {endings.map((trigger, index) => (
           <Button
             variant="secondary"
             key={trigger}
             type="button"
+            // Equal choices, but the page has one primary-action anchor: the
+            // first ending in reading order (what the fold check measures).
+            data-primary-action={enabled && index === 0 ? '' : undefined}
             className="w-full"
             disabled={!enabled || pending}
             onClick={() => void choose(trigger)}

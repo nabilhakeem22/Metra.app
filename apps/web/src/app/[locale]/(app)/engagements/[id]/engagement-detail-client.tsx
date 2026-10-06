@@ -1,9 +1,6 @@
 'use client';
 
-import { useTranslations } from 'next-intl';
 import { useState } from 'react';
-import { Link } from '@/i18n/routing';
-import { resolveActionError } from '@/lib/actions/error-message';
 import { resolveBudgetBadge } from '@/lib/engagements/budget-badge';
 import { landedKeysOf } from '@/lib/engagements/held-key';
 import { isTerminal } from '@/lib/engagements/states';
@@ -39,8 +36,6 @@ export function EngagementDetailClient(props: EngagementDetailProps) {
     paymentClaims,
     awaitingReplyCount,
   } = props;
-  const t = useTranslations('engagements');
-  const te = useTranslations('errors');
   const [tab, setTab] = useState<EngagementTab>('files');
   const { pending, error, runAction } = useEngagementAction({
     engagementId: header.id,
@@ -55,17 +50,9 @@ export function EngagementDetailClient(props: EngagementDetailProps) {
 
   return (
     <div className="space-y-4">
-      <Link href="/engagements" className="text-body text-primary hover:underline">
-        {t('backToList')}
-      </Link>
-
-      <EngagementCommandCard {...commandCardPropsOf(props, { pending, runAction })} />
-
-      {error && (
-        <p className="text-body text-destructive" role="alert">
-          {resolveActionError(error, te)}
-        </p>
-      )}
+      <EngagementCommandCard
+        {...commandCardPropsOf(props, { pending, runAction, actionError: error })}
+      />
 
       <EngagementTabStrip
         tab={tab}
