@@ -98,16 +98,41 @@ describe('EngagementInlineDropzone', () => {
     expect(screen.getAllByText(en('engagements.files.status.done'))).toHaveLength(3);
   });
 
-  test('a failed file says why, beside it, and nothing refreshes', async () => {
-    upload.mockResolvedValue({ ok: false, reason: 'wrong_type' });
+  test('a refused file says why beside it, never uploads, and the page still refreshes', async () => {
     const zone = renderDropzone();
     await act(async () => {
       fireEvent.drop(zone, { dataTransfer: { files: [pdf('a.exe')] } });
       await new Promise((resolve) => setTimeout(resolve, 10));
     });
+    expect(upload).not.toHaveBeenCalled();
     expect(screen.getByText(en('engagements.files.status.failed'))).toBeTruthy();
     expect(screen.getByRole('alert').textContent).toBe(en('engagements.files.wrongType'));
-    expect(router.refresh).not.toHaveBeenCalled();
+    expect(router.refresh).toHaveBeenCalledTimes(1);
+  });
+
+  test('only files that land use a capped slot: [notes.txt, option.pdf] with 1 left uploads option.pdf', async () => {
+    deferredUploads();
+    const zone = renderDropzone(1);
+    await act(async () => {
+      fireEvent.drop(zone, { dataTransfer: { files: [pdf('notes.txt'), pdf('option.pdf')] } });
+      await new Promise((resolve) => setTimeout(resolve, 30));
+    });
+    expect(upload).toHaveBeenCalledTimes(1);
+    expect(upload.mock.calls[0][2].name).toBe('option.pdf');
+    expect(screen.queryByText(en('engagements.files.status.skipped'))).toBeNull();
+  });
+
+  test('a failed upload gives its slot to the next file', async () => {
+    upload
+      .mockResolvedValueOnce({ ok: false, reason: 'put_failed' })
+      .mockResolvedValueOnce({ ok: true });
+    const zone = renderDropzone(1);
+    await act(async () => {
+      fireEvent.drop(zone, { dataTransfer: { files: [pdf('a.pdf'), pdf('b.pdf')] } });
+      await new Promise((resolve) => setTimeout(resolve, 30));
+    });
+    expect(upload).toHaveBeenCalledTimes(2);
+    expect(screen.getByText(en('engagements.files.status.done'))).toBeTruthy();
   });
 });
 

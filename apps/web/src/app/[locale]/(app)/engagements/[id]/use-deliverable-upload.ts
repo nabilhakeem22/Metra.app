@@ -8,6 +8,7 @@ import { resolveActionError } from '@/lib/actions/error-message';
 import type { ActionCode } from '@/lib/actions/result';
 import { getDeliverableUrl } from '@/lib/engagements/actions';
 import type { WorkingFileCategory } from '@/lib/engagements/working-files';
+import { validateDeliverableFile } from '@/lib/engagements/deliverable-files';
 import { formatNumber } from '@/lib/format/number';
 import { uploadDeliverableFile, type DeliverableUploadOutcome } from './upload-deliverable';
 
@@ -21,10 +22,10 @@ export interface UploadQueueItem {
 
 /**
  * The shared deliverable upload, for the working-files tray AND the command
- * card's dropzone. `uploadMany` takes every file the studio picked or dropped,
- * marks the ones past `maxFiles` as skipped (concept options are capped and
- * append-only), then uploads the rest ONE AFTER ANOTHER in a single transition,
- * each through `uploadDeliverableFile`. Each file's status, and why it failed,
+ * card's dropzone. `uploadMany` takes every file the studio picked or dropped
+ * and uploads them ONE AFTER ANOTHER in a single transition, each through
+ * `uploadDeliverableFile`; once `maxFiles` have LANDED (concept options are
+ * capped and append-only) the rest are skipped. Each file's status, and why it failed,
  * stays in `queue` beside it. Afterwards: one refresh if anything landed, and one
  * summary toast. Nothing here advances the delivery.
  */
@@ -55,27 +56,48 @@ export function useDeliverableUpload(engagementId: string): {
 
   function uploadMany(category: WorkingFileCategory, files: File[], maxFiles?: number): void {
     if (files.length === 0) return;
-    const limit = maxFiles ?? files.length;
     const batch = `${Date.now()}`;
     const items: UploadQueueItem[] = files.map((file, index) => ({
       key: `${batch}-${index}`,
       name: file.name,
-      status: index < limit ? 'queued' : 'skipped',
+      status: 'queued',
       message: null,
     }));
     setQueue(items);
 
     startTransition(async () => {
+      // Only a file that actually LANDS takes one of the capped slots: a file
+      // the pre-flight refuses, or an upload that fails, leaves its slot for the
+      // next file, and "limit reached" is said only once the cap really is.
+      let slotsLeft = maxFiles ?? Number.POSITIVE_INFINITY;
       let done = 0;
+      let failed = 0;
       for (const [index, file] of files.entries()) {
-        if (index >= limit) continue;
         const key = items[index].key;
+        const localError = validateDeliverableFile(category, file.name, file.size);
+        if (localError) {
+          failed += 1;
+          const reason = localError === 'file_too_large' ? 'too_large' : 'wrong_type';
+          setItem(key, { status: 'failed', message: messageOf({ ok: false, reason }) });
+          continue;
+        }
+        if (slotsLeft <= 0) {
+          setItem(key, { status: 'skipped' });
+          continue;
+        }
         setItem(key, { status: 'uploading' });
         const outcome = await uploadDeliverableFile(engagementId, category, file);
-        if (outcome.ok) done += 1;
+        if (outcome.ok) {
+          done += 1;
+          slotsLeft -= 1;
+        } else {
+          failed += 1;
+        }
         setItem(key, { status: outcome.ok ? 'done' : 'failed', message: messageOf(outcome) });
       }
-      if (done > 0) router.refresh();
+      // A failure may still have landed server-side (or the cap moved under us):
+      // refresh so the card's count and dropzone match the ledger either way.
+      if (done > 0 || failed > 0) router.refresh();
       toast({
         title: t('uploadedSummary', {
           done: formatNumber(done, locale),

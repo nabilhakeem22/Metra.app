@@ -170,13 +170,33 @@ describe('optionsReady — inside the 2–4 range (advances to concept_review)',
 });
 
 describe('optionsReady — above the 2–4 range (stays layout)', () => {
+  // Round A1 fix (R2/S1): recordArtifactCore now refuses a 5th concept option,
+  // so the 5th is seeded raw (BYPASSRLS) to keep pinning the GUARD's upper bound.
   it('with 5 concept options: concept_options_out_of_range, no transition', async () => {
     const { ctx, engagementId } = await setupLayout();
-    await recordConceptOptions(ctx, engagementId, 5);
+    await recordConceptOptions(ctx, engagementId, 4);
+    await raw.query(
+      `insert into public.engagement_artifacts (org_id, engagement_id, kind, attested_by)
+       values ('${ctx.orgId}', '${engagementId}', 'concept_option', '${ctx.userId}')`,
+    );
     const res = await optionsReady(ctx, engagementId);
     expect(res).toEqual({ ok: false, error: 'concept_options_out_of_range' });
     expect(await stateOf(engagementId)).toBe('layout');
     expect(await optionsTransitionCount(engagementId)).toBe(0);
+  });
+});
+
+describe('recordArtifactCore — the concept-option cap is a server fence', () => {
+  it('a 5th concept option is concept_options_out_of_range and writes nothing', async () => {
+    const { ctx, engagementId } = await setupLayout();
+    await recordConceptOptions(ctx, engagementId, 4);
+    const fifth = await recordArtifactCore(ctx, { engagementId, kind: 'concept_option', label: 'E' });
+    expect(fifth).toEqual({ ok: false, error: 'concept_options_out_of_range' });
+    const [row] = await raw.query<{ n: number }>(
+      `select count(*)::int as n from public.engagement_artifacts
+        where engagement_id = '${engagementId}' and kind = 'concept_option'`,
+    );
+    expect(Number(row.n)).toBe(4);
   });
 });
 
