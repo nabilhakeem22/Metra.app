@@ -5,6 +5,7 @@ import { useTranslations } from 'next-intl';
 import { useTransition } from 'react';
 import { Button } from '@/components/ui/button';
 import { useConfirm } from '@/components/ui/confirm-dialog';
+import { flushPendingRemovals } from '@/hooks/pending-removals';
 import { toast } from '@/hooks/use-toast';
 import { resolveActionError } from '@/lib/actions/error-message';
 import type { ActionCode } from '@/lib/actions/result';
@@ -61,6 +62,11 @@ export function BoqIssue({
 
     start(async () => {
       try {
+        // A line deleted inside its Undo window is still on the server. Commit
+        // it (and close its toast) BEFORE issuing, so the frozen document holds
+        // exactly the lines on screen. A refused delete has put its row back
+        // with its own error: stop, rather than issue a BOQ that still holds it.
+        if (!(await flushPendingRemovals())) return;
         const res = await issueBoq(boqId);
         if (res.ok) {
           toast({ title: t('issued') });

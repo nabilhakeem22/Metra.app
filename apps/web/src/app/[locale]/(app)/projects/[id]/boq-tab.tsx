@@ -49,18 +49,18 @@ export function BoqTab({
     <BoqSheet
       boq={boq}
       canEdit={canEdit}
-      actions={
+      actions={(shown) => (
         <>
           {canSeeCost && <BoqCostedCopy boqId={boq.id} documentNumber={boq.documentNumber} />}
           {canEdit && (
             <BoqIssue
               boqId={boq.id}
-              disabled={boq.lineCount === 0}
+              disabled={shown.lineCount === 0}
               clientCanOpen={clientCanOpenOnIssue}
             />
           )}
         </>
-      }
+      )}
     />
   );
 }

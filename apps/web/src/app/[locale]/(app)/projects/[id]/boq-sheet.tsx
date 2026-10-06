@@ -4,6 +4,7 @@ import type { ReactNode } from 'react';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import type { BoqDetail } from '@/lib/boqs/queries';
 import { hasLineDiscounts } from '@/lib/boqs/line-discounts';
+import { withoutLines } from '@/lib/boqs/without-lines';
 import { BoqSheetFooter, BoqSheetHeader } from './boq-sheet-chrome';
 import { sheetColumnCount } from './boq-sheet-columns';
 import { BoqSheetHead } from './boq-sheet-head';
@@ -32,8 +33,12 @@ export function BoqSheet({
   boq: BoqDetail;
   /** Draft + the boq_build capability. An issued sheet has no inputs at all. */
   canEdit: boolean;
-  /** Issue / download controls — owned by the tab, rendered in this header. */
-  actions?: ReactNode;
+  /**
+   * Issue / download controls, owned by the tab and rendered in this header.
+   * Handed the BOQ AS SHOWN (lines held for Undo removed), so a control gated
+   * on the line count sees the count the studio sees.
+   */
+  actions?: (shown: BoqDetail) => ReactNode;
 }) {
   const edits = useBoqEdits();
   const writes = useBoqWrites({ boq, edits });
@@ -43,9 +48,13 @@ export function BoqSheet({
   const rowApi = useBoqRowApi({ canEdit, edits, writes, gridRef });
 
   const needle = searchNeedle(query);
+  // A line deleted inside its Undo window is gone from the studio's point of
+  // view: every figure below (rows, count, subtotals, totals) reads `shown`.
+  const hiddenLineIds = writes.hiddenLineIds;
+  const shown = useMemo(() => withoutLines(boq, hiddenLineIds), [boq, hiddenLineIds]);
   // Line discounts are shown only when the studio gave one (owner decision): the
   // discount column exists for THIS BOQ only if some line carries a discount.
-  const discounted = useMemo(() => hasLineDiscounts(boq.sections), [boq]);
+  const discounted = useMemo(() => hasLineDiscounts(shown.sections), [shown]);
   const colCount = sheetColumnCount(discounted, canEdit);
 
   const toggleSection = useCallback((sectionId: string): void => {
@@ -63,25 +72,24 @@ export function BoqSheet({
    * object, so a fresh array per keystroke would hand every memoised row a new
    * `line` and defeat the memo entirely.
    */
-  const hiddenLineIds = writes.hiddenLineIds;
   const bodies = useMemo(
     () =>
-      boq.sections.map((section) => ({
+      shown.sections.map((section) => ({
         section,
-        lines: visibleLines(section, needle).filter((line) => !hiddenLineIds.has(line.id)),
+        lines: visibleLines(section, needle),
       })),
-    [boq, needle, hiddenLineIds],
+    [shown, needle],
   );
-  const visibleCount = useMemo(() => countVisibleLines(boq, needle), [boq, needle]);
+  const visibleCount = useMemo(() => countVisibleLines(shown, needle), [shown, needle]);
 
   return (
     <div className="overflow-hidden rounded-panel border border-[color:var(--rule)] bg-card shadow-sm">
       <BoqSheetHeader
-        boq={boq}
+        boq={shown}
         visibleCount={visibleCount}
         query={query}
         onQueryChange={setQuery}
-        actions={actions}
+        actions={actions?.(shown)}
       />
 
       {/* A BOUNDED height is what makes the pinned header and pinned totals
@@ -112,7 +120,7 @@ export function BoqSheet({
           ))}
 
           <BoqTotals
-            boq={boq}
+            boq={shown}
             canEdit={canEdit}
             colCount={colCount}
             discounted={discounted}
