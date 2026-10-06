@@ -56,7 +56,7 @@ type SegmentStatus = 'done' | 'current' | 'upcoming' | 'muted';
 function barClass(status: SegmentStatus): string {
   switch (status) {
     case 'done':
-      return 'bg-brand opacity-90';
+      return 'bg-[color:var(--spine-done)]';
     case 'current':
       return 'bg-brand';
     case 'muted':

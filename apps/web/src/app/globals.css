@@ -106,10 +106,11 @@
        #68707b scored 4.92 on --card and was signed off on that basis -- but it
        also renders on --track (the card's tinted header band, chips, the
        segmented strip), where the same value scored 4.31 and failed. Section
-       labels and meta are 10-11px, nowhere near the 18.66px+ that would let the
-       large-text 3.0 apply, so 4.5 is the real floor. This value clears it on
-       both: 5.28 on --card, 4.62 on --track. */
-    --text-faint: #646b76;
+       labels and meta are 12-13px, nowhere near the 18.66px+ that would let the
+       large-text 3.0 apply, so 4.5 is the real floor. Measured on the WORSE
+       surface (--glass over --bg-base, then --track), #646b76 was 4.41; this
+       clears it at 4.55. Pinned by app/globals-contrast.test.ts. */
+    --text-faint: #626973;
 
     /* --brand is consumed by Tailwind as hsl(var(--brand)), so it is defined as
        an H S% L% triplet in the bridge below (the cobalt #2E6BE6), not as the
@@ -187,6 +188,10 @@
     /* Loader halo. Deliberately stronger than --brand-tint, which is a chip
        fill: this one has to read as light coming off the mark. */
     --halo: rgba(46, 107, 230, 0.34);
+    /* A FINISHED spine stage. Pale enough that the stage you are on (solid
+       --brand) stands out from it at 3:1, the non-text floor; the old 90%
+       brand made the two 1.16:1 apart. */
+    --spine-done: rgba(46, 107, 230, 0.28);
 
     /* ---- shadcn bridge (light) — every var the app's Tailwind colors read ---- */
     --background: 216 33% 94%; /* #EBEFF5 */
@@ -238,9 +243,9 @@
     --text: #eef2f8;
     --text-body: #c3ccdb;
     --text-muted: #9aa6ba;
-    /* Same correction as light: #7e8b9f scored 5.04 on --card but 4.16 on
-       --track. Now 5.59 / 4.62. */
-    --text-faint: #8793a5;
+    /* Same correction as light, on the same worst surface: #8793a5 was 4.48
+       on --track over the glass; this is 4.59. */
+    --text-faint: #8995a7;
 
     /* The UI brand LIGHTENS on dark for contrast over the navy ground. The MARK
        does not — it keeps the identity's #5A8DF2 -> #2E6BE6 gradient in both
@@ -286,6 +291,7 @@
     /* Dropped from .55 so the tile edge doesn't glow on the navy ground. */
     --mark-hairline: rgba(255, 255, 255, 0.28);
     --halo: rgba(90, 141, 242, 0.4);
+    --spine-done: rgba(109, 154, 245, 0.32);
 
     /* ---- shadcn bridge (dark) ---- */
     --background: 220 38% 6%; /* #0A0E16 */
