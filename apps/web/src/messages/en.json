@@ -2174,16 +2174,16 @@
       "readyTag": "Ready for you",
       "inProgressTag": "In progress",
       "deliveredTag": "Delivered",
-      "reassurance": "Nothing to do right now. We'll message you the moment there's an update.",
+      "reassurance": "Nothing to do right now. Check this page for updates from your designer.",
       "concept": {
         "headline": "Your concept design is ready",
         "body": "Your designer shared the first layout and look for your space. Take a look and let them know what you think.",
         "approve": "Review & approve",
         "changes": "Request changes instead",
         "approvedTitle": "Concept approved 🎉",
-        "approvedBody": "Your designer has been notified and is starting your 3D visuals.",
+        "approvedBody": "Your approval is recorded. Your designer will see it and start your 3D visuals.",
         "changesTitle": "Changes requested",
-        "changesBody": "Your designer has been notified and will refine the concept with you."
+        "changesBody": "Your request is recorded. Your designer will see it and refine the concept with you."
       },
       "design": {
         "headline": "Your final design is ready to sign off",
@@ -2191,16 +2191,16 @@
         "approve": "Approve final design",
         "changes": "Request changes instead",
         "approvedTitle": "Design approved 🎉",
-        "approvedBody": "Your designer has been notified and is preparing your design handover.",
+        "approvedBody": "Your approval is recorded. Your designer will see it and prepare your design handover.",
         "changesTitle": "Changes requested",
-        "changesBody": "Your designer has been notified and will refine the design with you."
+        "changesBody": "Your request is recorded. Your designer will see it and refine the design with you."
       },
       "handoff": {
         "headline": "Your design package is ready",
         "body": "Confirm you've received your design package and we'll wrap things up.",
         "acknowledge": "Confirm handover",
         "acknowledgedTitle": "Handover confirmed 🎉",
-        "acknowledgedBody": "Thank you. Your design project is complete."
+        "acknowledgedBody": "Thank you. Your designer will now close the design project."
       }
     },
     "whatsNext": {
@@ -2214,7 +2214,7 @@
       "upTo": "Up to",
       "note": "An early estimate of the cost of executing your design. The final price is set in the bill of quantities.",
       "acknowledge": "I acknowledge this budget",
-      "acknowledged": "Acknowledged. Your design team has been notified."
+      "acknowledged": "Acknowledged. Your design team can see your confirmation."
     },
     "payments": {
       "title": "Payments",
