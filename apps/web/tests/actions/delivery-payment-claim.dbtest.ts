@@ -2,6 +2,8 @@ import { sqlstateOf } from '@metra/db/sqlstate';
 import { afterAll, describe, expect, it } from 'vitest';
 import { createClientCore } from '@/lib/clients/core';
 import { listClients } from '@/lib/clients/queries';
+import { recordArtifactCore } from '@/lib/engagements/artifacts';
+import { confirmPaymentClaimAndAdvanceCore } from '@/lib/engagements/confirm-claim-and-advance';
 import { createEngagementCore } from '@/lib/engagements/core';
 import { executeTransition } from '@/lib/engagements/executor';
 import {
@@ -512,5 +514,84 @@ describe('client_payment_claims_resolution — status and resolution agree (M5)'
   it('accepts an ordinary pending claim', async () => {
     const { ctx, engagementId } = await seedClaimDelivery('check-ok');
     expect(await insertClaim(ctx.orgId, engagementId, {})).toBeNull();
+  });
+});
+
+/** Drive design_proposal -> concept_review through the machine (deposit, survey, 2 options). */
+async function toConceptReview(ctx: OrgContext, engagementId: string): Promise<void> {
+  await recordPaymentCore(ctx, { engagementId, kind: 'deposit', amount: '30000' });
+  expect((await executeTransition(ctx, { engagementId, trigger: 'confirmAndPayDeposit' })).ok).toBe(
+    true,
+  );
+  await recordArtifactCore(ctx, { engagementId, kind: 'survey' });
+  expect((await executeTransition(ctx, { engagementId, trigger: 'spatialBaseReady' })).ok).toBe(
+    true,
+  );
+  await recordArtifactCore(ctx, { engagementId, kind: 'concept_option', label: 'A' });
+  await recordArtifactCore(ctx, { engagementId, kind: 'concept_option', label: 'B' });
+  expect((await executeTransition(ctx, { engagementId, trigger: 'optionsReady' })).ok).toBe(true);
+}
+
+async function stateOf(engagementId: string): Promise<string> {
+  const [row] = await raw.query<{ state: string }>(
+    `select state from public.design_engagements where id = '${engagementId}'`,
+  );
+  return row.state;
+}
+
+describe('confirmPaymentClaimAndAdvanceCore (round A1)', () => {
+  it('a full gate_a claim confirmed at concept_review ends in negotiation', async () => {
+    const { ctx, engagementId, token } = await seedClaimDelivery('confirm-advance');
+    await toConceptReview(ctx, engagementId);
+    await claimPaymentByToken(token, { milestoneKind: 'gate_a' });
+    const [claim] = (await claimRows(engagementId)).filter((row) => row.milestone_kind === 'gate_a');
+
+    const res = await confirmPaymentClaimAndAdvanceCore(ctx, {
+      claimId: claim.id,
+      amount: claim.claimed_amount,
+    });
+    expect(res).toMatchObject({ ok: true, paymentRecorded: true, advanced: true });
+    expect(await stateOf(engagementId)).toBe('negotiation');
+    expect((await claimRows(engagementId)).find((row) => row.id === claim.id)?.status).toBe(
+      'confirmed',
+    );
+  });
+
+  it('a balance claim at execution_decision is recorded and never picks an ending', async () => {
+    const { ctx, engagementId, token } = await seedClaimDelivery('confirm-choice');
+    await forceState(engagementId, 'execution_decision');
+    await claimPaymentByToken(token, { milestoneKind: 'balance' });
+    const [claim] = await claimRows(engagementId);
+
+    const res = await confirmPaymentClaimAndAdvanceCore(ctx, {
+      claimId: claim.id,
+      amount: claim.claimed_amount,
+    });
+    expect(res).toMatchObject({ ok: true, paymentRecorded: true, advanced: false });
+    expect(await stateOf(engagementId)).toBe('execution_decision');
+    const payments = await paymentRows(engagementId);
+    expect(payments).toHaveLength(1);
+    expect(payments[0].kind).toBe('balance');
+  });
+
+  it("a foreign org's claim reads as claim_not_found and writes nothing", async () => {
+    const a = await seedClaimDelivery('confirm-advance-iso');
+    await claimPaymentByToken(a.token, { milestoneKind: 'deposit' });
+    const [claimA] = await claimRows(a.engagementId);
+    const { orgId: orgB, ownerIds: ownersB } = await seedOrg({ owners: 1 });
+    orgIds.push(orgB);
+
+    const res = await confirmPaymentClaimAndAdvanceCore(ctxFor(orgB, ownersB[0], 'owner'), {
+      claimId: claimA.id,
+      amount: '30000',
+    });
+    expect(res).toEqual({
+      ok: false,
+      error: 'claim_not_found',
+      paymentRecorded: false,
+      advanced: false,
+    });
+    expect(await paymentRows(a.engagementId)).toHaveLength(0);
+    expect(await stateOf(a.engagementId)).toBe('design_proposal');
   });
 });

@@ -7,8 +7,8 @@ import {
   logPaymentAndAdvanceCore,
   type LogPaymentAndAdvanceInput,
 } from '../pay-and-advance';
+import { confirmPaymentClaimAndAdvanceCore } from '../confirm-claim-and-advance';
 import {
-  confirmPaymentClaimCore,
   dismissPaymentClaimCore,
   type ConfirmPaymentClaimInput,
   type DismissPaymentClaimInput,
@@ -54,19 +54,20 @@ export async function logPaymentAndAdvance(
 }
 
 /**
- * Server-action wrapper for {@link confirmPaymentClaimCore} — the studio confirms a
- * pending client payment claim (records the real payment + flips the claim), in one
- * tx. Resolves the org context and revalidates the shell on success so the cockpit
- * claim list + payment ledger refresh. Returns the ActionResult (with the payment id
- * in `data`) — never throws to the client.
+ * Server-action wrapper for {@link confirmPaymentClaimAndAdvanceCore} — the studio
+ * confirms a pending client payment claim (records the real payment + flips the
+ * claim, in one tx), then advances when that claim pays the gate the delivery is
+ * waiting on. Revalidates the shell WHENEVER the payment persisted, even if the
+ * advance guard refused. Returns the ActionResult (payment id in `data`) — never
+ * throws to the client.
  */
 export async function confirmPaymentClaim(
   input: ConfirmPaymentClaimInput,
 ): Promise<ActionResult & { data?: string }> {
   const ctx = await requireOrg();
-  const res = await confirmPaymentClaimCore(ctx, input);
-  if (res.ok) revalidatePath('/', 'layout');
-  return res;
+  const { paymentRecorded, ...result } = await confirmPaymentClaimAndAdvanceCore(ctx, input);
+  if (paymentRecorded) revalidatePath('/', 'layout');
+  return result;
 }
 
 /**
