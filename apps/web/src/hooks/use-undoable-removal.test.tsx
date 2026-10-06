@@ -1,23 +1,33 @@
 import { act, cleanup, renderHook } from '@testing-library/react';
-import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+import { afterEach, describe, expect, test, vi } from 'vitest';
 import type { ActionResult } from '@/lib/actions/result';
+import { flushPendingRemovals, hasPendingRemovals } from './pending-removals';
 import { useUndoableRemoval } from './use-undoable-removal';
 
-const undoToast = vi.hoisted(() => ({ onUndo: null as null | (() => void) }));
+// The toast is the hook's clock; here it is a double whose close we drive.
+const toastDouble = vi.hoisted(() => ({
+  onUndo: null as null | (() => void),
+  onExpire: null as null | (() => void),
+  dismiss: (() => {}) as () => void,
+  dismissCalls: 0,
+}));
 vi.mock('./undo-toast', () => ({
-  UNDO_WINDOW_MS: 5000,
-  showUndoToast: (options: { onUndo: () => void }) => {
-    undoToast.onUndo = options.onUndo;
+  showUndoToast: (options: { onUndo: () => void; onExpire?: () => void }) => {
+    toastDouble.onUndo = options.onUndo;
+    toastDouble.onExpire = options.onExpire ?? null;
+    return {
+      dismiss: () => {
+        toastDouble.dismissCalls += 1;
+      },
+    };
   },
 }));
 
-beforeEach(() => {
-  vi.useFakeTimers();
-  undoToast.onUndo = null;
-});
 afterEach(() => {
   cleanup();
-  vi.useRealTimers();
+  toastDouble.onUndo = null;
+  toastDouble.onExpire = null;
+  toastDouble.dismissCalls = 0;
 });
 
 function setup(result: ActionResult = { ok: true }) {
@@ -36,47 +46,71 @@ function setup(result: ActionResult = { ok: true }) {
   return { hook, commit, onFailed, onCommitted };
 }
 
-describe('useUndoableRemoval', () => {
-  test('hides the row at once and offers Undo', () => {
-    const { hook } = setup();
+describe('useUndoableRemoval: the Undo toast is the only clock', () => {
+  test('hides the row at once, offers Undo, and deletes nothing yet', () => {
+    const { hook, commit } = setup();
     expect(hook.result.current.hiddenIds.has('row-1')).toBe(true);
-    expect(undoToast.onUndo).not.toBeNull();
+    expect(toastDouble.onUndo).not.toBeNull();
+    expect(commit).not.toHaveBeenCalled();
   });
 
-  test('Undo before 5000 ms: the delete never runs and the row is back', async () => {
+  test('Undo: the delete never runs and the row is back', async () => {
     const { hook, commit } = setup();
-    await act(async () => vi.advanceTimersByTime(4000));
-    act(() => undoToast.onUndo?.());
-    await act(async () => vi.advanceTimersByTime(5000));
+    act(() => toastDouble.onUndo?.());
+    await act(async () => toastDouble.onExpire?.());
     expect(commit).not.toHaveBeenCalled();
     expect(hook.result.current.hiddenIds.has('row-1')).toBe(false);
   });
 
-  test('no Undo: the delete runs exactly once, at 5000 ms', async () => {
+  test('the toast closing without Undo commits exactly once', async () => {
     const { commit, onCommitted } = setup();
-    await act(async () => vi.advanceTimersByTime(4999));
-    expect(commit).not.toHaveBeenCalled();
-    await act(async () => vi.advanceTimersByTime(1));
+    await act(async () => toastDouble.onExpire?.());
+    await act(async () => toastDouble.onExpire?.());
     expect(commit).toHaveBeenCalledTimes(1);
     expect(commit).toHaveBeenCalledWith('row-1');
     expect(onCommitted).toHaveBeenCalledTimes(1);
-    await act(async () => vi.advanceTimersByTime(10_000));
-    expect(commit).toHaveBeenCalledTimes(1);
   });
 
-  test('leaving the screen at 1000 ms commits the pending delete once', async () => {
-    const { hook, commit } = setup();
-    await act(async () => vi.advanceTimersByTime(1000));
+  test('leaving the screen commits once, closes the toast, then refreshes', async () => {
+    const { hook, commit, onCommitted } = setup();
     hook.unmount();
     expect(commit).toHaveBeenCalledTimes(1);
-    await act(async () => vi.advanceTimersByTime(10_000));
+    expect(toastDouble.dismissCalls).toBe(1);
+    await act(async () => {});
+    expect(onCommitted).toHaveBeenCalledTimes(1);
+    // A stale Undo, had it been clicked anyway, does nothing.
+    act(() => toastDouble.onUndo?.());
     expect(commit).toHaveBeenCalledTimes(1);
   });
 
-  test('a refused delete brings the row back and reports the failure', async () => {
+  test('the page going to the background commits now', async () => {
+    const { commit } = setup();
+    const hidden = vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('hidden');
+    await act(async () => document.dispatchEvent(new Event('visibilitychange')));
+    hidden.mockRestore();
+    expect(commit).toHaveBeenCalledTimes(1);
+    expect(toastDouble.dismissCalls).toBe(1);
+  });
+
+  test('pagehide commits now', async () => {
+    const { commit } = setup();
+    await act(async () => window.dispatchEvent(new Event('pagehide')));
+    expect(commit).toHaveBeenCalledTimes(1);
+  });
+
+  test('the app-wide flush commits, closes the toast and waits for the answer', async () => {
+    const { commit } = setup();
+    expect(hasPendingRemovals()).toBe(true);
+    await act(async () => flushPendingRemovals());
+    expect(commit).toHaveBeenCalledTimes(1);
+    expect(toastDouble.dismissCalls).toBe(1);
+    expect(hasPendingRemovals()).toBe(false);
+  });
+
+  test('a refused delete brings the row back and reports it', async () => {
     const refused: ActionResult = { ok: false, error: 'forbidden' };
     const { hook, onFailed, onCommitted } = setup(refused);
-    await act(async () => vi.advanceTimersByTime(5000));
+    await act(async () => toastDouble.onExpire?.());
     expect(hook.result.current.hiddenIds.has('row-1')).toBe(false);
     expect(onFailed).toHaveBeenCalledWith(refused);
     expect(onCommitted).not.toHaveBeenCalled();

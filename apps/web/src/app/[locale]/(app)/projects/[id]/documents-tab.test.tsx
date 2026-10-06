@@ -21,9 +21,10 @@ vi.mock('@/hooks/use-toast', () => ({
 
 const undoToasts = vi.hoisted(() => [] as string[]);
 vi.mock('@/hooks/undo-toast', () => ({
-  UNDO_WINDOW_MS: 0,
-  showUndoToast: (options: { title: string }) => {
+  showUndoToast: (options: { title: string; onExpire?: () => void }) => {
     undoToasts.push(options.title);
+    queueMicrotask(() => options.onExpire?.());
+    return { dismiss: () => {} };
   },
 }));
 

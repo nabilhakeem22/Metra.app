@@ -8,11 +8,14 @@ import { ContactsList } from './contacts-list';
 const actions = vi.hoisted(() => ({ deleteContact: vi.fn(), setPrimaryContact: vi.fn() }));
 vi.mock('@/lib/client-contacts/actions', () => actions);
 vi.mock('@/hooks/use-toast', () => ({ toast: vi.fn() }));
-// The Undo window is the hook's own (tested there); here it passes at once.
+// The Undo toast's clock is the hook's own (tested there); here it closes at once.
 const undo = vi.hoisted(() => ({ titles: [] as string[] }));
 vi.mock('@/hooks/undo-toast', () => ({
-  UNDO_WINDOW_MS: 0,
-  showUndoToast: (options: { title: string }) => undo.titles.push(options.title),
+  showUndoToast: (options: { title: string; onExpire?: () => void }) => {
+    undo.titles.push(options.title);
+    queueMicrotask(() => options.onExpire?.());
+    return { dismiss: () => {} };
+  },
 }));
 const router = vi.hoisted(() => ({ refresh: vi.fn() }));
 vi.mock('@/i18n/routing', async (importOriginal) => ({

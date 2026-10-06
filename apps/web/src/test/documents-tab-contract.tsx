@@ -24,8 +24,8 @@ export interface DocumentsTabContract {
   toasts: CapturedToast[];
   /**
    * The titles the caller's `vi.mock('@/hooks/undo-toast')` factory pushes into.
-   * That mock sets `UNDO_WINDOW_MS: 0`: the window itself is
-   * use-undoable-removal's to test, so here the delete commits at once.
+   * That mock closes the toast at once: its clock is use-undoable-removal's to
+   * test, so here the delete commits as soon as the Undo toast is shown.
    */
   undoToasts: string[];
   /** The caller's doubled router, so "did it refresh" is answerable. */

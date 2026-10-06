@@ -5,13 +5,13 @@ import { useTranslations } from 'next-intl';
 import { useState, type CSSProperties } from 'react';
 import { Wordmark } from '@/components/brand/wordmark';
 import { Link, usePathname } from '@/i18n/routing';
-import { signOut } from '@/lib/auth/actions';
 import { can } from '@/lib/permissions/can';
 import type { MemberRole } from '@/lib/permissions/roles';
 import { cn } from '@/lib/utils';
 import { COMING_SOON_ITEMS, NAV_GROUPS } from './nav-items';
 import { OrgSwitcher, type OrgOption } from './org-switcher';
 import { SectionLabel } from '@/components/ui/section-label';
+import { signOutAfterPendingWrites } from './sign-out-after-pending-writes';
 
 export interface SidebarProps {
   /** Called after a nav link is followed — used to close the mobile drawer. */
@@ -107,7 +107,7 @@ export function Sidebar({
 
                 if (item.action === 'signout') {
                   return (
-                    <form key={item.key} action={signOut}>
+                    <form key={item.key} action={signOutAfterPendingWrites}>
                       <button
                         type="submit"
                         className={cn(

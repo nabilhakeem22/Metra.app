@@ -78,9 +78,30 @@ function reducer(state: State, action: Action): State {
 const listeners: Array<(state: State) => void> = [];
 let memoryState: State = { toasts: [] };
 
+// `onClose` handlers, kept OUT of the store (the store is spread onto the
+// Radix Toast as props). Each fires exactly once, when its toast leaves.
+const closeHandlers = new Map<string, () => void>();
+
+function settleClose(toastId: string): void {
+  const onClose = closeHandlers.get(toastId);
+  if (!onClose) return;
+  closeHandlers.delete(toastId);
+  onClose();
+}
+
 function dispatch(action: Action) {
+  const before = memoryState.toasts;
   memoryState = reducer(memoryState, action);
   listeners.forEach((l) => l(memoryState));
+  // A toast has left when it is dismissed (timeout, close button, its action,
+  // swipe, Escape, dismiss()) or when it drops out of the list (removed, or
+  // evicted by TOAST_LIMIT). Either way its owner hears about it, once.
+  if (action.type === 'DISMISS_TOAST') {
+    for (const t of before) if (action.toastId === undefined || t.id === action.toastId) settleClose(t.id);
+  }
+  for (const t of before) {
+    if (!memoryState.toasts.some((kept) => kept.id === t.id)) settleClose(t.id);
+  }
 }
 
 export interface ToastInput {
@@ -90,6 +111,13 @@ export interface ToastInput {
   action?: ToastActionElement;
   duration?: number;
   type?: ToastProps['type'];
+  /**
+   * Called once when this toast leaves for ANY reason: its timer, its close
+   * button, its action, a swipe or Escape, `dismiss()`, or eviction by the
+   * toast limit. A toast whose lifetime IS a clock (the Undo toast) hangs its
+   * consequence here, so what is on screen and what happens can never drift.
+   */
+  onClose?: () => void;
 }
 
 /**
@@ -103,8 +131,9 @@ function defaultsFor(variant: ToastInput['variant']): Pick<ToastInput, 'duration
   return variant === 'destructive' ? { duration: Infinity } : { type: 'background' };
 }
 
-export function toast({ ...props }: ToastInput) {
+export function toast({ onClose, ...props }: ToastInput) {
   const id = genId();
+  if (onClose) closeHandlers.set(id, onClose);
   const update = (next: Partial<ToasterToast>) =>
     dispatch({ type: 'UPDATE_TOAST', toast: { ...next, id } });
   const dismiss = () => dispatch({ type: 'DISMISS_TOAST', toastId: id });

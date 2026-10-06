@@ -13,8 +13,8 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { usePathname, useRouter } from '@/i18n/routing';
-import { signOut } from '@/lib/auth/actions';
 import type { MemberRole } from '@/lib/permissions/roles';
+import { signOutAfterPendingWrites } from './sign-out-after-pending-writes';
 
 const THEME_OPTIONS = [
   { value: 'light', icon: Sun },
@@ -112,7 +112,7 @@ export function UserMenu({
 
         <DropdownMenuSeparator />
 
-        <form action={signOut} className="w-full">
+        <form action={signOutAfterPendingWrites} className="w-full">
           <DropdownMenuItem asChild>
             <button type="submit" className="w-full text-destructive">
               <LogOut className="size-4" aria-hidden />
