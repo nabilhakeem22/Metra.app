@@ -13,12 +13,12 @@ describe('derivePillKey — the pill table, 4 modes x claim-count 0 and 2', () =
     ['closed', 0, 'closed'],
     ['closed', 2, 'closed'],
     ['ready', 0, 'ready'],
-    ['ready', 2, 'ready'],
     ['blockedStudio', 0, 'studio'],
-    ['blockedStudio', 2, 'studio'],
     ['blockedClient', 0, 'waitingClient'],
-    // THE ONE ROW THAT MATTERS: a claim actually sits with the STUDIO, so the
-    // card must not read "waiting on the client".
+    // A claim sits with the STUDIO in every live mode, so the card must say so:
+    // never "waiting on the client", and never a plain "ready".
+    ['ready', 2, 'paymentToConfirm'],
+    ['blockedStudio', 2, 'paymentToConfirm'],
     ['blockedClient', 2, 'paymentToConfirm'],
   ];
 
@@ -26,10 +26,10 @@ describe('derivePillKey — the pill table, 4 modes x claim-count 0 and 2', () =
     expect(derivePillKey(mode, claims)).toBe(expected);
   });
 
-  test('only blockedClient is sensitive to the claim count', () => {
+  test('only closed ignores the claim count', () => {
     for (const mode of MODES) {
-      if (mode === 'blockedClient') continue;
-      expect(derivePillKey(mode, 0)).toBe(derivePillKey(mode, 5));
+      const sensitive = derivePillKey(mode, 0) !== derivePillKey(mode, 5);
+      expect(sensitive).toBe(mode !== 'closed');
     }
   });
 });
@@ -82,7 +82,8 @@ describe('resolveCommandCardChrome — the four class families', () => {
 describe('resolveCommandCardChrome — the pill and the waiting flag', () => {
   test('the pill renders ONLY for paymentToConfirm', () => {
     for (const mode of MODES) {
-      const expected = mode === 'blockedClient';
+      // Every live mode with a pending claim (the C4 whose-move rule).
+      const expected = mode !== 'closed';
       expect(resolveCommandCardChrome({ mode, paymentClaimCount: 2 }).showPaymentPill).toBe(
         expected,
       );

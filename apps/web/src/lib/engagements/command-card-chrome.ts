@@ -1,4 +1,5 @@
 import type { CommandCardMode } from './command-card';
+import { whoseMoveOfMode } from './whose-move';
 
 // The command card's CHROME, as a pure function of its mode. No React, no
 // `server-only`, no db: which colour family the card wears and which pill it
@@ -40,24 +41,30 @@ export type CommandCardPillKey =
   | 'paymentToConfirm'
   | 'waitingClient';
 
+const MODE_PILL: Record<CommandCardMode, CommandCardPillKey> = {
+  closed: 'closed',
+  ready: 'ready',
+  blockedStudio: 'studio',
+  blockedClient: 'waitingClient',
+};
+
 /**
  * The human status pill, pure from the command view + the pending
- * client-payment-claim count. blockedClient with a pending claim reads as
- * "payment to confirm" (the studio's move to record it), not "waiting on client".
+ * client-payment-claim count. It reads the SAME whose-move rule as the deliveries
+ * list and the dashboard: a pending claim reads "payment to confirm" in every
+ * live mode (the studio's move to record it), never "waiting on the client".
  */
 export function derivePillKey(
   mode: CommandCardMode,
   paymentClaimCount: number,
 ): CommandCardPillKey {
-  switch (mode) {
+  switch (whoseMoveOfMode(mode, paymentClaimCount)) {
     case 'closed':
       return 'closed';
-    case 'ready':
-      return 'ready';
-    case 'blockedStudio':
-      return 'studio';
+    case 'confirmPayment':
+      return 'paymentToConfirm';
     default:
-      return paymentClaimCount > 0 ? 'paymentToConfirm' : 'waitingClient';
+      return MODE_PILL[mode];
   }
 }
 

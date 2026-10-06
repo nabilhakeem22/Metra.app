@@ -1,0 +1,77 @@
+import { describe, expect, test } from 'vitest';
+import type { CommandCardMode } from './command-card';
+import { derivePillKey, type CommandCardPillKey } from './command-card-chrome';
+import type { GateChecklistItem } from './gate-preview';
+import type { Trigger } from './transitions';
+import { resolveWhoseMove, whoseMoveOfMode, type WhoseMove } from './whose-move';
+
+describe('whoseMoveOfMode — 4 modes x claims 0/1', () => {
+  const table: [CommandCardMode, number, WhoseMove][] = [
+    ['closed', 0, 'closed'],
+    ['closed', 1, 'closed'],
+    ['ready', 0, 'studio'],
+    ['ready', 1, 'confirmPayment'],
+    ['blockedStudio', 0, 'studio'],
+    ['blockedStudio', 1, 'confirmPayment'],
+    ['blockedClient', 0, 'client'],
+    ['blockedClient', 1, 'confirmPayment'],
+  ];
+
+  test.each(table)('%s + %i claims -> %s', (mode, claims, expected) => {
+    expect(whoseMoveOfMode(mode, claims)).toBe(expected);
+  });
+
+  // The list/dashboard chip and the cockpit pill must say the same thing.
+  const PILL_FOR: Record<WhoseMove, CommandCardPillKey[]> = {
+    studio: ['ready', 'studio'],
+    client: ['waitingClient'],
+    confirmPayment: ['paymentToConfirm'],
+    closed: ['closed'],
+  };
+  test.each(table)('%s + %i claims: the cockpit pill agrees', (mode, claims, expected) => {
+    expect(PILL_FOR[expected]).toContain(derivePillKey(mode, claims));
+  });
+});
+
+describe('resolveWhoseMove', () => {
+  const ENDINGS: Trigger[] = ['chooseDesignOnly', 'chooseExecution'];
+  const balance = (ok: boolean): GateChecklistItem => ({
+    guard: 'balanceCleared',
+    ok,
+    code: ok ? null : 'balance_not_cleared',
+    amountDue: ok ? null : '1000.0000',
+  });
+  const choice = (balanceCleared: boolean) => ({
+    primaryTrigger: null,
+    endingChoices: ENDINGS,
+    items: [balance(balanceCleared)],
+  });
+
+  test('execution_decision with the balance cleared is the studio move', () => {
+    expect(
+      resolveWhoseMove({ state: 'execution_decision', preview: choice(true), pendingClaimCount: 0 }),
+    ).toBe('studio');
+  });
+
+  test('execution_decision with the balance unpaid waits on the client', () => {
+    expect(
+      resolveWhoseMove({ state: 'execution_decision', preview: choice(false), pendingClaimCount: 0 }),
+    ).toBe('client');
+  });
+
+  test('a pending claim is a payment to confirm', () => {
+    expect(
+      resolveWhoseMove({ state: 'execution_decision', preview: choice(false), pendingClaimCount: 1 }),
+    ).toBe('confirmPayment');
+  });
+
+  test('a terminal state is closed, claims or not', () => {
+    expect(
+      resolveWhoseMove({
+        state: 'execution',
+        preview: { primaryTrigger: null, endingChoices: [], items: [] },
+        pendingClaimCount: 1,
+      }),
+    ).toBe('closed');
+  });
+});
