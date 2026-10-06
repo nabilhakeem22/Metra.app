@@ -85,7 +85,7 @@ export function PreviewModal({
       </DialogPrimitive.Trigger>
       <DialogPrimitive.Portal>
         <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-foreground/40 backdrop-blur-sm data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 motion-reduce:animate-none" />
-        <DialogPrimitive.Content className="fixed inset-0 z-50 m-auto flex h-[90vh] w-[min(56rem,92vw)] flex-col border bg-card shadow-card outline-none data-[state=open]:animate-in data-[state=open]:fade-in-0 motion-reduce:animate-none">
+        <DialogPrimitive.Content className="fixed inset-0 z-50 m-auto flex h-[90vh] w-[min(56rem,92vw)] flex-col overflow-hidden rounded-panel border bg-card shadow-card outline-none data-[state=open]:animate-in data-[state=open]:fade-in-0 motion-reduce:animate-none">
           <div className="flex items-center gap-2 border-b px-4 py-2">
             <DialogPrimitive.Title className="text-body font-semibold">
               {t('title')}
