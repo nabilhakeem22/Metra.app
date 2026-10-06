@@ -75,7 +75,13 @@ export default async function ClientProfilePage({
   return (
     <div className="space-y-4">
       <ClientCreatedHandoff
-        clientId={id}
+        client={{
+          id,
+          nameEn: client.nameEn,
+          nameAr: client.nameAr,
+          city: client.city,
+          country: client.country,
+        }}
         clientName={name}
         canCreateProject={can(ctx.role, 'projects', 'create')}
       />
