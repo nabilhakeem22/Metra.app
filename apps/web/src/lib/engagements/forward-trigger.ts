@@ -16,6 +16,41 @@ import { legalTriggersFrom } from './ui';
 const NON_FORWARD_TRIGGERS = new Set<Trigger>(['rejectDesign', 'abandon']);
 
 /**
+ * The two ENDINGS of a delivery. Both leave `execution_decision` and both are
+ * final, so the studio must choose one explicitly: no generic control (Advance,
+ * Log payment & advance, the payment-claim confirm) may ever pick one for it.
+ */
+export const ENDING_TRIGGERS: ReadonlySet<Trigger> = new Set<Trigger>([
+  'chooseDesignOnly',
+  'chooseExecution',
+]);
+
+export function isEndingTrigger(trigger: Trigger): boolean {
+  return ENDING_TRIGGERS.has(trigger);
+}
+
+/**
+ * The endings legal from `state`, in registry order. Empty everywhere except
+ * `execution_decision`, where the card offers them as two equal choices.
+ */
+export function endingChoicesFrom(state: DesignState): Trigger[] {
+  return legalTriggersFrom(state).filter(isEndingTrigger);
+}
+
+/**
+ * The "More actions" row: every permitted trigger except the forward one and the
+ * endings (which the card renders as their own choice). Order is preserved.
+ */
+export function secondaryTriggersOf(
+  permitted: Trigger[],
+  primaryTrigger: Trigger | null,
+): Trigger[] {
+  return permitted.filter(
+    (trigger) => trigger !== primaryTrigger && !isEndingTrigger(trigger),
+  );
+}
+
+/**
  * The single forward-advance trigger from `state`: the wired, legal trigger (via
  * `legalTriggersFrom`) — excluding the non-forward rejectDesign/abandon — whose
  * destination sits FURTHEST along the funnel (highest `STAGE_NUMBER` of its `to`).
