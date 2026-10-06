@@ -1923,7 +1923,15 @@
       "open": "Open",
       "upload": "Upload",
       "uploading": "Uploading…",
-      "uploaded": "File uploaded.",
+      "dropHere": "Drop files here",
+      "uploadedSummary": "{done} of {total} uploaded",
+      "status": {
+        "queued": "Waiting",
+        "uploading": "Uploading",
+        "done": "Uploaded",
+        "failed": "Failed",
+        "skipped": "Skipped: options limit reached"
+      },
       "wrongType": "That file type isn't allowed here.",
       "tooLarge": "That file is too large. The limit is 100 MB.",
       "conceptOptionCap": "Maximum 4 concept options reached",

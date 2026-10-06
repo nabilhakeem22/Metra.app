@@ -11,6 +11,7 @@ import {
 } from '@/lib/engagements/working-files';
 import { ArtifactVisibilityControl } from './artifact-visibility-control';
 import { useClientVisibility } from './use-client-visibility';
+import { UploadQueueList } from './upload-queue-list';
 import { useDeliverableUpload } from './use-deliverable-upload';
 
 // Epic D, Slice 5 + Deliverable Uploads — the "Working files" tray, now pinned at
@@ -49,7 +50,7 @@ export function EngagementFilesTray({
   canUpload: boolean;
 }) {
   const t = useTranslations('engagements.files');
-  const { pending, upload, download } = useDeliverableUpload(engagementId);
+  const { pending, queue, uploadMany, download } = useDeliverableUpload(engagementId);
   // Client Deliverables, Step 1. `canUpload` is the §2.2 engagements_design/create
   // cell; for THIS capability the create and update cells are identical for all
   // seven roles (only `viewer` is read-only), so it is also the right gate for the
@@ -62,11 +63,11 @@ export function EngagementFilesTray({
   const rows = deriveWorkingFiles(artifacts);
 
   function onPick(category: WorkingFileCategory, event: ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
-    // Clear the input immediately (the File is captured) so re-picking the same
-    // file still fires a change; the shared hook owns validation + the upload.
+    const files = Array.from(event.target.files ?? []);
+    // Clear the input immediately (the Files are captured) so re-picking the same
+    // file still fires a change; the shared hook owns validation + the uploads.
     event.target.value = '';
-    if (file) upload(category, file);
+    uploadMany(category, files);
   }
 
   return (
@@ -132,6 +133,7 @@ export function EngagementFilesTray({
                         inputRefs.current[row.category] = el;
                       }}
                       type="file"
+                      multiple
                       className="hidden"
                       accept={acceptFor(row.category)}
                       onChange={(event) => onPick(row.category, event)}
@@ -168,6 +170,11 @@ export function EngagementFilesTray({
           );
         })}
       </div>
+      {queue.length > 0 && (
+        <div className="border-t border-[color:var(--rule)] px-4 py-2">
+          <UploadQueueList queue={queue} />
+        </div>
+      )}
     </section>
   );
 }

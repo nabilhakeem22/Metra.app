@@ -23,7 +23,7 @@ export function CommandCardSteps({
 }: {
   engagementId: string;
   project: { id: string; state: DesignState; boqStep: BoqStepData };
-  ctas: Pick<CommandCardCtas, 'dropzoneCategory' | 'dropzoneAtCapacity'>;
+  ctas: Pick<CommandCardCtas, 'dropzoneCategory' | 'dropzoneAtCapacity' | 'dropzoneRemaining'>;
   copy: CommandCardCopy;
   canUpload: boolean;
   checklist: {
@@ -52,6 +52,7 @@ export function CommandCardSteps({
           category={ctas.dropzoneCategory}
           canUpload={canUpload}
           atCapacity={ctas.dropzoneAtCapacity}
+          maxFiles={ctas.dropzoneRemaining ?? undefined}
           // The headline and the control say the SAME sentence. If they ever
           // disagree, the registry row is wrong -- that is the check.
           label={copy.actor === 'studio' ? copy.headline : undefined}

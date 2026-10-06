@@ -2,17 +2,20 @@
 
 import { Loader2, Upload } from 'lucide-react';
 import { useTranslations } from 'next-intl';
-import { useRef, type ChangeEvent } from 'react';
+import { useRef, useState, type ChangeEvent, type DragEvent } from 'react';
 import { acceptFor } from '@/lib/engagements/deliverable-files';
 import type { WorkingFileCategory } from '@/lib/engagements/working-files';
+import { UploadQueueList } from './upload-queue-list';
 import { useDeliverableUpload } from './use-deliverable-upload';
 
 // The command card's inline attachment dropzone — "THE ONE ACTION" when the
 // studio's next move is to attach a deliverable, and it says so in the stage's
-// own words when the card passes a `label`. A single tap opens the picker;
-// the file runs through the SAME shared upload hook the working-files tray uses
-// (validate → signed URL → PUT → attach/attest → refresh), so recording the
-// deliverable is what unblocks the stage (owner decision: no auto-advance).
+// own words when the card passes a `label`. A tap opens the picker (several
+// files at once), or files can be DROPPED on it; they run one after another
+// through the SAME shared upload hook the working-files tray uses (validate →
+// signed URL → PUT → attach/attest → refresh), each with its status listed
+// underneath. Recording the deliverable is what unblocks the stage (owner
+// decision: no auto-advance). The button stays the keyboard path.
 // Logical CSS only (mirrors in ar-EG RTL); accept-list is the category's exact
 // server-enforced extensions. The state → category table itself is DATA, not UI:
 // it lives in the pure lib/engagements/inline-dropzone-category.ts leaf.
@@ -22,6 +25,7 @@ export function EngagementInlineDropzone({
   category,
   canUpload,
   atCapacity = false,
+  maxFiles,
   label,
 }: {
   engagementId: string;
@@ -29,6 +33,8 @@ export function EngagementInlineDropzone({
   canUpload: boolean;
   /** This category already holds every file its guard will accept. */
   atCapacity?: boolean;
+  /** How many more files this category may take (concept options); undefined = no cap. */
+  maxFiles?: number;
   /**
    * The stage's act, in its own words -- "Attach the concept layouts". When the
    * card knows what this upload IS, the button says that instead of naming a file
@@ -39,8 +45,9 @@ export function EngagementInlineDropzone({
   label?: string;
 }) {
   const t = useTranslations('engagements.files');
-  const { pending, upload } = useDeliverableUpload(engagementId);
+  const { pending, queue, uploadMany } = useDeliverableUpload(engagementId);
   const inputRef = useRef<HTMLInputElement>(null);
+  const [dragging, setDragging] = useState(false);
 
   if (!canUpload) return null;
 
@@ -61,9 +68,22 @@ export function EngagementInlineDropzone({
   }
 
   function onPick(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
+    const files = Array.from(event.target.files ?? []);
+    // Clear the input (the Files are captured) so re-picking the same file fires.
     event.target.value = '';
-    if (file) upload(category, file);
+    uploadMany(category, files, maxFiles);
+  }
+
+  function onDragOver(event: DragEvent<HTMLElement>) {
+    event.preventDefault();
+    if (!pending) setDragging(true);
+  }
+
+  function onDrop(event: DragEvent<HTMLElement>) {
+    event.preventDefault();
+    setDragging(false);
+    if (pending) return;
+    uploadMany(category, Array.from(event.dataTransfer.files), maxFiles);
   }
 
   return (
@@ -71,6 +91,7 @@ export function EngagementInlineDropzone({
       <input
         ref={inputRef}
         type="file"
+        multiple
         className="hidden"
         accept={acceptFor(category)}
         onChange={onPick}
@@ -79,8 +100,15 @@ export function EngagementInlineDropzone({
       <button
         type="button"
         onClick={() => inputRef.current?.click()}
+        onDragEnter={onDragOver}
+        onDragOver={onDragOver}
+        onDragLeave={() => setDragging(false)}
+        onDrop={onDrop}
         disabled={pending}
-        className="flex w-full items-center justify-center gap-2 rounded-[var(--r-item)] border border-dashed border-[color:var(--brand-tint-border)] bg-brand-tint px-4 py-5 text-[13px] font-semibold text-brand-ink transition-colors hover:bg-[color:var(--track)] disabled:cursor-not-allowed disabled:opacity-60"
+        data-dragging={dragging || undefined}
+        className={`flex w-full items-center justify-center gap-2 rounded-[var(--r-item)] border border-[color:var(--brand-tint-border)] px-4 py-5 text-[13px] font-semibold text-brand-ink transition-colors hover:bg-[color:var(--track)] disabled:cursor-not-allowed disabled:opacity-60 ${
+          dragging ? 'border-solid bg-[color:var(--track)]' : 'border-dashed bg-brand-tint'
+        }`}
       >
         {pending ? (
           <Loader2 className="size-4 animate-spin" aria-hidden />
@@ -90,9 +118,12 @@ export function EngagementInlineDropzone({
         <span>
           {pending
             ? t('uploading')
-            : (label ?? `${t('upload')} · ${t(`category.${category}`)}`)}
+            : dragging
+              ? t('dropHere')
+              : (label ?? `${t('upload')} · ${t(`category.${category}`)}`)}
         </span>
       </button>
+      <UploadQueueList queue={queue} />
     </div>
   );
 }

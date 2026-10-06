@@ -1,108 +1,88 @@
 'use client';
 
-import { useTransition } from 'react';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
+import { useState, useTransition } from 'react';
 import { toast } from '@/hooks/use-toast';
 import { useRouter } from '@/i18n/routing';
 import { resolveActionError } from '@/lib/actions/error-message';
 import type { ActionCode } from '@/lib/actions/result';
-import {
-  attachDeliverable,
-  createDeliverableUpload,
-  getDeliverableUrl,
-} from '@/lib/engagements/actions';
-import { validateDeliverableFile } from '@/lib/engagements/deliverable-files';
+import { getDeliverableUrl } from '@/lib/engagements/actions';
 import type { WorkingFileCategory } from '@/lib/engagements/working-files';
+import { formatNumber } from '@/lib/format/number';
+import { uploadDeliverableFile, type DeliverableUploadOutcome } from './upload-deliverable';
 
-// Storage PUT deadline. A hung upload (dead Storage / lost network) must not leave
-// the tray/dropzone spinner stuck forever: the AbortController below aborts the
-// PUT after this, the fetch rejects, and the shared catch ends the transition +
-// toasts. 60s is generous headroom for the 100MB deliverable cap.
-const UPLOAD_TIMEOUT_MS = 60_000;
+export interface UploadQueueItem {
+  key: string;
+  name: string;
+  status: 'queued' | 'uploading' | 'done' | 'failed' | 'skipped';
+  /** Why a file failed, localized; null otherwise. */
+  message: string | null;
+}
 
 /**
- * The shared deliverable-upload flow, extracted verbatim from the working-files
- * tray so the tray AND the command-card inline dropzone drive the SAME path with
- * NO behaviour change: friendly client pre-flight (`validateDeliverableFile`) →
- * `createDeliverableUpload` (signed URL) → PUT to Storage → `attachDeliverable`
- * (records + attests the category's artifact) → success toast → `router.refresh`.
- * No new server action. `pending` is a single shared transition flag; `upload`
- * takes an already-picked File (the caller clears its own input); `download`
- * opens a short-lived signed URL. Every failure surfaces a localized toast — the
- * caller never has to translate a code.
+ * The shared deliverable upload, for the working-files tray AND the command
+ * card's dropzone. `uploadMany` takes every file the studio picked or dropped,
+ * marks the ones past `maxFiles` as skipped (concept options are capped and
+ * append-only), then uploads the rest ONE AFTER ANOTHER in a single transition,
+ * each through `uploadDeliverableFile`. Each file's status, and why it failed,
+ * stays in `queue` beside it. Afterwards: one refresh if anything landed, and one
+ * summary toast. Nothing here advances the delivery.
  */
 export function useDeliverableUpload(engagementId: string): {
   pending: boolean;
-  upload: (category: WorkingFileCategory, file: File) => void;
+  queue: UploadQueueItem[];
+  uploadMany: (category: WorkingFileCategory, files: File[], maxFiles?: number) => void;
   download: (fileId: string) => void;
 } {
   const t = useTranslations('engagements.files');
   const te = useTranslations('errors');
+  const locale = useLocale();
   const router = useRouter();
   const [pending, startTransition] = useTransition();
+  const [queue, setQueue] = useState<UploadQueueItem[]>([]);
 
-  function upload(category: WorkingFileCategory, file: File) {
-    // Friendly client-side pre-flight before we ever request a signed URL.
-    const localError = validateDeliverableFile(category, file.name, file.size);
-    if (localError) {
-      toast({
-        title: localError === 'file_too_large' ? t('tooLarge') : t('wrongType'),
-        variant: 'destructive',
-      });
-      return;
-    }
+  function messageOf(outcome: DeliverableUploadOutcome): string | null {
+    if (outcome.ok) return null;
+    if (outcome.reason === 'too_large') return t('tooLarge');
+    if (outcome.reason === 'wrong_type') return t('wrongType');
+    if (outcome.reason === 'put_failed') return te('generic');
+    return resolveActionError(outcome.reason as ActionCode, te);
+  }
+
+  function setItem(key: string, patch: Partial<UploadQueueItem>): void {
+    setQueue((items) => items.map((item) => (item.key === key ? { ...item, ...patch } : item)));
+  }
+
+  function uploadMany(category: WorkingFileCategory, files: File[], maxFiles?: number): void {
+    if (files.length === 0) return;
+    const limit = maxFiles ?? files.length;
+    const batch = `${Date.now()}`;
+    const items: UploadQueueItem[] = files.map((file, index) => ({
+      key: `${batch}-${index}`,
+      name: file.name,
+      status: index < limit ? 'queued' : 'skipped',
+      message: null,
+    }));
+    setQueue(items);
 
     startTransition(async () => {
-      try {
-        const signed = await createDeliverableUpload({
-          engagementId,
-          category,
-          originalName: file.name,
-          contentType: file.type,
-          sizeBytes: file.size,
-        });
-        if ('ok' in signed) {
-          toast({
-            title: resolveActionError(signed.error as ActionCode, te),
-            variant: 'destructive',
-          });
-          return;
-        }
-        // Bound the PUT so a hung Storage origin can't wedge the spinner: abort
-        // after UPLOAD_TIMEOUT_MS. The rejection (AbortError) falls into the catch
-        // below, which ends the transition and toasts.
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), UPLOAD_TIMEOUT_MS);
-        let put: Response;
-        try {
-          put = await fetch(signed.signedUrl, {
-            method: 'PUT',
-            headers: { 'content-type': file.type, 'x-upsert': 'true' },
-            body: file,
-            signal: controller.signal,
-          });
-        } finally {
-          clearTimeout(timeoutId);
-        }
-        if (!put.ok) throw new Error('put_failed');
-        const attached = await attachDeliverable({
-          engagementId,
-          category,
-          fileId: signed.fileId,
-          label: file.name,
-        });
-        if (!attached.ok) {
-          toast({
-            title: resolveActionError(attached.error as ActionCode, te),
-            variant: 'destructive',
-          });
-          return;
-        }
-        toast({ title: t('uploaded') });
-        router.refresh();
-      } catch {
-        toast({ title: te('generic'), variant: 'destructive' });
+      let done = 0;
+      for (const [index, file] of files.entries()) {
+        if (index >= limit) continue;
+        const key = items[index].key;
+        setItem(key, { status: 'uploading' });
+        const outcome = await uploadDeliverableFile(engagementId, category, file);
+        if (outcome.ok) done += 1;
+        setItem(key, { status: outcome.ok ? 'done' : 'failed', message: messageOf(outcome) });
       }
+      if (done > 0) router.refresh();
+      toast({
+        title: t('uploadedSummary', {
+          done: formatNumber(done, locale),
+          total: formatNumber(files.length, locale),
+        }),
+        variant: done === 0 ? 'destructive' : undefined,
+      });
     });
   }
 
@@ -113,5 +93,5 @@ export function useDeliverableUpload(engagementId: string): {
     });
   }
 
-  return { pending, upload, download };
+  return { pending, queue, uploadMany, download };
 }
