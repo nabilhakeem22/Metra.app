@@ -63,8 +63,8 @@ export function PublicContractView({
         <h1 className="text-heading font-semibold">
           {pick(contract.org.name_ar, contract.org.name_en) || 'Metra'}
         </h1>
-        <p className="text-body text-muted-foreground" dir="ltr">
-          {t('contract')} · {num}
+        <p className="text-body text-muted-foreground">
+          {t('contract')} · <span dir="ltr">{num}</span>
         </p>
         <p className="font-medium">{pick(contract.title_ar, contract.title_en)}</p>
       </header>
@@ -95,7 +95,7 @@ export function PublicContractView({
       ))}
 
       <Card>
-        <CardContent className="ms-auto max-w-xs space-y-1 py-4 text-body" dir="ltr">
+        <CardContent className="ms-auto max-w-xs space-y-1 py-4 text-body">
           <Row label={t('originalValue')} value={m(contract.total)} bold />
           <Row label={t('header.advancePct')} value={formatPercent(contract.advance_pct, locale)} />
           <Row label={t('header.retentionPct')} value={formatPercent(contract.retention_pct, locale)} />
@@ -149,7 +149,7 @@ function Row({ label, value, bold }: { label: string; value: string; bold?: bool
   return (
     <div className={`flex justify-between ${bold ? 'font-semibold' : ''}`}>
       <span className="text-muted-foreground">{label}</span>
-      <span>{value}</span>
+      <span dir="ltr">{value}</span>
     </div>
   );
 }

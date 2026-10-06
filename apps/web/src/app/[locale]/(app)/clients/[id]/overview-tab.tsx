@@ -9,11 +9,12 @@ export async function OverviewTab({ overview }: { overview: ClientOverview }) {
   const t = await getTranslations('clients.profile.overview');
   const locale = await getLocale();
 
-  const Stat = ({ label, value }: { label: string; value: string }) => (
+  // A figure is pinned LTR; a word (a status, "no contracts yet") follows the page.
+  const Stat = ({ label, value, figure = true }: { label: string; value: string; figure?: boolean }) => (
     <Card>
       <CardContent className="py-4">
         <p className="text-caption text-muted-foreground">{label}</p>
-        <p className="mt-1 text-heading font-semibold" dir="ltr">
+        <p className="mt-1 text-heading font-semibold" dir={figure ? 'ltr' : undefined}>
           {value}
         </p>
       </CardContent>

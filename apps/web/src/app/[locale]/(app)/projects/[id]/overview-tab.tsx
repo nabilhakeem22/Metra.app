@@ -36,11 +36,12 @@ export async function OverviewTab({
     ? pickLocale({ nameAr: cur.nameAr, nameEn: cur.nameEn }, 'name', locale).value
     : t('noStage');
 
-  const Stat = ({ label, value }: { label: string; value: string }) => (
+  // A figure is pinned LTR; a word (a status, "no contracts yet") follows the page.
+  const Stat = ({ label, value, figure = true }: { label: string; value: string; figure?: boolean }) => (
     <Card>
       <CardContent className="py-4">
         <p className="text-caption text-muted-foreground">{label}</p>
-        <p className="mt-1 text-heading font-semibold" dir="ltr">
+        <p className="mt-1 text-heading font-semibold" dir={figure ? 'ltr' : undefined}>
           {value}
         </p>
       </CardContent>
@@ -50,7 +51,7 @@ export async function OverviewTab({
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <Stat label={t('status')} value={ts(overview.status)} />
+        <Stat label={t('status')} value={ts(overview.status)} figure={false} />
         <Card>
           <CardContent className="py-4">
             <p className="text-caption text-muted-foreground">{t('currentStage')}</p>

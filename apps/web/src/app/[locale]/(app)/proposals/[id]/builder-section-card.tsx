@@ -189,8 +189,9 @@ export function BuilderSectionCard({
               </Select>
             )}
           </div>
-          <span className="text-body font-medium" dir="ltr">
-            {t('builder.sectionSubtotal')}: {formatMoney(st.sectionSubtotal, locale)}
+          <span className="text-body font-medium">
+            {t('builder.sectionSubtotal')}:{' '}
+            <span dir="ltr">{formatMoney(st.sectionSubtotal, locale)}</span>
           </span>
         </div>
       </CardContent>

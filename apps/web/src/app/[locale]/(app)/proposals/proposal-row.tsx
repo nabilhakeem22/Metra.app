@@ -24,17 +24,23 @@ export function ProposalRow({ row }: { row: ProposalListRow }) {
 
   return (
     <tr className="border-b last:border-0 hover:bg-muted/40">
-      <td className="px-4 py-2 font-mono text-caption" dir="ltr">
+      <td className="px-4 py-2 text-caption">
         <Link href={href} className="text-primary hover:underline">
           {row.kind === 'boq' ? (
             <ProposalKindTag />
           ) : (
-            formatProposalNumber(row.number, proposalYear(row.issueDate, row.createdAt))
+            <span dir="ltr" className="font-mono">
+              {formatProposalNumber(row.number, proposalYear(row.issueDate, row.createdAt))}
+            </span>
           )}
         </Link>
       </td>
-      <td className="px-4 py-2">{title}</td>
-      <td className="px-4 py-2 text-muted-foreground">{clientName || '—'}</td>
+      <td className="px-4 py-2" dir="auto">
+        {title}
+      </td>
+      <td className="px-4 py-2 text-muted-foreground" dir="auto">
+        {clientName || '—'}
+      </td>
       <td className="px-4 py-2">
         <StatusChip tone={PROPOSAL_STATUS_TONE[row.status]} label={t(`statuses.${row.status}`)} />
       </td>

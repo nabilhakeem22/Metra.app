@@ -152,7 +152,7 @@ export function ProposalView({
       ))}
 
       <Card>
-        <CardContent className="ms-auto max-w-xs space-y-1 py-4 text-body" dir="ltr">
+        <CardContent className="ms-auto max-w-xs space-y-1 py-4 text-body">
           <Row label={t('p.subtotal')} value={money(detail.subtotal)} />
           <Row label={t('p.discount')} value={money(detail.discountAmount)} />
           <Row label={t('p.tax')} value={money(detail.taxAmount)} />
@@ -171,7 +171,7 @@ function Row({ label, value, bold }: { label: string; value: string; bold?: bool
   return (
     <div className={`flex justify-between ${bold ? 'font-semibold' : ''}`}>
       <span className="text-muted-foreground">{label}</span>
-      <span>{value}</span>
+      <span dir="ltr">{value}</span>
     </div>
   );
 }

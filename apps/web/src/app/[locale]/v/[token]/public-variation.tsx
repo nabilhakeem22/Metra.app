@@ -68,8 +68,8 @@ export function PublicVariationView({
         <h1 className="text-heading font-semibold">
           {pick(variation.org.name_ar, variation.org.name_en) || 'Metra'}
         </h1>
-        <p className="text-body text-muted-foreground" dir="ltr">
-          {t('variation')} · {num}
+        <p className="text-body text-muted-foreground">
+          {t('variation')} · <span dir="ltr">{num}</span>
         </p>
         <p className="font-medium">{pick(variation.title_ar, variation.title_en)}</p>
         {(variation.reason_ar || variation.reason_en) && (
@@ -99,10 +99,10 @@ export function PublicVariationView({
       </Card>
 
       <Card>
-        <CardContent className="ms-auto max-w-xs py-4 text-body" dir="ltr">
+        <CardContent className="ms-auto max-w-xs py-4 text-body">
           <div className="flex justify-between font-semibold">
             <span className="text-muted-foreground">{t('netDelta')}</span>
-            <span>{m(variation.net_delta)}</span>
+            <span dir="ltr">{m(variation.net_delta)}</span>
           </div>
         </CardContent>
       </Card>

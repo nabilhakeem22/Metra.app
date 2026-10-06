@@ -58,7 +58,7 @@ export function TeamMemberList({
               >
                 <div className="min-w-0">
                   <p className="truncate text-body font-medium">
-                    {m.fullName || m.email || t('unknownUser')}
+                    <bdi>{m.fullName || m.email || t('unknownUser')}</bdi>
                     {isSelf && (
                       <span className="ms-2 rounded-pill bg-muted px-2 py-0.5 text-caption text-muted-foreground">
                         {t('you')}

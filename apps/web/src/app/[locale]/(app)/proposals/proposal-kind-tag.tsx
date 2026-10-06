@@ -8,7 +8,7 @@ import { useTranslations } from 'next-intl';
 export function ProposalKindTag() {
   const t = useTranslations('proposals.kindTag');
   return (
-    <span className="inline-flex rounded-pill bg-[color:var(--brand-tint)] px-2 py-0.5 font-sans text-caption font-medium text-[color:var(--brand-ink)]">
+    <span className="inline-flex rounded-pill bg-[color:var(--brand-tint)] px-2 py-0.5 text-caption font-medium text-[color:var(--brand-ink)]">
       {t('boq')}
     </span>
   );

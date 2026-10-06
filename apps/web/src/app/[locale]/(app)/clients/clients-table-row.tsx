@@ -80,7 +80,9 @@ export function ClientTableRow({
           {name}
         </Link>
       </td>
-      <td className={CELL}>{client.contactName || '—'}</td>
+      <td className={CELL} dir="auto">
+        {client.contactName || '—'}
+      </td>
       <td className={CELL}>{t(`types.${client.type}`)}</td>
       {/* Email and phone share one column: they are the same fact (how to reach
           them) and two columns pushed the table wide. */}
@@ -92,7 +94,9 @@ export function ClientTableRow({
           {client.phone || '—'}
         </span>
       </td>
-      <td className={CELL}>{client.city || '—'}</td>
+      <td className={CELL} dir="auto">
+        {client.city || '—'}
+      </td>
       <td className={`${CELL} tabular-nums`} dir="ltr">
         {client.projectCount}
       </td>

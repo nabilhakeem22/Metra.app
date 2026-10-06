@@ -47,14 +47,16 @@ export async function ProposalsTab({
               <tbody>
                 {proposals.map((p) => (
                   <tr key={p.id} className="border-b last:border-0">
-                    <td className="px-4 py-2 font-mono text-caption" dir="ltr">
+                    <td className="px-4 py-2 text-caption">
                       {p.kind === 'boq' ? (
                         <ProposalKindTag />
                       ) : (
-                        formatProposalNumber(
-                          p.number,
-                          proposalYear(p.issueDate, new Date(p.createdAt)),
-                        )
+                        <span dir="ltr" className="font-mono">
+                          {formatProposalNumber(
+                            p.number,
+                            proposalYear(p.issueDate, new Date(p.createdAt)),
+                          )}
+                        </span>
                       )}
                     </td>
                     <td className="px-4 py-2">

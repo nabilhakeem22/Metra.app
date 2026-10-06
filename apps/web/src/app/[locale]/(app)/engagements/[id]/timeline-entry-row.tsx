@@ -23,12 +23,14 @@ function OnBehalfProvenance({ entry }: { entry: TimelineEntry }) {
     <div className={`${PROVENANCE_BLOCK} text-[color:var(--text-muted)]`}>
       <div className="font-bold text-[color:var(--danger)]">{t('timeline.recordedBy')}</div>
       {entry.occurredOn && (
-        <div dir="ltr">
+        <div>
           {t('timeline.confirmedOn', { date: formatDate(entry.occurredOn, locale) })}
         </div>
       )}
       {entry.evidence && (
-        <div className="whitespace-pre-line break-words">{entry.evidence}</div>
+        <div className="whitespace-pre-line break-words" dir="auto">
+          {entry.evidence}
+        </div>
       )}
     </div>
   );

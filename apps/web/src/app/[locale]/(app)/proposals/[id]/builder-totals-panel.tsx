@@ -63,7 +63,7 @@ export function BuilderTotalsPanel({
             </>
           )}
         </div>
-        <div className="ms-auto max-w-xs space-y-1 text-body" dir="ltr">
+        <div className="ms-auto max-w-xs space-y-1 text-body">
           <Row label={t('builder.subtotal')} value={formatMoney(doc.subtotal, locale)} />
           <Row label={t('builder.docDiscount')} value={formatMoney(doc.discountAmount, locale)} />
           {quote && (
@@ -95,7 +95,7 @@ function Row({ label, value, bold }: { label: string; value: string; bold?: bool
   return (
     <div className={`flex justify-between ${bold ? 'font-semibold' : ''}`}>
       <span className="text-muted-foreground">{label}</span>
-      <span>{value}</span>
+      <span dir="ltr">{value}</span>
     </div>
   );
 }

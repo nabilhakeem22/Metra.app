@@ -18,11 +18,12 @@ export async function FinancialsTab({
   const t = await getTranslations('clients.profile.financials');
   const locale = await getLocale();
 
-  const Stat = ({ label, value }: { label: string; value: string }) => (
+  // A figure is pinned LTR; a word (a status, "no contracts yet") follows the page.
+  const Stat = ({ label, value, figure = true }: { label: string; value: string; figure?: boolean }) => (
     <Card>
       <CardContent className="py-4">
         <p className="text-caption text-muted-foreground">{label}</p>
-        <p className="mt-1 text-heading font-semibold" dir="ltr">
+        <p className="mt-1 text-heading font-semibold" dir={figure ? 'ltr' : undefined}>
           {value}
         </p>
       </CardContent>
@@ -51,9 +52,11 @@ export async function FinancialsTab({
         <Stat
           label={t('advance')}
           value={advancePct === null ? t('noContracts') : formatPercent(advancePct, locale)}
+          figure={advancePct !== null}
         />
         <Stat
           label={t('retention')}
+          figure={retentionPct !== null}
           value={
             retentionPct === null ? t('noContracts') : formatPercent(retentionPct, locale)
           }

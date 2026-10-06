@@ -83,17 +83,21 @@ export function ApiKeysTable({
                   const status = statusOf(key);
                   return (
                     <tr key={key.id} className="border-b last:border-0">
-                      <td className="py-2">{key.label}</td>
+                      <td className="py-2" dir="auto">
+                        {key.label}
+                      </td>
                       <td className="py-2 font-mono" dir="ltr">
                         {key.prefix}…
                       </td>
                       <td className="py-2 tabular-nums" dir="ltr">
                         {formatDate(key.createdAt)}
                       </td>
-                      <td className="py-2 tabular-nums" dir="ltr">
-                        {key.lastUsedAt
-                          ? formatDate(key.lastUsedAt)
-                          : t('neverUsed')}
+                      <td className="py-2 tabular-nums">
+                        {key.lastUsedAt ? (
+                          <span dir="ltr">{formatDate(key.lastUsedAt)}</span>
+                        ) : (
+                          t('neverUsed')
+                        )}
                       </td>
                       <td className="py-2">{t(`status.${status}`)}</td>
                       <td className="py-2 text-end">

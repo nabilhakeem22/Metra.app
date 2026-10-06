@@ -33,7 +33,7 @@ export function EngagementHeroBadges({
   return (
     <div className="mb-3.5 flex flex-wrap gap-2">
       <span className="inline-flex items-center gap-1.5 rounded-pill bg-[color:var(--track)] px-2.5 py-1 text-caption font-semibold text-[color:var(--text-muted)]">
-        <span className="font-mono font-medium tabular-nums" dir="ltr">
+        <span className="font-medium tabular-nums">
           {revisionTrigger === 'designChangeRaised'
             ? th('designRevision', { n: count, free })
             : th('revision', { n: count, free })}

@@ -87,7 +87,7 @@ export function ContactsList({
                 <tr key={contact.id} className="border-b last:border-0">
                   <td className="px-4 py-2">
                     <span className="inline-flex items-center gap-2">
-                      {contact.name}
+                      <bdi>{contact.name}</bdi>
                       {contact.isPrimary && (
                         <span className="bg-primary/10 px-1.5 py-0.5 text-caption text-primary">
                           {t('primary')}
@@ -95,7 +95,9 @@ export function ContactsList({
                       )}
                     </span>
                   </td>
-                  <td className="px-4 py-2 text-muted-foreground">{contact.role}</td>
+                  <td className="px-4 py-2 text-muted-foreground" dir="auto">
+                    {contact.role}
+                  </td>
                   <td className="px-4 py-2" dir="ltr">{contact.phone}</td>
                   <td className="px-4 py-2" dir="ltr">{contact.email}</td>
                   {canManage && (
