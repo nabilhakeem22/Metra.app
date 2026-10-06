@@ -266,3 +266,21 @@ describe('execution decision — the balance gates BOTH exits (owner-locked)', (
     );
   });
 });
+
+describe('only owner, admin and project manager choose the ending (owner decision, Oct 6)', () => {
+  for (const ending of ['chooseExecution', 'chooseDesignOnly'] as const) {
+    it(`a site_engineer firing ${ending} directly is forbidden; the state does not move`, async () => {
+      const { ctx, engagementId } = await setupExecutionDecision(WITHOUT_BALANCE, '50000');
+      // The executor gates on the ROLE in the context (fabricated, as every
+      // action-core test does); the fence must hold even with the balance clear.
+      const siteEngineer = ctxFor(ctx.orgId, ctx.userId, 'site_engineer');
+      expect(await executeTransition(siteEngineer, { engagementId, trigger: ending })).toEqual({
+        ok: false,
+        error: 'forbidden',
+      });
+      expect(await stateOf(engagementId)).toBe('execution_decision');
+      const projectManager = ctxFor(ctx.orgId, ctx.userId, 'project_manager');
+      expect((await executeTransition(projectManager, { engagementId, trigger: ending })).ok).toBe(true);
+    });
+  }
+});

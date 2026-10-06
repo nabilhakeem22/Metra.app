@@ -115,6 +115,13 @@ describe('the ending choice at execution_decision', () => {
     expect(button('engagements.hero.advance')).toBeNull();
   });
 
+  test('a role that may not choose the ending sees who decides, not the buttons', () => {
+    renderWithIntl(<EngagementCommandCard {...props({ canAdvance: false })} />);
+    expect(button('engagements.command.ending.chooseDesignOnly.cta')).toBeNull();
+    expect(button('engagements.command.ending.chooseExecution.cta')).toBeNull();
+    expect(screen.getByText(ar('engagements.command.ending.decidedBy'))).toBeTruthy();
+  });
+
   test('Not yet in the confirm dialog fires nothing', async () => {
     renderWithIntl(<EngagementCommandCard {...props()} />);
     fireEvent.click(button('engagements.command.ending.chooseExecution.cta')!);

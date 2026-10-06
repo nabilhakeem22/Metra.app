@@ -18,6 +18,7 @@ import { NOT_UUID, optionalUuid } from '@/lib/uuid';
 import {
   CAPABILITY_ACTION,
   TRANSITIONS,
+  roleMayFire,
   type TransitionDef,
   type Trigger,
 } from '../transitions';
@@ -84,6 +85,9 @@ export async function executeTransition(
   // Defence for untyped callers (e.g. a future Public API forwarding a string):
   // an unknown trigger has no def and is rejected before any DB work.
   if (!def) return err('illegal_trigger');
+  // A per-trigger role restriction (the endings: owner/admin/PM only) is refused
+  // before any DB work, like the capability gate below.
+  if (!roleMayFire(def, ctx.role)) return err('forbidden');
 
   // Normalise before any DB work: '' / whitespace reads as absent (a plain
   // transition), and a present-but-malformed key is a coded `invalid` rather

@@ -8,3 +8,4 @@
 export * from './types';
 export * from './registry';
 export * from './capability-action';
+export * from './trigger-roles';

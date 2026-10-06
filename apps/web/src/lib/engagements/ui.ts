@@ -7,7 +7,7 @@
 // `actions.ts` here.
 import { can } from '../permissions/can';
 import type { MemberRole } from '../permissions/roles';
-import { CAPABILITY_ACTION, TRANSITIONS, type Trigger } from './transitions';
+import { CAPABILITY_ACTION, TRANSITIONS, roleMayFire, type Trigger } from './transitions';
 import type { DesignState } from './states';
 
 /**
@@ -43,10 +43,10 @@ export function triggerNeedsForm(trigger: Trigger): boolean {
 
 /**
  * May `role` fire `trigger`? Checks the trigger's capability family at the same
- * action the executor gates on — so a hidden button matches the server gate
+ * action the executor gates on, and its per-trigger role restriction — so a hidden button matches the server gate
  * exactly (the button is convenience; the action is the real fence).
  */
 export function canRunTrigger(role: MemberRole, trigger: Trigger): boolean {
-  const capability = TRANSITIONS[trigger].capability;
-  return can(role, capability, CAPABILITY_ACTION[capability]);
+  const def = TRANSITIONS[trigger];
+  return can(role, def.capability, CAPABILITY_ACTION[def.capability]) && roleMayFire(def, role);
 }

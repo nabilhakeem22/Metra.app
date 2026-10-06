@@ -3,7 +3,7 @@
 // that describe the shape of every edge. The concrete edge table lives in
 // `./registry`; these are the types it is declared against.
 import type { MilestoneBasis, MilestoneKind } from '@metra/db';
-import type { Capability } from '@/lib/permissions/roles';
+import type { Capability, MemberRole } from '@/lib/permissions/roles';
 import type { ClientReleaseKey } from '../client-release';
 import type { GuardKey } from '../guards';
 import type { DesignState } from '../states';
@@ -113,4 +113,9 @@ export interface TransitionDef {
    * every edge that shares nothing.
    */
   clientRelease?: ClientReleaseKey;
+  /**
+   * The only roles that may fire this edge, on top of `capability` (absent: any
+   * role the capability admits). See trigger-roles.ts.
+   */
+  decidedBy?: readonly MemberRole[];
 }

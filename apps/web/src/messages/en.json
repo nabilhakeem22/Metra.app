@@ -1684,6 +1684,7 @@
         "headline": "Choose how this delivery ends",
         "hint": "Record the client's decision. Both endings are final.",
         "cancel": "Not yet",
+        "decidedBy": "An owner, admin or project manager chooses how this delivery ends.",
         "chooseDesignOnly": {
           "cta": "Design-only handover",
           "confirmTitle": "Hand over the design only?",

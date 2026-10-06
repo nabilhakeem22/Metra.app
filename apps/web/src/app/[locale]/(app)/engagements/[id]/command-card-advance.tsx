@@ -52,6 +52,13 @@ export function AdvanceOrReshare(props: CommandCardActionProps) {
   const tcmd = useTranslations('engagements.command');
   if (props.ctas.actOnCard) return null;
   if (props.view.endingChoices.length > 0 && !props.waitingOnClient) {
+    // Choosing the ending is the owner's, admin's or project manager's call: any
+    // other role sees who decides instead of buttons it may not press.
+    if (props.view.mode === 'ready' && !props.view.endingsEnabled) {
+      return (
+        <p className="text-[13px] text-[color:var(--text-muted)]">{tcmd('ending.decidedBy')}</p>
+      );
+    }
     return (
       <CommandCardEndings
         engagementId={props.advance.engagementId}
