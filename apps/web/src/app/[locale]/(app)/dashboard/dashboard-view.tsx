@@ -76,10 +76,7 @@ function DashboardIdentityHeader({ identity }: { identity: DashboardIdentity }) 
           </Badge>
           {identity.orgName.isFallback && <Badge>{tc('untranslated')}</Badge>}
         </span>
-        <h1
-          className="text-display font-bold text-[color:var(--text)]"
-          style={{ lineHeight: 1.25 }}
-        >
+        <h1 className="text-display font-bold text-[color:var(--text)]">
           {identity.orgName.value}
         </h1>
         <p className="text-body text-[color:var(--text-muted)]">{d('welcomeBack')}</p>

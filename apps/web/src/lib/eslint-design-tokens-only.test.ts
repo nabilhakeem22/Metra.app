@@ -32,6 +32,17 @@ it('design-tokens-only: tokens pass, everything off the scale fails', () => {
       { code: 'const a = <span dir="ltr" className={cn("font-mono", x)} />;', filename: APP_FILE },
       { code: "const m = { figure: 'font-mono tabular-nums tracking-tight' };", filename: APP_FILE },
       { code: "const m = { num: 'tracking-[var(--tracking-num)]' };", filename: APP_FILE },
+      // Round A2 fix (F6): the tester's false-positive probes.
+      { code: `const a = <span dir={'ltr'} className="font-mono">x</span>;`, filename: APP_FILE },
+      { code: `const a = <span className={cn('font-mono', 'tabular-nums')}>1</span>;`, filename: APP_FILE },
+      { code: 'const a = <span className="font-mono sm:tabular-nums">1</span>;', filename: APP_FILE },
+      { code: `const a = <span dir="ltr" className={cn({ uppercase: x })}>x</span>;`, filename: APP_FILE },
+      { code: `t('text-sm');`, filename: APP_FILE },
+      { code: `const u = '/api/rounded';`, filename: APP_FILE },
+      { code: `const m = 'text-base';`, filename: APP_FILE },
+      { code: '<div data-shape="rounded" />;', filename: APP_FILE },
+      { code: `const a = <div style={{ ['--x']: 1, background: 'var(--track)' }} />;`, filename: APP_FILE },
+      { code: `const a = <div style={{ textTransform: 'uppercase' }} />;`, filename: APP_FILE },
     ],
     invalid: [
       { code: 'const a = <p className="text-[11px]" />;', filename: APP_FILE, errors: [{ messageId: 'offScaleType' }] },
@@ -51,6 +62,18 @@ it('design-tokens-only: tokens pass, everything off the scale fails', () => {
       // `tabular` excuses figures from mono and tracking, never from uppercase.
       { code: "const m = { label: 'uppercase tabular' };", filename: APP_FILE, errors: [{ messageId: 'arabicUnsafe' }] },
       { code: 'const a = <p dir="rtl" className="font-mono" />;', filename: APP_FILE, errors: [{ messageId: 'arabicUnsafe' }] },
+      // Round A2 fix (F6): the tester's false-negative probes the rule now closes.
+      { code: 'const a = cn({ uppercase: x });', filename: APP_FILE, errors: [{ messageId: 'arabicUnsafe' }] },
+      { code: `const a = cn({ 'text-sm': x });`, filename: APP_FILE, errors: [{ messageId: 'offScaleType' }] },
+      { code: `const a = 'text-[calc(12px+1px)]';`, filename: APP_FILE, errors: [{ messageId: 'offScaleType' }] },
+      { code: `const a = 'text-[clamp(1rem,2vw,2rem)]';`, filename: APP_FILE, errors: [{ messageId: 'offScaleType' }] },
+      { code: `const a = 'text-[length:var(--foo)]';`, filename: APP_FILE, errors: [{ messageId: 'offScaleType' }] },
+      { code: `const a = 'bg-amber-50/50';`, filename: APP_FILE, errors: [{ messageId: 'paletteColour' }] },
+      { code: `const a = 'font-[650]';`, filename: APP_FILE, errors: [{ messageId: 'offSetWeight' }] },
+      { code: 'const a = <div style={big ? { fontSize: 18 } : undefined} />;', filename: APP_FILE, errors: [{ messageId: 'styleKey' }] },
+      { code: 'const a = <div style={{ borderTopLeftRadius: 8 }} />;', filename: APP_FILE, errors: [{ messageId: 'styleKey' }] },
+      { code: `const a = <div style={{ font: '700 12px Manrope' }} />;`, filename: APP_FILE, errors: [{ messageId: 'styleKey' }] },
+      { code: 'function barClass() { return "rounded"; }', filename: APP_FILE, errors: [{ messageId: 'offScaleRadius' }] },
     ],
   });
 });

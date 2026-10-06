@@ -2,30 +2,43 @@
 // none / full), semantic colours and four font weights. Anything else drifts.
 // Uppercase, letter-spacing and mono are Latin-only and must be scoped so.
 //
-// Unlike `no-physical-inline-direction`, this visits EVERY string literal and
-// template chunk in the file, not only className / cn() arguments, so a class
-// string kept in a const map (`const STATUS_STYLE = { ... }`) is covered too.
-// Comments are never visited: prose that names a banned class is fine.
+// It checks CLASS LISTS (see design-tokens-context.mjs for what counts as one:
+// className, class helpers, named const class maps, class-returning functions),
+// the keys of `cn({ 'class': condition })`, and JSX `style` objects. Comments
+// are never visited: prose that names a banned class is fine.
 //
 // Each string is split on whitespace; per token a leading `!` is dropped and
 // the variant chain is split on `:` outside `[...]`. The last segment is the
 // utility; the rest are its variants (`sm:`, `hover:`, `file:`, ...).
 
+import {
+  classify,
+  isConditionalClassObject,
+  isJsxStyleObject,
+  onLtrElement,
+  stringsUnder,
+} from './design-tokens-context.mjs';
+
 const TYPE_TOKENS = 'caption, small, body, title, heading, display';
 const RADIUS_VALUES = new Set(['none', 'item', 'panel', 'frame', 'pill', 'full']);
 
-const OFF_SCALE_TYPE = /^text-(\[(length:)?[0-9.]|(xs|sm|base|lg|xl|[2-9]xl)$)/;
+// An arbitrary text value is a SIZE when it is a number, a math function, or
+// hinted `length:` (`text-[color:...]` and a bare `text-[var(--x)]` are colours).
+const OFF_SCALE_TYPE =
+  /^text-(\[(length:|[0-9.]|calc\(|clamp\(|min\(|max\()|(xs|sm|base|lg|xl|[2-9]xl)$)/;
 const RADIUS = /^rounded(?:-(s|e|t|b|ss|se|es|ee|tl|tr|bl|br))?(?:-(.+))?$/;
 const PALETTE_COLOUR =
   /^(bg|text|border|ring|outline|fill|stroke|from|via|to|divide|placeholder|decoration|shadow|accent|caret)-(slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose)-[0-9]{2,3}(\/[0-9]+)?$/;
 const OFF_SET_WEIGHT = /^font-(thin|extralight|light|extrabold|black|\[.+\])$/;
-const BANNED_STYLE_KEYS = new Set(['fontSize', 'borderRadius', 'fontWeight', 'letterSpacing']);
+const BANNED_STYLE_KEY =
+  /^(fontSize|fontWeight|letterSpacing|lineHeight|font|border(Top|Bottom|Start|End)?(Left|Right|Start|End)?Radius)$/;
 // Arabic script is joined: letter-spacing tears the joins apart, a monospace
 // face has no Arabic glyphs worth the name, and Arabic has no case. These are
 // Latin-only typography, so they must be scoped to Latin (an `ltr:` variant, an
-// element marked dir="ltr", or figures: `tabular` in the same class string).
+// element marked dir="ltr", or figures: `tabular` in the same class expression).
 const ARABIC_UNSAFE = /^(uppercase|tracking-.+|font-mono)$/;
 const ALWAYS_SAFE = new Set(['tracking-[var(--tracking-num)]']);
+const FIGURES = new Set(['tabular', 'tabular-nums']);
 
 // Display (28px) is the dashboard's hero figure size and nothing else's.
 const DISPLAY_ALLOWED = [
@@ -33,17 +46,6 @@ const DISPLAY_ALLOWED = [
   '/app/[locale]/(app)/dashboard/',
   '/components/ui/stat-card.tsx',
 ];
-
-// Expression nodes a class string can sit inside on its way to a className.
-const PASS_THROUGH = new Set([
-  'JSXExpressionContainer',
-  'TemplateLiteral',
-  'CallExpression',
-  'ConditionalExpression',
-  'LogicalExpression',
-  'BinaryExpression',
-  'ArrayExpression',
-]);
 
 /** Split a class token into its variants and the utility, honouring `[...]`. */
 export function splitVariants(token) {
@@ -73,6 +75,24 @@ function isOffScaleRadius(utility) {
 
 function withoutModifier(utility) {
   return utility.startsWith('text-[') ? utility : utility.replace(/\/[^/]+$/, '');
+}
+
+/** A lone token outside a class position is checked only when no prose looks like it. */
+function unmistakablyAClass(token) {
+  const { variants, utility } = splitVariants(token);
+  return (
+    variants.length > 0 ||
+    token.includes('[') ||
+    PALETTE_COLOUR.test(utility) ||
+    OFF_SET_WEIGHT.test(utility) ||
+    /^rounded-/.test(utility)
+  );
+}
+
+function hasFigures(strings) {
+  return strings.some((value) =>
+    value.split(/\s+/).some((token) => token && FIGURES.has(splitVariants(token).utility)),
+  );
 }
 
 /** @type {import('eslint').Rule.RuleModule} */
@@ -119,40 +139,26 @@ export const designTokensOnly = {
       }
     }
 
-    function checkString(node, value, wholeString) {
+    /** `node` is the reporting node; `stringNode` the string's own AST position. */
+    function checkString(node, value, stringNode = node) {
       if (typeof value !== 'string') return;
-      const latinScoped = onLtrElement(node);
-      const figures = /(^|\s)(tabular|tabular-nums)(\s|$)/.test(wholeString ?? value);
-      for (const token of value.split(/\s+/)) {
-        if (token) checkToken(node, token, latinScoped, figures);
+      const tokens = value.split(/\s+/).filter(Boolean);
+      if (tokens.length === 0) return;
+      const { kind, root } = classify(stringNode);
+      if (kind === 'no') return;
+      const inTemplateWithExpressions =
+        stringNode.type === 'TemplateElement' && stringNode.parent.expressions.length > 0;
+      if (
+        kind === 'maybe' &&
+        tokens.length === 1 &&
+        !inTemplateWithExpressions &&
+        !unmistakablyAClass(tokens[0])
+      ) {
+        return;
       }
-    }
-
-    /** The string is (part of) the className of a JSX element with dir="ltr". */
-    function onLtrElement(node) {
-      let current = node.parent;
-      while (current && current.type !== 'JSXAttribute') {
-        if (!PASS_THROUGH.has(current.type)) return false;
-        current = current.parent;
-      }
-      if (!current || current.name?.name !== 'className') return false;
-      const element = current.parent;
-      return element.attributes.some(
-        (attribute) =>
-          attribute.type === 'JSXAttribute' &&
-          attribute.name?.name === 'dir' &&
-          attribute.value?.type === 'Literal' &&
-          attribute.value.value === 'ltr',
-      );
-    }
-
-    function isJsxStyleObject(node) {
-      const container = node.parent;
-      return (
-        container?.type === 'JSXExpressionContainer' &&
-        container.parent?.type === 'JSXAttribute' &&
-        container.parent.name?.name === 'style'
-      );
+      const latinScoped = onLtrElement(stringNode);
+      const figures = hasFigures(root ? stringsUnder(root) : [value]);
+      for (const token of tokens) checkToken(node, token, latinScoped, figures);
     }
 
     return {
@@ -160,8 +166,13 @@ export const designTokensOnly = {
         checkString(node, node.value);
       },
       TemplateElement(node) {
-        const whole = node.parent.quasis.map((quasi) => quasi.value.cooked).join(' ');
-        checkString(node, node.value.cooked, whole);
+        checkString(node, node.value.cooked);
+      },
+      // `cn({ uppercase: isLabel })`: an identifier key there is a class.
+      Property(node) {
+        if (node.computed || node.key.type !== 'Identifier') return;
+        if (!isConditionalClassObject(node.parent)) return;
+        checkString(node.key, node.key.name, node.value);
       },
       ObjectExpression(node) {
         if (!isJsxStyleObject(node)) return;
@@ -169,7 +180,7 @@ export const designTokensOnly = {
           if (property.type !== 'Property') continue;
           const key =
             property.key.type === 'Identifier' ? property.key.name : property.key.value;
-          if (BANNED_STYLE_KEYS.has(key)) {
+          if (BANNED_STYLE_KEY.test(String(key))) {
             context.report({ node: property, messageId: 'styleKey', data: { key: String(key) } });
           }
         }
