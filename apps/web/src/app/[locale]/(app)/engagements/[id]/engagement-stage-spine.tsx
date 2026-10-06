@@ -106,7 +106,7 @@ export function EngagementStageSpine({ state }: { state: DesignState }) {
                 }`}
               />
               <span
-                className={`whitespace-nowrap font-mono text-caption font-bold uppercase leading-tight tracking-[0.06em] ${
+                className={`whitespace-nowrap text-caption font-bold leading-tight ltr:font-mono ltr:uppercase ltr:tracking-[0.06em] ${
                   here ? 'text-[color:var(--warn)]' : 'text-[color:var(--text-faint)]'
                 }`}
               >

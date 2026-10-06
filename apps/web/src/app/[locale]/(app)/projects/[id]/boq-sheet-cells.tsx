@@ -28,7 +28,7 @@ export function Th({
   return (
     <th
       scope="col"
-      className={`sticky top-0 whitespace-nowrap bg-[color:var(--thead)] p-3 font-mono text-caption font-bold uppercase tracking-[0.09em] text-[color:var(--thead-ink)] ${num ? 'text-end' : 'text-start'}`}
+      className={`sticky top-0 whitespace-nowrap bg-[color:var(--thead)] p-3 text-caption font-bold text-[color:var(--thead-ink)] ltr:font-mono ltr:uppercase ltr:tracking-[0.09em] ${num ? 'text-end' : 'text-start'}`}
       style={{
         zIndex: sticky ? 4 : 3,
         borderBottom: '1px solid var(--thead-rule)',

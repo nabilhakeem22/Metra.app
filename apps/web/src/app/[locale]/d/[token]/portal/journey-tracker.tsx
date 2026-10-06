@@ -43,7 +43,7 @@ export function JourneyTracker({
 
   return (
     <section className={bare ? "" : "rounded-panel border bg-muted/40 p-4"}>
-      <p className="mb-3 text-caption font-semibold uppercase tracking-wider text-muted-foreground">
+      <p className="mb-3 text-caption font-semibold text-muted-foreground ltr:uppercase ltr:tracking-wider">
         {t('eyebrow')}
       </p>
       <ol className="flex items-start">

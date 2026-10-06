@@ -7,7 +7,7 @@ import { RetractButton } from './engagement-retract-button';
 import type { TimelineEntry } from './timeline-entries';
 
 const PROVENANCE_BLOCK =
-  'mt-1.5 border-s-2 border-[color:var(--danger)] ps-2 font-mono text-caption leading-relaxed';
+  'mt-1.5 border-s-2 border-[color:var(--danger)] ps-2 text-caption leading-relaxed ltr:font-mono';
 
 /**
  * THE PROVENANCE BLOCK. What the on-behalf chip asserts, spelled out: that the
@@ -80,7 +80,7 @@ export function TimelineEntryRow({
             typed themselves -- the data layer always could, and until now this
             page could not. */}
         {entry.onBehalf && (
-          <span className="inline-flex items-center rounded-pill border border-[color:var(--danger)] px-2 py-0.5 font-mono text-caption font-bold uppercase tracking-[0.06em] text-[color:var(--danger)]">
+          <span className="inline-flex items-center rounded-pill border border-[color:var(--danger)] px-2 py-0.5 text-caption font-bold text-[color:var(--danger)] ltr:font-mono ltr:uppercase ltr:tracking-[0.06em]">
             {t('timeline.onBehalfChip')}
           </span>
         )}

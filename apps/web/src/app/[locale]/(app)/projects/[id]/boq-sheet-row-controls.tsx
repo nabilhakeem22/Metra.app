@@ -49,7 +49,7 @@ export function BoqProvisionalCell({
             title={t('provisional')}
             disabled={pending}
             onClick={() => api.saveLine(line, { provisional: !line.provisional }, [])}
-            className="inline-flex size-6 items-center justify-center rounded-item border font-mono text-caption font-bold"
+            className="inline-flex size-6 items-center justify-center rounded-item border text-caption font-bold ltr:font-mono"
             style={line.provisional ? PROVISIONAL_ON : PROVISIONAL_OFF}
           >
             P

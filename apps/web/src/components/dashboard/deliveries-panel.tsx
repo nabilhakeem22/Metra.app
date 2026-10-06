@@ -54,7 +54,7 @@ export async function DeliveriesPanel({
       <div className="flex flex-wrap items-center gap-3 border-b border-[color:var(--rule)] p-4">
         <h2 className="flex items-center gap-2 font-bold text-[color:var(--text)]">
           {t('title')}
-          <span className="rounded-pill bg-[color:var(--brand-tint)] px-2 py-1 font-mono text-caption font-bold text-[color:var(--brand-ink)]">
+          <span className="rounded-pill bg-[color:var(--brand-tint)] px-2 py-1 font-mono text-caption font-bold tabular-nums text-[color:var(--brand-ink)]">
             {totalActive}
           </span>
         </h2>
@@ -103,7 +103,7 @@ export async function DeliveriesPanel({
                       status chip and the age still show there. */}
                   <span className="hidden sm:block">
                     <DeliveryRibbon position={pos} />
-                    <span className="mt-1 block whitespace-nowrap font-mono text-caption text-[color:var(--text-faint)]">
+                    <span className="mt-1 block whitespace-nowrap text-caption text-[color:var(--text-muted)] ltr:font-mono">
                       {spine(spineStageKeyOf(d.state))}
                       {pos.atGate ? ` · ${spine(pos.atGate)}` : ''}
                     </span>

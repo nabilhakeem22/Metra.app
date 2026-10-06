@@ -15,6 +15,7 @@ import { toast } from '@/hooks/use-toast';
 import { Link, useRouter } from '@/i18n/routing';
 import { pickLocale } from '@/lib/i18n/pick-locale';
 import { setActiveOrg } from '@/lib/org/actions';
+import { SectionLabel } from '@/components/ui/section-label';
 
 // Structurally identical to UserOrgOption (lib/org/queries) so the layout passes
 // rows straight through. Account fields arrive as serialized props — this is a
@@ -89,9 +90,7 @@ export function OrgSwitcher({
       <DropdownMenuContent align="start" className="w-56">
         {accountName && (
           <div className="px-2 py-1.5">
-            <p className="text-caption font-medium uppercase tracking-wide text-muted-foreground">
-              {t('account')}
-            </p>
+            <SectionLabel>{t('account')}</SectionLabel>
             <p className="truncate text-body font-medium text-muted-foreground">
               {accountName}
             </p>

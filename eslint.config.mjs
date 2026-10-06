@@ -15,7 +15,9 @@
 //     in `loggableFailure()`.
 //   • `metra/design-tokens-only`: the design system's six type sizes, four
 //     radii, semantic colours and four font weights; any other size, radius,
-//     palette colour or weight class (or inline style) fails. apps/web/src only.
+//     palette colour or weight class (or inline style) fails, and so does
+//     Latin-only typography (uppercase, letter-spacing, mono) that is not
+//     scoped to Latin, because it breaks Arabic. apps/web/src only.
 import js from '@eslint/js';
 import tseslint from 'typescript-eslint';
 import { noPhysicalInlineDirection } from './eslint-rules/no-physical-inline-direction.mjs';

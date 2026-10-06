@@ -1,5 +1,6 @@
 import { Card, CardContent } from '@/components/ui/card';
 import type { ChartSeries } from './dashboard-bar-chart';
+import { SectionLabel } from '@/components/ui/section-label';
 
 /** One slice: which series it is, and how much of the whole it accounts for. */
 export interface DonutSlice {
@@ -136,9 +137,9 @@ export function DashboardDonut({
             >
               {total}
             </span>
-            <span className="mt-1 font-mono text-caption font-semibold uppercase tracking-[0.1em] text-[color:var(--text-faint)]">
+            <SectionLabel as="span" className="mt-1">
               {totalLabel}
-            </span>
+            </SectionLabel>
           </div>
         </div>
 

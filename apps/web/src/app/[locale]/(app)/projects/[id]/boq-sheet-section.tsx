@@ -52,7 +52,7 @@ export function BoqSectionHeaderRow({
             aria-hidden
           />
           <span dir="auto">{section.title}</span>
-          <span className="font-mono text-caption font-semibold text-[color:var(--text-faint)]">
+          <span className="font-mono text-caption font-semibold tabular-nums text-[color:var(--text-faint)]">
             {section.lines.length}
           </span>
         </button>

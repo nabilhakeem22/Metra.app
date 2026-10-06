@@ -49,7 +49,7 @@ export function PanelHeader({
     <div className="border-b border-[color:var(--rule)]">
       <div className="flex flex-wrap items-center gap-3 px-4 py-3.5">
         <div className="min-w-0">
-          <p className="text-body font-semibold leading-tight tracking-[var(--tracking-title)]">
+          <p className="text-body font-semibold leading-tight">
             {title}
           </p>
           {sub && (

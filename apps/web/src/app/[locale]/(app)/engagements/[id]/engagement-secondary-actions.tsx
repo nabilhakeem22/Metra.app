@@ -16,6 +16,7 @@ import type { Trigger } from '@/lib/engagements/transitions';
 import { triggerNeedsForm } from '@/lib/engagements/ui';
 import { EngagementRevisionForm } from './engagement-revision-form';
 import { DIRECT_TRIGGER_ACTIONS } from './trigger-actions';
+import { SectionLabel } from '@/components/ui/section-label';
 
 /** The payload triggers that can be secondary — each opens a form here instead of
  *  firing. `submitDesignFee` is not one: it is only legal from `created`, where it
@@ -82,9 +83,7 @@ export function EngagementSecondaryActions({
 
   return (
     <div className="mt-5 space-y-3 border-t border-[color:var(--rule)] pt-4">
-      <p className="font-mono text-caption font-semibold uppercase tracking-[0.1em] text-[color:var(--text-faint)]">
-        {tcmd('moreLabel')}
-      </p>
+      <SectionLabel>{tcmd('moreLabel')}</SectionLabel>
       {dialog}
       <div className="flex flex-wrap items-center gap-2">
         {buttonTriggers.map((trigger) => (

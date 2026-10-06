@@ -42,7 +42,7 @@ export function BoqSheetHeader({
         <p className="flex items-center gap-2 font-bold text-[color:var(--text)]">
           <span dir="auto">{boq.title}</span>
           <span
-            className="rounded-pill px-2 py-1 text-caption font-semibold uppercase"
+            className="rounded-pill px-2 py-1 text-caption font-semibold ltr:uppercase"
             style={issued ? ISSUED_PILL : DRAFT_PILL}
           >
             {issued ? t('statusIssued') : t('statusDraft')}

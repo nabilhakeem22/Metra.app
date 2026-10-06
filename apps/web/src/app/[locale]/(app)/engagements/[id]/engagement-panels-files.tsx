@@ -10,6 +10,7 @@ import { ArtifactPanel } from './engagement-artifact-panel';
 import { EngagementFilesTray } from './engagement-files-tray';
 import { PanelHeader } from './engagement-panel-header';
 import { ArtifactsPanel } from './engagement-panels-artifacts';
+import { SectionLabel } from '@/components/ui/section-label';
 
 /**
  * The Files detail tab: the working-files tray (latest approved deliverable per
@@ -77,9 +78,7 @@ export function FilesTab({
           canUpload={canUpload}
         />
         <div>
-          <p className="mb-2 font-mono text-caption font-semibold uppercase tracking-[0.1em] text-[color:var(--text-muted)]">
-            {t('panels.artifacts')}
-          </p>
+          <SectionLabel className="mb-2">{t('panels.artifacts')}</SectionLabel>
           {/* `canUpload` is the §2.2 engagements_design/create cell; for THIS
               capability create and update are identical across all seven roles (only
               `viewer` is read-only), so it is also the right gate for the client-portal

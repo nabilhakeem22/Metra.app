@@ -3,6 +3,7 @@
 import { useLocale, useTranslations } from 'next-intl';
 import type { CommercialPulse } from '@/lib/engagements/pulse';
 import { formatMoney } from '@/lib/format/money';
+import { SectionLabel } from '@/components/ui/section-label';
 
 // The Commercial Pulse Bar (Slice 4) — the 3-cell strip that sits ABOVE the phase
 // rail. Purely presentational over the server-computed `CommercialPulse` read-model
@@ -26,18 +27,18 @@ export function EngagementPulseBar({ pulse }: { pulse: CommercialPulse }) {
   return (
     <section className="grid grid-cols-1 gap-px overflow-hidden rounded-panel border border-[color:var(--rule)] bg-[color:var(--rule)] text-[color:var(--text)] shadow-sm sm:grid-cols-[1fr_1fr_1.6fr]">
       <div className="bg-card px-[18px] py-[14px]">
-        <div className="mb-1.5 font-mono text-caption font-semibold uppercase tracking-[0.1em] text-[color:var(--text-muted)]">
+        <SectionLabel as="div" className="mb-1.5">
           {t('contractTotal')}
-        </div>
+        </SectionLabel>
         <div className="text-heading font-semibold leading-tight tabular" dir="ltr">
           {formatMoney(contractTotal, locale)}
         </div>
       </div>
 
       <div className="bg-card px-[18px] py-[14px]">
-        <div className="mb-1.5 font-mono text-caption font-semibold uppercase tracking-[0.1em] text-[color:var(--text-muted)]">
+        <SectionLabel as="div" className="mb-1.5">
           {t('collected')}
-        </div>
+        </SectionLabel>
         <div className="text-heading font-semibold leading-tight tabular" dir="ltr">
           {formatMoney(collected, locale)}
         </div>
@@ -60,9 +61,9 @@ export function EngagementPulseBar({ pulse }: { pulse: CommercialPulse }) {
       </div>
 
       <div className="bg-brand-tint px-[18px] py-[14px]">
-        <div className="mb-1.5 font-mono text-caption font-semibold uppercase tracking-[0.1em] text-brand-ink">
+        <SectionLabel as="div" className="mb-1.5 text-brand-ink">
           {t('pendingGate')}
-        </div>
+        </SectionLabel>
         {pendingGate ? (
           <>
             {/* Amount on its own line (tabular, dir=ltr); the "due" qualifier

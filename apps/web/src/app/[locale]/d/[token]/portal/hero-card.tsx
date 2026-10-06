@@ -117,7 +117,7 @@ function ActionHero({ token, group }: { token: string; group: HeroGroup }) {
 
   return (
     <section className="space-y-3 rounded-panel border-2 border-primary/25 bg-background p-5 shadow-md">
-      <span className="inline-flex items-center gap-1.5 rounded-pill bg-primary/10 px-2.5 py-1 text-caption font-bold uppercase tracking-wide text-primary">
+      <span className="inline-flex items-center gap-1.5 rounded-pill bg-primary/10 px-2.5 py-1 text-caption font-bold text-primary ltr:uppercase ltr:tracking-wide">
         <span aria-hidden>●</span>
         {tHero('readyTag')}
       </span>
@@ -183,7 +183,7 @@ function CalmHero({
     >
       {kind !== 'closed' && (
         <span
-          className={`inline-flex items-center rounded-pill px-2.5 py-1 text-caption font-bold uppercase tracking-wide ${
+          className={`inline-flex items-center rounded-pill px-2.5 py-1 text-caption font-bold ltr:uppercase ltr:tracking-wide ${
             delivered
               ? 'bg-[color:var(--success-tint)] text-[color:var(--success)]'
               : 'bg-muted text-muted-foreground'

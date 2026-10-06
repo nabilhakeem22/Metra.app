@@ -16,6 +16,7 @@ import { PanelHeader } from './engagement-panel-header';
 import { Empty } from './engagement-panels-parts';
 import { RomIssueButton } from './engagement-rom-issue-button';
 import { RomRangeForm } from './engagement-rom-range-form';
+import { SectionLabel } from '@/components/ui/section-label';
 
 /**
  * The Budget tab — the indicative build cost, as a ledger rather than a number.
@@ -112,9 +113,7 @@ export function BudgetTab({
         </div>
 
         <div>
-          <p className="mb-2 font-mono text-caption font-semibold uppercase tracking-[0.1em] text-[color:var(--text-muted)]">
-            {tp('budgetHistory')}
-          </p>
+          <SectionLabel className="mb-2">{tp('budgetHistory')}</SectionLabel>
           {entries.length === 0 ? (
             <Empty text={t('rom.noHistory')} />
           ) : (

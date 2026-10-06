@@ -5,6 +5,7 @@ import { findLatestClientChangeRequestNote } from '@/lib/engagements/client-acti
 import type { EngagementClientActivityRecord } from '@/lib/engagements/queries/client-activity';
 import { formatDate } from '@/lib/format/date';
 import type { CommandCardCopy } from './command-card-copy';
+import { SectionLabel } from '@/components/ui/section-label';
 
 /**
  * The client's own words — a QUIET callout under the headline, never a second CTA.
@@ -27,9 +28,7 @@ function ClientNoteCallout({
   const clientNoteDate = formatDate(clientNote.decidedAt, locale);
   return (
     <div className="mb-4 rounded-panel border border-[color:var(--rule)] bg-[color:var(--track)] px-3 py-2.5">
-      <p className="text-caption font-semibold uppercase tracking-[0.08em] text-[color:var(--text-faint)]">
-        {tcmd('clientNote')}
-      </p>
+      <SectionLabel>{tcmd('clientNote')}</SectionLabel>
       {/* Clamped to 4 lines: a long client note must never push the primary
           Advance CTA below the fold — the whole point of this card is one
           unmissable next action. The full text is always in the Timeline. */}
@@ -72,9 +71,9 @@ export function CommandCardHeadline({
           action — it is a different, healthy one — so it gets its own label rather
           than no label at all, which left the headline floating. */}
       {!closed && (
-        <p className="mb-1.5 font-mono text-caption font-bold uppercase tracking-[0.14em] text-[color:var(--text-faint)]">
+        <SectionLabel className="mb-1.5">
           {copy.actor === 'client' ? tcmd('pill.waitingClient') : tcmd('nextAction')}
-        </p>
+        </SectionLabel>
       )}
       <h2 className="mb-1 text-heading font-semibold leading-tight text-balance">
         {copy.headline}

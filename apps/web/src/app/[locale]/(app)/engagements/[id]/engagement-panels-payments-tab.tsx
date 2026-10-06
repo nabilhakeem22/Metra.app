@@ -17,6 +17,7 @@ import { PaymentsPanel } from './engagement-panels-payments';
 import { PaymentPanel } from './engagement-payment-panel';
 import { EngagementPulseBar } from './engagement-pulse-bar';
 import type { RunAction } from './use-engagement-action';
+import { SectionLabel } from '@/components/ui/section-label';
 
 /**
  * The Payments detail tab — the commercial pulse, the fee schedule and the
@@ -102,9 +103,7 @@ export function PaymentsTab({
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div>
-      <p className="mb-2 font-mono text-caption font-semibold uppercase tracking-[0.1em] text-[color:var(--text-muted)]">
-        {title}
-      </p>
+      <SectionLabel className="mb-2">{title}</SectionLabel>
       {children}
     </div>
   );

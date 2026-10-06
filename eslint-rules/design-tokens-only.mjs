@@ -1,5 +1,6 @@
 // ESLint rule: the design system is six type sizes, four corner sizes (plus
 // none / full), semantic colours and four font weights. Anything else drifts.
+// Uppercase, letter-spacing and mono are Latin-only and must be scoped so.
 //
 // Unlike `no-physical-inline-direction`, this visits EVERY string literal and
 // template chunk in the file, not only className / cn() arguments, so a class
@@ -19,6 +20,12 @@ const PALETTE_COLOUR =
   /^(bg|text|border|ring|outline|fill|stroke|from|via|to|divide|placeholder|decoration|shadow|accent|caret)-(slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose)-[0-9]{2,3}(\/[0-9]+)?$/;
 const OFF_SET_WEIGHT = /^font-(thin|extralight|light|extrabold|black|\[.+\])$/;
 const BANNED_STYLE_KEYS = new Set(['fontSize', 'borderRadius', 'fontWeight', 'letterSpacing']);
+// Arabic script is joined: letter-spacing tears the joins apart, a monospace
+// face has no Arabic glyphs worth the name, and Arabic has no case. These are
+// Latin-only typography, so they must be scoped to Latin (an `ltr:` variant, an
+// element marked dir="ltr", or figures: `tabular` in the same class string).
+const ARABIC_UNSAFE = /^(uppercase|tracking-.+|font-mono)$/;
+const ALWAYS_SAFE = new Set(['tracking-[var(--tracking-num)]']);
 
 // Display (28px) is the dashboard's hero figure size and nothing else's.
 const DISPLAY_ALLOWED = [
@@ -26,6 +33,17 @@ const DISPLAY_ALLOWED = [
   '/app/[locale]/(app)/dashboard/',
   '/components/ui/stat-card.tsx',
 ];
+
+// Expression nodes a class string can sit inside on its way to a className.
+const PASS_THROUGH = new Set([
+  'JSXExpressionContainer',
+  'TemplateLiteral',
+  'CallExpression',
+  'ConditionalExpression',
+  'LogicalExpression',
+  'BinaryExpression',
+  'ArrayExpression',
+]);
 
 /** Split a class token into its variants and the utility, honouring `[...]`. */
 export function splitVariants(token) {
@@ -78,27 +96,54 @@ export const designTokensOnly = {
         'Font weight "{{token}}" is not loaded. Use font-normal, font-medium, font-semibold or font-bold.',
       styleKey:
         'Inline style "{{key}}" bypasses the design tokens. Use the matching Tailwind token class.',
+      arabicUnsafe:
+        '"{{token}}" breaks Arabic (joined script, no case, no mono glyphs). Scope it with ltr:, put it on a dir="ltr" element, or (mono/tracking) pair it with tabular figures.',
     },
   },
   create(context) {
     const filename = context.filename.replace(/\\/g, '/');
     const displayAllowed = DISPLAY_ALLOWED.some((path) => filename.includes(path));
 
-    function checkToken(node, token) {
-      const { utility } = splitVariants(token);
+    function checkToken(node, token, latinScoped, figures) {
+      const { variants, utility } = splitVariants(token);
       const report = (messageId) => context.report({ node, messageId, data: { token } });
       if (OFF_SCALE_TYPE.test(withoutModifier(utility))) return report('offScaleType');
       if (utility === 'text-display' && !displayAllowed) return report('displayOutsideDashboard');
       if (isOffScaleRadius(utility)) return report('offScaleRadius');
       if (PALETTE_COLOUR.test(utility)) return report('paletteColour');
       if (OFF_SET_WEIGHT.test(utility)) return report('offSetWeight');
+      if (ARABIC_UNSAFE.test(utility) && !ALWAYS_SAFE.has(utility)) {
+        const scoped = latinScoped || variants.includes('ltr');
+        const isFigure = figures && utility !== 'uppercase';
+        if (!scoped && !isFigure) return report('arabicUnsafe');
+      }
     }
 
-    function checkString(node, value) {
+    function checkString(node, value, wholeString) {
       if (typeof value !== 'string') return;
+      const latinScoped = onLtrElement(node);
+      const figures = /(^|\s)(tabular|tabular-nums)(\s|$)/.test(wholeString ?? value);
       for (const token of value.split(/\s+/)) {
-        if (token) checkToken(node, token);
+        if (token) checkToken(node, token, latinScoped, figures);
       }
+    }
+
+    /** The string is (part of) the className of a JSX element with dir="ltr". */
+    function onLtrElement(node) {
+      let current = node.parent;
+      while (current && current.type !== 'JSXAttribute') {
+        if (!PASS_THROUGH.has(current.type)) return false;
+        current = current.parent;
+      }
+      if (!current || current.name?.name !== 'className') return false;
+      const element = current.parent;
+      return element.attributes.some(
+        (attribute) =>
+          attribute.type === 'JSXAttribute' &&
+          attribute.name?.name === 'dir' &&
+          attribute.value?.type === 'Literal' &&
+          attribute.value.value === 'ltr',
+      );
     }
 
     function isJsxStyleObject(node) {
@@ -115,7 +160,8 @@ export const designTokensOnly = {
         checkString(node, node.value);
       },
       TemplateElement(node) {
-        checkString(node, node.value.cooked);
+        const whole = node.parent.quasis.map((quasi) => quasi.value.cooked).join(' ');
+        checkString(node, node.value.cooked, whole);
       },
       ObjectExpression(node) {
         if (!isJsxStyleObject(node)) return;

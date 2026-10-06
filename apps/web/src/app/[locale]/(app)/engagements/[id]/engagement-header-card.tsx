@@ -9,6 +9,7 @@ import { formatDate } from '@/lib/format/date';
 import { docYear, formatDocNumber } from '@/lib/format/doc-number';
 import { formatMoney } from '@/lib/format/money';
 import { pickLocale } from '@/lib/i18n/pick-locale';
+import { SectionLabel } from '@/components/ui/section-label';
 
 // The cockpit HEADER — breadcrumb and document number on a quiet mono line, the
 // engagement named at display weight, then a chip row of what is true about it,
@@ -88,11 +89,11 @@ export function EngagementHeaderCard({
         {/* Breadcrumb + document number on one mono line: where you are, and which
             record this is. The number was a bordered pill of its own; here it earns
             less weight than the client's name, which is what a studio scans for. */}
-        <p className="font-mono text-caption font-semibold uppercase tracking-[0.1em] text-[color:var(--text-faint)]">
+        <SectionLabel>
           <span>{tc('crumb')}</span>
           <span aria-hidden> / </span>
           <span dir="ltr">{docNumber}</span>
-        </p>
+        </SectionLabel>
         <h1 className="mt-1 text-heading font-bold leading-tight text-[color:var(--text)] text-balance">
           {client}
           {/* `·` not an em dash: — is not Arabic punctuation, and this line

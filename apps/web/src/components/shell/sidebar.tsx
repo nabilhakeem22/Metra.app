@@ -11,6 +11,7 @@ import type { MemberRole } from '@/lib/permissions/roles';
 import { cn } from '@/lib/utils';
 import { COMING_SOON_ITEMS, NAV_GROUPS } from './nav-items';
 import { OrgSwitcher, type OrgOption } from './org-switcher';
+import { SectionLabel } from '@/components/ui/section-label';
 
 export interface SidebarProps {
   /** Called after a nav link is followed — used to close the mobile drawer. */
@@ -71,11 +72,9 @@ export function Sidebar({
         {NAV_GROUPS.map((group) => (
           <div key={group.groupKey} className="flex flex-col gap-[3px]">
             {group.labelKey && (
-              <span
-                className="px-[11px] pb-1 text-caption font-bold uppercase tracking-[0.04em] text-[color:var(--text-faint)]"
-              >
+              <SectionLabel as="span" className="px-[11px] pb-1">
                 {nav(group.labelKey)}
-              </span>
+              </SectionLabel>
             )}
 
             {group.items

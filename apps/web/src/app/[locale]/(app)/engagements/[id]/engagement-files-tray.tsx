@@ -13,6 +13,7 @@ import { ArtifactVisibilityControl } from './artifact-visibility-control';
 import { useClientVisibility } from './use-client-visibility';
 import { UploadQueueList } from './upload-queue-list';
 import { useDeliverableUpload } from './use-deliverable-upload';
+import { SectionLabel } from '@/components/ui/section-label';
 
 // Epic D, Slice 5 + Deliverable Uploads — the "Working files" tray, now pinned at
 // the top of the Files detail tab. It shows the latest approved deliverable per
@@ -73,9 +74,9 @@ export function EngagementFilesTray({
   return (
     <section className="overflow-hidden rounded-panel border border-[color:var(--rule)] bg-card text-[color:var(--text)] shadow-sm">
       <header className="flex items-center justify-between border-b border-[color:var(--rule)] px-4 py-3">
-        <h3 className="m-0 font-mono text-caption font-semibold uppercase tracking-[0.1em] text-[color:var(--text-muted)]">
+        <SectionLabel as="h3" className="m-0">
           {t('title')}
-        </h3>
+        </SectionLabel>
         <span className="text-caption text-[color:var(--text-muted)]">
           {t('latestApproved')}
         </span>
@@ -92,7 +93,7 @@ export function EngagementFilesTray({
               key={row.category}
               className="flex items-center gap-[11px] rounded-item border border-[color:var(--rule)] bg-card px-3 py-2.5"
             >
-              <span className="grid h-[30px] w-[30px] shrink-0 place-items-center rounded-item bg-brand-tint font-mono text-small font-semibold text-brand-ink">
+              <span className="grid h-[30px] w-[30px] shrink-0 place-items-center rounded-item bg-brand-tint text-small font-semibold text-brand-ink ltr:font-mono">
                 {t(`badge.${row.category}`)}
               </span>
               <div className="min-w-0">

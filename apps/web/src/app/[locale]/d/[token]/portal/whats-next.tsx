@@ -51,7 +51,7 @@ export function WhatsNext({
         <ArrowRight className="size-4" />
       </div>
       <div className="min-w-0">
-        <p className="text-caption font-semibold uppercase tracking-wide text-muted-foreground">
+        <p className="text-caption font-semibold text-muted-foreground ltr:uppercase ltr:tracking-wide">
           {t('whatsNext.eyebrow')}
         </p>
         <p className="mt-0.5 truncate text-body font-semibold">
