@@ -58,7 +58,7 @@ const ToastAction = React.forwardRef<
   <ToastPrimitives.Action
     ref={ref}
     className={cn(
-      'inline-flex h-8 shrink-0 items-center justify-center rounded-item border bg-transparent px-3 text-body font-medium transition-colors hover:bg-muted',
+      'inline-flex h-8 shrink-0 items-center justify-center rounded-item border bg-transparent px-3 text-body font-medium transition-colors hover:bg-muted coarse:min-h-11',
       className,
     )}
     {...props}
@@ -73,7 +73,8 @@ const ToastClose = React.forwardRef<
   <ToastPrimitives.Close
     ref={ref}
     className={cn(
-      'absolute end-2 top-2 rounded-item p-1 text-foreground/60 opacity-0 transition-opacity hover:text-foreground group-hover:opacity-100 focus:opacity-100',
+      // Always visible: a touch screen has no hover to reveal it.
+      'absolute end-2 top-2 inline-flex items-center justify-center rounded-item p-1 text-foreground/60 transition-colors hover:text-foreground coarse:size-11',
       className,
     )}
     toast-close=""

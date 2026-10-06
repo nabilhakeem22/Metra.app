@@ -618,6 +618,13 @@
     color: var(--text);
     background: var(--glass-strong);
   }
+  /* A finger needs 44px; a mouse does not, so the desktop bar stays compact. */
+  @media (pointer: coarse) {
+    .glass-icon-btn {
+      inline-size: 44px;
+      block-size: 44px;
+    }
+  }
 }
 
 @layer utilities {

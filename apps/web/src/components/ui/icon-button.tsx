@@ -2,7 +2,7 @@ import { Slot } from '@radix-ui/react-slot';
 import * as React from 'react';
 import { cn } from '@/lib/utils';
 
-// Shared 34px glass icon button (--r-item): flat --glass fill + hairline, no
+// Shared 34px (44px on touch) glass icon button (--r-item): flat --glass fill + hairline, no
 // backdrop-filter (never nests blur). Used by the top-bar bell / help / menu.
 // Callers MUST pass an aria-label (icon-only control).
 export interface IconButtonProps

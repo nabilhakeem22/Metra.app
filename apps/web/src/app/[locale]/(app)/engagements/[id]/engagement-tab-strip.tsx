@@ -6,7 +6,7 @@ import type { BudgetBadge } from '@/lib/engagements/budget-badge';
 import { ENGAGEMENT_TABS, type EngagementTab } from './tabs';
 
 const TAB_BASE =
-  'inline-flex items-center gap-1.5 rounded-item px-3.5 py-1.5 text-small transition-colors disabled:cursor-not-allowed disabled:opacity-60';
+  'inline-flex items-center gap-1.5 rounded-item px-3.5 py-1.5 text-small transition-colors disabled:cursor-not-allowed disabled:opacity-60 coarse:min-h-11';
 const TAB_ACTIVE = 'bg-card font-bold text-[color:var(--text)] shadow-sm';
 const TAB_IDLE =
   'font-medium text-[color:var(--text-muted)] hover:text-[color:var(--text)]';

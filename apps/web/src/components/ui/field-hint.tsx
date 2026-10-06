@@ -42,7 +42,9 @@ export function FieldHint({
           aria-label={t('common.hint')}
           onClick={() => setOpen((v) => !v)}
           className={cn(
-            'ms-1 inline-flex size-4 shrink-0 items-center justify-center border border-border text-caption font-semibold leading-none text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+            'relative ms-1 inline-flex size-4 shrink-0 items-center justify-center rounded-full border border-border text-caption font-semibold leading-none text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+            // On touch the 16px mark keeps its size but its hit area is 44px.
+            "coarse:after:absolute coarse:after:-inset-[14px] coarse:after:content-['']",
             className,
           )}
         >

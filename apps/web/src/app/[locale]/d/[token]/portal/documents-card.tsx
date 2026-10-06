@@ -92,7 +92,7 @@ export function DocumentsCard({
                   href={`/${locale}/d/${encodeURIComponent(token)}/documents/${releasedDocument.id}`}
                   rel="noopener"
                   target={releasedDocument.access === 'preview' ? '_blank' : undefined}
-                  className="ms-auto inline-flex items-center gap-1.5 rounded-pill border px-3 py-1.5 text-caption font-semibold hover:bg-muted"
+                  className="ms-auto inline-flex items-center gap-1.5 rounded-pill border px-3 py-1.5 text-caption font-semibold hover:bg-muted coarse:min-h-11"
                 >
                   {releasedDocument.access === 'preview' ? (
                     <>

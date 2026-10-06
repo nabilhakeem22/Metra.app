@@ -61,7 +61,7 @@ export function DocumentThread({
         type="button"
         onClick={thread.toggle}
         aria-expanded={thread.open}
-        className="inline-flex items-center gap-1.5 rounded-pill px-2 py-1 text-caption font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
+        className="inline-flex items-center gap-1.5 rounded-pill px-2 py-1 text-caption font-medium text-muted-foreground hover:bg-muted hover:text-foreground coarse:min-h-11"
       >
         <MessageSquare className="size-3.5" aria-hidden />
         {count > 0 ? t('toggleCount', { count }) : t('toggleEmpty')}
