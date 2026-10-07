@@ -53,6 +53,14 @@ describe('clientActEmailTemplate', () => {
     expect(email.text).toContain('The client approved the final design.');
   });
 
+  it('R5: a title with line breaks and 5000 characters stays one capped line in the subject', () => {
+    const email = render({ kind: 'design_approved' }, 'en', `DE-2026-0001 · Villa\r\nBcc: x@e.com${'a'.repeat(5000)}`);
+    expect(email.subject).not.toMatch(/[\r\n]/);
+    expect(Array.from(email.subject).length).toBeLessThan(200);
+    expect(email.subject.endsWith('…')).toBe(true);
+    expect(email.html.length).toBeLessThan(4000);
+  });
+
   it('escapes the delivery title, which is studio-typed text', () => {
     const email = render({ kind: 'commented' }, 'en', 'DE-2026-0001 · <b>Villa</b>');
     expect(email.html).not.toContain('<b>Villa</b>');

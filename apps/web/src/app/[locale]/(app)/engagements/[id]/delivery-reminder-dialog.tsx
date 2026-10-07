@@ -1,14 +1,17 @@
 'use client';
 
 import * as DialogPrimitive from '@radix-ui/react-dialog';
-import { Loader2, RefreshCw, X } from 'lucide-react';
+import { Loader2, X } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { useEffect } from 'react';
-import { Button } from '@/components/ui/button';
-import { useConfirm } from '@/components/ui/confirm-dialog';
 import { IconButton } from '@/components/ui/icon-button';
 import { resolveActionError } from '@/lib/actions/error-message';
 import { DeliveryReminderReady } from './delivery-reminder-ready';
+import {
+  ReminderNotConfigured,
+  ReminderNotShared,
+  ReminderReplaceLink,
+} from './delivery-reminder-refusals';
 import { DELIVERY_REMINDER_OPEN_EVENT } from './share-anchor';
 import { useDeliveryReminder, type DeliveryReminderApi } from './use-delivery-reminder';
 
@@ -17,8 +20,9 @@ import { useDeliveryReminder, type DeliveryReminderApi } from './use-delivery-re
  * with the link they ALREADY hold. Owner/admin only (the caller renders it only
  * with `canShare`; the server actions enforce it). Opens from the header menu,
  * the waiting card and the checklist's nudge pill (`openDeliveryReminder()`).
- * Opening it never rotates the link; a link that cannot be re-created is
- * replaced only through the confirmation below.
+ * Opening it never changes the link (it writes one audit row: the link was
+ * shown). A link that cannot be re-created is replaced only through a
+ * confirmation; a delivery with no link is offered Share instead.
  */
 export function DeliveryReminderDialog({ engagementId }: { engagementId: string }) {
   const t = useTranslations('engagements.reminder');
@@ -60,7 +64,9 @@ function ReminderBody({ api }: { api: DeliveryReminderApi }) {
   const terrors = useTranslations('errors');
   const { view } = api;
   if (view.status === 'ready') return <DeliveryReminderReady api={api} reminder={view.reminder} />;
-  if (view.status === 'unrecoverable') return <ReplaceLink api={api} />;
+  if (view.status === 'notShared') return <ReminderNotShared api={api} />;
+  if (view.status === 'notConfigured') return <ReminderNotConfigured />;
+  if (view.status === 'unrecoverable') return <ReminderReplaceLink api={api} />;
   if (view.status === 'failed') {
     return (
       <p className="text-body text-destructive" role="alert">
@@ -73,45 +79,5 @@ function ReminderBody({ api }: { api: DeliveryReminderApi }) {
       <Loader2 className="size-4 animate-spin" aria-hidden />
       {t('loading')}
     </p>
-  );
-}
-
-/** The link cannot be re-created: explain why, and offer ONE replacement, behind a confirm. */
-function ReplaceLink({ api }: { api: DeliveryReminderApi }) {
-  const t = useTranslations('engagements.reminder');
-  const tc = useTranslations('common');
-  const { confirm, dialog } = useConfirm();
-
-  async function confirmReplace(): Promise<void> {
-    const confirmed = await confirm({
-      title: t('confirmReplace.title'),
-      description: `${t('confirmReplace.body')} ${tc('cannotUndo')}`,
-      confirmLabel: t('replace'),
-      cancelLabel: tc('cancel'),
-      variant: 'destructive',
-    });
-    if (confirmed) api.replaceAndReload();
-  }
-
-  return (
-    <div className="space-y-3">
-      {dialog}
-      <p className="text-body font-semibold">{t('unrecoverableTitle')}</p>
-      <p className="text-small text-[color:var(--text-muted)]">{t('unrecoverableBody')}</p>
-      <Button
-        type="button"
-        variant="secondary"
-        className="w-full"
-        disabled={api.replacing}
-        onClick={() => void confirmReplace()}
-      >
-        {api.replacing ? (
-          <Loader2 className="size-4 animate-spin" aria-hidden />
-        ) : (
-          <RefreshCw className="size-4" aria-hidden />
-        )}
-        {t('replace')}
-      </Button>
-    </div>
   );
 }

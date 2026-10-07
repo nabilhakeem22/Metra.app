@@ -15,7 +15,7 @@ vi.mock('@/lib/email/delivery-senders', () => ({
 }));
 
 import { AUTH_LOOKUP_TIMEOUT_MS } from '@/lib/http/deadlines';
-import { emailClientActRecipients } from './email';
+import { CLIENT_ACT_EMAIL_CONCURRENCY, emailClientActRecipients } from './email';
 
 const batch = (userIds: string[]) => ({
   userIds,
@@ -52,6 +52,7 @@ describe('emailClientActRecipients', () => {
       'u2@studio.example',
     ]);
     expect(console.info).toHaveBeenCalledWith('client act email:', {
+      act: 'client_design_approved',
       sent: 2,
       failed: 0,
       noAddress: 0,
@@ -70,6 +71,7 @@ describe('emailClientActRecipients', () => {
 
     expect(sendClientActEmail).toHaveBeenCalledTimes(1);
     expect(console.info).toHaveBeenCalledWith('client act email:', {
+      act: 'client_design_approved',
       sent: 1,
       failed: 1,
       noAddress: 0,
@@ -87,8 +89,60 @@ describe('emailClientActRecipients', () => {
     expect(logged).not.toContain('secret@studio.example');
     expect(logged).not.toContain('user-id-1');
     expect(console.info).toHaveBeenCalledWith('client act email:', {
+      act: 'client_design_approved',
       sent: 0,
       failed: 1,
+      noAddress: 0,
+    });
+  });
+
+  it('R1: never more than 4 recipients in flight', async () => {
+    let inFlight = 0;
+    let peak = 0;
+    getUserById.mockImplementation(async (id: string) => ({
+      data: { user: { email: `${id}@studio.example` } },
+      error: null,
+    }));
+    sendClientActEmail.mockImplementation(async () => {
+      inFlight += 1;
+      peak = Math.max(peak, inFlight);
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      inFlight -= 1;
+      return { sent: true };
+    });
+    const pending = emailClientActRecipients(batch(Array.from({ length: 30 }, (_, i) => `u${i}`)));
+    await vi.advanceTimersByTimeAsync(2_000);
+    await pending;
+    expect(CLIENT_ACT_EMAIL_CONCURRENCY).toBe(4);
+    expect(peak).toBe(4);
+    expect(sendClientActEmail).toHaveBeenCalledTimes(30);
+    expect(console.info).toHaveBeenCalledWith('client act email:', {
+      act: 'client_design_approved',
+      sent: 30,
+      failed: 0,
+      noAddress: 0,
+    });
+  });
+
+  it('R1: a queued recipient is not looked up (no deadline armed) until a slot frees', async () => {
+    getUserById.mockImplementation(
+      (id: string) =>
+        new Promise((resolve) =>
+          setTimeout(() => resolve({ data: { user: { email: `${id}@studio.example` } }, error: null }), 3_000),
+        ),
+    );
+    const pending = emailClientActRecipients(batch(Array.from({ length: 10 }, (_, i) => `u${i}`)));
+    await vi.advanceTimersByTimeAsync(0);
+    expect(getUserById).toHaveBeenCalledTimes(4);
+    // 3 waves of a 3 s lookup: 9 s, past AUTH_LOOKUP_TIMEOUT_MS from the start,
+    // and nobody fails because each 8 s clock started with its own slot.
+    await vi.advanceTimersByTimeAsync(3 * 3_000 + 100);
+    await pending;
+    expect(getUserById).toHaveBeenCalledTimes(10);
+    expect(console.info).toHaveBeenCalledWith('client act email:', {
+      act: 'client_design_approved',
+      sent: 10,
+      failed: 0,
       noAddress: 0,
     });
   });

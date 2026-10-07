@@ -200,6 +200,31 @@ every link minted under the old value can no longer be re-derived, so the next
 reminder for each delivery has to replace that delivery's link once, with the
 studio's confirmation. Rotate it only if it may have leaked.
 
+If the secret is **missing or shorter than 32 characters**, links still work
+(new ones are plain random tokens) but none can be shown again or resent: the
+studio's reminder and "Show link" say the server needs configuring, offer no
+replacement, and the Worker logs one warning naming `SHARE_LINK_SECRET` (never
+a value).
+
+### Client links in WhatsApp reminders (owner decision, Round B)
+
+"Open WhatsApp" in the studio's reminder is a one-click `https://wa.me/…?text=`
+link whose text **carries the client's portal link**. That link is the client's
+only credential for the portal (it does not expire while active). Opening the
+wa.me URL is an ordinary HTTPS request outside WhatsApp's end-to-end encryption,
+so the portal link also lands in:
+
+- the studio user's **browser history** (and synced history and address-bar
+  suggestions, which matters on a shared office computer);
+- **wa.me / api.whatsapp.com request logs** at Meta.
+
+The owner accepted this trade-off for the one-click send. **The containment is
+"Replace the link"** in the client-link dialog (header menu, Client link): it
+kills the old link at once (the portal resolves links by hash) and the next
+reminder carries the new one. Replace it when a shared or synced browser
+profile, or a lost device, may have exposed it. "Copy message" puts the same
+text on the clipboard without going through wa.me.
+
 ## The cron Worker is a separate deployment
 
 `workers/cron` is **not** an npm workspace and is **not** deployed by

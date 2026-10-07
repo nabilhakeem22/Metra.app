@@ -75,6 +75,12 @@ describe('the client link menu', () => {
     expect(screen.getByRole('alert').textContent).toBe(en('delivery.share.unrecoverable'));
   });
 
+  test('F9: a server without the link secret says so instead of "try again"', () => {
+    const share = { ...sharedLink(), error: 'delivery_links_not_configured' };
+    renderWithIntl(<ShareLinkPanel share={share} />, { locale: 'en' });
+    expect(screen.getByRole('alert').textContent).toBe(en('delivery.share.notConfigured'));
+  });
+
   test('a delivery not yet shared offers only the Share button', () => {
     const share = { ...sharedLink(), shared: false };
     renderWithIntl(<ShareLinkPanel share={share} />, { locale: 'en' });

@@ -535,6 +535,9 @@
     "delivery_link_unrecoverable": "This client link can't be shown again. Replace it to send a reminder.",
     "client_email_missing": "The client has no email address on file.",
     "reminder_email_failed": "The reminder email didn't go out. Try again, or send it on WhatsApp.",
+    "delivery_link_not_shared": "There's no client link yet. Share one with the client first.",
+    "delivery_links_not_configured": "Link reminders are unavailable until the server is configured. Ask your Metra administrator.",
+    "reminder_too_soon": "A reminder email went to this client in the last 15 minutes. Try again later.",
     "handoff_not_open": "The design-only handoff isn't open at this stage",
     "rom_range_invalid": "Enter a valid build-cost range, low to high",
     "rom_not_set": "Enter the build-cost range before recording the client's acknowledgement",
@@ -2184,6 +2187,11 @@
       "emailTo": "Email goes to {email}",
       "noEmail": "No email address on file for this client.",
       "emailSent": "Reminder emailed.",
+      "notSharedTitle": "No client link yet",
+      "notSharedBody": "This delivery has no live client link, so there is nothing to remind them with. Share one first; the reminder then carries it.",
+      "share": "Share with client",
+      "notConfiguredTitle": "Link reminders are unavailable",
+      "notConfiguredBody": "The server is not set up to show client links again. The client's current link keeps working; ask your Metra administrator to configure it.",
       "unrecoverableTitle": "This link can't be resent",
       "unrecoverableBody": "It was made before links could be shown again, so Metra cannot re-create it. Replace it once: the client's current link stops working, and from then on the new one can be resent.",
       "replace": "Replace link and continue",
@@ -2207,6 +2215,7 @@
       "revoke": "Revoke",
       "error": "Something went wrong. Please try again.",
       "unrecoverable": "This link was made before links could be shown again, so it cannot be shown. Replace it to get one you can copy: the client's current link stops working.",
+      "notConfigured": "This server can't show client links again yet. The client's link keeps working; ask your Metra administrator.",
       "rotateHint": "Replacing the link stops the current one working.",
       "moreActions": "Link actions",
       "confirmRotate": {
@@ -2370,7 +2379,7 @@
       }
     },
     "reminder": {
-      "message": "Hello {client}, a reminder from {studio}: your design project is waiting for your review. You can see the latest updates and reply here:\n{link}"
+      "message": "Hello {client}, a reminder from {studio} about your design project. You can see the latest updates and anything that needs you here:\n{link}"
     }
   }
 }

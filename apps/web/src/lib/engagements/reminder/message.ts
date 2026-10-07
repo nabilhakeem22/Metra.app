@@ -8,6 +8,7 @@ import 'server-only';
 // studio user's, and the core must also run outside a request (the API, tests).
 import { createTranslator } from 'next-intl';
 import { LOCALES, type Locale } from '@/i18n/routing';
+import { NAME_MAX_CHARS, oneLine } from '@/lib/format/one-line';
 import { pickLocale } from '@/lib/i18n/pick-locale';
 import arEG from '@/messages/ar-EG.json';
 import en from '@/messages/en.json';
@@ -36,8 +37,8 @@ export function reminderMessages(input: {
       },
     });
     const text = t('message', {
-      client: pickLocale(input.recipient.client, 'name', locale).value.trim(),
-      studio: pickLocale(input.recipient.studio, 'name', locale).value.trim(),
+      client: oneLine(pickLocale(input.recipient.client, 'name', locale).value, NAME_MAX_CHARS),
+      studio: oneLine(pickLocale(input.recipient.studio, 'name', locale).value, NAME_MAX_CHARS),
       link: deliveryPortalUrl(input.origin, locale, input.rawToken),
     });
     return [locale, text] as const;

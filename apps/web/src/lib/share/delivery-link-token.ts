@@ -45,9 +45,27 @@ export interface DeliveryLinkToken {
   nonce: string | null;
 }
 
+/** One warning per isolate, so a misconfigured deployment is visible without flooding the log. */
+let warnedMissingSecret = false;
+
 function linkSecret(): string | null {
   const secret = runtimeSecret('SHARE_LINK_SECRET');
-  return secret && secret.length >= MIN_SECRET_LENGTH ? secret : null;
+  if (secret && secret.length >= MIN_SECRET_LENGTH) return secret;
+  if (!warnedMissingSecret) {
+    warnedMissingSecret = true;
+    // The NAME only, never a value, a length or a prefix.
+    console.warn('SHARE_LINK_SECRET is missing or too short: delivery links cannot be shown again or resent');
+  }
+  return null;
+}
+
+/**
+ * Can links be re-derived on this deployment at all? When not, a "replace the
+ * link" would kill the client's working link and STILL not be resendable, so
+ * the studio is told the server needs configuring instead.
+ */
+export function deliveryLinkSecretConfigured(): boolean {
+  return linkSecret() !== null;
 }
 
 function deriveRaw(secret: string, engagementId: string, nonce: string): string {

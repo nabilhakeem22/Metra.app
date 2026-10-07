@@ -6,6 +6,7 @@
 // studio reads that in the app, behind its own login.
 import { EMAIL_BRAND } from '@/lib/email/brand';
 import type { ClientAct, ClientActKind } from '@/lib/engagements/client-acts/acts';
+import { TITLE_MAX_CHARS, oneLine } from '@/lib/format/one-line';
 import { escapeHtml } from '@/lib/html/escape';
 import type { EmailContent } from './automation';
 import { emailShell } from './shell';
@@ -19,6 +20,9 @@ export interface ClientActEmailInput {
 }
 
 type Copy = Record<'ar' | 'en', string>;
+
+/** `DE-YYYY-NNNN · ` plus a capped title. */
+const LABEL_MAX_CHARS = 'DE-0000-0000 · '.length + TITLE_MAX_CHARS;
 
 /** What the client did, as one sentence. */
 const ACT_LINE: Record<Exclude<ClientActKind, 'payment_claimed'>, Copy> = {
@@ -79,7 +83,9 @@ function actLine(act: ClientAct, lang: 'ar' | 'en'): string {
 
 export function clientActEmailTemplate(input: ClientActEmailInput): EmailContent {
   const lang = input.locale.startsWith('ar') ? 'ar' : 'en';
-  const label = input.deliveryLabel.trim();
+  // `DE-YYYY-NNNN · title`: one line, the title part already capped by the
+  // caller; capped again here so no caller can put a line break in a subject.
+  const label = oneLine(input.deliveryLabel, LABEL_MAX_CHARS);
   const subject =
     lang === 'ar'
       ? label

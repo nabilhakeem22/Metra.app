@@ -2,7 +2,11 @@ import { act, fireEvent, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import { messageAt, renderWithIntl } from '@/test/render-with-intl';
 import { DeliveryReminderDialog } from './delivery-reminder-dialog';
-import { openDeliveryReminder } from './share-anchor';
+import {
+  DELIVERY_LINK_CHANGED_EVENT,
+  announceDeliveryLinkChanged,
+  openDeliveryReminder,
+} from './share-anchor';
 
 // "Send reminder" (B11): the WhatsApp link carries the EXISTING client link,
 // opening the dialog never rotates it, and a link that cannot be re-created is
@@ -16,6 +20,7 @@ const actions = vi.hoisted(() => ({
   prepareDeliveryReminder: vi.fn(),
   emailDeliveryReminder: vi.fn(),
   rotateDeliveryLink: vi.fn(),
+  shareDeliveryLink: vi.fn(),
 }));
 vi.mock('@/lib/engagements/actions', () => actions);
 
@@ -130,5 +135,79 @@ describe('the reminder dialog', () => {
     actions.prepareDeliveryReminder.mockResolvedValue({ ok: false, error: 'forbidden' });
     await openDialog();
     expect((await screen.findByRole('alert')).textContent).toBe(en('errors.forbidden'));
+  });
+
+  test('F3: a never-shared or revoked delivery offers Share, not the legacy replacement', async () => {
+    actions.prepareDeliveryReminder
+      .mockResolvedValueOnce({ ok: false, error: 'delivery_link_not_shared' })
+      .mockResolvedValueOnce(READY);
+    actions.shareDeliveryLink.mockResolvedValue({ ok: true, link: LINK_AR });
+    const changes: unknown[] = [];
+    const listener = (event: Event) => changes.push((event as CustomEvent).detail);
+    window.addEventListener(DELIVERY_LINK_CHANGED_EVENT, listener);
+    await openDialog();
+    expect(await screen.findByText(en('engagements.reminder.notSharedTitle'))).toBeTruthy();
+    expect(screen.queryByText(en('engagements.reminder.unrecoverableBody'))).toBeNull();
+    expect(screen.queryByRole('button', { name: en('engagements.reminder.replace') })).toBeNull();
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: en('engagements.reminder.share') }));
+    });
+    expect(actions.shareDeliveryLink).toHaveBeenCalledWith('e-1');
+    expect(actions.rotateDeliveryLink).not.toHaveBeenCalled();
+    await waitFor(whatsappLink);
+    expect(changes).toEqual([{ shared: true, source: 'reminder' }]);
+    window.removeEventListener(DELIVERY_LINK_CHANGED_EVENT, listener);
+  });
+
+  test('F9: without the server secret there is no Replace, only the explanation', async () => {
+    actions.prepareDeliveryReminder.mockResolvedValue({ ok: false, error: 'delivery_links_not_configured' });
+    await openDialog();
+    expect(await screen.findByText(en('engagements.reminder.notConfiguredBody'))).toBeTruthy();
+    expect(screen.queryByRole('button', { name: en('engagements.reminder.replace') })).toBeNull();
+    expect(screen.queryByRole('button', { name: en('engagements.reminder.share') })).toBeNull();
+  });
+
+  test('F9: a replacement that is STILL unrecoverable stops there instead of offering another', async () => {
+    actions.prepareDeliveryReminder.mockResolvedValue({ ok: false, error: 'delivery_link_unrecoverable' });
+    actions.rotateDeliveryLink.mockResolvedValue({ ok: true, link: LINK_AR });
+    await openDialog();
+    fireEvent.click(await screen.findByRole('button', { name: en('engagements.reminder.replace') }));
+    const confirm = await screen.findByRole('alertdialog');
+    await act(async () => {
+      fireEvent.click(
+        [...confirm.querySelectorAll('button')].find(
+          (button) => button.textContent === en('engagements.reminder.replace'),
+        )!,
+      );
+    });
+    expect((await screen.findByRole('alert')).textContent).toBe(en('errors.delivery_link_unrecoverable'));
+    expect(screen.queryByRole('button', { name: en('engagements.reminder.replace') })).toBeNull();
+    expect(actions.rotateDeliveryLink).toHaveBeenCalledTimes(1);
+  });
+
+  test('R7: a change made in the client-link dialog re-reads the open reminder', async () => {
+    actions.prepareDeliveryReminder
+      .mockResolvedValueOnce(READY)
+      .mockResolvedValueOnce({ ok: false, error: 'delivery_link_not_shared' });
+    await openDialog();
+    await waitFor(whatsappLink);
+    await act(async () => announceDeliveryLinkChanged({ shared: false, source: 'clientLink' }));
+    expect(await screen.findByText(en('engagements.reminder.notSharedTitle'))).toBeTruthy();
+    expect(screen.queryByRole('link', { name: en('engagements.reminder.openWhatsapp') })).toBeNull();
+    expect(actions.prepareDeliveryReminder).toHaveBeenCalledTimes(2);
+  });
+
+  test('R7: focus re-reads an open reminder only after 30 s', async () => {
+    const now = vi.spyOn(Date, 'now');
+    now.mockReturnValue(1_000_000);
+    actions.prepareDeliveryReminder.mockResolvedValue(READY);
+    await openDialog();
+    await waitFor(whatsappLink);
+    await act(async () => window.dispatchEvent(new Event('focus')));
+    expect(actions.prepareDeliveryReminder).toHaveBeenCalledTimes(1);
+    now.mockReturnValue(1_000_000 + 31_000);
+    await act(async () => window.dispatchEvent(new Event('focus')));
+    await waitFor(() => expect(actions.prepareDeliveryReminder).toHaveBeenCalledTimes(2));
+    now.mockRestore();
   });
 });

@@ -33,3 +33,21 @@ export const DELIVERY_REMINDER_OPEN_EVENT = 'metra:delivery-reminder-open';
 export function openDeliveryReminder(): void {
   window.dispatchEvent(new CustomEvent(DELIVERY_REMINDER_OPEN_EVENT));
 }
+
+/**
+ * Fired on `window` after THIS page minted, replaced or revoked the client link
+ * (either dialog). The other dialog drops what it was showing: a link it
+ * revealed may be dead, a reminder it prepared may carry the old link.
+ */
+export const DELIVERY_LINK_CHANGED_EVENT = 'metra:delivery-link-changed';
+
+export interface DeliveryLinkChange {
+  /** Is there a live client link after the change? */
+  shared: boolean;
+  /** Which dialog changed it: each ignores its own announcement. */
+  source: 'clientLink' | 'reminder';
+}
+
+export function announceDeliveryLinkChanged(change: DeliveryLinkChange): void {
+  window.dispatchEvent(new CustomEvent<DeliveryLinkChange>(DELIVERY_LINK_CHANGED_EVENT, { detail: change }));
+}

@@ -82,3 +82,28 @@ describe('rederiveDeliveryLinkToken', () => {
     expect(rederiveDeliveryLinkToken(ENGAGEMENT, minted.nonce, null)).toBeNull();
   });
 });
+
+describe('a deployment without a usable secret (F9)', () => {
+  it('says so once per isolate, by name, never the value', async () => {
+    vi.resetModules();
+    process.env.SHARE_LINK_SECRET = 'short-but-secret-value';
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const fresh = await import('./delivery-link-token');
+    expect(fresh.deliveryLinkSecretConfigured()).toBe(false);
+    fresh.mintDeliveryLinkToken(ENGAGEMENT);
+    fresh.rederiveDeliveryLinkToken(ENGAGEMENT, 'nonce', 'hash');
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(String(warn.mock.calls[0][0])).toContain('SHARE_LINK_SECRET');
+    expect(JSON.stringify(warn.mock.calls)).not.toContain('short-but-secret-value');
+    warn.mockRestore();
+  });
+
+  it('a usable secret is "configured" and warns nothing', async () => {
+    vi.resetModules();
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const fresh = await import('./delivery-link-token');
+    expect(fresh.deliveryLinkSecretConfigured()).toBe(true);
+    expect(warn).not.toHaveBeenCalled();
+    warn.mockRestore();
+  });
+});

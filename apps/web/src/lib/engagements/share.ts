@@ -16,6 +16,14 @@ import { fail, mutateInOrg } from '@/lib/actions/mutate';
 import type { ActionResult } from '@/lib/actions/result';
 import type { OrgContext } from '@/lib/db/context';
 import { mintDeliveryLinkToken } from '@/lib/share/delivery-link-token';
+import { isUuid } from '@/lib/uuid';
+
+/** The id a link is DERIVED from, as the row stores it (lower case): Postgres
+ *  matches any case, the HMAC does not, so reveal could never re-derive it. */
+function canonicalEngagementId(engagementId: string): string {
+  if (!isUuid(engagementId)) fail('engagement_not_found');
+  return engagementId.toLowerCase();
+}
 
 /**
  * Mint the FIRST share link for a delivery. Atomic admission gate: sets token_hash
@@ -34,13 +42,14 @@ export async function mintDeliveryLinkCore(
     ctx,
     { capability: 'engagements_issue', action: 'approve', flow: 'interior' },
     async (tx, audit) => {
-      const { raw, hash, nonce } = mintDeliveryLinkToken(engagementId);
+      const id = canonicalEngagementId(engagementId);
+      const { raw, hash, nonce } = mintDeliveryLinkToken(id);
       const gated = await tx
         .update(designEngagements)
         .set({ tokenHash: hash, tokenNonce: nonce, shareExpiresAt: null, updatedAt: new Date() })
         .where(
           and(
-            eq(designEngagements.id, engagementId),
+            eq(designEngagements.id, id),
             isNull(designEngagements.tokenHash),
           ),
         )
@@ -50,13 +59,13 @@ export async function mintDeliveryLinkCore(
         const [exists] = await tx
           .select({ id: designEngagements.id })
           .from(designEngagements)
-          .where(eq(designEngagements.id, engagementId))
+          .where(eq(designEngagements.id, id))
           .limit(1);
         fail(exists ? 'invalid' : 'engagement_not_found');
       }
       await audit({
         entity: 'design_engagement',
-        entityId: engagementId,
+        entityId: id,
         action: 'issue',
         before: { shared: false },
         after: { shared: true },
@@ -81,18 +90,19 @@ export async function rotateDeliveryLinkCore(
     ctx,
     { capability: 'engagements_issue', action: 'approve', flow: 'interior' },
     async (tx, audit) => {
-      const { raw, hash, nonce } = mintDeliveryLinkToken(engagementId);
+      const id = canonicalEngagementId(engagementId);
+      const { raw, hash, nonce } = mintDeliveryLinkToken(id);
       // The nonce is written in the SAME statement as the hash, so the 0056
       // trigger keeps it (it clears a nonce only when the writer left it as was).
       const updated = await tx
         .update(designEngagements)
         .set({ tokenHash: hash, tokenNonce: nonce, shareExpiresAt: null, updatedAt: new Date() })
-        .where(eq(designEngagements.id, engagementId))
+        .where(eq(designEngagements.id, id))
         .returning({ id: designEngagements.id });
       if (!updated[0]) fail('engagement_not_found');
       await audit({
         entity: 'design_engagement',
-        entityId: engagementId,
+        entityId: id,
         action: 'issue',
         before: { rotated: true },
         after: { shared: true },

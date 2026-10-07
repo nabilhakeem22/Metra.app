@@ -1,13 +1,11 @@
 // Who a delivery reminder goes to and who it is from, read inside the caller's
-// RLS transaction (Round B, B11). SERVER-SIDE. The number and address chosen
-// here are where the reminder lands, so the precedence is written down once:
-//   WhatsApp number: primary contact `whatsapp`, then their `phone`, then the
-//                    client's own `phone`;
-//   email:           the client's `email` (the address proposals go to), then
-//                    the primary contact's.
+// RLS transaction (Round B, B11). SERVER-SIDE. Which phone and which address
+// win is one pure rule, ./channels.ts (the client record over the primary
+// contact's stale copy).
 import { clientContacts, clients, organizations, type MetraDb } from '@metra/db';
 import { and, eq } from 'drizzle-orm';
 import { fail } from '@/lib/actions/result';
+import { reminderChannels } from './channels';
 
 type Bilingual = { nameAr: string | null; nameEn: string | null };
 
@@ -19,15 +17,6 @@ export interface ReminderRecipient {
   /** The raw phone to message on WhatsApp (normalised by whatsappDigits). */
   phone: string | null;
   email: string | null;
-}
-
-/** The first non-blank value, trimmed, or null. */
-function firstPresent(...values: Array<string | null | undefined>): string | null {
-  for (const value of values) {
-    const trimmed = value?.trim();
-    if (trimmed) return trimmed;
-  }
-  return null;
 }
 
 /** The delivery's client, its primary contact and the studio. `engagement_not_found` if the client is gone. */
@@ -60,7 +49,6 @@ export async function readReminderRecipient(
     client: { nameAr: client.nameAr, nameEn: client.nameEn },
     studio: { nameAr: studio?.nameAr ?? null, nameEn: studio?.nameEn ?? null },
     defaultLocale: studio?.defaultLocale === 'en' ? 'en' : 'ar-EG',
-    phone: firstPresent(contact?.whatsapp, contact?.phone, client.phone),
-    email: firstPresent(client.email, contact?.email),
+    ...reminderChannels({ client, primaryContact: contact ?? null }),
   };
 }

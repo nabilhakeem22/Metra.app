@@ -96,6 +96,14 @@ export type ActionCode =
   | 'client_email_missing'
   // The reminder email did not go out (Resend refused or timed out).
   | 'reminder_email_failed'
+  // There is no live client link to reveal or resend (never shared, or revoked):
+  // the studio shares one, it is not a "legacy" link to replace.
+  | 'delivery_link_not_shared'
+  // SHARE_LINK_SECRET is missing or too short: no link can be re-derived, and a
+  // replacement would not fix it. A server configuration matter.
+  | 'delivery_links_not_configured'
+  // An email reminder for this delivery went out less than 15 minutes ago.
+  | 'reminder_too_soon'
   | 'handoff_not_open'
   | 'rom_range_invalid'
   | 'rom_not_set'

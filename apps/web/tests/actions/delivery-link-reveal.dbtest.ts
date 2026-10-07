@@ -1,4 +1,6 @@
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { listClients } from '@/lib/clients/queries';
+import { updateClientCore } from '@/lib/clients/core';
 import { emailDeliveryReminderCore } from '@/lib/engagements/reminder/email';
 import { prepareDeliveryReminderCore } from '@/lib/engagements/reminder/prepare';
 import {
@@ -21,6 +23,21 @@ import { forceState, seedRoundBDelivery, snapshotOf, type RoundBDelivery } from 
 //     `delivery_link_unrecoverable`, and a rotate is the way out (AC 40);
 //   * preparing or emailing a reminder never changes token_hash (AC 38);
 //   * only owner/admin, server-enforced; another org reads as not found.
+
+// The email provider is the one thing replaced here: CI has no Resend key, and
+// the cooldown is about what happens after a send that DID go out.
+const mail = vi.hoisted(() => ({ sent: false, calls: 0 }));
+vi.mock('@/lib/email/delivery-senders', () => ({
+  sendDeliveryReminderEmail: async () => {
+    mail.calls += 1;
+    return { sent: mail.sent };
+  },
+  sendClientActEmail: async () => ({ sent: false }),
+}));
+beforeEach(() => {
+  mail.sent = false;
+  mail.calls = 0;
+});
 
 const SECRET = 'round-b-dbtest-secret-0123456789abcdef0123456789';
 let previousSecret: string | undefined;
@@ -78,9 +95,14 @@ describe('reveal', () => {
     const d = await seed('reveal-revoke');
     expect((await revokeDeliveryLinkCore(d.ctx, d.engagementId)).ok).toBe(true);
     expect(await linkColumns(d.engagementId)).toEqual({ token_hash: null, token_nonce: null });
+    // F3: a revoked link is not a legacy one: the way out is Share, not Replace.
     expect(await revealDeliveryLinkCore(d.ctx, d.engagementId)).toEqual({
       ok: false,
-      error: 'delivery_link_unrecoverable',
+      error: 'delivery_link_not_shared',
+    });
+    expect(await prepareDeliveryReminderCore(d.ctx, d.engagementId, ORIGIN)).toEqual({
+      ok: false,
+      error: 'delivery_link_not_shared',
     });
   });
 
@@ -108,14 +130,20 @@ describe('reveal', () => {
     });
   });
 
-  it('without the secret nothing is re-derivable, and the link keeps working', async () => {
+  it('without the secret nothing is re-derivable, it says so, and the link keeps working', async () => {
     const d = await seed('reveal-no-secret');
     delete process.env.SHARE_LINK_SECRET;
     try {
+      // F9: not "unrecoverable" (whose way out, Replace, would not help here).
       expect(await revealDeliveryLinkCore(d.ctx, d.engagementId)).toEqual({
         ok: false,
-        error: 'delivery_link_unrecoverable',
+        error: 'delivery_links_not_configured',
       });
+      expect(await prepareDeliveryReminderCore(d.ctx, d.engagementId, ORIGIN)).toEqual({
+        ok: false,
+        error: 'delivery_links_not_configured',
+      });
+      expect(await snapshotOf(d.hash)).not.toBeNull();
       // A link minted now is a plain random token with no nonce.
       const rotated = await rotateDeliveryLinkCore(d.ctx, d.engagementId);
       expect(rotated.ok).toBe(true);
@@ -212,5 +240,114 @@ describe('reminders never rotate the link (AC 38)', () => {
     const d = await seed('reminder-mint-twice');
     expect(await mintDeliveryLinkCore(d.ctx, d.engagementId)).toEqual({ ok: false, error: 'invalid' });
     expect((await linkColumns(d.engagementId)).token_hash).toBe(d.hash);
+  });
+
+  it('a link minted from an upper-case id is still re-derivable (the canonical id)', async () => {
+    const d = await seed('reveal-case');
+    const rotated = await rotateDeliveryLinkCore(d.ctx, d.engagementId.toUpperCase());
+    expect(rotated.ok).toBe(true);
+    expect(await revealDeliveryLinkCore(d.ctx, d.engagementId)).toEqual({ ok: true, data: rotated.data });
+    expect(await rotateDeliveryLinkCore(d.ctx, 'not-a-uuid')).toEqual({
+      ok: false,
+      error: 'engagement_not_found',
+    });
+  });
+});
+
+describe('F6: the reminder goes to the client as edited', () => {
+  it('after the client phone and email are changed, WhatsApp and email use the edit', async () => {
+    const d = await seed('reminder-edited-client');
+    const [client] = await listClients(d.ctx, {});
+    // What createClientCore leaves when the form names a contact: a primary
+    // contact holding a COPY of the phone and email typed at creation.
+    await raw.query(
+      `insert into public.client_contacts (org_id, client_id, name, phone, email, is_primary)
+       values ('${d.orgId}', '${client.id}', 'Sam', '01000000000', 'old@client.example', true)`,
+    );
+    const updated = await updateClientCore(d.ctx, {
+      id: client.id,
+      nameEn: client.nameEn ?? 'Acme',
+      phone: '01122223333',
+      email: 'edited@client.example',
+    });
+    expect(updated.ok).toBe(true);
+    // updateClientCore edits the client row only: the contact keeps the old copy.
+    const [contact] = await raw.query<{ phone: string | null }>(
+      `select phone from public.client_contacts where client_id = '${client.id}' and is_primary`,
+    );
+    expect(contact.phone).toBe('01000000000');
+
+    const prepared = await prepareDeliveryReminderCore(d.ctx, d.engagementId, ORIGIN);
+    expect(prepared.ok).toBe(true);
+    expect(prepared.data!.whatsappDigits).toBe('201122223333');
+    expect(prepared.data!.clientEmail).toBe('edited@client.example');
+  });
+});
+
+describe('S2: one email reminder per delivery per 15 minutes', () => {
+  async function withEmail(suffix: string): Promise<RoundBDelivery> {
+    const d = await seed(suffix);
+    await raw.query(
+      `update public.clients set email = 'client@example.com'
+        where id = (select client_id from public.design_engagements where id = '${d.engagementId}')`,
+    );
+    return d;
+  }
+
+  it('a sent reminder blocks the next one with reminder_too_soon', async () => {
+    const d = await withEmail('cooldown-sent');
+    mail.sent = true;
+    const input = { engagementId: d.engagementId, locale: 'ar-EG' };
+    expect(await emailDeliveryReminderCore(d.ctx, input, ORIGIN)).toEqual({ ok: true });
+    expect(await emailDeliveryReminderCore(d.ctx, input, ORIGIN)).toEqual({
+      ok: false,
+      error: 'reminder_too_soon',
+    });
+    expect(mail.calls).toBe(1);
+
+    // Older than the cooldown: allowed again.
+    await raw.query(
+      `update public.audit_log set at = now() - interval '16 minutes'
+        where entity = 'design_engagement' and entity_id = '${d.engagementId}'`,
+    );
+    expect(await emailDeliveryReminderCore(d.ctx, input, ORIGIN)).toEqual({ ok: true });
+    expect(mail.calls).toBe(2);
+  });
+
+  it('a send that failed does not start the cooldown', async () => {
+    const d = await withEmail('cooldown-failed');
+    const input = { engagementId: d.engagementId, locale: 'en' };
+    expect(await emailDeliveryReminderCore(d.ctx, input, ORIGIN)).toEqual({
+      ok: false,
+      error: 'reminder_email_failed',
+    });
+    mail.sent = true;
+    expect(await emailDeliveryReminderCore(d.ctx, input, ORIGIN)).toEqual({ ok: true });
+  });
+
+  it('two at once (two tabs, a loop) send ONE email', async () => {
+    const d = await withEmail('cooldown-race');
+    mail.sent = true;
+    const input = { engagementId: d.engagementId, locale: 'en' };
+    const results = await Promise.all([
+      emailDeliveryReminderCore(d.ctx, input, ORIGIN),
+      emailDeliveryReminderCore(d.ctx, input, ORIGIN),
+      emailDeliveryReminderCore(d.ctx, input, ORIGIN),
+    ]);
+    expect(results.filter((result) => result.ok)).toHaveLength(1);
+    expect(results.filter((result) => result.error === 'reminder_too_soon')).toHaveLength(2);
+    expect(mail.calls).toBe(1);
+  });
+
+  it('the cooldown is per delivery', async () => {
+    const first = await withEmail('cooldown-first');
+    const second = await withEmail('cooldown-second');
+    mail.sent = true;
+    expect(
+      await emailDeliveryReminderCore(first.ctx, { engagementId: first.engagementId, locale: 'en' }, ORIGIN),
+    ).toEqual({ ok: true });
+    expect(
+      await emailDeliveryReminderCore(second.ctx, { engagementId: second.engagementId, locale: 'en' }, ORIGIN),
+    ).toEqual({ ok: true });
   });
 });

@@ -115,6 +115,12 @@ function ShareActions({ share }: { share: DeliveryShareApi }) {
   );
 }
 
+/** The refusals this dialog explains in its own words; anything else is "try again". */
+const SHARE_ERROR_KEY: Partial<Record<string, 'unrecoverable' | 'notConfigured'>> = {
+  delivery_link_unrecoverable: 'unrecoverable',
+  delivery_links_not_configured: 'notConfigured',
+};
+
 /** Everything the disclosure reveals when it is open. */
 export function ShareLinkPanel({ share }: { share: DeliveryShareApi }) {
   const t = useTranslations('delivery.share');
@@ -126,7 +132,7 @@ export function ShareLinkPanel({ share }: { share: DeliveryShareApi }) {
 
       {share.error && (
         <p className="text-body text-destructive" role="alert">
-          {share.error === 'delivery_link_unrecoverable' ? t('unrecoverable') : t('error')}
+          {t(SHARE_ERROR_KEY[share.error] ?? 'error')}
         </p>
       )}
 

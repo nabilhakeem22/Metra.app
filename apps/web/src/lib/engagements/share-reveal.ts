@@ -11,7 +11,10 @@ import { designEngagements, type MetraDb } from '@metra/db';
 import { fail, mutateInOrg, requireInOrg } from '@/lib/actions/mutate';
 import type { ActionResult } from '@/lib/actions/result';
 import type { OrgContext } from '@/lib/db/context';
-import { rederiveDeliveryLinkToken } from '@/lib/share/delivery-link-token';
+import {
+  deliveryLinkSecretConfigured,
+  rederiveDeliveryLinkToken,
+} from '@/lib/share/delivery-link-token';
 import { isUuid } from '@/lib/uuid';
 import { isTerminal, type DesignState } from './states';
 
@@ -31,13 +34,17 @@ export interface LiveDeliveryLink {
 
 /**
  * The delivery's live link, re-derived, inside the caller's RLS transaction.
- * `engagement_not_found` for a foreign, absent or malformed id;
- * `delivery_link_unrecoverable` when there is no live link (never shared,
- * revoked, expired) or it cannot be re-derived (minted before B11 or without
- * the secret, a rotated secret, a nonce that does not match the hash).
- * With `activeOnly`, a closed or abandoned delivery answers
- * `engagement_not_active` first: there is nobody to remind, and no link to
- * replace for it.
+ * The codes, in the order they are decided, each with its own way out:
+ * - `engagement_not_found`: a foreign, absent or malformed id;
+ * - `engagement_not_active` (with `activeOnly`): closed or abandoned, nobody
+ *   to remind;
+ * - `delivery_link_not_shared`: no live link (never shared, revoked, expired);
+ *   the way out is Share, not Replace;
+ * - `delivery_links_not_configured`: SHARE_LINK_SECRET missing or too short;
+ *   a Replace would kill the client's link and still not be resendable;
+ * - `delivery_link_unrecoverable`: a live link that cannot be re-derived
+ *   (minted before B11 or without the secret, a rotated secret, a nonce that
+ *   does not match the hash); ONE Replace fixes it.
  */
 export async function readLiveDeliveryLink(
   tx: MetraDb,
@@ -62,7 +69,9 @@ export async function readLiveDeliveryLink(
   if (options.activeOnly && isTerminal(row.state)) fail('engagement_not_active');
   const live =
     row.tokenHash !== null && (row.shareExpiresAt === null || row.shareExpiresAt > new Date());
-  const raw = live ? rederiveDeliveryLinkToken(row.id, row.tokenNonce, row.tokenHash) : null;
+  if (!live) fail('delivery_link_not_shared');
+  if (!deliveryLinkSecretConfigured()) fail('delivery_links_not_configured');
+  const raw = rederiveDeliveryLinkToken(row.id, row.tokenNonce, row.tokenHash);
   if (raw === null) fail('delivery_link_unrecoverable');
   return { raw, state: row.state, clientId: row.clientId };
 }

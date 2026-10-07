@@ -2,7 +2,7 @@
 // a missing or malformed answer is "not notified" with no email, and only the
 // NEW recipients are emailed, from after(), never awaited by the action.
 import type { SQL } from 'drizzle-orm';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('server-only', () => ({}));
 
@@ -33,7 +33,8 @@ vi.mock('./email', () => ({
 }));
 
 import { hashShareToken } from '@/lib/share/token';
-import { notifyStudioOfClientAct, parseStudioNotified, withStudioNotified } from './notify';
+import { NOTIFY_BUDGET_MS, notifyStudioOfClientAct, withStudioNotified } from './notify';
+import { parseStudioNotified } from './studio-notified';
 
 const ENGAGEMENT = '11111111-1111-4111-8111-111111111111';
 const OWNER = '22222222-2222-4222-8222-222222222222';
@@ -54,6 +55,7 @@ beforeEach(() => {
   deliveryLabelForEmail.mockReset().mockResolvedValue('DE-2026-0012 · Villa');
   emailClientActRecipients.mockReset().mockResolvedValue(undefined);
   vi.spyOn(console, 'error').mockImplementation(() => {});
+  vi.spyOn(console, 'warn').mockImplementation(() => {});
 });
 
 describe('notifyStudioOfClientAct', () => {
@@ -121,7 +123,10 @@ describe('notifyStudioOfClientAct', () => {
     expect(await notifyStudioOfClientAct('raw', { kind: 'design_approved' })).toEqual({
       studioNotified: false,
     });
-    expect(console.error).toHaveBeenCalledWith('client act notify failed:', expect.anything());
+    expect(console.error).toHaveBeenCalledWith('client act notify failed:', {
+      act: 'client_design_approved',
+      error: expect.anything(),
+    });
   });
 
   it('starts the emails for the NEW recipients at once and hands them to after()', async () => {
@@ -178,6 +183,86 @@ describe('notifyStudioOfClientAct', () => {
       studioNotified: true,
     });
     expect(emailClientActRecipients).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('the client never waits more than NOTIFY_BUDGET_MS (R2)', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('a hung notifier answers "not notified" at the budget', async () => {
+    vi.useFakeTimers();
+    readSdfJson.mockReturnValue(new Promise(() => {}));
+    const pending = notifyStudioOfClientAct('raw', { kind: 'design_approved' });
+    await vi.advanceTimersByTimeAsync(NOTIFY_BUDGET_MS);
+    expect(await pending).toEqual({ studioNotified: false });
+    expect(NOTIFY_BUDGET_MS).toBe(2_000);
+    expect(console.error).toHaveBeenCalledWith('client act notify failed:', {
+      act: 'client_design_approved',
+      error: expect.objectContaining({ name: 'HttpDeadlineError' }),
+    });
+  });
+
+  it('a hung label read is cut at what is left of the budget; the email still goes, unlabelled', async () => {
+    vi.useFakeTimers();
+    readSdfJson.mockImplementation(
+      () =>
+        new Promise((resolve) =>
+          setTimeout(
+            () =>
+              resolve({
+                engagement_id: ENGAGEMENT,
+                locale: 'en',
+                notified_count: 1,
+                new_recipients: [OWNER],
+              }),
+            500,
+          ),
+        ),
+    );
+    deliveryLabelForEmail.mockReturnValue(new Promise(() => {}));
+    const pending = notifyStudioOfClientAct('raw', { kind: 'design_approved' });
+    await vi.advanceTimersByTimeAsync(NOTIFY_BUDGET_MS);
+    expect(await pending).toEqual({ studioNotified: true });
+    expect(emailClientActRecipients).toHaveBeenCalledWith(
+      expect.objectContaining({ deliveryLabel: '', userIds: [OWNER] }),
+    );
+  });
+
+  it('with no budget left, the label is not even read', async () => {
+    vi.useFakeTimers();
+    readSdfJson.mockImplementation(
+      () =>
+        new Promise((resolve) =>
+          setTimeout(
+            () =>
+              resolve({
+                engagement_id: ENGAGEMENT,
+                locale: 'en',
+                notified_count: 1,
+                new_recipients: [OWNER],
+              }),
+            NOTIFY_BUDGET_MS - 50,
+          ),
+        ),
+    );
+    const pending = notifyStudioOfClientAct('raw', { kind: 'design_approved' });
+    await vi.advanceTimersByTimeAsync(NOTIFY_BUDGET_MS);
+    expect(await pending).toEqual({ studioNotified: true });
+    expect(deliveryLabelForEmail).not.toHaveBeenCalled();
+    expect(emailClientActRecipients).toHaveBeenCalledWith(expect.objectContaining({ deliveryLabel: '' }));
+  });
+});
+
+describe('R6: a notifier that wrote nothing says so, naming the act', () => {
+  it('logs the act key and nothing else', async () => {
+    readSdfJson.mockResolvedValue(null);
+    await notifyStudioOfClientAct('raw-secret-token', { kind: 'payment_claimed', milestoneKind: 'deposit' });
+    expect(console.warn).toHaveBeenCalledWith('client act notify wrote nothing:', {
+      act: 'client_payment_claimed',
+    });
+    expect(JSON.stringify(vi.mocked(console.warn).mock.calls)).not.toContain('raw-secret-token');
   });
 });
 

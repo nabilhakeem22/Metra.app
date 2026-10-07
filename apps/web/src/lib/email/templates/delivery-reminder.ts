@@ -5,6 +5,7 @@
 // existing shell (no branding change). No money, no stage detail: the portal
 // behind the link says what is waiting.
 import { EMAIL_BRAND } from '@/lib/email/brand';
+import { NAME_MAX_CHARS, oneLine } from '@/lib/format/one-line';
 import { escapeHtml } from '@/lib/html/escape';
 import type { EmailContent } from './automation';
 import { emailShell } from './shell';
@@ -19,8 +20,10 @@ export interface DeliveryReminderEmailInput {
 
 export function deliveryReminderEmailTemplate(input: DeliveryReminderEmailInput): EmailContent {
   const ar = input.locale.startsWith('ar');
-  const client = input.clientName.trim();
-  const studio = input.studioName.trim();
+  // Names are studio-typed and unbounded: one line each, capped, before they
+  // reach a subject (a line break there is a rejected email).
+  const client = oneLine(input.clientName, NAME_MAX_CHARS);
+  const studio = oneLine(input.studioName, NAME_MAX_CHARS);
 
   const subject = ar
     ? `تذكير من ${studio}: مشروع التصميم بانتظارك`

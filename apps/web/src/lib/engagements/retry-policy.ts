@@ -65,6 +65,9 @@ export const DEFINITE_REFUSALS: ReadonlySet<ActionCode> = new Set<ActionCode>([
   // Reveal/reminder refusals: read-only, nothing was written.
   'delivery_link_unrecoverable',
   'client_email_missing',
+  'delivery_link_not_shared',
+  'delivery_links_not_configured',
+  'reminder_too_soon',
   'design_fee_required',
   'milestone_split_invalid',
   'milestone_kind_duplicate',

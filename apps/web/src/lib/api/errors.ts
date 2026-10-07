@@ -159,6 +159,11 @@ export const ACTION_CODE_PROBLEM: Record<ActionCode, ApiProblemKind> = {
   client_email_missing: 'bad-request',
   // Best-effort send that failed on the provider's side.
   reminder_email_failed: 'internal',
+  delivery_link_not_shared: 'conflict',
+  // The deployment lacks a secret: the server's fault, not the request's.
+  delivery_links_not_configured: 'internal',
+  // A per-delivery throttle: try again later.
+  reminder_too_soon: 'rate-limited',
   handoff_not_open: 'bad-request',
   rom_range_invalid: 'bad-request',
   rom_not_set: 'bad-request',

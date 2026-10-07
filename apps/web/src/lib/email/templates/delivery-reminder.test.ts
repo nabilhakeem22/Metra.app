@@ -28,6 +28,13 @@ describe('deliveryReminderEmailTemplate', () => {
     expect(render('ar-EG', '').text.startsWith('مرحبًا،')).toBe(true);
   });
 
+  it('R5: names are one capped line in the subject and the body', () => {
+    const email = render('en', `Ahmed\nBcc: x${'b'.repeat(300)}`, `Diwan\r\n${'s'.repeat(5000)}`);
+    expect(email.subject).not.toMatch(/[\r\n]/);
+    expect(Array.from(email.subject).length).toBeLessThan(160);
+    expect(email.text.split('\n')[0]).toMatch(/^Hello Ahmed Bcc: xb+…,$/);
+  });
+
   it('escapes the names, which are studio-typed text', () => {
     const email = render('en', '<img src=x>', 'A & B');
     expect(email.html).not.toContain('<img src=x>');
