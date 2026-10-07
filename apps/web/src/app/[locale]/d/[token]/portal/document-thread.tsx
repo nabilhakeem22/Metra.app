@@ -1,14 +1,13 @@
 'use client';
 
 import { Loader2, MessageSquare, Send } from 'lucide-react';
-import { useCallback } from 'react';
-import { useLocale, useTranslations } from 'next-intl';
+import { useCallback, useState } from 'react';
+import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
 import type { PublicDocumentComment } from '@/lib/engagements/public-comments';
 import { useDocumentThread } from '@/lib/engagements/use-document-thread';
-import { bidiIsolate } from '@/lib/format/bidi';
-import { formatDate } from '@/lib/format/date';
 import { addDeliveryComment, loadDeliveryDocumentComments } from '../actions';
+import { DocumentThreadMessages } from './document-thread-messages';
 import { Textarea } from '@/components/ui/textarea';
 
 /** Hard cap, mirrored from the SDF and the table's CHECK. Enforced here only so the
@@ -26,9 +25,9 @@ const BODY_MAX = 2000;
  * to move anything, so a client who comments can never end up waiting on a stage
  * that is in fact waiting on them.
  *
- * The studio's replies are attributed to the firm, never to a named member — the
- * read SDF does not return staff names. Dates use Western numerals inside a bidi
- * isolate; logical CSS only, so it mirrors correctly in RTL.
+ * The messages render in DocumentThreadMessages. After a send, the thread says
+ * the team has been notified only when the portal action says it was. Logical
+ * CSS only, so it mirrors correctly in RTL.
  */
 export function DocumentThread({
   token,
@@ -40,14 +39,21 @@ export function DocumentThread({
   initialCount: number;
 }) {
   const t = useTranslations('delivery.comments');
-  const locale = useLocale();
+  // Did the LAST message sent from here reach the studio? Only then may the
+  // thread say the team has been notified.
+  const [studioNotified, setStudioNotified] = useState(false);
 
   const load = useCallback(
     () => loadDeliveryDocumentComments(token, documentId),
     [token, documentId],
   );
   const submit = useCallback(
-    (body: string) => addDeliveryComment(token, documentId, body),
+    async (body: string) => {
+      setStudioNotified(false);
+      const result = await addDeliveryComment(token, documentId, body);
+      setStudioNotified(result.studioNotified === true);
+      return result;
+    },
     [token, documentId],
   );
   const thread = useDocumentThread<PublicDocumentComment>({ load, send: submit });
@@ -78,32 +84,7 @@ export function DocumentThread({
           ) : thread.messages.length === 0 ? (
             <p className="text-caption text-muted-foreground">{t('empty')}</p>
           ) : (
-            <ul className="space-y-2">
-              {thread.messages.map((message) => (
-                <li
-                  key={message.id}
-                  className={
-                    message.channel === 'client'
-                      ? 'rounded-item bg-background p-2.5 shadow-sm'
-                      : 'rounded-item border border-primary/20 bg-primary/5 p-2.5'
-                  }
-                >
-                  <p className="text-caption font-semibold text-muted-foreground">
-                    {message.channel === 'client'
-                      ? message.authorName || t('you')
-                      : t('studio')}
-                    {message.createdAt && (
-                      <span className="ms-2 font-normal">
-                        {bidiIsolate(formatDate(message.createdAt, locale))}
-                      </span>
-                    )}
-                  </p>
-                  <p className="mt-1 whitespace-pre-wrap break-words text-caption">
-                    {message.body}
-                  </p>
-                </li>
-              ))}
-            </ul>
+            <DocumentThreadMessages messages={thread.messages} />
           )}
 
           <div className="space-y-1.5">
@@ -136,6 +117,11 @@ export function DocumentThread({
                 {t('send')}
               </Button>
             </div>
+            {studioNotified && !thread.error && (
+              <p className="text-caption text-muted-foreground" role="status">
+                {t('notified')}
+              </p>
+            )}
             {thread.error && (
               <p className="text-caption text-destructive" role="alert">
                 {t(`error.${thread.error}`)}

@@ -147,6 +147,27 @@ describe('PaymentsCard', () => {
     expect(actions.markDeliveryPaymentPaid).toHaveBeenCalledWith('tok', 'gate_b');
     expect(claimButtons('en')).toHaveLength(0);
     expect(container.textContent).toContain(messageAt('en', 'delivery.payments.awaitingConfirmation'));
+    // The action did not say the studio heard about it, so the card does not either.
+    expect(container.textContent).not.toContain(messageAt('en', 'delivery.payments.claimNotified'));
+  });
+
+  it('says the team was notified only when the claim really reached the studio', async () => {
+    actions.markDeliveryPaymentPaid.mockResolvedValue({ ok: true, studioNotified: true });
+    const { container } = renderCard(MIDWAY, {
+      claimableMilestones: [claimable('gate_b', '28000.0000')],
+    }, 'ar-EG');
+    fireEvent.click(claimButtons('ar-EG')[0]);
+    const status = await screen.findByRole('status');
+    expect(status.textContent).toContain(messageAt('ar-EG', 'delivery.payments.claimNotified'));
+    expect(container.textContent).toContain(messageAt('ar-EG', 'delivery.payments.awaitingConfirmation'));
+  });
+
+  it('an already-pending claim from an earlier visit never says notified', () => {
+    const { container } = renderCard(MIDWAY, {
+      claimableMilestones: [claimable('gate_b', '28000.0000', true)],
+    });
+    expect(container.textContent).toContain(messageAt('en', 'delivery.payments.awaitingConfirmation'));
+    expect(container.textContent).not.toContain(messageAt('en', 'delivery.payments.claimNotified'));
   });
 
   it('shows a localized error on a failed claim and keeps the button', async () => {

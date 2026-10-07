@@ -1,6 +1,6 @@
 'use client';
 
-import { CheckCircle2, Loader2 } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
 import { useState, useTransition } from 'react';
 import { Button } from '@/components/ui/button';
@@ -11,9 +11,7 @@ import {
 import type { HeroGroup, HeroView } from '@/lib/engagements/portal-hero';
 import { recordDeliveryAction } from '../actions';
 import { Textarea } from '@/components/ui/textarea';
-
-/** The confirmation an acted-on button resolves to (names the next phase). */
-type HeroOutcome = 'approved' | 'changes' | 'acknowledged';
+import { HeroConfirmed, type HeroOutcome } from './hero-confirmed';
 
 interface HeroButton {
   verb: string;
@@ -41,13 +39,6 @@ const GROUP_BUTTONS: Record<HeroGroup, HeroButton[]> = {
   handoff: [
     { verb: 'acknowledge_handoff', labelKey: 'acknowledge', outcome: 'acknowledged', variant: 'default' },
   ],
-};
-
-/** Which `delivery.hero.<group>` title/body keys each outcome confirms with. */
-const CONFIRM_KEYS: Record<HeroOutcome, { title: string; body: string }> = {
-  approved: { title: 'approvedTitle', body: 'approvedBody' },
-  changes: { title: 'changesTitle', body: 'changesBody' },
-  acknowledged: { title: 'acknowledgedTitle', body: 'acknowledgedBody' },
 };
 
 /**
@@ -79,7 +70,10 @@ function ActionHero({ token, group }: { token: string; group: HeroGroup }) {
   const tActions = useTranslations('delivery.actions');
   const [pending, startTransition] = useTransition();
   const [note, setNote] = useState('');
-  const [confirmed, setConfirmed] = useState<HeroOutcome | null>(null);
+  const [confirmed, setConfirmed] = useState<{
+    outcome: HeroOutcome;
+    studioNotified: boolean;
+  } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const buttons = GROUP_BUTTONS[group];
 
@@ -90,7 +84,7 @@ function ActionHero({ token, group }: { token: string; group: HeroGroup }) {
       try {
         const result = await recordDeliveryAction(token, verb, note);
         // `already` resolves ok:true (idempotent) — treat as a confirmed signal.
-        if (result.ok) setConfirmed(outcome);
+        if (result.ok) setConfirmed({ outcome, studioNotified: result.studioNotified === true });
         else setError(result.error ?? 'generic');
       } catch {
         setError('generic');
@@ -99,20 +93,12 @@ function ActionHero({ token, group }: { token: string; group: HeroGroup }) {
   }
 
   if (confirmed) {
-    const keys = CONFIRM_KEYS[confirmed];
     return (
-      <section className="rounded-panel border border-[color:var(--success)]/30 bg-[color:var(--success-tint)] p-5 text-center shadow-sm">
-        <CheckCircle2
-          className="mx-auto mb-3 size-11 text-[color:var(--success)]"
-          aria-hidden
-        />
-        <h2 className="text-title font-semibold text-foreground">
-          {tGroup(keys.title)}
-        </h2>
-        <p className="mx-auto mt-2 max-w-xs text-body text-muted-foreground">
-          {tGroup(keys.body)}
-        </p>
-      </section>
+      <HeroConfirmed
+        group={group}
+        outcome={confirmed.outcome}
+        studioNotified={confirmed.studioNotified}
+      />
     );
   }
 

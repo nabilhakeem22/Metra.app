@@ -29,10 +29,14 @@ export function PaymentClaimControl({
 
   if (claimState.kind === 'pending') {
     return (
-      <p role="status" className="flex items-center gap-1.5 text-caption font-medium text-muted-foreground">
-        <Clock className="size-3.5 shrink-0" aria-hidden />
-        {t('awaitingConfirmation')}
-      </p>
+      <div role="status" className="space-y-0.5 text-caption font-medium text-muted-foreground">
+        <p className="flex items-center gap-1.5">
+          <Clock className="size-3.5 shrink-0" aria-hidden />
+          {t('awaitingConfirmation')}
+        </p>
+        {/* Only for a claim made in this visit that really reached the studio. */}
+        {submission.notifiedKinds.has(milestoneKind) && <p>{t('claimNotified')}</p>}
+      </div>
     );
   }
 

@@ -16,12 +16,14 @@ import { BudgetRange } from './budget-range';
  * `recordDeliveryAction`; a repeat resolves ok (idempotent). `rom` is null until
  * the studio ISSUES the band, in which case the card asks without a figure, as it
  * always has. Theme tokens only, so the confirmed state reads in light and dark.
+ * The confirmation says the team was notified only when it really was.
  */
 export function BudgetCard({ token, rom }: { token: string; rom: PublicDelivery['rom'] }) {
   const t = useTranslations('delivery.budget');
   const tActions = useTranslations('delivery.actions');
   const [pending, startTransition] = useTransition();
-  const [confirmed, setConfirmed] = useState(false);
+  // Non-null once acknowledged; says whether the studio was really notified.
+  const [confirmed, setConfirmed] = useState<{ studioNotified: boolean } | null>(null);
   const [error, setError] = useState<PortalErrorKey | null>(null);
 
   function acknowledge() {
@@ -30,7 +32,7 @@ export function BudgetCard({ token, rom }: { token: string; rom: PublicDelivery[
       // Wrap the await so a rejected action can never leave the spinner stuck.
       try {
         const result = await recordDeliveryAction(token, 'acknowledge_rom');
-        if (result.ok) setConfirmed(true);
+        if (result.ok) setConfirmed({ studioNotified: result.studioNotified === true });
         else setError(portalErrorKey(result.error));
       } catch {
         setError('generic');
@@ -51,7 +53,7 @@ export function BudgetCard({ token, rom }: { token: string; rom: PublicDelivery[
           className="flex items-center gap-2 rounded-item bg-[color:var(--success-tint)] px-3 py-2.5 text-body font-semibold text-[color:var(--success)]"
         >
           <Check className="size-4 shrink-0" aria-hidden />
-          {t('acknowledged')}
+          {confirmed.studioNotified ? t('acknowledgedNotified') : t('acknowledged')}
         </p>
       ) : (
         <>

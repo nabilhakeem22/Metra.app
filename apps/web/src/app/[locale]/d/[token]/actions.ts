@@ -2,6 +2,11 @@
 
 import { headers } from 'next/headers';
 import {
+  clientActOfVerb,
+  paymentClaimedAct,
+} from '@/lib/engagements/client-acts/acts';
+import { withStudioNotified } from '@/lib/engagements/client-acts/notify';
+import {
   claimPaymentByToken,
   recordDeliveryActionByToken,
   type DeliveryActionResult,
@@ -12,6 +17,12 @@ import {
   type DeliveryCommentResult,
   type PublicDocumentComment,
 } from '@/lib/engagements/public-comments';
+
+/** A portal write's answer, plus whether the studio heard about it: true only
+ *  when a notification row was written for THIS act, which is the only time the
+ *  portal may say "your designer has been notified". */
+export type DeliveryActResult = DeliveryActionResult & { studioNotified?: boolean };
+export type DeliveryCommentActResult = DeliveryCommentResult & { studioNotified?: boolean };
 
 /**
  * The client IP for the advisory audit trail, capped at 45 chars. Prefers the
@@ -30,24 +41,27 @@ function clientIp(h: Headers): string | null {
  * user agent from the request headers for the append-only engagement_events audit
  * trail (mirrors the proposal p/[token] action). The raw token flows straight to
  * recordDeliveryActionByToken, which hashes it — it is NEVER logged here. The
- * signal is advisory: it moves no state and adds no blocking guard.
+ * signal is advisory: it moves no state and adds no blocking guard. A first `ok`
+ * then notifies the studio (client-acts/notify.ts); the act is derived from the
+ * verb the SDF just accepted, never from anything else the request carries.
  */
 export async function recordDeliveryAction(
   token: string,
   action: string,
   note?: string,
-): Promise<DeliveryActionResult> {
+): Promise<DeliveryActResult> {
   const h = await headers();
   // Cap the audit fields before they reach the DB (the SDF also caps note at 2000).
   const ip = clientIp(h);
   const ua = h.get('user-agent')?.slice(0, 512) || null;
   const trimmedNote = note?.trim().slice(0, 2000) || null;
-  return recordDeliveryActionByToken(token, {
+  const result = await recordDeliveryActionByToken(token, {
     action,
     note: trimmedNote,
     ip,
     userAgent: ua,
   });
+  return withStudioNotified(token, result, clientActOfVerb(action));
 }
 
 /**
@@ -57,23 +71,25 @@ export async function recordDeliveryAction(
  * here — it flows straight to claimPaymentByToken, which hashes it. The claim is a
  * PENDING record: it moves no state and writes no money ledger (the studio confirms
  * it later). The amount is locked server-side to the milestone's remaining due —
- * this action deliberately carries no amount input.
+ * this action deliberately carries no amount input. A first `ok` notifies the
+ * studio's finance roles, naming the milestone the SDF just accepted.
  */
 export async function markDeliveryPaymentPaid(
   token: string,
   milestoneKind: string,
   note?: string,
-): Promise<DeliveryActionResult> {
+): Promise<DeliveryActResult> {
   const h = await headers();
   const ip = clientIp(h);
   const ua = h.get('user-agent')?.slice(0, 512) || null;
   const trimmedNote = note?.trim().slice(0, 2000) || null;
-  return claimPaymentByToken(token, {
+  const result = await claimPaymentByToken(token, {
     milestoneKind,
     note: trimmedNote,
     ip,
     userAgent: ua,
   });
+  return withStudioNotified(token, result, paymentClaimedAct(milestoneKind));
 }
 
 /**
@@ -85,23 +101,25 @@ export async function markDeliveryPaymentPaid(
  *
  * The message is ADVISORY: it moves no state and opens no change order. The client
  * still approves or requests changes with the stage buttons — this only lets them
- * say WHICH drawing and WHAT about it.
+ * say WHICH drawing and WHAT about it. Every sent message notifies the studio;
+ * a burst collapses into one unread notification with a count.
  */
 export async function addDeliveryComment(
   token: string,
   documentId: string,
   body: string,
-): Promise<DeliveryCommentResult> {
+): Promise<DeliveryCommentActResult> {
   const h = await headers();
   // Cap before the DB (the SDF also trims + caps at 2000 and CHECKs the length).
   const trimmed = body?.trim().slice(0, 2000) ?? '';
-  if (!trimmed) return { ok: false, error: 'empty' };
-  return addDeliveryCommentByToken(token, {
+  if (!trimmed) return { ok: false, error: 'empty', studioNotified: false };
+  const result = await addDeliveryCommentByToken(token, {
     documentId,
     body: trimmed,
     ip: clientIp(h),
     userAgent: h.get('user-agent')?.slice(0, 512) || null,
   });
+  return withStudioNotified(token, result, { kind: 'commented' });
 }
 
 /**

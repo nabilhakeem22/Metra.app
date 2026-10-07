@@ -68,9 +68,18 @@ describe('BudgetCard', () => {
     const confirmed = await screen.findByRole('status');
     expect(confirmed.textContent).toContain(messageAt('en', 'delivery.budget.acknowledged'));
     expect(actions.recordDeliveryAction).toHaveBeenCalledWith('tok', 'acknowledge_rom');
+    expect(confirmed.textContent).not.toContain(messageAt('en', 'delivery.budget.acknowledgedNotified'));
     expect(screen.queryByRole('button')).toBeNull();
     // The range stays on screen after acknowledging.
     expect(container.textContent).toContain('1,200,000');
+  });
+
+  it('says the team was notified only when the studio really was', async () => {
+    actions.recordDeliveryAction.mockResolvedValue({ ok: true, studioNotified: true });
+    renderCard(ROM, 'ar-EG');
+    fireEvent.click(screen.getByRole('button', { name: messageAt('ar-EG', 'delivery.budget.acknowledge') }));
+    const confirmed = await screen.findByRole('status');
+    expect(confirmed.textContent).toContain(messageAt('ar-EG', 'delivery.budget.acknowledgedNotified'));
   });
 
   it('paints the confirmed state with theme tokens, never a fixed light palette', async () => {

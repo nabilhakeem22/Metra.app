@@ -305,6 +305,9 @@ const SDF_CALLER_ALLOWLIST = [
   'apps/web/src/lib/engagements/public/respond.ts',
   'apps/web/src/lib/engagements/public-documents.ts',
   'apps/web/src/lib/engagements/public-comments.ts',
+  // Round B: after a portal write answered `ok`, the studio is notified through
+  // the SAME token (app_delivery_notify_studio_by_token); the client has no session.
+  'apps/web/src/lib/engagements/client-acts/notify.ts',
   // The module itself (it DEFINES the runners) and its own unit test.
   'apps/web/src/lib/share/sdf-call.ts',
   'apps/web/src/lib/share/sdf-call.test.ts',

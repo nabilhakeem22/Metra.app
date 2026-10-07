@@ -12,6 +12,9 @@ export interface PaymentClaimSubmission {
   /** Milestones claimed successfully in this session: a local optimistic flip to
    *  the waiting state, so the client sees the result before the next read. */
   claimedKinds: ReadonlySet<string>;
+  /** Of those, the ones whose claim really reached the studio (a notification
+   *  row was written): only these may say the team has been notified. */
+  notifiedKinds: ReadonlySet<string>;
   /** The last failed claim, already narrowed to a key the catalog holds. */
   failure: { kind: string; error: PortalErrorKey } | null;
   claim: (milestoneKind: string) => void;
@@ -27,6 +30,7 @@ export function usePaymentClaim(token: string): PaymentClaimSubmission {
   const [pending, startTransition] = useTransition();
   const [submittingKind, setSubmittingKind] = useState<string | null>(null);
   const [claimedKinds, setClaimedKinds] = useState<ReadonlySet<string>>(new Set());
+  const [notifiedKinds, setNotifiedKinds] = useState<ReadonlySet<string>>(new Set());
   const [failure, setFailure] = useState<PaymentClaimSubmission['failure']>(null);
 
   function claim(milestoneKind: string) {
@@ -35,8 +39,14 @@ export function usePaymentClaim(token: string): PaymentClaimSubmission {
     startTransition(async () => {
       try {
         const result = await markDeliveryPaymentPaid(token, milestoneKind);
-        if (result.ok) setClaimedKinds((previous) => new Set(previous).add(milestoneKind));
-        else setFailure({ kind: milestoneKind, error: portalErrorKey(result.error) });
+        if (result.ok) {
+          setClaimedKinds((previous) => new Set(previous).add(milestoneKind));
+          if (result.studioNotified) {
+            setNotifiedKinds((previous) => new Set(previous).add(milestoneKind));
+          }
+        } else {
+          setFailure({ kind: milestoneKind, error: portalErrorKey(result.error) });
+        }
       } catch {
         setFailure({ kind: milestoneKind, error: 'generic' });
       } finally {
@@ -45,5 +55,5 @@ export function usePaymentClaim(token: string): PaymentClaimSubmission {
     });
   }
 
-  return { pending, submittingKind, claimedKinds, failure, claim };
+  return { pending, submittingKind, claimedKinds, notifiedKinds, failure, claim };
 }

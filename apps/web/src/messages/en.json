@@ -2217,8 +2217,10 @@
         "changes": "Request changes instead",
         "approvedTitle": "Concept approved 🎉",
         "approvedBody": "Your approval is recorded. Your designer will see it and start your 3D visuals.",
+        "approvedBodyNotified": "Your approval is recorded and your designer has been notified. They will start your 3D visuals.",
         "changesTitle": "Changes requested",
-        "changesBody": "Your request is recorded. Your designer will see it and refine the concept with you."
+        "changesBody": "Your request is recorded. Your designer will see it and refine the concept with you.",
+        "changesBodyNotified": "Your request is recorded and your designer has been notified. They will refine the concept with you."
       },
       "design": {
         "headline": "Your final design is ready to sign off",
@@ -2227,15 +2229,18 @@
         "changes": "Request changes instead",
         "approvedTitle": "Design approved 🎉",
         "approvedBody": "Your approval is recorded. Your designer will see it and prepare your design handover.",
+        "approvedBodyNotified": "Your approval is recorded and your designer has been notified. They will prepare your design handover.",
         "changesTitle": "Changes requested",
-        "changesBody": "Your request is recorded. Your designer will see it and refine the design with you."
+        "changesBody": "Your request is recorded. Your designer will see it and refine the design with you.",
+        "changesBodyNotified": "Your request is recorded and your designer has been notified. They will refine the design with you."
       },
       "handoff": {
         "headline": "Your design package is ready",
         "body": "Confirm you've received your design package and we'll wrap things up.",
         "acknowledge": "Confirm handover",
         "acknowledgedTitle": "Handover confirmed 🎉",
-        "acknowledgedBody": "Thank you. Your designer will now close the design project."
+        "acknowledgedBody": "Thank you. Your designer will now close the design project.",
+        "acknowledgedBodyNotified": "Thank you. Your designer has been notified and will now close the design project."
       }
     },
     "whatsNext": {
@@ -2249,7 +2254,8 @@
       "upTo": "Up to",
       "note": "An early estimate of the cost of executing your design. The final price is set in the bill of quantities.",
       "acknowledge": "I acknowledge this budget",
-      "acknowledged": "Acknowledged. Your design team can see your confirmation."
+      "acknowledged": "Acknowledged. Your design team can see your confirmation.",
+      "acknowledgedNotified": "Acknowledged. Your design team has been notified."
     },
     "payments": {
       "title": "Payments",
@@ -2258,6 +2264,7 @@
       "nextPayment": "Next payment · {milestone}, remaining",
       "claim": "I've made this payment",
       "awaitingConfirmation": "Waiting for your design team to confirm",
+      "claimNotified": "Your design team has been notified.",
       "settledTitle": "All payments settled",
       "settledBody": "Thank you. Nothing is due.",
       "state": {
@@ -2319,6 +2326,7 @@
       "you": "You",
       "studio": "Your design team",
       "advisory": "A question here doesn't request changes. Use the buttons above for that.",
+      "notified": "Your design team has been notified of your message.",
       "error": {
         "generic": "That didn't send. Please try again.",
         "empty": "Write a message first.",
