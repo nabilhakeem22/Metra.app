@@ -827,8 +827,9 @@ Expected:
 - `db:migrate` exits 0. It does not print a count, so re-run query (a) from
   step 2: `migrations` is exactly one higher and `newest` is `1791342035319`
   (0057's journal stamp).
-- `db:apply-rls` ends with these two lines (the exact lines CI printed for
-  this branch):
+- `db:apply-rls` ends with these two lines (printed from the committed
+  `rls/` files, so they are the same on every database; CI's apply-rls step
+  verified exactly these counts on this branch):
   `apply-rls: verified in the catalogues — 46 tables, 46 policies, 13 triggers,
   37 functions, RLS forced on all of them, role metra_app present.` and
   `apply-rls: grants verified — design_engagements update narrowed to 16
