@@ -1,46 +1,55 @@
 'use client';
 
 import { useLocale, useTranslations } from 'next-intl';
-import { useState, useTransition } from 'react';
+import { useRef, useState, useTransition } from 'react';
 import { toast } from '@/hooks/use-toast';
 import { useRouter } from '@/i18n/routing';
 import { resolveActionError } from '@/lib/actions/error-message';
 import type { ActionCode } from '@/lib/actions/result';
 import { getDeliverableUrl } from '@/lib/engagements/actions';
 import type { WorkingFileCategory } from '@/lib/engagements/working-files';
-import { validateDeliverableFile } from '@/lib/engagements/deliverable-files';
 import { formatNumber } from '@/lib/format/number';
 import { uploadDeliverableFile, type DeliverableUploadOutcome } from './upload-deliverable';
-
-export interface UploadQueueItem {
-  key: string;
-  name: string;
-  status: 'queued' | 'uploading' | 'done' | 'failed' | 'skipped';
-  /** Why a file failed, localized; null otherwise. */
-  message: string | null;
-}
+import {
+  queuedItem,
+  settledPatch,
+  SKIPPED_PATCH,
+  UPLOADING_PATCH,
+  type UploadQueueItem,
+} from './upload-queue-item';
+import { runUploadQueue, type QueuedFile } from './upload-queue-run';
 
 /**
  * The shared deliverable upload, for the working-files tray AND the command
- * card's dropzone. `uploadMany` takes every file the studio picked or dropped
- * and uploads them ONE AFTER ANOTHER in a single transition, each through
- * `uploadDeliverableFile`; once `maxFiles` have LANDED (concept options are
- * capped and append-only) the rest are skipped. Each file's status, and why it failed,
- * stays in `queue` beside it. Afterwards: one refresh if anything landed, and one
- * summary toast. Nothing here advances the delivery.
+ * card's dropzone. `uploadMany` uploads every picked or dropped file ONE AFTER
+ * ANOTHER in one run; once `maxFiles` have LANDED (concept options are
+ * capped and append-only) the rest are skipped. Each file's status, progress and
+ * failure reason stay in `queue`. A failed TRANSFER can be retried alone (`retry`)
+ * or together (`retryFailed`), against the caller's CURRENT cap. After each run:
+ * one refresh if anything landed or failed, one summary toast. Nothing here
+ * advances the delivery.
  */
 export function useDeliverableUpload(engagementId: string): {
   pending: boolean;
   queue: UploadQueueItem[];
   uploadMany: (category: WorkingFileCategory, files: File[], maxFiles?: number) => void;
+  retry: (key: string, maxFiles?: number) => void;
+  retryFailed: (maxFiles?: number) => void;
   download: (fileId: string) => void;
 } {
   const t = useTranslations('engagements.files');
   const te = useTranslations('errors');
   const locale = useLocale();
   const router = useRouter();
-  const [pending, startTransition] = useTransition();
+  // Uploads track their own flag rather than a transition: an update made inside
+  // an async transition is held until the whole action ends, so the first file's
+  // "Uploading" and its progress would never paint while it uploads.
+  const [uploading, setUploading] = useState(false);
+  const running = useRef(false);
+  const [downloading, startDownload] = useTransition();
   const [queue, setQueue] = useState<UploadQueueItem[]>([]);
+  // The files of the CURRENT batch by queue key, so a retry can send one again.
+  const batchFiles = useRef(new Map<string, QueuedFile>());
 
   function messageOf(outcome: DeliverableUploadOutcome): string | null {
     if (outcome.ok) return null;
@@ -54,66 +63,67 @@ export function useDeliverableUpload(engagementId: string): {
     setQueue((items) => items.map((item) => (item.key === key ? { ...item, ...patch } : item)));
   }
 
-  function uploadMany(category: WorkingFileCategory, files: File[], maxFiles?: number): void {
-    if (files.length === 0) return;
-    const batch = `${Date.now()}`;
-    const items: UploadQueueItem[] = files.map((file, index) => ({
-      key: `${batch}-${index}`,
-      name: file.name,
-      status: 'queued',
-      message: null,
-    }));
-    setQueue(items);
+  /** Upload one queued file, keeping its row current. True when it landed. */
+  async function uploadOne(key: string, { file, category }: QueuedFile): Promise<boolean> {
+    setItem(key, UPLOADING_PATCH);
+    const outcome = await uploadDeliverableFile(engagementId, category, file, (progress) =>
+      setItem(key, { progress }),
+    );
+    setItem(key, settledPatch(outcome, messageOf(outcome)));
+    return outcome.ok;
+  }
 
-    startTransition(async () => {
-      // Only a file that actually LANDS takes one of the capped slots: a file
-      // the pre-flight refuses, or an upload that fails, leaves its slot for the
-      // next file, and "limit reached" is said only once the cap really is.
-      let slotsLeft = maxFiles ?? Number.POSITIVE_INFINITY;
-      let done = 0;
-      let failed = 0;
-      for (const [index, file] of files.entries()) {
-        const key = items[index].key;
-        const localError = validateDeliverableFile(category, file.name, file.size);
-        if (localError) {
-          failed += 1;
-          const reason = localError === 'file_too_large' ? 'too_large' : 'wrong_type';
-          setItem(key, { status: 'failed', message: messageOf({ ok: false, reason }) });
-          continue;
-        }
-        if (slotsLeft <= 0) {
-          setItem(key, { status: 'skipped' });
-          continue;
-        }
-        setItem(key, { status: 'uploading' });
-        const outcome = await uploadDeliverableFile(engagementId, category, file);
-        if (outcome.ok) {
-          done += 1;
-          slotsLeft -= 1;
-        } else {
-          failed += 1;
-        }
-        setItem(key, { status: outcome.ok ? 'done' : 'failed', message: messageOf(outcome) });
-      }
+  async function run(keys: string[], maxFiles: number | undefined): Promise<void> {
+    running.current = true;
+    setUploading(true);
+    try {
+      const { done, failed } = await runUploadQueue(keys, batchFiles.current, maxFiles, {
+        upload: uploadOne,
+        refuse: (key, refusal) => setItem(key, settledPatch(refusal, messageOf(refusal))),
+        skip: (key) => setItem(key, SKIPPED_PATCH),
+      });
       // A failure may still have landed server-side (or the cap moved under us):
       // refresh so the card's count and dropzone match the ledger either way.
       if (done > 0 || failed > 0) router.refresh();
       toast({
         title: t('uploadedSummary', {
           done: formatNumber(done, locale),
-          total: formatNumber(files.length, locale),
+          total: formatNumber(keys.length, locale),
         }),
         variant: done === 0 ? 'destructive' : undefined,
       });
-    });
+    } finally {
+      running.current = false;
+      setUploading(false);
+    }
+  }
+
+  function uploadMany(category: WorkingFileCategory, files: File[], maxFiles?: number): void {
+    if (files.length === 0 || running.current) return;
+    const batch = `${Date.now()}`;
+    const items = files.map((file, index) => queuedItem(`${batch}-${index}`, file.name));
+    batchFiles.current = new Map(items.map((item, index) => [item.key, { file: files[index], category }]));
+    setQueue(items);
+    void run(items.map((item) => item.key), maxFiles);
+  }
+
+  function retry(key: string, maxFiles?: number): void {
+    if (running.current || !queue.some((item) => item.key === key && item.retryable)) return;
+    void run([key], maxFiles);
+  }
+
+  function retryFailed(maxFiles?: number): void {
+    const keys = queue.filter((item) => item.retryable).map((item) => item.key);
+    if (running.current || keys.length === 0) return;
+    void run(keys, maxFiles);
   }
 
   function download(fileId: string) {
-    startTransition(async () => {
+    startDownload(async () => {
       const res = await getDeliverableUrl(fileId);
       if (res.ok && res.url) window.open(res.url, '_blank', 'noopener');
     });
   }
 
-  return { pending, queue, uploadMany, download };
+  return { pending: uploading || downloading, queue, uploadMany, retry, retryFailed, download };
 }

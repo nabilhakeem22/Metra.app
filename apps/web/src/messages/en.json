@@ -1922,6 +1922,9 @@
       "uploading": "Uploading…",
       "dropHere": "Drop files here",
       "uploadedSummary": "{done} of {total} uploaded",
+      "retry": "Retry",
+      "retryFile": "Retry {name}",
+      "retryFailed": "Retry failed",
       "status": {
         "queued": "Waiting",
         "uploading": "Uploading",

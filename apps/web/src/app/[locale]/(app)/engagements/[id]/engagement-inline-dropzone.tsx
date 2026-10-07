@@ -45,7 +45,7 @@ export function EngagementInlineDropzone({
   label?: string;
 }) {
   const t = useTranslations('engagements.files');
-  const { pending, queue, uploadMany } = useDeliverableUpload(engagementId);
+  const { pending, queue, uploadMany, retry, retryFailed } = useDeliverableUpload(engagementId);
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
 
@@ -123,7 +123,12 @@ export function EngagementInlineDropzone({
               : (label ?? `${t('upload')} · ${t(`category.${category}`)}`)}
         </span>
       </button>
-      <UploadQueueList queue={queue} />
+      <UploadQueueList
+        queue={queue}
+        pending={pending}
+        onRetry={(key) => retry(key, maxFiles)}
+        onRetryFailed={() => retryFailed(maxFiles)}
+      />
     </div>
   );
 }

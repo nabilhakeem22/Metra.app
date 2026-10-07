@@ -1,8 +1,8 @@
 // ONE deliverable file through the upload path, as a plain async function (no
 // React): friendly pre-flight (`validateDeliverableFile`) -> `createDeliverableUpload`
-// (signed URL) -> PUT to Storage (bounded) -> `attachDeliverable` (records +
-// attests the category's artifact). Moved verbatim out of `useDeliverableUpload`
-// so a queue of files can run it one after another and report each outcome.
+// (signed URL) -> PUT to Storage (bounded, with progress) -> `attachDeliverable`
+// (records + attests the category's artifact). A queue of files runs it one after
+// another and reports each outcome; a retry runs it again for one file.
 // It never throws: every failure is an outcome the queue shows next to the file.
 // It never advances the delivery (owner rule: no auto-advance after uploads).
 import type { ActionCode } from '@/lib/actions/result';
@@ -14,43 +14,73 @@ import { validateDeliverableFile } from '@/lib/engagements/deliverable-files';
 import type { WorkingFileCategory } from '@/lib/engagements/working-files';
 
 // Storage PUT deadline. A hung upload (dead Storage / lost network) must not leave
-// the spinner stuck forever: the AbortController below aborts the PUT after this,
+// the spinner stuck forever: the request's own timeout ends the PUT after this,
 // and the file is reported as failed. 60s is generous headroom for the 100MB cap.
-const UPLOAD_TIMEOUT_MS = 60_000;
+export const UPLOAD_TIMEOUT_MS = 60_000;
 
 export type DeliverableUploadOutcome =
   | { ok: true }
   | { ok: false; reason: 'too_large' | 'wrong_type' | 'put_failed' | ActionCode };
 
-async function putToStorage(signedUrl: string, file: File): Promise<boolean> {
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), UPLOAD_TIMEOUT_MS);
-  try {
-    const put = await fetch(signedUrl, {
-      method: 'PUT',
-      headers: { 'content-type': file.type, 'x-upsert': 'true' },
-      body: file,
-      signal: controller.signal,
-    });
-    return put.ok;
-  } catch {
-    // Aborted by the deadline, or the network dropped.
-    return false;
-  } finally {
-    clearTimeout(timeoutId);
-  }
+/** Whole percent of the file sent so far, 0..100. */
+export type UploadProgressListener = (percent: number) => void;
+
+/**
+ * PUT the file to its signed URL through XMLHttpRequest, the one browser API that
+ * reports upload progress. Resolves true on a 2xx; false on any HTTP error,
+ * network drop, abort or the deadline. The listener hears each whole percent once.
+ */
+function putToStorage(
+  signedUrl: string,
+  file: File,
+  onProgress?: UploadProgressListener,
+): Promise<boolean> {
+  return new Promise((resolve) => {
+    const request = new XMLHttpRequest();
+    let lastPercent = -1;
+    const fail = () => resolve(false);
+    request.onload = () => resolve(request.status >= 200 && request.status < 300);
+    request.onerror = fail;
+    request.onabort = fail;
+    request.ontimeout = fail;
+    request.upload.onprogress = (event) => {
+      if (!onProgress || !event.lengthComputable || event.total <= 0) return;
+      const percent = Math.min(100, Math.round((event.loaded / event.total) * 100));
+      if (percent === lastPercent) return;
+      lastPercent = percent;
+      onProgress(percent);
+    };
+    try {
+      request.open('PUT', signedUrl);
+      request.timeout = UPLOAD_TIMEOUT_MS;
+      request.setRequestHeader('content-type', file.type);
+      request.setRequestHeader('x-upsert', 'true');
+      request.send(file);
+    } catch {
+      // A malformed URL or a refused header: the same outcome as a dropped network.
+      fail();
+    }
+  });
+}
+
+/** The friendly client-side pre-flight: a refusal before any signed URL, or null. */
+export function preflightRefusal(
+  category: WorkingFileCategory,
+  file: File,
+): DeliverableUploadOutcome | null {
+  const localError = validateDeliverableFile(category, file.name, file.size);
+  if (!localError) return null;
+  return { ok: false, reason: localError === 'file_too_large' ? 'too_large' : 'wrong_type' };
 }
 
 export async function uploadDeliverableFile(
   engagementId: string,
   category: WorkingFileCategory,
   file: File,
+  onProgress?: UploadProgressListener,
 ): Promise<DeliverableUploadOutcome> {
-  // Friendly client-side pre-flight before we ever request a signed URL.
-  const localError = validateDeliverableFile(category, file.name, file.size);
-  if (localError) {
-    return { ok: false, reason: localError === 'file_too_large' ? 'too_large' : 'wrong_type' };
-  }
+  const refusal = preflightRefusal(category, file);
+  if (refusal) return refusal;
   try {
     const signed = await createDeliverableUpload({
       engagementId,
@@ -60,7 +90,9 @@ export async function uploadDeliverableFile(
       sizeBytes: file.size,
     });
     if ('ok' in signed) return { ok: false, reason: (signed.error as ActionCode) ?? 'generic' };
-    if (!(await putToStorage(signed.signedUrl, file))) return { ok: false, reason: 'put_failed' };
+    if (!(await putToStorage(signed.signedUrl, file, onProgress))) {
+      return { ok: false, reason: 'put_failed' };
+    }
     const attached = await attachDeliverable({
       engagementId,
       category,

@@ -1922,6 +1922,9 @@
       "uploading": "جاري الرفع...",
       "dropHere": "سيب الملفات هنا",
       "uploadedSummary": "اترفع {done} من {total}",
+      "retry": "جرّب تاني",
+      "retryFile": "جرّب {name} تاني",
+      "retryFailed": "جرّب اللي فشل تاني",
       "status": {
         "queued": "مستني",
         "uploading": "بيترفع",
