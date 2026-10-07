@@ -90,6 +90,7 @@ const ALL_CODES: ActionCode[] = [
   'client_review_pending',
   'offline_approval_date_out_of_range',
   'offline_approval_note_too_long',
+  'client_review_answered',
   'handoff_not_open',
   'rom_range_invalid',
   'rom_not_set',

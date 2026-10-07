@@ -60,6 +60,8 @@ export const DEFINITE_REFUSALS: ReadonlySet<ActionCode> = new Set<ActionCode>([
   // Input the side-effect refused, rolling the whole transition back.
   'offline_approval_date_out_of_range',
   'offline_approval_note_too_long',
+  // Re-checked under the delivery row lock: the client answered first.
+  'client_review_answered',
   'design_fee_required',
   'milestone_split_invalid',
   'milestone_kind_duplicate',

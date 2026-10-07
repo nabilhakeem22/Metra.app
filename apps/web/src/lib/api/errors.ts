@@ -152,6 +152,8 @@ export const ACTION_CODE_PROBLEM: Record<ActionCode, ApiProblemKind> = {
   client_review_pending: 'conflict',
   offline_approval_date_out_of_range: 'bad-request',
   offline_approval_note_too_long: 'bad-request',
+  // The client answered first: a state conflict, not malformed input.
+  client_review_answered: 'conflict',
   handoff_not_open: 'bad-request',
   rom_range_invalid: 'bad-request',
   rom_not_set: 'bad-request',

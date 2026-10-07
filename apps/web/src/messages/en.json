@@ -531,6 +531,7 @@
     "client_review_pending": "The client has not answered the review yet",
     "offline_approval_date_out_of_range": "Pick a date between the start of this review and today",
     "offline_approval_note_too_long": "The note is too long: 2000 characters at most",
+    "client_review_answered": "The client answered the review in the meantime. Reload the page to see their answer.",
     "handoff_not_open": "The design-only handoff isn't open at this stage",
     "rom_range_invalid": "Enter a valid build-cost range, low to high",
     "rom_not_set": "Enter the build-cost range before recording the client's acknowledgement",

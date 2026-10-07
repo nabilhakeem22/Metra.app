@@ -86,6 +86,9 @@ export type ActionCode =
   // "Client approved offline" input a retry can never fix (offline-approval.ts).
   | 'offline_approval_date_out_of_range'
   | 'offline_approval_note_too_long'
+  // The client answered the review on the portal while the studio was recording
+  // an offline approval (offline-approval-input.ts): reload and read their answer.
+  | 'client_review_answered'
   | 'handoff_not_open'
   | 'rom_range_invalid'
   | 'rom_not_set'
