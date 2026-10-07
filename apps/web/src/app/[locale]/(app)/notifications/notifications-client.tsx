@@ -2,19 +2,26 @@
 
 import { Check, CheckCheck } from 'lucide-react';
 import { useTranslations } from 'next-intl';
+import { useLayoutEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Link } from '@/i18n/routing';
 import {
   notificationHref,
+  PAGE_FEED_LIMIT,
   type NotificationFeed,
 } from '@/components/notifications/feed-item';
-import { useNotificationFeed } from '@/components/notifications/use-notification-feed';
+import { useSharedNotificationFeed } from '@/components/notifications/notification-feed-context';
 import { useNotificationText } from '@/components/notifications/use-notification-text';
 
-/** The full feed: the same live data and wording as the bell, with more rows. */
+/**
+ * The full feed: the shell's ONE live feed (the bell's), widened to this page's
+ * server read. No poller of its own: the bell's poll keeps the newest current.
+ */
 export function NotificationsClient({ initialFeed }: { initialFeed: NotificationFeed }) {
   const t = useTranslations('notifications');
-  const feed = useNotificationFeed(initialFeed);
+  const feed = useSharedNotificationFeed();
+  const { adopt } = feed;
+  useLayoutEffect(() => adopt(initialFeed, PAGE_FEED_LIMIT), [adopt, initialFeed]);
   const text = useNotificationText();
 
   if (feed.items.length === 0) {

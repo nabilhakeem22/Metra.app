@@ -26,6 +26,9 @@ export interface FeedItem {
 /** How many notifications the bell shows, and so how many a poll reads. */
 export const BELL_FEED_LIMIT = 8;
 
+/** How many the notifications page reads; the shared poll keeps the newest current. */
+export const PAGE_FEED_LIMIT = 50;
+
 /** The bell's and the page's data: what is unread, and the newest items. */
 export interface NotificationFeed {
   unreadCount: number;

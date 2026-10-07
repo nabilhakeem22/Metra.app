@@ -1457,6 +1457,7 @@
       "client_budget_acknowledged": "The client acknowledged the budget range on {delivery}.",
       "client_handover_acknowledged": "The client confirmed receiving the handover on {delivery}.",
       "client_payment_claimed": "{hasMilestone, select, yes {The client says they paid ({milestone}) on {delivery}. Confirm it from the delivery.} other {The client says they made a payment on {delivery}. Confirm it from the delivery.}}",
+      "client_payment_claimed_many": "{claimCount, plural, one {The client says they made a payment on {delivery}. Confirm it from the delivery.} other {The client says they made {count} payments on {delivery}. Confirm them from the delivery.}}",
       "client_commented": "{commentCount, plural, one {The client left a comment on {delivery}.} other {The client left {count} comments on {delivery}.}}"
     },
     "viewAll": "View all"
@@ -2166,6 +2167,7 @@
         "mine": "My move"
       },
       "mineEmpty": "Nothing is waiting on you.",
+      "mineEmptyPartial": "None of the {count} newest open deliveries is waiting on you. Older ones were not checked.",
       "truncated": "Showing the {count} newest open deliveries only."
     },
     "age": {

@@ -3,8 +3,8 @@
 import { Bell } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
 import { useEffect, useRef, useState } from 'react';
-import type { NotificationFeed } from '@/components/notifications/feed-item';
-import { useNotificationFeed } from '@/components/notifications/use-notification-feed';
+import { BELL_FEED_LIMIT } from '@/components/notifications/feed-item';
+import { useSharedNotificationFeed } from '@/components/notifications/notification-feed-context';
 import { IconButton } from '@/components/ui/icon-button';
 import { formatNumber } from '@/lib/format/number';
 import { NotificationBellPanel } from './notification-bell-panel';
@@ -14,18 +14,19 @@ const BADGE_CAP = 9;
 
 /**
  * Header bell: a COUNT of unread notifications (a pill, not a dot) and a dropdown
- * of the newest. The feed starts from the (app) layout's server read, so opening
- * the panel costs no request, and stays live through `useNotificationFeed`'s poll.
+ * of the newest. The feed is the shell's shared one (notification-feed-context):
+ * it starts from the (app) layout's server read, so opening the panel costs no
+ * request, and stays live through its one poll.
  *
  * Reading a notification never takes you away from what you were doing: marking
  * one read updates in place, and only clicking through navigates. Closes on
  * outside click and on Escape, reports its state via `aria-expanded`, and anchors
  * with logical properties so it lands on the correct corner in RTL.
  */
-export function NotificationBell({ initialFeed }: { initialFeed: NotificationFeed }) {
+export function NotificationBell() {
   const t = useTranslations('notifications');
   const locale = useLocale();
-  const feed = useNotificationFeed(initialFeed);
+  const feed = useSharedNotificationFeed();
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const hasUnread = feed.unreadCount > 0;
@@ -79,7 +80,7 @@ export function NotificationBell({ initialFeed }: { initialFeed: NotificationFee
 
       {open && (
         <NotificationBellPanel
-          items={feed.items}
+          items={feed.items.slice(0, BELL_FEED_LIMIT)}
           hasUnread={hasUnread}
           onMarkRead={feed.markRead}
           onMarkAllRead={feed.markAllRead}

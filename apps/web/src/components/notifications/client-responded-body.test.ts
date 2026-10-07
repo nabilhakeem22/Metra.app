@@ -70,6 +70,17 @@ describe('client_responded bodies', () => {
     expect(unknown).toContain('DE-2026-0012');
   });
 
+  it('F4: two collapsed payment claims say two payments, not only the latest milestone', () => {
+    const twice = render('en', 'client_payment_claimed', { ...DELIVERY, milestoneKind: 'gate_a', count: 2 });
+    expect(twice).toContain('2 payments');
+    expect(twice).not.toContain('Concept payment');
+    const arabic = render('ar-EG', 'client_payment_claimed', { ...DELIVERY, milestoneKind: 'gate_a', count: 3 });
+    expect(arabic).toContain('3');
+    expect(ARABIC_INDIC.test(arabic)).toBe(false);
+    expect(DASH.test(arabic)).toBe(false);
+    expect(render('en', 'client_payment_claimed', { ...DELIVERY, milestoneKind: 'deposit', count: 1 })).toContain('(Deposit)');
+  });
+
   it('repeated comments say how many, in Latin digits', () => {
     expect(render('en', 'client_commented', { ...DELIVERY, count: 3 })).toContain('3 comments');
     const arabic = render('ar-EG', 'client_commented', { ...DELIVERY, count: 3 });

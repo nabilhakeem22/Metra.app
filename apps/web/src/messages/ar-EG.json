@@ -1457,6 +1457,7 @@
       "client_budget_acknowledged": "العميل أكد نطاق الميزانية في {delivery}.",
       "client_handover_acknowledged": "العميل أكد استلام التسليم في {delivery}.",
       "client_payment_claimed": "{hasMilestone, select, yes {العميل بيقول إنه دفع ({milestone}) في {delivery}. أكدها من صفحة التسليم.} other {العميل بيقول إنه دفع دفعة في {delivery}. أكدها من صفحة التسليم.}}",
+      "client_payment_claimed_many": "{claimCount, plural, zero {العميل بيقول إنه دفع في {delivery}. أكدها من صفحة التسليم.} one {العميل بيقول إنه دفع دفعة في {delivery}. أكدها من صفحة التسليم.} two {العميل بيقول إنه دفع دفعتين في {delivery}. أكدهم من صفحة التسليم.} few {العميل بيقول إنه دفع {count} دفعات في {delivery}. أكدهم من صفحة التسليم.} many {العميل بيقول إنه دفع {count} دفعة في {delivery}. أكدهم من صفحة التسليم.} other {العميل بيقول إنه دفع {count} دفعة في {delivery}. أكدهم من صفحة التسليم.}}",
       "client_commented": "{commentCount, plural, zero {العميل كتب تعليقات على {delivery}.} one {العميل كتب تعليق على {delivery}.} two {العميل كتب تعليقين على {delivery}.} few {العميل كتب {count} تعليقات على {delivery}.} many {العميل كتب {count} تعليق على {delivery}.} other {العميل كتب {count} تعليق على {delivery}.}}"
     },
     "viewAll": "عرض الكل"
@@ -2166,6 +2167,7 @@
         "mine": "دوري"
       },
       "mineEmpty": "مفيش حاجة مستنياك.",
+      "mineEmptyPartial": "مفيش ولا تسليم من أحدث {count} تسليم مفتوح مستنيك. الأقدم منهم ما اتراجعش.",
       "truncated": "بنعرض أحدث {count} تسليم مفتوح بس."
     },
     "age": {

@@ -43,6 +43,12 @@ export function clientRespondedBody(
   milestoneLabel: (kind: string) => string | null,
 ): string {
   const delivery = deliveryLabel(params, locale);
+  if (bodyKey === 'client_payment_claimed' && (wholeNumber(params.count) ?? 1) > 1) {
+    // Repeated claims collapse into one unread row whose params name only the
+    // latest milestone: say how many, not just the last one.
+    const count = wholeNumber(params.count) ?? 1;
+    return translate('client_payment_claimed_many', { delivery, claimCount: count, count: String(count) });
+  }
   if (bodyKey === 'client_payment_claimed') {
     const milestone = text(params.milestoneKind) ? milestoneLabel(String(params.milestoneKind)) : null;
     return translate(bodyKey, {

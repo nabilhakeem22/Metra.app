@@ -1,11 +1,9 @@
 import { getTranslations } from 'next-intl/server';
+import { PAGE_FEED_LIMIT } from '@/components/notifications/feed-item';
 import { PageHeader } from '@/components/ui/page-header';
 import { requireOrg } from '@/lib/auth/require-org';
 import { loadNotificationFeed } from '@/lib/notifications/feed';
 import { NotificationsClient } from './notifications-client';
-
-/** The page shows more than the bell; its poll refreshes the newest of them. */
-const PAGE_FEED_LIMIT = 50;
 
 export default async function NotificationsPage() {
   const ctx = await requireOrg();

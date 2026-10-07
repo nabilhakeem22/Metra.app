@@ -3,7 +3,13 @@ import { act, screen } from '@testing-library/react';
 import { renderWithIntl } from '@/test/render-with-intl';
 import { NotificationBell } from '@/components/shell/notification-bell';
 import type { FeedItem, NotificationFeed } from './feed-item';
-import { NOTIFICATION_POLL_MS, useNotificationFeed } from './use-notification-feed';
+import { NotificationsClient } from '@/app/[locale]/(app)/notifications/notifications-client';
+import { NotificationFeedProvider } from './notification-feed-context';
+import {
+  NOTIFICATION_POLL_MS,
+  RETURN_POLL_MIN_GAP_MS,
+  useNotificationFeed,
+} from './use-notification-feed';
 
 const actions = vi.hoisted(() => ({
   pollNotificationFeed: vi.fn(),
@@ -105,7 +111,20 @@ describe('useNotificationFeed polling', () => {
     visibility = 'visible';
     await act(async () => void document.dispatchEvent(new Event('visibilitychange')));
     expect(actions.pollNotificationFeed).toHaveBeenCalledTimes(1);
-    await act(async () => void window.dispatchEvent(new Event('focus')));
+  });
+
+  it('R7: returning to the tab polls at most once per 15 s, however often focus fires', async () => {
+    renderWithIntl(<Probe feed={FEED} />, { locale: 'en' });
+    const focus = () => act(async () => void window.dispatchEvent(new Event('focus')));
+    await focus();
+    expect(actions.pollNotificationFeed).toHaveBeenCalledTimes(1);
+    for (let second = 0; second < 14; second += 2) {
+      await advance(2_000);
+      await focus();
+    }
+    expect(actions.pollNotificationFeed).toHaveBeenCalledTimes(1);
+    await advance(RETURN_POLL_MIN_GAP_MS);
+    await focus();
     expect(actions.pollNotificationFeed).toHaveBeenCalledTimes(2);
   });
 
@@ -139,22 +158,50 @@ describe('useNotificationFeed marking', () => {
   });
 });
 
+const bell = (feed: NotificationFeed) => (
+  <NotificationFeedProvider initialFeed={feed}>
+    <NotificationBell />
+  </NotificationFeedProvider>
+);
+
 describe('NotificationBell count', () => {
   it.each([
     [3, '3'],
     [12, '9+'],
   ])('%i unread shows "%s" (a count, not a dot)', (unreadCount, shown) => {
-    const { container } = renderWithIntl(
-      <NotificationBell initialFeed={{ unreadCount, items: [] }} />,
-      { locale: 'ar-EG' },
-    );
+    const { container } = renderWithIntl(bell({ unreadCount, items: [] }), { locale: 'ar-EG' });
     expect(container.querySelector('[data-unread-badge]')?.textContent).toBe(shown);
   });
 
   it('nothing unread shows no badge', () => {
-    const { container } = renderWithIntl(<NotificationBell initialFeed={{ unreadCount: 0, items: [] }} />, {
-      locale: 'en',
-    });
+    const { container } = renderWithIntl(bell({ unreadCount: 0, items: [] }), { locale: 'en' });
+    expect(container.querySelector('[data-unread-badge]')).toBeNull();
+  });
+});
+
+describe('one feed for the bell and the notifications page (R7)', () => {
+  it('the page adds no poller: one poll a minute with both on screen', async () => {
+    renderWithIntl(
+      <NotificationFeedProvider initialFeed={FEED}>
+        <NotificationBell />
+        <NotificationsClient initialFeed={{ unreadCount: 1, items: [item('a'), item('z', true)] }} />
+      </NotificationFeedProvider>,
+      { locale: 'en' },
+    );
+    await advance(5 * NOTIFICATION_POLL_MS);
+    expect(actions.pollNotificationFeed).toHaveBeenCalledTimes(5);
+  });
+
+  it('marking read on the page is read in the bell too', async () => {
+    const { container } = renderWithIntl(
+      <NotificationFeedProvider initialFeed={FEED}>
+        <NotificationBell />
+        <NotificationsClient initialFeed={FEED} />
+      </NotificationFeedProvider>,
+      { locale: 'en' },
+    );
+    expect(container.querySelector('[data-unread-badge]')?.textContent).toBe('1');
+    await act(async () => void screen.getByRole('button', { name: 'Mark read' }).click());
     expect(container.querySelector('[data-unread-badge]')).toBeNull();
   });
 });
