@@ -3,14 +3,8 @@ import type {
   EngagementEventRecord,
   EngagementTransitionRecord,
 } from '@/lib/engagements/queries';
-import {
-  isClientGenerated,
-  isRecordedForClient,
-} from '@/lib/engagements/event-provenance';
-import {
-  offlineApprovalChannelOf,
-  type OfflineApprovalChannel,
-} from '@/lib/engagements/offline-approval';
+import { isClientGenerated, isRecordedForClient } from '@/lib/engagements/event-provenance';
+import { offlineApprovalChannelOf, type OfflineApprovalChannel } from '@/lib/engagements/offline-approval';
 
 // WHAT THE TIMELINE SHOWS, and in what order. PURE and server-safe: no React, no
 // db. Merging three record streams into one ledger, deciding which rows are
@@ -30,7 +24,12 @@ export interface TimelineEntry {
   eventId: string | null;
   /** The correction that retracted this row, drawn ON it. */
   retraction: EngagementEventRecord | null;
+  /** A concept choice's letter position, as SAVED with it (1 = A), else null. */
+  optionPosition: number | null;
 }
+
+/** The fields a row that is not a studio-recorded event leaves empty. */
+const PLAIN_ROW = { onBehalf: false, occurredOn: null, evidence: null, eventId: null, retraction: null };
 
 /** The sentences the feed needs from the catalogue, as functions. */
 export interface TimelineLabels {
@@ -47,19 +46,15 @@ export interface TimelineInput {
   clientActivity: readonly EngagementClientActivityRecord[];
 }
 
-/**
- * A ledger row's free-text note, blank-safe: whitespace-only (or absent) reads as
- * "no note" so the timeline never renders an empty quoted line.
- */
+/** A ledger row's note, blank-safe: whitespace-only reads as "no note". */
 export function trimmedNote(note: string | null | undefined): string | null {
   return note?.trim() || null;
 }
 
 /**
- * Which rows a correction has retracted, and why. Read from the SAME array the
- * guards filter with `liveEvents` — this view deliberately keeps the retracted row
- * VISIBLE (that history IS the protection) and marks it, rather than hiding it as
- * the guards do.
+ * Which rows a correction has retracted, and why. The guards drop a retracted
+ * row (`liveEvents`); this view keeps it VISIBLE and marks it: that history IS
+ * the protection.
  */
 function retractionsByTarget(
   events: readonly EngagementEventRecord[],
@@ -80,11 +75,8 @@ function transitionEntry(
     at: transition.decidedAt,
     label: labels.transition(transition.fromState, transition.toState),
     note: trimmedNote(transition.note),
-    onBehalf: false,
-    occurredOn: null,
-    evidence: null,
-    eventId: null,
-    retraction: null,
+    ...PLAIN_ROW,
+    optionPosition: null,
   };
 }
 
@@ -109,6 +101,7 @@ function eventEntry(
     evidence: evidenceOf(event, labels),
     eventId: event.id,
     retraction: retractions.get(event.id) ?? null,
+    optionPosition: event.chosenPosition,
   };
 }
 
@@ -122,24 +115,16 @@ function clientEntry(
     at: entry.decidedAt,
     label: labels.clientActivity(entry.kind, entry.actorName),
     note: trimmedNote(entry.note),
-    onBehalf: false,
-    occurredOn: null,
-    evidence: null,
-    eventId: null,
-    retraction: null,
+    ...PLAIN_ROW,
+    optionPosition: entry.chosenPosition,
   };
 }
 
 /**
- * The merged ledger, newest first.
- *
- * CLIENT-CHANNEL EVENT ROWS ARE SKIPPED, not filtered in the query: they arrive
- * again through `clientActivity`, which carries the actor's NAME. Rendering both
- * drew every genuine client acknowledgement TWICE and made this ledger unreliable
- * to count — which matters, because counting it is what somebody does in a
- * dispute.
- *
- * A CORRECTION is never an entry of its own: it is drawn ON the row it retracts.
+ * The merged ledger, newest first. CLIENT-CHANNEL EVENT ROWS ARE SKIPPED: they
+ * arrive again through `clientActivity`, which carries the actor's NAME, and
+ * drawing both made this ledger (the one counted in a dispute) count every
+ * client act TWICE. A CORRECTION is drawn ON the row it retracts, never alone.
  */
 export function buildTimelineEntries(
   input: TimelineInput,

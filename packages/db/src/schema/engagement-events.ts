@@ -5,6 +5,7 @@ import {
   date,
   index,
   pgTable,
+  smallint,
   text,
   timestamp,
   unique,
@@ -109,7 +110,14 @@ export const engagementEvents = pgTable(
      * an approval that named no option (the plain "approve concept" verb).
      */
     chosenArtifactId: uuid('chosen_artifact_id'),
-    decidedAt:timestamp('decided_at', { withTimezone: true })
+    /**
+     * The LETTER the client saw on the option they chose (0057): 1 = A to 4 = D,
+     * saved with the choice so it never changes when the studio later hides or
+     * releases options. Present exactly when `chosenArtifactId` is (CHECK), and
+     * 1 to 4 (CHECK). Readers show this column and never re-rank.
+     */
+    chosenPosition: smallint('chosen_position'),
+    decidedAt: timestamp('decided_at', { withTimezone: true })
       .notNull()
       .defaultNow(),
   },
@@ -123,6 +131,14 @@ export const engagementEvents = pgTable(
     check(
       'engagement_events_chosen_artifact_only_concept',
       sql`chosen_artifact_id is null or kind::text = 'concept_approval'`,
+    ),
+    check(
+      'engagement_events_chosen_position_pairs',
+      sql`(chosen_artifact_id IS NULL) = (chosen_position IS NULL)`,
+    ),
+    check(
+      'engagement_events_chosen_position_range',
+      sql`chosen_position IS NULL OR chosen_position BETWEEN 1 AND 4`,
     ),
     index('engagement_events_org_engagement_kind_idx').on(
       t.orgId,

@@ -4,6 +4,7 @@ import { BellRing } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
+import type { LetteredConceptOption } from '@/lib/engagements/concept-choice';
 import type { Trigger } from '@/lib/engagements/transitions';
 import {
   OfflineApprovalForm,
@@ -27,6 +28,7 @@ export function CommandCardWaitingClient({
   offlineApproval,
   reviewAnswerOnly,
   reviewRoundStartedAt,
+  conceptOptions,
   canShare,
   primary,
   pending,
@@ -42,6 +44,8 @@ export function CommandCardWaitingClient({
   reviewAnswerOnly: boolean;
   /** When that review round began (ISO): the offline approval's date floor. */
   reviewRoundStartedAt: string;
+  /** The lettered options an offline concept choice may name. */
+  conceptOptions: LetteredConceptOption[];
   canShare: boolean;
   /** False when a payment opener above is already the filled primary action. */
   primary: boolean;
@@ -92,6 +96,7 @@ export function CommandCardWaitingClient({
           engagementId={engagementId}
           trigger={offlineTrigger}
           reviewRoundStartedAt={reviewRoundStartedAt}
+          conceptOptions={conceptOptions}
           pending={pending}
           runAction={runAction}
           onCancel={() => setFormOpen(false)}

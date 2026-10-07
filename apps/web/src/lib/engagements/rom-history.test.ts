@@ -16,6 +16,8 @@ function event(over: Partial<EngagementEventRecord>): EngagementEventRecord {
     rangeLow: '1500000.0000',
     rangeHigh: '2500000.0000',
     acknowledgedIssueAt: null,
+    chosenArtifactId: null,
+    chosenPosition: null,
     decidedAt: new Date('2026-08-14T10:00:00Z'),
     createdAt: new Date('2026-08-14T10:00:00Z'),
     ...over,

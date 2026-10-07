@@ -88,6 +88,7 @@ function props(overrides: Partial<EngagementCommandCardProps> = {}): EngagementC
     canAdvance: true,
     canRecordOfflineApproval: true,
     reviewRoundStartedAt: '2026-06-01T07:00:00.000Z',
+    conceptOptions: [],
     canRecordPayment: true,
     canResolveClaims: true,
     canShare: true,
@@ -610,8 +611,41 @@ describe('waiting for the client to answer the review', () => {
       channel: 'whatsapp',
       occurredOn: null,
       note: 'Approved option B',
+      chosenArtifactId: null,
     });
     expect(actions.recordOfflineDesignApproval).not.toHaveBeenCalled();
+    // No released option has a letter here, so "Which option?" is not offered.
+    expect(screen.queryByLabelText(ar('engagements.offlineApproval.whichOption'))).toBeNull();
+  });
+
+  test('B12: "Which option?" lists the lettered options only and sends the chosen one', async () => {
+    actions.recordOfflineConceptApproval.mockResolvedValue({ ok: true });
+    renderWaiting({
+      conceptOptions: [
+        { id: 'opt-a', letter: 'A' },
+        { id: 'opt-b', letter: 'B' },
+      ],
+    });
+    fireEvent.click(offlineButton()!);
+    const select = screen.getByLabelText(ar('engagements.offlineApproval.whichOption'));
+    const options = [...select.querySelectorAll('option')];
+    expect(options.map((option) => option.value)).toEqual(['', 'opt-a', 'opt-b']);
+    expect(options[2].textContent).toBe(
+      ar('engagements.conceptOption.letter').replace('{letter}', '⁨B⁩'),
+    );
+    fireEvent.change(screen.getByLabelText(ar('engagements.offlineApproval.channelLabel')), {
+      target: { value: 'phone' },
+    });
+    fireEvent.change(select, { target: { value: 'opt-b' } });
+    await act(async () => {
+      fireEvent.click(button('engagements.offlineApproval.save')!);
+    });
+    expect(actions.recordOfflineConceptApproval).toHaveBeenCalledWith('e-1', {
+      channel: 'phone',
+      occurredOn: null,
+      note: null,
+      chosenArtifactId: 'opt-b',
+    });
   });
 
   test('at final_approval the form records the design approval', async () => {
@@ -634,7 +668,42 @@ describe('waiting for the client to answer the review', () => {
       channel: 'phone',
       occurredOn: null,
       note: null,
+      chosenArtifactId: null,
     });
+  });
+
+  test('B12: after the client chose option B, the card says so with the SAVED letter', () => {
+    const { container } = renderWaiting({
+      preview: {
+        ...waitingPreview(false),
+        clientDecision: {
+          kind: 'concept_approval',
+          decidedAt: '2026-06-02T09:00:00.000Z',
+          chosenArtifactId: 'opt-b',
+          chosenPosition: 2,
+        },
+      },
+    });
+    const choice = container.querySelector('[data-client-choice]');
+    expect(choice?.getAttribute('data-client-choice')).toBe('B');
+    expect(choice?.textContent).toBe(
+      ar('engagements.command.clientChoseOption').replace('{letter}', '⁨B⁩'),
+    );
+  });
+
+  test('a plain approval (no option named) shows no choice line', () => {
+    const { container } = renderWaiting({
+      preview: {
+        ...waitingPreview(false),
+        clientDecision: {
+          kind: 'concept_approval',
+          decidedAt: '2026-06-02T09:00:00.000Z',
+          chosenArtifactId: null,
+          chosenPosition: null,
+        },
+      },
+    });
+    expect(container.querySelector('[data-client-choice]')).toBeNull();
   });
 
   test('once the client has answered, Advance is back', () => {

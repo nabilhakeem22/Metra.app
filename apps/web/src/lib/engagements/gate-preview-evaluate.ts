@@ -56,6 +56,8 @@ export interface ClientDecisionSummary {
   kind: EngagementEventKind;
   decidedAt: string;
   chosenArtifactId: string | null;
+  /** The letter position saved with a concept choice (1 = A), never re-ranked. */
+  chosenPosition: number | null;
 }
 
 /** The preview of an engagement that is absent or has nowhere to go. */
@@ -75,6 +77,7 @@ function summarize(decision: ClientReviewEvent | null): ClientDecisionSummary | 
     kind: decision.kind,
     decidedAt: decision.decidedAt.toISOString(),
     chosenArtifactId: decision.chosenArtifactId ?? null,
+    chosenPosition: decision.chosenPosition ?? null,
   };
 }
 

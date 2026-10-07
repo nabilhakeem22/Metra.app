@@ -110,6 +110,8 @@ function clientEvent(kind: GuardEvent['kind'], decidedAt: Date): GuardEvent {
     acknowledgedIssueAt: null,
     rangeLow: null,
     rangeHigh: null,
+    chosenArtifactId: null,
+    chosenPosition: null,
   };
 }
 
@@ -132,7 +134,23 @@ describe('evaluateGatePreview: the client review', () => {
       kind: 'concept_change_request',
       decidedAt: decidedAt.toISOString(),
       chosenArtifactId: null,
+      chosenPosition: null,
     });
+  });
+
+  it('a concept choice carries the letter position SAVED with it (B12)', () => {
+    const option = '88888888-8888-4888-8888-888888888888';
+    const preview = evaluateGatePreview({
+      ...facts('concept_review', []),
+      events: [
+        {
+          ...clientEvent('concept_approval', new Date('2026-02-01T09:00:00Z')),
+          chosenArtifactId: option,
+          chosenPosition: 2,
+        },
+      ],
+    });
+    expect(preview.clientDecision).toMatchObject({ chosenArtifactId: option, chosenPosition: 2 });
   });
 
   it('outside a review stage nothing waits on a client review', () => {

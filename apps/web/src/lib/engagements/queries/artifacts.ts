@@ -6,6 +6,7 @@ import {
 } from '@metra/db';
 import { desc, eq } from 'drizzle-orm';
 import { withOrgContext, type OrgContext } from '@/lib/db/context';
+import { conceptOptionPositions } from './concept-positions';
 
 /**
  * The approved-render baseline captured when `rendersReady` fired. Both are null
@@ -54,18 +55,23 @@ export interface EngagementArtifactRecord {
    *  tokenized client portal (auto-shared by a release-carrying transition, or
    *  toggled by the studio's per-file manual override). */
   clientVisible: boolean;
+  /** The option's letter position as the CLIENT sees it now (1 = A to 4 = D),
+   *  from the one lettering rule the portal reads; null for any artifact that is
+   *  not a released, file-bearing concept option among the first four. */
+  conceptPosition: number | null;
 }
 
 /**
- * The artifacts recorded against an engagement, NEWEST FIRST. RLS scopes the read
+ * The artifacts recorded against an engagement, NEWEST FIRST, each with its
+ * concept letter position (read in the same transaction). RLS scopes the read
  * to the caller's org (a foreign engagement reads as an empty list).
  */
 export function getEngagementArtifacts(
   ctx: OrgContext,
   engagementId: string,
 ): Promise<EngagementArtifactRecord[]> {
-  return withOrgContext(ctx, (tx) =>
-    tx
+  return withOrgContext(ctx, async (tx) => {
+    const rows = await tx
       .select({
         id: engagementArtifacts.id,
         kind: engagementArtifacts.kind,
@@ -82,6 +88,8 @@ export function getEngagementArtifacts(
       .orderBy(
         desc(engagementArtifacts.attestedAt),
         desc(engagementArtifacts.createdAt),
-      ),
-  );
+      );
+    const positions = await conceptOptionPositions(tx, engagementId);
+    return rows.map((row) => ({ ...row, conceptPosition: positions.get(row.id) ?? null }));
+  });
 }

@@ -17,13 +17,10 @@ export interface EngagementTransitionRecord {
   actorUserId: string | null;
   note: string | null;
   /**
-   * The key the cockpit sent with the attempt that wrote this row, where 0050
-   * records one (self-loop edges; NULL on every other edge and on every row
-   * written before 0050). Selected because the cockpit ANSWERS A QUESTION WITH
-   * IT: a key it is still holding for an attempt it was never told the outcome
-   * of has landed iff a row here carries that exact key — see
-   * `@/lib/engagements/held-key`. It is an opaque UUID this client minted, never
-   * a secret and never rendered.
+   * The key the cockpit sent with the attempt that wrote this row (0050; NULL
+   * on edges that record none). A key the cockpit still holds for an attempt it
+   * was never told the outcome of has landed iff a row here carries it
+   * (`@/lib/engagements/held-key`). An opaque UUID, never a secret, never rendered.
    */
   idempotencyKey: string | null;
   decidedAt: Date;
@@ -97,6 +94,9 @@ export interface EngagementEventRecord {
    * studio staring at a button that will not work.
    */
   acknowledgedIssueAt: Date | null;
+  /** A concept approval's chosen option and the letter SAVED with it (0057). */
+  chosenArtifactId: string | null;
+  chosenPosition: number | null;
   decidedAt: Date;
   /**
    * Insert order, for breaking a `decidedAt` tie. Two events written in the same
@@ -132,6 +132,8 @@ export function getEngagementEvents(
         rangeLow: engagementEvents.rangeLow,
         rangeHigh: engagementEvents.rangeHigh,
         acknowledgedIssueAt: engagementEvents.acknowledgedIssueAt,
+        chosenArtifactId: engagementEvents.chosenArtifactId,
+        chosenPosition: engagementEvents.chosenPosition,
         decidedAt: engagementEvents.decidedAt,
         createdAt: engagementEvents.createdAt,
       })

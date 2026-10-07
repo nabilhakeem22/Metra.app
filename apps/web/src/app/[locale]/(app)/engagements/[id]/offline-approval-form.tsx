@@ -5,16 +5,15 @@ import { useState } from 'react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import {
-  recordOfflineConceptApproval,
-  recordOfflineDesignApproval,
-} from '@/lib/engagements/actions';
+import { recordOfflineConceptApproval, recordOfflineDesignApproval } from '@/lib/engagements/actions';
+import type { LetteredConceptOption } from '@/lib/engagements/concept-choice';
 import {
   OFFLINE_APPROVAL_CHANNELS,
   isOfflineApprovalChannel,
   type OfflineApprovalChannel,
 } from '@/lib/engagements/offline-approval';
 import { offlineApprovalBounds } from '@/lib/engagements/review-round';
+import { bidiIsolate } from '@/lib/format/bidi';
 import { MAX_NOTE_CHARS } from '@/lib/validation/text';
 import { FormActions } from './engagement-form-actions';
 import type { RunAction } from './use-engagement-action';
@@ -32,15 +31,17 @@ export function isOfflineApprovalTrigger(trigger: string | null): trigger is Off
 }
 
 /**
- * "Client approved offline": HOW the client approved (required), WHEN when it
- * was not today (within the round, by Cairo day), and an optional note capped
- * at the server's length. Saving fires the same transition as
+ * "Client approved offline": HOW the client approved (required), WHEN when not
+ * today (within the round, by Cairo day), an optional capped note and, at the
+ * concept review, WHICH released option they chose (optional; only a lettered
+ * option can be named, owner decision Q1). Saving fires the same transition as
  * Advance, so every guard still runs; Cancel fires nothing.
  */
 export function OfflineApprovalForm({
   engagementId,
   trigger,
   reviewRoundStartedAt,
+  conceptOptions,
   pending,
   runAction,
   onCancel,
@@ -49,14 +50,19 @@ export function OfflineApprovalForm({
   trigger: OfflineApprovalTrigger;
   /** When the review round under answer began (ISO): the earliest day allowed. */
   reviewRoundStartedAt: string;
+  /** The released, lettered concept options (empty hides "Which option?"). */
+  conceptOptions: LetteredConceptOption[];
   pending: boolean;
   runAction: RunAction;
   onCancel: () => void;
 }) {
   const t = useTranslations('engagements.offlineApproval');
+  const tc = useTranslations('engagements.conceptOption');
   const [channel, setChannel] = useState<OfflineApprovalChannel | ''>('');
   const [occurredOn, setOccurredOn] = useState('');
   const [note, setNote] = useState('');
+  const [chosenArtifactId, setChosenArtifactId] = useState('');
+  const offersOptions = trigger === 'selectConcept' && conceptOptions.length > 0;
   // The same Cairo days the server enforces: not before the round, not after today.
   const bounds = offlineApprovalBounds(new Date(reviewRoundStartedAt), new Date());
 
@@ -68,6 +74,7 @@ export function OfflineApprovalForm({
         channel,
         occurredOn: occurredOn || null,
         note: note.trim() || null,
+        chosenArtifactId: offersOptions && chosenArtifactId ? chosenArtifactId : null,
       }),
     );
   }
@@ -88,9 +95,7 @@ export function OfflineApprovalForm({
           >
             <option value="">{t('channelPlaceholder')}</option>
             {OFFLINE_APPROVAL_CHANNELS.map((option) => (
-              <option key={option} value={option}>
-                {t(`channel.${option}`)}
-              </option>
+              <option key={option} value={option}>{t(`channel.${option}`)}</option>
             ))}
           </select>
         </div>
@@ -107,6 +112,22 @@ export function OfflineApprovalForm({
           />
         </div>
       </div>
+      {offersOptions && (
+        <div className="space-y-1.5">
+          <Label htmlFor="offline-approval-option">{t('whichOption')}</Label>
+          <select
+            id="offline-approval-option"
+            value={chosenArtifactId}
+            onChange={(event) => setChosenArtifactId(event.target.value)}
+            className="h-9 w-full rounded-item border bg-background px-2 field-text"
+          >
+            <option value="">{t('optionUnspecified')}</option>
+            {conceptOptions.map(({ id, letter }) => (
+              <option key={id} value={id}>{tc('letter', { letter: bidiIsolate(letter) })}</option>
+            ))}
+          </select>
+        </div>
+      )}
       <div className="space-y-1.5">
         <Label htmlFor="offline-approval-note">{t('note')}</Label>
         <Textarea

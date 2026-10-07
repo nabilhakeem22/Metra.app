@@ -25,6 +25,7 @@ import { SectionLabel } from '@/components/ui/section-label';
 export function FilesTab({
   engagementId,
   artifacts,
+  chosenConceptId,
   canUpload,
   canRecordArtifact,
   pending,
@@ -32,6 +33,8 @@ export function FilesTab({
 }: {
   engagementId: string;
   artifacts: EngagementArtifactRecord[];
+  /** The concept option the client chose, for its chip in the artifact list. */
+  chosenConceptId: string | null;
   canUpload: boolean;
   canRecordArtifact: boolean;
   pending: boolean;
@@ -83,7 +86,11 @@ export function FilesTab({
               capability create and update are identical across all seven roles (only
               `viewer` is read-only), so it is also the right gate for the client-portal
               visibility toggle. The server action re-checks update regardless. */}
-          <ArtifactsPanel artifacts={artifacts} canManageVisibility={canUpload} />
+          <ArtifactsPanel
+            artifacts={artifacts}
+            canManageVisibility={canUpload}
+            chosenConceptId={chosenConceptId}
+          />
         </div>
       </div>
     </div>

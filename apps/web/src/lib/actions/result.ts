@@ -93,6 +93,8 @@ export type ActionCode =
   // The client answered the review on the portal while the studio was recording
   // an offline approval (offline-approval-input.ts): reload and read their answer.
   | 'client_review_answered'
+  // An offline concept choice of an option with no letter (offline-provenance.ts).
+  | 'concept_option_not_found'
   // Round B, B11: the client link cannot be re-derived (minted before re-derivable
   // links, or the Worker secret is missing/rotated); one confirmed replacement fixes it.
   | 'delivery_link_unrecoverable'

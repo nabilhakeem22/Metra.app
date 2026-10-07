@@ -1,6 +1,7 @@
 import type { MilestoneProgress } from '@/lib/engagements/journey-map';
 import type { HeroView } from '@/lib/engagements/portal-hero';
 import type { PortalLabel } from '@/lib/engagements/portal-labels';
+import type { PublicDelivery } from '@/lib/engagements/public/types';
 import { HeroCard } from './hero-card';
 import { JourneyTracker } from './journey-tracker';
 import { WhatsNext } from './whats-next';
@@ -28,12 +29,15 @@ export function PortalCommandCard({
   milestone,
   stageLabel,
   stageNote,
+  concept,
 }: {
   token: string;
   hero: HeroView;
   milestone: MilestoneProgress;
   stageLabel: PortalLabel;
   stageNote: PortalLabel;
+  /** What the hero needs to offer the concept options as a choice (B12). */
+  concept: Pick<PublicDelivery, 'clientActions' | 'conceptOptions' | 'conceptChoice'>;
 }) {
   return (
     <section className="space-y-4 rounded-panel border bg-background p-4 shadow-sm">
@@ -43,6 +47,9 @@ export function PortalCommandCard({
         hero={hero}
         stageLabel={stageLabel}
         stageNote={stageNote}
+        clientActions={concept.clientActions}
+        conceptOptions={concept.conceptOptions}
+        conceptChoice={concept.conceptChoice}
       />
       <WhatsNext milestone={milestone} bare />
     </section>

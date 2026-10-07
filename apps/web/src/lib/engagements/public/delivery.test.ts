@@ -304,6 +304,25 @@ describe('getDeliveryByToken hardening', () => {
     expect((await readDelivery('raw-token'))?.documents).toEqual([]);
   });
 
+  it('maps the lettered concept options and the saved choice (B12); absent keys degrade', async () => {
+    const option = '11111111-1111-4111-8111-111111111111';
+    setSnapshot({
+      ...validSnapshot(),
+      concept_options: [{ id: option, position: 2 }, { id: 'junk', position: 1 }],
+      concept_choice_id: option,
+      concept_choice_position: 3,
+    });
+    const lettered = await readDelivery('raw-token');
+    expect(lettered?.conceptOptions).toEqual([{ id: option, position: 2, letter: 'B' }]);
+    // The saved letter, not the option's current one.
+    expect(lettered?.conceptChoice).toEqual({ id: option, letter: 'C' });
+
+    setSnapshot(validSnapshot());
+    const bare = await readDelivery('raw-token');
+    expect(bare?.conceptOptions).toEqual([]);
+    expect(bare?.conceptChoice).toBeNull();
+  });
+
   it('never throws across a battery of hostile snapshots', async () => {
     const hostile: unknown[] = [
       undefined,

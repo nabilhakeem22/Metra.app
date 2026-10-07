@@ -1,12 +1,9 @@
 'use server';
 
-import { headers } from 'next/headers';
-import {
-  clientActOfVerb,
-  paymentClaimedAct,
-} from '@/lib/engagements/client-acts/acts';
+import { clientActOfVerb, paymentClaimedAct } from '@/lib/engagements/client-acts/acts';
 import { withStudioNotified } from '@/lib/engagements/client-acts/notify';
 import {
+  chooseConceptByToken,
   claimPaymentByToken,
   recordDeliveryActionByToken,
   type DeliveryActionResult,
@@ -17,6 +14,7 @@ import {
   type DeliveryCommentResult,
   type PublicDocumentComment,
 } from '@/lib/engagements/public-comments';
+import { requestProvenance } from './request-provenance';
 
 /** A portal write's answer, plus whether the studio heard about it: true only
  *  when a notification row was written for THIS act, which is the only time the
@@ -25,20 +23,8 @@ export type DeliveryActResult = DeliveryActionResult & { studioNotified?: boolea
 export type DeliveryCommentActResult = DeliveryCommentResult & { studioNotified?: boolean };
 
 /**
- * The client IP for the advisory audit trail, capped at 45 chars. Prefers the
- * platform-trusted edge header `cf-connecting-ip` (set by Cloudflare, not
- * client-spoofable) and falls back to the FIRST `x-forwarded-for` hop only when the
- * edge header is absent. Advisory provenance only — never an authorization input.
- */
-function clientIp(h: Headers): string | null {
-  const edge = h.get('cf-connecting-ip')?.trim();
-  if (edge) return edge.slice(0, 45);
-  return h.get('x-forwarded-for')?.split(',')[0]?.trim().slice(0, 45) || null;
-}
-
-/**
  * Public (no-session) client delivery-portal action. Captures the client IP +
- * user agent from the request headers for the append-only engagement_events audit
+ * user agent (./request-provenance.ts) for the append-only engagement_events audit
  * trail (mirrors the proposal p/[token] action). The raw token flows straight to
  * recordDeliveryActionByToken, which hashes it — it is NEVER logged here. The
  * signal is advisory: it moves no state and adds no blocking guard. A first `ok`
@@ -50,18 +36,36 @@ export async function recordDeliveryAction(
   action: string,
   note?: string,
 ): Promise<DeliveryActResult> {
-  const h = await headers();
   // Cap the audit fields before they reach the DB (the SDF also caps note at 2000).
-  const ip = clientIp(h);
-  const ua = h.get('user-agent')?.slice(0, 512) || null;
-  const trimmedNote = note?.trim().slice(0, 2000) || null;
   const result = await recordDeliveryActionByToken(token, {
     action,
-    note: trimmedNote,
-    ip,
-    userAgent: ua,
+    note: note?.trim().slice(0, 2000) || null,
+    ...(await requestProvenance()),
   });
   return withStudioNotified(token, result, clientActOfVerb(action));
+}
+
+/**
+ * Public (no-session) client delivery-portal action (Round B, B12): the client
+ * CHOOSES one concept option. `position` is the letter the client saw (1 = A);
+ * the SDF accepts it only while that option still has that letter, and saves
+ * it, so the studio reads the letter the client tapped. Same provenance capping
+ * as recordDeliveryAction; the raw token is NEVER logged here. A first `ok`, or
+ * a repeat whose notification was lost, notifies the studio.
+ */
+export async function chooseDeliveryConcept(
+  token: string,
+  artifactId: string,
+  position: number,
+  note?: string,
+): Promise<DeliveryActResult> {
+  const result = await chooseConceptByToken(token, {
+    artifactId,
+    position,
+    note: note?.trim().slice(0, 2000) || null,
+    ...(await requestProvenance()),
+  });
+  return withStudioNotified(token, result, { kind: 'concept_chosen' });
 }
 
 /**
@@ -79,15 +83,10 @@ export async function markDeliveryPaymentPaid(
   milestoneKind: string,
   note?: string,
 ): Promise<DeliveryActResult> {
-  const h = await headers();
-  const ip = clientIp(h);
-  const ua = h.get('user-agent')?.slice(0, 512) || null;
-  const trimmedNote = note?.trim().slice(0, 2000) || null;
   const result = await claimPaymentByToken(token, {
     milestoneKind,
-    note: trimmedNote,
-    ip,
-    userAgent: ua,
+    note: note?.trim().slice(0, 2000) || null,
+    ...(await requestProvenance()),
   });
   return withStudioNotified(token, result, paymentClaimedAct(milestoneKind));
 }
@@ -109,15 +108,13 @@ export async function addDeliveryComment(
   documentId: string,
   body: string,
 ): Promise<DeliveryCommentActResult> {
-  const h = await headers();
   // Cap before the DB (the SDF also trims + caps at 2000 and CHECKs the length).
   const trimmed = body?.trim().slice(0, 2000) ?? '';
   if (!trimmed) return { ok: false, error: 'empty', studioNotified: false };
   const result = await addDeliveryCommentByToken(token, {
     documentId,
     body: trimmed,
-    ip: clientIp(h),
-    userAgent: h.get('user-agent')?.slice(0, 512) || null,
+    ...(await requestProvenance()),
   });
   return withStudioNotified(token, result, { kind: 'commented' });
 }

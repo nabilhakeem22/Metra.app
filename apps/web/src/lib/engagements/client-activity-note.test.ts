@@ -18,6 +18,7 @@ function entry(
     note,
     rangeLow: null,
     rangeHigh: null,
+    chosenPosition: null,
     decidedAt: new Date(decidedAt),
   };
 }

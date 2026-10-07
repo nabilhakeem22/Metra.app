@@ -4,7 +4,10 @@
 // `{delivery}` is the delivery's number (bidi-isolated, so `DE-2026-0012` reads
 // the same inside Arabic) and its title in the reader's language, falling back to
 // the other. Numbers reach the catalogue as STRINGS (Latin digits); the one number
-// passed as a number, `commentCount`, only selects the plural form.
+// passed as a number, `commentCount`, only selects the plural form. A chosen
+// concept option reads as its letter (`optionPosition`, written by the notifier
+// from the saved choice, 0057), bidi-isolated like the number.
+import { conceptLetter } from '@/lib/engagements/concept-letter';
 import { bidiIsolate } from '@/lib/format/bidi';
 import { formatDocNumber } from '@/lib/format/doc-number';
 import {
@@ -43,18 +46,22 @@ export function clientRespondedBody(
   milestoneLabel: (kind: string) => string | null,
 ): string {
   const delivery = deliveryLabel(params, locale);
-  if (bodyKey === 'client_payment_claimed' && (wholeNumber(params.count) ?? 1) > 1) {
-    // Repeated claims collapse into one unread row whose params name only the
-    // latest milestone: say how many, not just the last one.
-    const count = wholeNumber(params.count) ?? 1;
-    return translate('client_payment_claimed_many', { delivery, claimCount: count, count: String(count) });
-  }
+  // One unread row per MILESTONE since 0057, so a count above 1 is the same
+  // milestone claimed again: the sentence always names that milestone.
   if (bodyKey === 'client_payment_claimed') {
     const milestone = text(params.milestoneKind) ? milestoneLabel(String(params.milestoneKind)) : null;
     return translate(bodyKey, {
       delivery,
       hasMilestone: milestone ? 'yes' : 'no',
       milestone: milestone ?? '',
+    });
+  }
+  if (bodyKey === 'client_concept_chosen') {
+    const letter = conceptLetter(params.optionPosition);
+    return translate(bodyKey, {
+      delivery,
+      hasLetter: letter ? 'yes' : 'no',
+      letter: letter ? bidiIsolate(letter) : '',
     });
   }
   if (bodyKey === 'client_commented') {

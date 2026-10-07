@@ -94,6 +94,7 @@ const ALL_CODES: ActionCode[] = [
   'offline_approval_date_out_of_range',
   'offline_approval_note_too_long',
   'client_review_answered',
+  'concept_option_not_found',
   'delivery_link_unrecoverable',
   'client_email_missing',
   'reminder_email_failed',

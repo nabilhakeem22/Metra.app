@@ -2,6 +2,7 @@
 
 import { useTranslations } from 'next-intl';
 import type { MilestoneKind } from '@metra/db';
+import { chosenConceptOf } from '@/lib/engagements/concept-choice';
 import type { CommercialPulse } from '@/lib/engagements/pulse';
 import type {
   EngagementArtifactRecord,
@@ -22,18 +23,11 @@ import { TimelineTab } from './engagement-panels-timeline';
 import type { EngagementTab } from './tabs';
 import type { RunAction } from './use-engagement-action';
 
-// The engagement detail panels — the fuller record below the command card,
-// dispatched by the five detail tabs. Files (working-files tray + the full
-// artifact list), Timeline (transitions + events + the client-activity feed),
-// Payments (the commercial pulse + fee schedule + the payment ledger), Budget
-// (the build-cost range and every band recorded before it) and Change orders.
-//
-// EACH TAB OWNS ITS OWN HEADER, and with it the actions that write into the
-// record it displays. That is why the padding moved out of here and into the tab
-// bodies: the header band runs edge to edge and carries the rule under it, which
-// a shared `p-4` on this wrapper could not do. Visual reskin of the glass system
-// as a FLAT (opaque `bg-card`) surface; money is `font-mono tabular-nums`,
-// `dir=ltr`. Logical CSS only so it mirrors in ar-EG RTL.
+// The engagement detail panels: the fuller record below the command card,
+// dispatched by the five detail tabs (Files, Timeline, Payments, Budget, Change
+// orders). EACH TAB OWNS ITS OWN HEADER, and with it the actions that write into
+// the record it displays, so the padding lives in the tab bodies (the header
+// band runs edge to edge). A flat `bg-card` surface; logical CSS only.
 
 export interface PanelData {
   header: EngagementHeader;
@@ -86,6 +80,7 @@ export function EngagementPanels({
         <FilesTab
           engagementId={engagementId}
           artifacts={data.artifacts}
+          chosenConceptId={chosenConceptOf(data.events)?.artifactId ?? null}
           canUpload={canUpload}
           canRecordArtifact={capabilities.recordArtifact}
           pending={pending}
@@ -136,15 +131,10 @@ export function EngagementPanels({
 }
 
 /**
- * Change orders — the one tab with no action of its own. A change order is
- * RAISED by a transition (a revision past its allowance, a flagged as-built
- * variance), never typed in here, so a header with no button is the honest one.
+ * Change orders: the one tab with no action of its own. A change order is RAISED
+ * by a transition, never typed in here, so a header with no button is honest.
  */
-function ChangeOrdersTab({
-  changeOrders,
-}: {
-  changeOrders: EngagementChangeOrderRecord[];
-}) {
+function ChangeOrdersTab({ changeOrders }: { changeOrders: EngagementChangeOrderRecord[] }) {
   const tp = useTranslations('engagements.panels');
   const tpa = useTranslations('engagements.panelActions');
   return (

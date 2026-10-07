@@ -1,11 +1,8 @@
-// Turning one delivery SNAPSHOT into the client-facing view — pure, and
-// deliberately paranoid. Nothing here reads the database or the token.
-//
-// WHY SO DEFENSIVE: a valid token must never 500, and the snapshot is jsonb from
-// a SECURITY DEFINER function — a schema change, an older SDF or a half-populated
-// row arrives as a missing key, not as a type error. Every dereference is
-// null-safe and every list passes a row guard, so a malformed field costs that
-// field and not the page.
+// Turning one delivery SNAPSHOT into the client-facing view: pure, and
+// deliberately paranoid, because a valid token must never 500. The snapshot is
+// jsonb from a SECURITY DEFINER function, so a schema change or an older SDF
+// arrives as a missing key, not a type error. Every dereference is null-safe and
+// every list passes a row guard: a malformed field costs that field, not the page.
 import { KIND_CATEGORY } from '../portal-documents';
 import { PORTAL_STAGE_LABEL, PORTAL_STAGE_NOTE } from '../portal-labels';
 import { parseDocumentAccess } from '../document-access';
@@ -17,6 +14,8 @@ import {
   isRenderableClaim,
   isRenderableDocument,
   isRenderableMilestone,
+  parseConceptChoice,
+  parseConceptOptions,
   type DeliverySnapshot,
 } from './row-guards';
 import type { PublicDelivery, PublicDeliveryMilestone } from './types';
@@ -145,5 +144,7 @@ export function shapeDelivery(snapshot: DeliverySnapshot): PublicDelivery | null
     paymentClaim: shapePaymentClaim(snapshot),
     documents: shapeDocuments(snapshot),
     clientActions,
+    conceptOptions: parseConceptOptions(snapshot.concept_options),
+    conceptChoice: parseConceptChoice(snapshot.concept_choice_id, snapshot.concept_choice_position),
   };
 }

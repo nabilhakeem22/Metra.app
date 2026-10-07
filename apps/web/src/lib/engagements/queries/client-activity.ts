@@ -17,6 +17,8 @@ export interface EngagementClientActivityRecord {
   note: string | null;
   rangeLow: string | null;
   rangeHigh: string | null;
+  /** A concept choice's letter position, SAVED with it (0057; 1 = A), else null. */
+  chosenPosition: number | null;
   decidedAt: Date;
 }
 
@@ -40,6 +42,7 @@ export function getEngagementClientActivity(
         note: engagementEvents.note,
         rangeLow: engagementEvents.rangeLow,
         rangeHigh: engagementEvents.rangeHigh,
+        chosenPosition: engagementEvents.chosenPosition,
         decidedAt: engagementEvents.decidedAt,
       })
       .from(engagementEvents)

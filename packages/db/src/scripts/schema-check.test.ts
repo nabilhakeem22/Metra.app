@@ -188,9 +188,9 @@ describe('runSchemaCheck', () => {
     expect(printed).toMatch(/constraints — \d+ declared/);
     expect(printed).toMatch(/functions — \d+ declared/);
     expect(sectionsPrinted()).toEqual([
-      'assert-schema-applied: indexes — 107 declared, 107 NOT FOUND (report only, does not fail this check):',
-      'assert-schema-applied: constraints — 227 declared, 227 NOT FOUND (report only, does not fail this check):',
-      'assert-schema-applied: functions — 35 declared, 35 NOT FOUND (report only, does not fail this check):',
+      'assert-schema-applied: indexes — 108 declared, 108 NOT FOUND (report only, does not fail this check):',
+      'assert-schema-applied: constraints — 229 declared, 229 NOT FOUND (report only, does not fail this check):',
+      'assert-schema-applied: functions — 37 declared, 37 NOT FOUND (report only, does not fail this check):',
       'columns: BEHIND',
     ]);
     expect(printed).toContain('REPORT ONLY');
@@ -202,12 +202,12 @@ describe('runSchemaCheck', () => {
       fixtureSql({ ...completeCatalogues(), functionNames: new Set(['app_nothing']) }),
     );
     expect(code).toBe(0);
-    expect(logged.join('\n')).toContain('functions — 35 declared, 35 NOT FOUND');
+    expect(logged.join('\n')).toContain('functions — 37 declared, 37 NOT FOUND');
   });
 });
 
 describe('the counts the deploy order asks the owner to compare', () => {
-  it('declares 35 RLS functions', () => {
+  it('declares 37 RLS functions', () => {
     // wave6-coder.md's handoff said 29 and instructed the lead to compare the
     // printed counts against it. A `create or replace function public.<name>`
     // grep over rls/ returns 30 with no duplicate name, so the handoff number
@@ -215,8 +215,10 @@ describe('the counts the deploy order asks the owner to compare', () => {
     // 32 since BOQ as a proposal added app_boq_releasable and app_document_settled.
     // 34 since Round B (0056) added app_delivery_choose_concept_by_token and
     // app_delivery_notify_studio_by_token; 35 with the trigger fn
-    // clear_token_nonce_on_hash_change.
-    expect(declaredFunctions().size).toBe(35);
+    // clear_token_nonce_on_hash_change. 37 since PR-B12 (0057) added
+    // app_concept_option_positions and app_delivery_act_notified_by_token (the
+    // choose function was dropped and re-created under its own name).
+    expect(declaredFunctions().size).toBe(37);
   });
 });
 

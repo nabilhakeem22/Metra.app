@@ -158,6 +158,7 @@ export const ACTION_CODE_PROBLEM: Record<ActionCode, ApiProblemKind> = {
   offline_approval_note_too_long: 'bad-request',
   // The client answered first: a state conflict, not malformed input.
   client_review_answered: 'conflict',
+  concept_option_not_found: 'bad-request',
   // The link exists but cannot be shown again until it is replaced.
   delivery_link_unrecoverable: 'conflict',
   client_email_missing: 'bad-request',

@@ -308,6 +308,9 @@ const SDF_CALLER_ALLOWLIST = [
   // Round B: after a portal write answered `ok`, the studio is notified through
   // the SAME token (app_delivery_notify_studio_by_token); the client has no session.
   'apps/web/src/lib/engagements/client-acts/notify.ts',
+  // Round B (0057): on a repeat (`already`), was that act's notification ever
+  // written? (app_delivery_act_notified_by_token, a boolean, same token).
+  'apps/web/src/lib/engagements/client-acts/already-notified.ts',
   // The module itself (it DEFINES the runners) and its own unit test.
   'apps/web/src/lib/share/sdf-call.ts',
   'apps/web/src/lib/share/sdf-call.test.ts',

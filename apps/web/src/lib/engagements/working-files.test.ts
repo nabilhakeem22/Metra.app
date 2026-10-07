@@ -18,6 +18,7 @@ function artifact(
     attestedAt: new Date(attestedAt),
     note: null,
     clientVisible: false,
+    conceptPosition: null,
     ...overrides,
   };
 }

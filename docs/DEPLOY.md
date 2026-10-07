@@ -100,9 +100,9 @@ live there, never in a migration).
 `pg_class`, `pg_policies`, `pg_trigger`, `pg_proc` and `pg_roles` on the same
 connection and exits **1** listing anything the manifest declares that the
 database does not have: every schema table RLS-enabled **and** forced, all 46
-policies, all 13 triggers, all 35 functions, and `metra_app` present and neither
+policies, all 13 triggers, all 37 functions, and `metra_app` present and neither
 LOGIN nor BYPASSRLS. A green run ends with `apply-rls: verified in the
-catalogues — 46 tables, 46 policies, 13 triggers, 35 functions, ...`. Before
+catalogues — 46 tables, 46 policies, 13 triggers, 37 functions, ...`. Before
 this, the only post-condition was that no statement threw — which says a file
 RAN, not that its objects exist. Indexes and constraints are deliberately **not**
 checked here: they carry the 0017 case-fold drift and would be red on every
@@ -720,10 +720,234 @@ is unchanged, but the database already behaves the Round B way:
    Wave 1 is still deployed.
 3. If the two new functions must go regardless (only after step 1 has put a
    pre-PR-B10 Worker in place, since PR-B10 and PR-B12 call them):
-   `drop function public.app_delivery_choose_concept_by_token(text, uuid, text,
-   text, text, text); drop function public.app_delivery_notify_studio_by_token(text,
-   text, jsonb, jsonb);`. The columns, constraints, index and trigger stay:
+   `drop function public.app_delivery_choose_concept_by_token(text, uuid,
+   integer, text, text, text, text); drop function
+   public.app_delivery_notify_studio_by_token(text, text, jsonb, jsonb);`. The
+   choice function has had seven arguments since 0057 (*0057 and the B12
+   database step* below). The columns, constraints, index and trigger stay:
    dropping a column is the one non-additive change this file never makes.
+
+### 0057 and the B12 database step: owner runbook
+
+PR-B12 (the client's concept picker) carries one database step: migration
+`0057_concept_letters_and_feed_index.sql` plus changed and new functions under
+`rls/`. It is validated on branch `validate/round-b-b12`.
+
+**THE ORDER (do not change it):**
+
+1. **You run the database step on production FIRST**, from the B12 branch
+   (steps 1 to 4 below).
+2. **Only then** does `validate/round-b-b12` merge (step 5).
+
+Why, one sentence each:
+
+- **B12's code before the migration is an outage:** its drizzle schema names
+  the new column `chosen_position`, and Drizzle full-row selects list every
+  column, so every engagement read fails with 42703 (*Deploying before
+  migrating* above).
+- **The database step before the code is safe:** the live code never names
+  `chosen_position`, never calls the concept-choice function, and every
+  function it does call keeps its exact arguments and result (pinned by
+  `delivery-portal-round-b.dbtest.ts`).
+
+**What it changes.** Additive only; no row is updated or backfilled.
+
+| Object | Change |
+|---|---|
+| `engagement_events.chosen_position` | new nullable `smallint`: the option letter (1 = A) the client saw when choosing |
+| `engagement_events_chosen_position_pairs` | CHECK `(chosen_artifact_id IS NULL) = (chosen_position IS NULL)`: a chosen option always has a letter, and a letter always has an option |
+| `engagement_events_chosen_position_range` | CHECK `chosen_position IS NULL OR chosen_position BETWEEN 1 AND 4`: the letter is A to D |
+| `notifications_org_recipient_created_idx` | index `(org_id, recipient_user_id, created_at DESC)`: the bell and the notifications page read the newest rows without sorting every notification |
+| `app_concept_option_positions(uuid)` | NEW, returns `TABLE(artifact_id uuid, option_position integer)`: the one rule that letters options (released, with a file, A to D). SECURITY INVOKER |
+| `app_delivery_by_token(text)` | same signature; letters rank released options only; a choice's letter is read from its row |
+| `app_delivery_choose_concept_by_token` | the 6-argument version is DROPPED (nothing deployed calls it); NEW 7-argument version `(text, uuid, integer, text, text, text, text)` takes the letter the client saw, returns `text` |
+| `app_delivery_notify_studio_by_token(text, text, jsonb, jsonb)` | same signature; one unread notification per payment milestone; also returns the delivery's number, year and titles; a concept choice carries its saved letter |
+| `app_delivery_act_notified_by_token(text, text, text)` | NEW, returns `boolean`: "was this client act's notification ever written?" |
+| grants | the three new signatures: EXECUTE for `metra_app` only, revoked from `public`, `anon`, `authenticated`, `service_role` in the same transaction that creates them (and again in `roles.sql`) |
+
+**1. Put the B12 code in the production checkout.** Detach onto the branch
+(it is checked out in another worktree). This step changes no dependency, so
+the installed `node_modules` serve as they are.
+
+```powershell
+cd C:\Users\HP\merta-main
+git fetch origin
+git switch --detach origin/validate/round-b-b12
+git log --oneline -1    # must be the SHA the lead gave you for this run, with green CI
+```
+
+**2. Read-only, before** (Supabase SQL editor). Note the numbers:
+
+```sql
+-- (a) migrations recorded so far, and the newest one's stamp
+select count(*) as migrations, max(created_at) as newest
+from drizzle.__drizzle_migrations;
+
+-- (b) how big the two tables the migration locks are
+select (select count(*) from engagement_events) as ledger_rows,
+       (select count(*) from notifications)     as notifications;
+
+-- (c) MUST be 0: choices recorded with an option. If it is not 0, STOP and tell the lead.
+select count(*) from engagement_events where chosen_artifact_id is not null;
+
+-- (d) 0 rows: the index does not exist yet
+select indexname from pg_indexes
+where schemaname = 'public' and indexname = 'notifications_org_recipient_created_idx';
+
+-- (e) 1 row: p_hash text, p_artifact_id uuid, p_note text, p_name text, p_ip text, p_ua text
+select pg_get_function_identity_arguments(p.oid) from pg_proc p
+where p.proname = 'app_delivery_choose_concept_by_token';
+```
+
+**Only if (b) `notifications` is above 200,000:** build the index first, as the
+ONLY statement in the editor (CONCURRENTLY refuses to run inside a
+transaction, and it does not block new notifications while it builds):
+
+```sql
+create index concurrently if not exists notifications_org_recipient_created_idx
+  on public.notifications (org_id, recipient_user_id, created_at desc);
+```
+
+Then check it with the index query in step 4 (expect `t`); the migration's
+`IF NOT EXISTS` then skips it. If that query reports `f` (a failed concurrent
+build), run `drop index concurrently public.notifications_org_recipient_created_idx;`
+and ask the lead before going on.
+
+**3. Migrate, then apply RLS, then prove it landed.** In this order, from
+`C:\Users\HP\merta-main` (its `.env` is the production connection):
+
+```powershell
+npm run db:migrate
+npm run db:apply-rls
+npm run assert-schema-applied -w @metra/db
+```
+
+Expected:
+
+- `db:migrate` exits 0. It does not print a count, so re-run query (a) from
+  step 2: `migrations` is exactly one higher and `newest` is `1791342035319`
+  (0057's journal stamp).
+- `db:apply-rls` ends with these two lines (the exact lines CI printed for
+  this branch):
+  `apply-rls: verified in the catalogues — 46 tables, 46 policies, 13 triggers,
+  37 functions, RLS forced on all of them, role metra_app present.` and
+  `apply-rls: grants verified — design_engagements update narrowed to 16
+  columns with no table-level update, and 5 narrowed table(s) (boqs,
+  document_categories, engagement_document_comments, engagement_milestones,
+  workspace_entitlements) holding exactly what rls/roles.sql leaves them.`
+- `assert-schema-applied` exits 0.
+
+If `db:apply-rls` is run BEFORE `db:migrate`, it stops at
+`40-delivery-read.sql` with 42703 (the new function reads `chosen_position`,
+and a `language sql` body is checked against the columns when it is created).
+Nothing is broken: run `db:migrate` and then `db:apply-rls` again. Both are
+re-runnable, and a 55P03 from either is a lock wait that gave up: re-run at a
+quieter moment.
+
+**Locks.** `db:migrate` runs 0057 as ONE transaction:
+
+- ACCESS EXCLUSIVE on `engagement_events` from the ADD COLUMN until the commit,
+  with one scan of the ledger for each of the two CHECKs inside it: delivery
+  pages and studio pages opened in that window wait; they do not fail.
+- SHARE on `notifications` for the index build: new notifications and
+  mark-as-read wait, the bell still reads.
+- With the counts from step 2 (b) this is well under a second against the
+  migrator's 3 s `lock_timeout`. It is an estimate, not a production
+  measurement.
+
+`db:apply-rls` replaces functions without table locks; the `drop function` of
+the 6-argument choice takes a catalogue lock only. The policy files are the
+33 s worst case described above.
+
+**4. Read-only, after: expected results.**
+
+```sql
+-- 1 row: engagement_events | chosen_position | smallint | YES
+select table_name, column_name, data_type, is_nullable from information_schema.columns
+where table_schema = 'public' and column_name = 'chosen_position';
+
+-- 2
+select count(*) from pg_constraint
+where conname in ('engagement_events_chosen_position_pairs',
+                  'engagement_events_chosen_position_range');
+
+-- 1 row: t | CREATE INDEX notifications_org_recipient_created_idx ON public.notifications USING btree (org_id, recipient_user_id, created_at DESC)
+select i.indisvalid, pg_get_indexdef(i.indexrelid)
+from pg_index i join pg_class c on c.oid = i.indexrelid
+where c.relname = 'notifications_org_recipient_created_idx';
+
+-- 8 rows, one per function (no extra overload):
+--   app_concept_option_positions          p_engagement_id uuid -> TABLE(artifact_id uuid, option_position integer)
+--   app_delivery_act_notified_by_token    p_hash text, p_body_key text, p_milestone_kind text -> boolean
+--   app_delivery_by_token                 p_hash text -> jsonb
+--   app_delivery_choose_concept_by_token  p_hash text, p_artifact_id uuid, p_position integer, p_note text, p_name text, p_ip text, p_ua text -> text
+--   app_delivery_claim_payment_by_token   p_hash text, p_milestone_kind text, p_note text, p_name text, p_ip text, p_ua text -> text
+--   app_delivery_comment_by_token         p_hash text, p_document_id uuid, p_body text, p_name text, p_ip text, p_ua text -> text
+--   app_delivery_notify_studio_by_token   p_hash text, p_body_key text, p_params jsonb, p_roles jsonb -> jsonb
+--   app_delivery_respond_by_token         p_hash text, p_action text, p_note text, p_name text, p_ip text, p_ua text -> text
+select p.proname, pg_get_function_identity_arguments(p.oid) as args,
+       pg_get_function_result(p.oid) as result
+from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+where n.nspname = 'public'
+  and p.proname in ('app_concept_option_positions', 'app_delivery_act_notified_by_token',
+                    'app_delivery_by_token', 'app_delivery_choose_concept_by_token',
+                    'app_delivery_claim_payment_by_token', 'app_delivery_comment_by_token',
+                    'app_delivery_respond_by_token', 'app_delivery_notify_studio_by_token')
+order by 1;
+
+-- 3 rows, each: metra_app = true, public_grants = 0, anon = false,
+-- authenticated = false, service_role = false
+select f.sig,
+       has_function_privilege('metra_app', f.sig, 'execute') as metra_app,
+       (select count(*) from aclexplode(coalesce(p.proacl, acldefault('f', p.proowner))) a
+         where a.grantee = 0) as public_grants,
+       has_function_privilege('anon', f.sig, 'execute') as anon,
+       has_function_privilege('authenticated', f.sig, 'execute') as authenticated,
+       has_function_privilege('service_role', f.sig, 'execute') as service_role
+from (values
+  ('public.app_concept_option_positions(uuid)'),
+  ('public.app_delivery_act_notified_by_token(text, text, text)'),
+  ('public.app_delivery_choose_concept_by_token(text, uuid, integer, text, text, text, text)')
+) as f(sig)
+join pg_proc p on p.oid = f.sig::regprocedure;
+
+-- 0: nothing was backfilled
+select count(*) from engagement_events where chosen_position is not null;
+```
+
+**5. Afterwards: merge, then return the checkout to main.**
+
+1. **Stop and do not merge** if any output in steps 3 or 4 differs from what
+   is written there. Tell the lead what you saw instead.
+2. Otherwise tell the lead the step is done. The lead merges
+   `validate/round-b-b12`. Merging deploys automatically: wait for the Deploy
+   workflow to go green before the live checks.
+3. Put the production checkout back on main:
+
+```powershell
+cd C:\Users\HP\merta-main
+git fetch origin
+git switch --detach origin/main
+```
+
+**What you will notice between step 3 and the next deploy.** Payment claims on
+two different milestones now give two notifications (and two emails) instead of
+one row counting both; the bell and the notifications page load faster.
+Nothing else changes: no deployed code calls the new or changed concept
+functions, and the deployed code ignores the notifier's new fields.
+
+**Undo, if ever needed.** Undo the CODE, never the database: roll the Worker
+back with `npx wrangler rollback metra-web` (see *Rolling back*). Every Worker
+version runs on the 0057 database: older code never names `chosen_position`
+and never calls the concept-choice function. Do NOT run `db:apply-rls` from an
+older `main` while B12 code serves: it re-creates the 6-argument choice
+function beside the 7-argument one, puts back the old portal letters (ranked
+over every option ever recorded) while the choice still checks the new ones,
+so a client choosing after the studio hid an option is told the options
+changed, and restores the old notifier (claims on different milestones
+collapse into one notification again). The column, the two CHECKs and the
+index stay: dropping a column is the one non-additive change this file never
+makes.
 
 ## Rolling back
 
@@ -757,6 +981,10 @@ covers older code's rotate and revoke). Running `db:apply-rls` from an older
 from the UPDATE grant and that code's revoke fails with 42501. The order, and
 the one case where dropping the two new functions is allowed, are under *0056
 and the Round B database step*, "Undo, if ever needed".
+
+**PR-B12 (0057) specifically:** the same. Roll back the Worker, leave the
+database alone, and never run `db:apply-rls` from an older `main` while B12
+code serves (*0057 and the B12 database step*, "Undo, if ever needed").
 
 After rolling back, hit an authenticated page and watch `npx wrangler tail
 metra-web` for `42501` (a missing grant), `MT100` (an immutability trigger) and

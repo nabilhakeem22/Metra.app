@@ -40,6 +40,15 @@ export const notifications = pgTable(
       t.recipientUserId,
       t.readAt,
     ),
+    // Live since 0057: the bell and the feed read a recipient's NEWEST rows
+    // (order by created_at desc, limit n). The read index above serves the
+    // unread count; without this one every feed load sorted all of a
+    // recipient's notifications.
+    index('notifications_org_recipient_created_idx').on(
+      t.orgId,
+      t.recipientUserId,
+      t.createdAt.desc().nullsFirst(),
+    ),
   ],
 );
 

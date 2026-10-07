@@ -80,6 +80,7 @@ export function AdvanceOrReshare(props: CommandCardActionProps) {
           props.view.awaitingClientReview && props.view.blockingGuards.length === 0
         }
         reviewRoundStartedAt={props.advance.reviewRoundStartedAt}
+        conceptOptions={props.advance.conceptOptions}
         canShare={props.canShare}
         primary={props.ctas.payCta === null}
         pending={props.pending}

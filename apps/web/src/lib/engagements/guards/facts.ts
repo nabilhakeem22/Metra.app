@@ -46,6 +46,8 @@ export type GuardEvent = Pick<
   | 'acknowledgedIssueAt'
   | 'rangeLow'
   | 'rangeHigh'
+  | 'chosenArtifactId'
+  | 'chosenPosition'
 >;
 
 /**

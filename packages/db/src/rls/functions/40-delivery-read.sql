@@ -154,6 +154,72 @@ as $$
   end;
 $$;
 
+-- Round B (0057): THE rule that letters concept options, the released
+-- (`client_visible`), file-bearing `concept_option` artifacts of one delivery,
+-- ranked by (attested_at, id), positions 1 to 4 (option A to D). A fifth
+-- visible option, a hidden one and one without a file get no position.
+-- Positions rank only what the client can see NOW, so hiding or releasing an
+-- option renumbers the later ones; a CHOICE therefore saves the position it
+-- was made under (engagement_events.chosen_position) and is never re-ranked.
+--
+-- ONE function, three callers: app_delivery_by_token (the letters the portal
+-- shows), app_delivery_choose_concept_by_token (the letter it accepts) and the
+-- studio's artifact query (lib/engagements/queries/concept-positions.ts), so
+-- the studio and the client can never letter the same option differently.
+-- Callers must never re-rank in JS: attested_at has microseconds and a JS Date
+-- keeps milliseconds.
+--
+-- SECURITY INVOKER on purpose. Called from the two definer functions it runs
+-- with their rights and sees the delivery they proved; called by metra_app
+-- from the studio it is org-scoped by RLS, so a foreign engagement id returns
+-- nothing. Same-org is guaranteed by engagement_artifacts' composite same-org
+-- FK to design_engagements and by the `files` join on org_id. It returns ids
+-- and numbers only, never a label, a file name or a money column.
+create or replace function public.app_concept_option_positions(p_engagement_id uuid)
+returns table (artifact_id uuid, option_position integer)
+language sql
+stable
+security invoker
+set search_path = ''
+as $$
+  select ranked.id, ranked.rn
+  from (
+    select a.id, (row_number() over (order by a.attested_at, a.id))::integer as rn
+    from public.engagement_artifacts a
+    join public.files f on f.id = a.file_id and f.org_id = a.org_id
+    where a.engagement_id = p_engagement_id
+      and a.kind = 'concept_option'
+      and a.client_visible
+  ) ranked
+  where ranked.rn <= 4
+  order by ranked.rn;
+$$;
+
+-- Closed in the SAME implicit transaction as the CREATE above. A new function
+-- is executable by PUBLIC (and, on Supabase, by the API roles through default
+-- privileges) from the moment it exists; roles.sql revokes that too, but it
+-- runs later, in its own transaction. This leaves no window. The metra_app
+-- grant is guarded because on a fresh database roles.sql, which creates that
+-- role, has not run yet.
+revoke all on function public.app_concept_option_positions(uuid) from public;
+do $$
+declare
+  r text;
+begin
+  foreach r in array array['anon', 'authenticated', 'service_role'] loop
+    if exists (select 1 from pg_roles where rolname = r) then
+      execute format(
+        'revoke all on function public.app_concept_option_positions(uuid) from %I',
+        r
+      );
+    end if;
+  end loop;
+  if exists (select 1 from pg_roles where rolname = 'metra_app') then
+    grant execute on function public.app_concept_option_positions(uuid) to metra_app;
+  end if;
+end
+$$;
+
 -- Public share: fetch ONE design delivery by its token hash as a client-safe JSON
 -- snapshot. SECURITY DEFINER — the token IS the authorization (no session, no org
 -- GUC). Resolves exactly the one delivery whose token_hash = p_hash, and only
@@ -182,22 +248,19 @@ $$;
 --     `attested_by` and files.original_name/size_bytes are NOT exposed — an
 --     internal label or filename can itself be sensitive. `files` is joined only to
 --     prove a downloadable object exists; no column of it is returned.
---   concept_options (Round B, 0056): id and a STABLE 1-based `position` for
---     each released, file-bearing `concept_option` of this delivery at
---     position 1..4 (option A..D). The position ranks EVERY concept option the
---     delivery ever recorded, visible or not, by (attested_at, id), so hiding
---     an option never renumbers another, and app_delivery_choose_concept_by_token
---     accepts exactly these. attested_at is never rewritten and artifacts are
---     never deleted, so a position never changes. Consumers (PR-B12, portal and
---     studio) must use THIS position and never re-rank in JS: attested_at has
---     microseconds and a JS Date keeps milliseconds, so two options attested in
---     the same millisecond can sort differently there.
---   concept_choice_id + concept_choice_position (Round B, 0056): the option
---     named by the newest LIVE (not retracted) CLIENT concept_approval, and its
---     stable position, both null when there is none or it named no option. The
---     position is returned separately because the studio may hide the chosen
---     option afterwards, which drops it from concept_options; "you chose option
---     C" must still read from here.
+--   concept_options (Round B, 0056; letters 0057): id and a 1-based
+--     `position` (1..4 = option A..D) for each released, file-bearing
+--     `concept_option` of this delivery, from app_concept_option_positions,
+--     the one rule the choose function and the studio also read. Positions
+--     rank VISIBLE options only, so hiding or releasing one renumbers the
+--     later ones. Consumers must use THIS position and never re-rank in JS:
+--     attested_at has microseconds and a JS Date keeps milliseconds.
+--   concept_choice_id + concept_choice_position (Round B, 0056; 0057): the
+--     option named by the newest LIVE (not retracted) CLIENT concept_approval
+--     and the letter SAVED on that row (engagement_events.chosen_position),
+--     the one the client saw when choosing. Both null when there is none or it
+--     named no option. A choice keeps its saved letter whatever the studio
+--     hides or releases afterwards; it is never re-ranked.
 --
 -- RETRACTED CLIENT DECISIONS (an event_correction points at them) answer
 --   nothing here, exactly as liveEvents() drops them in the studio's TS rule.
@@ -509,52 +572,30 @@ as $$
         limit 200
       ) dx
     ), '[]'::jsonb),
-    -- Round B — the concept options the client may CHOOSE between: released,
-    -- file-bearing `concept_option` artifacts of this delivery at a STABLE
-    -- position 1..4. The position ranks every concept option the delivery
-    -- ever recorded (visible or not) by (attested_at, id), so hiding one never
-    -- renumbers another. Only the id and the number cross the wire; the label
-    -- and the file name stay internal, as for `documents`.
+    -- Round B: the concept options the client may CHOOSE between, lettered
+    -- by app_concept_option_positions (released, file-bearing, A to D in the
+    -- order the client sees them). Only the id and the number cross the wire;
+    -- the label and the file name stay internal, as for `documents`.
     'concept_options', coalesce((
       select jsonb_agg(
-        jsonb_build_object('id', opt.id, 'position', opt.option_position)
-        order by opt.option_position
+        jsonb_build_object('id', p.artifact_id, 'position', p.option_position)
+        order by p.option_position
       )
-      from (
-        select a.id, a.org_id, a.file_id, a.client_visible,
-          row_number() over (order by a.attested_at, a.id) as option_position
-        from public.engagement_artifacts a
-        where a.engagement_id = de.id
-          and a.org_id = de.org_id
-          and a.kind = 'concept_option'
-      ) opt
-      join public.files f on f.id = opt.file_id and f.org_id = opt.org_id
-      where opt.client_visible and opt.option_position <= 4
+      from public.app_concept_option_positions(de.id) p
     ), '[]'::jsonb),
-    -- Round B — which option the client chose, and its stable position: from
-    -- the newest LIVE client concept approval (one the studio retracted with an
-    -- event_correction answers nothing). Both null when there is none or it
-    -- named no option. The position survives the studio hiding the option.
+    -- Round B: which option the client chose, and the letter SAVED with that
+    -- choice (0057): from the newest LIVE client concept approval (one the
+    -- studio retracted with an event_correction answers nothing). Both null
+    -- when there is none or it named no option. The saved letter survives the
+    -- studio hiding or releasing options.
     'concept_choice_id', choice.chosen_artifact_id,
-    'concept_choice_position', choice.option_position
+    'concept_choice_position', choice.chosen_position
   )
   from public.design_engagements de
   join public.organizations o on o.id = de.org_id
   join public.clients c on c.id = de.client_id
   left join lateral (
-    select e.chosen_artifact_id,
-      (
-        select ranked.option_position
-        from (
-          select a.id,
-            row_number() over (order by a.attested_at, a.id) as option_position
-          from public.engagement_artifacts a
-          where a.engagement_id = de.id
-            and a.org_id = de.org_id
-            and a.kind = 'concept_option'
-        ) ranked
-        where ranked.id = e.chosen_artifact_id
-      ) as option_position
+    select e.chosen_artifact_id, e.chosen_position
     from public.engagement_events e
     where e.engagement_id = de.id
       and e.actor_channel = 'client'

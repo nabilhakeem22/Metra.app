@@ -2,9 +2,11 @@
 
 import { useLocale, useTranslations } from 'next-intl';
 import { Fragment } from 'react';
+import { conceptLetter } from '@/lib/engagements/concept-letter';
 import type { EngagementArtifactRecord } from '@/lib/engagements/queries';
 import { formatDate } from '@/lib/format/date';
 import { ArtifactVisibilityControl } from './artifact-visibility-control';
+import { ConceptOptionChip } from './concept-option-chip';
 import { DocumentThreadPanel } from './document-thread-panel';
 import { Empty, HEAD_ROW } from './engagement-panels-parts';
 import { useClientVisibility } from './use-client-visibility';
@@ -21,13 +23,19 @@ import { useClientVisibility } from './use-client-visibility';
  * cell, and pushing it below keeps the scannable row scannable. The thread is lazy;
  * only file-bearing artifacts get one, since a thread about a document the client
  * cannot receive has nobody on the other end.
+ *
+ * Round B (B12): a concept option carries its letter as the client sees it and,
+ * on the one the client chose, a "Client choice" chip.
  */
 export function ArtifactsPanel({
   artifacts,
   canManageVisibility,
+  chosenConceptId,
 }: {
   artifacts: EngagementArtifactRecord[];
   canManageVisibility: boolean;
+  /** The concept option the client chose (concept-choice.ts), or null. */
+  chosenConceptId: string | null;
 }) {
   const t = useTranslations('engagements');
   const locale = useLocale();
@@ -51,7 +59,17 @@ export function ArtifactsPanel({
             {/* The rule sits under the THREAD row when there is one, so a document
                 and its conversation read as a single block. */}
             <tr className={a.fileId ? '' : 'border-b border-[color:var(--rule)]'}>
-              <td className="py-2">{t(`artifactKind.${a.kind}`)}</td>
+              <td className="py-2">
+                <span className="inline-flex flex-wrap items-center gap-1.5">
+                  {t(`artifactKind.${a.kind}`)}
+                  {a.kind === 'concept_option' && (
+                    <ConceptOptionChip
+                      letter={conceptLetter(a.conceptPosition)}
+                      chosen={a.id === chosenConceptId}
+                    />
+                  )}
+                </span>
+              </td>
               <td className="py-2 text-[color:var(--text-muted)]">{a.label || '—'}</td>
               <td className="py-2 text-[color:var(--text-muted)]" dir="ltr">
                 {formatDate(a.attestedAt, locale)}

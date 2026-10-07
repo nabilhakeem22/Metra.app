@@ -11,27 +11,16 @@
 // The client's acknowledgement of the ROM band (Step 12) is a standalone action,
 // not a side-effect: ./rom-acknowledgement.ts.
 import { engagementEvents, type MetraDb } from '@metra/db';
-import { fail } from '@/lib/actions/mutate';
 import type { OrgContext } from '@/lib/db/context';
 import type { OfflineApproval } from './offline-approval';
-
-/**
- * The provenance columns of a staff approval row: none for the studio's own
- * Advance, the channel, date and note for one taken offline from the client.
- * Which concept option they chose is recorded once the column exists (wave 3);
- * until then a choice is refused rather than silently dropped.
- */
-function offlineProvenance(offline: OfflineApproval | null) {
-  if (offline === null) return {};
-  if (offline.chosenArtifactId !== null) fail('invalid');
-  return { evidence: offline.channel, occurredOn: offline.occurredOn, note: offline.note };
-}
+import { conceptApprovalProvenance, designApprovalProvenance } from './offline-provenance';
 
 /**
  * Append ONE `concept_approval` row to the append-only engagement approvals ledger
  * for `engagementId`. `decidedAt` defaults to now() at the database; `actorUserId`
  * is the internal actor from the request context. `offline` is the approval the
- * client gave the studio directly ("Client approved offline"), else null.
+ * client gave the studio directly ("Client approved offline"), else null; it may
+ * name the option they chose (./offline-provenance.ts).
  */
 export async function recordConceptApproval(
   tx: MetraDb,
@@ -44,7 +33,7 @@ export async function recordConceptApproval(
     engagementId,
     kind: 'concept_approval',
     actorUserId: ctx.userId,
-    ...offlineProvenance(offline),
+    ...(await conceptApprovalProvenance(tx, engagementId, offline)),
   });
 }
 
@@ -67,6 +56,6 @@ export async function recordDesignApproval(
     engagementId,
     kind: 'design_approval',
     actorUserId: ctx.userId,
-    ...offlineProvenance(offline),
+    ...designApprovalProvenance(offline),
   });
 }

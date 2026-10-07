@@ -3,7 +3,14 @@ import { revokeDeliveryLinkCore } from '@/lib/engagements/share';
 import { markNotificationReadCore } from '@/lib/notifications/core';
 import { countUnread, listNotifications } from '@/lib/notifications/queries';
 import { closeFixture, ctxFor, raw, teardown } from './fixture';
-import { seedRoundBDelivery, type RoundBDelivery } from './round-b-fixture';
+import {
+  attestAt,
+  chooseConcept,
+  forceState,
+  seedArtifact,
+  seedRoundBDelivery,
+  type RoundBDelivery,
+} from './round-b-fixture';
 
 // Round B, wave 2 (PR-B9): app_delivery_notify_studio_by_token (AC 34). The
 // portal calls it after a client act answered `ok`; it writes the studio's
@@ -12,8 +19,11 @@ import { seedRoundBDelivery, type RoundBDelivery } from './round-b-fixture';
 //     the caller passes, never the `client` role;
 //   * owner decision Q2: the design-act list includes site engineers, the
 //     payment list is owner, admin and accountant;
-//   * dedupe: ONE unread row per (recipient, delivery, body key); a repeat bumps
-//     params.count and reports no new recipient; a read row is never bumped;
+//   * dedupe: ONE unread row per (recipient, delivery, body key, milestone); a
+//     repeat bumps params.count and reports no new recipient; a read row is
+//     never bumped; claims on two milestones are two rows (0057, F5);
+//   * the answer carries the delivery's number, Cairo year and titles (0057, R4);
+//   * a concept choice's rows carry the letter SAVED with it, never the caller's;
 //   * malformed input and dead links answer null and write nothing.
 
 const orgIds: string[] = [];
@@ -30,6 +40,19 @@ interface NotifyResult {
   locale: string;
   notified_count: number;
   new_recipients: string[];
+  number: number;
+  year: number;
+  title_ar: string | null;
+  title_en: string | null;
+}
+
+/** The delivery's own number and Cairo creation year, read independently. */
+async function identityOf(engagementId: string): Promise<{ number: number; year: number }> {
+  const [identity] = await raw.query<{ number: number; year: number }>(
+    `select number, extract(year from created_at at time zone 'Africa/Cairo')::int as year
+       from public.design_engagements where id = '${engagementId}'`,
+  );
+  return identity;
 }
 
 function sqlJson(value: string | null): string {
@@ -112,19 +135,20 @@ describe('notify studio: recipients by role, in the delivery org only', () => {
       '{"milestoneKind":"deposit"}',
     );
     const expected = [studio.roleIds.owner, studio.roleIds.admin].sort();
+    const identity = await identityOf(studio.engagementId);
     expect(result).toEqual({
       engagement_id: studio.engagementId,
       locale: 'ar-EG',
       notified_count: 2,
       new_recipients: expected,
+      number: identity.number,
+      year: identity.year,
+      title_ar: 'فيلا',
+      title_en: 'Villa notify-roles',
     });
 
     const rows = await notificationsOf(studio.orgId);
     expect(recipientsOf(rows)).toEqual(expected);
-    const [identity] = await raw.query<{ number: number; year: number }>(
-      `select number, extract(year from created_at at time zone 'Africa/Cairo')::int as year
-         from public.design_engagements where id = '${studio.engagementId}'`,
-    );
     for (const row of rows) {
       expect(row).toMatchObject({
         kind: 'client_responded',
@@ -174,7 +198,7 @@ describe('notify studio: recipients by role, in the delivery org only', () => {
 
   it('an empty role list is valid and notifies nobody', async () => {
     const studio = await seedStudio('notify-empty-roles');
-    expect(await notify(studio.hash, 'client_commented', '[]')).toEqual({
+    expect(await notify(studio.hash, 'client_commented', '[]')).toMatchObject({
       engagement_id: studio.engagementId,
       locale: 'ar-EG',
       notified_count: 0,
@@ -381,5 +405,91 @@ describe('notify studio: malformed input and dead links answer null, write nothi
     expect(await listNotifications(ownerCtx)).toHaveLength(1);
     expect(await listNotifications(adminCtx)).toEqual([]);
     expect(await countUnread(adminCtx)).toBe(0);
+  });
+});
+
+describe('notify studio: one unread row per payment MILESTONE (0057, F5)', () => {
+  it('a claim on another milestone is a new row and a new email; the same one is a bump', async () => {
+    const studio = await seedStudio('notify-f5');
+    const roles = '["owner","admin"]';
+    const both = [studio.roleIds.owner, studio.roleIds.admin].sort();
+
+    const deposit = await notify(studio.hash, 'client_payment_claimed', roles, '{"milestoneKind":"deposit"}');
+    expect(deposit!.new_recipients).toEqual(both);
+    const gateA = await notify(studio.hash, 'client_payment_claimed', roles, '{"milestoneKind":"gate_a"}');
+    expect(gateA!.new_recipients).toEqual(both);
+
+    const rows = await notificationsOf(studio.orgId);
+    for (const recipient of both) {
+      const own = rows.filter((row) => row.recipient_user_id === recipient);
+      expect(own.map((row) => row.params.milestoneKind).sort()).toEqual(['deposit', 'gate_a']);
+      expect(own.every((row) => row.read_at === null && row.params.count === 1)).toBe(true);
+    }
+
+    // The deposit again while its row is unread: that row is bumped, gate_a is not.
+    const again = await notify(studio.hash, 'client_payment_claimed', roles, '{"milestoneKind":"deposit"}');
+    expect(again!.new_recipients).toEqual([]);
+    expect(again!.notified_count).toBe(2);
+    const after = await notificationsOf(studio.orgId);
+    expect(after).toHaveLength(4);
+    for (const row of after) {
+      expect(row.params.count).toBe(row.params.milestoneKind === 'deposit' ? 2 : 1);
+    }
+  });
+
+  it('every other key still collapses per (recipient, delivery, body key)', async () => {
+    const studio = await seedStudio('notify-f5-other');
+    await notify(studio.hash, 'client_commented', '["owner"]');
+    const repeat = await notify(studio.hash, 'client_commented', '["owner"]', '{"milestoneKind":"deposit"}');
+    // A milestone on a non-payment key is a different dedupe key: never sent by
+    // the app (acts.ts adds it only to payment claims), pinned so it stays a
+    // separate row rather than silently merging into another milestone's.
+    expect(repeat!.new_recipients).toEqual([studio.roleIds.owner]);
+    const plain = await notify(studio.hash, 'client_commented', '["owner"]');
+    expect(plain!.new_recipients).toEqual([]);
+  });
+});
+
+describe('notify studio: the answer names the delivery (0057, R4)', () => {
+  it('returns the number, the Cairo creation year and both titles', async () => {
+    const studio = await seedStudio('notify-r4');
+    await raw.query(
+      `update public.design_engagements set created_at = '2026-12-31T23:30:00Z'
+        where id = '${studio.engagementId}'`,
+    );
+    const identity = await identityOf(studio.engagementId);
+    expect(identity.year).toBe(2027);
+    expect(await notify(studio.hash, 'client_commented', '["owner"]')).toMatchObject({
+      number: identity.number,
+      year: 2027,
+      title_ar: 'فيلا',
+      title_en: 'Villa notify-r4',
+    });
+  });
+});
+
+describe('notify studio: a chosen option carries the SAVED letter (0057)', () => {
+  it('reads optionPosition from the choice row and ignores the caller', async () => {
+    const studio = await seedStudio('notify-letter');
+    await forceState(studio.engagementId, 'concept_review');
+    const first = await seedArtifact(studio, 'concept_option');
+    const second = await seedArtifact(studio, 'concept_option');
+    await attestAt(first, '2026-01-01T00:00:00Z');
+    await attestAt(second, '2026-01-02T00:00:00Z');
+    expect(await chooseConcept(studio.hash, second, 2)).toBe('ok');
+
+    await notify(studio.hash, 'client_concept_chosen', '["owner","admin"]', '{"optionPosition":4}');
+    const rows = await notificationsOf(studio.orgId);
+    expect(rows).toHaveLength(2);
+    for (const row of rows) expect(row.params.optionPosition).toBe(2);
+  });
+
+  it('without a choice there is no letter, whatever the caller sends', async () => {
+    const studio = await seedStudio('notify-no-letter');
+    await notify(studio.hash, 'client_concept_chosen', '["owner"]', '{"optionPosition":3}');
+    await notify(studio.hash, 'client_commented', '["owner"]', '{"optionPosition":3}');
+    for (const row of await notificationsOf(studio.orgId)) {
+      expect(row.params).not.toHaveProperty('optionPosition');
+    }
   });
 });

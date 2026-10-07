@@ -17,12 +17,21 @@ const here = dirname(fileURLToPath(import.meta.url)); // packages/db/src/rls
 
 const LOCKED_DOWN_IN_PLACE = [
   {
+    file: 'functions/40-delivery-read.sql',
+    signature: 'public.app_concept_option_positions(uuid)',
+  },
+  {
     file: 'functions/50-delivery-write.sql',
-    signature: 'public.app_delivery_choose_concept_by_token(text, uuid, text, text, text, text)',
+    signature:
+      'public.app_delivery_choose_concept_by_token(text, uuid, integer, text, text, text, text)',
   },
   {
     file: 'functions/50-delivery-write.sql',
     signature: 'public.app_delivery_notify_studio_by_token(text, text, jsonb, jsonb)',
+  },
+  {
+    file: 'functions/50-delivery-write.sql',
+    signature: 'public.app_delivery_act_notified_by_token(text, text, text)',
   },
 ] as const;
 

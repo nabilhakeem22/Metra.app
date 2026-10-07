@@ -5,6 +5,7 @@
 // COST-BLIND BY CONSTRUCTION: there is no cost, margin, build-cost, internal note
 // or raw machine-state field anywhere below. The SDF omits them; this type is the
 // second wall, because a field that does not exist here cannot be rendered.
+import type { ConceptLetter } from '../concept-letter';
 import type { DocumentAccess } from '../document-access';
 import type { MilestoneProgress } from '../journey-map';
 import type { PortalLabel } from '../portal-labels';
@@ -82,4 +83,11 @@ export interface PublicDelivery {
    *  acknowledge_rom, acknowledge_handoff). Server-computed by the SDF; NEVER a raw
    *  machine state name. Empty when nothing is actionable / already confirmed. */
   clientActions: string[];
+  /** Round B (B12): the concept options the client may choose between, in the
+   *  order the client sees them, lettered by the DATABASE (A to D). Only the id
+   *  and the letter cross the wire, never a label or a file name. */
+  conceptOptions: Array<{ id: string; position: 1 | 2 | 3 | 4; letter: ConceptLetter }>;
+  /** The option the client chose and the letter SAVED with that choice (the one
+   *  they saw), or null. Survives the studio hiding or releasing options. */
+  conceptChoice: { id: string; letter: ConceptLetter } | null;
 }

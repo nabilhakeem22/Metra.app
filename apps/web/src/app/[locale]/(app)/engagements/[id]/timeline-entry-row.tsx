@@ -2,6 +2,8 @@
 
 import { useLocale, useTranslations } from 'next-intl';
 import type { ActionResult } from '@/lib/actions/result';
+import { conceptLetter } from '@/lib/engagements/concept-letter';
+import { bidiIsolate } from '@/lib/format/bidi';
 import { formatDate } from '@/lib/format/date';
 import { RetractButton } from './engagement-retract-button';
 import type { TimelineEntry } from './timeline-entries';
@@ -53,6 +55,8 @@ export function TimelineEntryRow({
 }) {
   const t = useTranslations('engagements');
   const locale = useLocale();
+  // The letter SAVED with a concept choice: the one the client saw.
+  const optionLetter = conceptLetter(entry.optionPosition);
   return (
     <li className="relative ps-5 pb-3.5 text-small last:pb-0">
       <span
@@ -77,6 +81,11 @@ export function TimelineEntryRow({
         >
           {entry.label}
         </span>
+        {optionLetter && (
+          <span data-option-letter={optionLetter} className="text-caption font-semibold">
+            {t('timeline.optionLetter', { letter: bidiIsolate(optionLetter) })}
+          </span>
+        )}
         {/* PERMANENT, not a warning shown before the fact. A reader six months
             from now has to be able to tell this apart from something the client
             typed themselves -- the data layer always could, and until now this

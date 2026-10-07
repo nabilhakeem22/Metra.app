@@ -535,6 +535,7 @@
     "offline_approval_date_out_of_range": "Pick a date between the start of this review and today",
     "offline_approval_note_too_long": "The note is too long: 2000 characters at most",
     "client_review_answered": "The client answered the review in the meantime. Reload the page to see their answer.",
+    "concept_option_not_found": "That option is not released to the client. Choose one of the lettered options.",
     "delivery_link_unrecoverable": "This client link can't be shown again. Replace it to send a reminder.",
     "client_email_missing": "The client has no email address on file.",
     "reminder_email_failed": "The reminder email didn't go out. Try again, or send it on WhatsApp.",
@@ -1457,14 +1458,13 @@
       "portfolio_digest": "{active} active projects, {awaiting} awaiting response, {expiring} expiring soon, {overdue} overdue stages.",
       "stage_reminder": "{overdue} overdue stages and {upcoming} upcoming.",
       "client_concept_approved": "The client approved the concept on {delivery}.",
-      "client_concept_chosen": "The client chose a concept option on {delivery}.",
+      "client_concept_chosen": "The client chose {hasLetter, select, yes {option {letter}} other {a concept option}} on {delivery}.",
       "client_concept_changes_requested": "The client asked for changes to the concept on {delivery}.",
       "client_design_approved": "The client approved the design on {delivery}.",
       "client_design_changes_requested": "The client asked for changes to the design on {delivery}.",
       "client_budget_acknowledged": "The client acknowledged the budget range on {delivery}.",
       "client_handover_acknowledged": "The client confirmed receiving the handover on {delivery}.",
       "client_payment_claimed": "{hasMilestone, select, yes {The client says they paid ({milestone}) on {delivery}. Confirm it from the delivery.} other {The client says they made a payment on {delivery}. Confirm it from the delivery.}}",
-      "client_payment_claimed_many": "{claimCount, plural, one {The client says they made a payment on {delivery}. Confirm it from the delivery.} other {The client says they made {count} payments on {delivery}. Confirm them from the delivery.}}",
       "client_commented": "{commentCount, plural, one {The client left a comment on {delivery}.} other {The client left {count} comments on {delivery}.}}"
     },
     "viewAll": "View all"
@@ -1727,6 +1727,7 @@
       "readyHeadline": "Ready to advance to {phase}",
       "readyHint": "Everything checks out. Advance when you're ready.",
       "clientNote": "What the client asked for",
+      "clientChoseOption": "Client chose option {letter}",
       "nudge": "Nudge client",
       "nudgeHint": "Send the client a reminder with the link they already have.",
       "sendReminder": "Send reminder",
@@ -2016,6 +2017,10 @@
       "contentHash": "Hash",
       "attestedAt": "Attested"
     },
+    "conceptOption": {
+      "letter": "Option {letter}",
+      "clientChoice": "Client choice"
+    },
     "changeOrders": {
       "empty": "No change orders raised.",
       "amount": "Amount",
@@ -2034,6 +2039,7 @@
       "empty": "No activity yet.",
       "arrow": "{from} → {to}",
       "onBehalfChip": "Recorded for the client",
+      "optionLetter": "Option {letter}",
       "recordedBy": "Recorded by the studio",
       "confirmedOn": "Confirmed {date}",
       "retract": "Retract",
@@ -2203,6 +2209,8 @@
         "other": "Another way"
       },
       "occurredOn": "When (if not today)",
+      "whichOption": "Which option did they choose?",
+      "optionUnspecified": "Not specified",
       "note": "Note (optional)",
       "save": "Record the approval",
       "cancel": "Cancel"
@@ -2321,6 +2329,19 @@
         "acknowledgedBody": "Thank you. Your designer will now close the design project.",
         "acknowledgedBodyNotified": "Thank you. Your designer has been notified and will now close the design project."
       }
+    },
+    "conceptPicker": {
+      "title": "Choose your preferred option",
+      "body": "Open each option, then choose the one you want developed.",
+      "option": "Option {letter}",
+      "view": "View",
+      "choose": "Choose this option",
+      "confirmTitle": "Choose option {letter}?",
+      "confirmBody": "Your choice is recorded for your designer and cannot be changed from this page.",
+      "confirm": "Yes, choose option {letter}",
+      "cancel": "Cancel",
+      "changed": "The options have changed. Please review them again.",
+      "chosen": "You chose option {letter}."
     },
     "whatsNext": {
       "eyebrow": "Up next"

@@ -1,16 +1,25 @@
 import { afterAll, describe, expect, it } from 'vitest';
 import { clientActOfVerb, paymentClaimedAct } from '@/lib/engagements/client-acts/acts';
 import { notifyStudioOfClientAct, withStudioNotified } from '@/lib/engagements/client-acts/notify';
-import { recordDeliveryActionByToken } from '@/lib/engagements/public';
+import { claimPaymentByToken, recordDeliveryActionByToken } from '@/lib/engagements/public';
 import { revokeDeliveryLinkCore } from '@/lib/engagements/share';
 import { closeFixture, raw, teardown } from './fixture';
-import { forceState, seedRoundBDelivery, type RoundBDelivery } from './round-b-fixture';
+import {
+  forceState,
+  seedFeeSchedule,
+  seedRoundBDelivery,
+  type RoundBDelivery,
+} from './round-b-fixture';
 
 // Round B, B10 (AC 36): the portal's notifier wrapper against the real
 // app_delivery_notify_studio_by_token. The roles come from the permission
 // matrix (owner decision Q2), the key and params from the act, and the portal
 // learns one boolean. Outside a request there is no `after()` and no origin,
 // so no email is attempted here; the wrapper must still answer.
+//
+// B12 (0057, R3, AC 21): a repeat (`already`) asks
+// app_delivery_act_notified_by_token whether the act's notification was ever
+// written: it says "notified" when it was, and repairs a lost one when not.
 
 const orgIds: string[] = [];
 afterAll(async () => {
@@ -83,7 +92,7 @@ describe('notifyStudioOfClientAct', () => {
     }
   });
 
-  it('an `already` repeat never calls the notifier; a second real act bumps the count', async () => {
+  it('an `already` repeat of a notified act says so and never notifies again; a real act bumps', async () => {
     const studio = await seedStudio('b10-repeat');
     await forceState(studio.engagementId, 'final_approval');
     const first = await recordDeliveryActionByToken(studio.token, { action: 'approve_design' });
@@ -94,7 +103,7 @@ describe('notifyStudioOfClientAct', () => {
     expect(await withStudioNotified(studio.token, repeat, clientActOfVerb('approve_design'))).toEqual({
       ok: true,
       code: 'already',
-      studioNotified: false,
+      studioNotified: true,
     });
     expect((await rowsOf(studio.orgId)).every((row) => row.params.count === 1)).toBe(true);
 
@@ -126,5 +135,57 @@ describe('notifyStudioOfClientAct', () => {
       studioNotified: false,
     });
     expect(await rowsOf(studio.orgId)).toEqual([]);
+  });
+});
+
+describe('a repeat repairs a lost notification (0057, R3, AC 21)', () => {
+  it('the first notify never landed: the repeat notifies once, one row per member', async () => {
+    const studio = await seedStudio('b12-lost');
+    await forceState(studio.engagementId, 'final_approval');
+    // The act lands, the notifier "fails": nothing is written.
+    expect(await recordDeliveryActionByToken(studio.token, { action: 'approve_design' })).toEqual({
+      ok: true,
+    });
+    expect(await rowsOf(studio.orgId)).toEqual([]);
+
+    const repeat = await recordDeliveryActionByToken(studio.token, { action: 'approve_design' });
+    expect(await withStudioNotified(studio.token, repeat, clientActOfVerb('approve_design'))).toEqual({
+      ok: true,
+      code: 'already',
+      studioNotified: true,
+    });
+    const rows = await rowsOf(studio.orgId);
+    expect(rows.map((row) => row.recipient_user_id).sort()).toEqual(
+      [studio.ids.owner, studio.ids.admin, studio.ids.projectManager, studio.ids.siteEngineer].sort(),
+    );
+    expect(rows.every((row) => row.params.count === 1)).toBe(true);
+
+    // A third tap finds the repaired notification and sends nothing more.
+    const third = await recordDeliveryActionByToken(studio.token, { action: 'approve_design' });
+    expect(await withStudioNotified(studio.token, third, clientActOfVerb('approve_design'))).toEqual({
+      ok: true,
+      code: 'already',
+      studioNotified: true,
+    });
+    expect((await rowsOf(studio.orgId)).every((row) => row.params.count === 1)).toBe(true);
+  });
+
+  it('a lost payment-claim notification is repaired for THAT milestone', async () => {
+    const studio = await seedStudio('b12-lost-claim');
+    await seedFeeSchedule(studio);
+    const claim = { milestoneKind: 'deposit' };
+    expect(await claimPaymentByToken(studio.token, claim)).toEqual({ ok: true });
+    const repeat = await claimPaymentByToken(studio.token, claim);
+    expect(repeat).toEqual({ ok: true, code: 'already' });
+    expect(await withStudioNotified(studio.token, repeat, paymentClaimedAct('deposit'))).toEqual({
+      ok: true,
+      code: 'already',
+      studioNotified: true,
+    });
+    const rows = await rowsOf(studio.orgId);
+    expect(rows.map((row) => row.recipient_user_id).sort()).toEqual(
+      [studio.ids.owner, studio.ids.admin, studio.ids.accountant].sort(),
+    );
+    expect(rows.every((row) => row.params.milestoneKind === 'deposit')).toBe(true);
   });
 });

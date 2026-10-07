@@ -7,26 +7,20 @@ import 'server-only';
 //
 // THE CALLER CONTRACT (50-delivery-write.sql) is kept here: the body key, the
 // role list and the params come from the server-side map in ./acts.ts, never
-// from request input; this runs only after the write SDF returned `ok` (the
-// portal action's job); and `new_recipients` and `locale` never leave the
-// server: the portal learns one boolean.
+// from request input; this runs after the write SDF returned `ok`, or on an
+// `already` whose act was never notified (./already-notified.ts, 0057); and
+// `new_recipients` and `locale` never leave the server: the portal learns one
+// boolean.
 import { sql } from 'drizzle-orm';
 import { loggableFailure } from '@/lib/actions/loggable-failure';
 import { withDeadline } from '@/lib/http/deadlines';
 import { normalizeRawToken, readSdfJson } from '@/lib/share/sdf-call';
 import { hashShareToken } from '@/lib/share/token';
 import { CLIENT_ACT_BODY_KEY, clientActParams, recipientRolesFor, type ClientAct } from './acts';
+import { actAlreadyNotified } from './already-notified';
+import { NOTIFY_BUDGET_MS } from './notify-budget';
 import { scheduleStudioEmails } from './schedule-emails';
 import { parseStudioNotified } from './studio-notified';
-
-/**
- * The most the client's answer waits for notification work, all of it: the
- * notifier write, the label read, the scheduling. The act itself is already
- * committed; past this the portal says "recorded" and the studio still sees
- * the delivery's state. The notifier is a WRITE: a call abandoned here can
- * still commit, so its rows may land without their email.
- */
-export const NOTIFY_BUDGET_MS = 2_000;
 
 /**
  * Tell the studio the client just acted. `studioNotified` is true only when at
@@ -41,7 +35,6 @@ export async function notifyStudioOfClientAct(
 ): Promise<{ studioNotified: boolean }> {
   const token = normalizeRawToken(rawToken);
   if (!token) return { studioNotified: false };
-  const deadlineAt = Date.now() + NOTIFY_BUDGET_MS;
   const bodyKey = CLIENT_ACT_BODY_KEY[act.kind];
   try {
     const hash = hashShareToken(token);
@@ -62,7 +55,7 @@ export async function notifyStudioOfClientAct(
       return { studioNotified: false };
     }
     if (notified.newRecipients.length > 0) {
-      await scheduleStudioEmails(token, act, notified, deadlineAt);
+      await scheduleStudioEmails(act, notified);
     }
     return { studioNotified: notified.notifiedCount > 0 };
   } catch (err) {
@@ -72,19 +65,41 @@ export async function notifyStudioOfClientAct(
 }
 
 /**
- * A portal write's result, plus whether the studio heard about it. The notifier
- * runs ONLY on a first `ok`: a refusal and an idempotent repeat (`already`)
- * never reach it, so a client tapping twice notifies once. `act` is null when
- * the write's input names no act (it then answered a refusal anyway).
+ * Whether the studio has heard about an act the write answered `already` for,
+ * notifying now if it never did (R3, 0057). A comment has no single act to
+ * anchor on and never repeats as `already` in practice, so it is never re-sent.
+ * `true`: the notification exists, nothing is sent. `false`: it was lost, so
+ * this is the first notification. `null` (no answer, or the check failed): not
+ * notified, and nothing is sent.
+ */
+async function notifyIfNeverNotified(
+  rawToken: string,
+  act: ClientAct,
+): Promise<{ studioNotified: boolean }> {
+  if (act.kind === 'commented') return { studioNotified: false };
+  const alreadyNotified = await actAlreadyNotified(rawToken, act);
+  if (alreadyNotified === true) return { studioNotified: true };
+  if (alreadyNotified === false) return notifyStudioOfClientAct(rawToken, act);
+  return { studioNotified: false };
+}
+
+/**
+ * A portal write's result, plus whether the studio heard about it. A refusal
+ * never notifies. A first `ok` notifies. An idempotent repeat (`already`)
+ * notifies only when the first one's notification was never written, so a
+ * client tapping twice notifies once and a lost notification is repaired; it
+ * then reports the truth about the act either way. `act` is null when the
+ * write's input names no act (it then answered a refusal anyway).
  */
 export async function withStudioNotified<TResult extends { ok: boolean; code?: 'already' }>(
   rawToken: string,
   result: TResult,
   act: ClientAct | null,
 ): Promise<TResult & { studioNotified: boolean }> {
-  if (!result.ok || result.code === 'already' || act === null) {
-    return { ...result, studioNotified: false };
-  }
-  const { studioNotified } = await notifyStudioOfClientAct(rawToken, act);
+  if (!result.ok || act === null) return { ...result, studioNotified: false };
+  const { studioNotified } =
+    result.code === 'already'
+      ? await notifyIfNeverNotified(rawToken, act)
+      : await notifyStudioOfClientAct(rawToken, act);
   return { ...result, studioNotified };
 }

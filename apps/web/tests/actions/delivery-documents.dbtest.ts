@@ -406,11 +406,15 @@ const TOKEN_SDFS: ReadonlyArray<{ name: string; args: string }> = [
   // Round B (0056). The concept choice takes caller-supplied p_name/p_ip/p_ua
   // written into the append-only ledger; the notifier writes notification rows
   // for every member of the delivery's org, so a direct RPC could spam a studio.
+  // 0057: the choice takes the letter the client saw (the 6-argument version
+  // is dropped); the predicate answers whether a client act's notification was
+  // ever written, which is an oracle about the studio a direct RPC must not reach.
   {
     name: 'app_delivery_choose_concept_by_token',
-    args: 'text, uuid, text, text, text, text',
+    args: 'text, uuid, integer, text, text, text, text',
   },
   { name: 'app_delivery_notify_studio_by_token', args: 'text, text, jsonb, jsonb' },
+  { name: 'app_delivery_act_notified_by_token', args: 'text, text, text' },
 ];
 
 function signatureOf(sdf: { name: string; args: string }): string {

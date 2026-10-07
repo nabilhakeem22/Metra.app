@@ -25,6 +25,8 @@ export interface ClientReviewEvent {
   acknowledgedIssueAt: Date | null;
   decidedAt: Date;
   chosenArtifactId?: string | null;
+  /** The letter position SAVED with a concept choice (0057), 1 = A to 4 = D. */
+  chosenPosition?: number | null;
 }
 
 export interface ClientReviewInput {

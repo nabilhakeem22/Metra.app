@@ -4,6 +4,7 @@ import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
 import type { CommandCardView } from '@/lib/engagements/command-card';
 import type { CommandCardCtas } from '@/lib/engagements/command-card-ctas';
+import type { LetteredConceptOption } from '@/lib/engagements/concept-choice';
 import type { EngagementGatePreview } from '@/lib/engagements/gate-preview';
 import { AdvanceOrReshare } from './command-card-advance';
 import type { RunAction } from './use-engagement-action';
@@ -35,6 +36,8 @@ export interface CommandCardActionProps {
     openFeeForm: () => void;
     /** When the review round under answer began (ISO): the offline approval's date floor. */
     reviewRoundStartedAt: string;
+    /** The lettered options an offline concept choice may name. */
+    conceptOptions: LetteredConceptOption[];
   };
 }
 

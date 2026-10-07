@@ -1,21 +1,16 @@
 // What the portal will and will not render from an UNTRUSTED jsonb snapshot.
 //
-// PURE and unit-testable — no `server-only`, no db, no imports beyond the two
-// enums these guards check against. They lived inside the 409-line `public.ts`
-// where the only way to exercise them was to drive a mocked database through
-// `getDeliveryByToken`; they are the part of that file most worth proving
-// directly, because every one of them exists to stop a malformed row reaching a
-// client's screen.
-//
-// The posture is the same in all three: a row is renderable only when it carries
-// the fields the portal dereferences. Anything else — a null hole, a stray shape,
-// an enum value added to the database but not yet mapped — is DROPPED, never
-// rendered. Dropping one row shows the client a slightly shorter list; trusting
-// it shows them an unnamed file or crashes the page.
+// PURE and unit-testable: no `server-only`, no db. Every guard here exists to
+// stop a malformed row reaching a client's screen, and the posture is the same
+// in all of them: a row is renderable only when it carries the fields the
+// portal dereferences. Anything else (a null hole, a stray shape, an enum value
+// added to the database but not yet mapped) is DROPPED, never rendered.
 import type { EngagementArtifactKind } from '@metra/db';
+import { isUuid } from '@/lib/uuid';
+import { conceptLetter } from '../concept-letter';
 import { isClientDocumentKind } from '../portal-documents';
 import { DESIGN_STATES } from '../states';
-import type { PublicDeliveryMilestone } from './types';
+import type { PublicDelivery, PublicDeliveryMilestone } from './types';
 
 /**
  * The raw jsonb shape the SDF returns (snake_case, matches app_delivery_by_token).
@@ -40,6 +35,9 @@ export interface DeliverySnapshot {
   payment_schedule?: PublicDeliveryMilestone[] | null;
   documents?: Array<DeliveryDocumentRow | null> | null;
   client_actions?: string[] | null;
+  concept_options?: unknown;
+  concept_choice_id?: unknown;
+  concept_choice_position?: unknown;
   claim?: {
     claimable_milestones?: Array<{
       milestone_kind?: string | null;
@@ -121,4 +119,31 @@ export function isRenderableMilestone(row: unknown): row is PublicDeliveryMilest
     MILESTONE_STATUSES.has(candidate.status) &&
     candidate.amount_due != null
   );
+}
+
+/**
+ * The concept options the client may choose between, in letter order. A row is
+ * kept only when its id is a uuid (the choose call casts it) and its position
+ * maps to a letter (1 to 4); a position seen twice keeps the first row. Anything
+ * else, including a missing or non-array key, is dropped: a shorter list, never
+ * an option the client cannot actually choose.
+ */
+export function parseConceptOptions(raw: unknown): PublicDelivery['conceptOptions'] {
+  if (!Array.isArray(raw)) return [];
+  const byPosition = new Map<number, PublicDelivery['conceptOptions'][number]>();
+  for (const row of raw) {
+    if (!row || typeof row !== 'object') continue;
+    const { id, position } = row as Record<string, unknown>;
+    const letter = conceptLetter(position);
+    if (typeof id !== 'string' || !isUuid(id) || letter === null) continue;
+    const at = position as 1 | 2 | 3 | 4;
+    if (!byPosition.has(at)) byPosition.set(at, { id, position: at, letter });
+  }
+  return [...byPosition.values()].sort((a, b) => a.position - b.position);
+}
+
+/** The choice and its saved letter, or null unless BOTH are usable. */
+export function parseConceptChoice(id: unknown, position: unknown): PublicDelivery['conceptChoice'] {
+  const letter = conceptLetter(position);
+  return typeof id === 'string' && isUuid(id) && letter !== null ? { id, letter } : null;
 }

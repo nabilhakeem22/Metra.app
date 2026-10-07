@@ -70,15 +70,27 @@ describe('client_responded bodies', () => {
     expect(unknown).toContain('DE-2026-0012');
   });
 
-  it('F4: two collapsed payment claims say two payments, not only the latest milestone', () => {
-    const twice = render('en', 'client_payment_claimed', { ...DELIVERY, milestoneKind: 'gate_a', count: 2 });
-    expect(twice).toContain('2 payments');
-    expect(twice).not.toContain('Concept payment');
-    const arabic = render('ar-EG', 'client_payment_claimed', { ...DELIVERY, milestoneKind: 'gate_a', count: 3 });
-    expect(arabic).toContain('3');
+  it('a payment row counted twice still names its milestone: rows are per milestone since 0057', () => {
+    // A count above 1 is the SAME milestone claimed again (the notifier keeps one
+    // unread row per milestone), so the sentence names it rather than a total.
+    expect(render('en', 'client_payment_claimed', { ...DELIVERY, milestoneKind: 'deposit', count: 2 })).toContain(
+      '(Deposit)',
+    );
+    const arabic = render('ar-EG', 'client_payment_claimed', { ...DELIVERY, milestoneKind: 'deposit', count: 3 });
+    expect(arabic).toContain('(عربون)');
     expect(ARABIC_INDIC.test(arabic)).toBe(false);
     expect(DASH.test(arabic)).toBe(false);
-    expect(render('en', 'client_payment_claimed', { ...DELIVERY, milestoneKind: 'deposit', count: 1 })).toContain('(Deposit)');
+  });
+
+  it('a chosen concept option reads as its letter, and generically without one (B12)', () => {
+    expect(render('en', 'client_concept_chosen', { ...DELIVERY, optionPosition: 2 })).toContain('option ⁨B⁩');
+    expect(render('ar-EG', 'client_concept_chosen', { ...DELIVERY, optionPosition: 2 })).toContain('البديل ⁨B⁩');
+    for (const optionPosition of [undefined, 0, 5, '2', 1.5]) {
+      const generic = render('en', 'client_concept_chosen', { ...DELIVERY, optionPosition });
+      expect(generic).toContain('a concept option');
+      expect(generic).not.toMatch(/option [A-D]/);
+    }
+    expect(render('ar-EG', 'client_concept_chosen', DELIVERY)).toContain('بديل للفكرة');
   });
 
   it('repeated comments say how many, in Latin digits', () => {

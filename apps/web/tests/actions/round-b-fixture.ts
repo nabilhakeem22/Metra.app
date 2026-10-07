@@ -1,10 +1,9 @@
-// Shared setup for the Round B database suites (migration 0056 and its apply-rls
-// functions). Not a test file: it is imported by `delivery-portal-round-b.dbtest.ts`
-// and `delivery-notify-studio.dbtest.ts` and runs inside their runner.
+// Shared setup for the Round B database suites (migrations 0056 and 0057 and
+// their apply-rls functions). Not a test file: it is imported by the Round B
+// dbtests and runs inside their runner.
 //
-// The two NEW functions have no TypeScript wrapper yet (PR-B10 and PR-B12 build
-// them), so they are called here over the BYPASSRLS connection exactly as the
-// wrappers will call them: by the sha256 hash of the raw share token.
+// The token functions are called here over the BYPASSRLS connection exactly as
+// their TypeScript wrappers call them: by the sha256 hash of the raw share token.
 import { randomUUID } from 'node:crypto';
 import { expect } from 'vitest';
 import type { MemberRole } from '@metra/db';
@@ -14,6 +13,7 @@ import type { OrgContext } from '@/lib/db/context';
 import { recordArtifactCore } from '@/lib/engagements/artifacts';
 import { setArtifactClientVisibilityCore } from '@/lib/engagements/client-visibility';
 import { createEngagementCore } from '@/lib/engagements/core';
+import { executeTransition } from '@/lib/engagements/executor';
 import { mintDeliveryLinkCore } from '@/lib/engagements/share';
 import { createProjectCore } from '@/lib/projects/core';
 import { listProjects } from '@/lib/projects/queries';
@@ -110,20 +110,47 @@ export async function clientActionsOf(hash: string): Promise<string[]> {
   return (snapshot?.client_actions as string[] | undefined) ?? [];
 }
 
-/** Call the concept-choice function exactly as the PR-B12 wrapper will. */
+/**
+ * Call the concept-choice function as chooseConceptByToken does: the option and
+ * the letter position the client SAW (1 = A), which the function saves.
+ */
 export async function chooseConcept(
   hash: string,
   artifactId: string | null,
+  position: number | null,
   note: string | null = null,
 ): Promise<string> {
   const artifact = artifactId === null ? 'null' : `'${artifactId}'::uuid`;
+  const positionSql = position === null ? 'null' : `${position}`;
   const noteSql = note === null ? 'null' : `'${note}'`;
   const [row] = await raw.query<{ code: string }>(
     `select public.app_delivery_choose_concept_by_token(
-       '${hash}', ${artifact}, ${noteSql}, 'Client Sam', '1.2.3.4', 'probe/1'
+       '${hash}', ${artifact}, ${positionSql}, ${noteSql}, 'Client Sam', '1.2.3.4', 'probe/1'
      ) as code`,
   );
   return row.code;
+}
+
+/** Pin an artifact's attestation instant, so its letter is deterministic. */
+export async function attestAt(artifactId: string, instant: string): Promise<void> {
+  await raw.query(
+    `update public.engagement_artifacts set attested_at = '${instant}' where id = '${artifactId}'`,
+  );
+}
+
+/** Release (or hide) an artifact directly, as the studio's visibility toggle does. */
+export async function setVisible(artifactId: string, visible: boolean): Promise<void> {
+  await raw.query(
+    `update public.engagement_artifacts set client_visible = ${visible} where id = '${artifactId}'`,
+  );
+}
+
+/** The portal's letters: [id, position] pairs from the snapshot, in order. */
+export async function portalLetters(hash: string): Promise<Array<[string, number]>> {
+  const snapshot = await snapshotOf(hash);
+  return ((snapshot?.concept_options ?? []) as Array<{ id: string; position: number }>).map(
+    (option) => [option.id, option.position],
+  );
 }
 
 /** Back-date updated_at so a later refresh is visible regardless of clock resolution. */
@@ -179,4 +206,22 @@ export async function seedArtifact(
     expect(released.ok).toBe(true);
   }
   return artifactId;
+}
+
+/** The four-milestone fee schedule, so a client can claim a payment (submitDesignFee). */
+export async function seedFeeSchedule(delivery: RoundBDelivery): Promise<void> {
+  const fee = await executeTransition(delivery.ctx, {
+    engagementId: delivery.engagementId,
+    trigger: 'submitDesignFee',
+    payload: {
+      designFee: '100000',
+      milestones: [
+        { kind: 'deposit', basis: 'amount', value: '30000' },
+        { kind: 'gate_a', basis: 'amount', value: '20000' },
+        { kind: 'gate_b', basis: 'amount', value: '25000' },
+        { kind: 'balance', basis: 'amount', value: '25000' },
+      ],
+    },
+  });
+  expect(fee.ok).toBe(true);
 }

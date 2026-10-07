@@ -200,3 +200,14 @@ describe('buildTimelineEntries — the on-behalf marker', () => {
     expect(build({ clientActivity: [clientActivity()] })[0]?.onBehalf).toBe(false);
   });
 });
+
+describe('a concept choice carries the letter SAVED with it (B12)', () => {
+  test('on the client row and on a choice the studio recorded offline', () => {
+    const entries = build({
+      clientActivity: [clientActivity({ kind: 'concept_approval', chosenPosition: 2 })],
+      events: [event({ id: 'ev-offline', kind: 'concept_approval', chosenPosition: 1 })],
+      transitions: [transition()],
+    });
+    expect(entries.map((entry) => entry.optionPosition)).toEqual([2, 1, null]);
+  });
+});

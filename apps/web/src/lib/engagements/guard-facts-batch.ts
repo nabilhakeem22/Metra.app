@@ -52,6 +52,8 @@ const GUARD_EVENT_COLUMNS = {
   acknowledgedIssueAt: engagementEvents.acknowledgedIssueAt,
   rangeLow: engagementEvents.rangeLow,
   rangeHigh: engagementEvents.rangeHigh,
+  chosenArtifactId: engagementEvents.chosenArtifactId,
+  chosenPosition: engagementEvents.chosenPosition,
 };
 
 /** Group rows by their engagement id, keeping each group in read order. */

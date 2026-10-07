@@ -1,5 +1,5 @@
 import 'server-only';
-// Public (no-session) client delivery portal — the WRITES. Both are APPEND-ONLY
+// Public (no-session) client delivery portal: the WRITES. All are APPEND-ONLY
 // ADVISORY signals: the SDF moves no state, writes no money ledger, and returns
 // only a status code. A repeat is an idempotent SUCCESS (`code: 'already'`), which
 // is the whole difference between a signal and a document response — a client
@@ -12,6 +12,8 @@ import {
   type TokenResponseError,
 } from '@/lib/share/sdf-result';
 import { hashShareToken } from '@/lib/share/token';
+import { isUuid } from '@/lib/uuid';
+import { conceptLetter } from '../concept-letter';
 
 /** Coded outcomes the portal maps to a bilingual message. `already` is NOT an
  *  error — a repeat signal resolves to `{ ok: true, code: 'already' }`, which is
@@ -79,6 +81,39 @@ export async function claimPaymentByToken(
   const code = await readSdfCode(sql`select public.app_delivery_claim_payment_by_token(
     ${hash}, ${input.milestoneKind}, ${input.note ?? null},
     ${input.actorName ?? null}, ${input.ip ?? null}, ${input.userAgent ?? null}
+  ) as code`);
+  return mapSignalSdfCode(code);
+}
+
+/**
+ * Session-less (Round B, B12): the client CHOOSES one concept option, by its RAW
+ * share token. `position` is the letter the client SAW (1 = A to 4 = D); the SDF
+ * accepts the choice only while that option still sits at that letter, and SAVES
+ * it, so the studio reads the same letter the client tapped. A repeat maps to the
+ * idempotent `already`; a letter that moved under the client (the studio hid or
+ * released an option meanwhile) answers `wrong_state`. A non-uuid id or a
+ * position that is not a letter never reaches the database: it is that same
+ * `wrong_state`, so the answer is no oracle for which ids exist.
+ */
+export async function chooseConceptByToken(
+  rawToken: string,
+  input: {
+    artifactId: string;
+    position: number;
+    note?: string | null;
+    ip?: string | null;
+    userAgent?: string | null;
+  },
+): Promise<DeliveryActionResult> {
+  const token = normalizeRawToken(rawToken);
+  if (!token) return { ok: false, error: 'token_invalid' };
+  if (!isUuid(input.artifactId) || conceptLetter(input.position) === null) {
+    return mapSignalSdfCode('wrong_state');
+  }
+  const hash = hashShareToken(token);
+  const code = await readSdfCode(sql`select public.app_delivery_choose_concept_by_token(
+    ${hash}, ${input.artifactId}::uuid, ${input.position}::int, ${input.note ?? null},
+    null, ${input.ip ?? null}, ${input.userAgent ?? null}
   ) as code`);
   return mapSignalSdfCode(code);
 }

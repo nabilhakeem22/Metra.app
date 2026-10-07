@@ -535,6 +535,7 @@
     "offline_approval_date_out_of_range": "اختار تاريخ من أول المراجعة دي لحد النهارده",
     "offline_approval_note_too_long": "الملاحظة طويلة قوي: 2000 حرف بالكتير",
     "client_review_answered": "العميل رد على المراجعة في نفس الوقت. حدّث الصفحة عشان تشوف رده.",
+    "concept_option_not_found": "البديل ده مش معروض للعميل. اختار واحد من البدائل اللي ليها حرف.",
     "delivery_link_unrecoverable": "الرابط ده مينفعش يظهر تاني. استبدله عشان تبعت تذكير.",
     "client_email_missing": "مفيش إيميل متسجل للعميل.",
     "reminder_email_failed": "إيميل التذكير ماتبعتش. جرّب تاني أو ابعته على واتساب.",
@@ -1457,14 +1458,13 @@
       "portfolio_digest": "{active} مشاريع شغالة، {awaiting} مستنية الرد، {expiring} هتنتهي قريب، {overdue} مراحل متأخرة.",
       "stage_reminder": "{overdue} مراحل متأخرة و{upcoming} جايين.",
       "client_concept_approved": "العميل وافق على الفكرة في {delivery}.",
-      "client_concept_chosen": "العميل اختار بديل للفكرة في {delivery}.",
+      "client_concept_chosen": "العميل اختار {hasLetter, select, yes {البديل {letter}} other {بديل للفكرة}} في {delivery}.",
       "client_concept_changes_requested": "العميل طلب تعديلات على الفكرة في {delivery}.",
       "client_design_approved": "العميل وافق على التصميم في {delivery}.",
       "client_design_changes_requested": "العميل طلب تعديلات على التصميم في {delivery}.",
       "client_budget_acknowledged": "العميل أكد نطاق الميزانية في {delivery}.",
       "client_handover_acknowledged": "العميل أكد استلام التسليم في {delivery}.",
       "client_payment_claimed": "{hasMilestone, select, yes {العميل بيقول إنه دفع ({milestone}) في {delivery}. أكدها من صفحة التسليم.} other {العميل بيقول إنه دفع دفعة في {delivery}. أكدها من صفحة التسليم.}}",
-      "client_payment_claimed_many": "{claimCount, plural, zero {العميل بيقول إنه دفع في {delivery}. أكدها من صفحة التسليم.} one {العميل بيقول إنه دفع دفعة في {delivery}. أكدها من صفحة التسليم.} two {العميل بيقول إنه دفع دفعتين في {delivery}. أكدهم من صفحة التسليم.} few {العميل بيقول إنه دفع {count} دفعات في {delivery}. أكدهم من صفحة التسليم.} many {العميل بيقول إنه دفع {count} دفعة في {delivery}. أكدهم من صفحة التسليم.} other {العميل بيقول إنه دفع {count} دفعة في {delivery}. أكدهم من صفحة التسليم.}}",
       "client_commented": "{commentCount, plural, zero {العميل كتب تعليقات على {delivery}.} one {العميل كتب تعليق على {delivery}.} two {العميل كتب تعليقين على {delivery}.} few {العميل كتب {count} تعليقات على {delivery}.} many {العميل كتب {count} تعليق على {delivery}.} other {العميل كتب {count} تعليق على {delivery}.}}"
     },
     "viewAll": "عرض الكل"
@@ -1727,6 +1727,7 @@
       "readyHeadline": "جاهز للانتقال إلى {phase}",
       "readyHint": "كل حاجة مظبوطة. انقل لما تكون جاهز.",
       "clientNote": "اللي العميل طلبه",
+      "clientChoseOption": "العميل اختار البديل {letter}",
       "nudge": "فكّر العميل",
       "nudgeHint": "ابعت للعميل تذكير بنفس اللينك اللي معاه.",
       "sendReminder": "ابعت تذكير",
@@ -2016,6 +2017,10 @@
       "contentHash": "التشفير",
       "attestedAt": "معتمد"
     },
+    "conceptOption": {
+      "letter": "البديل {letter}",
+      "clientChoice": "اختيار العميل"
+    },
     "changeOrders": {
       "empty": "مفيش أوامر تغيير اتعملت.",
       "amount": "المبلغ",
@@ -2034,6 +2039,7 @@
       "empty": "مفيش نشاط لسه.",
       "arrow": "{from} ← {to}",
       "onBehalfChip": "متسجّل عن العميل",
+      "optionLetter": "البديل {letter}",
       "recordedBy": "سجّله الاستوديو",
       "confirmedOn": "اتأكد في {date}",
       "retract": "إلغاء التسجيل",
@@ -2203,6 +2209,8 @@
         "other": "طريقة تانية"
       },
       "occurredOn": "إمتى (لو مش النهارده)",
+      "whichOption": "اختار أنهي بديل؟",
+      "optionUnspecified": "مش محدد",
       "note": "ملاحظة (اختياري)",
       "save": "سجّل الموافقة",
       "cancel": "إلغاء"
@@ -2321,6 +2329,19 @@
         "acknowledgedBody": "شكرًا لك. سيقوم مصممك الآن بإغلاق مشروع التصميم.",
         "acknowledgedBodyNotified": "شكرًا لك. تم إبلاغ مصممك، وسيقوم الآن بإغلاق مشروع التصميم."
       }
+    },
+    "conceptPicker": {
+      "title": "اختر البديل الذي تفضّله",
+      "body": "افتح كل بديل، ثم اختر البديل الذي تريد تطويره.",
+      "option": "البديل {letter}",
+      "view": "عرض",
+      "choose": "اختيار هذا البديل",
+      "confirmTitle": "هل تختار البديل {letter}؟",
+      "confirmBody": "سيُسجَّل اختيارك لدى المصمم، ولا يمكن تغييره من هذه الصفحة.",
+      "confirm": "نعم، أختار البديل {letter}",
+      "cancel": "إلغاء",
+      "changed": "تغيّرت البدائل المعروضة. يُرجى مراجعتها مرة أخرى.",
+      "chosen": "اخترتَ البديل {letter}."
     },
     "whatsNext": {
       "eyebrow": "التالي"

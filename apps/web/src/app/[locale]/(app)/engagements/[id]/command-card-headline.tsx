@@ -2,9 +2,11 @@
 
 import { useLocale, useTranslations } from 'next-intl';
 import { currentChangeRequestNote } from '@/lib/engagements/client-activity-note';
+import { conceptLetter } from '@/lib/engagements/concept-letter';
 import type { ClientDecisionSummary } from '@/lib/engagements/gate-preview';
 import type { EngagementClientActivityRecord } from '@/lib/engagements/queries/client-activity';
 import type { DesignState } from '@/lib/engagements/states';
+import { bidiIsolate } from '@/lib/format/bidi';
 import { formatDate } from '@/lib/format/date';
 import type { CommandCardCopy } from './command-card-copy';
 import { SectionLabel } from '@/components/ui/section-label';
@@ -73,6 +75,11 @@ export function CommandCardHeadline({
   awaitingReplyCount: number;
 }) {
   const tcmd = useTranslations('engagements.command');
+  // Which option the client chose, in the letter SAVED with the choice (0057).
+  const chosenLetter =
+    review.clientDecision?.kind === 'concept_approval'
+      ? conceptLetter(review.clientDecision.chosenPosition)
+      : null;
   return (
     <>
       {/* The eyebrow carries the ACTOR. A client-actor stage is not a MISSING next
@@ -88,6 +95,11 @@ export function CommandCardHeadline({
       </h2>
       {copy.hint && (
         <p className="mb-4 text-small text-[color:var(--text-muted)]">{copy.hint}</p>
+      )}
+      {chosenLetter && (
+        <p data-client-choice={chosenLetter} className="mb-4 text-small font-semibold">
+          {tcmd('clientChoseOption', { letter: bidiIsolate(chosenLetter) })}
+        </p>
       )}
 
       <ClientNoteCallout clientActivity={clientActivity} review={review} />

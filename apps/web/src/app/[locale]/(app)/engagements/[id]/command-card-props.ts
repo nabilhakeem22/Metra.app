@@ -1,5 +1,6 @@
 import type { ActionCode } from '@/lib/actions/result';
 import type { BoqStepData } from '@/lib/boqs/step';
+import type { LetteredConceptOption } from '@/lib/engagements/concept-choice';
 import type { FeeSplitPrefill } from '@/lib/engagements/default-fee-split';
 import type { DeliveryStatus } from '@/lib/engagements/delivery-status';
 import type { EngagementGatePreview } from '@/lib/engagements/gate-preview';
@@ -37,6 +38,8 @@ export interface EngagementCommandCardProps {
   canRecordOfflineApproval: boolean;
   /** When the review round under answer began (ISO): the floor of an offline approval's date. */
   reviewRoundStartedAt: string;
+  /** The released, lettered concept options an offline choice may name (B12, Q1). */
+  conceptOptions: LetteredConceptOption[];
   canRecordPayment: boolean;
   /** May this role confirm or dismiss a client payment claim (`engagements_finance` create)? */
   canResolveClaims: boolean;

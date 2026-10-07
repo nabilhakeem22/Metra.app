@@ -8,12 +8,15 @@ import { deliveryOrNull } from './delivery-read';
 import { closeFixture, raw, teardown } from './fixture';
 import {
   ageUpdatedAt,
+  attestAt,
   chooseConcept,
   clientActionsOf,
   forceState,
+  portalLetters,
   rendersReadyAtText,
   seedArtifact,
   seedRoundBDelivery,
+  setVisible,
   snapshotOf,
   stampRenders,
   updatedAtRefreshed,
@@ -24,8 +27,9 @@ import {
 //   * a client DESIGN decision answers ONE render issuance (AC 30, 31);
 //   * every `ok` client act refreshes the delivery's updated_at, an `already`
 //     does not (AC 32);
-//   * the client can choose ONE visible concept option (AC 33), at a STABLE
-//     position 1..4, with the caller's name/ip/ua capped (F4, L3, S2);
+//   * the client can choose ONE visible concept option (AC 33) under the letter
+//     it saw (0057: letters rank VISIBLE options, the choice SAVES its letter),
+//     with the caller's name/ip/ua capped (F4, L3, S2);
 //   * a decision the studio retracted answers nothing, read and write alike (L1);
 //   * a nonce never outlives its hash, whatever code writes the row (S4);
 //   * 0056's constraints exist and bite, and the functions the deployed app
@@ -255,11 +259,11 @@ describe('every ok client act refreshes updated_at, an already does not (AC 32)'
     await forceState(d.engagementId, 'concept_review');
     const option = await seedArtifact(d, 'concept_option');
     await ageUpdatedAt(d.engagementId);
-    expect(await chooseConcept(d.hash, option)).toBe('ok');
+    expect(await chooseConcept(d.hash, option, 1)).toBe('ok');
     expect(await updatedAtRefreshed(d.engagementId)).toBe(true);
 
     await ageUpdatedAt(d.engagementId);
-    expect(await chooseConcept(d.hash, option)).toBe('already');
+    expect(await chooseConcept(d.hash, option, 1)).toBe('already');
     expect(await updatedAtRefreshed(d.engagementId)).toBe(false);
   });
 });
@@ -269,10 +273,11 @@ async function conceptApprovals(engagementId: string) {
   return raw.query<{
     actor_channel: string;
     chosen_artifact_id: string | null;
+    chosen_position: number | null;
     note: string | null;
     actor_name: string | null;
   }>(
-    `select actor_channel, chosen_artifact_id, note, actor_name
+    `select actor_channel, chosen_artifact_id, chosen_position, note, actor_name
        from public.engagement_events
       where engagement_id = '${engagementId}' and kind = 'concept_approval'
       order by decided_at`,
@@ -306,26 +311,30 @@ describe('the client chooses ONE concept option (AC 33)', () => {
     ]);
     expect(before!.concept_choice_id).toBeNull();
 
-    expect(await chooseConcept(d.hash, hidden)).toBe('wrong_state');
-    expect(await chooseConcept(d.hash, fileless)).toBe('wrong_state');
-    expect(await chooseConcept(d.hash, optionA, 'The second one, please')).toBe('ok');
+    for (const position of [1, 2, 3]) {
+      expect(await chooseConcept(d.hash, hidden, position)).toBe('wrong_state');
+      expect(await chooseConcept(d.hash, fileless, position)).toBe('wrong_state');
+    }
+    expect(await chooseConcept(d.hash, optionA, 2, 'The second one, please')).toBe('ok');
 
     expect(await conceptApprovals(d.engagementId)).toEqual([
       {
         actor_channel: 'client',
         chosen_artifact_id: optionA,
+        chosen_position: 2,
         note: 'The second one, please',
         actor_name: 'Client Sam',
       },
     ]);
     const after = await snapshotOf(d.hash);
     expect(after!.concept_choice_id).toBe(optionA);
+    expect(after!.concept_choice_position).toBe(2);
     expect(after!.client_actions).toEqual([]);
     // The deployed parser still reads the snapshot with the two new keys in it.
     expect((await deliveryOrNull(d.token))!.clientActions).toEqual([]);
 
     // One decision per delivery: a second choice, or approving on top, repeats.
-    expect(await chooseConcept(d.hash, optionB)).toBe('already');
+    expect(await chooseConcept(d.hash, optionB, 1)).toBe('already');
     expect(await recordDeliveryActionByToken(d.token, { action: 'approve_concept' })).toEqual({
       ok: true,
       code: 'already',
@@ -345,7 +354,7 @@ describe('the client chooses ONE concept option (AC 33)', () => {
     expect(
       await recordDeliveryActionByToken(d.token, { action: 'request_concept_changes' }),
     ).toEqual({ ok: true });
-    expect(await chooseConcept(d.hash, option)).toBe('already');
+    expect(await chooseConcept(d.hash, option, 1)).toBe('already');
     expect(await conceptApprovals(d.engagementId)).toEqual([]);
   });
 
@@ -358,10 +367,10 @@ describe('the client chooses ONE concept option (AC 33)', () => {
     const foreignOption = await seedArtifact(other, 'concept_option');
     const ownOption = await seedArtifact(d, 'concept_option');
 
-    expect(await chooseConcept(d.hash, render)).toBe('wrong_state');
-    expect(await chooseConcept(d.hash, foreignOption)).toBe('wrong_state');
-    expect(await chooseConcept(d.hash, null)).toBe('wrong_state');
-    expect(await chooseConcept(d.hash, '00000000-0000-4000-8000-000000000000')).toBe(
+    expect(await chooseConcept(d.hash, render, 1)).toBe('wrong_state');
+    expect(await chooseConcept(d.hash, foreignOption, 1)).toBe('wrong_state');
+    expect(await chooseConcept(d.hash, null, 1)).toBe('wrong_state');
+    expect(await chooseConcept(d.hash, '00000000-0000-4000-8000-000000000000', 1)).toBe(
       'wrong_state',
     );
     expect(await conceptApprovals(d.engagementId)).toEqual([]);
@@ -369,9 +378,9 @@ describe('the client chooses ONE concept option (AC 33)', () => {
 
     // Outside concept_review the visible option is refused too.
     await forceState(d.engagementId, 'final_approval');
-    expect(await chooseConcept(d.hash, ownOption)).toBe('wrong_state');
+    expect(await chooseConcept(d.hash, ownOption, 1)).toBe('wrong_state');
     await forceState(d.engagementId, 'abandoned');
-    expect(await chooseConcept(d.hash, ownOption)).toBe('not_active');
+    expect(await chooseConcept(d.hash, ownOption, 1)).toBe('not_active');
     expect(await conceptApprovals(d.engagementId)).toEqual([]);
   });
 
@@ -380,14 +389,14 @@ describe('the client chooses ONE concept option (AC 33)', () => {
     await forceState(d.engagementId, 'concept_review');
     const option = await seedArtifact(d, 'concept_option');
 
-    expect(await chooseConcept('not-a-real-hash', option)).toBe('invalid');
+    expect(await chooseConcept('not-a-real-hash', option, 1)).toBe('invalid');
     await raw.query(
       `update public.design_engagements set share_expires_at = now() - interval '1 day'
         where id = '${d.engagementId}'`,
     );
-    expect(await chooseConcept(d.hash, option)).toBe('expired');
+    expect(await chooseConcept(d.hash, option, 1)).toBe('expired');
     expect((await revokeDeliveryLinkCore(d.ctx, d.engagementId)).ok).toBe(true);
-    expect(await chooseConcept(d.hash, option)).toBe('invalid');
+    expect(await chooseConcept(d.hash, option, 1)).toBe('invalid');
     expect(await conceptApprovals(d.engagementId)).toEqual([]);
   });
 
@@ -397,7 +406,12 @@ describe('the client chooses ONE concept option (AC 33)', () => {
     const optionA = await seedArtifact(d, 'concept_option');
     const optionB = await seedArtifact(d, 'concept_option');
 
-    const codes = await Promise.all([chooseConcept(d.hash, optionA), chooseConcept(d.hash, optionB)]);
+    await attestAt(optionA, '2026-01-01T00:00:00Z');
+    await attestAt(optionB, '2026-01-02T00:00:00Z');
+    const codes = await Promise.all([
+      chooseConcept(d.hash, optionA, 1),
+      chooseConcept(d.hash, optionB, 2),
+    ]);
     expect([...codes].sort()).toEqual(['already', 'ok']);
     expect(await conceptApprovals(d.engagementId)).toHaveLength(1);
   });
@@ -420,16 +434,9 @@ async function latestClientEventId(engagementId: string, kind: string): Promise<
   return row.id;
 }
 
-/** Pin an artifact's attestation instant, so positions are deterministic. */
-async function attestAt(artifactId: string, instant: string): Promise<void> {
-  await raw.query(
-    `update public.engagement_artifacts set attested_at = '${instant}' where id = '${artifactId}'`,
-  );
-}
-
-describe('concept option positions are STABLE and capped at 4 (F4, L3)', () => {
-  it('ranks every option ever recorded, so hiding one never renumbers another', async () => {
-    const d = await seedRoundBDelivery(orgIds, 'stable-positions');
+describe('letters rank VISIBLE options; a choice keeps the letter it was made under (0057)', () => {
+  it('hiding an option renumbers the later ones, but never a saved choice', async () => {
+    const d = await seedRoundBDelivery(orgIds, 'visible-letters');
     await forceState(d.engagementId, 'concept_review');
     const first = await seedArtifact(d, 'concept_option');
     const second = await seedArtifact(d, 'concept_option');
@@ -438,19 +445,27 @@ describe('concept option positions are STABLE and capped at 4 (F4, L3)', () => {
     await attestAt(second, '2026-01-02T00:00:00Z');
     await attestAt(third, '2026-01-03T00:00:00Z');
 
-    expect(await chooseConcept(d.hash, third)).toBe('ok');
-    // The studio hides option 1 and then the chosen option itself.
-    await raw.query(
-      `update public.engagement_artifacts set client_visible = false
-        where id in ('${first}', '${third}')`,
-    );
+    // The studio hides option A: B and C become A and B for the client.
+    await setVisible(first, false);
+    expect(await portalLetters(d.hash)).toEqual([
+      [second, 1],
+      [third, 2],
+    ]);
+    expect(await chooseConcept(d.hash, third, 2)).toBe('ok');
+
+    // The studio now hides the chosen option and releases the first again.
+    await setVisible(third, false);
+    await setVisible(first, true);
+    expect(await portalLetters(d.hash)).toEqual([
+      [first, 1],
+      [second, 2],
+    ]);
     const snapshot = await snapshotOf(d.hash);
-    expect(snapshot!.concept_options).toEqual([{ id: second, position: 2 }]);
-    // The choice still resolves to the letter the client saw (C).
+    // The choice still reads as the letter the client saw (B).
     expect(snapshot!.concept_choice_id).toBe(third);
-    expect(snapshot!.concept_choice_position).toBe(3);
+    expect(snapshot!.concept_choice_position).toBe(2);
     // A stale double submit answers `already` before the option is looked at.
-    expect(await chooseConcept(d.hash, third)).toBe('already');
+    expect(await chooseConcept(d.hash, third, 2)).toBe('already');
   });
 
   it('never lists or accepts a position above 4', async () => {
@@ -473,7 +488,9 @@ describe('concept option positions are STABLE and capped at 4 (F4, L3)', () => {
     expect((snapshot!.concept_options as Array<{ position: number }>).map((o) => o.position)).toEqual([
       1, 2, 3, 4,
     ]);
-    expect(await chooseConcept(d.hash, fifth.id)).toBe('wrong_state');
+    for (const position of [4, 5]) {
+      expect(await chooseConcept(d.hash, fifth.id, position)).toBe('wrong_state');
+    }
     expect(await conceptApprovals(d.engagementId)).toEqual([]);
   });
 });
@@ -485,7 +502,7 @@ describe('the choice caps what the client sends, like the comment function (S2)'
     const option = await seedArtifact(d, 'concept_option');
     const [result] = await raw.query<{ code: string }>(
       `select public.app_delivery_choose_concept_by_token(
-         '${d.hash}', '${option}'::uuid, null,
+         '${d.hash}', '${option}'::uuid, 1, null,
          '   ${'n'.repeat(300)}', '${'i'.repeat(100)}', '${'u'.repeat(900)}'
        ) as code`,
     );
@@ -501,7 +518,7 @@ describe('the choice caps what the client sends, like the comment function (S2)'
     const blankOption = await seedArtifact(blank, 'concept_option');
     await raw.query(
       `select public.app_delivery_choose_concept_by_token(
-         '${blank.hash}', '${blankOption}'::uuid, null, '   ', '', '') as code`,
+         '${blank.hash}', '${blankOption}'::uuid, 1, null, '   ', '', '') as code`,
     );
     const [empty] = await raw.query<{ name: string | null; ip: string | null; agent: string | null }>(
       `select actor_name as name, actor_ip as ip, actor_user_agent as agent
@@ -555,7 +572,7 @@ describe('a retracted client decision answers nothing, as liveEvents() in TS (L1
     const d = await seedRoundBDelivery(orgIds, 'retract-concept');
     await forceState(d.engagementId, 'concept_review');
     const option = await seedArtifact(d, 'concept_option');
-    expect(await chooseConcept(d.hash, option)).toBe('ok');
+    expect(await chooseConcept(d.hash, option, 1)).toBe('ok');
     await retract(d.orgId, d.engagementId, await latestClientEventId(d.engagementId, 'concept_approval'));
 
     const snapshot = await snapshotOf(d.hash);
@@ -563,7 +580,7 @@ describe('a retracted client decision answers nothing, as liveEvents() in TS (L1
     expect(snapshot!.concept_choice_position).toBeNull();
     expect(snapshot!.client_actions).toEqual(['request_concept_changes']);
     // The approval slot is still taken by the retracted row: both writes agree.
-    expect(await chooseConcept(d.hash, option)).toBe('already');
+    expect(await chooseConcept(d.hash, option, 1)).toBe('already');
     expect(await recordDeliveryActionByToken(d.token, { action: 'approve_concept' })).toEqual({
       ok: true,
       code: 'already',
@@ -610,15 +627,18 @@ describe('0056 constraints exist and bite (AC 33, 35)', () => {
     const option = await seedArtifact(d, 'concept_option');
     const failure = await raw
       .query(
-        `insert into public.engagement_events (org_id, engagement_id, kind, chosen_artifact_id)
-         values ('${d.orgId}', '${d.engagementId}', 'design_approval', '${option}')`,
+        `insert into public.engagement_events
+           (org_id, engagement_id, kind, chosen_artifact_id, chosen_position)
+         values ('${d.orgId}', '${d.engagementId}', 'design_approval', '${option}', 1)`,
       )
       .catch((error: unknown) => error);
     expect(sqlstateOf(failure)).toBe('23514');
-    // The same pointer on a concept approval is accepted (staff channel here).
+    // The same pointer on a concept approval is accepted (staff channel here),
+    // with the letter 0057 pairs it with.
     await raw.query(
-      `insert into public.engagement_events (org_id, engagement_id, kind, chosen_artifact_id)
-       values ('${d.orgId}', '${d.engagementId}', 'concept_approval', '${option}')`,
+      `insert into public.engagement_events
+         (org_id, engagement_id, kind, chosen_artifact_id, chosen_position)
+       values ('${d.orgId}', '${d.engagementId}', 'concept_approval', '${option}', 1)`,
     );
   });
 
@@ -628,8 +648,9 @@ describe('0056 constraints exist and bite (AC 33, 35)', () => {
     const foreignOption = await seedArtifact(other, 'concept_option');
     const failure = await raw
       .query(
-        `insert into public.engagement_events (org_id, engagement_id, kind, chosen_artifact_id)
-         values ('${d.orgId}', '${d.engagementId}', 'concept_approval', '${foreignOption}')`,
+        `insert into public.engagement_events
+           (org_id, engagement_id, kind, chosen_artifact_id, chosen_position)
+         values ('${d.orgId}', '${d.engagementId}', 'concept_approval', '${foreignOption}', 1)`,
       )
       .catch((error: unknown) => error);
     expect(sqlstateOf(failure)).toBe('23503');
@@ -747,9 +768,19 @@ describe('the functions the deployed app calls kept their signatures', () => {
       args: 'p_hash text, p_document_id uuid, p_body text, p_name text, p_ip text, p_ua text',
       result: 'text',
     },
+    // 0057 dropped the 6-argument version (no deployed caller) and created this
+    // one: the letter the client saw is the third argument.
     app_delivery_choose_concept_by_token: {
-      args: 'p_hash text, p_artifact_id uuid, p_note text, p_name text, p_ip text, p_ua text',
+      args: 'p_hash text, p_artifact_id uuid, p_position integer, p_note text, p_name text, p_ip text, p_ua text',
       result: 'text',
+    },
+    app_delivery_act_notified_by_token: {
+      args: 'p_hash text, p_body_key text, p_milestone_kind text',
+      result: 'boolean',
+    },
+    app_concept_option_positions: {
+      args: 'p_engagement_id uuid',
+      result: 'TABLE(artifact_id uuid, option_position integer)',
     },
     app_delivery_notify_studio_by_token: {
       args: 'p_hash text, p_body_key text, p_params jsonb, p_roles jsonb',
@@ -777,7 +808,7 @@ describe('the functions the deployed app calls kept their signatures', () => {
     }
   });
 
-  it('runs both new functions as SECURITY DEFINER with an empty search_path, metra_app only', async () => {
+  it('runs the token functions as SECURITY DEFINER with an empty search_path, metra_app only', async () => {
     const rows = await raw.query<{
       name: string;
       definer: boolean;
@@ -793,10 +824,11 @@ describe('the functions the deployed app calls kept their signatures', () => {
          from pg_proc p join pg_namespace n on n.oid = p.pronamespace
         where n.nspname = 'public'
           and p.proname in ('app_delivery_choose_concept_by_token',
-                            'app_delivery_notify_studio_by_token')
+                            'app_delivery_notify_studio_by_token',
+                            'app_delivery_act_notified_by_token')
         order by p.proname`,
     );
-    expect(rows).toHaveLength(2);
+    expect(rows).toHaveLength(3);
     for (const row of rows) {
       expect(row.definer).toBe(true);
       expect(row.config).toEqual(['search_path=""']);
@@ -805,13 +837,37 @@ describe('the functions the deployed app calls kept their signatures', () => {
     }
   });
 
-  it('neither new function, nor the read snapshot, mentions a pricing column', async () => {
+  it('the lettering rule is INVOKER (RLS-scoped from the studio), granted to metra_app only', async () => {
+    const [row] = await raw.query<{
+      definer: boolean;
+      config: string[] | null;
+      app_can_execute: boolean;
+      public_grants: number;
+    }>(
+      `select p.prosecdef as definer, p.proconfig as config,
+              has_function_privilege('metra_app', p.oid, 'execute') as app_can_execute,
+              (select count(*)::int
+                 from aclexplode(coalesce(p.proacl, acldefault('f', p.proowner))) acl
+                where acl.grantee = 0) as public_grants
+         from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+        where n.nspname = 'public' and p.proname = 'app_concept_option_positions'`,
+    );
+    expect(row).toEqual({
+      definer: false,
+      config: ['search_path=""'],
+      app_can_execute: true,
+      public_grants: 0,
+    });
+  });
+
+  it('no new function, nor the read snapshot, mentions a pricing column', async () => {
     const rows = await raw.query<{ proname: string; prosrc: string }>(
       `select proname, prosrc from pg_proc
         where proname in ('app_delivery_by_token', 'app_delivery_choose_concept_by_token',
-                          'app_delivery_notify_studio_by_token')`,
+                          'app_delivery_notify_studio_by_token',
+                          'app_delivery_act_notified_by_token', 'app_concept_option_positions')`,
     );
-    expect(rows).toHaveLength(3);
+    expect(rows).toHaveLength(5);
     const FORBIDDEN = /unit_cost|line_cost|total_cost|margin|supervision|build_cost/;
     for (const row of rows) expect(FORBIDDEN.test(row.prosrc)).toBe(false);
   });

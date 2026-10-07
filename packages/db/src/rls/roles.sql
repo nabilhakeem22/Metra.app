@@ -329,10 +329,20 @@ revoke execute on function public.app_delivery_comment_by_token(text, uuid, text
 -- already applies the same revokes and grant right after each CREATE, in the
 -- same transaction, so there is no window while apply-rls runs; they are
 -- repeated here so this file stays the complete privilege model.
-grant execute on function public.app_delivery_choose_concept_by_token(text, uuid, text, text, text, text) to metra_app;
-revoke execute on function public.app_delivery_choose_concept_by_token(text, uuid, text, text, text, text) from public;
+grant execute on function public.app_delivery_choose_concept_by_token(text, uuid, integer, text, text, text, text) to metra_app;
+revoke execute on function public.app_delivery_choose_concept_by_token(text, uuid, integer, text, text, text, text) from public;
 grant execute on function public.app_delivery_notify_studio_by_token(text, text, jsonb, jsonb) to metra_app;
 revoke execute on function public.app_delivery_notify_studio_by_token(text, text, jsonb, jsonb) from public;
+-- Round B (0057): the lost-notification predicate and the concept lettering
+-- rule. The predicate is token-resolved like the rest; the lettering rule takes
+-- a bare engagement id and is INVOKER, so through metra_app it is org-scoped by
+-- RLS, but an API role must not be able to call it at all. Both are also locked
+-- down in place, right after their CREATE (40-delivery-read.sql,
+-- 50-delivery-write.sql).
+grant execute on function public.app_delivery_act_notified_by_token(text, text, text) to metra_app;
+revoke execute on function public.app_delivery_act_notified_by_token(text, text, text) from public;
+grant execute on function public.app_concept_option_positions(uuid) to metra_app;
+revoke execute on function public.app_concept_option_positions(uuid) from public;
 -- Client Deliverables Step 3 — the payment-settled test and the document-access
 -- rule the portal list and the download route both read. Not token-resolved (their
 -- callers have already proven the token), so they are locked down here for the same
@@ -443,11 +453,19 @@ begin
         r
       );
       execute format(
-        'revoke execute on function public.app_delivery_choose_concept_by_token(text, uuid, text, text, text, text) from %I',
+        'revoke execute on function public.app_delivery_choose_concept_by_token(text, uuid, integer, text, text, text, text) from %I',
         r
       );
       execute format(
         'revoke execute on function public.app_delivery_notify_studio_by_token(text, text, jsonb, jsonb) from %I',
+        r
+      );
+      execute format(
+        'revoke execute on function public.app_delivery_act_notified_by_token(text, text, text) from %I',
+        r
+      );
+      execute format(
+        'revoke execute on function public.app_concept_option_positions(uuid) from %I',
         r
       );
       execute format(

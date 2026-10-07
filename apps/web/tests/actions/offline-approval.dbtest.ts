@@ -250,7 +250,7 @@ describe('Client approved offline at final_approval', () => {
     expect(await approvalRows(engagementId, 'design_approval')).toHaveLength(0);
   });
 
-  it('an unknown channel, or an option choice before the picker exists, is invalid', async () => {
+  it('an unknown channel, or an option named on a DESIGN approval, is invalid', async () => {
     const { ctx, engagementId } = await seedFinalApproval();
     await recordPaymentCore(ctx, { engagementId, kind: 'gate_b', amount: '20000' });
     for (const approval of [
@@ -298,5 +298,86 @@ describe('Client approved offline at concept_review', () => {
     await advance(engineer, engagementId, 'selectConcept');
     const [row] = await approvalRows(engagementId, 'concept_approval');
     expect(row).toMatchObject({ actor_channel: 'staff', evidence: null, occurred_on: null });
+  });
+});
+
+/** Give an artifact a stored file and release it to the client (BYPASSRLS). */
+async function releaseWithFile(orgId: string, engagementId: string, artifactId: string): Promise<void> {
+  const [file] = await raw.query<{ id: string }>(
+    `insert into public.files (org_id, entity, entity_id, bucket, object_key, original_name)
+     values ('${orgId}', 'engagement', '${engagementId}', 'metra-files',
+             '${orgId}/engagement/' || gen_random_uuid(), 'Option.png')
+     returning id`,
+  );
+  await raw.query(
+    `update public.engagement_artifacts set file_id = '${file.id}', client_visible = true
+      where id = '${artifactId}'`,
+  );
+}
+
+/** The concept options of a delivery, oldest first. */
+async function conceptOptionIds(engagementId: string): Promise<string[]> {
+  const rows = await raw.query<{ id: string }>(
+    `select id from public.engagement_artifacts
+      where engagement_id = '${engagementId}' and kind = 'concept_option'
+      order by attested_at, id`,
+  );
+  return rows.map((row) => row.id);
+}
+
+async function chosenOn(engagementId: string) {
+  return raw.query<{ actor_channel: string; chosen_artifact_id: string | null; chosen_position: number | null }>(
+    `select actor_channel, chosen_artifact_id, chosen_position from public.engagement_events
+      where engagement_id = '${engagementId}' and kind = 'concept_approval'`,
+  );
+}
+
+describe('an offline concept choice names a RELEASED option only (B12, owner Q1)', () => {
+  it('records the option and the letter the client sees for it', async () => {
+    const { ctx, engagementId } = await seedConceptReview();
+    await recordPaymentCore(ctx, { engagementId, kind: 'gate_a', amount: '20000' });
+    const [first, second] = await conceptOptionIds(engagementId);
+    await releaseWithFile(ctx.orgId, engagementId, first);
+    await releaseWithFile(ctx.orgId, engagementId, second);
+
+    const res = await recordOfflineApprovalCore(ctx, {
+      engagementId,
+      trigger: 'selectConcept',
+      approval: { channel: 'phone', chosenArtifactId: second },
+    });
+    expect(res.ok).toBe(true);
+    expect(await stateOf(engagementId)).toBe('negotiation');
+    expect(await chosenOn(engagementId)).toEqual([
+      { actor_channel: 'staff', chosen_artifact_id: second, chosen_position: 2 },
+    ]);
+  });
+
+  it('a hidden, foreign or non-concept id is concept_option_not_found and nothing moves', async () => {
+    const { ctx, engagementId } = await seedConceptReview();
+    await recordPaymentCore(ctx, { engagementId, kind: 'gate_a', amount: '20000' });
+    const [first, second] = await conceptOptionIds(engagementId);
+    await releaseWithFile(ctx.orgId, engagementId, first);
+    // `second` has no file and is not released: it has no letter.
+    const survey = await raw.query<{ id: string }>(
+      `select id from public.engagement_artifacts
+        where engagement_id = '${engagementId}' and kind = 'survey'`,
+    );
+    await releaseWithFile(ctx.orgId, engagementId, survey[0].id);
+    const other = await seedConceptReview();
+    const [foreign] = await conceptOptionIds(other.engagementId);
+    await releaseWithFile(other.ctx.orgId, other.engagementId, foreign);
+
+    for (const chosenArtifactId of [second, survey[0].id, foreign, '11111111-1111-4111-8111-111111111111']) {
+      expect(
+        await recordOfflineApprovalCore(ctx, {
+          engagementId,
+          trigger: 'selectConcept',
+          approval: { channel: 'phone', chosenArtifactId },
+        }),
+      ).toEqual({ ok: false, error: 'concept_option_not_found' });
+    }
+    expect(await stateOf(engagementId)).toBe('concept_review');
+    expect(await chosenOn(engagementId)).toEqual([]);
+    expect(await transitionCount(engagementId, 'selectConcept')).toBe(0);
   });
 });
