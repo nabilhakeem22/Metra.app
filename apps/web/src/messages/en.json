@@ -2149,7 +2149,14 @@
       "lastChange": "Last change",
       "older": "Older deliveries",
       "newest": "Newest deliveries",
-      "pages": "Delivery pages"
+      "pages": "Delivery pages",
+      "filter": {
+        "label": "Show deliveries",
+        "all": "All",
+        "mine": "My move"
+      },
+      "mineEmpty": "Nothing is waiting on you.",
+      "truncated": "Showing the {count} newest open deliveries only."
     },
     "age": {
       "today": "today",

@@ -3,7 +3,7 @@ import { notFound } from 'next/navigation';
 import { PageHeader } from '@/components/ui/page-header';
 import { requireOrg } from '@/lib/auth/require-org';
 import { getClientOptions } from '@/lib/clients/queries';
-import { listEngagements } from '@/lib/engagements/queries';
+import { listEngagements, MY_MOVE_SCAN_LIMIT } from '@/lib/engagements/queries';
 import { can } from '@/lib/permissions/can';
 import { listProjects } from '@/lib/projects/queries';
 import { EngagementsClient } from './engagements-client';
@@ -11,11 +11,13 @@ import { EngagementsClient } from './engagements-client';
 export default async function EngagementsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ new?: string; before?: string }>;
+  searchParams: Promise<{ new?: string; before?: string; move?: string }>;
 }) {
-  const { new: openCreate, before } = await searchParams;
-  // The keyset cursor of an older page; anything else reads the newest page.
-  const beforeNumber = before && /^\d+$/.test(before) ? Number(before) : undefined;
+  const { new: openCreate, before, move } = await searchParams;
+  // "My move" is one page of its own; otherwise the keyset cursor of an older
+  // page, and anything else reads the newest page.
+  const mine = move === 'mine';
+  const beforeNumber = !mine && before && /^\d+$/.test(before) ? Number(before) : undefined;
   const ctx = await requireOrg();
   // Gate the read on the engagements_design read capability in the CALLER (RLS is
   // the second factor) — consistent with the other internal list pages.
@@ -23,7 +25,7 @@ export default async function EngagementsPage({
 
   const t = await getTranslations('engagements');
   const [page, clientOptions, projects] = await Promise.all([
-    listEngagements(ctx, { before: beforeNumber }),
+    listEngagements(ctx, mine ? { move: 'mine' } : { before: beforeNumber }),
     getClientOptions(ctx),
     listProjects(ctx, { active: true }),
   ]);
@@ -41,6 +43,7 @@ export default async function EngagementsPage({
       <EngagementsClient
         items={page.rows}
         paging={{ nextBefore: page.nextBefore, isFirstPage: beforeNumber === undefined }}
+        view={{ mine, truncatedAt: page.truncated ? MY_MOVE_SCAN_LIMIT : null }}
         clientOptions={clientOptions}
         projectOptions={projectOptions}
         canCreate={canCreate}
