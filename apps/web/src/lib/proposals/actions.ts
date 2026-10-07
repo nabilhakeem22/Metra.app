@@ -52,6 +52,18 @@ export async function saveProposalDraft(
   return { ok: res.ok, error: res.error };
 }
 
+/**
+ * The builder's AUTOSAVE: the same save, WITHOUT `refreshApp()`. The builder's own
+ * state is the truth while it is open, so a pause in typing must not re-render
+ * the page from the server. The explicit saves (Send, Send as BOQ, Back) still go
+ * through `saveProposalDraft`, which refreshes once.
+ */
+export async function autosaveProposalDraft(input: SaveDraftInput): Promise<ActionResult> {
+  const ctx = await requireOrg();
+  const res = await saveProposalDraftCore(ctx, input);
+  return { ok: res.ok, error: res.error };
+}
+
 export async function sendProposal(id: string): Promise<
   ActionResult & {
     link?: string;

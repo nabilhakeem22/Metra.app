@@ -17,6 +17,7 @@ import type { ProposalDraftState } from './proposal-payload';
 import type { SectionOption } from './section-combobox';
 import { SendAsBoqButton } from './send-as-boq-button';
 import { useBoqModeActions, type BoqModeProps } from './use-boq-mode-actions';
+import { useDraftAutosave } from './use-draft-autosave';
 import { useProposalDraft } from './use-proposal-draft';
 
 export type { BoqModeProps };
@@ -28,10 +29,10 @@ export type { BoqModeProps };
 // (boq-mode-bar, send-as-boq-button) replace the quote's Delete, Send and share
 // link.
 //
-// ONE BUSY FLAG. While anything is in flight (a save, Back, Send as BOQ) the
-// whole builder sits inside a disabled <fieldset>: every editor, Save, Preview,
-// Back and Send. An edit typed during a send would land AFTER the snapshot the
-// BOQ was cut from.
+// The draft SAVES ITSELF (use-draft-autosave.ts); Send, Send as BOQ and Back
+// flush it first. ONE BUSY FLAG: while an action is in flight the whole builder
+// sits inside a disabled <fieldset> (an edit typed during a send would land AFTER
+// the snapshot the BOQ was cut from). The autosave itself never disables typing.
 export function ProposalBuilder({
   detail,
   boqMode,
@@ -62,11 +63,18 @@ export function ProposalBuilder({
     sections: draft.sections,
     seeMargin,
   });
-  const actions = useBuilderActions({ proposalId: detail.id, confirm, draftState });
+  // Read when an action RUNS, once `autosave` exists. Sent quote: autosave stops.
+  const flush = () => autosave.flush();
+  const actions = useBuilderActions({ proposalId: detail.id, confirm, flush });
+  const autosave = useDraftAutosave({
+    draft: draftState(),
+    enabled: detail.status === 'draft' && actions.link === null,
+  });
   const boq = useBoqModeActions({
     proposalId: detail.id,
     boqMode,
     draftState,
+    flush,
     totalBeforeVat: () => draft.totals.doc.total,
     confirm,
   });
@@ -82,6 +90,26 @@ export function ProposalBuilder({
         )}
 
         {!boqMode && actions.link && <BuilderShareLink t={t} link={actions.link} />}
+
+        <BuilderToolbar
+          mode={boqMode ? 'boq' : 'quote'}
+          proposalId={detail.id}
+          seeMargin={seeMargin}
+          canSend={canSend}
+          busy={busy}
+          autosave={autosave}
+          onDelete={actions.onDelete}
+          onSend={actions.onSend}
+        >
+          {boqMode?.canSend && (
+            <SendAsBoqButton
+              onSend={() => void boq.send()}
+              pending={boq.sendPending}
+              disabled={busy}
+              lineCount={countSendable(draft.sections).lineCount}
+            />
+          )}
+        </BuilderToolbar>
 
         {draft.sections.map((section, sectionIndex) => (
           <BuilderSectionCard
@@ -119,27 +147,6 @@ export function ProposalBuilder({
           doc={draft.totals.doc}
           seeMargin={seeMargin}
         />
-
-        <BuilderToolbar
-          mode={boqMode ? 'boq' : 'quote'}
-          proposalId={detail.id}
-          seeMargin={seeMargin}
-          canSend={canSend}
-          pending={actions.pending}
-          busy={busy}
-          onDelete={actions.onDelete}
-          onSave={actions.save}
-          onSend={actions.onSend}
-        >
-          {boqMode?.canSend && (
-            <SendAsBoqButton
-              onSend={() => void boq.send()}
-              pending={boq.sendPending}
-              disabled={busy}
-              lineCount={countSendable(draft.sections).lineCount}
-            />
-          )}
-        </BuilderToolbar>
       </fieldset>
     </div>
   );

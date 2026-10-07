@@ -16,6 +16,8 @@ import type { CostItemResolved } from './draft-save-cost-items';
 import type { LineInput } from './types';
 
 export interface ResolvedLine {
+  /** The STORED id, kept through the rebuild so the next save finds it (F1). */
+  id?: string;
   costItemId: string | null;
   descriptionAr: string | null;
   descriptionEn: string | null;
@@ -56,6 +58,12 @@ function resolveLineIdentity(
   };
 }
 
+/** The line's id when it names one of this proposal's stored lines, else null. */
+function storedLineId(line: LineInput, costSnapshot: Map<string, string>): string | null {
+  const lineId = line.id?.trim() || null;
+  return lineId && costSnapshot.has(lineId) ? lineId : null;
+}
+
 /**
  * F1 cost resolution BY STABLE IDENTITY.
  *
@@ -70,7 +78,7 @@ function resolveLineCost(
   costSnapshot: Map<string, string>,
   seeMargin: boolean,
 ): string | null {
-  const lineId = line.id?.trim() || null;
+  const lineId = storedLineId(line, costSnapshot);
   const storedCost = lineId ? costSnapshot.get(lineId) : undefined;
   if (storedCost !== undefined) {
     return seeMargin ? (line.unitCost ?? storedCost) : storedCost;
@@ -130,6 +138,7 @@ export function resolveDraftLine(
   return {
     totals,
     line: {
+      id: storedLineId(line, costSnapshot) ?? undefined,
       costItemId: identity.costItemId,
       descriptionAr: identity.descriptionAr,
       descriptionEn: identity.descriptionEn,

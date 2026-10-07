@@ -1293,8 +1293,15 @@
       "unitPrice": "Unit price",
       "discount": "Disc %",
       "removeLine": "Remove line",
-      "save": "Save draft",
       "send": "Send",
+      "autosave": {
+        "saved": "Saved",
+        "savedAt": "Saved {time}",
+        "saving": "Saving",
+        "dirty": "Unsaved changes",
+        "failed": "Not saved: {reason}",
+        "retry": "Retry"
+      },
       "delete": "Delete draft",
       "sectionSubtotal": "Section subtotal",
       "subtotal": "Subtotal",
@@ -1334,7 +1341,6 @@
     },
     "toast": {
       "created": "Proposal created",
-      "saved": "Draft saved",
       "sent": "Proposal sent",
       "expired": "Proposal marked expired",
       "superseded": "Version 2 created",

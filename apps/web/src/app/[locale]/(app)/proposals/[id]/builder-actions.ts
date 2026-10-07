@@ -7,8 +7,7 @@ import { useRouter } from '@/i18n/routing';
 import { resolveActionError } from '@/lib/actions/error-message';
 import type { ActionCode } from '@/lib/actions/result';
 import { deleteDraftProposal, sendProposal } from '@/lib/proposals/actions';
-import { persistDraft } from './persist-draft';
-import type { ProposalDraftState } from './proposal-payload';
+import type { SaveDraftResult } from './persist-draft';
 
 // EVERY server write the proposal builder makes, and every toast it raises.
 
@@ -16,7 +15,6 @@ export interface BuilderActionsApi {
   pending: boolean;
   /** The share link, once the proposal has been sent. Null until then. */
   link: string | null;
-  save: () => void;
   onSend: () => void;
   onDelete: () => Promise<void>;
 }
@@ -30,7 +28,8 @@ type ConfirmFn = (options: {
 }) => Promise<boolean>;
 
 export function useBuilderActions(options: {
-  draftState: () => ProposalDraftState;
+  /** Store the latest edits (the autosave's flush); answers like a save. */
+  flush: () => Promise<SaveDraftResult>;
   proposalId: string;
   confirm: ConfirmFn;
 }): BuilderActionsApi {
@@ -43,19 +42,11 @@ export function useBuilderActions(options: {
   const refuse = (code: ActionCode | undefined) =>
     toast({ title: resolveActionError(code, te), variant: 'destructive' });
 
-  function save(): void {
-    startTransition(async () => {
-      const result = await persistDraft(options.draftState());
-      if (result.ok) toast({ title: t('toast.saved') });
-      else refuse(result.error as ActionCode);
-    });
-  }
-
   /** SAVE THEN SEND, in one transition: sending a draft that was never saved
    *  would mail the client the version before the studio's last edit. */
   function onSend(): void {
     startTransition(async () => {
-      const saved = await persistDraft(options.draftState());
+      const saved = await options.flush();
       if (!saved.ok) {
         refuse(saved.error as ActionCode);
         return;
@@ -90,5 +81,5 @@ export function useBuilderActions(options: {
     });
   }
 
-  return { pending, link, save, onSend, onDelete };
+  return { pending, link, onSend, onDelete };
 }

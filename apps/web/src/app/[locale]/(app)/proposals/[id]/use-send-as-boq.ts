@@ -11,7 +11,7 @@ import { sendProposalAsBoq } from '@/lib/boq-proposals/actions';
 import { countSendable } from '@/lib/boq-proposals/count';
 import { formatMoney } from '@/lib/format/money';
 import { formatNumber } from '@/lib/format/number';
-import { persistDraft } from './persist-draft';
+import type { SaveDraftResult } from './persist-draft';
 import { buildProposalPayload, type ProposalDraftState } from './proposal-payload';
 
 /** Left-to-right isolate, so a money figure reads the same inside Arabic text. */
@@ -42,6 +42,8 @@ export function useSendAsBoq(options: {
   engagementId: string;
   clientCanOpenNow: boolean;
   draftState: () => ProposalDraftState;
+  /** Store the latest edits (the autosave's flush); answers like a save. */
+  flush: () => Promise<SaveDraftResult>;
   totalBeforeVat: () => string;
   confirm: (options: ConfirmOptions) => Promise<boolean>;
 }): { send: () => Promise<void>; pending: boolean } {
@@ -105,7 +107,7 @@ export function useSendAsBoq(options: {
       // A save that fails or throws keeps the studio on its draft: nothing was
       // sent, and leaving would drop edits that may not be stored.
       try {
-        const saved = await persistDraft(options.draftState());
+        const saved = await options.flush();
         if (!saved.ok) {
           refuse(saved.error);
           return;

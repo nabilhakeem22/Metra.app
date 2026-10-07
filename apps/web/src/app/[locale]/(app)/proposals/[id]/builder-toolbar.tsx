@@ -1,26 +1,29 @@
 'use client';
 
-import { Loader2, Send, Trash2 } from 'lucide-react';
+import { Send, Trash2 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import type { ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
 import { OverflowMenu } from '@/components/ui/overflow-menu';
+import { BuilderSaveStatus } from './builder-save-status';
 import { PreviewModal } from './preview-modal';
+import type { DraftAutosaveApi } from './use-draft-autosave';
 
 /**
- * `mode: 'boq'` is the delivery's BOQ working copy: no Delete, no quote Send, no
- * PDF downloads in the preview (the BOQ PDF is produced when it is sent), and
- * the BOQ's own action arrives as `children`.
+ * The builder's actions, held at the top of the column while it scrolls, with
+ * where the autosave stands at its start. `mode: 'boq'` is the
+ * delivery's BOQ working copy: no Delete, no quote Send, no PDF downloads in the
+ * preview (the BOQ PDF is produced when it is sent), and the BOQ's own action
+ * arrives as `children`.
  */
 export function BuilderToolbar({
   mode,
   proposalId,
   seeMargin,
   canSend,
-  pending,
   busy,
+  autosave,
   onDelete,
-  onSave,
   onSend,
   children,
 }: {
@@ -28,12 +31,10 @@ export function BuilderToolbar({
   proposalId: string;
   seeMargin: boolean;
   canSend: boolean;
-  /** THIS toolbar's own save/send/delete is in flight (drives the spinner). */
-  pending: boolean;
   /** Anything in the builder is in flight: every control here is disabled. */
   busy: boolean;
+  autosave: DraftAutosaveApi;
   onDelete: () => void;
-  onSave: () => void;
   onSend: () => void;
   children?: ReactNode;
 }) {
@@ -42,11 +43,10 @@ export function BuilderToolbar({
   const quote = mode === 'quote';
 
   return (
-    <div className="flex flex-wrap justify-end gap-2">
-      <Button variant="secondary" onClick={onSave} disabled={busy}>
-        {pending && <Loader2 className="size-4 animate-spin" aria-hidden />}
-        {t('builder.save')}
-      </Button>
+    <div className="sticky top-0 z-10 flex flex-wrap items-center justify-end gap-2 rounded-panel border border-[color:var(--rule)] bg-card px-3 py-2 shadow-sm">
+      <div className="me-auto">
+        <BuilderSaveStatus autosave={autosave} />
+      </div>
       <PreviewModal
         proposalId={proposalId}
         canSeeInternal={seeMargin}

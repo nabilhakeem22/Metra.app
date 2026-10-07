@@ -23,8 +23,12 @@ vi.mock('@/i18n/routing', async (importOriginal) => ({
 // Every server action the builder reaches: replaced, so no server stack loads.
 const boqActions = vi.hoisted(() => ({ sendProposalAsBoq: vi.fn() }));
 vi.mock('@/lib/boq-proposals/actions', () => boqActions);
+const proposalActions = vi.hoisted(() => ({
+  saveProposalDraft: vi.fn(),
+  autosaveProposalDraft: vi.fn(),
+}));
 vi.mock('@/lib/proposals/actions', () => ({
-  saveProposalDraft: vi.fn().mockResolvedValue({ ok: true }),
+  ...proposalActions,
   deleteDraftProposal: vi.fn(),
   sendProposal: vi.fn(),
   getProposalPreviewHtml: vi.fn(),
@@ -84,10 +88,12 @@ function renderBoqBuilder() {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  proposalActions.saveProposalDraft.mockResolvedValue({ ok: true });
+  proposalActions.autosaveProposalDraft.mockResolvedValue({ ok: true });
 });
 
 describe('the builder while Send as BOQ is in flight (R3)', () => {
-  it('disables every editor, Save, Preview, Back and Send until the send settles', async () => {
+  it('disables every editor, Preview, Back and Send until the send settles', async () => {
     let finishSend: (value: unknown) => void = () => {};
     boqActions.sendProposalAsBoq.mockReturnValue(
       new Promise((resolve) => {
@@ -115,7 +121,6 @@ describe('the builder while Send as BOQ is in flight (R3)', () => {
     expect(fieldset?.querySelectorAll('input').length).toBeGreaterThan(3);
     // And the named controls carry their own disabled state too.
     for (const name of [
-      en('proposals.builder.save'),
       en('proposals.preview.open'),
       en('proposals.boqMode.back'),
       en('proposals.boqMode.send'),
@@ -125,7 +130,35 @@ describe('the builder while Send as BOQ is in flight (R3)', () => {
 
     finishSend({ ok: true, data: { documentNumber: 'BQ-2026-0014' } });
     await waitFor(() =>
-      expect(screen.getByRole('button', { name: en('proposals.builder.save') }).matches(':disabled')).toBe(false),
+      expect(screen.getByRole('button', { name: en('proposals.preview.open') }).matches(':disabled')).toBe(false),
     );
+  });
+});
+
+describe('the builder saves itself (B6)', () => {
+  it('has no Save button and says where the draft stands', () => {
+    renderBoqBuilder();
+    expect(screen.queryByRole('button', { name: /save/i })).toBeNull();
+    expect(screen.getByRole('status').textContent).toBe(en('proposals.builder.autosave.saved'));
+  });
+
+  it('Send as BOQ stores the latest edit first, through the refreshing save, then sends', async () => {
+    boqActions.sendProposalAsBoq.mockResolvedValue({ ok: true, data: { documentNumber: 'BQ-2026-0014' } });
+    const { container } = renderBoqBuilder();
+    const qty = container.querySelector('input[value="10"]') as HTMLInputElement;
+    fireEvent.change(qty, { target: { value: '12' } });
+    expect(screen.getByRole('status').textContent).toBe(en('proposals.builder.autosave.dirty'));
+
+    fireEvent.click(screen.getByRole('button', { name: en('proposals.boqMode.send') }));
+    const dialog = await screen.findByRole('alertdialog');
+    fireEvent.click(within(dialog).getByRole('button', { name: en('proposals.boqMode.confirm') }));
+
+    await waitFor(() => expect(boqActions.sendProposalAsBoq).toHaveBeenCalledWith('p-1'));
+    expect(proposalActions.saveProposalDraft).toHaveBeenCalledTimes(1);
+    expect(proposalActions.saveProposalDraft.mock.calls[0][0].sections[0].lines[0].qty).toBe('12');
+    expect(proposalActions.saveProposalDraft.mock.invocationCallOrder[0]).toBeLessThan(
+      boqActions.sendProposalAsBoq.mock.invocationCallOrder[0],
+    );
+    expect(proposalActions.autosaveProposalDraft).not.toHaveBeenCalled();
   });
 });
