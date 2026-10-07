@@ -79,6 +79,8 @@ export function useDeliverableUpload(engagementId: string): {
       signal: leaving.current.signal,
       resume: queued.resume,
     });
+    // The page has gone: nothing left to tell, and no row to update.
+    if (!outcome.ok && outcome.reason === 'aborted') return false;
     queued.resume = outcome.ok ? undefined : outcome.resume;
     setItem(key, settledPatch(outcome, messageOf(outcome)));
     return outcome.ok;
