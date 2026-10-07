@@ -1431,13 +1431,23 @@
       "followup_reminder": "تنبيه متابعة",
       "expire_nudge": "عرض سعر هينتهي قريب",
       "portfolio_digest": "ملخص محفظة الأعمال",
-      "stage_reminder": "تنبيه المرحلة"
+      "stage_reminder": "تنبيه المرحلة",
+      "client_responded": "العميل رد"
     },
     "body": {
       "proposal_expiring": "عرض السعر {number} هينتهي في {date}.",
       "proposal_followup": "عرض السعر {number} مستني رد بقاله {days} يوم.",
       "portfolio_digest": "{active} مشاريع شغالة، {awaiting} مستنية الرد، {expiring} هتنتهي قريب، {overdue} مراحل متأخرة.",
-      "stage_reminder": "{overdue} مراحل متأخرة و{upcoming} جايين."
+      "stage_reminder": "{overdue} مراحل متأخرة و{upcoming} جايين.",
+      "client_concept_approved": "العميل وافق على الفكرة في {delivery}.",
+      "client_concept_chosen": "العميل اختار بديل للفكرة في {delivery}.",
+      "client_concept_changes_requested": "العميل طلب تعديلات على الفكرة في {delivery}.",
+      "client_design_approved": "العميل وافق على التصميم في {delivery}.",
+      "client_design_changes_requested": "العميل طلب تعديلات على التصميم في {delivery}.",
+      "client_budget_acknowledged": "العميل أكد نطاق الميزانية في {delivery}.",
+      "client_handover_acknowledged": "العميل أكد استلام التسليم في {delivery}.",
+      "client_payment_claimed": "{hasMilestone, select, yes {العميل بيقول إنه دفع ({milestone}) في {delivery}. أكدها من صفحة التسليم.} other {العميل بيقول إنه دفع دفعة في {delivery}. أكدها من صفحة التسليم.}}",
+      "client_commented": "{commentCount, plural, zero {العميل كتب تعليقات على {delivery}.} one {العميل كتب تعليق على {delivery}.} two {العميل كتب تعليقين على {delivery}.} few {العميل كتب {count} تعليقات على {delivery}.} many {العميل كتب {count} تعليق على {delivery}.} other {العميل كتب {count} تعليق على {delivery}.}}"
     },
     "viewAll": "عرض الكل"
   },

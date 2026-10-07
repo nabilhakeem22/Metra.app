@@ -18,11 +18,12 @@ const item = (over: Partial<FeedItem> = {}): FeedItem => ({
 });
 
 /** Echoes the key and its values, so a test can see exactly what was passed. */
-const translate = (key: string, values?: Record<string, string>) =>
+const translate = (key: string, values?: Record<string, string | number>) =>
   `${key}(${Object.entries(values ?? {})
     .map(([k, v]) => `${k}=${v}`)
     .join(',')})`;
 const formatDate = (iso: string) => `D:${iso}`;
+const noMilestone = () => null;
 
 describe('notificationHref', () => {
   it('points at the entity it is about', () => {
@@ -31,6 +32,9 @@ describe('notificationHref', () => {
     );
     expect(notificationHref(item({ entityType: 'project', entityId: 'x9' }))).toBe(
       '/projects/x9',
+    );
+    expect(notificationHref(item({ entityType: 'engagement', entityId: 'e7' }))).toBe(
+      '/engagements/e7',
     );
   });
 
@@ -53,6 +57,8 @@ describe('notificationBody', () => {
       item({ bodyKey: 'proposal_followup', params: { number: 12, days: 3 } }),
       translate,
       formatDate,
+      'en',
+      noMilestone,
     );
     expect(out).toBe('proposal_followup(number=12,days=3)');
   });
@@ -62,6 +68,8 @@ describe('notificationBody', () => {
       item({ params: { number: 7, expiryDate: '2026-10-01' } }),
       translate,
       formatDate,
+      'en',
+      noMilestone,
     );
     expect(out).toBe('proposal_expiring(number=7,date=D:2026-10-01)');
   });
@@ -71,6 +79,8 @@ describe('notificationBody', () => {
       item({ bodyKey: 'stage_reminder', params: {} }),
       translate,
       formatDate,
+      'en',
+      noMilestone,
     );
     expect(out).toBe('stage_reminder(overdue=0,upcoming=0)');
   });
@@ -83,13 +93,15 @@ describe('notificationBody', () => {
       }),
       translate,
       formatDate,
+      'en',
+      noMilestone,
     );
     expect(out).toBe('portfolio_digest(active=4,awaiting=2,expiring=1,overdue=5)');
   });
 
   it('returns an empty line for an unknown kind instead of throwing', () => {
     // A notification kind added server-side must not break an older bell.
-    expect(notificationBody(item({ bodyKey: 'not_a_kind' }), translate, formatDate)).toBe(
+    expect(notificationBody(item({ bodyKey: 'not_a_kind' }), translate, formatDate, 'en', noMilestone)).toBe(
       '',
     );
   });
