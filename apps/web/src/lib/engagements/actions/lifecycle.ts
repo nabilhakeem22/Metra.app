@@ -7,7 +7,7 @@ import { recordEventCorrectionCore, type RecordEventCorrectionInput } from '../c
 import {
   recordRomAcknowledgementCore,
   type RecordRomAcknowledgementInput,
-} from '../approvals';
+} from '../rom-acknowledgement';
 import { createEngagementCore, type CreateEngagementInput } from '../core';
 import { executeTransition } from '../executor';
 import {

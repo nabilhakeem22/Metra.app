@@ -28,8 +28,7 @@ describe('AppLayout: the bell never takes the shell down (R6)', () => {
     bell.countUnread.mockRejectedValue(new Error('db down'));
     bell.listNotifications.mockRejectedValue(new Error('db down'));
     const props = await shellProps();
-    expect(props.unreadCount).toBe(0);
-    expect(props.notifications).toEqual([]);
+    expect(props.notificationFeed).toEqual({ unreadCount: 0, items: [] });
     expect(props.email).toBe('studio@example.com');
   });
 
@@ -38,7 +37,6 @@ describe('AppLayout: the bell never takes the shell down (R6)', () => {
     bell.countUnread.mockResolvedValue(3);
     bell.listNotifications.mockRejectedValue(new Error('db down'));
     const props = await shellProps();
-    expect(props.unreadCount).toBe(3);
-    expect(props.notifications).toEqual([]);
+    expect(props.notificationFeed).toEqual({ unreadCount: 3, items: [] });
   });
 });

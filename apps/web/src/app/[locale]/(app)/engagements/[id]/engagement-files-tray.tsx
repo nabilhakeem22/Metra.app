@@ -51,7 +51,8 @@ export function EngagementFilesTray({
   canUpload: boolean;
 }) {
   const t = useTranslations('engagements.files');
-  const { pending, queue, uploadMany, download } = useDeliverableUpload(engagementId);
+  const { pending, queue, uploadMany, retry, retryFailed, download } =
+    useDeliverableUpload(engagementId);
   // Client Deliverables, Step 1. `canUpload` is the §2.2 engagements_design/create
   // cell; for THIS capability the create and update cells are identical for all
   // seven roles (only `viewer` is read-only), so it is also the right gate for the
@@ -173,7 +174,12 @@ export function EngagementFilesTray({
       </div>
       {queue.length > 0 && (
         <div className="border-t border-[color:var(--rule)] px-4 py-2">
-          <UploadQueueList queue={queue} />
+          <UploadQueueList
+            queue={queue}
+            pending={pending}
+            onRetry={(key) => retry(key)}
+            onRetryFailed={() => retryFailed()}
+          />
         </div>
       )}
     </section>

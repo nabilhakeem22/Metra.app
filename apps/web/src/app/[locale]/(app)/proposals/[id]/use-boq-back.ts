@@ -5,8 +5,7 @@ import { useTransition } from 'react';
 import { toast } from '@/hooks/use-toast';
 import { useRouter } from '@/i18n/routing';
 import { resolveActionError } from '@/lib/actions/error-message';
-import { persistDraft } from './persist-draft';
-import type { ProposalDraftState } from './proposal-payload';
+import type { SaveDraftResult } from './persist-draft';
 
 /**
  * "Back to delivery": SAVE first, send nothing. On a refused or thrown save the
@@ -14,7 +13,8 @@ import type { ProposalDraftState } from './proposal-payload';
  */
 export function useBoqBack(options: {
   engagementId: string;
-  draftState: () => ProposalDraftState;
+  /** Store the latest edits (the autosave's flush); answers like a save. */
+  flush: () => Promise<SaveDraftResult>;
 }): { back: () => void; pending: boolean } {
   const te = useTranslations('errors');
   const router = useRouter();
@@ -23,7 +23,7 @@ export function useBoqBack(options: {
   function back(): void {
     start(async () => {
       try {
-        const saved = await persistDraft(options.draftState());
+        const saved = await options.flush();
         if (saved.ok) {
           router.push(`/engagements/${options.engagementId}`);
           return;

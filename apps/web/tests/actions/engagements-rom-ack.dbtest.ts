@@ -1,6 +1,6 @@
 import { sql } from 'drizzle-orm';
 import { afterAll, describe, expect, it } from 'vitest';
-import { recordRomAcknowledgementCore } from '@/lib/engagements/approvals';
+import { recordRomAcknowledgementCore } from '@/lib/engagements/rom-acknowledgement';
 import { createClientCore } from '@/lib/clients/core';
 import { listClients } from '@/lib/clients/queries';
 import { createEngagementCore } from '@/lib/engagements/core';

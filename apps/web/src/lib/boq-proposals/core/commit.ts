@@ -12,7 +12,8 @@ import type { OrgContext } from '@/lib/db/context';
 import { formatDocNumber } from '@/lib/format/doc-number';
 import type { MappedBoq } from '../map';
 import { findSentRevision, type SentBoq } from '../sent-revision';
-import { proposalRevision, type SendSnapshot } from '../snapshot';
+import { proposalRevision } from '@/lib/proposals/revision';
+import type { SendSnapshot } from '../snapshot';
 import { insertBoqHeader, insertSectionsAndLines } from './commit-persist';
 
 export interface CommitProposalBoqInput {

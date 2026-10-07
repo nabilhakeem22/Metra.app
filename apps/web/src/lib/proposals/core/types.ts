@@ -39,6 +39,13 @@ export interface SectionInput {
 
 export interface SaveDraftInput {
   id: string;
+  /**
+   * The revision token the caller last loaded or saved (../revision.ts). When
+   * given and no longer current, the save is refused `draft_changed_elsewhere`:
+   * another tab or user saved in between, and this save would overwrite them.
+   * Omitted: no check (callers that hold no revision).
+   */
+  revision?: string;
   header?: {
     titleAr?: string | null;
     titleEn?: string | null;
@@ -54,4 +61,14 @@ export interface SaveDraftInput {
     termsEn?: string | null;
   };
   sections: SectionInput[];
+}
+
+/**
+ * What a draft save stored, in the order it was sent: each section's id and its
+ * lines' ids (a kept id, or the one the server gave a new line), and the new
+ * revision. The builder adopts these so its next save names stored lines.
+ */
+export interface DraftSaveReceipt {
+  revision: string;
+  sections: { id: string; lineIds: string[] }[];
 }

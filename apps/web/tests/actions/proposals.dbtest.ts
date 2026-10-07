@@ -407,6 +407,53 @@ describe('F1 — margin-blind save preserves stored cost', () => {
     const d = await getProposalWithLines(ctx, id, true);
     expect(d!.sections[0].lines[0].unitCost).toBe('77.0000');
   });
+
+  it('(d) a stored line keeps its id through the rebuild, so a builder that saves twice without reloading (autosave) keeps the cost', async () => {
+    const { ctx, pm, clientId, projectId } = await marginBlindSetup();
+    const id = ((await createProposalCore(ctx, { clientId, projectId })) as { data?: string }).data!;
+    await saveProposalDraftCore(ctx, {
+      id,
+      sections: [{ titleEn: 'S', lines: [{ descriptionEn: 'Manual', qty: '2', unit: 'sqm', unitCost: '500', unitPrice: '800', discountPct: '0' }] }],
+    });
+    const loaded = await getProposalWithLines(ctx, id, true);
+    const lineId = loaded!.sections[0].lines[0].id;
+    // The ids the builder loaded, sent twice: the second save must still find them.
+    const marginBlindSave = (qty: string) =>
+      saveProposalDraftCore(pm, {
+        id,
+        sections: [{ titleEn: 'S', lines: [{ id: lineId, descriptionEn: 'Manual', qty, unit: 'sqm', unitCost: null, unitPrice: '800', discountPct: '0' }] }],
+      });
+    expect((await marginBlindSave('3')).ok).toBe(true);
+    expect((await marginBlindSave('4')).ok).toBe(true);
+    const after = await getProposalWithLines(ctx, id, true);
+    expect(after!.sections[0].lines[0].id).toBe(lineId);
+    expect(after!.sections[0].lines[0].unitCost).toBe('500.0000');
+    expect(after!.sections[0].lines[0].lineCost).toBe('2000.0000');
+  });
+
+  it('(e) the same stored id sent twice keeps it on the first line only; a foreign id is a new line', async () => {
+    const { ctx, clientId, projectId } = await marginBlindSetup();
+    const id = ((await createProposalCore(ctx, { clientId, projectId })) as { data?: string }).data!;
+    await saveProposalDraftCore(ctx, {
+      id,
+      sections: [{ titleEn: 'S', lines: [{ descriptionEn: 'A', qty: '1', unit: 'sqm', unitCost: '10', unitPrice: '20', discountPct: '0' }] }],
+    });
+    const lineId = (await getProposalWithLines(ctx, id, true))!.sections[0].lines[0].id;
+    const foreignId = '00000000-0000-4000-8000-000000000001';
+    const line = (lineIdToSend: string, descriptionEn: string) => ({
+      id: lineIdToSend, descriptionEn, qty: '1', unit: 'sqm' as const, unitCost: '10', unitPrice: '20', discountPct: '0',
+    });
+    const res = await saveProposalDraftCore(ctx, {
+      id,
+      sections: [{ titleEn: 'S', lines: [line(lineId, 'A'), line(lineId, 'A copy'), line(foreignId, 'B')] }],
+    });
+    expect(res.ok).toBe(true);
+    const ids = (await getProposalWithLines(ctx, id, true))!.sections[0].lines.map((l) => l.id);
+    expect(ids).toHaveLength(3);
+    expect(ids[0]).toBe(lineId);
+    expect(new Set(ids).size).toBe(3);
+    expect(ids).not.toContain(foreignId);
+  });
 });
 
 describe('supervision fee (after VAT, untaxed; persisted + guarded)', () => {

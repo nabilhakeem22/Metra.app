@@ -20,3 +20,15 @@ export function formatDate(input: Date | string | number, locale: string): strin
   // Force DD/MM/YYYY order regardless of the locale's default pattern.
   return `${get('day')}/${get('month')}/${get('year')}`;
 }
+
+/** Clock time, HH:mm (24-hour), Cairo time, Latin digits: "14:02". */
+export function formatTime(input: Date | string | number, locale: string): string {
+  const date = input instanceof Date ? input : new Date(input);
+  if (Number.isNaN(date.getTime())) return '';
+  return new Intl.DateTimeFormat(latnLocale(locale), {
+    timeZone: CAIRO,
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  }).format(date);
+}

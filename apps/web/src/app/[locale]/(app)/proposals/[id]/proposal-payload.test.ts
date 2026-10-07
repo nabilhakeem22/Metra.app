@@ -4,6 +4,7 @@ import { buildProposalPayload, type ProposalDraftState } from './proposal-payloa
 
 function line(overrides: Partial<LineState> = {}): LineState {
   return {
+    key: 'k-1',
     id: 'line-1',
     costItemId: 'cost-1',
     descriptionEn: 'Gypsum ceiling',
@@ -133,5 +134,26 @@ describe('buildProposalPayload — order is ARRAY POSITION', () => {
 
   test('no sections at all is an empty list, not a crash', () => {
     expect(buildProposalPayload(draft({ sections: [] })).sections).toEqual([]);
+  });
+
+  test('F3: figures are sent as the preview reads them (Arabic digits, 1,000, a trailing dot)', () => {
+    const payload = buildProposalPayload(
+      draft({
+        discountPct: '٥',
+        sections: [section([line({ qty: '١٢', unitPrice: '1,000', unitCost: '7.', discountPct: '' })])],
+      }),
+    );
+    expect(payload.header.discountPct).toBe('5');
+    expect(payload.sections[0]?.lines[0]).toMatchObject({
+      qty: '12',
+      unitPrice: '1000',
+      unitCost: '7',
+      discountPct: '0',
+    });
+  });
+
+  test('the row key is the builder own handle and is never sent', () => {
+    const payload = buildProposalPayload(draft());
+    expect(JSON.stringify(payload)).not.toContain('k-1');
   });
 });

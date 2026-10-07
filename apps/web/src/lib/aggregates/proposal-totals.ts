@@ -48,9 +48,14 @@ export function clampMoney4(s: string): string {
   return frac > 4 ? s.slice(0, dot + 5) : s;
 }
 
-export function coerceMoneyInput(s: string): string {
+/** A non-negative money figure the server's parser will accept. */
+export function isValidMoneyInput(s: string): boolean {
   const t = s.trim();
-  return MONEY_RE.test(t) && !t.startsWith('-') ? clampMoney4(t) : '0';
+  return MONEY_RE.test(t) && !t.startsWith('-');
+}
+
+export function coerceMoneyInput(s: string): string {
+  return isValidMoneyInput(s) ? clampMoney4(s.trim()) : '0';
 }
 
 /** floor(a / b) for b > 0 (BigInt / truncates toward zero). */

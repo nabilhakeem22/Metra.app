@@ -54,6 +54,8 @@ export interface ProposalDetail {
   issueDate: string | null;
   expiryDate: string | null;
   createdAt: string;
+  /** The revision token (lib/proposals/revision.ts) the builder saves against. */
+  revision: string;
   version: number;
   supersedesId: string | null;
   clientId: string;

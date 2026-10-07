@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatDate } from './date';
+import { formatDate, formatTime } from './date';
 import { formatDocNumber } from './doc-number';
 import { formatMoney, formatMoneyAmount, moneySymbol } from './money';
 import { formatNumber, formatPercent, formatQuantity } from './number';
@@ -181,6 +181,21 @@ describe('formatDate — DD/MM/YYYY, Africa/Cairo', () => {
   it('uses Latin digits in Arabic locale', () => {
     const s = formatDate('2026-08-09T09:00:00Z', 'ar-EG');
     expect(ARABIC_INDIC.test(s)).toBe(false);
+  });
+});
+
+describe('formatTime: HH:mm, Africa/Cairo', () => {
+  it('renders 24-hour Cairo time with Latin digits in both locales', () => {
+    // August: Cairo is UTC+3 (summer time).
+    expect(formatTime('2026-08-09T11:02:00Z', 'en')).toBe('14:02');
+    const arabic = formatTime('2026-08-09T11:02:00Z', 'ar-EG');
+    expect(ARABIC_INDIC.test(arabic)).toBe(false);
+    expect(arabic).toContain('14');
+    expect(arabic).toContain('02');
+  });
+
+  it('renders nothing for an invalid instant', () => {
+    expect(formatTime('not a date', 'en')).toBe('');
   });
 });
 

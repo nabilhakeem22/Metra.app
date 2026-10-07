@@ -14,6 +14,11 @@ const router = vi.hoisted(() => ({
   forward: vi.fn(),
   prefetch: vi.fn(),
 }));
+const nextRouter = vi.hoisted(() => ({ push: vi.fn() }));
+vi.mock('next/navigation', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('next/navigation')>()),
+  useRouter: () => nextRouter,
+}));
 vi.mock('@/i18n/routing', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/i18n/routing')>()),
   useRouter: () => router,
@@ -23,8 +28,12 @@ vi.mock('@/i18n/routing', async (importOriginal) => ({
 // Every server action the builder reaches: replaced, so no server stack loads.
 const boqActions = vi.hoisted(() => ({ sendProposalAsBoq: vi.fn() }));
 vi.mock('@/lib/boq-proposals/actions', () => boqActions);
+const proposalActions = vi.hoisted(() => ({
+  saveProposalDraft: vi.fn(),
+  autosaveProposalDraft: vi.fn(),
+}));
 vi.mock('@/lib/proposals/actions', () => ({
-  saveProposalDraft: vi.fn().mockResolvedValue({ ok: true }),
+  ...proposalActions,
   deleteDraftProposal: vi.fn(),
   sendProposal: vi.fn(),
   getProposalPreviewHtml: vi.fn(),
@@ -36,6 +45,7 @@ const en = (path: string) => messageAt('en', path);
 
 const DETAIL = {
   id: 'p-1',
+  revision: '1789000000000000',
   number: 3,
   kind: 'boq',
   engagementId: 'e-1',
@@ -84,10 +94,13 @@ function renderBoqBuilder() {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  const receipt = { ok: true, data: { revision: '1789000000000001', sections: [{ id: 's-1', lineIds: ['l-1'] }] } };
+  proposalActions.saveProposalDraft.mockResolvedValue(receipt);
+  proposalActions.autosaveProposalDraft.mockResolvedValue(receipt);
 });
 
 describe('the builder while Send as BOQ is in flight (R3)', () => {
-  it('disables every editor, Save, Preview, Back and Send until the send settles', async () => {
+  it('disables every editor, Preview, Back and Send until the send settles', async () => {
     let finishSend: (value: unknown) => void = () => {};
     boqActions.sendProposalAsBoq.mockReturnValue(
       new Promise((resolve) => {
@@ -115,7 +128,6 @@ describe('the builder while Send as BOQ is in flight (R3)', () => {
     expect(fieldset?.querySelectorAll('input').length).toBeGreaterThan(3);
     // And the named controls carry their own disabled state too.
     for (const name of [
-      en('proposals.builder.save'),
       en('proposals.preview.open'),
       en('proposals.boqMode.back'),
       en('proposals.boqMode.send'),
@@ -125,7 +137,80 @@ describe('the builder while Send as BOQ is in flight (R3)', () => {
 
     finishSend({ ok: true, data: { documentNumber: 'BQ-2026-0014' } });
     await waitFor(() =>
-      expect(screen.getByRole('button', { name: en('proposals.builder.save') }).matches(':disabled')).toBe(false),
+      expect(screen.getByRole('button', { name: en('proposals.preview.open') }).matches(':disabled')).toBe(false),
     );
+  });
+});
+
+describe('the builder saves itself (B6)', () => {
+  it('has no Save button and says where the draft stands', () => {
+    renderBoqBuilder();
+    expect(screen.queryByRole('button', { name: /save/i })).toBeNull();
+    expect(screen.getByRole('status').textContent).toBe(en('proposals.builder.autosave.saved'));
+  });
+
+  it('Send as BOQ stores the latest edit first, through the refreshing save, then sends', async () => {
+    boqActions.sendProposalAsBoq.mockResolvedValue({ ok: true, data: { documentNumber: 'BQ-2026-0014' } });
+    const { container } = renderBoqBuilder();
+    const qty = container.querySelector('input[value="10"]') as HTMLInputElement;
+    fireEvent.change(qty, { target: { value: '12' } });
+    expect(screen.getByRole('status').textContent).toBe(en('proposals.builder.autosave.dirty'));
+
+    fireEvent.click(screen.getByRole('button', { name: en('proposals.boqMode.send') }));
+    const dialog = await screen.findByRole('alertdialog');
+    fireEvent.click(within(dialog).getByRole('button', { name: en('proposals.boqMode.confirm') }));
+
+    await waitFor(() => expect(boqActions.sendProposalAsBoq).toHaveBeenCalledWith('p-1'));
+    expect(proposalActions.saveProposalDraft).toHaveBeenCalledTimes(1);
+    expect(proposalActions.saveProposalDraft.mock.calls[0][0].sections[0].lines[0].qty).toBe('12');
+    expect(proposalActions.saveProposalDraft.mock.invocationCallOrder[0]).toBeLessThan(
+      boqActions.sendProposalAsBoq.mock.invocationCallOrder[0],
+    );
+    expect(proposalActions.autosaveProposalDraft).not.toHaveBeenCalled();
+    expect(proposalActions.saveProposalDraft.mock.calls[0][0].revision).toBe('1789000000000000');
+  });
+
+  it('F3: Send as BOQ with a blank line just added sends nothing, says why and puts the caret in it', async () => {
+    renderBoqBuilder();
+    fireEvent.click(screen.getByRole('button', { name: en('proposals.builder.addLine') }));
+    expect(screen.getByRole('status').textContent).toBe(en('proposals.builder.autosave.incomplete'));
+    fireEvent.click(screen.getByRole('button', { name: en('proposals.boqMode.send') }));
+    const dialog = await screen.findByRole('alertdialog');
+    fireEvent.click(within(dialog).getByRole('button', { name: en('proposals.boqMode.confirm') }));
+    await waitFor(() =>
+      expect(screen.getByRole('alert').textContent).toContain(en('errors.draft_incomplete')),
+    );
+    expect(boqActions.sendProposalAsBoq).not.toHaveBeenCalled();
+    expect(proposalActions.saveProposalDraft).not.toHaveBeenCalled();
+    expect((document.activeElement as HTMLElement).getAttribute('data-draft-input')).toBe('description');
+  });
+
+  it('F2: leaving through an in-app link with a blank line keeps the studio here and asks, with the reason', async () => {
+    renderBoqBuilder();
+    fireEvent.click(screen.getByRole('button', { name: en('proposals.builder.addLine') }));
+    const away = document.createElement('a');
+    away.href = '/en/engagements';
+    away.textContent = 'Deliveries';
+    document.body.appendChild(away);
+    fireEvent.click(away);
+    const dialog = await screen.findByRole('alertdialog');
+    expect(dialog.textContent).toContain(en('errors.draft_incomplete'));
+    fireEvent.click(within(dialog).getByRole('button', { name: en('proposals.builder.leave.stay') }));
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());
+    expect(nextRouter.push).not.toHaveBeenCalled();
+    expect(screen.getByRole('alert').textContent).toContain(en('errors.draft_incomplete'));
+    away.remove();
+  });
+
+  it('F2: leaving with a finished edit saves it first, then goes', async () => {
+    const { container } = renderBoqBuilder();
+    fireEvent.change(container.querySelector('input[value="10"]') as HTMLInputElement, { target: { value: '11' } });
+    const away = document.createElement('a');
+    away.href = '/en/engagements';
+    document.body.appendChild(away);
+    fireEvent.click(away);
+    await waitFor(() => expect(nextRouter.push).toHaveBeenCalledWith('/en/engagements'));
+    expect(proposalActions.saveProposalDraft.mock.calls[0][0].sections[0].lines[0].qty).toBe('11');
+    away.remove();
   });
 });

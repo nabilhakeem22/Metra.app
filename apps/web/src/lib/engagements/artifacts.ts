@@ -19,13 +19,12 @@ import {
   engagementArtifacts,
   files,
   type EngagementArtifactKind,
-  type MetraDb,
 } from '@metra/db';
-import { and, count, eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { fail, mutateInOrg, requireInOrg } from '@/lib/actions/mutate';
 import type { ActionResult } from '@/lib/actions/result';
 import type { OrgContext } from '@/lib/db/context';
-import { CONCEPT_OPTION_MAX } from './concept-options';
+import { artifactRecordingFile, assertConceptOptionSlot } from './artifact-fences';
 import { isTerminal } from './states';
 import { isUuid } from '@/lib/uuid';
 import {
@@ -44,30 +43,6 @@ export interface RecordArtifactInput {
   contentHash?: string | null;
   label?: string | null;
   note?: string | null;
-}
-
-/**
- * Concept options are APPEND-ONLY and `optionsReady` accepts at most
- * CONCEPT_OPTION_MAX, so a fifth one strands the delivery for good. The browser
- * stops offering the upload at the cap; this is the fence. The engagement row is
- * locked first so two concurrent uploads cannot both count three and both land.
- */
-async function assertConceptOptionSlot(tx: MetraDb, engagementId: string): Promise<void> {
-  await tx
-    .select({ id: designEngagements.id })
-    .from(designEngagements)
-    .where(eq(designEngagements.id, engagementId))
-    .for('update');
-  const [{ recorded }] = await tx
-    .select({ recorded: count() })
-    .from(engagementArtifacts)
-    .where(
-      and(
-        eq(engagementArtifacts.engagementId, engagementId),
-        eq(engagementArtifacts.kind, 'concept_option'),
-      ),
-    );
-  if (recorded >= CONCEPT_OPTION_MAX) fail('concept_options_out_of_range');
 }
 
 /**
@@ -114,6 +89,12 @@ export async function recordArtifactCore(
       );
       // No recording an artifact against a finished engagement (abandoned / closed).
       if (isTerminal(engagement.state)) fail('engagement_not_active');
+      // A retried attach of the SAME upload (its first answer lost in transport)
+      // is the artifact already recorded, never a second one.
+      if (fileId !== null) {
+        const recorded = await artifactRecordingFile(tx, input.engagementId, fileId);
+        if (recorded) return recorded;
+      }
       if (input.kind === 'concept_option') await assertConceptOptionSlot(tx, input.engagementId);
 
       // A supplied file must be THIS engagement's own upload. RLS scopes the read to

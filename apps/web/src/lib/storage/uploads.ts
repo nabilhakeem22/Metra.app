@@ -93,6 +93,22 @@ export async function createSignedUploadUrl(
 }
 
 /**
+ * A fresh signed upload URL for an EXISTING files row whose bytes never arrived
+ * (a browser PUT that stalled or dropped). Retrying through this reuses the row,
+ * so a failed attempt never leaves a second orphan `files` row behind it. The
+ * caller has already proved the row is its own and unattached; `upsert` lets a
+ * partial object from the failed attempt be replaced.
+ */
+export async function renewSignedUploadUrl(objectKey: string): Promise<{ signedUrl: string }> {
+  const supabase = createSupabaseAdminClient();
+  const { data, error } = await supabase.storage
+    .from(FILES_BUCKET)
+    .createSignedUploadUrl(objectKey, { upsert: true });
+  if (error) throw error;
+  return { signedUrl: data.signedUrl };
+}
+
+/**
  * Store bytes the SERVER generated, as a file row plus an uploaded object.
  *
  * The signed-upload path above exists for a browser PUT; a document Metra renders

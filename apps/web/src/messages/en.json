@@ -479,6 +479,9 @@
     "client_required": "Select a client",
     "invalid_dates": "End date must be on or after the start date",
     "proposal_not_draft": "This proposal is no longer a draft",
+    "draft_changed_elsewhere": "This draft was changed in another tab or by someone else. Reload the page to get the latest version, then make your change again.",
+    "draft_too_large": "This draft is too large to save in one go. Split it into fewer lines or shorter descriptions.",
+    "draft_incomplete": "Every line needs a description and valid figures, and every section a name. The first one missing is selected.",
     "line_required": "Add at least one line",
     "token_invalid": "This link is not valid",
     "token_expired": "This link has expired",
@@ -1300,8 +1303,22 @@
       "unitPrice": "Unit price",
       "discount": "Disc %",
       "removeLine": "Remove line",
-      "save": "Save draft",
       "send": "Send",
+      "autosave": {
+        "saved": "Saved",
+        "savedAt": "Saved {time}",
+        "saving": "Saving",
+        "dirty": "Unsaved changes",
+        "incomplete": "Unsaved changes: they save once every line has a description and every section a name",
+        "failed": "Not saved: {reason}",
+        "retry": "Retry"
+      },
+      "leave": {
+        "title": "Leave without saving?",
+        "body": "Your latest changes are not saved: {reason}",
+        "confirm": "Leave without saving",
+        "stay": "Stay and fix it"
+      },
       "delete": "Delete draft",
       "sectionSubtotal": "Section subtotal",
       "subtotal": "Subtotal",
@@ -1341,7 +1358,6 @@
     },
     "toast": {
       "created": "Proposal created",
-      "saved": "Draft saved",
       "sent": "Proposal sent",
       "expired": "Proposal marked expired",
       "superseded": "Version 2 created",
@@ -1432,13 +1448,24 @@
       "followup_reminder": "Follow-up reminder",
       "expire_nudge": "Quotation expiring soon",
       "portfolio_digest": "Portfolio digest",
-      "stage_reminder": "Stage reminder"
+      "stage_reminder": "Stage reminder",
+      "client_responded": "Client responded"
     },
     "body": {
       "proposal_expiring": "Quotation {number} expires on {date}.",
       "proposal_followup": "Quotation {number} has been awaiting a response for {days} days.",
       "portfolio_digest": "{active} active projects, {awaiting} awaiting response, {expiring} expiring soon, {overdue} overdue stages.",
-      "stage_reminder": "{overdue} overdue stages and {upcoming} upcoming."
+      "stage_reminder": "{overdue} overdue stages and {upcoming} upcoming.",
+      "client_concept_approved": "The client approved the concept on {delivery}.",
+      "client_concept_chosen": "The client chose a concept option on {delivery}.",
+      "client_concept_changes_requested": "The client asked for changes to the concept on {delivery}.",
+      "client_design_approved": "The client approved the design on {delivery}.",
+      "client_design_changes_requested": "The client asked for changes to the design on {delivery}.",
+      "client_budget_acknowledged": "The client acknowledged the budget range on {delivery}.",
+      "client_handover_acknowledged": "The client confirmed receiving the handover on {delivery}.",
+      "client_payment_claimed": "{hasMilestone, select, yes {The client says they paid ({milestone}) on {delivery}. Confirm it from the delivery.} other {The client says they made a payment on {delivery}. Confirm it from the delivery.}}",
+      "client_payment_claimed_many": "{claimCount, plural, one {The client says they made a payment on {delivery}. Confirm it from the delivery.} other {The client says they made {count} payments on {delivery}. Confirm them from the delivery.}}",
+      "client_commented": "{commentCount, plural, one {The client left a comment on {delivery}.} other {The client left {count} comments on {delivery}.}}"
     },
     "viewAll": "View all"
   },
@@ -1929,6 +1956,9 @@
       "uploading": "Uploading…",
       "dropHere": "Drop files here",
       "uploadedSummary": "{done} of {total} uploaded",
+      "retry": "Retry",
+      "retryFile": "Retry {name}",
+      "retryFailed": "Retry failed",
       "status": {
         "queued": "Waiting",
         "uploading": "Uploading",
@@ -2137,7 +2167,15 @@
       "lastChange": "Last change",
       "older": "Older deliveries",
       "newest": "Newest deliveries",
-      "pages": "Delivery pages"
+      "pages": "Delivery pages",
+      "filter": {
+        "label": "Show deliveries",
+        "all": "All",
+        "mine": "My move"
+      },
+      "mineEmpty": "Nothing is waiting on you.",
+      "mineEmptyPartial": "None of the {count} newest open deliveries is waiting on you. Older ones were not checked.",
+      "truncated": "Showing the {count} newest open deliveries only."
     },
     "age": {
       "today": "today",

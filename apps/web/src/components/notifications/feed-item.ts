@@ -6,6 +6,11 @@
 // feed resolve a notification identically. Two copies of this would drift the moment
 // a new notification kind was added, and the copy nobody remembered would render an
 // empty line.
+import {
+  clientRespondedBody,
+  isClientRespondedBodyKey,
+  type BodyTranslate,
+} from './client-responded-body';
 
 export interface FeedItem {
   id: string;
@@ -18,10 +23,23 @@ export interface FeedItem {
   read: boolean;
 }
 
+/** How many notifications the bell shows, and so how many a poll reads. */
+export const BELL_FEED_LIMIT = 8;
+
+/** How many the notifications page reads; the shared poll keeps the newest current. */
+export const PAGE_FEED_LIMIT = 50;
+
+/** The bell's and the page's data: what is unread, and the newest items. */
+export interface NotificationFeed {
+  unreadCount: number;
+  items: FeedItem[];
+}
+
 /** Where a notification points, by the entity it is about. */
 export const ENTITY_HREF: Record<string, (id: string) => string> = {
   proposal: (id) => `/proposals/${id}`,
   project: (id) => `/projects/${id}`,
+  engagement: (id) => `/engagements/${id}`,
 };
 
 /** The destination for one item, or null when it is not about a linkable entity. */
@@ -34,8 +52,10 @@ export function notificationHref(item: FeedItem): string | null {
 /**
  * The localized body line for one notification.
  *
- * `translate` and `formatDate` are passed in rather than imported so this stays a
- * pure function usable from any component — and testable without a React tree.
+ * `translate`, `formatDate` and `milestoneLabel` (a payment milestone's name, or
+ * null for a kind it does not know) are passed in rather than imported so this
+ * stays a pure function usable from any component, and testable without a React
+ * tree. `locale` picks a delivery's title.
  *
  * NUMERIC PARAMS ARE PASSED AS STRINGS on purpose: next-intl would otherwise apply
  * locale number formatting and emit Arabic-Indic digits for ar-EG, and Metra renders
@@ -43,10 +63,15 @@ export function notificationHref(item: FeedItem): string | null {
  */
 export function notificationBody(
   item: FeedItem,
-  translate: (key: string, values?: Record<string, string>) => string,
+  translate: BodyTranslate,
   formatDate: (iso: string) => string,
+  locale: string,
+  milestoneLabel: (kind: string) => string | null,
 ): string {
   const p = item.params;
+  if (isClientRespondedBodyKey(item.bodyKey)) {
+    return clientRespondedBody(item.bodyKey, p, translate, locale, milestoneLabel);
+  }
   const s = (v: unknown) => String(v ?? 0);
   switch (item.bodyKey) {
     case 'proposal_expiring':

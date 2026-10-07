@@ -21,8 +21,7 @@ vi.mock('@/i18n/routing', async (importOriginal) => ({
 // Both are server actions: replaced, so no server-only stack is loaded.
 const actions = vi.hoisted(() => ({ sendProposalAsBoq: vi.fn() }));
 vi.mock('@/lib/boq-proposals/actions', () => actions);
-const persist = vi.hoisted(() => ({ persistDraft: vi.fn() }));
-vi.mock('./persist-draft', () => persist);
+const flush = vi.hoisted(() => vi.fn());
 
 const toasts = vi.hoisted(() => [] as Array<{ title?: string; variant?: string }>);
 vi.mock('@/hooks/use-toast', () => ({
@@ -45,6 +44,7 @@ const draft: ProposalDraftState = {
       titleAr: '',
       lines: [
         {
+          key: 'k-1',
           id: null,
           costItemId: null,
           descriptionEn: 'Gypsum',
@@ -69,6 +69,7 @@ function Harness() {
     engagementId: 'e-1',
     clientCanOpenNow: false,
     draftState: () => draft,
+    flush,
     totalBeforeVat: () => '1000.0000',
     confirm,
   });
@@ -87,7 +88,7 @@ beforeEach(() => {
 
 describe('useSendAsBoq', () => {
   it('states the sendable lines, sections, total and the locked gate in ONE confirm', async () => {
-    persist.persistDraft.mockResolvedValue({ ok: true });
+    flush.mockResolvedValue({ ok: true });
     actions.sendProposalAsBoq.mockResolvedValue({ ok: true, data: { documentNumber: 'BQ-2026-0014' } });
     renderWithIntl(<Harness />, { locale: 'en' });
     fireEvent.click(screen.getByRole('button'));
@@ -104,12 +105,12 @@ describe('useSendAsBoq', () => {
     renderWithIntl(<Harness />, { locale: 'en' });
     fireEvent.click(screen.getByRole('button'));
     await waitFor(() => expect(confirm).toHaveBeenCalled());
-    expect(persist.persistDraft).not.toHaveBeenCalled();
+    expect(flush).not.toHaveBeenCalled();
     expect(actions.sendProposalAsBoq).not.toHaveBeenCalled();
   });
 
   it('a refused save stops before the send and toasts the coded error', async () => {
-    persist.persistDraft.mockResolvedValue({ ok: false, error: 'too_many_lines' });
+    flush.mockResolvedValue({ ok: false, error: 'too_many_lines' });
     renderWithIntl(<Harness />, { locale: 'en' });
     fireEvent.click(screen.getByRole('button'));
     await waitFor(() => expect(toasts.at(-1)?.title).toBe(en('errors.too_many_lines')));
@@ -118,7 +119,7 @@ describe('useSendAsBoq', () => {
   });
 
   it('a successful send toasts the BQ number and returns to the delivery', async () => {
-    persist.persistDraft.mockResolvedValue({ ok: true });
+    flush.mockResolvedValue({ ok: true });
     actions.sendProposalAsBoq.mockResolvedValue({ ok: true, data: { documentNumber: 'BQ-2026-0014' } });
     renderWithIntl(<Harness />, { locale: 'en' });
     fireEvent.click(screen.getByRole('button'));
@@ -130,7 +131,7 @@ describe('useSendAsBoq', () => {
   it('a THROWN send toasts generic, clears the spinner and shows the delivery as it is (R1)', async () => {
     // The send may or may not have issued a BOQ: retrying from the builder could
     // issue a second one, so the studio is taken to the freshly read delivery.
-    persist.persistDraft.mockResolvedValue({ ok: true });
+    flush.mockResolvedValue({ ok: true });
     actions.sendProposalAsBoq.mockRejectedValue(new Error('network died'));
     renderWithIntl(<Harness />, { locale: 'en' });
     const button = screen.getByRole('button');
@@ -144,7 +145,7 @@ describe('useSendAsBoq', () => {
   it.each(['uncertain', 'boq_send_conflict'] as const)(
     'after %s it toasts the code and shows the delivery as it is (R1)',
     async (code) => {
-      persist.persistDraft.mockResolvedValue({ ok: true });
+      flush.mockResolvedValue({ ok: true });
       actions.sendProposalAsBoq.mockResolvedValue({ ok: false, error: code });
       renderWithIntl(<Harness />, { locale: 'en' });
       fireEvent.click(screen.getByRole('button'));
@@ -155,7 +156,7 @@ describe('useSendAsBoq', () => {
   );
 
   it('a plain refusal (nothing was sent) keeps the studio on the draft', async () => {
-    persist.persistDraft.mockResolvedValue({ ok: true });
+    flush.mockResolvedValue({ ok: true });
     actions.sendProposalAsBoq.mockResolvedValue({ ok: false, error: 'line_required' });
     renderWithIntl(<Harness />, { locale: 'en' });
     fireEvent.click(screen.getByRole('button'));
@@ -165,7 +166,7 @@ describe('useSendAsBoq', () => {
   });
 
   it('a THROWN save keeps the studio on the draft and sends nothing', async () => {
-    persist.persistDraft.mockRejectedValue(new Error('network died'));
+    flush.mockRejectedValue(new Error('network died'));
     renderWithIntl(<Harness />, { locale: 'en' });
     fireEvent.click(screen.getByRole('button'));
     await waitFor(() => expect(toasts.at(-1)?.title).toBe(en('errors.generic')));

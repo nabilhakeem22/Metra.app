@@ -19,6 +19,7 @@ const { buildProposalHtml } = await import('./proposal-template');
 function detail(): ProposalDetail {
   return {
     id: 'p1',
+    revision: '1789000000000000',
     number: 7,
     titleAr: 'تشطيب مكتب',
     titleEn: 'Office fit-out',

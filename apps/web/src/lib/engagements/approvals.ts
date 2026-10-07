@@ -1,4 +1,5 @@
-// Design-Engagement Machine — the append-only engagement approvals ledger.
+// Design-Engagement Machine — the append-only engagement approvals ledger: the
+// staff approval rows the executor's side-effects write.
 //
 // Step 7: `recordConceptApproval`, the `selectConcept` side-effect. Executor-only:
 // MUST be called with the executor's `tx` so the approval-event insert commits
@@ -7,23 +8,12 @@
 // ledger beforehand and the `gateAInstallmentCleared` guard verifies it cleared;
 // this side-effect only appends the row that witnesses the concept selection.
 //
-// Step 12: `recordRomAcknowledgementCore`, a STANDALONE data-entry action (not a
-// transition) that appends the client's acknowledgement of the firm's ROM band,
-// snapshotting the current ROM into the event so the acknowledged range is frozen.
-import { designEngagements, engagementEvents, type MetraDb } from '@metra/db';
-import { sql } from 'drizzle-orm';
-import { fail, mutateInOrg, requireInOrg } from '@/lib/actions/mutate';
-import { err, type ActionResult } from '@/lib/actions/result';
-import { isValidOccurredOn } from './event-provenance';
-import type { OfflineApproval } from './offline-approval';
+// The client's acknowledgement of the ROM band (Step 12) is a standalone action,
+// not a side-effect: ./rom-acknowledgement.ts.
+import { engagementEvents, type MetraDb } from '@metra/db';
+import { fail } from '@/lib/actions/mutate';
 import type { OrgContext } from '@/lib/db/context';
-import {
-  MAX_LABEL_CHARS,
-  MAX_NOTE_CHARS,
-  TOO_LONG,
-  optionalText,
-} from '@/lib/validation/text';
-import { isTerminal } from './states';
+import type { OfflineApproval } from './offline-approval';
 
 /**
  * The provenance columns of a staff approval row: none for the studio's own
@@ -79,136 +69,4 @@ export async function recordDesignApproval(
     actorUserId: ctx.userId,
     ...offlineProvenance(offline),
   });
-}
-
-export interface RecordRomAcknowledgementInput {
-  engagementId: string;
-  note?: string | null;
-  /**
-   * The date the CLIENT actually confirmed, when that is not today. `decided_at`
-   * only ever records when the studio typed it, and a record dated "today" for a
-   * call last Thursday is the weakest possible evidence. Omitted means the two
-   * coincide.
-   */
-  occurredOn?: string | null;
-  /** HOW they confirmed: a phone call, a WhatsApp message, a signature on paper. */
-  evidence?: string | null;
-}
-
-/**
- * Design-Engagement Machine, Step 12 — record the client's acknowledgement of the
- * firm's ROM band as an append-only event. This is a STANDALONE data-entry action
- * (the manual-model client ack), NOT a machine transition: it moves no state and
- * touches no trigger — Gate B's later guard reads this event. Gated on the
- * `engagements_design` capability (create). Flow: open the RLS tx; assert the
- * engagement resolves in-org (`engagement_not_found` if absent/foreign) and is NOT
- * terminal (`engagement_not_active`); require BOTH `rom_low` and `rom_high` are set
- * (else `rom_not_set` — you can't acknowledge a range never entered) and that the
- * band was ISSUED to the client (else `rom_not_issued` — a band the client never
- * saw cannot have been acknowledged, and Gate B reads this event as consent); append ONE
- * `rom_acknowledgement` row that SNAPSHOTS the engagement's current ROM into the
- * event's `range_low`/`range_high` columns, so the acknowledged band is frozen at
- * ack time even if ROM is later edited. Returns the new event id. Never throws to
- * the client — coded ActionResult only.
- */
-export async function recordRomAcknowledgementCore(
-  ctx: OrgContext,
-  input: RecordRomAcknowledgementInput,
-): Promise<ActionResult & { data?: string }> {
-  const note = optionalText(input.note, MAX_NOTE_CHARS);
-  const evidence = optionalText(input.evidence, MAX_NOTE_CHARS);
-  // Provenance, validated before the transaction opens. A future date is either
-  // a typo or a fabrication, and either way has no business on an evidentiary
-  // record. `toISOString` gives today in UTC, which is the same calendar day the
-  // `<input type="date">` offered.
-  const occurredOn = optionalText(input.occurredOn, MAX_LABEL_CHARS);
-  // An over-long field is a REFUSAL, not a truncation: silently storing the
-  // first 2000 characters of what the studio typed would lose the rest of an
-  // evidentiary note without telling anyone.
-  if (note === TOO_LONG || evidence === TOO_LONG || occurredOn === TOO_LONG) {
-    return err('invalid');
-  }
-  if (
-    occurredOn !== null &&
-    !isValidOccurredOn(occurredOn, new Date().toISOString().slice(0, 10))
-  ) {
-    return err('invalid');
-  }
-
-  return mutateInOrg(
-    ctx,
-    { capability: 'engagements_design', action: 'create', flow: 'interior' },
-    async (tx, audit) => {
-      const engagement = await requireInOrg(
-        tx,
-        designEngagements,
-        input.engagementId,
-        {
-          id: designEngagements.id,
-          state: designEngagements.state,
-          romLow: designEngagements.romLow,
-          romHigh: designEngagements.romHigh,
-          romIssuedAt: designEngagements.romIssuedAt,
-        },
-        'engagement_not_found',
-      );
-      // No acknowledging a range on a finished engagement (abandoned / closed).
-      if (isTerminal(engagement.state)) fail('engagement_not_active');
-      // Can't acknowledge a range that was never entered (Step 10's setEngagementRom).
-      if (engagement.romLow === null || engagement.romHigh === null) {
-        fail('rom_not_set');
-      }
-      // And no acknowledging a band the client was never shown. Gate B reads this
-      // event as the client's consent, so recording one against an unissued band
-      // would let the studio unlock the gate on a range it kept to itself.
-      if (engagement.romIssuedAt === null) {
-        fail('rom_not_issued');
-      }
-
-      // Snapshot the CURRENT canonical ROM into the event so the acknowledged band
-      // is frozen at ack time — a later ROM edit must not rewrite this witness.
-      const [row] = await tx
-        .insert(engagementEvents)
-        .values({
-          orgId: ctx.orgId,
-          engagementId: input.engagementId,
-          kind: 'rom_acknowledgement',
-          actorUserId: ctx.userId,
-          rangeLow: engagement.romLow,
-          rangeHigh: engagement.romHigh,
-          // WHICH issuance the client answered (0049), read in the same tx as the
-          // rom_not_issued check above, so the stamp and the precondition cannot
-          // disagree. Without it a re-issue of the SAME numbers would leave this
-          // row looking current forever — the band comparison cannot see that.
-          acknowledgedIssueAt: engagement.romIssuedAt,
-          note,
-          occurredOn,
-          evidence,
-          // Stamped AFTER the reads, not at BEGIN. The column default is `now()`,
-          // which is `transaction_timestamp()` — so two overlapping writers could
-          // commit in one order and be stamped in the other, and the Budget tab
-          // reads this table as a chronology. `setEngagementRomCore` sets the same
-          // way; a ledger whose order is only trustworthy for one of its two
-          // writers is not a trustworthy ledger.
-          decidedAt: sql`clock_timestamp()`,
-        })
-        .returning({ id: engagementEvents.id });
-
-      await audit({
-        entity: 'design_engagement',
-        entityId: input.engagementId,
-        action: 'create',
-        before: null,
-        after: {
-          event_id: row.id,
-          kind: 'rom_acknowledgement',
-          range_low: engagement.romLow,
-          range_high: engagement.romHigh,
-          occurred_on: occurredOn,
-          evidence,
-        },
-      });
-      return row.id;
-    },
-  );
 }

@@ -97,6 +97,10 @@ export const ACTION_CODE_PROBLEM: Record<ActionCode, ApiProblemKind> = {
   client_required: 'bad-request',
   invalid_dates: 'bad-request',
   proposal_not_draft: 'bad-request',
+  // Another tab or user saved the draft after this caller loaded it.
+  draft_changed_elsewhere: 'conflict',
+  draft_too_large: 'bad-request',
+  draft_incomplete: 'bad-request',
   line_required: 'bad-request',
   token_invalid: 'unauthorized',
   token_expired: 'unauthorized',

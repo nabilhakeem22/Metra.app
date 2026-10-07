@@ -8,7 +8,7 @@ import { loadSendSnapshot } from '@/lib/boq-proposals/snapshot';
 import { createClientCore } from '@/lib/clients/core';
 import { listClients } from '@/lib/clients/queries';
 import type { OrgContext } from '@/lib/db/context';
-import { recordRomAcknowledgementCore } from '@/lib/engagements/approvals';
+import { recordRomAcknowledgementCore } from '@/lib/engagements/rom-acknowledgement';
 import { recordArtifactCore } from '@/lib/engagements/artifacts';
 import { createEngagementCore } from '@/lib/engagements/core';
 import { executeTransition } from '@/lib/engagements/executor';

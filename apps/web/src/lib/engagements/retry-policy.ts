@@ -24,6 +24,10 @@ import type { ActionCode, ActionResult } from '@/lib/actions/result';
 export const DEFINITE_REFUSALS: ReadonlySet<ActionCode> = new Set<ActionCode>([
   // Refused before the transaction even opened.
   'forbidden',
+  'draft_too_large',
+  'draft_incomplete',
+  // The draft moved on under a stale tab; the save rolled back.
+  'draft_changed_elsewhere',
   'invalid',
   'flow_not_enabled',
   'illegal_trigger',

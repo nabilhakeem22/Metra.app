@@ -49,8 +49,30 @@ function resolveDraftSection(
 }
 
 /**
+ * One stored id, one line. A payload that names the same stored line twice keeps
+ * the id on the FIRST and gives the repeat a fresh one, so the rebuild never
+ * inserts two rows under one primary key.
+ */
+function keepEachStoredIdOnce(sections: ResolvedSection[]): ResolvedSection[] {
+  const kept = new Set<string>();
+  return sections.map((section) => ({
+    ...section,
+    lines: section.lines.map((line) => {
+      if (!line.id) return line;
+      if (!kept.has(line.id)) {
+        kept.add(line.id);
+        return line;
+      }
+      return { ...line, id: undefined };
+    }),
+  }));
+}
+
+/**
  * Resolve every section + line (cost by the F1 stable-id rule, price/unit from
- * the line or the price book), computing each line + section total.
+ * the line or the price book), computing each line + section total. A stored
+ * line keeps its id, so a builder that saves again without reloading (autosave)
+ * still names lines the server knows.
  */
 export function resolveDraftLines(
   sections: SectionInput[],
@@ -62,7 +84,7 @@ export function resolveDraftLines(
     resolveDraftSection(section, index, costItemMap, costSnapshot, seeMargin),
   );
   return {
-    resolvedSections: resolved.map((entry) => entry.section),
+    resolvedSections: keepEachStoredIdOnce(resolved.map((entry) => entry.section)),
     sectionTotals: resolved.map((entry) => entry.totals),
   };
 }

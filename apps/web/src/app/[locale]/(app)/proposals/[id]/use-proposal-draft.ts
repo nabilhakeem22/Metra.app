@@ -1,15 +1,10 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { computeSection, computeTotals } from '@/lib/aggregates/proposal-totals';
 import type { ProposalDetail } from '@/lib/proposals/queries';
-import {
-  move,
-  previewLine,
-  type CostItemOption,
-  type LineState,
-  type SectionState,
-} from './builder-model';
+import { move, type CostItemOption, type LineState, type SectionState } from './builder-model';
+import { withLineIds } from './draft-save-receipt';
+import { computeDraftTotals, draftFromDetail, newLine } from './draft-state';
 
 /** Everything the builder holds while a studio is editing, and nothing else. */
 export interface ProposalDraftApi {
@@ -28,57 +23,8 @@ export interface ProposalDraftApi {
   addLine: (sectionIndex: number, costItem?: CostItemOption) => void;
   removeLine: (sectionIndex: number, lineIndex: number) => void;
   moveSection: (sectionIndex: number, direction: -1 | 1) => void;
-}
-
-/** A blank line, or one seeded from the price book. */
-function newLine(costItem?: CostItemOption): LineState {
-  return {
-    id: null,
-    costItemId: costItem?.id ?? null,
-    descriptionEn: costItem?.nameEn ?? '',
-    descriptionAr: costItem?.nameAr ?? '',
-    qty: '1',
-    unit: costItem?.unit ?? 'sqm',
-    unitCost: costItem?.defaultUnitCost ?? '0',
-    unitPrice: costItem?.defaultUnitPrice ?? '0',
-    discountPct: '0',
-  };
-}
-
-/** The stored document, as the editable shape. */
-function draftFromDetail(detail: ProposalDetail): SectionState[] {
-  return detail.sections.map((section) => ({
-    titleEn: section.titleEn ?? '',
-    titleAr: section.titleAr ?? '',
-    lines: section.lines.map((line) => ({
-      id: line.id,
-      costItemId: line.costItemId,
-      descriptionEn: line.descriptionEn ?? '',
-      descriptionAr: line.descriptionAr ?? '',
-      qty: line.qty,
-      unit: line.unit,
-      unitCost: line.unitCost ?? '0',
-      unitPrice: line.unitPrice,
-      discountPct: line.discountPct,
-    })),
-  }));
-}
-
-/** Live totals. `previewLine` coerces exactly as the server would, so what the
- *  studio steers by is what will be stored. */
-function computeDraftTotals(
-  sections: SectionState[],
-  header: { discountPct: string; taxRate: string; supervisionPct: string },
-) {
-  const sectionTotals = sections.map((section) =>
-    computeSection(section.lines.map(previewLine)),
-  );
-  const doc = computeTotals(sectionTotals, {
-    discountPct: header.discountPct || '0',
-    taxRate: header.taxRate || '0',
-    supervisionPct: header.supervisionPct || '0',
-  });
-  return { sectionTotals, doc };
+  /** Give lines the ids a save stored them under, by `LineState.key`. */
+  adoptLineIds: (idsByKey: ReadonlyMap<string, string>) => void;
 }
 
 export function useProposalDraft(detail: ProposalDetail): ProposalDraftApi {
@@ -162,5 +108,7 @@ export function useProposalDraft(detail: ProposalDetail): ProposalDraftApi {
       replaceLines(sectionIndex, (lines) => lines.filter((_, j) => j !== lineIndex)),
     moveSection: (sectionIndex, direction) =>
       setSections((current) => move(current, sectionIndex, direction)),
+    adoptLineIds: (idsByKey) =>
+      setSections((current) => withLineIds(current, idsByKey)),
   };
 }

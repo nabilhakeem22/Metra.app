@@ -3,7 +3,7 @@
 // for the client's own `acknowledge_handoff` token action), NOT a machine
 // transition: it moves no state and touches no trigger — the
 // `handoffAcknowledged` guard on `recipientAcknowledges` reads the event it
-// writes. Mirrors `recordRomAcknowledgementCore` (approvals.ts).
+// writes. Mirrors `recordRomAcknowledgementCore` (rom-acknowledgement.ts).
 import { designEngagements, engagementEvents } from '@metra/db';
 import { fail, mutateInOrg, requireInOrg } from '@/lib/actions/mutate';
 import { err, type ActionResult } from '@/lib/actions/result';

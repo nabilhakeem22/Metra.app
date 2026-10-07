@@ -1,4 +1,4 @@
-import type { LineState, SectionState } from './builder-model';
+import { figureOf, type LineState, type SectionState } from './builder-model';
 
 // WHAT A CLIENT SIGNS, built from what is on screen. PURE and server-safe: no
 // React, no db. It was an untested closure inside a 243-line component, which is
@@ -56,9 +56,10 @@ function textOrNull(value: string): string | null {
   return value || null;
 }
 
-/** An empty number box means zero, which is what the server would have stored. */
+/** An empty number box means zero, which is what the server would have stored;
+ *  anything typed is read as the preview reads it (Arabic digits, 1,000, "1."). */
 function numberOrZero(value: string): string {
-  return value || '0';
+  return figureOf(value) || '0';
 }
 
 function payloadLine(

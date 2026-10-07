@@ -19,6 +19,7 @@ import {
   sendProposalCore,
   supersedeProposalCore,
   type CreateProposalInput,
+  type DraftSaveReceipt,
   type SaveDraftInput,
 } from './core';
 import { renderProposalPreviewHtml } from './preview-html';
@@ -43,13 +44,26 @@ export async function createProposal(
   return res;
 }
 
-export async function saveProposalDraft(
-  input: SaveDraftInput,
-): Promise<ActionResult> {
+/** A draft save's answer: on success, the receipt (new revision, stored ids). */
+export type SaveDraftActionResult = ActionResult & { data?: DraftSaveReceipt };
+
+export async function saveProposalDraft(input: SaveDraftInput): Promise<SaveDraftActionResult> {
   const ctx = await requireOrg();
   const res = await saveProposalDraftCore(ctx, input);
   if (res.ok) refreshApp();
-  return { ok: res.ok, error: res.error };
+  return res.ok ? { ok: true, data: res.data } : { ok: false, error: res.error };
+}
+
+/**
+ * The builder's AUTOSAVE: the same save, WITHOUT `refreshApp()`. The builder's own
+ * state is the truth while it is open, so a pause in typing must not re-render
+ * the page from the server. The explicit saves (Send, Send as BOQ, Back) still go
+ * through `saveProposalDraft`, which refreshes once.
+ */
+export async function autosaveProposalDraft(input: SaveDraftInput): Promise<SaveDraftActionResult> {
+  const ctx = await requireOrg();
+  const res = await saveProposalDraftCore(ctx, input);
+  return res.ok ? { ok: true, data: res.data } : { ok: false, error: res.error };
 }
 
 export async function sendProposal(id: string): Promise<

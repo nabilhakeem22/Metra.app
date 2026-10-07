@@ -1,6 +1,7 @@
 'use client';
 
 import type { ConfirmOptions } from '@/components/ui/confirm-dialog';
+import type { SaveDraftResult } from './persist-draft';
 import type { ProposalDraftState } from './proposal-payload';
 import { useBoqBack } from './use-boq-back';
 import { useSendAsBoq } from './use-send-as-boq';
@@ -25,16 +26,18 @@ export function useBoqModeActions(options: {
   proposalId: string;
   boqMode: BoqModeProps | null;
   draftState: () => ProposalDraftState;
+  flush: () => Promise<SaveDraftResult>;
   totalBeforeVat: () => string;
   confirm: (options: ConfirmOptions) => Promise<boolean>;
 }) {
   const engagementId = options.boqMode?.engagementId ?? '';
-  const back = useBoqBack({ engagementId, draftState: options.draftState });
+  const back = useBoqBack({ engagementId, flush: options.flush });
   const sending = useSendAsBoq({
     proposalId: options.proposalId,
     engagementId,
     clientCanOpenNow: options.boqMode?.clientCanOpenNow ?? false,
     draftState: options.draftState,
+    flush: options.flush,
     totalBeforeVat: options.totalBeforeVat,
     confirm: options.confirm,
   });

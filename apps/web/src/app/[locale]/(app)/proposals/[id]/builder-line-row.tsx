@@ -42,12 +42,12 @@ export function BuilderLineRow({
   const lt = previewLine(line);
 
   return (
-    <tr className="border-t">
+    <tr className="border-t" data-draft-line={`${si}-${li}`}>
       <td className="px-1 py-1">
-        <Input dir="ltr" value={line.descriptionEn} onChange={(e) => patchLine(si, li, { descriptionEn: e.target.value })} className={inp} />
+        <Input dir="ltr" data-draft-input="description" value={line.descriptionEn} onChange={(e) => patchLine(si, li, { descriptionEn: e.target.value })} className={inp} />
       </td>
       <td className="px-1 py-1">
-        <Input dir="ltr" inputMode="decimal" value={line.qty} onChange={(e) => patchLine(si, li, { qty: e.target.value })} className={`${inp} w-16`} />
+        <Input dir="ltr" inputMode="decimal" data-draft-input="qty" value={line.qty} onChange={(e) => patchLine(si, li, { qty: e.target.value })} className={`${inp} w-16`} />
       </td>
       <td className="px-1 py-1">
         <Select value={line.unit} onValueChange={(v) => patchLine(si, li, { unit: v })}>
@@ -63,14 +63,14 @@ export function BuilderLineRow({
       </td>
       {seeMargin && (
         <td className="px-1 py-1">
-          <Input dir="ltr" inputMode="decimal" value={line.unitCost} onChange={(e) => patchLine(si, li, { unitCost: e.target.value })} className={`${inp} w-20`} />
+          <Input dir="ltr" inputMode="decimal" data-draft-input="unitCost" value={line.unitCost} onChange={(e) => patchLine(si, li, { unitCost: e.target.value })} className={`${inp} w-20`} />
         </td>
       )}
       <td className="px-1 py-1">
-        <Input dir="ltr" inputMode="decimal" value={line.unitPrice} onChange={(e) => patchLine(si, li, { unitPrice: e.target.value })} className={`${inp} w-20`} />
+        <Input dir="ltr" inputMode="decimal" data-draft-input="unitPrice" value={line.unitPrice} onChange={(e) => patchLine(si, li, { unitPrice: e.target.value })} className={`${inp} w-20`} />
       </td>
       <td className="px-1 py-1">
-        <Input dir="ltr" inputMode="decimal" value={line.discountPct} onChange={(e) => patchLine(si, li, { discountPct: e.target.value })} className={`${inp} w-14`} />
+        <Input dir="ltr" inputMode="decimal" data-draft-input="discountPct" value={line.discountPct} onChange={(e) => patchLine(si, li, { discountPct: e.target.value })} className={`${inp} w-14`} />
       </td>
       <td className="px-1 py-1 text-end" dir="ltr">{formatMoney(lt.lineTotal, locale)}</td>
       <td className="px-1 py-1">

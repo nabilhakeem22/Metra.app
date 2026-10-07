@@ -479,6 +479,9 @@
     "client_required": "اختار عميل",
     "invalid_dates": "تاريخ النهاية لازم يكون في نفس يوم تاريخ البداية أو بعده",
     "proposal_not_draft": "العرض ده مبقاش مسودة.",
+    "draft_changed_elsewhere": "المسودة دي اتعدلت في تاب تاني أو من حد تاني. اعمل تحميل للصفحة عشان تجيب آخر نسخة، وبعدين اعمل تعديلك تاني.",
+    "draft_too_large": "المسودة دي كبيرة قوي ومينفعش تتحفظ مرة واحدة. قلل عدد البنود أو قصّر الوصف.",
+    "draft_incomplete": "كل بند محتاج وصف وأرقام صح، وكل قسم محتاج اسم. أول خانة ناقصة اتحددت.",
     "line_required": "ضيف بند واحد على الأقل",
     "token_invalid": "هذا الرابط غير صالح",
     "token_expired": "انتهت صلاحية هذا الرابط",
@@ -1300,8 +1303,22 @@
       "unitPrice": "سعر الوحدة",
       "discount": "خصم %",
       "removeLine": "حذف البند",
-      "save": "حفظ كمسودة",
       "send": "إرسال",
+      "autosave": {
+        "saved": "اتحفظ",
+        "savedAt": "اتحفظ {time}",
+        "saving": "بيتحفظ",
+        "dirty": "فيه تعديلات لسه ما اتحفظتش",
+        "incomplete": "فيه تعديلات لسه ما اتحفظتش: هتتحفظ لما كل بند ياخد وصف وكل قسم ياخد اسم",
+        "failed": "ما اتحفظش: {reason}",
+        "retry": "جرّب تاني"
+      },
+      "leave": {
+        "title": "تمشي من غير ما تحفظ؟",
+        "body": "آخر تعديلاتك ما اتحفظتش: {reason}",
+        "confirm": "امشي من غير حفظ",
+        "stay": "خليك وصلّحها"
+      },
       "delete": "حذف المسودة",
       "sectionSubtotal": "إجمالي القسم",
       "subtotal": "المجموع الفرعي",
@@ -1341,7 +1358,6 @@
     },
     "toast": {
       "created": "العرض اتعمل",
-      "saved": "المسودة اتحفظت",
       "sent": "العرض اتبعت",
       "expired": "العرض اتعلم كمنتهي الصلاحية",
       "superseded": "الإصدار 2 اتعمل",
@@ -1432,13 +1448,24 @@
       "followup_reminder": "تنبيه متابعة",
       "expire_nudge": "عرض سعر هينتهي قريب",
       "portfolio_digest": "ملخص محفظة الأعمال",
-      "stage_reminder": "تنبيه المرحلة"
+      "stage_reminder": "تنبيه المرحلة",
+      "client_responded": "العميل رد"
     },
     "body": {
       "proposal_expiring": "عرض السعر {number} هينتهي في {date}.",
       "proposal_followup": "عرض السعر {number} مستني رد بقاله {days} يوم.",
       "portfolio_digest": "{active} مشاريع شغالة، {awaiting} مستنية الرد، {expiring} هتنتهي قريب، {overdue} مراحل متأخرة.",
-      "stage_reminder": "{overdue} مراحل متأخرة و{upcoming} جايين."
+      "stage_reminder": "{overdue} مراحل متأخرة و{upcoming} جايين.",
+      "client_concept_approved": "العميل وافق على الفكرة في {delivery}.",
+      "client_concept_chosen": "العميل اختار بديل للفكرة في {delivery}.",
+      "client_concept_changes_requested": "العميل طلب تعديلات على الفكرة في {delivery}.",
+      "client_design_approved": "العميل وافق على التصميم في {delivery}.",
+      "client_design_changes_requested": "العميل طلب تعديلات على التصميم في {delivery}.",
+      "client_budget_acknowledged": "العميل أكد نطاق الميزانية في {delivery}.",
+      "client_handover_acknowledged": "العميل أكد استلام التسليم في {delivery}.",
+      "client_payment_claimed": "{hasMilestone, select, yes {العميل بيقول إنه دفع ({milestone}) في {delivery}. أكدها من صفحة التسليم.} other {العميل بيقول إنه دفع دفعة في {delivery}. أكدها من صفحة التسليم.}}",
+      "client_payment_claimed_many": "{claimCount, plural, zero {العميل بيقول إنه دفع في {delivery}. أكدها من صفحة التسليم.} one {العميل بيقول إنه دفع دفعة في {delivery}. أكدها من صفحة التسليم.} two {العميل بيقول إنه دفع دفعتين في {delivery}. أكدهم من صفحة التسليم.} few {العميل بيقول إنه دفع {count} دفعات في {delivery}. أكدهم من صفحة التسليم.} many {العميل بيقول إنه دفع {count} دفعة في {delivery}. أكدهم من صفحة التسليم.} other {العميل بيقول إنه دفع {count} دفعة في {delivery}. أكدهم من صفحة التسليم.}}",
+      "client_commented": "{commentCount, plural, zero {العميل كتب تعليقات على {delivery}.} one {العميل كتب تعليق على {delivery}.} two {العميل كتب تعليقين على {delivery}.} few {العميل كتب {count} تعليقات على {delivery}.} many {العميل كتب {count} تعليق على {delivery}.} other {العميل كتب {count} تعليق على {delivery}.}}"
     },
     "viewAll": "عرض الكل"
   },
@@ -1929,6 +1956,9 @@
       "uploading": "جاري الرفع...",
       "dropHere": "سيب الملفات هنا",
       "uploadedSummary": "اترفع {done} من {total}",
+      "retry": "جرّب تاني",
+      "retryFile": "جرّب {name} تاني",
+      "retryFailed": "جرّب اللي فشل تاني",
       "status": {
         "queued": "مستني",
         "uploading": "بيترفع",
@@ -2137,7 +2167,15 @@
       "lastChange": "آخر تغيير",
       "older": "تسليمات أقدم",
       "newest": "أحدث التسليمات",
-      "pages": "صفحات التسليمات"
+      "pages": "صفحات التسليمات",
+      "filter": {
+        "label": "اعرض التسليمات",
+        "all": "الكل",
+        "mine": "دوري"
+      },
+      "mineEmpty": "مفيش حاجة مستنياك.",
+      "mineEmptyPartial": "مفيش ولا تسليم من أحدث {count} تسليم مفتوح مستنيك. الأقدم منهم ما اتراجعش.",
+      "truncated": "بنعرض أحدث {count} تسليم مفتوح بس."
     },
     "age": {
       "today": "النهارده",

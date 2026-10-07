@@ -106,6 +106,22 @@ describe('EngagementsList', () => {
     ]);
   });
 
+  test('below sm each row is a stacked card: title, then status, stage and age; sm and up keep the four columns', () => {
+    const { container } = renderWithIntl(<EngagementsList items={rows} now={NOW} />, { locale: 'en' });
+    for (const link of container.querySelectorAll('[data-delivery-row]')) {
+      expect(link.className).toMatch(/(^| )flex( |$)/);
+      expect(link.className).toContain('flex-col');
+      expect(link.className).toContain('sm:grid');
+      const [title, stage, status, age] = [...link.children];
+      expect(title.className).not.toMatch(/order-/);
+      expect(status.className).toContain('order-2');
+      expect(stage.className).toContain('order-3');
+      expect(age.className).toContain('order-4');
+      for (const cell of [stage, status, age]) expect(cell.className).toContain('sm:order-none');
+    }
+    expect(container.querySelectorAll('[data-delivery-row]')).toHaveLength(rows.length);
+  });
+
   test('each row carries its age', () => {
     renderWithIntl(<EngagementsList items={rows} now={NOW} />, { locale: 'en' });
     expect(screen.getAllByText('5 days')).toHaveLength(3);

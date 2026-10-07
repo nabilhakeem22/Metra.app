@@ -45,6 +45,7 @@ export {
 export {
   recordArtifact,
   createDeliverableUpload,
+  renewDeliverableUpload,
   attachDeliverable,
   getDeliverableUrl,
   setArtifactClientVisibility,
