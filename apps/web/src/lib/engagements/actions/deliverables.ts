@@ -22,6 +22,10 @@ import {
   type AttachDeliverableInput,
   type CreateDeliverableUploadInput,
 } from '../deliverable-uploads';
+import {
+  renewDeliverableUploadCore,
+  type RenewDeliverableUploadInput,
+} from '../deliverable-upload-renew';
 
 /**
  * Server-action wrapper for {@link recordArtifactCore}: resolves the request's
@@ -50,6 +54,17 @@ export async function createDeliverableUpload(
 ): Promise<SignedUpload | ActionResult> {
   const ctx = await requireOrg();
   return createDeliverableUploadCore(ctx, input);
+}
+
+/**
+ * Server-action wrapper for {@link renewDeliverableUploadCore}: a new signed PUT
+ * URL for a failed upload, on the same files row. Never throws to the client.
+ */
+export async function renewDeliverableUpload(
+  input: RenewDeliverableUploadInput,
+): Promise<{ fileId: string; signedUrl: string } | ActionResult> {
+  const ctx = await requireOrg();
+  return renewDeliverableUploadCore(ctx, input);
 }
 
 /**

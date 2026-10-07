@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { afterAll, describe, expect, it } from 'vitest';
+import { afterAll, describe, expect, it, vi } from 'vitest';
 import { createClientCore } from '@/lib/clients/core';
 import { listClients } from '@/lib/clients/queries';
 import {
@@ -7,12 +7,19 @@ import {
   getDeliverableUrlCore,
 } from '@/lib/engagements/deliverable-uploads';
 import { createEngagementCore } from '@/lib/engagements/core';
+import { renewDeliverableUploadCore } from '@/lib/engagements/deliverable-upload-renew';
 import { deriveWorkingFiles } from '@/lib/engagements/working-files';
 import { getEngagementArtifacts } from '@/lib/engagements/queries';
 import { createProjectCore } from '@/lib/projects/core';
 import { listProjects } from '@/lib/projects/queries';
 import type { OrgContext } from '@/lib/db/context';
 import { closeFixture, ctxFor, raw, seedOrg, teardown } from './fixture';
+
+// Storage is not in the dbtest: a renewed signed URL is its object key on a fake host.
+vi.mock('@/lib/storage/uploads', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/storage/uploads')>()),
+  renewSignedUploadUrl: async (objectKey: string) => ({ signedUrl: `https://storage.test/${objectKey}` }),
+}));
 
 const orgIds: string[] = [];
 
@@ -189,5 +196,67 @@ describe('getDeliverableUrl — foreign file guard', () => {
 
     const res = await getDeliverableUrlCore(ctxA, foreignFileId);
     expect(res).toEqual({ ok: false, error: 'invalid' });
+  });
+});
+
+describe('a retried attach is the artifact already recorded (F5)', () => {
+  it('attaching the same upload twice records ONE concept option and answers its id both times', async () => {
+    const { ctx, engagementId } = await setupEngagement();
+    const fileId = await seedEngagementFile(ctx.orgId, engagementId, ctx.userId);
+    const first = await attachDeliverableCore(ctx, { engagementId, category: 'conceptOption', fileId });
+    const again = await attachDeliverableCore(ctx, { engagementId, category: 'conceptOption', fileId });
+    expect(first.ok && again.ok).toBe(true);
+    expect(again.data).toBe(first.data);
+    const [row] = await raw.query<{ count: number }>(
+      `select count(*)::int as count from public.engagement_artifacts
+        where engagement_id = '${engagementId}' and file_id = '${fileId}'`,
+    );
+    expect(Number(row.count)).toBe(1);
+  });
+
+  it('a retried attach of the fourth option is not refused as a fifth', async () => {
+    const { ctx, engagementId } = await setupEngagement();
+    const fileIds: string[] = [];
+    for (let option = 0; option < 4; option += 1) {
+      const fileId = await seedEngagementFile(ctx.orgId, engagementId, ctx.userId);
+      fileIds.push(fileId);
+      expect((await attachDeliverableCore(ctx, { engagementId, category: 'conceptOption', fileId })).ok).toBe(true);
+    }
+    expect((await attachDeliverableCore(ctx, { engagementId, category: 'conceptOption', fileId: fileIds[3] })).ok).toBe(true);
+    const fifth = await seedEngagementFile(ctx.orgId, engagementId, ctx.userId);
+    expect(await attachDeliverableCore(ctx, { engagementId, category: 'conceptOption', fileId: fifth })).toEqual({
+      ok: false,
+      error: 'concept_options_out_of_range',
+    });
+  });
+});
+
+describe('renewDeliverableUpload reuses the files row of a failed upload (R3)', () => {
+  it('signs the SAME object again for an unattached upload of this delivery', async () => {
+    const { ctx, engagementId } = await setupEngagement();
+    const fileId = await seedEngagementFile(ctx.orgId, engagementId, ctx.userId);
+    const [before] = await raw.query<{ count: number }>(`select count(*)::int as count from public.files where org_id = '${ctx.orgId}'`);
+    const renewed = await renewDeliverableUploadCore(ctx, { engagementId, fileId });
+    expect(renewed).toEqual({ fileId, signedUrl: `https://storage.test/${ctx.orgId}/engagement/${fileId}` });
+    const [after] = await raw.query<{ count: number }>(`select count(*)::int as count from public.files where org_id = '${ctx.orgId}'`);
+    expect(Number(after.count)).toBe(Number(before.count));
+  });
+
+  it('refuses an attached file, another delivery or org file, and a closed delivery', async () => {
+    const { ctx, engagementId } = await setupEngagement();
+    const attached = await seedEngagementFile(ctx.orgId, engagementId, ctx.userId);
+    await attachDeliverableCore(ctx, { engagementId, category: 'layout', fileId: attached });
+    expect(await renewDeliverableUploadCore(ctx, { engagementId, fileId: attached })).toEqual({ ok: false, error: 'invalid' });
+
+    const { ctx: other, engagementId: otherEngagement } = await setupEngagement();
+    const foreign = await seedEngagementFile(other.orgId, otherEngagement, other.userId);
+    expect(await renewDeliverableUploadCore(ctx, { engagementId, fileId: foreign })).toEqual({ ok: false, error: 'invalid' });
+
+    const pending = await seedEngagementFile(ctx.orgId, engagementId, ctx.userId);
+    await raw.query(`update public.design_engagements set state = 'abandoned' where id = '${engagementId}'`);
+    expect(await renewDeliverableUploadCore(ctx, { engagementId, fileId: pending })).toEqual({
+      ok: false,
+      error: 'engagement_not_active',
+    });
   });
 });

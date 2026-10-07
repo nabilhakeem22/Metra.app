@@ -1,7 +1,7 @@
 'use client';
 
 import { useLocale, useTranslations } from 'next-intl';
-import { useRef, useState, useTransition } from 'react';
+import { useEffect, useRef, useState, useTransition } from 'react';
 import { toast } from '@/hooks/use-toast';
 import { useRouter } from '@/i18n/routing';
 import { resolveActionError } from '@/lib/actions/error-message';
@@ -50,6 +50,14 @@ export function useDeliverableUpload(engagementId: string): {
   const [queue, setQueue] = useState<UploadQueueItem[]>([]);
   // The files of the CURRENT batch by queue key, so a retry can send one again.
   const batchFiles = useRef(new Map<string, QueuedFile>());
+  // Leaving the page abandons the transfer in flight and the rest of the queue:
+  // no upload, refresh or toast lands on a page the studio has moved on to.
+  const leaving = useRef(new AbortController());
+  useEffect(() => {
+    const controller = new AbortController();
+    leaving.current = controller;
+    return () => controller.abort();
+  }, []);
 
   function messageOf(outcome: DeliverableUploadOutcome): string | null {
     if (outcome.ok) return null;
@@ -64,11 +72,14 @@ export function useDeliverableUpload(engagementId: string): {
   }
 
   /** Upload one queued file, keeping its row current. True when it landed. */
-  async function uploadOne(key: string, { file, category }: QueuedFile): Promise<boolean> {
+  async function uploadOne(key: string, queued: QueuedFile): Promise<boolean> {
     setItem(key, UPLOADING_PATCH);
-    const outcome = await uploadDeliverableFile(engagementId, category, file, (progress) =>
-      setItem(key, { progress }),
-    );
+    const outcome = await uploadDeliverableFile(engagementId, queued.category, queued.file, {
+      onProgress: (progress) => setItem(key, { progress }),
+      signal: leaving.current.signal,
+      resume: queued.resume,
+    });
+    queued.resume = outcome.ok ? undefined : outcome.resume;
     setItem(key, settledPatch(outcome, messageOf(outcome)));
     return outcome.ok;
   }
@@ -77,11 +88,15 @@ export function useDeliverableUpload(engagementId: string): {
     running.current = true;
     setUploading(true);
     try {
-      const { done, failed } = await runUploadQueue(keys, batchFiles.current, maxFiles, {
+      const signal = leaving.current.signal;
+      const steps = {
         upload: uploadOne,
-        refuse: (key, refusal) => setItem(key, settledPatch(refusal, messageOf(refusal))),
-        skip: (key) => setItem(key, SKIPPED_PATCH),
-      });
+        refuse: (key: string, refusal: DeliverableUploadOutcome) =>
+          setItem(key, settledPatch(refusal, messageOf(refusal))),
+        skip: (key: string) => setItem(key, SKIPPED_PATCH),
+      };
+      const { done, failed } = await runUploadQueue(keys, batchFiles.current, maxFiles, steps, signal);
+      if (signal.aborted) return;
       // A failure may still have landed server-side (or the cap moved under us):
       // refresh so the card's count and dropzone match the ledger either way.
       if (done > 0 || failed > 0) router.refresh();

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test, vi } from 'vitest';
-import { act, fireEvent, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, screen } from '@testing-library/react';
 import { messageAt, renderWithIntl } from '@/test/render-with-intl';
 import { EngagementInlineDropzone } from './engagement-inline-dropzone';
 import { UploadQueueList } from './upload-queue-list';
@@ -199,8 +199,8 @@ describe('EngagementInlineDropzone retry', () => {
   test('a file uploading shows its progress as a progressbar', async () => {
     let finish: (value: { ok: true }) => void = () => {};
     upload.mockImplementationOnce(
-      (_engagementId: string, _category: string, _file: File, onProgress: (percent: number) => void) => {
-        onProgress(40);
+      (_engagementId: string, _category: string, _file: File, options: { onProgress: (percent: number) => void }) => {
+        options.onProgress(40);
         return new Promise((resolve) => {
           finish = resolve;
         });
@@ -218,6 +218,50 @@ describe('EngagementInlineDropzone retry', () => {
       await new Promise((resolve) => setTimeout(resolve, 10));
     });
     expect(screen.queryByRole('progressbar')).toBeNull();
+  });
+});
+
+describe('EngagementInlineDropzone leaving', () => {
+  test('R3: unmounting aborts the upload in flight and the rest of the queue, with no refresh or toast', async () => {
+    let signal: AbortSignal | undefined;
+    upload.mockImplementationOnce(
+      (_engagementId: string, _category: string, _file: File, options: { signal: AbortSignal }) => {
+        signal = options.signal;
+        return new Promise((resolve) => {
+          options.signal.addEventListener('abort', () => resolve({ ok: false, reason: 'aborted' }));
+        });
+      },
+    );
+    const zone = renderDropzone();
+    await act(async () => {
+      fireEvent.drop(zone, { dataTransfer: { files: [pdf('a.pdf'), pdf('b.pdf')] } });
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    });
+    cleanup();
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    });
+    expect(signal?.aborted).toBe(true);
+    expect(upload).toHaveBeenCalledTimes(1);
+    expect(router.refresh).not.toHaveBeenCalled();
+    expect(toasts).toEqual([]);
+  });
+
+  test('F5: Retry hands the attempt its own resume point (the same file row)', async () => {
+    upload
+      .mockResolvedValueOnce({ ok: false, reason: 'generic', resume: { fileId: 'f-9', stage: 'attach' } })
+      .mockResolvedValueOnce({ ok: true });
+    const zone = renderDropzone();
+    await act(async () => {
+      fireEvent.drop(zone, { dataTransfer: { files: [pdf('a.pdf')] } });
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Retry a.pdf' }));
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    });
+    expect(upload.mock.calls[0][3].resume).toBeUndefined();
+    expect(upload.mock.calls[1][3].resume).toEqual({ fileId: 'f-9', stage: 'attach' });
   });
 });
 
