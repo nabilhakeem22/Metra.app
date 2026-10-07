@@ -71,6 +71,13 @@ describe('EngagementsClient: All / My move', () => {
     expect(screen.getByText('Showing the 200 newest open deliveries only.')).toBeTruthy();
   });
 
+  test('F8: an empty but partial My move never says nothing is waiting', () => {
+    renderList({ mine: true, items: [], truncatedAt: 200 });
+    expect(screen.queryByText(en('engagements.list.mineEmpty'))).toBeNull();
+    expect(screen.getByText('None of the 200 newest open deliveries is waiting on you. Older ones were not checked.')).toBeTruthy();
+    expect(screen.queryByText('Showing the 200 newest open deliveries only.')).toBeNull();
+  });
+
   test('an empty My move says nothing is waiting, not "start a delivery"', () => {
     renderList({ mine: true, items: [] });
     expect(screen.getByText(en('engagements.list.mineEmpty'))).toBeTruthy();

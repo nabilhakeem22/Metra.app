@@ -66,7 +66,16 @@ export function EngagementsClient({
       {items.length === 0 && view.mine ? (
         <Card>
           <CardContent className="py-4">
-            <EmptyState icon={<Compass className="size-6" aria-hidden />} title={t('list.mineEmpty')} />
+            {/* Past the scan limit "nothing is waiting" would be a claim about
+                deliveries never looked at: say what was checked instead. */}
+            <EmptyState
+              icon={<Compass className="size-6" aria-hidden />}
+              title={
+                view.truncatedAt === null
+                  ? t('list.mineEmpty')
+                  : t('list.mineEmptyPartial', { count: formatNumber(view.truncatedAt, locale) })
+              }
+            />
           </CardContent>
         </Card>
       ) : items.length === 0 && paging.isFirstPage ? (
@@ -87,7 +96,7 @@ export function EngagementsClient({
           </CardContent>
         </Card>
       )}
-      {view.truncatedAt !== null && (
+      {view.truncatedAt !== null && items.length > 0 && (
         <p className="text-caption text-muted-foreground">
           {t('list.truncated', { count: formatNumber(view.truncatedAt, locale) })}
         </p>
