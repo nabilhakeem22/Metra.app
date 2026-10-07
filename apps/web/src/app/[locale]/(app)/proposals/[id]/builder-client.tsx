@@ -17,7 +17,7 @@ import type { ProposalDraftState } from './proposal-payload';
 import type { SectionOption } from './section-combobox';
 import { SendAsBoqButton } from './send-as-boq-button';
 import { useBoqModeActions, type BoqModeProps } from './use-boq-mode-actions';
-import { useDraftAutosave } from './use-draft-autosave';
+import { useBuilderAutosave } from './use-builder-autosave';
 import { useProposalDraft } from './use-proposal-draft';
 
 export type { BoqModeProps };
@@ -66,9 +66,12 @@ export function ProposalBuilder({
   // Read when an action RUNS, once `autosave` exists. Sent quote: autosave stops.
   const flush = () => autosave.flush();
   const actions = useBuilderActions({ proposalId: detail.id, confirm, flush });
-  const autosave = useDraftAutosave({
+  const autosave = useBuilderAutosave({
     draft: draftState(),
+    revision: detail.revision,
     enabled: detail.status === 'draft' && actions.link === null,
+    adoptLineIds: draft.adoptLineIds,
+    confirm,
   });
   const boq = useBoqModeActions({
     proposalId: detail.id,

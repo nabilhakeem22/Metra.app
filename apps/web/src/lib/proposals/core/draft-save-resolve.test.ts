@@ -39,6 +39,21 @@ describe('resolveDraftLines keeps stored ids', () => {
     expect(lines[2].unitCost).toBe('0');
   });
 
+  it('F1: a NEW price-book line keeps the cost a margin-visible caller sent; a margin-blind one gets the price book', () => {
+    const priceBook = new Map([['ci-1', { id: 'ci-1', active: true, unit: 'sqm', defaultUnitCost: '100.0000', defaultUnitPrice: '200', nameEn: 'Marble', nameAr: null }]]);
+    const marble = { ...line(null, 'Marble'), costItemId: 'ci-1', unitCost: '150' };
+    const owner = resolveDraftLines([{ titleEn: 'S', lines: [marble] }], priceBook as never, new Map(), true);
+    const pm = resolveDraftLines([{ titleEn: 'S', lines: [marble] }], priceBook as never, new Map(), false);
+    expect(owner.resolvedSections[0].lines[0].unitCost).toBe('150');
+    expect(pm.resolvedSections[0].lines[0].unitCost).toBe('100.0000');
+  });
+
+  it('S1: a line id that is not a string is a new line, never a TypeError', () => {
+    const odd = { ...line(null, 'A'), id: { toString: () => 'l-1' } as unknown as string };
+    const { resolvedSections } = resolveDraftLines([{ titleEn: 'S', lines: [odd] }], new Map(), new Map([['l-1', '5']]), false);
+    expect(resolvedSections[0].lines[0].id).toBeUndefined();
+  });
+
   it('the first claim wins across sections', () => {
     const snapshot = new Map([['l-1', '1']]);
     const { resolvedSections } = resolveDraftLines(

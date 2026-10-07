@@ -6,6 +6,7 @@ import { MAX_BOQ_LINES } from '@/lib/boqs/core';
 import { loadDocumentNames, type DocumentNames } from '@/lib/boqs/issue';
 import { withOrgContext, type OrgContext } from '@/lib/db/context';
 import { isTerminal } from '@/lib/engagements/states';
+import { proposalRevision } from '@/lib/proposals/revision';
 import { isUuid } from '@/lib/uuid';
 import { countSendable } from './count';
 import type { ProposalSourceSection } from './map';
@@ -39,9 +40,6 @@ export interface SendSnapshot {
 export interface AlreadySent {
   alreadySent: SentBoq;
 }
-
-/** The SQL text form of a revision token, shared with the commit's re-read. */
-export const proposalRevision = sql<string>`(extract(epoch from ${proposals.updatedAt}) * 1000000)::bigint::text`;
 
 /** The BOQ proposal's header, or null when it is missing, foreign or a quote. */
 async function readBoqProposal(

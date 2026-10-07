@@ -44,6 +44,7 @@ const draft: ProposalDraftState = {
       titleAr: '',
       lines: [
         {
+          key: 'k-1',
           id: null,
           costItemId: null,
           descriptionEn: 'Gypsum',

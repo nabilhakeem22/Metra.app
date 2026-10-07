@@ -60,7 +60,7 @@ function resolveLineIdentity(
 
 /** The line's id when it names one of this proposal's stored lines, else null. */
 function storedLineId(line: LineInput, costSnapshot: Map<string, string>): string | null {
-  const lineId = line.id?.trim() || null;
+  const lineId = typeof line.id === 'string' ? line.id.trim() : '';
   return lineId && costSnapshot.has(lineId) ? lineId : null;
 }
 
@@ -70,7 +70,8 @@ function storedLineId(line: LineInput, costSnapshot: Map<string, string>): strin
  * An EXISTING line keeps its stored cost unless a margin-visible caller sent a
  * new one — which is what stops a project manager who cannot see cost from
  * silently zeroing it just by saving the page they are allowed to edit. A NEW
- * line takes the price book's cost, or the caller's, or zero.
+ * line takes the cost a margin-visible caller sent (an owner's override of the
+ * price book), else the price book's, else zero.
  */
 function resolveLineCost(
   line: LineInput,
@@ -83,8 +84,8 @@ function resolveLineCost(
   if (storedCost !== undefined) {
     return seeMargin ? (line.unitCost ?? storedCost) : storedCost;
   }
-  if (identity.costItemId) return identity.costItem!.defaultUnitCost;
-  return seeMargin ? line.unitCost || '0' : '0';
+  if (seeMargin && line.unitCost) return line.unitCost;
+  return identity.costItemId ? identity.costItem!.defaultUnitCost : '0';
 }
 
 /** The four priced figures, read. Range-checking the discount is the CALLER's

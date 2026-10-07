@@ -8,6 +8,7 @@ import 'server-only';
 // silently go missing and nothing would fail.
 import { clients, proposals, type MetraDb } from '@metra/db';
 import { eq } from 'drizzle-orm';
+import { proposalRevision } from '../revision';
 
 const PROPOSAL_HEADER_COLUMNS = {
   id: proposals.id,
@@ -21,6 +22,7 @@ const PROPOSAL_HEADER_COLUMNS = {
   issueDate: proposals.issueDate,
   expiryDate: proposals.expiryDate,
   createdAt: proposals.createdAt,
+  revision: proposalRevision,
   version: proposals.version,
   supersedesId: proposals.supersedesId,
   clientId: proposals.clientId,

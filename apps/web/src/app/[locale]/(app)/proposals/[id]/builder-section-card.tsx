@@ -65,7 +65,7 @@ export function BuilderSectionCard({
   return (
     <Card>
       <CardContent className="space-y-3 py-4">
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2" data-draft-section={si}>
           <SectionCombobox
             className="min-w-40 flex-1"
             locale={locale}
@@ -149,7 +149,7 @@ export function BuilderSectionCard({
             <tbody>
               {sec.lines.map((l, li) => (
                 <BuilderLineRow
-                  key={li}
+                  key={l.key}
                   line={l}
                   sectionIndex={si}
                   lineIndex={li}

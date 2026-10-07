@@ -12,9 +12,9 @@ import type { DraftAutosaveApi } from './use-draft-autosave';
  * Save button: the draft saves itself.
  */
 export function BuilderSaveStatus({
-  autosave: { saveState, lastSavedAt, error, retry },
+  autosave: { saveState, incomplete, lastSavedAt, error, retry },
 }: {
-  autosave: Pick<DraftAutosaveApi, 'saveState' | 'lastSavedAt' | 'error' | 'retry'>;
+  autosave: Pick<DraftAutosaveApi, 'saveState' | 'incomplete' | 'lastSavedAt' | 'error' | 'retry'>;
 }) {
   const t = useTranslations('proposals.builder.autosave');
   const te = useTranslations('errors');
@@ -37,7 +37,7 @@ export function BuilderSaveStatus({
     saveState === 'saving'
       ? t('saving')
       : saveState === 'dirty'
-        ? t('dirty')
+        ? t(incomplete ? 'incomplete' : 'dirty')
         : lastSavedAt
           ? t('savedAt', { time: formatTime(lastSavedAt, locale) })
           : t('saved');

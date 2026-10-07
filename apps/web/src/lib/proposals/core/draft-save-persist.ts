@@ -7,12 +7,15 @@ import {
   proposals,
   type MetraDb,
 } from '@metra/db';
+import { randomUUID } from 'node:crypto';
 import { and, eq, sql } from 'drizzle-orm';
 import { fail } from '@/lib/actions/mutate';
 import { insertLinesInChunks } from '@/lib/lines/insert-chunked';
 import type { DocTotals } from '@/lib/aggregates/proposal-totals';
 import type { ResolvedHeader } from './draft-save-validate';
+import { proposalRevision } from '../revision';
 import type { ResolvedSection } from './draft-save-resolve';
+import type { DraftSaveReceipt } from './types';
 
 /**
  * Replace the document's sections and lines: delete, then batch-insert the
@@ -21,59 +24,47 @@ import type { ResolvedSection } from './draft-save-resolve';
  *
  * THE DELETE IS UNCONDITIONAL, and that is the point: a save that sends NO
  * sections must EMPTY the document, not leave the previous ones standing.
+ *
+ * Every row's id is decided HERE, before the inserts (a kept line id, else a
+ * fresh uuid), so the receipt names each stored row in the order it was sent
+ * without trusting the order RETURNING happens to give.
  */
 export async function replaceDraftSectionsAndLines(
   tx: MetraDb,
   orgId: string,
   proposalId: string,
   resolvedSections: ResolvedSection[],
-): Promise<void> {
+): Promise<DraftSaveReceipt['sections']> {
   await tx
     .delete(proposalSections)
     .where(eq(proposalSections.proposalId, proposalId));
-  if (!resolvedSections.length) return;
-  const sectionIds = await insertDraftSections(
-    tx,
-    orgId,
-    proposalId,
-    resolvedSections,
-  );
-  const lineRows = resolvedSections.flatMap((section, index) =>
-    section.lines.map((line) => ({
+  if (!resolvedSections.length) return [];
+  const stored = resolvedSections.map((section) => ({
+    id: randomUUID(),
+    lineIds: section.lines.map((line) => line.id ?? randomUUID()),
+  }));
+  await tx.insert(proposalSections).values(
+    resolvedSections.map((section, index) => ({
+      id: stored[index].id,
       orgId,
       proposalId,
-      sectionId: sectionIds[index],
+      titleAr: section.titleAr,
+      titleEn: section.titleEn,
+      sortOrder: section.sortOrder,
+      sectionSubtotal: section.subtotal,
+    })),
+  );
+  const lineRows = resolvedSections.flatMap((section, index) =>
+    section.lines.map((line, lineIndex) => ({
       ...line,
+      id: stored[index].lineIds[lineIndex],
+      orgId,
+      proposalId,
+      sectionId: stored[index].id,
     })),
   );
   await insertLinesInChunks(tx, proposalLines, lineRows);
-}
-
-/**
- * ONE insert for every section, returning their new ids IN INPUT ORDER — which is
- * what lets the lines below be pointed at their section by index rather than by a
- * second query each.
- */
-async function insertDraftSections(
-  tx: MetraDb,
-  orgId: string,
-  proposalId: string,
-  resolvedSections: ResolvedSection[],
-): Promise<string[]> {
-  const rows = await tx
-    .insert(proposalSections)
-    .values(
-      resolvedSections.map((section) => ({
-        orgId,
-        proposalId,
-        titleAr: section.titleAr,
-        titleEn: section.titleEn,
-        sortOrder: section.sortOrder,
-        sectionSubtotal: section.subtotal,
-      })),
-    )
-    .returning({ id: proposalSections.id });
-  return rows.map((row) => row.id);
+  return stored;
 }
 
 /** The nine money columns the engine recomputed. Never a client-supplied one. */
@@ -102,13 +93,15 @@ function totalsColumns(totals: DocTotals) {
  * and a `console.error('mutateInOrg failed:')` went into the log for a race the
  * product expects. Gating the UPDATE answers `proposal_not_draft`, which the
  * catalogue already has in both languages, and writes no false defect line.
+ *
+ * Returns the proposal's new revision token (../revision.ts).
  */
 export async function persistDraftHeaderAndTotals(
   tx: MetraDb,
   proposalId: string,
   header: ResolvedHeader,
   totals: DocTotals,
-): Promise<void> {
+): Promise<string> {
   const saved = await tx
     .update(proposals)
     .set({
@@ -130,6 +123,7 @@ export async function persistDraftHeaderAndTotals(
       updatedAt: sql`clock_timestamp()`,
     })
     .where(and(eq(proposals.id, proposalId), eq(proposals.status, 'draft')))
-    .returning({ id: proposals.id });
+    .returning({ revision: proposalRevision });
   if (!saved[0]) fail('proposal_not_draft');
+  return saved[0].revision;
 }

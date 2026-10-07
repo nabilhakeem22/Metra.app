@@ -24,6 +24,17 @@ const nextConfig = {
   // runs on Cloudflare Browser Rendering (the BROWSER binding via
   // @cloudflare/puppeteer), so the old Chromium bundling externals are gone.
   serverExternalPackages: ['postgres'],
+  // Server actions refuse a body over 1 MB by default. The proposal builder saves
+  // the whole draft in one action (autosave, and Send's save first), and a
+  // 2,000-line BOQ with full bilingual descriptions encodes past 1 MB, which would
+  // leave it unable to save or send at all. 4 MB holds the 2,000-line cap with
+  // descriptions of about 500 characters in both languages. Workers accept request
+  // bodies up to 100 MB on every plan, so this is Next's limit, not the
+  // platform's. The builder checks the size first and says so past ~90% of it
+  // (draft-size.ts, SERVER_ACTION_BODY_LIMIT_MB, kept equal by its test).
+  experimental: {
+    serverActions: { bodySizeLimit: '4mb' },
+  },
 };
 
 export default withNextIntl(nextConfig);

@@ -27,6 +27,10 @@ export type ActionCode =
   | 'client_required'
   | 'invalid_dates'
   | 'proposal_not_draft'
+  // The proposal builder (proposals/core/draft-save*.ts, the autosave hook).
+  | 'draft_changed_elsewhere'
+  | 'draft_too_large'
+  | 'draft_incomplete'
   | 'line_required'
   | 'token_invalid'
   | 'token_expired'

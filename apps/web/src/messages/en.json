@@ -479,6 +479,9 @@
     "client_required": "Select a client",
     "invalid_dates": "End date must be on or after the start date",
     "proposal_not_draft": "This proposal is no longer a draft",
+    "draft_changed_elsewhere": "This draft was changed in another tab or by someone else. Reload the page to get the latest version, then make your change again.",
+    "draft_too_large": "This draft is too large to save in one go. Split it into fewer lines or shorter descriptions.",
+    "draft_incomplete": "Every line needs a description and valid figures, and every section a name. The first one missing is selected.",
     "line_required": "Add at least one line",
     "token_invalid": "This link is not valid",
     "token_expired": "This link has expired",
@@ -1299,8 +1302,15 @@
         "savedAt": "Saved {time}",
         "saving": "Saving",
         "dirty": "Unsaved changes",
+        "incomplete": "Unsaved changes: they save once every line has a description and every section a name",
         "failed": "Not saved: {reason}",
         "retry": "Retry"
+      },
+      "leave": {
+        "title": "Leave without saving?",
+        "body": "Your latest changes are not saved: {reason}",
+        "confirm": "Leave without saving",
+        "stay": "Stay and fix it"
       },
       "delete": "Delete draft",
       "sectionSubtotal": "Section subtotal",

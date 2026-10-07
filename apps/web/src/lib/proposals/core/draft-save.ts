@@ -4,15 +4,24 @@
 // (./draft-save-validate), the price-book lookup (./draft-save-cost-items), line
 // resolution (./draft-save-resolve) and persistence (./draft-save-persist).
 // Draft-only (proposal_not_draft).
+//
+// ONE WRITER AT A TIME. The proposal row is locked FOR UPDATE before anything is
+// read, so two saves of one draft (two tabs, a leave-save racing a new mount, a
+// save racing a delete or a send) serialise on it. Without the lock the second
+// save's DELETE could not see the first one's freshly inserted sections and the
+// draft kept BOTH sets. The caller's revision token then refuses a save made
+// from a stale copy (`draft_changed_elsewhere`) instead of overwriting.
 import { organizations, proposalLines, proposals } from '@metra/db';
 import { eq } from 'drizzle-orm';
 import { fail, mutateInOrg } from '@/lib/actions/mutate';
-import type { AuditEntry } from '@/lib/audit';
-import type { ActionResult } from '@/lib/actions/result';
+import { err, type ActionResult } from '@/lib/actions/result';
 import type { MetraDb } from '@metra/db';
 import type { OrgContext } from '@/lib/db/context';
 import { canSeeMargin } from '@/lib/permissions/can';
-import type { SaveDraftInput } from './types';
+import { proposalRevision } from '../revision';
+import { isSaveDraftInputShape } from './draft-save-shape';
+import type { DraftSaveReceipt, SaveDraftInput } from './types';
+import { auditDraftSaved } from './draft-save-audit';
 import { computeTotalsWithinCap } from './draft-save-caps';
 import { loadCostItemMap } from './draft-save-cost-items';
 import {
@@ -28,16 +37,27 @@ import {
 
 type ProposalRow = typeof proposals.$inferSelect;
 
-/** The proposal being edited, refusing anything that has left draft. */
-async function loadDraftProposal(tx: MetraDb, id: string): Promise<ProposalRow> {
-  const [proposal] = await tx
-    .select()
+/**
+ * The proposal being edited, LOCKED for the rest of the transaction, refusing
+ * anything that has left draft or moved on since the caller's revision.
+ */
+async function lockDraftProposal(
+  tx: MetraDb,
+  id: string,
+  expectedRevision: string | undefined,
+): Promise<ProposalRow> {
+  const [locked] = await tx
+    .select({ proposal: proposals, revision: proposalRevision })
     .from(proposals)
     .where(eq(proposals.id, id))
-    .limit(1);
-  if (!proposal) fail('invalid');
-  if (proposal.status !== 'draft') fail('proposal_not_draft');
-  return proposal;
+    .limit(1)
+    .for('update');
+  if (!locked) fail('invalid');
+  if (locked.proposal.status !== 'draft') fail('proposal_not_draft');
+  if (expectedRevision !== undefined && locked.revision !== expectedRevision) {
+    fail('draft_changed_elsewhere');
+  }
+  return locked.proposal;
 }
 
 /**
@@ -71,26 +91,11 @@ async function loadCostSnapshot(
   return new Map(existingLines.map((line) => [line.id, line.unitCost]));
 }
 
-/** The ledger entry a draft save leaves: how much document, and worth what. */
-function auditDraftSaved(
-  audit: (entry: AuditEntry) => Promise<void>,
-  proposalId: string,
-  sectionCount: number,
-  total: string,
-): Promise<void> {
-  return audit({
-    entity: 'proposal',
-    entityId: proposalId,
-    action: 'update',
-    before: null,
-    after: { sections: sectionCount, total },
-  });
-}
-
 export async function saveProposalDraftCore(
   ctx: OrgContext,
   input: SaveDraftInput,
-): Promise<ActionResult> {
+): Promise<ActionResult & { data?: DraftSaveReceipt }> {
+  if (!isSaveDraftInputShape(input)) return err('invalid');
   return mutateInOrg(
     ctx,
     {
@@ -104,7 +109,7 @@ export async function saveProposalDraftCore(
       immutableCode: 'proposal_not_draft',
     },
     async (tx, audit) => {
-      const proposal = await loadDraftProposal(tx, input.id);
+      const proposal = await lockDraftProposal(tx, input.id, input.revision);
       const seeMargin = await loadMarginVisibility(tx, ctx);
       const header = pricingForKind(
         proposal.kind,
@@ -120,10 +125,11 @@ export async function saveProposalDraftCore(
         costSnapshot,
         seeMargin,
       );
-      await replaceDraftSectionsAndLines(tx, ctx.orgId, input.id, resolvedSections);
+      const sections = await replaceDraftSectionsAndLines(tx, ctx.orgId, input.id, resolvedSections);
       const totals = computeTotalsWithinCap(sectionTotals, header);
-      await persistDraftHeaderAndTotals(tx, input.id, header, totals);
-      await auditDraftSaved(audit, input.id, input.sections.length, totals.total);
+      const revision = await persistDraftHeaderAndTotals(tx, input.id, header, totals);
+      await auditDraftSaved(tx, audit, input.id, input.sections.length, totals.total);
+      return { revision, sections };
     },
   );
 }
