@@ -6,7 +6,11 @@ import { withLineIds } from './draft-save-receipt';
 import type { ProposalDraftState } from './proposal-payload';
 import { useDraftAutosave } from './use-draft-autosave';
 
-const saves = vi.hoisted(() => ({ autosaveDraft: vi.fn(), persistDraft: vi.fn() }));
+const saves = vi.hoisted(() => ({
+  autosaveDraft: vi.fn(),
+  persistDraft: vi.fn(),
+  readStoredDraftState: vi.fn(),
+}));
 vi.mock('./persist-draft', () => saves);
 
 function lineWith(qty: string, overrides: Partial<LineState> = {}): LineState {
@@ -268,6 +272,84 @@ describe('useDraftAutosave: failures and the state it shows', () => {
     await advance(1500);
     expect(saves.autosaveDraft).not.toHaveBeenCalled();
     expect(hook.result.current.error).toBe('draft_too_large');
+  });
+});
+
+/** The draft as the server would store draftWith(qty): figures to 4 places, blanks as null. */
+function storedAs(qty: string, revision: string, lineId = 'l-1') {
+  return {
+    ok: true,
+    data: {
+      revision,
+      discountPct: '0.0000',
+      taxRate: '0.0000',
+      supervisionPct: '0.0000',
+      sections: [
+        {
+          id: 's-9',
+          titleEn: 'Ceilings',
+          titleAr: null,
+          lines: [
+            {
+              id: lineId,
+              costItemId: null,
+              descriptionEn: 'Gypsum',
+              descriptionAr: null,
+              qty: `${qty}.0000`,
+              unit: 'sqm',
+              unitPrice: '100.0000',
+              discountPct: '0.0000',
+              unitCost: '60.0000',
+            },
+          ],
+        },
+      ],
+    },
+  };
+}
+
+describe('useDraftAutosave: a save that committed but lost its answer', () => {
+  it('own commit: the stale refusal is recognised, the stored revision adopted, and the edit saved once more', async () => {
+    saves.autosaveDraft
+      .mockRejectedValueOnce(new Error('fetch failed'))
+      .mockResolvedValueOnce({ ok: false, error: 'draft_changed_elsewhere' })
+      .mockResolvedValueOnce(receipt('r-10', ['l-1']));
+    saves.readStoredDraftState.mockResolvedValueOnce(storedAs('2', 'r-9'));
+    const hook = renderAutosave();
+    hook.rerender({ draft: draftWith('2') });
+    await advance(1500);
+    expect(hook.result.current.saveState).toBe('failed');
+    hook.rerender({ draft: draftWith('3') });
+    await advance(1500);
+    expect(saves.readStoredDraftState).toHaveBeenCalledWith('p-1');
+    expect(saves.autosaveDraft.mock.calls.map((call) => call[1])).toEqual(['r-0', 'r-0', 'r-9']);
+    expect(saves.autosaveDraft.mock.calls[2][0].sections[0].lines[0].qty).toBe('3');
+    expect(hook.result.current.saveState).toBe('saved');
+    expect(hook.result.current.error).toBeNull();
+  });
+
+  it('another tab really wrote: the conflict is shown as before, nothing is sent again', async () => {
+    saves.autosaveDraft
+      .mockRejectedValueOnce(new Error('fetch failed'))
+      .mockResolvedValueOnce({ ok: false, error: 'draft_changed_elsewhere' });
+    saves.readStoredDraftState.mockResolvedValueOnce(storedAs('7', 'r-9'));
+    const hook = renderAutosave();
+    hook.rerender({ draft: draftWith('2') });
+    await advance(1500);
+    hook.rerender({ draft: draftWith('3') });
+    await advance(1500);
+    expect(saves.autosaveDraft).toHaveBeenCalledTimes(2);
+    expect(hook.result.current.saveState).toBe('failed');
+    expect(hook.result.current.error).toBe('draft_changed_elsewhere');
+  });
+
+  it('a stale refusal with no unanswered save of ours reads nothing and is a conflict', async () => {
+    saves.autosaveDraft.mockResolvedValueOnce({ ok: false, error: 'draft_changed_elsewhere' });
+    const hook = renderAutosave();
+    hook.rerender({ draft: draftWith('2') });
+    await advance(1500);
+    expect(saves.readStoredDraftState).not.toHaveBeenCalled();
+    expect(hook.result.current.error).toBe('draft_changed_elsewhere');
   });
 });
 

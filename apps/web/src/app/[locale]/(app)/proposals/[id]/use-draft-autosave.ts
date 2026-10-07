@@ -6,6 +6,7 @@ import type { ActionCode } from '@/lib/actions/result';
 import { firstIncompleteField, type DraftField } from './draft-completeness';
 import { lineIdsByKey, withLineIds } from './draft-save-receipt';
 import { exceedsDraftSaveLimit } from './draft-size';
+import { recoverLostCommit } from './lost-commit';
 import { autosaveDraft, persistDraft, type SaveDraft, type SaveDraftResult } from './persist-draft';
 import { buildProposalPayload, type ProposalDraftState } from './proposal-payload';
 
@@ -64,14 +65,30 @@ export function useDraftAutosave(input: {
   const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
   const inFlight = useRef<Promise<unknown> | null>(null);
   const inFlightSnapshot = useRef<string | null>(null);
+  // A save that never answered: it may have committed (lost-commit.ts).
+  const unconfirmed = useRef<ProposalDraftState | null>(null);
   const followUp = useRef(false);
   const flushing = useRef(false);
   const dirtySince = useRef<number | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
+  /** One send of `draft`; an unknown outcome (no answer) is remembered. */
+  async function sendOnce(save: SaveDraft, draft: ProposalDraftState): Promise<SaveDraftResult> {
+    try {
+      const result = await save(draft, revision.current);
+      if (result.ok) unconfirmed.current = null;
+      else if (result.error === 'generic' || result.error === 'uncertain') unconfirmed.current = draft;
+      return result;
+    } catch {
+      unconfirmed.current = draft;
+      return { ok: false, error: 'generic' };
+    }
+  }
+
   /** Store the latest draft through `save` and adopt what the server answered. */
   async function saveLatest(save: SaveDraft): Promise<SaveDraftResult> {
-    const { draft: toSave, snapshot: savedAs } = latest.current;
+    const savedAs = latest.current.snapshot;
+    let toSave = latest.current.draft;
     if (exceedsDraftSaveLimit(savedAs)) {
       setFailure({ code: 'draft_too_large', snapshot: savedAs });
       return { ok: false, error: 'draft_too_large' };
@@ -79,11 +96,18 @@ export function useDraftAutosave(input: {
     dirtySince.current = null;
     inFlightSnapshot.current = savedAs;
     setSaving(true);
-    let result: SaveDraftResult;
-    try {
-      result = await save(toSave, revision.current);
-    } catch {
-      result = { ok: false, error: 'generic' };
+    let result = await sendOnce(save, toSave);
+    // Refused as stale while an earlier save's answer was lost: if what is
+    // stored is that save, it was ours. Adopt it and send this one again, once.
+    if (!result.ok && result.error === 'draft_changed_elsewhere' && unconfirmed.current) {
+      const recovered = await recoverLostCommit(unconfirmed.current, toSave);
+      if (recovered) {
+        unconfirmed.current = null;
+        revision.current = recovered.revision;
+        latest.current.callbacks.onStored(recovered.idsByKey);
+        toSave = recovered.draft;
+        result = await sendOnce(save, toSave);
+      }
     }
     inFlightSnapshot.current = null;
     setSaving(false);

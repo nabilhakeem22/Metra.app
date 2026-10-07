@@ -157,7 +157,7 @@ Estimates (pilot phase — the 5 pilot firms are an open PRD §10 decision):
 
 The inputs that are weird *in Egyptian fit-out specifically* — this is what makes tester-functional sharp:
 - **Money:** piastre-exact, never float. Percentage fields (discount, **supervision** [after-VAT, untaxed], advance, retention) are `[0,100]` — DB CHECK enforced (SQLSTATE 23514). Supervision base = works value after doc discount.
-- **Money parser:** reject comma-decimal corruption (`1,5`→ must NOT become `15`); Arabic normalization for matching (أ/إ/آ→ا, ة→ه); Arabic-Indic digits rejected as input.
+- **Money parser:** reject comma-decimal corruption (`1,5`→ must NOT become `15`); Arabic normalization for matching (أ/إ/آ→ا, ة→ه). The SERVER money parser stays strict and rejects Arabic-Indic digits. The proposal builder's number boxes (owner decision, Oct 8 2026) ACCEPT Arabic-Indic digits, the Arabic decimal mark and well-formed grouped thousands (`1,000`), and on blur rewrite the box to the Latin-digit figure that is saved (`lib/validation/decimal-input.ts`).
 - **Bilingual:** `bilingualCheck` = name_ar OR name_en present (whitespace-safe). Arabic cursive joining breaks per-character typewriter animation (use fade, not typewriter, for Arabic).
 - **Immutability:** proposals lock on `send` (`enforce_immutable_when`, SQLSTATE MT100); children editable only while parent is `draft`. Accept/reject metadata lives in an append-only events table (the locked row can't hold it).
 - **Concurrency:** state transitions MUST be atomic admission gates (`UPDATE ... WHERE status=... RETURNING`, check rowCount) — not read-then-write; per-org `pg_advisory_xact_lock` for number allocation.

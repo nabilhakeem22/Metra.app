@@ -1,4 +1,4 @@
-import { autosaveProposalDraft, saveProposalDraft } from '@/lib/proposals/actions';
+import { autosaveProposalDraft, readStoredDraft, saveProposalDraft } from '@/lib/proposals/actions';
 import { buildProposalPayload, type ProposalDraftState } from './proposal-payload';
 
 // Saving the draft, the two ways the builder does it. A plain module (no React):
@@ -25,3 +25,6 @@ export const persistDraft: SaveDraft = (state, revision) =>
 /** The silent save after a pause in typing: stores the draft, no refresh. */
 export const autosaveDraft: SaveDraft = (state, revision) =>
   autosaveProposalDraft(inputOf(state, revision));
+
+/** The draft as stored now, to tell a lost answer of our own from another tab. */
+export const readStoredDraftState = (proposalId: string) => readStoredDraft(proposalId);

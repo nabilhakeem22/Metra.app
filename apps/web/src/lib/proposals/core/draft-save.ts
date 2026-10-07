@@ -128,7 +128,13 @@ export async function saveProposalDraftCore(
       const sections = await replaceDraftSectionsAndLines(tx, ctx.orgId, input.id, resolvedSections);
       const totals = computeTotalsWithinCap(sectionTotals, header);
       const revision = await persistDraftHeaderAndTotals(tx, input.id, header, totals);
-      await auditDraftSaved(tx, audit, input.id, input.sections.length, totals.total);
+      await auditDraftSaved(tx, audit, {
+        proposalId: input.id,
+        actorUserId: ctx.userId,
+        sectionCount: input.sections.length,
+        lineCount: input.sections.reduce((count, section) => count + section.lines.length, 0),
+        total: totals.total,
+      });
       return { revision, sections };
     },
   );

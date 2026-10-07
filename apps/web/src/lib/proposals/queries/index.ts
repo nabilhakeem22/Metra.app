@@ -11,3 +11,4 @@
 export * from './list';
 export * from './detail';
 export * from './send-meta';
+export * from './stored-draft';

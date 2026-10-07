@@ -64,7 +64,12 @@ export async function uploadDeliverableFile(
             contentType: file.type,
             sizeBytes: file.size,
           });
-      if ('ok' in signed) return { ok: false, reason: (signed.error as ActionCode) ?? 'generic' };
+      if ('ok' in signed) {
+        const reason = (signed.error as ActionCode) ?? 'generic';
+        // A renewal Storage could not sign is still the same row: retry it there.
+        const resume = fileId && reason === 'generic' ? { fileId, stage: 'put' as const } : undefined;
+        return { ok: false, reason, resume };
+      }
       fileId = signed.fileId;
       stage = 'put';
       const put = await putToStorage(signed.signedUrl, file, options);

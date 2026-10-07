@@ -16,9 +16,12 @@ import type { OrgContext } from '@/lib/db/context';
 import { closeFixture, ctxFor, raw, seedOrg, teardown } from './fixture';
 
 // Storage is not in the dbtest: a renewed signed URL is its object key on a fake host.
+const storage = vi.hoisted(() => ({
+  renewSignedUploadUrl: vi.fn(async (objectKey: string) => ({ signedUrl: `https://storage.test/${objectKey}` })),
+}));
 vi.mock('@/lib/storage/uploads', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/lib/storage/uploads')>()),
-  renewSignedUploadUrl: async (objectKey: string) => ({ signedUrl: `https://storage.test/${objectKey}` }),
+  renewSignedUploadUrl: storage.renewSignedUploadUrl,
 }));
 
 const orgIds: string[] = [];
@@ -240,6 +243,18 @@ describe('renewDeliverableUpload reuses the files row of a failed upload (R3)', 
     expect(renewed).toEqual({ fileId, signedUrl: `https://storage.test/${ctx.orgId}/engagement/${fileId}` });
     const [after] = await raw.query<{ count: number }>(`select count(*)::int as count from public.files where org_id = '${ctx.orgId}'`);
     expect(Number(after.count)).toBe(Number(before.count));
+  });
+
+  it('a Storage failure is a coded generic, never a throw through the action', async () => {
+    const { ctx, engagementId } = await setupEngagement();
+    const fileId = await seedEngagementFile(ctx.orgId, engagementId, ctx.userId);
+    storage.renewSignedUploadUrl.mockRejectedValueOnce(new Error('storage down'));
+    const quiet = vi.spyOn(console, 'error').mockImplementation(() => {});
+    await expect(renewDeliverableUploadCore(ctx, { engagementId, fileId })).resolves.toEqual({
+      ok: false,
+      error: 'generic',
+    });
+    quiet.mockRestore();
   });
 
   it('refuses an attached file, another delivery or org file, and a closed delivery', async () => {

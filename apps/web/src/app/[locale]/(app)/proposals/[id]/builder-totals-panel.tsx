@@ -3,7 +3,7 @@
 import { useLocale, useTranslations } from 'next-intl';
 import { Card, CardContent } from '@/components/ui/card';
 import { FieldHint } from '@/components/ui/field-hint';
-import { Input } from '@/components/ui/input';
+import { FigureInput } from './figure-input';
 import type { DocTotals } from '@/lib/aggregates/proposal-totals';
 import { formatMoney } from '@/lib/format/money';
 import { INPUT_CLASS } from './builder-model';
@@ -46,19 +46,19 @@ export function BuilderTotalsPanel({
           <label className="flex items-center gap-1.5 text-body">
             {t('builder.discountPct')}
             <FieldHint hint={th('discountPct')} />
-            <Input dir="ltr" inputMode="decimal" value={discountPct} onChange={(e) => onDiscountPctChange(e.target.value)} className={`${inp} w-20`} />
+            <FigureInput value={discountPct} onValueChange={onDiscountPctChange} className={`${inp} w-20`} />
           </label>
           {quote && (
             <>
               <label className="flex items-center gap-1.5 text-body">
                 {t('builder.taxRate')}
                 <FieldHint hint={th('taxRate')} />
-                <Input dir="ltr" inputMode="decimal" value={taxRate} onChange={(e) => onTaxRateChange(e.target.value)} className={`${inp} w-20`} />
+                <FigureInput value={taxRate} onValueChange={onTaxRateChange} className={`${inp} w-20`} />
               </label>
               <label className="flex items-center gap-1.5 text-body">
                 {t('builder.supervisionPct')}
                 <FieldHint hint={th('supervisionPct')} />
-                <Input dir="ltr" inputMode="decimal" value={supervisionPct} onChange={(e) => onSupervisionPctChange(e.target.value)} className={`${inp} w-20`} />
+                <FigureInput value={supervisionPct} onValueChange={onSupervisionPctChange} className={`${inp} w-20`} />
               </label>
             </>
           )}

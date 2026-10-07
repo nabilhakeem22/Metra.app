@@ -11,6 +11,7 @@ vi.mock('next-intl/server', () => ({ getLocale: vi.fn() }));
 vi.mock('@/lib/http/request-origin', () => ({ resolveRequestOrigin: vi.fn() }));
 vi.mock('./preview-html', () => ({ renderProposalPreviewHtml: vi.fn() }));
 vi.mock('./send-email', () => ({ notifyClientOfSentProposal: vi.fn() }));
+vi.mock('./queries', () => ({ readStoredDraftCore: vi.fn() }));
 
 const { autosaveProposalDraft, saveProposalDraft } = await import('./actions');
 

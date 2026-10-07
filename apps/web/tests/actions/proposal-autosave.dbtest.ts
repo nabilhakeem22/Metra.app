@@ -20,7 +20,7 @@ import {
   saveProposalDraftCore,
   type SaveDraftInput,
 } from '@/lib/proposals/core';
-import { getProposalWithLines } from '@/lib/proposals/queries';
+import { getProposalWithLines, readStoredDraftCore } from '@/lib/proposals/queries';
 import { closeFixture, ctxFor, raw, seedOrg, teardown } from './fixture';
 
 const orgIds: string[] = [];
@@ -145,6 +145,24 @@ describe('the save receipt (F1)', () => {
   });
 });
 
+describe('readStoredDraft: telling a lost answer of our own from another tab', () => {
+  it('answers the stored revision and ids, margin-gated, and refuses what it should', async () => {
+    const { ctx, pm, id } = await setup();
+    const saved = await saveProposalDraftCore(ctx, { id, sections: [{ titleEn: 'A', lines: lines(2, 'a', '10') }] });
+    const read = await readStoredDraftCore(ctx, id);
+    expect(read.ok).toBe(true);
+    expect(read.data!.revision).toBe(saved.data!.revision);
+    expect(read.data!.sections.map((section) => section.lines.map((line) => line.id))).toEqual([
+      saved.data!.sections[0].lineIds,
+    ]);
+    expect(read.data!.sections[0].lines[0].unitCost).toBe('100.0000');
+    const blind = await readStoredDraftCore(pm, id);
+    expect(blind.ok).toBe(true);
+    expect('unitCost' in blind.data!.sections[0].lines[0]).toBe(false);
+    expect(await readStoredDraftCore(ctx, 'not-a-uuid')).toEqual({ ok: false, error: 'invalid' });
+  });
+});
+
 describe('one writer at a time (R1, R6, R9)', () => {
   it('a save from a stale revision is refused and changes nothing', async () => {
     const { ctx, id } = await setup();
@@ -211,6 +229,41 @@ describe('proportionate audit (R4) and the payload boundary (S1)', () => {
         where entity = 'proposal' and entity_id = '${id}' and action = 'update'`,
     );
     expect(Number(row.count)).toBe(1);
+  });
+
+  it('per actor: a colleague saving the same draft gets their own row, each with the totals of the save that wrote it', async () => {
+    const { ctx, pm, id } = await setup();
+    const storedTotal = async () =>
+      Number((await raw.query<{ total: string }>(`select total::text from public.proposals where id = '${id}'`))[0].total);
+    const save = async (who: OrgContext, price: string) => {
+      expect((await saveProposalDraftCore(who, { id, sections: [{ titleEn: 'A', lines: lines(2, 'a', price) }] })).ok).toBe(true);
+      return storedTotal();
+    };
+    const ownerFirst = await save(ctx, '10');
+    await save(ctx, '11');
+    const pmSave = await save(pm, '12');
+    const audits = async () =>
+      raw.query<{ actor: string; total: string; lines: number }>(
+        `select actor_user_id as actor, after->>'total' as total, (after->>'lines')::int as lines
+           from public.audit_log
+          where entity = 'proposal' and entity_id = '${id}' and action = 'update'
+          order by at, id`,
+      );
+    const rows = await audits();
+    expect(rows.map((row) => row.actor)).toEqual([ctx.userId, pm.userId]);
+    expect(Number(rows[0].total)).toBe(ownerFirst);
+    expect(Number(rows[1].total)).toBe(pmSave);
+    expect(rows[1].lines).toBe(2);
+
+    // Five minutes on, the owner's next save leaves a row with ITS totals.
+    await raw.query(
+      `update public.audit_log set at = at - interval '6 minutes'
+        where entity = 'proposal' and entity_id = '${id}' and actor_user_id = '${ctx.userId}'`,
+    );
+    const ownerLater = await save(ctx, '15');
+    expect(ownerLater).not.toBe(ownerFirst);
+    const later = (await audits()).filter((row) => row.actor === ctx.userId);
+    expect(later.map((row) => Number(row.total))).toEqual([ownerFirst, ownerLater]);
   });
 
   it('a non-string line id is invalid at the boundary, not a TypeError', async () => {

@@ -129,6 +129,14 @@ describe('uploadDeliverableFile', () => {
     expect(actions.attachDeliverable).toHaveBeenCalledWith(expect.objectContaining({ fileId: 'f-1' }));
   });
 
+  test('R3: a renewal Storage could not sign is retryable on the SAME row', async () => {
+    actions.renewDeliverableUpload.mockResolvedValueOnce({ ok: false, error: 'generic' });
+    const outcome = await uploadDeliverableFile('e-1', 'layout', pdf, { resume: { fileId: 'f-1', stage: 'put' } });
+    expect(outcome).toEqual({ ok: false, reason: 'generic', resume: { fileId: 'f-1', stage: 'put' } });
+    expect(isRetryableOutcome(outcome)).toBe(true);
+    expect(actions.createDeliverableUpload).not.toHaveBeenCalled();
+  });
+
   test('F5: an attach lost in transport resumes AT the attach, with the same file and no second upload', async () => {
     actions.attachDeliverable.mockRejectedValueOnce(new Error('fetch failed'));
     const first = uploadDeliverableFile('e-1', 'conceptOption', pdf);

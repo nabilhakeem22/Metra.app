@@ -23,6 +23,7 @@ import {
   type SaveDraftInput,
 } from './core';
 import { renderProposalPreviewHtml } from './preview-html';
+import { readStoredDraftCore, type ProposalDetail } from './queries';
 import { notifyClientOfSentProposal } from './send-email';
 
 /** The reader's locale, or the product default. `getLocale()` throws outside a
@@ -64,6 +65,11 @@ export async function autosaveProposalDraft(input: SaveDraftInput): Promise<Save
   const ctx = await requireOrg();
   const res = await saveProposalDraftCore(ctx, input);
   return res.ok ? { ok: true, data: res.data } : { ok: false, error: res.error };
+}
+
+/** The draft as stored now (see readStoredDraftCore). Read-only. */
+export async function readStoredDraft(id: string): Promise<ActionResult & { data?: ProposalDetail }> {
+  return readStoredDraftCore(await requireOrg(), id);
 }
 
 export async function sendProposal(id: string): Promise<
