@@ -8,6 +8,8 @@ import { createEngagementCore } from '@/lib/engagements/core';
 import { executeTransition } from '@/lib/engagements/executor';
 import { recordOfflineApprovalCore, type OfflineApprovalInput } from '@/lib/engagements/offline-approval-core';
 import { recordPaymentCore } from '@/lib/engagements/payments';
+import { mintDeliveryLinkCore } from '@/lib/engagements/share';
+import { hashShareToken } from '@/lib/share/token';
 import { setEngagementRomCore } from '@/lib/engagements/rom';
 import { issueRomCore } from '@/lib/engagements/rom-issue';
 import type { GenerateFeeSchedulePayload } from '@/lib/engagements/transitions';
@@ -379,5 +381,32 @@ describe('an offline concept choice names a RELEASED option only (B12, owner Q1)
     expect(await stateOf(engagementId)).toBe('concept_review');
     expect(await chosenOn(engagementId)).toEqual([]);
     expect(await transitionCount(engagementId, 'selectConcept')).toBe(0);
+  });
+
+  it("F2: once the client chose, the studio cannot record another option over it", async () => {
+    const { ctx, engagementId } = await seedConceptReview();
+    await recordPaymentCore(ctx, { engagementId, kind: 'gate_a', amount: '20000' });
+    const [first, second] = await conceptOptionIds(engagementId);
+    await releaseWithFile(ctx.orgId, engagementId, first);
+    await releaseWithFile(ctx.orgId, engagementId, second);
+    const minted = await mintDeliveryLinkCore(ctx, engagementId);
+    const hash = hashShareToken(minted.data!);
+    const [chosen] = await raw.query<{ code: string }>(
+      `select public.app_delivery_choose_concept_by_token(
+         '${hash}', '${second}'::uuid, 2, null, null, null, null) as code`,
+    );
+    expect(chosen.code).toBe('ok');
+
+    expect(
+      await recordOfflineApprovalCore(ctx, {
+        engagementId,
+        trigger: 'selectConcept',
+        approval: { channel: 'phone', chosenArtifactId: first },
+      }),
+    ).toEqual({ ok: false, error: 'client_review_answered' });
+    expect(await stateOf(engagementId)).toBe('concept_review');
+    expect(await chosenOn(engagementId)).toEqual([
+      { actor_channel: 'client', chosen_artifact_id: second, chosen_position: 2 },
+    ]);
   });
 });

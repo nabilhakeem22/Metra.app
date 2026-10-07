@@ -171,10 +171,14 @@ $$;
 --
 -- SECURITY INVOKER on purpose. Called from the two definer functions it runs
 -- with their rights and sees the delivery they proved; called by metra_app
--- from the studio it is org-scoped by RLS, so a foreign engagement id returns
--- nothing. Same-org is guaranteed by engagement_artifacts' composite same-org
--- FK to design_engagements and by the `files` join on org_id. It returns ids
+-- from the studio it is org-scoped by RLS (design_engagements, artifacts and
+-- files all are), so a foreign engagement id returns nothing. It returns ids
 -- and numbers only, never a label, a file name or a money column.
+--
+-- THE JOIN TO design_engagements is for the plan as much as for scoping: every
+-- engagement_artifacts index leads with org_id, so `a.org_id = de.org_id` lets
+-- the definer callers (which bypass RLS and so carry no org qual) range-scan
+-- ONE delivery's artifacts instead of walking the whole index across tenants.
 create or replace function public.app_concept_option_positions(p_engagement_id uuid)
 returns table (artifact_id uuid, option_position integer)
 language sql
@@ -185,9 +189,11 @@ as $$
   select ranked.id, ranked.rn
   from (
     select a.id, (row_number() over (order by a.attested_at, a.id))::integer as rn
-    from public.engagement_artifacts a
+    from public.design_engagements de
+    join public.engagement_artifacts a
+      on a.org_id = de.org_id and a.engagement_id = de.id
     join public.files f on f.id = a.file_id and f.org_id = a.org_id
-    where a.engagement_id = p_engagement_id
+    where de.id = p_engagement_id
       and a.kind = 'concept_option'
       and a.client_visible
   ) ranked
@@ -261,6 +267,12 @@ $$;
 --     the one the client saw when choosing. Both null when there is none or it
 --     named no option. A choice keeps its saved letter whatever the studio
 --     hides or releases afterwards; it is never re-ranked.
+--   concept_decision (0057, B12): which concept decision of the client is on
+--     file, from the newest LIVE client concept_approval or
+--     concept_change_request: 'chosen' (an approval naming an option),
+--     'approved' (a plain approval), 'changes_requested', or null. A repeat
+--     tap that the write answers `already` is told what was actually SAVED,
+--     never the option it just named.
 --
 -- RETRACTED CLIENT DECISIONS (an event_correction points at them) answer
 --   nothing here, exactly as liveEvents() drops them in the studio's TS rule.
@@ -589,7 +601,25 @@ as $$
     -- when there is none or it named no option. The saved letter survives the
     -- studio hiding or releasing options.
     'concept_choice_id', choice.chosen_artifact_id,
-    'concept_choice_position', choice.chosen_position
+    'concept_choice_position', choice.chosen_position,
+    -- Round B (B12): the client's concept decision on file, of either kind.
+    'concept_decision', (
+      select case
+        when e.kind = 'concept_change_request' then 'changes_requested'
+        when e.chosen_artifact_id is not null then 'chosen'
+        else 'approved'
+      end
+      from public.engagement_events e
+      where e.engagement_id = de.id
+        and e.actor_channel = 'client'
+        and e.kind in ('concept_approval', 'concept_change_request')
+        and not exists (
+          select 1 from public.engagement_events x
+          where x.org_id = e.org_id and x.supersedes_event_id = e.id
+        )
+      order by e.decided_at desc
+      limit 1
+    )
   )
   from public.design_engagements de
   join public.organizations o on o.id = de.org_id

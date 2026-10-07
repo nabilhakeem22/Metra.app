@@ -2,6 +2,7 @@
 
 import { useLocale, useTranslations } from 'next-intl';
 import { Fragment } from 'react';
+import type { ChosenConcept } from '@/lib/engagements/concept-choice';
 import { conceptLetter } from '@/lib/engagements/concept-letter';
 import type { EngagementArtifactRecord } from '@/lib/engagements/queries';
 import { formatDate } from '@/lib/format/date';
@@ -24,18 +25,18 @@ import { useClientVisibility } from './use-client-visibility';
  * only file-bearing artifacts get one, since a thread about a document the client
  * cannot receive has nobody on the other end.
  *
- * Round B (B12): a concept option carries its letter as the client sees it and,
- * on the one the client chose, a "Client choice" chip.
+ * Round B (B12): a concept option carries its letter as the client sees it; the
+ * one the client chose carries the letter SAVED with the choice instead.
  */
 export function ArtifactsPanel({
   artifacts,
   canManageVisibility,
-  chosenConceptId,
+  chosenConcept,
 }: {
   artifacts: EngagementArtifactRecord[];
   canManageVisibility: boolean;
-  /** The concept option the client chose (concept-choice.ts), or null. */
-  chosenConceptId: string | null;
+  /** The concept option the client chose and its saved letter (concept-choice.ts). */
+  chosenConcept: ChosenConcept | null;
 }) {
   const t = useTranslations('engagements');
   const locale = useLocale();
@@ -65,7 +66,7 @@ export function ArtifactsPanel({
                   {a.kind === 'concept_option' && (
                     <ConceptOptionChip
                       letter={conceptLetter(a.conceptPosition)}
-                      chosen={a.id === chosenConceptId}
+                      chosenLetter={a.id === chosenConcept?.artifactId ? chosenConcept.letter : null}
                     />
                   )}
                 </span>

@@ -14,10 +14,9 @@ import {
   isRenderableClaim,
   isRenderableDocument,
   isRenderableMilestone,
-  parseConceptChoice,
-  parseConceptOptions,
   type DeliverySnapshot,
 } from './row-guards';
+import { parseConceptChoice, parseConceptDecision, parseConceptOptions } from './concept-rows';
 import type { PublicDelivery, PublicDeliveryMilestone } from './types';
 
 /** The state, only if it is one the portal has labels for. Never a raw key. */
@@ -146,5 +145,6 @@ export function shapeDelivery(snapshot: DeliverySnapshot): PublicDelivery | null
     clientActions,
     conceptOptions: parseConceptOptions(snapshot.concept_options),
     conceptChoice: parseConceptChoice(snapshot.concept_choice_id, snapshot.concept_choice_position),
+    conceptDecision: parseConceptDecision(snapshot.concept_decision),
   };
 }

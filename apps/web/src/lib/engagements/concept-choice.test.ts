@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { chosenConceptOf, letteredConceptOptions, type ConceptChoiceEvent } from './concept-choice';
+import {
+  chosenConceptOf,
+  letteredConceptOptions,
+  offlineConceptOptions,
+  type ConceptChoiceEvent,
+} from './concept-choice';
 
 const OPTION_A = '11111111-1111-4111-8111-111111111111';
 const OPTION_B = '22222222-2222-4222-8222-222222222222';
@@ -62,5 +67,18 @@ describe('letteredConceptOptions', () => {
       { id: 'a', letter: 'A' },
       { id: 'c', letter: 'C' },
     ]);
+  });
+});
+
+describe('offlineConceptOptions (F2)', () => {
+  const artifacts = [
+    { id: 'a', conceptPosition: 1 },
+    { id: 'b', conceptPosition: 2 },
+  ];
+  it('offers the current letters while the client has not answered', () => {
+    expect(offlineConceptOptions(artifacts, null).map((option) => option.letter)).toEqual(['A', 'B']);
+  });
+  it('offers nothing once the client has answered the round', () => {
+    expect(offlineConceptOptions(artifacts, { kind: 'concept_approval' })).toEqual([]);
   });
 });

@@ -62,3 +62,16 @@ export function letteredConceptOptions(
     })
     .sort((a, b) => a.letter.localeCompare(b.letter));
 }
+
+/**
+ * What the offline "Which option?" select offers: the current letters (an
+ * offline choice is a NEW choice), and nothing at all once the client has
+ * answered the review themselves, so the studio cannot record an option over
+ * the client's own pick (the server refuses that too: client_review_answered).
+ */
+export function offlineConceptOptions(
+  artifacts: readonly { id: string; conceptPosition: number | null }[],
+  clientDecision: { kind: string } | null,
+): LetteredConceptOption[] {
+  return clientDecision ? [] : letteredConceptOptions(artifacts);
+}

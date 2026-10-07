@@ -2,7 +2,7 @@
 // (no React, no 'use client'): the cockpit body composes the card, this names
 // how each of its props is derived, so the body stays a composition.
 import type { ActionCode } from '@/lib/actions/result';
-import { letteredConceptOptions } from '@/lib/engagements/concept-choice';
+import { offlineConceptOptions } from '@/lib/engagements/concept-choice';
 import { countConceptOptions } from '@/lib/engagements/concept-options';
 import { secondaryTriggersOf } from '@/lib/engagements/forward-trigger';
 import { reviewRoundStartedAt } from '@/lib/engagements/review-round';
@@ -39,7 +39,7 @@ export function commandCardPropsOf(
           ?.decidedAt ?? null,
       createdAt: header.createdAt,
     }).toISOString(),
-    conceptOptions: letteredConceptOptions(detail.artifacts),
+    conceptOptions: offlineConceptOptions(detail.artifacts, detail.gatePreview.clientDecision),
     canRecordPayment: detail.capabilities.recordPayment,
     canResolveClaims: detail.canResolveClaims,
     canShare: detail.canShare,

@@ -113,6 +113,20 @@ describe('one lettering rule for the portal, the choice and the studio (AC 3)', 
   });
 });
 
+describe('S1: the lettering rule reads ONE delivery through the org-leading index', () => {
+  it('joins design_engagements on org and id, and stays SECURITY INVOKER', async () => {
+    const [fn] = await raw.query<{ source: string; definer: boolean }>(
+      `select prosrc as source, prosecdef as definer from pg_proc
+        where proname = 'app_concept_option_positions'`,
+    );
+    expect(fn.definer).toBe(false);
+    // Every engagement_artifacts index leads with org_id; the definer callers
+    // carry no RLS org qual, so the org must come from the delivery row.
+    expect(fn.source).toMatch(/join public\.engagement_artifacts a\s+on a\.org_id = de\.org_id and a\.engagement_id = de\.id/);
+    expect(fn.source).toContain('where de.id = p_engagement_id');
+  });
+});
+
 describe('a choice saves the letter the client saw (AC 4, 5, 6)', () => {
   it('saves position 2, and keeps it through every later hide and release', async () => {
     const d = await seedRoundBDelivery(orgIds, 'saved-letter');

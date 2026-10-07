@@ -90,4 +90,7 @@ export interface PublicDelivery {
   /** The option the client chose and the letter SAVED with that choice (the one
    *  they saw), or null. Survives the studio hiding or releasing options. */
   conceptChoice: { id: string; letter: ConceptLetter } | null;
+  /** The client's concept decision on file (an option chosen, a plain approval,
+   *  or changes requested), or null: what a repeat tap is told was SAVED. */
+  conceptDecision: 'chosen' | 'approved' | 'changes_requested' | null;
 }

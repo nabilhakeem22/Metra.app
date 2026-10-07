@@ -469,8 +469,11 @@ $$;
 -- happened, so the caller must:
 --   * build the key, the role list and the params from a SERVER-SIDE map keyed
 --     on the act it just performed, never from request input;
---   * call it only AFTER the client's write function returned `ok` (never on
---     `already` or a refusal);
+--   * call it only AFTER the client's write function returned `ok`, or on an
+--     `already` for which app_delivery_act_notified_by_token answered false
+--     (the R3 repair of a lost notification, 0057); never on a refusal, never
+--     on any other `already`, and for an `already` the act notified is the
+--     decision actually on file, not the one the repeat request named;
 --   * never return `new_recipients` or `locale` to the portal (they are the
 --     studio's member ids and setting); the portal learns only whether
 --     notified_count > 0.

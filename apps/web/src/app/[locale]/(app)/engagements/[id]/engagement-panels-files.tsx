@@ -5,6 +5,7 @@ import { useTranslations } from 'next-intl';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import type { ActionResult } from '@/lib/actions/result';
+import type { ChosenConcept } from '@/lib/engagements/concept-choice';
 import type { EngagementArtifactRecord } from '@/lib/engagements/queries';
 import { ArtifactPanel } from './engagement-artifact-panel';
 import { EngagementFilesTray } from './engagement-files-tray';
@@ -25,7 +26,7 @@ import { SectionLabel } from '@/components/ui/section-label';
 export function FilesTab({
   engagementId,
   artifacts,
-  chosenConceptId,
+  chosenConcept,
   canUpload,
   canRecordArtifact,
   pending,
@@ -33,8 +34,8 @@ export function FilesTab({
 }: {
   engagementId: string;
   artifacts: EngagementArtifactRecord[];
-  /** The concept option the client chose, for its chip in the artifact list. */
-  chosenConceptId: string | null;
+  /** The concept option the client chose and its saved letter, for its chip. */
+  chosenConcept: ChosenConcept | null;
   canUpload: boolean;
   canRecordArtifact: boolean;
   pending: boolean;
@@ -89,7 +90,7 @@ export function FilesTab({
           <ArtifactsPanel
             artifacts={artifacts}
             canManageVisibility={canUpload}
-            chosenConceptId={chosenConceptId}
+            chosenConcept={chosenConcept}
           />
         </div>
       </div>

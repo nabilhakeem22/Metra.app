@@ -759,7 +759,7 @@ Why, one sentence each:
 | `engagement_events_chosen_position_range` | CHECK `chosen_position IS NULL OR chosen_position BETWEEN 1 AND 4`: the letter is A to D |
 | `notifications_org_recipient_created_idx` | index `(org_id, recipient_user_id, created_at DESC)`: the bell and the notifications page read the newest rows without sorting every notification |
 | `app_concept_option_positions(uuid)` | NEW, returns `TABLE(artifact_id uuid, option_position integer)`: the one rule that letters options (released, with a file, A to D). SECURITY INVOKER |
-| `app_delivery_by_token(text)` | same signature; letters rank released options only; a choice's letter is read from its row |
+| `app_delivery_by_token(text)` | same signature; letters rank released options only; a choice's letter is read from its row; new key `concept_decision` (the client's concept decision on file) |
 | `app_delivery_choose_concept_by_token` | the 6-argument version is DROPPED (nothing deployed calls it); NEW 7-argument version `(text, uuid, integer, text, text, text, text)` takes the letter the client saw, returns `text` |
 | `app_delivery_notify_studio_by_token(text, text, jsonb, jsonb)` | same signature; one unread notification per payment milestone; also returns the delivery's number, year and titles; a concept choice carries its saved letter |
 | `app_delivery_act_notified_by_token(text, text, text)` | NEW, returns `boolean`: "was this client act's notification ever written?" |
@@ -829,7 +829,8 @@ Expected:
   (0057's journal stamp).
 - `db:apply-rls` ends with these two lines (printed from the committed
   `rls/` files, so they are the same on every database; CI's apply-rls step
-  verified exactly these counts on this branch):
+  verified exactly these counts on this branch, and a production-shaped
+  rehearsal printed them verbatim):
   `apply-rls: verified in the catalogues — 46 tables, 46 policies, 13 triggers,
   37 functions, RLS forced on all of them, role metra_app present.` and
   `apply-rls: grants verified — design_engagements update narrowed to 16
@@ -838,12 +839,23 @@ Expected:
   workspace_entitlements) holding exactly what rls/roles.sql leaves them.`
 - `assert-schema-applied` exits 0.
 
+**If a command fails, it prints the SQLSTATE and what to do,** on two lines:
+
+- `Migration failed: SQLSTATE 23514: check constraint "engagement_events_chosen_position_pairs" of relation "engagement_events" is violated by some row`
+  then `Migration failed: STOP, tell the lead (a CHECK refused existing rows; the whole batch rolled back, nothing was changed).`
+  This is the case before-check (c) exists for. Do not re-run; tell the lead.
+- `Migration failed: SQLSTATE 55P03: canceling statement due to lock timeout`
+  (or `SQLSTATE 40P01: deadlock detected`) then `Migration failed: lock wait or deadlock, safe to re-run at a quieter moment (the whole batch rolled back, nothing was changed).`
+  Re-run `db:migrate` a little later. The same two codes from `db:apply-rls`
+  print `apply-rls failed: ...` and end `(this file rolled back; the files
+  before it stay applied).`: re-run `db:apply-rls`.
+- Any other code ends `tell the lead before running anything else`.
+
 If `db:apply-rls` is run BEFORE `db:migrate`, it stops at
-`40-delivery-read.sql` with 42703 (the new function reads `chosen_position`,
-and a `language sql` body is checked against the columns when it is created).
-Nothing is broken: run `db:migrate` and then `db:apply-rls` again. Both are
-re-runnable, and a 55P03 from either is a lock wait that gave up: re-run at a
-quieter moment.
+`40-delivery-read.sql` with `apply-rls failed: SQLSTATE 42703` (the new
+function reads `chosen_position`, and a `language sql` body is checked against
+the columns when it is created). Nothing is broken: run `db:migrate` and then
+`db:apply-rls` again. Both are re-runnable.
 
 **Locks.** `db:migrate` runs 0057 as ONE transaction:
 
@@ -852,6 +864,10 @@ quieter moment.
   pages and studio pages opened in that window wait; they do not fail.
 - SHARE on `notifications` for the index build: new notifications and
   mark-as-read wait, the bell still reads.
+- Taking the second lock after the first, it can meet an app transaction that
+  holds `notifications` and wants `engagement_events`: Postgres then cancels
+  one side with 40P01 (deadlock). If it cancels the migration, the batch rolls
+  back and the output says to re-run (above).
 - With the counts from step 2 (b) this is well under a second against the
   migrator's 3 s `lock_timeout`. It is an estimate, not a production
   measurement.
@@ -935,7 +951,15 @@ git switch --detach origin/main
 two different milestones now give two notifications (and two emails) instead of
 one row counting both; the bell and the notifications page load faster.
 Nothing else changes: no deployed code calls the new or changed concept
-functions, and the deployed code ignores the notifier's new fields.
+functions, and the deployed code ignores the notifier's and the snapshot's new
+fields.
+
+**After the B12 deploy, one wording change in old notifications.** A payment
+notification written BEFORE 0057 that merged claims on two milestones (count 2
+or more) now reads as one claim naming the latest milestone, because B12
+removed the "made N payments" sentence (since 0057 each milestone has its own
+row). The lead's read-only check on production (Oct 2026) found 0
+`client_payment_claimed` notifications, so no existing row is affected.
 
 **Undo, if ever needed.** Undo the CODE, never the database: roll the Worker
 back with `npx wrangler rollback metra-web` (see *Rolling back*). Every Worker

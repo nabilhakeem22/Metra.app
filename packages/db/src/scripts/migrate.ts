@@ -5,6 +5,7 @@ import { migrate } from 'drizzle-orm/postgres-js/migrator';
 import { createDb } from '../client';
 import { MIGRATION_DATABASE_URL } from '../env';
 import { MIGRATION_LOCK_TIMEOUT, applyMigrationTimeouts } from './lock-timeout';
+import { schemaScriptFailureLines } from './script-failure';
 
 const here = dirname(fileURLToPath(import.meta.url)); // packages/db/src/scripts
 const migrationsFolder = resolve(here, '../../migrations');
@@ -30,7 +31,7 @@ async function main() {
   }
 }
 
-main().catch((err) => {
-  console.error('Migration failed:', err.message);
+main().catch((err: unknown) => {
+  for (const line of schemaScriptFailureLines('migrate', err)) console.error(line);
   process.exit(1);
 });

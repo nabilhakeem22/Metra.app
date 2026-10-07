@@ -2019,7 +2019,7 @@
     },
     "conceptOption": {
       "letter": "Option {letter}",
-      "clientChoice": "Client choice"
+      "clientChoice": "Client chose option {letter}"
     },
     "changeOrders": {
       "empty": "No change orders raised.",
@@ -2341,6 +2341,7 @@
       "confirm": "Yes, choose option {letter}",
       "cancel": "Cancel",
       "changed": "The options have changed. Please review them again.",
+      "movedOn": "This step has already moved on. The page now shows where things stand.",
       "chosen": "You chose option {letter}."
     },
     "whatsNext": {

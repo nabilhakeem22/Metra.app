@@ -72,7 +72,7 @@ describe('ConceptOptionPicker', () => {
   });
 
   it('Confirm sends the option, the letter it was seen under and the note, once', async () => {
-    actions.chooseDeliveryConcept.mockResolvedValue({ ok: true, studioNotified: true });
+    actions.chooseDeliveryConcept.mockResolvedValue({ kind: 'chosen', letter: 'B', studioNotified: true });
     renderPicker();
     fireEvent.change(screen.getByPlaceholderText(en('delivery.actions.notePlaceholder')), {
       target: { value: 'The middle one' },
@@ -84,25 +84,59 @@ describe('ConceptOptionPicker', () => {
     expect(screen.getByText(en('delivery.hero.concept.approvedBodyNotified'))).toBeTruthy();
   });
 
-  it('says "notified" only when the studio was, also on a repeat (`already`)', async () => {
-    actions.chooseDeliveryConcept.mockResolvedValue({ ok: true, code: 'already', studioNotified: false });
+  it('F1: a repeat names the SAVED letter, never the one just tapped', async () => {
+    // Another tab chose B; this stale tab taps C and the write answers `already`.
+    actions.chooseDeliveryConcept.mockResolvedValue({ kind: 'chosen', letter: 'B', studioNotified: false });
     renderPicker();
     await chooseAndConfirm('C');
-    expect(await screen.findByText(en('delivery.conceptPicker.chosen', { letter: 'C' }))).toBeTruthy();
+    expect(await screen.findByText(en('delivery.conceptPicker.chosen', { letter: 'B' }))).toBeTruthy();
+    expect(screen.queryByText(en('delivery.conceptPicker.chosen', { letter: 'C' }))).toBeNull();
     expect(screen.getByText(en('delivery.hero.concept.approvedBody'))).toBeTruthy();
     expect(screen.queryByText(en('delivery.hero.concept.approvedBodyNotified'))).toBeNull();
   });
 
-  it('a letter that moved (wrong_state) says the options changed and refreshes', async () => {
-    actions.chooseDeliveryConcept.mockResolvedValue({ ok: false, error: 'wrong_state', studioNotified: false });
+  it('F1: a repeat over a plain approval names no letter at all', async () => {
+    actions.chooseDeliveryConcept.mockResolvedValue({ kind: 'approved', studioNotified: true });
+    renderPicker();
+    await chooseAndConfirm('A');
+    expect(await screen.findByText(en('delivery.hero.concept.approvedBodyNotified'))).toBeTruthy();
+    expect(screen.queryByText(/You chose option/)).toBeNull();
+  });
+
+  it('F1: a repeat over a request for changes confirms the request, with no letter', async () => {
+    actions.chooseDeliveryConcept.mockResolvedValue({ kind: 'changes_requested', studioNotified: false });
+    renderPicker();
+    await chooseAndConfirm('B');
+    expect(await screen.findByText(en('delivery.hero.concept.changesTitle'))).toBeTruthy();
+    expect(screen.getByText(en('delivery.hero.concept.changesBody'))).toBeTruthy();
+    expect(screen.queryByText(/You chose option/)).toBeNull();
+  });
+
+  it('a letter that moved says the options changed and refreshes', async () => {
+    actions.chooseDeliveryConcept.mockResolvedValue({ kind: 'options_changed' });
     renderPicker();
     await chooseAndConfirm('A');
     expect((await screen.findByRole('alert')).textContent).toBe(en('delivery.conceptPicker.changed'));
     expect(router.refresh).toHaveBeenCalledTimes(1);
   });
 
+  it('F5: a review that closed says the step moved on, in Arabic too, and refreshes', async () => {
+    actions.chooseDeliveryConcept.mockResolvedValue({ kind: 'moved_on' });
+    renderPicker('ar-EG');
+    fireEvent.click(
+      within(card('A')).getByRole('button', { name: at('ar-EG', 'delivery.conceptPicker.choose') }),
+    );
+    const dialog = await screen.findByRole('alertdialog');
+    fireEvent.click(
+      within(dialog).getByRole('button', { name: at('ar-EG', 'delivery.conceptPicker.confirm', { letter: 'A' }) }),
+    );
+    await act(async () => {});
+    expect((await screen.findByRole('alert')).textContent).toBe(at('ar-EG', 'delivery.conceptPicker.movedOn'));
+    expect(router.refresh).toHaveBeenCalledTimes(1);
+  });
+
   it('any other refusal is the portal error message, with no refresh', async () => {
-    actions.chooseDeliveryConcept.mockResolvedValue({ ok: false, error: 'token_expired', studioNotified: false });
+    actions.chooseDeliveryConcept.mockResolvedValue({ kind: 'error', error: 'token_expired' });
     renderPicker();
     await chooseAndConfirm('A');
     expect((await screen.findByRole('alert')).textContent).toBe(en('delivery.actions.error.token_expired'));

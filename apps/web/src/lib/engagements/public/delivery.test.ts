@@ -311,16 +311,19 @@ describe('getDeliveryByToken hardening', () => {
       concept_options: [{ id: option, position: 2 }, { id: 'junk', position: 1 }],
       concept_choice_id: option,
       concept_choice_position: 3,
+      concept_decision: 'chosen',
     });
     const lettered = await readDelivery('raw-token');
     expect(lettered?.conceptOptions).toEqual([{ id: option, position: 2, letter: 'B' }]);
     // The saved letter, not the option's current one.
     expect(lettered?.conceptChoice).toEqual({ id: option, letter: 'C' });
+    expect(lettered?.conceptDecision).toBe('chosen');
 
     setSnapshot(validSnapshot());
     const bare = await readDelivery('raw-token');
     expect(bare?.conceptOptions).toEqual([]);
     expect(bare?.conceptChoice).toBeNull();
+    expect(bare?.conceptDecision).toBeNull();
   });
 
   it('never throws across a battery of hostile snapshots', async () => {

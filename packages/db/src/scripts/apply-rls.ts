@@ -14,6 +14,7 @@ import { createSql } from '../client';
 import { MIGRATION_DATABASE_URL } from '../env';
 import { RLS_APPLY_ORDER } from '../rls/manifest';
 import { MIGRATION_LOCK_TIMEOUT, applyRlsTimeouts } from './lock-timeout';
+import { schemaScriptFailureLines } from './script-failure';
 import { declaredCounts, verifiedGrantsSummary, verifyRlsApplied } from './verify-rls-applied';
 
 const here = dirname(fileURLToPath(import.meta.url)); // packages/db/src/scripts
@@ -93,7 +94,7 @@ main()
   .then((code) => {
     process.exitCode = code;
   })
-  .catch((err: Error) => {
-    console.error('apply-rls failed:', err.message);
+  .catch((err: unknown) => {
+    for (const line of schemaScriptFailureLines('apply-rls', err)) console.error(line);
     process.exitCode = 1;
   });

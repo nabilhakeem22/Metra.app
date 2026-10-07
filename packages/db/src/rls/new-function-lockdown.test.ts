@@ -56,3 +56,13 @@ describe('new token functions are locked down in the transaction that creates th
     });
   }
 });
+
+describe("the notifier's written caller contract matches the R3 repair (B12 S2)", () => {
+  it('allows an `already` only when the act was never notified, and names the act on file', () => {
+    const sql = readFileSync(resolve(here, 'functions/50-delivery-write.sql'), 'utf8').replace(/\r\n/g, '\n');
+    const contract = sql.slice(sql.indexOf('-- THE CALLER CONTRACT (PR-B10).'));
+    expect(contract).toContain('app_delivery_act_notified_by_token answered false');
+    expect(contract).toContain('the act notified is the\n--     decision actually on file');
+    expect(contract).not.toContain('(never on\n--     `already` or a refusal)');
+  });
+});

@@ -80,7 +80,7 @@ export function EngagementPanels({
         <FilesTab
           engagementId={engagementId}
           artifacts={data.artifacts}
-          chosenConceptId={chosenConceptOf(data.events)?.artifactId ?? null}
+          chosenConcept={chosenConceptOf(data.events)}
           canUpload={canUpload}
           canRecordArtifact={capabilities.recordArtifact}
           pending={pending}

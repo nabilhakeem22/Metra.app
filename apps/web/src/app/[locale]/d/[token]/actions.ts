@@ -1,9 +1,10 @@
 'use server';
 
 import { clientActOfVerb, paymentClaimedAct } from '@/lib/engagements/client-acts/acts';
+import { chooseConceptAndNotify } from '@/lib/engagements/client-acts/choose-concept';
 import { withStudioNotified } from '@/lib/engagements/client-acts/notify';
+import type { ConceptChoiceOutcome } from '@/lib/engagements/concept-choice-outcome';
 import {
-  chooseConceptByToken,
   claimPaymentByToken,
   recordDeliveryActionByToken,
   type DeliveryActionResult,
@@ -49,23 +50,22 @@ export async function recordDeliveryAction(
  * Public (no-session) client delivery-portal action (Round B, B12): the client
  * CHOOSES one concept option. `position` is the letter the client saw (1 = A);
  * the SDF accepts it only while that option still has that letter, and saves
- * it, so the studio reads the letter the client tapped. Same provenance capping
- * as recordDeliveryAction; the raw token is NEVER logged here. A first `ok`, or
- * a repeat whose notification was lost, notifies the studio.
+ * it. The answer names only a SAVED decision: on a repeat it is the decision on
+ * file, which may differ from this tap (client-acts/choose-concept.ts). Same
+ * provenance capping as recordDeliveryAction; the raw token is NEVER logged.
  */
 export async function chooseDeliveryConcept(
   token: string,
   artifactId: string,
   position: number,
   note?: string,
-): Promise<DeliveryActResult> {
-  const result = await chooseConceptByToken(token, {
+): Promise<ConceptChoiceOutcome> {
+  return chooseConceptAndNotify(token, {
     artifactId,
     position,
     note: note?.trim().slice(0, 2000) || null,
     ...(await requestProvenance()),
   });
-  return withStudioNotified(token, result, { kind: 'concept_chosen' });
 }
 
 /**
