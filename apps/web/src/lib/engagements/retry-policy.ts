@@ -62,6 +62,9 @@ export const DEFINITE_REFUSALS: ReadonlySet<ActionCode> = new Set<ActionCode>([
   'offline_approval_note_too_long',
   // Re-checked under the delivery row lock: the client answered first.
   'client_review_answered',
+  // Reveal/reminder refusals: read-only, nothing was written.
+  'delivery_link_unrecoverable',
+  'client_email_missing',
   'design_fee_required',
   'milestone_split_invalid',
   'milestone_kind_duplicate',

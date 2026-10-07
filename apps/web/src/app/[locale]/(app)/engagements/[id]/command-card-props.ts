@@ -64,5 +64,6 @@ export interface EngagementCommandCardProps {
   runAction: RunAction;
   /** The last card action's refusal, shown inside the card under the action. */
   actionError: ActionCode | null;
+  /** Opens the "Send reminder" dialog (the nudge pill, the waiting card). */
   onNudge: () => void;
 }

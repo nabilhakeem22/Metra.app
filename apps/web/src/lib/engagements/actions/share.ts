@@ -1,31 +1,26 @@
 'use server';
 
-import { getLocale } from 'next-intl/server';
 import { refreshApp } from '@/lib/actions/refresh';
 import type { ActionResult } from '@/lib/actions/result';
 import { requireOrg } from '@/lib/auth/require-org';
 import { resolveRequestOrigin } from '@/lib/http/request-origin';
+import { deliveryPortalUrl, requestLocaleOrDefault } from '../portal-url';
 import {
   mintDeliveryLinkCore,
   revokeDeliveryLinkCore,
   rotateDeliveryLinkCore,
 } from '../share';
 
-/** Build the durable public portal URL for a freshly-minted RAW token. */
+/** The durable public portal URL for a RAW token, in the studio user's locale. */
 async function deliveryLink(origin: string, rawToken: string): Promise<string> {
-  let locale = 'ar-EG';
-  try {
-    locale = await getLocale();
-  } catch {
-    /* default locale */
-  }
-  return `${origin}/${locale}/d/${rawToken}`;
+  return deliveryPortalUrl(origin, await requestLocaleOrDefault(), rawToken);
 }
 
 /**
  * Server-action wrapper for {@link mintDeliveryLinkCore}: mints the FIRST client
- * share link and returns its absolute URL ONCE (`link`) — the raw token is never
- * re-retrievable. Revalidates the shell on success. Never throws to the client.
+ * share link and returns its absolute URL (`link`). Later it is shown again by
+ * revealDeliveryLink (./reminder.ts) while SHARE_LINK_SECRET is set. Revalidates
+ * the shell on success. Never throws to the client.
  */
 export async function shareDeliveryLink(
   engagementId: string,
@@ -45,7 +40,7 @@ export async function shareDeliveryLink(
 
 /**
  * Server-action wrapper for {@link rotateDeliveryLinkCore}: replaces the link
- * (the previous token stops working) and returns the fresh absolute URL ONCE.
+ * (the previous token stops working) and returns the fresh absolute URL.
  * Revalidates the shell on success. Never throws to the client.
  */
 export async function rotateDeliveryLink(

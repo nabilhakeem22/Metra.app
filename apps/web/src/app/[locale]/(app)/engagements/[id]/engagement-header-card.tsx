@@ -1,19 +1,21 @@
 'use client';
 
-import { Link2 } from 'lucide-react';
+import { BellRing, Link2 } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
 import { DeliveryStatusChip } from '@/components/engagements/delivery-status-chip';
 import { OverflowMenu } from '@/components/ui/overflow-menu';
 import { StatusChip } from '@/components/ui/status-chip';
 import type { DeliveryStatus } from '@/lib/engagements/delivery-status';
 import type { EngagementHeader } from '@/lib/engagements/queries';
+import { isTerminal } from '@/lib/engagements/states';
 import { formatDate } from '@/lib/format/date';
 import { docYear, formatDocNumber } from '@/lib/format/doc-number';
 import { formatMoney } from '@/lib/format/money';
 import type { StatusTone } from '@/lib/ui/status-tone';
 import { ClientLinkDialog } from './client-link-dialog';
+import { DeliveryReminderDialog } from './delivery-reminder-dialog';
 import { EngagementHeaderCrumbs, type HeaderCrumbs } from './engagement-header-crumbs';
-import { revealDeliveryShareLink } from './share-anchor';
+import { openDeliveryReminder, revealDeliveryShareLink } from './share-anchor';
 
 // The cockpit HEADER. Row 1: the trail (Deliveries / client / project) ending in
 // the document number, on a quiet mono line. Row 2: the delivery named at heading
@@ -43,7 +45,7 @@ export function EngagementHeaderCard({
   /** The delivery's status: the same chip the deliveries list and dashboard show. */
   status: DeliveryStatus;
   shared: boolean;
-  /** Owner/admin (`engagements_issue` approve): the menu and its client link. */
+  /** Owner/admin (`engagements_issue` approve): the menu, its client link and the reminder. */
   canShare: boolean;
   crumbs: HeaderCrumbs;
 }) {
@@ -58,6 +60,7 @@ export function EngagementHeaderCard({
     docYear(null, header.createdAt),
   );
   const started = formatDate(header.createdAt, locale);
+  const remindable = !isTerminal(header.state);
   const feeLabel = header.designFee
     ? tc('feeChip', { amount: formatMoney(header.designFee, locale) })
     : null;
@@ -115,9 +118,21 @@ export function EngagementHeaderCard({
                     icon: Link2,
                     onSelect: revealDeliveryShareLink,
                   },
+                  // A closed delivery has nobody to remind.
+                  ...(remindable
+                    ? [
+                        {
+                          key: 'sendReminder',
+                          label: tc('sendReminder'),
+                          icon: BellRing,
+                          onSelect: openDeliveryReminder,
+                        },
+                      ]
+                    : []),
                 ]}
               />
               <ClientLinkDialog engagementId={header.id} initialShared={shared} />
+              {remindable && <DeliveryReminderDialog engagementId={header.id} />}
             </>
           )}
         </div>

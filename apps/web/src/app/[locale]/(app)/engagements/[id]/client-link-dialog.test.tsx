@@ -11,6 +11,7 @@ vi.mock('@/i18n/routing', async (importOriginal) => ({
 }));
 const actions = vi.hoisted(() => ({
   shareDeliveryLink: vi.fn(),
+  revealDeliveryLink: vi.fn(),
   rotateDeliveryLink: vi.fn(),
   revokeDeliveryLink: vi.fn(),
 }));
@@ -42,6 +43,19 @@ describe('the client link dialog', () => {
     );
     await act(async () => {});
     expect(actions.revokeDeliveryLink).toHaveBeenCalledWith('e-1');
+  });
+
+  test('Show link shows the link the client already has, and rotates nothing', async () => {
+    actions.revealDeliveryLink.mockResolvedValue({ ok: true, link: 'https://metra.app/en/d/tok-1' });
+    renderWithIntl(<ClientLinkDialog engagementId="e-1" initialShared />, { locale: 'en' });
+    act(() => revealDeliveryShareLink());
+    await screen.findByRole('dialog');
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: en('delivery.share.showLink') }));
+    });
+    expect(actions.revealDeliveryLink).toHaveBeenCalledWith('e-1');
+    expect(await screen.findByText('https://metra.app/en/d/tok-1')).toBeTruthy();
+    expect(actions.rotateDeliveryLink).not.toHaveBeenCalled();
   });
 
   test('the close button closes it', async () => {

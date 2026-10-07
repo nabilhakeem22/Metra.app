@@ -3,31 +3,35 @@
 import { useState, useTransition } from 'react';
 import { useRouter } from '@/i18n/routing';
 import {
+  revealDeliveryLink,
   revokeDeliveryLink,
   rotateDeliveryLink,
   shareDeliveryLink,
 } from '@/lib/engagements/actions';
 
 /**
- * The state of the cockpit's client-link dialog (`open`), and the three writes
- * that change the link.
+ * The state of the cockpit's client-link dialog (`open`), the three writes that
+ * change the link, and `reveal`, which shows the link the client ALREADY holds.
  *
- * THE RAW TOKEN IS SHOWN ONCE AND IS THEN UNRECOVERABLE. Only its sha256 hash is
- * persisted (share.ts) — for this portal the token IS the client's
- * authentication, so keeping the plaintext would mean a database read, a backup,
- * or a leaked dump hands someone the client's delivery. That is why the answer to
- * "show me the link again" has to be a NEW link rather than the old one.
+ * Only the token's sha256 hash and a nonce are stored (share.ts); the token IS
+ * the client's authentication, so it is never kept in plaintext. Round B (B11):
+ * it is re-derived from the nonce under the Worker secret, so "show me the link
+ * again" no longer has to rotate it. A link minted before that (or without the
+ * secret) answers `delivery_link_unrecoverable`, and the dialog points at the
+ * one confirmed way out: Replace the link.
  */
 export interface DeliveryShareApi {
   pending: boolean;
   shared: boolean;
-  /** The raw link, revealed ONCE right after mint/rotate. Cleared on revoke. */
+  /** The raw link, after mint/rotate/reveal. Cleared on revoke. */
   link: string | null;
   copied: boolean;
   open: boolean;
   setOpen: (open: boolean) => void;
   error: string | null;
   share: () => void;
+  /** Show the existing link again. Never rotates. */
+  reveal: () => void;
   rotate: () => void;
   revoke: () => void;
   copy: () => void;
@@ -47,17 +51,25 @@ export function useDeliveryShare(options: {
   const [error, setError] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
 
+  /** Run one link action. `writes`: it changed the link, so the page re-reads. */
   function run(
     action: () => Promise<ShareResult>,
     onOk: (link?: string) => void,
+    writes = true,
   ): void {
     setError(null);
     setCopied(false);
     startTransition(async () => {
-      const result = await action();
+      // Wrapped: a rejected action must surface as an error, never a stuck spinner.
+      let result: ShareResult;
+      try {
+        result = await action();
+      } catch {
+        result = { ok: false, error: 'generic' };
+      }
       if (result.ok) {
         onOk(result.link);
-        router.refresh();
+        if (writes) router.refresh();
       } else {
         setError(result.error ?? 'generic');
         // A refusal belongs on screen, not behind a closed dialog.
@@ -86,6 +98,7 @@ export function useDeliveryShare(options: {
         setShared(true);
         reveal(revealed);
       }),
+    reveal: () => run(() => revealDeliveryLink(options.engagementId), reveal, false),
     rotate: () => run(() => rotateDeliveryLink(options.engagementId), reveal),
     revoke: () =>
       run(() => revokeDeliveryLink(options.engagementId), () => {

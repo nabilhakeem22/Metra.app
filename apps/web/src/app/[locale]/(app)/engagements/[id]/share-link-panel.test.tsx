@@ -17,6 +17,7 @@ function sharedLink(): DeliveryShareApi {
     setOpen: vi.fn(),
     error: null,
     share: vi.fn(),
+    reveal: vi.fn(),
     rotate: vi.fn(),
     revoke: vi.fn(),
     copy: vi.fn(),
@@ -58,6 +59,20 @@ describe('the client link menu', () => {
     fireEvent.keyDown(dialog, { key: 'Escape' });
     await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());
     expect(share.rotate).not.toHaveBeenCalled();
+  });
+
+  test('Show link reveals the existing link and never rotates it', () => {
+    const share = sharedLink();
+    renderWithIntl(<ShareLinkPanel share={share} />, { locale: 'en' });
+    fireEvent.click(screen.getByRole('button', { name: en('delivery.share.showLink') }));
+    expect(share.reveal).toHaveBeenCalledTimes(1);
+    expect(share.rotate).not.toHaveBeenCalled();
+  });
+
+  test('a link that cannot be re-created says so, and points at Replace', () => {
+    const share = { ...sharedLink(), error: 'delivery_link_unrecoverable' };
+    renderWithIntl(<ShareLinkPanel share={share} />, { locale: 'en' });
+    expect(screen.getByRole('alert').textContent).toBe(en('delivery.share.unrecoverable'));
   });
 
   test('a delivery not yet shared offers only the Share button', () => {

@@ -1,8 +1,12 @@
 // Client Delivery Portal (P1) — the studio "share with client" token lifecycle.
 // ONE durable per-delivery link: mint (first share), rotate (replace — the old
-// token dies), revoke (turn the link off). The RAW token is returned ONCE from
+// token dies), revoke (turn the link off). The RAW token is returned from
 // mint/rotate and is NEVER stored or logged — only its sha256 hash is persisted
-// in design_engagements.token_hash (unique). All three gate on the owner/admin
+// in design_engagements.token_hash (unique). Round B (B11): the token is an HMAC
+// of the delivery id and a per-link nonce under SHARE_LINK_SECRET, and the nonce
+// is stored beside the hash in token_nonce, so the studio can show and resend
+// the SAME link later (share-reveal.ts, lib/share/delivery-link-token.ts). All
+// three gate on the owner/admin
 // `engagements_issue` capability (the same one the plan reserves for minting
 // client share links) and run inside mutateInOrg's RLS tx, so a caller can only
 // ever touch a delivery in their own org.
@@ -11,13 +15,14 @@ import { and, eq, isNull } from 'drizzle-orm';
 import { fail, mutateInOrg } from '@/lib/actions/mutate';
 import type { ActionResult } from '@/lib/actions/result';
 import type { OrgContext } from '@/lib/db/context';
-import { mintShareToken } from '@/lib/share/token';
+import { mintDeliveryLinkToken } from '@/lib/share/delivery-link-token';
 
 /**
  * Mint the FIRST share link for a delivery. Atomic admission gate: sets token_hash
  * only while it is still null (a concurrent second mint finds 0 rows). Returns the
- * RAW token in `data` — reveal it to the studio user ONCE; it is unrecoverable
- * afterwards (only the hash is stored). `share_expires_at` stays null: the link is
+ * RAW token in `data`. Only the hash and the nonce are stored; the token can be
+ * re-derived later only while SHARE_LINK_SECRET is set (without it the nonce is
+ * null and the token is unrecoverable, as before). `share_expires_at` stays null: the link is
  * durable and revocable, never hard-expiring while active. `invalid` means the
  * delivery already has a live link (rotate to replace it).
  */
@@ -29,10 +34,10 @@ export async function mintDeliveryLinkCore(
     ctx,
     { capability: 'engagements_issue', action: 'approve', flow: 'interior' },
     async (tx, audit) => {
-      const { raw, hash } = mintShareToken();
+      const { raw, hash, nonce } = mintDeliveryLinkToken(engagementId);
       const gated = await tx
         .update(designEngagements)
-        .set({ tokenHash: hash, shareExpiresAt: null, updatedAt: new Date() })
+        .set({ tokenHash: hash, tokenNonce: nonce, shareExpiresAt: null, updatedAt: new Date() })
         .where(
           and(
             eq(designEngagements.id, engagementId),
@@ -63,9 +68,10 @@ export async function mintDeliveryLinkCore(
 
 /**
  * Rotate the share link: overwrite token_hash with a fresh one so the PREVIOUS raw
- * token stops resolving immediately. Returns the new RAW token once. Works whether
- * or not a link currently exists (also the way to re-reveal a link whose raw token
- * was lost). `engagement_not_found` if the delivery is foreign/absent.
+ * token stops resolving immediately. Returns the new RAW token. Works whether or
+ * not a link currently exists; it is also the ONE confirmed replacement for a link
+ * that cannot be re-derived (minted before B11, or without the secret).
+ * `engagement_not_found` if the delivery is foreign/absent.
  */
 export async function rotateDeliveryLinkCore(
   ctx: OrgContext,
@@ -75,10 +81,12 @@ export async function rotateDeliveryLinkCore(
     ctx,
     { capability: 'engagements_issue', action: 'approve', flow: 'interior' },
     async (tx, audit) => {
-      const { raw, hash } = mintShareToken();
+      const { raw, hash, nonce } = mintDeliveryLinkToken(engagementId);
+      // The nonce is written in the SAME statement as the hash, so the 0056
+      // trigger keeps it (it clears a nonce only when the writer left it as was).
       const updated = await tx
         .update(designEngagements)
-        .set({ tokenHash: hash, shareExpiresAt: null, updatedAt: new Date() })
+        .set({ tokenHash: hash, tokenNonce: nonce, shareExpiresAt: null, updatedAt: new Date() })
         .where(eq(designEngagements.id, engagementId))
         .returning({ id: designEngagements.id });
       if (!updated[0]) fail('engagement_not_found');

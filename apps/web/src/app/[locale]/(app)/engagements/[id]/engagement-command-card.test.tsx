@@ -543,7 +543,22 @@ describe('waiting for the client to answer the review', () => {
     expect(button('engagements.hero.advance')).toBeNull();
     expect(button('engagements.hero.logPaymentAdvance')).toBeNull();
     expect(offlineButton()).not.toBeNull();
-    expect(button('engagements.command.reshare')).not.toBeNull();
+    // The reminder is the ONE filled primary action of a waiting card (B11).
+    const reminder = button('engagements.command.sendReminder');
+    expect(reminder).not.toBeNull();
+    expect([...container.querySelectorAll('[data-primary-action]')]).toEqual([reminder]);
+  });
+
+  test('the reminder button opens the reminder (onNudge), and never touches the link', () => {
+    const onNudge = vi.fn();
+    renderWaiting({ onNudge });
+    fireEvent.click(button('engagements.command.sendReminder')!);
+    expect(onNudge).toHaveBeenCalledTimes(1);
+  });
+
+  test('a role without share capability gets no reminder button', () => {
+    const { container } = renderWaiting({ canShare: false });
+    expect(button('engagements.command.sendReminder')).toBeNull();
     expect(container.querySelectorAll('[data-primary-action]')).toHaveLength(0);
   });
 

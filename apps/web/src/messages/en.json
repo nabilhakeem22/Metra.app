@@ -532,6 +532,9 @@
     "offline_approval_date_out_of_range": "Pick a date between the start of this review and today",
     "offline_approval_note_too_long": "The note is too long: 2000 characters at most",
     "client_review_answered": "The client answered the review in the meantime. Reload the page to see their answer.",
+    "delivery_link_unrecoverable": "This client link can't be shown again. Replace it to send a reminder.",
+    "client_email_missing": "The client has no email address on file.",
+    "reminder_email_failed": "The reminder email didn't go out. Try again, or send it on WhatsApp.",
     "handoff_not_open": "The design-only handoff isn't open at this stage",
     "rom_range_invalid": "Enter a valid build-cost range, low to high",
     "rom_not_set": "Enter the build-cost range before recording the client's acknowledgement",
@@ -1695,7 +1698,8 @@
       "readyHint": "Everything checks out. Advance when you're ready.",
       "clientNote": "What the client asked for",
       "nudge": "Nudge client",
-      "nudgeHint": "Reveal the client link so you can follow up.",
+      "nudgeHint": "Send the client a reminder with the link they already have.",
+      "sendReminder": "Send reminder",
       "clientLinkActive": "Client link active",
       "clientLinkInactive": "Not shared",
       "clientLink": "Client link",
@@ -1713,7 +1717,6 @@
       "awaitingReply": "{n, plural, one {# client question is waiting on your reply, in Files.} other {# client questions are waiting on your reply, in Files.}}",
       "nextAction": "Next action",
       "advanceLeadsTo": "This moves the job to {phase}.",
-      "reshare": "Reveal & re-share the client link",
       "waitingClient": {
         "concept_review": {
           "headline": "Waiting for the client to choose a concept",
@@ -2162,24 +2165,52 @@
       "note": "Note (optional)",
       "save": "Record the approval",
       "cancel": "Cancel"
+    },
+    "reminder": {
+      "title": "Remind the client",
+      "intro": "The message carries the link the client already has. Sending it changes nothing.",
+      "loading": "Preparing the reminder",
+      "language": "Message language",
+      "locale": {
+        "ar-EG": "Arabic",
+        "en": "English"
+      },
+      "preview": "Message",
+      "openWhatsapp": "Open WhatsApp",
+      "noNumber": "No WhatsApp number on file: WhatsApp opens with the message and you pick the chat.",
+      "copy": "Copy message",
+      "copied": "Copied",
+      "email": "Send by email",
+      "emailTo": "Email goes to {email}",
+      "noEmail": "No email address on file for this client.",
+      "emailSent": "Reminder emailed.",
+      "unrecoverableTitle": "This link can't be resent",
+      "unrecoverableBody": "It was made before links could be shown again, so Metra cannot re-create it. Replace it once: the client's current link stops working, and from then on the new one can be resent.",
+      "replace": "Replace link and continue",
+      "confirmReplace": {
+        "title": "Replace the client link?",
+        "body": "The link the client has now stops working. The reminder then carries the new one."
+      }
     }
   },
   "delivery": {
     "share": {
       "title": "Share with client",
       "notSharedHint": "Create a private link the client can open to follow this delivery. No login needed.",
-      "sharedHint": "A private link is active. The link itself is never stored, so it cannot be shown again. Reveal a new one to get a fresh link you can send.",
+      "sharedHint": "A private link is active. Show it to copy it again; replace it if it reached the wrong person.",
       "shareCta": "Share with client",
       "copyLink": "Copy link",
       "copied": "Copied",
-      "revealOnce": "Copy this link now. It won't be shown again.",
-      "rotate": "Reveal a new link",
+      "copyHint": "Copy the link and send it to the client.",
+      "showLink": "Show link",
+      "rotate": "Replace the link",
       "revoke": "Revoke",
       "error": "Something went wrong. Please try again.",
-      "rotateHint": "Revealing a new link stops the current one working.",
+      "unrecoverable": "This link was made before links could be shown again, so it cannot be shown. Replace it to get one you can copy: the client's current link stops working.",
+      "rotateHint": "Replacing the link stops the current one working.",
       "moreActions": "Link actions",
       "confirmRotate": {
-        "title": "Reveal a new link?",
+        "title": "Replace the client link?",
         "body": "The link the client has now stops working. You send them the new one."
       },
       "confirmRevoke": {
@@ -2337,6 +2368,9 @@
         "not_active": "This delivery is closed. Please contact your design team.",
         "wrong_state": "This isn't available right now."
       }
+    },
+    "reminder": {
+      "message": "Hello {client}, a reminder from {studio}: your design project is waiting for your review. You can see the latest updates and reply here:\n{link}"
     }
   }
 }

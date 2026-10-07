@@ -89,6 +89,13 @@ export type ActionCode =
   // The client answered the review on the portal while the studio was recording
   // an offline approval (offline-approval-input.ts): reload and read their answer.
   | 'client_review_answered'
+  // Round B, B11: the client link cannot be re-derived (minted before re-derivable
+  // links, or the Worker secret is missing/rotated); one confirmed replacement fixes it.
+  | 'delivery_link_unrecoverable'
+  // A reminder email with no client address on file.
+  | 'client_email_missing'
+  // The reminder email did not go out (Resend refused or timed out).
+  | 'reminder_email_failed'
   | 'handoff_not_open'
   | 'rom_range_invalid'
   | 'rom_not_set'

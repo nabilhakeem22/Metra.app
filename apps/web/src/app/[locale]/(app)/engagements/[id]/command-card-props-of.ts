@@ -7,7 +7,7 @@ import { secondaryTriggersOf } from '@/lib/engagements/forward-trigger';
 import { reviewRoundStartedAt } from '@/lib/engagements/review-round';
 import type { EngagementCommandCardProps } from './command-card-props';
 import type { EngagementDetailProps } from './engagement-detail-props';
-import { revealDeliveryShareLink } from './share-anchor';
+import { openDeliveryReminder } from './share-anchor';
 import type { RunAction } from './use-engagement-action';
 
 export function commandCardPropsOf(
@@ -60,6 +60,8 @@ export function commandCardPropsOf(
     pending: action.pending,
     runAction: action.runAction,
     actionError: action.actionError,
-    onNudge: revealDeliveryShareLink,
+    // The nudge pill and the waiting card remind the client with the link they
+    // already hold (B11); the header's menu still opens the link itself.
+    onNudge: openDeliveryReminder,
   };
 }

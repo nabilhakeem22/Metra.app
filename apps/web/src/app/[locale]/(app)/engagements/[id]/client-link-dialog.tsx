@@ -10,15 +10,15 @@ import { ShareLinkPanel } from './share-link-panel';
 import { useDeliveryShare } from './use-delivery-share';
 
 /**
- * The client link: share it, reveal a new one, or revoke it. Owner/admin only
- * (the caller renders it only with `canShare`).
+ * The client link: share it, show it again (re-derived, never rotated),
+ * replace it, or revoke it. Owner/admin only (the caller renders it only with
+ * `canShare`; the server actions enforce it).
  *
  * A dialog rather than a bar on the page: sharing is a side action, and as a bar
  * it sat between the header and the command card, pushing the one thing the
- * studio came here to do down the page. It opens from the header's menu and from
- * anything that calls `revealDeliveryShareLink()` (the nudge pill, re-share), and
- * by itself whenever there is something to read: a freshly revealed link or a
- * refusal (use-delivery-share.ts).
+ * studio came here to do down the page. It opens from the header's menu (any
+ * caller of `revealDeliveryShareLink()`), and by itself whenever there is
+ * something to read: a revealed link or a refusal (use-delivery-share.ts).
  */
 export function ClientLinkDialog({
   engagementId,

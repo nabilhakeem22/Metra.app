@@ -9,7 +9,8 @@ import { formatMoneyExact } from '@/lib/format/money';
 // the mockup's `.checklist`: each row is a circular mark (green ✓ done / amber ●
 // pending) + a bold title + a small subtext line. A pending row the CLIENT clears
 // by acting on the delivery link carries a "Nudge client" pill on the inline-END
-// (reveals the existing share link — no new action). Purely presentational;
+// (opens the reminder dialog, which carries the link the client already holds;
+// it never rotates it). Purely presentational;
 // rendered by the parent only when there are items to show. `showNudgePill`
 // mirrors the command view's `showNudge && canShare`.
 export function EngagementHeroChecklist({

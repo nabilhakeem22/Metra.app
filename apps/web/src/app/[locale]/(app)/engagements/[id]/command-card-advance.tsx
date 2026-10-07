@@ -37,7 +37,7 @@ function fireAdvance(props: CommandCardActionProps): void {
  * which the first cut of this did.
  *
  * Advance is hidden in TWO situations, for the same reason: it cannot move and
- * something better already occupies its place. Here that is the re-share button.
+ * something better already occupies its place. Here that is the reminder button.
  * The other is `actOnCard`: the studio is blocked and the dropzone under it IS
  * the act, worded from the same registry row as the headline, so a second dead
  * button for the same move is exactly the duplication Option D removes.
@@ -81,6 +81,7 @@ export function AdvanceOrReshare(props: CommandCardActionProps) {
         }
         reviewRoundStartedAt={props.advance.reviewRoundStartedAt}
         canShare={props.canShare}
+        primary={props.ctas.payCta === null}
         pending={props.pending}
         onNudge={props.onNudge}
         runAction={props.advance.runAction}

@@ -1,13 +1,13 @@
 'use client';
 
-import { Copy, Link2, Loader2, RefreshCw, Share2, X } from 'lucide-react';
+import { Copy, Eye, Link2, Loader2, RefreshCw, Share2, X } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
 import { useConfirm } from '@/components/ui/confirm-dialog';
 import { OverflowMenu } from '@/components/ui/overflow-menu';
 import type { DeliveryShareApi } from './use-delivery-share';
 
-/** The revealed link, its copy button, and the once-only warning under it. */
+/** The revealed link, its copy button, and what to do with it. */
 function RevealedLink({ share }: { share: DeliveryShareApi }) {
   const t = useTranslations('delivery.share');
   if (!share.link) return null;
@@ -23,16 +23,16 @@ function RevealedLink({ share }: { share: DeliveryShareApi }) {
           {share.copied ? t('copied') : t('copyLink')}
         </Button>
       </div>
-      <p className="text-caption text-muted-foreground">{t('revealOnce')}</p>
+      <p className="text-caption text-muted-foreground">{t('copyHint')}</p>
     </div>
   );
 }
 
 /**
- * Share, or the link's menu (reveal a new link, revoke). Never both: a link
- * either exists or does not. Both menu actions ask first: each one stops the
- * link the client holds from working, and neither can be taken back (the old
- * token is never stored, so it cannot be restored).
+ * Share, or (once shared) Show link plus the link's menu (replace, revoke).
+ * Show link re-derives the link the client already holds and changes nothing.
+ * Both menu actions ask first: each one stops the link the client holds from
+ * working, and neither can be taken back.
  */
 function ShareActions({ share }: { share: DeliveryShareApi }) {
   const t = useTranslations('delivery.share');
@@ -69,6 +69,12 @@ function ShareActions({ share }: { share: DeliveryShareApi }) {
   return (
     <div className="flex items-center gap-2">
       {dialog}
+      {!share.link && (
+        <Button variant="secondary" size="sm" disabled={share.pending} onClick={share.reveal}>
+          <Eye className="size-4" aria-hidden />
+          {t('showLink')}
+        </Button>
+      )}
       {share.pending && <Loader2 className="size-4 animate-spin" aria-hidden />}
       <OverflowMenu
         label={t('moreActions')}
@@ -120,7 +126,7 @@ export function ShareLinkPanel({ share }: { share: DeliveryShareApi }) {
 
       {share.error && (
         <p className="text-body text-destructive" role="alert">
-          {t('error')}
+          {share.error === 'delivery_link_unrecoverable' ? t('unrecoverable') : t('error')}
         </p>
       )}
 

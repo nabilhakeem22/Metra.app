@@ -1,17 +1,17 @@
-// Server-safe name of the "open the client link" event. A PLAIN module (NOT
-// 'use client'), so the dispatcher below and the dialog that listens for it
-// import the same constant without turning it into a client-reference proxy.
+// Server-safe names of the "open the client link" and "open the reminder"
+// events. A PLAIN module (NOT 'use client'), so the dispatchers below and the
+// dialogs that listen for them import the same constants without turning them
+// into client-reference proxies.
 
 /**
- * Fired on `window` to ask the client-link dialog to OPEN. The checklist's
- * "nudge client" pill and the waiting card's re-share button sit in the command
- * card; the dialog hangs off the header's menu. A window event rather than
- * shared state: the two are siblings several components apart.
+ * Fired on `window` to ask the client-link dialog to OPEN, from the header's
+ * menu. A window event rather than shared state: the opener and the dialog are
+ * siblings several components apart.
  */
 export const DELIVERY_SHARE_OPEN_EVENT = 'metra:delivery-share-open';
 
 /**
- * Nudge = open the client-link dialog. No server action, no notify.
+ * Open the client-link dialog. No server action.
  *
  * It lives beside the event it dispatches rather than in the component that
  * calls it: the function that fires an event and the name of that event are one
@@ -20,4 +20,16 @@ export const DELIVERY_SHARE_OPEN_EVENT = 'metra:delivery-share-open';
  */
 export function revealDeliveryShareLink(): void {
   window.dispatchEvent(new CustomEvent(DELIVERY_SHARE_OPEN_EVENT));
+}
+
+/**
+ * Fired on `window` to ask the "Send reminder" dialog to OPEN (Round B, B11).
+ * The header menu, the waiting card's primary and the checklist's nudge pill
+ * all open it; the dialog hangs off the header, like the client-link dialog.
+ */
+export const DELIVERY_REMINDER_OPEN_EVENT = 'metra:delivery-reminder-open';
+
+/** Nudge = open the reminder dialog, which carries the link the client already holds. */
+export function openDeliveryReminder(): void {
+  window.dispatchEvent(new CustomEvent(DELIVERY_REMINDER_OPEN_EVENT));
 }
