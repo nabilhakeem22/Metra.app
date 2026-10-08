@@ -55,6 +55,9 @@ vi.mock('./portfolio-digest', () => ({
 vi.mock('./stage-reminders', () => ({
   runStageReminders: (deps: AutomationDeps) => state.core('stage', deps),
 }));
+vi.mock('./delivery-followups', () => ({
+  runDeliveryFollowups: (deps: AutomationDeps) => state.core('delivery', deps),
+}));
 vi.mock('./handover-closer', () => ({
   runHandoverCloser: (deps: AutomationDeps) => state.core('handover', deps),
 }));
@@ -66,7 +69,7 @@ import { ORG_CONCURRENCY, runDueAutomations } from './runner';
 
 const NOW = new Date('2026-10-05T21:00:00Z');
 /** The runner's core order (./cores.ts). */
-const CORE_ORDER: AutomationKey[] = ['expire', 'followup', 'digest', 'stage', 'handover'];
+const CORE_ORDER: AutomationKey[] = ['expire', 'followup', 'digest', 'stage', 'delivery', 'handover'];
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 function actorFor(orgId: string): OrgContext {

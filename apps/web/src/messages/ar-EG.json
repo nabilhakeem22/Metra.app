@@ -1454,13 +1454,16 @@
       "expire_nudge": "عرض سعر هينتهي قريب",
       "portfolio_digest": "ملخص محفظة الأعمال",
       "stage_reminder": "تنبيه المرحلة",
-      "client_responded": "العميل رد"
+      "client_responded": "العميل رد",
+      "delivery_followup": "متابعة تسليم"
     },
     "body": {
       "proposal_expiring": "عرض السعر {number} هينتهي في {date}.",
       "proposal_followup": "عرض السعر {number} مستني رد بقاله {days} يوم.",
       "portfolio_digest": "{active} مشاريع شغالة، {awaiting} مستنية الرد، {expiring} هتنتهي قريب، {overdue} مراحل متأخرة.",
+      "portfolio_digest_deliveries": "التسليمات: {yourMove} محتاجة خطوة منك، {waiting} مستنية العميل، {stalled} متعطلة.",
       "stage_reminder": "{overdue} مراحل متأخرة و{upcoming} جايين.",
+      "delivery_waiting_on_client": "{delivery} مستني العميل من {days} يوم. ابعتله تذكير.",
       "client_concept_approved": "العميل وافق على الفكرة في {delivery}.",
       "client_concept_chosen": "العميل اختار {hasLetter, select, yes {البديل {letter}} other {بديل للفكرة}} في {delivery}.",
       "client_concept_changes_requested": "العميل طلب تعديلات على الفكرة في {delivery}.",
@@ -1482,7 +1485,7 @@
     "expireNudgeDesc": "بلّغ اللي بعت قبل ما عرض السعر ينتهي.",
     "leadDaysLabel": "الأيام قبل انتهاء الصلاحية",
     "followupLabel": "تنبيهات المتابعة",
-    "followupDesc": "فكّر اللي بعت لما عرض السعر المرسل يفضل من غير رد.",
+    "followupDesc": "فكّر فريقك يتابع لما العميل مايردّش على عرض سعر أو تسليم خلال عدد الأيام اللي تحت.",
     "thresholdLabel": "الأيام من غير رد",
     "digestLabel": "ملخص محفظة الأعمال",
     "digestDesc": "ابعث للمالكين والمسؤولين ملخص عن محفظة الأعمال.",

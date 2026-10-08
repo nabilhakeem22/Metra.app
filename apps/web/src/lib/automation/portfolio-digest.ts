@@ -7,19 +7,41 @@ import {
   weekPeriodKey,
 } from './clock';
 import { claimPeriod } from './claim';
-import { digestData, orgOwnerAdminIds } from './due-work';
+import { deliveryCounts, inFlightDeliveries } from './delivery-due-work';
+import { digestData, orgOwnerAdminIds, type DigestData } from './due-work';
 import { countEmailOutcome, emailRecipient } from './email-delivery';
 import type { AutomationDeps, AutomationResult } from './types';
+import type { MetraDb } from '@metra/db';
 import { withOrgContext } from '@/lib/db/context';
 import { sendDigestEmail } from '@/lib/email/resend';
 import { insertNotification } from '@/lib/notifications/core';
+import type { MemberRole } from '@/lib/permissions/roles';
 
 const EXPIRING_SOON_DAYS = 7;
+
+/** The digest's figures: the portfolio's, plus its deliveries by status (Round C). */
+async function portfolioFigures(
+  tx: MetraDb,
+  role: MemberRole,
+  now: Date,
+  window: { today: string; soon: string },
+): Promise<DigestData & { deliveriesYourMove: number; deliveriesWaiting: number; deliveriesStalled: number }> {
+  const portfolio = await digestData(tx, window.today, window.soon);
+  const { deliveries } = await inFlightDeliveries(tx, role, now);
+  const counts = deliveryCounts(deliveries);
+  return {
+    ...portfolio,
+    deliveriesYourMove: counts.yourMove,
+    deliveriesWaiting: counts.waitingOnClient,
+    deliveriesStalled: counts.stalled,
+  };
+}
 
 /**
  * Portfolio digest for owners/admins, gated to the 07:00 Cairo send hour and
  * claimed once per cadence period (ISO week for weekly, Cairo day for daily).
- * Aggregate-only figures — never a client address, never cost/margin. Notifies
+ * Aggregate-only figures (the portfolio's, and its deliveries by the shared
+ * status rule) — never a client address, never cost/margin. Notifies
  * every owner/admin and best-effort emails each.
  */
 export async function runPortfolioDigest(
@@ -50,7 +72,7 @@ export async function runPortfolioDigest(
       `${cadence}:${period}`,
     );
     if (!claimed) return null;
-    const data = await digestData(tx, today, soon);
+    const data = await portfolioFigures(tx, ctx.role, now, { today, soon });
     const owners = await orgOwnerAdminIds(tx);
     for (const o of owners) {
       await insertNotification(tx, ctx.orgId, {

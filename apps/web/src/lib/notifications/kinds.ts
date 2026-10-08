@@ -9,6 +9,7 @@ export const NOTIFICATION_KINDS = [
   'portfolio_digest',
   'stage_reminder',
   'client_responded',
+  'delivery_followup',
 ] as const;
 
 export type NotificationKind = (typeof NOTIFICATION_KINDS)[number];

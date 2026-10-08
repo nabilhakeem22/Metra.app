@@ -225,6 +225,25 @@ reminder carries the new one. Replace it when a shared or synced browser
 profile, or a lost device, may have exposed it. "Copy message" puts the same
 text on the clipboard without going through wa.me.
 
+## Owner task: verify the Resend sending domain
+
+Today every email Metra sends (the digest, follow-ups, the studio's client-act
+emails, the client reminders the studio sends) reaches **only the Resend account
+owner**: Resend refuses other recipients until the sending domain is verified.
+Nothing in Round C waits for this; do it whenever ready.
+
+1. Own a domain for mail. The app still runs on workers.dev, so this domain is
+   for sending mail only.
+2. In the Resend dashboard: **Domains**, **Add domain**, enter it.
+3. At the domain's DNS host, add the records Resend shows: the **TXT (SPF)**
+   record and the **DKIM** records.
+4. Back in Resend, press **Verify** and wait until it says verified.
+5. Point the app at an address on that domain, from `apps/web`:
+   `npx wrangler secret put RESEND_FROM` (for example `Metra <hello@your-domain>`).
+
+There is no code change and no PR: `wrangler secret put` itself rolls out a new
+Worker version. The next digest or follow-up email then reaches every recipient.
+
 ## The cron Worker is a separate deployment
 
 `workers/cron` is **not** an npm workspace and is **not** deployed by
@@ -248,7 +267,7 @@ the symptom is automations silently not firing.
 | one tick, wall clock | **15 minutes** | the cron Worker's Cron Trigger limit. The route runs inside its service-binding call, so this is the ceiling; an HTTP-triggered Worker alone has none while the caller stays connected |
 | `maxDuration` | **none** | a route segment option OpenNext on Cloudflare ignores; deliberately not exported by the route |
 | open connections per invocation | **6** | Cloudflare; past six, new connections queue until one closes |
-| orgs worked on at once | **`ORG_CONCURRENCY` = 3** | `lib/automation/runner.ts`. Each org's four cores stay sequential: one DB socket (of the request pool's `max: 5`) plus one outbound call (Supabase auth or Resend) per org, so 3 orgs = 6 connections |
+| orgs worked on at once | **`ORG_CONCURRENCY` = 3** | `lib/automation/runner.ts`. Each org's cores (`lib/automation/cores.ts`) stay sequential: one DB socket (of the request pool's `max: 5`) plus one outbound call (Supabase auth or Resend) per org, so 3 orgs = 6 connections |
 | one recipient lookup / one email | **8 s / 5 s** | `AUTH_LOOKUP_TIMEOUT_MS` / `EMAIL_TIMEOUT_MS` in `lib/http/deadlines.ts`; past that the email counts as failed and the tick moves on. Lookups are memoised per user for the tick |
 
 **Measured** (Oct 5, `automation_run_log` timestamps): about **5.3 s per org**,
@@ -262,6 +281,36 @@ Orgs run in `id` order, so a tick that is cut off always drops the HIGHEST ids.
 The expiry and follow-up cores catch up on the next hourly tick; the digest and
 stage reminders are gated to 07:00 Cairo, so an org cut off at that hour misses
 that day's (or week's) send.
+
+### The automation cores
+
+Each org runs these in this order on every hourly tick (`lib/automation/cores.ts`).
+A core decides for itself whether this is its hour and whether it already ran:
+its claim is an `automation_run_log` row `(automation_key, period_key)`, unique
+per org, so two overlapping ticks cannot both do the work.
+
+| core | when | claims (`automation_key`: `period_key`) | reaches |
+|---|---|---|---|
+| `expire` | every tick | `expire`: Cairo day; `expire_nudge`: proposal id | the quotation's sender |
+| `followup` | every tick | `followup`: proposal id and ISO week | the quotation's sender |
+| `digest` | 07:00 Cairo | `digest`: cadence and day or ISO week | owners and admins |
+| `stage` | 07:00 Cairo | `stage`: Cairo day | owners and admins |
+| `delivery` (Round C) | 07:00 Cairo, while follow-ups are on | `delivery`: Cairo day; `delivery-followup`: `<delivery id>:<ISO week>` | owners and admins, about deliveries waiting on the client for the follow-up threshold (at most 10 per org per day; 200 in-flight deliveries read) |
+| `handover` (Round C) | every tick | none: closing is idempotent through the state gate | nobody: it closes design-only deliveries whose handover the client confirmed at least 2 minutes ago (at most 50 per org per tick) |
+
+No core ever messages a client (owner decision, Oct 9): the `delivery` core
+reminds the studio, and the studio sends the client the existing WhatsApp or
+email reminder from the delivery page.
+
+**Tick budget for Round C** (plan A14). The measured midnight batch before Round
+C was ~5.5 s for 6 claims. Off 07:00 the tick gains the `handover` core (one
+read per org: 4 round trips); at 07:00 it gains the `delivery` core and the
+digest's delivery counts (a pool read plus at most 7 whose-move reads each).
+On a local Postgres (round trips well under 1 ms) these cost 2 to 3 ms, ~30 ms
+and ~7 ms per org; production is dominated by round trips to eu-west-1. The
+budget: `durationMs` grows by at most **1.5 s** off 07:00 and **3 s** at 07:00
+Cairo for today's org count. Check it from the tick line below after the deploy;
+if it is exceeded, cap the cores, do not lower `ORG_CONCURRENCY`.
 
 Every tick logs one line, counts only (no ids, no addresses):
 `automation tick: orgs= processed= skipped= failed= coreFailures= emailsSent= emailsFailed= durationMs=`.

@@ -95,6 +95,9 @@ describe('automation senders', () => {
       awaitingResponse: 0,
       expiringSoon: 0,
       overdueStages: 0,
+      deliveriesYourMove: 0,
+      deliveriesWaiting: 0,
+      deliveriesStalled: 0,
       dashboardUrl: 'https://metra.app/en/dashboard',
       locale: 'en',
     });

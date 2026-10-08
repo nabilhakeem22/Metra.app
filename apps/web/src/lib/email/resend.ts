@@ -88,6 +88,9 @@ export function sendDigestEmail(input: {
   awaitingResponse: number;
   expiringSoon: number;
   overdueStages: number;
+  deliveriesYourMove: number;
+  deliveriesWaiting: number;
+  deliveriesStalled: number;
   dashboardUrl: string;
   locale: string;
 }): Promise<{ sent: boolean }> {

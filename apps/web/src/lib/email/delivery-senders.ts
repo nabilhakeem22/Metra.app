@@ -1,9 +1,14 @@
 import 'server-only';
-// The delivery's two emails: the studio hearing that the client acted (Round B,
-// B10) and the client being reminded of their link (B11). Each builds its
+// The delivery's emails: the studio hearing that the client acted (Round B,
+// B10), the client being reminded of their link (B11), and the studio's morning
+// follow-up on deliveries waiting on the client (Round C). Each builds its
 // template and hands it to the ONE deadlined dispatch; best-effort, never throws.
 import { dispatchEmail } from './dispatch';
 import { clientActEmailTemplate, type ClientActEmailInput } from './templates/client-act';
+import {
+  deliveryFollowupEmailTemplate,
+  type DeliveryFollowupEmailInput,
+} from './templates/delivery-followup';
 import {
   deliveryReminderEmailTemplate,
   type DeliveryReminderEmailInput,
@@ -23,5 +28,15 @@ export function sendDeliveryReminderEmail(
   return dispatchEmail(
     { to: input.to, ...deliveryReminderEmailTemplate(input) },
     'sendDeliveryReminderEmail',
+  );
+}
+
+/** To ONE owner or admin: the deliveries that have waited on the client too long. */
+export function sendDeliveryFollowupEmail(
+  input: DeliveryFollowupEmailInput & { to: string },
+): Promise<{ sent: boolean }> {
+  return dispatchEmail(
+    { to: input.to, ...deliveryFollowupEmailTemplate(input) },
+    'sendDeliveryFollowupEmail',
   );
 }

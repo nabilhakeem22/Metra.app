@@ -1454,13 +1454,16 @@
       "expire_nudge": "Quotation expiring soon",
       "portfolio_digest": "Portfolio digest",
       "stage_reminder": "Stage reminder",
-      "client_responded": "Client responded"
+      "client_responded": "Client responded",
+      "delivery_followup": "Delivery follow-up"
     },
     "body": {
       "proposal_expiring": "Quotation {number} expires on {date}.",
       "proposal_followup": "Quotation {number} has been awaiting a response for {days} days.",
       "portfolio_digest": "{active} active projects, {awaiting} awaiting response, {expiring} expiring soon, {overdue} overdue stages.",
+      "portfolio_digest_deliveries": "Deliveries: {yourMove} need your move, {waiting} wait on the client, {stalled} stalled.",
       "stage_reminder": "{overdue} overdue stages and {upcoming} upcoming.",
+      "delivery_waiting_on_client": "{delivery} has waited on the client for {days} days. Send them a reminder.",
       "client_concept_approved": "The client approved the concept on {delivery}.",
       "client_concept_chosen": "The client chose {hasLetter, select, yes {option {letter}} other {a concept option}} on {delivery}.",
       "client_concept_changes_requested": "The client asked for changes to the concept on {delivery}.",
@@ -1482,7 +1485,7 @@
     "expireNudgeDesc": "Notify the sender ahead of a quotation's expiry date.",
     "leadDaysLabel": "Days before expiry",
     "followupLabel": "Follow-up reminders",
-    "followupDesc": "Nudge the sender when a sent quotation goes unanswered.",
+    "followupDesc": "Remind your team when a client has not answered a quotation or a delivery for the days below.",
     "thresholdLabel": "Days without a response",
     "digestLabel": "Portfolio digest",
     "digestDesc": "Send owners and admins a summary of the portfolio.",

@@ -1,4 +1,5 @@
 import 'server-only';
+import { runDeliveryFollowups } from './delivery-followups';
 import { runExpireProposals } from './expire-proposals';
 import { runFollowupReminders } from './followup-reminders';
 import { runHandoverCloser } from './handover-closer';
@@ -19,5 +20,6 @@ export const CORES: ReadonlyArray<{
   { key: 'followup', run: runFollowupReminders },
   { key: 'digest', run: runPortfolioDigest },
   { key: 'stage', run: runStageReminders },
+  { key: 'delivery', run: runDeliveryFollowups },
   { key: 'handover', run: runHandoverCloser },
 ];

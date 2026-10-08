@@ -11,6 +11,7 @@ import {
   isClientRespondedBodyKey,
   type BodyTranslate,
 } from './client-responded-body';
+import { deliveryLabelOf } from './delivery-label';
 
 export interface FeedItem {
   id: string;
@@ -85,11 +86,28 @@ export function notificationBody(
         days: s(p.days),
       });
     case 'portfolio_digest':
-      return translate('portfolio_digest', {
-        active: s(p.activeProjects),
-        awaiting: s(p.awaitingResponse),
-        expiring: s(p.expiringSoon),
-        overdue: s(p.overdueStages),
+      return [
+        translate('portfolio_digest', {
+          active: s(p.activeProjects),
+          awaiting: s(p.awaitingResponse),
+          expiring: s(p.expiringSoon),
+          overdue: s(p.overdueStages),
+        }),
+        // Digests written before Round C carry no delivery counts: they read as before.
+        typeof p.deliveriesYourMove === 'number'
+          ? translate('portfolio_digest_deliveries', {
+              yourMove: s(p.deliveriesYourMove),
+              waiting: s(p.deliveriesWaiting),
+              stalled: s(p.deliveriesStalled),
+            })
+          : '',
+      ]
+        .filter(Boolean)
+        .join(' ');
+    case 'delivery_waiting_on_client':
+      return translate('delivery_waiting_on_client', {
+        delivery: deliveryLabelOf(p, locale),
+        days: s(p.days),
       });
     case 'stage_reminder':
       return translate('stage_reminder', {

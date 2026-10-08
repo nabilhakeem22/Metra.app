@@ -16,7 +16,7 @@ export interface EmailContent {
  * fallback link block — these go to the studio's own inbox, not a client's, and
  * the button has never been the only way in.
  */
-function automationEmail(
+export function automationEmail(
   locale: string,
   heading: string,
   lines: string[],
@@ -68,6 +68,9 @@ export function digestEmailTemplate(input: {
   awaitingResponse: number;
   expiringSoon: number;
   overdueStages: number;
+  deliveriesYourMove: number;
+  deliveriesWaiting: number;
+  deliveriesStalled: number;
   dashboardUrl: string;
   locale: string;
 }): EmailContent {
@@ -80,12 +83,18 @@ export function digestEmailTemplate(input: {
         `عروض بانتظار الرد: ${input.awaitingResponse}`,
         `عروض تنتهي قريبًا: ${input.expiringSoon}`,
         `مراحل متأخرة: ${input.overdueStages}`,
+        `تسليمات محتاجة خطوة منك: ${input.deliveriesYourMove}`,
+        `تسليمات مستنية العميل: ${input.deliveriesWaiting}`,
+        `تسليمات متعطلة: ${input.deliveriesStalled}`,
       ]
     : [
         `Active projects: ${input.activeProjects}`,
         `Awaiting response: ${input.awaitingResponse}`,
         `Expiring soon: ${input.expiringSoon}`,
         `Overdue stages: ${input.overdueStages}`,
+        `Deliveries needing your move: ${input.deliveriesYourMove}`,
+        `Deliveries waiting on the client: ${input.deliveriesWaiting}`,
+        `Deliveries stalled: ${input.deliveriesStalled}`,
       ];
   const cta = {
     label: ar ? 'فتح لوحة التحكم' : 'Open dashboard',
