@@ -1,10 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import {
-  ACTION_CODE_PROBLEM,
-  problemBody,
-  problemFromActionCode,
-  problemResponse,
-} from './errors';
+import { ACTION_CODE_PROBLEM } from './action-code-problem';
+import { problemBody, problemFromActionCode, problemResponse } from './errors';
 import type { ActionCode } from '@/lib/actions/result';
 
 // The full ActionCode union, mirrored so the test fails loudly if a code is added

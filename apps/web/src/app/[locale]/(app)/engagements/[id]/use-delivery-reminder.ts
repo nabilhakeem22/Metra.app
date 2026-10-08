@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState, useTransition } from 'react';
+import { useCallback, useEffect, useState, useTransition } from 'react';
 import { useRouter } from '@/i18n/routing';
 import type { Locale } from '@/i18n/routing';
 import type { ActionCode } from '@/lib/actions/result';
@@ -10,31 +10,13 @@ import {
   rotateDeliveryLink,
   shareDeliveryLink,
 } from '@/lib/engagements/actions';
-import type { DeliveryReminder } from '@/lib/engagements/reminder/prepare';
+import { reminderViewOf, type ReminderView } from './reminder-view';
 import {
   DELIVERY_LINK_CHANGED_EVENT,
   announceDeliveryLinkChanged,
   type DeliveryLinkChange,
 } from './share-anchor';
-
-/**
- * What the dialog shows. Each refusal has its own way out:
- * `notShared` -> Share; `unrecoverable` -> ONE Replace; `notConfigured` -> none
- * (a server setting; a Replace would only kill the client's working link).
- */
-export type ReminderView =
-  | { status: 'loading' }
-  | { status: 'ready'; reminder: DeliveryReminder }
-  | { status: 'notShared' }
-  | { status: 'notConfigured' }
-  | { status: 'unrecoverable' }
-  | { status: 'failed'; error: ActionCode };
-
-const VIEW_OF_REFUSAL: Partial<Record<ActionCode, ReminderView>> = {
-  delivery_link_not_shared: { status: 'notShared' },
-  delivery_links_not_configured: { status: 'notConfigured' },
-  delivery_link_unrecoverable: { status: 'unrecoverable' },
-};
+import { useRefreshOnFocus } from './use-refresh-on-focus';
 
 /** A focus within this long of the last load does not re-read (each read is audited). */
 const REFRESH_ON_FOCUS_AFTER_MS = 30_000;
@@ -72,11 +54,10 @@ async function settled<T>(action: () => Promise<Result<T>>): Promise<Result<T>> 
 }
 
 /**
- * The "Send reminder" dialog's state. The reminder carries the link the client
- * already holds, and it is re-read whenever that link may have changed: the
- * other dialog replaced or revoked it, or the window regains focus (another
- * tab or person may have). The only writes here are Share and Replace, each
- * behind the caller's own button (Replace behind a confirmation).
+ * The "Send reminder" dialog's state. The reminder carries the client's current
+ * link and is re-read whenever it may have changed: the other dialog replaced or
+ * revoked it, or the window regains focus (another tab or person may have). The
+ * only writes are Share and Replace, each behind its own button (Replace asks).
  */
 export function useDeliveryReminder(engagementId: string): DeliveryReminderApi {
   const router = useRouter();
@@ -87,56 +68,40 @@ export function useDeliveryReminder(engagementId: string): DeliveryReminderApi {
   const [emailing, startEmailing] = useTransition();
   const [emailResult, setEmailResult] = useState<DeliveryReminderApi['emailResult']>(null);
   const [copied, setCopied] = useState(false);
-  const openRef = useRef(false);
-  const loadedAt = useRef(0);
+  // A stale wa.me link is a dead link: re-read on focus (another tab or person).
+  const { markRefreshed } = useRefreshOnFocus(open, REFRESH_ON_FOCUS_AFTER_MS, () => void load());
 
-  // `afterReplace`: a link we just replaced that STILL cannot be re-created is
-  // a dead end, not an invitation to replace again.
   const load = useCallback(
     async (afterReplace = false): Promise<void> => {
       setView({ status: 'loading' });
       setEmailResult(null);
       setCopied(false);
-      loadedAt.current = Date.now();
+      markRefreshed();
       const result = await settled(() => prepareDeliveryReminder(engagementId));
-      if (result.ok && result.data) {
-        setLocale(result.data.defaultLocale);
-        setView({ status: 'ready', reminder: result.data });
-        return;
-      }
-      const error = result.error ?? 'generic';
-      const loops = afterReplace && error === 'delivery_link_unrecoverable';
-      setView((!loops && VIEW_OF_REFUSAL[error]) || { status: 'failed', error });
+      if (result.ok && result.data) setLocale(result.data.defaultLocale);
+      setView(reminderViewOf(result, afterReplace));
     },
-    [engagementId],
+    [engagementId, markRefreshed],
   );
 
   const setOpen = useCallback(
     (next: boolean): void => {
-      openRef.current = next;
       setOpenState(next);
       if (next) void load();
     },
     [load],
   );
 
-  // A stale wa.me link is a dead link: re-read after the other dialog changed
-  // the link, and on focus (another tab or person), while open.
+  // Re-read, while open, after the other dialog changed the link.
   useEffect(() => {
+    if (!open) return;
     const onChanged = (event: Event) => {
       const change = (event as CustomEvent<DeliveryLinkChange>).detail;
-      if (openRef.current && change?.source === 'clientLink') void load();
-    };
-    const onFocus = () => {
-      if (openRef.current && Date.now() - loadedAt.current > REFRESH_ON_FOCUS_AFTER_MS) void load();
+      if (change?.source === 'clientLink') void load();
     };
     window.addEventListener(DELIVERY_LINK_CHANGED_EVENT, onChanged);
-    window.addEventListener('focus', onFocus);
-    return () => {
-      window.removeEventListener(DELIVERY_LINK_CHANGED_EVENT, onChanged);
-      window.removeEventListener('focus', onFocus);
-    };
-  }, [load]);
+    return () => window.removeEventListener(DELIVERY_LINK_CHANGED_EVENT, onChanged);
+  }, [open, load]);
 
   function changeLinkThenReload(write: () => Promise<Result>, afterReplace: boolean): void {
     startChangingLink(async () => {

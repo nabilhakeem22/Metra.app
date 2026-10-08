@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import ar from '@/messages/ar-EG.json';
 import en from '@/messages/en.json';
-import { ACTION_CODE_PROBLEM } from '@/lib/api/errors';
+import { ACTION_CODE_PROBLEM } from '@/lib/api/action-code-problem';
 import { resolveActionError } from './error-message';
 import type { ActionCode } from './result';
 

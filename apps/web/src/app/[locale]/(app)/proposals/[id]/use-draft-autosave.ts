@@ -4,13 +4,14 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useUnsavedChangesPrompt } from '@/hooks/use-unsaved-changes-prompt';
 import type { ActionCode } from '@/lib/actions/result';
 import { firstIncompleteField, type DraftField } from './draft-completeness';
+import { createDraftSaveFlight } from './draft-save-flight';
 import { lineIdsByKey, withLineIds } from './draft-save-receipt';
+import { draftSaveStateOf, snapshotOf, type DraftSaveState } from './draft-save-state';
 import { exceedsDraftSaveLimit } from './draft-size';
-import { recoverLostCommit } from './lost-commit';
 import { autosaveDraft, persistDraft, type SaveDraft, type SaveDraftResult } from './persist-draft';
-import { buildProposalPayload, type ProposalDraftState } from './proposal-payload';
+import type { ProposalDraftState } from './proposal-payload';
 
-export type DraftSaveState = 'saved' | 'dirty' | 'saving' | 'failed';
+export type { DraftSaveState } from './draft-save-state';
 
 export const AUTOSAVE_DEBOUNCE_MS = 1500;
 /** Continuous editing still saves at least this often. */
@@ -26,20 +27,13 @@ export interface DraftAutosaveApi {
   retry: () => void;
 }
 
-/** What a save would send, as one comparable string. */
-const snapshotOf = (state: ProposalDraftState) => JSON.stringify(buildProposalPayload(state));
-
 /**
- * The proposal builder saves itself. The state is DERIVED: saved when what a save
- * would send equals what was last stored (so undoing an edit is "saved" again),
- * failed when the last attempt at exactly this content was refused, else dirty.
- * It saves silently 1.5 s after the last edit, and at least every 10 s while
- * editing goes on; never while a line or section is still unfinished. ONE save at
- * a time; an edit during a save queues one more. Each save sends the revision it
- * was edited from and adopts the receipt (new revision, the ids of new lines,
- * through `onStored`). `flush()` (Send, Send as BOQ, Back, leaving) waits for a
- * running save, then stores the rest with the refreshing save, naming the first
- * unfinished field through `onIncomplete` instead.
+ * The proposal builder saves itself, silently, 1.5 s after the last edit and at
+ * least every 10 s while editing goes on; never while a line or section is
+ * unfinished. One save at a time (draft-save-flight.ts); each adopts its receipt
+ * (revision, new line ids through `onStored`). `flush()` (Send, Send as BOQ, Back,
+ * leaving) waits for a running save, then stores the rest with the refreshing
+ * save, or names the first unfinished field through `onIncomplete`.
  */
 export function useDraftAutosave(input: {
   draft: ProposalDraftState;
@@ -57,114 +51,59 @@ export function useDraftAutosave(input: {
     [id, sections, discountPct, taxRate, supervisionPct, seeMargin],
   );
   const latest = useRef({ draft, snapshot, enabled, callbacks: input });
-  const revision = useRef(input.revision);
-  const stored = useRef(snapshot);
   const [storedSnapshot, setStoredSnapshot] = useState(snapshot);
   const [failure, setFailure] = useState<{ code: ActionCode; snapshot: string } | null>(null);
   const [saving, setSaving] = useState(false);
   const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
-  const inFlight = useRef<Promise<unknown> | null>(null);
-  const inFlightSnapshot = useRef<string | null>(null);
-  // A save that never answered: it may have committed (lost-commit.ts).
-  const unconfirmed = useRef<ProposalDraftState | null>(null);
-  const followUp = useRef(false);
-  const flushing = useRef(false);
-  const dirtySince = useRef<number | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-
-  /** One send of `draft`; an unknown outcome (no answer) is remembered. */
-  async function sendOnce(save: SaveDraft, draft: ProposalDraftState): Promise<SaveDraftResult> {
-    try {
-      const result = await save(draft, revision.current);
-      if (result.ok) unconfirmed.current = null;
-      else if (result.error === 'generic' || result.error === 'uncertain') unconfirmed.current = draft;
-      return result;
-    } catch {
-      unconfirmed.current = draft;
-      return { ok: false, error: 'generic' };
-    }
-  }
+  const [flight] = useState(() =>
+    createDraftSaveFlight(startAutosave, { revision: input.revision, stored: snapshot }),
+  );
 
   /** Store the latest draft through `save` and adopt what the server answered. */
   async function saveLatest(save: SaveDraft): Promise<SaveDraftResult> {
     const savedAs = latest.current.snapshot;
-    let toSave = latest.current.draft;
     if (exceedsDraftSaveLimit(savedAs)) {
       setFailure({ code: 'draft_too_large', snapshot: savedAs });
       return { ok: false, error: 'draft_too_large' };
     }
-    dirtySince.current = null;
-    inFlightSnapshot.current = savedAs;
     setSaving(true);
-    let result = await sendOnce(save, toSave);
-    // Refused as stale while an earlier save's answer was lost: if what is
-    // stored is that save, it was ours. Adopt it and send this one again, once.
-    if (!result.ok && result.error === 'draft_changed_elsewhere' && unconfirmed.current) {
-      const recovered = await recoverLostCommit(unconfirmed.current, toSave);
-      if (recovered) {
-        unconfirmed.current = null;
-        revision.current = recovered.revision;
-        latest.current.callbacks.onStored(recovered.idsByKey);
-        toSave = recovered.draft;
-        result = await sendOnce(save, toSave);
-      }
-    }
-    inFlightSnapshot.current = null;
+    const { result, sent } = await flight.send(save, latest.current.draft, savedAs, (idsByKey) =>
+      latest.current.callbacks.onStored(idsByKey),
+    );
     setSaving(false);
     if (!result.ok) {
       setFailure({ code: (result.error as ActionCode | undefined) ?? 'generic', snapshot: savedAs });
       return result;
     }
-    const idsByKey = result.data ? lineIdsByKey(toSave.sections, result.data) : new Map<string, string>();
-    if (result.data) revision.current = result.data.revision;
-    stored.current = snapshotOf({ ...toSave, sections: withLineIds(toSave.sections, idsByKey) });
-    setStoredSnapshot(stored.current);
+    const idsByKey = result.data ? lineIdsByKey(sent.sections, result.data) : new Map<string, string>();
+    if (result.data) flight.revision = result.data.revision;
+    flight.stored = snapshotOf({ ...sent, sections: withLineIds(sent.sections, idsByKey) });
+    setStoredSnapshot(flight.stored);
     setFailure(null);
     setLastSavedAt(new Date());
     latest.current.callbacks.onStored(idsByKey);
     return result;
   }
 
-  function autosave(): void {
-    if (flushing.current) return;
-    if (inFlight.current) {
-      followUp.current = true;
-      return;
-    }
+  /** The background save the flight starts; null when there is nothing to store. */
+  function startAutosave(): Promise<SaveDraftResult> | null {
     const { draft: current, snapshot: now } = latest.current;
-    if (now === stored.current || firstIncompleteField(current.sections)) return;
-    inFlight.current = saveLatest(autosaveDraft).then(() => {
-      inFlight.current = null;
-      if (!followUp.current || flushing.current) return;
-      followUp.current = false;
-      autosave();
-    });
+    if (now === flight.stored || firstIncompleteField(current.sections)) return null;
+    return saveLatest(autosaveDraft);
   }
 
-  async function flush(): Promise<SaveDraftResult> {
-    flushing.current = true;
-    followUp.current = false;
+  function flush(): Promise<SaveDraftResult> {
     clearTimeout(timer.current);
-    try {
-      while (inFlight.current) await inFlight.current;
+    return flight.flush(async (): Promise<SaveDraftResult> => {
       const { draft: current, snapshot: now } = latest.current;
-      if (now === stored.current) return { ok: true };
+      if (now === flight.stored) return { ok: true };
       const field = firstIncompleteField(current.sections);
-      if (field) {
-        setFailure({ code: 'draft_incomplete', snapshot: now });
-        latest.current.callbacks.onIncomplete(field);
-        return { ok: false, error: 'draft_incomplete' };
-      }
-      const run = saveLatest(persistDraft);
-      inFlight.current = run;
-      try {
-        return await run;
-      } finally {
-        inFlight.current = null;
-      }
-    } finally {
-      flushing.current = false;
-    }
+      if (!field) return saveLatest(persistDraft);
+      setFailure({ code: 'draft_incomplete', snapshot: now });
+      latest.current.callbacks.onIncomplete(field);
+      return { ok: false, error: 'draft_incomplete' };
+    });
   }
 
   useEffect(() => {
@@ -175,41 +114,29 @@ export function useDraftAutosave(input: {
   // what the wait had not, once, unless a running save already carries it.
   useEffect(() => () => {
     const last = latest.current;
-    if (!last.enabled || flushing.current) return;
-    if (last.snapshot === stored.current || last.snapshot === inFlightSnapshot.current) return;
-    if (firstIncompleteField(last.draft.sections)) return;
-    void Promise.resolve(inFlight.current)
-      .then(() => autosaveDraft(last.draft, revision.current))
-      .catch(() => undefined);
-  }, []);
+    if (!last.enabled || firstIncompleteField(last.draft.sections)) return;
+    flight.storeOnLeave(autosaveDraft, last.draft, last.snapshot);
+  }, [flight]);
 
   // The debounce, with a ceiling: each change restarts the wait, but never past
-  // `maxWaitMs` from the first unsaved change (`autosave` reads only refs).
+  // `maxWaitMs` from the first unsaved change (the flight reads only refs).
   useEffect(() => {
     if (!enabled || snapshot === storedSnapshot) {
-      dirtySince.current = null;
+      flight.clearDirty();
       return;
     }
-    dirtySince.current ??= Date.now();
-    const untilCeiling = dirtySince.current + maxWaitMs - Date.now();
-    timer.current = setTimeout(autosave, Math.max(0, Math.min(debounceMs, untilCeiling)));
+    timer.current = setTimeout(flight.request, flight.delayUntilSave(Date.now(), debounceMs, maxWaitMs));
     return () => clearTimeout(timer.current);
-  }, [snapshot, storedSnapshot, enabled, debounceMs, maxWaitMs]);
+  }, [snapshot, storedSnapshot, enabled, debounceMs, maxWaitMs, flight]);
 
-  const saveState: DraftSaveState = saving
-    ? 'saving'
-    : snapshot === storedSnapshot
-      ? 'saved'
-      : failure?.snapshot === snapshot
-        ? 'failed'
-        : 'dirty';
+  const saveState = draftSaveStateOf({ saving, snapshot, storedSnapshot, refusedSnapshot: failure?.snapshot });
   useUnsavedChangesPrompt(enabled && saveState !== 'saved');
 
   function retry(): void {
     clearTimeout(timer.current);
     const field = firstIncompleteField(latest.current.draft.sections);
     if (field) latest.current.callbacks.onIncomplete(field);
-    else autosave();
+    else flight.request();
   }
 
   return {
