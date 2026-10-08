@@ -29,6 +29,9 @@ export interface ProposalPayloadLine {
 }
 
 export interface ProposalPayloadSection {
+  /** The stored id (null for a section not yet stored): an unchanged section is
+   *  then not rewritten by the save. */
+  id: string | null;
   titleEn: string | null;
   titleAr: string | null;
   sortOrder: number;
@@ -95,6 +98,7 @@ export function buildProposalPayload(state: ProposalDraftState): ProposalPayload
       supervisionPct: numberOrZero(state.supervisionPct),
     },
     sections: state.sections.map((section, sectionIndex) => ({
+      id: section.id,
       titleEn: textOrNull(section.titleEn),
       titleAr: textOrNull(section.titleAr),
       sortOrder: sectionIndex,

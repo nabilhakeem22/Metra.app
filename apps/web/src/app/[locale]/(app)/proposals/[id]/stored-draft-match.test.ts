@@ -10,6 +10,8 @@ const sent: ProposalDraftState = {
   seeMargin: false,
   sections: [
     {
+      key: 's-1',
+      id: null,
       titleEn: 'Floors',
       titleAr: '',
       lines: [

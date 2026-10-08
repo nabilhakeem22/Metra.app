@@ -2,16 +2,18 @@
 // engine, never trust a client-supplied subtotal/total, F1-preserve stored costs
 // by stable line id. A thin orchestrator over named phases — header validation
 // (./draft-save-validate), the price-book lookup (./draft-save-cost-items), line
-// resolution (./draft-save-resolve) and persistence (./draft-save-persist).
+// resolution (./draft-save-resolve), the write plan against what is stored
+// (./draft-save-stored, ./draft-save-diff) and persistence (./draft-save-persist).
 // Draft-only (proposal_not_draft).
 //
 // ONE WRITER AT A TIME. The proposal row is locked FOR UPDATE before anything is
 // read, so two saves of one draft (two tabs, a leave-save racing a new mount, a
-// save racing a delete or a send) serialise on it. Without the lock the second
-// save's DELETE could not see the first one's freshly inserted sections and the
-// draft kept BOTH sets. The caller's revision token then refuses a save made
-// from a stale copy (`draft_changed_elsewhere`) instead of overwriting.
-import { organizations, proposalLines, proposals } from '@metra/db';
+// save racing a delete or a send) serialise on it, and the stored rows the write
+// plan is diffed against are read only after it. Without the lock the second
+// save could plan against rows the first was still replacing and the draft kept
+// BOTH sets. The caller's revision token then refuses a save made from a stale
+// copy (`draft_changed_elsewhere`) instead of overwriting.
+import { organizations, proposals } from '@metra/db';
 import { eq } from 'drizzle-orm';
 import { fail, mutateInOrg } from '@/lib/actions/mutate';
 import { err, type ActionResult } from '@/lib/actions/result';
@@ -30,10 +32,9 @@ import {
   validateDraftHeader,
 } from './draft-save-validate';
 import { resolveDraftLines } from './draft-save-resolve';
-import {
-  persistDraftHeaderAndTotals,
-  replaceDraftSectionsAndLines,
-} from './draft-save-persist';
+import { planDraftWrite } from './draft-save-diff';
+import { applyDraftWritePlan, persistDraftHeaderAndTotals } from './draft-save-persist';
+import { loadStoredDraft, storedCostsById } from './draft-save-stored';
 
 type ProposalRow = typeof proposals.$inferSelect;
 
@@ -75,22 +76,6 @@ async function loadMarginVisibility(tx: MetraDb, ctx: OrgContext): Promise<boole
   return canSeeMargin(ctx.role, orgRow?.hide ?? true);
 }
 
-/**
- * F1: this proposal's current line costs by stable id, snapshotted BEFORE the
- * rebuild delete wipes them. Without it, every save by a cost-blind caller would
- * silently reprice the document to zero cost.
- */
-async function loadCostSnapshot(
-  tx: MetraDb,
-  proposalId: string,
-): Promise<Map<string, string>> {
-  const existingLines = await tx
-    .select({ id: proposalLines.id, unitCost: proposalLines.unitCost })
-    .from(proposalLines)
-    .where(eq(proposalLines.proposalId, proposalId));
-  return new Map(existingLines.map((line) => [line.id, line.unitCost]));
-}
-
 export async function saveProposalDraftCore(
   ctx: OrgContext,
   input: SaveDraftInput,
@@ -117,15 +102,16 @@ export async function saveProposalDraftCore(
       );
       enforceLineCaps(input.sections);
 
-      const costSnapshot = await loadCostSnapshot(tx, input.id);
+      const stored = await loadStoredDraft(tx, input.id);
       const costItemMap = await loadCostItemMap(tx, input.sections);
       const { resolvedSections, sectionTotals } = resolveDraftLines(
         input.sections,
         costItemMap,
-        costSnapshot,
+        storedCostsById(stored),
         seeMargin,
       );
-      const sections = await replaceDraftSectionsAndLines(tx, ctx.orgId, input.id, resolvedSections);
+      const plan = planDraftWrite(resolvedSections, stored);
+      await applyDraftWritePlan(tx, ctx.orgId, input.id, plan);
       const totals = computeTotalsWithinCap(sectionTotals, header);
       const revision = await persistDraftHeaderAndTotals(tx, input.id, header, totals);
       await auditDraftSaved(tx, audit, {
@@ -135,7 +121,7 @@ export async function saveProposalDraftCore(
         lineCount: input.sections.reduce((count, section) => count + section.lines.length, 0),
         total: totals.total,
       });
-      return { revision, sections };
+      return { revision, sections: plan.receipt };
     },
   );
 }

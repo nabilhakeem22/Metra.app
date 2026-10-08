@@ -70,7 +70,7 @@ export function ProposalBuilder({
     draft: draftState(),
     revision: detail.revision,
     enabled: detail.status === 'draft' && actions.link === null,
-    adoptLineIds: draft.adoptLineIds,
+    adoptStoredIds: draft.adoptStoredIds,
     confirm,
   });
   const boq = useBoqModeActions({

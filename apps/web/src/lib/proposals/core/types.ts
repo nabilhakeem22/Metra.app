@@ -30,7 +30,9 @@ export interface LineInput {
 }
 
 export interface SectionInput {
-  id?: string;
+  /** The STORED id of an existing section (round-tripped by the builder), so
+   * an unchanged section is not rewritten. Absent/unknown -> a new section. */
+  id?: string | null;
   titleAr?: string | null;
   titleEn?: string | null;
   sortOrder?: number;

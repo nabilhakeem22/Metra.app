@@ -5,7 +5,7 @@ import { useUnsavedChangesPrompt } from '@/hooks/use-unsaved-changes-prompt';
 import type { ActionCode } from '@/lib/actions/result';
 import { firstIncompleteField, type DraftField } from './draft-completeness';
 import { createDraftSaveFlight } from './draft-save-flight';
-import { lineIdsByKey, withLineIds } from './draft-save-receipt';
+import { storedIdsByKey, withStoredIds } from './draft-save-receipt';
 import { draftSaveStateOf, snapshotOf, type DraftSaveState } from './draft-save-state';
 import { exceedsDraftSaveLimit } from './draft-size';
 import { autosaveDraft, persistDraft, type SaveDraft, type SaveDraftResult } from './persist-draft';
@@ -31,7 +31,7 @@ export interface DraftAutosaveApi {
  * The proposal builder saves itself, silently, 1.5 s after the last edit and at
  * least every 10 s while editing goes on; never while a line or section is
  * unfinished. One save at a time (draft-save-flight.ts); each adopts its receipt
- * (revision, new line ids through `onStored`). `flush()` (Send, Send as BOQ, Back,
+ * (revision, new section and line ids through `onStored`). `flush()` (Send, Send as BOQ, Back,
  * leaving) waits for a running save, then stores the rest with the refreshing
  * save, or names the first unfinished field through `onIncomplete`.
  */
@@ -76,9 +76,9 @@ export function useDraftAutosave(input: {
       setFailure({ code: (result.error as ActionCode | undefined) ?? 'generic', snapshot: savedAs });
       return result;
     }
-    const idsByKey = result.data ? lineIdsByKey(sent.sections, result.data) : new Map<string, string>();
+    const idsByKey = result.data ? storedIdsByKey(sent.sections, result.data) : new Map<string, string>();
     if (result.data) flight.revision = result.data.revision;
-    flight.stored = snapshotOf({ ...sent, sections: withLineIds(sent.sections, idsByKey) });
+    flight.stored = snapshotOf({ ...sent, sections: withStoredIds(sent.sections, idsByKey) });
     setStoredSnapshot(flight.stored);
     setFailure(null);
     setLastSavedAt(new Date());

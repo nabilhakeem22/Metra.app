@@ -19,7 +19,7 @@ function line(overrides: Partial<LineState> = {}): LineState {
 }
 
 function section(lines: LineState[], overrides: Partial<SectionState> = {}): SectionState {
-  return { titleEn: 'Ceilings', titleAr: 'الأسقف', lines, ...overrides };
+  return { key: 's-1', id: null, titleEn: 'Ceilings', titleAr: 'الأسقف', lines, ...overrides };
 }
 
 function draft(overrides: Partial<ProposalDraftState> = {}): ProposalDraftState {

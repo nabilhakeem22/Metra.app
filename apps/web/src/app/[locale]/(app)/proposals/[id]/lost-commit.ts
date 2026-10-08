@@ -1,7 +1,7 @@
 // Recovering a save that committed but lost its answer. No React: the autosave
 // hook calls this when a save is refused `draft_changed_elsewhere` while an
 // earlier save's outcome is still unknown.
-import { lineIdsByKey, withLineIds } from './draft-save-receipt';
+import { storedIdsByKey, withStoredIds } from './draft-save-receipt';
 import { readStoredDraftState } from './persist-draft';
 import { buildProposalPayload, type ProposalDraftState } from './proposal-payload';
 import { receiptOfStored, storedDraftMatches } from './stored-draft-match';
@@ -33,10 +33,10 @@ export async function recoverLostCommit(
   }
   if (!stored.ok || !stored.data) return null;
   if (!storedDraftMatches(stored.data, buildProposalPayload(unconfirmed))) return null;
-  const idsByKey = lineIdsByKey(unconfirmed.sections, receiptOfStored(stored.data));
+  const idsByKey = storedIdsByKey(unconfirmed.sections, receiptOfStored(stored.data));
   return {
     revision: stored.data.revision,
     idsByKey,
-    draft: { ...current, sections: withLineIds(current.sections, idsByKey) },
+    draft: { ...current, sections: withStoredIds(current.sections, idsByKey) },
   };
 }

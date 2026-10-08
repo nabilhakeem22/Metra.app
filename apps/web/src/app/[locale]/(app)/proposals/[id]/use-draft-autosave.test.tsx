@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, cleanup, renderHook } from '@testing-library/react';
 import { useState } from 'react';
 import type { LineState } from './builder-model';
-import { withLineIds } from './draft-save-receipt';
+import { withStoredIds } from './draft-save-receipt';
 import type { ProposalDraftState } from './proposal-payload';
 import { useDraftAutosave } from './use-draft-autosave';
 
@@ -36,7 +36,7 @@ function draftWith(qty: string, extraLines: LineState[] = []): ProposalDraftStat
     taxRate: '0',
     supervisionPct: '0',
     seeMargin: true,
-    sections: [{ titleEn: 'Ceilings', titleAr: '', lines: [lineWith(qty), ...extraLines] }],
+    sections: [{ key: 'section-key-1', id: 's-1', titleEn: 'Ceilings', titleAr: '', lines: [lineWith(qty), ...extraLines] }],
   };
 }
 
@@ -75,7 +75,7 @@ function useAdoptingBuilder(initial: ProposalDraftState) {
     draft: { ...initial, sections },
     revision: 'r-0',
     enabled: true,
-    onStored: (ids) => setSections((current) => withLineIds(current, ids)),
+    onStored: (ids) => setSections((current) => withStoredIds(current, ids)),
     onIncomplete,
   });
   return { autosave, sections, setSections };

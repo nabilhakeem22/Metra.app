@@ -3,8 +3,8 @@
 import { useMemo, useState } from 'react';
 import type { ProposalDetail } from '@/lib/proposals/queries';
 import { move, type CostItemOption, type LineState, type SectionState } from './builder-model';
-import { withLineIds } from './draft-save-receipt';
-import { computeDraftTotals, draftFromDetail, newLine } from './draft-state';
+import { withStoredIds } from './draft-save-receipt';
+import { computeDraftTotals, draftFromDetail, newLine, newSection } from './draft-state';
 
 /** Everything the builder holds while a studio is editing, and nothing else. */
 export interface ProposalDraftApi {
@@ -23,8 +23,8 @@ export interface ProposalDraftApi {
   addLine: (sectionIndex: number, costItem?: CostItemOption) => void;
   removeLine: (sectionIndex: number, lineIndex: number) => void;
   moveSection: (sectionIndex: number, direction: -1 | 1) => void;
-  /** Give lines the ids a save stored them under, by `LineState.key`. */
-  adoptLineIds: (idsByKey: ReadonlyMap<string, string>) => void;
+  /** Give sections and lines the ids a save stored them under, by their `key`. */
+  adoptStoredIds: (idsByKey: ReadonlyMap<string, string>) => void;
 }
 
 export function useProposalDraft(detail: ProposalDetail): ProposalDraftApi {
@@ -98,8 +98,7 @@ export function useProposalDraft(detail: ProposalDetail): ProposalDraftApi {
     totals,
     patchSection,
     patchLine,
-    addSection: () =>
-      setSections((current) => [...current, { titleEn: '', titleAr: '', lines: [] }]),
+    addSection: () => setSections((current) => [...current, newSection()]),
     removeSection: (sectionIndex) =>
       setSections((current) => current.filter((_, index) => index !== sectionIndex)),
     addLine: (sectionIndex, costItem) =>
@@ -108,7 +107,7 @@ export function useProposalDraft(detail: ProposalDetail): ProposalDraftApi {
       replaceLines(sectionIndex, (lines) => lines.filter((_, j) => j !== lineIndex)),
     moveSection: (sectionIndex, direction) =>
       setSections((current) => move(current, sectionIndex, direction)),
-    adoptLineIds: (idsByKey) =>
-      setSections((current) => withLineIds(current, idsByKey)),
+    adoptStoredIds: (idsByKey) =>
+      setSections((current) => withStoredIds(current, idsByKey)),
   };
 }

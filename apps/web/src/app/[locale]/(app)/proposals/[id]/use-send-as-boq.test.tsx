@@ -40,6 +40,8 @@ const draft: ProposalDraftState = {
   seeMargin: true,
   sections: [
     {
+      key: 's-1',
+      id: null,
       titleEn: 'Ceilings',
       titleAr: '',
       lines: [
@@ -57,7 +59,7 @@ const draft: ProposalDraftState = {
         },
       ],
     },
-    { titleEn: 'Empty', titleAr: '', lines: [] },
+    { key: 's-2', id: null, titleEn: 'Empty', titleAr: '', lines: [] },
   ],
 };
 

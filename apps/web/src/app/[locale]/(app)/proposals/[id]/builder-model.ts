@@ -31,6 +31,10 @@ export interface LineState {
 }
 
 export interface SectionState {
+  /** This session's handle on the section, never sent (see `LineState.key`). */
+  key: string;
+  /** The STORED id, round-tripped so a save updates this section in place. */
+  id: string | null;
   titleEn: string;
   titleAr: string;
   lines: LineState[];
@@ -49,12 +53,18 @@ export function move<T>(arr: T[], i: number, dir: -1 | 1): T[] {
   return copy;
 }
 
-let lastLineKey = 0;
+let lastRowKey = 0;
 
 /** A fresh `LineState.key`, unique within this page. */
 export function newLineKey(): string {
-  lastLineKey += 1;
-  return `line-${lastLineKey}`;
+  lastRowKey += 1;
+  return `line-${lastRowKey}`;
+}
+
+/** A fresh `SectionState.key`, unique within this page and apart from line keys. */
+export function newSectionKey(): string {
+  lastRowKey += 1;
+  return `section-${lastRowKey}`;
 }
 
 /** A typed figure as it will be saved (see decimal-input.ts). */

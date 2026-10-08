@@ -7,64 +7,60 @@ import {
   proposals,
   type MetraDb,
 } from '@metra/db';
-import { randomUUID } from 'node:crypto';
-import { and, eq, sql } from 'drizzle-orm';
+import { and, eq, inArray, sql } from 'drizzle-orm';
 import { fail } from '@/lib/actions/mutate';
 import { insertLinesInChunks } from '@/lib/lines/insert-chunked';
+import { updateRowsInChunks } from '@/lib/lines/update-chunked';
 import type { DocTotals } from '@/lib/aggregates/proposal-totals';
 import type { ResolvedHeader } from './draft-save-validate';
 import { proposalRevision } from '../revision';
-import type { ResolvedSection } from './draft-save-resolve';
-import type { DraftSaveReceipt } from './types';
+import { LINE_COLUMNS, SECTION_COLUMNS, type DraftWritePlan } from './draft-save-diff';
+
+const SECTION_COLUMN_KEYS = Object.keys(SECTION_COLUMNS) as (keyof typeof SECTION_COLUMNS)[];
+const LINE_COLUMN_KEYS = Object.keys(LINE_COLUMNS) as (keyof typeof LINE_COLUMNS)[];
+
+/** Every `(org, proposal)` row of a planned write, as the table stores it. */
+function inDraft<Row>(rows: Row[], orgId: string, proposalId: string) {
+  return rows.map((row) => ({ ...row, orgId, proposalId }));
+}
 
 /**
- * Replace the document's sections and lines: delete, then batch-insert the
- * resolved ones (subtotal precomputed). The cascade takes the old lines with the
- * old sections.
+ * Write what the plan (./draft-save-diff) decided, in an order every foreign key
+ * and the child-draft trigger accept: new sections first (lines may move into
+ * them), changed sections, new lines, changed lines (a moved line leaves its old
+ * section here), then the removed lines, then the removed sections. An unchanged
+ * row is not written at all, which is what keeps one edited line in a 2,000-line
+ * draft to one row's WAL instead of a rewrite of the document.
  *
- * THE DELETE IS UNCONDITIONAL, and that is the point: a save that sends NO
- * sections must EMPTY the document, not leave the previous ones standing.
- *
- * Every row's id is decided HERE, before the inserts (a kept line id, else a
- * fresh uuid), so the receipt names each stored row in the order it was sent
- * without trusting the order RETURNING happens to give.
+ * Every statement is scoped to this proposal as well as to the row id. A save
+ * that sends NO sections deletes every stored row: it empties the document.
  */
-export async function replaceDraftSectionsAndLines(
+export async function applyDraftWritePlan(
   tx: MetraDb,
   orgId: string,
   proposalId: string,
-  resolvedSections: ResolvedSection[],
-): Promise<DraftSaveReceipt['sections']> {
-  await tx
-    .delete(proposalSections)
-    .where(eq(proposalSections.proposalId, proposalId));
-  if (!resolvedSections.length) return [];
-  const stored = resolvedSections.map((section) => ({
-    id: randomUUID(),
-    lineIds: section.lines.map((line) => line.id ?? randomUUID()),
-  }));
-  await tx.insert(proposalSections).values(
-    resolvedSections.map((section, index) => ({
-      id: stored[index].id,
-      orgId,
-      proposalId,
-      titleAr: section.titleAr,
-      titleEn: section.titleEn,
-      sortOrder: section.sortOrder,
-      sectionSubtotal: section.subtotal,
-    })),
-  );
-  const lineRows = resolvedSections.flatMap((section, index) =>
-    section.lines.map((line, lineIndex) => ({
-      ...line,
-      id: stored[index].lineIds[lineIndex],
-      orgId,
-      proposalId,
-      sectionId: stored[index].id,
-    })),
-  );
-  await insertLinesInChunks(tx, proposalLines, lineRows);
-  return stored;
+  plan: DraftWritePlan,
+): Promise<void> {
+  if (plan.sectionInserts.length) {
+    await tx.insert(proposalSections).values(inDraft(plan.sectionInserts, orgId, proposalId));
+  }
+  const scope = { column: proposalSections.proposalId, value: proposalId };
+  await updateRowsInChunks(tx, proposalSections, SECTION_COLUMN_KEYS, plan.sectionUpdates, scope);
+  await insertLinesInChunks(tx, proposalLines, inDraft(plan.lineInserts, orgId, proposalId));
+  await updateRowsInChunks(tx, proposalLines, LINE_COLUMN_KEYS, plan.lineUpdates, {
+    column: proposalLines.proposalId,
+    value: proposalId,
+  });
+  if (plan.lineDeletes.length) {
+    await tx
+      .delete(proposalLines)
+      .where(and(eq(proposalLines.proposalId, proposalId), inArray(proposalLines.id, plan.lineDeletes)));
+  }
+  if (plan.sectionDeletes.length) {
+    await tx
+      .delete(proposalSections)
+      .where(and(eq(proposalSections.proposalId, proposalId), inArray(proposalSections.id, plan.sectionDeletes)));
+  }
 }
 
 /** The nine money columns the engine recomputed. Never a client-supplied one. */

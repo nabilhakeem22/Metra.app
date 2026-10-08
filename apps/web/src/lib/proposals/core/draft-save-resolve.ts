@@ -13,11 +13,19 @@ export type { ResolvedLine } from './draft-save-resolve-line';
 export { loadCostItemMap } from './draft-save-cost-items';
 
 export interface ResolvedSection {
+  /** The id the payload named this section by; a STORED one is kept (./draft-save-diff). */
+  id?: string;
   titleAr: string | null;
   titleEn: string | null;
   sortOrder: number;
   subtotal: string;
   lines: ResolvedLine[];
+}
+
+/** The section id the payload sent, trimmed; absent when blank. */
+function sectionIdOf(section: SectionInput): string | undefined {
+  const id = typeof section.id === 'string' ? section.id.trim() : '';
+  return id || undefined;
 }
 
 /** One section and every line under it. `sortOrder` falls back to its position. */
@@ -39,6 +47,7 @@ function resolveDraftSection(
   return {
     totals,
     section: {
+      id: sectionIdOf(section),
       titleAr,
       titleEn,
       sortOrder: section.sortOrder ?? index,

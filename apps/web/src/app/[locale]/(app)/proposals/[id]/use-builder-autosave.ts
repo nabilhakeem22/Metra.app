@@ -26,7 +26,7 @@ export function useBuilderAutosave(input: {
   draft: ProposalDraftState;
   revision: string;
   enabled: boolean;
-  adoptLineIds: (idsByKey: ReadonlyMap<string, string>) => void;
+  adoptStoredIds: (idsByKey: ReadonlyMap<string, string>) => void;
   confirm: (options: ConfirmOptions) => Promise<boolean>;
 }): DraftAutosaveApi {
   const t = useTranslations('proposals.builder.leave');
@@ -35,7 +35,7 @@ export function useBuilderAutosave(input: {
     draft: input.draft,
     revision: input.revision,
     enabled: input.enabled,
-    onStored: input.adoptLineIds,
+    onStored: input.adoptStoredIds,
     onIncomplete: focusDraftField,
   });
   useInAppLeaveGuard({

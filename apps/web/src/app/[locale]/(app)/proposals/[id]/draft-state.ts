@@ -5,6 +5,7 @@ import type { ProposalDetail } from '@/lib/proposals/queries';
 import {
   figureOf,
   newLineKey,
+  newSectionKey,
   previewLine,
   type CostItemOption,
   type LineState,
@@ -27,9 +28,16 @@ export function newLine(costItem?: CostItemOption): LineState {
   };
 }
 
+/** A blank section, not yet stored. */
+export function newSection(): SectionState {
+  return { key: newSectionKey(), id: null, titleEn: '', titleAr: '', lines: [] };
+}
+
 /** The stored document, as the editable shape. */
 export function draftFromDetail(detail: ProposalDetail): SectionState[] {
   return detail.sections.map((section) => ({
+    key: newSectionKey(),
+    id: section.id,
     titleEn: section.titleEn ?? '',
     titleAr: section.titleAr ?? '',
     lines: section.lines.map((line) => ({
