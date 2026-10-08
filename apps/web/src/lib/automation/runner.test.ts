@@ -55,6 +55,9 @@ vi.mock('./portfolio-digest', () => ({
 vi.mock('./stage-reminders', () => ({
   runStageReminders: (deps: AutomationDeps) => state.core('stage', deps),
 }));
+vi.mock('./handover-closer', () => ({
+  runHandoverCloser: (deps: AutomationDeps) => state.core('handover', deps),
+}));
 vi.mock('./recipients', () => ({
   createRecipientEmailLookup: () => vi.fn(async () => ({ status: 'no-address' })),
 }));
@@ -62,6 +65,8 @@ vi.mock('./recipients', () => ({
 import { ORG_CONCURRENCY, runDueAutomations } from './runner';
 
 const NOW = new Date('2026-10-05T21:00:00Z');
+/** The runner's core order (./cores.ts). */
+const CORE_ORDER: AutomationKey[] = ['expire', 'followup', 'digest', 'stage', 'handover'];
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 function actorFor(orgId: string): OrgContext {
@@ -102,7 +107,7 @@ describe('runDueAutomations', () => {
     expect(state.orderedBy).toEqual([asc(organizations.id)]);
     expect(summary.results.map((r) => `${r.orgId}:${r.automation}`)).toEqual(
       ['org-a', 'org-b', 'org-c'].flatMap((org) =>
-        ['expire', 'followup', 'digest', 'stage'].map((key) => `${org}:${key}`),
+        CORE_ORDER.map((key) => `${org}:${key}`),
       ),
     );
   });
@@ -125,7 +130,7 @@ describe('runDueAutomations', () => {
       peakCoresInOneOrg = Math.max(peakCoresInOneOrg, running);
       await sleep(2);
       activeCoresByOrg.set(orgId, running - 1);
-      if (key === 'stage') activeOrgs.delete(orgId);
+      if (key === CORE_ORDER.at(-1)) activeOrgs.delete(orgId);
       return emptyResult(key);
     };
 
@@ -155,14 +160,11 @@ describe('runDueAutomations', () => {
       coreFailures: 1,
     });
     const orgB = summary.results.filter((r) => r.orgId === 'org-b');
-    expect(orgB.map((r) => [r.automation, r.failed, r.ran])).toEqual([
-      ['expire', false, true],
-      ['followup', true, false],
-      ['digest', false, true],
-      ['stage', false, true],
-    ]);
+    expect(orgB.map((r) => [r.automation, r.failed, r.ran])).toEqual(
+      CORE_ORDER.map((key) => [key, key === 'followup', key !== 'followup']),
+    );
     expect(summary.results.some((r) => r.orgId === 'org-c')).toBe(false);
-    expect(summary.results.filter((r) => r.orgId === 'org-d')).toHaveLength(4);
+    expect(summary.results.filter((r) => r.orgId === 'org-d')).toHaveLength(CORE_ORDER.length);
   });
 
   it('skips an org with no settings row or no owner/admin, without running a core', async () => {

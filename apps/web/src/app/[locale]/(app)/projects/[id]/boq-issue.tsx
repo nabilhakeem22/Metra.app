@@ -10,12 +10,24 @@ import { toast } from '@/hooks/use-toast';
 import { resolveActionError } from '@/lib/actions/error-message';
 import type { ActionCode } from '@/lib/actions/result';
 import { issueBoq } from '@/lib/boqs/actions';
+import type { BoqStepCompletion } from '@/lib/engagements/boq-step-complete';
 
 /** Refusals whose own catalog sentence tells the studio what to do next. */
 const SPEAKS_FOR_ITSELF: ReadonlySet<ActionCode | undefined> = new Set<ActionCode | undefined>([
   'boq_send_conflict',
   'renderer_busy',
 ]);
+
+/**
+ * The toast after an issue, by what became of the delivery's BOQ step: done, or
+ * waiting for the finance roles (owner decision Q1); otherwise only the issue.
+ */
+const ISSUED_TOAST: Record<BoqStepCompletion, 'issued' | 'issuedStepDone' | 'issuedStepWaits'> = {
+  completed: 'issuedStepDone',
+  not_permitted: 'issuedStepWaits',
+  not_at_boq: 'issued',
+  failed: 'issued',
+};
 
 /**
  * Issue the BOQ: freeze it, render its PDF, and hand that PDF to the engagement
@@ -69,7 +81,7 @@ export function BoqIssue({
         if (!(await flushPendingRemovals())) return;
         const res = await issueBoq(boqId);
         if (res.ok) {
-          toast({ title: t('issued') });
+          toast({ title: t(res.data ? ISSUED_TOAST[res.data.boqStep] : 'issued') });
           return;
         }
         toast({ title: failureMessage(res.error), variant: 'destructive' });

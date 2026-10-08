@@ -36,9 +36,11 @@ export interface SendSnapshot {
   names: DocumentNames;
 }
 
-/** This revision was already sent: the BOQ it produced. Nothing to render. */
+/** This revision was already sent: the BOQ it produced, and the delivery it
+ *  went to (a replay still completes a BOQ step a failed first try left). */
 export interface AlreadySent {
   alreadySent: SentBoq;
+  engagementId: string;
 }
 
 /** The BOQ proposal's header, or null when it is missing, foreign or a quote. */
@@ -103,7 +105,7 @@ function readSnapshotRows(
     const header = await readBoqProposal(tx, proposalId);
     if (!header) return 'invalid';
     const sent = await findSentRevision(tx, proposalId, header.revision);
-    if (sent) return { alreadySent: sent };
+    if (sent) return { alreadySent: sent, engagementId: header.engagementId };
     const engagement = await readActiveEngagement(tx, header.engagementId);
     if (typeof engagement === 'string') return engagement;
     const { engagementId: _linked, ...proposal } = header;

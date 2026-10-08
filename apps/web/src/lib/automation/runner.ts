@@ -3,17 +3,13 @@ import { automationSettings, organizations, type AutomationSettings } from '@met
 import { asc } from 'drizzle-orm';
 import { loggableFailure } from '@/lib/actions/loggable-failure';
 import { settleWithConcurrency } from './concurrency';
-import { runExpireProposals } from './expire-proposals';
-import { runFollowupReminders } from './followup-reminders';
-import { runPortfolioDigest } from './portfolio-digest';
+import { CORES } from './cores';
 import { createRecipientEmailLookup } from './recipients';
 import { summarizeTick, tickLogLine } from './run-summary';
-import { runStageReminders } from './stage-reminders';
 import { resolveSystemContext } from './system-context';
 import type {
   AutomationDeps,
   AutomationKey,
-  AutomationResult,
   AutomationRunSummary,
   OrgAutomationResult,
   OrgRunOutcome,
@@ -31,16 +27,6 @@ import { withRequestDb } from '@/lib/db/client';
  */
 export const ORG_CONCURRENCY = 3;
 
-const CORES: Array<{
-  key: AutomationKey;
-  run: (deps: AutomationDeps) => Promise<AutomationResult>;
-}> = [
-  { key: 'expire', run: runExpireProposals },
-  { key: 'followup', run: runFollowupReminders },
-  { key: 'digest', run: runPortfolioDigest },
-  { key: 'stage', run: runStageReminders },
-];
-
 /** Everything shared by every org on one tick. */
 type TickDeps = Pick<AutomationDeps, 'now' | 'appUrl' | 'lookupRecipientEmail'>;
 type OrgRow = { id: string; defaultLocale: string | null };
@@ -57,7 +43,7 @@ function failedCore(orgId: string, key: AutomationKey): OrgAutomationResult {
   };
 }
 
-/** The four cores for one org, in order; one throwing never stops the next. */
+/** Every core for one org, in order (./cores.ts); one throwing never stops the next. */
 async function runCores(deps: AutomationDeps): Promise<OrgAutomationResult[]> {
   const orgId = deps.ctx.orgId;
   const results: OrgAutomationResult[] = [];
@@ -119,7 +105,7 @@ function orgOutcomeOf(
  * system tables (organizations, automation_settings, memberships) to enumerate
  * orgs and their config — it NEVER touches a business table privileged. For each
  * org it resolves a system actor (earliest owner, fallback admin) and dispatches
- * the four cores, each of which does ALL business reads/writes inside a single-org
+ * every core, each of which does ALL business reads/writes inside a single-org
  * withOrgContext RLS tx keyed on that actor. Orgs run ORG_CONCURRENCY at a time;
  * per-org and per-core isolation means one failure never aborts the others. Logs
  * one count-only summary line. Throws only if the org or settings list itself

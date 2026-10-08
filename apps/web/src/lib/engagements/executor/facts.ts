@@ -35,7 +35,7 @@ export interface LoadedGuardFacts extends GuardFacts {
   changeOrders: EngagementChangeOrder[];
   events: EngagementEvent[];
 }
-import type { TransitionRun } from './index';
+import type { TransitionRun } from './run';
 
 /**
  * The engagement this transition moves, or `engagement_not_found`.

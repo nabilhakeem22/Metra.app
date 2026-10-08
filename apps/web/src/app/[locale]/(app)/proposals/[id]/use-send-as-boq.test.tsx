@@ -91,7 +91,7 @@ beforeEach(() => {
 describe('useSendAsBoq', () => {
   it('states the sendable lines, sections, total and the locked gate in ONE confirm', async () => {
     flush.mockResolvedValue({ ok: true });
-    actions.sendProposalAsBoq.mockResolvedValue({ ok: true, data: { documentNumber: 'BQ-2026-0014' } });
+    actions.sendProposalAsBoq.mockResolvedValue({ ok: true, data: { documentNumber: 'BQ-2026-0014', boqStep: 'not_permitted' } });
     renderWithIntl(<Harness />, { locale: 'en' });
     fireEvent.click(screen.getByRole('button'));
     await waitFor(() => expect(confirm).toHaveBeenCalledTimes(1));
@@ -120,14 +120,14 @@ describe('useSendAsBoq', () => {
     expect(router.push).not.toHaveBeenCalled();
   });
 
-  it('a successful send toasts the BQ number and returns to the delivery', async () => {
+  it('a successful send that completes the BOQ step toasts both and returns to the delivery', async () => {
     flush.mockResolvedValue({ ok: true });
-    actions.sendProposalAsBoq.mockResolvedValue({ ok: true, data: { documentNumber: 'BQ-2026-0014' } });
+    actions.sendProposalAsBoq.mockResolvedValue({ ok: true, data: { documentNumber: 'BQ-2026-0014', boqStep: 'completed' } });
     renderWithIntl(<Harness />, { locale: 'en' });
     fireEvent.click(screen.getByRole('button'));
     await waitFor(() => expect(router.push).toHaveBeenCalledWith('/engagements/e-1'));
     expect(actions.sendProposalAsBoq).toHaveBeenCalledWith('p-1');
-    expect(toasts.at(-1)?.title).toBe('BQ-2026-0014 sent to the client');
+    expect(toasts.at(-1)?.title).toBe('BQ-2026-0014 sent to the client. The BOQ step is done.');
   });
 
   it('a THROWN send toasts generic, clears the spinner and shows the delivery as it is (R1)', async () => {

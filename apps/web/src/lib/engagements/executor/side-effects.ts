@@ -18,7 +18,7 @@ import { captureRenderManifest } from '../renders';
 import { isRevisionTrigger } from '../revision-allowance';
 import { applyRevision, resetRevisionsOnReject } from '../revisions';
 import type { SideEffectKey, Trigger } from '../transitions';
-import type { TransitionRun } from './index';
+import type { TransitionRun } from './run';
 
 /**
  * Everything a side-effect may read. The engagement row is the one loaded

@@ -1190,6 +1190,8 @@
         "issueConfirmBodyOpen": "It will be frozen and published in the client's delivery link, replacing any earlier BOQ. The client can open it right away. Changing it afterwards means issuing a new version.",
         "issueConfirm": "Issue",
         "issued": "BOQ issued and published to the client",
+        "issuedStepDone": "BOQ issued and published to the client. The BOQ step is done.",
+        "issuedStepWaits": "BOQ issued and published to the client. An owner, admin or accountant completes the BOQ step.",
         "issueFailed": "Could not issue the BOQ",
         "issueNoEngagement": "This project has no single active engagement to deliver through",
         "statusIssued": "Issued",
@@ -1396,6 +1398,8 @@
       "confirm": "Send as BOQ",
       "cancel": "Keep editing",
       "sent": "{documentNumber} sent to the client",
+      "sentStepDone": "{documentNumber} sent to the client. The BOQ step is done.",
+      "sentStepWaits": "{documentNumber} sent to the client. An owner, admin or accountant completes the BOQ step.",
       "totalBeforeVat": "Total before VAT"
     },
     "kindTag": {
@@ -1766,6 +1770,7 @@
         "hint": "Record the client's decision. Both endings are final.",
         "cancel": "Not yet",
         "decidedBy": "An owner, admin or project manager chooses how this delivery ends.",
+        "designOnlyCloses": "Upload the handover files first: when the client confirms receipt, this delivery closes.",
         "chooseDesignOnly": {
           "cta": "Design-only handover",
           "confirmTitle": "Hand over the design only?",
@@ -2038,6 +2043,8 @@
     "timeline": {
       "empty": "No activity yet.",
       "arrow": "{from} → {to}",
+      "byMetra": "By Metra",
+      "closedOnClientConfirmation": "Closed when the client confirmed receipt",
       "onBehalfChip": "Recorded for the client",
       "optionLetter": "Option {letter}",
       "recordedBy": "Recorded by the studio",
@@ -2075,6 +2082,7 @@
     "handoffAck": {
       "title": "Record handoff receipt",
       "hint": "Log the recipient's acknowledgement of the design-only package taken offline.",
+      "closesDelivery": "Recording the client's confirmation closes this delivery.",
       "submit": "Record acknowledgement"
     },
     "paymentKind": {

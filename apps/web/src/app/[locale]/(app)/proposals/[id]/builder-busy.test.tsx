@@ -135,7 +135,7 @@ describe('the builder while Send as BOQ is in flight (R3)', () => {
       expect(screen.getByRole('button', { name }).matches(':disabled')).toBe(true);
     }
 
-    finishSend({ ok: true, data: { documentNumber: 'BQ-2026-0014' } });
+    finishSend({ ok: true, data: { documentNumber: 'BQ-2026-0014', boqStep: 'not_at_boq' } });
     await waitFor(() =>
       expect(screen.getByRole('button', { name: en('proposals.preview.open') }).matches(':disabled')).toBe(false),
     );
@@ -150,7 +150,7 @@ describe('the builder saves itself (B6)', () => {
   });
 
   it('Send as BOQ stores the latest edit first, through the refreshing save, then sends', async () => {
-    boqActions.sendProposalAsBoq.mockResolvedValue({ ok: true, data: { documentNumber: 'BQ-2026-0014' } });
+    boqActions.sendProposalAsBoq.mockResolvedValue({ ok: true, data: { documentNumber: 'BQ-2026-0014', boqStep: 'not_at_boq' } });
     const { container } = renderBoqBuilder();
     const qty = container.querySelector('input[value="10"]') as HTMLInputElement;
     fireEvent.change(qty, { target: { value: '12' } });

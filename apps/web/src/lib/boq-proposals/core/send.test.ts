@@ -1,23 +1,24 @@
 // The orchestrator's ordering promise, with the database and Chromium mocked:
-// a refused caller costs nothing, a failed render writes nothing, and the commit
-// receives the number and year the PDF printed.
+// a refused caller costs nothing, a failed render writes nothing, the commit
+// receives the number and year the PDF printed, and every success (a replay
+// too) asks to complete the delivery's BOQ step.
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { OrgContext } from '@/lib/db/context';
 import type { SendSnapshot } from '../snapshot';
 
 vi.mock('server-only', () => ({}));
 
-const { loadSendSnapshot, renderAndStoreClientBoqPdf, commitProposalBoqCore } = vi.hoisted(
-  () => ({
+const { loadSendSnapshot, renderAndStoreClientBoqPdf, commitProposalBoqCore, completeBoqStep } =
+  vi.hoisted(() => ({
     loadSendSnapshot: vi.fn(),
     renderAndStoreClientBoqPdf: vi.fn(),
     commitProposalBoqCore: vi.fn(),
-  }),
-);
-
+    completeBoqStep: vi.fn(),
+  }));
 vi.mock('../snapshot', () => ({ loadSendSnapshot }));
 vi.mock('@/lib/boqs/issue', () => ({ renderAndStoreClientBoqPdf }));
 vi.mock('./commit', () => ({ commitProposalBoqCore }));
+vi.mock('@/lib/engagements/boq-step-complete', () => ({ completeBoqStep }));
 
 const { sendProposalAsBoqCore } = await import('./send');
 const { RendererBusyError } = await import('@/lib/pdf/renderer-busy');
@@ -104,13 +105,11 @@ describe('sendProposalAsBoqCore', () => {
       ok: true,
       data: { boqId: 'b1', documentNumber: 'BQ-2026-0014' },
     });
+    completeBoqStep.mockResolvedValue('not_permitted');
+    const res = await sendProposalAsBoqCore(ctx('project_manager'), { proposalId: 'p1', locale: 'en' });
 
-    const res = await sendProposalAsBoqCore(ctx('project_manager'), {
-      proposalId: 'p1',
-      locale: 'en',
-    });
-
-    expect(res).toEqual({ ok: true, data: { documentNumber: 'BQ-2026-0014' } });
+    expect(res).toEqual({ ok: true, data: { documentNumber: 'BQ-2026-0014', boqStep: 'not_permitted' } });
+    expect(completeBoqStep).toHaveBeenCalledWith(ctx('project_manager'), 'e1');
     const rendered = renderAndStoreClientBoqPdf.mock.calls[0][1];
     expect(rendered.year).toBe(2026);
     expect(rendered.detail.number).toBe(14);
@@ -131,9 +130,12 @@ describe('sendProposalAsBoqCore', () => {
   it('answers a replayed revision with the BOQ already sent, rendering and committing nothing', async () => {
     loadSendSnapshot.mockResolvedValue({
       alreadySent: { boqId: 'b1', documentNumber: 'BQ-2026-0014' },
+      engagementId: 'e1',
     });
+    completeBoqStep.mockResolvedValue('not_at_boq');
     const res = await sendProposalAsBoqCore(ctx('owner'), { proposalId: 'p1', locale: 'en' });
-    expect(res).toEqual({ ok: true, data: { documentNumber: 'BQ-2026-0014' } });
+    expect(res).toEqual({ ok: true, data: { documentNumber: 'BQ-2026-0014', boqStep: 'not_at_boq' } });
+    expect(completeBoqStep).toHaveBeenCalledWith(ctx('owner'), 'e1');
     expect(renderAndStoreClientBoqPdf).not.toHaveBeenCalled();
     expect(commitProposalBoqCore).not.toHaveBeenCalled();
   });

@@ -4,6 +4,7 @@ import 'server-only';
 import { err, type ActionCode, type ActionResult } from '@/lib/actions/result';
 import { renderAndStoreClientBoqPdf } from '@/lib/boqs/issue';
 import type { OrgContext } from '@/lib/db/context';
+import { completeBoqStep, type BoqStepCompletion } from '@/lib/engagements/boq-step-complete';
 import { renderFailureCode } from '@/lib/pdf/render-failure-code';
 import { can } from '@/lib/permissions/can';
 import { toBoqDetail } from '../detail';
@@ -12,6 +13,12 @@ import { loadSendSnapshot, type SendSnapshot } from '../snapshot';
 import { commitProposalBoqCore, type CommitProposalBoqInput } from './commit';
 
 type StoredFile = { fileId: string; label: string };
+type SentAsBoq = ActionResult & { data?: { documentNumber: string; boqStep: BoqStepCompletion } };
+
+/** The send's answer, after completing the BOQ step when it is the sender's to complete. */
+async function sentAsBoq(ctx: OrgContext, engagementId: string, documentNumber: string): Promise<SentAsBoq> {
+  return { ok: true, data: { documentNumber, boqStep: await completeBoqStep(ctx, engagementId) } };
+}
 
 /** The client PDF, numbered with the number the commit must allocate, or the
  *  refusal code (`renderer_busy` when it is worth retrying). */
@@ -76,17 +83,21 @@ function commitInput(
  * A REPLAY RENDERS NOTHING: a revision that is already out is answered with the
  * BOQ it produced, from the snapshot, before Chromium is touched (and again under
  * the commit's lock, for a replay that races the first send).
+ *
+ * EVERY SUCCESS, the replay included, then completes the delivery's BOQ step when
+ * the sender may (../../engagements/boq-step-complete.ts): a retry repairs a step
+ * move that failed after the first send. The step answer rides in `boqStep`.
  */
 export async function sendProposalAsBoqCore(
   ctx: OrgContext,
   input: { proposalId: string; locale: string },
-): Promise<ActionResult & { data?: { documentNumber: string } }> {
+): Promise<SentAsBoq> {
   if (!can(ctx.role, 'boq_build', 'create')) return err('forbidden');
 
   const snapshot = await loadSendSnapshot(ctx, input.proposalId);
   if (typeof snapshot === 'string') return err(snapshot);
   if ('alreadySent' in snapshot) {
-    return { ok: true, data: { documentNumber: snapshot.alreadySent.documentNumber } };
+    return sentAsBoq(ctx, snapshot.engagementId, snapshot.alreadySent.documentNumber);
   }
   const mapped = mapProposalToBoq(snapshot.source, snapshot.proposal.discountPct);
 
@@ -95,5 +106,5 @@ export async function sendProposalAsBoqCore(
 
   const committed = await commitProposalBoqCore(ctx, commitInput(snapshot, mapped, file));
   if (!committed.ok || !committed.data) return { ok: false, error: committed.error ?? 'generic' };
-  return { ok: true, data: { documentNumber: committed.data.documentNumber } };
+  return sentAsBoq(ctx, snapshot.engagement.id, committed.data.documentNumber);
 }

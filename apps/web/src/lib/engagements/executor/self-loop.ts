@@ -5,7 +5,7 @@
 import { designEngagements, engagementTransitions } from '@metra/db';
 import { and, eq } from 'drizzle-orm';
 import { isSelfLoop } from './admissibility';
-import type { TransitionRun } from './index';
+import type { TransitionRun } from './run';
 
 /**
  * Serialise the racers on a SELF-LOOP edge, BEFORE any fact is read. The state

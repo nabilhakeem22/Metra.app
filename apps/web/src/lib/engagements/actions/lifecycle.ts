@@ -11,10 +11,6 @@ import {
 import { createEngagementCore, type CreateEngagementInput } from '../core';
 import { executeTransition } from '../executor';
 import {
-  recordHandoffAcknowledgementCore,
-  type RecordHandoffAcknowledgementInput,
-} from '../handoff';
-import {
   setEngagementOffPlanCore,
   type SetEngagementOffPlanInput,
 } from '../off-plan';
@@ -444,23 +440,6 @@ export async function recordRomAcknowledgement(
 ): Promise<ActionResult & { data?: string }> {
   const ctx = await requireOrg();
   const res = await recordRomAcknowledgementCore(ctx, input);
-  if (res.ok) revalidatePath('/', 'layout');
-  return res;
-}
-
-/**
- * Server-action wrapper for {@link recordHandoffAcknowledgementCore}: resolves
- * the request's org context, appends one `handoff_acknowledgement` event (the
- * staff stand-in for the client's token ack), and revalidates the shell on
- * success. Returns the ActionResult (with the new event id in `data`) — never
- * throws to the client. This is manual-model data entry, NOT a machine
- * transition; the `recipientAcknowledges` guard reads the event it writes.
- */
-export async function recordHandoffAcknowledgement(
-  input: RecordHandoffAcknowledgementInput,
-): Promise<ActionResult & { data?: string }> {
-  const ctx = await requireOrg();
-  const res = await recordHandoffAcknowledgementCore(ctx, input);
   if (res.ok) revalidatePath('/', 'layout');
   return res;
 }

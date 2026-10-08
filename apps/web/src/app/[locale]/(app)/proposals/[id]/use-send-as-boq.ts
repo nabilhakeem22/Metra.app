@@ -9,6 +9,7 @@ import { resolveActionError } from '@/lib/actions/error-message';
 import type { ActionCode } from '@/lib/actions/result';
 import { sendProposalAsBoq } from '@/lib/boq-proposals/actions';
 import { countSendable } from '@/lib/boq-proposals/count';
+import type { BoqStepCompletion } from '@/lib/engagements/boq-step-complete';
 import { formatMoney } from '@/lib/format/money';
 import { formatNumber } from '@/lib/format/number';
 import type { SaveDraftResult } from './persist-draft';
@@ -28,6 +29,18 @@ const UNKNOWN_OUTCOME: ReadonlySet<ActionCode | undefined> = new Set<ActionCode 
   'uncertain',
   'boq_send_conflict',
 ]);
+
+/**
+ * The toast after a send, by what became of the delivery's BOQ step: done, or
+ * waiting for the finance roles (owner decision Q1). Not at the step (a later
+ * version) or a failed move says only that the BOQ went out.
+ */
+const SENT_TOAST: Record<BoqStepCompletion, 'sent' | 'sentStepDone' | 'sentStepWaits'> = {
+  completed: 'sentStepDone',
+  not_permitted: 'sentStepWaits',
+  not_at_boq: 'sent',
+  failed: 'sent',
+};
 
 /**
  * "Send as BOQ": one confirmation that states what is being sent, then save
@@ -73,7 +86,7 @@ export function useSendAsBoq(options: {
       return;
     }
     if (sent.ok && sent.data) {
-      toast({ title: t('sent', { documentNumber: sent.data.documentNumber }) });
+      toast({ title: t(SENT_TOAST[sent.data.boqStep], { documentNumber: sent.data.documentNumber }) });
       router.push(`/engagements/${options.engagementId}`);
       return;
     }

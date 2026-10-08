@@ -5,7 +5,7 @@ import { designEngagements } from '@metra/db';
 import { and, eq } from 'drizzle-orm';
 import { fail } from '@/lib/actions/result';
 import type { DesignState } from '../states';
-import type { TransitionRun } from './index';
+import type { TransitionRun } from './run';
 
 /**
  * Admission gate: only the writer that flips the state off the expected

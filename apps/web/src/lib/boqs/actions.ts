@@ -58,7 +58,7 @@ export async function commitBoqImport(input: {
  */
 export async function issueBoq(
   boqId: string,
-): Promise<ActionResult & { data?: { artifactId: string; version: number } }> {
+): Promise<Awaited<ReturnType<typeof issueBoqCore>>> {
   const ctx = await requireOrg();
   let locale = 'ar-EG';
   try {

@@ -4,7 +4,8 @@ import type {
   EngagementTransitionRecord,
 } from '@/lib/engagements/queries';
 import { isClientGenerated, isRecordedForClient } from '@/lib/engagements/event-provenance';
-import { offlineApprovalChannelOf, type OfflineApprovalChannel } from '@/lib/engagements/offline-approval';
+import { offlineApprovalChannelOf } from '@/lib/engagements/offline-approval';
+import { transitionLabel, type TimelineLabels } from './timeline-labels';
 
 // WHAT THE TIMELINE SHOWS, and in what order. PURE and server-safe: no React, no
 // db. Merging three record streams into one ledger, deciding which rows are
@@ -30,15 +31,6 @@ export interface TimelineEntry {
 
 /** The fields a row that is not a studio-recorded event leaves empty. */
 const PLAIN_ROW = { onBehalf: false, occurredOn: null, evidence: null, eventId: null, retraction: null };
-
-/** The sentences the feed needs from the catalogue, as functions. */
-export interface TimelineLabels {
-  transition(fromState: string | null, toState: string | null): string;
-  eventKind(kind: string): string;
-  clientActivity(kind: string, actorName: string | null): string;
-  /** "By phone", "On WhatsApp"...: how the client gave an offline approval. */
-  offlineChannel(channel: OfflineApprovalChannel): string;
-}
 
 export interface TimelineInput {
   transitions: readonly EngagementTransitionRecord[];
@@ -73,7 +65,7 @@ function transitionEntry(
   return {
     id: `t-${transition.id}`,
     at: transition.decidedAt,
-    label: labels.transition(transition.fromState, transition.toState),
+    label: transitionLabel(transition, labels),
     note: trimmedNote(transition.note),
     ...PLAIN_ROW,
     optionPosition: null,

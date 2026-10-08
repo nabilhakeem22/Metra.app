@@ -7,7 +7,7 @@ import { sql } from 'drizzle-orm';
 import { fail } from '@/lib/actions/result';
 import type { DesignState } from '../states';
 import { isSelfLoop } from './admissibility';
-import type { TransitionRun } from './index';
+import type { TransitionRun } from './run';
 
 /**
  * The arbiter 0050's partial unique index publishes.
@@ -48,7 +48,9 @@ export async function persistTransitionRow(
       trigger: run.input.trigger,
       fromState,
       toState: run.def.to,
-      actorUserId: run.ctx.userId,
+      // The person who fired the trigger, or null when Metra moved the delivery
+      // as the consequence of an act that had already decided it (consequence.ts).
+      actorUserId: run.ledgerActorUserId,
       // Self-loops only. On an advancing edge the state gate is the
       // protection, and storing a key there would let one key block a later,
       // legitimately different transition on the same engagement.
@@ -72,7 +74,10 @@ function failLostIdempotencyRace(run: TransitionRun): never {
   fail('engagement_state_conflict');
 }
 
-/** The audit entry for the state move, written with the tx's own `audit`. */
+/**
+ * The audit entry for the state move, written with the tx's own `audit`. A
+ * consequence names its cause, so the audit says why nobody chose the move.
+ */
 export async function auditStateMove(
   run: TransitionRun,
   fromState: DesignState,
@@ -82,6 +87,6 @@ export async function auditStateMove(
     entityId: run.input.engagementId,
     action: 'update',
     before: { state: fromState },
-    after: { state: run.def.to },
+    after: run.cause === null ? { state: run.def.to } : { state: run.def.to, cause: run.cause },
   });
 }

@@ -1,8 +1,8 @@
 import type { AutomationSettings } from '@metra/db';
 import type { OrgContext } from '@/lib/db/context';
 
-/** One of the four automation cores. */
-export type AutomationKey = 'expire' | 'followup' | 'digest' | 'stage';
+/** One of the automation cores (./cores.ts). */
+export type AutomationKey = 'expire' | 'followup' | 'digest' | 'stage' | 'handover';
 
 /**
  * Where an internal user's email address came from on this tick. `failed` is a

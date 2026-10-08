@@ -39,6 +39,8 @@ export function TimelineFeed({
               to: t(`state.${toState}`),
             })
           : t(`state.${toState ?? 'created'}`),
+      byMetra: (move) => `${move} · ${t('timeline.byMetra')}`,
+      closedOnClientConfirmation: () => t('timeline.closedOnClientConfirmation'),
       eventKind: (kind) => t(`eventKind.${kind}`),
       clientActivity: (kind, actorName) =>
         actorName

@@ -33,8 +33,8 @@ export {
   setEngagementOffPlan,
   recordEventCorrection,
   recordRomAcknowledgement,
-  recordHandoffAcknowledgement,
 } from './lifecycle';
+export { recordHandoffAcknowledgement } from './handoff';
 export { setEngagementRom, issueRom } from './rom';
 export {
   recordPayment,

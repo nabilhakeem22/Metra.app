@@ -259,6 +259,7 @@ describe('Send as BOQ is idempotent per revision (R1)', () => {
     // The snapshot recognises it too, so a replayed send never reaches the render.
     expect(await loadSendSnapshot(org.ctx, proposalId)).toEqual({
       alreadySent: first.result.data,
+      engagementId,
     });
   });
 });

@@ -20,7 +20,7 @@ export async function openBoqProposal(
 /** Send the working copy to the client as the next BOQ version. */
 export async function sendProposalAsBoq(
   proposalId: string,
-): Promise<ActionResult & { data?: { documentNumber: string } }> {
+): Promise<Awaited<ReturnType<typeof sendProposalAsBoqCore>>> {
   const ctx = await requireOrg();
   let locale = 'ar-EG';
   try {

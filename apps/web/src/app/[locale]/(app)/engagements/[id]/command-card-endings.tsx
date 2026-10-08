@@ -12,7 +12,8 @@ import type { RunAction } from './use-engagement-action';
  * forward move: the client either builds with the studio or takes the design
  * only, and both are final. So neither is the default: the two buttons share one
  * variant and one size, and each asks for confirmation before it fires. Cancel
- * fires nothing.
+ * fires nothing. The design-only confirmation also says what will close it: the
+ * client's confirmation of receipt (lib/engagements/handover-close.ts).
  */
 export function CommandCardEndings({
   engagementId,
@@ -35,7 +36,10 @@ export function CommandCardEndings({
     if (!action) return;
     const confirmed = await confirm({
       title: tending(`${trigger}.confirmTitle`),
-      description: tending(`${trigger}.confirmBody`),
+      description:
+        trigger === 'chooseDesignOnly'
+          ? `${tending(`${trigger}.confirmBody`)} ${tending('designOnlyCloses')}`
+          : tending(`${trigger}.confirmBody`),
       confirmLabel: tending(`${trigger}.cta`),
       cancelLabel: tending('cancel'),
     });

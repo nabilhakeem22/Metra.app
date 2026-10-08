@@ -5,6 +5,7 @@ import { mutateInOrg } from '@/lib/actions/mutate';
 import { err, type ActionCode, type ActionResult } from '@/lib/actions/result';
 import type { OrgContext } from '@/lib/db/context';
 import { withOrgContext } from '@/lib/db/context';
+import { completeBoqStep, type BoqStepCompletion } from '@/lib/engagements/boq-step-complete';
 import { renderFailureCode } from '@/lib/pdf/render-failure-code';
 import { can } from '@/lib/permissions/can';
 import { getBoqDetail, type BoqDetail } from '../queries';
@@ -33,11 +34,14 @@ export { getBoqIssueReleasable } from './releasable';
  * version that supersedes, producing its own artifact. That is why the write
  * opens with a CONTENT FENCE: the revision read before the render must still be
  * the BOQ's revision under FOR UPDATE, or nothing is frozen (`boq_send_conflict`).
+ *
+ * An issued BOQ then completes the delivery's BOQ step when the issuer may
+ * (../../engagements/boq-step-complete.ts), answered in `boqStep`.
  */
 export async function issueBoqCore(
   ctx: OrgContext,
   input: { boqId: string; locale: string },
-): Promise<ActionResult & { data?: { artifactId: string; version: number } }> {
+): Promise<ActionResult & { data?: { artifactId: string; version: number; boqStep: BoqStepCompletion } }> {
   // Refused before the render, so a caller who may not issue never costs a
   // Chromium run or leaves a stored file behind.
   if (!can(ctx.role, 'boq_build', 'update')) return err('forbidden');
@@ -52,7 +56,7 @@ export async function issueBoqCore(
     return err(renderFailureCode(e, 'BOQ issue'));
   }
 
-  return mutateInOrg(ctx, { capability: 'boq_build', action: 'update' }, async (tx) => {
+  const issued = await mutateInOrg(ctx, { capability: 'boq_build', action: 'update' }, async (tx) => {
     await fenceIssueRevision(tx, input.boqId, source.revision);
     return freezeAndRecordIssue(tx, ctx, {
       boqId: input.boqId,
@@ -61,6 +65,8 @@ export async function issueBoqCore(
       ...file,
     });
   });
+  if (!issued.ok || !issued.data) return { ...issued, data: undefined };
+  return { ...issued, data: { ...issued.data, boqStep: await completeBoqStep(ctx, source.engagementId) } };
 }
 
 interface IssueSource {

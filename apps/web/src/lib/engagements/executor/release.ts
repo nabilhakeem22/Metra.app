@@ -5,7 +5,7 @@
 import { type EngagementArtifact, engagementArtifacts } from '@metra/db';
 import { and, eq, inArray } from 'drizzle-orm';
 import { CLIENT_RELEASES, selectReleaseArtifactIds } from '../client-release';
-import type { TransitionRun } from './index';
+import type { TransitionRun } from './run';
 
 /**
  * Client Deliverables (Step 1): auto-share. A release-carrying edge publishes
