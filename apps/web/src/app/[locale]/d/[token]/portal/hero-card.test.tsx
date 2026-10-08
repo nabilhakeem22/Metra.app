@@ -5,11 +5,25 @@ import { HeroCard } from './hero-card';
 
 // The hero's confirmation says the designer HAS BEEN NOTIFIED only when the
 // portal action says a notification row was written for this act; otherwise it
-// says the answer is recorded and the designer will see it.
+// says the answer is recorded and the designer will see it. It offers only the
+// verbs the client is offered, and a concept verb confirms the decision SAVED
+// on file (a repeat shows that one, never the verb just tapped).
 
-const actions = vi.hoisted(() => ({ recordDeliveryAction: vi.fn(), chooseDeliveryConcept: vi.fn() }));
+const actions = vi.hoisted(() => ({
+  recordDeliveryAction: vi.fn(),
+  chooseDeliveryConcept: vi.fn(),
+  respondToDeliveryConcept: vi.fn(),
+}));
 vi.mock('../actions', () => actions);
-vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
+const router = vi.hoisted(() => ({ refresh: vi.fn() }));
+vi.mock('next/navigation', () => ({ useRouter: () => router }));
+
+/** Every verb of each group, as the SDF offers them on a fresh review. */
+const GROUP_VERBS = {
+  concept: ['approve_concept', 'request_concept_changes'],
+  design: ['approve_design', 'request_design_changes'],
+  handoff: ['acknowledge_handoff'],
+} as const;
 
 const LABEL = { ar: 'مراجعة', en: 'Review' };
 
@@ -31,7 +45,7 @@ function renderHero(
       hero={{ kind: 'action', group, showRomAck: false }}
       stageLabel={LABEL}
       stageNote={LABEL}
-      clientActions={concept.clientActions ?? []}
+      clientActions={concept.clientActions ?? [...GROUP_VERBS[group]]}
       conceptOptions={concept.conceptOptions ?? []}
       conceptChoice={null}
     />,
@@ -41,6 +55,8 @@ function renderHero(
 
 beforeEach(() => {
   actions.recordDeliveryAction.mockReset();
+  actions.respondToDeliveryConcept.mockReset();
+  router.refresh.mockReset();
 });
 
 describe('HeroCard confirmation', () => {
@@ -54,17 +70,24 @@ describe('HeroCard confirmation', () => {
     '%s %s: "notified" copy only when the studio was notified',
     async (group, buttonKey, verb, bodyKey) => {
       const button = messageAt('en', `delivery.hero.${group}.${buttonKey}`);
+      // A concept verb answers an outcome (the decision on file); the others a result.
+      const isConcept = group === 'concept';
+      const action = isConcept ? actions.respondToDeliveryConcept : actions.recordDeliveryAction;
+      const answer = (studioNotified: boolean) =>
+        isConcept
+          ? { kind: verb === 'approve_concept' ? 'approved' : 'changes_requested', studioNotified }
+          : { ok: true, studioNotified };
 
-      actions.recordDeliveryAction.mockResolvedValue({ ok: true, studioNotified: true });
+      action.mockResolvedValue(answer(true));
       const notified = renderHero(group, 'en');
       fireEvent.click(screen.getByRole('button', { name: button }));
       expect(
         await screen.findByText(messageAt('en', `delivery.hero.${group}.${bodyKey}Notified`)),
       ).toBeTruthy();
-      expect(actions.recordDeliveryAction).toHaveBeenCalledWith('tok', verb, '');
+      expect(action).toHaveBeenCalledWith('tok', verb, '');
       notified.unmount();
 
-      actions.recordDeliveryAction.mockResolvedValue({ ok: true, studioNotified: false });
+      action.mockResolvedValue(answer(false));
       renderHero(group, 'en');
       fireEvent.click(screen.getByRole('button', { name: button }));
       expect(await screen.findByText(messageAt('en', `delivery.hero.${group}.${bodyKey}`))).toBeTruthy();
@@ -74,7 +97,7 @@ describe('HeroCard confirmation', () => {
     },
   );
 
-  it('an idempotent repeat (`already`, never notified) reads as recorded, in Arabic too', async () => {
+  it('a design repeat (`already`, never notified) reads as recorded, in Arabic too', async () => {
     actions.recordDeliveryAction.mockResolvedValue({ ok: true, code: 'already', studioNotified: false });
     renderHero('design', 'ar-EG');
     fireEvent.click(screen.getByRole('button', { name: messageAt('ar-EG', 'delivery.hero.design.approve') }));
@@ -135,5 +158,51 @@ describe('the calm hero repeats the saved choice (B12)', () => {
   it('says nothing about it once the delivery is closed', () => {
     renderCalm('closed', 'en');
     expect(screen.queryByText(/You chose option/)).toBeNull();
+  });
+});
+
+describe('ActionHero offers only what is offered, and confirms only what is SAVED (B12)', () => {
+  const approve = () => screen.queryByRole('button', { name: messageAt('en', 'delivery.hero.concept.approve') });
+  const changes = () => screen.queryByRole('button', { name: messageAt('en', 'delivery.hero.concept.changes') });
+
+  it('a retracted change request still holding its slot: Request changes is not offered', () => {
+    renderHero('concept', 'en', { clientActions: ['approve_concept'] });
+    expect(approve()).toBeTruthy();
+    expect(changes()).toBeNull();
+  });
+
+  it('a retracted approval holding its slot: only Request changes is offered', () => {
+    renderHero('concept', 'en', { clientActions: ['request_concept_changes'] });
+    expect(approve()).toBeNull();
+    expect(changes()).toBeTruthy();
+  });
+
+  it('a stale Approve over a saved choice of B says "You chose option B", not "approved"', async () => {
+    actions.respondToDeliveryConcept.mockResolvedValue({ kind: 'chosen', letter: 'B', studioNotified: true });
+    renderHero('concept', 'en');
+    fireEvent.click(approve()!);
+    expect(
+      await screen.findByText(messageAt('en', 'delivery.conceptPicker.chosen').replace('{letter}', '\u2068B\u2069')),
+    ).toBeTruthy();
+    expect(actions.recordDeliveryAction).not.toHaveBeenCalled();
+  });
+
+  it('a stale Approve over a saved request for changes confirms the request', async () => {
+    actions.respondToDeliveryConcept.mockResolvedValue({ kind: 'changes_requested', studioNotified: false });
+    renderHero('concept', 'en');
+    fireEvent.click(approve()!);
+    expect(await screen.findByText(messageAt('en', 'delivery.hero.concept.changesTitle'))).toBeTruthy();
+    expect(screen.queryByText(messageAt('en', 'delivery.hero.concept.approvedTitle'))).toBeNull();
+  });
+
+  it('a repeat with nothing live on file says the step moved on and refreshes', async () => {
+    actions.respondToDeliveryConcept.mockResolvedValue({ kind: 'moved_on' });
+    renderHero('concept', 'en');
+    fireEvent.click(changes()!);
+    expect((await screen.findByRole('alert')).textContent).toBe(
+      messageAt('en', 'delivery.conceptPicker.movedOn'),
+    );
+    expect(router.refresh).toHaveBeenCalledTimes(1);
+    expect(screen.queryByText(messageAt('en', 'delivery.hero.concept.changesTitle'))).toBeNull();
   });
 });

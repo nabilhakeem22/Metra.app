@@ -39,9 +39,20 @@ describe('schemaScriptFailureLines', () => {
     ]);
   });
 
+  it('42703 from apply-rls says to migrate first; from migrate it stays generic', () => {
+    const missing = Object.assign(new Error('column "chosen_position" does not exist'), { code: '42703' });
+    expect(schemaScriptFailureLines('apply-rls', missing)).toEqual([
+      'apply-rls failed: SQLSTATE 42703: column "chosen_position" does not exist',
+      'apply-rls failed: a column is missing because db:migrate has not run: run db:migrate, then db:apply-rls again; nothing is broken (this file rolled back; the files before it stay applied).',
+    ]);
+    expect(schemaScriptFailureLines('migrate', missing)[1]).toBe(
+      'Migration failed: tell the lead before running anything else (the whole batch rolled back, nothing was changed).',
+    );
+  });
+
   it('a bare driver error and an error with no code both still print', () => {
-    expect(schemaScriptFailureLines('apply-rls', Object.assign(new Error('x'), { code: '42703' }))[0]).toBe(
-      'apply-rls failed: SQLSTATE 42703: x',
+    expect(schemaScriptFailureLines('apply-rls', Object.assign(new Error('x'), { code: '42P01' }))[0]).toBe(
+      'apply-rls failed: SQLSTATE 42P01: x',
     );
     expect(schemaScriptFailureLines('migrate', new Error('ECONNREFUSED'))).toEqual([
       'Migration failed: SQLSTATE none: ECONNREFUSED',

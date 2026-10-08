@@ -41,8 +41,16 @@ export function HeroCard({
       hero.group === 'concept' &&
       clientActions.includes('approve_concept') &&
       conceptOptions.length >= PICKER_MIN_OPTIONS;
-    if (picksAnOption) return <ConceptOptionPicker token={token} options={conceptOptions} />;
-    return <ActionHero token={token} group={hero.group} />;
+    if (picksAnOption) {
+      return (
+        <ConceptOptionPicker
+          token={token}
+          options={conceptOptions}
+          canRequestChanges={clientActions.includes('request_concept_changes')}
+        />
+      );
+    }
+    return <ActionHero token={token} group={hero.group} clientActions={clientActions} />;
   }
   return (
     <CalmHero

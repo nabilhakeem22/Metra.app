@@ -852,10 +852,11 @@ Expected:
 - Any other code ends `tell the lead before running anything else`.
 
 If `db:apply-rls` is run BEFORE `db:migrate`, it stops at
-`40-delivery-read.sql` with `apply-rls failed: SQLSTATE 42703` (the new
-function reads `chosen_position`, and a `language sql` body is checked against
-the columns when it is created). Nothing is broken: run `db:migrate` and then
-`db:apply-rls` again. Both are re-runnable.
+`40-delivery-read.sql` (the new function reads `chosen_position`, and a
+`language sql` body is checked against the columns when it is created) and
+prints `apply-rls failed: SQLSTATE 42703: column e.chosen_position does not exist`
+then `apply-rls failed: a column is missing because db:migrate has not run: run db:migrate, then db:apply-rls again; nothing is broken (this file rolled back; the files before it stay applied).`
+Do exactly that: both are re-runnable.
 
 **Locks.** `db:migrate` runs 0057 as ONE transaction:
 

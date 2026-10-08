@@ -7,7 +7,7 @@ import { ConceptOptionPicker } from './concept-option-picker';
 // letter they saw sent with the choice, the saved letter in the confirmation,
 // and "the options have changed" plus a refresh when the letter moved.
 
-const actions = vi.hoisted(() => ({ chooseDeliveryConcept: vi.fn(), recordDeliveryAction: vi.fn() }));
+const actions = vi.hoisted(() => ({ chooseDeliveryConcept: vi.fn(), respondToDeliveryConcept: vi.fn() }));
 vi.mock('../actions', () => actions);
 const router = vi.hoisted(() => ({ refresh: vi.fn() }));
 vi.mock('next/navigation', () => ({ useRouter: () => router }));
@@ -25,8 +25,11 @@ function at(locale: TestLocale, path: string, values?: { letter: string }): stri
 }
 const en = (path: string, values?: { letter: string }) => at('en', path, values);
 
-function renderPicker(locale: TestLocale = 'en') {
-  return renderWithIntl(<ConceptOptionPicker token="tok/1" options={OPTIONS} />, { locale });
+function renderPicker(locale: TestLocale = 'en', canRequestChanges = true) {
+  return renderWithIntl(
+    <ConceptOptionPicker token="tok/1" options={OPTIONS} canRequestChanges={canRequestChanges} />,
+    { locale },
+  );
 }
 
 /** The card of one option, by its letter. */
@@ -45,7 +48,7 @@ async function chooseAndConfirm(letter: string) {
 
 beforeEach(() => {
   actions.chooseDeliveryConcept.mockReset();
-  actions.recordDeliveryAction.mockReset();
+  actions.respondToDeliveryConcept.mockReset();
   router.refresh.mockReset();
 });
 
@@ -143,13 +146,35 @@ describe('ConceptOptionPicker', () => {
     expect(router.refresh).not.toHaveBeenCalled();
   });
 
-  it('Request changes stays, through the respond verb', async () => {
-    actions.recordDeliveryAction.mockResolvedValue({ ok: true, studioNotified: false });
+  it('Request changes stays while offered, through the concept respond action', async () => {
+    actions.respondToDeliveryConcept.mockResolvedValue({ kind: 'changes_requested', studioNotified: false });
     renderPicker();
     fireEvent.click(screen.getByRole('button', { name: en('delivery.hero.concept.changes') }));
     await act(async () => {});
-    expect(actions.recordDeliveryAction).toHaveBeenCalledWith('tok/1', 'request_concept_changes', '');
+    expect(actions.respondToDeliveryConcept).toHaveBeenCalledWith('tok/1', 'request_concept_changes', '');
     expect(await screen.findByText(en('delivery.hero.concept.changesBody'))).toBeTruthy();
     expect(actions.chooseDeliveryConcept).not.toHaveBeenCalled();
+  });
+
+  it('a retracted change request holding its slot: Request changes is not offered', () => {
+    renderPicker('en', false);
+    expect(screen.queryByRole('button', { name: en('delivery.hero.concept.changes') })).toBeNull();
+    expect(screen.getAllByRole('button', { name: en('delivery.conceptPicker.choose') })).toHaveLength(3);
+  });
+
+  it('a stale Request changes over a saved choice says the choice, never "changes requested"', async () => {
+    actions.respondToDeliveryConcept.mockResolvedValue({ kind: 'chosen', letter: 'B', studioNotified: true });
+    renderPicker();
+    fireEvent.click(screen.getByRole('button', { name: en('delivery.hero.concept.changes') }));
+    expect(await screen.findByText(en('delivery.conceptPicker.chosen', { letter: 'B' }))).toBeTruthy();
+    expect(screen.queryByText(en('delivery.hero.concept.changesTitle'))).toBeNull();
+  });
+
+  it('a repeat with nothing live on file says the step moved on and refreshes', async () => {
+    actions.respondToDeliveryConcept.mockResolvedValue({ kind: 'moved_on' });
+    renderPicker();
+    fireEvent.click(screen.getByRole('button', { name: en('delivery.hero.concept.changes') }));
+    expect((await screen.findByRole('alert')).textContent).toBe(en('delivery.conceptPicker.movedOn'));
+    expect(router.refresh).toHaveBeenCalledTimes(1);
   });
 });

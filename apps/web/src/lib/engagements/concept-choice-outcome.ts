@@ -20,6 +20,20 @@ export type ConceptChoiceOutcome =
   | { kind: 'moved_on' }
   | { kind: 'error'; error: PortalErrorKey };
 
+/** The two respond verbs of the concept review (app_delivery_respond_by_token). */
+export const CONCEPT_VERBS = ['approve_concept', 'request_concept_changes'] as const;
+export type ConceptVerb = (typeof CONCEPT_VERBS)[number];
+
+export function isConceptVerb(verb: unknown): verb is ConceptVerb {
+  return CONCEPT_VERBS.some((candidate) => candidate === verb);
+}
+
+/** What a FIRST `ok` of each respond verb recorded. */
+export const OUTCOME_OF_CONCEPT_VERB = {
+  approve_concept: 'approved',
+  request_concept_changes: 'changes_requested',
+} as const satisfies Record<ConceptVerb, 'approved' | 'changes_requested'>;
+
 /** The part of the re-read snapshot the outcome is decided from. */
 export type SavedConcept = Pick<PublicDelivery, 'clientActions' | 'conceptChoice' | 'conceptDecision'>;
 

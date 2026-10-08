@@ -1,9 +1,9 @@
 'use server';
 
 import { clientActOfVerb, paymentClaimedAct } from '@/lib/engagements/client-acts/acts';
-import { chooseConceptAndNotify } from '@/lib/engagements/client-acts/choose-concept';
+import { chooseConceptAndNotify, respondToConceptAndNotify } from '@/lib/engagements/client-acts/concept-acts';
 import { withStudioNotified } from '@/lib/engagements/client-acts/notify';
-import type { ConceptChoiceOutcome } from '@/lib/engagements/concept-choice-outcome';
+import { isConceptVerb, type ConceptChoiceOutcome } from '@/lib/engagements/concept-choice-outcome';
 import {
   claimPaymentByToken,
   recordDeliveryActionByToken,
@@ -51,7 +51,7 @@ export async function recordDeliveryAction(
  * CHOOSES one concept option. `position` is the letter the client saw (1 = A);
  * the SDF accepts it only while that option still has that letter, and saves
  * it. The answer names only a SAVED decision: on a repeat it is the decision on
- * file, which may differ from this tap (client-acts/choose-concept.ts). Same
+ * file, which may differ from this tap (client-acts/concept-acts.ts). Same
  * provenance capping as recordDeliveryAction; the raw token is NEVER logged.
  */
 export async function chooseDeliveryConcept(
@@ -69,14 +69,30 @@ export async function chooseDeliveryConcept(
 }
 
 /**
+ * Public (no-session) concept-review verbs (B12): approve the concept or ask for
+ * changes. Like chooseDeliveryConcept, the answer confirms only a SAVED
+ * decision: a repeat reports the decision on file, never the verb just tapped.
+ * Any other verb is refused here (a server action is directly invokable).
+ */
+export async function respondToDeliveryConcept(
+  token: string,
+  verb: string,
+  note?: string,
+): Promise<ConceptChoiceOutcome> {
+  if (!isConceptVerb(verb)) return { kind: 'error', error: 'generic' };
+  return respondToConceptAndNotify(token, {
+    action: verb,
+    note: note?.trim().slice(0, 2000) || null,
+    ...(await requestProvenance()),
+  });
+}
+
+/**
  * Public (no-session) client delivery-portal action (Phase 3): the client "mark as
- * paid" on ONE milestone. Captures the client IP + user agent from the request
- * headers (capped 45/512) for the claim's provenance; the raw token is NEVER logged
- * here — it flows straight to claimPaymentByToken, which hashes it. The claim is a
- * PENDING record: it moves no state and writes no money ledger (the studio confirms
- * it later). The amount is locked server-side to the milestone's remaining due —
- * this action deliberately carries no amount input. A first `ok` notifies the
- * studio's finance roles, naming the milestone the SDF just accepted.
+ * paid" on ONE milestone, with the same provenance capping; the raw token is NEVER
+ * logged. The claim is PENDING: no state move, no money ledger (the studio confirms
+ * it later), and the amount is locked server-side, so no amount input exists. A
+ * first `ok` notifies the finance roles, naming the milestone the SDF accepted.
  */
 export async function markDeliveryPaymentPaid(
   token: string,

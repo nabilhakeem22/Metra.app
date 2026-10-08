@@ -1,5 +1,8 @@
 import { afterAll, describe, expect, it } from 'vitest';
-import { chooseConceptAndNotify } from '@/lib/engagements/client-acts/choose-concept';
+import {
+  chooseConceptAndNotify,
+  respondToConceptAndNotify,
+} from '@/lib/engagements/client-acts/concept-acts';
 import { offlineConceptOptions, chosenConceptOf } from '@/lib/engagements/concept-choice';
 import { getEngagementGatePreview } from '@/lib/engagements/gate-preview';
 import { recordDeliveryActionByToken } from '@/lib/engagements/public';
@@ -11,6 +14,7 @@ import {
   seedArtifact,
   seedRoundBDelivery,
   setVisible,
+  snapshotOf,
   type RoundBDelivery,
 } from './round-b-fixture';
 
@@ -153,5 +157,70 @@ describe('F2: hide, choose, re-release: one letter for the client pick', () => {
     const preview = await getEngagementGatePreview(d.ctx, d.engagementId);
     expect(preview.clientDecision).toMatchObject({ chosenArtifactId: t3, chosenPosition: 2 });
     expect(offlineConceptOptions(artifacts, preview.clientDecision)).toEqual([]);
+  });
+});
+
+/** Concept events on file, oldest first. */
+async function conceptEvents(engagementId: string) {
+  return raw.query<{ kind: string; actor_channel: string }>(
+    `select kind::text as kind, actor_channel from public.engagement_events
+      where engagement_id = '${engagementId}'
+        and kind in ('concept_approval', 'concept_change_request', 'event_correction')
+      order by created_at`,
+  );
+}
+
+describe('the respond verbs confirm only what is SAVED (approve / request changes)', () => {
+  it('a first approve confirms and notifies the approval', async () => {
+    const d = await twoOptions('respond-first');
+    expect(await respondToConceptAndNotify(d.token, { action: 'approve_concept' })).toEqual({
+      kind: 'approved',
+      studioNotified: true,
+    });
+    expect(await bodyKeys(d.orgId)).toEqual(['client_concept_approved']);
+  });
+
+  it('a stale Approve or Request changes after a choice of B is told B; nothing new is written', async () => {
+    const d = await twoOptions('respond-after-choice');
+    await chooseConceptAndNotify(d.token, { artifactId: d.y, position: 2 });
+    for (const action of ['approve_concept', 'request_concept_changes'] as const) {
+      expect(await respondToConceptAndNotify(d.token, { action })).toEqual({
+        kind: 'chosen',
+        letter: 'B',
+        studioNotified: true,
+      });
+    }
+    expect(await conceptEvents(d.engagementId)).toEqual([
+      { kind: 'concept_approval', actor_channel: 'client' },
+    ]);
+    expect(await bodyKeys(d.orgId)).toEqual(['client_concept_chosen']);
+  });
+
+  it('a retracted change request still holding its slot: not offered, and a stale tap says moved on', async () => {
+    const d = await twoOptions('respond-retracted');
+    expect(
+      await recordDeliveryActionByToken(d.token, { action: 'request_concept_changes' }),
+    ).toEqual({ ok: true });
+    const [request] = await raw.query<{ id: string }>(
+      `select id from public.engagement_events
+        where engagement_id = '${d.engagementId}' and kind = 'concept_change_request'`,
+    );
+    await raw.query(
+      `insert into public.engagement_events (org_id, engagement_id, kind, supersedes_event_id)
+       values ('${d.orgId}', '${d.engagementId}', 'event_correction', '${request.id}')`,
+    );
+    // The portal now offers approve only: the retracted row holds the slot.
+    expect((await snapshotOf(d.hash))!.client_actions).toEqual(['approve_concept']);
+    expect((await snapshotOf(d.hash))!.concept_decision).toBeNull();
+
+    expect(await respondToConceptAndNotify(d.token, { action: 'request_concept_changes' })).toEqual({
+      kind: 'moved_on',
+    });
+    // Nothing saved by the tap, nobody notified.
+    expect(await conceptEvents(d.engagementId)).toEqual([
+      { kind: 'concept_change_request', actor_channel: 'client' },
+      { kind: 'event_correction', actor_channel: 'staff' },
+    ]);
+    expect(await bodyKeys(d.orgId)).toEqual([]);
   });
 });

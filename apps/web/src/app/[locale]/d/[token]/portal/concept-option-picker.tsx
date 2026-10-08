@@ -1,7 +1,6 @@
 'use client';
 
-import { Eye } from 'lucide-react';
-import { useLocale, useTranslations } from 'next-intl';
+import { useTranslations } from 'next-intl';
 import { useRouter } from 'next/navigation';
 import { useState, useTransition } from 'react';
 import { Button } from '@/components/ui/button';
@@ -9,14 +8,14 @@ import { useConfirm } from '@/components/ui/confirm-dialog';
 import { Textarea } from '@/components/ui/textarea';
 import type { PublicDelivery } from '@/lib/engagements/public/types';
 import { bidiIsolate } from '@/lib/format/bidi';
-import { chooseDeliveryConcept, recordDeliveryAction } from '../actions';
+import { chooseDeliveryConcept, respondToDeliveryConcept } from '../actions';
 import {
-  answerOfChangeRequest,
-  answerOfChoice,
-  type PickerAnswer,
-  type PickerConfirmed,
-  type PickerError,
-} from './concept-picker-answer';
+  answerOfConceptOutcome,
+  type HeroAnswer,
+  type HeroConfirmedState,
+  type HeroError,
+} from './hero-answer';
+import { ConceptOptionCard } from './concept-option-card';
 import { HeroConfirmed } from './hero-confirmed';
 
 type ConceptOption = PublicDelivery['conceptOptions'][number];
@@ -27,22 +26,30 @@ type ConceptOption = PublicDelivery['conceptOptions'][number];
  * option", which asks first (Cancel calls nothing). The letter the client saw is
  * sent and saved; the answer names only a SAVED decision (a repeat shows the one
  * on file), and changed options or a closed review refresh the page with a
- * message (./concept-picker-answer.ts). "Request changes" stays.
+ * message (./hero-answer.ts). "Request changes" stays while it is offered.
  */
-export function ConceptOptionPicker({ token, options }: { token: string; options: ConceptOption[] }) {
+export function ConceptOptionPicker({
+  token,
+  options,
+  canRequestChanges,
+}: {
+  token: string;
+  options: ConceptOption[];
+  /** `request_concept_changes` is among the client actions on offer. */
+  canRequestChanges: boolean;
+}) {
   const t = useTranslations('delivery.conceptPicker');
   const tHero = useTranslations('delivery.hero');
   const tGroup = useTranslations('delivery.hero.concept');
   const tActions = useTranslations('delivery.actions');
-  const locale = useLocale();
   const router = useRouter();
   const { confirm, dialog } = useConfirm();
   const [pending, startTransition] = useTransition();
   const [note, setNote] = useState('');
-  const [confirmed, setConfirmed] = useState<PickerConfirmed | null>(null);
-  const [error, setError] = useState<PickerError | null>(null);
+  const [confirmed, setConfirmed] = useState<HeroConfirmedState | null>(null);
+  const [error, setError] = useState<HeroError | null>(null);
 
-  function run(act: () => Promise<PickerAnswer>) {
+  function run(act: () => Promise<HeroAnswer>) {
     setError(null);
     startTransition(async () => {
       try {
@@ -65,7 +72,7 @@ export function ConceptOptionPicker({ token, options }: { token: string; options
       cancelLabel: t('cancel'),
     });
     if (!accepted) return;
-    run(async () => answerOfChoice(await chooseDeliveryConcept(token, option.id, option.position, note)));
+    run(async () => answerOfConceptOutcome(await chooseDeliveryConcept(token, option.id, option.position, note)));
   }
 
   if (confirmed) {
@@ -89,34 +96,13 @@ export function ConceptOptionPicker({ token, options }: { token: string; options
       <p className="text-body text-muted-foreground">{t('body')}</p>
       <ul className="space-y-2">
         {options.map((option) => (
-          <li
+          <ConceptOptionCard
             key={option.id}
-            data-concept-option={option.letter}
-            className="flex flex-wrap items-center gap-2 rounded-item border p-3"
-          >
-            <span id={`concept-option-${option.id}`} className="text-body font-semibold">
-              {t('option', { letter: bidiIsolate(option.letter) })}
-            </span>
-            <a
-              href={`/${locale}/d/${encodeURIComponent(token)}/documents/${option.id}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-describedby={`concept-option-${option.id}`}
-              className="ms-auto inline-flex items-center gap-1.5 rounded-pill border px-3 py-1.5 text-caption font-semibold hover:bg-muted coarse:min-h-11"
-            >
-              <Eye className="size-3.5" aria-hidden />
-              {t('view')}
-            </a>
-            <Button
-              variant="default"
-              size="sm"
-              disabled={pending}
-              aria-describedby={`concept-option-${option.id}`}
-              onClick={() => void choose(option)}
-            >
-              {t('choose')}
-            </Button>
-          </li>
+            token={token}
+            option={option}
+            pending={pending}
+            onChoose={() => void choose(option)}
+          />
         ))}
       </ul>
       <Textarea
@@ -127,16 +113,20 @@ export function ConceptOptionPicker({ token, options }: { token: string; options
         dir="auto"
         placeholder={tActions('notePlaceholder')}
       />
-      <Button
-        variant="ghost"
-        className="w-full"
-        disabled={pending}
-        onClick={() =>
-          run(async () => answerOfChangeRequest(await recordDeliveryAction(token, 'request_concept_changes', note)))
-        }
-      >
-        {tGroup('changes')}
-      </Button>
+      {canRequestChanges && (
+        <Button
+          variant="ghost"
+          className="w-full"
+          disabled={pending}
+          onClick={() =>
+            run(async () =>
+              answerOfConceptOutcome(await respondToDeliveryConcept(token, 'request_concept_changes', note)),
+            )
+          }
+        >
+          {tGroup('changes')}
+        </Button>
+      )}
       {error && (
         <p className="text-body text-destructive" role="alert">
           {error === 'changed' || error === 'movedOn' ? t(error) : tActions(`error.${error}`)}

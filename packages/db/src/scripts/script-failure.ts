@@ -32,6 +32,11 @@ function hintFor(script: SchemaScript, code: string | undefined): string {
   if (code === '55P03' || code === '40P01') {
     return `lock wait or deadlock, safe to re-run at a quieter moment (${ROLLED_BACK[script]}).`;
   }
+  // apply-rls before migrate: a function body names a column the migration has
+  // not added yet. The docs/DEPLOY.md runbook gives the same instruction.
+  if (code === '42703' && script === 'apply-rls') {
+    return `a column is missing because db:migrate has not run: run db:migrate, then db:apply-rls again; nothing is broken (${ROLLED_BACK[script]}).`;
+  }
   return `tell the lead before running anything else (${ROLLED_BACK[script]}).`;
 }
 

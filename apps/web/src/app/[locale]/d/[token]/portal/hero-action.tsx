@@ -2,12 +2,20 @@
 
 import { Loader2 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
+import { useRouter } from 'next/navigation';
 import { useState, useTransition } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { portalErrorKey, type PortalErrorKey } from '@/lib/engagements/portal-error-key';
+import { isConceptVerb } from '@/lib/engagements/concept-choice-outcome';
 import type { HeroGroup } from '@/lib/engagements/portal-hero';
-import { recordDeliveryAction } from '../actions';
+import { recordDeliveryAction, respondToDeliveryConcept } from '../actions';
+import {
+  answerOfConceptOutcome,
+  answerOfSignal,
+  type HeroAnswer,
+  type HeroConfirmedState,
+  type HeroError,
+} from './hero-answer';
 import { HeroConfirmed, type HeroOutcome } from './hero-confirmed';
 
 interface HeroButton {
@@ -40,30 +48,47 @@ const GROUP_BUTTONS: Record<HeroGroup, HeroButton[]> = {
 
 /**
  * The actionable hero: the plain-language CTA for its group, a note field, and
- * the existing `recordDeliveryAction`. One primary button, never a menu.
+ * one button per verb the client is actually OFFERED (`clientActions`). One
+ * primary button, never a menu. A concept verb answers from the decision SAVED
+ * on file (a repeat shows that one, B12); a design or handover verb confirms
+ * the tapped verb.
  */
-export function ActionHero({ token, group }: { token: string; group: HeroGroup }) {
+export function ActionHero({
+  token,
+  group,
+  clientActions,
+}: {
+  token: string;
+  group: HeroGroup;
+  clientActions: readonly string[];
+}) {
   const tHero = useTranslations('delivery.hero');
   const tGroup = useTranslations(`delivery.hero.${group}`);
   const tActions = useTranslations('delivery.actions');
+  const tPicker = useTranslations('delivery.conceptPicker');
+  const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [note, setNote] = useState('');
-  const [confirmed, setConfirmed] = useState<{
-    outcome: HeroOutcome;
-    studioNotified: boolean;
-  } | null>(null);
-  const [error, setError] = useState<PortalErrorKey | null>(null);
-  const buttons = GROUP_BUTTONS[group];
+  const [confirmed, setConfirmed] = useState<HeroConfirmedState | null>(null);
+  const [error, setError] = useState<HeroError | null>(null);
+  const buttons = GROUP_BUTTONS[group].filter((button) => clientActions.includes(button.verb));
+
+  async function answerOf(verb: string, outcome: HeroOutcome): Promise<HeroAnswer> {
+    if (isConceptVerb(verb)) {
+      return answerOfConceptOutcome(await respondToDeliveryConcept(token, verb, note));
+    }
+    return answerOfSignal(await recordDeliveryAction(token, verb, note), outcome);
+  }
 
   function submit(verb: string, outcome: HeroOutcome) {
     setError(null);
     startTransition(async () => {
       // Wrap the await so a rejected action can never leave the spinner stuck.
       try {
-        const result = await recordDeliveryAction(token, verb, note);
-        // `already` resolves ok:true (idempotent) — treat as a confirmed signal.
-        if (result.ok) setConfirmed({ outcome, studioNotified: result.studioNotified === true });
-        else setError(portalErrorKey(result.error));
+        const answer = await answerOf(verb, outcome);
+        if ('confirmed' in answer) return setConfirmed(answer.confirmed);
+        setError(answer.error);
+        if (answer.refresh) router.refresh();
       } catch {
         setError('generic');
       }
@@ -76,6 +101,7 @@ export function ActionHero({ token, group }: { token: string; group: HeroGroup }
         group={group}
         outcome={confirmed.outcome}
         studioNotified={confirmed.studioNotified}
+        chosenLetter={confirmed.chosenLetter}
       />
     );
   }
@@ -113,7 +139,7 @@ export function ActionHero({ token, group }: { token: string; group: HeroGroup }
       </div>
       {error && (
         <p className="text-body text-destructive" role="alert">
-          {tActions(`error.${error}`)}
+          {error === 'changed' || error === 'movedOn' ? tPicker(error) : tActions(`error.${error}`)}
         </p>
       )}
     </section>

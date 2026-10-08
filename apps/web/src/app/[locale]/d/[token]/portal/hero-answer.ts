@@ -1,26 +1,30 @@
-// What the concept picker shows after an action answered. PURE (no React, no
-// server code): the picker renders it, a unit test pins it.
+// What an actionable hero shows after a client action answered. PURE (no React,
+// no server code): the concept picker and the plain action hero render it, a
+// unit test pins it.
 import type { ConceptChoiceOutcome } from '@/lib/engagements/concept-choice-outcome';
 import { portalErrorKey, type PortalErrorKey } from '@/lib/engagements/portal-error-key';
 import type { DeliveryActResult } from '../actions';
 import type { HeroOutcome } from './hero-confirmed';
 
 /** The confirmation card: what was recorded, and the SAVED letter when there is one. */
-export interface PickerConfirmed {
+export interface HeroConfirmedState {
   outcome: HeroOutcome;
   studioNotified: boolean;
   chosenLetter?: string;
 }
 
 /** A portal error, `changed` (the letters moved) or `movedOn` (the review closed). */
-export type PickerError = PortalErrorKey | 'changed' | 'movedOn';
+export type HeroError = PortalErrorKey | 'changed' | 'movedOn';
 
-export type PickerAnswer =
-  | { confirmed: PickerConfirmed }
-  | { error: PickerError; refresh: boolean };
+export type HeroAnswer =
+  | { confirmed: HeroConfirmedState }
+  | { error: HeroError; refresh: boolean };
 
-/** The answer to "Choose this option": only a SAVED letter is ever named. */
-export function answerOfChoice(outcome: ConceptChoiceOutcome): PickerAnswer {
+/**
+ * The answer to a concept-review action (choose, approve, request changes): it
+ * confirms only a decision that is SAVED, so a repeat shows the one on file.
+ */
+export function answerOfConceptOutcome(outcome: ConceptChoiceOutcome): HeroAnswer {
   switch (outcome.kind) {
     case 'chosen':
       return {
@@ -39,9 +43,9 @@ export function answerOfChoice(outcome: ConceptChoiceOutcome): PickerAnswer {
   }
 }
 
-/** The answer to "Request changes" (the respond verb), as the plain hero gives it. */
-export function answerOfChangeRequest(result: DeliveryActResult): PickerAnswer {
+/** The answer to a design or handover action: the tapped verb, as recorded. */
+export function answerOfSignal(result: DeliveryActResult, outcome: HeroOutcome): HeroAnswer {
   return result.ok
-    ? { confirmed: { outcome: 'changes', studioNotified: result.studioNotified === true } }
+    ? { confirmed: { outcome, studioNotified: result.studioNotified === true } }
     : { error: portalErrorKey(result.error), refresh: false };
 }
