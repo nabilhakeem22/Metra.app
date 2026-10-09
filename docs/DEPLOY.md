@@ -244,6 +244,33 @@ Nothing in Round C waits for this; do it whenever ready.
 There is no code change and no PR: `wrangler secret put` itself rolls out a new
 Worker version. The next digest or follow-up email then reaches every recipient.
 
+## Owner task: limit the types the `metra-files` bucket stores (Round C, S2)
+
+Storage keeps whatever Content-Type the uploading browser declares, and the
+bucket has no allow-list today, so a file named `render.pdf` can be stored as
+`image/svg+xml` or `text/html`. The app already never OPENS such a file for a
+client: the client page opens a document in the browser only when it is a
+pdf/png/jpg/jpeg stored as exactly that type, and saves everything else as an
+attachment (`apps/web/src/lib/files/inline-view.ts`); while money is
+outstanding the client gets a downscaled image streamed by the app, never a
+storage link. The bucket setting is the second wall, and it is a dashboard
+change, not code:
+
+1. Supabase dashboard, Storage, `metra-files`, Edit bucket.
+2. Allowed MIME types: `application/pdf`, `image/png`, `image/jpeg`,
+   `image/webp`, `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`,
+   `text/csv`, `application/acad`, `image/vnd.dwg`, `image/x-dwg`,
+   `application/dxf`, `image/vnd.dxf`, `application/octet-stream` (browsers
+   send that last one for most DWG/DXF files; it is never rendered as a page).
+   Leave out every `svg`, `html`, `xhtml` and `xml` type.
+3. Save, then upload one file of each kind the studio uses (a PDF, a PNG, a
+   DWG, an XLSX, a logo) from the app. If a DWG is refused, note the type the
+   browser sent (devtools, the upload request) and add it.
+
+Signed links a paid client opens live 300 seconds, so after a link is replaced
+or revoked a document URL minted just before still works for up to five
+minutes (accepted, Round C S4).
+
 ## The cron Worker is a separate deployment
 
 `workers/cron` is **not** an npm workspace and is **not** deployed by

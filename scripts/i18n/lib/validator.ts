@@ -3,6 +3,7 @@
  * both `validate.ts` (the gate) and `apply.ts` (the promote step). No process
  * exit, no argument parsing here — callers own those.
  */
+import { egyptianMarkersIn } from './egyptian-markers';
 import { flatten } from './flatten';
 import {
   collectArgumentNames,
@@ -12,6 +13,7 @@ import {
   parseMessage,
 } from './icu';
 import { EN_PATH, readCatalog } from './paths';
+import { loadPolicy, registerFor } from './registers';
 
 export type Finding = { key: string; detail: string };
 
@@ -70,6 +72,7 @@ export function validate(targetPath: string, strict: boolean): Report {
   const en = flatten(readCatalog(EN_PATH));
   const ar = flatten(readCatalog(targetPath));
 
+  const registers = loadPolicy();
   const enKeys = Object.keys(en);
   const arKeySet = new Set(Object.keys(ar));
   const enKeySet = new Set(enKeys);
@@ -131,6 +134,17 @@ export function validate(targetPath: string, strict: boolean): Report {
         key,
         detail: `ar value contains — or –: "${arValue}"`,
       });
+    }
+
+    // 4b. Register: a فصحى (client-facing) key may not carry an Egyptian word.
+    if (registerFor(key, registers) === 'msa') {
+      const markers = egyptianMarkersIn(arValue);
+      if (markers.length) {
+        addFinding(report.fatal, 'egyptian word in msa key', {
+          key,
+          detail: `${markers.join(', ')} in "${arValue}"`,
+        });
+      }
     }
 
     // 5. ICU parse of both sides.

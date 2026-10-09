@@ -5,12 +5,8 @@ import { useState, useTransition, type ChangeEvent } from 'react';
 import { toast } from '@/hooks/use-toast';
 import { resolveActionError } from '@/lib/actions/error-message';
 import type { ActionCode } from '@/lib/actions/result';
-import {
-  createLogoUpload,
-  setOrgLogo,
-  updateOrgProfile,
-  updateOrgSettings,
-} from '@/lib/org/actions';
+import { updateOrgProfile, updateOrgSettings } from '@/lib/org/actions';
+import { createLogoUpload, setOrgLogo } from '@/lib/org/logo-actions';
 import { SettingsProfileCard } from './settings-profile-card';
 import { SettingsVisibilityCard } from './settings-visibility-card';
 
@@ -83,23 +79,17 @@ export function SettingsClient({
     setLogoPreview(URL.createObjectURL(file));
     startUpload(async () => {
       try {
-        const signed = await createLogoUpload({
-          contentType: file.type,
-          originalName: file.name,
-        });
-        // Manage-gated server-side; the inner catch surfaces the generic toast.
+        const signed = await createLogoUpload({ contentType: file.type, originalName: file.name, size: file.size });
+        // Manage-, type- and size-gated server-side; the catch surfaces the generic toast.
         if ('ok' in signed) throw new Error('logo_forbidden');
         const put = await fetch(signed.signedUrl, {
           method: 'PUT',
           headers: { 'content-type': file.type, 'x-upsert': 'true' },
           body: file,
         });
-        if (put.ok) {
-          await setOrgLogo(signed.fileId);
-          toast({ title: t('logoUpdated') });
-        } else {
-          toast({ title: t('errorGeneric'), variant: 'destructive' });
-        }
+        // Attached only once Storage's copy passes the same rule (setOrgLogo).
+        const attached = put.ok && (await setOrgLogo(signed.fileId)).ok;
+        toast(attached ? { title: t('logoUpdated') } : { title: t('errorGeneric'), variant: 'destructive' });
       } catch {
         toast({ title: t('errorGeneric'), variant: 'destructive' });
       }

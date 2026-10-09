@@ -9,8 +9,7 @@
     "tagline": "Project and cost control for interior-design studios",
     "intro": "Every pound of a project's value, traceable from the line you quoted to the line you invoiced.",
     "getStarted": "Get started",
-    "signIn": "Sign in",
-    "localeName": "English"
+    "signIn": "Sign in"
   },
   "landing": {
     "seo": {
@@ -173,41 +172,20 @@
     "channelLabel": "How should we send your code?"
   },
   "onboarding": {
-    "stepOf": "Step {current} of {total}",
-    "step1Title": "Company profile",
-    "step2Title": "Firm type",
-    "step3Title": "Confirm defaults",
-    "step4Title": "Invite your team",
+    "formTitle": "Company profile",
     "hint": "You will be the owner. At least one name is required.",
     "nameEnLabel": "Firm name (English)",
     "nameArLabel": "Firm name (Arabic)",
     "cityLabel": "City (optional)",
-    "taxLabel": "Tax registration number (optional)",
     "logoLabel": "Company logo (optional)",
     "logoChoose": "Choose image",
     "logoRemove": "Remove",
-    "firmTypeHint": "Choose what your firm does. You can enable more later.",
-    "firmTypeInterior": "Interior fit-out",
-    "firmTypeInteriorDesc": "Quotes, contracts and مستخلص invoicing for interior fit-out projects.",
-    "firmTypeConstruction": "Construction",
-    "firmTypeConstructionDesc": "General contracting and site works.",
-    "firmTypeBoth": "Interior + construction",
-    "firmTypeBothDesc": "Both verticals in a single workspace.",
-    "firmTypeComingSoon": "Coming soon",
-    "next": "Next",
-    "back": "Back",
-    "finish": "Finish",
+    "create": "Create my studio",
     "creating": "Creating…",
     "createdTitle": "Firm created",
     "logoUploadFailed": "Logo upload failed, but your firm was created.",
     "errorRequired": "Enter at least one company name.",
-    "confirmHint": "You can change these later in settings.",
-    "confirmLanguage": "Language",
-    "confirmCurrency": "Currency",
-    "currencyEgp": "Egyptian Pound (EGP)",
-    "inviteHint": "Invite teammates to collaborate. You can do this now or later.",
-    "inviteComingSoon": "Team invites arrive next. Skip for now.",
-    "valueProp": "From the first quote to the final invoice, every line accounted for.",
+    "tooLong": "Keep it to {max} characters or fewer.",
     "title": "Get started",
     "subtitle": "A few steps to set up your firm.",
     "dismiss": "Dismiss",
@@ -220,9 +198,8 @@
       "completeProfile": "Complete your company profile",
       "addClient": "Add your first client",
       "addProject": "Create your first project",
-      "addCostItem": "Add a price-book item",
-      "buildProposal": "Build a proposal",
-      "sendProposal": "Send a proposal"
+      "startDelivery": "Start your first delivery",
+      "shareDelivery": "Share the delivery with your client"
     }
   },
   "dashboard": {
@@ -233,6 +210,7 @@
     "ctaAddClient": "Add a client",
     "ctaAddProject": "Add a project",
     "ctaStartDelivery": "Start delivery",
+    "ctaShareDelivery": "Share with your client",
     "ctaInviteTeam": "Invite your team",
     "ctaManageTeam": "Manage your team",
     "cards": {
@@ -1424,13 +1402,9 @@
       "title": "Create projects",
       "body": "Group your fit-out jobs under a client. Proposals are built per project."
     },
-    "priceBook": {
-      "title": "Build your price book",
-      "body": "Your catalogue of cost items with costs and prices, reused across proposals."
-    },
-    "proposals": {
-      "title": "Send proposals",
-      "body": "Assemble a sectioned quotation, then send a share link your client can accept."
+    "deliveries": {
+      "title": "Start a delivery here",
+      "body": "A delivery follows one design project from the fee to the handover, and your client follows it on their own page."
     }
   },
   "help": {
@@ -2294,14 +2268,87 @@
       "title": "We could not load this page",
       "body": "Something went wrong on our side. Please refresh in a moment; your link is still valid."
     },
+    "meta": {
+      "description": "Your design project with {firm}: where it stands, your payments and your files."
+    },
     "greeting": "Hello, {name} 👋",
-    "firmSubtitle": "Your design project",
+    "loading": "Loading your project…",
+    "language": {
+      "switchTo": "العربية"
+    },
+    "stage": {
+      "gettingStarted": {
+        "label": "Getting started",
+        "note": "Your design team is setting up your project."
+      },
+      "proposalReady": {
+        "label": "Proposal ready for you",
+        "note": "Your design proposal is ready. Your team will walk you through the next step."
+      },
+      "measuring": {
+        "label": "Measuring your space",
+        "note": "We are capturing accurate measurements of your space."
+      },
+      "spacePlanning": {
+        "label": "Working on the layout",
+        "note": "We are shaping the layout of your space."
+      },
+      "conceptReview": {
+        "label": "Concept ready for your review",
+        "note": "A first design concept is ready for you to look over."
+      },
+      "refiningConcept": {
+        "label": "Refining the concept with you",
+        "note": "We are refining the concept based on your feedback."
+      },
+      "visuals": {
+        "label": "Preparing your 3D visuals",
+        "note": "We are preparing 3D visuals so you can picture the result."
+      },
+      "finalApproval": {
+        "label": "Final design ready for approval",
+        "note": "The final design is ready for your approval."
+      },
+      "reviewingChanges": {
+        "label": "Reviewing as-built changes",
+        "note": "We are reviewing changes found on site."
+      },
+      "drawings": {
+        "label": "Preparing production drawings",
+        "note": "We are preparing the detailed drawings for construction."
+      },
+      "quantities": {
+        "label": "Preparing the bill of quantities",
+        "note": "We are preparing the detailed scope of works."
+      },
+      "nextSteps": {
+        "label": "Planning the next steps",
+        "note": "We are planning how your project moves forward."
+      },
+      "handover": {
+        "label": "Preparing your design handover",
+        "note": "Your design package is being prepared for handover."
+      },
+      "delivered": {
+        "label": "Design delivered",
+        "note": "Your design has been delivered. Thank you for working with us."
+      },
+      "construction": {
+        "label": "In construction",
+        "note": "Your project is under construction."
+      },
+      "closed": {
+        "label": "Closed",
+        "note": "This project is closed."
+      }
+    },
     "journey": {
       "eyebrow": "Your journey",
       "proposal": "Proposal",
       "survey": "Survey",
       "concept": "Concept",
-      "threeD": "3D visuals",
+      "design": "Design",
+      "documents": "Drawings and quantities",
       "handover": "Handover"
     },
     "hero": {
@@ -2309,11 +2356,21 @@
       "inProgressTag": "In progress",
       "deliveredTag": "Delivered",
       "reassurance": "Nothing to do right now. Check this page for updates from your designer.",
+      "answered": {
+        "responded": "Your response is recorded",
+        "conceptApproved": "You approved the concept",
+        "conceptChanges": "You asked for changes to the concept",
+        "handoverReceived": "We have received your confirmation",
+        "body": "Your designer is preparing the next step.",
+        "handoverBody": "Your designer will close the project shortly. Your files stay available on this page."
+      },
       "concept": {
         "headline": "Your concept design is ready",
         "body": "Your designer shared the first layout and look for your space. Take a look and let them know what you think.",
         "approve": "Review & approve",
         "changes": "Request changes instead",
+        "confirmTitle": "Approve the concept?",
+        "confirmBody": "Your designer will start the next stage based on this concept.",
         "approvedTitle": "Concept approved 🎉",
         "approvedBody": "Your approval is recorded. Your designer will see it and start your 3D visuals.",
         "approvedBodyNotified": "Your approval is recorded and your designer has been notified. They will start your 3D visuals.",
@@ -2326,9 +2383,11 @@
         "body": "Everything's refined and ready. Approve to receive your full design package.",
         "approve": "Approve final design",
         "changes": "Request changes instead",
+        "confirmTitle": "Approve the final design?",
+        "confirmBody": "Your designer will prepare the drawings for execution based on this design.",
         "approvedTitle": "Design approved 🎉",
-        "approvedBody": "Your approval is recorded. Your designer will see it and prepare your design handover.",
-        "approvedBodyNotified": "Your approval is recorded and your designer has been notified. They will prepare your design handover.",
+        "approvedBody": "Your approval is recorded. Your designer will see it and prepare the drawings for execution.",
+        "approvedBodyNotified": "Your approval is recorded and your designer has been notified. They will prepare the drawings for execution.",
         "changesTitle": "Changes requested",
         "changesBody": "Your request is recorded. Your designer will see it and refine the design with you.",
         "changesBodyNotified": "Your request is recorded and your designer has been notified. They will refine the design with you."
@@ -2337,9 +2396,11 @@
         "headline": "Your design package is ready",
         "body": "Confirm you've received your design package and we'll wrap things up.",
         "acknowledge": "Confirm handover",
+        "confirmTitle": "Confirm you received the design package?",
+        "confirmBody": "Your designer will then close the design project. Your files stay available on this page.",
         "acknowledgedTitle": "Handover confirmed 🎉",
-        "acknowledgedBody": "Thank you. Your designer will now close the design project.",
-        "acknowledgedBodyNotified": "Thank you. Your designer has been notified and will now close the design project."
+        "acknowledgedBody": "Thank you, we have received your confirmation. Your designer will close the project shortly.",
+        "acknowledgedBodyNotified": "Thank you, we have received your confirmation and your designer has been notified. They will close the project shortly."
       }
     },
     "conceptPicker": {
@@ -2368,7 +2429,8 @@
       "note": "An early estimate of the cost of executing your design. The final price is set in the bill of quantities.",
       "acknowledge": "I acknowledge this budget",
       "acknowledged": "Acknowledged. Your design team can see your confirmation.",
-      "acknowledgedNotified": "Acknowledged. Your design team has been notified."
+      "acknowledgedNotified": "Acknowledged. Your design team has been notified.",
+      "acknowledgedNote": "You have seen this range."
     },
     "payments": {
       "title": "Payments",
@@ -2376,6 +2438,9 @@
       "paidOf": "{paid} paid of {total}",
       "nextPayment": "Next payment · {milestone}, remaining",
       "claim": "I've made this payment",
+      "confirmTitle": "Did you make this payment?",
+      "confirmBody": "{milestone}: {amount}. Your designer confirms it once it arrives.",
+      "changed": "This payment changed before it was sent, so nothing was sent. The page now shows where it stands.",
       "awaitingConfirmation": "Waiting for your design team to confirm",
       "claimNotified": "Your design team has been notified.",
       "settledTitle": "All payments settled",
@@ -2402,6 +2467,9 @@
     },
     "actions": {
       "notePlaceholder": "Add a note (optional)",
+      "changesNeedNote": "Tell your designer what to change.",
+      "confirm": "Confirm",
+      "cancel": "Cancel",
       "error": {
         "token_invalid": "This link is no longer available. Please contact your design team.",
         "token_expired": "This link has expired. Please contact your design team.",

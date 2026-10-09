@@ -5,7 +5,8 @@
  *
  * Validates a target Arabic catalog against the English source of truth:
  *   FATAL   parity mismatch, placeholder/tag mismatch, ICU parse failure,
- *           Arabic-Indic digits, empty value.
+ *           Arabic-Indic digits, empty value, an em/en dash, and an Egyptian
+ *           word in a فصحى (client-facing) key (lib/egyptian-markers.ts).
  *   WARNING plural incompleteness (missing CLDR categories) — becomes FATAL
  *           under --strict.
  *

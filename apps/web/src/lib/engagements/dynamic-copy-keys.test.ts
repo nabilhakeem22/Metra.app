@@ -3,7 +3,9 @@ import en from '@/messages/en.json';
 import ar from '@/messages/ar-EG.json';
 import { CLIENT_REVIEW_KINDS } from './client-review';
 import { ENDING_TRIGGERS } from './forward-trigger';
+import { JOURNEY_MILESTONES } from './journey-map';
 import { OFFLINE_APPROVAL_CHANNELS } from './offline-approval';
+import { PORTAL_STAGE_KEYS } from './portal-stage';
 import { TERMINAL_STATES } from './states';
 import type { DeliveryStatusKind } from './delivery-status';
 
@@ -67,5 +69,14 @@ describe('dynamic engagement copy keys exist in both catalogs', () => {
 
   it.each([...OFFLINE_APPROVAL_CHANNELS])('offline approval channel %s', (channel) => {
     expectInBothCatalogs(`engagements.offlineApproval.channel.${channel}`);
+  });
+
+  it.each([...PORTAL_STAGE_KEYS])('client stage %s: a label and a note', (stageKey) => {
+    expectInBothCatalogs(`delivery.stage.${stageKey}.label`);
+    expectInBothCatalogs(`delivery.stage.${stageKey}.note`);
+  });
+
+  it.each([...JOURNEY_MILESTONES])('client journey milestone %s', (milestone) => {
+    expectInBothCatalogs(`delivery.journey.${milestone}`);
   });
 });

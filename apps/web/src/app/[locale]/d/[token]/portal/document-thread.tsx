@@ -1,9 +1,11 @@
 'use client';
 
 import { Loader2, MessageSquare, Send } from 'lucide-react';
-import { useCallback, useState } from 'react';
 import { useTranslations } from 'next-intl';
+import { useRouter } from 'next/navigation';
+import { useCallback, useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { portalCommentErrorKey } from '@/lib/engagements/portal-error-key';
 import type { PublicDocumentComment } from '@/lib/engagements/public-comments';
 import { useDocumentThread } from '@/lib/engagements/use-document-thread';
 import { addDeliveryComment, loadDeliveryDocumentComments } from '../actions';
@@ -26,7 +28,8 @@ const BODY_MAX = 2000;
  * that is in fact waiting on them.
  *
  * The messages render in DocumentThreadMessages. After a send, the thread says
- * the team has been notified only when the portal action says it was. Logical
+ * the team has been notified only when the portal action says it was, and the
+ * page re-reads itself from the server. Logical
  * CSS only, so it mirrors correctly in RTL.
  */
 export function DocumentThread({
@@ -39,6 +42,7 @@ export function DocumentThread({
   initialCount: number;
 }) {
   const t = useTranslations('delivery.comments');
+  const router = useRouter();
   // Did the LAST message sent from here reach the studio? Only then may the
   // thread say the team has been notified.
   const [studioNotified, setStudioNotified] = useState(false);
@@ -52,9 +56,11 @@ export function DocumentThread({
       setStudioNotified(false);
       const result = await addDeliveryComment(token, documentId, body);
       setStudioNotified(result.studioNotified === true);
+      // The page's message counts and anything the studio changed meanwhile.
+      if (result.ok) router.refresh();
       return result;
     },
-    [token, documentId],
+    [token, documentId, router],
   );
   const thread = useDocumentThread<PublicDocumentComment>({ load, send: submit });
 
@@ -124,7 +130,7 @@ export function DocumentThread({
             )}
             {thread.error && (
               <p className="text-caption text-destructive" role="alert">
-                {t(`error.${thread.error}`)}
+                {t(`error.${portalCommentErrorKey(thread.error)}`)}
               </p>
             )}
           </div>

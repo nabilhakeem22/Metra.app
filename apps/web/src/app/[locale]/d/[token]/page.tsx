@@ -1,10 +1,24 @@
 import type { Metadata } from 'next';
+import { getTranslations } from 'next-intl/server';
+import { cache } from 'react';
 import { getDeliveryByToken } from '@/lib/engagements/public';
-import { PRIVATE_METADATA } from '@/lib/seo/private-metadata';
+import { deliveryMetadata, type DeliveryTranslator } from './delivery-metadata';
 import { PublicDeliveryView } from './public-delivery';
 
-// Durable client share link — private to the recipient. Never index it.
-export const metadata: Metadata = PRIVATE_METADATA;
+/** One read of the delivery per request, shared by the metadata and the page. */
+const readDelivery = cache(getDeliveryByToken);
+
+// Durable client share link — private to the recipient. Never indexed, and titled
+// in the client's own words (./delivery-metadata.ts).
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string; token: string }>;
+}): Promise<Metadata> {
+  const { locale, token } = await params;
+  const t = await getTranslations({ locale, namespace: 'delivery' });
+  return deliveryMetadata(await readDelivery(token), locale, t as unknown as DeliveryTranslator);
+}
 
 // Public client delivery portal: NO session, NO (app) shell/nav, never redirects
 // to /login. Lives outside the (app) group so the auth layout never runs. The
@@ -23,7 +37,7 @@ export default async function PublicDeliveryPage({
   // one flag, no detail, so the notice can never tell the client (or a prober)
   // WHICH failure occurred.
   const { document } = await searchParams;
-  const read = await getDeliveryByToken(token);
+  const read = await readDelivery(token);
   return (
     <PublicDeliveryView
       token={token}

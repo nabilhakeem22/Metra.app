@@ -1,22 +1,18 @@
 import { describe, expect, it } from 'vitest';
+import ar from '@/messages/ar-EG.json';
+import en from '@/messages/en.json';
 import { JOURNEY_MILESTONES, stateMilestone } from './journey-map';
 import { DESIGN_STATES, type DesignState } from './states';
 
 describe('JOURNEY_MILESTONES', () => {
-  it('has the five client-facing milestones in order', () => {
-    expect(JOURNEY_MILESTONES.map((m) => m.key)).toEqual([
-      'proposal',
-      'survey',
-      'concept',
-      'threeD',
-      'handover',
-    ]);
+  it('has the six client-facing milestones in order', () => {
+    expect(JOURNEY_MILESTONES).toEqual(['proposal', 'survey', 'concept', 'design', 'documents', 'handover']);
   });
 
-  it('carries both locales for every milestone', () => {
-    for (const milestone of JOURNEY_MILESTONES) {
-      expect(milestone.label.en.length).toBeGreaterThan(0);
-      expect(milestone.label.ar.length).toBeGreaterThan(0);
+  it('every milestone label is in both catalogs', () => {
+    for (const key of JOURNEY_MILESTONES) {
+      expect(en.delivery.journey[key].length, `en ${key}`).toBeGreaterThan(0);
+      expect(ar.delivery.journey[key].length, `ar ${key}`).toBeGreaterThan(0);
     }
   });
 });
@@ -31,14 +27,14 @@ describe('stateMilestone', () => {
     ['concept_review', 2, false, false],
     ['negotiation', 2, false, false],
     ['design_3d', 3, false, false],
-    ['final_approval', 4, false, false],
-    ['change_triage', 4, false, false],
+    ['final_approval', 3, false, false],
+    ['change_triage', 3, false, false],
     ['shop_drawings', 4, false, false],
     ['boq', 4, false, false],
     ['execution_decision', 4, false, false],
-    ['design_only_handoff', 4, false, false],
-    ['closed_design_only', 5, true, false],
-    ['execution', 5, true, false],
+    ['design_only_handoff', 5, false, false],
+    ['closed_design_only', 6, true, false],
+    ['execution', 6, true, false],
     ['abandoned', 0, false, true],
   ];
 
@@ -49,12 +45,11 @@ describe('stateMilestone', () => {
     expect(progress.closed).toBe(closed);
   });
 
-  it('covers every machine state (exhaustive)', () => {
-    for (const state of DESIGN_STATES) {
-      expect(() => stateMilestone(state)).not.toThrow();
-      const progress = stateMilestone(state);
-      expect(progress.index).toBeGreaterThanOrEqual(0);
-      expect(progress.index).toBeLessThanOrEqual(5);
-    }
+  it('covers all 16 machine states', () => {
+    expect(cases.map(([state]) => state).sort()).toEqual([...DESIGN_STATES].sort());
+  });
+
+  it('at the final approval the client is at Design, not Handover', () => {
+    expect(JOURNEY_MILESTONES[stateMilestone('final_approval').index]).toBe('design');
   });
 });

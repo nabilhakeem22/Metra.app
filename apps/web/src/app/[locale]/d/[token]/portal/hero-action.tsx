@@ -3,12 +3,14 @@
 import { Loader2 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { useRouter } from 'next/navigation';
-import { useState, useTransition } from 'react';
+import { useId, useState, useTransition } from 'react';
 import { Button } from '@/components/ui/button';
-import { Textarea } from '@/components/ui/textarea';
+import { isBlankNote } from '@/lib/engagements/client-note';
 import { isConceptVerb } from '@/lib/engagements/concept-choice-outcome';
 import type { HeroGroup } from '@/lib/engagements/portal-hero';
 import { recordDeliveryAction, respondToDeliveryConcept } from '../actions';
+import { ChangesNote } from './changes-note';
+import { ConfirmActDialog } from './confirm-act-dialog';
 import {
   answerOfConceptOutcome,
   answerOfSignal,
@@ -16,62 +18,43 @@ import {
   type HeroConfirmedState,
   type HeroError,
 } from './hero-answer';
-import { HeroConfirmed, type HeroOutcome } from './hero-confirmed';
-
-interface HeroButton {
-  verb: string;
-  /** Key under `delivery.hero.<group>` for the button label. */
-  labelKey: 'approve' | 'changes' | 'acknowledge';
-  outcome: HeroOutcome;
-  variant: 'default' | 'ghost';
-}
-
-/**
- * The one-action-never-a-menu button set per group: a single primary CTA with a
- * quiet "request changes" beside it (handoff has only the confirm). The verbs are
- * the SDF-computed client-action tokens; recording either of a concept/design pair
- * drops BOTH from the next read (server-side), so confirming one ends the group.
- */
-const GROUP_BUTTONS: Record<HeroGroup, HeroButton[]> = {
-  concept: [
-    { verb: 'approve_concept', labelKey: 'approve', outcome: 'approved', variant: 'default' },
-    { verb: 'request_concept_changes', labelKey: 'changes', outcome: 'changes', variant: 'ghost' },
-  ],
-  design: [
-    { verb: 'approve_design', labelKey: 'approve', outcome: 'approved', variant: 'default' },
-    { verb: 'request_design_changes', labelKey: 'changes', outcome: 'changes', variant: 'ghost' },
-  ],
-  handoff: [
-    { verb: 'acknowledge_handoff', labelKey: 'acknowledge', outcome: 'acknowledged', variant: 'default' },
-  ],
-};
+import { GROUP_BUTTONS, type HeroButton } from './hero-buttons';
+import { HeroErrorText } from './hero-error';
+import type { HeroOutcome } from './hero-confirmed';
 
 /**
  * The actionable hero: the plain-language CTA for its group, a note field, and
  * one button per verb the client is actually OFFERED (`clientActions`). One
- * primary button, never a menu. A concept verb answers from the decision SAVED
- * on file (a repeat shows that one, B12); a design or handover verb confirms
- * the tapped verb.
+ * primary button, never a menu. Approving and confirming the handover ask
+ * first (ConfirmActDialog; Cancel sends nothing); a request for changes needs a
+ * note. A concept verb answers from the decision SAVED on file (a repeat shows
+ * that one, B12); a design or handover verb confirms the tapped verb. A
+ * confirmed answer goes UP (`onAnswered`): the command card keeps it on screen
+ * across the refresh that follows.
  */
 export function ActionHero({
   token,
   group,
   clientActions,
+  onAnswered,
 }: {
   token: string;
   group: HeroGroup;
   clientActions: readonly string[];
+  onAnswered: (answer: HeroConfirmedState) => void;
 }) {
   const tHero = useTranslations('delivery.hero');
   const tGroup = useTranslations(`delivery.hero.${group}`);
   const tActions = useTranslations('delivery.actions');
-  const tPicker = useTranslations('delivery.conceptPicker');
   const router = useRouter();
+  const hintId = useId();
   const [pending, startTransition] = useTransition();
   const [note, setNote] = useState('');
-  const [confirmed, setConfirmed] = useState<HeroConfirmedState | null>(null);
+  const [asking, setAsking] = useState<HeroButton | null>(null);
   const [error, setError] = useState<HeroError | null>(null);
   const buttons = GROUP_BUTTONS[group].filter((button) => clientActions.includes(button.verb));
+  const noteBlank = isBlankNote(note);
+  const offersChanges = buttons.some((button) => !button.confirms);
 
   async function answerOf(verb: string, outcome: HeroOutcome): Promise<HeroAnswer> {
     if (isConceptVerb(verb)) {
@@ -80,30 +63,21 @@ export function ActionHero({
     return answerOfSignal(await recordDeliveryAction(token, verb, note), outcome);
   }
 
-  function submit(verb: string, outcome: HeroOutcome) {
+  function submit(button: HeroButton) {
     setError(null);
     startTransition(async () => {
       // Wrap the await so a rejected action can never leave the spinner stuck.
       try {
-        const answer = await answerOf(verb, outcome);
-        if ('confirmed' in answer) return setConfirmed(answer.confirmed);
+        const answer = await answerOf(button.verb, button.outcome);
+        if ('confirmed' in answer) return onAnswered(answer.confirmed);
         setError(answer.error);
         if (answer.refresh) router.refresh();
       } catch {
         setError('generic');
+      } finally {
+        setAsking(null);
       }
     });
-  }
-
-  if (confirmed) {
-    return (
-      <HeroConfirmed
-        group={group}
-        outcome={confirmed.outcome}
-        studioNotified={confirmed.studioNotified}
-        chosenLetter={confirmed.chosenLetter}
-      />
-    );
   }
 
   return (
@@ -114,34 +88,33 @@ export function ActionHero({
       </span>
       <h2 className="text-heading font-semibold">{tGroup('headline')}</h2>
       <p className="text-body text-muted-foreground">{tGroup('body')}</p>
-      <Textarea
-        value={note}
-        onChange={(event) => setNote(event.target.value)}
-        maxLength={2000}
-        rows={2}
-        dir="auto"
-        placeholder={tActions('notePlaceholder')}
-      />
+      <ChangesNote note={note} onChange={setNote} hintId={hintId} showHint={offersChanges && noteBlank} />
       <div className="flex flex-col gap-2">
         {buttons.map((button) => (
           <Button
             key={button.verb}
             variant={button.variant}
-            disabled={pending}
-            onClick={() => submit(button.verb, button.outcome)}
+            className="min-h-11"
+            disabled={pending || (!button.confirms && noteBlank)}
+            aria-describedby={!button.confirms && noteBlank ? hintId : undefined}
+            onClick={() => (button.confirms ? setAsking(button) : submit(button))}
           >
-            {pending && button.variant === 'default' && (
-              <Loader2 className="size-4 animate-spin" aria-hidden />
-            )}
+            {pending && !asking && !button.confirms && <Loader2 className="size-4 animate-spin" aria-hidden />}
             {tGroup(button.labelKey)}
           </Button>
         ))}
       </div>
-      {error && (
-        <p className="text-body text-destructive" role="alert">
-          {error === 'changed' || error === 'movedOn' ? tPicker(error) : tActions(`error.${error}`)}
-        </p>
-      )}
+      {error && <HeroErrorText error={error} />}
+      <ConfirmActDialog
+        open={asking !== null}
+        title={tGroup('confirmTitle')}
+        body={<p>{tGroup('confirmBody')}</p>}
+        confirmLabel={tActions('confirm')}
+        cancelLabel={tActions('cancel')}
+        pending={pending}
+        onConfirm={() => asking && submit(asking)}
+        onOpenChange={(open) => !open && setAsking(null)}
+      />
     </section>
   );
 }

@@ -2,6 +2,7 @@
 
 import { Check, Loader2 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
+import { useRouter } from 'next/navigation';
 import { useState, useTransition } from 'react';
 import { Button } from '@/components/ui/button';
 import type { PublicDelivery } from '@/lib/engagements/public';
@@ -10,17 +11,27 @@ import { recordDeliveryAction } from '../actions';
 import { BudgetRange } from './budget-range';
 
 /**
- * The budget-acknowledgement card: the issued range first, then the button. It is
- * deliberately SUBORDINATE to the hero (deriveHero keeps `acknowledge_rom` out of
- * the hero, exposing it only via `showRomAck`). Fires the same append-only advisory
- * `recordDeliveryAction`; a repeat resolves ok (idempotent). `rom` is null until
- * the studio ISSUES the band, in which case the card asks without a figure, as it
- * always has. Theme tokens only, so the confirmed state reads in light and dark.
- * The confirmation says the team was notified only when it really was.
+ * The budget card: the issued range, ALWAYS, whenever the studio has issued one
+ * (the caller renders it only then), before and after the client has seen it.
+ * The acknowledge button shows only while the server offers it (`canAcknowledge`
+ * = the hero's `showRomAck`); it fires the append-only advisory
+ * `recordDeliveryAction`, a repeat resolving ok (idempotent), and then re-reads
+ * the page. After a local acknowledgement the range stays with "You have seen
+ * this range", and says the team was notified only when it really was. Theme
+ * tokens only, so the confirmed state reads in light and dark.
  */
-export function BudgetCard({ token, rom }: { token: string; rom: PublicDelivery['rom'] }) {
+export function BudgetCard({
+  token,
+  rom,
+  canAcknowledge,
+}: {
+  token: string;
+  rom: NonNullable<PublicDelivery['rom']>;
+  canAcknowledge: boolean;
+}) {
   const t = useTranslations('delivery.budget');
   const tActions = useTranslations('delivery.actions');
+  const router = useRouter();
   const [pending, startTransition] = useTransition();
   // Non-null once acknowledged; says whether the studio was really notified.
   const [confirmed, setConfirmed] = useState<{ studioNotified: boolean } | null>(null);
@@ -32,8 +43,9 @@ export function BudgetCard({ token, rom }: { token: string; rom: PublicDelivery[
       // Wrap the await so a rejected action can never leave the spinner stuck.
       try {
         const result = await recordDeliveryAction(token, 'acknowledge_rom');
-        if (result.ok) setConfirmed({ studioNotified: result.studioNotified === true });
-        else setError(portalErrorKey(result.error));
+        if (!result.ok) return setError(portalErrorKey(result.error));
+        setConfirmed({ studioNotified: result.studioNotified === true });
+        router.refresh();
       } catch {
         setError('generic');
       }
@@ -48,17 +60,24 @@ export function BudgetCard({ token, rom }: { token: string; rom: PublicDelivery[
       </div>
       <BudgetRange rom={rom} />
       {confirmed ? (
-        <p
+        <div
           role="status"
-          className="flex items-center gap-2 rounded-item bg-[color:var(--success-tint)] px-3 py-2.5 text-body font-semibold text-[color:var(--success)]"
+          className="space-y-0.5 rounded-item bg-[color:var(--success-tint)] px-3 py-2.5 text-[color:var(--success)]"
         >
-          <Check className="size-4 shrink-0" aria-hidden />
-          {confirmed.studioNotified ? t('acknowledgedNotified') : t('acknowledged')}
-        </p>
+          <p className="flex items-center gap-2 text-body font-semibold">
+            <Check className="size-4 shrink-0" aria-hidden />
+            {t('acknowledgedNote')}
+          </p>
+          <p className="text-caption">
+            {confirmed.studioNotified ? t('acknowledgedNotified') : t('acknowledged')}
+          </p>
+        </div>
       ) : (
+        <p className="text-caption text-muted-foreground">{t('note')}</p>
+      )}
+      {canAcknowledge && !confirmed && (
         <>
-          <p className="text-caption text-muted-foreground">{t('note')}</p>
-          <Button variant="default" className="w-full" disabled={pending} onClick={acknowledge}>
+          <Button variant="default" className="min-h-11 w-full" disabled={pending} onClick={acknowledge}>
             {pending && <Loader2 className="size-4 animate-spin" aria-hidden />}
             {t('acknowledge')}
           </Button>

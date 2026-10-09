@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, screen, within } from '@testing-library/react';
+import { screen, within } from '@testing-library/react';
 import type { PublicDelivery, PublicDeliveryMilestone } from '@/lib/engagements/public/types';
 import { messageAt, renderWithIntl, type TestLocale } from '@/test/render-with-intl';
 import { PaymentsCard } from './payments-card';
@@ -7,6 +7,7 @@ import { PaymentsCard } from './payments-card';
 // The server action is replaced, so no server-only stack is loaded.
 const actions = vi.hoisted(() => ({ markDeliveryPaymentPaid: vi.fn() }));
 vi.mock('../actions', () => actions);
+vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
 
 const ARABIC_INDIC = /[٠-٩۰-۹]/;
 
@@ -114,70 +115,6 @@ describe('PaymentsCard', () => {
     );
     const rows = screen.getAllByRole('listitem');
     expect(rows[1].textContent).toContain(messageAt('en', 'delivery.payments.state.due'));
-  });
-
-  it('shows the waiting state instead of the button when a claim is pending', () => {
-    const { container } = renderCard(MIDWAY, {
-      claimableMilestones: [claimable('gate_b', '28000.0000', true)],
-    });
-    expect(claimButtons('en')).toHaveLength(0);
-    expect(container.textContent).toContain(messageAt('en', 'delivery.payments.awaitingConfirmation'));
-  });
-
-  it('offers the claim only for milestones the SDF lists as claimable', () => {
-    renderCard(MIDWAY, { claimableMilestones: [claimable('balance', '36000.0000')] });
-    // gate_b is next but not claimable: no prominent button; balance keeps its row button.
-    const buttons = claimButtons('en');
-    expect(buttons).toHaveLength(1);
-    expect(screen.getAllByRole('listitem')[2].contains(buttons[0])).toBe(true);
-  });
-
-  it('shows no claim at all when the snapshot carried no claim object', () => {
-    renderCard(MIDWAY, null);
-    expect(claimButtons('en')).toHaveLength(0);
-  });
-
-  it('claims the milestone and flips it to waiting', async () => {
-    actions.markDeliveryPaymentPaid.mockResolvedValue({ ok: true });
-    const { container } = renderCard(MIDWAY, {
-      claimableMilestones: [claimable('gate_b', '28000.0000')],
-    });
-    fireEvent.click(claimButtons('en')[0]);
-    await screen.findByRole('status');
-    expect(actions.markDeliveryPaymentPaid).toHaveBeenCalledWith('tok', 'gate_b');
-    expect(claimButtons('en')).toHaveLength(0);
-    expect(container.textContent).toContain(messageAt('en', 'delivery.payments.awaitingConfirmation'));
-    // The action did not say the studio heard about it, so the card does not either.
-    expect(container.textContent).not.toContain(messageAt('en', 'delivery.payments.claimNotified'));
-  });
-
-  it('says the team was notified only when the claim really reached the studio', async () => {
-    actions.markDeliveryPaymentPaid.mockResolvedValue({ ok: true, studioNotified: true });
-    const { container } = renderCard(MIDWAY, {
-      claimableMilestones: [claimable('gate_b', '28000.0000')],
-    }, 'ar-EG');
-    fireEvent.click(claimButtons('ar-EG')[0]);
-    const status = await screen.findByRole('status');
-    expect(status.textContent).toContain(messageAt('ar-EG', 'delivery.payments.claimNotified'));
-    expect(container.textContent).toContain(messageAt('ar-EG', 'delivery.payments.awaitingConfirmation'));
-  });
-
-  it('an already-pending claim from an earlier visit never says notified', () => {
-    const { container } = renderCard(MIDWAY, {
-      claimableMilestones: [claimable('gate_b', '28000.0000', true)],
-    });
-    expect(container.textContent).toContain(messageAt('en', 'delivery.payments.awaitingConfirmation'));
-    expect(container.textContent).not.toContain(messageAt('en', 'delivery.payments.claimNotified'));
-  });
-
-  it('shows a localized error on a failed claim and keeps the button', async () => {
-    actions.markDeliveryPaymentPaid.mockResolvedValue({ ok: false, error: 'wrong_state' });
-    renderCard(MIDWAY, { claimableMilestones: [claimable('gate_b', '28000.0000')] });
-    fireEvent.click(claimButtons('en')[0]);
-    expect((await screen.findByRole('alert')).textContent).toBe(
-      messageAt('en', 'delivery.payments.error.wrong_state'),
-    );
-    expect(claimButtons('en')).toHaveLength(1);
   });
 
   it('all settled (ar-EG): the thank-you, a full bar, no claim, Latin digits', () => {

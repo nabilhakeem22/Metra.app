@@ -1,6 +1,7 @@
 'use server';
 
 import { clientActOfVerb, paymentClaimedAct } from '@/lib/engagements/client-acts/acts';
+import { clientNote } from '@/lib/engagements/client-note';
 import { chooseConceptAndNotify, respondToConceptAndNotify } from '@/lib/engagements/client-acts/concept-acts';
 import { withStudioNotified } from '@/lib/engagements/client-acts/notify';
 import { isConceptVerb, type ConceptChoiceOutcome } from '@/lib/engagements/concept-choice-outcome';
@@ -37,10 +38,10 @@ export async function recordDeliveryAction(
   action: string,
   note?: string,
 ): Promise<DeliveryActResult> {
-  // Cap the audit fields before they reach the DB (the SDF also caps note at 2000).
+  // Cap the audit fields before they reach the DB; an invisible note is no note.
   const result = await recordDeliveryActionByToken(token, {
     action,
-    note: note?.trim().slice(0, 2000) || null,
+    note: clientNote(note),
     ...(await requestProvenance()),
   });
   return withStudioNotified(token, result, clientActOfVerb(action));
@@ -63,7 +64,7 @@ export async function chooseDeliveryConcept(
   return chooseConceptAndNotify(token, {
     artifactId,
     position,
-    note: note?.trim().slice(0, 2000) || null,
+    note: clientNote(note),
     ...(await requestProvenance()),
   });
 }
@@ -82,7 +83,7 @@ export async function respondToDeliveryConcept(
   if (!isConceptVerb(verb)) return { kind: 'error', error: 'generic' };
   return respondToConceptAndNotify(token, {
     action: verb,
-    note: note?.trim().slice(0, 2000) || null,
+    note: clientNote(note),
     ...(await requestProvenance()),
   });
 }
@@ -101,7 +102,7 @@ export async function markDeliveryPaymentPaid(
 ): Promise<DeliveryActResult> {
   const result = await claimPaymentByToken(token, {
     milestoneKind,
-    note: note?.trim().slice(0, 2000) || null,
+    note: clientNote(note),
     ...(await requestProvenance()),
   });
   return withStudioNotified(token, result, paymentClaimedAct(milestoneKind));

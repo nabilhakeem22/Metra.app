@@ -4,10 +4,10 @@
 // arrives as a missing key, not a type error. Every dereference is null-safe and
 // every list passes a row guard: a malformed field costs that field, not the page.
 import { KIND_CATEGORY } from '../portal-documents';
-import { PORTAL_STAGE_LABEL, PORTAL_STAGE_NOTE } from '../portal-labels';
 import { parseDocumentAccess } from '../document-access';
 import { stateMilestone } from '../journey-map';
 import { CLIENT_ACTION_VERBS, deriveHero } from '../portal-hero';
+import { PORTAL_STAGE_KEY } from '../portal-stage';
 import type { DesignState } from '../states';
 import {
   STATE_SET,
@@ -127,8 +127,7 @@ export function shapeDelivery(snapshot: DeliverySnapshot): PublicDelivery | null
   const rom = snapshot.rom;
   return {
     ...identity,
-    stageLabel: PORTAL_STAGE_LABEL[state],
-    stageNote: PORTAL_STAGE_NOTE[state],
+    stageKey: PORTAL_STAGE_KEY[state],
     milestone: stateMilestone(state),
     hero: deriveHero(clientActions, state),
     offPlan: snapshot.off_plan === true,

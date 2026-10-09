@@ -120,7 +120,7 @@ export function PriceBookToolbar({
             <Upload className="size-4" aria-hidden />
             {t('actions.import')}
           </Button>
-          <Button variant="default" data-tour="price-book-new" onClick={onNew}>
+          <Button variant="default" onClick={onNew}>
             <Plus className="size-4" aria-hidden />
             {t('actions.new')}
           </Button>

@@ -121,7 +121,7 @@ describe('delivery portal — cost-safe token snapshot', () => {
     // Raw machine state must NOT be on the client-facing shape (S1); the mapped
     // friendly label is what the portal renders.
     expect((delivery as unknown as { state?: unknown }).state).toBeUndefined();
-    expect(delivery!.stageLabel.en).toBeTruthy();
+    expect(delivery!.stageKey).toBeTruthy();
     // The fixture timestamps its org names so leaked debris is identifiable, so
     // assert the marker rather than the whole string.
     expect(delivery!.firm.nameEn).toContain(FIXTURE_ORG_MARKER);

@@ -2,10 +2,10 @@
 
 import { useTranslations } from 'next-intl';
 import { useRouter } from 'next/navigation';
-import { useState, useTransition } from 'react';
+import { useId, useState, useTransition } from 'react';
 import { Button } from '@/components/ui/button';
 import { useConfirm } from '@/components/ui/confirm-dialog';
-import { Textarea } from '@/components/ui/textarea';
+import { isBlankNote } from '@/lib/engagements/client-note';
 import type { PublicDelivery } from '@/lib/engagements/public/types';
 import { bidiIsolate } from '@/lib/format/bidi';
 import { chooseDeliveryConcept, respondToDeliveryConcept } from '../actions';
@@ -15,8 +15,9 @@ import {
   type HeroConfirmedState,
   type HeroError,
 } from './hero-answer';
+import { ChangesNote } from './changes-note';
 import { ConceptOptionCard } from './concept-option-card';
-import { HeroConfirmed } from './hero-confirmed';
+import { HeroErrorText } from './hero-error';
 
 type ConceptOption = PublicDelivery['conceptOptions'][number];
 
@@ -26,35 +27,39 @@ type ConceptOption = PublicDelivery['conceptOptions'][number];
  * option", which asks first (Cancel calls nothing). The letter the client saw is
  * sent and saved; the answer names only a SAVED decision (a repeat shows the one
  * on file), and changed options or a closed review refresh the page with a
- * message (./hero-answer.ts). "Request changes" stays while it is offered.
+ * message (./hero-answer.ts). "Request changes" stays while it is offered, and
+ * needs a note. A confirmed answer goes UP (`onAnswered`): the command card keeps
+ * it on screen across the refresh that follows.
  */
 export function ConceptOptionPicker({
   token,
   options,
   canRequestChanges,
+  onAnswered,
 }: {
   token: string;
   options: ConceptOption[];
   /** `request_concept_changes` is among the client actions on offer. */
   canRequestChanges: boolean;
+  onAnswered: (answer: HeroConfirmedState) => void;
 }) {
   const t = useTranslations('delivery.conceptPicker');
   const tHero = useTranslations('delivery.hero');
   const tGroup = useTranslations('delivery.hero.concept');
-  const tActions = useTranslations('delivery.actions');
   const router = useRouter();
+  const hintId = useId();
   const { confirm, dialog } = useConfirm();
   const [pending, startTransition] = useTransition();
   const [note, setNote] = useState('');
-  const [confirmed, setConfirmed] = useState<HeroConfirmedState | null>(null);
   const [error, setError] = useState<HeroError | null>(null);
+  const noteBlank = isBlankNote(note);
 
   function run(act: () => Promise<HeroAnswer>) {
     setError(null);
     startTransition(async () => {
       try {
         const answer = await act();
-        if ('confirmed' in answer) return setConfirmed(answer.confirmed);
+        if ('confirmed' in answer) return onAnswered(answer.confirmed);
         setError(answer.error);
         if (answer.refresh) router.refresh();
       } catch {
@@ -73,17 +78,6 @@ export function ConceptOptionPicker({
     });
     if (!accepted) return;
     run(async () => answerOfConceptOutcome(await chooseDeliveryConcept(token, option.id, option.position, note)));
-  }
-
-  if (confirmed) {
-    return (
-      <HeroConfirmed
-        group="concept"
-        outcome={confirmed.outcome}
-        studioNotified={confirmed.studioNotified}
-        chosenLetter={confirmed.chosenLetter}
-      />
-    );
   }
 
   return (
@@ -105,19 +99,13 @@ export function ConceptOptionPicker({
           />
         ))}
       </ul>
-      <Textarea
-        value={note}
-        onChange={(event) => setNote(event.target.value)}
-        maxLength={2000}
-        rows={2}
-        dir="auto"
-        placeholder={tActions('notePlaceholder')}
-      />
+      <ChangesNote note={note} onChange={setNote} hintId={hintId} showHint={canRequestChanges && noteBlank} />
       {canRequestChanges && (
         <Button
           variant="ghost"
-          className="w-full"
-          disabled={pending}
+          className="min-h-11 w-full"
+          disabled={pending || noteBlank}
+          aria-describedby={noteBlank ? hintId : undefined}
           onClick={() =>
             run(async () =>
               answerOfConceptOutcome(await respondToDeliveryConcept(token, 'request_concept_changes', note)),
@@ -127,11 +115,7 @@ export function ConceptOptionPicker({
           {tGroup('changes')}
         </Button>
       )}
-      {error && (
-        <p className="text-body text-destructive" role="alert">
-          {error === 'changed' || error === 'movedOn' ? t(error) : tActions(`error.${error}`)}
-        </p>
-      )}
+      {error && <HeroErrorText error={error} />}
       {dialog}
     </section>
   );

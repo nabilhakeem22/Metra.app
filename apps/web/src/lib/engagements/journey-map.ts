@@ -1,33 +1,25 @@
-// Client-portal (P2 redesign) journey map. PURE and SERVER-SAFE: no `@metra/db`
-// runtime value, no 'use client'. Collapses the 16 internal machine states into
-// the FIVE friendly milestones a homeowner recognises — Proposal, Survey, Concept,
-// 3D, Handover — so the portal can light the client's position without ever
-// surfacing a raw machine state name. Mirrors `portal-labels.ts`.
+// Client-portal journey map. PURE and SERVER-SAFE: no `@metra/db` runtime value,
+// no 'use client'. Collapses the 16 internal machine states into the SIX
+// milestones a homeowner recognises, so the portal can light the client's
+// position without ever surfacing a raw machine state name. The milestone
+// labels live in the catalogs under `delivery.journey.<key>`.
 import type { DesignState } from './states';
 
-/** A friendly milestone the client sees on the journey tracker. */
-export interface JourneyMilestone {
-  key: string;
-  label: { en: string; ar: string };
-}
-
-/**
- * The five client-facing milestones, in order. `index` in `stateMilestone` is a
- * 0-based position into THIS array (0 = Proposal … 4 = Handover; 5 = past the end,
- * i.e. all complete). The labels are mirrored in the `delivery.journey.*` message
- * catalog for the view; kept here too so the pure map + its test are self-contained.
- */
-export const JOURNEY_MILESTONES: readonly JourneyMilestone[] = [
-  { key: 'proposal', label: { en: 'Proposal', ar: 'العرض' } },
-  { key: 'survey', label: { en: 'Survey', ar: 'المعاينة' } },
-  { key: 'concept', label: { en: 'Concept', ar: 'التصميم المبدئي' } },
-  { key: 'threeD', label: { en: '3D visuals', ar: 'التصور ثلاثي الأبعاد' } },
-  { key: 'handover', label: { en: 'Handover', ar: 'التسليم' } },
+/** The six client-facing milestones, in order. */
+export const JOURNEY_MILESTONES = [
+  'proposal',
+  'survey',
+  'concept',
+  'design',
+  'documents',
+  'handover',
 ] as const;
 
-/** Where the client is on the five-milestone journey. */
+export type JourneyMilestoneKey = (typeof JOURNEY_MILESTONES)[number];
+
+/** Where the client is on the six-milestone journey. */
 export interface MilestoneProgress {
-  /** 0-based index of the CURRENT milestone (5 = past the last, all complete). */
+  /** 0-based index of the CURRENT milestone (6 = past the last, all complete). */
   index: number;
   /** Every milestone is done (the design is delivered). */
   allComplete: boolean;
@@ -35,35 +27,41 @@ export interface MilestoneProgress {
   closed: boolean;
 }
 
+function at(index: number): MilestoneProgress {
+  return { index, allComplete: false, closed: false };
+}
+
+const COMPLETE: MilestoneProgress = { index: JOURNEY_MILESTONES.length, allComplete: true, closed: false };
+
 /**
  * Exhaustive machine-state → journey-milestone map. `tsc` fails if a new
- * `DesignState` is added without a row here (the `Record` is total), so the portal
- * can never fall back to a raw state name. Groupings (owner-approved table):
+ * `DesignState` is added without a row here (the `Record` is total), so the
+ * portal can never fall back to a raw state name.
  *  - Proposal  (0): created, design_proposal
  *  - Survey    (1): survey, layout
  *  - Concept   (2): concept_review, negotiation
- *  - 3D        (3): design_3d
- *  - Handover  (4): final_approval, change_triage, shop_drawings, boq,
- *                   execution_decision, design_only_handoff
- *  - allComplete (5): closed_design_only, execution
+ *  - Design    (3): design_3d, final_approval, change_triage
+ *  - Drawings and quantities (4): shop_drawings, boq, execution_decision
+ *  - Handover  (5): design_only_handoff
+ *  - allComplete (6): closed_design_only, execution
  *  - closed:      abandoned
  */
 const STATE_MILESTONE: Record<DesignState, MilestoneProgress> = {
-  created: { index: 0, allComplete: false, closed: false },
-  design_proposal: { index: 0, allComplete: false, closed: false },
-  survey: { index: 1, allComplete: false, closed: false },
-  layout: { index: 1, allComplete: false, closed: false },
-  concept_review: { index: 2, allComplete: false, closed: false },
-  negotiation: { index: 2, allComplete: false, closed: false },
-  design_3d: { index: 3, allComplete: false, closed: false },
-  final_approval: { index: 4, allComplete: false, closed: false },
-  change_triage: { index: 4, allComplete: false, closed: false },
-  shop_drawings: { index: 4, allComplete: false, closed: false },
-  boq: { index: 4, allComplete: false, closed: false },
-  execution_decision: { index: 4, allComplete: false, closed: false },
-  design_only_handoff: { index: 4, allComplete: false, closed: false },
-  closed_design_only: { index: 5, allComplete: true, closed: false },
-  execution: { index: 5, allComplete: true, closed: false },
+  created: at(0),
+  design_proposal: at(0),
+  survey: at(1),
+  layout: at(1),
+  concept_review: at(2),
+  negotiation: at(2),
+  design_3d: at(3),
+  final_approval: at(3),
+  change_triage: at(3),
+  shop_drawings: at(4),
+  boq: at(4),
+  execution_decision: at(4),
+  design_only_handoff: at(5),
+  closed_design_only: COMPLETE,
+  execution: COMPLETE,
   abandoned: { index: 0, allComplete: false, closed: true },
 };
 

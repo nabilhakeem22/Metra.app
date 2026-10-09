@@ -1,15 +1,19 @@
 // PURE (client-safe: no server-only). The studio's SETUP LADDER: a delivery
 // needs a project, and a project needs a client, so the dashboard points at the
-// first of those that is missing, and only with a link the role may follow.
+// first of those that is missing, and only with a link the role may follow. The
+// last rung is sharing the first delivery with its client.
 import { can } from '../permissions/can';
+import { shareDeliveryHref } from '../onboarding/share-delivery-href';
 import type { MemberRole } from '../permissions/roles';
 import type { PrimaryCta } from './primary-cta';
 
-/** The three facts the ladder reads (a subset of the onboarding progress). */
+/** The facts the ladder reads (a subset of the onboarding progress). */
 export interface SetupProgress {
   hasClient: boolean;
   hasProject: boolean;
   hasEngagement: boolean;
+  hasSharedDelivery: boolean;
+  newestUnsharedDeliveryId: string | null;
 }
 
 const ADD_CLIENT: PrimaryCta = { messageKey: 'ctaAddClient', href: '/clients?new=1' };
@@ -26,6 +30,10 @@ export function nextSetupStep(role: MemberRole, progress: SetupProgress): Primar
   if (!progress.hasProject) return can(role, 'projects', 'create') ? ADD_PROJECT : null;
   if (!progress.hasEngagement) {
     return can(role, 'engagements_design', 'create') ? START_DELIVERY : null;
+  }
+  // Sharing mints the client link: owner/admin only (`engagements_issue`).
+  if (!progress.hasSharedDelivery && can(role, 'engagements_issue', 'approve')) {
+    return { messageKey: 'ctaShareDelivery', href: shareDeliveryHref(progress.newestUnsharedDeliveryId) };
   }
   return null;
 }

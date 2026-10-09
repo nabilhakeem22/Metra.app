@@ -5,10 +5,12 @@ import { useLocale, useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
 import type { PublicDelivery } from '@/lib/engagements/public/types';
 import { bidiIsolate } from '@/lib/format/bidi';
+import { documentUrl } from './document-url';
 
 /**
- * One released concept option in the picker: its letter, "View" (the file in a
- * new tab, through the gated document route) and "Choose this option".
+ * One released concept option in the picker: its letter, "View" (the file opened
+ * in the browser in a new tab, through the gated document route) and "Choose
+ * this option".
  */
 export function ConceptOptionCard({
   token,
@@ -33,11 +35,11 @@ export function ConceptOptionCard({
         {t('option', { letter: bidiIsolate(option.letter) })}
       </span>
       <a
-        href={`/${locale}/d/${encodeURIComponent(token)}/documents/${option.id}`}
+        href={documentUrl(locale, token, option.id, 'view')}
         target="_blank"
         rel="noopener noreferrer"
         aria-describedby={titleId}
-        className="ms-auto inline-flex items-center gap-1.5 rounded-pill border px-3 py-1.5 text-caption font-semibold hover:bg-muted coarse:min-h-11"
+        className="ms-auto inline-flex min-h-11 min-w-11 items-center justify-center gap-1.5 rounded-pill border px-3 text-caption font-semibold hover:bg-muted"
       >
         <Eye className="size-3.5" aria-hidden />
         {t('view')}

@@ -26,3 +26,11 @@ export function portalErrorKey(code: string | null | undefined): PortalErrorKey 
       return 'generic';
   }
 }
+
+/** The error keys a document thread's catalog (`delivery.comments.error`) defines. */
+export type PortalCommentErrorKey = PortalErrorKey | 'empty' | 'too_many';
+
+/** Map a comment send/read error code to a key the comments catalog holds. */
+export function portalCommentErrorKey(code: string | null | undefined): PortalCommentErrorKey {
+  return code === 'empty' || code === 'too_many' ? code : portalErrorKey(code);
+}

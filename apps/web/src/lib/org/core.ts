@@ -22,6 +22,7 @@ import type { OrgContext } from '@/lib/db/context';
 import { FLOWS } from '@/lib/entitlements/flows';
 import { firmTypeDef, type FirmTypeKey } from '@/lib/entitlements/firm-types';
 import { clean } from '@/lib/validation/text';
+import { ORG_PROFILE_LIMITS } from './profile-limits';
 
 export interface OrgProfileInput {
   nameEn?: string | null;
@@ -34,8 +35,7 @@ export interface OrgProfileInput {
   firmType?: FirmTypeKey;
 }
 
-// Cap user-supplied text at the boundary (defense-in-depth).
-const LIMITS = { name: 200, city: 120, taxReg: 64 } as const;
+// Cap user-supplied text at the boundary (defense-in-depth): ./profile-limits.ts.
 
 export function profileWithinLimits(
   nameEn: string | null,
@@ -44,10 +44,10 @@ export function profileWithinLimits(
   tax: string | null,
 ): boolean {
   return (
-    (nameEn?.length ?? 0) <= LIMITS.name &&
-    (nameAr?.length ?? 0) <= LIMITS.name &&
-    (city?.length ?? 0) <= LIMITS.city &&
-    (tax?.length ?? 0) <= LIMITS.taxReg
+    (nameEn?.length ?? 0) <= ORG_PROFILE_LIMITS.name &&
+    (nameAr?.length ?? 0) <= ORG_PROFILE_LIMITS.name &&
+    (city?.length ?? 0) <= ORG_PROFILE_LIMITS.city &&
+    (tax?.length ?? 0) <= ORG_PROFILE_LIMITS.taxReg
   );
 }
 

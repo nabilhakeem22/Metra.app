@@ -3,15 +3,11 @@ import { afterAll, describe, expect, it } from 'vitest';
 import { createClientCore, setClientActiveCore } from '@/lib/clients/core';
 import { listClients } from '@/lib/clients/queries';
 import { createEngagementCore } from '@/lib/engagements/core';
+import { mintDeliveryLinkCore, revokeDeliveryLinkCore } from '@/lib/engagements/share';
 import { getOnboardingProgress } from '@/lib/onboarding/progress';
-import { createCostItemCore } from '@/lib/price-book/core';
 import { createProjectCore } from '@/lib/projects/core';
 import { listProjects } from '@/lib/projects/queries';
-import {
-  createProposalCore,
-  saveProposalDraftCore,
-  sendProposalCore,
-} from '@/lib/proposals/core';
+import type { OrgContext } from '@/lib/db/context';
 import {
   closeFixture,
   ctxFor,
@@ -30,6 +26,17 @@ afterAll(async () => {
 const orgWithCity = { nameEn: 'Org', nameAr: null, city: 'Cairo' } as unknown as Organization;
 const orgNoCity = { nameEn: 'Org', nameAr: null, city: null } as unknown as Organization;
 
+/** A new project (and client) with one delivery started on it; the delivery's id. */
+async function startDelivery(ctx: OrgContext, code: string): Promise<string> {
+  await createClientCore(ctx, { phone: '01000000000', nameEn: `Client ${code}` });
+  const [client] = await listClients(ctx, {});
+  await createProjectCore(ctx, { startDate: '2026-01-01', endDate: '2026-06-30', code, nameEn: `Project ${code}`, clientId: client.id, status: 'active' });
+  const project = (await listProjects(ctx, {})).find((row) => row.code === code)!;
+  const started = await createEngagementCore(ctx, { titleEn: code, clientId: client.id, projectId: project.id });
+  expect(started.ok).toBe(true);
+  return (started as { data?: string }).data!;
+}
+
 describe('getOnboardingProgress — in-org rows only', () => {
   it('each flag reflects only THIS org (another org does not flip it)', async () => {
     const { orgId, ownerIds } = await seedOrg({ owners: 1 });
@@ -40,13 +47,9 @@ describe('getOnboardingProgress — in-org rows only', () => {
     const [client] = await listClients(ctx, {});
     await createProjectCore(ctx, { startDate: '2026-01-01', endDate: '2026-06-30', code: 'P', nameEn: 'Proj', clientId: client.id, status: 'active' });
     const [project] = await listProjects(ctx, {});
-    expect(
-      (await createEngagementCore(ctx, { titleEn: 'D', clientId: client.id, projectId: project.id })).ok,
-    ).toBe(true);
-    await createCostItemCore(ctx, { code: 'CI', nameEn: 'Item', sectionId: await raw.sectionId(orgId), unit: 'sqm', defaultUnitCost: '1', defaultUnitPrice: '2' });
-    const propId = ((await createProposalCore(ctx, { clientId: client.id, projectId: project.id })) as { data?: string }).data!;
-    await saveProposalDraftCore(ctx, { id: propId, sections: [{ titleEn: 'S', lines: [{ descriptionEn: 'x', qty: '1', unit: 'sqm', unitCost: '0', unitPrice: '1', discountPct: '0' }] }] });
-    await sendProposalCore(ctx, { id: propId });
+    const started = await createEngagementCore(ctx, { titleEn: 'D', clientId: client.id, projectId: project.id });
+    expect(started.ok).toBe(true);
+    expect((await mintDeliveryLinkCore(ctx, (started as { data?: string }).data!)).ok).toBe(true);
     await seedPendingInvite(orgId, 'invitee@example.com', ownerIds[0], 'viewer');
 
     const pa = await getOnboardingProgress(ctx, orgWithCity);
@@ -56,9 +59,8 @@ describe('getOnboardingProgress — in-org rows only', () => {
       hasClient: true,
       hasProject: true,
       hasEngagement: true,
-      hasCostItem: true,
-      hasProposal: true,
-      hasSentProposal: true,
+      hasSharedDelivery: true,
+      newestUnsharedDeliveryId: null,
     });
 
     // A pristine second org sees NONE of org A's rows.
@@ -72,27 +74,49 @@ describe('getOnboardingProgress — in-org rows only', () => {
       hasClient: false,
       hasProject: false,
       hasEngagement: false,
-      hasCostItem: false,
-      hasProposal: false,
-      hasSentProposal: false,
+      hasSharedDelivery: false,
+      newestUnsharedDeliveryId: null,
     });
   });
 
-  it('hasSentProposal stays false for a draft-only org, teamInvited on 2 members', async () => {
-    const { orgId, ownerIds, memberIds } = await seedOrg({ owners: 1, members: [{ role: 'viewer' }] });
+  it('teamInvited on 2 members', async () => {
+    const { orgId, ownerIds } = await seedOrg({ owners: 1, members: [{ role: 'viewer' }] });
     orgIds.push(orgId);
     const ctx = ctxFor(orgId, ownerIds[0], 'owner');
-    void memberIds;
-    await createClientCore(ctx, { phone: '01000000000', nameEn: 'C' });
-    const [client] = await listClients(ctx, {});
-    await createProjectCore(ctx, { startDate: '2026-01-01', endDate: '2026-06-30', code: 'P', nameEn: 'Proj', clientId: client.id, status: 'active' });
-    const [project] = await listProjects(ctx, {});
-    await createProposalCore(ctx, { clientId: client.id, projectId: project.id });
+    expect((await getOnboardingProgress(ctx, orgNoCity)).teamInvited).toBe(true);
+  });
 
-    const p = await getOnboardingProgress(ctx, orgNoCity);
-    expect(p.teamInvited).toBe(true); // 2 members
-    expect(p.hasProposal).toBe(true);
-    expect(p.hasSentProposal).toBe(false); // still draft
+  it('share: the newest unshared in-flight delivery is the target, until every link is out', async () => {
+    const { orgId, ownerIds } = await seedOrg({ owners: 1 });
+    orgIds.push(orgId);
+    const ctx = ctxFor(orgId, ownerIds[0], 'owner');
+    const older = await startDelivery(ctx, 'OLD');
+    const newer = await startDelivery(ctx, 'NEW');
+    await raw.query(
+      `update public.design_engagements set created_at = created_at - interval '1 hour' where id = '${older}'`,
+    );
+
+    let progress = await getOnboardingProgress(ctx, orgNoCity);
+    expect(progress).toMatchObject({ hasEngagement: true, hasSharedDelivery: false, newestUnsharedDeliveryId: newer });
+
+    expect((await mintDeliveryLinkCore(ctx, newer)).ok).toBe(true);
+    progress = await getOnboardingProgress(ctx, orgNoCity);
+    expect(progress).toMatchObject({ hasSharedDelivery: true, newestUnsharedDeliveryId: older });
+
+    // A closed delivery is never a share target.
+    await raw.query(`update public.design_engagements set state = 'abandoned' where id = '${older}'`);
+    expect((await getOnboardingProgress(ctx, orgNoCity)).newestUnsharedDeliveryId).toBeNull();
+
+    // Revoking the only live link asks the studio to share again.
+    expect((await revokeDeliveryLinkCore(ctx, newer)).ok).toBe(true);
+    progress = await getOnboardingProgress(ctx, orgNoCity);
+    expect(progress).toMatchObject({ hasSharedDelivery: false, newestUnsharedDeliveryId: newer });
+
+    // Another org's unshared delivery is never this org's target.
+    const other = await seedOrg({ owners: 1 });
+    orgIds.push(other.orgId);
+    const otherCtx = ctxFor(other.orgId, other.ownerIds[0], 'owner');
+    expect((await getOnboardingProgress(otherCtx, orgNoCity)).newestUnsharedDeliveryId).toBeNull();
   });
 
   it('a deactivated client does not count: the ladder still asks for a client', async () => {

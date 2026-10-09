@@ -1,7 +1,7 @@
 'use server';
 
 import { randomUUID } from 'node:crypto';
-import { files, organizations } from '@metra/db';
+import { organizations } from '@metra/db';
 import { eq, sql } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
 import { cookies } from 'next/headers';
@@ -16,8 +16,6 @@ import { requireOrg } from '@/lib/auth/require-org';
 import { getSessionUser } from '@/lib/auth/session';
 import { withOrgContext, withUserContext } from '@/lib/db/context';
 import { canManageOrg } from '@/lib/permissions/can';
-import { ensureFilesBucket } from '@/lib/storage/bucket';
-import { createSignedUploadUrl, type SignedUpload } from '@/lib/storage/uploads';
 import { clean } from '@/lib/validation/text';
 import {
   createOrgCore,
@@ -57,49 +55,6 @@ export async function createOrg(input: OrgProfileInput): Promise<ActionResult> {
     { orgId: randomUUID(), userId: user.id, role: 'owner' },
     input,
   );
-}
-
-/** Signed upload URL for the org logo (org must already exist). Manage-only. */
-export async function createLogoUpload(input: {
-  contentType?: string;
-  originalName?: string;
-}): Promise<SignedUpload | ActionResult> {
-  const ctx = await requireOrg();
-  if (!canManageOrg(ctx.role)) return err('forbidden');
-  await ensureFilesBucket();
-  return createSignedUploadUrl(ctx, 'org-logo', {
-    contentType: input.contentType,
-    originalName: input.originalName,
-  });
-}
-
-/** Points the org at an uploaded logo file — only if the file is in the org. */
-export async function setOrgLogo(fileId: string): Promise<ActionResult> {
-  const ctx = await requireOrg();
-  if (!canManageOrg(ctx.role)) return err('forbidden');
-  return withOrgContext(ctx, async (tx) => {
-    // Confirm the file belongs to the caller's org (RLS-scoped). Reject otherwise.
-    const [owned] = await tx
-      .select({ id: files.id })
-      .from(files)
-      .where(eq(files.id, fileId))
-      .limit(1);
-    if (!owned) return { ok: false, error: 'invalid' };
-
-    await tx
-      .update(organizations)
-      .set({ logoFileId: fileId, updatedAt: new Date() })
-      .where(eq(organizations.id, ctx.orgId));
-
-    await recordAudit(tx, {
-      entity: 'organization',
-      entityId: ctx.orgId,
-      action: 'update',
-      before: null,
-      after: { logo_file_id: fileId },
-    });
-    return { ok: true };
-  });
 }
 
 // --- Org settings (owner/admin only) ---------------------------------------

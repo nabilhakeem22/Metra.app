@@ -1,18 +1,20 @@
 'use client';
 
-import { Download, Eye, FileText, Lock } from 'lucide-react';
+import { FileText } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
 import type { PublicDelivery } from '@/lib/engagements/public';
 import { bidiIsolate } from '@/lib/format/bidi';
 import { formatDate } from '@/lib/format/date';
+import { DocumentLinks } from './document-links';
 import { DocumentThread } from './document-thread';
 
 /**
  * Client Deliverables, Step 1 — "Your documents". Lists the files the studio has
  * released to this client, newest share first. Each row shows the friendly category
  * name (never the studio's internal label or the stored filename), the share date,
- * and a plain `<a>` Download link to the tokenized download route — a normal link,
- * so it works with no JavaScript and the browser handles the redirect to the
+ * and plain `<a>` links to the tokenized document route (./document-links.tsx):
+ * View opens the file in the browser, Download saves it. Normal links, so they
+ * work with no JavaScript and the browser follows the redirect to the
  * short-lived signed URL.
  *
  * The card ALWAYS renders: with nothing shared it shows the honest empty copy
@@ -80,33 +82,11 @@ export function DocumentsCard({
                   </p>
                 )}
               </div>
-              {releasedDocument.access === 'withheld' ? (
-                // No link at all — and the route refuses this id independently, so
-                // an old URL is just as dead as the missing button.
-                <span className="ms-auto inline-flex items-center gap-1.5 rounded-pill border border-dashed px-3 py-1.5 text-caption font-medium text-muted-foreground">
-                  <Lock className="size-3.5" aria-hidden />
-                  {t('afterPayment')}
-                </span>
-              ) : (
-                <a
-                  href={`/${locale}/d/${encodeURIComponent(token)}/documents/${releasedDocument.id}`}
-                  rel="noopener"
-                  target={releasedDocument.access === 'preview' ? '_blank' : undefined}
-                  className="ms-auto inline-flex items-center gap-1.5 rounded-pill border px-3 py-1.5 text-caption font-semibold hover:bg-muted coarse:min-h-11"
-                >
-                  {releasedDocument.access === 'preview' ? (
-                    <>
-                      <Eye className="size-3.5" aria-hidden />
-                      {t('view')}
-                    </>
-                  ) : (
-                    <>
-                      <Download className="size-3.5" aria-hidden />
-                      {t('download')}
-                    </>
-                  )}
-                </a>
-              )}
+              <DocumentLinks
+                token={token}
+                documentId={releasedDocument.id}
+                access={releasedDocument.access}
+              />
               {/* Full-width, so the thread wraps onto its own line under the row. */}
               <DocumentThread
                 token={token}
