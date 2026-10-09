@@ -8,9 +8,9 @@
 import type { ConceptLetter } from '../concept-letter';
 import type { DocumentAccess } from '../document-access';
 import type { MilestoneProgress } from '../journey-map';
-import type { PortalLabel } from '../portal-labels';
 import type { ClientDocumentCategory } from '../portal-documents';
 import type { HeroView } from '../portal-hero';
+import type { PortalStageKey } from '../portal-stage';
 
 /** One milestone in the client's payment schedule — DUE amounts only, no cost. */
 export interface PublicDeliveryMilestone {
@@ -25,13 +25,12 @@ export interface PublicDeliveryMilestone {
 export interface PublicDelivery {
   id: string;
   number: number;
-  /** Client-friendly, bilingual stage label (mapped from `state` server-side).
-   *  The raw machine state is deliberately NOT part of this client-facing shape,
-   *  so it never reaches the browser payload. */
-  stageLabel: PortalLabel;
-  /** Read-only "what's happening / what's next" line, bilingual. */
-  stageNote: PortalLabel;
-  /** The client's position on the 5-milestone journey. Derived server-side from
+  /** The client word for the current stage (mapped from `state` server-side);
+   *  its label and note are `delivery.stage.<key>` in the catalogs. The raw
+   *  machine state is deliberately NOT part of this client-facing shape, so it
+   *  never reaches the browser payload, and no stage key equals a state name. */
+  stageKey: PortalStageKey;
+  /** The client's position on the 6-milestone journey. Derived server-side from
    *  the raw state so the machine state name never reaches the browser payload. */
   milestone: MilestoneProgress;
   /** The single "what needs you now" hero. Derived server-side (no raw state). */

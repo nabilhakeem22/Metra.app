@@ -67,8 +67,7 @@ export function PublicDeliveryView({
           token={token}
           hero={delivery.hero}
           milestone={delivery.milestone}
-          stageLabel={delivery.stageLabel}
-          stageNote={delivery.stageNote}
+          stageKey={delivery.stageKey}
           concept={delivery}
         />
         {delivery.hero.showRomAck && <BudgetCard token={token} rom={delivery.rom} />}

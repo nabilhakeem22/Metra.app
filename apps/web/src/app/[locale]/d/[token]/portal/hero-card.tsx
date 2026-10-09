@@ -1,9 +1,9 @@
 'use client';
 
-import { useLocale, useTranslations } from 'next-intl';
+import { useTranslations } from 'next-intl';
 import type { PublicDelivery } from '@/lib/engagements/public/types';
-import { pickPortalLabel, type PortalLabel } from '@/lib/engagements/portal-labels';
 import type { HeroView } from '@/lib/engagements/portal-hero';
+import type { PortalStageKey } from '@/lib/engagements/portal-stage';
 import { bidiIsolate } from '@/lib/format/bidi';
 import { ConceptOptionPicker } from './concept-option-picker';
 import { ActionHero } from './hero-action';
@@ -15,23 +15,22 @@ const PICKER_MIN_OPTIONS = 2;
  * The hero: the single "what needs you now" surface. At the concept review, with
  * at least two released options and the approval still open, it is the option
  * picker; in any other actionable state it is the group's CTA (./hero-action.tsx);
- * otherwise a calm in-progress / delivered / closed card reusing the client-safe
- * stage label and note, which also repeats the option the client chose, in the
- * letter saved with that choice. Never renders a raw state name.
+ * otherwise a calm in-progress / delivered / closed card with the stage's label
+ * and note from the catalog (`delivery.stage.<key>`), which also repeats the
+ * option the client chose, in the letter saved with that choice. Never renders
+ * a raw state name.
  */
 export function HeroCard({
   token,
   hero,
-  stageLabel,
-  stageNote,
+  stageKey,
   clientActions,
   conceptOptions,
   conceptChoice,
 }: {
   token: string;
   hero: HeroView;
-  stageLabel: PortalLabel;
-  stageNote: PortalLabel;
+  stageKey: PortalStageKey;
   clientActions: PublicDelivery['clientActions'];
   conceptOptions: PublicDelivery['conceptOptions'];
   conceptChoice: PublicDelivery['conceptChoice'];
@@ -55,8 +54,7 @@ export function HeroCard({
   return (
     <CalmHero
       kind={hero.kind}
-      stageLabel={stageLabel}
-      stageNote={stageNote}
+      stageKey={stageKey}
       chosenLetter={conceptChoice?.letter ?? null}
     />
   );
@@ -65,26 +63,21 @@ export function HeroCard({
 /** The calm, non-actionable hero (in-progress / delivered / closed). */
 function CalmHero({
   kind,
-  stageLabel,
-  stageNote,
+  stageKey,
   chosenLetter,
 }: {
   kind: HeroView['kind'];
-  stageLabel: PortalLabel;
-  stageNote: PortalLabel;
+  stageKey: PortalStageKey;
   /** The letter saved with the client's concept choice, if they made one. */
   chosenLetter: string | null;
 }) {
   const t = useTranslations('delivery.hero');
+  const tStage = useTranslations('delivery.stage');
   const tPicker = useTranslations('delivery.conceptPicker');
-  const locale = useLocale();
   const delivered = kind === 'delivered';
-  const headline = pickPortalLabel(stageLabel, locale);
+  const headline = tStage(`${stageKey}.label`);
   // In-progress reassures ("nothing to do"); delivered/closed keep the stage note.
-  const body =
-    kind === 'inProgress'
-      ? t('reassurance')
-      : pickPortalLabel(stageNote, locale);
+  const body = kind === 'inProgress' ? t('reassurance') : tStage(`${stageKey}.note`);
 
   return (
     <section

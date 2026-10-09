@@ -2257,12 +2257,79 @@
     },
     "greeting": "Hello, {name} 👋",
     "firmSubtitle": "Your design project",
+    "stage": {
+      "gettingStarted": {
+        "label": "Getting started",
+        "note": "Your design team is setting up your project."
+      },
+      "proposalReady": {
+        "label": "Proposal ready for you",
+        "note": "Your design proposal is ready. Your team will walk you through the next step."
+      },
+      "measuring": {
+        "label": "Measuring your space",
+        "note": "We are capturing accurate measurements of your space."
+      },
+      "spacePlanning": {
+        "label": "Working on the layout",
+        "note": "We are shaping the layout of your space."
+      },
+      "conceptReview": {
+        "label": "Concept ready for your review",
+        "note": "A first design concept is ready for you to look over."
+      },
+      "refiningConcept": {
+        "label": "Refining the concept with you",
+        "note": "We are refining the concept based on your feedback."
+      },
+      "visuals": {
+        "label": "Preparing your 3D visuals",
+        "note": "We are preparing 3D visuals so you can picture the result."
+      },
+      "finalApproval": {
+        "label": "Final design ready for approval",
+        "note": "The final design is ready for your approval."
+      },
+      "reviewingChanges": {
+        "label": "Reviewing as-built changes",
+        "note": "We are reviewing changes found on site."
+      },
+      "drawings": {
+        "label": "Preparing production drawings",
+        "note": "We are preparing the detailed drawings for construction."
+      },
+      "quantities": {
+        "label": "Preparing the bill of quantities",
+        "note": "We are preparing the detailed scope of works."
+      },
+      "nextSteps": {
+        "label": "Planning the next steps",
+        "note": "We are planning how your project moves forward."
+      },
+      "handover": {
+        "label": "Preparing your design handover",
+        "note": "Your design package is being prepared for handover."
+      },
+      "delivered": {
+        "label": "Design delivered",
+        "note": "Your design has been delivered. Thank you for working with us."
+      },
+      "construction": {
+        "label": "In construction",
+        "note": "Your project is under construction."
+      },
+      "closed": {
+        "label": "Closed",
+        "note": "This project is closed."
+      }
+    },
     "journey": {
       "eyebrow": "Your journey",
       "proposal": "Proposal",
       "survey": "Survey",
       "concept": "Concept",
-      "threeD": "3D visuals",
+      "design": "Design",
+      "documents": "Drawings and quantities",
       "handover": "Handover"
     },
     "hero": {

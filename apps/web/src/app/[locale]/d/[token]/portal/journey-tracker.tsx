@@ -10,7 +10,7 @@ import {
 type StepState = 'done' | 'now' | 'future';
 
 /**
- * Resolve each of the five steps to done / now / future per the render rule:
+ * Resolve each of the six steps to done / now / future per the render rule:
  *  - allComplete → every step done
  *  - closed (abandoned) → every step muted (future)
  *  - otherwise → i < index done, i === index now, i > index future
@@ -26,7 +26,7 @@ function stepStates(milestone: MilestoneProgress): StepState[] {
 }
 
 /**
- * The five-milestone journey tracker (Proposal → Handover). Logical CSS only, so
+ * The six-milestone journey tracker (Proposal → Handover). Logical CSS only, so
  * the connector line mirrors correctly in RTL (inset-inline-start). Never shows a
  * raw machine state — it renders only the derived MilestoneProgress.
  */
@@ -52,8 +52,9 @@ export function JourneyTracker({
           const active = state === 'done' || state === 'now';
           return (
             <li
-              key={step.key}
-              className="relative flex flex-1 flex-col items-center gap-2 text-center"
+              key={step}
+              aria-current={state === 'now' ? 'step' : undefined}
+              className="relative flex min-w-0 flex-1 flex-col items-center gap-2 text-center"
             >
               {index > 0 && (
                 <span
@@ -78,12 +79,14 @@ export function JourneyTracker({
                   index + 1
                 )}
               </span>
+              {/* Six columns at 390 px leave about 54 px each: a long word may
+                  hyphenate or break rather than push the page sideways. */}
               <span
-                className={`text-caption font-semibold leading-tight ${
+                className={`max-w-full text-caption font-semibold leading-tight hyphens-auto [overflow-wrap:anywhere] ${
                   active ? 'text-foreground' : 'text-muted-foreground'
                 }`}
               >
-                {t(step.key)}
+                {t(step)}
               </span>
             </li>
           );

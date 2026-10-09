@@ -36,7 +36,7 @@ export function WhatsNext({
       <p className="flex items-baseline gap-1.5 text-small text-muted-foreground">
         <ArrowRight className="size-3.5 shrink-0 translate-y-0.5 rtl:rotate-180" aria-hidden />
         <span>
-          {t('whatsNext.eyebrow')} · <span className="font-semibold text-foreground">{tJourney(nextMilestone.key)}</span>
+          {t('whatsNext.eyebrow')} · <span className="font-semibold text-foreground">{tJourney(nextMilestone)}</span>
         </span>
       </p>
     );
@@ -55,7 +55,7 @@ export function WhatsNext({
           {t('whatsNext.eyebrow')}
         </p>
         <p className="mt-0.5 truncate text-body font-semibold">
-          {tJourney(nextMilestone.key)}
+          {tJourney(nextMilestone)}
         </p>
       </div>
     </section>

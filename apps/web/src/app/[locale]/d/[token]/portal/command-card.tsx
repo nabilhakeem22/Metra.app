@@ -1,6 +1,6 @@
 import type { MilestoneProgress } from '@/lib/engagements/journey-map';
 import type { HeroView } from '@/lib/engagements/portal-hero';
-import type { PortalLabel } from '@/lib/engagements/portal-labels';
+import type { PortalStageKey } from '@/lib/engagements/portal-stage';
 import type { PublicDelivery } from '@/lib/engagements/public/types';
 import { HeroCard } from './hero-card';
 import { JourneyTracker } from './journey-tracker';
@@ -15,7 +15,7 @@ import { WhatsNext } from './whats-next';
  * end, and a next-step card that far away does not do that job.
  *
  * So they are one card now, read top to bottom, every time:
- *   1. where we are      — the five-milestone ribbon
+ *   1. where we are      — the six-milestone ribbon
  *   2. the one thing now — the hero's single CTA (or its calm in-progress state)
  *   3. what happens next — one quiet line, directly under the action
  *
@@ -27,15 +27,13 @@ export function PortalCommandCard({
   token,
   hero,
   milestone,
-  stageLabel,
-  stageNote,
+  stageKey,
   concept,
 }: {
   token: string;
   hero: HeroView;
   milestone: MilestoneProgress;
-  stageLabel: PortalLabel;
-  stageNote: PortalLabel;
+  stageKey: PortalStageKey;
   /** What the hero needs to offer the concept options as a choice (B12). */
   concept: Pick<PublicDelivery, 'clientActions' | 'conceptOptions' | 'conceptChoice'>;
 }) {
@@ -45,8 +43,7 @@ export function PortalCommandCard({
       <HeroCard
         token={token}
         hero={hero}
-        stageLabel={stageLabel}
-        stageNote={stageNote}
+        stageKey={stageKey}
         clientActions={concept.clientActions}
         conceptOptions={concept.conceptOptions}
         conceptChoice={concept.conceptChoice}

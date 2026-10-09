@@ -25,8 +25,6 @@ const GROUP_VERBS = {
   handoff: ['acknowledge_handoff'],
 } as const;
 
-const LABEL = { ar: 'مراجعة', en: 'Review' };
-
 const OPTION_A = '11111111-1111-4111-8111-111111111111';
 const OPTION_B = '22222222-2222-4222-8222-222222222222';
 const TWO_OPTIONS = [
@@ -43,8 +41,7 @@ function renderHero(
     <HeroCard
       token="tok"
       hero={{ kind: 'action', group, showRomAck: false }}
-      stageLabel={LABEL}
-      stageNote={LABEL}
+      stageKey="conceptReview"
       clientActions={concept.clientActions ?? [...GROUP_VERBS[group]]}
       conceptOptions={concept.conceptOptions ?? []}
       conceptChoice={null}
@@ -137,8 +134,7 @@ describe('the calm hero repeats the saved choice (B12)', () => {
       <HeroCard
         token="tok"
         hero={{ kind, showRomAck: false }}
-        stageLabel={LABEL}
-        stageNote={LABEL}
+        stageKey="visuals"
         clientActions={[]}
         conceptOptions={[]}
         conceptChoice={{ id: OPTION_B, letter: 'B' }}
