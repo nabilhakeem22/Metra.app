@@ -7,13 +7,14 @@ import 'server-only';
 // tick in the same hour simply finds nothing. No email: the client act already
 // notified the studio.
 //
-// ONE READ PER ORG PER HOUR when there is nothing to close (R1): the probe runs
-// on the runner's privileged connection, like its other per-tick reads, so it
-// opens no RLS transaction. It is scoped to this org explicitly and answers only
-// ids and who confirmed; every close then runs through the executor in the org's
-// RLS transaction as the system actor, with its capability and guard checks.
+// ONE READ PER ORG PER HOUR when there is nothing to close (R1): a single
+// statement inside the org's RLS read transaction, as the system actor (tenant
+// isolation stays with RLS; the explicit org predicate is belt and braces). It
+// answers only ids and who confirmed; every close then runs through the executor
+// in its own RLS transaction, with its capability and guard checks.
+import type { MetraDb } from '@metra/db';
 import { sql } from 'drizzle-orm';
-import { withRequestDb } from '@/lib/db/client';
+import { withOrgContext } from '@/lib/db/context';
 import { closeAcknowledgedHandover } from '@/lib/engagements/handover-close';
 import type { AutomationDeps, AutomationResult } from './types';
 
@@ -35,9 +36,8 @@ interface AcknowledgedHandover {
  * design (interior) flow is on: a delivery the executor would refuse
  * (`flow_not_enabled`) never takes a place in the window.
  */
-async function acknowledgedHandovers(orgId: string, settledBy: Date): Promise<AcknowledgedHandover[]> {
-  const rows = await withRequestDb((db) =>
-    db.execute(sql`
+async function acknowledgedHandovers(tx: MetraDb, orgId: string, settledBy: Date): Promise<AcknowledgedHandover[]> {
+  const rows = await tx.execute(sql`
       select de.id as engagement_id,
              case when ack.actor_channel = 'client' or ack.actor_user_id is null
                   then 'client' else ack.actor_user_id::text end as recorded_by
@@ -62,8 +62,7 @@ async function acknowledgedHandovers(orgId: string, settledBy: Date): Promise<Ac
            select 1 from public.workspace_entitlements we
             where we.org_id = de.org_id and 'interior' = any (we.enabled_flows))
        order by de.updated_at asc
-       limit ${HANDOVER_CLOSES_PER_TICK}`),
-  );
+       limit ${HANDOVER_CLOSES_PER_TICK}`);
   return (rows as unknown as Array<{ engagement_id: string; recorded_by: string }>).map((row) => ({
     engagementId: row.engagement_id,
     recordedBy: row.recorded_by,
@@ -73,7 +72,8 @@ async function acknowledgedHandovers(orgId: string, settledBy: Date): Promise<Ac
 export async function runHandoverCloser(deps: AutomationDeps): Promise<AutomationResult> {
   const result: AutomationResult = { automation: 'handover', ran: true, effects: 0, emailsSent: 0, emailsFailed: 0 };
   const settledBy = new Date(deps.now.getTime() - SETTLE_MS);
-  for (const handover of await acknowledgedHandovers(deps.ctx.orgId, settledBy)) {
+  const handovers = await withOrgContext(deps.ctx, (tx) => acknowledgedHandovers(tx, deps.ctx.orgId, settledBy));
+  for (const handover of handovers) {
     const outcome = await closeAcknowledgedHandover(deps.ctx, handover.engagementId, handover.recordedBy);
     if (outcome === 'closed') result.effects += 1;
   }

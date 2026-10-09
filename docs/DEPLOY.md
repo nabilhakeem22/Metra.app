@@ -296,7 +296,7 @@ per org, so two overlapping ticks cannot both do the work.
 | `digest` | 07:00 Cairo | `digest`: cadence and day or ISO week | owners and admins |
 | `stage` | 07:00 Cairo | `stage`: Cairo day | owners and admins |
 | `delivery` (Round C) | 07:00 Cairo, while follow-ups are on | `delivery`: Cairo day; `delivery-followup`: `<delivery id>:<ISO week>` | owners and admins, about deliveries waiting on the client for the follow-up threshold (at most 10 per org per day; 200 in-flight deliveries read) |
-| `handover` (Round C) | every tick | none: closing is idempotent through the state gate | nobody: it closes design-only deliveries whose handover the client confirmed at least 2 minutes ago (at most 50 per org per tick). An org with nothing to close costs one read on the runner's connection, no transaction; a workspace whose design flow is off is skipped |
+| `handover` (Round C) | every tick | none: closing is idempotent through the state gate | nobody: it closes design-only deliveries whose handover the client confirmed at least 2 minutes ago (at most 50 per org per tick). An org with nothing to close costs one read inside its RLS transaction; a workspace whose design flow is off is skipped |
 
 No core ever messages a client (owner decision, Oct 9): the `delivery` core
 reminds the studio, and the studio sends the client the existing WhatsApp or
@@ -310,8 +310,9 @@ case, 2 client-confirmed handovers to close on that very tick:
 
 | orgs | off 07:00, nothing to close | off 07:00, 2 closes per org | 07:00 Cairo |
 |---|---|---|---|
-| 20 | +0.47 s | +11.7 s | +19.1 s |
-| 100 | +2.3 s | +56.6 s | +92.6 s |
+| 1 | +0.20 s | +1.8 s | +2.9 s |
+| 20 | +1.41 s | +12.8 s | +20.6 s |
+| 100 | +6.8 s | +61.2 s | +98.4 s |
 
 The off-hour cost with nothing to close is within budget at 20 orgs. Each close
 is a full executor run (13 statements, ~0.8 s at that round-trip time) and
@@ -319,7 +320,7 @@ happens once per delivery in its life, so the "2 closes per org" column is a
 burst, not a steady state. The 07:00 delta (about 0.5 s per org for the
 follow-ups, 0.5 s for the digest's delivery counts, plus any closes) is over the
 plan's 3 s at 20 orgs on this model; the 15-minute ceiling holds with a wide
-margin (100 orgs: 163 s; with Resend hanging: 146 s, was 910 s). Read the real
+margin (100 orgs at 07:00: about 170 s; with Resend hanging: 146 s, was 910 s). Read the real
 figure from the tick line below at the first 07:00 Cairo after the deploy before
 deciding anything; if it must come down, cap the cores, do not lower
 `ORG_CONCURRENCY`.

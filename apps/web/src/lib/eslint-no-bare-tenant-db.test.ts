@@ -59,11 +59,6 @@ it('no-bare-tenant-db: flags raw-connection queries, allows scoped ones', () => 
         filename: 'apps/web/src/lib/automation/system-context.ts',
         code: 'withRequestDb((db) => db.select().from(memberships));',
       },
-      // Allowlisted handover-closer existence probe (sanctioned exception 4).
-      {
-        filename: 'apps/web/src/lib/automation/handover-closer.ts',
-        code: 'withRequestDb((db) => db.execute(sql`select de.id from public.design_engagements de where de.org_id = ${orgId}::uuid`));',
-      },
       // Allowlisted isolation test dir.
       {
         filename: 'tests/isolation/shared-pool.test.ts',
