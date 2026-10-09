@@ -154,6 +154,58 @@ as $$
   end;
 $$;
 
+-- Round C (0058): THE rule for "is this file an image, a PDF or something
+-- else", by the extension of its stored name: png, jpg, jpeg, webp = 'image';
+-- pdf = 'pdf'; anything else, no extension or a NULL name = 'other'. The portal
+-- snapshot (documents[].media), the download route's resolver
+-- (app_delivery_document_by_token) and the studio logo (app_delivery_logo_by_token)
+-- all read it, so the thumbnail the portal shows and the bytes the route serves
+-- can never disagree about what a file is.
+--
+-- It is not app_document_access's preview test: a payment-gated PREVIEW still
+-- needs a png/jpg/jpeg (webp is an image here, but is withheld before payment
+-- there). IMMUTABLE and not SECURITY DEFINER: it reads no table. Revoked from
+-- public and the API roles right below, like every app_* function.
+create or replace function public.app_document_media(p_original_name text)
+returns text
+language sql
+immutable
+set search_path = ''
+as $$
+  select case lower(coalesce(
+    substring(p_original_name from '\.([A-Za-z0-9]{1,5})$'), ''
+  ))
+    when 'png' then 'image'
+    when 'jpg' then 'image'
+    when 'jpeg' then 'image'
+    when 'webp' then 'image'
+    when 'pdf' then 'pdf'
+    else 'other'
+  end;
+$$;
+
+-- Closed in the SAME implicit transaction as the CREATE above (see
+-- app_concept_option_positions below for why). The metra_app grant is guarded
+-- because on a fresh database roles.sql, which creates that role, has not run.
+revoke all on function public.app_document_media(text) from public;
+do $$
+declare
+  r text;
+begin
+  foreach r in array array['anon', 'authenticated', 'service_role'] loop
+    if exists (select 1 from pg_roles where rolname = r) then
+      execute format(
+        'revoke all on function public.app_document_media(text) from %I',
+        r
+      );
+    end if;
+  end loop;
+  if exists (select 1 from pg_roles where rolname = 'metra_app') then
+    grant execute on function public.app_document_media(text) to metra_app;
+  end if;
+end
+$$;
+
 -- Round B (0057): THE rule that letters concept options, the released
 -- (`client_visible`), file-bearing `concept_option` artifacts of one delivery,
 -- ranked by (attested_at, id), positions 1 to 4 (option A to D). A fifth
@@ -244,7 +296,15 @@ $$;
 --     rom_low, rom_high (the budget band, and ONLY once rom_issued_at is
 --     stamped — an unissued band is the studio's private working state),
 --     share_expires_at
---   organizations (the firm): name_ar, name_en, logo_file_id
+--   organizations (the firm): name_ar, name_en, logo_file_id;
+--     studio_phone, studio_whatsapp (Round C, 0058: firm.phone, firm.whatsapp,
+--     the Call and WhatsApp buttons, shown whenever set);
+--     instapay_address, bank_name, bank_account_holder, bank_account_number,
+--     bank_iban (0058: `payment_details`, the studio's own payment
+--     instructions, written by owner/admin for clients to read). ONLY while a
+--     payment is due: null once every milestone is settled (or there is no
+--     schedule), and null when none of the five is set. The TS mapper
+--     (lib/engagements/public) applies the same rule before the browser.
 --   clients (the end client): name_ar, name_en
 --   engagement_milestones: kind, basis, sort_order, value (only as an input to
 --     the client's amount_due — the raw basis value is not leaked as cost)
@@ -273,6 +333,39 @@ $$;
 --     'approved' (a plain approval), 'changes_requested', or null. A repeat
 --     tap that the write answers `already` is told what was actually SAVED,
 --     never the option it just named.
+--   claim.claimable_milestones[].claimed_at (0058): created_at of that
+--     milestone's PENDING client claim (null when there is none), so the page
+--     can say when the client marked it as paid. No other claim column.
+--   documents[].media (0058): 'image' | 'pdf' | 'other' from
+--     app_document_media(files.original_name). The name itself is still never
+--     returned; only this three-way class of it is.
+--   expected_on (0058): design_engagements.client_expected_on, ONLY while
+--     client_expected_state equals the current state, so a stage move retires
+--     the date without any write. client_expected_state is read, never returned.
+--   design_decision (0058): the newest LIVE client design_approval or
+--     design_change_request of the CURRENT render round (the respond
+--     function's round predicate on renders_ready_at) as
+--     { kind: 'approved' | 'changes_requested', at: decided_at }, else null.
+--   handover_acknowledged_at (0058): decided_at of the newest LIVE client
+--     handoff_acknowledgement, else null.
+--   rom_acknowledged_at (0058): decided_at of the newest LIVE client
+--     rom_acknowledgement of the CURRENT issuance (acknowledged_issue_at is not
+--     distinct from rom_issued_at), only while a band is issued; else null.
+--   timeline (0058): the newest 60 of, newest first:
+--     * { type: 'stage', state, at } per engagement_transitions row of this
+--       delivery that MOVED the state (to_state not null and distinct from
+--       from_state; self-loops are not stages). `state` is the raw key the TS
+--       layer maps to a client word, as for the top-level `state`;
+--     * { type: 'decision', kind, at, by_studio, option_position } per LIVE
+--       engagement_events row of the six decision kinds that is the client's
+--       own (actor_channel = 'client'), or a budget or handover
+--       acknowledgement, or a concept/design approval the studio recorded WITH
+--       evidence (by_studio = true). option_position is the saved letter of a
+--       concept choice, else null;
+--     * { type: 'payment', kind, amount, at } per payment_events row (amount
+--       as a scale-4 string, at = cleared_at): money the CLIENT paid.
+--     Never selected for the timeline: an actor id or name, a note, evidence
+--     text, a payment method or reference, the trigger name.
 --
 -- RETRACTED CLIENT DECISIONS (an event_correction points at them) answer
 --   nothing here, exactly as liveEvents() drops them in the studio's TS rule.
@@ -283,7 +376,7 @@ $$;
 -- READ, NEVER RETURNED: design_engagements.renders_ready_at (Round B). The
 --   design decision verbs in `client_actions` answer ONE render issuance, so
 --   the predicate compares the client's design decisions against it; the value
---   itself does not cross the wire.
+--   itself does not cross the wire. Likewise client_expected_state (0058).
 --
 -- PHYSICALLY OMITTED (never referenced): design_engagements.render_manifest_hash,
 --   revision_count, free_revision_n, design_revision_count,
@@ -323,8 +416,32 @@ as $$
     'firm', jsonb_build_object(
       'name_ar', o.name_ar,
       'name_en', o.name_en,
-      'logo_file_id', o.logo_file_id
+      'logo_file_id', o.logo_file_id,
+      'phone', o.studio_phone,
+      'whatsapp', o.studio_whatsapp
     ),
+    -- Round C (0058): the studio's payment instructions, ONLY while a payment
+    -- is due (owner decision): null when no milestone has a remaining due (the
+    -- settled test, the same price-blind math as `claim` below, so a schedule
+    -- with no milestones is settled too) and null when the studio set none of
+    -- the five. The TS mapper applies the same rule again before the browser.
+    'payment_details', case
+      when public.app_engagement_payments_settled(de.id) then null
+      when coalesce(o.instapay_address, o.bank_name, o.bank_account_holder,
+                    o.bank_account_number, o.bank_iban) is null then null
+      else jsonb_build_object(
+        'instapay', o.instapay_address,
+        'bank_name', o.bank_name,
+        'bank_account_holder', o.bank_account_holder,
+        'bank_account_number', o.bank_account_number,
+        'bank_iban', o.bank_iban
+      )
+    end,
+    -- Round C (0058): the date the client should expect the next step, only
+    -- while the delivery is still in the stage the studio set it for.
+    'expected_on', case
+      when de.client_expected_state = de.state then de.client_expected_on
+    end,
     'client', jsonb_build_object(
       'name_ar', c.name_ar,
       'name_en', c.name_en
@@ -521,6 +638,15 @@ as $$
                 where pc.engagement_id = de.id
                   and pc.milestone_kind = m.kind
                   and pc.status = 'pending'
+              ),
+              -- Round C (0058): when the client marked it as paid. At most one
+              -- pending claim per milestone (0034), so max() is that one.
+              'claimed_at', (
+                select max(pc.created_at) from public.client_payment_claims pc
+                where pc.engagement_id = de.id
+                  and pc.org_id = de.org_id
+                  and pc.milestone_kind = m.kind
+                  and pc.status = 'pending'
               )
             ) as cm
           from public.engagement_milestones m
@@ -575,7 +701,10 @@ as $$
             -- enforcement read ONE rule.
             'access', public.app_document_access(
               a.kind, public.app_document_settled(a.kind, de.id), f.original_name
-            )
+            ),
+            -- Round C (0058): image, pdf or other, by the one media rule the
+            -- download route also reads. The file name is not returned.
+            'media', public.app_document_media(f.original_name)
           ) as d
         from public.engagement_artifacts a
         join public.files f on f.id = a.file_id and f.org_id = a.org_id
@@ -619,7 +748,124 @@ as $$
         )
       order by e.decided_at desc
       limit 1
-    )
+    ),
+    -- Round C (0058): the client's design decision on file for the CURRENT
+    -- render round, by the respond function's own round predicate, so a
+    -- re-issued set of renders reads as "no decision yet".
+    'design_decision', (
+      select jsonb_build_object(
+        'kind', case when e.kind = 'design_approval' then 'approved' else 'changes_requested' end,
+        'at', e.decided_at
+      )
+      from public.engagement_events e
+      where e.engagement_id = de.id
+        and e.org_id = de.org_id
+        and e.actor_channel = 'client'
+        and e.kind in ('design_approval', 'design_change_request')
+        and not exists (
+          select 1 from public.engagement_events x
+          where x.org_id = e.org_id and x.supersedes_event_id = e.id
+        )
+        and (
+          e.acknowledged_issue_at is not distinct from de.renders_ready_at
+          or (e.acknowledged_issue_at is null
+              and de.renders_ready_at is not null
+              and e.decided_at >= de.renders_ready_at)
+        )
+      order by e.decided_at desc
+      limit 1
+    ),
+    -- Round C (0058): when the client confirmed receiving the handover.
+    'handover_acknowledged_at', (
+      select max(e.decided_at)
+      from public.engagement_events e
+      where e.engagement_id = de.id
+        and e.org_id = de.org_id
+        and e.actor_channel = 'client'
+        and e.kind = 'handoff_acknowledgement'
+        and not exists (
+          select 1 from public.engagement_events x
+          where x.org_id = e.org_id and x.supersedes_event_id = e.id
+        )
+    ),
+    -- Round C (0058): when the client acknowledged the band issued NOW. A
+    -- re-issued band reads as not yet acknowledged.
+    'rom_acknowledged_at', case
+      when de.rom_issued_at is null then null
+      else (
+        select max(e.decided_at)
+        from public.engagement_events e
+        where e.engagement_id = de.id
+          and e.org_id = de.org_id
+          and e.actor_channel = 'client'
+          and e.kind = 'rom_acknowledgement'
+          and e.acknowledged_issue_at is not distinct from de.rom_issued_at
+          and not exists (
+            select 1 from public.engagement_events x
+            where x.org_id = e.org_id and x.supersedes_event_id = e.id
+          )
+      )
+    end,
+    -- Round C (0058): what happened, dated, newest first, at most 60 entries.
+    -- Only the fields listed in the header comment are selected: no actor,
+    -- note, evidence text, method or reference.
+    'timeline', coalesce((
+      select jsonb_agg(t.entry order by t.at desc, t.entry::text)
+      from (
+        select u.entry, u.at
+        from (
+          select jsonb_build_object(
+                   'type', 'stage',
+                   'state', tr.to_state,
+                   'at', tr.decided_at
+                 ) as entry,
+                 tr.decided_at as at
+          from public.engagement_transitions tr
+          where tr.engagement_id = de.id
+            and tr.org_id = de.org_id
+            and tr.to_state is not null
+            and tr.to_state is distinct from tr.from_state
+          union all
+          select jsonb_build_object(
+                   'type', 'decision',
+                   'kind', e.kind,
+                   'at', e.decided_at,
+                   'by_studio', e.actor_channel <> 'client',
+                   'option_position', e.chosen_position
+                 ),
+                 e.decided_at
+          from public.engagement_events e
+          where e.engagement_id = de.id
+            and e.org_id = de.org_id
+            and e.kind in ('concept_approval', 'concept_change_request',
+                           'design_approval', 'design_change_request',
+                           'rom_acknowledgement', 'handoff_acknowledgement')
+            and (
+              e.actor_channel = 'client'
+              or e.kind in ('rom_acknowledgement', 'handoff_acknowledgement')
+              or (e.kind in ('concept_approval', 'design_approval')
+                  and e.evidence is not null)
+            )
+            and not exists (
+              select 1 from public.engagement_events x
+              where x.org_id = e.org_id and x.supersedes_event_id = e.id
+            )
+          union all
+          select jsonb_build_object(
+                   'type', 'payment',
+                   'kind', pe.kind,
+                   'amount', pe.amount::numeric(18, 4)::text,
+                   'at', pe.cleared_at
+                 ),
+                 pe.cleared_at
+          from public.payment_events pe
+          where pe.engagement_id = de.id
+            and pe.org_id = de.org_id
+        ) u
+        order by u.at desc, u.entry::text
+        limit 60
+      ) t
+    ), '[]'::jsonb)
   )
   from public.design_engagements de
   join public.organizations o on o.id = de.org_id

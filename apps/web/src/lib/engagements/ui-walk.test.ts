@@ -184,6 +184,8 @@ function engagement(): DesignEngagement {
     tokenHash: null,
     tokenNonce: null,
     shareExpiresAt: null,
+    clientExpectedOn: null,
+    clientExpectedState: null,
   };
 }
 

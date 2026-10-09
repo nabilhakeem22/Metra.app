@@ -477,6 +477,10 @@ $$;
 --   * never return `new_recipients` or `locale` to the portal (they are the
 --     studio's member ids and setting); the portal learns only whether
 --     notified_count > 0.
+-- The one other caller is app_notify_lost_client_acts (Round C, 0058), the
+-- hourly repair: it calls this only for an act that the shared anchor rule
+-- dates inside its window and that no notification answers, with the act's
+-- own key, the milestone it names and the role list the app gave for that key.
 --
 -- DEDUPE (0057): ONE UNREAD notification per (recipient, delivery, body key,
 -- milestone). `milestone` is `p_params.milestoneKind`, which only
@@ -687,15 +691,12 @@ begin
 end
 $$;
 
--- Round B (0057): was THIS client act's studio notification ever written?
--- The safety net for a lost notification. A client write function answers
--- `already` on a repeat tap; if the notifier failed on the first `ok` (a
--- timeout, a dropped connection), the studio was never told. On `already` the
--- portal asks this predicate and notifies only when it answers false, so a
--- repeat tap repairs the loss and an ordinary repeat sends nothing twice.
---
--- THE ANCHOR is the act the write's `already` pointed at, by body key (client
--- channel; a row an event_correction retracts does not count):
+-- Round C (0058): WHEN did the client act this notification body key reports
+-- happen? THE ONE ANCHOR RULE, read by app_delivery_act_notified_by_token (the
+-- repeat-tap repair, R3) and app_notify_lost_client_acts (the hourly sweep), so
+-- the two can never disagree about which act a notification answers. The rule
+-- is B12's predicate table, moved here verbatim, plus one key (client channel;
+-- a row an event_correction retracts does not count):
 --   client_concept_approved          newest client concept_approval naming no option
 --   client_concept_chosen            newest client concept_approval naming an option
 --   client_concept_changes_requested newest client concept_change_request
@@ -705,51 +706,55 @@ $$;
 --   client_budget_acknowledged       client rom_acknowledgement of the current issuance
 --   client_handover_acknowledged     newest client handoff_acknowledgement
 --   client_payment_claimed           the PENDING claim of p_milestone_kind (its created_at)
--- It then answers whether a `client_responded` notification with that body key
--- (and, for a payment claim, that milestone) was written or bumped at or after
--- the anchor, for ANY recipient, read or not. Sound because the notifier always
--- writes (or bumps created_at to now on) its row in a LATER transaction than
--- the act it reports.
+--   client_commented                 newest client comment on any document (0058;
+--                                      only the sweep asks for it: the R3 predicate
+--                                      answers null for a comment, as it did in B12)
+-- Any other key, an unknown delivery, or no anchor row: null.
 --
--- RETURNS null when no live link matches (the same share_expires_at rule as
--- app_delivery_by_token), when the key has no anchor rule (client_commented, an
--- unknown key) or when no anchor row exists; the caller then does not notify.
--- Otherwise true or false. It reads no money column (a claim's created_at only)
--- and returns nothing but that boolean, so it is no oracle beyond "the studio
--- was told". STABLE: it only reads.
-create or replace function public.app_delivery_act_notified_by_token(
-  p_hash text,
+-- INTERNAL. It takes a bare engagement id, so it is revoked from public, the
+-- API roles AND metra_app, and only the two definer functions in this file call
+-- it (they have already proven the token or the org). SECURITY INVOKER: under
+-- those callers it runs with their rights; nobody else may run it at all. It
+-- reads no money column (a claim's created_at only) and returns one instant.
+create or replace function public.app_client_act_anchor(
+  p_engagement_id uuid,
+  p_org_id uuid,
   p_body_key text,
   p_milestone_kind text
 )
-returns boolean
+returns timestamptz
 language plpgsql
 stable
-security definer
+security invoker
 set search_path = ''
 as $$
 declare
-  eid     uuid;
-  oid     uuid;
   ri      timestamptz;
   rr      timestamptz;
   anchor  timestamptz;
 begin
-  select id, org_id, rom_issued_at, renders_ready_at
-    into eid, oid, ri, rr
+  select rom_issued_at, renders_ready_at
+    into ri, rr
     from public.design_engagements
-   where token_hash = p_hash
-     and (share_expires_at is null or share_expires_at > now());
+   where id = p_engagement_id
+     and org_id = p_org_id;
   if not found then return null; end if;
 
   if p_body_key = 'client_payment_claimed' then
     select max(pc.created_at)
       into anchor
       from public.client_payment_claims pc
-     where pc.engagement_id = eid
-       and pc.org_id = oid
+     where pc.engagement_id = p_engagement_id
+       and pc.org_id = p_org_id
        and pc.milestone_kind::text = p_milestone_kind
        and pc.status = 'pending';
+  elsif p_body_key = 'client_commented' then
+    select max(dc.created_at)
+      into anchor
+      from public.engagement_document_comments dc
+     where dc.engagement_id = p_engagement_id
+       and dc.org_id = p_org_id
+       and dc.author_channel = 'client';
   elsif p_body_key in (
     'client_concept_approved', 'client_concept_chosen',
     'client_concept_changes_requested', 'client_design_approved',
@@ -759,8 +764,8 @@ begin
     select max(e.decided_at)
       into anchor
       from public.engagement_events e
-     where e.engagement_id = eid
-       and e.org_id = oid
+     where e.engagement_id = p_engagement_id
+       and e.org_id = p_org_id
        and e.actor_channel = 'client'
        and not exists (
          select 1 from public.engagement_events x
@@ -792,6 +797,78 @@ begin
   else
     return null;
   end if;
+  return anchor;
+end
+$$;
+
+-- Closed in the SAME implicit transaction as the CREATE above, and to EVERY
+-- caller role: unlike the token functions, metra_app gets no grant. Its two
+-- callers are SECURITY DEFINER functions, which run it as their owner.
+revoke all on function public.app_client_act_anchor(uuid, uuid, text, text) from public;
+do $$
+declare
+  r text;
+begin
+  foreach r in array array['anon', 'authenticated', 'service_role', 'metra_app'] loop
+    if exists (select 1 from pg_roles where rolname = r) then
+      execute format(
+        'revoke all on function public.app_client_act_anchor(uuid, uuid, text, text) from %I',
+        r
+      );
+    end if;
+  end loop;
+end
+$$;
+
+-- Round B (0057): was THIS client act's studio notification ever written?
+-- The safety net for a lost notification. A client write function answers
+-- `already` on a repeat tap; if the notifier failed on the first `ok` (a
+-- timeout, a dropped connection), the studio was never told. On `already` the
+-- portal asks this predicate and notifies only when it answers false, so a
+-- repeat tap repairs the loss and an ordinary repeat sends nothing twice.
+--
+-- THE ANCHOR is the act the write's `already` pointed at, by body key, from
+-- app_client_act_anchor above (Round C, 0058: the rule moved there unchanged so
+-- the hourly sweep reads the same one). A comment has no anchor HERE: this
+-- predicate answers null for client_commented exactly as it did in B12.
+-- It then answers whether a `client_responded` notification with that body key
+-- (and, for a payment claim, that milestone) was written or bumped at or after
+-- the anchor, for ANY recipient, read or not. Sound because the notifier always
+-- writes (or bumps created_at to now on) its row in a LATER transaction than
+-- the act it reports.
+--
+-- RETURNS null when no live link matches (the same share_expires_at rule as
+-- app_delivery_by_token), when the key has no anchor rule (client_commented, an
+-- unknown key) or when no anchor row exists; the caller then does not notify.
+-- Otherwise true or false. It reads no money column (a claim's created_at only)
+-- and returns nothing but that boolean, so it is no oracle beyond "the studio
+-- was told". STABLE: it only reads. Signature, result and answers unchanged
+-- since 0057.
+create or replace function public.app_delivery_act_notified_by_token(
+  p_hash text,
+  p_body_key text,
+  p_milestone_kind text
+)
+returns boolean
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  eid     uuid;
+  oid     uuid;
+  anchor  timestamptz;
+begin
+  select id, org_id
+    into eid, oid
+    from public.design_engagements
+   where token_hash = p_hash
+     and (share_expires_at is null or share_expires_at > now());
+  if not found then return null; end if;
+
+  if p_body_key = 'client_commented' then return null; end if;
+  anchor := public.app_client_act_anchor(eid, oid, p_body_key, p_milestone_kind);
   if anchor is null then return null; end if;
 
   return exists (
@@ -824,6 +901,252 @@ begin
   end loop;
   if exists (select 1 from pg_roles where rolname = 'metra_app') then
     grant execute on function public.app_delivery_act_notified_by_token(text, text, text) to metra_app;
+  end if;
+end
+$$;
+
+-- Round C (0058): WHICH delivery does a client's handover confirmation close?
+-- By share token, for the portal's inline close right after the client taps
+-- "I received it" (the client has no session, so the app needs the org to
+-- resolve its system actor, and the delivery to name to the executor). The
+-- executor still runs the edge's role gate, guards and atomic state move; this
+-- only says where to point it.
+--
+-- RETURNS { org_id, engagement_id } when a LIVE link matches (the same
+-- share_expires_at rule as app_delivery_by_token), the delivery is at
+-- design_only_handoff, and a LIVE client handoff_acknowledgement exists (one an
+-- event_correction retracts does not count, exactly as liveEvents() drops it).
+-- Otherwise null: an unknown, revoked or expired token, any other state
+-- (including closed), and no live acknowledgement all look the same. It reads
+-- no money column. STABLE: it only reads. Locked down right below.
+create or replace function public.app_delivery_close_target_by_token(p_hash text)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  eid  uuid;
+  oid  uuid;
+  st   text;
+begin
+  select id, org_id, state
+    into eid, oid, st
+    from public.design_engagements
+   where token_hash = p_hash
+     and (share_expires_at is null or share_expires_at > now());
+  if not found then return null; end if;
+  if st <> 'design_only_handoff' then return null; end if;
+  if not exists (
+    select 1 from public.engagement_events e
+     where e.engagement_id = eid
+       and e.org_id = oid
+       and e.actor_channel = 'client'
+       and e.kind = 'handoff_acknowledgement'
+       and not exists (
+         select 1 from public.engagement_events x
+         where x.org_id = e.org_id and x.supersedes_event_id = e.id
+       )
+  ) then
+    return null;
+  end if;
+  return jsonb_build_object('org_id', oid, 'engagement_id', eid);
+end
+$$;
+
+-- Same-transaction lockdown as the choice function above, for the same reason.
+revoke all on function public.app_delivery_close_target_by_token(text) from public;
+do $$
+declare
+  r text;
+begin
+  foreach r in array array['anon', 'authenticated', 'service_role'] loop
+    if exists (select 1 from pg_roles where rolname = r) then
+      execute format(
+        'revoke all on function public.app_delivery_close_target_by_token(text) from %I',
+        r
+      );
+    end if;
+  end loop;
+  if exists (select 1 from pg_roles where rolname = 'metra_app') then
+    grant execute on function public.app_delivery_close_target_by_token(text) to metra_app;
+  end if;
+end
+$$;
+
+-- Round C (0058): the hourly repair of studio notifications LOST on a client's
+-- first tap. A client act and its notification are two transactions (the write
+-- commits, then the portal calls the notifier); if the second one fails (a
+-- timeout, a dropped connection) and the client never taps again, the studio is
+-- never told. The acts themselves are the outbox: this function finds acts in
+-- a window that no notification answers, and notifies them through THE notifier
+-- (app_delivery_notify_studio_by_token), so the dedupe, the recipients and the
+-- params are exactly the ones a first tap produces.
+--
+-- WHO MAY CALL. The hourly runner, inside the org's own transaction: the caller
+-- must have set app.current_org_id and app.current_user_id (withOrgContext) and
+-- that user must be an OWNER or ADMIN member of that org (the runner's system
+-- actor is). Anything else returns null. Every read and write is scoped to that
+-- one org; another tenant's acts are never seen.
+--
+-- THE WINDOW. Only acts whose anchor (app_client_act_anchor, the SAME rule the
+-- repeat-tap repair reads) lies in [p_since, p_until]. The caller passes
+-- now - 48 h and now - 10 min: an act younger than 10 minutes is left to the
+-- portal's own notify, so the sweep never races a first tap; one older than 48
+-- hours is not dug up. p_since < p_until <= now() and a window of at most 7
+-- days, else null.
+--
+-- LOST MEANS: no `client_responded` notification for that delivery and body key
+-- (and, for a payment claim, that milestone) was written or bumped at or after
+-- the anchor, for any recipient, read or not. The predicate of
+-- app_delivery_act_notified_by_token, so the sweep and the repeat tap agree. A
+-- repaired act therefore has a notification at or after its anchor, and the
+-- next sweep finds nothing: no act is notified twice by the sweep. (A repeat
+-- tap repairing the same act in the same instant meets the notifier's own
+-- per-recipient lock and bumps the unread row's count; it adds no row and no
+-- email.)
+--
+-- THE KEYS. The nine client-act keys the notifier allows; client_payment_claimed
+-- is asked once per milestone (deposit, gate_a, gate_b, balance), because the
+-- notifier keeps one row per milestone. p_roles is a JSON object mapping each
+-- body key to the member_role array the app's permission matrix gives that act;
+-- `p_roles -> key` is handed to the notifier unchanged. The notifier never
+-- notifies the client role, so this function can message nobody but studio
+-- members, and it sends no email itself (the app emails the notifier's
+-- new_recipients, as on a first tap).
+--
+-- WHICH DELIVERIES. This org's deliveries with a live link (the notifier needs
+-- one) and updated_at >= p_since. The second condition is a bound, not a rule
+-- change: every client write (respond, claim, choose, comment) refreshes
+-- updated_at in the transaction that writes the act, and nothing moves
+-- updated_at backwards, so a delivery with an act in the window always passes.
+-- Oldest updated_at first, so an act about to leave the window is repaired
+-- first.
+--
+-- BOUNDED: at most 50 notifier calls per call; the rest wait for the next hour.
+-- RETURNS a JSON array, one entry per notifier call:
+--   { body_key, milestone_kind (null unless a payment claim), notified (the
+--     notifier's answer, which carries engagement_id, locale, new_recipients) }
+-- or `[]` when nothing was lost. The raw token hash never leaves this function.
+-- It reads no money column. VOLATILE: the notifier writes.
+create or replace function public.app_notify_lost_client_acts(
+  p_since timestamptz,
+  p_until timestamptz,
+  p_roles jsonb
+)
+returns jsonb
+language plpgsql
+volatile
+security definer
+set search_path = ''
+as $$
+declare
+  v_keys constant text[] := array[
+    'client_concept_approved',
+    'client_concept_chosen',
+    'client_concept_changes_requested',
+    'client_design_approved',
+    'client_design_changes_requested',
+    'client_budget_acknowledged',
+    'client_handover_acknowledged',
+    'client_payment_claimed',
+    'client_commented'
+  ];
+  v_milestones constant text[] := array['deposit', 'gate_a', 'gate_b', 'balance'];
+  v_max_calls  constant integer := 50;
+  v_org        uuid;
+  v_user       uuid;
+  v_delivery   record;
+  v_key        text;
+  v_milestone  text;
+  v_anchor     timestamptz;
+  v_notified   jsonb;
+  v_calls      integer := 0;
+  v_result     jsonb := '[]'::jsonb;
+begin
+  v_org := nullif(current_setting('app.current_org_id', true), '')::uuid;
+  v_user := nullif(current_setting('app.current_user_id', true), '')::uuid;
+  if v_org is null or v_user is null then return null; end if;
+  if not exists (
+    select 1 from public.memberships m
+     where m.org_id = v_org
+       and m.user_id = v_user
+       and m.role::text in ('owner', 'admin')
+  ) then
+    return null;
+  end if;
+  if p_roles is null or jsonb_typeof(p_roles) <> 'object' then return null; end if;
+  if p_since is null or p_until is null
+     or p_since >= p_until
+     or p_until > now()
+     or p_until - p_since > interval '7 days' then
+    return null;
+  end if;
+
+  for v_delivery in
+    select de.id, de.token_hash
+      from public.design_engagements de
+     where de.org_id = v_org
+       and de.token_hash is not null
+       and (de.share_expires_at is null or de.share_expires_at > now())
+       and de.updated_at >= p_since
+     order by de.updated_at, de.id
+  loop
+    foreach v_key in array v_keys loop
+      foreach v_milestone in array (
+        case when v_key = 'client_payment_claimed' then v_milestones
+             else array[null]::text[] end
+      ) loop
+        v_anchor := public.app_client_act_anchor(v_delivery.id, v_org, v_key, v_milestone);
+        continue when v_anchor is null or v_anchor < p_since or v_anchor > p_until;
+        continue when exists (
+          select 1 from public.notifications n
+           where n.org_id = v_org
+             and n.kind = 'client_responded'
+             and n.entity_type = 'engagement'
+             and n.entity_id = v_delivery.id
+             and n.body_key = v_key
+             and (v_milestone is null or n.params ->> 'milestoneKind' = v_milestone)
+             and n.created_at >= v_anchor
+        );
+        if v_calls >= v_max_calls then return v_result; end if;
+        v_notified := public.app_delivery_notify_studio_by_token(
+          v_delivery.token_hash,
+          v_key,
+          case when v_milestone is null then '{}'::jsonb
+               else jsonb_build_object('milestoneKind', v_milestone) end,
+          p_roles -> v_key
+        );
+        v_calls := v_calls + 1;
+        v_result := v_result || jsonb_build_array(jsonb_build_object(
+          'body_key', v_key,
+          'milestone_kind', v_milestone,
+          'notified', v_notified
+        ));
+      end loop;
+    end loop;
+  end loop;
+  return v_result;
+end
+$$;
+
+-- Same-transaction lockdown as the choice function above, for the same reason.
+revoke all on function public.app_notify_lost_client_acts(timestamptz, timestamptz, jsonb) from public;
+do $$
+declare
+  r text;
+begin
+  foreach r in array array['anon', 'authenticated', 'service_role'] loop
+    if exists (select 1 from pg_roles where rolname = r) then
+      execute format(
+        'revoke all on function public.app_notify_lost_client_acts(timestamptz, timestamptz, jsonb) from %I',
+        r
+      );
+    end if;
+  end loop;
+  if exists (select 1 from pg_roles where rolname = 'metra_app') then
+    grant execute on function public.app_notify_lost_client_acts(timestamptz, timestamptz, jsonb) to metra_app;
   end if;
 end
 $$;

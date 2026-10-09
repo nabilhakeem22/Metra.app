@@ -407,6 +407,13 @@
       "when": 1791342035319,
       "tag": "0057_concept_letters_and_feed_index",
       "breakpoints": true
+    },
+    {
+      "idx": 58,
+      "version": "7",
+      "when": 1791583616467,
+      "tag": "0058_client_page_details",
+      "breakpoints": true
     }
   ]
 }

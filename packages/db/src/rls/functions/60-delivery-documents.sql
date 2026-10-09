@@ -47,7 +47,10 @@ as $$
     -- as a downscaled rendition with no download filename.
     'access', public.app_document_access(
       a.kind, public.app_document_settled(a.kind, de.id), f.original_name
-    )
+    ),
+    -- Round C (0058): image, pdf or other, by the SAME rule the portal
+    -- snapshot's documents[].media reads, so a thumbnail and its bytes agree.
+    'media', public.app_document_media(f.original_name)
   )
   from public.design_engagements de
   join public.engagement_artifacts a
@@ -60,6 +63,61 @@ as $$
   where de.token_hash = p_hash
     and (de.share_expires_at is null or de.share_expires_at > now())
     and a.id = p_document_id;
+$$;
+
+-- Round C (0058): the STUDIO LOGO for the client page, by share token.
+-- SECURITY DEFINER (the token IS the authorization; no session, no org GUC),
+-- resolved exactly like app_delivery_document_by_token: the delivery by
+-- token_hash while the link is live, its organization, and the `files` row
+-- organizations.logo_file_id points at, joined IN-ORG (f.org_id = de.org_id) so
+-- a logo id can never address another tenant's object.
+--
+-- Returns { bucket, object_key } only when that file is an image
+-- (app_document_media = 'image'): the route serves a downscaled rendition, and
+-- Storage transforms images only. NO ORACLE: an unknown, revoked or expired
+-- token, an org with no logo, a logo row in another org and a non-image logo all
+-- return the same null. It selects files.bucket and files.object_key (and reads
+-- original_name for the media test); no name, size, money or pricing column is
+-- returned. Locked down right below, in this same transaction.
+create or replace function public.app_delivery_logo_by_token(p_hash text)
+returns jsonb
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select jsonb_build_object('bucket', f.bucket, 'object_key', f.object_key)
+  from public.design_engagements de
+  join public.organizations o on o.id = de.org_id
+  join public.files f on f.id = o.logo_file_id and f.org_id = de.org_id
+  where de.token_hash = p_hash
+    and (de.share_expires_at is null or de.share_expires_at > now())
+    and public.app_document_media(f.original_name) = 'image';
+$$;
+
+-- Closed in the SAME implicit transaction as the CREATE above. A new function
+-- is executable by PUBLIC (and, on Supabase, by the API roles through default
+-- privileges) from the moment it exists; roles.sql revokes that too, but it
+-- runs later, in its own transaction. This leaves no window. The metra_app
+-- grant is guarded because on a fresh database roles.sql, which creates that
+-- role, has not run yet.
+revoke all on function public.app_delivery_logo_by_token(text) from public;
+do $$
+declare
+  r text;
+begin
+  foreach r in array array['anon', 'authenticated', 'service_role'] loop
+    if exists (select 1 from pg_roles where rolname = r) then
+      execute format(
+        'revoke all on function public.app_delivery_logo_by_token(text) from %I',
+        r
+      );
+    end if;
+  end loop;
+  if exists (select 1 from pg_roles where rolname = 'metra_app') then
+    grant execute on function public.app_delivery_logo_by_token(text) to metra_app;
+  end if;
+end
 $$;
 
 -- Client Deliverables Step 2 — read ONE released document's comment thread by share

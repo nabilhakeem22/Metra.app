@@ -415,6 +415,11 @@ const TOKEN_SDFS: ReadonlyArray<{ name: string; args: string }> = [
   },
   { name: 'app_delivery_notify_studio_by_token', args: 'text, text, jsonb, jsonb' },
   { name: 'app_delivery_act_notified_by_token', args: 'text, text, text' },
+  // Round C (0058): the studio logo (a storage location in the delivery's org)
+  // and the handover close target (the org and delivery ids). Both are
+  // token-resolved and must not be reachable with an API key.
+  { name: 'app_delivery_logo_by_token', args: 'text' },
+  { name: 'app_delivery_close_target_by_token', args: 'text' },
 ];
 
 function signatureOf(sdf: { name: string; args: string }): string {

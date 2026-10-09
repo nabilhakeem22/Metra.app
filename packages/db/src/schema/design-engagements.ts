@@ -2,6 +2,7 @@ import { sql } from 'drizzle-orm';
 import {
   boolean,
   check,
+  date,
   index,
   integer,
   pgTable,
@@ -82,6 +83,12 @@ export const designEngagements = pgTable(
     // refuses a nonce without a hash, so a revoke must clear both.
     tokenNonce: text('token_nonce'),
     shareExpiresAt: timestamp('share_expires_at', { withTimezone: true }),
+    // When the client should expect the next step (0058), and the stage the
+    // studio set it in. Set and cleared as a pair (CHECK). The client page shows
+    // the date only while `state` still equals `clientExpectedState`, so a stage
+    // move retires it without a write.
+    clientExpectedOn: date('client_expected_on'),
+    clientExpectedState: designEngagementState('client_expected_state'),
   },
   (t) => [
     unique('design_engagements_org_id_id_unique').on(t.orgId, t.id),
@@ -95,6 +102,10 @@ export const designEngagements = pgTable(
     check(
       'design_engagements_token_nonce_needs_hash',
       sql`token_nonce is null or token_hash is not null`,
+    ),
+    check(
+      'design_engagements_client_expected_pair',
+      sql`(client_expected_on IS NULL) = (client_expected_state IS NULL)`,
     ),
     ...sameOrgFk(t, 'client', clients, { onDelete: 'restrict' }),
     ...sameOrgFk(t, 'project', projects, { onDelete: 'restrict' }),

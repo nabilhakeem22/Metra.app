@@ -14,7 +14,7 @@ import {
 // THE GRANT AND THE CODE, KEPT HONEST BY A MACHINE.
 //
 // `rls/roles.sql` grants metra_app a COLUMN-LEVEL update on
-// `design_engagements`: fifteen derived columns and nothing else, so the client,
+// `design_engagements`: eighteen derived columns and nothing else, so the client,
 // the project, the number, `created_at` and — the ones that matter — the two
 // free-revision ALLOWANCES cannot be moved by any future code path or by SQL
 // injected past the ORM.
@@ -66,6 +66,14 @@ const here = dirname(fileURLToPath(import.meta.url)); // apps/web/src/lib/engage
 const REPO_ROOT = resolve(here, '../../../../..');
 const SCAN_ROOTS = [resolve(REPO_ROOT, 'apps/web/src'), resolve(REPO_ROOT, 'packages/db/src')];
 const ROLES_SQL = resolve(REPO_ROOT, 'packages/db/src/rls/roles.sql');
+
+/**
+ * Columns roles.sql grants BEFORE any app code writes them, because the owner's
+ * one database step must cover the code that follows it. Round C (0058): the
+ * client's expected date and its stage, written by the expected-date core in
+ * Wave 3, which removes them from this list (the test below insists).
+ */
+const GRANTED_AHEAD_OF_WRITER: readonly string[] = ['client_expected_on', 'client_expected_state'];
 
 /** The drizzle table object's exported name, and the table it maps to. */
 const TABLE_EXPORT = 'designEngagements';
@@ -579,13 +587,26 @@ describe('design_engagements column grants match what the app writes', () => {
     const written = new Set(sites.flatMap((site) => site.columns));
     const granted = new Set(grantedUpdateColumns(readFileSync(ROLES_SQL, 'utf8')));
     const missing = [...written].filter((column) => !granted.has(column)).sort();
-    const surplus = [...granted].filter((column) => !written.has(column)).sort();
+    const surplus = [...granted]
+      .filter((column) => !written.has(column) && !GRANTED_AHEAD_OF_WRITER.includes(column))
+      .sort();
 
     // Reported as two named lists rather than a set comparison: which DIRECTION
     // it drifted is the whole diagnosis. `missing` is a 42501 waiting to happen;
     // `surplus` is authority nothing uses.
     expect({ missing, surplus }).toEqual({ missing: [], surplus: [] });
-    expect(granted.size).toBe(16);
+    expect(granted.size).toBe(18);
+  });
+
+  it('lists a column as granted ahead only while it is granted and has no writer yet', () => {
+    // The exemption above is for a database step that lands BEFORE the code it
+    // serves (Round C: 0058 grants the expected-date pair, its writer arrives
+    // in Wave 3). The moment a writer exists the entry must go, so the list
+    // cannot quietly outlive its reason.
+    const written = new Set(sites.flatMap((site) => site.columns));
+    const granted = new Set(grantedUpdateColumns(readFileSync(ROLES_SQL, 'utf8')));
+    expect(GRANTED_AHEAD_OF_WRITER.filter((column) => written.has(column))).toEqual([]);
+    expect(GRANTED_AHEAD_OF_WRITER.filter((column) => !granted.has(column))).toEqual([]);
   });
 
   it('keeps the table-level UPDATE revoked, so the column list is not cosmetic', () => {

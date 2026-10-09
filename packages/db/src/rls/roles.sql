@@ -63,8 +63,8 @@ grant select, insert, update, delete on public.variation_order_lines to metra_ap
 -- Design Engagements (Step 1): the engagement record is mutable (create + Step 2
 -- state transitions); the transition ledger is append-only (granted below).
 --
--- UPDATE IS COLUMN-LEVEL, and the list is the sixteen DERIVED columns the app
--- actually writes after the row exists — nothing else. `design_engagements` is
+-- UPDATE IS COLUMN-LEVEL, and the list is the eighteen DERIVED columns the app
+-- writes after the row exists (two of them from Round C Wave 3) — nothing else. `design_engagements` is
 -- the widest mutable table in the machine and most of it is CONTRACTUAL: the
 -- client, the project, the number, the two free-revision ALLOWANCES
 -- (`free_revision_n`, `free_design_revision_n`), `created_at`. Those are set at
@@ -84,6 +84,14 @@ grant select, insert, update, delete on public.variation_order_lines to metra_ap
 -- `design_revision_count` IS in the list and `free_revision_n` /
 -- `free_design_revision_n` are NOT — the first is written live by
 -- `revisions.ts`'s counter factory, the other two are never updated at all.
+--
+-- `client_expected_on` / `client_expected_state` (0058) are the date the studio
+-- tells the client to expect the next step, and the stage it was set in. They
+-- are granted in the Round C database step, AHEAD of their one writer (the
+-- expected-date core, Round C Wave 3), so the owner's one database step covers
+-- the code that follows it. Until that writer lands, the unit test names them
+-- as granted-ahead and fails the moment a writer exists without its entry
+-- being removed.
 --
 -- `token_nonce` (0056) is written by the share-link lifecycle beside
 -- `token_hash`: revoke clears it explicitly, and the re-derivable mint/rotate
@@ -123,7 +131,9 @@ grant update (
   token_hash,
   token_nonce,
   share_expires_at,
-  updated_at
+  updated_at,
+  client_expected_on,
+  client_expected_state
 ) on public.design_engagements to metra_app;
 -- engagement_milestones (Step 3): the schedule is written ONCE by
 -- generateFeeSchedule at submitDesignFee and never edited by any code path, so
@@ -343,6 +353,27 @@ grant execute on function public.app_delivery_act_notified_by_token(text, text, 
 revoke execute on function public.app_delivery_act_notified_by_token(text, text, text) from public;
 grant execute on function public.app_concept_option_positions(uuid) to metra_app;
 revoke execute on function public.app_concept_option_positions(uuid) from public;
+-- Round C (0058): the media rule, the studio logo and the handover close target
+-- by token, and the hourly lost-notification sweep. The token functions follow
+-- the same treatment as the rest; the sweep writes notifications for a whole
+-- org, so an API role must never reach it, and it refuses any caller that is
+-- not an owner/admin member of the org in the GUCs. All four are also locked
+-- down in place, right after their CREATE (40-delivery-read.sql,
+-- 50-delivery-write.sql, 60-delivery-documents.sql).
+grant execute on function public.app_document_media(text) to metra_app;
+revoke execute on function public.app_document_media(text) from public;
+grant execute on function public.app_delivery_logo_by_token(text) to metra_app;
+revoke execute on function public.app_delivery_logo_by_token(text) from public;
+grant execute on function public.app_delivery_close_target_by_token(text) to metra_app;
+revoke execute on function public.app_delivery_close_target_by_token(text) from public;
+grant execute on function public.app_notify_lost_client_acts(timestamptz, timestamptz, jsonb) to metra_app;
+revoke execute on function public.app_notify_lost_client_acts(timestamptz, timestamptz, jsonb) from public;
+-- The anchor rule takes a bare engagement id and is INTERNAL: NO grant at all,
+-- not even to metra_app. Only the definer functions above call it, as their
+-- owner. Revoked from public here, from metra_app on the next line, and from
+-- the API roles in the loop below.
+revoke execute on function public.app_client_act_anchor(uuid, uuid, text, text) from public;
+revoke execute on function public.app_client_act_anchor(uuid, uuid, text, text) from metra_app;
 -- Client Deliverables Step 3 — the payment-settled test and the document-access
 -- rule the portal list and the download route both read. Not token-resolved (their
 -- callers have already proven the token), so they are locked down here for the same
@@ -466,6 +497,26 @@ begin
       );
       execute format(
         'revoke execute on function public.app_concept_option_positions(uuid) from %I',
+        r
+      );
+      execute format(
+        'revoke execute on function public.app_document_media(text) from %I',
+        r
+      );
+      execute format(
+        'revoke execute on function public.app_delivery_logo_by_token(text) from %I',
+        r
+      );
+      execute format(
+        'revoke execute on function public.app_delivery_close_target_by_token(text) from %I',
+        r
+      );
+      execute format(
+        'revoke execute on function public.app_notify_lost_client_acts(timestamptz, timestamptz, jsonb) from %I',
+        r
+      );
+      execute format(
+        'revoke execute on function public.app_client_act_anchor(uuid, uuid, text, text) from %I',
         r
       );
       execute format(

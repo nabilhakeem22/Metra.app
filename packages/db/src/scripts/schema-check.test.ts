@@ -189,8 +189,8 @@ describe('runSchemaCheck', () => {
     expect(printed).toMatch(/functions — \d+ declared/);
     expect(sectionsPrinted()).toEqual([
       'assert-schema-applied: indexes — 108 declared, 108 NOT FOUND (report only, does not fail this check):',
-      'assert-schema-applied: constraints — 229 declared, 229 NOT FOUND (report only, does not fail this check):',
-      'assert-schema-applied: functions — 37 declared, 37 NOT FOUND (report only, does not fail this check):',
+      'assert-schema-applied: constraints — 237 declared, 237 NOT FOUND (report only, does not fail this check):',
+      'assert-schema-applied: functions — 42 declared, 42 NOT FOUND (report only, does not fail this check):',
       'columns: BEHIND',
     ]);
     expect(printed).toContain('REPORT ONLY');
@@ -202,12 +202,12 @@ describe('runSchemaCheck', () => {
       fixtureSql({ ...completeCatalogues(), functionNames: new Set(['app_nothing']) }),
     );
     expect(code).toBe(0);
-    expect(logged.join('\n')).toContain('functions — 37 declared, 37 NOT FOUND');
+    expect(logged.join('\n')).toContain('functions — 42 declared, 42 NOT FOUND');
   });
 });
 
 describe('the counts the deploy order asks the owner to compare', () => {
-  it('declares 37 RLS functions', () => {
+  it('declares 42 RLS functions', () => {
     // wave6-coder.md's handoff said 29 and instructed the lead to compare the
     // printed counts against it. A `create or replace function public.<name>`
     // grep over rls/ returns 30 with no duplicate name, so the handoff number
@@ -217,8 +217,11 @@ describe('the counts the deploy order asks the owner to compare', () => {
     // app_delivery_notify_studio_by_token; 35 with the trigger fn
     // clear_token_nonce_on_hash_change. 37 since PR-B12 (0057) added
     // app_concept_option_positions and app_delivery_act_notified_by_token (the
-    // choose function was dropped and re-created under its own name).
-    expect(declaredFunctions().size).toBe(37);
+    // choose function was dropped and re-created under its own name). 42 since
+    // Round C (0058) added app_document_media, app_delivery_logo_by_token,
+    // app_delivery_close_target_by_token, app_client_act_anchor and
+    // app_notify_lost_client_acts.
+    expect(declaredFunctions().size).toBe(42);
   });
 });
 
