@@ -1,16 +1,15 @@
 import { createHash, randomBytes } from 'node:crypto';
-import type { Organization } from '@metra/db';
 import { afterAll, describe, expect, it, vi } from 'vitest';
 import { GET as proposalsList } from '@/app/api/v1/proposals/route';
 import { GET as proposalDetail } from '@/app/api/v1/proposals/[id]/route';
 import { listProposalsPage } from '@/lib/api/queries';
-import { getOnboardingProgress } from '@/lib/onboarding/progress';
 import { createProposalCore } from '@/lib/proposals/core';
 import { boqProposalWith, rawEngagement, seedBoqOrg, TWO_SECTIONS } from './boq-proposal-fixture';
 import { closeFixture, raw, teardown } from './fixture';
 
 // Where a BOQ working copy must NOT show up as a quote: the Public API v1 (its
-// proposals are quotes, AC23) and the onboarding "built a proposal" tick (F6).
+// proposals are quotes, AC23). The onboarding "built a proposal" tick (F6) is
+// gone: Round C's checklist leads to the first delivery, not to a quotation.
 vi.mock('@/lib/pdf/render', () => ({
   renderPdf: () => Promise.reject(new Error('no renderer in the dbtest runner')),
 }));
@@ -38,9 +37,7 @@ async function apiKey(orgId: string, createdBy: string): Promise<string> {
 const bearer = (url: string, key: string) =>
   new Request(url, { headers: { authorization: `Bearer ${key}` } });
 
-const progressOrg = { nameAr: null, nameEn: 'Studio', city: 'Cairo' } as unknown as Organization;
-
-describe('a BOQ working copy is not a quote to the outside (AC23, F6)', () => {
+describe('a BOQ working copy is not a quote to the outside (AC23)', () => {
   it('is absent from listProposalsPage and the v1 list, and 404s on the v1 detail', async () => {
     const org = await seedBoqOrg(orgIds);
     const engagementId = await rawEngagement(org);
@@ -68,15 +65,5 @@ describe('a BOQ working copy is not a quote to the outside (AC23, F6)', () => {
       params: Promise.resolve({ id: quoteId }),
     });
     expect(quoteDetail.status).toBe(200);
-  });
-
-  it('does not tick the onboarding "built a proposal" step until a QUOTE exists', async () => {
-    const org = await seedBoqOrg(orgIds);
-    const engagementId = await rawEngagement(org);
-    await boqProposalWith(org.ctx, engagementId, TWO_SECTIONS);
-    expect((await getOnboardingProgress(org.ctx, progressOrg)).hasProposal).toBe(false);
-
-    await createProposalCore(org.ctx, { clientId: org.clientId, projectId: org.projectId });
-    expect((await getOnboardingProgress(org.ctx, progressOrg)).hasProposal).toBe(true);
   });
 });

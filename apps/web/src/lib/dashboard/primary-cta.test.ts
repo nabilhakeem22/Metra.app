@@ -7,6 +7,8 @@ const DONE = {
   hasClient: true,
   hasProject: true,
   hasEngagement: true,
+  hasSharedDelivery: true,
+  newestUnsharedDeliveryId: null,
 };
 
 describe('pickPrimaryCta', () => {
@@ -68,10 +70,23 @@ describe('pickPrimaryCta — the setup ladder', () => {
       messageKey: 'ctaStartDelivery',
       href: '/engagements?new=1',
     });
+    expect(
+      pickPrimaryCta('owner', { ...DONE, hasSharedDelivery: false, newestUnsharedDeliveryId: 'e-7' }),
+    ).toEqual({ messageKey: 'ctaShareDelivery', href: '/engagements/e-7?share=1' });
     expect(pickPrimaryCta('owner', { ...DONE, teamInvited: false })).toEqual({
       messageKey: 'ctaInviteTeam',
       href: '/team',
     });
+  });
+
+  it('a project manager is never sent to share: no engagements_issue', () => {
+    expect(
+      pickPrimaryCta('project_manager', {
+        ...DONE,
+        hasSharedDelivery: false,
+        newestUnsharedDeliveryId: 'e-7',
+      }),
+    ).toEqual({ messageKey: 'cards.projects', href: '/projects' });
   });
 
   it('a viewer never receives a create link, at any rung', () => {

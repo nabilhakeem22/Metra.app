@@ -1,6 +1,6 @@
 // PURE checklist builder (client-safe: no server-only). Each item is included
 // ONLY when the role may perform it (can(role, capability, action)); `percent` is
-// over the INCLUDED items so a read-only role never sees a stuck 0/6. A role with
+// over the INCLUDED items so a read-only role never sees a stuck 0/5. A role with
 // no create grants yields items:[] and the card shows a "you're all set" line.
 import { can } from '../permissions/can';
 import type {
@@ -9,6 +9,7 @@ import type {
   PermissionAction,
 } from '../permissions/roles';
 import type { OnboardingProgress } from './progress';
+import { shareDeliveryHref } from './share-delivery-href';
 
 export interface ChecklistItem {
   key: string;
@@ -36,12 +37,11 @@ export function buildChecklist(
 
   const all: ChecklistItem[] = [
     { key: 'completeProfile', done: p.profileComplete, href: '/settings', tourStep: null, capability: 'users_settings', action: 'update' },
-    { key: 'addClient', done: p.hasClient, href: '/clients', tourStep: 'clients', capability: 'clients', action: 'create' },
-    { key: 'addProject', done: p.hasProject, href: '/projects', tourStep: 'projects', capability: 'projects', action: 'create' },
-    { key: 'addCostItem', done: p.hasCostItem, href: '/price-book', tourStep: 'priceBook', capability: 'price_book', action: 'create' },
-    { key: 'buildProposal', done: p.hasProposal, href: '/proposals', tourStep: 'proposals', capability: 'proposals_build', action: 'create' },
-    // NB: send is gated on the real 'approve' action (owner/admin), not 'create'.
-    { key: 'sendProposal', done: p.hasSentProposal, href: '/proposals', tourStep: 'proposals', capability: 'proposals_send', action: 'approve' },
+    { key: 'addClient', done: p.hasClient, href: '/clients?new=1', tourStep: 'clients', capability: 'clients', action: 'create' },
+    { key: 'addProject', done: p.hasProject, href: '/projects?new=1', tourStep: 'projects', capability: 'projects', action: 'create' },
+    { key: 'startDelivery', done: p.hasEngagement, href: '/engagements?new=1', tourStep: 'deliveries', capability: 'engagements_design', action: 'create' },
+    // Sharing mints the client link: the owner/admin `engagements_issue` approve cell.
+    { key: 'shareDelivery', done: p.hasSharedDelivery, href: shareDeliveryHref(p.newestUnsharedDeliveryId), tourStep: null, capability: 'engagements_issue', action: 'approve' },
   ];
 
   const items = all.filter((i) => can(role, i.capability, i.action));

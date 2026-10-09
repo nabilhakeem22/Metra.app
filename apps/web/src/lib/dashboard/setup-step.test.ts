@@ -3,17 +3,42 @@ import { MEMBER_ROLES } from '../permissions/member-roles';
 import { can } from '../permissions/can';
 import { deliveriesEmptyState, nextSetupStep } from './setup-step';
 
-const NOTHING = { hasClient: false, hasProject: false, hasEngagement: false };
+const NOTHING = {
+  hasClient: false,
+  hasProject: false,
+  hasEngagement: false,
+  hasSharedDelivery: false,
+  newestUnsharedDeliveryId: null,
+};
 const CLIENT_ONLY = { ...NOTHING, hasClient: true };
 const READY = { ...CLIENT_ONLY, hasProject: true };
-const DONE = { ...READY, hasEngagement: true };
+const STARTED = { ...READY, hasEngagement: true, newestUnsharedDeliveryId: 'e-1' };
+const DONE = { ...STARTED, hasSharedDelivery: true };
 
 describe('nextSetupStep', () => {
-  it('walks client -> project -> delivery for an owner, then stops', () => {
+  it('walks client -> project -> delivery -> share for an owner, then stops', () => {
     expect(nextSetupStep('owner', NOTHING)?.href).toBe('/clients?new=1');
     expect(nextSetupStep('owner', CLIENT_ONLY)?.href).toBe('/projects?new=1');
     expect(nextSetupStep('owner', READY)?.href).toBe('/engagements?new=1');
+    expect(nextSetupStep('owner', STARTED)).toEqual({
+      messageKey: 'ctaShareDelivery',
+      href: '/engagements/e-1?share=1',
+    });
     expect(nextSetupStep('owner', DONE)).toBeNull();
+  });
+
+  it('with no unshared delivery in flight the share step opens the deliveries list', () => {
+    expect(nextSetupStep('admin', { ...STARTED, newestUnsharedDeliveryId: null })).toEqual({
+      messageKey: 'ctaShareDelivery',
+      href: '/engagements',
+    });
+  });
+
+  it('only a role that may mint the link is asked to share it', () => {
+    for (const role of MEMBER_ROLES) {
+      const step = nextSetupStep(role, STARTED);
+      expect(step !== null, role).toBe(can(role, 'engagements_issue', 'approve'));
+    }
   });
 
   it('never hands a role a create link it does not hold', () => {

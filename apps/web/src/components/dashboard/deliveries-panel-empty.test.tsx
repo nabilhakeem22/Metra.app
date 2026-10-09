@@ -5,7 +5,13 @@ import { messageAt, renderWithIntl } from '@/test/render-with-intl';
 import { DeliveriesPanelEmpty } from './deliveries-panel-empty';
 
 const en = (path: string) => messageAt('en', path);
-const NOTHING = { hasClient: false, hasProject: false, hasEngagement: false };
+const NOTHING = {
+  hasClient: false,
+  hasProject: false,
+  hasEngagement: false,
+  hasSharedDelivery: false,
+  newestUnsharedDeliveryId: null,
+};
 
 describe('DeliveriesPanelEmpty', () => {
   test('with zero clients an owner gets the reason and a button to /clients?new=1', () => {
@@ -29,7 +35,7 @@ describe('DeliveriesPanelEmpty', () => {
   test('"every delivery is closed" only once one existed', () => {
     renderWithIntl(
       <DeliveriesPanelEmpty
-        empty={deliveriesEmptyState('owner', { hasClient: true, hasProject: true, hasEngagement: true })}
+        empty={deliveriesEmptyState('owner', { ...NOTHING, hasClient: true, hasProject: true, hasEngagement: true })}
       />,
       { locale: 'en' },
     );

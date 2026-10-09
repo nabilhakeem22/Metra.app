@@ -35,7 +35,7 @@ export function PriceBookEmpty({
           action={
             canManage ? (
               <div className="flex flex-wrap justify-center gap-2">
-                <Button variant="default" data-tour="price-book-new" onClick={onLoadStarter} disabled={pending}>
+                <Button variant="default" onClick={onLoadStarter} disabled={pending}>
                   {pending && <Loader2 className="size-4 animate-spin" aria-hidden />}
                   {t('empty.loadStarter')}
                 </Button>

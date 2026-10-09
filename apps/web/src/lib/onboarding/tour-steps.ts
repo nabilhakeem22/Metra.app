@@ -18,8 +18,7 @@ export const TOUR_STEPS: TourStep[] = [
   { id: 'welcome', page: '/dashboard', anchor: 'dashboard-checklist', titleKey: 'tour.welcome.title', bodyKey: 'tour.welcome.body', placement: 'bottom', order: 1 },
   { id: 'clients', page: '/clients', anchor: 'clients-new', titleKey: 'tour.clients.title', bodyKey: 'tour.clients.body', placement: 'bottom', order: 2 },
   { id: 'projects', page: '/projects', anchor: 'projects-new', titleKey: 'tour.projects.title', bodyKey: 'tour.projects.body', placement: 'bottom', order: 3 },
-  { id: 'priceBook', page: '/price-book', anchor: 'price-book-new', titleKey: 'tour.priceBook.title', bodyKey: 'tour.priceBook.body', placement: 'bottom', order: 4 },
-  { id: 'proposals', page: '/proposals', anchor: 'proposals-new', titleKey: 'tour.proposals.title', bodyKey: 'tour.proposals.body', placement: 'bottom', order: 5 },
+  { id: 'deliveries', page: '/engagements', anchor: 'engagements-new', titleKey: 'tour.deliveries.title', bodyKey: 'tour.deliveries.body', placement: 'bottom', order: 4 },
 ];
 
 function normalizePath(pathname: string): string {

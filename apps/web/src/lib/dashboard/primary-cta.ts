@@ -3,6 +3,7 @@
 // steps are gated on each module's create grant, and /team is behind
 // `users_settings` in the §2.2 matrix (owner/admin only), so a role without
 // either is sent to /projects, which every role may read.
+import type { ShareDeliveryHref } from '../onboarding/share-delivery-href';
 import { can } from '../permissions/can';
 import type { MemberRole } from '../permissions/roles';
 import { nextSetupStep, type SetupProgress } from './setup-step';
@@ -14,6 +15,7 @@ export interface PrimaryCta {
     | 'ctaAddClient'
     | 'ctaAddProject'
     | 'ctaStartDelivery'
+    | 'ctaShareDelivery'
     | 'ctaInviteTeam'
     | 'ctaManageTeam'
     | 'cards.projects';
@@ -22,14 +24,15 @@ export interface PrimaryCta {
     | '/clients?new=1'
     | '/projects?new=1'
     | '/engagements?new=1'
+    | ShareDeliveryHref
     | '/team'
     | '/projects';
 }
 
 /**
  * A real primary action, never a dead control and never a link that 403s. The
- * ladder: profile, then add a client, add a project, start a delivery, then the
- * team.
+ * ladder: profile, then add a client, add a project, start a delivery, share it
+ * with the client, then the team.
  */
 export function pickPrimaryCta(
   role: MemberRole,

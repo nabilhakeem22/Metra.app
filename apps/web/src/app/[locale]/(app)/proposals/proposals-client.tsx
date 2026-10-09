@@ -38,7 +38,7 @@ export function ProposalsClient({
   }, [items, q]);
 
   const newButton = canManage && hasClients && (
-    <Button variant="default" data-tour="proposals-new" onClick={() => router.push('/proposals/new')}>
+    <Button variant="default" onClick={() => router.push('/proposals/new')}>
       <Plus className="size-4" aria-hidden />
       {t('actions.new')}
     </Button>

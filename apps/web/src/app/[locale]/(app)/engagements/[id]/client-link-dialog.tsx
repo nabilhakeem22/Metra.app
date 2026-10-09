@@ -3,11 +3,12 @@
 import * as DialogPrimitive from '@radix-ui/react-dialog';
 import { X } from 'lucide-react';
 import { useTranslations } from 'next-intl';
-import { useEffect } from 'react';
+import { useCallback, useEffect } from 'react';
 import { IconButton } from '@/components/ui/icon-button';
 import { DELIVERY_SHARE_OPEN_EVENT } from './share-anchor';
 import { ShareLinkPanel } from './share-link-panel';
 import { useDeliveryShare } from './use-delivery-share';
+import { useOpenOnShareLink } from './use-open-on-share-link';
 
 /**
  * The client link: share it, show it again (re-derived, never rotated),
@@ -18,7 +19,8 @@ import { useDeliveryShare } from './use-delivery-share';
  * it sat between the header and the command card, pushing the one thing the
  * studio came here to do down the page. It opens from the header's menu (any
  * caller of `revealDeliveryShareLink()`), and by itself whenever there is
- * something to read: a revealed link or a refusal (use-delivery-share.ts).
+ * something to read: a revealed link or a refusal (use-delivery-share.ts), and
+ * once on arrival from the dashboard's share step (`?share=1`).
  */
 export function ClientLinkDialog({
   engagementId,
@@ -31,6 +33,7 @@ export function ClientLinkDialog({
   const tc = useTranslations('common');
   const share = useDeliveryShare({ engagementId, initialShared });
   const { setOpen } = share;
+  useOpenOnShareLink(useCallback(() => setOpen(true), [setOpen]));
 
   useEffect(() => {
     const onOpen = () => setOpen(true);

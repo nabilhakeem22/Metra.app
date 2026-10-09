@@ -9,8 +9,7 @@
     "tagline": "Project and cost control for interior-design studios",
     "intro": "Every pound of a project's value, traceable from the line you quoted to the line you invoiced.",
     "getStarted": "Get started",
-    "signIn": "Sign in",
-    "localeName": "English"
+    "signIn": "Sign in"
   },
   "landing": {
     "seo": {
@@ -173,41 +172,19 @@
     "channelLabel": "How should we send your code?"
   },
   "onboarding": {
-    "stepOf": "Step {current} of {total}",
-    "step1Title": "Company profile",
-    "step2Title": "Firm type",
-    "step3Title": "Confirm defaults",
-    "step4Title": "Invite your team",
+    "formTitle": "Company profile",
     "hint": "You will be the owner. At least one name is required.",
     "nameEnLabel": "Firm name (English)",
     "nameArLabel": "Firm name (Arabic)",
     "cityLabel": "City (optional)",
-    "taxLabel": "Tax registration number (optional)",
     "logoLabel": "Company logo (optional)",
     "logoChoose": "Choose image",
     "logoRemove": "Remove",
-    "firmTypeHint": "Choose what your firm does. You can enable more later.",
-    "firmTypeInterior": "Interior fit-out",
-    "firmTypeInteriorDesc": "Quotes, contracts and مستخلص invoicing for interior fit-out projects.",
-    "firmTypeConstruction": "Construction",
-    "firmTypeConstructionDesc": "General contracting and site works.",
-    "firmTypeBoth": "Interior + construction",
-    "firmTypeBothDesc": "Both verticals in a single workspace.",
-    "firmTypeComingSoon": "Coming soon",
-    "next": "Next",
-    "back": "Back",
-    "finish": "Finish",
+    "create": "Create my studio",
     "creating": "Creating…",
     "createdTitle": "Firm created",
     "logoUploadFailed": "Logo upload failed, but your firm was created.",
     "errorRequired": "Enter at least one company name.",
-    "confirmHint": "You can change these later in settings.",
-    "confirmLanguage": "Language",
-    "confirmCurrency": "Currency",
-    "currencyEgp": "Egyptian Pound (EGP)",
-    "inviteHint": "Invite teammates to collaborate. You can do this now or later.",
-    "inviteComingSoon": "Team invites arrive next. Skip for now.",
-    "valueProp": "From the first quote to the final invoice, every line accounted for.",
     "title": "Get started",
     "subtitle": "A few steps to set up your firm.",
     "dismiss": "Dismiss",
@@ -220,9 +197,8 @@
       "completeProfile": "Complete your company profile",
       "addClient": "Add your first client",
       "addProject": "Create your first project",
-      "addCostItem": "Add a price-book item",
-      "buildProposal": "Build a proposal",
-      "sendProposal": "Send a proposal"
+      "startDelivery": "Start your first delivery",
+      "shareDelivery": "Share the delivery with your client"
     }
   },
   "dashboard": {
@@ -233,6 +209,7 @@
     "ctaAddClient": "Add a client",
     "ctaAddProject": "Add a project",
     "ctaStartDelivery": "Start delivery",
+    "ctaShareDelivery": "Share with your client",
     "ctaInviteTeam": "Invite your team",
     "ctaManageTeam": "Manage your team",
     "cards": {
@@ -1420,13 +1397,9 @@
       "title": "Create projects",
       "body": "Group your fit-out jobs under a client. Proposals are built per project."
     },
-    "priceBook": {
-      "title": "Build your price book",
-      "body": "Your catalogue of cost items with costs and prices, reused across proposals."
-    },
-    "proposals": {
-      "title": "Send proposals",
-      "body": "Assemble a sectioned quotation, then send a share link your client can accept."
+    "deliveries": {
+      "title": "Start a delivery here",
+      "body": "A delivery follows one design project from the fee to the handover, and your client follows it on their own page."
     }
   },
   "help": {
