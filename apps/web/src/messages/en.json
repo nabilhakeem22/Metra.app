@@ -2256,7 +2256,9 @@
       "body": "Something went wrong on our side. Please refresh in a moment; your link is still valid."
     },
     "greeting": "Hello, {name} 👋",
-    "firmSubtitle": "Your design project",
+    "language": {
+      "switchTo": "العربية"
+    },
     "stage": {
       "gettingStarted": {
         "label": "Getting started",
@@ -2342,6 +2344,8 @@
         "body": "Your designer shared the first layout and look for your space. Take a look and let them know what you think.",
         "approve": "Review & approve",
         "changes": "Request changes instead",
+        "confirmTitle": "Approve the concept?",
+        "confirmBody": "Your designer will start the next stage based on this concept.",
         "approvedTitle": "Concept approved 🎉",
         "approvedBody": "Your approval is recorded. Your designer will see it and start your 3D visuals.",
         "approvedBodyNotified": "Your approval is recorded and your designer has been notified. They will start your 3D visuals.",
@@ -2354,6 +2358,8 @@
         "body": "Everything's refined and ready. Approve to receive your full design package.",
         "approve": "Approve final design",
         "changes": "Request changes instead",
+        "confirmTitle": "Approve the final design?",
+        "confirmBody": "Your designer will prepare the drawings for execution based on this design.",
         "approvedTitle": "Design approved 🎉",
         "approvedBody": "Your approval is recorded. Your designer will see it and prepare your design handover.",
         "approvedBodyNotified": "Your approval is recorded and your designer has been notified. They will prepare your design handover.",
@@ -2365,9 +2371,11 @@
         "headline": "Your design package is ready",
         "body": "Confirm you've received your design package and we'll wrap things up.",
         "acknowledge": "Confirm handover",
+        "confirmTitle": "Confirm you received the design package?",
+        "confirmBody": "This completes your design project. Your files stay available on this page.",
         "acknowledgedTitle": "Handover confirmed 🎉",
-        "acknowledgedBody": "Thank you. Your designer will now close the design project.",
-        "acknowledgedBodyNotified": "Thank you. Your designer has been notified and will now close the design project."
+        "acknowledgedBody": "Thank you. Your design project is complete.",
+        "acknowledgedBodyNotified": "Thank you. Your design project is complete. Your designer has been notified."
       }
     },
     "conceptPicker": {
@@ -2396,7 +2404,8 @@
       "note": "An early estimate of the cost of executing your design. The final price is set in the bill of quantities.",
       "acknowledge": "I acknowledge this budget",
       "acknowledged": "Acknowledged. Your design team can see your confirmation.",
-      "acknowledgedNotified": "Acknowledged. Your design team has been notified."
+      "acknowledgedNotified": "Acknowledged. Your design team has been notified.",
+      "acknowledgedNote": "You have seen this range."
     },
     "payments": {
       "title": "Payments",
@@ -2404,6 +2413,8 @@
       "paidOf": "{paid} paid of {total}",
       "nextPayment": "Next payment · {milestone}, remaining",
       "claim": "I've made this payment",
+      "confirmTitle": "Did you make this payment?",
+      "confirmBody": "{milestone}: {amount}. Your designer confirms it once it arrives.",
       "awaitingConfirmation": "Waiting for your design team to confirm",
       "claimNotified": "Your design team has been notified.",
       "settledTitle": "All payments settled",
@@ -2430,6 +2441,9 @@
     },
     "actions": {
       "notePlaceholder": "Add a note (optional)",
+      "changesNeedNote": "Tell your designer what to change.",
+      "confirm": "Confirm",
+      "cancel": "Cancel",
       "error": {
         "token_invalid": "This link is no longer available. Please contact your design team.",
         "token_expired": "This link has expired. Please contact your design team.",

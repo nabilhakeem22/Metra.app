@@ -20,6 +20,8 @@ function renderCalm(kind: 'inProgress' | 'delivered' | 'closed', locale: TestLoc
       clientActions={[]}
       conceptOptions={[]}
       conceptChoice={null}
+      lastAnswer={null}
+      onAnswered={() => {}}
     />,
     { locale },
   );

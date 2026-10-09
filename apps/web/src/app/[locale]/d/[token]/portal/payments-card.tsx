@@ -11,6 +11,7 @@ import {
 import { bidiIsolate } from '@/lib/format/bidi';
 import { NextPayment } from './next-payment';
 import { PaymentClaimControl } from './payment-claim-control';
+import { PaymentClaimDialog } from './payment-claim-dialog';
 import { PaymentScheduleRow } from './payment-schedule-row';
 import { formatPortalMoney } from './portal-money';
 import { useMilestoneLabel } from './use-milestone-label';
@@ -56,8 +57,8 @@ function PaidMeter({ percentPaid, label }: { percentPaid: number; label: string 
 
 /**
  * The client's payments: the design fee, how much is paid, the ONE next payment
- * highlighted with its "I've made this payment" control, then every milestone with
- * its state. Other claimable milestones keep a small claim button in their row.
+ * highlighted with its "I've made this payment" control (which asks first, naming
+ * the milestone and the amount), then every milestone with its state. Other claimable milestones keep a small claim button in their row.
  * DUE amounts only (never cost); money is Latin digits, left-to-right; theme tokens
  * only, so it reads in light and dark. Renders nothing without a schedule.
  */
@@ -120,6 +121,7 @@ export function PaymentsCard({
           />
         ))}
       </ul>
+      <PaymentClaimDialog claim={claim} submission={submission} milestoneLabel={milestoneLabel} />
     </section>
   );
 }

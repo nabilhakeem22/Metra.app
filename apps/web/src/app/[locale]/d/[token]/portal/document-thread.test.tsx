@@ -11,6 +11,8 @@ const actions = vi.hoisted(() => ({
   loadDeliveryDocumentComments: vi.fn(),
 }));
 vi.mock('../actions', () => actions);
+const router = vi.hoisted(() => ({ refresh: vi.fn() }));
+vi.mock('next/navigation', () => ({ useRouter: () => router }));
 
 const DOCUMENT = '11111111-1111-4111-8111-111111111111';
 
@@ -25,6 +27,7 @@ async function openAndSend(locale: 'ar-EG' | 'en') {
 beforeEach(() => {
   actions.addDeliveryComment.mockReset();
   actions.loadDeliveryDocumentComments.mockReset().mockResolvedValue([]);
+  router.refresh.mockReset();
 });
 
 describe('DocumentThread', () => {
@@ -35,6 +38,8 @@ describe('DocumentThread', () => {
       messageAt('ar-EG', 'delivery.comments.notified'),
     );
     expect(actions.addDeliveryComment).toHaveBeenCalledWith('tok', DOCUMENT, 'Is this oak?');
+    // A sent message re-reads the page from the server, once.
+    expect(router.refresh).toHaveBeenCalledTimes(1);
   });
 
   it('says nothing about notifying when the studio was not', async () => {
@@ -52,5 +57,14 @@ describe('DocumentThread', () => {
       messageAt('en', 'delivery.comments.error.too_many'),
     );
     expect(screen.queryByRole('status')).toBeNull();
+    expect(router.refresh).not.toHaveBeenCalled();
+  });
+
+  it('a code the comments catalog has no copy for reads as the generic error', async () => {
+    actions.addDeliveryComment.mockResolvedValue({ ok: false, error: 'already_responded' });
+    await openAndSend('ar-EG');
+    expect((await screen.findByRole('alert')).textContent).toBe(
+      messageAt('ar-EG', 'delivery.comments.error.generic'),
+    );
   });
 });

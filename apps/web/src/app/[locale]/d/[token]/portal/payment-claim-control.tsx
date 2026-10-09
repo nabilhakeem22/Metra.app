@@ -10,8 +10,9 @@ import type { PaymentClaimSubmission } from './use-payment-claim';
  * The "I've made this payment" control for ONE milestone, or its
  * waiting-for-confirmation note once a claim is open. `prominent` is the next
  * payment's full-width button; otherwise it is a small text button inside the
- * row, so no claimable milestone loses the capability. Renders nothing when the
- * SDF did not list the milestone as claimable.
+ * row, so no claimable milestone loses the capability. A tap asks first (the
+ * payments card's confirmation names the milestone and the amount). Renders
+ * nothing when the SDF did not list the milestone as claimable.
  */
 export function PaymentClaimControl({
   milestoneKind,
@@ -49,7 +50,7 @@ export function PaymentClaimControl({
         size={prominent ? 'default' : 'sm'}
         className={prominent ? 'w-full' : 'self-start'}
         disabled={submission.pending}
-        onClick={() => submission.claim(milestoneKind)}
+        onClick={() => submission.ask(milestoneKind)}
       >
         {submitting && <Loader2 className="size-4 animate-spin" aria-hidden />}
         {t('claim')}

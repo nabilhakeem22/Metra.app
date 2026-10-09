@@ -3,25 +3,24 @@
 import { useLocale, useTranslations } from 'next-intl';
 import type { DeliveryReadResult } from '@/lib/engagements/public';
 import { BudgetCard } from './portal/budget-card';
+import { PortalCommandCard } from './portal/command-card';
+import { DeliveryNotice } from './portal/delivery-notice';
 import { DocumentsCard } from './portal/documents-card';
-import { FirmHeader } from './portal/firm-header';
 import { Greeting } from './portal/greeting';
 import { PaymentsCard } from './portal/payments-card';
-import { PortalCommandCard } from './portal/command-card';
+import { StudioBar } from './portal/studio-bar';
 
 /**
- * The session-less, mobile-first, firm-branded client portal — a guided single
- * column: firm header → greeting → the command card (journey, the ONE thing that
- * needs the client now, what's next) → an optional subordinate budget card → the
- * payments card (a payment due is something the client acts on, so it sits above
- * the documents) → the released documents → footer. Every derivation (journey
- * position, hero) is computed server-side and carries NO raw machine state; the
- * payments card's sums are exact scale-4 math. Every figure is a client-DUE
- * amount (no cost/margin ever reaches this surface). Bilingual, RTL-safe, Western
- * numerals, logical CSS only. A read that produced no delivery renders ONE OF TWO
- * notices, and which one matters: `not_found` is permanent and tells the client to
- * ask their design team for a new link; `read_failed` is transient and tells them
- * their link is still valid.
+ * The session-less, mobile-first, studio-branded client page — a guided single
+ * column under a sticky studio bar: greeting → the command card (journey, the
+ * ONE thing that needs the client now, what's next) → the budget card whenever
+ * the studio has issued a range → the payments card (a payment due is something
+ * the client acts on, so it sits above the documents) → the released documents
+ * → footer. Every derivation (journey position, stage, hero) is computed
+ * server-side and carries NO raw machine state; every figure is a client-DUE
+ * amount (no cost/margin ever reaches this surface). Bilingual, RTL-safe,
+ * Western numerals, logical CSS only. A read that produced no delivery renders
+ * a notice instead (./portal/delivery-notice.tsx).
  */
 export function PublicDeliveryView({
   token,
@@ -39,14 +38,7 @@ export function PublicDeliveryView({
 
   if (read.status !== 'ok') {
     const notice = read.status === 'read_failed' ? 'readFailed' : 'notFound';
-    return (
-      <div className="client-portal flex min-h-screen items-center justify-center p-6 text-center">
-        <div className="max-w-sm space-y-2">
-          <p className="text-title font-semibold">{t(notice + '.title')}</p>
-          <p className="text-body text-muted-foreground">{t(notice + '.body')}</p>
-        </div>
-      </div>
-    );
+    return <DeliveryNotice notice={notice} token={token} locale={locale} />;
   }
 
   const { delivery } = read;
@@ -57,11 +49,13 @@ export function PublicDeliveryView({
   const firmName = pick(delivery.firm.nameAr, delivery.firm.nameEn) || 'Metra';
   const title = pick(delivery.titleAr, delivery.titleEn);
   const clientName = pick(delivery.client.nameAr, delivery.client.nameEn);
+  // A range with neither bound (a malformed snapshot) has nothing to show.
+  const rom = delivery.rom?.low || delivery.rom?.high ? delivery.rom : null;
 
   return (
     <div className="client-portal min-h-screen">
+      <StudioBar firmName={firmName} token={token} locale={locale} />
       <div className="mx-auto flex max-w-md flex-col gap-4 p-4 md:py-8">
-        <FirmHeader firmName={firmName} />
         <Greeting clientName={clientName} title={title} />
         <PortalCommandCard
           token={token}
@@ -70,7 +64,7 @@ export function PublicDeliveryView({
           stageKey={delivery.stageKey}
           concept={delivery}
         />
-        {delivery.hero.showRomAck && <BudgetCard token={token} rom={delivery.rom} />}
+        {rom && <BudgetCard token={token} rom={rom} canAcknowledge={delivery.hero.showRomAck} />}
         <PaymentsCard
           token={token}
           schedule={delivery.paymentSchedule}

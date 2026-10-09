@@ -1,7 +1,7 @@
 import { act, fireEvent, screen, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { messageAt, renderWithIntl, type TestLocale } from '@/test/render-with-intl';
-import { ConceptOptionPicker } from './concept-option-picker';
+import { renderCommandCard } from '@/test/portal-command-card';
+import { messageAt, type TestLocale } from '@/test/render-with-intl';
 
 // The client picks one released concept option: a confirm dialog first, the
 // letter they saw sent with the choice, the saved letter in the confirmation,
@@ -26,9 +26,13 @@ function at(locale: TestLocale, path: string, values?: { letter: string }): stri
 const en = (path: string, values?: { letter: string }) => at('en', path, values);
 
 function renderPicker(locale: TestLocale = 'en', canRequestChanges = true) {
-  return renderWithIntl(
-    <ConceptOptionPicker token="tok/1" options={OPTIONS} canRequestChanges={canRequestChanges} />,
-    { locale },
+  return renderCommandCard(
+    {
+      hero: { kind: 'action', group: 'concept', showRomAck: false },
+      clientActions: canRequestChanges ? ['approve_concept', 'request_concept_changes'] : ['approve_concept'],
+      conceptOptions: OPTIONS,
+    },
+    { locale, token: 'tok/1' },
   );
 }
 
@@ -37,11 +41,11 @@ function card(letter: string): HTMLElement {
   return document.querySelector(`[data-concept-option="${letter}"]`) as HTMLElement;
 }
 
-async function chooseAndConfirm(letter: string) {
-  fireEvent.click(within(card(letter)).getByRole('button', { name: en('delivery.conceptPicker.choose') }));
+async function chooseAndConfirm(letter: string, locale: TestLocale = 'en') {
+  fireEvent.click(within(card(letter)).getByRole('button', { name: at(locale, 'delivery.conceptPicker.choose') }));
   const dialog = await screen.findByRole('alertdialog');
   fireEvent.click(
-    within(dialog).getByRole('button', { name: en('delivery.conceptPicker.confirm', { letter }) }),
+    within(dialog).getByRole('button', { name: at(locale, 'delivery.conceptPicker.confirm', { letter }) }),
   );
   await act(async () => {});
 }
@@ -59,7 +63,8 @@ describe('ConceptOptionPicker', () => {
     expect(cards.map((element) => element.getAttribute('data-concept-option'))).toEqual(['A', 'B', 'C']);
     expect(within(card('B')).getByText(at('ar-EG', 'delivery.conceptPicker.option', { letter: 'B' }))).toBeTruthy();
     const view = within(card('B')).getByRole('link', { name: messageAt('ar-EG', 'delivery.conceptPicker.view') });
-    expect(view.getAttribute('href')).toBe(`/ar-EG/d/tok%2F1/documents/${OPTIONS[1].id}`);
+    // Round C: View opens the file in the browser rather than forcing a download.
+    expect(view.getAttribute('href')).toBe(`/ar-EG/d/tok%2F1/documents/${OPTIONS[1].id}?variant=view`);
     expect(view.getAttribute('target')).toBe('_blank');
     expect(view.getAttribute('rel')).toBe('noopener noreferrer');
   });
@@ -126,14 +131,7 @@ describe('ConceptOptionPicker', () => {
   it('F5: a review that closed says the step moved on, in Arabic too, and refreshes', async () => {
     actions.chooseDeliveryConcept.mockResolvedValue({ kind: 'moved_on' });
     renderPicker('ar-EG');
-    fireEvent.click(
-      within(card('A')).getByRole('button', { name: at('ar-EG', 'delivery.conceptPicker.choose') }),
-    );
-    const dialog = await screen.findByRole('alertdialog');
-    fireEvent.click(
-      within(dialog).getByRole('button', { name: at('ar-EG', 'delivery.conceptPicker.confirm', { letter: 'A' }) }),
-    );
-    await act(async () => {});
+    await chooseAndConfirm('A', 'ar-EG');
     expect((await screen.findByRole('alert')).textContent).toBe(at('ar-EG', 'delivery.conceptPicker.movedOn'));
     expect(router.refresh).toHaveBeenCalledTimes(1);
   });
@@ -144,37 +142,5 @@ describe('ConceptOptionPicker', () => {
     await chooseAndConfirm('A');
     expect((await screen.findByRole('alert')).textContent).toBe(en('delivery.actions.error.token_expired'));
     expect(router.refresh).not.toHaveBeenCalled();
-  });
-
-  it('Request changes stays while offered, through the concept respond action', async () => {
-    actions.respondToDeliveryConcept.mockResolvedValue({ kind: 'changes_requested', studioNotified: false });
-    renderPicker();
-    fireEvent.click(screen.getByRole('button', { name: en('delivery.hero.concept.changes') }));
-    await act(async () => {});
-    expect(actions.respondToDeliveryConcept).toHaveBeenCalledWith('tok/1', 'request_concept_changes', '');
-    expect(await screen.findByText(en('delivery.hero.concept.changesBody'))).toBeTruthy();
-    expect(actions.chooseDeliveryConcept).not.toHaveBeenCalled();
-  });
-
-  it('a retracted change request holding its slot: Request changes is not offered', () => {
-    renderPicker('en', false);
-    expect(screen.queryByRole('button', { name: en('delivery.hero.concept.changes') })).toBeNull();
-    expect(screen.getAllByRole('button', { name: en('delivery.conceptPicker.choose') })).toHaveLength(3);
-  });
-
-  it('a stale Request changes over a saved choice says the choice, never "changes requested"', async () => {
-    actions.respondToDeliveryConcept.mockResolvedValue({ kind: 'chosen', letter: 'B', studioNotified: true });
-    renderPicker();
-    fireEvent.click(screen.getByRole('button', { name: en('delivery.hero.concept.changes') }));
-    expect(await screen.findByText(en('delivery.conceptPicker.chosen', { letter: 'B' }))).toBeTruthy();
-    expect(screen.queryByText(en('delivery.hero.concept.changesTitle'))).toBeNull();
-  });
-
-  it('a repeat with nothing live on file says the step moved on and refreshes', async () => {
-    actions.respondToDeliveryConcept.mockResolvedValue({ kind: 'moved_on' });
-    renderPicker();
-    fireEvent.click(screen.getByRole('button', { name: en('delivery.hero.concept.changes') }));
-    expect((await screen.findByRole('alert')).textContent).toBe(en('delivery.conceptPicker.movedOn'));
-    expect(router.refresh).toHaveBeenCalledTimes(1);
   });
 });

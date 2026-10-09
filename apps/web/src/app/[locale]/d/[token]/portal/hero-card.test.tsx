@@ -1,13 +1,11 @@
+import { act, fireEvent, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, screen } from '@testing-library/react';
-import { messageAt, renderWithIntl, type TestLocale } from '@/test/render-with-intl';
-import { HeroCard } from './hero-card';
+import { answerDialog, renderCommandCard } from '@/test/portal-command-card';
+import { messageAt, type TestLocale } from '@/test/render-with-intl';
 
-// The hero's confirmation says the designer HAS BEEN NOTIFIED only when the
-// portal action says a notification row was written for this act; otherwise it
-// says the answer is recorded and the designer will see it. It offers only the
-// verbs the client is offered, and a concept verb confirms the decision SAVED
-// on file (a repeat shows that one, never the verb just tapped).
+// Which hero the client sees: the option picker, the plain CTA or the calm card,
+// offering only the verbs the client is offered, and every refusal through a key
+// the catalog holds.
 
 const actions = vi.hoisted(() => ({
   recordDeliveryAction: vi.fn(),
@@ -18,37 +16,15 @@ vi.mock('../actions', () => actions);
 const router = vi.hoisted(() => ({ refresh: vi.fn() }));
 vi.mock('next/navigation', () => ({ useRouter: () => router }));
 
-/** Every verb of each group, as the SDF offers them on a fresh review. */
-const GROUP_VERBS = {
-  concept: ['approve_concept', 'request_concept_changes'],
-  design: ['approve_design', 'request_design_changes'],
-  handoff: ['acknowledge_handoff'],
-} as const;
-
+const en = (path: string) => messageAt('en', path);
 const OPTION_A = '11111111-1111-4111-8111-111111111111';
 const OPTION_B = '22222222-2222-4222-8222-222222222222';
 const TWO_OPTIONS = [
   { id: OPTION_A, position: 1 as const, letter: 'A' as const },
   { id: OPTION_B, position: 2 as const, letter: 'B' as const },
 ];
-
-function renderHero(
-  group: 'concept' | 'design' | 'handoff',
-  locale: TestLocale,
-  concept: Partial<Pick<Parameters<typeof HeroCard>[0], 'clientActions' | 'conceptOptions'>> = {},
-) {
-  return renderWithIntl(
-    <HeroCard
-      token="tok"
-      hero={{ kind: 'action', group, showRomAck: false }}
-      stageKey="conceptReview"
-      clientActions={concept.clientActions ?? [...GROUP_VERBS[group]]}
-      conceptOptions={concept.conceptOptions ?? []}
-      conceptChoice={null}
-    />,
-    { locale },
-  );
-}
+const OFFERED = ['approve_concept', 'request_concept_changes'];
+const CONCEPT = { kind: 'action', group: 'concept', showRomAck: false } as const;
 
 beforeEach(() => {
   actions.recordDeliveryAction.mockReset();
@@ -56,89 +32,46 @@ beforeEach(() => {
   router.refresh.mockReset();
 });
 
-describe('HeroCard confirmation', () => {
-  it.each([
-    ['concept', 'approve', 'approve_concept', 'approvedBody'],
-    ['concept', 'changes', 'request_concept_changes', 'changesBody'],
-    ['design', 'approve', 'approve_design', 'approvedBody'],
-    ['design', 'changes', 'request_design_changes', 'changesBody'],
-    ['handoff', 'acknowledge', 'acknowledge_handoff', 'acknowledgedBody'],
-  ] as const)(
-    '%s %s: "notified" copy only when the studio was notified',
-    async (group, buttonKey, verb, bodyKey) => {
-      const button = messageAt('en', `delivery.hero.${group}.${buttonKey}`);
-      // A concept verb answers an outcome (the decision on file); the others a result.
-      const isConcept = group === 'concept';
-      const action = isConcept ? actions.respondToDeliveryConcept : actions.recordDeliveryAction;
-      const answer = (studioNotified: boolean) =>
-        isConcept
-          ? { kind: verb === 'approve_concept' ? 'approved' : 'changes_requested', studioNotified }
-          : { ok: true, studioNotified };
-
-      action.mockResolvedValue(answer(true));
-      const notified = renderHero(group, 'en');
-      fireEvent.click(screen.getByRole('button', { name: button }));
-      expect(
-        await screen.findByText(messageAt('en', `delivery.hero.${group}.${bodyKey}Notified`)),
-      ).toBeTruthy();
-      expect(action).toHaveBeenCalledWith('tok', verb, '');
-      notified.unmount();
-
-      action.mockResolvedValue(answer(false));
-      renderHero(group, 'en');
-      fireEvent.click(screen.getByRole('button', { name: button }));
-      expect(await screen.findByText(messageAt('en', `delivery.hero.${group}.${bodyKey}`))).toBeTruthy();
-      expect(
-        screen.queryByText(messageAt('en', `delivery.hero.${group}.${bodyKey}Notified`)),
-      ).toBeNull();
-    },
-  );
-
-  it('a design repeat (`already`, never notified) reads as recorded, in Arabic too', async () => {
-    actions.recordDeliveryAction.mockResolvedValue({ ok: true, code: 'already', studioNotified: false });
-    renderHero('design', 'ar-EG');
-    fireEvent.click(screen.getByRole('button', { name: messageAt('ar-EG', 'delivery.hero.design.approve') }));
-    expect(await screen.findByText(messageAt('ar-EG', 'delivery.hero.design.approvedBody'))).toBeTruthy();
-  });
-});
-
-describe('HeroCard at the concept review (B12)', () => {
-  const offered = ['approve_concept', 'request_concept_changes'];
-
+describe('the hero at the concept review (B12)', () => {
   it('with 2 to 4 released options it is the picker: no plain Approve, Request changes kept', () => {
-    renderHero('concept', 'en', { clientActions: offered, conceptOptions: TWO_OPTIONS });
-    expect(screen.getByText(messageAt('en', 'delivery.conceptPicker.title'))).toBeTruthy();
-    expect(screen.getAllByRole('button', { name: messageAt('en', 'delivery.conceptPicker.choose') })).toHaveLength(2);
-    expect(screen.queryByRole('button', { name: messageAt('en', 'delivery.hero.concept.approve') })).toBeNull();
-    expect(screen.getByRole('button', { name: messageAt('en', 'delivery.hero.concept.changes') })).toBeTruthy();
+    renderCommandCard({ hero: CONCEPT, clientActions: OFFERED, conceptOptions: TWO_OPTIONS });
+    expect(screen.getByText(en('delivery.conceptPicker.title'))).toBeTruthy();
+    expect(screen.getAllByRole('button', { name: en('delivery.conceptPicker.choose') })).toHaveLength(2);
+    expect(screen.queryByRole('button', { name: en('delivery.hero.concept.approve') })).toBeNull();
+    expect(screen.getByRole('button', { name: en('delivery.hero.concept.changes') })).toBeTruthy();
   });
 
   it.each([
     ['no option', []],
     ['one option', TWO_OPTIONS.slice(0, 1)],
   ])('with %s it keeps the plain Approve / Request changes', (_label, conceptOptions) => {
-    renderHero('concept', 'en', { clientActions: offered, conceptOptions });
-    expect(screen.getByRole('button', { name: messageAt('en', 'delivery.hero.concept.approve') })).toBeTruthy();
-    expect(screen.queryByText(messageAt('en', 'delivery.conceptPicker.title'))).toBeNull();
+    renderCommandCard({ hero: CONCEPT, clientActions: OFFERED, conceptOptions });
+    expect(screen.getByRole('button', { name: en('delivery.hero.concept.approve') })).toBeTruthy();
+    expect(screen.queryByText(en('delivery.conceptPicker.title'))).toBeNull();
   });
 
   it('without approve_concept on offer it is not the picker', () => {
-    renderHero('concept', 'en', { clientActions: ['request_concept_changes'], conceptOptions: TWO_OPTIONS });
-    expect(screen.queryByText(messageAt('en', 'delivery.conceptPicker.title'))).toBeNull();
+    renderCommandCard({ hero: CONCEPT, clientActions: ['request_concept_changes'], conceptOptions: TWO_OPTIONS });
+    expect(screen.queryByText(en('delivery.conceptPicker.title'))).toBeNull();
+  });
+
+  it('a retracted change request still holding its slot: Request changes is not offered', () => {
+    renderCommandCard({ hero: CONCEPT, clientActions: ['approve_concept'] });
+    expect(screen.getByRole('button', { name: en('delivery.hero.concept.approve') })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: en('delivery.hero.concept.changes') })).toBeNull();
+  });
+
+  it('a retracted approval holding its slot: only Request changes is offered', () => {
+    renderCommandCard({ hero: CONCEPT, clientActions: ['request_concept_changes'] });
+    expect(screen.queryByRole('button', { name: en('delivery.hero.concept.approve') })).toBeNull();
+    expect(screen.getByRole('button', { name: en('delivery.hero.concept.changes') })).toBeTruthy();
   });
 });
 
 describe('the calm hero repeats the saved choice (B12)', () => {
   function renderCalm(kind: 'inProgress' | 'delivered' | 'closed', locale: TestLocale) {
-    return renderWithIntl(
-      <HeroCard
-        token="tok"
-        hero={{ kind, showRomAck: false }}
-        stageKey="visuals"
-        clientActions={[]}
-        conceptOptions={[]}
-        conceptChoice={{ id: OPTION_B, letter: 'B' }}
-      />,
+    return renderCommandCard(
+      { hero: { kind, showRomAck: false }, clientActions: [], conceptChoice: { id: OPTION_B, letter: 'B' } },
       { locale },
     );
   }
@@ -157,48 +90,33 @@ describe('the calm hero repeats the saved choice (B12)', () => {
   });
 });
 
-describe('ActionHero offers only what is offered, and confirms only what is SAVED (B12)', () => {
-  const approve = () => screen.queryByRole('button', { name: messageAt('en', 'delivery.hero.concept.approve') });
-  const changes = () => screen.queryByRole('button', { name: messageAt('en', 'delivery.hero.concept.changes') });
-
-  it('a retracted change request still holding its slot: Request changes is not offered', () => {
-    renderHero('concept', 'en', { clientActions: ['approve_concept'] });
-    expect(approve()).toBeTruthy();
-    expect(changes()).toBeNull();
+describe('a refusal always reads from the catalog', () => {
+  it('an error code the portal has no copy for shows the generic message', async () => {
+    actions.recordDeliveryAction.mockResolvedValue({ ok: false, error: 'contract_inactive' });
+    renderCommandCard({
+      hero: { kind: 'action', group: 'design', showRomAck: false },
+      clientActions: ['approve_design', 'request_design_changes'],
+    });
+    fireEvent.click(screen.getByRole('button', { name: en('delivery.hero.design.approve') }));
+    await answerDialog('en', 'confirm');
+    await act(async () => {});
+    expect((await screen.findByRole('alert')).textContent).toBe(en('delivery.actions.error.generic'));
+    // The hero stays, so the client can try again; nothing was confirmed.
+    expect(screen.getByRole('button', { name: en('delivery.hero.design.approve') })).toBeTruthy();
+    expect(router.refresh).not.toHaveBeenCalled();
   });
 
-  it('a retracted approval holding its slot: only Request changes is offered', () => {
-    renderHero('concept', 'en', { clientActions: ['request_concept_changes'] });
-    expect(approve()).toBeNull();
-    expect(changes()).toBeTruthy();
-  });
-
-  it('a stale Approve over a saved choice of B says "You chose option B", not "approved"', async () => {
-    actions.respondToDeliveryConcept.mockResolvedValue({ kind: 'chosen', letter: 'B', studioNotified: true });
-    renderHero('concept', 'en');
-    fireEvent.click(approve()!);
-    expect(
-      await screen.findByText(messageAt('en', 'delivery.conceptPicker.chosen').replace('{letter}', '\u2068B\u2069')),
-    ).toBeTruthy();
-    expect(actions.recordDeliveryAction).not.toHaveBeenCalled();
-  });
-
-  it('a stale Approve over a saved request for changes confirms the request', async () => {
-    actions.respondToDeliveryConcept.mockResolvedValue({ kind: 'changes_requested', studioNotified: false });
-    renderHero('concept', 'en');
-    fireEvent.click(approve()!);
-    expect(await screen.findByText(messageAt('en', 'delivery.hero.concept.changesTitle'))).toBeTruthy();
-    expect(screen.queryByText(messageAt('en', 'delivery.hero.concept.approvedTitle'))).toBeNull();
-  });
-
-  it('a repeat with nothing live on file says the step moved on and refreshes', async () => {
-    actions.respondToDeliveryConcept.mockResolvedValue({ kind: 'moved_on' });
-    renderHero('concept', 'en');
-    fireEvent.click(changes()!);
-    expect((await screen.findByRole('alert')).textContent).toBe(
-      messageAt('en', 'delivery.conceptPicker.movedOn'),
+  it('a rejected action leaves no spinner stuck and shows the generic message', async () => {
+    actions.recordDeliveryAction.mockRejectedValue(new Error('network'));
+    renderCommandCard({
+      hero: { kind: 'action', group: 'handoff', showRomAck: false },
+      clientActions: ['acknowledge_handoff'],
+    });
+    fireEvent.click(screen.getByRole('button', { name: en('delivery.hero.handoff.acknowledge') }));
+    await answerDialog('en', 'confirm');
+    expect((await screen.findByRole('alert')).textContent).toBe(en('delivery.actions.error.generic'));
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: en('delivery.hero.handoff.acknowledge') }).hasAttribute('disabled')).toBe(false),
     );
-    expect(router.refresh).toHaveBeenCalledTimes(1);
-    expect(screen.queryByText(messageAt('en', 'delivery.hero.concept.changesTitle'))).toBeNull();
   });
 });

@@ -1,27 +1,26 @@
+'use client';
+
+import { useRouter } from 'next/navigation';
+import { useState } from 'react';
 import type { MilestoneProgress } from '@/lib/engagements/journey-map';
 import type { HeroView } from '@/lib/engagements/portal-hero';
 import type { PortalStageKey } from '@/lib/engagements/portal-stage';
 import type { PublicDelivery } from '@/lib/engagements/public/types';
-import { HeroCard } from './hero-card';
+import { HeroCard, type HeroLastAnswer } from './hero-card';
 import { JourneyTracker } from './journey-tracker';
 import { WhatsNext } from './whats-next';
 
 /**
- * The client's command card — the studio cockpit's anatomy, on the client side.
- *
- * The portal used to stack these three as separate sections, with "what happens
- * next" at the BOTTOM of the page: five cards below the button it describes. The
- * rule the cockpit card is built on is that the one action never reads as a dead
- * end, and a next-step card that far away does not do that job.
- *
- * So they are one card now, read top to bottom, every time:
+ * The client's command card — the studio cockpit's anatomy, on the client side,
+ * read top to bottom, every time:
  *   1. where we are      — the six-milestone ribbon
  *   2. the one thing now — the hero's single CTA (or its calm in-progress state)
  *   3. what happens next — one quiet line, directly under the action
  *
- * Everything else (the budget card, the payments card, the documents) stays below.
- * This is a re-layout, not a new engine: the same three components, the same
- * props, the same server actions behind them.
+ * It OWNS the client's last confirmed answer. Every confirmed act re-reads the
+ * page from the server (`router.refresh()`), so the journey, the hero and the
+ * cards below show where things stand now; the answer is held here, above the
+ * hero that gave it, so the confirmation survives that refresh.
  */
 export function PortalCommandCard({
   token,
@@ -37,6 +36,14 @@ export function PortalCommandCard({
   /** What the hero needs to offer the concept options as a choice (B12). */
   concept: Pick<PublicDelivery, 'clientActions' | 'conceptOptions' | 'conceptChoice'>;
 }) {
+  const router = useRouter();
+  const [lastAnswer, setLastAnswer] = useState<HeroLastAnswer | null>(null);
+
+  function answered(answer: HeroLastAnswer) {
+    setLastAnswer(answer);
+    router.refresh();
+  }
+
   return (
     <section className="space-y-4 rounded-panel border bg-background p-4 shadow-sm">
       <JourneyTracker milestone={milestone} bare />
@@ -47,6 +54,8 @@ export function PortalCommandCard({
         clientActions={concept.clientActions}
         conceptOptions={concept.conceptOptions}
         conceptChoice={concept.conceptChoice}
+        lastAnswer={lastAnswer}
+        onAnswered={answered}
       />
       <WhatsNext milestone={milestone} bare />
     </section>
