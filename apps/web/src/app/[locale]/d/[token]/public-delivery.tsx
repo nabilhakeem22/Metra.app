@@ -55,7 +55,7 @@ export function PublicDeliveryView({
   return (
     <div className="client-portal min-h-screen">
       <StudioBar firmName={firmName} token={token} locale={locale} />
-      <div className="mx-auto flex max-w-md flex-col gap-4 p-4 md:py-8">
+      <div className="mx-auto flex max-w-md flex-col gap-4 p-4">
         <Greeting clientName={clientName} title={title} />
         <PortalCommandCard
           token={token}

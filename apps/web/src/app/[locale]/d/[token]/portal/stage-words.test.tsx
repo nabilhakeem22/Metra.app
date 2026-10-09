@@ -50,6 +50,9 @@ describe('the journey tracker', () => {
     const current = steps.filter((step) => step.getAttribute('aria-current') === 'step');
     expect(current).toHaveLength(1);
     expect(current[0].textContent).toContain(messageAt(locale, 'delivery.journey.design'));
+    // Named once on screen, beside the eyebrow; the other five only for a screen reader.
+    expect(screen.getAllByText(messageAt(locale, 'delivery.journey.design'))).toHaveLength(2);
+    expect(steps.filter((step) => step.querySelector('.sr-only'))).toHaveLength(6);
   });
 
   it('a delivered design marks all six done and none current', () => {

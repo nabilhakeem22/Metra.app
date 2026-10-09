@@ -23,7 +23,7 @@ export function PortalSkeleton() {
             <Skeleton className="ms-auto h-11 w-20 shrink-0 rounded-pill" />
           </div>
         </div>
-        <div className="mx-auto flex max-w-md flex-col gap-4 p-4 md:py-8">
+        <div className="mx-auto flex max-w-md flex-col gap-4 p-4">
           <Skeleton data-skeleton="greeting" className="h-6 w-2/3" />
           <div className="space-y-4 rounded-panel border bg-background p-4">
             <div data-skeleton="journey" className="flex justify-between px-2">
