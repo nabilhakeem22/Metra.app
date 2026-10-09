@@ -1,4 +1,4 @@
-import { createLogoUpload, setOrgLogo } from '@/lib/org/actions';
+import { createLogoUpload, setOrgLogo } from '@/lib/org/logo-actions';
 
 /**
  * Best-effort logo upload for the studio just created: sign, PUT the bytes,
@@ -8,8 +8,8 @@ import { createLogoUpload, setOrgLogo } from '@/lib/org/actions';
  */
 export async function uploadOnboardingLogo(file: File): Promise<boolean> {
   try {
-    const signed = await createLogoUpload({ contentType: file.type, originalName: file.name });
-    // A refused signing (a demoted user, say) answers an ActionResult.
+    const signed = await createLogoUpload({ contentType: file.type, originalName: file.name, size: file.size });
+    // A refused signing (a demoted user, a type or size the rule refuses) answers an ActionResult.
     if ('ok' in signed) return false;
     const uploaded = await fetch(signed.signedUrl, {
       method: 'PUT',

@@ -1,5 +1,6 @@
 'use client';
 
+import { answeredReview } from '@/lib/engagements/portal-answered';
 import type { PublicDelivery } from '@/lib/engagements/public/types';
 import type { HeroGroup, HeroView } from '@/lib/engagements/portal-hero';
 import type { PortalStageKey } from '@/lib/engagements/portal-stage';
@@ -22,12 +23,13 @@ export interface HeroLastAnswer {
  * The hero: the single "what needs you now" surface. At the concept review, with
  * at least two released options and the approval still open, it is the option
  * picker; in any other actionable state it is the group's CTA (./hero-action.tsx);
- * otherwise the calm card (./calm-hero.tsx).
+ * otherwise the calm card (./calm-hero.tsx), which says what the client
+ * answered when they have answered the stage's review.
  *
- * A confirmed answer stays on screen: until the refresh lands (the props still
- * offer the same group) the confirmation stands in place of the buttons, and
- * once the server says nothing is asked any more it sits above the calm hero.
- * A NEW request (another group) replaces it.
+ * A confirmed answer stays on screen in place of the hero, before and after
+ * the refresh that follows it (it already says what was done and what comes
+ * next, so the calm card under it would only repeat it). A NEW request (another
+ * group) replaces it.
  */
 export function HeroCard({
   token,
@@ -36,6 +38,7 @@ export function HeroCard({
   clientActions,
   conceptOptions,
   conceptChoice,
+  conceptDecision,
   lastAnswer,
   onAnswered,
 }: {
@@ -45,26 +48,24 @@ export function HeroCard({
   clientActions: PublicDelivery['clientActions'];
   conceptOptions: PublicDelivery['conceptOptions'];
   conceptChoice: PublicDelivery['conceptChoice'];
+  conceptDecision: PublicDelivery['conceptDecision'];
   lastAnswer: HeroLastAnswer | null;
   onAnswered: (answer: HeroLastAnswer) => void;
 }) {
   const asked = hero.kind === 'action' ? hero.group : undefined;
-  const calm = (
-    <CalmHero kind={hero.kind} stageKey={stageKey} chosenLetter={conceptChoice?.letter ?? null} />
-  );
-
   if (lastAnswer && (!asked || asked === lastAnswer.group)) {
-    const confirmation = <HeroConfirmed group={lastAnswer.group} {...lastAnswer.confirmed} />;
-    if (asked) return confirmation;
+    return <HeroConfirmed group={lastAnswer.group} {...lastAnswer.confirmed} />;
+  }
+  if (!asked) {
     return (
-      <div className="space-y-3">
-        {confirmation}
-        {calm}
-      </div>
+      <CalmHero
+        kind={hero.kind}
+        stageKey={stageKey}
+        answered={answeredReview({ stageKey, clientActions, conceptDecision, conceptChoice })}
+        chosenLetter={conceptChoice?.letter ?? null}
+      />
     );
   }
-
-  if (!asked) return calm;
   const answered = (confirmed: HeroConfirmedState) => onAnswered({ group: asked, confirmed });
   const picksAnOption =
     asked === 'concept' &&

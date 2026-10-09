@@ -34,7 +34,7 @@ export function PortalCommandCard({
   milestone: MilestoneProgress;
   stageKey: PortalStageKey;
   /** What the hero needs to offer the concept options as a choice (B12). */
-  concept: Pick<PublicDelivery, 'clientActions' | 'conceptOptions' | 'conceptChoice'>;
+  concept: Pick<PublicDelivery, 'clientActions' | 'conceptOptions' | 'conceptChoice' | 'conceptDecision'>;
 }) {
   const router = useRouter();
   const [lastAnswer, setLastAnswer] = useState<HeroLastAnswer | null>(null);
@@ -54,6 +54,7 @@ export function PortalCommandCard({
         clientActions={concept.clientActions}
         conceptOptions={concept.conceptOptions}
         conceptChoice={concept.conceptChoice}
+        conceptDecision={concept.conceptDecision}
         lastAnswer={lastAnswer}
         onAnswered={answered}
       />

@@ -84,6 +84,11 @@ describe('the notices', () => {
     expect(screen.getByRole('heading').textContent).toBe(messageAt('ar-EG', `delivery.${notice}.title`));
     expect(switchLink('ar-EG').getAttribute('href')).toBe('/en/d/deadbeef');
   });
+
+  it('F13: a token Next handed over still encoded is encoded once in the switch', () => {
+    renderWithIntl(<PublicDeliveryView token="dead%20beef" read={{ status: 'not_found' }} />, { locale: 'en' });
+    expect(switchLink('en').getAttribute('href')).toBe('/ar-EG/d/dead%20beef');
+  });
 });
 
 describe('the page', () => {
@@ -91,6 +96,14 @@ describe('the page', () => {
     renderPage('en');
     expect(screen.getByText(messageAt('en', 'delivery.budget.title'))).toBeTruthy();
     expect(screen.queryByRole('button', { name: messageAt('en', 'delivery.budget.acknowledge') })).toBeNull();
+  });
+
+  it('F14: a long project title keeps to one line (the full title stays in `title`)', () => {
+    const long = 'Zamalek flat, full interior fit-out with kitchen, three bathrooms and the roof terrace';
+    renderPage('en', { titleEn: long });
+    const heading = screen.getByRole('heading', { level: 1 });
+    expect(heading.className).toContain('truncate');
+    expect(heading.getAttribute('title')).toBe(long);
   });
 
   it('has no budget card without an issued range', () => {

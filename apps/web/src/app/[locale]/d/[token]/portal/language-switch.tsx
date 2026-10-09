@@ -2,6 +2,7 @@
 
 import { useTranslations } from 'next-intl';
 import { Link } from '@/i18n/routing';
+import { tokenPathSegment } from '@/lib/engagements/portal-path';
 
 /** The language a client page switches to, and that language's `lang` tag. */
 const OTHER_LOCALE = {
@@ -22,7 +23,7 @@ export function LanguageSwitch({ token, locale }: { token: string; locale: strin
   const target = OTHER_LOCALE[locale === 'en' ? 'en' : 'ar-EG'];
   return (
     <Link
-      href={`/d/${encodeURIComponent(token)}`}
+      href={`/d/${tokenPathSegment(token)}`}
       locale={target.locale}
       hrefLang={target.lang}
       lang={target.lang}

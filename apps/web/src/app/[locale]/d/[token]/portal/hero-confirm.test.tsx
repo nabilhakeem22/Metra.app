@@ -72,9 +72,10 @@ describe('approve and acknowledge ask first', () => {
     expect(screen.queryByRole('dialog')).toBeNull();
 
     landRefresh();
-    // The server now asks nothing: the confirmation sits above the calm hero.
+    // The server now asks nothing: the confirmation stays, alone (the calm card
+    // under it would only repeat it).
     expect(screen.getByText(en('delivery.hero.design.approvedBodyNotified'))).toBeTruthy();
-    expect(screen.getByText(en('delivery.stage.drawings.label'))).toBeTruthy();
+    expect(screen.queryByText(en('delivery.stage.drawings.label'))).toBeNull();
     expect(screen.queryByRole('button', { name: en('delivery.hero.design.approve') })).toBeNull();
     expect(router.refresh).toHaveBeenCalledTimes(1);
   });
@@ -104,8 +105,10 @@ describe('Request changes needs a note', () => {
     expect(changes.getAttribute('aria-describedby')).toBe(hint.id);
 
     const note = screen.getByRole('textbox');
-    fireEvent.change(note, { target: { value: '   ' } });
-    expect(changes.hasAttribute('disabled')).toBe(true);
+    for (const invisible of ['   ', '​', '‏⁠', '؜ ']) {
+      fireEvent.change(note, { target: { value: invisible } });
+      expect(changes.hasAttribute('disabled'), JSON.stringify(invisible)).toBe(true);
+    }
     fireEvent.change(note, { target: { value: 'A bigger window' } });
     expect(changes.hasAttribute('disabled')).toBe(false);
     expect(screen.queryByText(en('delivery.actions.changesNeedNote'))).toBeNull();

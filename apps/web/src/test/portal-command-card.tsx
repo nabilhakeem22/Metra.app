@@ -16,6 +16,7 @@ export interface CommandCardProps {
   clientActions: string[];
   conceptOptions?: PublicDelivery['conceptOptions'];
   conceptChoice?: PublicDelivery['conceptChoice'];
+  conceptDecision?: PublicDelivery['conceptDecision'];
   stageKey?: PortalStageKey;
 }
 
@@ -44,6 +45,7 @@ export function renderCommandCard(
             clientActions: props.clientActions,
             conceptOptions: props.conceptOptions ?? [],
             conceptChoice: props.conceptChoice ?? null,
+            conceptDecision: props.conceptDecision ?? null,
           }}
         />
       </>

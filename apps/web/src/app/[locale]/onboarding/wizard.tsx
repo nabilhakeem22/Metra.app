@@ -9,6 +9,7 @@ import { useRouter } from '@/i18n/routing';
 import { resolveActionError } from '@/lib/actions/error-message';
 import { createOrg } from '@/lib/org/actions';
 import { OnboardingProfileFields, type OnboardingProfileValues } from './onboarding-profile-fields';
+import { fieldsAtLimit, fieldsOverLimit } from './profile-field-limits';
 import { uploadOnboardingLogo } from './upload-onboarding-logo';
 
 const EMPTY: OnboardingProfileValues = { nameEn: '', nameAr: '', city: '' };
@@ -51,6 +52,9 @@ export function OnboardingWizard() {
       setError(t('errorRequired'));
       return;
     }
+    // Over a cap the server would refuse with a bare "invalid": each such field
+    // already says why under itself, so nothing is sent.
+    if (fieldsOverLimit(values).length > 0) return;
     setError(null);
     startTransition(async () => {
       try {
@@ -85,6 +89,7 @@ export function OnboardingWizard() {
       <OnboardingProfileFields
         values={values}
         onChange={(field, value) => setValues((previous) => ({ ...previous, [field]: value }))}
+        atLimit={fieldsAtLimit(values)}
         logo={logo}
         logoPreview={logoPreview}
         pickLogo={pickLogo}

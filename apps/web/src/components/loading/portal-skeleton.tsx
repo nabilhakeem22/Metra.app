@@ -1,3 +1,4 @@
+import { useTranslations } from 'next-intl';
 import { Skeleton } from '@/components/ui/skeleton';
 import { SkeletonRoot } from './skeleton-root';
 
@@ -13,9 +14,11 @@ const JOURNEY_DOTS = 6;
  * application.
  */
 export function PortalSkeleton() {
+  // The client reads this: their own words (فصحى), not the studio's "Loading".
+  const t = useTranslations('delivery');
   return (
     <div className="client-portal min-h-screen">
-      <SkeletonRoot className="space-y-0">
+      <SkeletonRoot className="space-y-0" label={t('loading')}>
         <div data-skeleton="bar" className="border-b bg-background/95">
           <div className="mx-auto flex max-w-md items-center gap-3 px-4 py-2">
             <Skeleton className="size-10 shrink-0" />

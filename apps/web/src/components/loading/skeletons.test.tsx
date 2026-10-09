@@ -21,11 +21,20 @@ const SKELETONS = {
 };
 
 describe('route skeletons', () => {
-  test.each(Object.entries(SKELETONS))('%s is one status region named Loading', (_name, Shape) => {
+  test.each(Object.entries(SKELETONS))('%s is one status region named Loading', (name, Shape) => {
     const { container } = renderWithIntl(<Shape />, { locale: 'en' });
     const regions = container.querySelectorAll('[role="status"]');
     expect(regions).toHaveLength(1);
-    expect(regions[0]!.getAttribute('aria-label')).toBe(messageAt('en', 'app.loading'));
+    // F12: the client page announces itself in the client's own words.
+    const label = name === 'PortalSkeleton' ? 'delivery.loading' : 'app.loading';
+    expect(regions[0]!.getAttribute('aria-label')).toBe(messageAt('en', label));
+  });
+
+  test('F12: the client page announces «جارٍ تحميل مشروعك…» in Arabic, not the studio wording', () => {
+    const { container } = renderWithIntl(<PortalSkeleton />, { locale: 'ar-EG' });
+    expect(container.querySelector('[role="status"]')!.getAttribute('aria-label')).toBe(
+      messageAt('ar-EG', 'delivery.loading'),
+    );
   });
 
   test('the delivery route waits in the delivery shape: a spine band, no stat cards', () => {

@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useId, useState, useTransition } from 'react';
 import { Button } from '@/components/ui/button';
 import { useConfirm } from '@/components/ui/confirm-dialog';
+import { isBlankNote } from '@/lib/engagements/client-note';
 import type { PublicDelivery } from '@/lib/engagements/public/types';
 import { bidiIsolate } from '@/lib/format/bidi';
 import { chooseDeliveryConcept, respondToDeliveryConcept } from '../actions';
@@ -51,7 +52,7 @@ export function ConceptOptionPicker({
   const [pending, startTransition] = useTransition();
   const [note, setNote] = useState('');
   const [error, setError] = useState<HeroError | null>(null);
-  const noteBlank = note.trim() === '';
+  const noteBlank = isBlankNote(note);
 
   function run(act: () => Promise<HeroAnswer>) {
     setError(null);

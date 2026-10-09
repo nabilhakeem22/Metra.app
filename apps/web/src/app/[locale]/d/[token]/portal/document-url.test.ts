@@ -12,4 +12,8 @@ describe('documentUrl', () => {
   it('encodes the token and the id, so neither can add a path or a query', () => {
     expect(documentUrl('en', 'a/b?c', 'x#y', 'view')).toBe('/en/d/a%2Fb%3Fc/documents/x%23y?variant=view');
   });
+
+  it('F13: a token Next handed over still encoded is encoded once, not twice', () => {
+    expect(documentUrl('en', 'dead%20beef', id)).toBe(`/en/d/dead%20beef/documents/${id}`);
+  });
 });

@@ -97,6 +97,11 @@ export function PaymentsCard({
         <span className="text-caption text-muted-foreground">{t('designFee', { amount: money(overview.total) })}</span>
       </div>
       <PaidMeter percentPaid={overview.percentPaid} label={t('title')} />
+      {submission.changedKind && (
+        <p role="status" className="text-caption text-muted-foreground">
+          {t('changed')}
+        </p>
+      )}
       {next ? (
         <>
           <p className="text-caption text-muted-foreground">

@@ -1,48 +1,26 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import {
-  PREVIEW_MAX_EDGE,
-  PREVIEW_QUALITY,
-} from '@/lib/engagements/document-access';
-import { getDeliveryDocumentByToken, type DeliveryDocumentTarget } from '@/lib/engagements/public-documents';
+import { tokenPathSegment } from '@/lib/engagements/portal-path';
+import { getDeliveryDocumentByToken } from '@/lib/engagements/public-documents';
 import { LOCALES, routing } from '@/i18n/routing';
-import { createSignedObjectUrl } from '@/lib/storage/signed-urls';
 import { isUuid } from '@/lib/uuid';
+import { DOCUMENT_HEADERS, documentResponse, type HandOver } from './document-response';
 
-// Client Deliverables, Step 1 — the session-less endpoint for ONE released
-// document of a tokenized delivery. GET only; the share token in the path IS the
-// authorization (the SDF resolves the delivery solely by its hash).
+// Client Deliverables — the session-less endpoint for ONE released document of a
+// tokenized delivery. GET only; the share token in the path IS the authorization
+// (the SDF resolves the delivery solely by its hash).
 //
-// TWO WAYS TO HAND IT OVER. No `variant` is the download (an attachment named
-// for the client, or the preview rendition). `?variant=view` opens it in the
-// browser: signed WITHOUT a download name, so no attachment disposition is
-// forced. Any other `variant` is refused like a forged id.
+// TWO WAYS TO HAND IT OVER. No `variant` is the download; `?variant=view` asks
+// to open it in the browser, which is honoured only for a file that is safe to
+// open (./document-response.ts). Any other `variant` is refused like a forged id.
+// While money is outstanding (`preview`), the client gets a downscaled image
+// streamed from here and never a storage URL.
 //
 // NO ORACLE: every failure — a non-uuid document id, a forged id, another delivery's
 // artifact, an unreleased artifact, an unknown/revoked/expired token, an unknown
-// variant, a Storage error, any throw — produces the IDENTICAL 303 back to the
-// portal with `?document=unavailable`. Never a 404 body, never a 500, never a
-// distinguishable response, so a caller cannot probe which documents or
-// deliveries exist.
-
-/** How long the client's signed link stays valid: long enough to open a large
- *  PDF and reload its tab, short enough not to be worth passing around. */
-const SIGNED_URL_TTL_SECONDS = 300;
-
-/** No caching, and the share token must never ride a Referer to Storage. */
-const SAFE_HEADERS = {
-  'Cache-Control': 'no-store',
-  'Referrer-Policy': 'no-referrer',
-} as const;
-
-/** The storage-side downscale a PREVIEW is served through, whichever variant. */
-const PREVIEW_TRANSFORM = {
-  width: PREVIEW_MAX_EDGE,
-  height: PREVIEW_MAX_EDGE,
-  resize: 'contain',
-  quality: PREVIEW_QUALITY,
-} as const;
-
-type HandOver = 'download' | 'view';
+// variant, a withheld document, a Storage error, any throw — produces the
+// IDENTICAL 303 back to the portal with `?document=unavailable`. Never a 404 body,
+// never a 500, never a distinguishable response, so a caller cannot probe which
+// documents or deliveries exist.
 
 /** The hand-over a `variant` asks for, or null for one this route does not know. */
 function handOverOf(variant: string | null): HandOver | null {
@@ -62,32 +40,10 @@ function unavailable(
 ): NextResponse {
   const safeLocale = isLocale(locale) ? locale : routing.defaultLocale;
   const target = new URL(
-    `/${safeLocale}/d/${encodeURIComponent(token)}?document=unavailable`,
+    `/${safeLocale}/d/${tokenPathSegment(token)}?document=unavailable`,
     request.url,
   );
-  return NextResponse.redirect(target, { status: 303, headers: SAFE_HEADERS });
-}
-
-/**
- * The signed URL for a document the client may have. The object key comes from
- * the `files` row the SDF resolved — never from the request. A PREVIEW is
- * always the downscaled rendition, signed without a download name, so the
- * full-resolution deliverable never reaches an unpaid client. A downloadable
- * file is signed with its client-facing name for a download, and without one
- * for a view.
- */
-function signDocument(document: DeliveryDocumentTarget, handOver: HandOver): Promise<string> {
-  if (document.access === 'preview') {
-    return createSignedObjectUrl(document.bucket, document.objectKey, SIGNED_URL_TTL_SECONDS, {
-      transform: PREVIEW_TRANSFORM,
-    });
-  }
-  return createSignedObjectUrl(
-    document.bucket,
-    document.objectKey,
-    SIGNED_URL_TTL_SECONDS,
-    handOver === 'download' ? { download: document.downloadName } : undefined,
-  );
+  return NextResponse.redirect(target, { status: 303, headers: DOCUMENT_HEADERS });
 }
 
 export async function GET(
@@ -110,8 +66,7 @@ export async function GET(
     // anyone who had it before the payment lapsed.
     if (document.access === 'withheld') return unavailable(request, locale, token);
 
-    const signedUrl = await signDocument(document, handOver);
-    return NextResponse.redirect(signedUrl, { status: 302, headers: SAFE_HEADERS });
+    return (await documentResponse(document, handOver)) ?? unavailable(request, locale, token);
   } catch {
     // Token-free breadcrumb only — never the raw token or the document id.
     console.error('delivery document download failed');

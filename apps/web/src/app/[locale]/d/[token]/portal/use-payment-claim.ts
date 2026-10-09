@@ -20,12 +20,17 @@ export interface PaymentClaimSubmission {
   notifiedKinds: ReadonlySet<string>;
   /** The last failed claim, already narrowed to a key the catalog holds. */
   failure: { kind: string; error: PortalErrorKey } | null;
+  /** A milestone whose confirmation a refresh made moot (it stopped being
+   *  claimable while the dialog was open): nothing was sent, and the card says so. */
+  changedKind: string | null;
   /** Ask first: opens the confirmation for this milestone. Sends nothing. */
   ask: (milestoneKind: string) => void;
   /** Close the confirmation without sending anything. */
   dismiss: () => void;
   /** The confirmation's Confirm: claims the milestone being asked about. */
   confirm: () => void;
+  /** Close a confirmation the server made moot, and keep the reason for the card. */
+  withdraw: (milestoneKind: string) => void;
 }
 
 /**
@@ -44,6 +49,7 @@ export function usePaymentClaim(token: string): PaymentClaimSubmission {
   const [claimedKinds, setClaimedKinds] = useState<ReadonlySet<string>>(new Set());
   const [notifiedKinds, setNotifiedKinds] = useState<ReadonlySet<string>>(new Set());
   const [failure, setFailure] = useState<PaymentClaimSubmission['failure']>(null);
+  const [changedKind, setChangedKind] = useState<string | null>(null);
 
   function confirm() {
     const milestoneKind = askingKind;
@@ -78,8 +84,16 @@ export function usePaymentClaim(token: string): PaymentClaimSubmission {
     claimedKinds,
     notifiedKinds,
     failure,
-    ask: setAskingKind,
+    changedKind,
+    ask: (milestoneKind) => {
+      setChangedKind(null);
+      setAskingKind(milestoneKind);
+    },
     dismiss: () => setAskingKind(null),
     confirm,
+    withdraw: (milestoneKind) => {
+      setAskingKind(null);
+      setChangedKind(milestoneKind);
+    },
   };
 }

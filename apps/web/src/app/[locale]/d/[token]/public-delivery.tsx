@@ -2,6 +2,7 @@
 
 import { useLocale, useTranslations } from 'next-intl';
 import type { DeliveryReadResult } from '@/lib/engagements/public';
+import { deliveryDisplayNames } from '@/lib/engagements/public/display-names';
 import { BudgetCard } from './portal/budget-card';
 import { PortalCommandCard } from './portal/command-card';
 import { DeliveryNotice } from './portal/delivery-notice';
@@ -43,12 +44,7 @@ export function PublicDeliveryView({
 
   const { delivery } = read;
 
-  const wantAr = locale.startsWith('ar');
-  const pick = (ar: string | null, en: string | null) =>
-    (wantAr ? ar || en : en || ar) ?? '';
-  const firmName = pick(delivery.firm.nameAr, delivery.firm.nameEn) || 'Metra';
-  const title = pick(delivery.titleAr, delivery.titleEn);
-  const clientName = pick(delivery.client.nameAr, delivery.client.nameEn);
+  const { firmName, title, clientName } = deliveryDisplayNames(delivery, locale);
   // A range with neither bound (a malformed snapshot) has nothing to show.
   const rom = delivery.rom?.low || delivery.rom?.high ? delivery.rom : null;
 

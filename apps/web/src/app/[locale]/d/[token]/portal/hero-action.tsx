@@ -5,6 +5,7 @@ import { useTranslations } from 'next-intl';
 import { useRouter } from 'next/navigation';
 import { useId, useState, useTransition } from 'react';
 import { Button } from '@/components/ui/button';
+import { isBlankNote } from '@/lib/engagements/client-note';
 import { isConceptVerb } from '@/lib/engagements/concept-choice-outcome';
 import type { HeroGroup } from '@/lib/engagements/portal-hero';
 import { recordDeliveryAction, respondToDeliveryConcept } from '../actions';
@@ -52,7 +53,7 @@ export function ActionHero({
   const [asking, setAsking] = useState<HeroButton | null>(null);
   const [error, setError] = useState<HeroError | null>(null);
   const buttons = GROUP_BUTTONS[group].filter((button) => clientActions.includes(button.verb));
-  const noteBlank = note.trim() === '';
+  const noteBlank = isBlankNote(note);
   const offersChanges = buttons.some((button) => !button.confirms);
 
   async function answerOf(verb: string, outcome: HeroOutcome): Promise<HeroAnswer> {

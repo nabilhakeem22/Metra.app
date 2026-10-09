@@ -185,6 +185,7 @@
     "createdTitle": "Firm created",
     "logoUploadFailed": "Logo upload failed, but your firm was created.",
     "errorRequired": "Enter at least one company name.",
+    "tooLong": "Keep it to {max} characters or fewer.",
     "title": "Get started",
     "subtitle": "A few steps to set up your firm.",
     "dismiss": "Dismiss",
@@ -2255,7 +2256,11 @@
       "title": "We could not load this page",
       "body": "Something went wrong on our side. Please refresh in a moment; your link is still valid."
     },
+    "meta": {
+      "description": "Your design project with {firm}: where it stands, your payments and your files."
+    },
     "greeting": "Hello, {name} 👋",
+    "loading": "Loading your project…",
     "language": {
       "switchTo": "العربية"
     },
@@ -2339,6 +2344,14 @@
       "inProgressTag": "In progress",
       "deliveredTag": "Delivered",
       "reassurance": "Nothing to do right now. Check this page for updates from your designer.",
+      "answered": {
+        "responded": "Your response is recorded",
+        "conceptApproved": "You approved the concept",
+        "conceptChanges": "You asked for changes to the concept",
+        "handoverReceived": "We have received your confirmation",
+        "body": "Your designer is preparing the next step.",
+        "handoverBody": "Your designer will close the project shortly. Your files stay available on this page."
+      },
       "concept": {
         "headline": "Your concept design is ready",
         "body": "Your designer shared the first layout and look for your space. Take a look and let them know what you think.",
@@ -2361,8 +2374,8 @@
         "confirmTitle": "Approve the final design?",
         "confirmBody": "Your designer will prepare the drawings for execution based on this design.",
         "approvedTitle": "Design approved 🎉",
-        "approvedBody": "Your approval is recorded. Your designer will see it and prepare your design handover.",
-        "approvedBodyNotified": "Your approval is recorded and your designer has been notified. They will prepare your design handover.",
+        "approvedBody": "Your approval is recorded. Your designer will see it and prepare the drawings for execution.",
+        "approvedBodyNotified": "Your approval is recorded and your designer has been notified. They will prepare the drawings for execution.",
         "changesTitle": "Changes requested",
         "changesBody": "Your request is recorded. Your designer will see it and refine the design with you.",
         "changesBodyNotified": "Your request is recorded and your designer has been notified. They will refine the design with you."
@@ -2372,10 +2385,10 @@
         "body": "Confirm you've received your design package and we'll wrap things up.",
         "acknowledge": "Confirm handover",
         "confirmTitle": "Confirm you received the design package?",
-        "confirmBody": "This completes your design project. Your files stay available on this page.",
+        "confirmBody": "Your designer will then close the design project. Your files stay available on this page.",
         "acknowledgedTitle": "Handover confirmed 🎉",
-        "acknowledgedBody": "Thank you. Your design project is complete.",
-        "acknowledgedBodyNotified": "Thank you. Your design project is complete. Your designer has been notified."
+        "acknowledgedBody": "Thank you, we have received your confirmation. Your designer will close the project shortly.",
+        "acknowledgedBodyNotified": "Thank you, we have received your confirmation and your designer has been notified. They will close the project shortly."
       }
     },
     "conceptPicker": {
@@ -2415,6 +2428,7 @@
       "claim": "I've made this payment",
       "confirmTitle": "Did you make this payment?",
       "confirmBody": "{milestone}: {amount}. Your designer confirms it once it arrives.",
+      "changed": "This payment changed before it was sent, so nothing was sent. The page now shows where it stands.",
       "awaitingConfirmation": "Waiting for your design team to confirm",
       "claimNotified": "Your design team has been notified.",
       "settledTitle": "All payments settled",

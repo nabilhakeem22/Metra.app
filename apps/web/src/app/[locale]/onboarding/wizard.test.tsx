@@ -9,6 +9,7 @@ const actions = vi.hoisted(() => ({
   setOrgLogo: vi.fn(),
 }));
 vi.mock('@/lib/org/actions', () => actions);
+vi.mock('@/lib/org/logo-actions', () => actions);
 const router = vi.hoisted(() => ({ push: vi.fn() }));
 vi.mock('@/i18n/routing', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/i18n/routing')>()),
@@ -67,5 +68,25 @@ describe('the one-screen onboarding', () => {
     });
     expect(screen.getByRole('alert').textContent).toBe(messageAt('ar-EG', 'errors.name_required'));
     expect(router.push).not.toHaveBeenCalled();
+  });
+
+  test('F5: each field stops at the server cap and says so under itself', () => {
+    renderWithIntl(<OnboardingWizard />, { locale: 'ar-EG' });
+    const input = (id: string) => document.getElementById(id) as HTMLInputElement;
+    expect([input('nameAr').maxLength, input('nameEn').maxLength, input('city').maxLength]).toEqual([200, 200, 120]);
+    fireEvent.change(input('city'), { target: { value: 'ج'.repeat(120) } });
+    const message = messageAt('ar-EG', 'onboarding.tooLong').replace('{max}', '120');
+    expect(screen.getByRole('alert').textContent).toBe(message);
+    expect(input('city').getAttribute('aria-invalid')).toBe('true');
+  });
+
+  test('F5: a value past the cap (a paste the input did not stop) is never sent', async () => {
+    renderWithIntl(<OnboardingWizard />, { locale: 'en' });
+    fireEvent.change(document.getElementById('nameAr')!, { target: { value: 'ا'.repeat(201) } });
+    await act(async () => {
+      fireEvent.submit(form());
+    });
+    expect(actions.createOrg).not.toHaveBeenCalled();
+    expect(screen.getByText(messageAt('en', 'onboarding.tooLong').replace('{max}', '200'))).toBeTruthy();
   });
 });
