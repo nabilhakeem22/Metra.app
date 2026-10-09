@@ -83,12 +83,15 @@ export const designEngagements = pgTable(
     // refuses a nonce without a hash, so a revoke must clear both.
     tokenNonce: text('token_nonce'),
     shareExpiresAt: timestamp('share_expires_at', { withTimezone: true }),
-    // When the client should expect the next step (0058), and the stage the
-    // studio set it in. Set and cleared as a pair (CHECK). The client page shows
-    // the date only while `state` still equals `clientExpectedState`, so a stage
-    // move retires it without a write.
+    // When the client should expect the next step (0058), the stage the studio
+    // set it in, and when it was set. All three set or all three empty (CHECK).
+    // The client page shows the date only while `state` still equals
+    // `clientExpectedState`, no state move has been recorded since
+    // `clientExpectedSetAt`, and the date is today or later in Cairo, so a
+    // stage move retires it for good without a write.
     clientExpectedOn: date('client_expected_on'),
     clientExpectedState: designEngagementState('client_expected_state'),
+    clientExpectedSetAt: timestamp('client_expected_set_at', { withTimezone: true }),
   },
   (t) => [
     unique('design_engagements_org_id_id_unique').on(t.orgId, t.id),
@@ -104,8 +107,8 @@ export const designEngagements = pgTable(
       sql`token_nonce is null or token_hash is not null`,
     ),
     check(
-      'design_engagements_client_expected_pair',
-      sql`(client_expected_on IS NULL) = (client_expected_state IS NULL)`,
+      'design_engagements_client_expected_together',
+      sql`(client_expected_on IS NULL) = (client_expected_state IS NULL) AND (client_expected_on IS NULL) = (client_expected_set_at IS NULL)`,
     ),
     ...sameOrgFk(t, 'client', clients, { onDelete: 'restrict' }),
     ...sameOrgFk(t, 'project', projects, { onDelete: 'restrict' }),

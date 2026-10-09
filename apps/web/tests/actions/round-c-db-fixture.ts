@@ -90,17 +90,6 @@ export async function plantClaim(d: RoundBDelivery, milestone: string, at: strin
   );
 }
 
-/** Set the studio's client-page columns on an organization (0058). */
-export async function setStudioDetails(
-  orgId: string,
-  details: Record<string, string | null>,
-): Promise<void> {
-  const assignments = Object.entries(details)
-    .map(([column, value]) => `${column} = ${literal(value)}`)
-    .join(', ');
-  await raw.query(`update public.organizations set ${assignments} where id = '${orgId}'`);
-}
-
 /**
  * The role map the hourly runner passes: every act's body key -> the member
  * roles the permission matrix says hear about it. Built from the app's own

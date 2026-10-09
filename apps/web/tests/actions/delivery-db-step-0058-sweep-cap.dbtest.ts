@@ -7,10 +7,11 @@ import { listProjects } from '@/lib/projects/queries';
 import { hashShareToken } from '@/lib/share/token';
 import { closeFixture, raw, teardown } from './fixture';
 import { seedRoundBDelivery, type RoundBDelivery } from './round-b-fixture';
-import { plantClaim, plantEvent, sweepAs } from './round-c-db-fixture';
+import { plantClaim, plantEvent, sweepAs, sweepRoles } from './round-c-db-fixture';
 
 // Round C, PR-C7: the sweep is BOUNDED (AC 40): at most 50 notifier calls per
-// call; what is left waits for the next one and is then repaired, once.
+// call; what is left waits for the next one and is then repaired, once. An act
+// nobody would hear about spends none of the 50 (fix round F7).
 
 const orgIds: string[] = [];
 afterAll(async () => {
@@ -72,5 +73,25 @@ describe('app_notify_lost_client_acts: the bound (AC 40)', () => {
       (entry) => `${entry.notified?.engagement_id}:${entry.body_key}:${entry.milestone_kind}`,
     );
     expect(new Set(keys).size).toBe(60);
+  });
+
+  it('acts whose role map reaches nobody cost nothing and cannot starve the bound (F7)', async () => {
+    const first = await seedRoundBDelivery(orgIds, 'sweep-unheard');
+    const deliveries = [first];
+    for (let index = 1; index < 6; index += 1) deliveries.push(await anotherDelivery(first, index));
+    for (const d of deliveries) await tenLostActs(d);
+    // Every key but the handover maps to a role nobody in this org holds, to
+    // the client role only, to a malformed value, or is missing from the map.
+    const roles = {
+      ...Object.fromEntries(Object.entries(sweepRoles()).map(([key]) => [key, ['viewer']])),
+      client_concept_approved: ['client'],
+      client_design_approved: 'owner',
+      client_handover_acknowledged: ['owner'],
+    } as Record<string, unknown>;
+    delete roles.client_payment_claimed;
+    const entries = await sweepAs(first.ctx, undefined, undefined, roles);
+    expect(entries!.map((entry) => entry.body_key)).toEqual(Array(6).fill('client_handover_acknowledged'));
+    expect(entries!.every((entry) => entry.notified?.notified_count === 1)).toBe(true);
+    expect(await sweepAs(first.ctx, undefined, undefined, roles)).toEqual([]);
   });
 });

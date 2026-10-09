@@ -140,3 +140,23 @@ create trigger trg_organizations_account_immutable
   for each row
   when (old.account_id is distinct from new.account_id)
   execute function public.enforce_account_id_immutable();
+
+-- Round C (0058, S1) — the studio's phone, WhatsApp and payment details change
+-- only by an owner or admin of the org (SQLSTATE MT120 otherwise; see
+-- enforce_client_page_details_writer in immutability.sql). The WHEN clause
+-- fires it only when one of the seven columns actually changes, so every
+-- other organizations update is untouched.
+drop trigger if exists trg_organizations_client_page_writer on public.organizations;
+create trigger trg_organizations_client_page_writer
+  before update on public.organizations
+  for each row
+  when (
+    old.studio_phone is distinct from new.studio_phone
+    or old.studio_whatsapp is distinct from new.studio_whatsapp
+    or old.instapay_address is distinct from new.instapay_address
+    or old.bank_name is distinct from new.bank_name
+    or old.bank_account_holder is distinct from new.bank_account_holder
+    or old.bank_account_number is distinct from new.bank_account_number
+    or old.bank_iban is distinct from new.bank_iban
+  )
+  execute function public.enforce_client_page_details_writer();

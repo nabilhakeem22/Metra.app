@@ -172,3 +172,66 @@ begin
   return NEW;
 end
 $$;
+
+-- Round C (0058, security review S1) — only an OWNER or ADMIN may change the
+-- studio's client-page details: studio_phone, studio_whatsapp and the five
+-- payment columns (instapay_address, bank_name, bank_account_holder,
+-- bank_account_number, bank_iban). These are the columns where a write is
+-- money: whoever changes them redirects every client's next payment. The
+-- table-level UPDATE grant and the org_isolation policy let ANY member of the
+-- org update the row (a viewer, a site engineer, the client member role), and
+-- the app's own capability check is the only other gate, so this is the
+-- database's own refusal behind it.
+--
+-- The acting member is the app's: app.current_org_id must be this row's id,
+-- and app.current_user_id must hold an owner or admin membership of it. Any
+-- other caller, including one with no GUCs at all (a script, the SQL editor),
+-- gets SQLSTATE MT120 and the whole statement rolls back. Every other column
+-- (the name, the logo, the settings flags) is untouched by this rule; the
+-- trigger's WHEN clause fires it only when one of the seven actually changes.
+-- SECURITY DEFINER + empty search_path: it reads memberships as the owner, so
+-- the membership RLS policy cannot hide the caller's own row from it.
+create or replace function public.enforce_client_page_details_writer()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if NEW.id is distinct from nullif(current_setting('app.current_org_id', true), '')::uuid
+     or not exists (
+       select 1 from public.memberships m
+        where m.org_id = NEW.id
+          and m.user_id = nullif(current_setting('app.current_user_id', true), '')::uuid
+          and m.role::text in ('owner', 'admin')
+     ) then
+    raise exception 'only an owner or admin may change the studio''s client page details'
+      using errcode = 'MT120';
+  end if;
+  return NEW;
+end
+$$;
+
+-- Closed in the SAME implicit transaction as the CREATE above. A trigger
+-- function cannot be called directly (0A000), so this is hygiene: no API role
+-- holds EXECUTE on a SECURITY DEFINER function from the moment it exists. The
+-- metra_app grant mirrors the other trigger functions (roles.sql) and is
+-- guarded because on a fresh database roles.sql has not run yet.
+revoke all on function public.enforce_client_page_details_writer() from public;
+do $$
+declare
+  r text;
+begin
+  foreach r in array array['anon', 'authenticated', 'service_role'] loop
+    if exists (select 1 from pg_roles where rolname = r) then
+      execute format(
+        'revoke all on function public.enforce_client_page_details_writer() from %I',
+        r
+      );
+    end if;
+  end loop;
+  if exists (select 1 from pg_roles where rolname = 'metra_app') then
+    grant execute on function public.enforce_client_page_details_writer() to metra_app;
+  end if;
+end
+$$;

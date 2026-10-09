@@ -118,7 +118,7 @@ describe('privileges (AC 41)', () => {
     }
   });
 
-  it('grants metra_app UPDATE on exactly 18 design_engagements columns, the two new ones included', async () => {
+  it('grants metra_app UPDATE on exactly 19 design_engagements columns, the three new ones included', async () => {
     const rows = await raw.query<{ column_name: string }>(
       `select column_name from information_schema.column_privileges
         where table_schema = 'public' and table_name = 'design_engagements'
@@ -126,7 +126,9 @@ describe('privileges (AC 41)', () => {
         order by column_name`,
     );
     const columns = rows.map((row) => row.column_name);
-    expect(columns).toHaveLength(18);
-    expect(columns).toEqual(expect.arrayContaining(['client_expected_on', 'client_expected_state']));
+    expect(columns).toHaveLength(19);
+    expect(columns).toEqual(
+      expect.arrayContaining(['client_expected_on', 'client_expected_state', 'client_expected_set_at']),
+    );
   });
 });

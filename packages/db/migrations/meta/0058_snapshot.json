@@ -1,5 +1,5 @@
 {
-  "id": "2f760e90-76a8-4783-a4b7-bb0b67c30186",
+  "id": "4875e9c8-b488-4161-9ab2-b26f57fc6e32",
   "prevId": "aec99e9f-0814-4915-ab30-2ad187bbeb51",
   "version": "7",
   "dialect": "postgresql",
@@ -259,7 +259,7 @@
         },
         "organizations_bank_account_number_format": {
           "name": "organizations_bank_account_number_format",
-          "value": "bank_account_number IS NULL OR bank_account_number ~ '^[0-9A-Za-z-]{4,34}$'"
+          "value": "bank_account_number IS NULL OR (bank_account_number ~ '^[0-9A-Za-z-]{4,34}$' AND bank_account_number ~ '[0-9]')"
         },
         "organizations_bank_iban_format": {
           "name": "organizations_bank_iban_format",
@@ -268,6 +268,10 @@
         "organizations_bank_account_needs_bank": {
           "name": "organizations_bank_account_needs_bank",
           "value": "(bank_account_number IS NULL AND bank_iban IS NULL) OR bank_name IS NOT NULL"
+        },
+        "organizations_payment_text_printable": {
+          "name": "organizations_payment_text_printable",
+          "value": "(instapay_address IS NULL OR (instapay_address ~ '[^\\u0009-\\u000D\\u0020\\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000\\uFEFF]' AND instapay_address !~ '[\\u00AD\\u0600-\\u0605\\u061C\\u06DD\\u070F\\u0890-\\u0891\\u08E2\\u180E\\u200B-\\u200F\\u202A-\\u202E\\u2060-\\u2064\\u2066-\\u206F\\uFEFF\\uFFF9-\\uFFFB\\U000110BD\\U000110CD\\U00013430-\\U0001343F\\U0001BCA0-\\U0001BCA3\\U0001D173-\\U0001D17A\\U000E0001\\U000E0020-\\U000E007F]')) AND (bank_name IS NULL OR (bank_name ~ '[^\\u0009-\\u000D\\u0020\\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000\\uFEFF]' AND bank_name !~ '[\\u00AD\\u0600-\\u0605\\u061C\\u06DD\\u070F\\u0890-\\u0891\\u08E2\\u180E\\u200B-\\u200F\\u202A-\\u202E\\u2060-\\u2064\\u2066-\\u206F\\uFEFF\\uFFF9-\\uFFFB\\U000110BD\\U000110CD\\U00013430-\\U0001343F\\U0001BCA0-\\U0001BCA3\\U0001D173-\\U0001D17A\\U000E0001\\U000E0020-\\U000E007F]')) AND (bank_account_holder IS NULL OR (bank_account_holder ~ '[^\\u0009-\\u000D\\u0020\\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000\\uFEFF]' AND bank_account_holder !~ '[\\u00AD\\u0600-\\u0605\\u061C\\u06DD\\u070F\\u0890-\\u0891\\u08E2\\u180E\\u200B-\\u200F\\u202A-\\u202E\\u2060-\\u2064\\u2066-\\u206F\\uFEFF\\uFFF9-\\uFFFB\\U000110BD\\U000110CD\\U00013430-\\U0001343F\\U0001BCA0-\\U0001BCA3\\U0001D173-\\U0001D17A\\U000E0001\\U000E0020-\\U000E007F]'))"
         }
       },
       "isRLSEnabled": false
@@ -6877,6 +6881,12 @@
           "typeSchema": "public",
           "primaryKey": false,
           "notNull": false
+        },
+        "client_expected_set_at": {
+          "name": "client_expected_set_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
         }
       },
       "indexes": {
@@ -7072,9 +7082,9 @@
           "name": "design_engagements_token_nonce_needs_hash",
           "value": "token_nonce is null or token_hash is not null"
         },
-        "design_engagements_client_expected_pair": {
-          "name": "design_engagements_client_expected_pair",
-          "value": "(client_expected_on IS NULL) = (client_expected_state IS NULL)"
+        "design_engagements_client_expected_together": {
+          "name": "design_engagements_client_expected_together",
+          "value": "(client_expected_on IS NULL) = (client_expected_state IS NULL) AND (client_expected_on IS NULL) = (client_expected_set_at IS NULL)"
         }
       },
       "isRLSEnabled": false
@@ -9169,6 +9179,27 @@
               "isExpression": false,
               "asc": false,
               "nulls": "first"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "notifications_org_entity_idx": {
+          "name": "notifications_org_entity_idx",
+          "columns": [
+            {
+              "expression": "org_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "entity_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
             }
           ],
           "isUnique": false,

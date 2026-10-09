@@ -1011,7 +1011,10 @@ $$;
 -- is asked once per milestone (deposit, gate_a, gate_b, balance), because the
 -- notifier keeps one row per milestone. p_roles is a JSON object mapping each
 -- body key to the member_role array the app's permission matrix gives that act;
--- `p_roles -> key` is handed to the notifier unchanged. The notifier never
+-- `p_roles -> key` is handed to the notifier unchanged. A key whose array is
+-- missing, malformed, or names no role a (non-client) member of the org holds
+-- is skipped before any work: it would notify nobody, so it never spends one
+-- of the 50 calls and never repeats hour after hour. The notifier never
 -- notifies the client role, so this function can message nobody but studio
 -- members, and it sends no email itself (the app emails the notifier's
 -- new_recipients, as on a first tap).
@@ -1064,6 +1067,7 @@ declare
   v_notified   jsonb;
   v_calls      integer := 0;
   v_result     jsonb := '[]'::jsonb;
+  v_heard_keys text[];
 begin
   v_org := nullif(current_setting('app.current_org_id', true), '')::uuid;
   v_user := nullif(current_setting('app.current_user_id', true), '')::uuid;
@@ -1084,6 +1088,24 @@ begin
     return null;
   end if;
 
+  -- The keys someone in this org would actually hear about: the role map
+  -- names a member_role array for the key, and a non-client member of the org
+  -- holds one of those roles (the notifier's own recipient rule). A key that
+  -- resolves to nobody is skipped BEFORE any work and spends no notifier call,
+  -- so a bad or partial map can never starve the 50-call bound.
+  select coalesce(array_agg(k.key), '{}')
+    into v_heard_keys
+    from unnest(v_keys) as k(key)
+   where case
+     when jsonb_typeof(p_roles -> k.key) = 'array' then exists (
+       select 1 from public.memberships m
+        where m.org_id = v_org
+          and m.role::text <> 'client'
+          and m.role::text in (select jsonb_array_elements_text(p_roles -> k.key))
+     )
+     else false
+   end;
+
   for v_delivery in
     select de.id, de.token_hash
       from public.design_engagements de
@@ -1093,7 +1115,7 @@ begin
        and de.updated_at >= p_since
      order by de.updated_at, de.id
   loop
-    foreach v_key in array v_keys loop
+    foreach v_key in array v_heard_keys loop
       foreach v_milestone in array (
         case when v_key = 'client_payment_claimed' then v_milestones
              else array[null]::text[] end

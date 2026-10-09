@@ -72,6 +72,11 @@ const LOCKED_DOWN_IN_PLACE: readonly LockedDown[] = [
     signature: 'public.app_client_act_anchor(uuid, uuid, text, text)',
     grantsApp: false,
   },
+  {
+    file: 'immutability.sql',
+    signature: 'public.enforce_client_page_details_writer()',
+    grantsApp: true,
+  },
 ];
 
 /** The text from this function's CREATE to the next CREATE (or the end). */

@@ -39,6 +39,7 @@ function engagement(state: DesignState, designFee: string | null): DesignEngagem
     shareExpiresAt: null,
     clientExpectedOn: null,
     clientExpectedState: null,
+    clientExpectedSetAt: null,
   };
 }
 

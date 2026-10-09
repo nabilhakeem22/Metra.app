@@ -17,7 +17,7 @@ import {
 //       table-level UPDATE and contains no word "update". The guard it defeated
 //       required that word between `grant` and `on`.
 //   S2  a SECOND `revoke update`, appended BELOW the column grant, wipes all
-//       eighteen column privileges (PostgreSQL revokes column privileges with the
+//       nineteen column privileges (PostgreSQL revokes column privileges with the
 //       table privilege). The guard it defeated looked at the first match only.
 //
 // The real file is read at the bottom, so these fixtures cannot drift away from
@@ -118,9 +118,9 @@ describe('updateRevokes', () => {
 });
 
 describe('the file as shipped', () => {
-  it('grants eighteen columns, revokes the table level first, and re-widens nowhere', () => {
+  it('grants nineteen columns, revokes the table level first, and re-widens nowhere', () => {
     const text = readFileSync(ROLES_SQL, 'utf8');
-    expect(grantedUpdateColumns(text)).toHaveLength(18);
+    expect(grantedUpdateColumns(text)).toHaveLength(19);
     expect(tableLevelUpdateGrants(text)).toEqual([]);
     expect(updateRevokes(text)).toEqual({
       before: ['revoke update on public.design_engagements from metra_app;'],

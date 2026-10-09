@@ -302,8 +302,9 @@ $$;
 --     instapay_address, bank_name, bank_account_holder, bank_account_number,
 --     bank_iban (0058: `payment_details`, the studio's own payment
 --     instructions, written by owner/admin for clients to read). ONLY while a
---     payment is due: null once every milestone is settled (or there is no
---     schedule), and null when none of the five is set. The TS mapper
+--     payment is due: null on an ended delivery, null once every milestone is
+--     settled (or there is no schedule), and null unless an InstaPay address,
+--     an account number or an IBAN is set. The TS mapper
 --     (lib/engagements/public) applies the same rule before the browser.
 --   clients (the end client): name_ar, name_en
 --   engagement_milestones: kind, basis, sort_order, value (only as an input to
@@ -333,6 +334,9 @@ $$;
 --     'approved' (a plain approval), 'changes_requested', or null. A repeat
 --     tap that the write answers `already` is told what was actually SAVED,
 --     never the option it just named.
+--   claim.claimable_milestones (0058): empty on an ended delivery
+--     (abandoned, closed_design_only, execution), where the claim write
+--     answers not_active.
 --   claim.claimable_milestones[].claimed_at (0058): created_at of that
 --     milestone's PENDING client claim (null when there is none), so the page
 --     can say when the client marked it as paid. No other claim column.
@@ -340,18 +344,23 @@ $$;
 --     app_document_media(files.original_name). The name itself is still never
 --     returned; only this three-way class of it is.
 --   expected_on (0058): design_engagements.client_expected_on, ONLY while
---     client_expected_state equals the current state, so a stage move retires
---     the date without any write. client_expected_state is read, never returned.
+--     client_expected_state equals the current state, no state move is in
+--     engagement_transitions after client_expected_set_at, and the date is
+--     today or later in Africa/Cairo; so a stage move retires the date for good
+--     without any write. client_expected_state and client_expected_set_at are
+--     read, never returned.
 --   design_decision (0058): the newest LIVE client design_approval or
 --     design_change_request of the CURRENT render round (the respond
 --     function's round predicate on renders_ready_at) as
 --     { kind: 'approved' | 'changes_requested', at: decided_at }, else null.
---   handover_acknowledged_at (0058): decided_at of the newest LIVE client
---     handoff_acknowledgement, else null.
+--   handover_acknowledged_at (0058): decided_at of the newest LIVE
+--     handoff_acknowledgement, the client's own or one the studio recorded
+--     for them, else null.
 --   rom_acknowledged_at (0058): decided_at of the newest LIVE client
 --     rom_acknowledgement of the CURRENT issuance (acknowledged_issue_at is not
 --     distinct from rom_issued_at), only while a band is issued; else null.
---   timeline (0058): the newest 60 of, newest first:
+--   timeline (0058): the newest 60 of, newest first (at the same instant: a
+--     stage before a decision before a payment, payments by amount, then id):
 --     * { type: 'stage', state, at } per engagement_transitions row of this
 --       delivery that MOVED the state (to_state not null and distinct from
 --       from_state; self-loops are not stages). `state` is the raw key the TS
@@ -421,14 +430,19 @@ as $$
       'whatsapp', o.studio_whatsapp
     ),
     -- Round C (0058): the studio's payment instructions, ONLY while a payment
-    -- is due (owner decision): null when no milestone has a remaining due (the
-    -- settled test, the same price-blind math as `claim` below, so a schedule
-    -- with no milestones is settled too) and null when the studio set none of
-    -- the five. The TS mapper applies the same rule again before the browser.
+    -- is due (owner decision): null on a delivery that has ended (abandoned,
+    -- closed_design_only, execution: the claim write answers not_active there,
+    -- and `claim` below lists nothing), null when no milestone has a remaining
+    -- due (the settled test, the same price-blind math as `claim`, so a
+    -- schedule with no milestones is settled too), and null unless the studio
+    -- set a USABLE method: an InstaPay address, or an account number or IBAN
+    -- (each of which needs a bank name, by CHECK). The TS mapper applies the
+    -- same rule again before the browser.
     'payment_details', case
+      when de.state in ('closed_design_only', 'execution', 'abandoned') then null
       when public.app_engagement_payments_settled(de.id) then null
-      when coalesce(o.instapay_address, o.bank_name, o.bank_account_holder,
-                    o.bank_account_number, o.bank_iban) is null then null
+      when o.instapay_address is null and o.bank_account_number is null
+           and o.bank_iban is null then null
       else jsonb_build_object(
         'instapay', o.instapay_address,
         'bank_name', o.bank_name,
@@ -437,10 +451,24 @@ as $$
         'bank_iban', o.bank_iban
       )
     end,
-    -- Round C (0058): the date the client should expect the next step, only
-    -- while the delivery is still in the stage the studio set it for.
+    -- Round C (0058): the date the client should expect the next step. Shown
+    -- only while (1) the delivery is still in the stage the studio set it in,
+    -- (2) no state move has been recorded since it was set (a revision loop
+    -- that comes back into the same stage does not bring an old date back),
+    -- and (3) the date is today or later in Cairo (a passed date is not an
+    -- expectation). Otherwise null; nothing is written to retire it.
     'expected_on', case
-      when de.client_expected_state = de.state then de.client_expected_on
+      when de.client_expected_state = de.state
+       and de.client_expected_on >= (now() at time zone 'Africa/Cairo')::date
+       and not exists (
+         select 1 from public.engagement_transitions tr
+         where tr.engagement_id = de.id
+           and tr.org_id = de.org_id
+           and tr.to_state is not null
+           and tr.to_state is distinct from tr.from_state
+           and tr.decided_at > de.client_expected_set_at
+       )
+      then de.client_expected_on
     end,
     'client', jsonb_build_object(
       'name_ar', c.name_ar,
@@ -665,6 +693,10 @@ as $$
           ) cl on true
           where m.engagement_id = de.id
             and (due.amount - coalesce(cl.cleared, 0)) > 0
+            -- Round C (0058): nothing is claimable on a delivery that has
+            -- ended; app_delivery_claim_payment_by_token answers not_active
+            -- there, so offering the claim would only end in a refusal.
+            and de.state not in ('closed_design_only', 'execution', 'abandoned')
         ) cmx
       ), '[]'::jsonb)
     ),
@@ -775,13 +807,16 @@ as $$
       order by e.decided_at desc
       limit 1
     ),
-    -- Round C (0058): when the client confirmed receiving the handover.
+    -- Round C (0058): when the handover was confirmed: the newest LIVE
+    -- handoff_acknowledgement, whether the client tapped it or the studio
+    -- recorded it for them (the timeline shows both), so the page never says
+    -- the package was received in one place and not in another.
+    -- app_delivery_close_target_by_token stays client-only on purpose.
     'handover_acknowledged_at', (
       select max(e.decided_at)
       from public.engagement_events e
       where e.engagement_id = de.id
         and e.org_id = de.org_id
-        and e.actor_channel = 'client'
         and e.kind = 'handoff_acknowledgement'
         and not exists (
           select 1 from public.engagement_events x
@@ -808,18 +843,26 @@ as $$
     end,
     -- Round C (0058): what happened, dated, newest first, at most 60 entries.
     -- Only the fields listed in the header comment are selected: no actor,
-    -- note, evidence text, method or reference.
+    -- note, evidence text, method or reference. Same-instant entries are
+    -- ordered causally and without any collation: a stage move reads as newer
+    -- than the decision or payment that caused it (rank 0 before 1 and 2),
+    -- payments by amount as numbers, and the row id last.
     'timeline', coalesce((
-      select jsonb_agg(t.entry order by t.at desc, t.entry::text)
+      select jsonb_agg(
+        t.entry order by t.at desc, t.causal_rank, t.amount desc nulls last, t.id desc
+      )
       from (
-        select u.entry, u.at
+        select u.entry, u.at, u.causal_rank, u.amount, u.id
         from (
           select jsonb_build_object(
                    'type', 'stage',
                    'state', tr.to_state,
                    'at', tr.decided_at
                  ) as entry,
-                 tr.decided_at as at
+                 tr.decided_at as at,
+                 0 as causal_rank,
+                 null::numeric as amount,
+                 tr.id
           from public.engagement_transitions tr
           where tr.engagement_id = de.id
             and tr.org_id = de.org_id
@@ -833,7 +876,10 @@ as $$
                    'by_studio', e.actor_channel <> 'client',
                    'option_position', e.chosen_position
                  ),
-                 e.decided_at
+                 e.decided_at,
+                 1,
+                 null::numeric,
+                 e.id
           from public.engagement_events e
           where e.engagement_id = de.id
             and e.org_id = de.org_id
@@ -857,12 +903,15 @@ as $$
                    'amount', pe.amount::numeric(18, 4)::text,
                    'at', pe.cleared_at
                  ),
-                 pe.cleared_at
+                 pe.cleared_at,
+                 2,
+                 pe.amount,
+                 pe.id
           from public.payment_events pe
           where pe.engagement_id = de.id
             and pe.org_id = de.org_id
         ) u
-        order by u.at desc, u.entry::text
+        order by u.at desc, u.causal_rank, u.amount desc nulls last, u.id desc
         limit 60
       ) t
     ), '[]'::jsonb)

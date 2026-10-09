@@ -2,9 +2,11 @@ import { sqlstateOf } from '@metra/db/sqlstate';
 import { afterAll, describe, expect, it } from 'vitest';
 import { closeFixture, raw, seedOrg, teardown } from './fixture';
 import { seedRoundBDelivery } from './round-b-fixture';
+import { updateOrganization } from './round-c-org-fixture';
 
-// Round C, PR-C7: migration 0058 (AC 32). Nine nullable columns, eight CHECKs,
-// each CHECK bites with 23514 and lets its boundary values through.
+// Round C, PR-C7: migration 0058 (AC 32). Ten nullable columns, nine CHECKs,
+// each CHECK bites with 23514 and lets its boundary values through. The
+// printable-text CHECK's full Unicode coverage is in -printable.dbtest.ts.
 
 const orgIds: string[] = [];
 afterAll(async () => {
@@ -14,11 +16,11 @@ afterAll(async () => {
 
 const NEW_COLUMNS = [
   'bank_account_holder', 'bank_account_number', 'bank_iban', 'bank_name', 'client_expected_on',
-  'client_expected_state', 'instapay_address', 'studio_phone', 'studio_whatsapp',
+  'client_expected_set_at', 'client_expected_state', 'instapay_address', 'studio_phone', 'studio_whatsapp',
 ];
 
 describe('0058 columns and CHECKs (AC 32)', () => {
-  it('adds the nine columns with the stated types, all nullable', async () => {
+  it('adds the ten columns with the stated types, all nullable', async () => {
     const rows = await raw.query<{ table_name: string; column_name: string; data_type: string; udt_name: string; is_nullable: string }>(
       `select table_name, column_name, data_type, udt_name, is_nullable from information_schema.columns
         where table_schema = 'public' and column_name in (${NEW_COLUMNS.map((c) => `'${c}'`).join(', ')})
@@ -26,6 +28,7 @@ describe('0058 columns and CHECKs (AC 32)', () => {
     );
     expect(rows).toEqual([
       { table_name: 'design_engagements', column_name: 'client_expected_on', data_type: 'date', udt_name: 'date', is_nullable: 'YES' },
+      { table_name: 'design_engagements', column_name: 'client_expected_set_at', data_type: 'timestamp with time zone', udt_name: 'timestamptz', is_nullable: 'YES' },
       { table_name: 'design_engagements', column_name: 'client_expected_state', data_type: 'USER-DEFINED', udt_name: 'design_engagement_state', is_nullable: 'YES' },
       ...['bank_account_holder', 'bank_account_number', 'bank_iban', 'bank_name', 'instapay_address', 'studio_phone', 'studio_whatsapp'].map(
         (column_name) => ({ table_name: 'organizations', column_name, data_type: 'text', udt_name: 'text', is_nullable: 'YES' }),
@@ -33,25 +36,24 @@ describe('0058 columns and CHECKs (AC 32)', () => {
     ]);
   });
 
-  it('creates the eight CHECKs by name', async () => {
+  it('creates the nine CHECKs by name', async () => {
     const rows = await raw.query<{ conname: string }>(
       `select conname from pg_constraint where contype = 'c' and conname in (
          'organizations_studio_phone_format', 'organizations_studio_whatsapp_format',
          'organizations_instapay_address_length', 'organizations_bank_text_length',
          'organizations_bank_account_number_format', 'organizations_bank_iban_format',
-         'organizations_bank_account_needs_bank', 'design_engagements_client_expected_pair')
+         'organizations_bank_account_needs_bank', 'organizations_payment_text_printable',
+         'design_engagements_client_expected_together')
        order by conname`,
     );
-    expect(rows).toHaveLength(8);
+    expect(rows).toHaveLength(9);
   });
 
-  /** Apply one assignment to a fresh org; the SQLSTATE, or 'ok'. */
+  /** Apply one assignment to a fresh org, as its owner; the SQLSTATE, or 'ok'. */
   async function tryOrg(assignment: string): Promise<string> {
-    const { orgId } = await seedOrg({ owners: 1 });
+    const { orgId, ownerIds } = await seedOrg({ owners: 1 });
     orgIds.push(orgId);
-    return raw
-      .query(`update public.organizations set ${assignment} where id = '${orgId}'`)
-      .then(() => 'ok', (error: unknown) => sqlstateOf(error) ?? 'unknown');
+    return updateOrganization(orgId, assignment, { userId: ownerIds[0] });
   }
 
   const long = (n: number) => 'x'.repeat(n);
@@ -65,6 +67,10 @@ describe('0058 columns and CHECKs (AC 32)', () => {
     ['organizations_bank_text_length (name)', `bank_name = 'B'`],
     ['organizations_bank_text_length (holder)', `bank_account_holder = '${long(121)}'`],
     ['organizations_bank_account_number_format', `bank_name = 'CIB', bank_account_number = '12 3'`],
+    ['organizations_bank_account_number_format (no digit)', `bank_name = 'CIB', bank_account_number = '----'`],
+    ['organizations_bank_account_number_format (letters only)', `bank_name = 'CIB', bank_account_number = 'ABCDEF'`],
+    ['organizations_payment_text_printable (blank InstaPay)', `instapay_address = '   '`],
+    ['organizations_payment_text_printable (blank bank name)', `bank_name = '  '`],
     ['organizations_bank_iban_format', `bank_name = 'CIB', bank_iban = 'eg380019000500000000263180002'`],
     ['organizations_bank_account_needs_bank (iban)', `bank_iban = 'EG380019000500000000263180002'`],
     ['organizations_bank_account_needs_bank (number)', `bank_account_number = '100023456789'`],
@@ -84,6 +90,8 @@ describe('0058 columns and CHECKs (AC 32)', () => {
       `bank_name = 'BM', bank_account_holder = '${long(120)}'`,
       `bank_name = '${long(120)}', bank_account_holder = 'Al'`,
       `bank_name = 'CIB', bank_account_number = '1234'`,
+      `bank_name = 'CIB', bank_account_number = 'AB-1'`,
+      `bank_name = 'بنك مصر', bank_account_holder = 'استوديو التصميم', instapay_address = 'studio@instapay'`,
       `bank_name = 'CIB', bank_account_number = '${'9'.repeat(34)}'`,
       `bank_name = 'NBE', bank_iban = 'EG380019000500000000263180002'`,
     ]) {
@@ -91,15 +99,19 @@ describe('0058 columns and CHECKs (AC 32)', () => {
     }
   });
 
-  it('pairs the expected date with its stage', async () => {
-    const d = await seedRoundBDelivery(orgIds, 'expected-pair');
+  it('sets the expected date, its stage and when it was set together, or none of them', async () => {
+    const d = await seedRoundBDelivery(orgIds, 'expected-together');
     const set = (assignment: string) =>
       raw
         .query(`update public.design_engagements set ${assignment} where id = '${d.engagementId}'`)
         .then(() => 'ok', (error: unknown) => sqlstateOf(error) ?? 'unknown');
     expect(await set(`client_expected_on = '2026-11-01'`)).toBe('23514');
     expect(await set(`client_expected_state = 'concept_review'`)).toBe('23514');
-    expect(await set(`client_expected_on = '2026-11-01', client_expected_state = 'concept_review'`)).toBe('ok');
-    expect(await set(`client_expected_on = null, client_expected_state = null`)).toBe('ok');
+    expect(await set(`client_expected_set_at = now()`)).toBe('23514');
+    expect(await set(`client_expected_on = '2026-11-01', client_expected_state = 'concept_review'`)).toBe('23514');
+    expect(
+      await set(`client_expected_on = '2026-11-01', client_expected_state = 'concept_review', client_expected_set_at = now()`),
+    ).toBe('ok');
+    expect(await set(`client_expected_on = null, client_expected_state = null, client_expected_set_at = null`)).toBe('ok');
   });
 });

@@ -188,9 +188,9 @@ describe('runSchemaCheck', () => {
     expect(printed).toMatch(/constraints — \d+ declared/);
     expect(printed).toMatch(/functions — \d+ declared/);
     expect(sectionsPrinted()).toEqual([
-      'assert-schema-applied: indexes — 108 declared, 108 NOT FOUND (report only, does not fail this check):',
-      'assert-schema-applied: constraints — 237 declared, 237 NOT FOUND (report only, does not fail this check):',
-      'assert-schema-applied: functions — 42 declared, 42 NOT FOUND (report only, does not fail this check):',
+      'assert-schema-applied: indexes — 109 declared, 109 NOT FOUND (report only, does not fail this check):',
+      'assert-schema-applied: constraints — 238 declared, 238 NOT FOUND (report only, does not fail this check):',
+      'assert-schema-applied: functions — 43 declared, 43 NOT FOUND (report only, does not fail this check):',
       'columns: BEHIND',
     ]);
     expect(printed).toContain('REPORT ONLY');
@@ -202,12 +202,12 @@ describe('runSchemaCheck', () => {
       fixtureSql({ ...completeCatalogues(), functionNames: new Set(['app_nothing']) }),
     );
     expect(code).toBe(0);
-    expect(logged.join('\n')).toContain('functions — 42 declared, 42 NOT FOUND');
+    expect(logged.join('\n')).toContain('functions — 43 declared, 43 NOT FOUND');
   });
 });
 
 describe('the counts the deploy order asks the owner to compare', () => {
-  it('declares 42 RLS functions', () => {
+  it('declares 43 RLS functions', () => {
     // wave6-coder.md's handoff said 29 and instructed the lead to compare the
     // printed counts against it. A `create or replace function public.<name>`
     // grep over rls/ returns 30 with no duplicate name, so the handoff number
@@ -220,8 +220,9 @@ describe('the counts the deploy order asks the owner to compare', () => {
     // choose function was dropped and re-created under its own name). 42 since
     // Round C (0058) added app_document_media, app_delivery_logo_by_token,
     // app_delivery_close_target_by_token, app_client_act_anchor and
-    // app_notify_lost_client_acts.
-    expect(declaredFunctions().size).toBe(42);
+    // app_notify_lost_client_acts; 43 with the trigger fn
+    // enforce_client_page_details_writer (the owner/admin-only rule).
+    expect(declaredFunctions().size).toBe(43);
   });
 });
 

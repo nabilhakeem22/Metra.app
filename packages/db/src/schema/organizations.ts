@@ -13,6 +13,25 @@ import { bilingual, bilingualCheck, timestamps } from './_helpers';
 import { files } from './files';
 
 /**
+ * Unicode format characters (category Cf: zero-width and bidirectional
+ * controls), spelled code point by code point so the CHECK does not depend on
+ * the database locale. A bank name copied with one of these can read
+ * differently from what is stored.
+ */
+const FORMAT_CHARACTERS = String.raw`\u00AD\u0600-\u0605\u061C\u06DD\u070F\u0890-\u0891\u08E2\u180E\u200B-\u200F\u202A-\u202E\u2060-\u2064\u2066-\u206F\uFEFF\uFFF9-\uFFFB\U000110BD\U000110CD\U00013430-\U0001343F\U0001BCA0-\U0001BCA3\U0001D173-\U0001D17A\U000E0001\U000E0020-\U000E007F`;
+
+/** Unicode white space, the same way: a value made only of these shows nothing. */
+const WHITE_SPACE = String.raw`\u0009-\u000D\u0020\u00A0\u1680\u2000-\u200A\u2028\u2029\u202F\u205F\u3000\uFEFF`;
+
+/** The free-text payment columns a client copies into a banking app. */
+const PRINTABLE_PAYMENT_TEXT = ['instapay_address', 'bank_name', 'bank_account_holder'];
+
+/** One visible character, and no format character. */
+function printableText(column: string): string {
+  return `(${column} IS NULL OR (${column} ~ '[^${WHITE_SPACE}]' AND ${column} !~ '[${FORMAT_CHARACTERS}]'))`;
+}
+
+/**
  * The tenant root. Its `id` IS the org id every other table scopes to, so this
  * table has no `org_id` column; its RLS policy keys on `id` instead.
  */
@@ -72,7 +91,7 @@ export const organizations = pgTable(
     ),
     check(
       'organizations_bank_account_number_format',
-      sql`bank_account_number IS NULL OR bank_account_number ~ '^[0-9A-Za-z-]{4,34}$'`,
+      sql`bank_account_number IS NULL OR (bank_account_number ~ '^[0-9A-Za-z-]{4,34}$' AND bank_account_number ~ '[0-9]')`,
     ),
     check(
       'organizations_bank_iban_format',
@@ -82,6 +101,10 @@ export const organizations = pgTable(
     check(
       'organizations_bank_account_needs_bank',
       sql`(bank_account_number IS NULL AND bank_iban IS NULL) OR bank_name IS NOT NULL`,
+    ),
+    check(
+      'organizations_payment_text_printable',
+      sql.raw(PRINTABLE_PAYMENT_TEXT.map(printableText).join(' AND ')),
     ),
     // UNIQUE partial index — DB-enforces the 1:1 org<->account invariant (no two
     // orgs may share an account). Partial (WHERE account_id IS NOT NULL) so the

@@ -63,8 +63,8 @@ grant select, insert, update, delete on public.variation_order_lines to metra_ap
 -- Design Engagements (Step 1): the engagement record is mutable (create + Step 2
 -- state transitions); the transition ledger is append-only (granted below).
 --
--- UPDATE IS COLUMN-LEVEL, and the list is the eighteen DERIVED columns the app
--- writes after the row exists (two of them from Round C Wave 3) — nothing else. `design_engagements` is
+-- UPDATE IS COLUMN-LEVEL, and the list is the nineteen DERIVED columns the app
+-- writes after the row exists (three of them from Round C Wave 3) — nothing else. `design_engagements` is
 -- the widest mutable table in the machine and most of it is CONTRACTUAL: the
 -- client, the project, the number, the two free-revision ALLOWANCES
 -- (`free_revision_n`, `free_design_revision_n`), `created_at`. Those are set at
@@ -85,8 +85,9 @@ grant select, insert, update, delete on public.variation_order_lines to metra_ap
 -- `free_design_revision_n` are NOT — the first is written live by
 -- `revisions.ts`'s counter factory, the other two are never updated at all.
 --
--- `client_expected_on` / `client_expected_state` (0058) are the date the studio
--- tells the client to expect the next step, and the stage it was set in. They
+-- `client_expected_on` / `client_expected_state` / `client_expected_set_at`
+-- (0058) are the date the studio tells the client to expect the next step, the
+-- stage it was set in, and when. They
 -- are granted in the Round C database step, AHEAD of their one writer (the
 -- expected-date core, Round C Wave 3), so the owner's one database step covers
 -- the code that follows it. Until that writer lands, the unit test names them
@@ -133,7 +134,8 @@ grant update (
   share_expires_at,
   updated_at,
   client_expected_on,
-  client_expected_state
+  client_expected_state,
+  client_expected_set_at
 ) on public.design_engagements to metra_app;
 -- engagement_milestones (Step 3): the schedule is written ONCE by
 -- generateFeeSchedule at submitDesignFee and never edited by any code path, so
@@ -219,6 +221,13 @@ grant execute on function public.enforce_immutable_when() to metra_app;
 
 -- S1 (Epic A2): organizations.account_id immutability trigger fn.
 grant execute on function public.enforce_account_id_immutable() to metra_app;
+
+-- Round C (0058, S1): the owner/admin-only rule for the studio's client-page
+-- details. Symmetry, like the trigger functions above; it is SECURITY DEFINER,
+-- so it is also revoked from public here and from the API roles in the loop
+-- below (and in place, in immutability.sql).
+grant execute on function public.enforce_client_page_details_writer() to metra_app;
+revoke execute on function public.enforce_client_page_details_writer() from public;
 
 -- Round B (0056): the share-link nonce trigger fn. Symmetry only, like the
 -- child-draft guards below: EXECUTE on a trigger function is checked when the
@@ -520,6 +529,10 @@ begin
         r
       );
       execute format(
+        'revoke execute on function public.enforce_client_page_details_writer() from %I',
+        r
+      );
+      execute format(
         'revoke execute on function public.app_engagement_payments_settled(uuid) from %I',
         r
       );
@@ -535,6 +548,39 @@ begin
         'revoke execute on function public.app_document_settled(public.engagement_artifact_kind, uuid) from %I',
         r
       );
+    end if;
+  end loop;
+end
+$$;
+
+-- Round C (0058), defence in depth: the Supabase API roles reach NOTHING in
+-- `public`. The app talks to Postgres directly (Hyperdrive, as the connection
+-- role, then SET LOCAL ROLE metra_app) and uses Supabase only for Auth and
+-- Storage, which live in their own schemas; no code path uses the Data API
+-- (PostgREST) against these tables. Supabase grants anon and authenticated
+-- ALL on every table and sequence in `public` by default, so if the Data API
+-- were ever switched back on, RLS would be the only thing between a browser
+-- holding the anon key and the studio's rows. This removes the grants
+-- themselves: every existing table and sequence, and (for objects the
+-- connection role creates from now on) its default privileges.
+--
+-- Guarded per role, because a plain Postgres (CI, local) has neither role.
+-- ALTER DEFAULT PRIVILEGES without FOR ROLE changes the defaults of the role
+-- running this file, which is the role that creates every table here (the
+-- migrator's); defaults another role set for its own objects are not ours to
+-- change and are not touched. service_role is left alone: it is a server
+-- secret that bypasses RLS anyway, and the app does not use it for tables.
+-- Idempotent.
+do $$
+declare
+  r text;
+begin
+  foreach r in array array['anon', 'authenticated'] loop
+    if exists (select 1 from pg_roles where rolname = r) then
+      execute format('revoke all on all tables in schema public from %I', r);
+      execute format('revoke all on all sequences in schema public from %I', r);
+      execute format('alter default privileges in schema public revoke all on tables from %I', r);
+      execute format('alter default privileges in schema public revoke all on sequences from %I', r);
     end if;
   end loop;
 end

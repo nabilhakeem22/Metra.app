@@ -49,6 +49,10 @@ export const notifications = pgTable(
       t.recipientUserId,
       t.createdAt.desc().nullsFirst(),
     ),
+    // Live since 0058: "was this client act ever notified?" (the repeat-tap
+    // repair and the hourly sweep) reads ONE delivery's notifications, for any
+    // recipient. Without it each check scanned the org's recent notifications.
+    index('notifications_org_entity_idx').on(t.orgId, t.entityId),
   ],
 );
 

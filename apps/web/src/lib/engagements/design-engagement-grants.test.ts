@@ -14,7 +14,7 @@ import {
 // THE GRANT AND THE CODE, KEPT HONEST BY A MACHINE.
 //
 // `rls/roles.sql` grants metra_app a COLUMN-LEVEL update on
-// `design_engagements`: eighteen derived columns and nothing else, so the client,
+// `design_engagements`: nineteen derived columns and nothing else, so the client,
 // the project, the number, `created_at` and — the ones that matter — the two
 // free-revision ALLOWANCES cannot be moved by any future code path or by SQL
 // injected past the ORM.
@@ -70,10 +70,14 @@ const ROLES_SQL = resolve(REPO_ROOT, 'packages/db/src/rls/roles.sql');
 /**
  * Columns roles.sql grants BEFORE any app code writes them, because the owner's
  * one database step must cover the code that follows it. Round C (0058): the
- * client's expected date and its stage, written by the expected-date core in
+ * client's expected date, its stage and when it was set, written by the expected-date core in
  * Wave 3, which removes them from this list (the test below insists).
  */
-const GRANTED_AHEAD_OF_WRITER: readonly string[] = ['client_expected_on', 'client_expected_state'];
+const GRANTED_AHEAD_OF_WRITER: readonly string[] = [
+  'client_expected_on',
+  'client_expected_state',
+  'client_expected_set_at',
+];
 
 /** The drizzle table object's exported name, and the table it maps to. */
 const TABLE_EXPORT = 'designEngagements';
@@ -595,7 +599,7 @@ describe('design_engagements column grants match what the app writes', () => {
     // it drifted is the whole diagnosis. `missing` is a 42501 waiting to happen;
     // `surplus` is authority nothing uses.
     expect({ missing, surplus }).toEqual({ missing: [], surplus: [] });
-    expect(granted.size).toBe(18);
+    expect(granted.size).toBe(19);
   });
 
   it('lists a column as granted ahead only while it is granted and has no writer yet', () => {

@@ -91,4 +91,28 @@ describe('timeline (AC 34)', () => {
     expect(await timelineOf(a.hash)).toEqual([]);
     expect(await timelineOf(b.hash)).toHaveLength(2);
   });
+
+  it('orders same-instant entries causally and numerically, never by text (F5)', async () => {
+    const d = await seedRoundBDelivery(orgIds, 'timeline-ties');
+    const at = `timestamptz '2026-10-01T10:00:00Z'`;
+    await plantPayment(d, 'deposit', '9', at);
+    await plantPayment(d, 'deposit', '10', at);
+    await plantPayment(d, 'deposit', '100', at);
+    const first = await plantEvent(d, { kind: 'design_approval', channel: 'staff', evidence: 'Signed', at });
+    const second = await plantEvent(d, { kind: 'rom_acknowledgement', channel: 'staff', at });
+    await plantTransition(d, 'final_approval', 'shop_drawings', at);
+
+    const timeline = await timelineOf(d.hash);
+    const decisions = [first, second].sort().reverse();
+    const [idOf] = await raw.query<{ ids: Record<string, string> }>(
+      `select jsonb_object_agg(id, kind) as ids from public.engagement_events where engagement_id = '${d.engagementId}'`,
+    );
+    expect(timeline.map((entry) => entry.type === 'payment' ? `payment:${entry.amount}` : `${entry.type}:${entry.state ?? entry.kind}`)).toEqual([
+      'stage:shop_drawings',
+      ...decisions.map((id) => `decision:${idOf.ids[id]}`),
+      'payment:100.0000',
+      'payment:10.0000',
+      'payment:9.0000',
+    ]);
+  });
 });

@@ -186,6 +186,7 @@ function engagement(): DesignEngagement {
     shareExpiresAt: null,
     clientExpectedOn: null,
     clientExpectedState: null,
+    clientExpectedSetAt: null,
   };
 }
 
