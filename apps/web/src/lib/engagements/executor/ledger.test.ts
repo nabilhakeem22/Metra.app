@@ -6,7 +6,7 @@ import { auditStateMove, persistTransitionRow } from './ledger';
 import type { TransitionRun } from './run';
 
 /** A run whose tx records the ledger row it is asked to insert. */
-function runWith(attribution: Pick<TransitionRun, 'ledgerActorUserId' | 'cause'>) {
+function runWith(attribution: Pick<TransitionRun, 'ledgerActorUserId' | 'cause' | 'recordedBy'>) {
   const inserted: Record<string, unknown>[] = [];
   const audits: AuditEntry[] = [];
   const tx = {
@@ -33,7 +33,7 @@ function runWith(attribution: Pick<TransitionRun, 'ledgerActorUserId' | 'cause'>
 
 describe('the ledger row and the audit of a state move', () => {
   it('a person firing a trigger is the ledger actor and the audit names no cause', async () => {
-    const { run, inserted, audits } = runWith({ ledgerActorUserId: 'owner-1', cause: null });
+    const { run, inserted, audits } = runWith({ ledgerActorUserId: 'owner-1', cause: null, recordedBy: null });
     await persistTransitionRow(run, 'design_only_handoff');
     await auditStateMove(run, 'design_only_handoff');
     expect(inserted[0]).toMatchObject({ actorUserId: 'owner-1', toState: 'closed_design_only' });
@@ -41,13 +41,13 @@ describe('the ledger row and the audit of a state move', () => {
   });
 
   it('a consequence with no ledger actor writes NULL and audits its cause', async () => {
-    const { run, inserted, audits } = runWith({ ledgerActorUserId: null, cause: 'handoverAcknowledged' });
+    const { run, inserted, audits } = runWith({ ledgerActorUserId: null, cause: 'handoverAcknowledged', recordedBy: 'site-1' });
     await persistTransitionRow(run, 'design_only_handoff');
     await auditStateMove(run, 'design_only_handoff');
     expect(inserted[0]).toMatchObject({ actorUserId: null, trigger: 'recipientAcknowledges' });
     expect(audits[0]).toMatchObject({
       before: { state: 'design_only_handoff' },
-      after: { state: 'closed_design_only', cause: 'handoverAcknowledged' },
+      after: { state: 'closed_design_only', cause: 'handoverAcknowledged', recordedBy: 'site-1' },
     });
   });
 });

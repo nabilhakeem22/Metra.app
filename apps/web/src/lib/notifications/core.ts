@@ -42,6 +42,31 @@ export async function insertNotification(
   });
 }
 
+/**
+ * Insert many notifications in ONE statement (the automation runner's batched
+ * cores: one round trip, not one per recipient). Same rules as
+ * `insertNotification`: inside the caller's tx, no `RETURNING`. An empty list
+ * issues nothing.
+ */
+export async function insertNotifications(
+  tx: MetraDb,
+  orgId: string,
+  inputs: readonly NotificationInput[],
+): Promise<void> {
+  if (inputs.length === 0) return;
+  await tx.insert(notifications).values(
+    inputs.map((input) => ({
+      orgId,
+      recipientUserId: input.recipientUserId,
+      kind: input.kind,
+      entityType: input.entityType ?? null,
+      entityId: input.entityId ?? null,
+      bodyKey: input.bodyKey,
+      params: (input.params ?? {}) as never,
+    })),
+  );
+}
+
 /** Mark one of the caller's notifications read (RLS scopes to the recipient). */
 export async function markNotificationReadCore(
   ctx: OrgContext,

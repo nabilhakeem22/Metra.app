@@ -4,8 +4,9 @@
 // transition: it moves no state and touches no trigger — the
 // `handoffAcknowledged` guard on `recipientAcknowledges` reads the event it
 // writes. Mirrors `recordRomAcknowledgementCore` (rom-acknowledgement.ts).
-import { designEngagements, engagementEvents } from '@metra/db';
-import { fail, mutateInOrg, requireInOrg } from '@/lib/actions/mutate';
+import { designEngagements, engagementEvents, type MetraDb } from '@metra/db';
+import { and, eq, inArray } from 'drizzle-orm';
+import { fail, mutateInOrg } from '@/lib/actions/mutate';
 import { err, type ActionResult } from '@/lib/actions/result';
 import type { OrgContext } from '@/lib/db/context';
 import {
@@ -14,7 +15,7 @@ import {
   TOO_LONG,
   optionalText,
 } from '@/lib/validation/text';
-import { isValidOccurredOn } from './event-provenance';
+import { isValidOccurredOn, liveEvents } from './event-provenance';
 import { isTerminal } from './states';
 
 export interface RecordHandoffAcknowledgementInput {
@@ -39,6 +40,11 @@ export interface RecordHandoffAcknowledgementInput {
  * acknowledge before the package is out); append ONE `handoff_acknowledgement`
  * row with the internal actor and the trimmed optional note. Returns the new
  * event id. Never throws to the client — coded ActionResult only.
+ *
+ * ONE CONFIRMATION, HOWEVER MANY RECORD IT (Round C): the delivery row is locked
+ * FOR UPDATE before the check, so two members recording at the same moment
+ * serialise, and a live acknowledgement already on file (recorded by a colleague
+ * or given by the client) is answered as it is, with no second row.
  */
 export async function recordHandoffAcknowledgementCore(
   ctx: OrgContext,
@@ -66,18 +72,20 @@ export async function recordHandoffAcknowledgementCore(
     ctx,
     { capability: 'engagements_design', action: 'create', flow: 'interior' },
     async (tx, audit) => {
-      const engagement = await requireInOrg(
-        tx,
-        designEngagements,
-        input.engagementId,
-        { id: designEngagements.id, state: designEngagements.state },
-        'engagement_not_found',
-      );
+      const [engagement] = await tx
+        .select({ id: designEngagements.id, state: designEngagements.state })
+        .from(designEngagements)
+        .where(eq(designEngagements.id, input.engagementId))
+        .limit(1)
+        .for('update');
+      if (!engagement) fail('engagement_not_found');
       // No acknowledging a handoff on a finished engagement (abandoned / closed).
       if (isTerminal(engagement.state)) fail('engagement_not_active');
       // The handoff must actually be open — any earlier (or the execution) stage
       // has no issued design-only package to receive.
       if (engagement.state !== 'design_only_handoff') fail('handoff_not_open');
+      const onFile = await liveHandoffAcknowledgementId(tx, input.engagementId);
+      if (onFile) return onFile;
 
       const [row] = await tx
         .insert(engagementEvents)
@@ -105,4 +113,18 @@ export async function recordHandoffAcknowledgementCore(
       return row.id;
     },
   );
+}
+
+/** The live (not retracted) handover acknowledgement on file, from any channel, or null. */
+async function liveHandoffAcknowledgementId(tx: MetraDb, engagementId: string): Promise<string | null> {
+  const rows = await tx
+    .select({ id: engagementEvents.id, kind: engagementEvents.kind, supersedesEventId: engagementEvents.supersedesEventId })
+    .from(engagementEvents)
+    .where(
+      and(
+        eq(engagementEvents.engagementId, engagementId),
+        inArray(engagementEvents.kind, ['handoff_acknowledgement', 'event_correction']),
+      ),
+    );
+  return liveEvents(rows).find((row) => row.kind === 'handoff_acknowledgement')?.id ?? null;
 }

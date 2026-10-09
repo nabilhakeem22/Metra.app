@@ -27,10 +27,20 @@ describe('deliveryFollowupEmailTemplate', () => {
     expect(html).toContain('dir="ltr"');
   });
 
+  it('a single day reads "1 day", never "1 days" (F5)', () => {
+    const { text } = deliveryFollowupEmailTemplate({
+      deliveries: [{ label: 'DE-2026-0003 · Villa', days: 1 }],
+      deliveriesUrl: 'https://metra.test/en/engagements',
+      locale: 'en',
+    });
+    expect(text).toContain('DE-2026-0003 · Villa: waiting on the client for 1 day\n');
+  });
+
   it('is in the studio register in Arabic, right to left, Latin digits, no dash', () => {
     const { subject, text, html } = render('ar-EG');
     expect(subject).toBe('تسليمات مستنية رد العميل');
-    expect(text).toContain('DE-2026-0012 · Villa <kitchen>: مستني العميل من 6 يوم');
+    expect(text).toContain('DE-2026-0012 · Villa <kitchen>: مستني العميل من 6 أيام');
+    expect(text).toContain('DE-2026-0015 · شقة الزمالك: مستني العميل من 11 يوم');
     expect(text).toContain('افتح التسليمات');
     expect(html).toContain('dir="rtl"');
     for (const part of [subject, text, html]) {

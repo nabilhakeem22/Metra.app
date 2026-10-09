@@ -26,12 +26,22 @@ export const CONSEQUENCES: Readonly<
   handoverAcknowledged: { trigger: 'recipientAcknowledges', ledgerActor: 'none' },
 };
 
-export async function executeConsequence(
-  ctx: OrgContext,
-  input: { engagementId: string; consequence: TransitionConsequence },
-): Promise<ActionResult> {
+export interface ConsequenceInput {
+  engagementId: string;
+  consequence: TransitionConsequence;
+  /**
+   * Who performed the act the move follows from, for the audit: a member's user
+   * id, or 'client' for the client's own act on their delivery page. Defaults to
+   * the caller.
+   */
+  recordedBy?: string;
+}
+
+export async function executeConsequence(ctx: OrgContext, input: ConsequenceInput): Promise<ActionResult> {
+  // Own keys only: a name like 'toString' must be a coded refusal, not a lookup
+  // on the prototype that then throws.
+  if (!Object.hasOwn(CONSEQUENCES, input.consequence)) return err('illegal_trigger');
   const consequence = CONSEQUENCES[input.consequence];
-  if (!consequence) return err('illegal_trigger');
   const def = TRANSITIONS[consequence.trigger];
   if (def.decidedBy !== undefined) return err('ending_requires_explicit_choice');
   return runGatedTransition(
@@ -41,6 +51,7 @@ export async function executeConsequence(
     {
       ledgerActorUserId: consequence.ledgerActor === 'caller' ? ctx.userId : null,
       cause: input.consequence,
+      recordedBy: input.recordedBy ?? ctx.userId,
     },
   );
 }

@@ -7,27 +7,32 @@ import {
   weekPeriodKey,
 } from './clock';
 import { claimPeriod } from './claim';
-import { deliveryCounts, inFlightDeliveries } from './delivery-due-work';
+import { deliveryCounts } from './delivery-due-work';
 import { digestData, orgOwnerAdminIds, type DigestData } from './due-work';
-import { countEmailOutcome, emailRecipient } from './email-delivery';
+import { emailEachRecipient } from './email-delivery';
+import { sharedInFlightDeliveries } from './org-tick-memo';
 import type { AutomationDeps, AutomationResult } from './types';
 import type { MetraDb } from '@metra/db';
 import { withOrgContext } from '@/lib/db/context';
 import { sendDigestEmail } from '@/lib/email/resend';
-import { insertNotification } from '@/lib/notifications/core';
-import type { MemberRole } from '@/lib/permissions/roles';
+import { insertNotifications } from '@/lib/notifications/core';
 
 const EXPIRING_SOON_DAYS = 7;
 
-/** The digest's figures: the portfolio's, plus its deliveries by status (Round C). */
+/**
+ * The digest's figures: the portfolio's, plus every in-flight delivery by the
+ * shared status rule (Round C; read once per org per tick and shared with the
+ * delivery follow-ups).
+ */
 async function portfolioFigures(
   tx: MetraDb,
-  role: MemberRole,
-  now: Date,
+  deps: AutomationDeps,
   window: { today: string; soon: string },
 ): Promise<DigestData & { deliveriesYourMove: number; deliveriesWaiting: number; deliveriesStalled: number }> {
-  const portfolio = await digestData(tx, window.today, window.soon);
-  const { deliveries } = await inFlightDeliveries(tx, role, now);
+  const [portfolio, { deliveries }] = await Promise.all([
+    digestData(tx, window.today, window.soon),
+    sharedInFlightDeliveries(deps, tx),
+  ]);
   const counts = deliveryCounts(deliveries);
   return {
     ...portfolio,
@@ -47,7 +52,7 @@ async function portfolioFigures(
 export async function runPortfolioDigest(
   deps: AutomationDeps,
 ): Promise<AutomationResult> {
-  const { ctx, settings, now, locale, appUrl, lookupRecipientEmail } = deps;
+  const { ctx, settings, now, locale, appUrl } = deps;
   const result: AutomationResult = {
     automation: 'digest',
     ran: false,
@@ -72,33 +77,30 @@ export async function runPortfolioDigest(
       `${cadence}:${period}`,
     );
     if (!claimed) return null;
-    const data = await portfolioFigures(tx, ctx.role, now, { today, soon });
+    const data = await portfolioFigures(tx, deps, { today, soon });
     const owners = await orgOwnerAdminIds(tx);
-    for (const o of owners) {
-      await insertNotification(tx, ctx.orgId, {
+    await insertNotifications(
+      tx,
+      ctx.orgId,
+      owners.map((o) => ({
         recipientUserId: o.userId,
-        kind: 'portfolio_digest',
+        kind: 'portfolio_digest' as const,
         bodyKey: 'portfolio_digest',
         params: { ...data },
-      });
-      result.effects += 1;
-    }
+      })),
+    );
+    result.effects += owners.length;
     return { data, owners };
   });
   if (!won) return result;
   result.ran = true;
 
-  for (const o of won.owners) {
-    const outcome = await emailRecipient(lookupRecipientEmail, o.userId, (to) =>
-      sendDigestEmail({
-        to,
-        ...won.data,
-        dashboardUrl: `${appUrl}/${locale}/dashboard`,
-        locale,
-      }),
-    );
-    countEmailOutcome(result, outcome);
-  }
+  await emailEachRecipient(
+    deps,
+    won.owners.map((o) => o.userId),
+    (to) => sendDigestEmail({ to, ...won.data, dashboardUrl: `${appUrl}/${locale}/dashboard`, locale }),
+    result,
+  );
 
   return result;
 }

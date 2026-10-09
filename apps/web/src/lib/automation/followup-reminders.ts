@@ -19,7 +19,7 @@ import { insertNotification } from '@/lib/notifications/core';
 export async function runFollowupReminders(
   deps: AutomationDeps,
 ): Promise<AutomationResult> {
-  const { ctx, settings, now, locale, appUrl, lookupRecipientEmail } = deps;
+  const { ctx, settings, now, locale, appUrl, lookupRecipientEmail, emailBreaker } = deps;
   const result: AutomationResult = {
     automation: 'followup',
     ran: false,
@@ -69,6 +69,7 @@ export async function runFollowupReminders(
         reviewUrl: `${appUrl}/${locale}/proposals/${c.id}`,
         locale,
       }),
+      emailBreaker,
     );
     countEmailOutcome(result, outcome);
   }

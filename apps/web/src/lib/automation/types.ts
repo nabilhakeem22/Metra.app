@@ -1,5 +1,7 @@
 import type { AutomationSettings } from '@metra/db';
 import type { OrgContext } from '@/lib/db/context';
+import type { EmailBreaker } from './email-breaker';
+import type { OrgTickMemo } from './org-tick-memo';
 
 /** One of the automation cores (./cores.ts). */
 export type AutomationKey = 'expire' | 'followup' | 'digest' | 'stage' | 'delivery' | 'handover';
@@ -20,8 +22,9 @@ export type RecipientEmailLookup = (userId: string) => Promise<RecipientLookup>;
 /**
  * Everything a core needs, resolved once per org by the runner: the system-actor
  * OrgContext (owner), that org's settings row, the run instant, the org's default
- * locale (for email copy), the absolute app origin (for links), and the tick's
- * shared recipient lookup.
+ * locale (for email copy), the absolute app origin (for links), the tick's
+ * shared recipient lookup and email breaker, and what this org's cores share on
+ * this tick.
  */
 export interface AutomationDeps {
   ctx: OrgContext;
@@ -30,6 +33,8 @@ export interface AutomationDeps {
   locale: string;
   appUrl: string;
   lookupRecipientEmail: RecipientEmailLookup;
+  emailBreaker: EmailBreaker;
+  memo: OrgTickMemo;
 }
 
 /** Outcome of a single core for a single org. */

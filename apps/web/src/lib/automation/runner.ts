@@ -4,6 +4,8 @@ import { asc } from 'drizzle-orm';
 import { loggableFailure } from '@/lib/actions/loggable-failure';
 import { settleWithConcurrency } from './concurrency';
 import { CORES } from './cores';
+import { createEmailBreaker } from './email-breaker';
+import { createOrgTickMemo } from './org-tick-memo';
 import { createRecipientEmailLookup } from './recipients';
 import { summarizeTick, tickLogLine } from './run-summary';
 import { resolveSystemContext } from './system-context';
@@ -28,7 +30,7 @@ import { withRequestDb } from '@/lib/db/client';
 export const ORG_CONCURRENCY = 3;
 
 /** Everything shared by every org on one tick. */
-type TickDeps = Pick<AutomationDeps, 'now' | 'appUrl' | 'lookupRecipientEmail'>;
+type TickDeps = Pick<AutomationDeps, 'now' | 'appUrl' | 'lookupRecipientEmail' | 'emailBreaker'>;
 type OrgRow = { id: string; defaultLocale: string | null };
 
 function failedCore(orgId: string, key: AutomationKey): OrgAutomationResult {
@@ -70,7 +72,7 @@ async function runOrg(
   const ctx = await resolveSystemContext(org.id);
   if (!ctx) return { orgId: org.id, status: 'skipped' }; // no owner/admin to act as
   const locale = org.defaultLocale ?? 'ar-EG';
-  const results = await runCores({ ...tick, ctx, settings, locale });
+  const results = await runCores({ ...tick, ctx, settings, locale, memo: createOrgTickMemo() });
   return { orgId: org.id, status: 'processed', results };
 }
 
@@ -119,6 +121,7 @@ export async function runDueAutomations(
     now,
     appUrl: process.env.NEXT_PUBLIC_APP_URL?.trim().replace(/\/$/, '') ?? '',
     lookupRecipientEmail: createRecipientEmailLookup(),
+    emailBreaker: createEmailBreaker(),
   };
   const orgs = await readOrgsInIdOrder();
   const settingsByOrg = await readSettingsByOrg();

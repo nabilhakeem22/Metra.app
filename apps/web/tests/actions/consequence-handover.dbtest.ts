@@ -3,58 +3,21 @@
 // the hourly closer closes what a client confirmed on their page. The ledger row
 // names no one and the audit names the cause.
 import { afterAll, describe, expect, it } from 'vitest';
-import type { AutomationSettings } from '@metra/db';
 import { runHandoverCloser } from '@/lib/automation/handover-closer';
-import { resolveSystemContext } from '@/lib/automation/system-context';
 import { recordArtifactCore } from '@/lib/engagements/artifacts';
 import { recordEventCorrectionCore } from '@/lib/engagements/corrections';
 import { executeTransition } from '@/lib/engagements/executor';
 import { recordHandoffAndCloseCore } from '@/lib/engagements/handover-close';
 import { recordPaymentCore } from '@/lib/engagements/payments';
-import { createProjectCore } from '@/lib/projects/core';
-import { engagementAtBoq, rawEngagement, seedBoqOrg, type BoqOrg } from './boq-proposal-fixture';
+import { engagementAtBoq, rawEngagement, seedBoqOrg } from './boq-proposal-fixture';
 import { closeFixture, raw, teardown } from './fixture';
+import { clientAck, closeRows, closerDeps, engagementOnOwnProject, stateOf } from './handover-fixture';
 
 const orgIds: string[] = [];
 afterAll(async () => {
   await teardown(orgIds);
   await closeFixture();
 });
-
-async function stateOf(engagementId: string): Promise<string> {
-  const [row] = await raw.query<{ state: string }>(
-    `select state from public.design_engagements where id = '${engagementId}'`,
-  );
-  return row.state;
-}
-
-async function closeRows(engagementId: string) {
-  return raw.query<{ actor_user_id: string | null }>(
-    `select actor_user_id from public.engagement_transitions
-      where engagement_id = '${engagementId}' and trigger = 'recipientAcknowledges'`,
-  );
-}
-
-/** A bare engagement in `state` on a project of its own (one active delivery per project). */
-async function engagementOnOwnProject(org: BoqOrg, state: string): Promise<string> {
-  const code = `HO-${Math.random().toString(36).slice(2, 8)}`;
-  const project = { startDate: '2026-01-01', endDate: '2026-06-30', code, nameEn: code, clientId: org.clientId };
-  expect((await createProjectCore(org.ctx, { ...project, status: 'active' })).ok).toBe(true);
-  const [row] = await raw.query<{ id: string }>(
-    `select id from public.projects where org_id = '${org.orgId}' and code = '${code}'`,
-  );
-  return rawEngagement({ ...org, projectId: row.id }, state);
-}
-
-/** A client-channel handover acknowledgement `minutesAgo` old, as the token path writes it. */
-async function clientAck(org: BoqOrg, engagementId: string, minutesAgo: number): Promise<string> {
-  const [row] = await raw.query<{ id: string }>(
-    `insert into public.engagement_events (org_id, engagement_id, kind, actor_channel, actor_name, decided_at)
-     values ('${org.orgId}', '${engagementId}', 'handoff_acknowledgement', 'client', 'Mona',
-             now() - interval '${minutesAgo} minutes') returning id`,
-  );
-  return row.id;
-}
 
 describe('the staff path closes inline (AC 11)', () => {
   it("a site engineer recording the client's confirmation closes the delivery, by no one, for a cause", async () => {
@@ -73,11 +36,12 @@ describe('the staff path closes inline (AC 11)', () => {
     expect(acks).toHaveLength(1);
     expect(await stateOf(engagementId)).toBe('closed_design_only');
     expect(await closeRows(engagementId)).toEqual([{ actor_user_id: null }]);
-    const [audit] = await raw.query<{ after: { state: string; cause: string } }>(
+    const [audit] = await raw.query<{ after: { state: string; cause: string; recordedBy: string } }>(
       `select after from public.audit_log where entity = 'design_engagement' and entity_id = '${engagementId}'
         order by created_at desc limit 1`,
     );
-    expect(audit.after).toEqual({ state: 'closed_design_only', cause: 'handoverAcknowledged' });
+    // The audit names who recorded the confirmation (F3); the ledger row names no one.
+    expect(audit.after).toEqual({ state: 'closed_design_only', cause: 'handoverAcknowledged', recordedBy: org.siteCtx.userId });
   });
 
   it('recorded in any other state: refused as today, nothing closes', async () => {
@@ -104,15 +68,7 @@ describe('the hourly closer (AC 12)', () => {
     ).toBe(true);
     await clientAck(org, elsewhere, 30);
 
-    const systemCtx = (await resolveSystemContext(org.orgId))!;
-    const deps = {
-      ctx: systemCtx,
-      settings: {} as AutomationSettings,
-      now: new Date(),
-      locale: 'en',
-      appUrl: 'https://metra.test',
-      lookupRecipientEmail: async () => ({ status: 'no-address' as const }),
-    };
+    const deps = await closerDeps(org.orgId);
     expect(await runHandoverCloser(deps)).toEqual({
       automation: 'handover',
       ran: true,

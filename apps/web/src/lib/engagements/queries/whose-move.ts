@@ -59,8 +59,10 @@ export async function loadWhoseMovesInTx(
     else live.push(subject.id);
   }
 
-  const facts = await loadGuardFactsBatch(tx, live);
-  const claims = await pendingClaimCounts(tx, role, live);
+  const [facts, claims] = await Promise.all([
+    loadGuardFactsBatch(tx, live),
+    pendingClaimCounts(tx, role, live),
+  ]);
   for (const [engagementId, engagementFacts] of facts) {
     moves.set(
       engagementId,

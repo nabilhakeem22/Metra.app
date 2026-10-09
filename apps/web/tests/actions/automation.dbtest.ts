@@ -1,4 +1,6 @@
 import { afterAll, describe, expect, it } from 'vitest';
+import { createEmailBreaker } from '@/lib/automation/email-breaker';
+import { createOrgTickMemo } from '@/lib/automation/org-tick-memo';
 import { runExpireProposals } from '@/lib/automation/expire-proposals';
 import { runFollowupReminders } from '@/lib/automation/followup-reminders';
 import { runPortfolioDigest } from '@/lib/automation/portfolio-digest';
@@ -86,7 +88,16 @@ async function depsFor(ctx: OrgContext, now: Date): Promise<AutomationDeps> {
   // The DB suite never reaches Supabase auth: every recipient has no address,
   // so the cores do their DB work and skip the send.
   const lookupRecipientEmail = async () => ({ status: 'no-address' as const });
-  return { ctx, settings, now, locale: 'en', appUrl: '', lookupRecipientEmail };
+  return {
+    ctx,
+    settings,
+    now,
+    locale: 'en',
+    appUrl: '',
+    lookupRecipientEmail,
+    emailBreaker: createEmailBreaker(),
+    memo: createOrgTickMemo(),
+  };
 }
 
 /** A UTC instant whose Cairo wall-clock hour is 7 (DST-safe scan). */

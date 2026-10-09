@@ -15,6 +15,7 @@ export const LABELS: TimelineLabels = {
   offlineChannel: (channel) => `channel:${channel}`,
   byMetra: (move) => `${move} by Metra`,
   closedOnClientConfirmation: () => 'closed on confirmation',
+  closedOnRecordedConfirmation: () => 'closed on recorded confirmation',
 };
 
 export function transition(

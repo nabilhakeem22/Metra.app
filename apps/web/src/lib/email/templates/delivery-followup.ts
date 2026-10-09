@@ -3,6 +3,7 @@
 // decision Q2), so it is in the studio's register (Egyptian Arabic). Western
 // numerals, no cost or margin, nothing about the client but the delivery's own
 // label.
+import { dayCountPhrase } from '@/lib/format/day-count';
 import { automationEmail, type EmailContent } from './automation';
 
 export interface DeliveryFollowupEmailInput {
@@ -18,7 +19,9 @@ export function deliveryFollowupEmailTemplate(input: DeliveryFollowupEmailInput)
   const subject = ar ? 'تسليمات مستنية رد العميل' : 'Deliveries waiting on your clients';
   const heading = ar ? 'تسليمات محتاجة متابعة' : 'Deliveries to follow up';
   const lines = input.deliveries.map(({ label, days }) =>
-    ar ? `${label}: مستني العميل من ${days} يوم` : `${label}: waiting on the client for ${days} days`,
+    ar
+      ? `${label}: مستني العميل من ${dayCountPhrase(days, 'ar')}`
+      : `${label}: waiting on the client for ${dayCountPhrase(days, 'en')}`,
   );
   lines.push(ar ? 'ابعت للعميل تذكير من صفحة التسليم.' : 'Send the client a reminder from the delivery page.');
   const cta = { label: ar ? 'افتح التسليمات' : 'Open your deliveries', url: input.deliveriesUrl };

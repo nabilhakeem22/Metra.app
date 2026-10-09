@@ -4,6 +4,8 @@
 import { expect } from 'vitest';
 import type { AutomationSettings } from '@metra/db';
 import { cairoHour } from '@/lib/automation/clock';
+import { createEmailBreaker } from '@/lib/automation/email-breaker';
+import { createOrgTickMemo } from '@/lib/automation/org-tick-memo';
 import { resolveSystemContext } from '@/lib/automation/system-context';
 import type { AutomationDeps } from '@/lib/automation/types';
 import { createClientCore } from '@/lib/clients/core';
@@ -56,9 +58,9 @@ export function sevenAmCairo(days = 0): Date {
 }
 
 /**
- * One delivery on its own project, last changed `ageDays` (and an hour) before
- * `asOf`: waiting on the client (fee set, deposit unpaid) or the studio's move
- * (just created).
+ * One delivery on its own project, created, moved and last changed `ageDays`
+ * (and an hour) before `asOf`: waiting on the client (fee set, deposit unpaid)
+ * or the studio's move (just created). Its wait therefore began then too.
  */
 export async function deliveryAged(
   org: FollowupOrg,
@@ -89,7 +91,10 @@ export async function deliveryAged(
     expect(fee.ok).toBe(true);
   }
   const changedAt = new Date(asOf.getTime() - ageDays * DAY_MS - 3_600_000).toISOString();
-  await raw.query(`update public.design_engagements set updated_at = '${changedAt}' where id = '${engagementId}'`);
+  await raw.query(
+    `update public.design_engagements set created_at = '${changedAt}', updated_at = '${changedAt}' where id = '${engagementId}'`,
+  );
+  await raw.query(`update public.engagement_transitions set decided_at = '${changedAt}' where engagement_id = '${engagementId}'`);
   return engagementId;
 }
 
@@ -102,6 +107,8 @@ export async function depsAt(org: FollowupOrg, now: Date, settings: Partial<Auto
     locale: 'en',
     appUrl: 'https://metra.test',
     lookupRecipientEmail: async (userId) => ({ status: 'found', email: `${userId}@studio.test` }),
+    emailBreaker: createEmailBreaker(),
+    memo: createOrgTickMemo(),
   };
 }
 

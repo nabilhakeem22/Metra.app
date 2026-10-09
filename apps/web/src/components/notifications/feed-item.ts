@@ -74,6 +74,8 @@ export function notificationBody(
     return clientRespondedBody(item.bodyKey, p, translate, locale, milestoneLabel);
   }
   const s = (v: unknown) => String(v ?? 0);
+  // A number only SELECTS a plural form; the figure shown is always the string.
+  const count = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : 0);
   switch (item.bodyKey) {
     case 'proposal_expiring':
       return translate('proposal_expiring', {
@@ -96,8 +98,11 @@ export function notificationBody(
         // Digests written before Round C carry no delivery counts: they read as before.
         typeof p.deliveriesYourMove === 'number'
           ? translate('portfolio_digest_deliveries', {
+              yourMoveCount: count(p.deliveriesYourMove),
               yourMove: s(p.deliveriesYourMove),
+              waitingCount: count(p.deliveriesWaiting),
               waiting: s(p.deliveriesWaiting),
+              stalledCount: count(p.deliveriesStalled),
               stalled: s(p.deliveriesStalled),
             })
           : '',
@@ -107,6 +112,7 @@ export function notificationBody(
     case 'delivery_waiting_on_client':
       return translate('delivery_waiting_on_client', {
         delivery: deliveryLabelOf(p, locale),
+        dayCount: count(p.days),
         days: s(p.days),
       });
     case 'stage_reminder':

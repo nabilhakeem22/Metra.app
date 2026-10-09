@@ -42,11 +42,22 @@ describe('delivery_waiting_on_client (AC 16)', () => {
     const english = render('en', 'delivery_waiting_on_client', { ...DELIVERY, days: 6 });
     expect(english).toBe('DE-2026-0012 · Villa kitchen has waited on the client for 6 days. Send them a reminder.');
     const arabic = render('ar-EG', 'delivery_waiting_on_client', { ...DELIVERY, days: 6 });
-    expect(arabic).toBe('DE-2026-0012 · مطبخ الفيلا مستني العميل من 6 يوم. ابعتله تذكير.');
+    expect(arabic).toBe('DE-2026-0012 · مطبخ الفيلا مستني العميل من 6 أيام. ابعتله تذكير.');
     for (const body of [english, arabic]) {
       expect(ARABIC_INDIC.test(body)).toBe(false);
       expect(DASH.test(body)).toBe(false);
     }
+  });
+
+  it('agrees with the number in both languages (F5)', () => {
+    const en1 = render('en', 'delivery_waiting_on_client', { ...DELIVERY, days: 1 });
+    expect(en1).toContain('for 1 day.');
+    const arabic = (days: number) => render('ar-EG', 'delivery_waiting_on_client', { ...DELIVERY, days });
+    expect(arabic(1)).toContain('مستني العميل من يوم.');
+    expect(arabic(2)).toContain('مستني العميل من يومين.');
+    expect(arabic(10)).toContain('مستني العميل من 10 أيام.');
+    expect(arabic(11)).toContain('مستني العميل من 11 يوم.');
+    expect(ARABIC_INDIC.test(arabic(11))).toBe(false);
   });
 
   it('an unknown body key still renders an empty line', () => {
@@ -65,10 +76,14 @@ describe('the digest with deliveries (AC 15)', () => {
       deliveriesStalled: 0,
     });
     expect(body).toBe(
-      '4 active projects, 2 awaiting response, 1 expiring soon, 0 overdue stages. Deliveries: 3 need your move, 1 wait on the client, 0 stalled.',
+      '4 active projects, 2 awaiting response, 1 expiring soon, 0 overdue stages. 3 deliveries need your move, 1 waits on the client, 0 are stalled.',
     );
     expect(render('ar-EG', 'portfolio_digest', { ...PORTFOLIO, deliveriesYourMove: 3, deliveriesWaiting: 1, deliveriesStalled: 0 }))
-      .toContain('التسليمات: 3 محتاجة خطوة منك، 1 مستنية العميل، 0 متعطلة.');
+      .toContain('3 تسليمات محتاجة خطوة منك، تسليم واحد مستني العميل، ومفيش تسليمات متعطلة.');
+    expect(render('en', 'portfolio_digest', { ...PORTFOLIO, deliveriesYourMove: 1, deliveriesWaiting: 2, deliveriesStalled: 1 }))
+      .toContain('1 delivery needs your move, 2 wait on the client, 1 is stalled.');
+    expect(render('ar-EG', 'portfolio_digest', { ...PORTFOLIO, deliveriesYourMove: 12, deliveriesWaiting: 2, deliveriesStalled: 1 }))
+      .toContain('12 تسليم محتاج خطوة منك، تسليمين مستنيين العميل، وتسليم واحد متعطل.');
   });
 
   it('a digest written before Round C reads exactly as before', () => {

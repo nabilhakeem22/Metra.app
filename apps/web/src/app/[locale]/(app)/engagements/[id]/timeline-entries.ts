@@ -5,7 +5,7 @@ import type {
 } from '@/lib/engagements/queries';
 import { isClientGenerated, isRecordedForClient } from '@/lib/engagements/event-provenance';
 import { offlineApprovalChannelOf } from '@/lib/engagements/offline-approval';
-import { transitionLabel, type TimelineLabels } from './timeline-labels';
+import { handoverConfirmedBy, transitionLabel, type TimelineLabels } from './timeline-labels';
 
 // WHAT THE TIMELINE SHOWS, and in what order. PURE and server-safe: no React, no
 // db. Merging three record streams into one ledger, deciding which rows are
@@ -61,11 +61,12 @@ function retractionsByTarget(
 function transitionEntry(
   transition: EngagementTransitionRecord,
   labels: TimelineLabels,
+  confirmedBy: 'client' | 'studio',
 ): TimelineEntry {
   return {
     id: `t-${transition.id}`,
     at: transition.decidedAt,
-    label: transitionLabel(transition, labels),
+    label: transitionLabel(transition, labels, confirmedBy),
     note: trimmedNote(transition.note),
     ...PLAIN_ROW,
     optionPosition: null,
@@ -124,7 +125,9 @@ export function buildTimelineEntries(
 ): TimelineEntry[] {
   const retractions = retractionsByTarget(input.events);
   return [
-    ...input.transitions.map((transition) => transitionEntry(transition, labels)),
+    ...input.transitions.map((transition) =>
+      transitionEntry(transition, labels, handoverConfirmedBy(input.events)),
+    ),
     ...input.events
       .filter((event) => !isClientGenerated(event.actorChannel))
       .filter((event) => event.supersedesEventId === null)

@@ -21,17 +21,17 @@ describe('executeConsequence', () => {
       ctx,
       TRANSITIONS.finalizeBOQ,
       { engagementId: 'e-1', trigger: 'finalizeBOQ' },
-      { ledgerActorUserId: 'user-1', cause: 'boqSent' },
+      { ledgerActorUserId: 'user-1', cause: 'boqSent', recordedBy: 'user-1' },
     );
   });
 
   it('handoverAcknowledged fires recipientAcknowledges with NO ledger actor', async () => {
-    await executeConsequence(ctx, { engagementId: 'e-2', consequence: 'handoverAcknowledged' });
+    await executeConsequence(ctx, { engagementId: 'e-2', consequence: 'handoverAcknowledged', recordedBy: 'client' });
     expect(run.runGatedTransition).toHaveBeenCalledWith(
       ctx,
       TRANSITIONS.recipientAcknowledges,
       { engagementId: 'e-2', trigger: 'recipientAcknowledges' },
-      { ledgerActorUserId: null, cause: 'handoverAcknowledged' },
+      { ledgerActorUserId: null, cause: 'handoverAcknowledged', recordedBy: 'client' },
     );
   });
 
@@ -41,6 +41,14 @@ describe('executeConsequence', () => {
       ok: false,
       error: 'illegal_trigger',
     });
+    expect(run.runGatedTransition).not.toHaveBeenCalled();
+  });
+
+  it('names off the prototype are refused with a code, never a throw (S2)', async () => {
+    for (const name of ['toString', 'constructor', '__proto__', 'hasOwnProperty']) {
+      const result = await executeConsequence(ctx, { engagementId: 'e-4', consequence: name as TransitionConsequence });
+      expect(result, name).toEqual({ ok: false, error: 'illegal_trigger' });
+    }
     expect(run.runGatedTransition).not.toHaveBeenCalled();
   });
 

@@ -68,23 +68,16 @@ export async function loadGuardFacts(
   engagement: DesignEngagement,
 ): Promise<LoadedGuardFacts> {
   const engagementId = engagement.id;
-  const milestones = await tx
-    .select()
-    .from(engagementMilestones)
-    .where(eq(engagementMilestones.engagementId, engagementId));
-  const payments = await tx
-    .select()
-    .from(paymentEvents)
-    .where(eq(paymentEvents.engagementId, engagementId));
-  const artifacts = await tx
-    .select()
-    .from(engagementArtifacts)
-    .where(eq(engagementArtifacts.engagementId, engagementId));
-  const changeOrders = await tx
-    .select()
-    .from(engagementChangeOrders)
-    .where(eq(engagementChangeOrders.engagementId, engagementId));
-  const events = await loadLiveEvents(tx, engagementId);
+  // Five independent reads of one transaction, issued together: the driver
+  // pipelines them on the transaction's connection, so a state move pays one
+  // round trip for its facts instead of five (Round C, R1).
+  const [milestones, payments, artifacts, changeOrders, events] = await Promise.all([
+    tx.select().from(engagementMilestones).where(eq(engagementMilestones.engagementId, engagementId)),
+    tx.select().from(paymentEvents).where(eq(paymentEvents.engagementId, engagementId)),
+    tx.select().from(engagementArtifacts).where(eq(engagementArtifacts.engagementId, engagementId)),
+    tx.select().from(engagementChangeOrders).where(eq(engagementChangeOrders.engagementId, engagementId)),
+    loadLiveEvents(tx, engagementId),
+  ]);
   return { engagement, milestones, payments, artifacts, changeOrders, events };
 }
 

@@ -76,7 +76,9 @@ function failLostIdempotencyRace(run: TransitionRun): never {
 
 /**
  * The audit entry for the state move, written with the tx's own `audit`. A
- * consequence names its cause, so the audit says why nobody chose the move.
+ * consequence names its cause and who performed the act it follows from (the
+ * member who recorded it, or 'client'), so the audit says why and because of
+ * whom, while its actor column is the system actor that executed the move.
  */
 export async function auditStateMove(
   run: TransitionRun,
@@ -87,6 +89,9 @@ export async function auditStateMove(
     entityId: run.input.engagementId,
     action: 'update',
     before: { state: fromState },
-    after: run.cause === null ? { state: run.def.to } : { state: run.def.to, cause: run.cause },
+    after:
+      run.cause === null
+        ? { state: run.def.to }
+        : { state: run.def.to, cause: run.cause, recordedBy: run.recordedBy },
   });
 }

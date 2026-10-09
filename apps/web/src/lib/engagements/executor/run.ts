@@ -45,6 +45,8 @@ export interface TransitionAttribution {
   ledgerActorUserId: string | null;
   /** The act that decided the move (consequence.ts), or null for a person's trigger. */
   cause: TransitionConsequence | null;
+  /** Who performed that act (a member's user id, or 'client'); null without a cause. */
+  recordedBy: string | null;
 }
 
 /**

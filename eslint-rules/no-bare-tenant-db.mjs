@@ -111,6 +111,14 @@
 //      `withOrgContext` RLS transaction keyed on a resolved system actor:
 //        apps/web/src/lib/automation/system-context.ts
 //        apps/web/src/lib/automation/runner.ts
+//   4. The hourly handover closer's existence probe (Round C, R1): ONE read-only
+//      statement per org per tick, so an org with nothing to close opens no RLS
+//      transaction. It is scoped by an explicit `org_id = <runner's org id>`
+//      parameter (from the runner's own org list, never from a request), selects
+//      only delivery ids and who confirmed (`'client'` or a member id), writes
+//      nothing, and every close it leads to runs through the executor inside the
+//      org's `withOrgContext` transaction as the system actor:
+//        apps/web/src/lib/automation/handover-closer.ts
 // Plus the trusted core that DEFINES `withOrgContext` / `withUserContext` itself
 // (it is where `set local role metra_app` lives), and the isolation tests that
 // probe the raw socket on purpose:
@@ -275,6 +283,8 @@ const ALLOWLISTED_FILES = [
   'apps/web/src/lib/api-keys/resolve.ts',
   'apps/web/src/lib/automation/system-context.ts',
   'apps/web/src/lib/automation/runner.ts',
+  // Read-only, org-scoped existence probe; see sanctioned exception 4 above.
+  'apps/web/src/lib/automation/handover-closer.ts',
   'packages/db/src/org-context.ts',
   // The RLS/roles/functions applier itself: it runs the .sql files that CREATE
   // the metra_app role and the policies, so by definition it must execute as the

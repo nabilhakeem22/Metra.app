@@ -36,5 +36,5 @@ export async function executeTransition(
   // Defence for untyped callers (e.g. a future Public API forwarding a string):
   // an unknown trigger has no def and is rejected before any DB work.
   if (!def) return err('illegal_trigger');
-  return runGatedTransition(ctx, def, input, { ledgerActorUserId: ctx.userId, cause: null });
+  return runGatedTransition(ctx, def, input, { ledgerActorUserId: ctx.userId, cause: null, recordedBy: null });
 }

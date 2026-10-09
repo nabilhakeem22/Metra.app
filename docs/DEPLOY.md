@@ -268,7 +268,7 @@ the symptom is automations silently not firing.
 | `maxDuration` | **none** | a route segment option OpenNext on Cloudflare ignores; deliberately not exported by the route |
 | open connections per invocation | **6** | Cloudflare; past six, new connections queue until one closes |
 | orgs worked on at once | **`ORG_CONCURRENCY` = 3** | `lib/automation/runner.ts`. Each org's cores (`lib/automation/cores.ts`) stay sequential: one DB socket (of the request pool's `max: 5`) plus one outbound call (Supabase auth or Resend) per org, so 3 orgs = 6 connections |
-| one recipient lookup / one email | **8 s / 5 s** | `AUTH_LOOKUP_TIMEOUT_MS` / `EMAIL_TIMEOUT_MS` in `lib/http/deadlines.ts`; past that the email counts as failed and the tick moves on. Lookups are memoised per user for the tick |
+| one recipient lookup / one email | **8 s / 5 s** | `AUTH_LOOKUP_TIMEOUT_MS` / `EMAIL_TIMEOUT_MS` in `lib/http/deadlines.ts`; past that the email counts as failed and the tick moves on. Lookups are memoised per user for the tick. After **5 consecutive failed emails** in one tick the rest of that tick's sends are skipped (counted failed, logged once: `automation emails paused for the rest of this tick`); an org's owner and admin emails go **2 at a time** (`lib/automation/email-breaker.ts`, `email-delivery.ts`) |
 
 **Measured** (Oct 5, `automation_run_log` timestamps): about **5.3 s per org**,
 strictly sequential — 6 orgs from 21:01:03 to 21:01:29 UTC. The cost is DB round
@@ -296,21 +296,33 @@ per org, so two overlapping ticks cannot both do the work.
 | `digest` | 07:00 Cairo | `digest`: cadence and day or ISO week | owners and admins |
 | `stage` | 07:00 Cairo | `stage`: Cairo day | owners and admins |
 | `delivery` (Round C) | 07:00 Cairo, while follow-ups are on | `delivery`: Cairo day; `delivery-followup`: `<delivery id>:<ISO week>` | owners and admins, about deliveries waiting on the client for the follow-up threshold (at most 10 per org per day; 200 in-flight deliveries read) |
-| `handover` (Round C) | every tick | none: closing is idempotent through the state gate | nobody: it closes design-only deliveries whose handover the client confirmed at least 2 minutes ago (at most 50 per org per tick) |
+| `handover` (Round C) | every tick | none: closing is idempotent through the state gate | nobody: it closes design-only deliveries whose handover the client confirmed at least 2 minutes ago (at most 50 per org per tick). An org with nothing to close costs one read on the runner's connection, no transaction; a workspace whose design flow is off is skipped |
 
 No core ever messages a client (owner decision, Oct 9): the `delivery` core
 reminds the studio, and the studio sends the client the existing WhatsApp or
 email reminder from the delivery page.
 
-**Tick budget for Round C** (plan A14). The measured midnight batch before Round
-C was ~5.5 s for 6 claims. Off 07:00 the tick gains the `handover` core (one
-read per org: 4 round trips); at 07:00 it gains the `delivery` core and the
-digest's delivery counts (a pool read plus at most 7 whose-move reads each).
-On a local Postgres (round trips well under 1 ms) these cost 2 to 3 ms, ~30 ms
-and ~7 ms per org; production is dominated by round trips to eu-west-1. The
-budget: `durationMs` grows by at most **1.5 s** off 07:00 and **3 s** at 07:00
-Cairo for today's org count. Check it from the tick line below after the deploy;
-if it is exceeded, cap the cores, do not lower `ORG_CONCURRENCY`.
+**Tick budget for Round C** (plan A14: `durationMs` grows by at most **1.5 s** off
+07:00 and **3 s** at 07:00 for today's org count). Measured on a local Postgres
+behind a proxy that adds ~31 ms per round trip (a Worker reaching eu-west-1 through
+Hyperdrive, modelled), each org with 18 in-flight deliveries and, in the worst
+case, 2 client-confirmed handovers to close on that very tick:
+
+| orgs | off 07:00, nothing to close | off 07:00, 2 closes per org | 07:00 Cairo |
+|---|---|---|---|
+| 20 | +0.47 s | +11.7 s | +19.1 s |
+| 100 | +2.3 s | +56.6 s | +92.6 s |
+
+The off-hour cost with nothing to close is within budget at 20 orgs. Each close
+is a full executor run (13 statements, ~0.8 s at that round-trip time) and
+happens once per delivery in its life, so the "2 closes per org" column is a
+burst, not a steady state. The 07:00 delta (about 0.5 s per org for the
+follow-ups, 0.5 s for the digest's delivery counts, plus any closes) is over the
+plan's 3 s at 20 orgs on this model; the 15-minute ceiling holds with a wide
+margin (100 orgs: 163 s; with Resend hanging: 146 s, was 910 s). Read the real
+figure from the tick line below at the first 07:00 Cairo after the deploy before
+deciding anything; if it must come down, cap the cores, do not lower
+`ORG_CONCURRENCY`.
 
 Every tick logs one line, counts only (no ids, no addresses):
 `automation tick: orgs= processed= skipped= failed= coreFailures= emailsSent= emailsFailed= durationMs=`.

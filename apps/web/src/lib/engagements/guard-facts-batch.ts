@@ -82,12 +82,11 @@ export async function loadGuardFactsBatch(
   if (engagementIds.length === 0) return facts;
   const ids = [...engagementIds];
 
-  const engagements = await tx
-    .select(GUARD_ENGAGEMENT_COLUMNS)
-    .from(designEngagements)
-    .where(inArray(designEngagements.id, ids));
-  const milestones = groupByEngagement(
-    await tx
+  // Six independent reads of one transaction, issued together so the driver can
+  // overlap them on the transaction's connection.
+  const [engagements, milestoneRows, paymentRows, artifactRows, changeOrderRows, eventRows] = await Promise.all([
+    tx.select(GUARD_ENGAGEMENT_COLUMNS).from(designEngagements).where(inArray(designEngagements.id, ids)),
+    tx
       .select({
         engagementId: engagementMilestones.engagementId,
         kind: engagementMilestones.kind,
@@ -96,9 +95,7 @@ export async function loadGuardFactsBatch(
       })
       .from(engagementMilestones)
       .where(inArray(engagementMilestones.engagementId, ids)),
-  );
-  const payments = groupByEngagement(
-    await tx
+    tx
       .select({
         engagementId: paymentEvents.engagementId,
         kind: paymentEvents.kind,
@@ -106,15 +103,11 @@ export async function loadGuardFactsBatch(
       })
       .from(paymentEvents)
       .where(inArray(paymentEvents.engagementId, ids)),
-  );
-  const artifacts = groupByEngagement(
-    await tx
+    tx
       .select({ engagementId: engagementArtifacts.engagementId, kind: engagementArtifacts.kind })
       .from(engagementArtifacts)
       .where(inArray(engagementArtifacts.engagementId, ids)),
-  );
-  const changeOrders = groupByEngagement(
-    await tx
+    tx
       .select({
         engagementId: engagementChangeOrders.engagementId,
         status: engagementChangeOrders.status,
@@ -122,15 +115,15 @@ export async function loadGuardFactsBatch(
       })
       .from(engagementChangeOrders)
       .where(inArray(engagementChangeOrders.engagementId, ids)),
-  );
-  // LIVE events only, decided per engagement: a correction retracts a row on
-  // its own engagement's ledger.
-  const events = groupByEngagement(
-    await tx
-      .select(GUARD_EVENT_COLUMNS)
-      .from(engagementEvents)
-      .where(inArray(engagementEvents.engagementId, ids)),
-  );
+    // LIVE events only, decided per engagement: a correction retracts a row on
+    // its own engagement's ledger.
+    tx.select(GUARD_EVENT_COLUMNS).from(engagementEvents).where(inArray(engagementEvents.engagementId, ids)),
+  ]);
+  const milestones = groupByEngagement(milestoneRows);
+  const payments = groupByEngagement(paymentRows);
+  const artifacts = groupByEngagement(artifactRows);
+  const changeOrders = groupByEngagement(changeOrderRows);
+  const events = groupByEngagement(eventRows);
 
   for (const engagement of engagements) {
     facts.set(engagement.id, {
