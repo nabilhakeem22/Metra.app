@@ -51,8 +51,9 @@ export interface PanelCapabilities {
   /** Issuing the band to the client — owner/admin only. */
   issueRom: boolean;
   recordRomAck: boolean;
-  /** Offered only while the engagement sits at design_only_handoff. */
+  /** At design_only_handoff: owner/admin/PM record the client's receipt; others are told who does. */
   recordHandoffAck: boolean;
+  handoffAckRecordedByOthers: boolean;
   /** Retracting a ledger row — owner/admin only. */
   retract: boolean;
 }
@@ -95,6 +96,7 @@ export function EngagementPanels({
           clientActivity={data.clientActivity}
           canRecordRomAck={capabilities.recordRomAck}
           canRecordHandoffAck={capabilities.recordHandoffAck}
+          handoffAckRecordedByOthers={capabilities.handoffAckRecordedByOthers}
           canRetract={capabilities.retract}
           romSet={data.header.romLow !== null && data.header.romHigh !== null}
           romIssued={data.header.romIssuedAt !== null}

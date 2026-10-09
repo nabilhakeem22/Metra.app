@@ -2061,6 +2061,7 @@
       "title": "Record handoff receipt",
       "hint": "Log the recipient's acknowledgement of the design-only package taken offline.",
       "closesDelivery": "Recording the client's confirmation closes this delivery.",
+      "decidedBy": "An owner, admin or project manager records that the client received the handover, and that closes the delivery.",
       "submit": "Record acknowledgement"
     },
     "paymentKind": {

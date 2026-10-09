@@ -58,7 +58,7 @@ describe('sendClientActEmail', () => {
     send.mockReturnValue(new Promise(() => {}));
     const pending = sendClientActEmail(input);
     await vi.advanceTimersByTimeAsync(EMAIL_TIMEOUT_MS);
-    await expect(pending).resolves.toEqual({ sent: false });
+    await expect(pending).resolves.toEqual({ sent: false, transient: true });
     expect(console.error).toHaveBeenCalledWith(
       'sendClientActEmail failed:',
       expect.objectContaining({ name: 'HttpDeadlineError' }),

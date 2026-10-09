@@ -63,7 +63,7 @@ describe('sendProposalEmail', () => {
     // clock can move at once: no microtask drain for a cold cache or a loaded
     // CPU to race.
     await vi.advanceTimersByTimeAsync(EMAIL_TIMEOUT_MS);
-    await expect(pending).resolves.toEqual({ sent: false });
+    await expect(pending).resolves.toEqual({ sent: false, transient: true });
     expect(console.error).toHaveBeenCalledWith(
       'sendProposalEmail failed:',
       expect.objectContaining({ name: 'HttpDeadlineError' }),
@@ -77,10 +77,10 @@ describe('sendProposalEmail', () => {
 
     secrets.RESEND_API_KEY = 're-test-key';
     send.mockResolvedValue({ error: { message: 'domain not verified' } });
-    await expect(sendProposalEmail(input)).resolves.toEqual({ sent: false });
+    await expect(sendProposalEmail(input)).resolves.toEqual({ sent: false, transient: false });
 
     send.mockRejectedValue(new Error('network'));
-    await expect(sendProposalEmail(input)).resolves.toEqual({ sent: false });
+    await expect(sendProposalEmail(input)).resolves.toEqual({ sent: false, transient: true });
   });
 });
 
@@ -102,7 +102,7 @@ describe('automation senders', () => {
       locale: 'en',
     });
     await vi.advanceTimersByTimeAsync(EMAIL_TIMEOUT_MS);
-    await expect(pending).resolves.toEqual({ sent: false });
+    await expect(pending).resolves.toEqual({ sent: false, transient: true });
     expect(console.error).toHaveBeenCalledWith(
       'sendDigestEmail failed:',
       expect.objectContaining({ name: 'HttpDeadlineError' }),

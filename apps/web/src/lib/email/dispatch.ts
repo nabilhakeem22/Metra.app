@@ -5,6 +5,17 @@ import 'server-only';
 import { loggableFailure } from '@/lib/actions/loggable-failure';
 import { runtimeSecret } from '@/lib/cf/secrets';
 import { EMAIL_TIMEOUT_MS, withDeadline } from '@/lib/http/deadlines';
+import { isTransientResendError } from './resend-failure';
+
+/**
+ * What became of one email. `transient` (only when not sent): a timeout, a
+ * throw, a network failure or a 5xx, as opposed to a 4xx refusal or a missing
+ * configuration (resend-failure.ts); the automation's breaker counts only these.
+ */
+export interface EmailDispatchResult {
+  sent: boolean;
+  transient?: boolean;
+}
 
 /** One email, fully built: the address and the rendered content. */
 export interface EmailPayload {
@@ -32,7 +43,7 @@ export interface EmailPayload {
 export async function dispatchEmail(
   payload: EmailPayload,
   label: string,
-): Promise<{ sent: boolean }> {
+): Promise<EmailDispatchResult> {
   const apiKey = runtimeSecret('RESEND_API_KEY');
   const from = runtimeSecret('RESEND_FROM');
   if (!apiKey || !from) return { sent: false };
@@ -45,10 +56,11 @@ export async function dispatchEmail(
       EMAIL_TIMEOUT_MS,
       label,
     );
-    return { sent: !res.error };
+    if (!res.error) return { sent: true };
+    return { sent: false, transient: isTransientResendError(res.error) };
   } catch (err) {
     console.error(`${label} failed:`, loggableFailure(err));
-    return { sent: false };
+    return { sent: false, transient: true };
   }
 }
 

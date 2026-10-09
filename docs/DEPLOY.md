@@ -244,28 +244,49 @@ Nothing in Round C waits for this; do it whenever ready.
 There is no code change and no PR: `wrangler secret put` itself rolls out a new
 Worker version. The next digest or follow-up email then reaches every recipient.
 
-## Owner task: limit the types the `metra-files` bucket stores (Round C, S2)
+## OPTIONAL owner task: limit the types the `metra-files` bucket stores (Round C, S2)
+
+**Optional. Nothing is waiting for it, and done carelessly it breaks uploads.**
 
 Storage keeps whatever Content-Type the uploading browser declares, and the
 bucket has no allow-list today, so a file named `render.pdf` can be stored as
-`image/svg+xml` or `text/html`. The app already never OPENS such a file for a
-client: the client page opens a document in the browser only when it is a
+`image/svg+xml` or `text/html`. **The client-facing risk is already closed in
+code:** the client page opens a document in the browser only when it is a
 pdf/png/jpg/jpeg stored as exactly that type, and saves everything else as an
-attachment (`apps/web/src/lib/files/inline-view.ts`); while money is
-outstanding the client gets a downscaled image streamed by the app, never a
-storage link. The bucket setting is the second wall, and it is a dashboard
-change, not code:
+attachment (`apps/web/src/lib/files/inline-view.ts`); while money is outstanding
+the client gets a downscaled image streamed by the app, never a storage link. A
+bucket allow-list would only be a second wall.
 
-1. Supabase dashboard, Storage, `metra-files`, Edit bucket.
-2. Allowed MIME types: `application/pdf`, `image/png`, `image/jpeg`,
-   `image/webp`, `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`,
-   `text/csv`, `application/acad`, `image/vnd.dwg`, `image/x-dwg`,
-   `application/dxf`, `image/vnd.dxf`, `application/octet-stream` (browsers
-   send that last one for most DWG/DXF files; it is never rendered as a page).
+**Why it can break uploads.** The client and project Documents tabs accept ANY
+file type (Word, PowerPoint, ZIP, iPhone photos, videos, ...), and both upload
+paths send the browser's own type as is. A browser that cannot type a file (a
+DWG on many machines) sends an EMPTY Content-Type. Any type missing from the
+list is refused at upload, and the studio sees "something went wrong".
+
+If you do it anyway:
+
+1. First, in the app, upload one file of each kind the studio really uses on the
+   client Documents tab, the project Documents tab and a delivery: PDF, PNG, JPG,
+   HEIC (iPhone photo), DOCX, XLSX, PPTX, ZIP, MP4, DWG, DXF, and a file with no
+   extension. Note the type each upload request sends (browser devtools, Network,
+   the PUT to storage, its `content-type` header).
+2. Supabase dashboard, Storage, `metra-files`, Edit bucket, Allowed MIME types:
+   every type you noted, and at least `application/pdf`, `image/png`,
+   `image/jpeg`, `image/webp`, `image/heic`, `image/heif`,
+   `application/msword`,
+   `application/vnd.openxmlformats-officedocument.wordprocessingml.document`,
+   `application/vnd.ms-excel`,
+   `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`,
+   `application/vnd.ms-powerpoint`,
+   `application/vnd.openxmlformats-officedocument.presentationml.presentation`,
+   `application/zip`, `application/x-zip-compressed`, `video/mp4`,
+   `video/quicktime`, `text/plain`, `text/csv`, `application/acad`,
+   `image/vnd.dwg`, `image/x-dwg`, `application/dxf`, `image/vnd.dxf` and
+   `application/octet-stream` (most DWG/DXF files; never rendered as a page).
    Leave out every `svg`, `html`, `xhtml` and `xml` type.
-3. Save, then upload one file of each kind the studio uses (a PDF, a PNG, a
-   DWG, an XLSX, a logo) from the app. If a DWG is refused, note the type the
-   browser sent (devtools, the upload request) and add it.
+3. Save, then repeat step 1 on all three Documents surfaces. If a file with no
+   type (empty Content-Type) is now refused, either remove the allow-list again
+   or accept that such files cannot be uploaded; do not leave it half-working.
 
 Signed links a paid client opens live 300 seconds, so after a link is replaced
 or revoked a document URL minted just before still works for up to five
@@ -322,7 +343,7 @@ per org, so two overlapping ticks cannot both do the work.
 | `followup` | every tick | `followup`: proposal id and ISO week | the quotation's sender |
 | `digest` | 07:00 Cairo | `digest`: cadence and day or ISO week | owners and admins |
 | `stage` | 07:00 Cairo | `stage`: Cairo day | owners and admins |
-| `delivery` (Round C) | 07:00 Cairo, while follow-ups are on | `delivery`: Cairo day; `delivery-followup`: `<delivery id>:<ISO week>` | owners and admins, about deliveries waiting on the client for the follow-up threshold (at most 10 per org per day; 200 in-flight deliveries read) |
+| `delivery` (Round C) | 07:00 Cairo, while follow-ups are on | `delivery`: Cairo day; `delivery-followup`: `<delivery id>:<ISO week>` | owners and admins, about deliveries waiting on the client for the follow-up threshold (at most 10 per org per day; every in-flight delivery read, newest first, up to 1,000) |
 | `handover` (Round C) | every tick | none: closing is idempotent through the state gate | nobody: it closes design-only deliveries whose handover the client confirmed at least 2 minutes ago (at most 50 per org per tick). An org with nothing to close costs one read inside its RLS transaction; a workspace whose design flow is off is skipped |
 
 No core ever messages a client (owner decision, Oct 9): the `delivery` core

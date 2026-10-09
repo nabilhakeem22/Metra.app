@@ -1,4 +1,5 @@
 import { loggableFailure } from '@/lib/actions/loggable-failure';
+import type { EmailDispatchResult } from '@/lib/email/dispatch';
 import { settleWithConcurrency } from './concurrency';
 import type { EmailBreaker } from './email-breaker';
 import type { AutomationResult, RecipientEmailLookup } from './types';
@@ -25,29 +26,30 @@ export const OWNER_EMAIL_CONCURRENCY = 2;
 export async function emailRecipient(
   lookupRecipientEmail: RecipientEmailLookup,
   userId: string,
-  send: (to: string) => Promise<{ sent: boolean }>,
+  send: (to: string) => Promise<EmailDispatchResult>,
   breaker?: EmailBreaker,
 ): Promise<EmailOutcome> {
   if (breaker?.open) return 'failed';
-  const outcome = await lookupAndSend(lookupRecipientEmail, userId, send);
-  breaker?.record(outcome);
+  const { outcome, transient } = await lookupAndSend(lookupRecipientEmail, userId, send);
+  breaker?.record(outcome, transient);
   return outcome;
 }
 
+/** The outcome, and whether a failure was transient (a lookup that failed or timed out, a send that did). */
 async function lookupAndSend(
   lookupRecipientEmail: RecipientEmailLookup,
   userId: string,
-  send: (to: string) => Promise<{ sent: boolean }>,
-): Promise<EmailOutcome> {
+  send: (to: string) => Promise<EmailDispatchResult>,
+): Promise<{ outcome: EmailOutcome; transient: boolean }> {
   const recipient = await lookupRecipientEmail(userId);
-  if (recipient.status === 'no-address') return 'no-address';
-  if (recipient.status === 'failed') return 'failed';
+  if (recipient.status === 'no-address') return { outcome: 'no-address', transient: false };
+  if (recipient.status === 'failed') return { outcome: 'failed', transient: true };
   try {
-    const { sent } = await send(recipient.email);
-    return sent ? 'sent' : 'failed';
+    const result = await send(recipient.email);
+    return result.sent ? { outcome: 'sent', transient: false } : { outcome: 'failed', transient: result.transient ?? true };
   } catch (err) {
     console.error('automation email send threw:', loggableFailure(err));
-    return 'failed';
+    return { outcome: 'failed', transient: true };
   }
 }
 
@@ -64,7 +66,7 @@ export function countEmailOutcome(result: AutomationResult, outcome: EmailOutcom
 export async function emailEachRecipient(
   deps: { lookupRecipientEmail: RecipientEmailLookup; emailBreaker: EmailBreaker },
   userIds: readonly string[],
-  send: (to: string) => Promise<{ sent: boolean }>,
+  send: (to: string) => Promise<EmailDispatchResult>,
   result: AutomationResult,
 ): Promise<void> {
   const settled = await settleWithConcurrency(userIds, OWNER_EMAIL_CONCURRENCY, (userId) =>

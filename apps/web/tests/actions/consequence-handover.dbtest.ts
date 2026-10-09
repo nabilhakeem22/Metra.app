@@ -20,7 +20,7 @@ afterAll(async () => {
 });
 
 describe('the staff path closes inline (AC 11)', () => {
-  it("a site engineer recording the client's confirmation closes the delivery, by no one, for a cause", async () => {
+  it("a project manager recording the client's confirmation closes the delivery, by no one, for a cause", async () => {
     const org = await seedBoqOrg(orgIds);
     const engagementId = await engagementAtBoq(org);
     await recordArtifactCore(org.ctx, { engagementId, kind: 'boq' });
@@ -28,7 +28,7 @@ describe('the staff path closes inline (AC 11)', () => {
     await recordPaymentCore(org.ctx, { engagementId, kind: 'balance', amount: '30000' });
     expect((await executeTransition(org.ctx, { engagementId, trigger: 'chooseDesignOnly' })).ok).toBe(true);
 
-    const recorded = await recordHandoffAndCloseCore(org.siteCtx, { engagementId, note: 'Received by hand' });
+    const recorded = await recordHandoffAndCloseCore(org.pmCtx, { engagementId, note: 'Received by hand' });
     expect(recorded).toMatchObject({ ok: true, closed: true });
     const acks = await raw.query(
       `select id from public.engagement_events where engagement_id = '${engagementId}' and kind = 'handoff_acknowledgement'`,
@@ -41,13 +41,13 @@ describe('the staff path closes inline (AC 11)', () => {
         order by created_at desc limit 1`,
     );
     // The audit names who recorded the confirmation (F3); the ledger row names no one.
-    expect(audit.after).toEqual({ state: 'closed_design_only', cause: 'handoverAcknowledged', recordedBy: org.siteCtx.userId });
+    expect(audit.after).toEqual({ state: 'closed_design_only', cause: 'handoverAcknowledged', recordedBy: org.pmCtx.userId });
   });
 
   it('recorded in any other state: refused as today, nothing closes', async () => {
     const org = await seedBoqOrg(orgIds);
     const engagementId = await rawEngagement(org, 'boq');
-    const recorded = await recordHandoffAndCloseCore(org.siteCtx, { engagementId });
+    const recorded = await recordHandoffAndCloseCore(org.pmCtx, { engagementId });
     expect(recorded).toEqual({ ok: false, error: 'handoff_not_open' });
     expect(await stateOf(engagementId)).toBe('boq');
   });

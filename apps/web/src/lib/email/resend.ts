@@ -2,7 +2,7 @@ import 'server-only';
 // The transactional senders: each builds its template and hands it to the ONE
 // deadlined dispatch (./dispatch.ts), which reads the Resend secrets at request
 // time and never throws.
-import { dispatchEmail } from './dispatch';
+import { dispatchEmail, type EmailDispatchResult } from './dispatch';
 import {
   digestEmailTemplate,
   followupReminderEmailTemplate,
@@ -27,7 +27,7 @@ export interface SendInviteEmailInput {
  */
 export function sendInviteEmail(
   input: SendInviteEmailInput,
-): Promise<{ sent: boolean }> {
+): Promise<EmailDispatchResult> {
   return dispatchEmail(
     { to: input.to, ...inviteEmailTemplate(input) },
     'sendInviteEmail',
@@ -52,7 +52,7 @@ export interface SendProposalEmailInput {
  */
 export function sendProposalEmail(
   input: SendProposalEmailInput,
-): Promise<{ sent: boolean }> {
+): Promise<EmailDispatchResult> {
   return dispatchEmail(
     { to: input.to, ...proposalSentEmailTemplate(input) },
     'sendProposalEmail',
@@ -64,7 +64,7 @@ function sendAutomationEmail(
   to: string,
   content: EmailContent,
   label: string,
-): Promise<{ sent: boolean }> {
+): Promise<EmailDispatchResult> {
   return dispatchEmail({ to, ...content }, label);
 }
 
@@ -74,7 +74,7 @@ export function sendFollowupReminderEmail(input: {
   days: number;
   reviewUrl: string;
   locale: string;
-}): Promise<{ sent: boolean }> {
+}): Promise<EmailDispatchResult> {
   return sendAutomationEmail(
     input.to,
     followupReminderEmailTemplate(input),
@@ -93,7 +93,7 @@ export function sendDigestEmail(input: {
   deliveriesStalled: number;
   dashboardUrl: string;
   locale: string;
-}): Promise<{ sent: boolean }> {
+}): Promise<EmailDispatchResult> {
   return sendAutomationEmail(
     input.to,
     digestEmailTemplate(input),
@@ -107,7 +107,7 @@ export function sendStageReminderEmail(input: {
   upcomingCount: number;
   projectsUrl: string;
   locale: string;
-}): Promise<{ sent: boolean }> {
+}): Promise<EmailDispatchResult> {
   return sendAutomationEmail(
     input.to,
     stageReminderEmailTemplate(input),

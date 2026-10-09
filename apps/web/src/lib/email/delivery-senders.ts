@@ -3,7 +3,7 @@ import 'server-only';
 // B10), the client being reminded of their link (B11), and the studio's morning
 // follow-up on deliveries waiting on the client (Round C). Each builds its
 // template and hands it to the ONE deadlined dispatch; best-effort, never throws.
-import { dispatchEmail } from './dispatch';
+import { dispatchEmail, type EmailDispatchResult } from './dispatch';
 import { clientActEmailTemplate, type ClientActEmailInput } from './templates/client-act';
 import {
   deliveryFollowupEmailTemplate,
@@ -17,14 +17,14 @@ import {
 /** To ONE studio member: the client acted on a delivery. */
 export function sendClientActEmail(
   input: ClientActEmailInput & { to: string },
-): Promise<{ sent: boolean }> {
+): Promise<EmailDispatchResult> {
   return dispatchEmail({ to: input.to, ...clientActEmailTemplate(input) }, 'sendClientActEmail');
 }
 
 /** To the CLIENT: a reminder carrying the link they already hold. */
 export function sendDeliveryReminderEmail(
   input: DeliveryReminderEmailInput & { to: string },
-): Promise<{ sent: boolean }> {
+): Promise<EmailDispatchResult> {
   return dispatchEmail(
     { to: input.to, ...deliveryReminderEmailTemplate(input) },
     'sendDeliveryReminderEmail',
@@ -34,7 +34,7 @@ export function sendDeliveryReminderEmail(
 /** To ONE owner or admin: the deliveries that have waited on the client too long. */
 export function sendDeliveryFollowupEmail(
   input: DeliveryFollowupEmailInput & { to: string },
-): Promise<{ sent: boolean }> {
+): Promise<EmailDispatchResult> {
   return dispatchEmail(
     { to: input.to, ...deliveryFollowupEmailTemplate(input) },
     'sendDeliveryFollowupEmail',

@@ -35,7 +35,7 @@ describe('two members record the confirmation at the same moment (F4)', () => {
     const org = await seedBoqOrg(orgIds);
     const engagementId = await atHandoff(org);
     const results = await Promise.all([
-      recordHandoffAndCloseCore(org.siteCtx, { engagementId }),
+      recordHandoffAndCloseCore(org.ctx, { engagementId }),
       recordHandoffAndCloseCore(org.pmCtx, { engagementId }),
     ]);
     expect(results.map((result) => ({ ok: result.ok, closed: result.closed }))).toEqual([
@@ -51,20 +51,37 @@ describe('two members record the confirmation at the same moment (F4)', () => {
   });
 });
 
+describe('who may record the confirmation (owner decision, Oct 9)', () => {
+  it('a site engineer or viewer is refused before anything is written; the delivery stays open; a PM closes it', async () => {
+    const org = await seedBoqOrg(orgIds);
+    const engagementId = await atHandoff(org);
+    for (const ctx of [org.siteCtx, org.viewerCtx]) {
+      expect(await recordHandoffAndCloseCore(ctx, { engagementId, note: 'Received' })).toEqual({ ok: false, error: 'forbidden' });
+    }
+    const written = await raw.query(
+      `select id from public.engagement_events where engagement_id = '${engagementId}' and kind = 'handoff_acknowledgement'`,
+    );
+    expect(written).toEqual([]);
+    expect(await stateOf(engagementId)).toBe('design_only_handoff');
+    expect(await recordHandoffAndCloseCore(org.pmCtx, { engagementId })).toMatchObject({ ok: true, closed: true });
+    expect(await stateOf(engagementId)).toBe('closed_design_only');
+  });
+});
+
 describe('the hourly closer names who confirmed (F3, S1)', () => {
   it("the client's own confirmation reads 'client'; one the studio recorded names the recorder", async () => {
     const org = await seedBoqOrg(orgIds);
     const byClient = await engagementOnOwnProject(org, 'design_only_handoff');
     const byStaff = await engagementOnOwnProject(org, 'design_only_handoff');
     await clientAck(org, byClient, 5);
-    await staffAck(org, byStaff, org.siteCtx.userId, 5);
+    await staffAck(org, byStaff, org.pmCtx.userId, 5);
     expect((await runHandoverCloser(await closerDeps(org.orgId))).effects).toBe(2);
     expect((await closeAudit(byClient)).after).toEqual({
       state: 'closed_design_only',
       cause: 'handoverAcknowledged',
       recordedBy: 'client',
     });
-    expect((await closeAudit(byStaff)).after.recordedBy).toBe(org.siteCtx.userId);
+    expect((await closeAudit(byStaff)).after.recordedBy).toBe(org.pmCtx.userId);
     expect(await closeRows(byStaff)).toEqual([{ actor_user_id: null }]);
   });
 });

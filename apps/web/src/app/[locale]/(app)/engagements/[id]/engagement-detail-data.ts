@@ -29,6 +29,7 @@ import {
   getLastUsedFeeSchedule,
   type EngagementHeader,
 } from '@/lib/engagements/queries';
+import { mayRecordHandoverConfirmation } from '@/lib/engagements/handover-recorders';
 import { resolveWhoseMove } from '@/lib/engagements/whose-move';
 import { can } from '@/lib/permissions/can';
 import { loadBoqStep } from './boq-step-data';
@@ -122,10 +123,10 @@ export function engagementCapabilities(
     // in front of the end client is not.
     issueRom: can(role, 'engagements_issue', 'approve'),
     recordRomAck: can(role, 'engagements_design', 'create'),
-    // The staff handoff-ack stand-in only makes sense while the design-only
-    // package awaits its receipt — never before, never after closing.
-    recordHandoffAck:
-      state === 'design_only_handoff' && can(role, 'engagements_design', 'create'),
+    // Only while the design-only package awaits its receipt. It closes the delivery,
+    // so owner/admin/PM only (owner decision, Oct 9); everyone else is told who does.
+    recordHandoffAck: state === 'design_only_handoff' && mayRecordHandoverConfirmation(role),
+    handoffAckRecordedByOthers: state === 'design_only_handoff' && !mayRecordHandoverConfirmation(role),
     // Retracting a ledger row is OWNER/ADMIN only, deliberately narrower than the
     // create gate on the acknowledgements themselves: recording what a client
     // said is routine studio work, unsaying it afterwards is not.

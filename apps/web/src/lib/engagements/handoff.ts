@@ -16,6 +16,7 @@ import {
   optionalText,
 } from '@/lib/validation/text';
 import { isValidOccurredOn, liveEvents } from './event-provenance';
+import { mayRecordHandoverConfirmation } from './handover-recorders';
 import { isTerminal } from './states';
 
 export interface RecordHandoffAcknowledgementInput {
@@ -41,6 +42,10 @@ export interface RecordHandoffAcknowledgementInput {
  * row with the internal actor and the trimmed optional note. Returns the new
  * event id. Never throws to the client — coded ActionResult only.
  *
+ * OWNER, ADMIN OR PROJECT MANAGER ONLY (owner decision, Oct 9): recording it
+ * closes the delivery irreversibly, so any other role is refused `forbidden`
+ * before anything is read (handover-recorders.ts).
+ *
  * ONE CONFIRMATION, HOWEVER MANY RECORD IT (Round C): the delivery row is locked
  * FOR UPDATE before the check, so two members recording at the same moment
  * serialise, and a live acknowledgement already on file (recorded by a colleague
@@ -50,6 +55,7 @@ export async function recordHandoffAcknowledgementCore(
   ctx: OrgContext,
   input: RecordHandoffAcknowledgementInput,
 ): Promise<ActionResult & { data?: string }> {
+  if (!mayRecordHandoverConfirmation(ctx.role)) return err('forbidden');
   const note = optionalText(input.note, MAX_NOTE_CHARS);
   const evidence = optionalText(input.evidence, MAX_NOTE_CHARS);
   // Same provenance rule as the ROM acknowledgement, validated before the

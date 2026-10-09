@@ -36,6 +36,7 @@ export function TimelineTab({
   clientActivity,
   canRecordRomAck,
   canRecordHandoffAck,
+  handoffAckRecordedByOthers,
   canRetract,
   romSet,
   romIssued,
@@ -48,6 +49,8 @@ export function TimelineTab({
   clientActivity: EngagementClientActivityRecord[];
   canRecordRomAck: boolean;
   canRecordHandoffAck: boolean;
+  /** At design_only_handoff, for a role that may not record it: say who does. */
+  handoffAckRecordedByOthers: boolean;
   /** Owner/admin only — retracting a ledger row is not routine studio work. */
   canRetract: boolean;
   /** A build-cost band exists. Without one there is nothing to acknowledge. */
@@ -59,6 +62,7 @@ export function TimelineTab({
 }) {
   const tp = useTranslations('engagements.panels');
   const tpa = useTranslations('engagements.panelActions');
+  const tha = useTranslations('engagements.handoffAck');
   const [panel, setPanel] = useState<OnBehalfPanel | null>(null);
 
   const availability = {
@@ -74,7 +78,13 @@ export function TimelineTab({
       <PanelHeader
         title={tp('timeline')}
         sub={tpa('timelineSub')}
-        reason={availability.romAckBlocked ? tpa(blockedReason) : undefined}
+        reason={
+          availability.romAckBlocked
+            ? tpa(blockedReason)
+            : handoffAckRecordedByOthers
+              ? tha('decidedBy')
+              : undefined
+        }
         actions={
           anyOnBehalf && (
             <OnBehalfActions
