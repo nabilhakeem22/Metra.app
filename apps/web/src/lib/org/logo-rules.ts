@@ -31,11 +31,22 @@ function mediaTypeOf(contentType: string | null | undefined): string | null {
   return typeof contentType === 'string' ? contentType.split(';')[0]!.trim().toLowerCase() || null : null;
 }
 
-/** Why this logo is refused, or null when it may be used. */
-export function logoRefusal({ originalName, contentType, size }: LogoFacts): LogoRefusal | null {
+/** The image type a logo file name promises (png, jpg, jpeg, webp), or null. */
+function logoTypeOfName(originalName: string | null | undefined): string | null {
   const dot = typeof originalName === 'string' ? originalName.lastIndexOf('.') : -1;
   const extension = dot < 0 ? '' : originalName!.slice(dot + 1).toLowerCase();
-  const expected = LOGO_TYPE_BY_EXTENSION[extension];
+  return LOGO_TYPE_BY_EXTENSION[extension] ?? null;
+}
+
+/** Whether a stored file's name is one a logo may have: what the studio's own
+ *  logo route serves (the client page's SDF applies the same list in SQL). */
+export function hasLogoImageName(originalName: string | null | undefined): boolean {
+  return logoTypeOfName(originalName) !== null;
+}
+
+/** Why this logo is refused, or null when it may be used. */
+export function logoRefusal({ originalName, contentType, size }: LogoFacts): LogoRefusal | null {
+  const expected = logoTypeOfName(originalName);
   if (!expected || mediaTypeOf(contentType) !== expected) return 'invalid';
   if (size === undefined || size === null) return null;
   if (!Number.isFinite(size) || size <= 0) return 'invalid';

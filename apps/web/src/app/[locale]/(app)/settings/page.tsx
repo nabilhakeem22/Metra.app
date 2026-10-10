@@ -31,7 +31,7 @@ export default async function SettingsPage() {
   const canManage = can(ctx.role, 'users_settings', 'update');
   // The document-category core gates on projects/update, matching the other
   // firm-vocabulary settings (project types, stage templates). Show the card to
-  // exactly the roles that can actually use it — a control nobody can operate is
+  // exactly the roles that can actually use it: a control nobody can operate is
   // worse than an absent one.
   const canManageVocabulary = can(ctx.role, 'projects', 'update');
 
@@ -48,6 +48,7 @@ export default async function SettingsPage() {
           hideMarginFromPm: org?.hideMarginFromPm ?? false,
           restrictFirmDashboard: org?.restrictFirmDashboard ?? false,
         }}
+        savedLogoId={org?.logoFileId ?? null}
       />
       {/* What the client's delivery page shows about the studio: read by every
           role, edited by owner/admin (the action and the database re-check). */}
@@ -56,7 +57,7 @@ export default async function SettingsPage() {
         details={clientPageDraftOf(org)}
         revision={clientPageRevision(org)}
       />
-      {/* The firm's document filing vocabulary — gated on the same capability as
+      {/* The firm's document filing vocabulary, gated on the same capability as
           the other firm-vocabulary settings (project types, stage templates). */}
       {canManageVocabulary && (
         <DocumentCategoriesCard

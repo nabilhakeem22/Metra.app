@@ -1,8 +1,7 @@
 'use client';
 
-import { Loader2, Upload } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import type { useTranslations } from 'next-intl';
-import type { ChangeEvent } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -14,17 +13,16 @@ import {
 import { FieldHint } from '@/components/ui/field-hint';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { SettingsLogoField } from './settings-logo-field';
 
-// The org profile card (logo · names · city · tax). All state and mutations
-// live in the parent (SettingsClient); this child is presentational, driven by
-// the passed values + callbacks.
+// The org profile card (logo · names · city · tax). The profile's state and
+// save live in the parent (SettingsClient); the logo is its own field
+// (SettingsLogoField), which uploads on pick and shows the saved logo.
 export function SettingsProfileCard({
   t,
   th,
-  logoPreview,
-  onLogo,
+  savedLogoId,
   disabled,
-  uploading,
   nameEn,
   setNameEn,
   nameAr,
@@ -39,10 +37,9 @@ export function SettingsProfileCard({
 }: {
   t: ReturnType<typeof useTranslations<'settings'>>;
   th: ReturnType<typeof useTranslations<'hints.org'>>;
-  logoPreview: string | null;
-  onLogo: (e: ChangeEvent<HTMLInputElement>) => void;
+  /** The saved logo's file id (also its cache key), or null when there is none. */
+  savedLogoId: string | null;
   disabled: boolean;
-  uploading: boolean;
   nameEn: string;
   setNameEn: (value: string) => void;
   nameAr: string;
@@ -62,35 +59,7 @@ export function SettingsProfileCard({
         <CardDescription>{t('profileSubtitle')}</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="flex items-center gap-3">
-          {logoPreview ? (
-            <img
-              src={logoPreview}
-              alt=""
-              className="size-12 rounded-item border object-cover"
-            />
-          ) : (
-            <div className="flex size-12 items-center justify-center rounded-item bg-muted text-muted-foreground">
-              <Upload className="size-5" aria-hidden />
-            </div>
-          )}
-          <input
-            id="logo"
-            type="file"
-            accept="image/*"
-            className="hidden"
-            onChange={onLogo}
-            disabled={disabled || uploading}
-          />
-          <Label
-            htmlFor="logo"
-            className="inline-flex h-9 cursor-pointer items-center rounded-pill border border-input px-3 text-body font-medium hover:bg-muted aria-disabled:pointer-events-none aria-disabled:opacity-50"
-            aria-disabled={disabled || uploading}
-          >
-            {uploading && <Loader2 className="me-2 size-4 animate-spin" aria-hidden />}
-            {t('changeLogo')}
-          </Label>
-        </div>
+        <SettingsLogoField savedLogoId={savedLogoId} disabled={disabled} />
 
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-2">

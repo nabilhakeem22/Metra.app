@@ -1,12 +1,11 @@
-import { createLogoUpload, setOrgLogo } from '@/lib/org/logo-actions';
+import { createLogoUpload, setOrgLogo } from './logo-actions';
 
 /**
- * Best-effort logo upload for the studio just created: sign, PUT the bytes,
- * attach. Answers false on any failure and never throws, because the studio
- * exists either way; the caller says so in a toast rather than failing the
- * onboarding.
+ * Uploads a new logo for the caller's studio: sign, PUT the bytes, attach.
+ * Answers whether the logo is now the studio's, and never throws: the caller
+ * (Settings, the onboarding) says so in a toast rather than failing its page.
  */
-export async function uploadOnboardingLogo(file: File): Promise<boolean> {
+export async function uploadOrgLogo(file: File): Promise<boolean> {
   try {
     const signed = await createLogoUpload({ contentType: file.type, originalName: file.name, size: file.size });
     // A refused signing (a demoted user, a type or size the rule refuses) answers an ActionResult.

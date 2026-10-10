@@ -8,9 +8,9 @@ import { toast } from '@/hooks/use-toast';
 import { useRouter } from '@/i18n/routing';
 import { resolveActionError } from '@/lib/actions/error-message';
 import { createOrg } from '@/lib/org/actions';
+import { uploadOrgLogo } from '@/lib/org/upload-org-logo';
 import { OnboardingProfileFields, type OnboardingProfileValues } from './onboarding-profile-fields';
 import { fieldsAtLimit, fieldsOverLimit } from './profile-field-limits';
-import { uploadOnboardingLogo } from './upload-onboarding-logo';
 
 const EMPTY: OnboardingProfileValues = { nameEn: '', nameAr: '', city: '' };
 
@@ -67,7 +67,7 @@ export function OnboardingWizard() {
           setError(resolveActionError(result.error, te));
           return;
         }
-        if (logo && !(await uploadOnboardingLogo(logo))) {
+        if (logo && !(await uploadOrgLogo(logo))) {
           toast({ title: t('logoUploadFailed'), variant: 'destructive' });
         }
         toast({ title: t('createdTitle') });

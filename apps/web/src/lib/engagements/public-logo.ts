@@ -10,11 +10,7 @@ import 'server-only';
 import { sql } from 'drizzle-orm';
 import { normalizeRawToken, readSdfJson } from '@/lib/share/sdf-call';
 import { hashShareToken } from '@/lib/share/token';
-
-export interface DeliveryLogoTarget {
-  bucket: string;
-  objectKey: string;
-}
+import type { LogoLocation } from '@/lib/storage/logo-rendition-response';
 
 /** The raw jsonb app_delivery_logo_by_token returns. Untrusted. */
 interface LogoSnapshot {
@@ -27,7 +23,7 @@ interface LogoSnapshot {
  * same null: an unknown, revoked or expired link, a studio with no logo, a logo
  * that is not an image, a malformed answer, a database throw. Never throws.
  */
-export async function getDeliveryLogoByToken(rawToken: string): Promise<DeliveryLogoTarget | null> {
+export async function getDeliveryLogoByToken(rawToken: string): Promise<LogoLocation | null> {
   const token = normalizeRawToken(rawToken);
   if (!token) return null;
   try {
