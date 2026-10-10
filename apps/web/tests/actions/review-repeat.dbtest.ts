@@ -134,7 +134,8 @@ describe('nothing live on file and the step moved on (AC 56)', () => {
       `select id from public.engagement_events where engagement_id = '${d.engagementId}' and kind = 'handoff_acknowledgement'`,
     );
     await retract(d, ack!.id);
-    // F12: still at the handover, so the step did not move on; it changed.
+    // Back at the handover (C11's first tap closes it): F12 reads `changed`.
+    await forceState(d.engagementId, 'design_only_handoff');
     expect(await acknowledgeHandoverAndNotify(d.token, {})).toEqual({ kind: 'changed' });
     await forceState(d.engagementId, 'abandoned');
     expect(await acknowledgeHandoverAndNotify(d.token, {})).toEqual({ kind: 'moved_on' });
