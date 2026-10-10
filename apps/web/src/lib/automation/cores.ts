@@ -3,6 +3,7 @@ import { runDeliveryFollowups } from './delivery-followups';
 import { runExpireProposals } from './expire-proposals';
 import { runFollowupReminders } from './followup-reminders';
 import { runHandoverCloser } from './handover-closer';
+import { runLostNotificationSweep } from './lost-notifications';
 import { runPortfolioDigest } from './portfolio-digest';
 import { runStageReminders } from './stage-reminders';
 import type { AutomationDeps, AutomationKey, AutomationResult } from './types';
@@ -22,4 +23,5 @@ export const CORES: ReadonlyArray<{
   { key: 'stage', run: runStageReminders },
   { key: 'delivery', run: runDeliveryFollowups },
   { key: 'handover', run: runHandoverCloser },
+  { key: 'notify', run: runLostNotificationSweep },
 ];

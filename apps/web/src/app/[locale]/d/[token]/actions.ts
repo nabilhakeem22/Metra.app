@@ -3,6 +3,7 @@
 import { clientActOfVerb, paymentClaimedAct } from '@/lib/engagements/client-acts/acts';
 import { clientNote } from '@/lib/engagements/client-note';
 import { chooseConceptAndNotify, respondToConceptAndNotify } from '@/lib/engagements/client-acts/concept-acts';
+import { closingConfirmedHandover } from '@/lib/engagements/client-acts/handover-close';
 import { withStudioNotified } from '@/lib/engagements/client-acts/notify';
 import { isConceptVerb, type ConceptChoiceOutcome } from '@/lib/engagements/concept-choice-outcome';
 import {
@@ -25,13 +26,12 @@ export type DeliveryActResult = DeliveryActionResult & { studioNotified?: boolea
 export type DeliveryCommentActResult = DeliveryCommentResult & { studioNotified?: boolean };
 
 /**
- * Public (no-session) client delivery-portal action. Captures the client IP +
- * user agent (./request-provenance.ts) for the append-only engagement_events audit
- * trail (mirrors the proposal p/[token] action). The raw token flows straight to
- * recordDeliveryActionByToken, which hashes it — it is NEVER logged here. The
- * signal is advisory: it moves no state and adds no blocking guard. A first `ok`
- * then notifies the studio (client-acts/notify.ts); the act is derived from the
- * verb the SDF just accepted, never from anything else the request carries.
+ * Public (no-session) client delivery-portal action: the capped client IP + user
+ * agent (./request-provenance.ts) go to the append-only audit trail; the raw token
+ * is hashed downstream and NEVER logged here. A first `ok` notifies the studio
+ * (client-acts/notify.ts), the act derived from the verb the SDF accepted. A
+ * handover confirmation (`ok`, or `already` to repair a failed close) then closes
+ * the design-only delivery in this request (client-acts/handover-close.ts).
  */
 export async function recordDeliveryAction(
   token: string,
@@ -44,7 +44,7 @@ export async function recordDeliveryAction(
     note: clientNote(note),
     ...(await requestProvenance()),
   });
-  return withStudioNotified(token, result, clientActOfVerb(action));
+  return closingConfirmedHandover(token, action, await withStudioNotified(token, result, clientActOfVerb(action)));
 }
 
 /**

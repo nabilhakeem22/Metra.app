@@ -3,9 +3,11 @@ import { can } from '@/lib/permissions/can';
 import { MEMBER_ROLES } from '@/lib/permissions/member-roles';
 import {
   CLIENT_ACT_BODY_KEY,
+  clientActOfBodyKey,
   clientActOfVerb,
   clientActParams,
   paymentClaimedAct,
+  recipientRolesByBodyKey,
   recipientRolesFor,
   type ClientActKind,
 } from './acts';
@@ -109,5 +111,43 @@ describe('clientActParams', () => {
       milestoneKind: 'gate_b',
     });
     expect(clientActParams({ kind: 'design_approved' })).toEqual({});
+  });
+});
+
+describe('clientActOfBodyKey (the hourly sweep reads keys back from SQL)', () => {
+  it('inverts CLIENT_ACT_BODY_KEY for every act but the payment claim', () => {
+    for (const kind of Object.keys(CLIENT_ACT_BODY_KEY) as ClientActKind[]) {
+      if (kind === 'payment_claimed') continue;
+      expect(clientActOfBodyKey(CLIENT_ACT_BODY_KEY[kind], null)).toEqual({ kind });
+    }
+  });
+
+  it('a payment claim round-trips with each claimable milestone', () => {
+    for (const milestoneKind of ['deposit', 'gate_a', 'gate_b', 'balance'] as const) {
+      const act = clientActOfBodyKey('client_payment_claimed', milestoneKind);
+      expect(act).toEqual({ kind: 'payment_claimed', milestoneKind });
+      expect(CLIENT_ACT_BODY_KEY[act!.kind]).toBe('client_payment_claimed');
+    }
+  });
+
+  it.each([
+    ['client_payment_claimed', null],
+    ['client_payment_claimed', 'retention'],
+    ['client_design_approved', 'deposit'],
+    ['client_unknown', null],
+    ['constructor', null],
+    ['', null],
+  ] as const)('answers null for %j with milestone %j', (bodyKey, milestoneKind) => {
+    expect(clientActOfBodyKey(bodyKey, milestoneKind)).toBeNull();
+  });
+});
+
+describe('recipientRolesByBodyKey', () => {
+  it('maps all nine keys to the roles a first tap would notify', () => {
+    const map = recipientRolesByBodyKey();
+    expect(Object.keys(map).sort()).toEqual([...SQL_ALLOWED_KEYS].sort());
+    expect(map.client_payment_claimed).toEqual(recipientRolesFor({ kind: 'payment_claimed', milestoneKind: 'deposit' }));
+    expect(map.client_commented).toEqual(recipientRolesFor({ kind: 'commented' }));
+    for (const roles of Object.values(map)) expect(roles).not.toContain('client');
   });
 });

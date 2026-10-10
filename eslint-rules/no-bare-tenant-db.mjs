@@ -311,6 +311,10 @@ const SDF_CALLER_ALLOWLIST = [
   // Round B (0057): on a repeat (`already`), was that act's notification ever
   // written? (app_delivery_act_notified_by_token, a boolean, same token).
   'apps/web/src/lib/engagements/client-acts/already-notified.ts',
+  // Round C (0058, C11): after the client confirms the handover, which delivery
+  // (and org) does it close? (app_delivery_close_target_by_token: two ids, same
+  // token, no money column.) The close itself runs through the executor.
+  'apps/web/src/lib/engagements/client-acts/handover-close.ts',
   // The module itself (it DEFINES the runners) and its own unit test.
   'apps/web/src/lib/share/sdf-call.ts',
   'apps/web/src/lib/share/sdf-call.test.ts',

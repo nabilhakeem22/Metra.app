@@ -61,6 +61,9 @@ vi.mock('./delivery-followups', () => ({
 vi.mock('./handover-closer', () => ({
   runHandoverCloser: (deps: AutomationDeps) => state.core('handover', deps),
 }));
+vi.mock('./lost-notifications', () => ({
+  runLostNotificationSweep: (deps: AutomationDeps) => state.core('notify', deps),
+}));
 vi.mock('./recipients', () => ({
   createRecipientEmailLookup: () => vi.fn(async () => ({ status: 'no-address' })),
 }));
@@ -69,7 +72,7 @@ import { ORG_CONCURRENCY, runDueAutomations } from './runner';
 
 const NOW = new Date('2026-10-05T21:00:00Z');
 /** The runner's core order (./cores.ts). */
-const CORE_ORDER: AutomationKey[] = ['expire', 'followup', 'digest', 'stage', 'delivery', 'handover'];
+const CORE_ORDER: AutomationKey[] = ['expire', 'followup', 'digest', 'stage', 'delivery', 'handover', 'notify'];
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 function actorFor(orgId: string): OrgContext {
@@ -168,6 +171,19 @@ describe('runDueAutomations', () => {
     );
     expect(summary.results.some((r) => r.orgId === 'org-c')).toBe(false);
     expect(summary.results.filter((r) => r.orgId === 'org-d')).toHaveLength(CORE_ORDER.length);
+  });
+
+  it('runs the lost-notification sweep last, even after the handover closer throws', async () => {
+    useOrgs(['org-a']);
+    state.core = async (key) => {
+      if (key === 'handover') throw new Error('close failed');
+      return emptyResult(key);
+    };
+    const summary = await runDueAutomations(NOW);
+    expect(summary.results.map((r) => [r.automation, r.failed])).toEqual(
+      CORE_ORDER.map((key) => [key, key === 'handover']),
+    );
+    expect(summary.results.at(-1)).toMatchObject({ automation: 'notify', ran: true, failed: false });
   });
 
   it('skips an org with no settings row or no owner/admin, without running a core', async () => {

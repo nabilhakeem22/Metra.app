@@ -85,3 +85,30 @@ export function recipientRolesFor(act: ClientAct): MemberRole[] {
 export function clientActParams(act: ClientAct): Record<string, string> {
   return act.milestoneKind ? { milestoneKind: act.milestoneKind } : {};
 }
+
+/**
+ * The act a notification body key reports: the inverse of CLIENT_ACT_BODY_KEY
+ * (the hourly sweep reads keys back from SQL). A payment claim needs its
+ * claimable milestone; every other act takes none. Anything else is null.
+ */
+export function clientActOfBodyKey(bodyKey: string, milestoneKind: string | null): ClientAct | null {
+  const kind = (Object.keys(CLIENT_ACT_BODY_KEY) as ClientActKind[]).find(
+    (candidate) => CLIENT_ACT_BODY_KEY[candidate] === bodyKey,
+  );
+  if (!kind) return null;
+  if (kind === 'payment_claimed') return milestoneKind === null ? null : paymentClaimedAct(milestoneKind);
+  return milestoneKind === null ? { kind } : null;
+}
+
+/**
+ * Who hears each act, keyed by its body key: the role map the hourly sweep
+ * hands app_notify_lost_client_acts, from the same matrix rule as a first tap.
+ */
+export function recipientRolesByBodyKey(): Record<string, MemberRole[]> {
+  return Object.fromEntries(
+    (Object.keys(CLIENT_ACT_BODY_KEY) as ClientActKind[]).map((kind) => [
+      CLIENT_ACT_BODY_KEY[kind],
+      recipientRolesFor({ kind }),
+    ]),
+  );
+}

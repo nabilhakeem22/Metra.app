@@ -9,7 +9,7 @@
 import { sql } from 'drizzle-orm';
 import type { OrgContext } from '@/lib/db/context';
 import { withOrgContext } from '@/lib/db/context';
-import { CLIENT_ACT_BODY_KEY, recipientRolesFor, type ClientActKind } from '@/lib/engagements/client-acts/acts';
+import { recipientRolesByBodyKey } from '@/lib/engagements/client-acts/acts';
 import { raw } from './fixture';
 import type { RoundBDelivery } from './round-b-fixture';
 
@@ -92,16 +92,12 @@ export async function plantClaim(d: RoundBDelivery, milestone: string, at: strin
 
 /**
  * The role map the hourly runner passes: every act's body key -> the member
- * roles the permission matrix says hear about it. Built from the app's own
- * map, never typed here, so the suite exercises the real contract.
+ * roles the permission matrix says hear about it. The app's own map (the one
+ * lib/automation/lost-notifications.ts sends), so the suite exercises the real
+ * contract.
  */
 export function sweepRoles(): Record<string, string[]> {
-  return Object.fromEntries(
-    (Object.keys(CLIENT_ACT_BODY_KEY) as ClientActKind[]).map((kind) => [
-      CLIENT_ACT_BODY_KEY[kind],
-      recipientRolesFor({ kind }),
-    ]),
-  );
+  return recipientRolesByBodyKey();
 }
 
 export interface SweepEntry {

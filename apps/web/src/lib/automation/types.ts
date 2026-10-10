@@ -4,7 +4,14 @@ import type { EmailBreaker } from './email-breaker';
 import type { OrgTickMemo } from './org-tick-memo';
 
 /** One of the automation cores (./cores.ts). */
-export type AutomationKey = 'expire' | 'followup' | 'digest' | 'stage' | 'delivery' | 'handover';
+export type AutomationKey =
+  | 'expire'
+  | 'followup'
+  | 'digest'
+  | 'stage'
+  | 'delivery'
+  | 'handover'
+  | 'notify';
 
 /**
  * Where an internal user's email address came from on this tick. `failed` is a

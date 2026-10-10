@@ -344,11 +344,16 @@ per org, so two overlapping ticks cannot both do the work.
 | `digest` | 07:00 Cairo | `digest`: cadence and day or ISO week | owners and admins |
 | `stage` | 07:00 Cairo | `stage`: Cairo day | owners and admins |
 | `delivery` (Round C) | 07:00 Cairo, while follow-ups are on | `delivery`: Cairo day; `delivery-followup`: `<delivery id>:<ISO week>` | owners and admins, about deliveries waiting on the client for the follow-up threshold (at most 10 per org per day; every in-flight delivery read, newest first, up to 1,000) |
-| `handover` (Round C) | every tick | none: closing is idempotent through the state gate | nobody: it closes design-only deliveries whose handover the client confirmed at least 2 minutes ago (at most 50 per org per tick). An org with nothing to close costs one read inside its RLS transaction; a workspace whose design flow is off is skipped |
+| `handover` (Round C) | every tick | none: closing is idempotent through the state gate | nobody: it closes design-only deliveries whose handover the client confirmed at least 2 minutes ago (at most 50 per org per tick). The client's own tap already closes inline on their page (C11); this is the safety net for a close that failed. An org with nothing to close costs one read inside its RLS transaction; a workspace whose design flow is off is skipped |
+| `notify` (Round C) | every tick | `notify`: Cairo hour (`YYYY-MM-DDTHH`) | the studio members a first tap would have notified (the act's roles in the permission matrix), never the client: it repairs a "client responded" notification lost on the client's first tap, for acts 10 minutes to 48 hours old (`app_notify_lost_client_acts`, at most 50 notifier calls per org per hour, run as the org's owner/admin system actor inside its RLS transaction), then emails each member who got a NEW notification, through the tick's email breaker |
 
 No core ever messages a client (owner decision, Oct 9): the `delivery` core
 reminds the studio, and the studio sends the client the existing WhatsApp or
 email reminder from the delivery page.
+
+The `notify` core adds one transaction per org per tick (its hour's claim and
+one function call that reads the org's recently active deliveries). It is NOT in
+the measurement below; read its cost off the live tick line (plan AC 65).
 
 **Tick budget for Round C** (plan A14: `durationMs` grows by at most **1.5 s** off
 07:00 and **3 s** at 07:00 for today's org count). Measured on a local Postgres
