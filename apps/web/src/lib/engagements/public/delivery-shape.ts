@@ -3,21 +3,22 @@
 // jsonb from a SECURITY DEFINER function, so a schema change or an older SDF
 // arrives as a missing key, not a type error. Every dereference is null-safe and
 // every list passes a row guard: a malformed field costs that field, not the page.
-import { KIND_CATEGORY } from '../portal-documents';
-import { parseDocumentAccess } from '../document-access';
+//
+// RAW KEYS STOP HERE. The snapshot carries machine words (a state, an event
+// kind on the timeline, the logo's file id); each is translated into a client
+// word or a boolean below, so none of them reaches the browser payload.
 import { stateMilestone } from '../journey-map';
-import { CLIENT_ACTION_VERBS, deriveHero } from '../portal-hero';
+import { deriveHero } from '../portal-hero';
 import { PORTAL_STAGE_KEY } from '../portal-stage';
 import type { DesignState } from '../states';
-import {
-  STATE_SET,
-  isRenderableClaim,
-  isRenderableDocument,
-  isRenderableMilestone,
-  type DeliverySnapshot,
-} from './row-guards';
 import { parseConceptChoice, parseConceptDecision, parseConceptOptions } from './concept-rows';
-import type { PublicDelivery, PublicDeliveryMilestone } from './types';
+import { parseDesignDecision } from './review-rows';
+import { STATE_SET, type DeliverySnapshot } from './row-guards';
+import { shapeClientActions, shapeDocuments, shapePaymentClaim, shapeSchedule } from './shape-lists';
+import { calendarDay, isoInstant, newestInstant } from './snapshot-values';
+import { parseFirm, parsePaymentDetails } from './studio-rows';
+import { parseTimeline } from './timeline-rows';
+import type { PublicDelivery } from './types';
 
 /** The state, only if it is one the portal has labels for. Never a raw key. */
 function renderableState(snapshot: DeliverySnapshot): DesignState | null {
@@ -43,70 +44,37 @@ function deliveryIdentity(
   };
 }
 
-/** Firm and client names. A missing party degrades to null fields, not a crash. */
-function shapeParties(snapshot: DeliverySnapshot): Pick<PublicDelivery, 'firm' | 'client'> {
-  const firm = snapshot.firm ?? ({} as NonNullable<DeliverySnapshot['firm']>);
+/** The end client's names. A missing party degrades to null fields, not a crash. */
+function shapeClient(snapshot: DeliverySnapshot): PublicDelivery['client'] {
   const client = snapshot.client ?? ({} as NonNullable<DeliverySnapshot['client']>);
+  return { nameAr: client.name_ar ?? null, nameEn: client.name_en ?? null };
+}
+
+/** The money side: the schedule, what may be claimed, and where to pay while something may. */
+function shapePayments(
+  snapshot: DeliverySnapshot,
+): Pick<PublicDelivery, 'paymentSchedule' | 'paymentClaim' | 'paymentDetails'> {
+  const paymentClaim = shapePaymentClaim(snapshot);
   return {
-    firm: {
-      nameAr: firm.name_ar ?? null,
-      nameEn: firm.name_en ?? null,
-      logoFileId: firm.logo_file_id ?? null,
-    },
-    client: { nameAr: client.name_ar ?? null, nameEn: client.name_en ?? null },
+    paymentSchedule: shapeSchedule(snapshot),
+    paymentClaim,
+    paymentDetails: parsePaymentDetails(snapshot.payment_details, paymentClaim?.claimableMilestones.length ?? 0),
   };
 }
 
-/** The payment schedule, with every unrenderable milestone dropped. */
-function shapeSchedule(snapshot: DeliverySnapshot): PublicDeliveryMilestone[] {
-  return Array.isArray(snapshot.payment_schedule)
-    ? snapshot.payment_schedule.filter(isRenderableMilestone)
-    : [];
-}
-
-/**
- * The released files. A missing or non-array `documents` key (an older SDF, a
- * malformed snapshot) degrades to an EMPTY list, so the portal renders its
- * honest "nothing shared yet" state rather than crashing.
- */
-function shapeDocuments(snapshot: DeliverySnapshot): PublicDelivery['documents'] {
-  if (!Array.isArray(snapshot.documents)) return [];
-  return snapshot.documents.filter(isRenderableDocument).map((row) => ({
-    id: row.id,
-    category: KIND_CATEGORY[row.kind],
-    sharedAt: row.shared_at ?? null,
-    // A count, never a body — the thread itself is a separate, lazy fetch.
-    // Non-numeric / negative jsonb degrades to 0 rather than rendering junk.
-    commentCount:
-      typeof row.comment_count === 'number' && row.comment_count > 0
-        ? Math.floor(row.comment_count)
-        : 0,
-    // Junk parses to `withheld`, never to `download`.
-    access: parseDocumentAccess(row.access),
-  }));
-}
-
-/** The verbs this client may act on now — only ones the portal knows. */
-function shapeClientActions(snapshot: DeliverySnapshot): string[] {
-  return Array.isArray(snapshot.client_actions)
-    ? snapshot.client_actions.filter(
-        (verb): verb is string =>
-          typeof verb === 'string' && CLIENT_ACTION_VERBS.has(verb),
-      )
-    : [];
-}
-
-/** The milestones the client may claim as paid. A missing or non-array claim
- *  object degrades to null: the portal renders no claim surface at all. */
-function shapePaymentClaim(snapshot: DeliverySnapshot): PublicDelivery['paymentClaim'] {
-  const rawClaims = snapshot.claim?.claimable_milestones;
-  if (!Array.isArray(rawClaims)) return null;
+/** What happened and what is on file (Round C): every instant parsed, every key translated. */
+function shapeRecord(
+  snapshot: DeliverySnapshot,
+  documents: PublicDelivery['documents'],
+): Pick<PublicDelivery, 'timeline' | 'expectedOn' | 'designDecision' | 'handoverAcknowledgedAt' | 'romAcknowledgedAt' | 'lastUpdateAt'> {
+  const timeline = parseTimeline(snapshot.timeline);
   return {
-    claimableMilestones: rawClaims.filter(isRenderableClaim).map((row) => ({
-      milestoneKind: row.milestone_kind,
-      amountRemaining: row.amount_remaining,
-      hasPendingClaim: row.has_pending_claim === true,
-    })),
+    timeline,
+    expectedOn: calendarDay(snapshot.expected_on),
+    designDecision: parseDesignDecision(snapshot.design_decision),
+    handoverAcknowledgedAt: isoInstant(snapshot.handover_acknowledged_at),
+    romAcknowledgedAt: isoInstant(snapshot.rom_acknowledged_at),
+    lastUpdateAt: newestInstant([timeline[0]?.at ?? null, ...documents.map((document) => document.sharedAt)]),
   };
 }
 
@@ -124,6 +92,7 @@ export function shapeDelivery(snapshot: DeliverySnapshot): PublicDelivery | null
   if (!identity) return null;
 
   const clientActions = shapeClientActions(snapshot);
+  const documents = shapeDocuments(snapshot);
   const rom = snapshot.rom;
   return {
     ...identity,
@@ -137,13 +106,14 @@ export function shapeDelivery(snapshot: DeliverySnapshot): PublicDelivery | null
     designFeeTotal: snapshot.design_fee_total ?? null,
     rom: rom ? { low: rom.low ?? null, high: rom.high ?? null } : null,
     shareExpiresAt: snapshot.share_expires_at ?? null,
-    ...shapeParties(snapshot),
-    paymentSchedule: shapeSchedule(snapshot),
-    paymentClaim: shapePaymentClaim(snapshot),
-    documents: shapeDocuments(snapshot),
+    firm: parseFirm(snapshot.firm),
+    client: shapeClient(snapshot),
+    ...shapePayments(snapshot),
+    documents,
     clientActions,
     conceptOptions: parseConceptOptions(snapshot.concept_options),
     conceptChoice: parseConceptChoice(snapshot.concept_choice_id, snapshot.concept_choice_position),
     conceptDecision: parseConceptDecision(snapshot.concept_decision),
+    ...shapeRecord(snapshot, documents),
   };
 }

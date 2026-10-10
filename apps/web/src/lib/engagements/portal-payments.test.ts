@@ -97,8 +97,8 @@ describe('derivePaymentsOverview', () => {
 describe('paymentClaimState', () => {
   const claim: PublicDelivery['paymentClaim'] = {
     claimableMilestones: [
-      { milestoneKind: 'gate_b', amountRemaining: '28000.0000', hasPendingClaim: false },
-      { milestoneKind: 'balance', amountRemaining: '36000.0000', hasPendingClaim: true },
+      { milestoneKind: 'gate_b', amountRemaining: '28000.0000', hasPendingClaim: false, claimedAt: null },
+      { milestoneKind: 'balance', amountRemaining: '36000.0000', hasPendingClaim: true, claimedAt: '2026-10-01T06:00:00.000Z' },
     ],
   };
   const none = new Set<string>();
@@ -110,12 +110,12 @@ describe('paymentClaimState', () => {
     });
   });
 
-  it('is pending when an open claim awaits the studio', () => {
-    expect(paymentClaimState(claim, 'balance', none)).toEqual({ kind: 'pending' });
+  it('is pending when an open claim awaits the studio, dated when the client sent it', () => {
+    expect(paymentClaimState(claim, 'balance', none)).toEqual({ kind: 'pending', claimedAt: '2026-10-01T06:00:00.000Z' });
   });
 
-  it('is pending once the client claimed it in this session', () => {
-    expect(paymentClaimState(claim, 'gate_b', new Set(['gate_b']))).toEqual({ kind: 'pending' });
+  it('is pending once the client claimed it in this session, undated until the next read', () => {
+    expect(paymentClaimState(claim, 'gate_b', new Set(['gate_b']))).toEqual({ kind: 'pending', claimedAt: null });
   });
 
   it('is none for a milestone the SDF did not list, or with no claim object', () => {

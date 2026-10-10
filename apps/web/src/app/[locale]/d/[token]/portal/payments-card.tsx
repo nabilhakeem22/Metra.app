@@ -1,6 +1,5 @@
 'use client';
 
-import { Check } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
 import type { PublicDelivery } from '@/lib/engagements/public';
 import {
@@ -12,64 +11,36 @@ import { bidiIsolate } from '@/lib/format/bidi';
 import { NextPayment } from './next-payment';
 import { PaymentClaimControl } from './payment-claim-control';
 import { PaymentClaimDialog } from './payment-claim-dialog';
+import { PaymentInstructions } from './payment-instructions';
+import { PaymentReceipts } from './payment-receipts';
 import { PaymentScheduleRow } from './payment-schedule-row';
+import { PaidMeter, SettledNote } from './payments-summary';
 import { formatPortalMoney } from './portal-money';
 import { useMilestoneLabel } from './use-milestone-label';
 import { usePaymentClaim } from './use-payment-claim';
 
-/** The all-paid close: a tick and a thank-you in place of the next payment. */
-function SettledNote() {
-  const t = useTranslations('delivery.payments');
-  return (
-    <div className="flex items-center gap-2.5">
-      <span
-        className="grid size-9 shrink-0 place-items-center rounded-full bg-[color:var(--success-tint)] text-[color:var(--success)]"
-        aria-hidden
-      >
-        <Check className="size-4" />
-      </span>
-      <div>
-        <p className="text-body font-semibold">{t('settledTitle')}</p>
-        <p className="text-caption text-muted-foreground">{t('settledBody')}</p>
-      </div>
-    </div>
-  );
-}
-
-/** The paid-so-far bar. A plain width: in RTL the bar fills from the right by itself. */
-function PaidMeter({ percentPaid, label }: { percentPaid: number; label: string }) {
-  return (
-    <div
-      role="progressbar"
-      aria-label={label}
-      aria-valuemin={0}
-      aria-valuemax={100}
-      aria-valuenow={percentPaid}
-      className="h-2 overflow-hidden rounded-full bg-muted"
-    >
-      <span
-        className="block h-full rounded-full bg-[color:var(--success)]"
-        style={{ width: `${percentPaid}%` }}
-      />
-    </div>
-  );
-}
-
 /**
  * The client's payments: the design fee, how much is paid, the ONE next payment
  * highlighted with its "I've made this payment" control (which asks first, naming
- * the milestone and the amount), then every milestone with its state. Other claimable milestones keep a small claim button in their row.
- * DUE amounts only (never cost); money is Latin digits, left-to-right; theme tokens
- * only, so it reads in light and dark. Renders nothing without a schedule.
+ * the milestone and the amount), how to pay (the studio's own details, while a
+ * payment is due and not yet claimed), then every milestone with its state, and
+ * the payments received with their dates. Other claimable milestones keep a
+ * small claim button in their row. DUE amounts only (never cost); money is Latin
+ * digits, left-to-right; theme tokens only, so it reads in light and dark.
+ * Renders nothing without a schedule.
  */
 export function PaymentsCard({
   token,
   schedule,
   claim,
+  details,
+  timeline,
 }: {
   token: string;
   schedule: PublicDelivery['paymentSchedule'];
   claim: PublicDelivery['paymentClaim'];
+  details: PublicDelivery['paymentDetails'];
+  timeline: PublicDelivery['timeline'];
 }) {
   const t = useTranslations('delivery.payments');
   const locale = useLocale();
@@ -79,16 +50,20 @@ export function PaymentsCard({
   if (!overview) return null;
 
   const money = (amount: string) => bidiIsolate(formatPortalMoney(amount, locale));
+  const claimStateOf = (milestoneKind: string) => paymentClaimState(claim, milestoneKind, submission.claimedKinds);
   const claimControlFor = (row: PaymentRow, prominent: boolean) => (
     <PaymentClaimControl
       milestoneKind={row.milestoneKind}
-      claimState={paymentClaimState(claim, row.milestoneKind, submission.claimedKinds)}
+      claimState={claimStateOf(row.milestoneKind)}
       submission={submission}
       prominent={prominent}
     />
   );
   const next = overview.next;
-  const nextClaim = next ? paymentClaimState(claim, next.milestoneKind, submission.claimedKinds) : null;
+  const nextClaim = next ? claimStateOf(next.milestoneKind) : null;
+  // How to pay matters only while something is still to be paid and claimed.
+  const awaitsPayment =
+    claim?.claimableMilestones.some((milestone) => claimStateOf(milestone.milestoneKind).kind === 'claimable') ?? false;
 
   return (
     <section className="space-y-3 rounded-panel border bg-background p-4 shadow-sm">
@@ -116,6 +91,7 @@ export function PaymentsCard({
       ) : (
         <SettledNote />
       )}
+      {details && awaitsPayment && <PaymentInstructions details={details} />}
       <ul>
         {overview.rows.map((row) => (
           <PaymentScheduleRow
@@ -126,6 +102,7 @@ export function PaymentsCard({
           />
         ))}
       </ul>
+      <PaymentReceipts timeline={timeline} />
       <PaymentClaimDialog claim={claim} submission={submission} milestoneLabel={milestoneLabel} />
     </section>
   );

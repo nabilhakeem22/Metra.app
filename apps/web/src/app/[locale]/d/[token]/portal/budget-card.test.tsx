@@ -21,7 +21,7 @@ function renderCard(
   locale: TestLocale,
   canAcknowledge = true,
 ) {
-  return renderWithIntl(<BudgetCard token="tok" rom={rom} canAcknowledge={canAcknowledge} />, { locale });
+  return renderWithIntl(<BudgetCard token="tok" rom={rom} canAcknowledge={canAcknowledge} acknowledgedAt={null} />, { locale });
 }
 
 beforeEach(() => {

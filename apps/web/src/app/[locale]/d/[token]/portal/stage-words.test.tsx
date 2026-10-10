@@ -17,10 +17,7 @@ function renderCalm(kind: 'inProgress' | 'delivered' | 'closed', locale: TestLoc
       token="tok"
       hero={{ kind, showRomAck: false }}
       stageKey={kind === 'delivered' ? 'delivered' : kind === 'closed' ? 'closed' : 'drawings'}
-      clientActions={[]}
-      conceptOptions={[]}
-      conceptChoice={null}
-      conceptDecision={null}
+      review={{ clientActions: [], conceptOptions: [], conceptChoice: null, conceptDecision: null, expectedOn: null, timeline: [] }}
       lastAnswer={null}
       onAnswered={() => {}}
     />,

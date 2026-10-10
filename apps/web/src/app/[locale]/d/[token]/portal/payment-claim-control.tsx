@@ -1,9 +1,11 @@
 'use client';
 
 import { Clock, Loader2 } from 'lucide-react';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
 import type { PaymentClaimState } from '@/lib/engagements/portal-payments';
+import { bidiIsolate } from '@/lib/format/bidi';
+import { formatDate } from '@/lib/format/date';
 import type { PaymentClaimSubmission } from './use-payment-claim';
 
 /**
@@ -26,14 +28,17 @@ export function PaymentClaimControl({
   prominent: boolean;
 }) {
   const t = useTranslations('delivery.payments');
+  const locale = useLocale();
   if (claimState.kind === 'none') return null;
 
   if (claimState.kind === 'pending') {
     return (
       <div role="status" className="space-y-0.5 text-caption font-medium text-muted-foreground">
-        <p className="flex items-center gap-1.5">
-          <Clock className="size-3.5 shrink-0" aria-hidden />
-          {t('awaitingConfirmation')}
+        <p className="flex items-start gap-1.5">
+          <Clock className="mt-0.5 size-3.5 shrink-0" aria-hidden />
+          {claimState.claimedAt
+            ? t('claimedOn', { date: bidiIsolate(formatDate(claimState.claimedAt, locale)) })
+            : t('awaitingConfirmation')}
         </p>
         {/* Only for a claim made in this visit that really reached the studio. */}
         {submission.notifiedKinds.has(milestoneKind) && <p>{t('claimNotified')}</p>}

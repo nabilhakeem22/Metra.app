@@ -31,11 +31,11 @@ const MIDWAY = [
 ];
 
 function claimable(milestoneKind: string, amountRemaining: string, hasPendingClaim = false) {
-  return { milestoneKind, amountRemaining, hasPendingClaim };
+  return { milestoneKind, amountRemaining, hasPendingClaim, claimedAt: null };
 }
 
 function renderCard(claim: PublicDelivery['paymentClaim'], locale: TestLocale = 'en') {
-  return renderWithIntl(<PaymentsCard token="tok" schedule={MIDWAY} claim={claim} />, { locale });
+  return renderWithIntl(<PaymentsCard token="tok" schedule={MIDWAY} claim={claim} details={null} timeline={[]} />, { locale });
 }
 
 const claimButtons = (locale: TestLocale) =>

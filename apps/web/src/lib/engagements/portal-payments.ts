@@ -98,7 +98,7 @@ export function derivePaymentsOverview(
 /** What the client may do about one milestone's payment right now. */
 export type PaymentClaimState =
   | { kind: 'claimable'; amountRemaining: string }
-  | { kind: 'pending' }
+  | { kind: 'pending'; claimedAt: string | null }
   | { kind: 'none' };
 
 /**
@@ -118,7 +118,8 @@ export function paymentClaimState(
   );
   if (!claimable) return { kind: 'none' };
   if (claimable.hasPendingClaim || claimedThisSession.has(milestoneKind)) {
-    return { kind: 'pending' };
+    // A claim made in this visit has no server date until the next read.
+    return { kind: 'pending', claimedAt: claimable.hasPendingClaim ? claimable.claimedAt : null };
   }
   return { kind: 'claimable', amountRemaining: claimable.amountRemaining };
 }

@@ -8,6 +8,7 @@ import { OFFLINE_APPROVAL_CHANNELS } from './offline-approval';
 import { PORTAL_STAGE_KEYS } from './portal-stage';
 import { TERMINAL_STATES } from './states';
 import type { DeliveryStatusKind } from './delivery-status';
+import type { PortalPaymentKind, PortalTimelineDecision } from './public/timeline-types';
 
 // Keys the UI builds at runtime (`t(\`kinds.${x}\`)`). Parity passes when a key is
 // absent from BOTH catalogs, and the browser then throws MISSING_MESSAGE, so each
@@ -46,6 +47,24 @@ const DELIVERY_STATUSES: Record<DeliveryStatusKind, true> = {
   abandoned: true,
 };
 
+/** Total over the client page's timeline words (Round C). */
+const TIMELINE_DECISIONS: Record<PortalTimelineDecision, true> = {
+  concept_approved: true,
+  concept_chosen: true,
+  concept_changes: true,
+  design_approved: true,
+  design_changes: true,
+  budget_acknowledged: true,
+  handover_acknowledged: true,
+};
+const PAYMENT_KINDS: Record<PortalPaymentKind, true> = {
+  deposit: true,
+  gate_a: true,
+  gate_b: true,
+  balance: true,
+  revision_co: true,
+};
+
 describe('dynamic engagement copy keys exist in both catalogs', () => {
   it.each([...ENDING_TRIGGERS])('ending %s: cta, confirm title and body', (trigger) => {
     for (const field of ['cta', 'confirmTitle', 'confirmBody']) {
@@ -78,5 +97,13 @@ describe('dynamic engagement copy keys exist in both catalogs', () => {
 
   it.each([...JOURNEY_MILESTONES])('client journey milestone %s', (milestone) => {
     expectInBothCatalogs(`delivery.journey.${milestone}`);
+  });
+
+  it.each(Object.keys(TIMELINE_DECISIONS))('client timeline decision %s', (decision) => {
+    expectInBothCatalogs(`delivery.timeline.decision.${decision}`);
+  });
+
+  it.each([...Object.keys(PAYMENT_KINDS), 'other'])('client payment kind %s', (kind) => {
+    expectInBothCatalogs(`delivery.payments.kind.${kind}`);
   });
 });

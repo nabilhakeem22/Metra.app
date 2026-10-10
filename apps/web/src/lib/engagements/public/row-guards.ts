@@ -8,6 +8,7 @@
 import type { EngagementArtifactKind } from '@metra/db';
 import { isClientDocumentKind } from '../portal-documents';
 import { DESIGN_STATES } from '../states';
+import type { FirmRow } from './studio-rows';
 import type { PublicDeliveryMilestone } from './types';
 
 /**
@@ -28,7 +29,7 @@ export interface DeliverySnapshot {
   design_fee_total?: string | null;
   rom?: { low?: string | null; high?: string | null } | null;
   share_expires_at?: string | null;
-  firm?: { name_ar?: string | null; name_en?: string | null; logo_file_id?: string | null } | null;
+  firm?: FirmRow | null;
   client?: { name_ar?: string | null; name_en?: string | null } | null;
   payment_schedule?: PublicDeliveryMilestone[] | null;
   documents?: Array<DeliveryDocumentRow | null> | null;
@@ -37,11 +38,19 @@ export interface DeliverySnapshot {
   concept_choice_id?: unknown;
   concept_choice_position?: unknown;
   concept_decision?: unknown;
+  // Round C (0058), read by ./studio-rows.ts, ./review-rows.ts and ./timeline-rows.ts.
+  payment_details?: unknown;
+  expected_on?: unknown;
+  design_decision?: unknown;
+  handover_acknowledged_at?: unknown;
+  rom_acknowledged_at?: unknown;
+  timeline?: unknown;
   claim?: {
     claimable_milestones?: Array<{
       milestone_kind?: string | null;
       amount_remaining?: string | null;
       has_pending_claim?: boolean | null;
+      claimed_at?: unknown;
     } | null> | null;
   } | null;
 }
@@ -53,6 +62,7 @@ export interface DeliveryDocumentRow {
   shared_at?: string | null;
   comment_count?: number | null;
   access?: string | null;
+  media?: unknown;
 }
 
 /**
@@ -78,6 +88,7 @@ export interface ClaimableMilestoneRow {
   milestone_kind: string;
   amount_remaining: string;
   has_pending_claim?: boolean | null;
+  claimed_at?: unknown;
 }
 
 /**

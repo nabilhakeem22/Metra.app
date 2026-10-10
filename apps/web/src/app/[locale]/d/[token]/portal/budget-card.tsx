@@ -1,12 +1,14 @@
 'use client';
 
 import { Check, Loader2 } from 'lucide-react';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import { useRouter } from 'next/navigation';
 import { useState, useTransition } from 'react';
 import { Button } from '@/components/ui/button';
 import type { PublicDelivery } from '@/lib/engagements/public';
 import { portalErrorKey, type PortalErrorKey } from '@/lib/engagements/portal-error-key';
+import { bidiIsolate } from '@/lib/format/bidi';
+import { formatDate } from '@/lib/format/date';
 import { recordDeliveryAction } from '../actions';
 import { BudgetRange } from './budget-range';
 
@@ -16,21 +18,26 @@ import { BudgetRange } from './budget-range';
  * The acknowledge button shows only while the server offers it (`canAcknowledge`
  * = the hero's `showRomAck`); it fires the append-only advisory
  * `recordDeliveryAction`, a repeat resolving ok (idempotent), and then re-reads
- * the page. After a local acknowledgement the range stays with "You have seen
- * this range", and says the team was notified only when it really was. Theme
- * tokens only, so the confirmed state reads in light and dark.
+ * the page. Once acknowledged the range stays with "You saw this range on
+ * {date}" (the day on file, Round C), or "You have seen this range" until the
+ * page re-reads it, and says the team was notified only when it really was.
+ * Theme tokens only, so the confirmed state reads in light and dark.
  */
 export function BudgetCard({
   token,
   rom,
   canAcknowledge,
+  acknowledgedAt,
 }: {
   token: string;
   rom: NonNullable<PublicDelivery['rom']>;
   canAcknowledge: boolean;
+  /** When the client acknowledged THIS range (the current issuance), or null. */
+  acknowledgedAt: PublicDelivery['romAcknowledgedAt'];
 }) {
   const t = useTranslations('delivery.budget');
   const tActions = useTranslations('delivery.actions');
+  const locale = useLocale();
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   // Non-null once acknowledged; says whether the studio was really notified.
@@ -59,18 +66,22 @@ export function BudgetCard({
         <p className="text-caption text-muted-foreground">{t('preparedBy')}</p>
       </div>
       <BudgetRange rom={rom} />
-      {confirmed ? (
+      {confirmed || acknowledgedAt ? (
         <div
           role="status"
           className="space-y-0.5 rounded-item bg-[color:var(--success-tint)] px-3 py-2.5 text-[color:var(--success)]"
         >
           <p className="flex items-center gap-2 text-body font-semibold">
             <Check className="size-4 shrink-0" aria-hidden />
-            {t('acknowledgedNote')}
+            {acknowledgedAt
+              ? t('acknowledgedOn', { date: bidiIsolate(formatDate(acknowledgedAt, locale)) })
+              : t('acknowledgedNote')}
           </p>
-          <p className="text-caption">
-            {confirmed.studioNotified ? t('acknowledgedNotified') : t('acknowledged')}
-          </p>
+          {confirmed && (
+            <p className="text-caption">
+              {confirmed.studioNotified ? t('acknowledgedNotified') : t('acknowledged')}
+            </p>
+          )}
         </div>
       ) : (
         <p className="text-caption text-muted-foreground">{t('note')}</p>

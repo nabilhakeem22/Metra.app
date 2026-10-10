@@ -128,7 +128,7 @@ describe('getDeliveryByToken hardening', () => {
     setSnapshot(snapshot);
     const result = await readDelivery('raw-token');
     expect(result).not.toBeNull();
-    expect(result?.firm).toEqual({ nameAr: null, nameEn: null, logoFileId: null });
+    expect(result?.firm).toEqual({ nameAr: null, nameEn: null, hasLogo: false, phone: null, whatsappDigits: null });
   });
 
   it('degrades a NULL client to null fields instead of throwing', async () => {
@@ -205,6 +205,7 @@ describe('getDeliveryByToken hardening', () => {
           shared_at: '2026-02-01T00:00:00Z',
           comment_count: 3,
           access: 'download',
+          media: 'image',
         },
         {
           id: 'doc-2',
@@ -223,6 +224,7 @@ describe('getDeliveryByToken hardening', () => {
         sharedAt: '2026-02-01T00:00:00Z',
         commentCount: 3,
         access: 'download',
+        media: 'image',
       },
       {
         id: 'doc-2',
@@ -230,6 +232,8 @@ describe('getDeliveryByToken hardening', () => {
         sharedAt: null,
         commentCount: 0,
         access: 'download',
+        // No media key (an SDF before 0058): never a thumbnail.
+        media: 'other',
       },
     ]);
   });
@@ -253,7 +257,7 @@ describe('getDeliveryByToken hardening', () => {
       // thread with nothing in it — never NaN, never undefined on the wire.
       // No `access` on the row either — it parses to the SAFEST verdict, never to
       // `download`, so a malformed row can't hand over the priced BOQ.
-      { id: 'doc-ok', category: 'boq', sharedAt: null, commentCount: 0, access: 'withheld' },
+      { id: 'doc-ok', category: 'boq', sharedAt: null, commentCount: 0, access: 'withheld', media: 'other' },
     ]);
   });
 

@@ -30,7 +30,7 @@ const MIDWAY = [
 const SETTLED = MIDWAY.map((row) => ({ ...row, amount_cleared: row.amount_due, status: 'paid' as const }));
 
 function claimable(milestoneKind: string, amountRemaining: string, hasPendingClaim = false) {
-  return { milestoneKind, amountRemaining, hasPendingClaim };
+  return { milestoneKind, amountRemaining, hasPendingClaim, claimedAt: null };
 }
 
 function renderCard(
@@ -38,7 +38,7 @@ function renderCard(
   claim: PublicDelivery['paymentClaim'],
   locale: TestLocale = 'en',
 ) {
-  return renderWithIntl(<PaymentsCard token="tok" schedule={schedule} claim={claim} />, { locale });
+  return renderWithIntl(<PaymentsCard token="tok" schedule={schedule} claim={claim} details={null} timeline={[]} />, { locale });
 }
 
 const claimButtons = (locale: TestLocale) =>

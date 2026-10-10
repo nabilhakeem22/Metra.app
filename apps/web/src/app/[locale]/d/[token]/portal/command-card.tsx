@@ -5,8 +5,7 @@ import { useState } from 'react';
 import type { MilestoneProgress } from '@/lib/engagements/journey-map';
 import type { HeroView } from '@/lib/engagements/portal-hero';
 import type { PortalStageKey } from '@/lib/engagements/portal-stage';
-import type { PublicDelivery } from '@/lib/engagements/public/types';
-import { HeroCard, type HeroLastAnswer } from './hero-card';
+import { HeroCard, type HeroLastAnswer, type HeroReview } from './hero-card';
 import { JourneyTracker } from './journey-tracker';
 import { WhatsNext } from './whats-next';
 
@@ -27,14 +26,14 @@ export function PortalCommandCard({
   hero,
   milestone,
   stageKey,
-  concept,
+  review,
 }: {
   token: string;
   hero: HeroView;
   milestone: MilestoneProgress;
   stageKey: PortalStageKey;
-  /** What the hero needs to offer the concept options as a choice (B12). */
-  concept: Pick<PublicDelivery, 'clientActions' | 'conceptOptions' | 'conceptChoice' | 'conceptDecision'>;
+  /** What the hero reads off the delivery (./hero-card.tsx). */
+  review: HeroReview;
 }) {
   const router = useRouter();
   const [lastAnswer, setLastAnswer] = useState<HeroLastAnswer | null>(null);
@@ -51,10 +50,7 @@ export function PortalCommandCard({
         token={token}
         hero={hero}
         stageKey={stageKey}
-        clientActions={concept.clientActions}
-        conceptOptions={concept.conceptOptions}
-        conceptChoice={concept.conceptChoice}
-        conceptDecision={concept.conceptDecision}
+        review={review}
         lastAnswer={lastAnswer}
         onAnswered={answered}
       />
