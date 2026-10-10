@@ -3,11 +3,13 @@
 // a unit test pins the shape the download route reads.
 import { tokenPathSegment } from '@/lib/engagements/portal-path';
 
-/** How the route should hand the file over: `view` opens it in the browser. */
-export type DocumentVariant = 'view';
+/** How the route should hand the file over: `view` opens it in the browser,
+ *  `thumb` is an image's gallery tile (streamed, never a storage URL). */
+export type DocumentVariant = 'view' | 'thumb';
 
 /**
- * `/{locale}/d/{token}/documents/{id}`, plus `?variant=view` for an inline view.
+ * `/{locale}/d/{token}/documents/{id}`, plus `?variant=view` for an inline view
+ * or `?variant=thumb` for a gallery tile.
  * No variant is the download (an attachment, or the preview rendition while
  * money is outstanding).
  */

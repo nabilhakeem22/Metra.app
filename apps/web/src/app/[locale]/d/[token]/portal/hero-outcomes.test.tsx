@@ -9,11 +9,14 @@ import { messageAt } from '@/test/render-with-intl';
 // never the verb just tapped).
 
 const actions = vi.hoisted(() => ({
-  recordDeliveryAction: vi.fn(),
   chooseDeliveryConcept: vi.fn(),
   respondToDeliveryConcept: vi.fn(),
+  respondToDeliveryDesign: vi.fn(),
+  approveDesignWithBudget: vi.fn(),
+  acknowledgeDeliveryHandover: vi.fn(),
 }));
-vi.mock('../actions', () => actions);
+vi.mock('../review-actions', () => actions);
+vi.mock('../actions', () => ({}));
 const router = vi.hoisted(() => ({ refresh: vi.fn() }));
 vi.mock('next/navigation', () => ({ useRouter: () => router }));
 
@@ -42,7 +45,8 @@ async function tapHeroButton(group: keyof typeof GROUP_VERBS, button: string, lo
 }
 
 beforeEach(() => {
-  actions.recordDeliveryAction.mockReset();
+  actions.respondToDeliveryDesign.mockReset();
+  actions.acknowledgeDeliveryHandover.mockReset();
   actions.respondToDeliveryConcept.mockReset();
   router.refresh.mockReset();
 });
@@ -55,18 +59,17 @@ describe('the confirmation says "notified" only when the studio was', () => {
     ['design', 'changes', 'request_design_changes', 'changesBody'],
     ['handoff', 'acknowledge', 'acknowledge_handoff', 'acknowledgedBody'],
   ] as const)('%s %s', async (group, button, verb, bodyKey) => {
-    const isConcept = group === 'concept';
-    const action = isConcept ? actions.respondToDeliveryConcept : actions.recordDeliveryAction;
-    const answer = (studioNotified: boolean) =>
-      isConcept
-        ? { kind: verb === 'approve_concept' ? 'approved' : 'changes_requested', studioNotified }
-        : { ok: true, studioNotified };
+    const action = { concept: actions.respondToDeliveryConcept, design: actions.respondToDeliveryDesign, handoff: actions.acknowledgeDeliveryHandover }[group];
+    const kind = { approve: 'approved', changes: 'changes_requested', acknowledge: 'acknowledged' }[button];
+    const answer = (studioNotified: boolean) => ({ kind, studioNotified });
+    const note = button === 'changes' ? 'More light' : '';
 
     action.mockResolvedValue(answer(true));
     const notified = renderHero(group);
     await tapHeroButton(group, button);
     expect(await screen.findByText(en(`delivery.hero.${group}.${bodyKey}Notified`))).toBeTruthy();
-    expect(action).toHaveBeenCalledWith('tok', verb, button === 'changes' ? 'More light' : '');
+    // The handover has one verb, so its action takes none.
+    expect(action).toHaveBeenCalledWith(...(group === 'handoff' ? ['tok', note] : ['tok', verb, note]));
     notified.unmount();
 
     action.mockResolvedValue(answer(false));
@@ -76,8 +79,8 @@ describe('the confirmation says "notified" only when the studio was', () => {
     expect(screen.queryByText(en(`delivery.hero.${group}.${bodyKey}Notified`))).toBeNull();
   });
 
-  it('a design repeat (`already`, never notified) reads as recorded, in Arabic too', async () => {
-    actions.recordDeliveryAction.mockResolvedValue({ ok: true, code: 'already', studioNotified: false });
+  it('a design repeat (the approval already on file, never notified) reads as recorded, in Arabic too', async () => {
+    actions.respondToDeliveryDesign.mockResolvedValue({ kind: 'approved', studioNotified: false });
     renderHero('design', 'ar-EG');
     await tapHeroButton('design', 'approve', 'ar-EG');
     expect(await screen.findByText(messageAt('ar-EG', 'delivery.hero.design.approvedBody'))).toBeTruthy();
@@ -92,7 +95,7 @@ describe('a concept verb confirms only what is SAVED (B12)', () => {
     expect(
       await screen.findByText(en('delivery.conceptPicker.chosen').replace('{letter}', '⁨B⁩')),
     ).toBeTruthy();
-    expect(actions.recordDeliveryAction).not.toHaveBeenCalled();
+    expect(actions.respondToDeliveryDesign).not.toHaveBeenCalled();
   });
 
   it('a stale Approve over a saved request for changes confirms the request', async () => {
@@ -107,7 +110,7 @@ describe('a concept verb confirms only what is SAVED (B12)', () => {
     actions.respondToDeliveryConcept.mockResolvedValue({ kind: 'moved_on' });
     renderHero('concept');
     await tapHeroButton('concept', 'changes');
-    expect((await screen.findByRole('alert')).textContent).toBe(en('delivery.conceptPicker.movedOn'));
+    expect((await screen.findByRole('alert')).textContent).toBe(en('delivery.actions.movedOn'));
     expect(router.refresh).toHaveBeenCalledTimes(1);
     expect(screen.queryByText(en('delivery.hero.concept.changesTitle'))).toBeNull();
   });

@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { answerOfConceptOutcome, answerOfSignal } from './hero-answer';
+import { answerOfConceptOutcome, answerOfDesignOutcome, answerOfHandoverOutcome } from './hero-answer';
 
-// The hero confirms only a SAVED concept decision, and the tapped verb only for
-// the design and handover signals.
+// The hero confirms only a SAVED decision, for the concept, the final design and
+// the handover alike; a step that moved on reads the same for all three.
 
 describe('answerOfConceptOutcome', () => {
   it('names the saved letter on a choice, none on an approval or a change request', () => {
@@ -27,14 +27,34 @@ describe('answerOfConceptOutcome', () => {
   });
 });
 
-describe('answerOfSignal', () => {
-  it('confirms the tapped verb, and maps an unknown error to generic', () => {
-    expect(answerOfSignal({ ok: true, studioNotified: true }, 'acknowledged')).toEqual({
+describe('answerOfDesignOutcome (AC 55, 56)', () => {
+  it('confirms the SAVED decision, with the budget when it was acknowledged too', () => {
+    expect(answerOfDesignOutcome({ kind: 'approved', studioNotified: true })).toEqual({
+      confirmed: { outcome: 'approved', studioNotified: true },
+    });
+    expect(answerOfDesignOutcome({ kind: 'approved', studioNotified: false, budgetAcknowledged: true })).toEqual({
+      confirmed: { outcome: 'approved', studioNotified: false, budgetAcknowledged: true },
+    });
+    expect(answerOfDesignOutcome({ kind: 'approved', studioNotified: false, budgetAcknowledged: false })).toEqual({
+      confirmed: { outcome: 'approved', studioNotified: false },
+    });
+    expect(answerOfDesignOutcome({ kind: 'changes_requested', studioNotified: true })).toEqual({
+      confirmed: { outcome: 'changes', studioNotified: true },
+    });
+  });
+
+  it('moved on refreshes; an error does not', () => {
+    expect(answerOfDesignOutcome({ kind: 'moved_on' })).toEqual({ error: 'movedOn', refresh: true });
+    expect(answerOfDesignOutcome({ kind: 'error', error: 'generic' })).toEqual({ error: 'generic', refresh: false });
+  });
+});
+
+describe('answerOfHandoverOutcome (AC 55, 56)', () => {
+  it('acknowledged while one is on file; moved on refreshes; an error does not', () => {
+    expect(answerOfHandoverOutcome({ kind: 'acknowledged', studioNotified: true })).toEqual({
       confirmed: { outcome: 'acknowledged', studioNotified: true },
     });
-    expect(answerOfSignal({ ok: false, error: 'already_responded' }, 'approved')).toEqual({
-      error: 'generic',
-      refresh: false,
-    });
+    expect(answerOfHandoverOutcome({ kind: 'moved_on' })).toEqual({ error: 'movedOn', refresh: true });
+    expect(answerOfHandoverOutcome({ kind: 'error', error: 'token_expired' })).toEqual({ error: 'token_expired', refresh: false });
   });
 });

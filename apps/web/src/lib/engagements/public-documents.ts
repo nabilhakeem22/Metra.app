@@ -16,6 +16,8 @@ import { hashShareToken } from '@/lib/share/token';
 import { safeExtension } from '@/lib/files/safe-name';
 import { parseDocumentAccess, type DocumentAccess } from './document-access';
 import { isUuid } from '@/lib/uuid';
+import { documentMedia } from './public/snapshot-values';
+import type { PortalDocumentMedia } from './public/timeline-types';
 import {
   CATEGORY_FILE_SLUG,
   KIND_CATEGORY,
@@ -31,6 +33,9 @@ export interface DeliveryDocumentTarget {
   /** Step 3 — the DATABASE's verdict on what this client may do with the file now.
    *  The route enforces it; it is not advisory. Junk parses to `withheld`. */
   access: DocumentAccess;
+  /** Round C: image, pdf or other, by the SAME SQL rule as the portal list, so a
+   *  gallery tile and the bytes behind it agree. Junk parses to `other`. */
+  media: PortalDocumentMedia;
 }
 
 /** The raw jsonb the SDF returns. Typed as UNTRUSTED — every field is optional. */
@@ -40,6 +45,7 @@ interface DocumentSnapshot {
   kind?: string | null;
   original_name?: string | null;
   access?: string | null;
+  media?: unknown;
 }
 
 /**
@@ -74,6 +80,7 @@ export async function getDeliveryDocumentByToken(
       objectKey,
       downloadName: extension ? `${slug}.${extension}` : slug,
       access: parseDocumentAccess(snapshot.access),
+      media: documentMedia(snapshot.media),
     };
   } catch {
     // Token-free breadcrumb only — never the raw token, the document id, or any

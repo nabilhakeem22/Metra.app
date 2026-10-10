@@ -2391,7 +2391,9 @@
         "approvedBodyNotified": "Your approval is recorded and your designer has been notified. They will prepare the drawings for execution.",
         "changesTitle": "Changes requested",
         "changesBody": "Your request is recorded. Your designer will see it and refine the design with you.",
-        "changesBodyNotified": "Your request is recorded and your designer has been notified. They will refine the design with you."
+        "changesBodyNotified": "Your request is recorded and your designer has been notified. They will refine the design with you.",
+        "confirmWithBudget": "Approving also confirms you have seen this budget range.",
+        "budgetAcknowledged": "You also confirmed seeing the budget range."
       },
       "handoff": {
         "headline": "Your design package is ready",
@@ -2404,7 +2406,12 @@
         "acknowledgedBodyNotified": "Thank you, we have received your confirmation and your designer has been notified. They will close the project shortly."
       },
       "expectedBy": "Expected by {date}",
-      "deliveredOn": "Delivered on {date}. Thank you."
+      "deliveredOn": "Delivered on {date}. Thank you.",
+      "work": {
+        "title": "The work to review",
+        "viewAll": "View all ({count})",
+        "seeFiles": "See your files below"
+      }
     },
     "conceptPicker": {
       "title": "Choose your preferred option",
@@ -2417,7 +2424,6 @@
       "confirm": "Yes, choose option {letter}",
       "cancel": "Cancel",
       "changed": "The options have changed. Please review them again.",
-      "movedOn": "This step has already moved on. The page now shows where things stand.",
       "chosen": "You chose option {letter}."
     },
     "whatsNext": {
@@ -2500,7 +2506,8 @@
         "not_active": "This delivery is closed. Please contact your design team.",
         "wrong_state": "This action isn't available right now. Please refresh the page.",
         "generic": "Something went wrong. Please try again."
-      }
+      },
+      "movedOn": "This step has already moved on. The page now shows where things stand."
     },
     "poweredBy": "Shared securely by {firm}",
     "documents": {
@@ -2566,6 +2573,15 @@
         "budget_acknowledged": "You saw the budget range",
         "handover_acknowledged": "You confirmed receiving the design package"
       }
+    },
+    "gallery": {
+      "imageAlt": "{category}, shared {date}"
+    },
+    "lightbox": {
+      "previous": "Previous image",
+      "next": "Next image",
+      "close": "Close",
+      "position": "{current} of {total}"
     }
   }
 }

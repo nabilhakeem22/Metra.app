@@ -1,7 +1,8 @@
 // Single values read off an UNTRUSTED delivery snapshot: an instant, a calendar
-// day, a scale-4 amount, a bounded text. PURE and client-safe. Each answers null
-// for anything that is not exactly the documented shape, so a caller drops the
-// field (or the row) rather than rendering junk or throwing.
+// day, a scale-4 amount, a bounded text, a media class. PURE and client-safe.
+// Each answers null (or the safest class) for anything that is not exactly the
+// documented shape, so a caller drops the field rather than rendering junk.
+import type { PortalDocumentMedia } from './timeline-types';
 
 /** An ISO instant with a zone, as Postgres writes a timestamptz into jsonb. */
 const ISO_INSTANT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,9})?(Z|[+-]\d{2}:\d{2})$/;
@@ -51,4 +52,11 @@ export function newestInstant(instants: ReadonlyArray<string | null>): string | 
     if (Number.isFinite(time) && (newest === null || time > newest)) newest = time;
   }
   return newest === null ? null : new Date(newest).toISOString();
+}
+
+const MEDIA: ReadonlySet<string> = new Set<PortalDocumentMedia>(['image', 'pdf', 'other']);
+
+/** A file's media class (the database's one rule), or `other`, never a thumbnail, for anything unknown. */
+export function documentMedia(value: unknown): PortalDocumentMedia {
+  return typeof value === 'string' && MEDIA.has(value) ? (value as PortalDocumentMedia) : 'other';
 }

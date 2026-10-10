@@ -8,7 +8,8 @@ import { messageAt } from '@/test/render-with-intl';
 // decision SAVED on file.
 
 const actions = vi.hoisted(() => ({ chooseDeliveryConcept: vi.fn(), respondToDeliveryConcept: vi.fn() }));
-vi.mock('../actions', () => actions);
+vi.mock('../review-actions', () => actions);
+vi.mock('../actions', () => ({}));
 const router = vi.hoisted(() => ({ refresh: vi.fn() }));
 vi.mock('next/navigation', () => ({ useRouter: () => router }));
 
@@ -81,7 +82,7 @@ describe('ConceptOptionPicker: Request changes', () => {
     actions.respondToDeliveryConcept.mockResolvedValue({ kind: 'moved_on' });
     renderPicker();
     await requestChanges('Warmer colours');
-    expect((await screen.findByRole('alert')).textContent).toBe(en('delivery.conceptPicker.movedOn'));
+    expect((await screen.findByRole('alert')).textContent).toBe(en('delivery.actions.movedOn'));
     expect(router.refresh).toHaveBeenCalledTimes(1);
   });
 });

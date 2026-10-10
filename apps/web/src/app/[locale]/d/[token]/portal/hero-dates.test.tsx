@@ -8,6 +8,7 @@ import { BudgetCard } from './budget-card';
 // expects the next step; a delivered one, on which day; the budget card, when
 // the client saw this range.
 
+vi.mock('../review-actions', () => ({}));
 vi.mock('../actions', () => ({}));
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
 

@@ -36,6 +36,7 @@ function validSnapshot(): Record<string, unknown> {
     kind: 'approved_render',
     original_name: 'Villa render FINAL.PNG',
     access: 'download',
+    media: 'image',
   };
 }
 
@@ -56,7 +57,15 @@ describe('getDeliveryDocumentByToken', () => {
       objectKey: 'org-1/engagement/file-1',
       downloadName: '3d-visual.png',
       access: 'download',
+      media: 'image',
     });
+  });
+
+  it('reads the media class, defaulting anything unknown to other (never a tile)', async () => {
+    for (const media of [undefined, null, 'IMAGE', 'svg', 7]) {
+      setSnapshot({ ...validSnapshot(), media });
+      expect((await getDeliveryDocumentByToken('raw-token', DOCUMENT_ID))?.media, String(media)).toBe('other');
+    }
   });
 
   it('parses the access verdict, defaulting an unknown one to `withheld`', async () => {

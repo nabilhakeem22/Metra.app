@@ -12,16 +12,8 @@ import {
   isRenderableMilestone,
   type DeliverySnapshot,
 } from './row-guards';
-import { isoInstant } from './snapshot-values';
-import type { PortalDocumentMedia } from './timeline-types';
+import { documentMedia, isoInstant } from './snapshot-values';
 import type { PublicDelivery, PublicDeliveryMilestone } from './types';
-
-const MEDIA: ReadonlySet<string> = new Set<PortalDocumentMedia>(['image', 'pdf', 'other']);
-
-/** The database's media class, or `other` (never a thumbnail) for anything unknown. */
-function parseDocumentMedia(value: unknown): PortalDocumentMedia {
-  return typeof value === 'string' && MEDIA.has(value) ? (value as PortalDocumentMedia) : 'other';
-}
 
 /** The payment schedule, with every unrenderable milestone dropped. */
 export function shapeSchedule(snapshot: DeliverySnapshot): PublicDeliveryMilestone[] {
@@ -49,7 +41,7 @@ export function shapeDocuments(snapshot: DeliverySnapshot): PublicDelivery['docu
         : 0,
     // Junk parses to `withheld`, never to `download`.
     access: parseDocumentAccess(row.access),
-    media: parseDocumentMedia(row.media),
+    media: documentMedia(row.media),
   }));
 }
 

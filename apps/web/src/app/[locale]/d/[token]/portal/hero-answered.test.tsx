@@ -8,11 +8,14 @@ import { messageAt, type TestLocale } from '@/test/render-with-intl';
 // landed) and not after a reload. A choice is named once.
 
 const actions = vi.hoisted(() => ({
-  recordDeliveryAction: vi.fn(),
   chooseDeliveryConcept: vi.fn(),
   respondToDeliveryConcept: vi.fn(),
+  respondToDeliveryDesign: vi.fn(),
+  approveDesignWithBudget: vi.fn(),
+  acknowledgeDeliveryHandover: vi.fn(),
 }));
-vi.mock('../actions', () => actions);
+vi.mock('../review-actions', () => actions);
+vi.mock('../actions', () => ({}));
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
 
 const OPTION_B = { id: '22222222-2222-4222-8222-222222222222', position: 2 as const, letter: 'B' as const };
@@ -33,7 +36,10 @@ function expectNoStaleAsk(locale: TestLocale) {
 }
 
 beforeEach(() => {
-  actions.recordDeliveryAction.mockReset().mockResolvedValue({ ok: true, studioNotified: true });
+  actions.respondToDeliveryDesign.mockReset().mockImplementation(async (_token: string, verb: string) => ({
+    kind: verb === 'approve_design' ? 'approved' : 'changes_requested',
+    studioNotified: true,
+  }));
   actions.respondToDeliveryConcept.mockReset();
   actions.chooseDeliveryConcept.mockReset();
 });

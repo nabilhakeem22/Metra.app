@@ -10,6 +10,7 @@ import { PublicDeliveryView } from './public-delivery';
 // targets on everything a finger can press.
 
 vi.mock('./actions', () => ({}));
+vi.mock('./review-actions', () => ({}));
 vi.mock('next/navigation', async (importOriginal) => ({
   ...(await importOriginal<typeof import('next/navigation')>()),
   useRouter: () => ({ refresh: vi.fn() }),

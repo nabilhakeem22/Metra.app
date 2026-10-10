@@ -8,11 +8,14 @@ import { messageAt, type TestLocale } from '@/test/render-with-intl';
 // the catalog holds.
 
 const actions = vi.hoisted(() => ({
-  recordDeliveryAction: vi.fn(),
   chooseDeliveryConcept: vi.fn(),
   respondToDeliveryConcept: vi.fn(),
+  respondToDeliveryDesign: vi.fn(),
+  approveDesignWithBudget: vi.fn(),
+  acknowledgeDeliveryHandover: vi.fn(),
 }));
-vi.mock('../actions', () => actions);
+vi.mock('../review-actions', () => actions);
+vi.mock('../actions', () => ({}));
 const router = vi.hoisted(() => ({ refresh: vi.fn() }));
 vi.mock('next/navigation', () => ({ useRouter: () => router }));
 
@@ -27,7 +30,8 @@ const OFFERED = ['approve_concept', 'request_concept_changes'];
 const CONCEPT = { kind: 'action', group: 'concept', showRomAck: false } as const;
 
 beforeEach(() => {
-  actions.recordDeliveryAction.mockReset();
+  actions.respondToDeliveryDesign.mockReset();
+  actions.acknowledgeDeliveryHandover.mockReset();
   actions.respondToDeliveryConcept.mockReset();
   router.refresh.mockReset();
 });
@@ -92,7 +96,8 @@ describe('the calm hero repeats the saved choice (B12)', () => {
 
 describe('a refusal always reads from the catalog', () => {
   it('an error code the portal has no copy for shows the generic message', async () => {
-    actions.recordDeliveryAction.mockResolvedValue({ ok: false, error: 'contract_inactive' });
+    // The design act narrows every server code; anything it has no copy for is generic.
+    actions.respondToDeliveryDesign.mockResolvedValue({ kind: 'error', error: 'generic' });
     renderCommandCard({
       hero: { kind: 'action', group: 'design', showRomAck: false },
       clientActions: ['approve_design', 'request_design_changes'],
@@ -107,7 +112,7 @@ describe('a refusal always reads from the catalog', () => {
   });
 
   it('a rejected action leaves no spinner stuck and shows the generic message', async () => {
-    actions.recordDeliveryAction.mockRejectedValue(new Error('network'));
+    actions.acknowledgeDeliveryHandover.mockRejectedValue(new Error('network'));
     renderCommandCard({
       hero: { kind: 'action', group: 'handoff', showRomAck: false },
       clientActions: ['acknowledge_handoff'],

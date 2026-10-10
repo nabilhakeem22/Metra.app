@@ -11,6 +11,7 @@ import { PaymentsCard } from './payments-card';
 
 const actions = vi.hoisted(() => ({ markDeliveryPaymentPaid: vi.fn() }));
 vi.mock('../actions', () => actions);
+vi.mock('../review-actions', () => ({}));
 const router = vi.hoisted(() => ({ refresh: vi.fn() }));
 vi.mock('next/navigation', () => ({ useRouter: () => router }));
 

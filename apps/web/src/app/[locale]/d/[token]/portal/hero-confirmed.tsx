@@ -31,13 +31,17 @@ export function HeroConfirmed({
   outcome,
   studioNotified,
   chosenLetter,
+  budgetAcknowledged,
 }: {
   group: HeroGroup;
   outcome: HeroOutcome;
   studioNotified: boolean;
   chosenLetter?: string;
+  /** A design approval that also acknowledged the budget range. */
+  budgetAcknowledged?: boolean;
 }) {
   const tGroup = useTranslations(`delivery.hero.${group}`);
+  const tDesign = useTranslations('delivery.hero.design');
   const tPicker = useTranslations('delivery.conceptPicker');
   const keys = CONFIRM_KEYS[outcome];
   return (
@@ -52,6 +56,9 @@ export function HeroConfirmed({
       <p className="mx-auto mt-2 max-w-xs text-body text-muted-foreground">
         {tGroup(studioNotified ? keys.notified : keys.body)}
       </p>
+      {budgetAcknowledged && (
+        <p className="mx-auto mt-2 max-w-xs text-body font-medium text-foreground">{tDesign('budgetAcknowledged')}</p>
+      )}
     </section>
   );
 }

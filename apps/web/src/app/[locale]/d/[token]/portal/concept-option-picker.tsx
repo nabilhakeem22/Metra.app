@@ -8,7 +8,7 @@ import { useConfirm } from '@/components/ui/confirm-dialog';
 import { isBlankNote } from '@/lib/engagements/client-note';
 import type { PublicDelivery } from '@/lib/engagements/public/types';
 import { bidiIsolate } from '@/lib/format/bidi';
-import { chooseDeliveryConcept, respondToDeliveryConcept } from '../actions';
+import { chooseDeliveryConcept, respondToDeliveryConcept } from '../review-actions';
 import {
   answerOfConceptOutcome,
   type HeroAnswer,

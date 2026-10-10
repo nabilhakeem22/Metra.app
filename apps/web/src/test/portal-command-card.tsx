@@ -20,6 +20,8 @@ export interface CommandCardProps {
   stageKey?: PortalStageKey;
   expectedOn?: PublicDelivery['expectedOn'];
   timeline?: PublicDelivery['timeline'];
+  documents?: PublicDelivery['documents'];
+  rom?: PublicDelivery['rom'];
 }
 
 const REFRESH_LABEL = 'land the server refresh';
@@ -48,6 +50,8 @@ export function renderCommandCard(
             conceptOptions: props.conceptOptions ?? [],
             conceptChoice: props.conceptChoice ?? null,
             conceptDecision: props.conceptDecision ?? null,
+            documents: props.documents ?? [],
+            rom: props.rom ?? null,
             expectedOn: props.expectedOn ?? null,
             timeline: props.timeline ?? [],
           }}

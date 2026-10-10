@@ -9,7 +9,7 @@ import type { PublicDelivery } from '@/lib/engagements/public';
 import { portalErrorKey, type PortalErrorKey } from '@/lib/engagements/portal-error-key';
 import { bidiIsolate } from '@/lib/format/bidi';
 import { formatDate } from '@/lib/format/date';
-import { recordDeliveryAction } from '../actions';
+import { acknowledgeDeliveryBudget } from '../review-actions';
 import { BudgetRange } from './budget-range';
 
 /**
@@ -17,7 +17,7 @@ import { BudgetRange } from './budget-range';
  * (the caller renders it only then), before and after the client has seen it.
  * The acknowledge button shows only while the server offers it (`canAcknowledge`
  * = the hero's `showRomAck`); it fires the append-only advisory
- * `recordDeliveryAction`, a repeat resolving ok (idempotent), and then re-reads
+ * `acknowledgeDeliveryBudget`, a repeat resolving ok (idempotent), and then re-reads
  * the page. Once acknowledged the range stays with "You saw this range on
  * {date}" (the day on file, Round C), or "You have seen this range" until the
  * page re-reads it, and says the team was notified only when it really was.
@@ -49,7 +49,7 @@ export function BudgetCard({
     startTransition(async () => {
       // Wrap the await so a rejected action can never leave the spinner stuck.
       try {
-        const result = await recordDeliveryAction(token, 'acknowledge_rom');
+        const result = await acknowledgeDeliveryBudget(token);
         if (!result.ok) return setError(portalErrorKey(result.error));
         setConfirmed({ studioNotified: result.studioNotified === true });
         router.refresh();

@@ -14,18 +14,12 @@ import {
   outcomeOfSavedDecision,
   type ConceptChoiceOutcome,
   type ConceptVerb,
-  type SavedConcept,
 } from '../concept-choice-outcome';
 import { portalErrorKey } from '../portal-error-key';
-import { chooseConceptByToken, getDeliveryByToken, recordDeliveryActionByToken } from '../public';
+import { chooseConceptByToken, recordDeliveryActionByToken } from '../public';
 import { clientActOfVerb } from './acts';
 import { withStudioNotified } from './notify';
-
-/** The decision on file through the client's own token, or null when unreadable. */
-async function savedConcept(rawToken: string): Promise<SavedConcept | null> {
-  const read = await getDeliveryByToken(rawToken);
-  return read.status === 'ok' ? read.delivery : null;
-}
+import { savedDelivery } from './saved-delivery';
 
 /**
  * A concept write answered `already`: nothing was saved by THIS tap. Answer the
@@ -34,7 +28,7 @@ async function savedConcept(rawToken: string): Promise<SavedConcept | null> {
  * moved on and nobody is notified.
  */
 async function answerRepeat(rawToken: string): Promise<ConceptChoiceOutcome> {
-  const saved = await savedConcept(rawToken);
+  const saved = await savedDelivery(rawToken);
   const decision = saved?.conceptDecision ?? null;
   if (decision === null) return { kind: 'moved_on' };
   const { studioNotified } = await withStudioNotified(
@@ -57,7 +51,7 @@ export async function chooseConceptAndNotify(
   const result = await chooseConceptByToken(rawToken, input);
   if (!result.ok) {
     if (result.error !== 'wrong_state') return { kind: 'error', error: portalErrorKey(result.error) };
-    return outcomeOfRefusedLetter(await savedConcept(rawToken));
+    return outcomeOfRefusedLetter(await savedDelivery(rawToken));
   }
   if (result.code === 'already') return answerRepeat(rawToken);
   const { studioNotified } = await withStudioNotified(rawToken, result, { kind: 'concept_chosen' });

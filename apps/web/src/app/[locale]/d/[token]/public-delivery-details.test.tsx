@@ -9,6 +9,7 @@ import { PublicDeliveryView } from './public-delivery';
 // to pay while a payment is due; the claim's "sent on" date; what was received.
 
 vi.mock('./actions', () => ({}));
+vi.mock('./review-actions', () => ({}));
 vi.mock('next/navigation', async (importOriginal) => ({
   ...(await importOriginal<typeof import('next/navigation')>()),
   useRouter: () => ({ refresh: vi.fn() }),

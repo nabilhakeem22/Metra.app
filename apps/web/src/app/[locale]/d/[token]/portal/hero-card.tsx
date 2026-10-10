@@ -21,10 +21,11 @@ export interface HeroLastAnswer {
 }
 
 /** What the hero reads off the delivery: the verbs on offer, the concept
- *  options and the decision on file, the expected day and the story so far. */
+ *  options and the decision on file, the work to look at (the released
+ *  pictures) and the budget range, the expected day and the story so far. */
 export type HeroReview = Pick<
   PublicDelivery,
-  'clientActions' | 'conceptOptions' | 'conceptChoice' | 'conceptDecision' | 'expectedOn' | 'timeline'
+  'clientActions' | 'conceptOptions' | 'conceptChoice' | 'conceptDecision' | 'documents' | 'rom' | 'expectedOn' | 'timeline'
 >;
 
 /**
@@ -87,5 +88,5 @@ export function HeroCard({
       />
     );
   }
-  return <ActionHero token={token} group={asked} clientActions={clientActions} onAnswered={answered} />;
+  return <ActionHero token={token} group={asked} review={review} onAnswered={answered} />;
 }

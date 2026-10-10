@@ -9,9 +9,10 @@ import { DOCUMENT_HEADERS, documentResponse, type HandOver } from './document-re
 // tokenized delivery. GET only; the share token in the path IS the authorization
 // (the SDF resolves the delivery solely by its hash).
 //
-// TWO WAYS TO HAND IT OVER. No `variant` is the download; `?variant=view` asks
+// THREE WAYS TO HAND IT OVER. No `variant` is the download; `?variant=view` asks
 // to open it in the browser, which is honoured only for a file that is safe to
-// open (./document-response.ts). Any other `variant` is refused like a forged id.
+// open (./document-response.ts); `?variant=thumb` is a gallery tile, streamed,
+// for an IMAGE only (Round C). Any other `variant` is refused like a forged id.
 // While money is outstanding (`preview`), the client gets a downscaled image
 // streamed from here and never a storage URL.
 //
@@ -25,7 +26,7 @@ import { DOCUMENT_HEADERS, documentResponse, type HandOver } from './document-re
 /** The hand-over a `variant` asks for, or null for one this route does not know. */
 function handOverOf(variant: string | null): HandOver | null {
   if (variant === null) return 'download';
-  return variant === 'view' ? 'view' : null;
+  return variant === 'view' || variant === 'thumb' ? variant : null;
 }
 
 function isLocale(value: string): boolean {

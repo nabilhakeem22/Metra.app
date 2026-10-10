@@ -8,6 +8,7 @@ import { JourneyTracker } from './journey-tracker';
 // The client's stage words come from the catalog (`delivery.stage.*`,
 // `delivery.journey.*`), never from a TS table, so the i18n gate checks them.
 
+vi.mock('../review-actions', () => ({}));
 vi.mock('../actions', () => ({}));
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
 
@@ -17,7 +18,7 @@ function renderCalm(kind: 'inProgress' | 'delivered' | 'closed', locale: TestLoc
       token="tok"
       hero={{ kind, showRomAck: false }}
       stageKey={kind === 'delivered' ? 'delivered' : kind === 'closed' ? 'closed' : 'drawings'}
-      review={{ clientActions: [], conceptOptions: [], conceptChoice: null, conceptDecision: null, expectedOn: null, timeline: [] }}
+      review={{ clientActions: [], conceptOptions: [], conceptChoice: null, conceptDecision: null, documents: [], rom: null, expectedOn: null, timeline: [] }}
       lastAnswer={null}
       onAnswered={() => {}}
     />,

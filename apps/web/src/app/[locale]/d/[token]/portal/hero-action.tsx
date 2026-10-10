@@ -6,41 +6,42 @@ import { useRouter } from 'next/navigation';
 import { useId, useState, useTransition } from 'react';
 import { Button } from '@/components/ui/button';
 import { isBlankNote } from '@/lib/engagements/client-note';
-import { isConceptVerb } from '@/lib/engagements/concept-choice-outcome';
+import { workImages } from '@/lib/engagements/portal-gallery';
 import type { HeroGroup } from '@/lib/engagements/portal-hero';
-import { recordDeliveryAction, respondToDeliveryConcept } from '../actions';
+import type { PublicDelivery } from '@/lib/engagements/public/types';
 import { ChangesNote } from './changes-note';
 import { ConfirmActDialog } from './confirm-act-dialog';
-import {
-  answerOfConceptOutcome,
-  answerOfSignal,
-  type HeroAnswer,
-  type HeroConfirmedState,
-  type HeroError,
-} from './hero-answer';
+import type { HeroConfirmedState, HeroError } from './hero-answer';
 import { GROUP_BUTTONS, type HeroButton } from './hero-buttons';
+import { HeroConfirmBody } from './hero-confirm-body';
 import { HeroErrorText } from './hero-error';
-import type { HeroOutcome } from './hero-confirmed';
+import { sendHeroVerb } from './hero-verbs';
+import { HeroWorkStrip } from './hero-work-strip';
+
+/** What the action hero reads off the delivery. */
+export type ActionHeroReview = Pick<PublicDelivery, 'clientActions' | 'documents' | 'rom'>;
 
 /**
- * The actionable hero: the plain-language CTA for its group, a note field, and
- * one button per verb the client is actually OFFERED (`clientActions`). One
+ * The actionable hero: the plain-language CTA for its group, the WORK to look
+ * at first (the concept options or the final renders, ./hero-work-strip.tsx),
+ * a note field, and one button per verb the client is actually OFFERED. One
  * primary button, never a menu. Approving and confirming the handover ask
- * first (ConfirmActDialog; Cancel sends nothing); a request for changes needs a
- * note. A concept verb answers from the decision SAVED on file (a repeat shows
- * that one, B12); a design or handover verb confirms the tapped verb. A
+ * first (ConfirmActDialog, repeating the first picture; Cancel sends nothing);
+ * a request for changes needs a note. The final approval, when the budget
+ * range is also waiting, acknowledges it in the SAME confirmation. Every verb
+ * answers from the decision SAVED on file (a repeat shows that one). A
  * confirmed answer goes UP (`onAnswered`): the command card keeps it on screen
  * across the refresh that follows.
  */
 export function ActionHero({
   token,
   group,
-  clientActions,
+  review,
   onAnswered,
 }: {
   token: string;
   group: HeroGroup;
-  clientActions: readonly string[];
+  review: ActionHeroReview;
   onAnswered: (answer: HeroConfirmedState) => void;
 }) {
   const tHero = useTranslations('delivery.hero');
@@ -52,23 +53,19 @@ export function ActionHero({
   const [note, setNote] = useState('');
   const [asking, setAsking] = useState<HeroButton | null>(null);
   const [error, setError] = useState<HeroError | null>(null);
+  const { clientActions, rom } = review;
   const buttons = GROUP_BUTTONS[group].filter((button) => clientActions.includes(button.verb));
   const noteBlank = isBlankNote(note);
   const offersChanges = buttons.some((button) => !button.confirms);
-
-  async function answerOf(verb: string, outcome: HeroOutcome): Promise<HeroAnswer> {
-    if (isConceptVerb(verb)) {
-      return answerOfConceptOutcome(await respondToDeliveryConcept(token, verb, note));
-    }
-    return answerOfSignal(await recordDeliveryAction(token, verb, note), outcome);
-  }
+  const work = workImages(review.documents, group);
+  const budget = group === 'design' && clientActions.includes('acknowledge_rom') && rom && (rom.low || rom.high) ? rom : null;
 
   function submit(button: HeroButton) {
     setError(null);
     startTransition(async () => {
       // Wrap the await so a rejected action can never leave the spinner stuck.
       try {
-        const answer = await answerOf(button.verb, button.outcome);
+        const answer = await sendHeroVerb(token, button.verb, note, { withBudget: budget !== null });
         if ('confirmed' in answer) return onAnswered(answer.confirmed);
         setError(answer.error);
         if (answer.refresh) router.refresh();
@@ -88,6 +85,7 @@ export function ActionHero({
       </span>
       <h2 className="text-heading font-semibold">{tGroup('headline')}</h2>
       <p className="text-body text-muted-foreground">{tGroup('body')}</p>
+      {group !== 'handoff' && <HeroWorkStrip token={token} images={work} />}
       <ChangesNote note={note} onChange={setNote} hintId={hintId} showHint={offersChanges && noteBlank} />
       <div className="flex flex-col gap-2">
         {buttons.map((button) => (
@@ -108,7 +106,7 @@ export function ActionHero({
       <ConfirmActDialog
         open={asking !== null}
         title={tGroup('confirmTitle')}
-        body={<p>{tGroup('confirmBody')}</p>}
+        body={<HeroConfirmBody token={token} group={group} firstImage={work[0] ?? null} budget={budget} />}
         confirmLabel={tActions('confirm')}
         cancelLabel={tActions('cancel')}
         pending={pending}

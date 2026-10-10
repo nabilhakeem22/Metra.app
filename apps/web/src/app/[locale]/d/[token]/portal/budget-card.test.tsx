@@ -4,8 +4,8 @@ import { messageAt, renderWithIntl, type TestLocale } from '@/test/render-with-i
 import { BudgetCard } from './budget-card';
 
 // The server action is replaced, so no server-only stack is loaded.
-const actions = vi.hoisted(() => ({ recordDeliveryAction: vi.fn() }));
-vi.mock('../actions', () => actions);
+const actions = vi.hoisted(() => ({ acknowledgeDeliveryBudget: vi.fn() }));
+vi.mock('../review-actions', () => actions);
 const router = vi.hoisted(() => ({ refresh: vi.fn() }));
 vi.mock('next/navigation', () => ({ useRouter: () => router }));
 
@@ -25,7 +25,7 @@ function renderCard(
 }
 
 beforeEach(() => {
-  actions.recordDeliveryAction.mockReset();
+  actions.acknowledgeDeliveryBudget.mockReset();
   router.refresh.mockReset();
 });
 
@@ -49,7 +49,7 @@ describe('BudgetCard', () => {
   });
 
   it('records acknowledge_rom, keeps the range with "you have seen it", and re-reads the page', async () => {
-    actions.recordDeliveryAction.mockResolvedValue({ ok: true });
+    actions.acknowledgeDeliveryBudget.mockResolvedValue({ ok: true });
     const { container } = renderCard(ROM, 'en');
     fireEvent.click(screen.getByRole('button', { name: messageAt('en', 'delivery.budget.acknowledge') }));
 
@@ -57,7 +57,7 @@ describe('BudgetCard', () => {
     expect(confirmed.textContent).toContain(messageAt('en', 'delivery.budget.acknowledgedNote'));
     expect(confirmed.textContent).toContain(messageAt('en', 'delivery.budget.acknowledged'));
     expect(router.refresh).toHaveBeenCalledTimes(1);
-    expect(actions.recordDeliveryAction).toHaveBeenCalledWith('tok', 'acknowledge_rom');
+    expect(actions.acknowledgeDeliveryBudget).toHaveBeenCalledWith('tok');
     expect(confirmed.textContent).not.toContain(messageAt('en', 'delivery.budget.acknowledgedNotified'));
     expect(screen.queryByRole('button')).toBeNull();
     // The range stays on screen after acknowledging.
@@ -65,7 +65,7 @@ describe('BudgetCard', () => {
   });
 
   it('says the team was notified only when the studio really was', async () => {
-    actions.recordDeliveryAction.mockResolvedValue({ ok: true, studioNotified: true });
+    actions.acknowledgeDeliveryBudget.mockResolvedValue({ ok: true, studioNotified: true });
     renderCard(ROM, 'ar-EG');
     fireEvent.click(screen.getByRole('button', { name: messageAt('ar-EG', 'delivery.budget.acknowledge') }));
     const confirmed = await screen.findByRole('status');
@@ -73,7 +73,7 @@ describe('BudgetCard', () => {
   });
 
   it('paints the confirmed state with theme tokens, never a fixed light palette', async () => {
-    actions.recordDeliveryAction.mockResolvedValue({ ok: true });
+    actions.acknowledgeDeliveryBudget.mockResolvedValue({ ok: true });
     const { container } = renderCard(ROM, 'ar-EG');
     fireEvent.click(screen.getByRole('button', { name: messageAt('ar-EG', 'delivery.budget.acknowledge') }));
     const confirmed = await screen.findByRole('status');
@@ -82,7 +82,7 @@ describe('BudgetCard', () => {
   });
 
   it('shows a known error for an unknown failure code, and the button stays', async () => {
-    actions.recordDeliveryAction.mockResolvedValue({ ok: false, error: 'contract_inactive' });
+    actions.acknowledgeDeliveryBudget.mockResolvedValue({ ok: false, error: 'contract_inactive' });
     renderCard(ROM, 'en');
     fireEvent.click(screen.getByRole('button', { name: messageAt('en', 'delivery.budget.acknowledge') }));
     const alert = await screen.findByRole('alert');
@@ -94,7 +94,7 @@ describe('BudgetCard', () => {
   });
 
   it('recovers from a rejected action without a stuck spinner', async () => {
-    actions.recordDeliveryAction.mockRejectedValue(new Error('network'));
+    actions.acknowledgeDeliveryBudget.mockRejectedValue(new Error('network'));
     renderCard(ROM, 'en');
     fireEvent.click(screen.getByRole('button', { name: messageAt('en', 'delivery.budget.acknowledge') }));
     expect((await screen.findByRole('alert')).textContent).toBe(
