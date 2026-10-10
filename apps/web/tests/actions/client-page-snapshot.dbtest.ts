@@ -50,7 +50,7 @@ describe('the studio on the client page', () => {
 });
 
 describe('payment instructions and the claim date (AC 47, 48)', () => {
-  it('present while a milestone is due, dated once claimed, gone when everything is paid', async () => {
+  it('present only while a payment is due now and unclaimed, dated once claimed, gone when everything is paid', async () => {
     const d = await seedRoundBDelivery(orgIds, 'c9-pay');
     await setStudioDetails(d.orgId, STUDIO_DETAILS);
     expect((await deliveryOrNull(d.token))!.paymentDetails).toBeNull();
@@ -67,8 +67,15 @@ describe('payment instructions and the claim date (AC 47, 48)', () => {
     const claimed = (await deliveryOrNull(d.token))!.paymentClaim!.claimableMilestones;
     expect(claimed.find((m) => m.milestoneKind === 'deposit')).toMatchObject({ hasPendingClaim: true, claimedAt: expect.any(String) });
     expect(claimed.find((m) => m.milestoneKind === 'gate_a')).toMatchObject({ hasPendingClaim: false, claimedAt: null });
+    // The deposit (due now) is claimed; gate_a is claimable but LATER: no "How to
+    // pay" on the page, so the details do not reach the browser (wave 3 gate).
+    expect((await deliveryOrNull(d.token))!.paymentDetails).toBeNull();
 
-    for (const [kind, amount] of [['deposit', '30000'], ['gate_a', '20000'], ['gate_b', '25000'], ['balance', '25000']]) {
+    // The deposit clears: gate_a is now the payment due, and the details return.
+    await plantPayment(d, 'deposit', '30000', `now() - interval '1 day'`);
+    expect((await deliveryOrNull(d.token))!.paymentDetails).toMatchObject({ instapay: 'studio@instapay' });
+
+    for (const [kind, amount] of [['gate_a', '20000'], ['gate_b', '25000'], ['balance', '25000']]) {
       await plantPayment(d, kind!, amount!, `now() - interval '1 day'`);
     }
     const settled = (await deliveryOrNull(d.token))!;

@@ -9,7 +9,8 @@ import { closeFixture, ctxFor, raw, seedOrg, teardown } from './fixture';
 // S2, S3, S4): the studio's client page details are saved by an owner or admin
 // only, as a set of CHANGES against the revision the sheet loaded, exactly as
 // normalised, never tripping a 0058 CHECK; every change is audited masked and
-// fingerprinted, and alerts every owner and admin, merged per actor per hour.
+// fingerprinted, and EVERY change notifies every owner and admin (only the email
+// is limited).
 
 const orgIds: string[] = [];
 afterAll(async () => {
@@ -212,27 +213,43 @@ describe('updateClientPageDetailsCore: the alert (S1, S3, S4)', () => {
     for (const row of alerts) expect(row.params).toEqual({ actorUserId: owner.userId, fields: ['studioWhatsapp'] });
   });
 
-  it("merges one actor's changes within an hour, alerts a second actor on their own, and caps emails", async () => {
+  it('EVERY change notifies, naming its fields: a phone fix does not hide an IBAN change five minutes later', async () => {
+    const { orgId, admin, ctx } = await studio();
+    const actor = ctx(admin, 'admin');
+    const now = new Date();
+    await save(actor, { bankName: 'CIB' }, now);
+    const phone = await save(actor, { studioPhone: '01012345678' }, new Date(now.getTime() + 60_000));
+    const ibanChange = await save(actor, { bankIban: 'EG380019000500000000263180002' }, new Date(now.getTime() + 5 * 60_000));
+    expect(phone.data?.alert?.fields).toEqual(['studioPhone']);
+    expect(ibanChange.data?.alert?.fields).toEqual(['bankIban']);
+    const named = (await alertsOf(orgId)).map((row) => (row.params.fields as string[]).join(','));
+    // 3 saves x 4 owners/admins, each naming exactly the fields of its own save.
+    expect(named.filter((fields) => fields === 'studioPhone')).toHaveLength(4);
+    expect(named.filter((fields) => fields === 'bankIban')).toHaveLength(4);
+    expect(named).toHaveLength(12);
+  });
+
+  it('the same actor repeating the same fields within the hour: notified again, not emailed again', async () => {
+    const { orgId, owner } = await studio();
+    const now = new Date();
+    expect((await save(owner, { bankName: 'CIB' }, now)).data?.alert).not.toBeNull();
+    expect(await save(owner, { bankName: 'NBE' }, now)).toMatchObject({ ok: true, data: { alert: null } });
+    expect(await alertsOf(orgId)).toHaveLength(8);
+    // A different field set, or the next hour, emails again.
+    expect((await save(owner, { bankName: 'QNB', bankAccountHolder: 'Studio' }, now)).data?.alert).not.toBeNull();
+    expect((await save(owner, { bankName: 'CIB' }, new Date(now.getTime() + 60 * 60 * 1000))).data?.alert).not.toBeNull();
+  });
+
+  it('past three email batches in an hour the alert is in-app only, never dropped', async () => {
     const { orgId, owner, owner2, admin, admin2, ctx } = await studio();
     const now = new Date();
-    const first = await save(owner, { bankName: 'CIB' }, now);
-    expect(first.data?.alert).not.toBeNull();
-    const again = await save(owner, { bankName: 'NBE' }, now);
-    expect(again).toMatchObject({ ok: true, data: { alert: null } });
-    expect(await alertsOf(orgId)).toHaveLength(4);
-
-    // Three more actors in the same hour: each is alerted in the app; email batches stop at three per hour.
-    const second = await save(owner2, { bankName: 'QNB' }, now);
-    const third = await save(ctx(admin, 'admin'), { bankName: 'HSBC' }, now);
-    const fourth = await save(ctx(admin2, 'admin'), { bankName: 'ADIB' }, now);
-    expect([second, third, fourth].map((result) => result.data?.alert !== null)).toEqual([true, true, false]);
+    const results = [];
+    for (const [actor, bankName] of [[owner, 'CIB'], [owner2, 'QNB'], [ctx(admin, 'admin'), 'HSBC'], [ctx(admin2, 'admin'), 'ADIB']] as const) {
+      results.push(await save(actor, { bankName }, now));
+    }
+    expect(results.map((result) => result.data?.alert !== null)).toEqual([true, true, true, false]);
     expect(await alertsOf(orgId)).toHaveLength(16);
-    // Every change is still audited.
     const audits = await raw.query(`select id from public.audit_log where org_id = '${orgId}' and entity = 'organization'`);
-    expect(audits).toHaveLength(5);
-
-    // The next hour, the same actor alerts again.
-    const later = new Date(now.getTime() + 60 * 60 * 1000);
-    expect((await save(owner, { bankName: 'CIB' }, later)).data?.alert).not.toBeNull();
+    expect(audits).toHaveLength(4);
   });
 });

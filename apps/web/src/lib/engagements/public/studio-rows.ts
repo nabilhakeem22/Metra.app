@@ -57,13 +57,14 @@ export function parseFirm(raw: FirmRow | null | undefined): PublicDelivery['firm
 }
 
 /**
- * The studio's payment instructions, or null. Shown ONLY while a milestone is
- * claimable (the database applies the same rule; this is the second wall) and
- * only when the client has somewhere to pay: an InstaPay address, an account
- * number or an IBAN. A holder or a bank name alone is not an instruction.
+ * The studio's payment instructions, or null. Shown ONLY while a payment is due
+ * now and still claimable (`dueNow`, portal-payments.ts `awaitsPaymentNow`; the
+ * database already withholds them unless something is claimable) and only when
+ * the client has somewhere to pay: an InstaPay address, an account number or an
+ * IBAN. A holder or a bank name alone is not an instruction.
  */
-export function parsePaymentDetails(raw: unknown, claimableCount: number): PortalPaymentDetails | null {
-  if (claimableCount === 0 || !raw || typeof raw !== 'object') return null;
+export function parsePaymentDetails(raw: unknown, dueNow: boolean): PortalPaymentDetails | null {
+  if (!dueNow || !raw || typeof raw !== 'object') return null;
   const row = raw as Record<string, unknown>;
   const details: PortalPaymentDetails = {
     instapay: instructionText(row.instapay),

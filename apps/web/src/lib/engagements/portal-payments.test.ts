@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { derivePaymentsOverview, paymentClaimState } from './portal-payments';
+import { awaitsPaymentNow, derivePaymentsOverview, paymentClaimState } from './portal-payments';
 import type { PublicDelivery, PublicDeliveryMilestone } from './public/types';
 
 function milestone(
@@ -121,5 +121,36 @@ describe('paymentClaimState', () => {
   it('is none for a milestone the SDF did not list, or with no claim object', () => {
     expect(paymentClaimState(claim, 'deposit', none)).toEqual({ kind: 'none' });
     expect(paymentClaimState(null, 'gate_b', none)).toEqual({ kind: 'none' });
+  });
+});
+
+describe('awaitsPaymentNow (wave 3 gate: payment details only while due NOW)', () => {
+  const claimable = (kinds: string[], pending: string[] = []): PublicDelivery['paymentClaim'] => ({
+    claimableMilestones: kinds.map((milestoneKind) => ({
+      milestoneKind,
+      amountRemaining: '1.0000',
+      hasPendingClaim: pending.includes(milestoneKind),
+      claimedAt: pending.includes(milestoneKind) ? '2026-10-10T08:00:00.000Z' : null,
+    })),
+  });
+  const FRESH = [
+    milestone('deposit', '30000.0000', '0.0000', 'due'),
+    milestone('gate_a', '20000.0000', '0.0000', 'due'),
+  ];
+
+  it('is true while the next milestone is claimable', () => {
+    expect(awaitsPaymentNow(FRESH, claimable(['deposit', 'gate_a']))).toBe(true);
+  });
+
+  it('is false when the due one is claimed and only a LATER milestone is claimable', () => {
+    expect(awaitsPaymentNow(FRESH, claimable(['deposit', 'gate_a'], ['deposit']))).toBe(false);
+    expect(awaitsPaymentNow(FRESH, claimable(['gate_a']))).toBe(false);
+    expect(awaitsPaymentNow(FRESH, claimable(['deposit', 'gate_a']), new Set(['deposit']))).toBe(false);
+  });
+
+  it('is true for a partly paid milestone still claimable, false with no schedule or nothing claimable', () => {
+    expect(awaitsPaymentNow(MIDWAY, claimable(['gate_b', 'balance']))).toBe(true);
+    expect(awaitsPaymentNow([], claimable(['deposit']))).toBe(false);
+    expect(awaitsPaymentNow(FRESH, null)).toBe(false);
   });
 });

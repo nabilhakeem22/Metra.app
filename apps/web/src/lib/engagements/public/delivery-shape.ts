@@ -9,6 +9,7 @@
 // word or a boolean below, so none of them reaches the browser payload.
 import { stateMilestone } from '../journey-map';
 import { deriveHero } from '../portal-hero';
+import { awaitsPaymentNow } from '../portal-payments';
 import { PORTAL_STAGE_KEY } from '../portal-stage';
 import type { DesignState } from '../states';
 import { parseConceptChoice, parseConceptDecision, parseConceptOptions } from './concept-rows';
@@ -55,10 +56,13 @@ function shapePayments(
   snapshot: DeliverySnapshot,
 ): Pick<PublicDelivery, 'paymentSchedule' | 'paymentClaim' | 'paymentDetails'> {
   const paymentClaim = shapePaymentClaim(snapshot);
+  const paymentSchedule = shapeSchedule(snapshot);
   return {
-    paymentSchedule: shapeSchedule(snapshot),
+    paymentSchedule,
     paymentClaim,
-    paymentDetails: parsePaymentDetails(snapshot.payment_details, paymentClaim?.claimableMilestones.length ?? 0),
+    // Only while the card would show "How to pay": a payment due NOW and still
+    // claimable. A later milestone alone never puts the details in the browser.
+    paymentDetails: parsePaymentDetails(snapshot.payment_details, awaitsPaymentNow(paymentSchedule, paymentClaim)),
   };
 }
 

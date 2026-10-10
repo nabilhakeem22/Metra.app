@@ -36,7 +36,7 @@ describe('parseFirm', () => {
 
 describe('parsePaymentDetails (AC 47)', () => {
   it('maps the five values while a milestone is claimable', () => {
-    expect(parsePaymentDetails(DETAILS, 1)).toEqual({
+    expect(parsePaymentDetails(DETAILS, true)).toEqual({
       instapay: 'studio@instapay',
       bankName: 'CIB',
       bankAccountHolder: 'Studio LLC',
@@ -46,15 +46,15 @@ describe('parsePaymentDetails (AC 47)', () => {
   });
 
   it('prints Latin digits only, whatever the studio typed (§4.1)', () => {
-    expect(parsePaymentDetails({ instapay: ' ٠١٠١٢٣٤٥٦٧٨ ' }, 1)!.instapay).toBe('01012345678');
+    expect(parsePaymentDetails({ instapay: ' ٠١٠١٢٣٤٥٦٧٨ ' }, true)!.instapay).toBe('01012345678');
   });
 
   it('is null when nothing is claimable, when every field is empty, or with no usable method', () => {
-    expect(parsePaymentDetails(DETAILS, 0)).toBeNull();
-    expect(parsePaymentDetails({ instapay: '  ', bank_name: '', bank_iban: null }, 1)).toBeNull();
-    expect(parsePaymentDetails({ bank_name: 'CIB', bank_account_holder: 'Studio LLC' }, 1)).toBeNull();
-    expect(parsePaymentDetails('nope', 1)).toBeNull();
-    expect(parsePaymentDetails({ instapay: 42 }, 1)).toBeNull();
+    expect(parsePaymentDetails(DETAILS, false)).toBeNull();
+    expect(parsePaymentDetails({ instapay: '  ', bank_name: '', bank_iban: null }, true)).toBeNull();
+    expect(parsePaymentDetails({ bank_name: 'CIB', bank_account_holder: 'Studio LLC' }, true)).toBeNull();
+    expect(parsePaymentDetails('nope', true)).toBeNull();
+    expect(parsePaymentDetails({ instapay: 42 }, true)).toBeNull();
   });
 });
 
@@ -63,9 +63,21 @@ describe('the mapped delivery (AC 47)', () => {
   const claim = (rows: ClaimRows) => ({ claim: { claimable_milestones: rows } });
   const due = { milestone_kind: 'deposit', amount_remaining: '30000.0000', has_pending_claim: false, claimed_at: null };
 
-  it('carries the instructions only while a milestone is claimable', () => {
-    expect(shapeDelivery({ ...base, ...claim([due]) })!.paymentDetails).not.toBeNull();
-    expect(shapeDelivery({ ...base, ...claim([]) })!.paymentDetails).toBeNull();
+  const schedule = {
+    payment_schedule: [
+      { milestone_kind: 'deposit', basis: 'amount', amount_due: '30000.0000', amount_cleared: '0.0000', status: 'due' as const },
+      { milestone_kind: 'gate_a', basis: 'amount', amount_due: '20000.0000', amount_cleared: '0.0000', status: 'due' as const },
+    ],
+  };
+  const later = { ...due, milestone_kind: 'gate_a', amount_remaining: '20000.0000' };
+
+  it('carries the instructions only while the payment due NOW is claimable (wave 3 gate)', () => {
+    expect(shapeDelivery({ ...base, ...schedule, ...claim([due, later]) })!.paymentDetails).not.toBeNull();
+    // Only a LATER milestone claimable, or the due one already claimed: no "How to pay", no details.
+    expect(shapeDelivery({ ...base, ...schedule, ...claim([later]) })!.paymentDetails).toBeNull();
+    expect(shapeDelivery({ ...base, ...schedule, ...claim([{ ...due, has_pending_claim: true }, later]) })!.paymentDetails).toBeNull();
+    expect(shapeDelivery({ ...base, ...schedule, ...claim([]) })!.paymentDetails).toBeNull();
+    expect(shapeDelivery({ ...base, ...claim([due]) })!.paymentDetails).toBeNull();
     expect(shapeDelivery(base)!.paymentDetails).toBeNull();
   });
 

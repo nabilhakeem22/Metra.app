@@ -1,44 +1,36 @@
 import 'server-only';
-// How often a change to the client page details may alert (Round C, C8 fix
-// round S4). Every change is AUDITED; the ALERT (an in-app notification to
-// every owner and admin, then an email each) is merged and capped:
-//   - one alert per actor per Cairo hour: the FIRST change an actor makes in an
-//     hour always alerts, and their later changes that hour are already covered
-//     by it (it opens Settings, which shows the current values);
-//   - a second actor in the same hour is alerted on their own, so a change can
-//     never hide behind a colleague's;
-//   - at most ALERT_EMAIL_BATCHES_PER_HOUR email batches per org per hour; past
-//     that the alert is in-app only, so a loop of saves cannot spend the shared
-//     mail quota.
-// Claims are `automation_run_log` rows written in the save's own transaction,
+// When a change to the client page details is also EMAILED (Round C, C8; owner
+// rule restored at the wave 3 gate). EVERY change to the phone, WhatsApp,
+// InstaPay or bank details notifies every owner and admin in the app, naming
+// every field that save changed; nothing here can withhold that. Only the
+// email is limited:
+//   - the same actor saving exactly the same set of fields again within the
+//     Cairo hour is not emailed twice (the in-app notification still lands);
+//   - at most ALERT_EMAIL_BATCHES_PER_HOUR email batches per org per hour, so
+//     a loop of saves cannot spend the shared mail quota; past that the alert
+//     is in-app only.
+// Both are `automation_run_log` claims written in the save's own transaction,
 // so a save that rolls back claims nothing.
 import type { MetraDb } from '@metra/db';
 import { claimPeriod } from '@/lib/automation/claim';
 import { cairoHourKey } from '@/lib/automation/clock';
+import type { ClientPageField } from './client-page-details';
 
 export const ALERT_EMAIL_BATCHES_PER_HOUR = 3;
 
-export interface AlertAllowance {
-  /** Write the in-app notifications for this change. */
-  notify: boolean;
-  /** Also email them. */
-  email: boolean;
-}
-
-export async function claimAlert(
+/** Whether this change's alert is also emailed. The in-app notification never depends on it. */
+export async function claimAlertEmail(
   tx: MetraDb,
   orgId: string,
   actorUserId: string,
+  fields: readonly ClientPageField[],
   now: Date,
-): Promise<AlertAllowance> {
+): Promise<boolean> {
   const hour = cairoHourKey(now);
-  if (!(await claimPeriod(tx, orgId, 'client-page-alert', `${hour}:${actorUserId}`))) {
-    return { notify: false, email: false };
-  }
+  const fieldSet = [...fields].sort().join(',');
+  if (!(await claimPeriod(tx, orgId, 'client-page-alert', `${hour}:${actorUserId}:${fieldSet}`))) return false;
   for (let batch = 1; batch <= ALERT_EMAIL_BATCHES_PER_HOUR; batch += 1) {
-    if (await claimPeriod(tx, orgId, 'client-page-alert-email', `${hour}:${batch}`)) {
-      return { notify: true, email: true };
-    }
+    if (await claimPeriod(tx, orgId, 'client-page-alert-email', `${hour}:${batch}`)) return true;
   }
-  return { notify: true, email: false };
+  return false;
 }

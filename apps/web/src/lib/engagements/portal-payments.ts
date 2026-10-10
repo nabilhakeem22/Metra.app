@@ -123,3 +123,25 @@ export function paymentClaimState(
   }
   return { kind: 'claimable', amountRemaining: claimable.amountRemaining };
 }
+
+/**
+ * Whether the client must pay something NOW: a milestone that is due (the next
+ * one) or partly paid, which the client may still claim (no open claim, none
+ * made in this visit). The ONE rule for "How to pay": the card shows the
+ * studio's payment details only then, and the server sends them to the browser
+ * only then, so a delivery whose only unpaid milestones are later ones never
+ * carries the studio's bank details (Round C wave 3 gate).
+ */
+export function awaitsPaymentNow(
+  schedule: PublicDeliveryMilestone[] | null | undefined,
+  claim: PublicDelivery['paymentClaim'],
+  claimedThisSession: ReadonlySet<string> = new Set(),
+): boolean {
+  const overview = derivePaymentsOverview(schedule);
+  if (!overview) return false;
+  return overview.rows.some(
+    (row) =>
+      (row.state === 'due' || row.state === 'partial') &&
+      paymentClaimState(claim, row.milestoneKind, claimedThisSession).kind === 'claimable',
+  );
+}

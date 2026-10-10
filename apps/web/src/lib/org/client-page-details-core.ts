@@ -13,7 +13,7 @@ import { orgOwnerAdminIds } from '@/lib/automation/due-work';
 import type { OrgContext } from '@/lib/db/context';
 import { insertNotifications } from '@/lib/notifications/core';
 import { auditFingerprint } from './audit-fingerprint';
-import { claimAlert } from './client-page-alert';
+import { claimAlertEmail } from './client-page-alert';
 import { changedFields, maskedChange } from './client-page-change';
 import {
   detailsAfter,
@@ -76,7 +76,10 @@ async function writeDetails(tx: MetraDb, orgId: string, changes: Partial<ClientP
   }
 }
 
-/** Notify every owner and admin in the app (merged per actor per hour), and say whom to email. */
+/**
+ * Notify every owner and admin in the app, EVERY time, naming every field this
+ * save changed (owner rule); then say whom to email, when the email limits allow.
+ */
 async function alertOwners(
   tx: MetraDb,
   ctx: OrgContext,
@@ -84,8 +87,6 @@ async function alertOwners(
   locale: string,
   now: Date,
 ): Promise<ClientPageAlert | null> {
-  const allowance = await claimAlert(tx, ctx.orgId, ctx.userId, now);
-  if (!allowance.notify) return null;
   const recipients = (await orgOwnerAdminIds(tx)).map((member) => member.userId);
   await insertNotifications(
     tx,
@@ -100,7 +101,8 @@ async function alertOwners(
       params: { actorUserId: ctx.userId, fields },
     })),
   );
-  return allowance.email ? { recipientUserIds: recipients, fields, locale } : null;
+  const email = await claimAlertEmail(tx, ctx.orgId, ctx.userId, fields, now);
+  return email ? { recipientUserIds: recipients, fields, locale } : null;
 }
 
 /**
