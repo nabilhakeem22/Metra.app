@@ -27,8 +27,10 @@ import { withRequestDb } from '@/lib/db/client';
  * it and asking the database is a wasted connection on a path that is reachable
  * by anyone with the URL. Every portal wrote `!raw || !raw.trim()` by hand.
  */
-export function normalizeRawToken(raw: string | null | undefined): string | null {
-  const trimmed = raw?.trim();
+export function normalizeRawToken(raw: unknown): string | null {
+  // A server action is directly invokable: a non-string is refused, never thrown on.
+  if (typeof raw !== 'string') return null;
+  const trimmed = raw.trim();
   return trimmed ? trimmed : null;
 }
 

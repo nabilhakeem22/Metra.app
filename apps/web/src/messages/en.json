@@ -2439,7 +2439,9 @@
         "approvedBodyNotified": "Your approval is recorded and your designer has been notified. They will prepare the drawings for execution.",
         "changesTitle": "Changes requested",
         "changesBody": "Your request is recorded. Your designer will see it and refine the design with you.",
-        "changesBodyNotified": "Your request is recorded and your designer has been notified. They will refine the design with you."
+        "changesBodyNotified": "Your request is recorded and your designer has been notified. They will refine the design with you.",
+        "confirmWithBudget": "Approving also confirms you have seen this budget range.",
+        "budgetAcknowledged": "You also confirmed seeing the budget range."
       },
       "handoff": {
         "headline": "Your design package is ready",
@@ -2450,6 +2452,14 @@
         "acknowledgedTitle": "Handover confirmed 🎉",
         "acknowledgedBody": "Thank you, we have received your confirmation. Your designer will close the project shortly.",
         "acknowledgedBodyNotified": "Thank you, we have received your confirmation and your designer has been notified. They will close the project shortly."
+      },
+      "expectedBy": "Expected by {date}",
+      "deliveredOn": "Delivered on {date}. Thank you.",
+      "work": {
+        "title": "The work to review",
+        "viewAll": "View all ({count})",
+        "seeFiles": "See your files below",
+        "locked": "Some of this work opens only after the payment that is due. Ask your designer to show it to you before you approve."
       }
     },
     "conceptPicker": {
@@ -2463,7 +2473,6 @@
       "confirm": "Yes, choose option {letter}",
       "cancel": "Cancel",
       "changed": "The options have changed. Please review them again.",
-      "movedOn": "This step has already moved on. The page now shows where things stand.",
       "chosen": "You chose option {letter}."
     },
     "whatsNext": {
@@ -2479,7 +2488,8 @@
       "acknowledge": "I acknowledge this budget",
       "acknowledged": "Acknowledged. Your design team can see your confirmation.",
       "acknowledgedNotified": "Acknowledged. Your design team has been notified.",
-      "acknowledgedNote": "You have seen this range."
+      "acknowledgedNote": "You have seen this range.",
+      "acknowledgedOn": "You saw this range on {date}."
     },
     "payments": {
       "title": "Payments",
@@ -2504,7 +2514,9 @@
         "deposit": "Deposit",
         "gate_a": "Concept payment",
         "gate_b": "First payment",
-        "balance": "Final payment"
+        "balance": "Final payment",
+        "revision_co": "Design changes payment",
+        "other": "Payment"
       },
       "error": {
         "token_invalid": "This link is no longer available. Please contact your design team.",
@@ -2512,6 +2524,24 @@
         "not_active": "This delivery is closed. Please contact your design team.",
         "wrong_state": "This payment isn't available to mark right now. Please refresh the page.",
         "generic": "Something went wrong. Please try again."
+      },
+      "claimedOn": "Thanks, we are confirming your payment. Sent on {date}. It is usually confirmed within one working day.",
+      "instructions": {
+        "title": "How to pay",
+        "body": "Pay using one of these, then tell your designer with \"I've made this payment\".",
+        "instapay": "InstaPay",
+        "bankName": "Bank",
+        "accountHolder": "Account name",
+        "accountNumber": "Account number",
+        "iban": "IBAN",
+        "copy": "Copy",
+        "copyLabel": "Copy {label}",
+        "copied": "Copied",
+        "copyFailed": "Copying is not available here. The text is selected: copy it from your keyboard or menu."
+      },
+      "receipts": {
+        "title": "Payments received",
+        "receivedOn": "Received on {date}"
       }
     },
     "actions": {
@@ -2525,7 +2555,9 @@
         "not_active": "This delivery is closed. Please contact your design team.",
         "wrong_state": "This action isn't available right now. Please refresh the page.",
         "generic": "Something went wrong. Please try again."
-      }
+      },
+      "movedOn": "This step has already moved on. The page now shows where things stand.",
+      "changed": "Something on this step changed since you opened it, so nothing was sent. The page now shows the latest; please review it again."
     },
     "poweredBy": "Shared securely by {firm}",
     "documents": {
@@ -2565,10 +2597,42 @@
         "token_expired": "This link has expired. Please contact your design team.",
         "not_active": "This delivery is closed. Please contact your design team.",
         "wrong_state": "This isn't available right now."
-      }
+      },
+      "advisoryLightbox": "A question here doesn't request changes. To request changes, close this view and use the buttons on the page."
     },
     "reminder": {
       "message": "Hello {client}, a reminder from {studio} about your design project. You can see the latest updates and anything that needs you here:\n{link}"
+    },
+    "studioBar": {
+      "whatsapp": "Message your design team on WhatsApp",
+      "call": "Call your design team",
+      "whatsappText": "Hello, I am writing about my design project {ref}."
+    },
+    "timeline": {
+      "title": "What happened",
+      "lastUpdate": "Last update {date}",
+      "showAll": "Show all ({count})",
+      "showFewer": "Show fewer",
+      "recordedByStudio": "{decision} (recorded by your designer)",
+      "payment": "Payment received: {milestone}, {amount}",
+      "decision": {
+        "concept_approved": "You approved the concept",
+        "concept_chosen": "You chose option {letter}",
+        "concept_changes": "You asked for changes to the concept",
+        "design_approved": "You approved the final design",
+        "design_changes": "You asked for changes to the design",
+        "budget_acknowledged": "You saw the budget range",
+        "handover_acknowledged": "You confirmed receiving the design package"
+      }
+    },
+    "gallery": {
+      "imageAlt": "{category}, shared {date}"
+    },
+    "lightbox": {
+      "previous": "Previous image",
+      "next": "Next image",
+      "close": "Close",
+      "position": "{current} of {total}"
     }
   }
 }

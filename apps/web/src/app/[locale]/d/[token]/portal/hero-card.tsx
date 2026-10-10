@@ -2,6 +2,7 @@
 
 import { answeredReview } from '@/lib/engagements/portal-answered';
 import type { PublicDelivery } from '@/lib/engagements/public/types';
+import { deliveredAt } from '@/lib/engagements/public/timeline-rows';
 import type { HeroGroup, HeroView } from '@/lib/engagements/portal-hero';
 import type { PortalStageKey } from '@/lib/engagements/portal-stage';
 import { CalmHero } from './calm-hero';
@@ -19,12 +20,21 @@ export interface HeroLastAnswer {
   confirmed: HeroConfirmedState;
 }
 
+/** What the hero reads off the delivery: the verbs on offer, the concept
+ *  options and the decision on file, the work to look at (the released
+ *  pictures) and the budget range, the expected day and the story so far. */
+export type HeroReview = Pick<
+  PublicDelivery,
+  'clientActions' | 'conceptOptions' | 'conceptChoice' | 'conceptDecision' | 'documents' | 'rom' | 'expectedOn' | 'timeline'
+>;
+
 /**
  * The hero: the single "what needs you now" surface. At the concept review, with
  * at least two released options and the approval still open, it is the option
  * picker; in any other actionable state it is the group's CTA (./hero-action.tsx);
  * otherwise the calm card (./calm-hero.tsx), which says what the client
- * answered when they have answered the stage's review.
+ * answered when they have answered the stage's review, the day the studio
+ * expects the next step, or the day the design was delivered.
  *
  * A confirmed answer stays on screen in place of the hero, before and after
  * the refresh that follows it (it already says what was done and what comes
@@ -35,23 +45,18 @@ export function HeroCard({
   token,
   hero,
   stageKey,
-  clientActions,
-  conceptOptions,
-  conceptChoice,
-  conceptDecision,
+  review,
   lastAnswer,
   onAnswered,
 }: {
   token: string;
   hero: HeroView;
   stageKey: PortalStageKey;
-  clientActions: PublicDelivery['clientActions'];
-  conceptOptions: PublicDelivery['conceptOptions'];
-  conceptChoice: PublicDelivery['conceptChoice'];
-  conceptDecision: PublicDelivery['conceptDecision'];
+  review: HeroReview;
   lastAnswer: HeroLastAnswer | null;
   onAnswered: (answer: HeroLastAnswer) => void;
 }) {
+  const { clientActions, conceptOptions, conceptChoice, conceptDecision } = review;
   const asked = hero.kind === 'action' ? hero.group : undefined;
   if (lastAnswer && (!asked || asked === lastAnswer.group)) {
     return <HeroConfirmed group={lastAnswer.group} {...lastAnswer.confirmed} />;
@@ -63,6 +68,8 @@ export function HeroCard({
         stageKey={stageKey}
         answered={answeredReview({ stageKey, clientActions, conceptDecision, conceptChoice })}
         chosenLetter={conceptChoice?.letter ?? null}
+        expectedOn={review.expectedOn}
+        deliveredAt={deliveredAt(review.timeline)}
       />
     );
   }
@@ -81,5 +88,5 @@ export function HeroCard({
       />
     );
   }
-  return <ActionHero token={token} group={asked} clientActions={clientActions} onAnswered={answered} />;
+  return <ActionHero token={token} group={asked} review={review} onAnswered={answered} />;
 }

@@ -4,6 +4,16 @@ import { deliveryDisplayNames } from '@/lib/engagements/public/display-names';
 import { PRIVATE_METADATA } from '@/lib/seo/private-metadata';
 
 /** A `delivery.*` translator: the client page's own (فصحى / English) words. */
+/**
+ * Never indexed, and no number on the page is turned into a link by the
+ * browser: the studio's InstaPay address and account numbers are text to copy,
+ * never something a tap dials or opens (iOS Safari links digit runs otherwise).
+ */
+const CLIENT_PAGE_METADATA: Metadata = {
+  ...PRIVATE_METADATA,
+  formatDetection: { telephone: false, email: false, address: false },
+};
+
 export type DeliveryTranslator = (key: string, values?: Record<string, string>) => string;
 
 /**
@@ -18,11 +28,11 @@ export type DeliveryTranslator = (key: string, values?: Record<string, string>) 
 export function deliveryMetadata(read: DeliveryReadResult, locale: string, t: DeliveryTranslator): Metadata {
   if (read.status !== 'ok') {
     const notice = read.status === 'read_failed' ? 'readFailed' : 'notFound';
-    return { ...PRIVATE_METADATA, title: { absolute: t(`${notice}.title`) }, description: t(`${notice}.body`) };
+    return { ...CLIENT_PAGE_METADATA, title: { absolute: t(`${notice}.title`) }, description: t(`${notice}.body`) };
   }
   const { firmName, title } = deliveryDisplayNames(read.delivery, locale);
   return {
-    ...PRIVATE_METADATA,
+    ...CLIENT_PAGE_METADATA,
     title: { absolute: title ? `${title} · ${firmName}` : firmName },
     description: t('meta.description', { firm: firmName }),
   };

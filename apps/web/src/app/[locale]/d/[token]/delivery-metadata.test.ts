@@ -13,7 +13,7 @@ const translator = (locale: TestLocale) => (key: string, values?: Record<string,
   );
 
 const DELIVERY = {
-  firm: { nameAr: 'ديوان', nameEn: 'Diwan Studio', logoFileId: null },
+  firm: { nameAr: 'ديوان', nameEn: 'Diwan Studio', hasLogo: false, phone: null, whatsappDigits: null },
   client: { nameAr: 'أحمد', nameEn: 'Ahmed' },
   titleAr: 'شقة الزمالك',
   titleEn: 'Zamalek flat',
@@ -28,6 +28,8 @@ describe('deliveryMetadata', () => {
     expect(metadata.title).toEqual({ absolute: title });
     expect(metadata.description).toBe(messageAt(locale, 'delivery.meta.description').replace('{firm}', firm));
     expect(metadata.robots).toEqual({ index: false, follow: false });
+    // The studio's account numbers are text to copy, never auto-linked.
+    expect(metadata.formatDetection).toEqual({ telephone: false, email: false, address: false });
     // Not the studio app's marketing copy.
     expect(JSON.stringify(metadata)).not.toContain(messageAt(locale, 'meta.description'));
   });

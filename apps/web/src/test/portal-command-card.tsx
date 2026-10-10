@@ -18,6 +18,10 @@ export interface CommandCardProps {
   conceptChoice?: PublicDelivery['conceptChoice'];
   conceptDecision?: PublicDelivery['conceptDecision'];
   stageKey?: PortalStageKey;
+  expectedOn?: PublicDelivery['expectedOn'];
+  timeline?: PublicDelivery['timeline'];
+  documents?: PublicDelivery['documents'];
+  rom?: PublicDelivery['rom'];
 }
 
 const REFRESH_LABEL = 'land the server refresh';
@@ -41,11 +45,15 @@ export function renderCommandCard(
           hero={props.hero}
           milestone={stateMilestone('concept_review')}
           stageKey={props.stageKey ?? 'conceptReview'}
-          concept={{
+          review={{
             clientActions: props.clientActions,
             conceptOptions: props.conceptOptions ?? [],
             conceptChoice: props.conceptChoice ?? null,
             conceptDecision: props.conceptDecision ?? null,
+            documents: props.documents ?? [],
+            rom: props.rom ?? null,
+            expectedOn: props.expectedOn ?? null,
+            timeline: props.timeline ?? [],
           }}
         />
       </>

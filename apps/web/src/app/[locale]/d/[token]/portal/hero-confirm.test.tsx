@@ -14,11 +14,14 @@ import { messageAt } from '@/test/render-with-intl';
 // on screen through that refresh. Request changes needs a note.
 
 const actions = vi.hoisted(() => ({
-  recordDeliveryAction: vi.fn(),
   chooseDeliveryConcept: vi.fn(),
   respondToDeliveryConcept: vi.fn(),
+  respondToDeliveryDesign: vi.fn(),
+  approveDesignWithBudget: vi.fn(),
+  acknowledgeDeliveryHandover: vi.fn(),
 }));
-vi.mock('../actions', () => actions);
+vi.mock('../review-actions', () => actions);
+vi.mock('../actions', () => ({}));
 const router = vi.hoisted(() => ({ refresh: vi.fn() }));
 vi.mock('next/navigation', () => ({ useRouter: () => router }));
 
@@ -32,7 +35,8 @@ const ACTION = {
 const CALM: CommandCardProps = { hero: { kind: 'inProgress', showRomAck: false }, clientActions: [], stageKey: 'drawings' };
 
 beforeEach(() => {
-  actions.recordDeliveryAction.mockReset();
+  actions.respondToDeliveryDesign.mockReset();
+  actions.acknowledgeDeliveryHandover.mockReset();
   actions.respondToDeliveryConcept.mockReset();
   router.refresh.mockReset();
 });
@@ -52,13 +56,14 @@ describe('approve and acknowledge ask first', () => {
     await answerDialog('en', 'cancel');
     await act(async () => {});
     expect(screen.queryByRole('dialog')).toBeNull();
-    expect(actions.recordDeliveryAction).not.toHaveBeenCalled();
+    expect(actions.respondToDeliveryDesign).not.toHaveBeenCalled();
+    expect(actions.acknowledgeDeliveryHandover).not.toHaveBeenCalled();
     expect(actions.respondToDeliveryConcept).not.toHaveBeenCalled();
     expect(router.refresh).not.toHaveBeenCalled();
   });
 
   it('Confirm sends once, refreshes once, and the confirmation survives the refresh', async () => {
-    actions.recordDeliveryAction.mockResolvedValue({ ok: true, studioNotified: true });
+    actions.respondToDeliveryDesign.mockResolvedValue({ kind: 'approved', studioNotified: true });
     renderCommandCard(
       { hero: ACTION.design, clientActions: ['approve_design', 'request_design_changes'] },
       { afterRefresh: CALM },
@@ -66,8 +71,9 @@ describe('approve and acknowledge ask first', () => {
     fireEvent.click(screen.getByRole('button', { name: en('delivery.hero.design.approve') }));
     await answerDialog('en', 'confirm');
     expect(await screen.findByText(en('delivery.hero.design.approvedBodyNotified'))).toBeTruthy();
-    expect(actions.recordDeliveryAction).toHaveBeenCalledTimes(1);
-    expect(actions.recordDeliveryAction).toHaveBeenCalledWith('tok', 'approve_design', '');
+    expect(actions.respondToDeliveryDesign).toHaveBeenCalledTimes(1);
+    // F2: the act carries the render round this hero showed.
+    expect(actions.respondToDeliveryDesign).toHaveBeenCalledWith('tok', 'approve_design', '', expect.objectContaining({ round: expect.any(String) }));
     expect(router.refresh).toHaveBeenCalledTimes(1);
     expect(screen.queryByRole('dialog')).toBeNull();
 
@@ -94,7 +100,7 @@ describe('approve and acknowledge ask first', () => {
 describe('Request changes needs a note', () => {
   it.each(['concept', 'design'] as const)('%s: disabled while blank, with the hint; no dialog', async (group) => {
     actions.respondToDeliveryConcept.mockResolvedValue({ kind: 'changes_requested', studioNotified: false });
-    actions.recordDeliveryAction.mockResolvedValue({ ok: true, studioNotified: false });
+    actions.respondToDeliveryDesign.mockResolvedValue({ kind: 'changes_requested', studioNotified: false });
     renderCommandCard({
       hero: ACTION[group],
       clientActions: group === 'concept' ? ['approve_concept', 'request_concept_changes'] : ['approve_design', 'request_design_changes'],
@@ -116,9 +122,14 @@ describe('Request changes needs a note', () => {
     fireEvent.click(changes);
     expect(screen.queryByRole('dialog')).toBeNull();
     await act(async () => {});
-    const sent = group === 'concept' ? actions.respondToDeliveryConcept : actions.recordDeliveryAction;
+    const sent = group === 'concept' ? actions.respondToDeliveryConcept : actions.respondToDeliveryDesign;
     expect(sent).toHaveBeenCalledTimes(1);
-    expect(sent).toHaveBeenCalledWith('tok', `request_${group}_changes`, 'A bigger window');
+    expect(sent).toHaveBeenCalledWith(
+      'tok',
+      `request_${group}_changes`,
+      'A bigger window',
+      ...(group === 'design' ? [expect.objectContaining({ round: expect.any(String) })] : []),
+    );
     expect(await screen.findByText(en(`delivery.hero.${group}.changesTitle`))).toBeTruthy();
   });
 

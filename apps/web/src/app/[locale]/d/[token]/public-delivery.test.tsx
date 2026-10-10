@@ -1,6 +1,7 @@
 import { screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import type { PublicDelivery } from '@/lib/engagements/public/types';
+import { DOCUMENT_ID, publicDeliveryFixture as delivery } from '@/test/public-delivery-fixture';
 import { messageAt, renderWithIntl, type TestLocale } from '@/test/render-with-intl';
 import { PublicDeliveryView } from './public-delivery';
 
@@ -9,41 +10,11 @@ import { PublicDeliveryView } from './public-delivery';
 // targets on everything a finger can press.
 
 vi.mock('./actions', () => ({}));
+vi.mock('./review-actions', () => ({}));
 vi.mock('next/navigation', async (importOriginal) => ({
   ...(await importOriginal<typeof import('next/navigation')>()),
   useRouter: () => ({ refresh: vi.fn() }),
 }));
-
-const DOCUMENT_ID = '11111111-1111-4111-8111-111111111111';
-
-function delivery(overrides: Partial<PublicDelivery> = {}): PublicDelivery {
-  return {
-    id: 'de-1',
-    number: 7,
-    stageKey: 'finalApproval',
-    milestone: { index: 3, allComplete: false, closed: false },
-    hero: { kind: 'action', group: 'design', showRomAck: false },
-    offPlan: false,
-    titleAr: 'شقة الزمالك',
-    titleEn: 'Zamalek flat',
-    createdAt: '2026-01-01T00:00:00Z',
-    designFeeTotal: '120000.0000',
-    rom: { low: '900000.0000', high: '1200000.0000' },
-    shareExpiresAt: null,
-    firm: { nameAr: 'ديوان', nameEn: 'Diwan Studio', logoFileId: null },
-    client: { nameAr: 'أحمد', nameEn: 'Ahmed' },
-    paymentSchedule: [
-      { milestone_kind: 'deposit', basis: 'amount', amount_due: '36000.0000', amount_cleared: '0.0000', status: 'due' },
-    ],
-    paymentClaim: { claimableMilestones: [{ milestoneKind: 'deposit', amountRemaining: '36000.0000', hasPendingClaim: false }] },
-    documents: [{ id: DOCUMENT_ID, category: 'render', sharedAt: '2026-02-01T00:00:00Z', commentCount: 0, access: 'download' }],
-    clientActions: ['approve_design', 'request_design_changes'],
-    conceptOptions: [],
-    conceptChoice: null,
-    conceptDecision: null,
-    ...overrides,
-  };
-}
 
 function renderPage(locale: TestLocale, overrides: Partial<PublicDelivery> = {}) {
   return renderWithIntl(

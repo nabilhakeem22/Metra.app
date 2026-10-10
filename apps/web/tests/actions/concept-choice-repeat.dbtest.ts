@@ -196,7 +196,7 @@ describe('the respond verbs confirm only what is SAVED (approve / request change
     expect(await bodyKeys(d.orgId)).toEqual(['client_concept_chosen']);
   });
 
-  it('a retracted change request still holding its slot: not offered, and a stale tap says moved on', async () => {
+  it('a retracted change request still holding its slot: not offered, and a stale tap says the step changed', async () => {
     const d = await twoOptions('respond-retracted');
     expect(
       await recordDeliveryActionByToken(d.token, { action: 'request_concept_changes' }),
@@ -213,8 +213,10 @@ describe('the respond verbs confirm only what is SAVED (approve / request change
     expect((await snapshotOf(d.hash))!.client_actions).toEqual(['approve_concept']);
     expect((await snapshotOf(d.hash))!.concept_decision).toBeNull();
 
+    // Fix round F12 (expectation changed on purpose): the review is still open,
+    // so the step did not move on; what the client saw changed ("review again").
     expect(await respondToConceptAndNotify(d.token, { action: 'request_concept_changes' })).toEqual({
-      kind: 'moved_on',
+      kind: 'changed',
     });
     // Nothing saved by the tap, nobody notified.
     expect(await conceptEvents(d.engagementId)).toEqual([

@@ -11,6 +11,7 @@ import { PaymentsCard } from './payments-card';
 
 const actions = vi.hoisted(() => ({ markDeliveryPaymentPaid: vi.fn() }));
 vi.mock('../actions', () => actions);
+vi.mock('../review-actions', () => ({}));
 const router = vi.hoisted(() => ({ refresh: vi.fn() }));
 vi.mock('next/navigation', () => ({ useRouter: () => router }));
 
@@ -31,11 +32,11 @@ const MIDWAY = [
 ];
 
 function claimable(milestoneKind: string, amountRemaining: string, hasPendingClaim = false) {
-  return { milestoneKind, amountRemaining, hasPendingClaim };
+  return { milestoneKind, amountRemaining, hasPendingClaim, claimedAt: null };
 }
 
 function renderCard(claim: PublicDelivery['paymentClaim'], locale: TestLocale = 'en') {
-  return renderWithIntl(<PaymentsCard token="tok" schedule={MIDWAY} claim={claim} />, { locale });
+  return renderWithIntl(<PaymentsCard token="tok" schedule={MIDWAY} claim={claim} details={null} timeline={[]} />, { locale });
 }
 
 const claimButtons = (locale: TestLocale) =>

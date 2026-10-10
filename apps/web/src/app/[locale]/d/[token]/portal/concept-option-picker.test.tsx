@@ -8,7 +8,8 @@ import { messageAt, type TestLocale } from '@/test/render-with-intl';
 // and "the options have changed" plus a refresh when the letter moved.
 
 const actions = vi.hoisted(() => ({ chooseDeliveryConcept: vi.fn(), respondToDeliveryConcept: vi.fn() }));
-vi.mock('../actions', () => actions);
+vi.mock('../review-actions', () => actions);
+vi.mock('../actions', () => ({}));
 const router = vi.hoisted(() => ({ refresh: vi.fn() }));
 vi.mock('next/navigation', () => ({ useRouter: () => router }));
 
@@ -132,7 +133,7 @@ describe('ConceptOptionPicker', () => {
     actions.chooseDeliveryConcept.mockResolvedValue({ kind: 'moved_on' });
     renderPicker('ar-EG');
     await chooseAndConfirm('A', 'ar-EG');
-    expect((await screen.findByRole('alert')).textContent).toBe(at('ar-EG', 'delivery.conceptPicker.movedOn'));
+    expect((await screen.findByRole('alert')).textContent).toBe(at('ar-EG', 'delivery.actions.movedOn'));
     expect(router.refresh).toHaveBeenCalledTimes(1);
   });
 

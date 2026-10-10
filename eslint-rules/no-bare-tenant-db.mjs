@@ -305,6 +305,9 @@ const SDF_CALLER_ALLOWLIST = [
   'apps/web/src/lib/engagements/public/respond.ts',
   'apps/web/src/lib/engagements/public-documents.ts',
   'apps/web/src/lib/engagements/public-comments.ts',
+  // Round C (0058): the studio's logo for the client page's bar
+  // (app_delivery_logo_by_token, same token; the client has no session).
+  'apps/web/src/lib/engagements/public-logo.ts',
   // Round B: after a portal write answered `ok`, the studio is notified through
   // the SAME token (app_delivery_notify_studio_by_token); the client has no session.
   'apps/web/src/lib/engagements/client-acts/notify.ts',

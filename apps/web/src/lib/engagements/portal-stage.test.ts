@@ -39,4 +39,14 @@ describe('the mapped delivery carries a stage key, never a state', () => {
     // Nowhere in the payload does the raw state name appear as a value.
     expect(JSON.stringify(delivery)).not.toContain(`"${state}"`);
   });
+
+  // AC 49: the dated timeline (Round C) carries raw states from the database;
+  // the payload carries their stage words only.
+  it('a timeline naming every state carries no state name either', () => {
+    const timeline = DESIGN_STATES.map((name) => ({ type: 'stage', state: name, at: '2026-10-01T09:00:00Z' }));
+    const delivery = shapeDelivery({ id: 'de-1', number: 3, state: 'abandoned', timeline });
+    expect(delivery!.timeline.length).toBeGreaterThan(0);
+    const json = JSON.stringify(delivery);
+    for (const state of DESIGN_STATES) expect(json, state).not.toContain(`"${state}"`);
+  });
 });

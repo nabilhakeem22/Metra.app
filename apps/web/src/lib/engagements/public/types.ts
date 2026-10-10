@@ -11,6 +11,9 @@ import type { MilestoneProgress } from '../journey-map';
 import type { ClientDocumentCategory } from '../portal-documents';
 import type { HeroView } from '../portal-hero';
 import type { PortalStageKey } from '../portal-stage';
+import type { PortalDocumentMedia, PortalPaymentDetails, PortalTimelineEntry } from './timeline-types';
+
+export type { PortalDocumentMedia, PortalPaymentDetails, PortalTimelineEntry } from './timeline-types';
 
 /** One milestone in the client's payment schedule — DUE amounts only, no cost. */
 export interface PublicDeliveryMilestone {
@@ -45,7 +48,17 @@ export interface PublicDelivery {
    *  an unissued band is the studio's private working state. */
   rom: { low: string | null; high: string | null } | null;
   shareExpiresAt: string | null;
-  firm: { nameAr: string | null; nameEn: string | null; logoFileId: string | null };
+  /** The studio. `hasLogo` only says the logo route may answer (the file id
+   *  never reaches the browser). `phone` is the studio's number as stored
+   *  (digits, one leading +); `whatsappDigits` the international digits wa.me
+   *  takes, from the WhatsApp number or else the phone. Null when unusable. */
+  firm: {
+    nameAr: string | null;
+    nameEn: string | null;
+    hasLogo: boolean;
+    phone: string | null;
+    whatsappDigits: string | null;
+  };
   client: { nameAr: string | null; nameEn: string | null };
   paymentSchedule: PublicDeliveryMilestone[];
   /** Client Delivery Portal Phase 3 — the milestones the client MAY "mark as paid"
@@ -58,8 +71,27 @@ export interface PublicDelivery {
       milestoneKind: string;
       amountRemaining: string;
       hasPendingClaim: boolean;
+      /** When the client marked it as paid (the pending claim), or null. */
+      claimedAt: string | null;
     }>;
   } | null;
+  /** Round C: the studio's payment instructions, ONLY while a milestone is
+   *  claimable and a usable method (InstaPay, an account number or an IBAN) is
+   *  set; null otherwise. Values the studio typed: rendered as text, never links. */
+  paymentDetails: PortalPaymentDetails | null;
+  /** Round C: what happened, dated, newest first (at most 60). Client words
+   *  only (a stage key, a decision word, a payment kind), never a machine state. */
+  timeline: PortalTimelineEntry[];
+  /** Round C: the date (YYYY-MM-DD) the studio expects the next step, or null. */
+  expectedOn: string | null;
+  /** Round C: the client's design decision on file for the CURRENT render round. */
+  designDecision: { kind: 'approved' | 'changes_requested'; at: string } | null;
+  /** Round C: when the handover was confirmed (by the client, or recorded by the studio). */
+  handoverAcknowledgedAt: string | null;
+  /** Round C: when the client acknowledged the budget range issued NOW. */
+  romAcknowledgedAt: string | null;
+  /** Round C: the newest dated thing on the page (a timeline entry or a shared file). */
+  lastUpdateAt: string | null;
   /** Client Deliverables Step 1 — the files the studio has released to this client,
    *  newest share first. Only the id (the download route's filter), a friendly
    *  category, and the share date cross the wire — never a label, filename or size. */
@@ -76,6 +108,8 @@ export interface PublicDelivery {
      *  independently re-reads and enforces it, so hiding a button is never the
      *  only thing standing between an unpaid client and the file. */
     access: DocumentAccess;
+    /** Round C: image, pdf or other, by the database's one media rule. */
+    media: PortalDocumentMedia;
   }>;
   /** Client-facing verb tokens the client MAY act on right now (approve_concept,
    *  request_concept_changes, approve_design, request_design_changes,

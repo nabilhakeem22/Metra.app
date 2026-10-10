@@ -36,10 +36,13 @@ export function DocumentThread({
   token,
   documentId,
   initialCount,
+  inLightbox = false,
 }: {
   token: string;
   documentId: string;
   initialCount: number;
+  /** In the lightbox the page's buttons are behind the view: the hint says so (F13). */
+  inLightbox?: boolean;
 }) {
   const t = useTranslations('delivery.comments');
   const router = useRouter();
@@ -108,7 +111,7 @@ export function DocumentThread({
               className="resize-y"
             />
             <div className="flex items-center justify-between gap-2">
-              <p className="text-caption text-muted-foreground">{t('advisory')}</p>
+              <p className="text-caption text-muted-foreground">{t(inLightbox ? 'advisoryLightbox' : 'advisory')}</p>
               <Button
                 variant="secondary"
                 size="sm"

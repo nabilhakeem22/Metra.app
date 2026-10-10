@@ -7,6 +7,7 @@ describe('documentUrl', () => {
   it('is the download route with no variant, and the inline view with `view`', () => {
     expect(documentUrl('en', 'tok', id)).toBe(`/en/d/tok/documents/${id}`);
     expect(documentUrl('ar-EG', 'tok', id, 'view')).toBe(`/ar-EG/d/tok/documents/${id}?variant=view`);
+    expect(documentUrl('en', 'tok', id, 'thumb')).toBe(`/en/d/tok/documents/${id}?variant=thumb`);
   });
 
   it('encodes the token and the id, so neither can add a path or a query', () => {

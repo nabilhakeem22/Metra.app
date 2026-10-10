@@ -3,12 +3,13 @@ import { NextResponse } from 'next/server';
 import { PREVIEW_MAX_EDGE, PREVIEW_QUALITY } from '@/lib/engagements/document-access';
 import type { DeliveryDocumentTarget } from '@/lib/engagements/public-documents';
 import { mayOpenInline } from '@/lib/files/inline-view';
-import { fetchImageRendition } from '@/lib/storage/image-rendition';
+import { fetchImageRendition, type ImageTransform } from '@/lib/storage/image-rendition';
 import { storedObjectInfo } from '@/lib/storage/object-info';
 import { createSignedObjectUrl } from '@/lib/storage/signed-urls';
 
-/** How the client asked for the file: saved (no variant) or opened (`?variant=view`). */
-export type HandOver = 'download' | 'view';
+/** How the client asked for the file: saved (no variant), opened (`?variant=view`)
+ *  or as a gallery tile (`?variant=thumb`, Round C). */
+export type HandOver = 'download' | 'view' | 'thumb';
 
 /** How long a PAID client's signed link stays valid: long enough to open a large
  *  PDF and reload its tab, short enough not to be worth passing around. */
@@ -23,17 +24,44 @@ export const DOCUMENT_HEADERS = {
 } as const;
 
 /** The storage-side downscale a PREVIEW is served through, whichever variant. */
-const PREVIEW_TRANSFORM = {
+const PREVIEW_TRANSFORM: ImageTransform = {
   width: PREVIEW_MAX_EDGE,
   height: PREVIEW_MAX_EDGE,
   resize: 'contain',
   quality: PREVIEW_QUALITY,
-} as const;
+};
+
+/** A gallery tile: small, cropped to fill its square, light. */
+export const THUMB_TRANSFORM: ImageTransform = { width: 480, height: 480, resize: 'cover', quality: 60 };
+
+/** A rendition's bytes, streamed from here, or null when Storage gave none. */
+async function streamedRendition(
+  document: DeliveryDocumentTarget,
+  transform: ImageTransform,
+): Promise<NextResponse | null> {
+  const rendition = await fetchImageRendition(document.bucket, document.objectKey, transform);
+  if (!rendition) return null;
+  return new NextResponse(rendition.body, {
+    status: 200,
+    headers: {
+      ...DOCUMENT_HEADERS,
+      // The browser may keep a picture for a few minutes (a gallery is not
+      // re-transformed on every view); no shared cache ever may (S2).
+      'Cache-Control': 'private, max-age=240',
+      'Content-Type': rendition.contentType,
+      'Content-Disposition': 'inline',
+    },
+  });
+}
 
 /**
  * The answer for a document the client may have, or null for the route's
  * indistinguishable "unavailable". The object key comes from the `files` row the
  * SDF resolved, never from the request.
+ *
+ * THUMB (Round C, an image the client may at least preview): the 480 px tile's
+ * BYTES, streamed from here whatever the payment state, so a gallery never
+ * holds a storage URL. Anything that is not an image is refused.
  *
  * PREVIEW (money outstanding): the downscaled image's BYTES, streamed from here.
  * No storage URL reaches the browser, because a render-transform token also
@@ -48,19 +76,10 @@ export async function documentResponse(
   document: DeliveryDocumentTarget,
   handOver: HandOver,
 ): Promise<NextResponse | null> {
-  if (document.access === 'preview') {
-    const rendition = await fetchImageRendition(document.bucket, document.objectKey, PREVIEW_TRANSFORM);
-    if (!rendition) return null;
-    return new NextResponse(rendition.body, {
-      status: 200,
-      headers: {
-        ...DOCUMENT_HEADERS,
-        'Cache-Control': 'private, no-store',
-        'Content-Type': rendition.contentType,
-        'Content-Disposition': 'inline',
-      },
-    });
+  if (handOver === 'thumb') {
+    return document.media === 'image' ? streamedRendition(document, THUMB_TRANSFORM) : null;
   }
+  if (document.access === 'preview') return streamedRendition(document, PREVIEW_TRANSFORM);
   const opensInline =
     handOver === 'view' &&
     mayOpenInline(document.downloadName, (await storedObjectInfo(document.bucket, document.objectKey))?.contentType);

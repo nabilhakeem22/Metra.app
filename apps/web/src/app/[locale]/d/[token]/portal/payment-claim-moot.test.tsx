@@ -17,7 +17,7 @@ const SCHEDULE: PublicDeliveryMilestone[] = [
   { milestone_kind: 'deposit', basis: 'amount', amount_due: '30000.0000', amount_cleared: '0.0000', status: 'due' },
 ];
 const CLAIMABLE: PublicDelivery['paymentClaim'] = {
-  claimableMilestones: [{ milestoneKind: 'deposit', amountRemaining: '30000.0000', hasPendingClaim: false }],
+  claimableMilestones: [{ milestoneKind: 'deposit', amountRemaining: '30000.0000', hasPendingClaim: false, claimedAt: null }],
 };
 const SETTLED: PublicDelivery['paymentClaim'] = { claimableMilestones: [] };
 
@@ -31,7 +31,7 @@ function Page() {
       <button type="button" hidden onClick={() => setClaim(CLAIMABLE)}>
         claimable again
       </button>
-      <PaymentsCard token="tok" schedule={SCHEDULE} claim={claim} />
+      <PaymentsCard token="tok" schedule={SCHEDULE} claim={claim} details={null} timeline={[]} />
     </>
   );
 }

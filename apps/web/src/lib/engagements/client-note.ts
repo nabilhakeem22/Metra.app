@@ -8,12 +8,13 @@ const INVISIBLE = /[\p{Cf}\p{Z}\s]/gu;
 /** The longest note stored with a client act (the SDFs cap it the same). */
 export const CLIENT_NOTE_MAX = 2000;
 
-/** True when the note has no visible character at all. */
-export function isBlankNote(note: string | null | undefined): boolean {
-  return (note ?? '').replace(INVISIBLE, '') === '';
+/** True when the note has no visible character at all. Anything that is not a
+ *  string (a server action is directly invokable) is no note. */
+export function isBlankNote(note: unknown): boolean {
+  return typeof note !== 'string' || note.replace(INVISIBLE, '') === '';
 }
 
 /** The note as it is stored: trimmed and capped, or null when it shows nothing. */
-export function clientNote(note: string | null | undefined): string | null {
-  return isBlankNote(note) ? null : (note ?? '').trim().slice(0, CLIENT_NOTE_MAX);
+export function clientNote(note: unknown): string | null {
+  return typeof note !== 'string' || isBlankNote(note) ? null : note.trim().slice(0, CLIENT_NOTE_MAX);
 }

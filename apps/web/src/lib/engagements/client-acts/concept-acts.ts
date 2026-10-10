@@ -2,10 +2,12 @@ import 'server-only';
 // The client's concept decisions on the portal (Round B, B12): choosing an
 // option, approving, asking for changes. Each is the write, the studio's
 // notification, and the answer the portal shows (../concept-choice-outcome.ts).
-// An `already` is answered from the snapshot read back after the write, so the
-// portal only ever confirms a decision that is SAVED, never the one a stale tap
-// named; a choice's `wrong_state` says whether the options changed or the step
-// moved on.
+// A write that saved nothing (a repeat, a review the studio has since closed,
+// a delivery that ended) is answered from the snapshot read back after it, so
+// the portal only ever confirms a decision that is SAVED, never the one a stale
+// tap named (fix round F6: the same rule as the design and the handover). A
+// choice's `wrong_state` with nothing on file says whether the options changed
+// or the step moved on.
 import { conceptLetter } from '../concept-letter';
 import {
   ACT_OF_DECISION,
@@ -17,26 +19,20 @@ import {
   type SavedConcept,
 } from '../concept-choice-outcome';
 import { portalErrorKey } from '../portal-error-key';
-import { chooseConceptByToken, getDeliveryByToken, recordDeliveryActionByToken } from '../public';
+import { chooseConceptByToken, recordDeliveryActionByToken } from '../public';
+import { answersFromSaved } from '../review-outcome';
 import { clientActOfVerb } from './acts';
 import { withStudioNotified } from './notify';
-
-/** The decision on file through the client's own token, or null when unreadable. */
-async function savedConcept(rawToken: string): Promise<SavedConcept | null> {
-  const read = await getDeliveryByToken(rawToken);
-  return read.status === 'ok' ? read.delivery : null;
-}
+import { savedDelivery } from './saved-delivery';
 
 /**
- * A concept write answered `already`: nothing was saved by THIS tap. Answer the
- * decision on file and notify (through the R3 check) that decision's act; with
- * no live decision on file (a retracted one still holds the slot) the step has
- * moved on and nobody is notified.
+ * Nothing was saved by THIS tap. Answer the decision on file and notify
+ * (through the R3 check) that decision's act; with no live decision on file
+ * nobody is notified and the answer says why (../concept-choice-outcome.ts).
  */
-async function answerRepeat(rawToken: string): Promise<ConceptChoiceOutcome> {
-  const saved = await savedConcept(rawToken);
+async function answerFromSaved(rawToken: string, saved: SavedConcept | null): Promise<ConceptChoiceOutcome> {
   const decision = saved?.conceptDecision ?? null;
-  if (decision === null) return { kind: 'moved_on' };
+  if (decision === null) return outcomeOfSavedDecision(saved, false);
   const { studioNotified } = await withStudioNotified(
     rawToken,
     { ok: true, code: 'already' as const },
@@ -47,19 +43,23 @@ async function answerRepeat(rawToken: string): Promise<ConceptChoiceOutcome> {
 
 /**
  * Choose, then notify and answer. A first `ok` saved the tapped letter and
- * notifies `concept_chosen`. A `wrong_state` says whether the options changed or
- * the step moved on. Any other refusal is the portal's error key.
+ * notifies `concept_chosen`. A `wrong_state` with a decision on file answers
+ * that decision; with none, whether the options changed or the step moved on.
+ * A `not_active` with a decision on file answers it too. Any other refusal is
+ * the portal's error key.
  */
 export async function chooseConceptAndNotify(
   rawToken: string,
   input: Parameters<typeof chooseConceptByToken>[1],
 ): Promise<ConceptChoiceOutcome> {
   const result = await chooseConceptByToken(rawToken, input);
+  if (result.ok && result.code === 'already') return answerFromSaved(rawToken, await savedDelivery(rawToken));
   if (!result.ok) {
-    if (result.error !== 'wrong_state') return { kind: 'error', error: portalErrorKey(result.error) };
-    return outcomeOfRefusedLetter(await savedConcept(rawToken));
+    if (!answersFromSaved(result)) return { kind: 'error', error: portalErrorKey(result.error) };
+    const saved = await savedDelivery(rawToken);
+    if (saved?.conceptDecision) return answerFromSaved(rawToken, saved);
+    return result.error === 'wrong_state' ? outcomeOfRefusedLetter(saved) : { kind: 'error', error: 'not_active' };
   }
-  if (result.code === 'already') return answerRepeat(rawToken);
   const { studioNotified } = await withStudioNotified(rawToken, result, { kind: 'concept_chosen' });
   const letter = conceptLetter(input.position);
   return letter ? { kind: 'chosen', letter, studioNotified } : { kind: 'approved', studioNotified };
@@ -67,16 +67,16 @@ export async function chooseConceptAndNotify(
 
 /**
  * Approve the concept or ask for changes (the respond verbs), then notify and
- * answer. A first `ok` confirms the verb; an `already` confirms the decision on
- * file, which may be a choice, the other verb, or nothing live at all.
+ * answer. A first `ok` confirms the verb; a write that saved nothing confirms
+ * the decision on file, which may be a choice, the other verb, or nothing live.
  */
 export async function respondToConceptAndNotify(
   rawToken: string,
   input: Omit<Parameters<typeof recordDeliveryActionByToken>[1], 'action'> & { action: ConceptVerb },
 ): Promise<ConceptChoiceOutcome> {
   const result = await recordDeliveryActionByToken(rawToken, input);
+  if (answersFromSaved(result)) return answerFromSaved(rawToken, await savedDelivery(rawToken));
   if (!result.ok) return { kind: 'error', error: portalErrorKey(result.error) };
-  if (result.code === 'already') return answerRepeat(rawToken);
   const { studioNotified } = await withStudioNotified(rawToken, result, clientActOfVerb(input.action));
   return { kind: OUTCOME_OF_CONCEPT_VERB[input.action], studioNotified };
 }

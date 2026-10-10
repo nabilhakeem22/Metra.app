@@ -21,8 +21,8 @@ const DOCUMENT_ID = '11111111-1111-4111-8111-111111111111';
 const OBJECT_KEY = 'org-1/engagement/file-9';
 const SIGNED = `https://storage.test/object/sign/metra-files/${OBJECT_KEY}?token=T`;
 const RENDER_SIGNED = `https://storage.test/render/image/sign/metra-files/${OBJECT_KEY}?token=R`;
-const PAID = { bucket: 'metra-files', objectKey: OBJECT_KEY, downloadName: 'drawing.pdf', access: 'download' };
-const UNPAID = { ...PAID, downloadName: 'render.png', access: 'preview' };
+const PAID = { bucket: 'metra-files', objectKey: OBJECT_KEY, downloadName: 'drawing.pdf', access: 'download', media: 'pdf' };
+const UNPAID = { ...PAID, downloadName: 'render.png', access: 'preview', media: 'image' };
 const PREVIEW_TRANSFORM = {
   transform: { width: PREVIEW_MAX_EDGE, height: PREVIEW_MAX_EDGE, resize: 'contain', quality: PREVIEW_QUALITY },
 };
@@ -87,7 +87,7 @@ describe('unpaid (preview): bytes, never a storage URL', () => {
     expect(response.status).toBe(200);
     expect(response.headers.get('location')).toBeNull();
     expect(response.headers.get('content-type')).toBe('image/jpeg');
-    expect(response.headers.get('cache-control')).toBe('private, no-store');
+    expect(response.headers.get('cache-control')).toBe('private, max-age=240');
     expect(response.headers.get('x-content-type-options')).toBe('nosniff');
     expect([...new Uint8Array(await response.arrayBuffer())]).toEqual([1, 2, 3]);
     // Signed only with the transform, fetched on the server, and the URL stays there.
@@ -111,7 +111,7 @@ describe('unpaid (preview): bytes, never a storage URL', () => {
 });
 
 describe('refusals', () => {
-  it.each(['?variant=other', '?variant=thumb', '?variant=', '?variant=VIEW'])('%s: unavailable, before any read', async (query) => {
+  it.each(['?variant=other', '?variant=', '?variant=VIEW', '?variant=THUMB'])('%s: unavailable, before any read', async (query) => {
     expectUnavailable(await get(query));
     expect(documents.getDeliveryDocumentByToken).not.toHaveBeenCalled();
   });
