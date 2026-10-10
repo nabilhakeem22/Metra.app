@@ -126,6 +126,11 @@ const ALL_CODES: ActionCode[] = [
   'invalid_qty',
   'invalid_price',
   'invalid_discount',
+  'phone_invalid',
+  'whatsapp_invalid',
+  'iban_invalid',
+  'bank_name_required',
+  'client_page_details_owner_only',
 ];
 
 describe('problem+json envelope', () => {

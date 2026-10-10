@@ -125,6 +125,12 @@ export const ACTION_CODE_PROBLEM: Record<ActionCode, ApiProblemKind> = {
   payment_kind_mismatch: 'bad-request',
   ending_requires_explicit_choice: 'bad-request',
   firm_type_unavailable: 'bad-request',
+  phone_invalid: 'bad-request',
+  whatsapp_invalid: 'bad-request',
+  iban_invalid: 'bad-request',
+  bank_name_required: 'bad-request',
+  // The database's own owner/admin gate (MT120) refused the write.
+  client_page_details_owner_only: 'forbidden',
   project_delivery_exists: 'conflict',
   project_delivery_limit_reached: 'conflict',
   claim_not_found: 'bad-request',

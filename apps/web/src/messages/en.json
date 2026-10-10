@@ -199,7 +199,8 @@
       "addClient": "Add your first client",
       "addProject": "Create your first project",
       "startDelivery": "Start your first delivery",
-      "shareDelivery": "Share the delivery with your client"
+      "shareDelivery": "Share the delivery with your client",
+      "clientPageDetails": "Add your phone and payment details for clients"
     }
   },
   "dashboard": {
@@ -366,6 +367,35 @@
       "toast": {
         "retired": "Category retired",
         "restored": "Category restored"
+      }
+    },
+    "clientPage": {
+      "title": "What your clients see",
+      "subtitle": "Shown on your client's delivery page: phone and WhatsApp always, payment details only while a payment is due.",
+      "contactHeading": "Contact",
+      "paymentHeading": "Payment",
+      "paymentNote": "Every owner and admin is told when the payment details change.",
+      "notSet": "Not set",
+      "edit": "Edit",
+      "save": "Save",
+      "saved": "Saved. Your clients see the new details.",
+      "fields": {
+        "studioPhone": "Phone",
+        "studioWhatsapp": "WhatsApp",
+        "instapayAddress": "InstaPay address",
+        "bankName": "Bank name",
+        "bankAccountHolder": "Account holder",
+        "bankAccountNumber": "Account number",
+        "bankIban": "IBAN"
+      },
+      "fieldInvalid": {
+        "studioPhone": "Write the phone with digits only, 7 to 15 of them.",
+        "studioWhatsapp": "Write the WhatsApp number with digits only, 7 to 15 of them.",
+        "instapayAddress": "Write the InstaPay address, 3 to 100 characters.",
+        "bankName": "Write the bank name, 2 to 120 characters.",
+        "bankAccountHolder": "Write the account holder's name, 2 to 120 characters.",
+        "bankAccountNumber": "Write the account number: 4 to 34 letters or digits, with at least one digit.",
+        "bankIban": "This IBAN does not look right. It starts with two letters, like EG."
       }
     }
   },
@@ -552,7 +582,12 @@
     "invalid_price": "That rate is not a number.",
     "invalid_discount": "The discount must be between 0 and 100.",
     "section_name_required": "A section needs a name.",
-    "section_name_too_long": "That section name is too long."
+    "section_name_too_long": "That section name is too long.",
+    "phone_invalid": "Write the phone with digits only, 7 to 15 of them.",
+    "whatsapp_invalid": "WhatsApp needs a mobile number: an Egyptian mobile, or the number with its country code, like +44.",
+    "iban_invalid": "This IBAN does not look right. It starts with two letters, like EG.",
+    "bank_name_required": "Add the bank name too.",
+    "client_page_details_owner_only": "Only the owner or an admin can change what your clients see."
   },
   "common": {
     "untranslated": "untranslated",
@@ -1429,7 +1464,8 @@
       "portfolio_digest": "Portfolio digest",
       "stage_reminder": "Stage reminder",
       "client_responded": "Client responded",
-      "delivery_followup": "Delivery follow-up"
+      "delivery_followup": "Delivery follow-up",
+      "payment_details_changed": "Payment details changed"
     },
     "body": {
       "proposal_expiring": "Quotation {number} expires on {date}.",
@@ -1446,7 +1482,8 @@
       "client_budget_acknowledged": "The client acknowledged the budget range on {delivery}.",
       "client_handover_acknowledged": "The client confirmed receiving the handover on {delivery}.",
       "client_payment_claimed": "{hasMilestone, select, yes {The client says they paid ({milestone}) on {delivery}. Confirm it from the delivery.} other {The client says they made a payment on {delivery}. Confirm it from the delivery.}}",
-      "client_commented": "{commentCount, plural, one {The client left a comment on {delivery}.} other {The client left {count} comments on {delivery}.}}"
+      "client_commented": "{commentCount, plural, one {The client left a comment on {delivery}.} other {The client left {count} comments on {delivery}.}}",
+      "payment_details_changed": "{hasName, select, yes {{name} changed the payment details your clients see. Check them in Settings.} other {The payment details your clients see were changed. Check them in Settings.}}"
     },
     "viewAll": "View all"
   },
@@ -2232,6 +2269,14 @@
         "title": "Replace the client link?",
         "body": "The link the client has now stops working. The reminder then carries the new one."
       }
+    },
+    "clientExpected": {
+      "label": "When should the client expect the next step?",
+      "hint": "The client sees this date on their page until the delivery moves on.",
+      "save": "Save",
+      "clear": "Clear",
+      "showing": "Client sees: expected by {date}",
+      "stale": "Date passed, set a new one."
     }
   },
   "delivery": {

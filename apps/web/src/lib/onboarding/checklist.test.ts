@@ -12,6 +12,7 @@ const NONE: OnboardingProgress = {
   hasEngagement: false,
   hasSharedDelivery: false,
   newestUnsharedDeliveryId: null,
+  hasClientPageDetails: false,
 };
 
 describe('buildChecklist', () => {
@@ -22,7 +23,7 @@ describe('buildChecklist', () => {
     expect(r.allDone).toBe(false);
   });
 
-  it('owner gets the five steps around the first delivery, in order', () => {
+  it('owner gets the steps around the first delivery, then the client page details, in order', () => {
     const r = buildChecklist(NONE, 'owner', false);
     expect(r.items.map((i) => i.key)).toEqual([
       'completeProfile',
@@ -30,6 +31,7 @@ describe('buildChecklist', () => {
       'addProject',
       'startDelivery',
       'shareDelivery',
+      'clientPageDetails',
     ]);
     expect(r.percent).toBe(0);
   });
@@ -76,5 +78,14 @@ describe('buildChecklist', () => {
     const done = buildChecklist({ ...p, hasEngagement: true }, 'project_manager', false);
     expect(done.percent).toBe(100);
     expect(done.allDone).toBe(true);
+  });
+
+  it('the client page details open their Settings card, are owner/admin only, and tick once saved', () => {
+    const owner = buildChecklist(NONE, 'owner', false).items.find((i) => i.key === 'clientPageDetails');
+    expect(owner).toMatchObject({ href: '/settings#client-page', tourStep: null, done: false });
+    expect(buildChecklist(NONE, 'admin', false).items.some((i) => i.key === 'clientPageDetails')).toBe(true);
+    expect(buildChecklist(NONE, 'project_manager', false).items.some((i) => i.key === 'clientPageDetails')).toBe(false);
+    const saved = buildChecklist({ ...NONE, hasClientPageDetails: true }, 'owner', false);
+    expect(saved.items.find((i) => i.key === 'clientPageDetails')?.done).toBe(true);
   });
 });

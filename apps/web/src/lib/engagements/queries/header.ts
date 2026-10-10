@@ -2,6 +2,7 @@ import 'server-only';
 import { clients, designEngagements, projects, type DesignEngagementState } from '@metra/db';
 import { eq, sql } from 'drizzle-orm';
 import { withOrgContext, type OrgContext } from '@/lib/db/context';
+import type { ClientExpectedRecord } from '../client-expected-view';
 
 /**
  * The engagement header for the detail surface. All money is returned as scale-4
@@ -42,6 +43,8 @@ export interface EngagementHeader {
   conceptLockedAt: string | null;
   renderManifestHash: string | null;
   rendersReadyAt: string | null;
+  /** The date the client page promises for the next step (0058); null when unset. */
+  clientExpected: ClientExpectedRecord | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -77,6 +80,9 @@ export function getEngagementHeader(
         conceptLockedAt: designEngagements.conceptLockedAt,
         renderManifestHash: designEngagements.renderManifestHash,
         rendersReadyAt: designEngagements.rendersReadyAt,
+        clientExpectedOn: designEngagements.clientExpectedOn,
+        clientExpectedState: designEngagements.clientExpectedState,
+        clientExpectedSetAt: designEngagements.clientExpectedSetAt,
         createdAt: designEngagements.createdAt,
         updatedAt: designEngagements.updatedAt,
       })
@@ -87,8 +93,14 @@ export function getEngagementHeader(
       .limit(1);
 
     if (!row) return null;
+    const { clientExpectedOn, clientExpectedState, clientExpectedSetAt, ...header } = row;
     return {
-      ...row,
+      ...header,
+      // All three or none (0058's CHECK); read as one record or null.
+      clientExpected:
+        clientExpectedOn && clientExpectedState && clientExpectedSetAt
+          ? { on: clientExpectedOn, state: clientExpectedState, setAt: clientExpectedSetAt.toISOString() }
+          : null,
       conceptLockedAt: row.conceptLockedAt?.toISOString() ?? null,
       rendersReadyAt: row.rendersReadyAt?.toISOString() ?? null,
       createdAt: row.createdAt.toISOString(),

@@ -69,15 +69,13 @@ const ROLES_SQL = resolve(REPO_ROOT, 'packages/db/src/rls/roles.sql');
 
 /**
  * Columns roles.sql grants BEFORE any app code writes them, because the owner's
- * one database step must cover the code that follows it. Round C (0058): the
- * client's expected date, its stage and when it was set, written by the expected-date core in
- * Wave 3, which removes them from this list (the test below insists).
+ * one database step must cover the code that follows it. Empty while every
+ * granted column has a writer: Round C's three expected-date columns (0058)
+ * left it when `lib/engagements/client-expected.ts` began writing them. A
+ * future database step that lands ahead of its code lists its columns here,
+ * and the test below makes the writer remove them.
  */
-const GRANTED_AHEAD_OF_WRITER: readonly string[] = [
-  'client_expected_on',
-  'client_expected_state',
-  'client_expected_set_at',
-];
+const GRANTED_AHEAD_OF_WRITER: readonly string[] = [];
 
 /** The drizzle table object's exported name, and the table it maps to. */
 const TABLE_EXPORT = 'designEngagements';

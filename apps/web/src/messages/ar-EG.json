@@ -199,7 +199,8 @@
       "addClient": "ضيف أول عميل ليك",
       "addProject": "اعمل أول مشروع ليك",
       "startDelivery": "ابدأ أول تسليم",
-      "shareDelivery": "شارك التسليم مع العميل"
+      "shareDelivery": "شارك التسليم مع العميل",
+      "clientPageDetails": "ضيف رقمك وبيانات الدفع للعملاء"
     }
   },
   "dashboard": {
@@ -366,6 +367,35 @@
       "toast": {
         "retired": "الفئة اتعطلت",
         "restored": "الفئة رجعت"
+      }
+    },
+    "clientPage": {
+      "title": "اللي العملاء بيشوفوه",
+      "subtitle": "بيظهر في صفحة التسليم عند العميل: التليفون والواتساب على طول، وبيانات الدفع بس لما يكون فيه دفعة مستحقة.",
+      "contactHeading": "التواصل",
+      "paymentHeading": "الدفع",
+      "paymentNote": "كل المالكين والأدمن بيوصلهم تنبيه لما بيانات الدفع تتغيّر.",
+      "notSet": "مش متحدد",
+      "edit": "تعديل",
+      "save": "حفظ",
+      "saved": "اتحفظ. العملاء هيشوفوا البيانات الجديدة.",
+      "fields": {
+        "studioPhone": "التليفون",
+        "studioWhatsapp": "الواتساب",
+        "instapayAddress": "عنوان InstaPay",
+        "bankName": "اسم البنك",
+        "bankAccountHolder": "اسم صاحب الحساب",
+        "bankAccountNumber": "رقم الحساب",
+        "bankIban": "الآيبان (IBAN)"
+      },
+      "fieldInvalid": {
+        "studioPhone": "اكتب رقم التليفون أرقام بس، من 7 لـ 15 رقم.",
+        "studioWhatsapp": "اكتب رقم الواتساب أرقام بس، من 7 لـ 15 رقم.",
+        "instapayAddress": "اكتب عنوان InstaPay، من 3 لـ 100 حرف.",
+        "bankName": "اكتب اسم البنك، من 2 لـ 120 حرف.",
+        "bankAccountHolder": "اكتب اسم صاحب الحساب، من 2 لـ 120 حرف.",
+        "bankAccountNumber": "اكتب رقم الحساب: من 4 لـ 34 حرف أو رقم، وفيه رقم واحد على الأقل.",
+        "bankIban": "رقم الآيبان ده شكله مش مظبوط. بيبدأ بحرفين زي EG."
       }
     }
   },
@@ -552,7 +582,12 @@
     "invalid_price": "الفئة دي مش رقم",
     "invalid_discount": "الخصم لازم يكون بين 0 و 100",
     "section_name_required": "القسم محتاج اسم",
-    "section_name_too_long": "اسم القسم ده طويل أوي"
+    "section_name_too_long": "اسم القسم ده طويل أوي",
+    "phone_invalid": "اكتب رقم التليفون أرقام بس، من 7 لـ 15 رقم.",
+    "whatsapp_invalid": "الواتساب محتاج رقم موبايل: موبايل مصري، أو الرقم بكود البلد زي +44.",
+    "iban_invalid": "رقم الآيبان ده شكله مش مظبوط. بيبدأ بحرفين زي EG.",
+    "bank_name_required": "اكتب اسم البنك كمان.",
+    "client_page_details_owner_only": "المالك أو الأدمن بس هما اللي يقدروا يغيّروا البيانات اللي العملاء بيشوفوها."
   },
   "common": {
     "untranslated": "غير مترجم",
@@ -1429,7 +1464,8 @@
       "portfolio_digest": "ملخص محفظة الأعمال",
       "stage_reminder": "تنبيه المرحلة",
       "client_responded": "العميل رد",
-      "delivery_followup": "متابعة تسليم"
+      "delivery_followup": "متابعة تسليم",
+      "payment_details_changed": "بيانات الدفع اتغيّرت"
     },
     "body": {
       "proposal_expiring": "عرض السعر {number} هينتهي في {date}.",
@@ -1446,7 +1482,8 @@
       "client_budget_acknowledged": "العميل أكد نطاق الميزانية في {delivery}.",
       "client_handover_acknowledged": "العميل أكد استلام التسليم في {delivery}.",
       "client_payment_claimed": "{hasMilestone, select, yes {العميل بيقول إنه دفع ({milestone}) في {delivery}. أكدها من صفحة التسليم.} other {العميل بيقول إنه دفع دفعة في {delivery}. أكدها من صفحة التسليم.}}",
-      "client_commented": "{commentCount, plural, zero {العميل كتب تعليقات على {delivery}.} one {العميل كتب تعليق على {delivery}.} two {العميل كتب تعليقين على {delivery}.} few {العميل كتب {count} تعليقات على {delivery}.} many {العميل كتب {count} تعليق على {delivery}.} other {العميل كتب {count} تعليق على {delivery}.}}"
+      "client_commented": "{commentCount, plural, zero {العميل كتب تعليقات على {delivery}.} one {العميل كتب تعليق على {delivery}.} two {العميل كتب تعليقين على {delivery}.} few {العميل كتب {count} تعليقات على {delivery}.} many {العميل كتب {count} تعليق على {delivery}.} other {العميل كتب {count} تعليق على {delivery}.}}",
+      "payment_details_changed": "{hasName, select, yes {{name} غيّر بيانات الدفع اللي العملاء بيشوفوها. راجعها من الإعدادات.} other {بيانات الدفع اللي العملاء بيشوفوها اتغيّرت. راجعها من الإعدادات.}}"
     },
     "viewAll": "عرض الكل"
   },
@@ -2232,6 +2269,14 @@
         "title": "تستبدل لينك العميل؟",
         "body": "اللينك اللي مع العميل دلوقتي هيبطل يشتغل، والتذكير هيبقى فيه اللينك الجديد."
       }
+    },
+    "clientExpected": {
+      "label": "العميل يتوقع الخطوة الجاية إمتى؟",
+      "hint": "العميل بيشوف الميعاد ده في صفحته لحد ما التسليم يتحرك.",
+      "save": "حفظ",
+      "clear": "امسح",
+      "showing": "العميل شايف: متوقع يوم {date}",
+      "stale": "الميعاد عدّى، حدد ميعاد جديد."
     }
   },
   "delivery": {

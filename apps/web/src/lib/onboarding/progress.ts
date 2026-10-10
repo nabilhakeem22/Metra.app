@@ -2,6 +2,7 @@ import 'server-only';
 import type { Organization } from '@metra/db';
 import { sql } from 'drizzle-orm';
 import { withOrgContext, type OrgContext } from '@/lib/db/context';
+import { hasClientPageDetails } from '@/lib/org/client-page-details';
 import { isProfileComplete } from '@/lib/org/profile';
 
 export interface OnboardingProgress {
@@ -16,6 +17,9 @@ export interface OnboardingProgress {
   /** The newest delivery still in flight that has no client link yet: where
    *  "Share with your client" opens the link dialog. Null when there is none. */
   newestUnsharedDeliveryId: string | null;
+  /** The client page can reach the studio (phone or WhatsApp) and pay it
+   *  (InstaPay, an account number or an IBAN): read off the org row itself. */
+  hasClientPageDetails: boolean;
 }
 
 interface ProgressRow {
@@ -76,5 +80,6 @@ export async function getOnboardingProgress(
     hasSharedDelivery: Boolean(r?.has_shared_delivery),
     newestUnsharedDeliveryId:
       typeof r?.newest_unshared_delivery_id === 'string' ? r.newest_unshared_delivery_id : null,
+    hasClientPageDetails: hasClientPageDetails(org),
   };
 }

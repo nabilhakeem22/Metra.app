@@ -13,6 +13,8 @@ import { getAutomationSettings } from '@/lib/automation/settings-queries';
 import { withOrgContext } from '@/lib/db/context';
 import { can } from '@/lib/permissions/can';
 import { AutomationSettingsClient } from './automation-settings-client';
+import { ClientPageCard } from './client-page-card';
+import { clientPageDraftOf } from './client-page-fields';
 import { listDocumentCategories } from '@/lib/document-categories/queries';
 import { DocumentCategoriesCard } from './document-categories-card';
 import { SettingsClient } from './settings-client';
@@ -46,6 +48,9 @@ export default async function SettingsPage() {
           restrictFirmDashboard: org?.restrictFirmDashboard ?? false,
         }}
       />
+      {/* What the client's delivery page shows about the studio: read by every
+          role, edited by owner/admin (the action and the database re-check). */}
+      <ClientPageCard canManage={canManage} details={clientPageDraftOf(org)} />
       {/* The firm's document filing vocabulary — gated on the same capability as
           the other firm-vocabulary settings (project types, stage templates). */}
       {canManageVocabulary && (

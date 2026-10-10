@@ -67,3 +67,16 @@ export function isUniqueViolationOf(error: unknown, constraint: string): boolean
 export function isImmutabilityViolation(error: unknown): boolean {
   return sqlstateOf(error) === IMMUTABILITY_VIOLATION;
 }
+
+/**
+ * Metra's reserved SQLSTATE MT120, raised by `enforce_client_page_details_writer`
+ * (`rls/immutability.sql`) when someone other than an owner or admin of the org
+ * changes the studio's phone, WhatsApp or payment details. The app gates first,
+ * so this is the database refusing a write that got past the app (a role
+ * changed under the request): a refusal with a name, not a defect.
+ */
+const OWNER_ONLY_COLUMN_VIOLATION = 'MT120';
+
+export function isOwnerOnlyColumnViolation(error: unknown): boolean {
+  return sqlstateOf(error) === OWNER_ONLY_COLUMN_VIOLATION;
+}

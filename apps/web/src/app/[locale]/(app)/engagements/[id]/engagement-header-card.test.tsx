@@ -47,6 +47,7 @@ const header: EngagementHeader = {
   conceptLockedAt: '2026-05-01T00:00:00.000Z',
   renderManifestHash: null,
   rendersReadyAt: null,
+  clientExpected: null,
   createdAt: '2026-04-01T00:00:00.000Z',
   updatedAt: '2026-06-10T00:00:00.000Z',
 };

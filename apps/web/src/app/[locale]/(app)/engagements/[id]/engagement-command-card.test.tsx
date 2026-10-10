@@ -108,6 +108,7 @@ function props(overrides: Partial<EngagementCommandCardProps> = {}): EngagementC
     },
     actionError: null,
     onNudge: () => {},
+    clientExpected: null,
     ...overrides,
   };
 }

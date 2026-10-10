@@ -88,6 +88,13 @@ export const DEFINITE_REFUSALS: ReadonlySet<ActionCode> = new Set<ActionCode>([
   'amount_too_large',
   'invalid_date',
   'file_too_large',
+  // The studio's client page details: refused before or by the one UPDATE,
+  // which rolled back (Round C, C8; MT120 is the database's owner/admin gate).
+  'phone_invalid',
+  'whatsapp_invalid',
+  'iban_invalid',
+  'bank_name_required',
+  'client_page_details_owner_only',
 ]);
 
 /** True only when the server is KNOWN to have committed nothing. */

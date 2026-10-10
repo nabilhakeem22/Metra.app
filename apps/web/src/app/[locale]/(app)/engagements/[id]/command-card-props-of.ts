@@ -65,5 +65,6 @@ export function commandCardPropsOf(
     // The nudge pill and the waiting card remind the client with the link they
     // already hold (B11); the header's menu still opens the link itself.
     onNudge: openDeliveryReminder,
+    clientExpected: detail.clientExpected,
   };
 }

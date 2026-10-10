@@ -15,6 +15,7 @@ import type {
   EngagementTransitionRecord,
 } from '@/lib/engagements/queries';
 import type { Trigger } from '@/lib/engagements/transitions';
+import type { ClientExpectedCard } from './client-expected-card';
 import type { PanelCapabilities } from './engagement-panels';
 
 /**
@@ -69,4 +70,6 @@ export interface EngagementDetailProps {
    *  across every document on this engagement. Feeds the command card's quiet
    *  one-line prompt and the Files tab badge. */
   awaitingReplyCount: number;
+  /** The client's expected date for the next step; null when not offered. */
+  clientExpected: ClientExpectedCard | null;
 }

@@ -1,6 +1,7 @@
 'use client';
 
 import { useTranslations } from 'next-intl';
+import { ClientExpectedDate } from './client-expected-date';
 import { CommandCardActRegion } from './command-card-act-region';
 import { CommandCardActionError } from './command-card-action-error';
 import { CommandCardClosedClaims } from './command-card-closed-claims';
@@ -80,6 +81,15 @@ export function EngagementCommandCard(props: EngagementCommandCardProps) {
             <div className="mb-5">
               <CommandCardActRegion card={props} model={{ view, ctas }} />
               <CommandCardActionError error={props.actionError} />
+              {props.clientExpected && (
+                <ClientExpectedDate
+                  key={props.clientExpected.view.kind === 'none' ? 'none' : props.clientExpected.view.on}
+                  engagementId={engagementId}
+                  card={props.clientExpected}
+                  pending={pending}
+                  runAction={props.runAction}
+                />
+              )}
             </div>
 
             <CommandCardSteps

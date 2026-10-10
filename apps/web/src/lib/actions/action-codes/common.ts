@@ -33,4 +33,10 @@ export type CommonActionCode =
   | 'amount_too_large'
   | 'last_primary_contact'
   | 'firm_type_unavailable'
-  | 'file_too_large';
+  | 'file_too_large'
+  // The studio's client page details (Round C, C8).
+  | 'phone_invalid'
+  | 'whatsapp_invalid'
+  | 'iban_invalid'
+  | 'bank_name_required'
+  | 'client_page_details_owner_only';

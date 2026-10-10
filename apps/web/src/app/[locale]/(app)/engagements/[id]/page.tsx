@@ -7,6 +7,7 @@ import { mayRecordOfflineApproval } from '@/lib/engagements/offline-approval';
 import { computeCommercialPulse } from '@/lib/engagements/pulse';
 import { canRunTrigger, legalTriggersFrom } from '@/lib/engagements/ui';
 import { can } from '@/lib/permissions/can';
+import { clientExpectedCardOf } from './client-expected-card';
 import { EngagementDetailClient } from './engagement-detail-client';
 import {
   deliveryStatusOf,
@@ -104,6 +105,7 @@ export default async function EngagementDetailPage({
         })}
         paymentClaims={paymentClaims}
         awaitingReplyCount={data.awaitingReplyCount}
+        clientExpected={clientExpectedCardOf({ role: ctx.role, header, transitions, status, now: new Date() })}
       />
     </div>
   );

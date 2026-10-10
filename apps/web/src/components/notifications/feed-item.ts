@@ -41,6 +41,8 @@ export const ENTITY_HREF: Record<string, (id: string) => string> = {
   proposal: (id) => `/proposals/${id}`,
   project: (id) => `/projects/${id}`,
   engagement: (id) => `/engagements/${id}`,
+  // The studio itself: today only the payment-details alert, which opens its card.
+  organization: () => '/settings#client-page',
 };
 
 /** The destination for one item, or null when it is not about a linkable entity. */
@@ -114,6 +116,11 @@ export function notificationBody(
         delivery: deliveryLabelOf(p, locale),
         dayCount: count(p.days),
         days: s(p.days),
+      });
+    case 'payment_details_changed':
+      return translate('payment_details_changed', {
+        hasName: typeof p.changedBy === 'string' && p.changedBy.trim() !== '' ? 'yes' : 'no',
+        name: typeof p.changedBy === 'string' ? p.changedBy.trim() : '',
       });
     case 'stage_reminder':
       return translate('stage_reminder', {

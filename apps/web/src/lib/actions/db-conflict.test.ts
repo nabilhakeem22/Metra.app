@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { isAmbiguousDbOutcome } from './db-failure';
 import {
   isImmutabilityViolation,
+  isOwnerOnlyColumnViolation,
   isUniqueViolation,
   isUniqueViolationOf,
 } from './db-conflict';
@@ -94,6 +95,19 @@ describe('isImmutabilityViolation', () => {
     expect(isImmutabilityViolation({ code: '23505' })).toBe(false);
     expect(isImmutabilityViolation(new Error('boom'))).toBe(false);
     expect(isImmutabilityViolation(null)).toBe(false);
+  });
+});
+
+describe('isOwnerOnlyColumnViolation', () => {
+  it('recognises MT120, bare and wrapped by drizzle', () => {
+    expect(isOwnerOnlyColumnViolation({ code: 'MT120' })).toBe(true);
+    expect(isOwnerOnlyColumnViolation(Object.assign(new Error('Failed query'), { cause: { code: 'MT120' } }))).toBe(true);
+  });
+
+  it('is false for MT100, a plain Error and null', () => {
+    expect(isOwnerOnlyColumnViolation({ code: 'MT100' })).toBe(false);
+    expect(isOwnerOnlyColumnViolation(new Error('boom'))).toBe(false);
+    expect(isOwnerOnlyColumnViolation(null)).toBe(false);
   });
 });
 

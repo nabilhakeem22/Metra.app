@@ -2,8 +2,9 @@
 // was split by area (SRP): `lifecycle` (create + the wired transition wrappers +
 // ROM data-entry), `payments` (record + log-and-advance), `deliverables` (artifact
 // + deliverable uploads/download), `share` (client delivery links), `reminder`
-// (show and resend the existing link) and `offline-approval` (an approval the
-// client gave the studio directly). Each split
+// (show and resend the existing link), `offline-approval` (an approval the
+// client gave the studio directly) and `client-expected` (the date the client
+// page promises for the next step). Each split
 // module carries its own `'use server';`. This barrel is a PLAIN re-export module
 // (NOT `'use server'`: a `'use server'` barrel rejects `export *`/re-exports — the
 // action references already live in the split modules) that names the IDENTICAL
@@ -36,6 +37,7 @@ export {
 } from './lifecycle';
 export { recordHandoffAcknowledgement } from './handoff';
 export { setEngagementRom, issueRom } from './rom';
+export { setClientExpectedDate } from './client-expected';
 export {
   recordPayment,
   logPaymentAndAdvance,

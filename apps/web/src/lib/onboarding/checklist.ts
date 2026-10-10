@@ -42,6 +42,8 @@ export function buildChecklist(
     { key: 'startDelivery', done: p.hasEngagement, href: '/engagements?new=1', tourStep: 'deliveries', capability: 'engagements_design', action: 'create' },
     // Sharing mints the client link: the owner/admin `engagements_issue` approve cell.
     { key: 'shareDelivery', done: p.hasSharedDelivery, href: shareDeliveryHref(p.newestUnsharedDeliveryId), tourStep: null, capability: 'engagements_issue', action: 'approve' },
+    // What the client page shows about the studio (Round C, C8): owner/admin, like the profile.
+    { key: 'clientPageDetails', done: p.hasClientPageDetails, href: '/settings#client-page', tourStep: null, capability: 'users_settings', action: 'update' },
   ];
 
   const items = all.filter((i) => can(role, i.capability, i.action));

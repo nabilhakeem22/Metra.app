@@ -10,6 +10,8 @@ export const NOTIFICATION_KINDS = [
   'stage_reminder',
   'client_responded',
   'delivery_followup',
+  // Round C: someone changed the InstaPay or bank details the client page shows.
+  'payment_details_changed',
 ] as const;
 
 export type NotificationKind = (typeof NOTIFICATION_KINDS)[number];

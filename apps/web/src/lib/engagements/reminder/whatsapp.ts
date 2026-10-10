@@ -31,6 +31,17 @@ function latinDigits(value: string): string {
 }
 
 /**
+ * A typed or pasted number with Latin digits only and nothing between them:
+ * Arabic-Indic digits folded, the invisible bidi marks and the punctuation
+ * people type removed. A leading + survives, and so do letters, so a caller's
+ * own pattern still refuses them. The studio's own numbers are stored in this
+ * form (lib/org/client-page-details.ts).
+ */
+export function compactPhone(phone: string): string {
+  return latinDigits(phone).replace(FORMAT_MARKS, '').replace(PHONE_PUNCTUATION, '');
+}
+
+/**
  * A number written WITHOUT an international prefix can only be placed if it is
  * an Egyptian mobile: `010…` (trunk 0 kept) and `10…` (trunk 0 dropped, as a
  * spreadsheet import does) both become `2010…`. Anything else is null: wa.me
@@ -57,7 +68,7 @@ function egyptianNational(digits: string): string | null {
  */
 export function whatsappDigits(phone: string | null): string | null {
   if (!phone) return null;
-  const compact = latinDigits(phone).replace(FORMAT_MARKS, '').replace(PHONE_PUNCTUATION, '');
+  const compact = compactPhone(phone);
   let digits: string | null;
   if (compact.startsWith('+')) digits = compact.slice(1);
   else if (compact.startsWith('00')) digits = compact.slice(2);

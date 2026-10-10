@@ -61,6 +61,7 @@ describe('getOnboardingProgress — in-org rows only', () => {
       hasEngagement: true,
       hasSharedDelivery: true,
       newestUnsharedDeliveryId: null,
+      hasClientPageDetails: false,
     });
 
     // A pristine second org sees NONE of org A's rows.
@@ -76,6 +77,7 @@ describe('getOnboardingProgress — in-org rows only', () => {
       hasEngagement: false,
       hasSharedDelivery: false,
       newestUnsharedDeliveryId: null,
+      hasClientPageDetails: false,
     });
   });
 
