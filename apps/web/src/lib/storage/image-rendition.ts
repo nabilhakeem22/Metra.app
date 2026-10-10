@@ -7,8 +7,10 @@ import 'server-only';
 // one path segment of a "preview" URL gets the full-resolution original. The
 // token therefore stays on the server: it is used once, here, and only the
 // rendition's bytes go to the browser. Every route that shows a client a
-// reduced image (the payment-gated preview now; the gallery thumbnails and the
-// studio logo in Wave 3) must go through this helper.
+// reduced image (the payment-gated preview and the gallery thumbnails) must go
+// through this helper. The studio logo is not gated, so it is served as its
+// stored original instead (./stored-image.ts).
+import { fetchBoundedImage, type BoundedImage } from './bounded-image-fetch';
 import { createSignedObjectUrl } from './signed-urls';
 
 export interface ImageTransform {
@@ -28,24 +30,6 @@ export const RENDITION_MAX_BYTES = 8 * 1024 * 1024;
 
 /** The server-side token's life: one fetch, right now. */
 const SIGNED_TTL_SECONDS = 30;
-const FETCH_TIMEOUT_MS = 10_000;
-
-export interface ImageRendition {
-  body: ReadableStream<Uint8Array>;
-  contentType: string;
-}
-
-/** A pass-through that errors the stream once more than `maxBytes` have gone by. */
-function byteCeiling(maxBytes: number): TransformStream<Uint8Array, Uint8Array> {
-  let seen = 0;
-  return new TransformStream({
-    transform(chunk, controller) {
-      seen += chunk.byteLength;
-      if (seen > maxBytes) controller.error(new Error('image rendition over its byte ceiling'));
-      else controller.enqueue(chunk);
-    },
-  });
-}
 
 /**
  * The transformed image of an ALREADY-AUTHORIZED object, as a stream, or null
@@ -56,15 +40,7 @@ export async function fetchImageRendition(
   bucket: string,
   objectKey: string,
   transform: ImageTransform,
-): Promise<ImageRendition | null> {
+): Promise<BoundedImage | null> {
   const signedUrl = await createSignedObjectUrl(bucket, objectKey, SIGNED_TTL_SECONDS, { transform });
-  const upstream = await fetch(signedUrl, { redirect: 'error', signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
-  if (!upstream.ok || !upstream.body) return null;
-  const contentType = (upstream.headers.get('content-type') ?? '').split(';')[0]!.trim().toLowerCase();
-  const declaredLength = Number(upstream.headers.get('content-length') ?? Number.NaN);
-  if (!RENDITION_TYPES.has(contentType) || declaredLength > RENDITION_MAX_BYTES) {
-    await upstream.body.cancel();
-    return null;
-  }
-  return { body: upstream.body.pipeThrough(byteCeiling(RENDITION_MAX_BYTES)), contentType };
+  return fetchBoundedImage(signedUrl, { allowedTypes: RENDITION_TYPES, maxBytes: RENDITION_MAX_BYTES });
 }

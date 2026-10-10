@@ -7,7 +7,7 @@ import { LOGO_HEADERS, logoRenditionResponse } from '@/lib/storage/logo-renditio
 // share token in the path IS the authorization (the SDF resolves the delivery
 // by its hash, the logo in-org, and only while the link is live).
 //
-// Served as streamed rendition BYTES, never a storage URL, and every miss is
+// Served as the stored original's BYTES, never a storage URL, and every miss is
 // the same empty 404 (../../../../../lib/storage/logo-rendition-response.ts):
 // an unknown, revoked or expired link and a malformed token included. More
 // than 300 pictures a minute for one link (per isolate,

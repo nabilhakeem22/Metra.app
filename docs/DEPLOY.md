@@ -300,6 +300,22 @@ Signed links a paid client opens live 300 seconds, so after a link is replaced
 or revoked a document URL minted just before still works for up to five
 minutes (accepted, Round C S4).
 
+## Supabase Free plan: no Storage image transformations
+
+The Supabase org is on the **Free** plan, which has no Storage image
+transformations (`render/image`). Until that changes:
+
+- **Unpaid previews and gallery thumbnails show "unavailable".** Both are
+  downscaled renditions (`apps/web/src/lib/storage/image-rendition.ts`), Storage
+  refuses to make them, and the client page answers "unavailable" instead. Paid
+  downloads are not affected. The fix is upgrading the plan or building preview
+  copies at upload time; nothing in code waits for either.
+- **The studio logo is served as its original bytes**
+  (`apps/web/src/lib/storage/stored-image.ts`), in Settings and on the client
+  page alike: it is not payment-gated, it is a png, jpg or webp of at most 2 MB
+  (checked at upload and again when attached), and the page scales it with CSS.
+  The app streams the bytes; the browser never receives a storage URL.
+
 ## The cron Worker is a separate deployment
 
 `workers/cron` is **not** an npm workspace and is **not** deployed by

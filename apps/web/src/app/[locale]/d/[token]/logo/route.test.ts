@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-// AC 45: the studio logo is the rendition's BYTES, streamed from here: never a
+// AC 45: the studio logo is its stored original's BYTES, streamed from here: never a
 // redirect and never a storage URL. Every miss is the same empty, uncached 404.
 
 vi.mock('server-only', () => ({}));
@@ -13,7 +13,7 @@ vi.mock('@/lib/storage/signed-urls', () => storage);
 const { GET } = await import('./route');
 
 const OBJECT_KEY = 'org-1/organization/logo-1';
-const RENDER_SIGNED = `https://storage.test/render/image/sign/metra-files/${OBJECT_KEY}?token=R`;
+const OBJECT_SIGNED = `https://storage.test/object/sign/metra-files/${OBJECT_KEY}?token=O`;
 const fetchMock = vi.fn();
 
 function get(token = 'tok') {
@@ -31,14 +31,14 @@ async function expectNotFound(response: Response) {
 
 beforeEach(() => {
   logo.getDeliveryLogoByToken.mockReset().mockResolvedValue({ bucket: 'metra-files', objectKey: OBJECT_KEY });
-  storage.createSignedObjectUrl.mockReset().mockResolvedValue(RENDER_SIGNED);
+  storage.createSignedObjectUrl.mockReset().mockResolvedValue(OBJECT_SIGNED);
   fetchMock.mockReset().mockResolvedValue(new Response(new Uint8Array([7, 8, 9]), { headers: { 'content-type': 'image/png' } }));
   vi.stubGlobal('fetch', fetchMock);
 });
 afterEach(() => vi.unstubAllGlobals());
 
 describe('the logo route', () => {
-  it('streams the 160 px rendition bytes, private (240 s, no shared cache), with no URL in the answer', async () => {
+  it('streams the stored logo bytes, private (240 s, no shared cache), with no URL in the answer', async () => {
     const response = await get();
     expect(response.status).toBe(200);
     expect(response.headers.get('location')).toBeNull();
@@ -48,10 +48,9 @@ describe('the logo route', () => {
     expect(response.headers.get('referrer-policy')).toBe('no-referrer');
     expect(response.headers.get('x-content-type-options')).toBe('nosniff');
     expect([...new Uint8Array(await response.arrayBuffer())]).toEqual([7, 8, 9]);
-    expect(storage.createSignedObjectUrl).toHaveBeenCalledWith('metra-files', OBJECT_KEY, 30, {
-      transform: { width: 160, height: 160, resize: 'contain', quality: 80 },
-    });
-    expect(fetchMock).toHaveBeenCalledWith(RENDER_SIGNED, expect.objectContaining({ redirect: 'error' }));
+    // The plain object URL, signed for 30 s, no transform: the stored original.
+    expect(storage.createSignedObjectUrl).toHaveBeenCalledWith('metra-files', OBJECT_KEY, 30);
+    expect(fetchMock).toHaveBeenCalledWith(OBJECT_SIGNED, expect.objectContaining({ redirect: 'error' }));
   });
 
   it('no logo, a revoked or malformed link: the empty 404', async () => {
@@ -61,10 +60,14 @@ describe('the logo route', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it('a rendition Storage refused, a non-image answer, or a throw: the same 404', async () => {
+  it('a fetch Storage refused, a non-image answer, an over-2 MB logo, or a throw: the same 404', async () => {
     fetchMock.mockResolvedValueOnce(new Response('no', { status: 400 }));
     await expectNotFound(await get());
     fetchMock.mockResolvedValueOnce(new Response('<svg/>', { headers: { 'content-type': 'image/svg+xml' } }));
+    await expectNotFound(await get());
+    fetchMock.mockResolvedValueOnce(
+      new Response('x', { headers: { 'content-type': 'image/png', 'content-length': String(2 * 1024 * 1024 + 1) } }),
+    );
     await expectNotFound(await get());
     storage.createSignedObjectUrl.mockRejectedValueOnce(new Error('storage down'));
     vi.spyOn(console, 'error').mockImplementation(() => {});

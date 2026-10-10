@@ -2,10 +2,11 @@ import { drizzle } from 'drizzle-orm/postgres-js';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // The studio's own logo for Settings: the signed-in member's ACTIVE org only,
-// streamed as rendition bytes (never a redirect, never a storage URL), and
-// every miss the same empty, uncached 404. The real reader (lib/org/own-logo.ts)
-// runs: its query is built against a driverless drizzle so the SQL it would send
-// can be read, and the rows it would get back are supplied here.
+// streamed as the stored original's bytes (never a redirect, never a storage
+// URL), and every miss the same empty, uncached 404. The real reader
+// (lib/org/own-logo.ts) runs: its query is built against a driverless drizzle so
+// the SQL it would send can be read, and the rows it would get back are supplied
+// here.
 
 vi.mock('server-only', () => ({}));
 const CTX = { orgId: 'org-own', userId: 'user-1', userEmail: 'a@b.c', role: 'viewer' } as const;
@@ -25,7 +26,7 @@ vi.mock('@/lib/storage/signed-urls', () => storage);
 const { GET } = await import('./route');
 
 const OBJECT_KEY = 'org-own/organization/logo-1';
-const RENDER_SIGNED = `https://storage.test/render/image/sign/metra-files/${OBJECT_KEY}?token=R`;
+const OBJECT_SIGNED = `https://storage.test/object/sign/metra-files/${OBJECT_KEY}?token=O`;
 const fetchMock = vi.fn();
 
 function storedLogo(originalName: string | null) {
@@ -45,7 +46,7 @@ beforeEach(() => {
   database.contexts = [];
   database.queries = [];
   storedLogo('logo.webp');
-  storage.createSignedObjectUrl.mockReset().mockResolvedValue(RENDER_SIGNED);
+  storage.createSignedObjectUrl.mockReset().mockResolvedValue(OBJECT_SIGNED);
   fetchMock.mockReset().mockResolvedValue(new Response(new Uint8Array([4, 5, 6]), { headers: { 'content-type': 'image/webp' } }));
   vi.stubGlobal('fetch', fetchMock);
 });
@@ -55,7 +56,7 @@ afterEach(() => {
 });
 
 describe('the studio logo route', () => {
-  it('streams the saved logo as 160 px rendition bytes, private, sniff-proof, with no URL in the answer', async () => {
+  it('streams the saved logo as its stored bytes, private, sniff-proof, with no URL in the answer', async () => {
     const response = await GET();
     expect(response.status).toBe(200);
     expect(response.headers.get('location')).toBeNull();
@@ -63,10 +64,9 @@ describe('the studio logo route', () => {
     expect(response.headers.get('cache-control')).toBe('private, max-age=240');
     expect(response.headers.get('x-content-type-options')).toBe('nosniff');
     expect([...new Uint8Array(await response.arrayBuffer())]).toEqual([4, 5, 6]);
-    expect(storage.createSignedObjectUrl).toHaveBeenCalledWith('metra-files', OBJECT_KEY, 30, {
-      transform: { width: 160, height: 160, resize: 'contain', quality: 80 },
-    });
-    expect(fetchMock).toHaveBeenCalledWith(RENDER_SIGNED, expect.objectContaining({ redirect: 'error' }));
+    // The plain object URL, signed for 30 s, no transform: the stored original.
+    expect(storage.createSignedObjectUrl).toHaveBeenCalledWith('metra-files', OBJECT_KEY, 30);
+    expect(fetchMock).toHaveBeenCalledWith(OBJECT_SIGNED, expect.objectContaining({ redirect: 'error' }));
   });
 
   it("reads only the caller's own org: its RLS context, its org row, a file of that same org", async () => {
@@ -92,10 +92,14 @@ describe('the studio logo route', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it('a rendition Storage refused, a non-image answer, or a throw: the same 404', async () => {
+  it('a fetch Storage refused, a non-image answer, an over-2 MB logo, or a throw: the same 404', async () => {
     fetchMock.mockResolvedValueOnce(new Response('no', { status: 400 }));
     await expectNotFound(await GET());
     fetchMock.mockResolvedValueOnce(new Response('<svg/>', { headers: { 'content-type': 'image/svg+xml' } }));
+    await expectNotFound(await GET());
+    fetchMock.mockResolvedValueOnce(
+      new Response('x', { headers: { 'content-type': 'image/png', 'content-length': String(2 * 1024 * 1024 + 1) } }),
+    );
     await expectNotFound(await GET());
     const log = vi.spyOn(console, 'error').mockImplementation(() => {});
     storage.createSignedObjectUrl.mockRejectedValueOnce(new Error('storage down'));

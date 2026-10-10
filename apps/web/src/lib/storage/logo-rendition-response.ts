@@ -3,24 +3,24 @@ import 'server-only';
 // and the studio's own Settings (/settings/logo) both answer through here, so
 // the two can never drift on how a logo is served.
 //
-// BYTES, NEVER A URL. The logo is streamed as a small rendition
-// (./image-rendition.ts). A redirect to a signed render URL would hand the
-// browser a token that also opens the original object at /object/sign/ (the
-// C5 S1 bypass), so no storage URL ever leaves the server.
+// BYTES, NEVER A URL. The logo is streamed as its stored ORIGINAL
+// (./stored-image.ts): it is not payment-gated, it is at most LOGO_MAX_BYTES of
+// png, jpg or webp (checked at upload and again when attached), and the page
+// scales it with CSS. The plain object URL is signed and used on the server
+// only; no storage URL ever leaves it. (Storage image transformations are not
+// on the Supabase plan in use, so a rendition is not an option; docs/DEPLOY.md.)
 //
-// NO ORACLE: no logo, a logo that is not an image, a failed rendition and any
-// throw all answer the same empty, uncached 404.
+// NO ORACLE: no logo, a logo that is not an image, an oversized or failed fetch
+// and any throw all answer the same empty, uncached 404.
 import { NextResponse } from 'next/server';
-import { fetchImageRendition, type ImageTransform } from './image-rendition';
+import { LOGO_MAX_BYTES } from '@/lib/org/logo-rules';
+import { fetchStoredImage } from './stored-image';
 
 /** Where a logo's object lives. Resolved and authorized by the caller. */
 export interface LogoLocation {
   bucket: string;
   objectKey: string;
 }
-
-/** 40 px on screen, sharp at 4x. `contain`: a logo is never cropped. */
-const LOGO_TRANSFORM: ImageTransform = { width: 160, height: 160, resize: 'contain', quality: 80 };
 
 /** Every answer: never a Referer, never content-sniffed. Caching is per
  *  answer: a miss never, the image privately. */
@@ -34,7 +34,7 @@ export function logoNotFound(): NextResponse {
 }
 
 /**
- * Resolves the logo and streams its rendition, or the empty 404. Never throws:
+ * Resolves the logo and streams its stored bytes, or the empty 404. Never throws:
  * a failure logs `failureBreadcrumb` (a fixed string, so nothing the caller
  * holds, a share token say, can reach the log) and answers the 404. The
  * caller authenticates BEFORE this, so an auth redirect is never swallowed.
@@ -46,15 +46,15 @@ export async function logoRenditionResponse(
   try {
     const logo = await resolveLogo();
     if (!logo) return logoNotFound();
-    const rendition = await fetchImageRendition(logo.bucket, logo.objectKey, LOGO_TRANSFORM);
-    if (!rendition) return logoNotFound();
-    return new NextResponse(rendition.body, {
+    const image = await fetchStoredImage(logo.bucket, logo.objectKey, LOGO_MAX_BYTES);
+    if (!image) return logoNotFound();
+    return new NextResponse(image.body, {
       status: 200,
       headers: {
         ...LOGO_HEADERS,
         // The browser may keep it for a few minutes; no shared cache ever may (S2).
         'Cache-Control': 'private, max-age=240',
-        'Content-Type': rendition.contentType,
+        'Content-Type': image.contentType,
         'Content-Disposition': 'inline',
       },
     });
