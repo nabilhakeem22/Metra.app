@@ -11,6 +11,8 @@ export type InFlightRead = { deliveries: InFlightDelivery[]; capped: boolean };
 /** Created by the runner for each org on each tick; cores read it through the helpers below. */
 export interface OrgTickMemo {
   inFlight?: Promise<InFlightRead>;
+  /** May the lost-notification sweep have work? (./lost-act-probe.ts) */
+  lostActsPossible?: Promise<boolean>;
 }
 
 export function createOrgTickMemo(): OrgTickMemo {

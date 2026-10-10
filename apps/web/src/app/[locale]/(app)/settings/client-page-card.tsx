@@ -16,7 +16,16 @@ import { ClientPageSheet } from './client-page-sheet';
  * form sheet. `id="client-page"` is the setup checklist's and the
  * payment-details alert's anchor.
  */
-export function ClientPageCard({ canManage, details }: { canManage: boolean; details: ClientPageDraft }) {
+export function ClientPageCard({
+  canManage,
+  details,
+  revision,
+}: {
+  canManage: boolean;
+  details: ClientPageDraft;
+  /** The stored values' revision, for the sheet's stale-save check. */
+  revision: string;
+}) {
   const t = useTranslations('settings.clientPage');
   const [editing, setEditing] = useState(false);
 
@@ -57,7 +66,7 @@ export function ClientPageCard({ canManage, details }: { canManage: boolean; det
           </div>
         ))}
       </CardContent>
-      {canManage && <ClientPageSheet open={editing} onOpenChange={setEditing} initial={details} />}
+      {canManage && <ClientPageSheet open={editing} onOpenChange={setEditing} initial={details} revision={revision} />}
     </Card>
   );
 }

@@ -8,6 +8,7 @@ import 'server-only';
 // net: a close that fails or runs out of time here is repaired within the hour,
 // and both are idempotent through the executor's state gate.
 import { sql } from 'drizzle-orm';
+import { after } from 'next/server';
 import { loggableFailure } from '@/lib/actions/loggable-failure';
 import { resolveSystemContext } from '@/lib/automation/system-context';
 import { withDeadline } from '@/lib/http/deadlines';
@@ -60,17 +61,50 @@ export async function closeHandoverByToken(rawToken: string): Promise<boolean> {
 }
 
 /**
- * A portal answer, after closing the delivery when it confirmed the handover:
- * the `acknowledge_handoff` verb answered `ok` (a first tap, or `already` on a
- * repeat, which repairs a close that failed). Any other verb or a refusal
- * passes through untouched. The answer itself is never changed: the client
- * page reads the closed state on the refresh that follows.
+ * The most the client's answer waits for the close (fix round F7). The close
+ * runs ALONGSIDE the studio notification, so the answer waits for the slower
+ * of the two; a close still running at this point finishes after the response
+ * where the platform allows it, and the hourly closer is the backstop either
+ * way. Measured at a 31 ms round trip the close takes about 1.4 s, so it
+ * normally lands before the page's refresh reads the delivery.
  */
-export async function closingConfirmedHandover<TAnswer extends { ok: boolean }>(
+export const HANDOVER_CLOSE_WAIT_MS = 1_500;
+
+/** True when `work` settled within `ms`. Never rejects. */
+function settledWithin(work: Promise<unknown>, ms: number): Promise<boolean> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const late = new Promise<boolean>((resolve) => {
+    timer = setTimeout(() => resolve(false), ms);
+  });
+  return Promise.race([work.then(() => true, () => true), late]).finally(() => clearTimeout(timer));
+}
+
+/** Let a close that outran the wait finish after the response (best effort). Never throws. */
+function finishAfterResponse(closing: Promise<boolean>): void {
+  try {
+    after(() => closing);
+  } catch (err) {
+    console.error('handover close not kept past the response:', loggableFailure(err));
+  }
+}
+
+/**
+ * A portal answer, with the delivery closed when it confirmed the handover:
+ * the `acknowledge_handoff` verb whose write answered `ok` (a first tap, or
+ * `already` on a repeat, which repairs a close that failed). `answer` (the
+ * studio notification) runs alongside the close; any other verb or a refusal
+ * just runs it. The answer itself is never changed: the client page reads the
+ * closed state on the refresh that follows.
+ */
+export async function withHandoverClose<TAnswer>(
   rawToken: string,
   verb: string,
-  answer: TAnswer,
+  written: { ok: boolean },
+  answer: () => Promise<TAnswer>,
 ): Promise<TAnswer> {
-  if (verb === 'acknowledge_handoff' && answer.ok) await closeHandoverByToken(rawToken);
-  return answer;
+  if (verb !== 'acknowledge_handoff' || !written.ok) return answer();
+  const closing = closeHandoverByToken(rawToken);
+  const [result, settled] = await Promise.all([answer(), settledWithin(closing, HANDOVER_CLOSE_WAIT_MS)]);
+  if (!settled) finishAfterResponse(closing);
+  return result;
 }

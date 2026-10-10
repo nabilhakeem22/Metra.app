@@ -374,7 +374,6 @@
       "subtitle": "بيظهر في صفحة التسليم عند العميل: التليفون والواتساب على طول، وبيانات الدفع بس لما يكون فيه دفعة مستحقة.",
       "contactHeading": "التواصل",
       "paymentHeading": "الدفع",
-      "paymentNote": "كل المالكين والأدمن بيوصلهم تنبيه لما بيانات الدفع تتغيّر.",
       "notSet": "مش متحدد",
       "edit": "تعديل",
       "save": "حفظ",
@@ -396,7 +395,8 @@
         "bankAccountHolder": "اكتب اسم صاحب الحساب، من 2 لـ 120 حرف.",
         "bankAccountNumber": "اكتب رقم الحساب: من 4 لـ 34 حرف أو رقم، وفيه رقم واحد على الأقل.",
         "bankIban": "رقم الآيبان ده شكله مش مظبوط. بيبدأ بحرفين زي EG."
-      }
+      },
+      "alertNote": "كل المالكين والأدمن بيوصلهم تنبيه لما أي حاجة من دي تتغيّر."
     }
   },
   "apiKeys": {
@@ -513,7 +513,7 @@
     "engagement_client_required": "اختار عميل",
     "engagement_project_required": "اختار مشروع",
     "engagement_not_found": "التسليم ده مش موجود",
-    "engagement_not_active": "التسليم ده مقفول، ومينفعش تسجل دفعات",
+    "engagement_not_active": "التسليم ده اتقفل، ومينفعش يتغيّر تاني.",
     "illegal_trigger": "الإجراء ده مش مسموح بيه في المرحلة الحالية",
     "engagement_state_conflict": "التسليم ده لسه متحدث حالا، اعمل تحديث للصفحة وجرب تاني",
     "guard_scope_inputs_missing": "ضيف عنوان وعميل ومشروع الأول عشان تكمل",
@@ -587,7 +587,9 @@
     "whatsapp_invalid": "الواتساب محتاج رقم موبايل: موبايل مصري، أو الرقم بكود البلد زي +44.",
     "iban_invalid": "رقم الآيبان ده شكله مش مظبوط. بيبدأ بحرفين زي EG.",
     "bank_name_required": "اكتب اسم البنك كمان.",
-    "client_page_details_owner_only": "المالك أو الأدمن بس هما اللي يقدروا يغيّروا البيانات اللي العملاء بيشوفوها."
+    "client_page_details_owner_only": "المالك أو الأدمن بس هما اللي يقدروا يغيّروا البيانات اللي العملاء بيشوفوها.",
+    "client_page_details_stale": "حد تاني غيّر البيانات دي وانت بتعدّل. اعمل تحديث للصفحة عشان تشوفها، وبعدين عدّل تاني.",
+    "expected_date_out_of_range": "اختار تاريخ من النهارده لحد سنة من دلوقتي."
   },
   "common": {
     "untranslated": "غير مترجم",
@@ -1465,7 +1467,7 @@
       "stage_reminder": "تنبيه المرحلة",
       "client_responded": "العميل رد",
       "delivery_followup": "متابعة تسليم",
-      "payment_details_changed": "بيانات الدفع اتغيّرت"
+      "client_page_details_changed": "بيانات صفحة العميل اتغيّرت"
     },
     "body": {
       "proposal_expiring": "عرض السعر {number} هينتهي في {date}.",
@@ -1483,7 +1485,7 @@
       "client_handover_acknowledged": "العميل أكد استلام التسليم في {delivery}.",
       "client_payment_claimed": "{hasMilestone, select, yes {العميل بيقول إنه دفع ({milestone}) في {delivery}. أكدها من صفحة التسليم.} other {العميل بيقول إنه دفع دفعة في {delivery}. أكدها من صفحة التسليم.}}",
       "client_commented": "{commentCount, plural, zero {العميل كتب تعليقات على {delivery}.} one {العميل كتب تعليق على {delivery}.} two {العميل كتب تعليقين على {delivery}.} few {العميل كتب {count} تعليقات على {delivery}.} many {العميل كتب {count} تعليق على {delivery}.} other {العميل كتب {count} تعليق على {delivery}.}}",
-      "payment_details_changed": "{hasName, select, yes {{name} غيّر بيانات الدفع اللي العملاء بيشوفوها. راجعها من الإعدادات.} other {بيانات الدفع اللي العملاء بيشوفوها اتغيّرت. راجعها من الإعدادات.}}"
+      "client_page_details_changed": "{hasActor, select, yes {{actor} غيّر بيانات التواصل والدفع اللي العملاء بيشوفوها. راجعها من الإعدادات.} other {بيانات التواصل والدفع اللي العملاء بيشوفوها اتغيّرت. راجعها من الإعدادات.}}"
     },
     "viewAll": "عرض الكل"
   },
@@ -2276,7 +2278,8 @@
       "save": "حفظ",
       "clear": "امسح",
       "showing": "العميل شايف: متوقع يوم {date}",
-      "stale": "الميعاد عدّى، حدد ميعاد جديد."
+      "stale": "الميعاد عدّى، حدد ميعاد جديد.",
+      "moved": "التسليم اتنقل لمرحلة جديدة، فالعميل مبقاش شايف الميعاد ده. حدد ميعاد للمرحلة دي."
     }
   },
   "delivery": {

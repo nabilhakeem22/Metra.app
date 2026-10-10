@@ -95,6 +95,8 @@ export const DEFINITE_REFUSALS: ReadonlySet<ActionCode> = new Set<ActionCode>([
   'iban_invalid',
   'bank_name_required',
   'client_page_details_owner_only',
+  'client_page_details_stale',
+  'expected_date_out_of_range',
 ]);
 
 /** True only when the server is KNOWN to have committed nothing. */

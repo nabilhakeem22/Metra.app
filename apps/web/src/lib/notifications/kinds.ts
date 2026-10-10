@@ -10,8 +10,9 @@ export const NOTIFICATION_KINDS = [
   'stage_reminder',
   'client_responded',
   'delivery_followup',
-  // Round C: someone changed the InstaPay or bank details the client page shows.
-  'payment_details_changed',
+  // Round C: someone changed the phone, WhatsApp, InstaPay or bank details the
+  // client page shows. Params carry the actor's id; the feed resolves who.
+  'client_page_details_changed',
 ] as const;
 
 export type NotificationKind = (typeof NOTIFICATION_KINDS)[number];

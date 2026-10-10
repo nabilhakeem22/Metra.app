@@ -39,4 +39,6 @@ export type CommonActionCode =
   | 'whatsapp_invalid'
   | 'iban_invalid'
   | 'bank_name_required'
-  | 'client_page_details_owner_only';
+  | 'client_page_details_owner_only'
+  | 'client_page_details_stale'
+  | 'expected_date_out_of_range';

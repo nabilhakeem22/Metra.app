@@ -12,7 +12,7 @@ import { resolveActionError } from '@/lib/actions/error-message';
 import type { ActionCode } from '@/lib/actions/result';
 import { updateClientPageDetails } from '@/lib/org/client-page-actions';
 import type { ClientPageField } from '@/lib/org/client-page-details';
-import { CLIENT_PAGE_FIELD_SPECS, type ClientPageDraft } from './client-page-fields';
+import { CLIENT_PAGE_FIELD_SPECS, changedDraftFields, type ClientPageDraft } from './client-page-fields';
 
 type Refusal = { code: ActionCode; field: ClientPageField | null };
 
@@ -26,10 +26,13 @@ export function ClientPageSheet({
   open,
   onOpenChange,
   initial,
+  revision,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   initial: ClientPageDraft;
+  /** The stored values' revision the sheet saves against (a stale save is refused). */
+  revision: string;
 }) {
   const t = useTranslations('settings.clientPage');
   const te = useTranslations('errors');
@@ -52,7 +55,7 @@ export function ClientPageSheet({
     setRefusal(null);
     startTransition(async () => {
       try {
-        const result = await updateClientPageDetails(draft);
+        const result = await updateClientPageDetails({ revision, changes: changedDraftFields(initial, draft) });
         if (result.ok) {
           toast({ title: t('saved') });
           onOpenChange(false);
@@ -79,10 +82,10 @@ export function ClientPageSheet({
       pending={pending}
       formError={refusal && !refusal.field ? messageOf(refusal) : null}
     >
+      <p className="text-caption text-muted-foreground">{t('alertNote')}</p>
       {(['contact', 'payment'] as const).map((group) => (
         <div key={group} className="space-y-4">
           <SectionLabel as="h3">{t(group === 'contact' ? 'contactHeading' : 'paymentHeading')}</SectionLabel>
-          {group === 'payment' && <p className="text-caption text-muted-foreground">{t('paymentNote')}</p>}
           {CLIENT_PAGE_FIELD_SPECS.filter((spec) => spec.group === group).map((spec) => (
             <FormField
               key={spec.field}

@@ -6,7 +6,7 @@
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { OrgContext } from '@/lib/db/context';
 import { runHandoverCloser } from '@/lib/automation/handover-closer';
-import { closeHandoverByToken, closingConfirmedHandover } from '@/lib/engagements/client-acts/handover-close';
+import { HANDOVER_CLOSE_WAIT_MS, closeHandoverByToken, withHandoverClose } from '@/lib/engagements/client-acts/handover-close';
 import { recordDeliveryActionByToken } from '@/lib/engagements/public';
 import { closeFixture, raw, teardown } from './fixture';
 import { closeAudit, closeRows, closerDeps, stateOf } from './handover-fixture';
@@ -43,10 +43,10 @@ async function atHandover(suffix: string) {
 /** The portal's own path: the token write, then the close that follows it. */
 async function confirmHandover(token: string) {
   const result = await recordDeliveryActionByToken(token, { action: 'acknowledge_handoff' });
-  return closingConfirmedHandover(token, 'acknowledge_handoff', result);
+  return withHandoverClose(token, 'acknowledge_handoff', result, async () => result);
 }
 
-describe('closingConfirmedHandover (AC 57)', () => {
+describe('withHandoverClose (AC 57)', () => {
   it("closes the delivery in the same request: ledger by no one, audit by the cause, 'client' as recorder", async () => {
     const d = await atHandover('close-inline');
     expect(await confirmHandover(d.token)).toEqual({ ok: true });
@@ -93,8 +93,9 @@ describe('closingConfirmedHandover (AC 57)', () => {
 
   it('closes nothing for any other verb, a refusal, an unknown token or a retracted confirmation', async () => {
     const d = await atHandover('close-none');
-    expect(await closingConfirmedHandover(d.token, 'acknowledge_rom', { ok: true })).toEqual({ ok: true });
-    expect(await closingConfirmedHandover(d.token, 'acknowledge_handoff', { ok: false })).toEqual({ ok: false });
+    const answer = async () => 'notified';
+    expect(await withHandoverClose(d.token, 'acknowledge_rom', { ok: true }, answer)).toBe('notified');
+    expect(await withHandoverClose(d.token, 'acknowledge_handoff', { ok: false }, answer)).toBe('notified');
     expect(await stateOf(d.engagementId)).toBe('design_only_handoff');
     expect(await closeHandoverByToken('not-a-token')).toBe(false);
     expect(await closeHandoverByToken('   ')).toBe(false);
@@ -112,5 +113,29 @@ describe('closingConfirmedHandover (AC 57)', () => {
     expect(await closeHandoverByToken(d.token)).toBe(false);
     expect(await stateOf(d.engagementId)).toBe('design_only_handoff');
     expect(await closeRows(d.engagementId)).toEqual([]);
+  });
+});
+
+describe('withHandoverClose: the answer waits for the slower of notify and close, capped (F7)', () => {
+  it('runs the notification alongside the close, not after it', async () => {
+    const d = await atHandover('close-parallel');
+    await recordDeliveryActionByToken(d.token, { action: 'acknowledge_handoff' });
+    let closedWhenNotifyStarted: string | null = null;
+    await withHandoverClose(d.token, 'acknowledge_handoff', { ok: true }, async () => {
+      closedWhenNotifyStarted = await stateOf(d.engagementId);
+      return null;
+    });
+    // The notification began before the close finished; the close still landed before the answer.
+    expect(closedWhenNotifyStarted).toBe('design_only_handoff');
+    expect(await stateOf(d.engagementId)).toBe('closed_design_only');
+  });
+
+  it(`answers within ${HANDOVER_CLOSE_WAIT_MS} ms of a slow notification, and the close still lands`, async () => {
+    const d = await atHandover('close-capped');
+    await recordDeliveryActionByToken(d.token, { action: 'acknowledge_handoff' });
+    const started = Date.now();
+    await withHandoverClose(d.token, 'acknowledge_handoff', { ok: true }, async () => 'notified');
+    expect(Date.now() - started).toBeLessThan(HANDOVER_CLOSE_WAIT_MS + 500);
+    expect(await stateOf(d.engagementId)).toBe('closed_design_only');
   });
 });

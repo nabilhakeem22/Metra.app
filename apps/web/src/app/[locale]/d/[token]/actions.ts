@@ -3,7 +3,7 @@
 import { clientActOfVerb, paymentClaimedAct } from '@/lib/engagements/client-acts/acts';
 import { clientNote } from '@/lib/engagements/client-note';
 import { chooseConceptAndNotify, respondToConceptAndNotify } from '@/lib/engagements/client-acts/concept-acts';
-import { closingConfirmedHandover } from '@/lib/engagements/client-acts/handover-close';
+import { withHandoverClose } from '@/lib/engagements/client-acts/handover-close';
 import { withStudioNotified } from '@/lib/engagements/client-acts/notify';
 import { isConceptVerb, type ConceptChoiceOutcome } from '@/lib/engagements/concept-choice-outcome';
 import {
@@ -44,7 +44,7 @@ export async function recordDeliveryAction(
     note: clientNote(note),
     ...(await requestProvenance()),
   });
-  return closingConfirmedHandover(token, action, await withStudioNotified(token, result, clientActOfVerb(action)));
+  return withHandoverClose(token, action, result, () => withStudioNotified(token, result, clientActOfVerb(action)));
 }
 
 /**

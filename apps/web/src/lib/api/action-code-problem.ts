@@ -131,6 +131,8 @@ export const ACTION_CODE_PROBLEM: Record<ActionCode, ApiProblemKind> = {
   bank_name_required: 'bad-request',
   // The database's own owner/admin gate (MT120) refused the write.
   client_page_details_owner_only: 'forbidden',
+  client_page_details_stale: 'conflict',
+  expected_date_out_of_range: 'bad-request',
   project_delivery_exists: 'conflict',
   project_delivery_limit_reached: 'conflict',
   claim_not_found: 'bad-request',

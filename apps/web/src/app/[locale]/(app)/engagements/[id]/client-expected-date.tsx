@@ -48,9 +48,9 @@ export function ClientExpectedDate({
       {view.kind === 'showing' && (
         <p className="text-small font-medium">{t('showing', { date: formatDate(view.on, locale) })}</p>
       )}
-      {view.kind === 'stale' && (
+      {(view.kind === 'passed' || view.kind === 'moved') && (
         <p className="text-small font-medium text-[color:var(--warn)]" role="status">
-          {t('stale')}
+          {t(view.kind === 'passed' ? 'stale' : 'moved')}
         </p>
       )}
       <div className="flex flex-wrap items-center gap-2">

@@ -374,7 +374,6 @@
       "subtitle": "Shown on your client's delivery page: phone and WhatsApp always, payment details only while a payment is due.",
       "contactHeading": "Contact",
       "paymentHeading": "Payment",
-      "paymentNote": "Every owner and admin is told when the payment details change.",
       "notSet": "Not set",
       "edit": "Edit",
       "save": "Save",
@@ -396,7 +395,8 @@
         "bankAccountHolder": "Write the account holder's name, 2 to 120 characters.",
         "bankAccountNumber": "Write the account number: 4 to 34 letters or digits, with at least one digit.",
         "bankIban": "This IBAN does not look right. It starts with two letters, like EG."
-      }
+      },
+      "alertNote": "Every owner and admin is told when any of these change."
     }
   },
   "apiKeys": {
@@ -513,7 +513,7 @@
     "engagement_client_required": "Select a client",
     "engagement_project_required": "Select a project",
     "engagement_not_found": "This delivery could not be found",
-    "engagement_not_active": "This delivery is closed. No payments can be recorded",
+    "engagement_not_active": "This delivery is closed, so it can't be changed anymore.",
     "illegal_trigger": "This action isn't allowed from the current stage",
     "engagement_state_conflict": "This delivery was just updated. Reload and try again",
     "guard_scope_inputs_missing": "Add a title, client, and project before continuing",
@@ -587,7 +587,9 @@
     "whatsapp_invalid": "WhatsApp needs a mobile number: an Egyptian mobile, or the number with its country code, like +44.",
     "iban_invalid": "This IBAN does not look right. It starts with two letters, like EG.",
     "bank_name_required": "Add the bank name too.",
-    "client_page_details_owner_only": "Only the owner or an admin can change what your clients see."
+    "client_page_details_owner_only": "Only the owner or an admin can change what your clients see.",
+    "client_page_details_stale": "Someone else changed these details while you were editing. Reload to see them, then make your change again.",
+    "expected_date_out_of_range": "Pick a date from today to a year from now."
   },
   "common": {
     "untranslated": "untranslated",
@@ -1465,7 +1467,7 @@
       "stage_reminder": "Stage reminder",
       "client_responded": "Client responded",
       "delivery_followup": "Delivery follow-up",
-      "payment_details_changed": "Payment details changed"
+      "client_page_details_changed": "Client page details changed"
     },
     "body": {
       "proposal_expiring": "Quotation {number} expires on {date}.",
@@ -1483,7 +1485,7 @@
       "client_handover_acknowledged": "The client confirmed receiving the handover on {delivery}.",
       "client_payment_claimed": "{hasMilestone, select, yes {The client says they paid ({milestone}) on {delivery}. Confirm it from the delivery.} other {The client says they made a payment on {delivery}. Confirm it from the delivery.}}",
       "client_commented": "{commentCount, plural, one {The client left a comment on {delivery}.} other {The client left {count} comments on {delivery}.}}",
-      "payment_details_changed": "{hasName, select, yes {{name} changed the payment details your clients see. Check them in Settings.} other {The payment details your clients see were changed. Check them in Settings.}}"
+      "client_page_details_changed": "{hasActor, select, yes {{actor} changed the contact and payment details your clients see. Check them in Settings.} other {The contact and payment details your clients see were changed. Check them in Settings.}}"
     },
     "viewAll": "View all"
   },
@@ -2276,7 +2278,8 @@
       "save": "Save",
       "clear": "Clear",
       "showing": "Client sees: expected by {date}",
-      "stale": "Date passed, set a new one."
+      "stale": "The date passed, set a new one.",
+      "moved": "The delivery moved to a new stage, so the client no longer sees this date. Set a date for this stage."
     }
   },
   "delivery": {

@@ -7,6 +7,7 @@ import {
 } from '@/components/notifications/feed-item';
 import { loggableFailure } from '@/lib/actions/loggable-failure';
 import type { OrgContext } from '@/lib/db/context';
+import { withActorIdentities } from './actor-identities';
 import { countUnread, listNotifications } from './queries';
 
 /** One stored notification, as the feed shows it. */
@@ -36,7 +37,7 @@ export async function loadNotificationFeed(
     countUnread(ctx),
     listNotifications(ctx, { limit }),
   ]);
-  return { unreadCount, items: rows.map(toFeedItem) };
+  return { unreadCount, items: await withActorIdentities(rows.map(toFeedItem)) };
 }
 
 /**
@@ -57,6 +58,6 @@ export async function loadShellNotificationFeed(ctx: OrgContext): Promise<Notifi
   }
   return {
     unreadCount: unread.status === 'fulfilled' ? unread.value : 0,
-    items: recent.status === 'fulfilled' ? recent.value.map(toFeedItem) : [],
+    items: recent.status === 'fulfilled' ? await withActorIdentities(recent.value.map(toFeedItem)) : [],
   };
 }

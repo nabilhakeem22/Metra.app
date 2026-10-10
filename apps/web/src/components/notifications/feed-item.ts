@@ -12,6 +12,7 @@ import {
   type BodyTranslate,
 } from './client-responded-body';
 import { deliveryLabelOf } from './delivery-label';
+import { actorLabel, type ActorIdentity } from '@/lib/team/display-name';
 
 export interface FeedItem {
   id: string;
@@ -44,6 +45,15 @@ export const ENTITY_HREF: Record<string, (id: string) => string> = {
   // The studio itself: today only the payment-details alert, which opens its card.
   organization: () => '/settings#client-page',
 };
+
+/** A resolved actor in a feed item's params, or nobody when it is not that shape. */
+function actorOf(value: unknown): ActorIdentity {
+  const actor = (value ?? {}) as Record<string, unknown>;
+  return {
+    name: typeof actor.name === 'string' ? actor.name : null,
+    email: typeof actor.email === 'string' ? actor.email : null,
+  };
+}
 
 /** The destination for one item, or null when it is not about a linkable entity. */
 export function notificationHref(item: FeedItem): string | null {
@@ -117,11 +127,11 @@ export function notificationBody(
         dayCount: count(p.days),
         days: s(p.days),
       });
-    case 'payment_details_changed':
-      return translate('payment_details_changed', {
-        hasName: typeof p.changedBy === 'string' && p.changedBy.trim() !== '' ? 'yes' : 'no',
-        name: typeof p.changedBy === 'string' ? p.changedBy.trim() : '',
-      });
+    case 'client_page_details_changed': {
+      // `actor` is resolved on the server from `actorUserId` (lib/notifications/actor-identities.ts).
+      const actor = actorLabel(actorOf(p.actor));
+      return translate('client_page_details_changed', { hasActor: actor ? 'yes' : 'no', actor: actor ?? '' });
+    }
     case 'stage_reminder':
       return translate('stage_reminder', {
         overdue: s(p.overdueCount),

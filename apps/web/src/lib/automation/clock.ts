@@ -38,6 +38,11 @@ export function cairoHour(now: Date): number {
   return Number(parts.find((p) => p.type === 'hour')?.value ?? '0');
 }
 
+/** The Cairo calendar hour as a claim key: `YYYY-MM-DDTHH`. */
+export function cairoHourKey(now: Date): string {
+  return `${todayInCairo(now)}T${String(cairoHour(now)).padStart(2, '0')}`;
+}
+
 /** Idempotency period key for daily automations: the Cairo date. */
 export function dayPeriodKey(now: Date): string {
   return todayInCairo(now);

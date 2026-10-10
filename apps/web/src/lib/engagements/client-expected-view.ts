@@ -21,8 +21,10 @@ export type ClientExpectedView =
   | { kind: 'none' }
   /** The client page shows "expected by {on}". */
   | { kind: 'showing'; on: string }
-  /** Set, but the client no longer sees it: the date passed or the stage moved. */
-  | { kind: 'stale'; on: string };
+  /** Set, but the delivery has moved on since (another stage, or a loop back): the client no longer sees it. */
+  | { kind: 'moved'; on: string }
+  /** Set in this stage, but the day has passed: the client no longer sees it. */
+  | { kind: 'passed'; on: string };
 
 export interface ClientExpectedViewInput {
   expected: ClientExpectedRecord | null;
@@ -40,7 +42,9 @@ export interface ClientExpectedViewInput {
 /**
  * `showing` while the delivery is still in the stage the date was set in, no
  * state move (a transition to a different state) was recorded after it was
- * set, and the date is today or later; otherwise `stale`. `none` when unset.
+ * set, and the date is today or later. Otherwise why not: `moved` when the
+ * delivery left that stage (even if it came back), else `passed`. `none` when
+ * unset.
  */
 export function clientExpectedViewOf(input: ClientExpectedViewInput): ClientExpectedView {
   const { expected } = input;
@@ -52,6 +56,6 @@ export function clientExpectedViewOf(input: ClientExpectedViewInput): ClientExpe
       transition.toState !== transition.fromState &&
       new Date(transition.decidedAt).getTime() > setAt,
   );
-  const showing = expected.state === input.state && expected.on >= input.today && !movedSince;
-  return showing ? { kind: 'showing', on: expected.on } : { kind: 'stale', on: expected.on };
+  if (movedSince || expected.state !== input.state) return { kind: 'moved', on: expected.on };
+  return expected.on >= input.today ? { kind: 'showing', on: expected.on } : { kind: 'passed', on: expected.on };
 }

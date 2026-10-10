@@ -23,20 +23,21 @@ describe('clientExpectedViewOf', () => {
     expect(view({ today: '2026-10-20' })).toEqual({ kind: 'showing', on: '2026-10-20' });
   });
 
-  it('is stale once the date has passed', () => {
-    expect(view({ today: '2026-10-21' })).toEqual({ kind: 'stale', on: '2026-10-20' });
+  it('is passed once the day is over, in the same stage', () => {
+    expect(view({ today: '2026-10-21' })).toEqual({ kind: 'passed', on: '2026-10-20' });
   });
 
-  it('is stale once the delivery is in another stage', () => {
-    expect(view({ state: 'negotiation' })).toEqual({ kind: 'stale', on: '2026-10-20' });
+  it('is moved (not passed) once the delivery is in another stage, even with the date still ahead (F3)', () => {
+    expect(view({ state: 'negotiation' })).toEqual({ kind: 'moved', on: '2026-10-20' });
+    expect(view({ state: 'negotiation', today: '2026-10-25' })).toEqual({ kind: 'moved', on: '2026-10-20' });
   });
 
-  it('is stale after a revision loop that came back to the same stage', () => {
+  it('is moved after a revision loop that came back to the same stage', () => {
     const transitions = [
       { fromState: 'concept_review', toState: 'negotiation', decidedAt: new Date('2026-10-11T08:00:00Z') },
       { fromState: 'negotiation', toState: 'concept_review', decidedAt: '2026-10-12T08:00:00Z' },
     ] as const;
-    expect(view({ transitions })).toEqual({ kind: 'stale', on: '2026-10-20' });
+    expect(view({ transitions })).toEqual({ kind: 'moved', on: '2026-10-20' });
   });
 
   it('ignores moves before it was set, self-loops and transitions with no state', () => {

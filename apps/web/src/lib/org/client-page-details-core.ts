@@ -1,8 +1,9 @@
 // The studio's client page details, saved (Round C, C8). One owner/admin write
-// of the seven `organizations` columns 0058 added, with a MASKED audit row and,
-// when a payment detail changed, an in-app alert to every owner and admin (owner
-// decision, Oct 10). The alert's emails are sent by the caller after the commit
-// (./payment-details-alert.ts), so a slow mail provider never holds the row.
+// of the seven `organizations` columns 0058 added, with a MASKED, fingerprinted
+// audit row and an alert to every owner and admin (owner decisions, Oct 10:
+// bank, InstaPay, phone and WhatsApp alike). The alert's emails are sent by the
+// caller after the commit (./client-page-alert-email.ts), so a slow mail provider
+// never holds the row.
 import { organizations, type MetraDb } from '@metra/db';
 import { eq } from 'drizzle-orm';
 import { isOwnerOnlyColumnViolation } from '@/lib/actions/db-conflict';
@@ -11,27 +12,37 @@ import type { ActionResult } from '@/lib/actions/result';
 import { orgOwnerAdminIds } from '@/lib/automation/due-work';
 import type { OrgContext } from '@/lib/db/context';
 import { insertNotifications } from '@/lib/notifications/core';
-import { changedFields, changedPaymentFields, maskedChange } from './client-page-change';
+import { auditFingerprint } from './audit-fingerprint';
+import { claimAlert } from './client-page-alert';
+import { changedFields, maskedChange } from './client-page-change';
 import {
-  normalizeClientPageDetails,
+  detailsAfter,
+  normalizeClientPageChanges,
   type ClientPageDetails,
   type ClientPageField,
 } from './client-page-details';
+import { clientPageRevision } from './client-page-revision';
 
-/** Who changed the payment details, whom to tell, and in which language. */
-export interface PaymentDetailsAlert {
+/** Whom to email about a change, and in which language. */
+export interface ClientPageAlert {
   recipientUserIds: string[];
-  changedBy: string | null;
   fields: ClientPageField[];
   /** The studio's default locale: the language of the alert emails. */
   locale: string;
 }
 
+/** A save: the revision the sheet loaded, and only the fields it changed. */
+export interface ClientPageDetailsSave {
+  revision: string;
+  /** A missing key is unchanged; null (or blank) clears the field. */
+  changes: Partial<Record<ClientPageField, string | null>>;
+}
+
 export type ClientPageDetailsResult = ActionResult & {
   /** The field a refusal is about, so the card can say it under that field. */
   field?: ClientPageField;
-  /** Set when a payment detail changed: the caller emails these people. */
-  data?: { alert: PaymentDetailsAlert | null };
+  /** Set when the change should be emailed: the caller emails these people. */
+  data?: { alert: ClientPageAlert | null };
 };
 
 /** The seven columns as they are now, locked so two saves audit in order. */
@@ -55,72 +66,84 @@ async function storedDetails(tx: MetraDb, orgId: string) {
   return { details: details satisfies ClientPageDetails, locale: defaultLocale };
 }
 
-/** The UPDATE; the database's own owner/admin gate (MT120) answers with a code. */
-async function writeDetails(tx: MetraDb, orgId: string, details: ClientPageDetails): Promise<void> {
+/** The UPDATE of the changed columns; the database's owner/admin gate (MT120) answers with a code. */
+async function writeDetails(tx: MetraDb, orgId: string, changes: Partial<ClientPageDetails>): Promise<void> {
   try {
-    await tx
-      .update(organizations)
-      .set({ ...details, updatedAt: new Date() })
-      .where(eq(organizations.id, orgId));
+    await tx.update(organizations).set({ ...changes, updatedAt: new Date() }).where(eq(organizations.id, orgId));
   } catch (e) {
     if (isOwnerOnlyColumnViolation(e)) fail('client_page_details_owner_only');
     throw e;
   }
 }
 
+/** Notify every owner and admin in the app (merged per actor per hour), and say whom to email. */
+async function alertOwners(
+  tx: MetraDb,
+  ctx: OrgContext,
+  fields: ClientPageField[],
+  locale: string,
+  now: Date,
+): Promise<ClientPageAlert | null> {
+  const allowance = await claimAlert(tx, ctx.orgId, ctx.userId, now);
+  if (!allowance.notify) return null;
+  const recipients = (await orgOwnerAdminIds(tx)).map((member) => member.userId);
+  await insertNotifications(
+    tx,
+    ctx.orgId,
+    recipients.map((recipientUserId) => ({
+      recipientUserId,
+      kind: 'client_page_details_changed',
+      entityType: 'organization',
+      entityId: ctx.orgId,
+      bodyKey: 'client_page_details_changed',
+      // The actor's ID, never a name: the feed resolves who it is when shown.
+      params: { actorUserId: ctx.userId, fields },
+    })),
+  );
+  return allowance.email ? { recipientUserIds: recipients, fields, locale } : null;
+}
+
 /**
  * Save what the client page shows about the studio. Owner/admin only
  * (`users_settings` update, refused before any transaction opens; MT120 is the
- * database's second word on it). The input is normalised first and a refusal
- * names its field. Saving what is already stored writes nothing. A change is
- * audited with every number masked; a change to a PAYMENT field also notifies
- * every owner and admin in the app, and returns them as `data.alert` for the
- * caller's emails. `changedBy` is the actor's display name, resolved by the
- * caller from the session (never from request input).
+ * database's second word on it). Only the sent fields change, and only when
+ * the stored values still match the `revision` the sheet loaded (else
+ * `client_page_details_stale`). A refusal names its field. Saving what is
+ * already stored writes nothing. A change is audited masked and fingerprinted
+ * and alerts every owner and admin; `data.alert` lists whom to email.
  */
 export async function updateClientPageDetailsCore(
   ctx: OrgContext,
-  input: Record<ClientPageField, unknown>,
-  changedBy: string | null,
+  input: unknown,
+  now: Date = new Date(),
 ): Promise<ClientPageDetailsResult> {
   // A server action is directly invokable: its argument may be anything.
-  if (typeof input !== 'object' || input === null) return { ok: false, error: 'invalid' };
-  const normalized = normalizeClientPageDetails(input);
-  if (!normalized.ok) return { ok: false, error: normalized.code, field: normalized.field };
-  const next = normalized.value;
+  const save = (typeof input === 'object' && input !== null ? input : {}) as Partial<ClientPageDetailsSave>;
+  if (typeof save.revision !== 'string') return { ok: false, error: 'invalid' };
+  const normalized = normalizeClientPageChanges(save.changes);
+  if (!normalized.ok) return { ok: false, error: normalized.code, ...(normalized.field ? { field: normalized.field } : {}) };
 
-  return mutateInOrg(
+  const result = await mutateInOrg(
     ctx,
     { capability: 'users_settings', action: 'update' },
-    async (tx, audit): Promise<{ alert: PaymentDetailsAlert | null }> => {
+    async (tx, audit): Promise<{ alert: ClientPageAlert | null }> => {
       const stored = await storedDetails(tx, ctx.orgId);
-      const fields = changedFields(stored.details, next);
+      if (clientPageRevision(stored.details) !== save.revision) fail('client_page_details_stale');
+      const after = detailsAfter(stored.details, normalized.value);
+      if (!after.ok) fail(after.code);
+      const fields = changedFields(stored.details, after.value);
       if (fields.length === 0) return { alert: null };
 
-      await writeDetails(tx, ctx.orgId, next);
+      await writeDetails(tx, ctx.orgId, Object.fromEntries(fields.map((field) => [field, after.value[field]])));
       await audit({
         entity: 'organization',
         entityId: ctx.orgId,
         action: 'update',
-        ...maskedChange(stored.details, next, fields),
+        ...maskedChange(stored.details, after.value, fields, auditFingerprint()),
       });
-
-      const paymentFields = changedPaymentFields(fields);
-      if (paymentFields.length === 0) return { alert: null };
-      const recipients = (await orgOwnerAdminIds(tx)).map((member) => member.userId);
-      await insertNotifications(
-        tx,
-        ctx.orgId,
-        recipients.map((recipientUserId) => ({
-          recipientUserId,
-          kind: 'payment_details_changed',
-          entityType: 'organization',
-          entityId: ctx.orgId,
-          bodyKey: 'payment_details_changed',
-          params: { changedBy, fields: paymentFields },
-        })),
-      );
-      return { alert: { recipientUserIds: recipients, changedBy, fields: paymentFields, locale: stored.locale } };
+      return { alert: await alertOwners(tx, ctx, fields, stored.locale, now) };
     },
   );
+  // The one cross-field refusal is always the bank name's.
+  return result.error === 'bank_name_required' ? { ...result, field: 'bankName' } : result;
 }

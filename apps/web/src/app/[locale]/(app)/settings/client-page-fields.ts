@@ -33,3 +33,17 @@ export function clientPageDraftOf(
     CLIENT_PAGE_FIELD_SPECS.map(({ field }) => [field, stored?.[field] ?? '']),
   ) as ClientPageDraft;
 }
+
+/**
+ * What a save sends: only the boxes the member changed since the sheet opened,
+ * a box emptied as null (an explicit clear). A box left alone is not sent, so it
+ * can never overwrite a colleague's newer value.
+ */
+export function changedDraftFields(initial: ClientPageDraft, draft: ClientPageDraft): Partial<Record<ClientPageField, string | null>> {
+  return Object.fromEntries(
+    CLIENT_PAGE_FIELD_SPECS.filter(({ field }) => draft[field] !== initial[field]).map(({ field }) => [
+      field,
+      draft[field].trim() === '' ? null : draft[field],
+    ]),
+  );
+}

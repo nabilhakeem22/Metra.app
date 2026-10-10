@@ -23,12 +23,12 @@ export interface SetClientExpectedDateInput {
   expectedOn: string | null;
 }
 
-/** The date as stored, or a refusal: not a real day, in the past, or too far ahead. */
-function expectedDateOf(value: unknown, now: Date): string | null | 'invalid_date' {
+/** The date as stored, or a refusal: not a real day, or outside today to a year ahead. */
+function expectedDateOf(value: unknown, now: Date): string | null | 'invalid_date' | 'expected_date_out_of_range' {
   if (value === null) return null;
   if (typeof value !== 'string' || !validIsoDate(value)) return 'invalid_date';
   const today = todayInCairo(now);
-  return value < today || value > addDays(today, CLIENT_EXPECTED_MAX_DAYS_AHEAD) ? 'invalid_date' : value;
+  return value < today || value > addDays(today, CLIENT_EXPECTED_MAX_DAYS_AHEAD) ? 'expected_date_out_of_range' : value;
 }
 
 /**
@@ -48,7 +48,7 @@ export async function setClientExpectedDateCore(
 ): Promise<ActionResult> {
   if (typeof input !== 'object' || input === null || !isUuid(input.engagementId)) return err('invalid');
   const expectedOn = expectedDateOf(input.expectedOn, now);
-  if (expectedOn === 'invalid_date') return err('invalid_date');
+  if (expectedOn === 'invalid_date' || expectedOn === 'expected_date_out_of_range') return err(expectedOn);
 
   return mutateInOrg(
     ctx,

@@ -73,9 +73,13 @@ describe('setClientExpectedDateCore', () => {
     expect((await snapshotOf(d.hash))!.expected_on).toBeNull();
   });
 
-  it('refuses yesterday, a day past a year ahead, an impossible day and a non-date', async () => {
+  it('refuses yesterday and past a year ahead as out of range, and an impossible day or a non-date as invalid (F9)', async () => {
     const d = await atConceptReview('expected-bad');
-    for (const expectedOn of [addDays(today, -1), addDays(today, 366), '2026-02-30', '20261020', 42 as never]) {
+    for (const expectedOn of [addDays(today, -1), addDays(today, 366)]) {
+      const result = await setClientExpectedDateCore(d.ctx, { engagementId: d.engagementId, expectedOn });
+      expect(result, expectedOn).toEqual({ ok: false, error: 'expected_date_out_of_range' });
+    }
+    for (const expectedOn of ['2026-02-30', '20261020', 42 as never]) {
       const result = await setClientExpectedDateCore(d.ctx, { engagementId: d.engagementId, expectedOn });
       expect(result, String(expectedOn)).toEqual({ ok: false, error: 'invalid_date' });
     }
