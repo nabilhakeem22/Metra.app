@@ -3,11 +3,12 @@
 import { useTranslations } from 'next-intl';
 import type { HeroError } from './hero-answer';
 
-/** The message of one hero error: the picker's `changed`, the one `movedOn`
- *  every hero shares, or a narrowed portal error key. */
+/** The message of one hero error: the picker's `changed`, the `movedOn` and
+ *  `reviewChanged` every hero shares, or a narrowed portal error key. */
 function messageKeyOf(error: HeroError): { scope: 'picker' | 'actions'; key: string } {
   if (error === 'changed') return { scope: 'picker', key: 'changed' };
   if (error === 'movedOn') return { scope: 'actions', key: 'movedOn' };
+  if (error === 'reviewChanged') return { scope: 'actions', key: 'changed' };
   return { scope: 'actions', key: `error.${error}` };
 }
 

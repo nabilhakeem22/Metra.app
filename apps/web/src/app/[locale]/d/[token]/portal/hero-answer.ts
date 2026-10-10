@@ -17,14 +17,16 @@ export interface HeroConfirmedState {
   budgetAcknowledged?: boolean;
 }
 
-/** A portal error, `changed` (the letters moved) or `movedOn` (the review closed). */
-export type HeroError = PortalErrorKey | 'changed' | 'movedOn';
+/** A portal error, `changed` (the concept letters moved), `reviewChanged` (what the
+ *  client saw is not what is on file now) or `movedOn` (the review closed). */
+export type HeroError = PortalErrorKey | 'changed' | 'reviewChanged' | 'movedOn';
 
 export type HeroAnswer =
   | { confirmed: HeroConfirmedState }
   | { error: HeroError; refresh: boolean };
 
 const MOVED_ON: HeroAnswer = { error: 'movedOn', refresh: true };
+const REVIEW_CHANGED: HeroAnswer = { error: 'reviewChanged', refresh: true };
 
 /**
  * The answer to a concept-review action (choose, approve, request changes): it
@@ -42,6 +44,8 @@ export function answerOfConceptOutcome(outcome: ConceptChoiceOutcome): HeroAnswe
       return { confirmed: { outcome: 'changes', studioNotified: outcome.studioNotified } };
     case 'options_changed':
       return { error: 'changed', refresh: true };
+    case 'changed':
+      return REVIEW_CHANGED;
     case 'moved_on':
       return MOVED_ON;
     case 'error':
@@ -62,6 +66,8 @@ export function answerOfDesignOutcome(outcome: DesignOutcome): HeroAnswer {
       };
     case 'changes_requested':
       return { confirmed: { outcome: 'changes', studioNotified: outcome.studioNotified } };
+    case 'changed':
+      return REVIEW_CHANGED;
     case 'moved_on':
       return MOVED_ON;
     case 'error':
@@ -74,6 +80,8 @@ export function answerOfHandoverOutcome(outcome: HandoverOutcome): HeroAnswer {
   switch (outcome.kind) {
     case 'acknowledged':
       return { confirmed: { outcome: 'acknowledged', studioNotified: outcome.studioNotified } };
+    case 'changed':
+      return REVIEW_CHANGED;
     case 'moved_on':
       return MOVED_ON;
     case 'error':

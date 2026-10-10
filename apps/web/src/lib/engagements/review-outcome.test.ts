@@ -22,27 +22,30 @@ describe('answersFromSaved', () => {
 describe('designOutcomeOfSaved', () => {
   it('names the decision on file, whatever was tapped', () => {
     const at = '2026-10-01T09:00:00.000Z';
-    expect(designOutcomeOfSaved({ designDecision: { kind: 'approved', at } }, true)).toEqual({ kind: 'approved', studioNotified: true });
-    expect(designOutcomeOfSaved({ designDecision: { kind: 'changes_requested', at } }, false)).toEqual({
+    expect(designOutcomeOfSaved({ designDecision: { kind: 'approved', at }, stageKey: 'drawings' }, true)).toEqual({ kind: 'approved', studioNotified: true });
+    expect(designOutcomeOfSaved({ designDecision: { kind: 'changes_requested', at }, stageKey: 'drawings' }, false)).toEqual({
       kind: 'changes_requested',
       studioNotified: false,
     });
   });
 
   it('nothing on file, or no snapshot: the step moved on', () => {
-    expect(designOutcomeOfSaved({ designDecision: null }, true)).toEqual({ kind: 'moved_on' });
+    expect(designOutcomeOfSaved({ designDecision: null, stageKey: 'drawings' }, true)).toEqual({ kind: 'moved_on' });
     expect(designOutcomeOfSaved(null, true)).toEqual({ kind: 'moved_on' });
+    // F12: still at the final approval (a withdrawn decision): changed, not moved on.
+    expect(designOutcomeOfSaved({ designDecision: null, stageKey: 'finalApproval' }, true)).toEqual({ kind: 'changed' });
   });
 });
 
 describe('handoverOutcomeOfSaved', () => {
   it('acknowledged while a confirmation is on file, else moved on', () => {
-    expect(handoverOutcomeOfSaved({ handoverAcknowledgedAt: '2026-10-01T09:00:00.000Z' }, true)).toEqual({
+    expect(handoverOutcomeOfSaved({ handoverAcknowledgedAt: '2026-10-01T09:00:00.000Z', stageKey: 'delivered' }, true)).toEqual({
       kind: 'acknowledged',
       studioNotified: true,
     });
-    expect(handoverOutcomeOfSaved({ handoverAcknowledgedAt: null }, true)).toEqual({ kind: 'moved_on' });
+    expect(handoverOutcomeOfSaved({ handoverAcknowledgedAt: null, stageKey: 'delivered' }, true)).toEqual({ kind: 'moved_on' });
     expect(handoverOutcomeOfSaved(null, false)).toEqual({ kind: 'moved_on' });
+    expect(handoverOutcomeOfSaved({ handoverAcknowledgedAt: null, stageKey: 'handover' }, false)).toEqual({ kind: 'changed' });
   });
 });
 

@@ -3,6 +3,7 @@ import { tokenPathSegment } from '@/lib/engagements/portal-path';
 import { getDeliveryDocumentByToken } from '@/lib/engagements/public-documents';
 import { LOCALES, routing } from '@/i18n/routing';
 import { isUuid } from '@/lib/uuid';
+import { PORTAL_RENDITION_THROTTLE, THROTTLE_RETRY_AFTER_SECONDS } from '@/lib/share/token-throttle';
 import { DOCUMENT_HEADERS, documentResponse, type HandOver } from './document-response';
 
 // Client Deliverables — the session-less endpoint for ONE released document of a
@@ -22,6 +23,8 @@ import { DOCUMENT_HEADERS, documentResponse, type HandOver } from './document-re
 // IDENTICAL 303 back to the portal with `?document=unavailable`. Never a 404 body,
 // never a 500, never a distinguishable response, so a caller cannot probe which
 // documents or deliveries exist.
+// The one other answer is a 429 for a link past the per-link brake (S2): it is
+// about the link the caller already holds, never about a document.
 
 /** The hand-over a `variant` asks for, or null for one this route does not know. */
 function handOverOf(variant: string | null): HandOver | null {
@@ -52,6 +55,13 @@ export async function GET(
   { params }: { params: Promise<{ locale: string; token: string; documentId: string }> },
 ): Promise<NextResponse> {
   const { locale, token, documentId } = await params;
+  // S2: more than 300 files a minute for one link (per isolate) is a loop, not a client.
+  if (!PORTAL_RENDITION_THROTTLE.allow(token)) {
+    return new NextResponse(null, {
+      status: 429,
+      headers: { ...DOCUMENT_HEADERS, 'Retry-After': String(THROTTLE_RETRY_AFTER_SECONDS) },
+    });
+  }
 
   try {
     // Shape checks first: a malformed id or variant never reaches the database.

@@ -75,6 +75,7 @@ export function PublicDeliveryView({
             rom={rom}
             canAcknowledge={delivery.hero.showRomAck}
             acknowledgedAt={delivery.romAcknowledgedAt}
+            prominent={delivery.hero.kind !== 'action'}
           />
         )}
         <PaymentsCard

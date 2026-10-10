@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { galleryImages, listedDocuments, picturesByCategory, workImages, type PortalDocument } from './portal-gallery';
+import {
+  galleryImages,
+  listedDocuments,
+  lockedWorkCount,
+  picturesByCategory,
+  workImages,
+  type PortalDocument,
+} from './portal-gallery';
 
 // AC 51: pictures are images the client may at least preview; a withheld file
 // is never one, and a PDF stays in the documents list.
@@ -37,5 +44,11 @@ describe('portal pictures', () => {
     expect(ids(workImages(DOCUMENTS, 'concept'))).toEqual(['concept-a']);
     expect(ids(workImages(DOCUMENTS, 'design'))).toEqual(['render-new', 'render-old']);
     expect(workImages(DOCUMENTS, 'handoff')).toEqual([]);
+  });
+
+  it('F8: counts the work under review the client cannot see yet', () => {
+    expect(lockedWorkCount(DOCUMENTS, 'design')).toBe(1);
+    expect(lockedWorkCount(DOCUMENTS, 'concept')).toBe(0);
+    expect(lockedWorkCount(DOCUMENTS, 'handoff')).toBe(0);
   });
 });

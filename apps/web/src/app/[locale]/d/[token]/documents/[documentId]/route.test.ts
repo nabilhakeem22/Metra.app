@@ -87,7 +87,7 @@ describe('unpaid (preview): bytes, never a storage URL', () => {
     expect(response.status).toBe(200);
     expect(response.headers.get('location')).toBeNull();
     expect(response.headers.get('content-type')).toBe('image/jpeg');
-    expect(response.headers.get('cache-control')).toBe('private, no-store');
+    expect(response.headers.get('cache-control')).toBe('private, max-age=240');
     expect(response.headers.get('x-content-type-options')).toBe('nosniff');
     expect([...new Uint8Array(await response.arrayBuffer())]).toEqual([1, 2, 3]);
     // Signed only with the transform, fetched on the server, and the URL stays there.

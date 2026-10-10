@@ -17,6 +17,7 @@ export type ConceptChoiceOutcome =
   | { kind: 'approved'; studioNotified: boolean }
   | { kind: 'changes_requested'; studioNotified: boolean }
   | { kind: 'options_changed' }
+  | { kind: 'changed' }
   | { kind: 'moved_on' }
   | { kind: 'error'; error: PortalErrorKey };
 
@@ -35,7 +36,7 @@ export const OUTCOME_OF_CONCEPT_VERB = {
 } as const satisfies Record<ConceptVerb, 'approved' | 'changes_requested'>;
 
 /** The part of the re-read snapshot the outcome is decided from. */
-export type SavedConcept = Pick<PublicDelivery, 'clientActions' | 'conceptChoice' | 'conceptDecision'>;
+export type SavedConcept = Pick<PublicDelivery, 'clientActions' | 'conceptChoice' | 'conceptDecision' | 'stageKey'>;
 
 /** A decision on file, as the act whose notification it is. */
 export type SavedConceptAct = 'concept_chosen' | 'concept_approved' | 'concept_changes_requested';
@@ -47,8 +48,9 @@ export const ACT_OF_DECISION = {
 } as const satisfies Record<NonNullable<PublicDelivery['conceptDecision']>, SavedConceptAct>;
 
 /**
- * After an `already`: the decision on file, or `moved_on` when none is (a
- * retracted decision still holds the slot, or the snapshot could not be read).
+ * After a write that saved nothing: the decision on file. With none on file, `changed`
+ * while the review is still open (a retracted decision still holds the slot)
+ * and `moved_on` once the delivery left it (or the snapshot could not be read).
  * A choice whose letter cannot be read is reported as a plain approval: true,
  * and it names no letter.
  */
@@ -66,7 +68,7 @@ export function outcomeOfSavedDecision(
     case 'changes_requested':
       return { kind: 'changes_requested', studioNotified };
     default:
-      return { kind: 'moved_on' };
+      return saved?.stageKey === 'conceptReview' ? { kind: 'changed' } : { kind: 'moved_on' };
   }
 }
 

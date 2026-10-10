@@ -45,7 +45,9 @@ async function streamedRendition(
     status: 200,
     headers: {
       ...DOCUMENT_HEADERS,
-      'Cache-Control': 'private, no-store',
+      // The browser may keep a picture for a few minutes (a gallery is not
+      // re-transformed on every view); no shared cache ever may (S2).
+      'Cache-Control': 'private, max-age=240',
       'Content-Type': rendition.contentType,
       'Content-Disposition': 'inline',
     },

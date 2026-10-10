@@ -4,11 +4,13 @@ import {
   approveDesignWithBudgetAndNotify,
   respondToDesignAndNotify,
 } from '@/lib/engagements/client-acts/design-acts';
+import { reviewSeenOf } from '@/lib/engagements/review-seen';
+import { deliveryOrNull } from './delivery-read';
 import { closeFixture, raw, teardown } from './fixture';
 import { forceState, seedRoundBDelivery, stampRenders, type RoundBDelivery } from './round-b-fixture';
 import { notificationsOf, retract } from './round-c-db-fixture';
 
-// Round C, PR-C10 (AC 54 to 56), through the real write, read and notifier:
+// Round C, PR-C10 (AC 54 to 56; fix round F1, F12), through the real write, read and notifier:
 // approve with the budget in one confirmation, and design / handover repeat
 // taps that confirm only the decision SAVED on file.
 
@@ -30,6 +32,11 @@ async function atFinalApproval(suffix: string): Promise<RoundBDelivery> {
   return d;
 }
 
+/** What the client's page shows right now (the fingerprint a dialog sends). */
+async function seen(d: RoundBDelivery) {
+  return reviewSeenOf((await deliveryOrNull(d.token))!);
+}
+
 async function clientEvents(d: RoundBDelivery): Promise<string[]> {
   const rows = await raw.query<{ kind: string }>(
     `select kind from public.engagement_events
@@ -47,7 +54,7 @@ async function bodyKeyCounts(d: RoundBDelivery): Promise<Record<string, number>>
 describe('approve with the budget in one confirmation (AC 54)', () => {
   it('writes the client design approval AND the client budget acknowledgement', async () => {
     const d = await atFinalApproval('c10-both');
-    expect(await approveDesignWithBudgetAndNotify(d.token, { note: 'Lovely' })).toEqual({
+    expect(await approveDesignWithBudgetAndNotify(d.token, { note: 'Lovely' }, await seen(d))).toEqual({
       kind: 'approved',
       studioNotified: true,
       budgetAcknowledged: true,
@@ -56,22 +63,18 @@ describe('approve with the budget in one confirmation (AC 54)', () => {
     expect(Object.keys(await bodyKeyCounts(d)).sort()).toEqual(['client_budget_acknowledged', 'client_design_approved']);
   });
 
-  it('a refused acknowledgement leaves the approval standing', async () => {
-    const d = await atFinalApproval('c10-refused');
-    // The band is no longer issued: the acknowledgement has nothing to answer.
+  it('a band withdrawn after the dialog opened: changed, nothing written (F1)', async () => {
+    const d = await atFinalApproval('c10-withdrawn');
+    const shown = await seen(d);
     await raw.query(`update public.design_engagements set rom_issued_at = null where id = '${d.engagementId}'`);
-    expect(await approveDesignWithBudgetAndNotify(d.token, {})).toEqual({
-      kind: 'approved',
-      studioNotified: true,
-      budgetAcknowledged: false,
-    });
-    expect(await clientEvents(d)).toEqual(['design_approval']);
+    expect(await approveDesignWithBudgetAndNotify(d.token, {}, shown)).toEqual({ kind: 'changed' });
+    expect(await clientEvents(d)).toEqual([]);
   });
 
   it('a stale tab whose saved answer is a change request acknowledges nothing', async () => {
     const d = await atFinalApproval('c10-stale-budget');
-    await respondToDesignAndNotify(d.token, { action: 'request_design_changes', note: 'Darker' });
-    expect(await approveDesignWithBudgetAndNotify(d.token, {})).toEqual({ kind: 'changes_requested', studioNotified: true });
+    await respondToDesignAndNotify(d.token, { action: 'request_design_changes', note: 'Darker' }, await seen(d));
+    expect(await approveDesignWithBudgetAndNotify(d.token, {}, await seen(d))).toEqual({ kind: 'changes_requested', studioNotified: true });
     expect(await clientEvents(d)).toEqual(['design_change_request']);
   });
 });
@@ -79,12 +82,12 @@ describe('approve with the budget in one confirmation (AC 54)', () => {
 describe('repeat taps confirm the SAVED decision (AC 55)', () => {
   it('design: A approves, stale B asks for changes and is told "approved"; nothing duplicated', async () => {
     const d = await atFinalApproval('c10-design-repeat');
-    expect(await respondToDesignAndNotify(d.token, { action: 'approve_design' })).toEqual({
+    expect(await respondToDesignAndNotify(d.token, { action: 'approve_design' }, await seen(d))).toEqual({
       kind: 'approved',
       studioNotified: true,
     });
     const notifiedOnce = await bodyKeyCounts(d);
-    expect(await respondToDesignAndNotify(d.token, { action: 'request_design_changes', note: 'Darker' })).toEqual({
+    expect(await respondToDesignAndNotify(d.token, { action: 'request_design_changes', note: 'Darker' }, await seen(d))).toEqual({
       kind: 'approved',
       studioNotified: true,
     });
@@ -93,7 +96,7 @@ describe('repeat taps confirm the SAVED decision (AC 55)', () => {
 
     // The studio moved on: a stale approve answers wrong_state and still shows the approval.
     await forceState(d.engagementId, 'shop_drawings');
-    expect(await respondToDesignAndNotify(d.token, { action: 'approve_design' })).toEqual({
+    expect(await respondToDesignAndNotify(d.token, { action: 'approve_design' }, await seen(d))).toEqual({
       kind: 'approved',
       studioNotified: true,
     });
@@ -114,13 +117,13 @@ describe('repeat taps confirm the SAVED decision (AC 55)', () => {
 describe('nothing live on file and the step moved on (AC 56)', () => {
   it('design: a retracted approval and a moved delivery read as moved on', async () => {
     const d = await atFinalApproval('c10-design-moved');
-    await respondToDesignAndNotify(d.token, { action: 'approve_design' });
+    await respondToDesignAndNotify(d.token, { action: 'approve_design' }, await seen(d));
     const [approval] = await raw.query<{ id: string }>(
       `select id from public.engagement_events where engagement_id = '${d.engagementId}' and kind = 'design_approval'`,
     );
     await retract(d, approval!.id);
     await forceState(d.engagementId, 'shop_drawings');
-    expect(await respondToDesignAndNotify(d.token, { action: 'request_design_changes', note: 'x' })).toEqual({ kind: 'moved_on' });
+    expect(await respondToDesignAndNotify(d.token, { action: 'request_design_changes', note: 'x' }, await seen(d))).toEqual({ kind: 'moved_on' });
   });
 
   it('handover: a retracted confirmation reads as moved on', async () => {
@@ -131,12 +134,17 @@ describe('nothing live on file and the step moved on (AC 56)', () => {
       `select id from public.engagement_events where engagement_id = '${d.engagementId}' and kind = 'handoff_acknowledgement'`,
     );
     await retract(d, ack!.id);
+    // F12: still at the handover, so the step did not move on; it changed.
+    expect(await acknowledgeHandoverAndNotify(d.token, {})).toEqual({ kind: 'changed' });
+    await forceState(d.engagementId, 'abandoned');
     expect(await acknowledgeHandoverAndNotify(d.token, {})).toEqual({ kind: 'moved_on' });
   });
 
-  it('any other refusal is the portal error key', async () => {
+  it('a link that no longer reads: changed (nothing written on a failed read); the page then shows why', async () => {
     const d = await atFinalApproval('c10-expired');
+    const shown = await seen(d);
     await raw.query(`update public.design_engagements set share_expires_at = now() - interval '1 minute' where id = '${d.engagementId}'`);
-    expect(await respondToDesignAndNotify(d.token, { action: 'approve_design' })).toEqual({ kind: 'error', error: 'token_expired' });
+    expect(await respondToDesignAndNotify(d.token, { action: 'approve_design' }, shown)).toEqual({ kind: 'changed' });
+    expect(await clientEvents(d)).toEqual([]);
   });
 });

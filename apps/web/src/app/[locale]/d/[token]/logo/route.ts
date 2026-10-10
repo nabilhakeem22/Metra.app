@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { getDeliveryLogoByToken } from '@/lib/engagements/public-logo';
+import { PORTAL_RENDITION_THROTTLE, THROTTLE_RETRY_AFTER_SECONDS } from '@/lib/share/token-throttle';
 import { fetchImageRendition, type ImageTransform } from '@/lib/storage/image-rendition';
 
 // Round C: the studio's logo on the client page's studio bar. GET only; the
@@ -13,13 +14,14 @@ import { fetchImageRendition, type ImageTransform } from '@/lib/storage/image-re
 //
 // NO ORACLE: an unknown, revoked or expired link, a malformed token, a studio
 // with no logo, a logo that is not an image, a failed rendition and any throw
-// all answer the same empty 404.
+// all answer the same empty 404. More than 300 pictures a minute for one link
+// (per isolate, ../../../../../lib/share/token-throttle.ts) answer 429.
 
 /** 40 px on screen, sharp at 4x. `contain`: a logo is never cropped. */
 const LOGO_TRANSFORM: ImageTransform = { width: 160, height: 160, resize: 'contain', quality: 80 };
 
-/** Every answer: never cached (the link can be revoked), never a Referer
- *  (the token is in the path), never content-sniffed. */
+/** Every answer: never a Referer (the token is in the path), never
+ *  content-sniffed. Caching is per answer: a miss never, the image privately. */
 const LOGO_HEADERS = {
   'Referrer-Policy': 'no-referrer',
   'X-Content-Type-Options': 'nosniff',
@@ -34,6 +36,12 @@ export async function GET(
   { params }: { params: Promise<{ locale: string; token: string }> },
 ): Promise<NextResponse> {
   const { token } = await params;
+  if (!PORTAL_RENDITION_THROTTLE.allow(token)) {
+    return new NextResponse(null, {
+      status: 429,
+      headers: { ...LOGO_HEADERS, 'Cache-Control': 'no-store', 'Retry-After': String(THROTTLE_RETRY_AFTER_SECONDS) },
+    });
+  }
   try {
     const logo = await getDeliveryLogoByToken(token);
     if (!logo) return notFound();
@@ -43,7 +51,8 @@ export async function GET(
       status: 200,
       headers: {
         ...LOGO_HEADERS,
-        'Cache-Control': 'private, no-store',
+        // The browser may keep it for a few minutes; no shared cache ever may (S2).
+        'Cache-Control': 'private, max-age=240',
         'Content-Type': rendition.contentType,
         'Content-Disposition': 'inline',
       },

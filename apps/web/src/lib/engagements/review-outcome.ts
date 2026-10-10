@@ -1,24 +1,34 @@
-// What the portal tells a client who answered the final design or confirmed the
-// handover (Round C, carry-over 5). PURE and CLIENT-SAFE: the server actions
-// compute it, the hero renders it.
+// What the portal tells a client who answered the final design, confirmed the
+// handover or acknowledged the budget (Round C, carry-over 5). PURE and
+// CLIENT-SAFE: the server actions compute it, the page renders it.
 //
 // THE RULE (B12's, for the concept): the portal only ever confirms a decision
 // that is SAVED. A first `ok` saved the tapped verb. A repeat (`already`), a
 // review that closed (`wrong_state`) or a delivery that ended (`not_active`)
 // saved nothing: the answer is the decision ON FILE, read back from the
-// snapshot, which may be the other verb (a stale tab), or nothing at all (the
-// studio retracted it and moved on).
+// snapshot, which may be the other verb (a stale tab). With nothing on file the
+// answer says why: `moved_on` only when the delivery really left the review
+// stage, `changed` when it is still there (the studio withdrew a decision, or
+// what the client saw is no longer what is issued).
 import type { PortalErrorKey } from './portal-error-key';
+import type { PortalStageKey } from './portal-stage';
 import type { PublicDelivery } from './public/types';
 
 export type DesignOutcome =
   | { kind: 'approved' | 'changes_requested'; studioNotified: boolean; budgetAcknowledged?: boolean }
+  | { kind: 'changed' }
   | { kind: 'moved_on' }
   | { kind: 'error'; error: PortalErrorKey };
 
 export type HandoverOutcome =
   | { kind: 'acknowledged'; studioNotified: boolean }
+  | { kind: 'changed' }
   | { kind: 'moved_on' }
+  | { kind: 'error'; error: PortalErrorKey };
+
+export type BudgetOutcome =
+  | { kind: 'acknowledged'; studioNotified: boolean }
+  | { kind: 'changed' }
   | { kind: 'error'; error: PortalErrorKey };
 
 /** The two respond verbs of the final design (app_delivery_respond_by_token). */
@@ -49,19 +59,27 @@ export function answersFromSaved(result: { ok: boolean; code?: string; error?: s
   return result.ok ? result.code === 'already' : SAVED_DECISION_REFUSALS.has(result.error ?? '');
 }
 
-/** The design decision on file, or `moved_on` when none is (or it could not be read). */
+/** With nothing on file: still at the review stage reads `changed`, elsewhere `moved_on`. */
+export function nothingOnFile(
+  saved: Pick<PublicDelivery, 'stageKey'> | null,
+  reviewStage: PortalStageKey,
+): { kind: 'changed' } | { kind: 'moved_on' } {
+  return saved?.stageKey === reviewStage ? { kind: 'changed' } : { kind: 'moved_on' };
+}
+
+/** The design decision on file, or why there is none. */
 export function designOutcomeOfSaved(
-  saved: Pick<PublicDelivery, 'designDecision'> | null,
+  saved: Pick<PublicDelivery, 'designDecision' | 'stageKey'> | null,
   studioNotified: boolean,
 ): DesignOutcome {
   const decision = saved?.designDecision ?? null;
-  return decision ? { kind: decision.kind, studioNotified } : { kind: 'moved_on' };
+  return decision ? { kind: decision.kind, studioNotified } : nothingOnFile(saved, 'finalApproval');
 }
 
-/** The handover confirmation on file, or `moved_on` when none is. */
+/** The handover confirmation on file, or why there is none. */
 export function handoverOutcomeOfSaved(
-  saved: Pick<PublicDelivery, 'handoverAcknowledgedAt'> | null,
+  saved: Pick<PublicDelivery, 'handoverAcknowledgedAt' | 'stageKey'> | null,
   studioNotified: boolean,
 ): HandoverOutcome {
-  return saved?.handoverAcknowledgedAt ? { kind: 'acknowledged', studioNotified } : { kind: 'moved_on' };
+  return saved?.handoverAcknowledgedAt ? { kind: 'acknowledged', studioNotified } : nothingOnFile(saved, 'handover');
 }

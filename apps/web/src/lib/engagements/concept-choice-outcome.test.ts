@@ -9,7 +9,7 @@ import {
 const B = '22222222-2222-4222-8222-222222222222';
 
 function saved(overrides: Partial<SavedConcept>): SavedConcept {
-  return { clientActions: [], conceptChoice: null, conceptDecision: null, ...overrides };
+  return { clientActions: [], conceptChoice: null, conceptDecision: null, stageKey: 'refiningConcept', ...overrides };
 }
 
 describe('outcomeOfSavedDecision (F1: only a SAVED letter is named)', () => {
@@ -40,6 +40,8 @@ describe('outcomeOfSavedDecision (F1: only a SAVED letter is named)', () => {
   it('no decision on file, or no snapshot, means the step moved on', () => {
     expect(outcomeOfSavedDecision(saved({}), true)).toEqual({ kind: 'moved_on' });
     expect(outcomeOfSavedDecision(null, true)).toEqual({ kind: 'moved_on' });
+    // F12: still at the concept review with nothing live on file: changed, not moved on.
+    expect(outcomeOfSavedDecision(saved({ stageKey: 'conceptReview' }), true)).toEqual({ kind: 'changed' });
   });
 
   it('notifies the act on file', () => {

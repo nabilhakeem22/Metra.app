@@ -69,7 +69,8 @@ describe('the confirmation says "notified" only when the studio was', () => {
     await tapHeroButton(group, button);
     expect(await screen.findByText(en(`delivery.hero.${group}.${bodyKey}Notified`))).toBeTruthy();
     // The handover has one verb, so its action takes none.
-    expect(action).toHaveBeenCalledWith(...(group === 'handoff' ? ['tok', note] : ['tok', verb, note]));
+    const args = { concept: ['tok', verb, note], design: ['tok', verb, note, expect.objectContaining({ round: expect.any(String) })], handoff: ['tok', note] }[group];
+    expect(action).toHaveBeenCalledWith(...args);
     notified.unmount();
 
     action.mockResolvedValue(answer(false));

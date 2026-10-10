@@ -10,11 +10,12 @@ import { Lightbox } from './lightbox';
  * The client's pictures (released images they may at least preview), newest
  * first, grouped by category, as tiles: two across on a phone, three from
  * 768 px. A tile opens the lightbox, which steps through every picture in the
- * order shown. Nothing when there are no pictures.
+ * order shown, keeping the picture it shows by id across a refresh. Nothing
+ * when there are no pictures.
  */
 export function Gallery({ token, images }: { token: string; images: readonly PortalDocument[] }) {
   const t = useTranslations('delivery.documents');
-  const [open, setOpen] = useState<number | null>(null);
+  const [openId, setOpenId] = useState<string | null>(null);
   if (images.length === 0) return null;
   const groups = picturesByCategory(images);
   // The lightbox steps in the order the tiles read: group by group.
@@ -28,13 +29,13 @@ export function Gallery({ token, images }: { token: string; images: readonly Por
           <ul className="grid grid-cols-2 gap-2 md:grid-cols-3">
             {group.images.map((image) => (
               <li key={image.id}>
-                <ImageTile token={token} image={image} className="w-full" onOpen={() => setOpen(ordered.indexOf(image))} />
+                <ImageTile token={token} image={image} className="w-full" onOpen={() => setOpenId(image.id)} />
               </li>
             ))}
           </ul>
         </div>
       ))}
-      <Lightbox token={token} images={ordered} index={open} onIndexChange={setOpen} />
+      <Lightbox token={token} images={ordered} openId={openId} onOpenIdChange={setOpenId} />
     </div>
   );
 }

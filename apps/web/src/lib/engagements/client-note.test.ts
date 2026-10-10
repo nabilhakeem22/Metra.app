@@ -23,4 +23,11 @@ describe('the client note rule (F9)', () => {
     expect(clientNote('x'.repeat(2500))).toHaveLength(2000);
     expect(clientNote(undefined)).toBeNull();
   });
+
+  it('S3: a non-string from a directly invoked action is no note, never a throw', () => {
+    for (const junk of [5, {}, [], true, Symbol('x')]) {
+      expect(clientNote(junk)).toBeNull();
+      expect(isBlankNote(junk)).toBe(true);
+    }
+  });
 });

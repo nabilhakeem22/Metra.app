@@ -49,7 +49,7 @@ describe('gallery tiles (?variant=thumb, AC 51, 52): streamed bytes, paid or not
     const response = await get('?variant=thumb');
     expect(response.status).toBe(200);
     expect(response.headers.get('location')).toBeNull();
-    expect(response.headers.get('cache-control')).toBe('private, no-store');
+    expect(response.headers.get('cache-control')).toBe('private, max-age=240');
     expect(response.headers.get('x-content-type-options')).toBe('nosniff');
     expect(storage.createSignedObjectUrl).toHaveBeenCalledTimes(1);
     expect(storage.createSignedObjectUrl).toHaveBeenCalledWith('metra-files', OBJECT_KEY, 30, {

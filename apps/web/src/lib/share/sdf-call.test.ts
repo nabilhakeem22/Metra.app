@@ -33,6 +33,10 @@ describe('normalizeRawToken', () => {
     expect(normalizeRawToken('abc123\n')).toBe('abc123');
     expect(normalizeRawToken('abc123')).toBe('abc123');
   });
+
+  it('S3: a non-string (a directly invoked server action) is refused, never thrown on', () => {
+    for (const raw of [5, {}, [], true, { trim: 1 }]) expect(normalizeRawToken(raw)).toBeNull();
+  });
 });
 
 describe('readSdfJson', () => {

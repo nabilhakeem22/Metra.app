@@ -4,7 +4,7 @@ import type { PortalDocument } from '@/lib/engagements/portal-gallery';
 import { answerDialog, confirmDialog, renderCommandCard } from '@/test/portal-command-card';
 import { messageAt } from '@/test/render-with-intl';
 
-// AC 53 to 56 on the page: the design hero shows the renders above Approve and
+// AC 53 to 56 on the page: the design hero shows the renders under Approve and
 // the dialog repeats the first; with the budget offered, ONE confirmation sends
 // approveDesignWithBudget; a stale tab is told the decision SAVED; a step that
 // moved on says so once, for every hero, and re-reads the page.
@@ -41,7 +41,7 @@ beforeEach(() => {
 });
 
 describe('the design hero shows the work first (AC 53)', () => {
-  it('four render tiles above Approve, "View all" for the fifth, the first repeated in the dialog', async () => {
+  it('four render tiles right under Approve, "View all" for the fifth, the first repeated in the dialog', async () => {
     renderCommandCard({ hero: DESIGN, clientActions: VERBS, stageKey: 'finalApproval', documents: RENDERS });
     const strip = screen.getByRole('group', { name: en('delivery.hero.work.title') });
     expect(within(strip).getAllByRole('img').map((image) => image.getAttribute('src'))).toEqual(
@@ -49,7 +49,9 @@ describe('the design hero shows the work first (AC 53)', () => {
     );
     expect(within(strip).getByRole('button', { name: 'View all (5)' })).toBeTruthy();
     const approve = screen.getByRole('button', { name: en('delivery.hero.design.approve') });
-    expect(strip.compareDocumentPosition(approve) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    // F3: Approve comes first (on the first screen), the work right under it, then the note.
+    expect(approve.compareDocumentPosition(strip) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(strip.compareDocumentPosition(screen.getByRole('textbox')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     fireEvent.click(approve);
     const dialog = await confirmDialog();
     expect(within(dialog).getByRole('img').getAttribute('src')).toBe(`/en/d/tok/documents/${RENDERS[0]!.id}?variant=thumb`);
@@ -58,6 +60,15 @@ describe('the design hero shows the work first (AC 53)', () => {
   it('no render to show: a link down to the documents', () => {
     renderCommandCard({ hero: DESIGN, clientActions: VERBS, stageKey: 'finalApproval' });
     expect(screen.getByRole('link', { name: en('delivery.hero.work.seeFiles') }).getAttribute('href')).toBe('#documents');
+  });
+});
+
+describe('work the client cannot see yet (F8)', () => {
+  it('says so instead of asking for an approval blind', () => {
+    const locked = { ...render(1), access: 'withheld' as const };
+    renderCommandCard({ hero: DESIGN, clientActions: VERBS, stageKey: 'finalApproval', documents: [locked] });
+    expect(screen.getByText(en('delivery.hero.work.locked'))).toBeTruthy();
+    expect(screen.queryByRole('link', { name: en('delivery.hero.work.seeFiles') })).toBeNull();
   });
 });
 
@@ -72,7 +83,8 @@ describe('approve with the budget (AC 54)', () => {
     await answerDialog('en', 'confirm');
     await act(async () => {});
     expect(actions.approveDesignWithBudget).toHaveBeenCalledTimes(1);
-    expect(actions.approveDesignWithBudget).toHaveBeenCalledWith('tok', '');
+    // F1: the band and the round this dialog showed travel with the act.
+    expect(actions.approveDesignWithBudget).toHaveBeenCalledWith('tok', '', { band: '900000.0000..1200000.0000', round: '|' });
     expect(actions.respondToDeliveryDesign).not.toHaveBeenCalled();
     expect(screen.getByText(en('delivery.hero.design.budgetAcknowledged'))).toBeTruthy();
   });

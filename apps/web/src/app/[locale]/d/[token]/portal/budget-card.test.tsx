@@ -21,7 +21,7 @@ function renderCard(
   locale: TestLocale,
   canAcknowledge = true,
 ) {
-  return renderWithIntl(<BudgetCard token="tok" rom={rom} canAcknowledge={canAcknowledge} acknowledgedAt={null} />, { locale });
+  return renderWithIntl(<BudgetCard token="tok" rom={rom} canAcknowledge={canAcknowledge} acknowledgedAt={null} prominent />, { locale });
 }
 
 beforeEach(() => {
@@ -49,7 +49,7 @@ describe('BudgetCard', () => {
   });
 
   it('records acknowledge_rom, keeps the range with "you have seen it", and re-reads the page', async () => {
-    actions.acknowledgeDeliveryBudget.mockResolvedValue({ ok: true });
+    actions.acknowledgeDeliveryBudget.mockResolvedValue({ kind: 'acknowledged', studioNotified: false });
     const { container } = renderCard(ROM, 'en');
     fireEvent.click(screen.getByRole('button', { name: messageAt('en', 'delivery.budget.acknowledge') }));
 
@@ -57,7 +57,8 @@ describe('BudgetCard', () => {
     expect(confirmed.textContent).toContain(messageAt('en', 'delivery.budget.acknowledgedNote'));
     expect(confirmed.textContent).toContain(messageAt('en', 'delivery.budget.acknowledged'));
     expect(router.refresh).toHaveBeenCalledTimes(1);
-    expect(actions.acknowledgeDeliveryBudget).toHaveBeenCalledWith('tok');
+    // F1: the card sends the band it shows, so another band issued meanwhile writes nothing.
+    expect(actions.acknowledgeDeliveryBudget).toHaveBeenCalledWith('tok', '900000.0000..1200000.0000');
     expect(confirmed.textContent).not.toContain(messageAt('en', 'delivery.budget.acknowledgedNotified'));
     expect(screen.queryByRole('button')).toBeNull();
     // The range stays on screen after acknowledging.
@@ -65,7 +66,7 @@ describe('BudgetCard', () => {
   });
 
   it('says the team was notified only when the studio really was', async () => {
-    actions.acknowledgeDeliveryBudget.mockResolvedValue({ ok: true, studioNotified: true });
+    actions.acknowledgeDeliveryBudget.mockResolvedValue({ kind: 'acknowledged', studioNotified: true });
     renderCard(ROM, 'ar-EG');
     fireEvent.click(screen.getByRole('button', { name: messageAt('ar-EG', 'delivery.budget.acknowledge') }));
     const confirmed = await screen.findByRole('status');
@@ -73,7 +74,7 @@ describe('BudgetCard', () => {
   });
 
   it('paints the confirmed state with theme tokens, never a fixed light palette', async () => {
-    actions.acknowledgeDeliveryBudget.mockResolvedValue({ ok: true });
+    actions.acknowledgeDeliveryBudget.mockResolvedValue({ kind: 'acknowledged', studioNotified: false });
     const { container } = renderCard(ROM, 'ar-EG');
     fireEvent.click(screen.getByRole('button', { name: messageAt('ar-EG', 'delivery.budget.acknowledge') }));
     const confirmed = await screen.findByRole('status');
@@ -81,8 +82,8 @@ describe('BudgetCard', () => {
     expect(container.innerHTML).not.toMatch(/emerald|amber/);
   });
 
-  it('shows a known error for an unknown failure code, and the button stays', async () => {
-    actions.acknowledgeDeliveryBudget.mockResolvedValue({ ok: false, error: 'contract_inactive' });
+  it('shows the narrowed error, and the button stays', async () => {
+    actions.acknowledgeDeliveryBudget.mockResolvedValue({ kind: 'error', error: 'generic' });
     renderCard(ROM, 'en');
     fireEvent.click(screen.getByRole('button', { name: messageAt('en', 'delivery.budget.acknowledge') }));
     const alert = await screen.findByRole('alert');
@@ -108,5 +109,23 @@ describe('BudgetCard', () => {
     expect(rangeParts(container)).toEqual(['900,000', messageAt('ar-EG', 'delivery.budget.to'), '1,200,000', 'ج.م']);
     expect(screen.queryByRole('button')).toBeNull();
     expect(container.textContent).toContain(messageAt('ar-EG', 'delivery.budget.note'));
+  });
+
+  it('F1: another band issued since the card was drawn: says so, writes nothing, re-reads', async () => {
+    actions.acknowledgeDeliveryBudget.mockResolvedValue({ kind: 'changed' });
+    renderCard(ROM, 'ar-EG');
+    fireEvent.click(screen.getByRole('button', { name: messageAt('ar-EG', 'delivery.budget.acknowledge') }));
+    expect((await screen.findByRole('alert')).textContent).toBe(messageAt('ar-EG', 'delivery.actions.changed'));
+    expect(router.refresh).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole('status')).toBeNull();
+  });
+
+  it('F10: secondary while the hero holds the one filled button, filled otherwise', () => {
+    const classOf = (prominent: boolean) =>
+      renderWithIntl(<BudgetCard token="tok" rom={ROM} canAcknowledge acknowledgedAt={null} prominent={prominent} />, { locale: 'en' })
+        .container.querySelector('button')!.className;
+    expect(classOf(false)).toContain('bg-[color:var(--glass-btn)]');
+    expect(classOf(false)).not.toContain('bg-[image:var(--brand-grad)]');
+    expect(classOf(true)).toContain('bg-[image:var(--brand-grad)]');
   });
 });

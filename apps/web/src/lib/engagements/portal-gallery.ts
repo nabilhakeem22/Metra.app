@@ -37,8 +37,19 @@ const WORK_CATEGORY: Partial<Record<HeroGroup, ClientDocumentCategory>> = {
   design: 'render',
 };
 
-/** The pictures a review hero shows above its buttons (none for the handover). */
+/** The pictures a review hero shows beside its buttons (none for the handover). */
 export function workImages(documents: readonly PortalDocument[], group: HeroGroup): PortalDocument[] {
   const category = WORK_CATEGORY[group];
   return category ? galleryImages(documents).filter((document) => document.category === category) : [];
+}
+
+/**
+ * How many files of the work under review the client CANNOT look at yet (fix
+ * round F8): withheld until a payment, e.g. a render stored in a format the
+ * preview rule does not cover. The hero says so rather than asking for an
+ * approval of work the client has not seen.
+ */
+export function lockedWorkCount(documents: readonly PortalDocument[], group: HeroGroup): number {
+  const category = WORK_CATEGORY[group];
+  return category ? documents.filter((document) => document.category === category && document.access === 'withheld').length : 0;
 }

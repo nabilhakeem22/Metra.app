@@ -2410,7 +2410,8 @@
       "work": {
         "title": "The work to review",
         "viewAll": "View all ({count})",
-        "seeFiles": "See your files below"
+        "seeFiles": "See your files below",
+        "locked": "Some of this work opens only after the payment that is due. Ask your designer to show it to you before you approve."
       }
     },
     "conceptPicker": {
@@ -2507,7 +2508,8 @@
         "wrong_state": "This action isn't available right now. Please refresh the page.",
         "generic": "Something went wrong. Please try again."
       },
-      "movedOn": "This step has already moved on. The page now shows where things stand."
+      "movedOn": "This step has already moved on. The page now shows where things stand.",
+      "changed": "Something on this step changed since you opened it, so nothing was sent. The page now shows the latest; please review it again."
     },
     "poweredBy": "Shared securely by {firm}",
     "documents": {
@@ -2547,7 +2549,8 @@
         "token_expired": "This link has expired. Please contact your design team.",
         "not_active": "This delivery is closed. Please contact your design team.",
         "wrong_state": "This isn't available right now."
-      }
+      },
+      "advisoryLightbox": "A question here doesn't request changes. To request changes, close this view and use the buttons on the page."
     },
     "reminder": {
       "message": "Hello {client}, a reminder from {studio} about your design project. You can see the latest updates and anything that needs you here:\n{link}"

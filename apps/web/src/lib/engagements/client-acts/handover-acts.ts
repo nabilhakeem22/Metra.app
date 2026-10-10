@@ -2,7 +2,8 @@ import 'server-only';
 // The client confirms receiving the design package (Round C, carry-over 5): the
 // write, the studio's notification, and the answer the portal shows
 // (../review-outcome.ts). A tap that saved nothing (a repeat, a delivery the
-// studio already closed) is answered from the confirmation ON FILE.
+// studio already closed) is answered from the confirmation ON FILE; with none on
+// file, `moved_on` only when the delivery left the handover stage.
 import { portalErrorKey } from '../portal-error-key';
 import { recordDeliveryActionByToken, type DeliveryActionResult } from '../public';
 import { answersFromSaved, handoverOutcomeOfSaved, type HandoverOutcome } from '../review-outcome';
@@ -15,7 +16,7 @@ type HandoverInput = Omit<Parameters<typeof recordDeliveryActionByToken>[1], 'ac
 async function answerOfHandoverWrite(rawToken: string, result: DeliveryActionResult): Promise<HandoverOutcome> {
   if (answersFromSaved(result)) {
     const saved = await savedDelivery(rawToken);
-    if (!saved?.handoverAcknowledgedAt) return { kind: 'moved_on' };
+    if (!saved?.handoverAcknowledgedAt) return handoverOutcomeOfSaved(saved, false);
     const { studioNotified } = await withStudioNotified(
       rawToken,
       { ok: true, code: 'already' as const },

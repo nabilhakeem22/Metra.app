@@ -61,9 +61,12 @@ export function PaymentsCard({
   );
   const next = overview.next;
   const nextClaim = next ? claimStateOf(next.milestoneKind) : null;
-  // How to pay matters only while something is still to be paid and claimed.
-  const awaitsPayment =
-    claim?.claimableMilestones.some((milestone) => claimStateOf(milestone.milestoneKind).kind === 'claimable') ?? false;
+  // How to pay matters only while a payment that is DUE now (not a later one)
+  // is still unclaimed; once every due payment is claimed, the claim's own
+  // "we are confirming your payment" line is the answer (F11).
+  const awaitsPayment = overview.rows.some(
+    (row) => (row.state === 'due' || row.state === 'partial') && claimStateOf(row.milestoneKind).kind === 'claimable',
+  );
 
   return (
     <section className="space-y-3 rounded-panel border bg-background p-4 shadow-sm">

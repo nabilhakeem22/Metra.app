@@ -38,12 +38,13 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals());
 
 describe('the logo route', () => {
-  it('streams the 160 px rendition bytes, private and uncached, with no URL in the answer', async () => {
+  it('streams the 160 px rendition bytes, private (240 s, no shared cache), with no URL in the answer', async () => {
     const response = await get();
     expect(response.status).toBe(200);
     expect(response.headers.get('location')).toBeNull();
     expect(response.headers.get('content-type')).toBe('image/png');
-    expect(response.headers.get('cache-control')).toBe('private, no-store');
+    // S2: the browser may keep the logo a few minutes; no shared cache may.
+    expect(response.headers.get('cache-control')).toBe('private, max-age=240');
     expect(response.headers.get('referrer-policy')).toBe('no-referrer');
     expect(response.headers.get('x-content-type-options')).toBe('nosniff');
     expect([...new Uint8Array(await response.arrayBuffer())]).toEqual([7, 8, 9]);
@@ -68,5 +69,17 @@ describe('the logo route', () => {
     storage.createSignedObjectUrl.mockRejectedValueOnce(new Error('storage down'));
     vi.spyOn(console, 'error').mockImplementation(() => {});
     await expectNotFound(await get());
+  });
+
+  it('S2: past 300 pictures a minute for one link, a 429 with Retry-After and no work', async () => {
+    fetchMock.mockImplementation(async () => new Response(new Uint8Array([1]), { headers: { 'content-type': 'image/png' } }));
+    for (let index = 0; index < 300; index += 1) expect((await get('loop-token')).status).toBe(200);
+    fetchMock.mockClear();
+    const refused = await get('loop-token');
+    expect(refused.status).toBe(429);
+    expect(refused.headers.get('retry-after')).toBe('60');
+    expect(refused.headers.get('cache-control')).toBe('no-store');
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect((await get('another-token')).status).toBe(200);
   });
 });

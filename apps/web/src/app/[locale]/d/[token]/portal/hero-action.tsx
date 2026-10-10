@@ -6,9 +6,10 @@ import { useRouter } from 'next/navigation';
 import { useId, useState, useTransition } from 'react';
 import { Button } from '@/components/ui/button';
 import { isBlankNote } from '@/lib/engagements/client-note';
-import { workImages } from '@/lib/engagements/portal-gallery';
+import { lockedWorkCount, workImages } from '@/lib/engagements/portal-gallery';
 import type { HeroGroup } from '@/lib/engagements/portal-hero';
 import type { PublicDelivery } from '@/lib/engagements/public/types';
+import { reviewSeenOf } from '@/lib/engagements/review-seen';
 import { ChangesNote } from './changes-note';
 import { ConfirmActDialog } from './confirm-act-dialog';
 import type { HeroConfirmedState, HeroError } from './hero-answer';
@@ -19,19 +20,19 @@ import { sendHeroVerb } from './hero-verbs';
 import { HeroWorkStrip } from './hero-work-strip';
 
 /** What the action hero reads off the delivery. */
-export type ActionHeroReview = Pick<PublicDelivery, 'clientActions' | 'documents' | 'rom'>;
+export type ActionHeroReview = Pick<PublicDelivery, 'clientActions' | 'documents' | 'rom' | 'timeline'>;
 
 /**
- * The actionable hero: the plain-language CTA for its group, the WORK to look
- * at first (the concept options or the final renders, ./hero-work-strip.tsx),
- * a note field, and one button per verb the client is actually OFFERED. One
- * primary button, never a menu. Approving and confirming the handover ask
- * first (ConfirmActDialog, repeating the first picture; Cancel sends nothing);
- * a request for changes needs a note. The final approval, when the budget
- * range is also waiting, acknowledges it in the SAME confirmation. Every verb
- * answers from the decision SAVED on file (a repeat shows that one). A
- * confirmed answer goes UP (`onAnswered`): the command card keeps it on screen
- * across the refresh that follows.
+ * The actionable hero, top to bottom (fix round F3, so the one filled button
+ * sits on the first screen): the plain-language CTA, its primary act (Approve,
+ * Confirm handover), the WORK to look at (./hero-work-strip.tsx), then the
+ * note and "Request changes", which needs the note. One primary, never a menu.
+ * Approving and confirming the handover ask first (ConfirmActDialog, repeating
+ * the first picture; Cancel sends nothing). The final approval, when the
+ * budget range is also waiting, acknowledges it in the SAME confirmation. Every
+ * act carries what this hero SHOWED (the render round, the band; F1/F2), and
+ * answers from the decision SAVED on file. A confirmed answer goes UP
+ * (`onAnswered`): the command card keeps it on screen across the refresh.
  */
 export function ActionHero({
   token,
@@ -59,13 +60,14 @@ export function ActionHero({
   const offersChanges = buttons.some((button) => !button.confirms);
   const work = workImages(review.documents, group);
   const budget = group === 'design' && clientActions.includes('acknowledge_rom') && rom && (rom.low || rom.high) ? rom : null;
+  const seen = reviewSeenOf(review);
 
   function submit(button: HeroButton) {
     setError(null);
     startTransition(async () => {
       // Wrap the await so a rejected action can never leave the spinner stuck.
       try {
-        const answer = await sendHeroVerb(token, button.verb, note, { withBudget: budget !== null });
+        const answer = await sendHeroVerb(token, button.verb, note, { withBudget: budget !== null, seen });
         if ('confirmed' in answer) return onAnswered(answer.confirmed);
         setError(answer.error);
         if (answer.refresh) router.refresh();
@@ -77,6 +79,20 @@ export function ActionHero({
     });
   }
 
+  const buttonOf = (button: HeroButton) => (
+    <Button
+      key={button.verb}
+      variant={button.variant}
+      className="min-h-11"
+      disabled={pending || (!button.confirms && noteBlank)}
+      aria-describedby={!button.confirms && noteBlank ? hintId : undefined}
+      onClick={() => (button.confirms ? setAsking(button) : submit(button))}
+    >
+      {pending && !asking && !button.confirms && <Loader2 className="size-4 animate-spin" aria-hidden />}
+      {tGroup(button.labelKey)}
+    </Button>
+  );
+
   return (
     <section className="space-y-3 rounded-panel border-2 border-primary/25 bg-background p-5 shadow-md">
       <span className="inline-flex items-center gap-1.5 rounded-pill bg-primary/10 px-2.5 py-1 text-caption font-bold text-primary ltr:uppercase ltr:tracking-wide">
@@ -85,23 +101,12 @@ export function ActionHero({
       </span>
       <h2 className="text-heading font-semibold">{tGroup('headline')}</h2>
       <p className="text-body text-muted-foreground">{tGroup('body')}</p>
-      {group !== 'handoff' && <HeroWorkStrip token={token} images={work} />}
+      <div className="flex flex-col gap-2">{buttons.filter((button) => button.confirms).map(buttonOf)}</div>
+      {group !== 'handoff' && (
+        <HeroWorkStrip token={token} images={work} lockedCount={lockedWorkCount(review.documents, group)} />
+      )}
       <ChangesNote note={note} onChange={setNote} hintId={hintId} showHint={offersChanges && noteBlank} />
-      <div className="flex flex-col gap-2">
-        {buttons.map((button) => (
-          <Button
-            key={button.verb}
-            variant={button.variant}
-            className="min-h-11"
-            disabled={pending || (!button.confirms && noteBlank)}
-            aria-describedby={!button.confirms && noteBlank ? hintId : undefined}
-            onClick={() => (button.confirms ? setAsking(button) : submit(button))}
-          >
-            {pending && !asking && !button.confirms && <Loader2 className="size-4 animate-spin" aria-hidden />}
-            {tGroup(button.labelKey)}
-          </Button>
-        ))}
-      </div>
+      {offersChanges && <div className="flex flex-col gap-2">{buttons.filter((button) => !button.confirms).map(buttonOf)}</div>}
       {error && <HeroErrorText error={error} />}
       <ConfirmActDialog
         open={asking !== null}

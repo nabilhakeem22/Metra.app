@@ -101,6 +101,25 @@ describe('how to pay (AC 47)', () => {
   });
 });
 
+describe('how to pay once the due payment is claimed (F11)', () => {
+  it('hidden while every DUE payment is claimed, even with later ones still unclaimed', () => {
+    renderPage('en', {
+      paymentDetails: DETAILS,
+      paymentSchedule: [
+        { milestone_kind: 'deposit', basis: 'amount', amount_due: '36000.0000', amount_cleared: '0.0000', status: 'due' },
+        { milestone_kind: 'gate_a', basis: 'amount', amount_due: '20000.0000', amount_cleared: '0.0000', status: 'due' },
+      ],
+      paymentClaim: {
+        claimableMilestones: [
+          { milestoneKind: 'deposit', amountRemaining: '36000.0000', hasPendingClaim: true, claimedAt: '2026-10-01T06:00:00.000Z' },
+          { milestoneKind: 'gate_a', amountRemaining: '20000.0000', hasPendingClaim: false, claimedAt: null },
+        ],
+      },
+    });
+    expect(screen.queryByText(messageAt('en', 'delivery.payments.instructions.title'))).toBeNull();
+  });
+});
+
 describe('payments received (AC 48)', () => {
   it('lists each payment with its amount (Latin digits, LTR, mono) and the day it was received', () => {
     renderPage('ar-EG', {
