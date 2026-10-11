@@ -6,10 +6,11 @@ import { useRouter } from 'next/navigation';
 import { useCallback, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { portalCommentErrorKey } from '@/lib/engagements/portal-error-key';
+import { ownSentComment, threadMessagesOrThrow } from '@/lib/engagements/portal-thread-read';
 import type { PublicDocumentComment } from '@/lib/engagements/public-comments';
 import { useDocumentThread } from '@/lib/engagements/use-document-thread';
 import { addDeliveryComment, loadDeliveryDocumentComments } from '../actions';
-import { DocumentThreadMessages } from './document-thread-messages';
+import { DocumentThreadBody } from './document-thread-messages';
 import { Textarea } from '@/components/ui/textarea';
 
 /** Hard cap, mirrored from the SDF and the table's CHECK. Enforced here only so the
@@ -27,7 +28,7 @@ const BODY_MAX = 2000;
  * to move anything, so a client who comments can never end up waiting on a stage
  * that is in fact waiting on them.
  *
- * The messages render in DocumentThreadMessages. After a send, the thread says
+ * The messages render in DocumentThreadBody. After a send, the thread says
  * the team has been notified only when the portal action says it was, and the
  * page re-reads itself from the server. Logical
  * CSS only, so it mirrors correctly in RTL.
@@ -51,7 +52,7 @@ export function DocumentThread({
   const [studioNotified, setStudioNotified] = useState(false);
 
   const load = useCallback(
-    () => loadDeliveryDocumentComments(token, documentId),
+    async () => threadMessagesOrThrow(await loadDeliveryDocumentComments(token, documentId)),
     [token, documentId],
   );
   const submit = useCallback(
@@ -65,7 +66,7 @@ export function DocumentThread({
     },
     [token, documentId, router],
   );
-  const thread = useDocumentThread<PublicDocumentComment>({ load, send: submit });
+  const thread = useDocumentThread<PublicDocumentComment>({ load, send: submit, echo: ownSentComment });
 
   // The server's count until the thread has really loaded, then its own length
   // (which reflects whatever was just sent).
@@ -85,16 +86,7 @@ export function DocumentThread({
 
       {thread.open && (
         <div className="mt-2 space-y-3 rounded-item border bg-muted/30 p-3">
-          {thread.loading && !thread.loaded ? (
-            <p className="flex items-center gap-1.5 text-caption text-muted-foreground">
-              <Loader2 className="size-3.5 animate-spin" aria-hidden />
-              {t('loading')}
-            </p>
-          ) : thread.messages.length === 0 ? (
-            <p className="text-caption text-muted-foreground">{t('empty')}</p>
-          ) : (
-            <DocumentThreadMessages messages={thread.messages} />
-          )}
+          <DocumentThreadBody thread={thread} />
 
           <div className="space-y-1.5">
             <label htmlFor={`comment-${documentId}`} className="sr-only">

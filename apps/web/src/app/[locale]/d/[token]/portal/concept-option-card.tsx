@@ -44,7 +44,7 @@ export function ConceptOptionCard({
         <Eye className="size-3.5" aria-hidden />
         {t('view')}
       </a>
-      <Button variant="default" size="sm" disabled={pending} aria-describedby={titleId} onClick={onChoose}>
+      <Button variant="secondary" size="sm" disabled={pending} aria-describedby={titleId} onClick={onChoose}>
         {t('choose')}
       </Button>
     </li>

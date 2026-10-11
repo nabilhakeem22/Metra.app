@@ -4,14 +4,9 @@ import { randomUUID } from 'node:crypto';
 import { organizations } from '@metra/db';
 import { eq, sql } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
-import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { recordAudit } from '@/lib/audit';
-import {
-  ACTIVE_ORG_COOKIE,
-  activeOrgCookieOptions,
-} from '@/lib/auth/active-org';
-import { err, type ActionResult } from '@/lib/actions/result';
+import type { ActionResult } from '@/lib/actions/result';
 import { requireOrg } from '@/lib/auth/require-org';
 import { getSessionUser } from '@/lib/auth/session';
 import { withOrgContext, withUserContext } from '@/lib/db/context';
@@ -138,28 +133,6 @@ export async function updateOrgSettings(input: {
     });
   });
 
-  revalidatePath('/', 'layout');
-  return { ok: true };
-}
-
-// --- Org switch (never trust a client-supplied org id) ---------------------
-export async function setActiveOrg(orgId: string): Promise<ActionResult> {
-  const user = await getSessionUser();
-  if (!user) return { ok: false, error: 'forbidden' };
-
-  // Validate membership server-side via the SECURITY DEFINER fn.
-  const rows = (await withUserContext(user.id, (tx) =>
-    tx.execute(
-      sql`select org_id from public.app_current_user_orgs() where org_id = ${orgId} limit 1`,
-    ),
-  )) as unknown as unknown[];
-  if (rows.length === 0) {
-    // Not a member of that org — set nothing.
-    return { ok: false, error: 'forbidden' };
-  }
-
-  const cookieStore = await cookies();
-  cookieStore.set(ACTIVE_ORG_COOKIE, orgId, activeOrgCookieOptions());
   revalidatePath('/', 'layout');
   return { ok: true };
 }

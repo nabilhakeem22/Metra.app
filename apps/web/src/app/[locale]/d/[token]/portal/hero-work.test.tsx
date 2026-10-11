@@ -2,6 +2,7 @@ import { act, fireEvent, screen, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PortalDocument } from '@/lib/engagements/portal-gallery';
 import { answerDialog, confirmDialog, renderCommandCard } from '@/test/portal-command-card';
+import { picturesStillLoading } from '@/test/picture-loading';
 import { messageAt } from '@/test/render-with-intl';
 
 // AC 53 to 56 on the page: the design hero shows the renders under Approve and
@@ -36,6 +37,7 @@ const RENDERS = [1, 2, 3, 4, 5].map(render);
 const ROM = { low: '900000.0000', high: '1200000.0000' };
 
 beforeEach(() => {
+  picturesStillLoading();
   for (const action of Object.values(actions)) action.mockReset();
   router.refresh.mockReset();
 });
@@ -45,7 +47,7 @@ describe('the design hero shows the work first (AC 53)', () => {
     renderCommandCard({ hero: DESIGN, clientActions: VERBS, stageKey: 'finalApproval', documents: RENDERS });
     const strip = screen.getByRole('group', { name: en('delivery.hero.work.title') });
     expect(within(strip).getAllByRole('img').map((image) => image.getAttribute('src'))).toEqual(
-      RENDERS.slice(0, 4).map((image) => `/en/d/tok/documents/${image.id}?variant=thumb`),
+      RENDERS.slice(0, 4).map((image) => `/ar-EG/d/tok/documents/${image.id}?variant=thumb`),
     );
     expect(within(strip).getByRole('button', { name: 'View all (5)' })).toBeTruthy();
     const approve = screen.getByRole('button', { name: en('delivery.hero.design.approve') });
@@ -54,7 +56,7 @@ describe('the design hero shows the work first (AC 53)', () => {
     expect(strip.compareDocumentPosition(screen.getByRole('textbox')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     fireEvent.click(approve);
     const dialog = await confirmDialog();
-    expect(within(dialog).getByRole('img').getAttribute('src')).toBe(`/en/d/tok/documents/${RENDERS[0]!.id}?variant=thumb`);
+    expect(within(dialog).getByRole('img').getAttribute('src')).toBe(`/ar-EG/d/tok/documents/${RENDERS[0]!.id}?variant=thumb`);
   });
 
   it('no render to show: a link down to the documents', () => {

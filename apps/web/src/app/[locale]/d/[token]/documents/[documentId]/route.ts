@@ -1,9 +1,10 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { tokenPathSegment } from '@/lib/engagements/portal-path';
 import { getDeliveryDocumentByToken } from '@/lib/engagements/public-documents';
-import { LOCALES, routing } from '@/i18n/routing';
+import { LOCALE_COOKIE_NAME, LOCALES, routing } from '@/i18n/routing';
 import { isUuid } from '@/lib/uuid';
-import { PORTAL_RENDITION_THROTTLE, THROTTLE_RETRY_AFTER_SECONDS } from '@/lib/share/token-throttle';
+import { portalReadVerdict } from '@/lib/share/portal-rate-limit';
+import { PORTAL_RETRY_AFTER_SECONDS } from '@/lib/share/portal-retry-after';
 import { DOCUMENT_HEADERS, documentResponse, type HandOver } from './document-response';
 
 // Client Deliverables — the session-less endpoint for ONE released document of a
@@ -19,12 +20,14 @@ import { DOCUMENT_HEADERS, documentResponse, type HandOver } from './document-re
 //
 // NO ORACLE: every failure — a non-uuid document id, a forged id, another delivery's
 // artifact, an unreleased artifact, an unknown/revoked/expired token, an unknown
-// variant, a withheld document, a Storage error, any throw — produces the
+// variant, a withheld document, a Storage error, a Worker deployed without its
+// read limiter binding (logged by name), any throw: produces the
 // IDENTICAL 303 back to the portal with `?document=unavailable`. Never a 404 body,
 // never a 500, never a distinguishable response, so a caller cannot probe which
 // documents or deliveries exist.
-// The one other answer is a 429 for a link past the per-link brake (S2): it is
-// about the link the caller already holds, never about a document.
+// The one other answer is a 429 for a link past its per-link read budget
+// (../../../../../../lib/share/portal-rate-limit.ts): it is about the link the
+// caller already holds, never about a document.
 
 /** The hand-over a `variant` asks for, or null for one this route does not know. */
 function handOverOf(variant: string | null): HandOver | null {
@@ -36,15 +39,32 @@ function isLocale(value: string): boolean {
   return (LOCALES as readonly string[]).includes(value);
 }
 
+/** A PICTURE fetch (an `<img>`), not a link the client followed: a gallery tile, or anything the browser fetches as an image. */
+function isPictureFetch(request: NextRequest): boolean {
+  return request.headers.get('sec-fetch-dest') === 'image' || request.nextUrl.searchParams.get('variant') === 'thumb';
+}
+
+/**
+ * The locale of the page a failure lands on. A LINK the client followed lands
+ * in its own page's locale (the path's). A PICTURE is fetched under one fixed
+ * locale segment (lib/engagements/portal-picture-path.ts) and the `<img>`
+ * follows this redirect, so it lands on the visitor's own locale (their locale
+ * cookie) instead, or landing would reset an English visitor's cookie.
+ */
+function landingLocale(request: NextRequest, locale: string): string {
+  const visitorLocale = request.cookies.get(LOCALE_COOKIE_NAME)?.value;
+  if (isPictureFetch(request) && visitorLocale && isLocale(visitorLocale)) return visitorLocale;
+  return isLocale(locale) ? locale : routing.defaultLocale;
+}
+
 /** The single, indistinguishable failure response. */
 function unavailable(
   request: NextRequest,
   locale: string,
   token: string,
 ): NextResponse {
-  const safeLocale = isLocale(locale) ? locale : routing.defaultLocale;
   const target = new URL(
-    `/${safeLocale}/d/${tokenPathSegment(token)}?document=unavailable`,
+    `/${landingLocale(request, locale)}/d/${tokenPathSegment(token)}?document=unavailable`,
     request.url,
   );
   return NextResponse.redirect(target, { status: 303, headers: DOCUMENT_HEADERS });
@@ -55,11 +75,13 @@ export async function GET(
   { params }: { params: Promise<{ locale: string; token: string; documentId: string }> },
 ): Promise<NextResponse> {
   const { locale, token, documentId } = await params;
-  // S2: more than 300 files a minute for one link (per isolate) is a loop, not a client.
-  if (!PORTAL_RENDITION_THROTTLE.allow(token)) {
+  // Past the link's read budget (per data centre) is a loop, not a client.
+  const verdict = await portalReadVerdict(token);
+  if (verdict === 'misdeployed') return unavailable(request, locale, token);
+  if (verdict === 'refused') {
     return new NextResponse(null, {
       status: 429,
-      headers: { ...DOCUMENT_HEADERS, 'Retry-After': String(THROTTLE_RETRY_AFTER_SECONDS) },
+      headers: { ...DOCUMENT_HEADERS, 'Retry-After': String(PORTAL_RETRY_AFTER_SECONDS) },
     });
   }
 

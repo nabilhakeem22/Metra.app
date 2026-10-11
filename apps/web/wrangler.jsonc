@@ -40,9 +40,17 @@
   //     bearer tokens cannot hammer the database for free. Its ceiling is higher
   //     than the per-key one because one caller IP can legitimately carry several
   //     keys.
-  // Both counters are PER DATA CENTRE, not global: a caller spread across k colos
-  // gets k x the limit below. The numbers bound the database work one colo can
-  // cause; they are not a global quota.
+  // The client portal's per-link brake (Round D), see
+  // lib/share/portal-rate-limit.ts. Same rule: ON Cloudflare a missing binding
+  // refuses the act or read rather than serving the portal unlimited.
+  //   PORTAL_ACT_RATE_LIMITER   30 req / 60s, keyed per share link (a sha256
+  //     prefix of the token): every server action under /d/[token].
+  //   PORTAL_READ_RATE_LIMITER its "limit" below / 60s (the one line to change),
+  //     keyed the same way: the document and logo routes and a document's
+  //     comment thread.
+  // Every counter here is PER DATA CENTRE, not global: a caller spread across k
+  // colos gets k x the limit below. The numbers bound the work one colo can be
+  // made to do; they are not a global quota.
   "ratelimits": [
     {
       "name": "API_RATE_LIMITER",
@@ -52,6 +60,16 @@
     {
       "name": "API_PREAUTH_RATE_LIMITER",
       "namespace_id": "1002",
+      "simple": { "limit": 300, "period": 60 }
+    },
+    {
+      "name": "PORTAL_ACT_RATE_LIMITER",
+      "namespace_id": "1003",
+      "simple": { "limit": 30, "period": 60 }
+    },
+    {
+      "name": "PORTAL_READ_RATE_LIMITER",
+      "namespace_id": "1004",
       "simple": { "limit": 300, "period": 60 }
     }
   ]

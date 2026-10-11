@@ -9,21 +9,27 @@ import { useState, useTransition } from 'react';
  * Headless on purpose. The two surfaces have genuinely different design systems
  * (the portal uses shadcn semantic classes, the cockpit uses Metra's `--token`
  * palette) and different server actions, so their MARKUP is legitimately separate.
- * Their behaviour is not: both are collapsed-by-default, both fetch lazily on the
- * first open only, both re-read after a send rather than appending locally, and both
- * wrap the await so a rejected action can never strand the spinner. That behaviour
+ * Their behaviour is not: both are collapsed-by-default, both fetch lazily on open
+ * until a read has completed, both re-read after a send rather than appending
+ * locally (a failed re-read keeps what is shown), and both wrap the await so a
+ * rejected action can never strand the spinner. That behaviour
  * lives here, once.
  *
  * Generic over the message type because the two readers return different shapes —
  * the client sees no staff identity, the studio sees author ids — and neither should
  * be widened to accommodate the other.
  */
+/** The error code of a thread that could not be READ (nothing was sent). */
+export const THREAD_LOAD_FAILED = 'load_failed';
+
 export interface DocumentThread<TMessage> {
   /** Is the thread expanded? */
   open: boolean;
   /** Has a fetch actually completed? Distinguishes "empty" from "not yet loaded". */
   loaded: boolean;
   messages: TMessage[];
+  /** Messages are shown but the last read failed, so some may be missing. */
+  partial: boolean;
   draft: string;
   setDraft: (value: string) => void;
   /** A coded error for the caller to localize, or null. */
@@ -32,17 +38,22 @@ export interface DocumentThread<TMessage> {
   loading: boolean;
   /** A send is in flight. */
   sending: boolean;
-  /** Expand/collapse, fetching on the FIRST expand only. */
+  /** Expand/collapse, fetching on an expand while nothing has loaded yet. */
   toggle: () => void;
   /** Send the trimmed draft, then re-read. No-op on a blank draft. */
   send: () => void;
 }
 
 export function useDocumentThread<TMessage>(options: {
-  /** Read the thread. Must resolve to `[]` rather than throwing on a miss. */
+  /** Read the thread. Resolves to `[]` on a miss; REJECTS when the read was refused
+   *  (not an empty thread), which shows THREAD_LOAD_FAILED and keeps `loaded` false. */
   load: () => Promise<TMessage[]>;
   /** Append one message. Resolves with a coded result — never throws to the UI. */
   send: (body: string) => Promise<{ ok: boolean; error?: string }>;
+  /** The sender's own message as the thread shows it, used only when the re-read
+   *  after a SUCCESSFUL send fails, so a saved message never vanishes from view.
+   *  Without it, that failure shows THREAD_LOAD_FAILED instead of saying nothing. */
+  echo?: (body: string) => TMessage;
 }): DocumentThread<TMessage> {
   const [open, setOpen] = useState(false);
   const [loaded, setLoaded] = useState(false);
@@ -60,7 +71,7 @@ export function useDocumentThread<TMessage>(options: {
         setMessages(await options.load());
         setLoaded(true);
       } catch {
-        setError('generic');
+        setError(THREAD_LOAD_FAILED);
       }
     });
   }
@@ -69,8 +80,24 @@ export function useDocumentThread<TMessage>(options: {
     const next = !open;
     setOpen(next);
     setError(null);
-    // Fetch on the FIRST open only; re-opening reuses what we already hold.
+    // Fetch until a read has completed; after that, re-opening reuses what we hold.
     if (next && !loaded && !loading) fetchThread();
+  }
+
+  /** After a successful send: re-read, or keep what is shown plus the sent message. */
+  async function rereadAfterSend(body: string): Promise<void> {
+    try {
+      setMessages(await options.load());
+      setLoaded(true);
+    } catch {
+      // The message WAS saved, so no send error. Keep what is on screen, add the
+      // sender's own message (`partial` then says some may be missing), and let
+      // the next open read the thread again.
+      const echo = options.echo;
+      if (echo) setMessages((shown) => [...shown, echo(body)]);
+      else setError(THREAD_LOAD_FAILED);
+      setLoaded(false);
+    }
   }
 
   function send(): void {
@@ -88,8 +115,7 @@ export function useDocumentThread<TMessage>(options: {
         // Re-read rather than appending locally: the stored row carries the real
         // timestamp, and a refetch also surfaces anything the other side sent
         // while this message was being written.
-        setMessages(await options.load());
-        setLoaded(true);
+        await rereadAfterSend(body);
       } catch {
         setError('generic');
       }
@@ -100,6 +126,7 @@ export function useDocumentThread<TMessage>(options: {
     open,
     loaded,
     messages,
+    partial: !loaded && !loading && messages.length > 0,
     draft,
     setDraft,
     error,

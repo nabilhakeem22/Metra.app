@@ -34,7 +34,7 @@ describe('the studio bar (AC 45, 46)', () => {
     renderPage('en');
     const bar = screen.getByRole('banner');
     const logo = bar.querySelector('img')!;
-    expect(logo.getAttribute('src')).toBe('/en/d/tok-1/logo');
+    expect(logo.getAttribute('src')).toBe('/ar-EG/d/tok-1/logo');
     fireEvent.error(logo);
     expect(bar.querySelector('img')).toBeNull();
     expect(within(bar).getByText('D')).toBeTruthy();

@@ -8,12 +8,26 @@ import {
   addDeliveryCommentByToken,
   getDeliveryDocumentCommentsByToken,
   type DeliveryCommentResult,
-  type PublicDocumentComment,
 } from '@/lib/engagements/public-comments';
+import { THREAD_READ_REFUSED, type PortalThreadRead } from '@/lib/engagements/portal-thread-read';
+import { portalActAllowed, portalReadAllowed } from '@/lib/share/portal-rate-limit';
+import { isUuid } from '@/lib/uuid';
 import { requestProvenance } from './request-provenance';
 
 // The client portal's payment claim and document comments. The review acts
 // (concept, design, budget, handover) are in ./review-actions.ts.
+//
+// THE PER-LINK BRAKE (Round D, ../../../../lib/share/portal-rate-limit.ts): the
+// claim and a comment share the link's act budget and, past it, write nothing.
+// A refused claim answers the generic failure (no error code, so the portal
+// shows "something went wrong, try again"); a refused comment answers
+// `too_many` ("try again shortly"), and is charged only once it is a valid
+// comment. A thread read shares the read budget and, past it, answers the
+// REFUSED marker (../../../../lib/engagements/portal-thread-read.ts), never an
+// empty thread.
+
+/** A refused claim: the generic failure, nothing written, nobody notified. */
+const THROTTLED = { ok: false, studioNotified: false } as const;
 
 /** A portal write's answer, plus whether the studio heard about it: true only
  *  when a notification row was written for THIS act, which is the only time the
@@ -34,6 +48,7 @@ export async function markDeliveryPaymentPaid(
   milestoneKind: string,
   note?: string,
 ): Promise<DeliveryActResult> {
+  if (!(await portalActAllowed(token))) return THROTTLED;
   const result = await claimPaymentByToken(token, {
     milestoneKind,
     note: clientNote(note),
@@ -62,6 +77,9 @@ export async function addDeliveryComment(
   // Cap before the DB (the SDF also trims + caps at 2000 and CHECKs the length).
   const trimmed = body?.trim().slice(0, 2000) ?? '';
   if (!trimmed) return { ok: false, error: 'empty', studioNotified: false };
+  // A malformed id is refused here, as the core would, before it spends the budget.
+  if (!isUuid(documentId)) return { ok: false, error: 'token_invalid', studioNotified: false };
+  if (!(await portalActAllowed(token))) return { ok: false, error: 'too_many', studioNotified: false };
   const result = await addDeliveryCommentByToken(token, {
     documentId,
     body: trimmed,
@@ -74,11 +92,13 @@ export async function addDeliveryComment(
  * Public (no-session) read of ONE released document's thread, called when the client
  * OPENS that document's comments (never on the portal's first paint), so an unopened
  * portal carries no message bodies at all. Every failure returns the same empty
- * array — the caller cannot tell a forged id from an empty thread.
+ * array: the caller cannot tell a forged id from an empty thread. The one
+ * exception is a link past its read budget, which answers THREAD_READ_REFUSED.
  */
 export async function loadDeliveryDocumentComments(
   token: string,
   documentId: string,
-): Promise<PublicDocumentComment[]> {
+): Promise<PortalThreadRead> {
+  if (!(await portalReadAllowed(token))) return THREAD_READ_REFUSED;
   return getDeliveryDocumentCommentsByToken(token, documentId);
 }

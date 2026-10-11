@@ -9,6 +9,9 @@ export const routing = defineRouting({
   defaultLocale: 'ar-EG',
 });
 
+/** The visitor's negotiated locale: next-intl's default cookie, which `routing` does not rename. */
+export const LOCALE_COOKIE_NAME = 'NEXT_LOCALE';
+
 export function isRtl(locale: string): boolean {
   return locale.startsWith('ar');
 }

@@ -27,10 +27,12 @@ export function portalErrorKey(code: string | null | undefined): PortalErrorKey 
   }
 }
 
-/** The error keys a document thread's catalog (`delivery.comments.error`) defines. */
-export type PortalCommentErrorKey = PortalErrorKey | 'empty' | 'too_many';
+/** The error keys a document thread's catalog (`delivery.comments.error`) defines.
+ *  `load_failed` is the shared thread hook's THREAD_LOAD_FAILED: a READ failed and
+ *  nothing was sent, so it must never read as "that didn't send". */
+export type PortalCommentErrorKey = PortalErrorKey | 'empty' | 'too_many' | 'load_failed';
 
 /** Map a comment send/read error code to a key the comments catalog holds. */
 export function portalCommentErrorKey(code: string | null | undefined): PortalCommentErrorKey {
-  return code === 'empty' || code === 'too_many' ? code : portalErrorKey(code);
+  return code === 'empty' || code === 'too_many' || code === 'load_failed' ? code : portalErrorKey(code);
 }

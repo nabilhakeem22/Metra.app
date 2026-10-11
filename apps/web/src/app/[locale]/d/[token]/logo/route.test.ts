@@ -1,5 +1,7 @@
 import { NextRequest } from 'next/server';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { fakePortalRateLimitEnv } from '@/test/fake-rate-limit-env';
+import { PORTAL_READ_CEILING } from '@/test/wrangler-rate-limits';
 
 // AC 45: the studio logo is its stored original's BYTES, streamed from here: never a
 // redirect and never a storage URL. Every miss is the same empty, uncached 404.
@@ -9,6 +11,9 @@ const logo = vi.hoisted(() => ({ getDeliveryLogoByToken: vi.fn() }));
 vi.mock('@/lib/engagements/public-logo', () => logo);
 const storage = vi.hoisted(() => ({ createSignedObjectUrl: vi.fn() }));
 vi.mock('@/lib/storage/signed-urls', () => storage);
+// Off-platform (no limit) unless a test puts the route on Cloudflare.
+const cf = vi.hoisted(() => ({ isCloudflareRuntime: vi.fn(), cfEnv: vi.fn() }));
+vi.mock('@/lib/cf/context', () => cf);
 
 const { GET } = await import('./route');
 
@@ -30,12 +35,17 @@ async function expectNotFound(response: Response) {
 }
 
 beforeEach(() => {
+  cf.isCloudflareRuntime.mockReset().mockReturnValue(false);
+  cf.cfEnv.mockReset();
   logo.getDeliveryLogoByToken.mockReset().mockResolvedValue({ bucket: 'metra-files', objectKey: OBJECT_KEY });
   storage.createSignedObjectUrl.mockReset().mockResolvedValue(OBJECT_SIGNED);
   fetchMock.mockReset().mockResolvedValue(new Response(new Uint8Array([7, 8, 9]), { headers: { 'content-type': 'image/png' } }));
   vi.stubGlobal('fetch', fetchMock);
 });
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+  vi.unstubAllGlobals();
+  vi.restoreAllMocks();
+});
 
 describe('the logo route', () => {
   it('streams the stored logo bytes, private (240 s, no shared cache), with no URL in the answer', async () => {
@@ -74,9 +84,12 @@ describe('the logo route', () => {
     await expectNotFound(await get());
   });
 
-  it('S2: past 300 pictures a minute for one link, a 429 with Retry-After and no work', async () => {
+  it('W4: on Cloudflare, the read past the ceiling for one link is a 429 with Retry-After and no work', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    cf.isCloudflareRuntime.mockReturnValue(true);
+    cf.cfEnv.mockReturnValue(fakePortalRateLimitEnv());
     fetchMock.mockImplementation(async () => new Response(new Uint8Array([1]), { headers: { 'content-type': 'image/png' } }));
-    for (let index = 0; index < 300; index += 1) expect((await get('loop-token')).status).toBe(200);
+    for (let index = 0; index < PORTAL_READ_CEILING; index += 1) expect((await get('loop-token')).status).toBe(200);
     fetchMock.mockClear();
     const refused = await get('loop-token');
     expect(refused.status).toBe(429);
@@ -84,5 +97,15 @@ describe('the logo route', () => {
     expect(refused.headers.get('cache-control')).toBe('no-store');
     expect(fetchMock).not.toHaveBeenCalled();
     expect((await get('another-token')).status).toBe(200);
+  });
+
+  it('F2: a Worker without its read binding answers the empty 404, logs the binding, looks nothing up', async () => {
+    cf.isCloudflareRuntime.mockReturnValue(true);
+    cf.cfEnv.mockReturnValue({});
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {});
+    await expectNotFound(await get('some-link'));
+    expect(logo.getDeliveryLogoByToken).not.toHaveBeenCalled();
+    expect(log).toHaveBeenCalledTimes(1);
+    expect(log.mock.calls[0][1]).toMatchObject({ binding: 'PORTAL_READ_RATE_LIMITER' });
   });
 });

@@ -13,7 +13,7 @@ import {
   type HandoverOutcome,
 } from '@/lib/engagements/review-outcome';
 import { parseBandSeen, parseReviewSeen } from '@/lib/engagements/review-seen';
-import { PORTAL_ACT_THROTTLE } from '@/lib/share/token-throttle';
+import { portalActAllowed } from '@/lib/share/portal-rate-limit';
 import { requestProvenance } from './request-provenance';
 
 // The client's REVIEW acts on the portal: the concept, the final design, the
@@ -22,19 +22,19 @@ import { requestProvenance } from './request-provenance';
 // NEVER logged here. Each act captures the client's IP and user agent
 // (./request-provenance.ts) for the append-only engagement_events trail, and an
 // invisible note is no note (clientNote). Every answer names only a decision
-// that is SAVED (../../../lib/engagements/review-outcome.ts): a repeat reports
+// that is SAVED (../../../../lib/engagements/review-outcome.ts): a repeat reports
 // the decision on file, never the verb just tapped. A verb outside an act's
 // own pair is refused here: a server action is directly invokable.
 //
 // WHAT WAS SEEN (fix round F1/F2): the design and budget acts carry the
 // fingerprint of what the client's dialog showed (the render round, the band;
-// ../../../lib/engagements/review-seen.ts). A missing or malformed one (an old
+// ../../../../lib/engagements/review-seen.ts). A missing or malformed one (an old
 // page during a deploy, a forged call) reads "changed": nothing is written and
 // the page re-reads.
 //
-// A LIGHT BRAKE (S2): 30 review acts a minute per link, per Worker isolate
-// (../../../lib/share/token-throttle.ts); past it an act answers the generic
-// "something went wrong, try again" and writes nothing.
+// A PER-LINK BRAKE (Round D): 30 acts a minute per link, per Cloudflare data
+// centre (../../../../lib/share/portal-rate-limit.ts); past it an act answers the
+// generic "something went wrong, try again" and writes nothing.
 
 const THROTTLED = { kind: 'error', error: 'generic' } as const;
 
@@ -45,13 +45,13 @@ export async function chooseDeliveryConcept(
   position: number,
   note?: string,
 ): Promise<ConceptChoiceOutcome> {
-  if (!PORTAL_ACT_THROTTLE.allow(token)) return THROTTLED;
+  if (!(await portalActAllowed(token))) return THROTTLED;
   return chooseConceptAndNotify(token, { artifactId, position, note: clientNote(note), ...(await requestProvenance()) });
 }
 
 /** Approve the concept or ask for changes to it. */
 export async function respondToDeliveryConcept(token: string, verb: string, note?: string): Promise<ConceptChoiceOutcome> {
-  if (!PORTAL_ACT_THROTTLE.allow(token)) return THROTTLED;
+  if (!(await portalActAllowed(token))) return THROTTLED;
   if (!isConceptVerb(verb)) return { kind: 'error', error: 'generic' };
   return respondToConceptAndNotify(token, { action: verb, note: clientNote(note), ...(await requestProvenance()) });
 }
@@ -63,7 +63,7 @@ export async function respondToDeliveryDesign(
   note: string,
   seen: unknown,
 ): Promise<DesignOutcome> {
-  if (!PORTAL_ACT_THROTTLE.allow(token)) return THROTTLED;
+  if (!(await portalActAllowed(token))) return THROTTLED;
   if (!isDesignVerb(verb)) return { kind: 'error', error: 'generic' };
   const parsed = parseReviewSeen(seen);
   if (!parsed) return { kind: 'changed' };
@@ -72,7 +72,7 @@ export async function respondToDeliveryDesign(
 
 /** Approve the final design and acknowledge the budget range, from one confirmation. */
 export async function approveDesignWithBudget(token: string, note: string, seen: unknown): Promise<DesignOutcome> {
-  if (!PORTAL_ACT_THROTTLE.allow(token)) return THROTTLED;
+  if (!(await portalActAllowed(token))) return THROTTLED;
   const parsed = parseReviewSeen(seen);
   if (!parsed) return { kind: 'changed' };
   return approveDesignWithBudgetAndNotify(token, { note: clientNote(note), ...(await requestProvenance()) }, parsed);
@@ -80,7 +80,7 @@ export async function approveDesignWithBudget(token: string, note: string, seen:
 
 /** Acknowledge the budget band the card showed (the budget card's own button). */
 export async function acknowledgeDeliveryBudget(token: string, bandSeen: unknown): Promise<BudgetOutcome> {
-  if (!PORTAL_ACT_THROTTLE.allow(token)) return THROTTLED;
+  if (!(await portalActAllowed(token))) return THROTTLED;
   const band = parseBandSeen(bandSeen);
   if (typeof band !== 'string') return { kind: 'changed' };
   return acknowledgeSeenBudgetAndNotify(token, await requestProvenance(), band);
@@ -88,6 +88,6 @@ export async function acknowledgeDeliveryBudget(token: string, bandSeen: unknown
 
 /** Confirm receiving the design package. */
 export async function acknowledgeDeliveryHandover(token: string, note?: string): Promise<HandoverOutcome> {
-  if (!PORTAL_ACT_THROTTLE.allow(token)) return THROTTLED;
+  if (!(await portalActAllowed(token))) return THROTTLED;
   return acknowledgeHandoverAndNotify(token, { note: clientNote(note), ...(await requestProvenance()) });
 }

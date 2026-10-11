@@ -1,6 +1,7 @@
 import { fireEvent, screen, within } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PortalDocument } from '@/lib/engagements/portal-gallery';
+import { picturesStillLoading } from '@/test/picture-loading';
 import { messageAt, renderWithIntl, type TestLocale } from '@/test/render-with-intl';
 import { DocumentsCard } from './documents-card';
 
@@ -28,10 +29,12 @@ function renderCard(locale: TestLocale = 'en') {
 
 const thumbs = () => [...document.querySelectorAll('img')].map((image) => image.getAttribute('src'));
 
+beforeEach(picturesStillLoading);
+
 describe('the gallery', () => {
   it('tiles only previewable images, through the thumb variant; the withheld one and the PDF stay rows', () => {
     renderCard();
-    expect(thumbs()).toEqual([`/en/d/tok/documents/${id(1)}?variant=thumb`, `/en/d/tok/documents/${id(2)}?variant=thumb`]);
+    expect(thumbs()).toEqual([`/ar-EG/d/tok/documents/${id(1)}?variant=thumb`, `/ar-EG/d/tok/documents/${id(2)}?variant=thumb`]);
     const rows = document.querySelectorAll('#documents ul.space-y-2 > li');
     expect(rows).toHaveLength(2);
     expect(rows[0]!.textContent).toContain(messageAt('en', 'delivery.documents.afterPayment'));
@@ -47,16 +50,16 @@ describe('the gallery', () => {
     fireEvent.click(document.querySelectorAll('#documents li button')[0]!);
     const dialog = screen.getByRole('dialog');
     const view = () => within(dialog).getAllByRole('img')[0]!.getAttribute('src');
-    expect(view()).toBe(`/${locale}/d/tok/documents/${id(1)}?variant=view`);
+    expect(view()).toBe(`/ar-EG/d/tok/documents/${id(1)}?variant=view`);
     expect(within(dialog).getByRole('link', { name: messageAt(locale, 'delivery.documents.download') })).toBeTruthy();
     fireEvent.keyDown(dialog, { key: forward });
-    expect(view()).toBe(`/${locale}/d/tok/documents/${id(2)}?variant=view`);
+    expect(view()).toBe(`/ar-EG/d/tok/documents/${id(2)}?variant=view`);
     // Paid only in preview: no Download.
     expect(within(dialog).queryByRole('link', { name: messageAt(locale, 'delivery.documents.download') })).toBeNull();
     fireEvent.keyDown(dialog, { key: back });
-    expect(view()).toBe(`/${locale}/d/tok/documents/${id(1)}?variant=view`);
+    expect(view()).toBe(`/ar-EG/d/tok/documents/${id(1)}?variant=view`);
     fireEvent.click(within(dialog).getByRole('button', { name: messageAt(locale, 'delivery.lightbox.next') }));
-    expect(view()).toBe(`/${locale}/d/tok/documents/${id(2)}?variant=view`);
+    expect(view()).toBe(`/ar-EG/d/tok/documents/${id(2)}?variant=view`);
     expect(within(dialog).getByRole('button', { name: messageAt(locale, 'delivery.lightbox.next') }).hasAttribute('disabled')).toBe(true);
   });
 

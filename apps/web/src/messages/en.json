@@ -2167,12 +2167,14 @@
       "client": "Client",
       "studio": "You",
       "advisory": "A reply doesn't move the stage.",
+      "partial": "Some messages may not be showing. Close and reopen the thread to load them all.",
       "error": {
         "generic": "That didn't send. Please try again.",
         "invalid": "That didn't send. Please try again.",
         "forbidden": "You don't have permission to reply.",
         "engagement_not_found": "This project is no longer available.",
-        "engagement_not_active": "This project is closed."
+        "engagement_not_active": "This project is closed.",
+        "load_failed": "Couldn't load the messages. Try again in a bit."
       }
     },
     "boqStep": {
@@ -2589,6 +2591,7 @@
       "studio": "Your design team",
       "advisory": "A question here doesn't request changes. Use the buttons above for that.",
       "notified": "Your design team has been notified of your message.",
+      "partial": "Some messages may not be showing. Close and reopen this thread to load them all.",
       "error": {
         "generic": "That didn't send. Please try again.",
         "empty": "Write a message first.",
@@ -2596,7 +2599,8 @@
         "token_invalid": "This link is no longer available. Please contact your design team.",
         "token_expired": "This link has expired. Please contact your design team.",
         "not_active": "This delivery is closed. Please contact your design team.",
-        "wrong_state": "This isn't available right now."
+        "wrong_state": "This isn't available right now.",
+        "load_failed": "We couldn't load the messages. Please try again shortly."
       },
       "advisoryLightbox": "A question here doesn't request changes. To request changes, close this view and use the buttons on the page."
     },

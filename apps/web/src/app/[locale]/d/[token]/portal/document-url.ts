@@ -1,6 +1,7 @@
 // The client page's ONE way to address a released document. PURE (no React):
 // the documents card and the concept options both build their links here, and
 // a unit test pins the shape the download route reads.
+import { PICTURE_LOCALE } from '@/lib/engagements/portal-picture-path';
 import { tokenPathSegment } from '@/lib/engagements/portal-path';
 
 /** How the route should hand the file over: `view` opens it in the browser,
@@ -21,4 +22,15 @@ export function documentUrl(
 ): string {
   const path = `/${locale}/d/${tokenPathSegment(token)}/documents/${encodeURIComponent(documentId)}`;
   return variant ? `${path}?variant=${variant}` : path;
+}
+
+/**
+ * A document shown as a PICTURE (an `<img>` source: a gallery tile, the hero's
+ * thumbnail, the lightbox image), always under the one picture locale so a
+ * language switch reuses the browser's cached copy
+ * (../../../../../lib/engagements/portal-picture-path.ts). Links the client
+ * follows keep their own locale: use documentUrl for those.
+ */
+export function pictureUrl(token: string, documentId: string, variant: DocumentVariant): string {
+  return documentUrl(PICTURE_LOCALE, token, documentId, variant);
 }

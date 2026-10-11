@@ -1,7 +1,9 @@
 'use client';
 
+import { Loader2 } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
 import type { PublicDocumentComment } from '@/lib/engagements/public-comments';
+import type { DocumentThread } from '@/lib/engagements/use-document-thread';
 import { bidiIsolate } from '@/lib/format/bidi';
 import { formatDate } from '@/lib/format/date';
 
@@ -10,7 +12,7 @@ import { formatDate } from '@/lib/format/date';
  * replies are attributed to the firm, never to a named member (the read SDF
  * returns no staff names). Dates use Western numerals inside a bidi isolate.
  */
-export function DocumentThreadMessages({ messages }: { messages: PublicDocumentComment[] }) {
+function DocumentThreadMessages({ messages }: { messages: PublicDocumentComment[] }) {
   const t = useTranslations('delivery.comments');
   const locale = useLocale();
   return (
@@ -36,5 +38,35 @@ export function DocumentThreadMessages({ messages }: { messages: PublicDocumentC
         </li>
       ))}
     </ul>
+  );
+}
+
+/**
+ * The thread's body: a spinner while the first read is in flight, the messages,
+ * and "No messages yet" ONLY after a read completed (a refused read is not an
+ * empty thread). Messages shown after a failed read say some may be missing.
+ */
+export function DocumentThreadBody({
+  thread,
+}: {
+  thread: Pick<DocumentThread<PublicDocumentComment>, 'loading' | 'loaded' | 'messages' | 'partial'>;
+}) {
+  const t = useTranslations('delivery.comments');
+  if (thread.loading && !thread.loaded) {
+    return (
+      <p className="flex items-center gap-1.5 text-caption text-muted-foreground">
+        <Loader2 className="size-3.5 animate-spin" aria-hidden />
+        {t('loading')}
+      </p>
+    );
+  }
+  if (thread.messages.length === 0) {
+    return thread.loaded ? <p className="text-caption text-muted-foreground">{t('empty')}</p> : null;
+  }
+  return (
+    <>
+      <DocumentThreadMessages messages={thread.messages} />
+      {thread.partial && <p className="text-caption text-muted-foreground">{t('partial')}</p>}
+    </>
   );
 }
