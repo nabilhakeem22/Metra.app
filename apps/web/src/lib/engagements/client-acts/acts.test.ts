@@ -112,6 +112,11 @@ describe('clientActParams', () => {
     });
     expect(clientActParams({ kind: 'design_approved' })).toEqual({});
   });
+
+  it('a design approval whose budget half was not saved says the budget is pending; no other act can', () => {
+    expect(clientActParams({ kind: 'design_approved', budgetPending: true })).toEqual({ budget: 'pending' });
+    expect(clientActParams({ kind: 'budget_acknowledged', budgetPending: true })).toEqual({});
+  });
 });
 
 describe('clientActOfBodyKey (the hourly sweep reads keys back from SQL)', () => {

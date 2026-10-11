@@ -10,6 +10,7 @@ import {
   isDesignVerb,
   type BudgetOutcome,
   type DesignOutcome,
+  type DesignWithBudgetOutcome,
   type HandoverOutcome,
 } from '@/lib/engagements/review-outcome';
 import { parseBandSeen, parseReviewSeen } from '@/lib/engagements/review-seen';
@@ -26,11 +27,12 @@ import { requestProvenance } from './request-provenance';
 // the decision on file, never the verb just tapped. A verb outside an act's
 // own pair is refused here: a server action is directly invokable.
 //
-// WHAT WAS SEEN (fix round F1/F2): the design and budget acts carry the
-// fingerprint of what the client's dialog showed (the render round, the band;
-// ../../../../lib/engagements/review-seen.ts). A missing or malformed one (an old
-// page during a deploy, a forged call) reads "changed": nothing is written and
-// the page re-reads.
+// WHAT WAS SEEN (Round D): the design and budget acts carry the issuance
+// instants the client's page showed (the render round, the band;
+// ../../../../lib/engagements/review-seen.ts), and the database refuses an act
+// whose issuance is no longer the one on file. A missing or malformed one (a
+// page from before Round D during a deploy, a forged call) reads "changed":
+// nothing is written and the page re-reads.
 //
 // A PER-LINK BRAKE (Round D): 30 acts a minute per link, per Cloudflare data
 // centre (../../../../lib/share/portal-rate-limit.ts); past it an act answers the
@@ -70,15 +72,23 @@ export async function respondToDeliveryDesign(
   return respondToDesignAndNotify(token, { action: verb, note: clientNote(note), ...(await requestProvenance()) }, parsed);
 }
 
-/** Approve the final design and acknowledge the budget range, from one confirmation. */
-export async function approveDesignWithBudget(token: string, note: string, seen: unknown): Promise<DesignOutcome> {
+/**
+ * Approve the final design and acknowledge the budget range, from one
+ * confirmation: two consents, each saved or refused on its own issuance. With
+ * no band on the page there is no budget to confirm: nothing is written.
+ */
+export async function approveDesignWithBudget(token: string, note: string, seen: unknown): Promise<DesignWithBudgetOutcome> {
   if (!(await portalActAllowed(token))) return THROTTLED;
   const parsed = parseReviewSeen(seen);
-  if (!parsed) return { kind: 'changed' };
-  return approveDesignWithBudgetAndNotify(token, { note: clientNote(note), ...(await requestProvenance()) }, parsed);
+  if (!parsed || parsed.romIssuedAt === null) return { kind: 'changed', budget: 'changed' };
+  return approveDesignWithBudgetAndNotify(
+    token,
+    { note: clientNote(note), ...(await requestProvenance()) },
+    { romIssuedAt: parsed.romIssuedAt, rendersIssuedAt: parsed.rendersIssuedAt },
+  );
 }
 
-/** Acknowledge the budget band the card showed (the budget card's own button). */
+/** Acknowledge the band issuance the card showed (the budget card's own button). */
 export async function acknowledgeDeliveryBudget(token: string, bandSeen: unknown): Promise<BudgetOutcome> {
   if (!(await portalActAllowed(token))) return THROTTLED;
   const band = parseBandSeen(bandSeen);

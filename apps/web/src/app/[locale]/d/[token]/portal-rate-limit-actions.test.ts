@@ -39,7 +39,8 @@ const portal = await import('./actions');
 
 const TOKEN = 'portal-link-token';
 const DOCUMENT_ID = '11111111-1111-4111-8111-111111111111';
-const SEEN = { band: '100|200', round: 'r1' };
+const BAND_SEEN = '2026-10-01T09:00:00.123456+00:00';
+const SEEN = { romIssuedAt: BAND_SEEN, rendersIssuedAt: '2026-10-02T09:00:00.000001+00:00' };
 
 type Act = [name: string, call: () => Promise<unknown>, write: keyof typeof writes, refused: unknown];
 const GENERIC_OUTCOME = { kind: 'error', error: 'generic' };
@@ -50,7 +51,7 @@ const ACTS: Act[] = [
   ['respondToDeliveryConcept', () => review.respondToDeliveryConcept(TOKEN, 'approve_concept'), 'respondToConceptAndNotify', GENERIC_OUTCOME],
   ['respondToDeliveryDesign', () => review.respondToDeliveryDesign(TOKEN, 'approve_design', '', SEEN), 'respondToDesignAndNotify', GENERIC_OUTCOME],
   ['approveDesignWithBudget', () => review.approveDesignWithBudget(TOKEN, '', SEEN), 'approveDesignWithBudgetAndNotify', GENERIC_OUTCOME],
-  ['acknowledgeDeliveryBudget', () => review.acknowledgeDeliveryBudget(TOKEN, '100|200'), 'acknowledgeSeenBudgetAndNotify', GENERIC_OUTCOME],
+  ['acknowledgeDeliveryBudget', () => review.acknowledgeDeliveryBudget(TOKEN, BAND_SEEN), 'acknowledgeSeenBudgetAndNotify', GENERIC_OUTCOME],
   ['acknowledgeDeliveryHandover', () => review.acknowledgeDeliveryHandover(TOKEN), 'acknowledgeHandoverAndNotify', GENERIC_OUTCOME],
   ['markDeliveryPaymentPaid', () => portal.markDeliveryPaymentPaid(TOKEN, 'deposit'), 'claimPaymentByToken', GENERIC_RESULT],
   ['addDeliveryComment', () => portal.addDeliveryComment(TOKEN, DOCUMENT_ID, 'Looks good'), 'addDeliveryCommentByToken', TOO_MANY_COMMENTS],

@@ -7,7 +7,6 @@ import { createEngagementCore } from '@/lib/engagements/core';
 import { executeTransition } from '@/lib/engagements/executor';
 import { recordHandoffAcknowledgementCore } from '@/lib/engagements/handoff';
 import { recordPaymentCore } from '@/lib/engagements/payments';
-import { recordDeliveryActionByToken } from '@/lib/engagements/public';
 import { setEngagementRomCore } from '@/lib/engagements/rom';
 import { issueRomCore } from '@/lib/engagements/rom-issue';
 import { mintDeliveryLinkCore } from '@/lib/engagements/share';
@@ -20,6 +19,7 @@ import { createProjectCore } from '@/lib/projects/core';
 import { listProjects } from '@/lib/projects/queries';
 import { closeFixture, ctxFor, raw, seedOrg, teardown } from './fixture';
 import type { OrgContext } from '@/lib/db/context';
+import { respondAsSeen } from './respond-as-seen';
 
 const orgIds: string[] = [];
 afterAll(async () => {
@@ -155,7 +155,7 @@ describe('recipientAcknowledges — the handoff-acknowledgement gate', () => {
     await intoHandoff(ctx, engagementId);
 
     // The client acknowledges via the P2 token path — the exact SDF action string.
-    const ack = await recordDeliveryActionByToken(token, {
+    const ack = await respondAsSeen(token, {
       action: 'acknowledge_handoff',
     });
     expect(ack).toEqual({ ok: true });

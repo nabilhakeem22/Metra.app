@@ -49,7 +49,7 @@ describe('the calm hero dates', () => {
 
 describe('the budget card date', () => {
   it('says on which day the client saw this range, with no button', () => {
-    const rom = { low: '900000.0000', high: '1200000.0000' };
+    const rom = { low: '900000.0000', high: '1200000.0000', issuedAt: '2026-09-01T09:00:00.123456+00:00' };
     renderWithIntl(<BudgetCard token="tok" rom={rom} canAcknowledge={false} acknowledgedAt="2026-09-30T10:00:00.000Z" prominent />, {
       locale: 'en',
     });

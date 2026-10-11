@@ -2,26 +2,33 @@
 
 import { CheckCircle2 } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
-import type { PortalTimelineEntry } from '@/lib/engagements/public/types';
+import { RECEIPTS_MAX_ENTRIES } from '@/lib/engagements/public/receipt-rows';
+import type { PortalReceipt } from '@/lib/engagements/public/types';
 import { bidiIsolate } from '@/lib/format/bidi';
 import { formatDate } from '@/lib/format/date';
 import { formatPortalMoney } from './portal-money';
 import { useMilestoneLabel } from './use-milestone-label';
 
-type PaymentEntry = Extract<PortalTimelineEntry, { type: 'payment' }>;
-
 /**
  * The money the studio has received from the client, newest first: which
- * payment, on which day (Cairo), and how much. From the timeline's payment
- * entries, so the page tells one story. Money per the Money law: Latin digits,
- * left to right, monospace, tabular, at the row's end. Nothing when nothing
- * was received.
+ * payment, on which day (Cairo), and how much. From the snapshot's own
+ * receipts list (Round D), so a payment never drops off behind newer stage
+ * moves on the 60-entry timeline; when the delivery has more than that list
+ * carries, a note says only the latest are shown. Money per the Money law:
+ * Latin digits, left to right, monospace, tabular, at the row's end. Nothing
+ * when nothing was received.
  */
-export function PaymentReceipts({ timeline }: { timeline: readonly PortalTimelineEntry[] }) {
+export function PaymentReceipts({
+  receipts,
+  truncated,
+}: {
+  receipts: readonly PortalReceipt[];
+  /** The delivery has more payments than `receipts` carries. */
+  truncated: boolean;
+}) {
   const t = useTranslations('delivery.payments.receipts');
   const locale = useLocale();
   const milestoneLabel = useMilestoneLabel();
-  const receipts = timeline.filter((entry): entry is PaymentEntry => entry.type === 'payment');
   if (receipts.length === 0) return null;
 
   return (
@@ -48,6 +55,9 @@ export function PaymentReceipts({ timeline }: { timeline: readonly PortalTimelin
           </li>
         ))}
       </ul>
+      {truncated && (
+        <p className="text-caption text-muted-foreground">{t('truncated', { count: String(RECEIPTS_MAX_ENTRIES) })}</p>
+      )}
     </section>
   );
 }

@@ -46,7 +46,7 @@ function rangeParts(
  * parts read in the locale's order. A lone bound reads "From X" / "Up to X" on
  * the same rule. No bound issued: nothing.
  */
-export function BudgetRange({ rom }: { rom: PublicDelivery['rom'] }) {
+export function BudgetRange({ rom }: { rom: Pick<NonNullable<PublicDelivery['rom']>, 'low' | 'high'> | null }) {
   const t = useTranslations('delivery.budget');
   const locale = useLocale();
   const parts = rangeParts(

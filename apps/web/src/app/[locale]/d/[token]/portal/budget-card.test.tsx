@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, screen, waitFor } from '@testing-library/react';
+import type { PublicDelivery } from '@/lib/engagements/public/types';
 import { messageAt, renderWithIntl, type TestLocale } from '@/test/render-with-intl';
 import { BudgetCard } from './budget-card';
 
@@ -9,7 +10,7 @@ vi.mock('../review-actions', () => actions);
 const router = vi.hoisted(() => ({ refresh: vi.fn() }));
 vi.mock('next/navigation', () => ({ useRouter: () => router }));
 
-const ROM = { low: '900000.0000', high: '1200000.0000' };
+const ROM = { low: '900000.0000', high: '1200000.0000', issuedAt: '2026-09-01T09:00:00.123456+00:00' };
 
 /** The budget range's parts (figures, words, currency) in DOM order. */
 function rangeParts(container: HTMLElement): string[] {
@@ -17,7 +18,7 @@ function rangeParts(container: HTMLElement): string[] {
 }
 
 function renderCard(
-  rom: { low: string | null; high: string | null },
+  rom: NonNullable<PublicDelivery['rom']>,
   locale: TestLocale,
   canAcknowledge = true,
 ) {
@@ -58,7 +59,8 @@ describe('BudgetCard', () => {
     expect(confirmed.textContent).toContain(messageAt('en', 'delivery.budget.acknowledged'));
     expect(router.refresh).toHaveBeenCalledTimes(1);
     // F1: the card sends the band it shows, so another band issued meanwhile writes nothing.
-    expect(actions.acknowledgeDeliveryBudget).toHaveBeenCalledWith('tok', '900000.0000..1200000.0000');
+    // Round D: the band ISSUANCE this card showed travels with the act, byte-identical.
+    expect(actions.acknowledgeDeliveryBudget).toHaveBeenCalledWith('tok', ROM.issuedAt);
     expect(confirmed.textContent).not.toContain(messageAt('en', 'delivery.budget.acknowledgedNotified'));
     expect(screen.queryByRole('button')).toBeNull();
     // The range stays on screen after acknowledging.

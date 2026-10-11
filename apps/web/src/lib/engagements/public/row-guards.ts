@@ -27,7 +27,11 @@ export interface DeliverySnapshot {
   title_en?: string | null;
   created_at?: string | null;
   design_fee_total?: string | null;
-  rom?: { low?: string | null; high?: string | null } | null;
+  rom?: { low?: string | null; high?: string | null; issued_at?: unknown } | null;
+  // Round D (0059): the render round's issuance, and the receipts (./receipt-rows.ts).
+  renders_issued_at?: unknown;
+  receipts?: unknown;
+  receipts_truncated?: unknown;
   share_expires_at?: string | null;
   firm?: FirmRow | null;
   client?: { name_ar?: string | null; name_en?: string | null } | null;

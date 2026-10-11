@@ -9,6 +9,7 @@ import { isBlankNote } from '@/lib/engagements/client-note';
 import { lockedWorkCount, workImages } from '@/lib/engagements/portal-gallery';
 import type { HeroGroup } from '@/lib/engagements/portal-hero';
 import type { PublicDelivery } from '@/lib/engagements/public/types';
+import type { BudgetPart } from '@/lib/engagements/review-outcome';
 import { reviewSeenOf } from '@/lib/engagements/review-seen';
 import { ChangesNote } from './changes-note';
 import { ConfirmActDialog } from './confirm-act-dialog';
@@ -20,7 +21,7 @@ import { sendHeroVerb } from './hero-verbs';
 import { HeroWorkStrip } from './hero-work-strip';
 
 /** What the action hero reads off the delivery. */
-export type ActionHeroReview = Pick<PublicDelivery, 'clientActions' | 'documents' | 'rom' | 'timeline'>;
+export type ActionHeroReview = Pick<PublicDelivery, 'clientActions' | 'documents' | 'rom' | 'rendersIssuedAt'>;
 
 /**
  * The actionable hero, top to bottom (fix round F3, so the one filled button
@@ -30,7 +31,7 @@ export type ActionHeroReview = Pick<PublicDelivery, 'clientActions' | 'documents
  * Approving and confirming the handover ask first (ConfirmActDialog, repeating
  * the first picture; Cancel sends nothing). The final approval, when the
  * budget range is also waiting, acknowledges it in the SAME confirmation. Every
- * act carries what this hero SHOWED (the render round, the band; F1/F2), and
+ * act carries the issuances this hero SHOWED (the render round, the band), and
  * answers from the decision SAVED on file. A confirmed answer goes UP
  * (`onAnswered`): the command card keeps it on screen across the refresh.
  */
@@ -53,7 +54,7 @@ export function ActionHero({
   const [pending, startTransition] = useTransition();
   const [note, setNote] = useState('');
   const [asking, setAsking] = useState<HeroButton | null>(null);
-  const [error, setError] = useState<HeroError | null>(null);
+  const [error, setError] = useState<{ error: HeroError; budget?: BudgetPart } | null>(null);
   const { clientActions, rom } = review;
   const buttons = GROUP_BUTTONS[group].filter((button) => clientActions.includes(button.verb));
   const noteBlank = isBlankNote(note);
@@ -69,10 +70,10 @@ export function ActionHero({
       try {
         const answer = await sendHeroVerb(token, button.verb, note, { withBudget: budget !== null, seen });
         if ('confirmed' in answer) return onAnswered(answer.confirmed);
-        setError(answer.error);
+        setError({ error: answer.error, budget: answer.budget });
         if (answer.refresh) router.refresh();
       } catch {
-        setError('generic');
+        setError({ error: 'generic' });
       } finally {
         setAsking(null);
       }
@@ -107,7 +108,7 @@ export function ActionHero({
       )}
       <ChangesNote note={note} onChange={setNote} hintId={hintId} showHint={offersChanges && noteBlank} />
       {offersChanges && <div className="flex flex-col gap-2">{buttons.filter((button) => !button.confirms).map(buttonOf)}</div>}
-      {error && <HeroErrorText error={error} />}
+      {error && <HeroErrorText error={error.error} budget={error.budget} />}
       <ConfirmActDialog
         open={asking !== null}
         title={tGroup('confirmTitle')}

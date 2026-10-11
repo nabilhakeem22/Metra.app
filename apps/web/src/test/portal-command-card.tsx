@@ -22,6 +22,7 @@ export interface CommandCardProps {
   timeline?: PublicDelivery['timeline'];
   documents?: PublicDelivery['documents'];
   rom?: PublicDelivery['rom'];
+  rendersIssuedAt?: PublicDelivery['rendersIssuedAt'];
 }
 
 const REFRESH_LABEL = 'land the server refresh';
@@ -52,6 +53,7 @@ export function renderCommandCard(
             conceptDecision: props.conceptDecision ?? null,
             documents: props.documents ?? [],
             rom: props.rom ?? null,
+            rendersIssuedAt: props.rendersIssuedAt ?? null,
             expectedOn: props.expectedOn ?? null,
             timeline: props.timeline ?? [],
           }}

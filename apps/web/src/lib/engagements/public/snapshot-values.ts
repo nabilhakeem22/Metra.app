@@ -1,5 +1,6 @@
-// Single values read off an UNTRUSTED delivery snapshot: an instant, a calendar
-// day, a scale-4 amount, a bounded text, a media class. PURE and client-safe.
+// Single values read off an UNTRUSTED delivery snapshot: an instant, an
+// issuance stamp, a calendar day, a scale-4 amount, a bounded text, a media
+// class. PURE and client-safe.
 // Each answers null (or the safest class) for anything that is not exactly the
 // documented shape, so a caller drops the field rather than rendering junk.
 import type { PortalDocumentMedia } from './timeline-types';
@@ -13,11 +14,29 @@ const CALENDAR_DAY = /^(\d{4})-(\d{2})-(\d{2})$/;
 /** numeric(18,4) as text: up to 14 whole digits, up to 4 decimals, no sign. */
 const SCALE4_AMOUNT = /^\d{1,14}(\.\d{1,4})?$/;
 
+/** An issuance instant as Postgres writes a timestamptz into jsonb: microseconds at most, a zone. */
+const ISSUANCE_STAMP = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,6})?(Z|[+-]\d{2}(:\d{2})?)$/;
+
+/** Longer than any timestamptz Postgres writes. */
+const ISSUANCE_STAMP_MAX_CHARS = 40;
+
 /** The instant, normalised to `toISOString()`, or null when it is not one. */
 export function isoInstant(value: unknown): string | null {
   if (typeof value !== 'string' || !ISO_INSTANT.test(value)) return null;
   const time = Date.parse(value);
   return Number.isFinite(time) ? new Date(time).toISOString() : null;
+}
+
+/**
+ * An issuance instant (rom.issued_at, renders_issued_at) EXACTLY as the SDF
+ * wrote it, or null. The client's review acts echo it back to the seven-argument
+ * app_delivery_respond_by_token, which compares it with the column to the
+ * microsecond, so it is never parsed: `isoInstant` goes through a JS Date, keeps
+ * milliseconds only, and every act would then answer "changed".
+ */
+export function issuanceStamp(value: unknown): string | null {
+  if (typeof value !== 'string' || value.length > ISSUANCE_STAMP_MAX_CHARS) return null;
+  return ISSUANCE_STAMP.test(value) ? value : null;
 }
 
 /** The day as written (YYYY-MM-DD), or null when it is not a real calendar day. */

@@ -1,10 +1,10 @@
 import { randomUUID } from 'node:crypto';
 import { afterAll, describe, expect, it } from 'vitest';
-import { recordDeliveryActionByToken } from '@/lib/engagements/public';
 import { revokeDeliveryLinkCore } from '@/lib/engagements/share';
 import { closeFixture, raw, teardown } from './fixture';
 import { forceState, seedArtifact, seedFile, seedRoundBDelivery, snapshotOf, type RoundBDelivery } from './round-b-fixture';
 import { plantEvent, retract } from './round-c-db-fixture';
+import { respondAsSeen } from './respond-as-seen';
 
 // Round C, PR-C7: the media rule (AC 36), the studio logo by token (AC 37) and
 // the handover close target by token (AC 38).
@@ -103,7 +103,7 @@ describe('app_delivery_close_target_by_token (AC 38)', () => {
     const d = await seedRoundBDelivery(orgIds, 'close-target');
     await forceState(d.engagementId, 'design_only_handoff');
     expect(await targetOf(d.hash)).toBeNull();
-    expect(await recordDeliveryActionByToken(d.token, { action: 'acknowledge_handoff' })).toEqual({ ok: true });
+    expect(await respondAsSeen(d.token, { action: 'acknowledge_handoff' })).toEqual({ ok: true });
     expect(await targetOf(d.hash)).toEqual({ org_id: d.orgId, engagement_id: d.engagementId });
     const [ack] = await raw.query<{ id: string }>(
       `select id from public.engagement_events where engagement_id = '${d.engagementId}'
@@ -116,7 +116,7 @@ describe('app_delivery_close_target_by_token (AC 38)', () => {
   it('null once closed, for a staff-only acknowledgement, and for an unknown token', async () => {
     const closed = await seedRoundBDelivery(orgIds, 'close-closed');
     await forceState(closed.engagementId, 'design_only_handoff');
-    expect(await recordDeliveryActionByToken(closed.token, { action: 'acknowledge_handoff' })).toEqual({ ok: true });
+    expect(await respondAsSeen(closed.token, { action: 'acknowledge_handoff' })).toEqual({ ok: true });
     await forceState(closed.engagementId, 'closed_design_only');
     expect(await targetOf(closed.hash)).toBeNull();
 

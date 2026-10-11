@@ -1,7 +1,7 @@
 import { sqlstateOf } from '@metra/db/sqlstate';
 import { afterAll, describe, expect, it } from 'vitest';
 import { executeTransition } from '@/lib/engagements/executor';
-import { claimPaymentByToken, recordDeliveryActionByToken } from '@/lib/engagements/public';
+import { claimPaymentByToken } from '@/lib/engagements/public';
 import { addDeliveryCommentByToken } from '@/lib/engagements/public-comments';
 import { revokeDeliveryLinkCore, rotateDeliveryLinkCore } from '@/lib/engagements/share';
 import { deliveryOrNull } from './delivery-read';
@@ -21,6 +21,7 @@ import {
   stampRenders,
   updatedAtRefreshed,
 } from './round-b-fixture';
+import { respondAsSeen } from './respond-as-seen';
 
 // Round B, wave 2 (PR-B9): migration 0056 and the apply-rls functions that use
 // it. The notifier has its own suite (delivery-notify-studio.dbtest.ts). Here:
@@ -74,10 +75,10 @@ describe('design decisions answer ONE render issuance (AC 30)', () => {
 
     expect(await clientActionsOf(d.hash)).toEqual(['approve_design', 'request_design_changes']);
     expect(
-      await recordDeliveryActionByToken(d.token, { action: 'request_design_changes' }),
+      await respondAsSeen(d.token, { action: 'request_design_changes' }),
     ).toEqual({ ok: true });
     // The other verb of the SAME round is the same decision: a repeat.
-    expect(await recordDeliveryActionByToken(d.token, { action: 'approve_design' })).toEqual({
+    expect(await respondAsSeen(d.token, { action: 'approve_design' })).toEqual({
       ok: true,
       code: 'already',
     });
@@ -94,7 +95,7 @@ describe('design decisions answer ONE render issuance (AC 30)', () => {
     // The deployed (pre-Round-B) parser reads the same verbs from the snapshot.
     expect((await deliveryOrNull(d.token))!.clientActions).toContain('approve_design');
 
-    expect(await recordDeliveryActionByToken(d.token, { action: 'approve_design' })).toEqual({
+    expect(await respondAsSeen(d.token, { action: 'approve_design' })).toEqual({
       ok: true,
     });
     expect(await designDecisions(d.engagementId)).toEqual([
@@ -103,7 +104,7 @@ describe('design decisions answer ONE render issuance (AC 30)', () => {
     ]);
     expect(await clientActionsOf(d.hash)).toEqual([]);
     expect(
-      await recordDeliveryActionByToken(d.token, { action: 'request_design_changes' }),
+      await respondAsSeen(d.token, { action: 'request_design_changes' }),
     ).toEqual({ ok: true, code: 'already' });
   });
 
@@ -113,8 +114,8 @@ describe('design decisions answer ONE render issuance (AC 30)', () => {
     await stampRenders(d.engagementId, 'now()');
 
     const results = await Promise.all([
-      recordDeliveryActionByToken(d.token, { action: 'approve_design' }),
-      recordDeliveryActionByToken(d.token, { action: 'request_design_changes' }),
+      respondAsSeen(d.token, { action: 'approve_design' }),
+      respondAsSeen(d.token, { action: 'request_design_changes' }),
     ]);
     expect(results.every((result) => result.ok)).toBe(true);
     expect(results.filter((result) => 'code' in result && result.code === 'already')).toHaveLength(1);
@@ -125,11 +126,11 @@ describe('design decisions answer ONE render issuance (AC 30)', () => {
     const d = await seedRoundBDelivery(orgIds, 'design-no-issuance');
     await forceState(d.engagementId, 'final_approval');
 
-    expect(await recordDeliveryActionByToken(d.token, { action: 'approve_design' })).toEqual({
+    expect(await respondAsSeen(d.token, { action: 'approve_design' })).toEqual({
       ok: true,
     });
     expect(
-      await recordDeliveryActionByToken(d.token, { action: 'request_design_changes' }),
+      await respondAsSeen(d.token, { action: 'request_design_changes' }),
     ).toEqual({ ok: true, code: 'already' });
     expect(await designDecisions(d.engagementId)).toEqual([
       { kind: 'design_approval', acknowledged_issue_at: null },
@@ -140,7 +141,7 @@ describe('design decisions answer ONE render issuance (AC 30)', () => {
   it('concept decisions are unchanged: one per delivery, never stamped', async () => {
     const d = await seedRoundBDelivery(orgIds, 'concept-unchanged');
     await forceState(d.engagementId, 'concept_review');
-    expect(await recordDeliveryActionByToken(d.token, { action: 'approve_concept' })).toEqual({
+    expect(await respondAsSeen(d.token, { action: 'approve_concept' })).toEqual({
       ok: true,
     });
     const [row] = await raw.query<{ acknowledged_issue_at: string | null }>(
@@ -159,7 +160,7 @@ describe('legacy unstamped design decisions (AC 31)', () => {
     await insertLegacyDesignDecision(d.orgId, d.engagementId, `now() - interval '1 hour'`);
 
     expect(await clientActionsOf(d.hash)).toEqual([]);
-    expect(await recordDeliveryActionByToken(d.token, { action: 'approve_design' })).toEqual({
+    expect(await respondAsSeen(d.token, { action: 'approve_design' })).toEqual({
       ok: true,
       code: 'already',
     });
@@ -174,7 +175,7 @@ describe('legacy unstamped design decisions (AC 31)', () => {
     const current = await rendersReadyAtText(d.engagementId);
 
     expect(await clientActionsOf(d.hash)).toEqual(['approve_design', 'request_design_changes']);
-    expect(await recordDeliveryActionByToken(d.token, { action: 'approve_design' })).toEqual({
+    expect(await respondAsSeen(d.token, { action: 'approve_design' })).toEqual({
       ok: true,
     });
     expect(await designDecisions(d.engagementId)).toEqual([
@@ -189,19 +190,19 @@ describe('every ok client act refreshes updated_at, an already does not (AC 32)'
     const d = await seedRoundBDelivery(orgIds, 'touch-respond');
     await forceState(d.engagementId, 'concept_review');
     await ageUpdatedAt(d.engagementId);
-    expect(await recordDeliveryActionByToken(d.token, { action: 'approve_concept' })).toEqual({
+    expect(await respondAsSeen(d.token, { action: 'approve_concept' })).toEqual({
       ok: true,
     });
     expect(await updatedAtRefreshed(d.engagementId)).toBe(true);
 
     await ageUpdatedAt(d.engagementId);
-    expect(await recordDeliveryActionByToken(d.token, { action: 'approve_concept' })).toEqual({
+    expect(await respondAsSeen(d.token, { action: 'approve_concept' })).toEqual({
       ok: true,
       code: 'already',
     });
     expect(await updatedAtRefreshed(d.engagementId)).toBe(false);
     // A refusal touches nothing either.
-    expect(await recordDeliveryActionByToken(d.token, { action: 'approve_design' })).toEqual({
+    expect(await respondAsSeen(d.token, { action: 'approve_design' })).toEqual({
       ok: false,
       error: 'wrong_state',
     });
@@ -335,7 +336,7 @@ describe('the client chooses ONE concept option (AC 33)', () => {
 
     // One decision per delivery: a second choice, or approving on top, repeats.
     expect(await chooseConcept(d.hash, optionB, 1)).toBe('already');
-    expect(await recordDeliveryActionByToken(d.token, { action: 'approve_concept' })).toEqual({
+    expect(await respondAsSeen(d.token, { action: 'approve_concept' })).toEqual({
       ok: true,
       code: 'already',
     });
@@ -352,7 +353,7 @@ describe('the client chooses ONE concept option (AC 33)', () => {
     await forceState(d.engagementId, 'concept_review');
     const option = await seedArtifact(d, 'concept_option');
     expect(
-      await recordDeliveryActionByToken(d.token, { action: 'request_concept_changes' }),
+      await respondAsSeen(d.token, { action: 'request_concept_changes' }),
     ).toEqual({ ok: true });
     expect(await chooseConcept(d.hash, option, 1)).toBe('already');
     expect(await conceptApprovals(d.engagementId)).toEqual([]);
@@ -534,7 +535,7 @@ describe('a retracted client decision answers nothing, as liveEvents() in TS (L1
     await forceState(d.engagementId, 'final_approval');
     await stampRenders(d.engagementId, `now() - interval '1 hour'`);
     expect(
-      await recordDeliveryActionByToken(d.token, { action: 'request_design_changes' }),
+      await respondAsSeen(d.token, { action: 'request_design_changes' }),
     ).toEqual({ ok: true });
     await retract(
       d.orgId,
@@ -545,10 +546,10 @@ describe('a retracted client decision answers nothing, as liveEvents() in TS (L1
     expect(await clientActionsOf(d.hash)).toEqual(['approve_design']);
     // Read and write agree on the closed verb...
     expect(
-      await recordDeliveryActionByToken(d.token, { action: 'request_design_changes' }),
+      await respondAsSeen(d.token, { action: 'request_design_changes' }),
     ).toEqual({ ok: true, code: 'already' });
     // ...and on the open one.
-    expect(await recordDeliveryActionByToken(d.token, { action: 'approve_design' })).toEqual({
+    expect(await respondAsSeen(d.token, { action: 'approve_design' })).toEqual({
       ok: true,
     });
     expect(await clientActionsOf(d.hash)).toEqual([]);
@@ -563,7 +564,7 @@ describe('a retracted client decision answers nothing, as liveEvents() in TS (L1
     await retract(d.orgId, d.engagementId, await latestClientEventId(d.engagementId, 'design_approval'));
 
     expect(await clientActionsOf(d.hash)).toEqual(['approve_design', 'request_design_changes']);
-    expect(await recordDeliveryActionByToken(d.token, { action: 'approve_design' })).toEqual({
+    expect(await respondAsSeen(d.token, { action: 'approve_design' })).toEqual({
       ok: true,
     });
   });
@@ -581,12 +582,12 @@ describe('a retracted client decision answers nothing, as liveEvents() in TS (L1
     expect(snapshot!.client_actions).toEqual(['request_concept_changes']);
     // The approval slot is still taken by the retracted row: both writes agree.
     expect(await chooseConcept(d.hash, option, 1)).toBe('already');
-    expect(await recordDeliveryActionByToken(d.token, { action: 'approve_concept' })).toEqual({
+    expect(await respondAsSeen(d.token, { action: 'approve_concept' })).toEqual({
       ok: true,
       code: 'already',
     });
     expect(
-      await recordDeliveryActionByToken(d.token, { action: 'request_concept_changes' }),
+      await respondAsSeen(d.token, { action: 'request_concept_changes' }),
     ).toEqual({ ok: true });
   });
 });

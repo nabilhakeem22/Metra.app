@@ -1,5 +1,6 @@
 // The Round C client-page shapes (0058): the dated timeline, the studio's
-// payment instructions, a document's media class. PURE TYPES, client-safe.
+// payment instructions, a document's media class; and the receipts (Round D,
+// 0059). PURE TYPES, client-safe.
 //
 // CLIENT WORDS ONLY. The snapshot carries raw machine keys (a state name, an
 // engagement_events kind); the mapper translates every one of them into the
@@ -36,6 +37,13 @@ export type PortalTimelineEntry =
       at: string;
     }
   | { type: 'payment'; kind: PortalPaymentKind; amount: string; at: string };
+
+/** One payment the studio received from the client (Round D): its kind, the scale-4 amount, an ISO instant. */
+export interface PortalReceipt {
+  kind: PortalPaymentKind;
+  amount: string;
+  at: string;
+}
 
 /** The studio's own payment instructions, as text. */
 export interface PortalPaymentDetails {

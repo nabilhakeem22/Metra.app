@@ -5,16 +5,19 @@ import {
   approveDesignWithBudgetAndNotify,
   respondToDesignAndNotify,
 } from '@/lib/engagements/client-acts/design-acts';
-import { recordDeliveryActionByToken } from '@/lib/engagements/public';
 import { bandSeenOf, reviewSeenOf } from '@/lib/engagements/review-seen';
 import { deliveryOrNull } from './delivery-read';
 import { closeFixture, raw, teardown } from './fixture';
 import { forceState, seedArtifact, seedRoundBDelivery, stampRenders, type RoundBDelivery } from './round-b-fixture';
 import { plantTransition } from './round-c-db-fixture';
+import { respondAsSeen } from './respond-as-seen';
 
 // Fix round F1/F2 (S1), F6, F7 through the real write, read and notifier: an
 // approval or acknowledgement is written only about what the client SAW, and a
 // repeat tap answers the decision on file whatever the studio did meanwhile.
+// Since Round D the database is the judge (the seven-argument guard), and the
+// design approval and the budget acknowledgement are two consents (owner
+// decision 2): each is saved or refused on its own issuance.
 
 const orgIds: string[] = [];
 afterAll(async () => {
@@ -23,6 +26,11 @@ afterAll(async () => {
 });
 
 const shown = async (d: RoundBDelivery) => reviewSeenOf((await deliveryOrNull(d.token))!);
+/** What a dialog with the budget on offer sends (a band is on the page). */
+const shownWithBand = async (d: RoundBDelivery) => {
+  const seen = await shown(d);
+  return { ...seen, romIssuedAt: seen.romIssuedAt! };
+};
 
 async function clientKinds(d: RoundBDelivery): Promise<string[]> {
   const rows = await raw.query<{ kind: string }>(
@@ -48,21 +56,21 @@ async function atFinalApproval(suffix: string): Promise<RoundBDelivery> {
 }
 
 describe('F1: the band acknowledged is the band the client saw', () => {
-  it('a band re-issued while the dialog was open: changed, neither approval nor acknowledgement', async () => {
+  it('a band re-issued while the dialog was open: the approval is saved, the new band is not acknowledged', async () => {
     const d = await atFinalApproval('consent-rebanded');
-    const seen = await shown(d);
+    const seen = await shownWithBand(d);
     await issueBand(d, 1500000, 2000000);
-    expect(await approveDesignWithBudgetAndNotify(d.token, {}, seen)).toEqual({ kind: 'changed' });
-    expect(await clientKinds(d)).toEqual([]);
+    expect(await approveDesignWithBudgetAndNotify(d.token, {}, seen)).toEqual({ kind: 'approved', studioNotified: true, budget: 'changed' });
+    expect(await clientKinds(d)).toEqual(['design_approval']);
   });
 
   it('a stale tab after the delivery moved on and a new band was issued acknowledges nothing', async () => {
     const d = await atFinalApproval('consent-stale');
-    const seen = await shown(d);
-    expect(await approveDesignWithBudgetAndNotify(d.token, {}, seen)).toMatchObject({ kind: 'approved', budgetAcknowledged: true });
+    const seen = await shownWithBand(d);
+    expect(await approveDesignWithBudgetAndNotify(d.token, {}, seen)).toMatchObject({ kind: 'approved', budget: 'acknowledged' });
     await forceState(d.engagementId, 'boq');
     await issueBand(d, 4000000, 5000000);
-    expect(await approveDesignWithBudgetAndNotify(d.token, {}, seen)).toEqual({ kind: 'changed' });
+    expect(await approveDesignWithBudgetAndNotify(d.token, {}, seen)).toEqual({ kind: 'approved', studioNotified: true, budget: 'changed' });
     const rows = await raw.query<{ range_low: string }>(
       `select range_low::text from public.engagement_events where engagement_id = '${d.engagementId}' and kind = 'rom_acknowledgement'`,
     );
@@ -71,7 +79,7 @@ describe('F1: the band acknowledged is the band the client saw', () => {
 
   it('the same band, still there: approval and acknowledgement in one go', async () => {
     const d = await atFinalApproval('consent-same');
-    expect(await approveDesignWithBudgetAndNotify(d.token, {}, await shown(d))).toMatchObject({ budgetAcknowledged: true });
+    expect(await approveDesignWithBudgetAndNotify(d.token, {}, await shownWithBand(d))).toMatchObject({ budget: 'acknowledged' });
     expect(await clientKinds(d)).toEqual(['design_approval', 'rom_acknowledgement']);
   });
 
@@ -90,7 +98,7 @@ describe('F2: a design decision answers the render round the client saw', () => 
   it('renders re-issued (a new move into final approval) or a new render shared: changed, nothing written', async () => {
     const d = await atFinalApproval('consent-round');
     const seen = await shown(d);
-    await plantTransition(d, 'design_3d', 'final_approval', 'now()');
+    await stampRenders(d.engagementId, 'clock_timestamp()');
     expect(await respondToDesignAndNotify(d.token, { action: 'approve_design' }, seen)).toEqual({ kind: 'changed' });
     const reseen = await shown(d);
     await seedArtifact(d, 'approved_render');
@@ -103,7 +111,7 @@ describe('F6, F7: repeat taps answer what is on file', () => {
   it('F6: a concept tap after the studio moved on answers the saved approval', async () => {
     const d = await seedRoundBDelivery(orgIds, 'consent-concept');
     await forceState(d.engagementId, 'concept_review');
-    expect(await recordDeliveryActionByToken(d.token, { action: 'approve_concept' })).toEqual({ ok: true });
+    expect(await respondAsSeen(d.token, { action: 'approve_concept' })).toEqual({ ok: true });
     await forceState(d.engagementId, 'negotiation');
     expect(await respondToConceptAndNotify(d.token, { action: 'request_concept_changes', note: 'x' })).toMatchObject({
       kind: 'approved',

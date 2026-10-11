@@ -35,13 +35,15 @@ export function PaymentsCard({
   schedule,
   claim,
   details,
-  timeline,
+  receipts,
+  receiptsTruncated,
 }: {
   token: string;
   schedule: PublicDelivery['paymentSchedule'];
   claim: PublicDelivery['paymentClaim'];
   details: PublicDelivery['paymentDetails'];
-  timeline: PublicDelivery['timeline'];
+  receipts: PublicDelivery['receipts'];
+  receiptsTruncated: PublicDelivery['receiptsTruncated'];
 }) {
   const t = useTranslations('delivery.payments');
   const locale = useLocale();
@@ -105,7 +107,7 @@ export function PaymentsCard({
           />
         ))}
       </ul>
-      <PaymentReceipts timeline={timeline} />
+      <PaymentReceipts receipts={receipts} truncated={receiptsTruncated} />
       <PaymentClaimDialog claim={claim} submission={submission} milestoneLabel={milestoneLabel} />
     </section>
   );

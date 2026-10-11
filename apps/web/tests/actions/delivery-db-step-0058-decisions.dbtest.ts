@@ -1,8 +1,8 @@
 import { afterAll, describe, expect, it } from 'vitest';
-import { recordDeliveryActionByToken } from '@/lib/engagements/public';
 import { closeFixture, raw, teardown } from './fixture';
 import { forceState, seedRoundBDelivery, snapshotOf, stampRenders, type RoundBDelivery } from './round-b-fixture';
 import { plantEvent, plantTransition, retract } from './round-c-db-fixture';
+import { respondAsSeen } from './respond-as-seen';
 
 // Round C, PR-C7: the decisions on file and the expected date that
 // app_delivery_by_token now returns (AC 35; fix round F1, F4). Each answers the
@@ -19,11 +19,11 @@ describe('decisions on file and the expected date (AC 35)', () => {
     const d = await seedRoundBDelivery(orgIds, 'design-round');
     await forceState(d.engagementId, 'final_approval');
     await stampRenders(d.engagementId, `now() - interval '1 hour'`);
-    expect(await recordDeliveryActionByToken(d.token, { action: 'approve_design' })).toEqual({ ok: true });
+    expect(await respondAsSeen(d.token, { action: 'approve_design' })).toEqual({ ok: true });
     expect((await snapshotOf(d.hash))!.design_decision).toMatchObject({ kind: 'approved' });
     await stampRenders(d.engagementId, 'now()');
     expect((await snapshotOf(d.hash))!.design_decision).toBeNull();
-    expect(await recordDeliveryActionByToken(d.token, { action: 'request_design_changes', note: 'Lighter' })).toEqual({ ok: true });
+    expect(await respondAsSeen(d.token, { action: 'request_design_changes', note: 'Lighter' })).toEqual({ ok: true });
     expect((await snapshotOf(d.hash))!.design_decision).toMatchObject({ kind: 'changes_requested' });
   });
 
@@ -33,14 +33,14 @@ describe('decisions on file and the expected date (AC 35)', () => {
       `update public.design_engagements set rom_low = 100000, rom_high = 200000,
               rom_issued_at = now() - interval '1 hour' where id = '${d.engagementId}'`,
     );
-    expect(await recordDeliveryActionByToken(d.token, { action: 'acknowledge_rom' })).toEqual({ ok: true });
+    expect(await respondAsSeen(d.token, { action: 'acknowledge_rom' })).toEqual({ ok: true });
     expect((await snapshotOf(d.hash))!.rom_acknowledged_at).toEqual(expect.any(String));
     await raw.query(`update public.design_engagements set rom_issued_at = now() where id = '${d.engagementId}'`);
     expect((await snapshotOf(d.hash))!.rom_acknowledged_at).toBeNull();
 
     await forceState(d.engagementId, 'design_only_handoff');
     expect((await snapshotOf(d.hash))!.handover_acknowledged_at).toBeNull();
-    expect(await recordDeliveryActionByToken(d.token, { action: 'acknowledge_handoff' })).toEqual({ ok: true });
+    expect(await respondAsSeen(d.token, { action: 'acknowledge_handoff' })).toEqual({ ok: true });
     expect((await snapshotOf(d.hash))!.handover_acknowledged_at).toEqual(expect.any(String));
   });
 

@@ -11,9 +11,10 @@
 import { conceptLetter } from '../concept-letter';
 import { PORTAL_STAGE_KEY } from '../portal-stage';
 import type { DesignState } from '../states';
+import { isPortalPaymentKind } from './receipt-rows';
 import { STATE_SET } from './row-guards';
 import { isoInstant, positiveAmount } from './snapshot-values';
-import type { PortalPaymentKind, PortalTimelineDecision, PortalTimelineEntry } from './timeline-types';
+import type { PortalTimelineDecision, PortalTimelineEntry } from './timeline-types';
 
 /** The SQL returns at most 60; a longer array is cut, never trusted. */
 export const TIMELINE_MAX_ENTRIES = 60;
@@ -27,14 +28,6 @@ const DECISION_OF_KIND: Readonly<Record<string, PortalTimelineDecision>> = {
   rom_acknowledgement: 'budget_acknowledged',
   handoff_acknowledgement: 'handover_acknowledged',
 };
-
-const PAYMENT_KINDS: ReadonlySet<string> = new Set<PortalPaymentKind>([
-  'deposit',
-  'gate_a',
-  'gate_b',
-  'balance',
-  'revision_co',
-]);
 
 function stageEntry(row: Record<string, unknown>, at: string): PortalTimelineEntry | null {
   if (typeof row.state !== 'string' || !STATE_SET.has(row.state)) return null;
@@ -57,8 +50,8 @@ function decisionEntry(row: Record<string, unknown>, at: string): PortalTimeline
 
 function paymentEntry(row: Record<string, unknown>, at: string): PortalTimelineEntry | null {
   const amount = positiveAmount(row.amount);
-  if (typeof row.kind !== 'string' || !PAYMENT_KINDS.has(row.kind) || amount === null) return null;
-  return { type: 'payment', kind: row.kind as PortalPaymentKind, amount, at };
+  if (!isPortalPaymentKind(row.kind) || amount === null) return null;
+  return { type: 'payment', kind: row.kind, amount, at };
 }
 
 /** One raw entry in client words, or null when it cannot be shown. */

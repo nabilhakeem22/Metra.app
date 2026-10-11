@@ -32,9 +32,15 @@ async function atFinalApproval(suffix: string): Promise<RoundBDelivery> {
   return d;
 }
 
-/** What the client's page shows right now (the fingerprint a dialog sends). */
+/** What the client's page shows right now (the issuances a dialog sends). */
 async function seen(d: RoundBDelivery) {
   return reviewSeenOf((await deliveryOrNull(d.token))!);
+}
+
+/** What a dialog with the budget on offer sends (a band is on the page). */
+async function seenWithBand(d: RoundBDelivery) {
+  const shown = await seen(d);
+  return { ...shown, romIssuedAt: shown.romIssuedAt! };
 }
 
 async function clientEvents(d: RoundBDelivery): Promise<string[]> {
@@ -54,28 +60,36 @@ async function bodyKeyCounts(d: RoundBDelivery): Promise<Record<string, number>>
 describe('approve with the budget in one confirmation (AC 54)', () => {
   it('writes the client design approval AND the client budget acknowledgement', async () => {
     const d = await atFinalApproval('c10-both');
-    expect(await approveDesignWithBudgetAndNotify(d.token, { note: 'Lovely' }, await seen(d))).toEqual({
+    expect(await approveDesignWithBudgetAndNotify(d.token, { note: 'Lovely' }, await seenWithBand(d))).toEqual({
       kind: 'approved',
       studioNotified: true,
-      budgetAcknowledged: true,
+      budget: 'acknowledged',
     });
     expect(await clientEvents(d)).toEqual(['design_approval', 'rom_acknowledgement']);
     expect(Object.keys(await bodyKeyCounts(d)).sort()).toEqual(['client_budget_acknowledged', 'client_design_approved']);
   });
 
-  it('a band withdrawn after the dialog opened: changed, nothing written (F1)', async () => {
+  it('a band withdrawn after the dialog opened: the design approval alone is saved (Round D, owner decision 2)', async () => {
     const d = await atFinalApproval('c10-withdrawn');
-    const shown = await seen(d);
+    const shown = await seenWithBand(d);
     await raw.query(`update public.design_engagements set rom_issued_at = null where id = '${d.engagementId}'`);
-    expect(await approveDesignWithBudgetAndNotify(d.token, {}, shown)).toEqual({ kind: 'changed' });
-    expect(await clientEvents(d)).toEqual([]);
+    expect(await approveDesignWithBudgetAndNotify(d.token, {}, shown)).toEqual({
+      kind: 'approved',
+      studioNotified: true,
+      budget: 'changed',
+    });
+    expect(await clientEvents(d)).toEqual(['design_approval']);
   });
 
-  it('a stale tab whose saved answer is a change request acknowledges nothing', async () => {
+  it('a stale tab whose saved answer is a change request: the request is the answer; the unchanged band is acknowledged', async () => {
     const d = await atFinalApproval('c10-stale-budget');
     await respondToDesignAndNotify(d.token, { action: 'request_design_changes', note: 'Darker' }, await seen(d));
-    expect(await approveDesignWithBudgetAndNotify(d.token, {}, await seen(d))).toEqual({ kind: 'changes_requested', studioNotified: true });
-    expect(await clientEvents(d)).toEqual(['design_change_request']);
+    expect(await approveDesignWithBudgetAndNotify(d.token, {}, await seenWithBand(d))).toEqual({
+      kind: 'changes_requested',
+      studioNotified: true,
+      budget: 'acknowledged',
+    });
+    expect((await clientEvents(d)).sort()).toEqual(['design_change_request', 'rom_acknowledgement']);
   });
 });
 
@@ -141,11 +155,11 @@ describe('nothing live on file and the step moved on (AC 56)', () => {
     expect(await acknowledgeHandoverAndNotify(d.token, {})).toEqual({ kind: 'moved_on' });
   });
 
-  it('a link that no longer reads: changed (nothing written on a failed read); the page then shows why', async () => {
+  it('a link that expired after the page loaded: the write says so (no read before it), nothing written', async () => {
     const d = await atFinalApproval('c10-expired');
     const shown = await seen(d);
     await raw.query(`update public.design_engagements set share_expires_at = now() - interval '1 minute' where id = '${d.engagementId}'`);
-    expect(await respondToDesignAndNotify(d.token, { action: 'approve_design' }, shown)).toEqual({ kind: 'changed' });
+    expect(await respondToDesignAndNotify(d.token, { action: 'approve_design' }, shown)).toEqual({ kind: 'error', error: 'token_expired' });
     expect(await clientEvents(d)).toEqual([]);
   });
 });

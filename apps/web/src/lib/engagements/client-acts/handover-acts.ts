@@ -11,7 +11,7 @@ import { withHandoverClose } from './handover-close';
 import { withStudioNotified } from './notify';
 import { savedDelivery } from './saved-delivery';
 
-type HandoverInput = Omit<Parameters<typeof recordDeliveryActionByToken>[1], 'action'>;
+type HandoverInput = Omit<Parameters<typeof recordDeliveryActionByToken>[1], 'action' | 'expectedIssueAt'>;
 
 /** Notify and answer one handover write: the confirmation SAVED, or why there is none. */
 async function answerOfHandoverWrite(rawToken: string, result: DeliveryActionResult): Promise<HandoverOutcome> {
@@ -38,6 +38,7 @@ async function answerOfHandoverWrite(rawToken: string, result: DeliveryActionRes
  * hourly closer stays the safety net). The close never changes the answer.
  */
 export async function acknowledgeHandoverAndNotify(rawToken: string, input: HandoverInput): Promise<HandoverOutcome> {
-  const result = await recordDeliveryActionByToken(rawToken, { ...input, action: 'acknowledge_handoff' });
+  // The handover names no issuance: the SDF ignores the argument for it.
+  const result = await recordDeliveryActionByToken(rawToken, { ...input, action: 'acknowledge_handoff', expectedIssueAt: null });
   return withHandoverClose(rawToken, 'acknowledge_handoff', result, () => answerOfHandoverWrite(rawToken, result));
 }

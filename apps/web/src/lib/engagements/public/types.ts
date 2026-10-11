@@ -11,9 +11,9 @@ import type { MilestoneProgress } from '../journey-map';
 import type { ClientDocumentCategory } from '../portal-documents';
 import type { HeroView } from '../portal-hero';
 import type { PortalStageKey } from '../portal-stage';
-import type { PortalDocumentMedia, PortalPaymentDetails, PortalTimelineEntry } from './timeline-types';
+import type { PortalDocumentMedia, PortalPaymentDetails, PortalReceipt, PortalTimelineEntry } from './timeline-types';
 
-export type { PortalDocumentMedia, PortalPaymentDetails, PortalTimelineEntry } from './timeline-types';
+export type { PortalDocumentMedia, PortalPaymentDetails, PortalReceipt, PortalTimelineEntry } from './timeline-types';
 
 /** One milestone in the client's payment schedule — DUE amounts only, no cost. */
 export interface PublicDeliveryMilestone {
@@ -45,8 +45,15 @@ export interface PublicDelivery {
   /** The design fee the CLIENT pays (scale-4 string), or null before it is set. */
   designFeeTotal: string | null;
   /** The budget band (scale-4 strings), or null when unset OR not yet ISSUED —
-   *  an unissued band is the studio's private working state. */
-  rom: { low: string | null; high: string | null } | null;
+   *  an unissued band is the studio's private working state. `issuedAt` is the
+   *  issuance this band is, exactly as the database wrote it (microseconds,
+   *  never re-formatted): the budget acknowledgement echoes it back, and the
+   *  database refuses it once another band is issued. No usable stamp, no band. */
+  rom: { low: string | null; high: string | null; issuedAt: string } | null;
+  /** Round D: the render round under review (renders_ready_at), exactly as the
+   *  database wrote it, or null before any round (a legacy delivery). The design
+   *  decision echoes it back, and the database refuses it once renders are re-issued. */
+  rendersIssuedAt: string | null;
   shareExpiresAt: string | null;
   /** The studio. `hasLogo` only says the logo route may answer (the file id
    *  never reaches the browser). `phone` is the studio's number as stored
@@ -82,6 +89,11 @@ export interface PublicDelivery {
   /** Round C: what happened, dated, newest first (at most 60). Client words
    *  only (a stage key, a decision word, a payment kind), never a machine state. */
   timeline: PortalTimelineEntry[];
+  /** Round D: the payments the studio received, newest first, at most 200, read
+   *  apart from the timeline so a payment never drops off behind stage moves. */
+  receipts: PortalReceipt[];
+  /** Round D: true when the delivery has more payments than `receipts` carries. */
+  receiptsTruncated: boolean;
   /** Round C: the date (YYYY-MM-DD) the studio expects the next step, or null. */
   expectedOn: string | null;
   /** Round C: the client's design decision on file for the CURRENT render round. */

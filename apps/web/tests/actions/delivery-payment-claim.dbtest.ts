@@ -12,13 +12,14 @@ import {
 } from '@/lib/engagements/payment-claims';
 import { recordPaymentCore } from '@/lib/engagements/payments';
 import { getEngagementPaymentClaims } from '@/lib/engagements/queries';
-import { claimPaymentByToken, recordDeliveryActionByToken } from '@/lib/engagements/public';
+import { claimPaymentByToken } from '@/lib/engagements/public';
 import { mintDeliveryLinkCore } from '@/lib/engagements/share';
 import { createProjectCore } from '@/lib/projects/core';
 import { listProjects } from '@/lib/projects/queries';
 import type { GenerateFeeSchedulePayload } from '@/lib/engagements/transitions';
 import type { OrgContext } from '@/lib/db/context';
 import { closeFixture, ctxFor, raw, seedOrg, teardown } from './fixture';
+import { respondAsSeen } from './respond-as-seen';
 
 const orgIds: string[] = [];
 afterAll(async () => {
@@ -614,7 +615,7 @@ async function stateOf(engagementId: string): Promise<string> {
 
 /** The client answers the concept review on their link (round B soft block). */
 async function clientApprovesConcept(token: string): Promise<void> {
-  expect(await recordDeliveryActionByToken(token, { action: 'approve_concept' })).toMatchObject({
+  expect(await respondAsSeen(token, { action: 'approve_concept' })).toMatchObject({
     ok: true,
   });
 }

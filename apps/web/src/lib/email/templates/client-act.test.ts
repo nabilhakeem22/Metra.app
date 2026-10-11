@@ -7,6 +7,7 @@ const ACTS: ClientAct[] = [
   { kind: 'concept_chosen' },
   { kind: 'concept_changes_requested' },
   { kind: 'design_approved' },
+  { kind: 'design_approved', budgetPending: true },
   { kind: 'design_changes_requested' },
   { kind: 'budget_acknowledged' },
   { kind: 'handover_acknowledged' },
@@ -45,6 +46,13 @@ describe('clientActEmailTemplate', () => {
     const act: ClientAct = { kind: 'payment_claimed', milestoneKind: 'gate_b' };
     expect(render(act, 'en').text).toContain('the first payment');
     expect(render(act, 'ar-EG').text).toContain('الدفعة الأولى');
+  });
+
+  it('a design approval whose budget half was not saved says the range still waits (Round D)', () => {
+    const pending: ClientAct = { kind: 'design_approved', budgetPending: true };
+    expect(render(pending, 'en').text).toContain('have not acknowledged the new range yet');
+    expect(render(pending, 'ar-EG').text).toContain('فلسه ما أكّدش النطاق الجديد');
+    expect(render({ kind: 'design_approved' }, 'en').text).not.toContain('range');
   });
 
   it('still reads without a delivery label', () => {

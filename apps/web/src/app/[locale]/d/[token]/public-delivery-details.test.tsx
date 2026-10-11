@@ -120,13 +120,12 @@ describe('how to pay once the due payment is claimed (F11)', () => {
   });
 });
 
-describe('payments received (AC 48)', () => {
+describe('payments received (AC 48; Round D A5: from the receipts list, not the timeline)', () => {
   it('lists each payment with its amount (Latin digits, LTR, mono) and the day it was received', () => {
     renderPage('ar-EG', {
-      timeline: [
-        { type: 'payment', kind: 'gate_a', amount: '20000.5000', at: '2026-09-02T10:00:00.000Z' },
-        { type: 'stage', stageKey: 'visuals', at: '2026-09-01T10:00:00.000Z' },
-        { type: 'payment', kind: 'deposit', amount: '30000.0000', at: '2026-08-01T10:00:00.000Z' },
+      receipts: [
+        { kind: 'gate_a', amount: '20000.5000', at: '2026-09-02T10:00:00.000Z' },
+        { kind: 'deposit', amount: '30000.0000', at: '2026-08-01T10:00:00.000Z' },
       ],
     });
     const section = screen.getByRole('region', { name: messageAt('ar-EG', 'delivery.payments.receipts.title') });
@@ -140,5 +139,36 @@ describe('payments received (AC 48)', () => {
     expect(amount.textContent).toMatch(/^20,000\.50/);
     expect(rows[0]!.textContent).toContain('02/09/2026');
     expect(section.textContent).not.toMatch(/[٠-٩]/);
+  });
+
+  it('A5: 4 payments behind 60 newer stage moves still show 4 receipts', () => {
+    const stages = Array.from({ length: 60 }, (_, index) => ({
+      type: 'stage' as const,
+      stageKey: index % 2 === 0 ? ('visuals' as const) : ('finalApproval' as const),
+      at: `2026-10-01T10:${String(index).padStart(2, '0')}:00.000Z`,
+    }));
+    const receipts = (['deposit', 'gate_a', 'gate_b', 'balance'] as const).map((kind, index) => ({
+      kind,
+      amount: '1000.0000',
+      at: `2026-09-0${index + 1}T10:00:00.000Z`,
+    }));
+    renderPage('en', { timeline: stages, receipts });
+    const section = screen.getByRole('region', { name: messageAt('en', 'delivery.payments.receipts.title') });
+    expect(within(section).getAllByRole('listitem')).toHaveLength(4);
+    expect(section.textContent).not.toContain('200');
+  });
+
+  it('with no payments there is no receipts section; a cut list says only the latest are shown', () => {
+    renderPage('en', { timeline: [{ type: 'payment', kind: 'deposit', amount: '1.0000', at: '2026-09-01T10:00:00.000Z' }] });
+    expect(screen.queryByRole('region', { name: messageAt('en', 'delivery.payments.receipts.title') })).toBeNull();
+    for (const locale of ['en', 'ar-EG'] as const) {
+      const { unmount } = renderPage(locale, {
+        receipts: [{ kind: 'deposit', amount: '1.0000', at: '2026-09-01T10:00:00.000Z' }],
+        receiptsTruncated: true,
+      });
+      const section = screen.getByRole('region', { name: messageAt(locale, 'delivery.payments.receipts.title') });
+      expect(section.textContent).toContain(messageAt(locale, 'delivery.payments.receipts.truncated').replace('{count}', '200'));
+      unmount();
+    }
   });
 });

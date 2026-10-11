@@ -72,8 +72,8 @@ describe('approve and acknowledge ask first', () => {
     await answerDialog('en', 'confirm');
     expect(await screen.findByText(en('delivery.hero.design.approvedBodyNotified'))).toBeTruthy();
     expect(actions.respondToDeliveryDesign).toHaveBeenCalledTimes(1);
-    // F2: the act carries the render round this hero showed.
-    expect(actions.respondToDeliveryDesign).toHaveBeenCalledWith('tok', 'approve_design', '', expect.objectContaining({ round: expect.any(String) }));
+    // Round D: the act carries the render round this hero showed (none here).
+    expect(actions.respondToDeliveryDesign).toHaveBeenCalledWith('tok', 'approve_design', '', expect.objectContaining({ rendersIssuedAt: null }));
     expect(router.refresh).toHaveBeenCalledTimes(1);
     expect(screen.queryByRole('dialog')).toBeNull();
 
@@ -128,7 +128,7 @@ describe('Request changes needs a note', () => {
       'tok',
       `request_${group}_changes`,
       'A bigger window',
-      ...(group === 'design' ? [expect.objectContaining({ round: expect.any(String) })] : []),
+      ...(group === 'design' ? [expect.objectContaining({ rendersIssuedAt: null })] : []),
     );
     expect(await screen.findByText(en(`delivery.hero.${group}.changesTitle`))).toBeTruthy();
   });

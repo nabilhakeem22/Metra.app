@@ -14,6 +14,7 @@ import {
 import { hashShareToken } from '@/lib/share/token';
 import { isUuid } from '@/lib/uuid';
 import { conceptLetter } from '../concept-letter';
+import { issuanceStamp } from './snapshot-values';
 
 /** Coded outcomes the portal maps to a bilingual message. `already` is NOT an
  *  error — a repeat signal resolves to `{ ok: true, code: 'already' }`, which is
@@ -30,14 +31,27 @@ export type DeliveryActionResult = SignalSdfResult;
  * request-changes / acknowledge) against a delivery by its RAW share token.
  * Mirrors respondToProposalByToken — sha256-hash the token (never sent in the
  * clear, never logged), run the SECURITY DEFINER write SDF on the base connection,
- * and map its status code. The SDF moves no state, adds no guard, and returns only
- * a status (no cost/margin). A repeat of an already-recorded signal maps to a
- * SUCCESSFUL no-op (`code: 'already'`), so a double submit is idempotent.
+ * and map its status code. The SDF moves no state and returns only a status (no
+ * cost/margin). A repeat of an already-recorded signal maps to a SUCCESSFUL no-op
+ * (`code: 'already'`), so a double submit is idempotent.
+ *
+ * THE CONSENT GUARD (Round D, 0059): `expectedIssueAt` is the issuance the
+ * client SAW, read off the page they tapped on: `rom.issuedAt` for
+ * acknowledge_rom, `rendersIssuedAt` for the two design verbs, null for the
+ * rest. The seven-argument SDF compares it with the row under its lock and
+ * answers `wrong_state` (nothing written) when another issuance is on file. It
+ * travels as the TEXT the snapshot carried, cast by Postgres: drizzle's
+ * postgres-js serializer passes a timestamptz parameter through untouched,
+ * where postgres.js on its own would re-format it through a JS Date and lose
+ * the microseconds. A value that is not a stamp never reaches the database: it
+ * is that same `wrong_state`. The retired six-argument form is never called
+ * (respond-arity.test.ts).
  */
 export async function recordDeliveryActionByToken(
   rawToken: string,
   input: {
     action: string;
+    expectedIssueAt: string | null;
     note?: string | null;
     actorName?: string | null;
     ip?: string | null;
@@ -46,10 +60,13 @@ export async function recordDeliveryActionByToken(
 ): Promise<DeliveryActionResult> {
   const token = normalizeRawToken(rawToken);
   if (!token) return { ok: false, error: 'token_invalid' };
+  if (input.expectedIssueAt !== null && issuanceStamp(input.expectedIssueAt) === null) {
+    return mapSignalSdfCode('wrong_state');
+  }
   const hash = hashShareToken(token);
   const code = await readSdfCode(sql`select public.app_delivery_respond_by_token(
-    ${hash}, ${input.action}, ${input.note ?? null}, ${input.actorName ?? null},
-    ${input.ip ?? null}, ${input.userAgent ?? null}
+    ${hash}, ${input.action}, ${input.expectedIssueAt}::timestamptz, ${input.note ?? null},
+    ${input.actorName ?? null}, ${input.ip ?? null}, ${input.userAgent ?? null}
   ) as code`);
   return mapSignalSdfCode(code);
 }

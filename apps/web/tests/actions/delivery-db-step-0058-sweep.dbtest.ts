@@ -1,8 +1,8 @@
 import { afterAll, describe, expect, it } from 'vitest';
-import { recordDeliveryActionByToken } from '@/lib/engagements/public';
 import { closeFixture, raw, teardown } from './fixture';
 import { forceState, seedArtifact, seedRoundBDelivery, stampRenders } from './round-b-fixture';
 import { notificationsOf, plantClaim, plantEvent, sweepAs } from './round-c-db-fixture';
+import { respondAsSeen } from './respond-as-seen';
 
 // Round C, PR-C7: what the lost-notification sweep repairs (AC 40). An act in
 // [now - 48 h, now - 10 min] that no notification answers is notified ONCE,
@@ -22,7 +22,7 @@ describe('app_notify_lost_client_acts: the repair (AC 40)', () => {
     const d = await seedRoundBDelivery(orgIds, 'sweep-design');
     await forceState(d.engagementId, 'final_approval');
     await stampRenders(d.engagementId, `now() - interval '2 hours'`);
-    expect(await recordDeliveryActionByToken(d.token, { action: 'approve_design' })).toEqual({ ok: true });
+    expect(await respondAsSeen(d.token, { action: 'approve_design' })).toEqual({ ok: true });
     await raw.query(
       `update public.engagement_events set decided_at = ${LOST} where engagement_id = '${d.engagementId}'`,
     );

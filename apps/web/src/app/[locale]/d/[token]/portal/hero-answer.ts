@@ -5,7 +5,12 @@
 // page.
 import type { ConceptChoiceOutcome } from '@/lib/engagements/concept-choice-outcome';
 import type { PortalErrorKey } from '@/lib/engagements/portal-error-key';
-import type { DesignOutcome, HandoverOutcome } from '@/lib/engagements/review-outcome';
+import type {
+  BudgetPart,
+  DesignOutcome,
+  DesignWithBudgetOutcome,
+  HandoverOutcome,
+} from '@/lib/engagements/review-outcome';
 import type { HeroOutcome } from './hero-confirmed';
 
 /** The confirmation card: what was recorded, and the SAVED letter when there is one. */
@@ -13,8 +18,8 @@ export interface HeroConfirmedState {
   outcome: HeroOutcome;
   studioNotified: boolean;
   chosenLetter?: string;
-  /** A design approval that also acknowledged the budget range (one confirmation). */
-  budgetAcknowledged?: boolean;
+  /** The one-tap approve+budget: how its budget half ended (Round D). */
+  budget?: BudgetPart;
 }
 
 /** A portal error, `changed` (the concept letters moved), `reviewChanged` (what the
@@ -23,7 +28,8 @@ export type HeroError = PortalErrorKey | 'changed' | 'reviewChanged' | 'movedOn'
 
 export type HeroAnswer =
   | { confirmed: HeroConfirmedState }
-  | { error: HeroError; refresh: boolean };
+  /** `budget`: the one-tap approve+budget's budget half, said beside the error when it was saved. */
+  | { error: HeroError; refresh: boolean; budget?: BudgetPart };
 
 const MOVED_ON: HeroAnswer = { error: 'movedOn', refresh: true };
 const REVIEW_CHANGED: HeroAnswer = { error: 'reviewChanged', refresh: true };
@@ -57,19 +63,42 @@ export function answerOfConceptOutcome(outcome: ConceptChoiceOutcome): HeroAnswe
 export function answerOfDesignOutcome(outcome: DesignOutcome): HeroAnswer {
   switch (outcome.kind) {
     case 'approved':
-      return {
-        confirmed: {
-          outcome: 'approved',
-          studioNotified: outcome.studioNotified,
-          ...(outcome.budgetAcknowledged ? { budgetAcknowledged: true } : {}),
-        },
-      };
+      return { confirmed: { outcome: 'approved', studioNotified: outcome.studioNotified } };
     case 'changes_requested':
       return { confirmed: { outcome: 'changes', studioNotified: outcome.studioNotified } };
     case 'changed':
       return REVIEW_CHANGED;
     case 'moved_on':
       return MOVED_ON;
+    case 'error':
+      return { error: outcome.error, refresh: false };
+  }
+}
+
+/**
+ * The answer to the one-tap approve+budget (owner decision 2): the design
+ * decision SAVED with a line on its budget half, or the reason nothing of the
+ * design was saved, still saying when the budget half was. An error before
+ * any write (a dead or expired link) is the portal error alone.
+ */
+export function answerOfDesignWithBudgetOutcome(outcome: DesignWithBudgetOutcome): HeroAnswer {
+  switch (outcome.kind) {
+    case 'approved':
+    case 'changes_requested':
+      return {
+        confirmed: {
+          outcome: outcome.kind === 'approved' ? 'approved' : 'changes',
+          studioNotified: outcome.studioNotified,
+          budget: outcome.budget,
+        },
+      };
+    case 'changed':
+    case 'moved_on':
+      return {
+        error: outcome.kind === 'changed' ? 'reviewChanged' : 'movedOn',
+        refresh: true,
+        ...(outcome.budget === 'acknowledged' ? { budget: outcome.budget } : {}),
+      };
     case 'error':
       return { error: outcome.error, refresh: false };
   }

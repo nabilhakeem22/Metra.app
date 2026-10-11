@@ -5,7 +5,6 @@ import {
 } from '@/lib/engagements/client-acts/concept-acts';
 import { offlineConceptOptions, chosenConceptOf } from '@/lib/engagements/concept-choice';
 import { getEngagementGatePreview } from '@/lib/engagements/gate-preview';
-import { recordDeliveryActionByToken } from '@/lib/engagements/public';
 import { getEngagementArtifacts, getEngagementEvents } from '@/lib/engagements/queries';
 import { closeFixture, raw, teardown } from './fixture';
 import {
@@ -17,6 +16,7 @@ import {
   snapshotOf,
   type RoundBDelivery,
 } from './round-b-fixture';
+import { respondAsSeen } from './respond-as-seen';
 
 // B12 fix round, against the real write, read and notifier:
 //   F1: a choose that answers `already` names only the decision SAVED on file,
@@ -74,7 +74,7 @@ describe('F1: a repeat choice names only the SAVED decision', () => {
   it('over a request for changes: the request is what is confirmed, with no letter', async () => {
     const d = await twoOptions('f1-changes');
     expect(
-      await recordDeliveryActionByToken(d.token, { action: 'request_concept_changes' }),
+      await respondAsSeen(d.token, { action: 'request_concept_changes' }),
     ).toEqual({ ok: true });
     // The request's own notification was never written (no wrapper above), so
     // the repeat repairs THAT one: never a "client chose" notification.
@@ -87,7 +87,7 @@ describe('F1: a repeat choice names only the SAVED decision', () => {
 
   it('over a plain approval: approved, with no letter', async () => {
     const d = await twoOptions('f1-approved');
-    expect(await recordDeliveryActionByToken(d.token, { action: 'approve_concept' })).toEqual({ ok: true });
+    expect(await respondAsSeen(d.token, { action: 'approve_concept' })).toEqual({ ok: true });
     expect(await chooseConceptAndNotify(d.token, { artifactId: d.y, position: 2 })).toEqual({
       kind: 'approved',
       studioNotified: true,
@@ -199,7 +199,7 @@ describe('the respond verbs confirm only what is SAVED (approve / request change
   it('a retracted change request still holding its slot: not offered, and a stale tap says the step changed', async () => {
     const d = await twoOptions('respond-retracted');
     expect(
-      await recordDeliveryActionByToken(d.token, { action: 'request_concept_changes' }),
+      await respondAsSeen(d.token, { action: 'request_concept_changes' }),
     ).toEqual({ ok: true });
     const [request] = await raw.query<{ id: string }>(
       `select id from public.engagement_events

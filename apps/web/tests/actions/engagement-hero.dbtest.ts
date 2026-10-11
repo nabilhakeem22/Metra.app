@@ -15,13 +15,13 @@ import { executeTransition } from '@/lib/engagements/executor';
 import { getEngagementGatePreview } from '@/lib/engagements/gate-preview';
 import { logPaymentAndAdvanceCore } from '@/lib/engagements/pay-and-advance';
 import { recordPaymentCore } from '@/lib/engagements/payments';
-import { recordDeliveryActionByToken } from '@/lib/engagements/public';
 import { mintDeliveryLinkCore } from '@/lib/engagements/share';
 import type { GenerateFeeSchedulePayload } from '@/lib/engagements/transitions';
 import { createProjectCore } from '@/lib/projects/core';
 import { listProjects } from '@/lib/projects/queries';
 import { closeFixture, ctxFor, raw, seedOrg, teardown } from './fixture';
 import type { OrgContext } from '@/lib/db/context';
+import { respondAsSeen } from './respond-as-seen';
 
 const orgIds: string[] = [];
 afterAll(async () => {
@@ -210,7 +210,7 @@ describe('getEngagementGatePreview — a non-money guard carries no amountDue', 
 async function clientApprovesConcept(ctx: OrgContext, engagementId: string): Promise<void> {
   const minted = await mintDeliveryLinkCore(ctx, engagementId);
   expect(minted.ok).toBe(true);
-  expect(await recordDeliveryActionByToken(minted.data!, { action: 'approve_concept' })).toMatchObject({
+  expect(await respondAsSeen(minted.data!, { action: 'approve_concept' })).toMatchObject({
     ok: true,
   });
 }

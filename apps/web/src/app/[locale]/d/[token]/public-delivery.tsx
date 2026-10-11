@@ -83,7 +83,8 @@ export function PublicDeliveryView({
           schedule={delivery.paymentSchedule}
           claim={delivery.paymentClaim}
           details={delivery.paymentDetails}
-          timeline={delivery.timeline}
+          receipts={delivery.receipts}
+          receiptsTruncated={delivery.receiptsTruncated}
         />
         <DocumentsCard
           token={token}

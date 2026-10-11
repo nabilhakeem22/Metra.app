@@ -93,6 +93,24 @@ describe('client_responded bodies', () => {
     expect(render('ar-EG', 'client_concept_chosen', DELIVERY)).toContain('بديل للفكرة');
   });
 
+  it('S11: a design approval says the budget still waits only when params.budget is "pending"', () => {
+    const pending = {
+      en: 'The budget range changed after they opened the page',
+      'ar-EG': 'بس نطاق الميزانية اتغيّر بعد ما فتح الصفحة',
+    } as const;
+    for (const locale of ['en', 'ar-EG'] as const) {
+      const withPending = render(locale, 'client_design_approved', { ...DELIVERY, budget: 'pending' });
+      expect(withPending).toContain(pending[locale]);
+      expect(withPending).toContain('DE-2026-0012');
+      expect(DASH.test(withPending) || ARABIC_INDIC.test(withPending)).toBe(false);
+      for (const budget of [undefined, 'other', 'acknowledged', 'PENDING', 1, true, { pending: true }]) {
+        const plain = render(locale, 'client_design_approved', { ...DELIVERY, budget });
+        expect(plain).not.toContain(pending[locale]);
+        expect(plain).toContain('DE-2026-0012');
+      }
+    }
+  });
+
   it('repeated comments say how many, in Latin digits', () => {
     expect(render('en', 'client_commented', { ...DELIVERY, count: 3 })).toContain('3 comments');
     const arabic = render('ar-EG', 'client_commented', { ...DELIVERY, count: 3 });

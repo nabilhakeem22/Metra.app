@@ -6,6 +6,8 @@
 // passed as a number, `commentCount`, only selects the plural form. A chosen
 // concept option reads as its letter (`optionPosition`, written by the notifier
 // from the saved choice, 0057), bidi-isolated like the number.
+// A design approval whose budget half was not saved (`budget: 'pending'`,
+// Round D) also says the budget range still waits.
 import { conceptLetter } from '@/lib/engagements/concept-letter';
 import { bidiIsolate } from '@/lib/format/bidi';
 import {
@@ -55,6 +57,10 @@ export function clientRespondedBody(
   if (bodyKey === 'client_commented') {
     const count = wholeNumber(params.count) ?? 1;
     return translate(bodyKey, { delivery, commentCount: count, count: String(count) });
+  }
+  if (bodyKey === 'client_design_approved') {
+    // Round D: the one-tap approve+budget saved the design but not the budget.
+    return translate(bodyKey, { delivery, budget: params.budget === 'pending' ? 'pending' : 'other' });
   }
   return translate(bodyKey, { delivery });
 }

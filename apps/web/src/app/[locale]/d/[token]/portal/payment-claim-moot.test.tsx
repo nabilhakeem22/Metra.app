@@ -31,7 +31,7 @@ function Page() {
       <button type="button" hidden onClick={() => setClaim(CLAIMABLE)}>
         claimable again
       </button>
-      <PaymentsCard token="tok" schedule={SCHEDULE} claim={claim} details={null} timeline={[]} />
+      <PaymentsCard token="tok" schedule={SCHEDULE} claim={claim} details={null} receipts={[]} receiptsTruncated={false} />
     </>
   );
 }

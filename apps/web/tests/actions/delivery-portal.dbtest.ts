@@ -270,7 +270,7 @@ describe('delivery portal — the band appears only once it is issued (M31)', ()
     expect((await issueRomCore(ctx, { engagementId })).ok).toBe(true);
 
     const snapshot = await deliveryOrNull(token);
-    expect(snapshot!.rom).toEqual({ low: '500000.0000', high: '800000.0000' });
+    expect(snapshot!.rom).toEqual({ low: '500000.0000', high: '800000.0000', issuedAt: expect.any(String) });
     expect(snapshot!.clientActions).toContain('acknowledge_rom');
   });
 

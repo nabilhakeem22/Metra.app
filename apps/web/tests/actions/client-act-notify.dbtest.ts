@@ -1,7 +1,7 @@
 import { afterAll, describe, expect, it } from 'vitest';
 import { clientActOfVerb, paymentClaimedAct } from '@/lib/engagements/client-acts/acts';
 import { notifyStudioOfClientAct, withStudioNotified } from '@/lib/engagements/client-acts/notify';
-import { claimPaymentByToken, recordDeliveryActionByToken } from '@/lib/engagements/public';
+import { claimPaymentByToken } from '@/lib/engagements/public';
 import { revokeDeliveryLinkCore } from '@/lib/engagements/share';
 import { closeFixture, raw, teardown } from './fixture';
 import {
@@ -10,6 +10,7 @@ import {
   seedRoundBDelivery,
   type RoundBDelivery,
 } from './round-b-fixture';
+import { respondAsSeen } from './respond-as-seen';
 
 // Round B, B10 (AC 36): the portal's notifier wrapper against the real
 // app_delivery_notify_studio_by_token. The roles come from the permission
@@ -72,7 +73,7 @@ describe('notifyStudioOfClientAct', () => {
   it('a design act reaches owner, admin, PM and site engineer of that org, linked to the delivery', async () => {
     const studio = await seedStudio('b10-design');
     await forceState(studio.engagementId, 'final_approval');
-    const written = await recordDeliveryActionByToken(studio.token, { action: 'approve_design' });
+    const written = await respondAsSeen(studio.token, { action: 'approve_design' });
     expect(written).toEqual({ ok: true });
 
     expect(await withStudioNotified(studio.token, written, clientActOfVerb('approve_design'))).toEqual({
@@ -95,10 +96,10 @@ describe('notifyStudioOfClientAct', () => {
   it('an `already` repeat of a notified act says so and never notifies again; a real act bumps', async () => {
     const studio = await seedStudio('b10-repeat');
     await forceState(studio.engagementId, 'final_approval');
-    const first = await recordDeliveryActionByToken(studio.token, { action: 'approve_design' });
+    const first = await respondAsSeen(studio.token, { action: 'approve_design' });
     await withStudioNotified(studio.token, first, clientActOfVerb('approve_design'));
 
-    const repeat = await recordDeliveryActionByToken(studio.token, { action: 'approve_design' });
+    const repeat = await respondAsSeen(studio.token, { action: 'approve_design' });
     expect(repeat).toEqual({ ok: true, code: 'already' });
     expect(await withStudioNotified(studio.token, repeat, clientActOfVerb('approve_design'))).toEqual({
       ok: true,
@@ -143,12 +144,12 @@ describe('a repeat repairs a lost notification (0057, R3, AC 21)', () => {
     const studio = await seedStudio('b12-lost');
     await forceState(studio.engagementId, 'final_approval');
     // The act lands, the notifier "fails": nothing is written.
-    expect(await recordDeliveryActionByToken(studio.token, { action: 'approve_design' })).toEqual({
+    expect(await respondAsSeen(studio.token, { action: 'approve_design' })).toEqual({
       ok: true,
     });
     expect(await rowsOf(studio.orgId)).toEqual([]);
 
-    const repeat = await recordDeliveryActionByToken(studio.token, { action: 'approve_design' });
+    const repeat = await respondAsSeen(studio.token, { action: 'approve_design' });
     expect(await withStudioNotified(studio.token, repeat, clientActOfVerb('approve_design'))).toEqual({
       ok: true,
       code: 'already',
@@ -161,7 +162,7 @@ describe('a repeat repairs a lost notification (0057, R3, AC 21)', () => {
     expect(rows.every((row) => row.params.count === 1)).toBe(true);
 
     // A third tap finds the repaired notification and sends nothing more.
-    const third = await recordDeliveryActionByToken(studio.token, { action: 'approve_design' });
+    const third = await respondAsSeen(studio.token, { action: 'approve_design' });
     expect(await withStudioNotified(studio.token, third, clientActOfVerb('approve_design'))).toEqual({
       ok: true,
       code: 'already',

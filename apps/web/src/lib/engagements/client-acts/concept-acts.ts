@@ -72,9 +72,10 @@ export async function chooseConceptAndNotify(
  */
 export async function respondToConceptAndNotify(
   rawToken: string,
-  input: Omit<Parameters<typeof recordDeliveryActionByToken>[1], 'action'> & { action: ConceptVerb },
+  input: Omit<Parameters<typeof recordDeliveryActionByToken>[1], 'action' | 'expectedIssueAt'> & { action: ConceptVerb },
 ): Promise<ConceptChoiceOutcome> {
-  const result = await recordDeliveryActionByToken(rawToken, input);
+  // The concept verbs name no issuance: the SDF ignores the argument for them.
+  const result = await recordDeliveryActionByToken(rawToken, { ...input, expectedIssueAt: null });
   if (answersFromSaved(result)) return answerFromSaved(rawToken, await savedDelivery(rawToken));
   if (!result.ok) return { kind: 'error', error: portalErrorKey(result.error) };
   const { studioNotified } = await withStudioNotified(rawToken, result, clientActOfVerb(input.action));

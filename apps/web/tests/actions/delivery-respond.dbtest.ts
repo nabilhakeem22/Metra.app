@@ -7,9 +7,6 @@ import { createEngagementCore } from '@/lib/engagements/core';
 import { executeTransition } from '@/lib/engagements/executor';
 import { recordPaymentCore } from '@/lib/engagements/payments';
 import { getEngagementClientActivity } from '@/lib/engagements/queries';
-import {
-  recordDeliveryActionByToken,
-} from '@/lib/engagements/public';
 import { deliveryOrNull } from './delivery-read';
 import { setEngagementRomCore } from '@/lib/engagements/rom';
 import { issueRomCore } from '@/lib/engagements/rom-issue';
@@ -19,6 +16,7 @@ import { listProjects } from '@/lib/projects/queries';
 import type { GenerateFeeSchedulePayload } from '@/lib/engagements/transitions';
 import type { OrgContext } from '@/lib/db/context';
 import { closeFixture, ctxFor, raw, seedOrg, teardown } from './fixture';
+import { respondAsSeen } from './respond-as-seen';
 
 const orgIds: string[] = [];
 afterAll(async () => {
@@ -123,7 +121,7 @@ describe('app_delivery_respond_by_token — each action at its legal state', () 
     const { engagementId, token } = await seedDelivery('approve-concept');
     await forceState(engagementId, 'concept_review');
 
-    const res = await recordDeliveryActionByToken(token, {
+    const res = await respondAsSeen(token, {
       action: 'approve_concept',
       actorName: 'Client Sam',
     });
@@ -143,7 +141,7 @@ describe('app_delivery_respond_by_token — each action at its legal state', () 
     const { engagementId, token } = await seedDelivery('req-concept');
     await forceState(engagementId, 'concept_review');
 
-    const res = await recordDeliveryActionByToken(token, {
+    const res = await respondAsSeen(token, {
       action: 'request_concept_changes',
       note: 'please widen the kitchen',
     });
@@ -160,7 +158,7 @@ describe('app_delivery_respond_by_token — each action at its legal state', () 
     const { engagementId, token } = await seedDelivery('approve-design');
     await forceState(engagementId, 'final_approval');
 
-    const res = await recordDeliveryActionByToken(token, { action: 'approve_design' });
+    const res = await respondAsSeen(token, { action: 'approve_design' });
     expect(res).toEqual({ ok: true });
 
     const rows = await clientRows(engagementId);
@@ -173,7 +171,7 @@ describe('app_delivery_respond_by_token — each action at its legal state', () 
     const { engagementId, token } = await seedDelivery('req-design');
     await forceState(engagementId, 'final_approval');
 
-    const res = await recordDeliveryActionByToken(token, {
+    const res = await respondAsSeen(token, {
       action: 'request_design_changes',
     });
     expect(res).toEqual({ ok: true });
@@ -193,11 +191,11 @@ describe('app_delivery_respond_by_token — each action at its legal state', () 
     });
     // A band the client has not been SENT is not acknowledgeable.
     expect(
-      await recordDeliveryActionByToken(token, { action: 'acknowledge_rom' }),
+      await respondAsSeen(token, { action: 'acknowledge_rom' }),
     ).toEqual({ ok: false, error: 'wrong_state' });
     expect((await issueRomCore(ctx, { engagementId })).ok).toBe(true);
 
-    const res = await recordDeliveryActionByToken(token, { action: 'acknowledge_rom' });
+    const res = await respondAsSeen(token, { action: 'acknowledge_rom' });
     expect(res).toEqual({ ok: true });
 
     const rows = await clientRows(engagementId);
@@ -217,7 +215,7 @@ describe('app_delivery_respond_by_token — each action at its legal state', () 
     const { engagementId, token } = await seedDelivery('ack-handoff');
     await forceState(engagementId, 'design_only_handoff');
 
-    const res = await recordDeliveryActionByToken(token, {
+    const res = await respondAsSeen(token, {
       action: 'acknowledge_handoff',
     });
     expect(res).toEqual({ ok: true });
@@ -249,7 +247,7 @@ describe('app_delivery_respond_by_token — client_actions never leaks a raw sta
     }
 
     // After the client acts, the mapped surface no longer offers the pair.
-    await recordDeliveryActionByToken(token, { action: 'approve_concept' });
+    await respondAsSeen(token, { action: 'approve_concept' });
     const after = await deliveryOrNull(token);
     expect(after!.clientActions).not.toContain('approve_concept');
     expect(after!.clientActions).not.toContain('request_concept_changes');
@@ -262,14 +260,14 @@ describe('app_delivery_respond_by_token — wrong state / expired / terminal / u
     await forceState(engagementId, 'final_approval');
 
     // approve_concept requires concept_review — not final_approval.
-    const res = await recordDeliveryActionByToken(token, { action: 'approve_concept' });
+    const res = await respondAsSeen(token, { action: 'approve_concept' });
     expect(res).toEqual({ ok: false, error: 'wrong_state' });
     expect(await totalEventCount(engagementId)).toBe(0);
   });
 
   it('acknowledge_rom with no ROM band returns wrong_state, writes nothing', async () => {
     const { engagementId, token } = await seedDelivery('rom-unset');
-    const res = await recordDeliveryActionByToken(token, { action: 'acknowledge_rom' });
+    const res = await respondAsSeen(token, { action: 'acknowledge_rom' });
     expect(res).toEqual({ ok: false, error: 'wrong_state' });
     expect(await totalEventCount(engagementId)).toBe(0);
   });
@@ -277,7 +275,7 @@ describe('app_delivery_respond_by_token — wrong state / expired / terminal / u
   it('a terminal delivery returns not_active, writes nothing', async () => {
     const { engagementId, token } = await seedDelivery('terminal');
     await forceState(engagementId, 'abandoned');
-    const res = await recordDeliveryActionByToken(token, { action: 'approve_concept' });
+    const res = await respondAsSeen(token, { action: 'approve_concept' });
     expect(res).toEqual({ ok: false, error: 'not_active' });
     expect(await totalEventCount(engagementId)).toBe(0);
   });
@@ -290,13 +288,13 @@ describe('app_delivery_respond_by_token — wrong state / expired / terminal / u
          set share_expires_at = now() - interval '1 day'
        where id = '${engagementId}'`,
     );
-    const res = await recordDeliveryActionByToken(token, { action: 'approve_concept' });
+    const res = await respondAsSeen(token, { action: 'approve_concept' });
     expect(res).toEqual({ ok: false, error: 'token_expired' });
     expect(await totalEventCount(engagementId)).toBe(0);
   });
 
   it('an unknown token hash returns token_invalid', async () => {
-    const res = await recordDeliveryActionByToken('never-minted-token', {
+    const res = await respondAsSeen('never-minted-token', {
       action: 'approve_concept',
     });
     expect(res).toEqual({ ok: false, error: 'token_invalid' });
@@ -305,7 +303,7 @@ describe('app_delivery_respond_by_token — wrong state / expired / terminal / u
   it('an unknown action returns token_invalid, writes nothing', async () => {
     const { engagementId, token } = await seedDelivery('unknown-action');
     await forceState(engagementId, 'concept_review');
-    const res = await recordDeliveryActionByToken(token, { action: 'demolish' });
+    const res = await respondAsSeen(token, { action: 'demolish' });
     expect(res).toEqual({ ok: false, error: 'token_invalid' });
     expect(await totalEventCount(engagementId)).toBe(0);
   });
@@ -316,17 +314,17 @@ describe('app_delivery_respond_by_token — idempotency (repeat + concurrent)', 
     const { engagementId, token } = await seedDelivery('repeat');
     await forceState(engagementId, 'concept_review');
 
-    expect(await recordDeliveryActionByToken(token, { action: 'approve_concept' })).toEqual({
+    expect(await respondAsSeen(token, { action: 'approve_concept' })).toEqual({
       ok: true,
     });
     // Second identical submit — idempotent no-op.
-    expect(await recordDeliveryActionByToken(token, { action: 'approve_concept' })).toEqual({
+    expect(await respondAsSeen(token, { action: 'approve_concept' })).toEqual({
       ok: true,
       code: 'already',
     });
     // The paired request_concept_changes is now blocked too (group confirmed).
     expect(
-      await recordDeliveryActionByToken(token, { action: 'request_concept_changes' }),
+      await respondAsSeen(token, { action: 'request_concept_changes' }),
     ).toEqual({ ok: true, code: 'already' });
 
     expect(await clientRows(engagementId)).toHaveLength(1);
@@ -337,8 +335,8 @@ describe('app_delivery_respond_by_token — idempotency (repeat + concurrent)', 
     await forceState(engagementId, 'concept_review');
 
     const [a, b] = await Promise.all([
-      recordDeliveryActionByToken(token, { action: 'approve_concept' }),
-      recordDeliveryActionByToken(token, { action: 'approve_concept' }),
+      respondAsSeen(token, { action: 'approve_concept' }),
+      respondAsSeen(token, { action: 'approve_concept' }),
     ]);
     // Both resolve ok (one records, one maps unique_violation -> already).
     expect(a.ok).toBe(true);
@@ -354,13 +352,13 @@ describe('app_delivery_respond_by_token — cross-delivery isolation', () => {
     await forceState(a.engagementId, 'concept_review');
     await forceState(b.engagementId, 'concept_review');
 
-    await recordDeliveryActionByToken(a.token, { action: 'approve_concept' });
+    await respondAsSeen(a.token, { action: 'approve_concept' });
 
     expect(await clientRows(a.engagementId)).toHaveLength(1);
     expect(await clientRows(b.engagementId)).toHaveLength(0);
 
     // B's token records only against B.
-    await recordDeliveryActionByToken(b.token, { action: 'request_concept_changes' });
+    await respondAsSeen(b.token, { action: 'request_concept_changes' });
     const bRows = await clientRows(b.engagementId);
     expect(bRows).toHaveLength(1);
     expect(bRows[0].kind).toBe('concept_change_request');
@@ -446,7 +444,7 @@ describe('client ROM ack satisfies the existing romAcknowledged guard (no new gu
     expect((await issueRomCore(ctx, { engagementId })).ok).toBe(true);
 
     // The CLIENT acknowledges the ROM via the token path (not the staff core).
-    const ack = await recordDeliveryActionByToken(token, { action: 'acknowledge_rom' });
+    const ack = await respondAsSeen(token, { action: 'acknowledge_rom' });
     expect(ack).toEqual({ ok: true });
 
     // No staff-recorded rom_acknowledgement exists — only the client one.
@@ -483,7 +481,7 @@ describe('client ROM ack satisfies the existing romAcknowledged guard (no new gu
     );
     expect(row.actor_channel).toBe('staff');
     // A client ack can still be recorded independently (distinct channel).
-    const clientAck = await recordDeliveryActionByToken(token, {
+    const clientAck = await respondAsSeen(token, {
       action: 'acknowledge_rom',
     });
     expect(clientAck).toEqual({ ok: true });
@@ -503,11 +501,11 @@ describe('delivery respond — an acknowledgement answers ONE issuance (0049)', 
 
     // 1. The client acknowledges what they were shown.
     expect(
-      await recordDeliveryActionByToken(token, { action: 'acknowledge_rom' }),
+      await respondAsSeen(token, { action: 'acknowledge_rom' }),
     ).toEqual({ ok: true });
     // A repeat of the SAME issuance is still a no-op — one row, not two.
     expect(
-      await recordDeliveryActionByToken(token, { action: 'acknowledge_rom' }),
+      await respondAsSeen(token, { action: 'acknowledge_rom' }),
     ).toEqual({ ok: true, code: 'already' });
     expect(await romAckRows(engagementId)).toHaveLength(1);
     expect(
@@ -526,12 +524,12 @@ describe('delivery respond — an acknowledgement answers ONE issuance (0049)', 
     // asks again. Before 0049 the stale acknowledgement suppressed the verb and
     // the record said the client had agreed to a band they never saw.
     const reOffered = await deliveryOrNull(token);
-    expect(reOffered!.rom).toEqual({ low: '900000.0000', high: '1400000.0000' });
+    expect(reOffered!.rom).toEqual({ low: '900000.0000', high: '1400000.0000', issuedAt: expect.any(String) });
     expect(reOffered!.clientActions).toContain('acknowledge_rom');
 
     // 4. And the second acknowledgement actually writes, against the new instant.
     expect(
-      await recordDeliveryActionByToken(token, { action: 'acknowledge_rom' }),
+      await respondAsSeen(token, { action: 'acknowledge_rom' }),
     ).toEqual({ ok: true });
 
     const rows = await romAckRows(engagementId);
@@ -592,7 +590,7 @@ describe('delivery respond — an acknowledgement answers ONE issuance (0049)', 
     });
     expect((await issueRomCore(ctx, { engagementId })).ok).toBe(true);
     expect(
-      await recordDeliveryActionByToken(token, { action: 'acknowledge_rom' }),
+      await respondAsSeen(token, { action: 'acknowledge_rom' }),
     ).toEqual({ ok: true });
 
     // Age the row into a pre-0049 shape (BYPASSRLS, as the fixture does elsewhere).
@@ -605,7 +603,7 @@ describe('delivery respond — an acknowledgement answers ONE issuance (0049)', 
       (await deliveryOrNull(token))!.clientActions,
     ).toContain('acknowledge_rom');
     expect(
-      await recordDeliveryActionByToken(token, { action: 'acknowledge_rom' }),
+      await respondAsSeen(token, { action: 'acknowledge_rom' }),
     ).toEqual({ ok: true });
     expect(await romAckRows(engagementId)).toHaveLength(2);
   });

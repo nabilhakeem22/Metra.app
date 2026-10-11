@@ -20,7 +20,7 @@ vi.mock('@/lib/db/client', () => ({
     }),
 }));
 
-const { chooseConceptByToken } = await import('./respond');
+const { chooseConceptByToken, recordDeliveryActionByToken } = await import('./respond');
 const { hashShareToken } = await import('@/lib/share/token');
 
 const OPTION = '11111111-1111-4111-8111-111111111111';
@@ -92,4 +92,46 @@ describe('chooseConceptByToken', () => {
     expect(await chooseConceptByToken('raw', input)).toEqual({ ok: false, error: 'wrong_state' });
     expect(dbState.queries).toEqual([]);
   });
+});
+
+describe('recordDeliveryActionByToken (Round D, the consent guard)', () => {
+  const STAMP = '2026-10-10T10:00:00.123456+03:00';
+
+  it('binds the issuance the client saw as the exact string, third of seven', async () => {
+    expect(
+      await recordDeliveryActionByToken(' raw-token ', {
+        action: 'acknowledge_rom',
+        expectedIssueAt: STAMP,
+        note: null,
+        actorName: 'Sam',
+        ip: '1.2.3.4',
+        userAgent: 'probe/1',
+      }),
+    ).toEqual({ ok: true });
+    expect(boundValues(dbState.queries[0] as SQL)).toEqual([
+      hashShareToken('raw-token'),
+      'acknowledge_rom',
+      STAMP,
+      null,
+      'Sam',
+      '1.2.3.4',
+      'probe/1',
+    ]);
+  });
+
+  it('null is bound as null (the verbs that name no issuance, a legacy round)', async () => {
+    await recordDeliveryActionByToken('raw', { action: 'acknowledge_handoff', expectedIssueAt: null });
+    expect(boundValues(dbState.queries[0] as SQL)[2]).toBeNull();
+  });
+
+  it.each(['yesterday', '2026-10-10', `${STAMP}; select 1`, '2026-10-10T10:00:00.123456789Z'])(
+    'a non-stamp (%s) is wrong_state and never reaches SQL',
+    async (expectedIssueAt) => {
+      expect(await recordDeliveryActionByToken('raw', { action: 'approve_design', expectedIssueAt })).toEqual({
+        ok: false,
+        error: 'wrong_state',
+      });
+      expect(dbState.queries).toEqual([]);
+    },
+  );
 });

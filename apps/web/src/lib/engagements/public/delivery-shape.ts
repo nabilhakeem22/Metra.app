@@ -13,10 +13,11 @@ import { awaitsPaymentNow } from '../portal-payments';
 import { PORTAL_STAGE_KEY } from '../portal-stage';
 import type { DesignState } from '../states';
 import { parseConceptChoice, parseConceptDecision, parseConceptOptions } from './concept-rows';
+import { parseReceipts } from './receipt-rows';
 import { parseDesignDecision } from './review-rows';
 import { STATE_SET, type DeliverySnapshot } from './row-guards';
 import { shapeClientActions, shapeDocuments, shapePaymentClaim, shapeSchedule } from './shape-lists';
-import { calendarDay, isoInstant, newestInstant } from './snapshot-values';
+import { calendarDay, isoInstant, issuanceStamp, newestInstant } from './snapshot-values';
 import { parseFirm, parsePaymentDetails } from './studio-rows';
 import { parseTimeline } from './timeline-rows';
 import type { PublicDelivery } from './types';
@@ -51,10 +52,16 @@ function shapeClient(snapshot: DeliverySnapshot): PublicDelivery['client'] {
   return { nameAr: client.name_ar ?? null, nameEn: client.name_en ?? null };
 }
 
-/** The money side: the schedule, what may be claimed, and where to pay while something may. */
+/** The issued band and the issuance it is, or null: a band without a usable stamp cannot be acknowledged. */
+function shapeRom(rom: DeliverySnapshot['rom']): PublicDelivery['rom'] {
+  const issuedAt = issuanceStamp(rom?.issued_at);
+  return rom && issuedAt ? { low: rom.low ?? null, high: rom.high ?? null, issuedAt } : null;
+}
+
+/** The money side: the schedule, what may be claimed, where to pay while something may, and what was received. */
 function shapePayments(
   snapshot: DeliverySnapshot,
-): Pick<PublicDelivery, 'paymentSchedule' | 'paymentClaim' | 'paymentDetails'> {
+): Pick<PublicDelivery, 'paymentSchedule' | 'paymentClaim' | 'paymentDetails' | 'receipts' | 'receiptsTruncated'> {
   const paymentClaim = shapePaymentClaim(snapshot);
   const paymentSchedule = shapeSchedule(snapshot);
   return {
@@ -63,6 +70,8 @@ function shapePayments(
     // Only while the card would show "How to pay": a payment due NOW and still
     // claimable. A later milestone alone never puts the details in the browser.
     paymentDetails: parsePaymentDetails(snapshot.payment_details, awaitsPaymentNow(paymentSchedule, paymentClaim)),
+    receipts: parseReceipts(snapshot.receipts),
+    receiptsTruncated: snapshot.receipts_truncated === true,
   };
 }
 
@@ -97,7 +106,6 @@ export function shapeDelivery(snapshot: DeliverySnapshot): PublicDelivery | null
 
   const clientActions = shapeClientActions(snapshot);
   const documents = shapeDocuments(snapshot);
-  const rom = snapshot.rom;
   return {
     ...identity,
     stageKey: PORTAL_STAGE_KEY[state],
@@ -108,7 +116,8 @@ export function shapeDelivery(snapshot: DeliverySnapshot): PublicDelivery | null
     titleEn: snapshot.title_en ?? null,
     createdAt: snapshot.created_at ?? null,
     designFeeTotal: snapshot.design_fee_total ?? null,
-    rom: rom ? { low: rom.low ?? null, high: rom.high ?? null } : null,
+    rom: shapeRom(snapshot.rom),
+    rendersIssuedAt: issuanceStamp(snapshot.renders_issued_at),
     shareExpiresAt: snapshot.share_expires_at ?? null,
     firm: parseFirm(snapshot.firm),
     client: shapeClient(snapshot),

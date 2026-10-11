@@ -34,7 +34,8 @@ const render = (n: number): PortalDocument => ({
   media: 'image',
 });
 const RENDERS = [1, 2, 3, 4, 5].map(render);
-const ROM = { low: '900000.0000', high: '1200000.0000' };
+const ROM = { low: '900000.0000', high: '1200000.0000', issuedAt: '2026-09-01T09:00:00.123456+00:00' };
+const ROUND_ISSUED_AT = '2026-09-02T09:00:00.000001+03:00';
 
 beforeEach(() => {
   picturesStillLoading();
@@ -76,8 +77,8 @@ describe('work the client cannot see yet (F8)', () => {
 
 describe('approve with the budget (AC 54)', () => {
   it('the dialog shows the range and says so; Confirm sends ONE approveDesignWithBudget', async () => {
-    actions.approveDesignWithBudget.mockResolvedValue({ kind: 'approved', studioNotified: true, budgetAcknowledged: true });
-    renderCommandCard({ hero: DESIGN, clientActions: [...VERBS, 'acknowledge_rom'], stageKey: 'finalApproval', rom: ROM });
+    actions.approveDesignWithBudget.mockResolvedValue({ kind: 'approved', studioNotified: true, budget: 'acknowledged' });
+    renderCommandCard({ hero: DESIGN, clientActions: [...VERBS, 'acknowledge_rom'], stageKey: 'finalApproval', rom: ROM, rendersIssuedAt: ROUND_ISSUED_AT });
     fireEvent.click(screen.getByRole('button', { name: en('delivery.hero.design.approve') }));
     const dialog = await confirmDialog();
     expect(within(dialog).getByText(en('delivery.hero.design.confirmWithBudget'))).toBeTruthy();
@@ -85,8 +86,8 @@ describe('approve with the budget (AC 54)', () => {
     await answerDialog('en', 'confirm');
     await act(async () => {});
     expect(actions.approveDesignWithBudget).toHaveBeenCalledTimes(1);
-    // F1: the band and the round this dialog showed travel with the act.
-    expect(actions.approveDesignWithBudget).toHaveBeenCalledWith('tok', '', { band: '900000.0000..1200000.0000', round: '|' });
+    // Round D: the band issuance and the render round this dialog showed travel with the act.
+    expect(actions.approveDesignWithBudget).toHaveBeenCalledWith('tok', '', { romIssuedAt: ROM.issuedAt, rendersIssuedAt: ROUND_ISSUED_AT });
     expect(actions.respondToDeliveryDesign).not.toHaveBeenCalled();
     expect(screen.getByText(en('delivery.hero.design.budgetAcknowledged'))).toBeTruthy();
   });

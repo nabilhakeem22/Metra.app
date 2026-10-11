@@ -9,7 +9,6 @@ import { executeTransition } from '@/lib/engagements/executor';
 import { getEngagementGatePreview } from '@/lib/engagements/gate-preview';
 import { recordOfflineApprovalCore } from '@/lib/engagements/offline-approval-core';
 import { recordPaymentCore } from '@/lib/engagements/payments';
-import { recordDeliveryActionByToken } from '@/lib/engagements/public';
 import { setEngagementRomCore } from '@/lib/engagements/rom';
 import { issueRomCore } from '@/lib/engagements/rom-issue';
 import { mintDeliveryLinkCore } from '@/lib/engagements/share';
@@ -19,6 +18,7 @@ import { listProjects } from '@/lib/projects/queries';
 import { hashShareToken } from '@/lib/share/token';
 import { closeFixture, ctxFor, raw, seedOrg, teardown } from './fixture';
 import { clientActionsOf } from './round-b-fixture';
+import { respondAsSeen } from './respond-as-seen';
 
 // Round B gate follow-ups, through the REAL paths on both sides:
 //   * a design review pushed into round 2 by the client (request changes on the
@@ -152,7 +152,7 @@ describe('a design review pushed into round 2 (studio rule vs portal)', () => {
     });
 
     // The client asks for changes on the portal: round 1 is answered on both sides.
-    expect(await recordDeliveryActionByToken(token, { action: 'request_design_changes' })).toEqual({
+    expect(await respondAsSeen(token, { action: 'request_design_changes' })).toEqual({
       ok: true,
     });
     expect(await bothSides(seeded)).toEqual({
@@ -181,7 +181,7 @@ describe('a design review pushed into round 2 (studio rule vs portal)', () => {
     });
 
     // The client approves round 2.
-    expect(await recordDeliveryActionByToken(token, { action: 'approve_design' })).toEqual({ ok: true });
+    expect(await respondAsSeen(token, { action: 'approve_design' })).toEqual({ ok: true });
     expect(await bothSides(seeded)).toEqual({
       studioWaiting: false,
       studioDecision: 'design_approval',
@@ -195,7 +195,7 @@ describe('R3: Client approved offline after the client answered', () => {
     const seeded = await seedConceptReview();
     const { ctx, engagementId, token } = seeded;
     await recordPaymentCore(ctx, { engagementId, kind: 'gate_a', amount: '20000' });
-    expect(await recordDeliveryActionByToken(token, { action: 'request_concept_changes' })).toEqual({
+    expect(await respondAsSeen(token, { action: 'request_concept_changes' })).toEqual({
       ok: true,
     });
 
@@ -212,7 +212,7 @@ describe('R3: Client approved offline after the client answered', () => {
   it('final_approval: a portal decision in THIS round refuses it', async () => {
     const seeded = await seedFinalApproval();
     const { ctx, engagementId, token } = seeded;
-    expect(await recordDeliveryActionByToken(token, { action: 'request_design_changes' })).toEqual({
+    expect(await respondAsSeen(token, { action: 'request_design_changes' })).toEqual({
       ok: true,
     });
 
@@ -229,7 +229,7 @@ describe('R3: Client approved offline after the client answered', () => {
   it("final_approval: an answer to an EARLIER round does not block round 2's offline approval", async () => {
     const seeded = await seedFinalApproval();
     const { ctx, engagementId, token } = seeded;
-    expect(await recordDeliveryActionByToken(token, { action: 'request_design_changes' })).toEqual({
+    expect(await respondAsSeen(token, { action: 'request_design_changes' })).toEqual({
       ok: true,
     });
     expect((await executeTransition(ctx, { engagementId, trigger: 'designChangeRaised' })).ok).toBe(true);
@@ -248,7 +248,7 @@ describe('R3: Client approved offline after the client answered', () => {
   it("the studio's own Advance (no payload) is not re-checked: decision 4 keeps approval advisory", async () => {
     const seeded = await seedFinalApproval();
     const { ctx, engagementId, token } = seeded;
-    expect(await recordDeliveryActionByToken(token, { action: 'request_design_changes' })).toEqual({
+    expect(await respondAsSeen(token, { action: 'request_design_changes' })).toEqual({
       ok: true,
     });
     expect((await executeTransition(ctx, { engagementId, trigger: 'approveDesign' })).ok).toBe(true);

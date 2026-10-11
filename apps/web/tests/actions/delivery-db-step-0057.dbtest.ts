@@ -1,7 +1,7 @@
 import { sqlstateOf } from '@metra/db/sqlstate';
 import { afterAll, describe, expect, it } from 'vitest';
 import { withOrgContext } from '@/lib/db/context';
-import { claimPaymentByToken, recordDeliveryActionByToken } from '@/lib/engagements/public';
+import { claimPaymentByToken } from '@/lib/engagements/public';
 import { getEngagementArtifacts } from '@/lib/engagements/queries';
 import { conceptOptionPositions } from '@/lib/engagements/queries/concept-positions';
 import { revokeDeliveryLinkCore } from '@/lib/engagements/share';
@@ -19,6 +19,7 @@ import {
   stampRenders,
   type RoundBDelivery,
 } from './round-b-fixture';
+import { respondAsSeen } from './respond-as-seen';
 
 // Round B, PR-B12: migration 0057 and its apply-rls changes.
 //   * letters rank only VISIBLE, file-bearing options, A to D, by ONE SQL rule
@@ -236,7 +237,7 @@ describe('app_delivery_act_notified_by_token (AC 10)', () => {
     await forceState(d.engagementId, 'final_approval');
     await stampRenders(d.engagementId, `now() - interval '1 hour'`);
     expect(await notifiedFor(d.hash, 'client_design_approved')).toBeNull();
-    expect(await recordDeliveryActionByToken(d.token, { action: 'approve_design' })).toEqual({ ok: true });
+    expect(await respondAsSeen(d.token, { action: 'approve_design' })).toEqual({ ok: true });
     expect(await notifiedFor(d.hash, 'client_design_approved')).toBe(false);
 
     await notifyOwner(d.hash, 'client_design_approved');
@@ -270,7 +271,7 @@ describe('app_delivery_act_notified_by_token (AC 10)', () => {
       `update public.notifications set created_at = now() - interval '1 day' where org_id = '${d.orgId}'`,
     );
     expect(
-      await recordDeliveryActionByToken(d.token, { action: 'acknowledge_handoff' }),
+      await respondAsSeen(d.token, { action: 'acknowledge_handoff' }),
     ).toEqual({ ok: true });
     expect(await notifiedFor(d.hash, 'client_handover_acknowledged')).toBe(false);
   });
@@ -293,7 +294,7 @@ describe('app_delivery_act_notified_by_token (AC 10)', () => {
   it('answers null for a comment, an unknown key, and an expired or revoked link', async () => {
     const d = await seedRoundBDelivery(orgIds, 'predicate-null');
     await forceState(d.engagementId, 'design_only_handoff');
-    expect(await recordDeliveryActionByToken(d.token, { action: 'acknowledge_handoff' })).toEqual({
+    expect(await respondAsSeen(d.token, { action: 'acknowledge_handoff' })).toEqual({
       ok: true,
     });
     await notifyOwner(d.hash, 'client_handover_acknowledged');

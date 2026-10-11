@@ -38,7 +38,7 @@ function renderCard(
   claim: PublicDelivery['paymentClaim'],
   locale: TestLocale = 'en',
 ) {
-  return renderWithIntl(<PaymentsCard token="tok" schedule={schedule} claim={claim} details={null} timeline={[]} />, { locale });
+  return renderWithIntl(<PaymentsCard token="tok" schedule={schedule} claim={claim} details={null} receipts={[]} receiptsTruncated={false} />, { locale });
 }
 
 const claimButtons = (locale: TestLocale) =>

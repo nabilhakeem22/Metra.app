@@ -25,6 +25,11 @@ export interface ClientAct {
   kind: ClientActKind;
   /** Only on `payment_claimed`: the milestone the client marked as paid. */
   milestoneKind?: MilestoneKind;
+  /** Only on `design_approved`, from the one-tap approve+budget (Round D): the
+   *  budget acknowledgement of the same tap was NOT saved, so the studio's
+   *  sentence says the range still waits. The repeat-tap repair and the hourly
+   *  sweep never set it: a repaired notification reads as a plain approval. */
+  budgetPending?: true;
 }
 
 /** The notification body key of each act: the nine keys the notifier allows. */
@@ -83,7 +88,10 @@ export function recipientRolesFor(act: ClientAct): MemberRole[] {
 
 /** The params the notification carries beyond the delivery's own identity. */
 export function clientActParams(act: ClientAct): Record<string, string> {
-  return act.milestoneKind ? { milestoneKind: act.milestoneKind } : {};
+  return {
+    ...(act.milestoneKind ? { milestoneKind: act.milestoneKind } : {}),
+    ...(act.budgetPending && act.kind === 'design_approved' ? { budget: 'pending' } : {}),
+  };
 }
 
 /**

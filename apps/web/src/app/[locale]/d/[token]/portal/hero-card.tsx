@@ -22,10 +22,19 @@ export interface HeroLastAnswer {
 
 /** What the hero reads off the delivery: the verbs on offer, the concept
  *  options and the decision on file, the work to look at (the released
- *  pictures) and the budget range, the expected day and the story so far. */
+ *  pictures), the budget range and the render round (the issuances an act
+ *  names), the expected day and the story so far. */
 export type HeroReview = Pick<
   PublicDelivery,
-  'clientActions' | 'conceptOptions' | 'conceptChoice' | 'conceptDecision' | 'documents' | 'rom' | 'expectedOn' | 'timeline'
+  | 'clientActions'
+  | 'conceptOptions'
+  | 'conceptChoice'
+  | 'conceptDecision'
+  | 'documents'
+  | 'rom'
+  | 'rendersIssuedAt'
+  | 'expectedOn'
+  | 'timeline'
 >;
 
 /**

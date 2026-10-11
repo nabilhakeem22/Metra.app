@@ -7,10 +7,10 @@ import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { OrgContext } from '@/lib/db/context';
 import { runHandoverCloser } from '@/lib/automation/handover-closer';
 import { HANDOVER_CLOSE_WAIT_MS, closeHandoverByToken, withHandoverClose } from '@/lib/engagements/client-acts/handover-close';
-import { recordDeliveryActionByToken } from '@/lib/engagements/public';
 import { closeFixture, raw, teardown } from './fixture';
 import { closeAudit, closeRows, closerDeps, stateOf } from './handover-fixture';
 import { forceState, seedRoundBDelivery } from './round-b-fixture';
+import { respondAsSeen } from './respond-as-seen';
 
 const failing = vi.hoisted(() => ({ systemActor: false }));
 
@@ -42,7 +42,7 @@ async function atHandover(suffix: string) {
 
 /** The portal's own path: the token write, then the close that follows it. */
 async function confirmHandover(token: string) {
-  const result = await recordDeliveryActionByToken(token, { action: 'acknowledge_handoff' });
+  const result = await respondAsSeen(token, { action: 'acknowledge_handoff' });
   return withHandoverClose(token, 'acknowledge_handoff', result, async () => result);
 }
 
@@ -119,7 +119,7 @@ describe('withHandoverClose (AC 57)', () => {
 describe('withHandoverClose: the answer waits for the slower of notify and close, capped (F7)', () => {
   it('runs the notification alongside the close, not after it', async () => {
     const d = await atHandover('close-parallel');
-    await recordDeliveryActionByToken(d.token, { action: 'acknowledge_handoff' });
+    await respondAsSeen(d.token, { action: 'acknowledge_handoff' });
     let closedWhenNotifyStarted: string | null = null;
     await withHandoverClose(d.token, 'acknowledge_handoff', { ok: true }, async () => {
       closedWhenNotifyStarted = await stateOf(d.engagementId);
@@ -132,7 +132,7 @@ describe('withHandoverClose: the answer waits for the slower of notify and close
 
   it(`answers within ${HANDOVER_CLOSE_WAIT_MS} ms of a slow notification, and the close still lands`, async () => {
     const d = await atHandover('close-capped');
-    await recordDeliveryActionByToken(d.token, { action: 'acknowledge_handoff' });
+    await respondAsSeen(d.token, { action: 'acknowledge_handoff' });
     const started = Date.now();
     await withHandoverClose(d.token, 'acknowledge_handoff', { ok: true }, async () => 'notified');
     expect(Date.now() - started).toBeLessThan(HANDOVER_CLOSE_WAIT_MS + 500);
