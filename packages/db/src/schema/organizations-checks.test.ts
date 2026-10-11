@@ -54,7 +54,8 @@ describe('NOT_VISIBLE (0059)', () => {
 });
 
 describe('the migration and the schema say the same thing', () => {
-  const migration = readFileSync(resolve(here, '../../migrations/0059_client_page_checks_tightened.sql'), 'utf8');
+  const migration = readFileSync(resolve(here, '../../migrations/0059_client_page_checks_tightened.sql'), 'utf8')
+    .replace(/\r\n/g, '\n');
 
   for (const name of [
     'organizations_studio_phone_format',
