@@ -2,6 +2,7 @@ import { act, fireEvent, screen, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PortalDocument } from '@/lib/engagements/portal-gallery';
 import { answerDialog, confirmDialog, renderCommandCard } from '@/test/portal-command-card';
+import { picturesStillLoading } from '@/test/picture-loading';
 import { messageAt } from '@/test/render-with-intl';
 
 // AC 53 to 56 on the page: the design hero shows the renders under Approve and
@@ -36,6 +37,7 @@ const RENDERS = [1, 2, 3, 4, 5].map(render);
 const ROM = { low: '900000.0000', high: '1200000.0000' };
 
 beforeEach(() => {
+  picturesStillLoading();
   for (const action of Object.values(actions)) action.mockReset();
   router.refresh.mockReset();
 });

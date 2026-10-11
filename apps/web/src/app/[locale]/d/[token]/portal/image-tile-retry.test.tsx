@@ -1,6 +1,7 @@
 import { act, cleanup, fireEvent } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PortalDocument } from '@/lib/engagements/portal-gallery';
+import { picturesStillLoading } from '@/test/picture-loading';
 import { renderWithIntl } from '@/test/render-with-intl';
 import { ImageTile } from './image-tile';
 import { PICTURE_RETRY_DELAY_MS } from './use-picture-retry';
@@ -22,8 +23,14 @@ function renderTile(locale: 'en' | 'ar-EG' = 'en') {
   return renderWithIntl(<ImageTile token="tok" image={IMAGE} onOpen={() => {}} />, { locale });
 }
 
-beforeEach(() => vi.useFakeTimers());
-afterEach(() => vi.useRealTimers());
+beforeEach(() => {
+  vi.useFakeTimers();
+  picturesStillLoading();
+});
+afterEach(() => {
+  vi.useRealTimers();
+  vi.restoreAllMocks();
+});
 
 describe('ImageTile retry', () => {
   it('waits at most 60 s', () => {

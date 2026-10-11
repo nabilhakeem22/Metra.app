@@ -60,6 +60,7 @@ export function ImageTile({
       ) : (
         <img
           key={picture.attempt}
+          ref={picture.pictureRef}
           src={pictureUrl(token, image.id, 'thumb')}
           alt={label}
           loading="lazy"

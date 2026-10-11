@@ -9,7 +9,10 @@ import { tokenPathSegment } from './portal-path';
 // failed DOWNLOAD lands on, which a picture never shows). Building every
 // picture URL under the page's own locale made a language switch miss the
 // browser cache and re-spend the link's read budget on every picture already
-// loaded. One segment keeps the private 240 s cache across a switch.
+// loaded. One segment keeps the private 240 s cache across a switch for tiles,
+// the hero thumbnail, the logo and preview-mode views. ACCEPTED exception: a
+// PAID client's lightbox view is a 302 to a signed storage URL, sent no-store
+// because a signed URL must never be cached, so each display spends one read.
 //
 // The middleware skips locale negotiation for these paths
 // (isPortalPicturePath): next-intl would otherwise set the visitor's locale

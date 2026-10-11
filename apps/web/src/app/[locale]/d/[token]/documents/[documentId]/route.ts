@@ -39,15 +39,21 @@ function isLocale(value: string): boolean {
   return (LOCALES as readonly string[]).includes(value);
 }
 
+/** A PICTURE fetch (an `<img>`), not a link the client followed: a gallery tile, or anything the browser fetches as an image. */
+function isPictureFetch(request: NextRequest): boolean {
+  return request.headers.get('sec-fetch-dest') === 'image' || request.nextUrl.searchParams.get('variant') === 'thumb';
+}
+
 /**
- * The locale of the page a failure lands on: the visitor's own (their locale
- * cookie), then the path's. A picture is fetched under one fixed locale segment
- * (lib/engagements/portal-picture-path.ts) and an `<img>` follows this redirect,
- * so landing on the path's locale would reset an English visitor's cookie.
+ * The locale of the page a failure lands on. A LINK the client followed lands
+ * in its own page's locale (the path's). A PICTURE is fetched under one fixed
+ * locale segment (lib/engagements/portal-picture-path.ts) and the `<img>`
+ * follows this redirect, so it lands on the visitor's own locale (their locale
+ * cookie) instead, or landing would reset an English visitor's cookie.
  */
 function landingLocale(request: NextRequest, locale: string): string {
   const visitorLocale = request.cookies.get(LOCALE_COOKIE_NAME)?.value;
-  if (visitorLocale && isLocale(visitorLocale)) return visitorLocale;
+  if (isPictureFetch(request) && visitorLocale && isLocale(visitorLocale)) return visitorLocale;
   return isLocale(locale) ? locale : routing.defaultLocale;
 }
 

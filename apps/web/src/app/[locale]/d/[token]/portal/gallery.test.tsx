@@ -1,6 +1,7 @@
 import { fireEvent, screen, within } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PortalDocument } from '@/lib/engagements/portal-gallery';
+import { picturesStillLoading } from '@/test/picture-loading';
 import { messageAt, renderWithIntl, type TestLocale } from '@/test/render-with-intl';
 import { DocumentsCard } from './documents-card';
 
@@ -27,6 +28,8 @@ function renderCard(locale: TestLocale = 'en') {
 }
 
 const thumbs = () => [...document.querySelectorAll('img')].map((image) => image.getAttribute('src'));
+
+beforeEach(picturesStillLoading);
 
 describe('the gallery', () => {
   it('tiles only previewable images, through the thumb variant; the withheld one and the PDF stay rows', () => {

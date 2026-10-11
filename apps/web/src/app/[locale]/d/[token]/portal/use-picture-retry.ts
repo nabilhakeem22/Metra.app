@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState, type RefObject } from 'react';
 import { PORTAL_RETRY_AFTER_SECONDS } from '@/lib/share/portal-retry-after';
 
 /** The longest a failed picture waits before its one retry. */
@@ -16,6 +16,8 @@ export interface PictureRetry {
   showPicture: boolean;
   /** A key for the `<img>`, so the retry is a fresh element and a fresh request. */
   attempt: number;
+  /** The `<img>` itself, for the failed-before-hydration check. */
+  pictureRef: RefObject<HTMLImageElement | null>;
   onError: () => void;
 }
 
@@ -26,9 +28,20 @@ export interface PictureRetry {
  * first failure shows the placeholder, waits the routes' Retry-After and tries
  * once more; a really broken picture costs one more read, then the placeholder
  * stays. The timer exists only while the tile is mounted.
+ *
+ * A picture that failed BEFORE hydration fired its error with no listener
+ * attached, and React does not replay it; so, as the studio mark does, each
+ * mounted `<img>` is checked once: loaded with no pixels is a failure. A lazy
+ * picture that has not started yet is not `complete`, so it is left alone.
  */
 export function usePictureRetry(): PictureRetry {
   const [attempt, setAttempt] = useState<PictureAttempt>('first');
+  const pictureRef = useRef<HTMLImageElement>(null);
+  const onError = () => setAttempt((current) => (current === 'first' ? 'waiting' : 'failed'));
+  useEffect(() => {
+    const picture = pictureRef.current;
+    if (picture?.complete && picture.naturalWidth === 0) onError();
+  }, [attempt]);
   useEffect(() => {
     if (attempt !== 'waiting') return;
     const timer = setTimeout(() => setAttempt('retry'), PICTURE_RETRY_DELAY_MS);
@@ -37,6 +50,7 @@ export function usePictureRetry(): PictureRetry {
   return {
     showPicture: attempt === 'first' || attempt === 'retry',
     attempt: attempt === 'retry' ? 1 : 0,
-    onError: () => setAttempt((current) => (current === 'first' ? 'waiting' : 'failed')),
+    pictureRef,
+    onError,
   };
 }

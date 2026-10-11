@@ -2,17 +2,17 @@
 
 import { Loader2, MessageSquare, Send } from 'lucide-react';
 import { useCallback } from 'react';
-import { useLocale, useTranslations } from 'next-intl';
+import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
 import {
   listDocumentComments,
   replyToDocument,
 } from '@/lib/engagements/actions/deliverables';
 import type { StudioDocumentComment } from '@/lib/engagements/document-comments';
+import { ownStudioReply } from '@/lib/engagements/studio-reply-echo';
 import { useDocumentThread } from '@/lib/engagements/use-document-thread';
-import { bidiIsolate } from '@/lib/format/bidi';
-import { formatDate } from '@/lib/format/date';
 import { Textarea } from '@/components/ui/textarea';
+import { DocumentThreadPanelBody } from './document-thread-panel-body';
 
 /** Mirrors the SDF cap and the table's CHECK. Enforced here so the studio sees the
  *  limit while typing rather than after a rejected send. */
@@ -28,7 +28,10 @@ const BODY_MAX = 2000;
  * the command card is derived from these messages, so it falls when the studio
  * REPLIES — opening a thread deliberately does not clear it.
  *
- * Logical CSS only, so it mirrors in ar-EG RTL; dates sit inside a bidi isolate.
+ * A reply whose re-read fails stays on screen (ownStudioReply), and a read that
+ * fails says so to every viewer, reply rights or not.
+ *
+ * Logical CSS only, so it mirrors in ar-EG RTL.
  */
 export function DocumentThreadPanel({
   artifactId,
@@ -38,14 +41,13 @@ export function DocumentThreadPanel({
   canReply: boolean;
 }) {
   const t = useTranslations('engagements.comments');
-  const locale = useLocale();
 
   const load = useCallback(() => listDocumentComments(artifactId), [artifactId]);
   const submit = useCallback(
     (body: string) => replyToDocument({ artifactId, body }),
     [artifactId],
   );
-  const thread = useDocumentThread<StudioDocumentComment>({ load, send: submit });
+  const thread = useDocumentThread<StudioDocumentComment>({ load, send: submit, echo: ownStudioReply });
 
   // Unanswered on THIS thread: client messages with no staff message after them.
   // The same rule as countAwaitingReplyCore, applied to the thread already in hand.
@@ -81,39 +83,7 @@ export function DocumentThreadPanel({
 
       {thread.open && (
         <div className="mt-2 space-y-3 rounded-item border border-[color:var(--rule)] bg-[color:var(--track)] p-3">
-          {thread.loading && !thread.loaded ? (
-            <p className="flex items-center gap-1.5 text-caption text-[color:var(--text-muted)]">
-              <Loader2 className="size-3.5 animate-spin" aria-hidden />
-              {t('loading')}
-            </p>
-          ) : thread.messages.length === 0 ? (
-            <p className="text-caption text-[color:var(--text-muted)]">{t('empty')}</p>
-          ) : (
-            <ul className="space-y-2">
-              {thread.messages.map((message) => (
-                <li
-                  key={message.id}
-                  className={
-                    message.channel === 'client'
-                      ? 'rounded-item border border-[color:var(--rule)] bg-card p-2.5'
-                      : 'rounded-item border border-[color:var(--brand-tint-border)] bg-[color:var(--brand-tint)] p-2.5'
-                  }
-                >
-                  <p className="text-caption font-semibold text-[color:var(--text-muted)]">
-                    {message.channel === 'client'
-                      ? message.authorName || t('client')
-                      : t('studio')}
-                    <span className="ms-2 font-normal" dir="ltr">
-                      {bidiIsolate(formatDate(message.createdAt, locale))}
-                    </span>
-                  </p>
-                  <p className="mt-1 whitespace-pre-wrap break-words text-caption">
-                    {message.body}
-                  </p>
-                </li>
-              ))}
-            </ul>
-          )}
+          <DocumentThreadPanelBody thread={thread} />
 
           {canReply && (
             <div className="space-y-1.5">
@@ -148,12 +118,12 @@ export function DocumentThreadPanel({
                   {t('reply')}
                 </Button>
               </div>
-              {thread.error && (
-                <p className="text-caption text-[color:var(--danger)]" role="alert">
-                  {t(`error.${thread.error}`)}
-                </p>
-              )}
             </div>
+          )}
+          {thread.error && (
+            <p className="text-caption text-[color:var(--danger)]" role="alert">
+              {t(`error.${thread.error}`)}
+            </p>
           )}
         </div>
       )}

@@ -19,12 +19,17 @@ import { useState, useTransition } from 'react';
  * the client sees no staff identity, the studio sees author ids — and neither should
  * be widened to accommodate the other.
  */
+/** The error code of a thread that could not be READ (nothing was sent). */
+export const THREAD_LOAD_FAILED = 'load_failed';
+
 export interface DocumentThread<TMessage> {
   /** Is the thread expanded? */
   open: boolean;
   /** Has a fetch actually completed? Distinguishes "empty" from "not yet loaded". */
   loaded: boolean;
   messages: TMessage[];
+  /** Messages are shown but the last read failed, so some may be missing. */
+  partial: boolean;
   draft: string;
   setDraft: (value: string) => void;
   /** A coded error for the caller to localize, or null. */
@@ -41,12 +46,13 @@ export interface DocumentThread<TMessage> {
 
 export function useDocumentThread<TMessage>(options: {
   /** Read the thread. Resolves to `[]` on a miss; REJECTS when the read was refused
-   *  (not an empty thread), which shows the generic error and keeps `loaded` false. */
+   *  (not an empty thread), which shows THREAD_LOAD_FAILED and keeps `loaded` false. */
   load: () => Promise<TMessage[]>;
   /** Append one message. Resolves with a coded result — never throws to the UI. */
   send: (body: string) => Promise<{ ok: boolean; error?: string }>;
   /** The sender's own message as the thread shows it, used only when the re-read
-   *  after a SUCCESSFUL send fails, so a saved message never vanishes from view. */
+   *  after a SUCCESSFUL send fails, so a saved message never vanishes from view.
+   *  Without it, that failure shows THREAD_LOAD_FAILED instead of saying nothing. */
   echo?: (body: string) => TMessage;
 }): DocumentThread<TMessage> {
   const [open, setOpen] = useState(false);
@@ -65,7 +71,7 @@ export function useDocumentThread<TMessage>(options: {
         setMessages(await options.load());
         setLoaded(true);
       } catch {
-        setError('generic');
+        setError(THREAD_LOAD_FAILED);
       }
     });
   }
@@ -85,9 +91,11 @@ export function useDocumentThread<TMessage>(options: {
       setLoaded(true);
     } catch {
       // The message WAS saved, so no send error. Keep what is on screen, add the
-      // sender's own message, and let the next open read the thread again.
+      // sender's own message (`partial` then says some may be missing), and let
+      // the next open read the thread again.
       const echo = options.echo;
       if (echo) setMessages((shown) => [...shown, echo(body)]);
+      else setError(THREAD_LOAD_FAILED);
       setLoaded(false);
     }
   }
@@ -118,6 +126,7 @@ export function useDocumentThread<TMessage>(options: {
     open,
     loaded,
     messages,
+    partial: !loaded && !loading && messages.length > 0,
     draft,
     setDraft,
     error,

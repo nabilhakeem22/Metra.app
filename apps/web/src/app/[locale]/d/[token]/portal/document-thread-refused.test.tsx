@@ -4,9 +4,9 @@ import { messageAt, renderWithIntl } from '@/test/render-with-intl';
 import { DocumentThread } from './document-thread';
 
 // Round D fix F1: a thread read the per-link budget refused is NOT an empty
-// thread. It shows the generic error, the next open reads again, and a refused
-// re-read after a successful send keeps every message on screen, the client's
-// new one included.
+// thread. It shows a LOAD error (never "that didn't send"), the next open reads
+// again, and a refused re-read after a successful send keeps every message on
+// screen, the client's new one included, saying some may be missing.
 
 const actions = vi.hoisted(() => ({
   addDeliveryComment: vi.fn(),
@@ -40,11 +40,12 @@ beforeEach(() => {
 });
 
 describe('DocumentThread when the read budget refuses', () => {
-  it('a refused read shows the error, never "No messages yet", and keeps the server count', async () => {
+  it('a refused read shows the load error, never "No messages yet", and keeps the server count', async () => {
     actions.loadDeliveryDocumentComments.mockResolvedValue(REFUSED);
     renderThread();
     toggle();
-    expect((await screen.findByRole('alert')).textContent).toBe(en('delivery.comments.error.generic'));
+    expect((await screen.findByRole('alert')).textContent).toBe(en('delivery.comments.error.load_failed'));
+    expect(en('delivery.comments.error.load_failed')).not.toBe(en('delivery.comments.error.generic'));
     expect(screen.queryByText(en('delivery.comments.empty'))).toBeNull();
     expect(screen.getByRole('button', { name: /3/ })).toBeTruthy();
   });
@@ -74,6 +75,20 @@ describe('DocumentThread when the read budget refuses', () => {
     for (const reply of REPLIES) expect(screen.getByText(reply.body)).toBeTruthy();
     expect(screen.queryByText(en('delivery.comments.empty'))).toBeNull();
     expect(screen.queryByRole('alert')).toBeNull();
+    expect(screen.getByText(en('delivery.comments.partial'))).toBeTruthy();
     expect((await screen.findByRole('status')).textContent).toBe(en('delivery.comments.notified'));
+  });
+
+  it('F5: refused first read, then a send whose re-read is refused: the own message AND a missing-messages notice', async () => {
+    actions.loadDeliveryDocumentComments.mockResolvedValue(REFUSED);
+    actions.addDeliveryComment.mockResolvedValue({ ok: true, studioNotified: true });
+    renderThread();
+    toggle();
+    await screen.findByRole('alert');
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Hello?' } });
+    fireEvent.click(screen.getByRole('button', { name: en('delivery.comments.send') }));
+    expect(await screen.findByText('Hello?')).toBeTruthy();
+    expect(screen.getByText(en('delivery.comments.partial'))).toBeTruthy();
+    expect(screen.queryByText(en('delivery.comments.empty'))).toBeNull();
   });
 });
