@@ -66,6 +66,15 @@ describe('C3: payment text a client can read', () => {
         'repeat(chr(133), 3)', // U+0085 NEL
         'repeat(chr(1617), 3)', // U+0651 Arabic shadda on its own
         `'ab' || chr(1)`, // a C0 control
+        // Round D review (F2, L3): selectors, fillers, private use and noncharacters on their own.
+        'repeat(chr(65039), 3)', // U+FE0F variation selector 16
+        'chr(6068) || chr(6069) || chr(6068)', // U+17B4, U+17B5 Khmer inherent vowels
+        'repeat(chr(917760), 3)', // U+E0100 variation selector 17
+        'repeat(chr(6155), 3)', // U+180B Mongolian free variation selector
+        'repeat(chr(94180), 3)', // U+16FE4 Khitan filler
+        'chr(847) || chr(78912) || chr(847)', // U+034F, U+13440
+        'repeat(chr(57344), 3)', // U+E000 private use
+        'repeat(chr(65535), 3)', // U+FFFF noncharacter
       ];
       for (const value of refused) {
         expect(await refusal(`${column} = ${value}`), value).toBe('organizations_payment_text_printable');
@@ -73,6 +82,8 @@ describe('C3: payment text a client can read', () => {
       for (const value of ['CIB', 'بنك مصر', 'studio@instapay']) {
         expect(await refusal(`${column} = ${quoted(value)}`), value).toBe('ok');
       }
+      // A visible letter with them is kept, as the app keeps it.
+      expect(await refusal(`${column} = 'CIB' || chr(65039) || chr(57344)`)).toBe('ok');
     });
   }
 });

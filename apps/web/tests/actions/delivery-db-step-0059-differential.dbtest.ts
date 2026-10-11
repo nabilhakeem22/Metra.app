@@ -1,3 +1,4 @@
+import { createSql } from '@metra/db';
 import { afterAll, describe, expect, it } from 'vitest';
 import type { OrgContext } from '@/lib/db/context';
 import { type ClientPageField, normalizeClientPageChanges } from '@/lib/org/client-page-details';
@@ -66,5 +67,31 @@ describe('C4: whatever the app accepts, the 0059 CHECKs keep', () => {
       if (!result.ok) failures.push({ changes, error: result.error });
     }
     expect(failures).toEqual([]);
+  }, 600_000);
+
+  it('keeps every value of one code point, three times over, that the app would store (all of Unicode)', async () => {
+    const stored: string[] = [];
+    for (let codePoint = 1; codePoint <= 0x10ffff; codePoint += 1) {
+      if (codePoint >= 0xd800 && codePoint <= 0xdfff) continue;
+      const result = normalizeClientPageChanges({ bankName: String.fromCodePoint(codePoint).repeat(3) });
+      if (result.ok && result.value.bankName) stored.push(result.value.bankName);
+    }
+    expect(stored.length).toBeGreaterThan(100_000);
+    const connection = createSql(process.env.DATABASE_URL as string, { max: 1, prepare: false });
+    try {
+      const [{ def }] = await connection.unsafe<Array<{ def: string }>>(
+        `select pg_get_constraintdef(oid) as def from pg_constraint where conname = 'organizations_payment_text_printable'`,
+      );
+      // The live CHECK's own expression, over the three columns at once.
+      const refused = await connection.unsafe<Array<{ value: string }>>(
+        `select o.bank_name as value from unnest($1::text[]) as t(value),
+           lateral (select t.value as instapay_address, t.value as bank_name, t.value as bank_account_holder) o
+          where not ${def.slice('CHECK '.length)}`,
+        [stored],
+      );
+      expect(refused.map(({ value }) => value.codePointAt(0)!.toString(16))).toEqual([]);
+    } finally {
+      await connection.end();
+    }
   }, 600_000);
 });
