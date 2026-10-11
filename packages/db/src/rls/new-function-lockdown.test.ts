@@ -83,6 +83,7 @@ const LOCKED_DOWN_IN_PLACE: readonly LockedDown[] = [
     signature: 'public.enforce_client_page_details_writer()',
     grantsApp: true,
   },
+  { file: 'rom-issue-trigger.sql', signature: 'public.clear_rom_issue_on_band_change()', grantsApp: true },
 ];
 
 /** The argument types a CREATE declares, as `pg_proc` would list them: `text, uuid`. */

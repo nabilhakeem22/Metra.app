@@ -40,7 +40,7 @@ const LOCK_TIMEOUT: Timeout = { name: 'lock_timeout', text: '3s', ms: 3_000 };
  * makes `sql.unsafe` wait forever, because postgres.js has no query-level deadline
  * and no TCP keepalive is configured here — a half-open Supavisor connection turns
  * into an operator staring at `Applying policies/10-…` with no error. 60 s is
- * generous for catalogue-only DDL (the whole 15-file apply measures 1 s in CI) and
+ * generous for catalogue-only DDL (the whole 16-file apply measures 1 s in CI) and
  * turns any unforeseen scan into a clean, named failure.
  */
 const RLS_STATEMENT_TIMEOUT: Timeout = { name: 'statement_timeout', text: '60s', ms: 60_000 };
@@ -117,8 +117,8 @@ export async function applyMigrationTimeouts(sql: PostgresJs): Promise<void> {
 }
 
 /**
- * `lock_timeout` AND `statement_timeout` — `apply-rls`, which runs fifteen files
- * as fifteen separate implicit transactions and has no other deadline.
+ * `lock_timeout` AND `statement_timeout` — `apply-rls`, which runs sixteen files
+ * as sixteen separate implicit transactions and has no other deadline.
  */
 export async function applyRlsTimeouts(sql: PostgresJs): Promise<void> {
   await applyTimeouts(sql, [LOCK_TIMEOUT, RLS_STATEMENT_TIMEOUT]);

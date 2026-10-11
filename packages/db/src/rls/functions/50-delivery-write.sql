@@ -697,6 +697,14 @@ $$;
 -- client_commented is exempt: every comment is a new act, and a second one
 -- while the row is unread still counts 2.
 --
+-- ACCEPTED LOW (Round D review, F1): the anchor is the NEWEST act of the key,
+-- not the act a given call reports. If one act's notifier runs late, after a
+-- second act of the same key (the band re-issued and acknowledged again, say),
+-- the late call is dated as the second act and the second act's own call then
+-- skips: the studio sees count 1 for two acts. Its row is still fresh and the
+-- cockpit's guards read the acts themselves, so nothing is lost but the count.
+-- Closing it needs the caller to pass the act's own instant (a later DB step).
+--
 -- THE YEAR in the params is the delivery's creation year in Africa/Cairo, the
 -- studio's local time, which is the year the app's DE-YYYY-NNNN shows its users
 -- (docYear() formats in the browser's local time).
@@ -1271,13 +1279,18 @@ security definer
 set search_path = ''
 as $$
 declare
+  -- THE ORDER IS A LOCK ORDER (Round D): the notifier takes a per-recipient
+  -- lock per key, and the portal's one-tap approve and budget notifies
+  -- client_budget_acknowledged BEFORE client_design_approved. Walking the keys
+  -- in that same order means the two can never wait on each other in a cycle,
+  -- even if a caller ever puts both notifies in one transaction.
   v_keys constant text[] := array[
     'client_concept_approved',
     'client_concept_chosen',
     'client_concept_changes_requested',
+    'client_budget_acknowledged',
     'client_design_approved',
     'client_design_changes_requested',
-    'client_budget_acknowledged',
     'client_handover_acknowledged',
     'client_payment_claimed',
     'client_commented'

@@ -234,6 +234,12 @@ revoke execute on function public.enforce_client_page_details_writer() from publ
 -- trigger is created, not when it fires.
 grant execute on function public.clear_token_nonce_on_hash_change() to metra_app;
 
+-- Round D (0059 step): the band-change trigger fn (rom-issue-trigger.sql).
+-- Symmetry, like the nonce trigger fn above; also revoked from public here and
+-- from the API roles in the loop below (and in place, in its own file).
+grant execute on function public.clear_rom_issue_on_band_change() to metra_app;
+revoke execute on function public.clear_rom_issue_on_band_change() from public;
+
 -- Proposals (P1 Slice 3): child-draft guard trigger fn + public token SDFs. The
 -- token functions run on the PUBLIC accept path (no session) via the base
 -- connection role (which executes them as their OWNER, so the revokes below cannot
@@ -539,6 +545,10 @@ begin
       );
       execute format(
         'revoke execute on function public.enforce_client_page_details_writer() from %I',
+        r
+      );
+      execute format(
+        'revoke execute on function public.clear_rom_issue_on_band_change() from %I',
         r
       );
       execute format(

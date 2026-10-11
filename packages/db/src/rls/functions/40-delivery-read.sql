@@ -380,9 +380,13 @@ $$;
 --     text, a payment method or reference, the trigger name.
 --   receipts (Round D, 0059): { kind, amount, at } per payment_events row of
 --     this delivery and org (amount as a scale-4 string, at = cleared_at),
---     newest first (at the same instant: amount, then id), with NO cap, so a
---     payment never drops off the client's receipts behind 60 newer stage
---     moves the way it does off the timeline.
+--     newest first (at the same instant: amount, then id). Its own cap of 200,
+--     apart from the timeline's 60, so a payment never drops off the client's
+--     receipts behind newer stage moves; a real delivery has a handful. The
+--     cap bounds what a studio member recording many tiny payments can make
+--     one client page carry.
+--   receipts_truncated (Round D, 0059): true when the delivery has more than
+--     200 payments, so the page can say the list is not complete.
 --   rom.issued_at, renders_issued_at (Round D, 0059): the ISSUANCE instants
 --     the client's review acts answer, as ISO strings with microseconds. The
 --     portal echoes them back unchanged into the seven-argument
@@ -869,22 +873,31 @@ as $$
           )
       )
     end,
-    -- Round D (0059): every payment the client made, newest first, uncapped.
+    -- Round D (0059): the payments the client made, newest first, at most 200.
     -- Only kind, amount and cleared_at: no method, reference, note, recorder
     -- or idempotency key.
     'receipts', coalesce((
-      select jsonb_agg(
-        jsonb_build_object(
-          'kind', pe.kind,
-          'amount', pe.amount::numeric(18, 4)::text,
-          'at', pe.cleared_at
-        )
+      select jsonb_agg(r.entry order by r.at desc, r.amount desc, r.id desc)
+      from (
+        select jsonb_build_object(
+                 'kind', pe.kind,
+                 'amount', pe.amount::numeric(18, 4)::text,
+                 'at', pe.cleared_at
+               ) as entry,
+               pe.cleared_at as at, pe.amount, pe.id
+        from public.payment_events pe
+        where pe.engagement_id = de.id
+          and pe.org_id = de.org_id
         order by pe.cleared_at desc, pe.amount desc, pe.id desc
-      )
-      from public.payment_events pe
+        limit 200
+      ) r
+    ), '[]'::jsonb),
+    'receipts_truncated', exists (
+      select 1 from public.payment_events pe
       where pe.engagement_id = de.id
         and pe.org_id = de.org_id
-    ), '[]'::jsonb),
+      offset 200
+    ),
     -- Round C (0058): what happened, dated, newest first, at most 60 entries.
     -- Only the fields listed in the header comment are selected: no actor,
     -- note, evidence text, method or reference. Same-instant entries are

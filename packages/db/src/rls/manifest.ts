@@ -11,6 +11,8 @@
  *   functions/*      create the SECURITY DEFINER token functions and the
  *                    child-draft trigger functions;
  *   immutability.sql creates the trigger FACTORIES (`enforce_immutable_when`);
+ *   rom-issue-trigger.sql  the band-change rule on design_engagements (Round D):
+ *                    its function, its trigger and their lockdown in one file;
  *   roles.sql        creates `metra_app` and grants execute on the functions
  *                    above, so they must exist first;
  *   policies/*       reference both the functions and the role.
@@ -33,6 +35,7 @@ export const RLS_APPLY_ORDER = [
   'functions/50-delivery-write.sql',
   'functions/60-delivery-documents.sql',
   'immutability.sql',
+  'rom-issue-trigger.sql',
   'roles.sql',
   'policies/00-core.sql',
   'policies/10-catalogue.sql',
