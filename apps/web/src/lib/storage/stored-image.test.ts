@@ -37,10 +37,22 @@ describe('fetchStoredImage', () => {
     expect(storage.createSignedObjectUrl).toHaveBeenCalledWith('b', 'k', 30);
     expect(fetchMock).toHaveBeenCalledWith(
       OBJECT_SIGNED,
-      expect.objectContaining({ redirect: 'error', signal: expect.any(AbortSignal) }),
+      expect.objectContaining({ redirect: 'manual', signal: expect.any(AbortSignal) }),
     );
     expect(image?.contentType).toBe('image/png');
     expect((await new Response(image!.body).arrayBuffer()).byteLength).toBe(10);
+  });
+
+  it('never follows a redirect: a 3xx answer is refused and its body cancelled', async () => {
+    const cancel = vi.fn();
+    fetchMock.mockResolvedValue(
+      new Response(new ReadableStream<Uint8Array>({ cancel }), {
+        status: 302,
+        headers: { location: 'https://elsewhere.test/x.png', 'content-type': 'image/png' },
+      }),
+    );
+    expect(await fetchStoredImage('b', 'k', MAX_BYTES)).toBeNull();
+    expect(cancel).toHaveBeenCalled();
   });
 
   it('hands back only the bytes and their type: never the URL, never a Location', async () => {

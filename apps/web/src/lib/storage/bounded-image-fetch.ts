@@ -33,13 +33,19 @@ function byteCeiling(maxBytes: number): TransformStream<Uint8Array, Uint8Array> 
 
 /**
  * The image at `signedUrl` as a stream, or null when Storage did not answer
- * with an allowed, bounded image. `redirect: 'error'`: a redirect is never
- * followed, so the fetch cannot be bounced elsewhere. Streams (never buffers)
- * and stops at `maxBytes` even when the length was not declared.
+ * with an allowed, bounded image. `redirect: 'manual'`: a redirect is never
+ * followed, so the fetch cannot be bounced elsewhere; a 3xx is not `ok` and is
+ * refused like any other miss. (Not `'error'`: Cloudflare Workers throw on it,
+ * which turned every image into a 404 in production while Node tests passed.)
+ * Streams (never buffers) and stops at `maxBytes` even when the length was not
+ * declared.
  */
 export async function fetchBoundedImage(signedUrl: string, limits: ImageLimits): Promise<BoundedImage | null> {
-  const upstream = await fetch(signedUrl, { redirect: 'error', signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
-  if (!upstream.ok || !upstream.body) return null;
+  const upstream = await fetch(signedUrl, { redirect: 'manual', signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
+  if (!upstream.ok || !upstream.body) {
+    await upstream.body?.cancel();
+    return null;
+  }
   const contentType = (upstream.headers.get('content-type') ?? '').split(';')[0]!.trim().toLowerCase();
   const declaredLength = Number(upstream.headers.get('content-length') ?? Number.NaN);
   if (!limits.allowedTypes.has(contentType) || declaredLength > limits.maxBytes) {

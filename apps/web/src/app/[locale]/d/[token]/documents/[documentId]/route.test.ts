@@ -93,7 +93,7 @@ describe('unpaid (preview): bytes, never a storage URL', () => {
     // Signed only with the transform, fetched on the server, and the URL stays there.
     expect(storage.createSignedObjectUrl).toHaveBeenCalledTimes(1);
     expect(storage.createSignedObjectUrl).toHaveBeenCalledWith('metra-files', OBJECT_KEY, 30, PREVIEW_TRANSFORM);
-    expect(fetchMock).toHaveBeenCalledWith(RENDER_SIGNED, expect.objectContaining({ redirect: 'error' }));
+    expect(fetchMock).toHaveBeenCalledWith(RENDER_SIGNED, expect.objectContaining({ redirect: 'manual' }));
     const visible = JSON.stringify([...response.headers.entries()]);
     expect(visible).not.toContain(OBJECT_KEY);
     expect(visible).not.toContain('storage.test');

@@ -60,7 +60,7 @@ describe('the logo route', () => {
     expect([...new Uint8Array(await response.arrayBuffer())]).toEqual([7, 8, 9]);
     // The plain object URL, signed for 30 s, no transform: the stored original.
     expect(storage.createSignedObjectUrl).toHaveBeenCalledWith('metra-files', OBJECT_KEY, 30);
-    expect(fetchMock).toHaveBeenCalledWith(OBJECT_SIGNED, expect.objectContaining({ redirect: 'error' }));
+    expect(fetchMock).toHaveBeenCalledWith(OBJECT_SIGNED, expect.objectContaining({ redirect: 'manual' }));
   });
 
   it('no logo, a revoked or malformed link: the empty 404', async () => {
