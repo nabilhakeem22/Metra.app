@@ -797,6 +797,9 @@ describe('the functions the deployed app calls kept their signatures', () => {
         where n.nspname = 'public' and p.proname in (${Object.keys(EXPECTED)
           .map((name) => `'${name}'`)
           .join(', ')})
+          -- Round D (0059) adds the consent-guarded respond overload beside the
+          -- one the deployed app calls; delivery-db-step-0059-functions pins it.
+          and p.oid <> 'public.app_delivery_respond_by_token(text, text, timestamptz, text, text, text, text)'::regprocedure
         order by p.proname`,
     );
     expect(rows).toHaveLength(Object.keys(EXPECTED).length);
