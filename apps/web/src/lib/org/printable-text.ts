@@ -2,8 +2,8 @@
 // PURE and CLIENT-SAFE. 0058's printable CHECK refuses format characters and
 // white-space-only values; this is stricter, so a value the app accepts always
 // shows the client something: no control characters (NUL included, which
-// Postgres refuses outright), no lone surrogates (which Postgres would quietly
-// replace), and at least one visible character, which the blank-looking letters
+// Postgres refuses outright, and the line and paragraph separators), no lone
+// surrogates (which Postgres would quietly replace), and at least one visible character, which the blank-looking letters
 // (the Braille blank, the Hangul fillers) and combining marks on their own are
 // not.
 
@@ -14,8 +14,12 @@
 const FORMAT_CHARACTERS =
   /[\p{Cf}\u{AD}\u{600}-\u{605}\u{61C}\u{6DD}\u{70F}\u{890}-\u{891}\u{8E2}\u{180E}\u{200B}-\u{200F}\u{202A}-\u{202E}\u{2060}-\u{2064}\u{2066}-\u{206F}\u{FEFF}\u{FFF9}-\u{FFFB}\u{110BD}\u{110CD}\u{13430}-\u{1343F}\u{1BCA0}-\u{1BCA3}\u{1D173}-\u{1D17A}\u{E0001}\u{E0020}-\u{E007F}]/gu;
 
-/** C0, DEL and C1 controls (NUL, tab, newline, NEL among them). */
-const CONTROL = /\p{Cc}/u;
+/**
+ * C0, DEL and C1 controls (NUL, tab, newline, NEL among them), and the LINE and
+ * PARAGRAPH separators (Round D): not controls to Unicode, but a line break all
+ * the same inside a bank name a client copies into a banking app.
+ */
+const CONTROL = /[\p{Cc}\u{2028}\u{2029}]/u;
 
 /** Half of a surrogate pair with no other half: not a character at all. */
 const LONE_SURROGATE = /\p{Cs}/u;

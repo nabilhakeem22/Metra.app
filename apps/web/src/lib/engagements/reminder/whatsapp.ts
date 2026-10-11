@@ -56,7 +56,9 @@ function egyptianNational(digits: string): string | null {
  * The number in the international, digits-only form wa.me expects, or null
  * when it cannot be one.
  * - `+20 10 1234 5678`, `0020 10 1234 5678`, `+20 010 1234 5678`,
- *   `+20 (0)10 1234 5678`: the country code kept, a trunk 0 after +20 dropped.
+ *   `+20 (0)10 1234 5678`, `+20 00 10 1234 5678`: the country code kept, every
+ *   trunk 0 after +20 dropped (Round D: a doubled one is a typing slip, not a
+ *   reason to refuse the number).
  * - `01012345678` and `1012345678` (an Egyptian mobile with or without its
  *   trunk 0): `201012345678`.
  * - Arabic-Indic digits and the invisible bidi marks a pasted number carries
@@ -74,8 +76,8 @@ export function whatsappDigits(phone: string | null): string | null {
   else if (compact.startsWith('00')) digits = compact.slice(2);
   else digits = egyptianNational(compact);
   if (digits === null) return null;
-  // Egypt written with its trunk 0 after the country code: +20 0 10…, +20 (0) 10…
-  if (/^200\d/.test(digits)) digits = `20${digits.slice(3)}`;
+  // Egypt written with its trunk 0 after the country code: +20 0 10…, +20 (0) 10…, +20 00 10…
+  digits = digits.replace(/^200+/, '20');
   return E164_DIGITS.test(digits) ? digits : null;
 }
 

@@ -72,6 +72,10 @@ describe('normalizeClientPageChanges: phones dial (F2)', () => {
     ['0020 (10) 1234.5678', '+201012345678'],
     [`${RLM}+20 10 1234 5678${LRM}`, '+201012345678'],
     ['+44 20 7946 0958', '+442079460958'],
+    // Round D: a doubled trunk 0 after +20 is stripped, never refused.
+    ['+20 00 10 1234 5678', '+201012345678'],
+    ['+20 00 2 2345 6789', '+20223456789'],
+    ['0020 00 10 1234 5678', '+201012345678'],
   ])('stores the phone %j as %j, in both fields where WhatsApp can place it', (typed, stored) => {
     expect(saved({ studioPhone: typed }).studioPhone).toBe(stored);
   });
@@ -152,6 +156,8 @@ describe('normalizeClientPageChanges: printable text only (F8)', () => {
     ['DEL', `ab${cp(0x7f)}`],
     ['NEL only', cp(0x85, 0x85, 0x85)],
     ['a C1 control', `ab${cp(0x9b)}`],
+    ['a line separator inside (Round D)', `CI${cp(0x2028)}B`],
+    ['a paragraph separator inside (Round D)', `CI${cp(0x2029)}B`],
     ['a lone surrogate', `a${String.fromCharCode(0xd800)}b`],
     ['Braille blanks', cp(0x2800, 0x2800)],
     ['Hangul fillers', cp(0x115f, 0x115f)],

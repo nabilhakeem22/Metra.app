@@ -13,7 +13,7 @@ describe('printable text (F8)', () => {
   });
 
   it('refuses controls and lone surrogates', () => {
-    for (const text of [`a${cp(0)}`, `a${cp(0x1f)}`, `a${cp(0x7f)}`, `a${cp(0x85)}`, `a${cp(0x9f)}`, `a${String.fromCharCode(0xdc00)}`]) {
+    for (const text of [`a${cp(0)}`, `a${cp(0x1f)}`, `a${cp(0x7f)}`, `a${cp(0x85)}`, `a${cp(0x9f)}`, `a${String.fromCharCode(0xdc00)}`, `CI${cp(0x2028)}B`, `CI${cp(0x2029)}B`]) {
       expect(unprintableReason(text)).toBe('control');
     }
   });
