@@ -14,8 +14,22 @@ import { and, eq } from 'drizzle-orm';
 import { fail, mutateInOrg, requireInOrg } from '@/lib/actions/mutate';
 import type { ActionResult } from '@/lib/actions/result';
 import type { OrgContext } from '@/lib/db/context';
-import { isTerminal } from './states';
+import { restampRenderRound } from './renders';
+import { isTerminal, type DesignState } from './states';
 import { isUuid } from '@/lib/uuid';
+
+/**
+ * True when this flip SHOWS the client a render while it is asked to approve
+ * the final design: the round it is answering changed (Round D, A1). Hiding a
+ * render, or showing one at any other stage, is not a new round.
+ */
+function showsNewRenderUnderReview(
+  artifact: { kind: string; clientVisible: boolean },
+  state: DesignState,
+  visible: boolean,
+): boolean {
+  return artifact.kind === 'approved_render' && visible && !artifact.clientVisible && state === 'final_approval';
+}
 
 export interface SetArtifactClientVisibilityInput {
   artifactId: string;
@@ -32,7 +46,8 @@ export interface SetArtifactClientVisibilityInput {
  * marked visible) → the parent engagement must resolve in-org
  * (`engagement_not_found`) and not be terminal (`engagement_not_active`), matching
  * recordArtifactCore / createDeliverableUploadCore → flip `client_visible` and
- * stamp `updated_at` (the portal renders that as the "shared on" date) → audit.
+ * stamp `updated_at` (the portal renders that as the "shared on" date) → a
+ * render newly shown at the final approval re-stamps the render round → audit.
  *
  * Setting the value it already has is a harmless no-op write; the action stays
  * idempotent. Never throws to the client — coded ActionResult only.
@@ -58,6 +73,7 @@ export async function setArtifactClientVisibilityCore(
           id: engagementArtifacts.id,
           engagementId: engagementArtifacts.engagementId,
           fileId: engagementArtifacts.fileId,
+          kind: engagementArtifacts.kind,
           clientVisible: engagementArtifacts.clientVisible,
         },
         'invalid',
@@ -82,6 +98,9 @@ export async function setArtifactClientVisibilityCore(
             eq(engagementArtifacts.id, artifact.id),
           ),
         );
+      if (showsNewRenderUnderReview(artifact, engagement.state, input.visible)) {
+        await restampRenderRound(tx, engagement.id);
+      }
 
       await audit({
         entity: 'design_engagement',
