@@ -9,7 +9,7 @@ import { consumeRateLimit, rateLimitBinding, type CloudflareRateLimit } from '@/
 // without it an unauthenticated flood of garbage bearer tokens is a free way to
 // hammer the database, and the per-key limiter can never see it because there is
 // no key. Off-platform (Node/Vitest, `next dev` on Node) the bindings are absent,
-// so this degrades to ALLOW — tests and local dev are never rate-limited. The
+// so this degrades to ALLOW: tests and local dev are never rate-limited. The
 // binding lookup and the fail-open / fail-closed rule are in
 // lib/cf/rate-limit-binding.ts.
 //

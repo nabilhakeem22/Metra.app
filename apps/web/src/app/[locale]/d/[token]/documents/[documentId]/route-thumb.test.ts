@@ -1,10 +1,12 @@
 import { NextRequest } from 'next/server';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { countingRateLimit, fakePortalRateLimitEnv } from '@/test/fake-rate-limit-env';
 
 // Round C, AC 51 and 52: a gallery tile (?variant=thumb) is the 480 px
 // rendition's BYTES, streamed from the app whether the client has paid or not,
 // never a storage URL; anything that is not a previewable image is the
-// indistinguishable "unavailable" redirect, with nothing signed.
+// indistinguishable "unavailable" redirect, with nothing signed. Round D (W4):
+// past the per-link read brake, a 429 with nothing looked up.
 
 vi.mock('server-only', () => ({}));
 const documents = vi.hoisted(() => ({ getDeliveryDocumentByToken: vi.fn() }));
@@ -12,6 +14,9 @@ vi.mock('@/lib/engagements/public-documents', () => documents);
 const storage = vi.hoisted(() => ({ createSignedObjectUrl: vi.fn() }));
 vi.mock('@/lib/storage/signed-urls', () => storage);
 vi.mock('@/lib/storage/object-info', () => ({ storedObjectInfo: vi.fn() }));
+// Off-platform (no limit) unless a test puts the route on Cloudflare.
+const cf = vi.hoisted(() => ({ isCloudflareRuntime: vi.fn(), cfEnv: vi.fn() }));
+vi.mock('@/lib/cf/context', () => cf);
 
 const { GET } = await import('./route');
 
@@ -22,9 +27,16 @@ const UNPAID = { ...PAID, downloadName: 'render.png', access: 'preview', media: 
 const PAID_IMAGE = { ...PAID, downloadName: 'render.png', media: 'image' };
 const fetchMock = vi.fn();
 
-function get(query: string) {
-  const request = new NextRequest(`https://app.test/en/d/tok/documents/${DOCUMENT_ID}${query}`);
-  return GET(request, { params: Promise.resolve({ locale: 'en', token: 'tok', documentId: DOCUMENT_ID }) });
+function get(query: string, token = 'tok') {
+  const request = new NextRequest(`https://app.test/en/d/${token}/documents/${DOCUMENT_ID}${query}`);
+  return GET(request, { params: Promise.resolve({ locale: 'en', token, documentId: DOCUMENT_ID }) });
+}
+
+function expectRefused(response: Response) {
+  expect(response.status).toBe(429);
+  expect(response.headers.get('retry-after')).toBe('60');
+  expect(response.headers.get('cache-control')).toBe('no-store');
+  expect(response.headers.get('location')).toBeNull();
 }
 
 function expectUnavailable(response: Response) {
@@ -33,6 +45,8 @@ function expectUnavailable(response: Response) {
 }
 
 beforeEach(() => {
+  cf.isCloudflareRuntime.mockReset().mockReturnValue(false);
+  cf.cfEnv.mockReset();
   documents.getDeliveryDocumentByToken.mockReset();
   storage.createSignedObjectUrl.mockReset().mockResolvedValue('https://storage.test/render/image/sign/x?token=R');
   fetchMock.mockReset().mockResolvedValue(new Response(new Uint8Array([1, 2, 3]), { headers: { 'content-type': 'image/jpeg' } }));
@@ -65,5 +79,26 @@ describe('gallery tiles (?variant=thumb, AC 51, 52): streamed bytes, paid or not
     documents.getDeliveryDocumentByToken.mockResolvedValue(document);
     expectUnavailable(await get('?variant=thumb'));
     expect(storage.createSignedObjectUrl).not.toHaveBeenCalled();
+  });
+});
+
+describe('the per-link read brake (W4)', () => {
+  it('on Cloudflare, the 301st tile in a minute for one link is a 429, nothing looked up; another link is served', async () => {
+    cf.isCloudflareRuntime.mockReturnValue(true);
+    cf.cfEnv.mockReturnValue(fakePortalRateLimitEnv());
+    documents.getDeliveryDocumentByToken.mockResolvedValue(UNPAID);
+    fetchMock.mockImplementation(async () => new Response(new Uint8Array([1]), { headers: { 'content-type': 'image/jpeg' } }));
+    for (let index = 0; index < 300; index += 1) expect((await get('?variant=thumb', 'loop-token')).status).toBe(200);
+    documents.getDeliveryDocumentByToken.mockClear();
+    expectRefused(await get('?variant=thumb', 'loop-token'));
+    expect(documents.getDeliveryDocumentByToken).not.toHaveBeenCalled();
+    expect((await get('?variant=thumb', 'another-token')).status).toBe(200);
+  });
+
+  it('a refusing limiter refuses a download the same way', async () => {
+    cf.isCloudflareRuntime.mockReturnValue(true);
+    cf.cfEnv.mockReturnValue({ PORTAL_READ_RATE_LIMITER: countingRateLimit(0) });
+    expectRefused(await get(''));
+    expect(documents.getDeliveryDocumentByToken).not.toHaveBeenCalled();
   });
 });

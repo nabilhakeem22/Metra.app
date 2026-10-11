@@ -10,10 +10,20 @@ import {
   type DeliveryCommentResult,
   type PublicDocumentComment,
 } from '@/lib/engagements/public-comments';
+import { portalActAllowed, portalReadAllowed } from '@/lib/share/portal-rate-limit';
 import { requestProvenance } from './request-provenance';
 
 // The client portal's payment claim and document comments. The review acts
 // (concept, design, budget, handover) are in ./review-actions.ts.
+//
+// THE PER-LINK BRAKE (Round D, ../../../../lib/share/portal-rate-limit.ts): the
+// claim and a comment share the 30-a-minute act budget, and past it answer the
+// generic failure (no error code, so the portal shows "something went wrong,
+// try again") and write nothing; a thread read shares the 300-a-minute read
+// budget, and past it reads as an empty thread.
+
+/** A refused act: the generic failure, nothing written, nobody notified. */
+const THROTTLED = { ok: false, studioNotified: false } as const;
 
 /** A portal write's answer, plus whether the studio heard about it: true only
  *  when a notification row was written for THIS act, which is the only time the
@@ -34,6 +44,7 @@ export async function markDeliveryPaymentPaid(
   milestoneKind: string,
   note?: string,
 ): Promise<DeliveryActResult> {
+  if (!(await portalActAllowed(token))) return THROTTLED;
   const result = await claimPaymentByToken(token, {
     milestoneKind,
     note: clientNote(note),
@@ -59,6 +70,7 @@ export async function addDeliveryComment(
   documentId: string,
   body: string,
 ): Promise<DeliveryCommentActResult> {
+  if (!(await portalActAllowed(token))) return THROTTLED;
   // Cap before the DB (the SDF also trims + caps at 2000 and CHECKs the length).
   const trimmed = body?.trim().slice(0, 2000) ?? '';
   if (!trimmed) return { ok: false, error: 'empty', studioNotified: false };
@@ -80,5 +92,6 @@ export async function loadDeliveryDocumentComments(
   token: string,
   documentId: string,
 ): Promise<PublicDocumentComment[]> {
+  if (!(await portalReadAllowed(token))) return [];
   return getDeliveryDocumentCommentsByToken(token, documentId);
 }

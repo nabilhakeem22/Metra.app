@@ -440,7 +440,7 @@ of the original items was a tenant-isolation or secret defect — those held.
 
 | Item | Status |
 |---|---|
-| Server-side rate limit + CAPTCHA on OTP send | **Still open.** The Workers rate-limit bindings cover the Public API only; `signInWithOtp` is not gated beyond Supabase's own limits |
+| Server-side rate limit + CAPTCHA on OTP send | **Still open.** The Workers rate-limit bindings cover the Public API and the client portal (per share link); `signInWithOtp` is not gated beyond Supabase's own limits |
 | Set `NEXT_PUBLIC_APP_URL` in prod | **Done, and enforced** — a production build throws without it |
 | Security headers + CSP | **Still open** — no `headers()` block in `next.config.mjs` |
 | Input length caps | **Partly** — present on the paths that mattered (e.g. the 254-char email cap in `inviteMember`); not a systematic policy |
