@@ -922,7 +922,9 @@ git switch --detach origin/validate/round-b-b12
 git log --oneline -1    # must be the SHA the lead gave you for this run, with green CI
 ```
 
-**2. Read-only, before** (Supabase SQL editor). Note the numbers:
+**2. Read-only, before** (Supabase SQL editor). Note the numbers. **Run each
+query on its own** (select it, then Run): when a whole block runs at once, the
+SQL editor shows only the LAST query's result. The same applies in step 4.
 
 ```sql
 -- (a) migrations recorded so far, and the newest one's stamp
@@ -1242,7 +1244,10 @@ npm run db:apply-rls
 npm run assert-schema-applied -w @metra/db
 ```
 
-Expected:
+Expected (both commands also print routine NOTICE blocks with a `code:` field,
+such as 42P06, 42P07, or "trigger ... does not exist, skipping" on the first
+0059 apply-rls; those are normal. Only a line that starts `Migration failed:`
+or `apply-rls failed:` is a failure):
 
 - `db:migrate` exits 0 and prints `Migrations applied.`. It does not print a
   count, so re-run query (a) from step 2: `migrations` is exactly one higher
@@ -1551,8 +1556,11 @@ dependency (`package.json` and the lockfile are unchanged), so the installed
 cd C:\Users\HP\merta-main
 git fetch origin
 git switch --detach origin/validate/round-d-db
-git log --oneline -2    # line 1: "docs(deploy): ..." (this runbook); line 2 MUST start aa84dbd (the code rehearsed); CI green
+git log --oneline -1    # a "docs(deploy): ..." commit (this runbook); CI green on it
+git diff --stat aa84dbd HEAD    # MUST list only docs/DEPLOY.md: the code is exactly what was rehearsed (aa84dbd)
 ```
+
+If the diff lists any other file, STOP and tell the lead.
 
 **2. Read-only, before** (Supabase SQL editor). Note the numbers:
 
