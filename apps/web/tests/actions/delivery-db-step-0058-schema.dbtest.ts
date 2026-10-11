@@ -83,7 +83,8 @@ describe('0058 columns and CHECKs (AC 32)', () => {
 
   it('lets every boundary value through', async () => {
     for (const assignment of [
-      `studio_phone = '1234567', studio_whatsapp = '+123456789012345'`,
+      // 0059 tightened the numbers: the shortest national and the longest international.
+      `studio_phone = '022345678', studio_whatsapp = '+123456789012345'`,
       `studio_phone = '+201012345678', studio_whatsapp = '01012345678'`,
       `instapay_address = 'abc'`,
       `instapay_address = '${long(100)}'`,
