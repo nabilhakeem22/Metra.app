@@ -96,13 +96,13 @@ Set `DEPLOY_ENABLED` **last**: it is the flag that arms the workflow.
 Run `npm run db:migrate`, then `npm run db:apply-rls` (RLS, roles and functions
 live there, never in a migration).
 
-`db:apply-rls` **verifies itself now.** After the fifteen files it re-reads
+`db:apply-rls` **verifies itself now.** After the sixteen files it re-reads
 `pg_class`, `pg_policies`, `pg_trigger`, `pg_proc` and `pg_roles` on the same
 connection and exits **1** listing anything the manifest declares that the
 database does not have: every schema table RLS-enabled **and** forced, all 46
-policies, all 14 triggers, all 43 functions, and `metra_app` present and neither
+policies, all 15 triggers, all 44 functions, and `metra_app` present and neither
 LOGIN nor BYPASSRLS. A green run ends with `apply-rls: verified in the
-catalogues — 46 tables, 46 policies, 14 triggers, 43 functions, ...`. Before
+catalogues — 46 tables, 46 policies, 15 triggers, 44 functions, ...`. Before
 this, the only post-condition was that no statement threw — which says a file
 RAN, not that its objects exist. Indexes and constraints are deliberately **not**
 checked here: they carry the 0017 case-fold drift and would be red on every
@@ -445,7 +445,7 @@ a script that waits forever while the schema sits locked.
 
 | script | `statement_timeout` | why that number |
 |---|---|---|
-| `db:apply-rls` | **`60s`** | catalogue-only DDL; the whole 15-file apply measures ~1 s in CI |
+| `db:apply-rls` | **`60s`** | catalogue-only DDL; the whole 16-file apply measures ~1 s in CI |
 | `db:migrate` | **`120s`** | double, because a migration may SCAN: 0052 runs twelve `VALIDATE CONSTRAINT`s and 0053 ten index builds |
 
 Both are set with `set_config` and **read back from `pg_settings`** on the same
@@ -1467,8 +1467,8 @@ stay: dropping a column is the one non-additive change this file never makes.
 ### 0059 and the Round D database step: owner runbook
 
 Round D has ONE database step, and this is it (Wave 1 had none): migration
-`0059_client_page_checks_tightened.sql` plus changed and new functions and
-grants under `rls/`. It is validated on branch `validate/round-d-db`. The Wave 3
+`0059_client_page_checks_tightened.sql` plus changed and new functions, one
+new trigger and grants under `rls/`. It is validated on branch `validate/round-d-db`. The Wave 3
 PR (the client page's consent guard, receipts and the one-tap approve and
 budget split) is cut only after this step is done and the branch is merged.
 
@@ -1486,10 +1486,10 @@ Why, one sentence each:
   fields of the client page snapshot, every function it calls keeps its exact
   arguments and result, and every value the live Settings card saves passes the
   tightened CHECKs (a test saves thousands of generated values through the
-  real Settings code against the new CHECKs, with no refusal). Measured on a
-  fresh 0059 database: main's own 970 database tests ran and 966 passed; the
-  four that failed are lists that pin "one overload per function" or 0058's
-  loosest phone, which this branch updates, not behaviour of the live code.
+  real Settings code against the new CHECKs, with no refusal), and the new
+  band trigger changes nothing the live code does (its one band writer
+  already clears the issuance stamp). Measured on a fresh database built from
+  this branch: {{COMPAT}}
 - **Wave 3 before the database step is an outage:** every review act on the
   client page (approve, ask for changes, confirm the budget) fails with 42883
   (no such function), and the payments card shows no receipts.
@@ -1510,12 +1510,34 @@ things, both fixes:
 |---|---|
 | `organizations_studio_phone_format` | tightened: `+` and 8 to 15 digits with a country code that does not start with 0, or an Egyptian number with its trunk 0 (`0` then 8 to 10 digits). Was: 7 to 15 digits with an optional `+` |
 | `organizations_studio_whatsapp_format` | tightened: the same international form, or an Egyptian mobile `01` + `0`, `1`, `2` or `5` + 8 digits (a landline cannot open WhatsApp) |
-| `organizations_payment_text_printable` | tightened: InstaPay, bank name and account holder may also hold no control character, and need a character a reader can see (white space, the Braille blank, the Hangul fillers and lone combining marks do not count) |
+| `organizations_payment_text_printable` | tightened: InstaPay, bank name and account holder may also hold no C0 or C1 control character, and may not be made ONLY of these: white space, NEL, the Braille blank, the Hangul fillers, the combining marks of the listed scripts (Latin, Cyrillic, Arabic and the generic combining blocks), the Khmer inherent vowels, the Mongolian and the other variation selectors, the Egyptian hieroglyph mirror, the Khitan filler, private-use characters and noncharacters. A list, not all of Unicode: a lone mark of another script still passes here (the Settings card refuses it) |
 | `app_delivery_respond_by_token(text, text, timestamptz, text, text, text, text)` | NEW overload, returns `text`: the client's review act names the issuance it saw (the budget band's, or the render round's); a band re-issued or renders re-stamped since the page loaded answers `wrong_state` and saves nothing. The design and budget checks are independent |
 | `app_delivery_respond_by_token(text, text, text, text, text, text)` | unchanged; retired from app use by Wave 3 and dropped at the next database step |
-| `app_delivery_by_token(text)` | same signature and result (`jsonb`); new fields `rom.issued_at`, `renders_issued_at` and `receipts` (every payment of the delivery: kind, amount, date; no method, reference or note); the expected date is compared with stage moves to the millisecond |
+| `app_delivery_by_token(text)` | same signature and result (`jsonb`); new fields `rom.issued_at`, `renders_issued_at`, `receipts` (the newest 200 payments of the delivery: kind, amount, date; no method, reference or note) and `receipts_truncated` (true only past 200 payments); the expected date is compared with stage moves to the millisecond |
 | `app_delivery_notify_studio_by_token(text, text, jsonb, jsonb)` | same signature and result; a member who already has a notification for this client act (read or not) is not counted twice. Comments are exempt: each comment is a new act |
-| grants | the new overload: EXECUTE for `metra_app` only, revoked from `public`, `anon`, `authenticated` and `service_role` in the same transaction that creates it (and again in `roles.sql`) |
+| `app_notify_lost_client_acts(timestamptz, timestamptz, jsonb)` | same signature and result; it now repairs a lost budget acknowledgement before the design decisions, the order the client page uses, so the two can never wait on each other |
+| `trg_design_engagements_rom_issue` + `clear_rom_issue_on_band_change()` | NEW trigger on `design_engagements`, before an update of `rom_low` or `rom_high`: a band change that keeps the old issuance stamp clears it, so a changed band always has to be issued again before the client can confirm it. It never refuses an update; issuing new numbers with a new stamp in one statement is left alone |
+| grants | the new overload and the new trigger function: EXECUTE for `metra_app` only, revoked from `public`, `anon`, `authenticated` and `service_role` in the same transaction that creates them (and again in `roles.sql`) |
+
+**Not in this step** (each comes later, in this order):
+
+- U+2028 and U+2029 (line and paragraph separators) in the studio's payment
+  text: the Settings card refuses them first (Wave 3), then a CHECK at the
+  next database step.
+- Phone numbers starting `+200`: see the deviation below.
+- The six-argument respond function: EXECUTE is revoked from `metra_app` once
+  Wave 3 is past its rollback window, and it is dropped at the next database
+  step.
+
+**Deviation from the Round D plan (D2-D1): `+200` numbers still pass.** The
+plan's phone and WhatsApp CHECKs refused `+200...` (a +20 number that keeps
+its trunk 0). The live Settings card can store such a number: it drops ONE
+zero after +20, so "+20 00 10 1234 5678" is saved as `+2001012345678`. A
+CHECK that refused it would make that save fail with 23514, and the rule for
+this step is that the database is never stricter than the app. So 0059 lets
+`+200` through. The app is fixed first (Wave 3 drops the extra zeros); the
+CHECK refuses `+200` at a later database step, after counting the stored
+`+200` numbers.
 
 **1. Put the Round D database code in the production checkout.** Detach onto
 the branch (it is checked out in another worktree). This step changes no
@@ -1526,7 +1548,7 @@ dependency (`package.json` and the lockfile are unchanged), so the installed
 cd C:\Users\HP\merta-main
 git fetch origin
 git switch --detach origin/validate/round-d-db
-git log --oneline -1    # must be the SHA the lead gave you for this run, with green CI
+git log --oneline -2    # line 1: "docs(deploy): ..." (this runbook); line 2 MUST start {{SHA}} (the code rehearsed); CI green
 ```
 
 **2. Read-only, before** (Supabase SQL editor). Note the numbers:
@@ -1551,6 +1573,11 @@ select to_regprocedure('public.app_delivery_respond_by_token(text, text, timesta
 select count(*) as studios_with_details from organizations
 where studio_phone is not null or studio_whatsapp is not null or instapay_address is not null
    or bank_name is not null or bank_account_holder is not null;
+
+-- (f) 0 rows: the new trigger and its function do not exist yet
+select tgname as name from pg_trigger where tgname = 'trg_design_engagements_rom_issue'
+union all
+select proname from pg_proc where proname = 'clear_rom_issue_on_band_change';
 ```
 
 **(b) THE PRE-CHECK. 0 rows, or STOP.** It lists every studio whose saved
@@ -1570,7 +1597,7 @@ from (
   select id, name_en, name_ar,
          coalesce(studio_phone IS NULL OR studio_phone ~ '^\+[1-9][0-9]{7,14}$' OR studio_phone ~ '^0[1-9][0-9]{7,9}$', true) as phone_ok,
          coalesce(studio_whatsapp IS NULL OR studio_whatsapp ~ '^\+[1-9][0-9]{7,14}$' OR studio_whatsapp ~ '^01[0125][0-9]{8}$', true) as whatsapp_ok,
-         coalesce((instapay_address IS NULL OR (instapay_address !~ '[\u00AD\u0600-\u0605\u061C\u06DD\u070F\u0890-\u0891\u08E2\u180E\u200B-\u200F\u202A-\u202E\u2060-\u2064\u2066-\u206F\uFEFF\uFFF9-\uFFFB\U000110BD\U000110CD\U00013430-\U0001343F\U0001BCA0-\U0001BCA3\U0001D173-\U0001D17A\U000E0001\U000E0020-\U000E007F]' AND instapay_address !~ '[\u0001-\u001F\u007F-\u009F]' AND instapay_address ~ '[^\u0009-\u000D\u0020\u00A0\u1680\u2000-\u200A\u2028\u2029\u202F\u205F\u3000\uFEFF\u0085\u2800\u115F\u1160\u3164\uFFA0\u0300-\u036F\u0483-\u0489\u0610-\u061A\u064B-\u065F\u0670\u06D6-\u06DC\u06DF-\u06E4\u06E7-\u06E8\u06EA-\u06ED\u1AB0-\u1ACE\u1DC0-\u1DFF\u20D0-\u20F0\uFE20-\uFE2F]')) AND (bank_name IS NULL OR (bank_name !~ '[\u00AD\u0600-\u0605\u061C\u06DD\u070F\u0890-\u0891\u08E2\u180E\u200B-\u200F\u202A-\u202E\u2060-\u2064\u2066-\u206F\uFEFF\uFFF9-\uFFFB\U000110BD\U000110CD\U00013430-\U0001343F\U0001BCA0-\U0001BCA3\U0001D173-\U0001D17A\U000E0001\U000E0020-\U000E007F]' AND bank_name !~ '[\u0001-\u001F\u007F-\u009F]' AND bank_name ~ '[^\u0009-\u000D\u0020\u00A0\u1680\u2000-\u200A\u2028\u2029\u202F\u205F\u3000\uFEFF\u0085\u2800\u115F\u1160\u3164\uFFA0\u0300-\u036F\u0483-\u0489\u0610-\u061A\u064B-\u065F\u0670\u06D6-\u06DC\u06DF-\u06E4\u06E7-\u06E8\u06EA-\u06ED\u1AB0-\u1ACE\u1DC0-\u1DFF\u20D0-\u20F0\uFE20-\uFE2F]')) AND (bank_account_holder IS NULL OR (bank_account_holder !~ '[\u00AD\u0600-\u0605\u061C\u06DD\u070F\u0890-\u0891\u08E2\u180E\u200B-\u200F\u202A-\u202E\u2060-\u2064\u2066-\u206F\uFEFF\uFFF9-\uFFFB\U000110BD\U000110CD\U00013430-\U0001343F\U0001BCA0-\U0001BCA3\U0001D173-\U0001D17A\U000E0001\U000E0020-\U000E007F]' AND bank_account_holder !~ '[\u0001-\u001F\u007F-\u009F]' AND bank_account_holder ~ '[^\u0009-\u000D\u0020\u00A0\u1680\u2000-\u200A\u2028\u2029\u202F\u205F\u3000\uFEFF\u0085\u2800\u115F\u1160\u3164\uFFA0\u0300-\u036F\u0483-\u0489\u0610-\u061A\u064B-\u065F\u0670\u06D6-\u06DC\u06DF-\u06E4\u06E7-\u06E8\u06EA-\u06ED\u1AB0-\u1ACE\u1DC0-\u1DFF\u20D0-\u20F0\uFE20-\uFE2F]')), true) as payment_text_ok
+         coalesce((instapay_address IS NULL OR (instapay_address !~ '[\u00AD\u0600-\u0605\u061C\u06DD\u070F\u0890-\u0891\u08E2\u180E\u200B-\u200F\u202A-\u202E\u2060-\u2064\u2066-\u206F\uFEFF\uFFF9-\uFFFB\U000110BD\U000110CD\U00013430-\U0001343F\U0001BCA0-\U0001BCA3\U0001D173-\U0001D17A\U000E0001\U000E0020-\U000E007F]' AND instapay_address !~ '[\u0001-\u001F\u007F-\u009F]' AND instapay_address ~ '[^\u0009-\u000D\u0020\u00A0\u1680\u2000-\u200A\u2028\u2029\u202F\u205F\u3000\uFEFF\u0085\u2800\u115F\u1160\u3164\uFFA0\u0300-\u036F\u0483-\u0489\u0610-\u061A\u064B-\u065F\u0670\u06D6-\u06DC\u06DF-\u06E4\u06E7-\u06E8\u06EA-\u06ED\u1AB0-\u1ACE\u1DC0-\u1DFF\u20D0-\u20F0\uFE20-\uFE2F\u17B4-\u17B5\u180B-\u180F\uFE00-\uFE0F\U00013440\U00016FE4\U000E0100-\U000E01EF\uE000-\uF8FF\uFDD0-\uFDEF\uFFFE-\uFFFF\U0001FFFE-\U0001FFFF\U0002FFFE-\U0002FFFF\U0003FFFE-\U0003FFFF\U0004FFFE-\U0004FFFF\U0005FFFE-\U0005FFFF\U0006FFFE-\U0006FFFF\U0007FFFE-\U0007FFFF\U0008FFFE-\U0008FFFF\U0009FFFE-\U0009FFFF\U000AFFFE-\U000AFFFF\U000BFFFE-\U000BFFFF\U000CFFFE-\U000CFFFF\U000DFFFE-\U000DFFFF\U000EFFFE-\U000EFFFF\U000F0000-\U0010FFFF]')) AND (bank_name IS NULL OR (bank_name !~ '[\u00AD\u0600-\u0605\u061C\u06DD\u070F\u0890-\u0891\u08E2\u180E\u200B-\u200F\u202A-\u202E\u2060-\u2064\u2066-\u206F\uFEFF\uFFF9-\uFFFB\U000110BD\U000110CD\U00013430-\U0001343F\U0001BCA0-\U0001BCA3\U0001D173-\U0001D17A\U000E0001\U000E0020-\U000E007F]' AND bank_name !~ '[\u0001-\u001F\u007F-\u009F]' AND bank_name ~ '[^\u0009-\u000D\u0020\u00A0\u1680\u2000-\u200A\u2028\u2029\u202F\u205F\u3000\uFEFF\u0085\u2800\u115F\u1160\u3164\uFFA0\u0300-\u036F\u0483-\u0489\u0610-\u061A\u064B-\u065F\u0670\u06D6-\u06DC\u06DF-\u06E4\u06E7-\u06E8\u06EA-\u06ED\u1AB0-\u1ACE\u1DC0-\u1DFF\u20D0-\u20F0\uFE20-\uFE2F\u17B4-\u17B5\u180B-\u180F\uFE00-\uFE0F\U00013440\U00016FE4\U000E0100-\U000E01EF\uE000-\uF8FF\uFDD0-\uFDEF\uFFFE-\uFFFF\U0001FFFE-\U0001FFFF\U0002FFFE-\U0002FFFF\U0003FFFE-\U0003FFFF\U0004FFFE-\U0004FFFF\U0005FFFE-\U0005FFFF\U0006FFFE-\U0006FFFF\U0007FFFE-\U0007FFFF\U0008FFFE-\U0008FFFF\U0009FFFE-\U0009FFFF\U000AFFFE-\U000AFFFF\U000BFFFE-\U000BFFFF\U000CFFFE-\U000CFFFF\U000DFFFE-\U000DFFFF\U000EFFFE-\U000EFFFF\U000F0000-\U0010FFFF]')) AND (bank_account_holder IS NULL OR (bank_account_holder !~ '[\u00AD\u0600-\u0605\u061C\u06DD\u070F\u0890-\u0891\u08E2\u180E\u200B-\u200F\u202A-\u202E\u2060-\u2064\u2066-\u206F\uFEFF\uFFF9-\uFFFB\U000110BD\U000110CD\U00013430-\U0001343F\U0001BCA0-\U0001BCA3\U0001D173-\U0001D17A\U000E0001\U000E0020-\U000E007F]' AND bank_account_holder !~ '[\u0001-\u001F\u007F-\u009F]' AND bank_account_holder ~ '[^\u0009-\u000D\u0020\u00A0\u1680\u2000-\u200A\u2028\u2029\u202F\u205F\u3000\uFEFF\u0085\u2800\u115F\u1160\u3164\uFFA0\u0300-\u036F\u0483-\u0489\u0610-\u061A\u064B-\u065F\u0670\u06D6-\u06DC\u06DF-\u06E4\u06E7-\u06E8\u06EA-\u06ED\u1AB0-\u1ACE\u1DC0-\u1DFF\u20D0-\u20F0\uFE20-\uFE2F\u17B4-\u17B5\u180B-\u180F\uFE00-\uFE0F\U00013440\U00016FE4\U000E0100-\U000E01EF\uE000-\uF8FF\uFDD0-\uFDEF\uFFFE-\uFFFF\U0001FFFE-\U0001FFFF\U0002FFFE-\U0002FFFF\U0003FFFE-\U0003FFFF\U0004FFFE-\U0004FFFF\U0005FFFE-\U0005FFFF\U0006FFFE-\U0006FFFF\U0007FFFE-\U0007FFFF\U0008FFFE-\U0008FFFF\U0009FFFE-\U0009FFFF\U000AFFFE-\U000AFFFF\U000BFFFE-\U000BFFFF\U000CFFFE-\U000CFFFF\U000DFFFE-\U000DFFFF\U000EFFFE-\U000EFFFF\U000F0000-\U0010FFFF]')), true) as payment_text_ok
   from public.organizations
 ) checked
 where not (phone_ok and whatsapp_ok and payment_text_ok);
@@ -1590,15 +1617,16 @@ Expected:
 - `db:migrate` exits 0 and prints `Migrations applied.`. It does not print a
   count, so re-run query (a) from step 2: `migrations` is exactly one higher
   (60) and `newest` is `1791734529315` (0059's journal stamp).
-- `db:apply-rls` ends with these two lines (the same as after 0058: the new
-  overload shares its function's name, and the counts are by name; a fresh
+- `db:apply-rls` ends with these two lines (one trigger and one function
+  more than after 0058: the band trigger and its function; the new respond
+  overload shares its function's name, and the counts are by name. A fresh
   CI-shaped database printed exactly these on this branch, and a
   production-shaped rehearsal printed them verbatim, twice):
-  `apply-rls: verified in the catalogues — 46 tables, 46 policies, 14 triggers, 43 functions, RLS forced on all of them, role metra_app present.`
+  `{{APPLY_RLS_1}}`
   and
-  `apply-rls: grants verified — design_engagements update narrowed to 19 columns with no table-level update, and 5 narrowed table(s) (boqs, document_categories, engagement_document_comments, engagement_milestones, workspace_entitlements) holding exactly what rls/roles.sql leaves them.`
+  `{{APPLY_RLS_2}}`
 - `assert-schema-applied` exits 0, and its functions line reads
-  `assert-schema-applied: functions — 43 declared, all present.` (its index and constraint lines are report only and
+  `{{ASSERT_FUNCTIONS}}` (its index and constraint lines are report only and
   do not fail it).
 
 **If a command fails, it prints the SQLSTATE and what to do,** on two lines:
@@ -1675,15 +1703,20 @@ from pg_proc p join pg_namespace n on n.oid = p.pronamespace
 where n.nspname = 'public' and p.proname like 'app_delivery_%'
 order by 1, 2;
 
--- 1 row: metra_app = true, public_grants = 0, anon = authenticated = service_role = false
-select has_function_privilege('metra_app', f.sig, 'execute') as metra_app,
+-- 2 rows: metra_app = true, public_grants = 0, anon = authenticated = service_role = false on both
+select f.sig, has_function_privilege('metra_app', f.sig, 'execute') as metra_app,
        (select count(*) from aclexplode(coalesce(p.proacl, acldefault('f', p.proowner))) a
          where a.grantee = 0) as public_grants,
        has_function_privilege('anon', f.sig, 'execute') as anon,
        has_function_privilege('authenticated', f.sig, 'execute') as authenticated,
        has_function_privilege('service_role', f.sig, 'execute') as service_role
-from (values ('public.app_delivery_respond_by_token(text, text, timestamptz, text, text, text, text)')) as f(sig)
+from (values ('public.app_delivery_respond_by_token(text, text, timestamptz, text, text, text, text)'),
+             ('public.clear_rom_issue_on_band_change()')) as f(sig)
 join pg_proc p on p.oid = f.sig::regprocedure;
+
+-- 1 row: {{TRIGGER_ROW}}
+select tgenabled, pg_get_triggerdef(oid) as definition from pg_trigger
+where tgrelid = 'public.design_engagements'::regclass and tgname = 'trg_design_engagements_rom_issue';
 
 -- The same number as step 2 (e): nothing was touched
 select count(*) as studios_with_details from organizations
@@ -1715,8 +1748,10 @@ stays. Do NOT run `db:apply-rls` from a `main` older than this branch once
 Wave 3 serves: it restores the older `app_delivery_by_token` without the
 issuance instants and receipts, so every design approval and budget
 confirmation on the client page answers "this changed, please look again" and
-the receipts disappear. `apply-rls` never drops a function, so the new
-overload stays either way.
+the receipts disappear. `apply-rls` never drops a function or a trigger, so
+the new overload and the band trigger stay either way; every older Worker
+works with the trigger, because the app's band writer already clears the
+stamp itself.
 
 **Only if a legitimate studio value is refused** by a tightened CHECK (the
 Settings card then says "something went wrong" on save; the lead confirms it
