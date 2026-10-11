@@ -66,7 +66,7 @@ describe('the studio logo route', () => {
     expect([...new Uint8Array(await response.arrayBuffer())]).toEqual([4, 5, 6]);
     // The plain object URL, signed for 30 s, no transform: the stored original.
     expect(storage.createSignedObjectUrl).toHaveBeenCalledWith('metra-files', OBJECT_KEY, 30);
-    expect(fetchMock).toHaveBeenCalledWith(OBJECT_SIGNED, expect.objectContaining({ redirect: 'error' }));
+    expect(fetchMock).toHaveBeenCalledWith(OBJECT_SIGNED, expect.objectContaining({ redirect: 'manual' }));
   });
 
   it("reads only the caller's own org: its RLS context, its org row, a file of that same org", async () => {
