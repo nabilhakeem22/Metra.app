@@ -1489,7 +1489,10 @@ Why, one sentence each:
   real Settings code against the new CHECKs, with no refusal), and the new
   band trigger changes nothing the live code does (its one band writer
   already clears the issuance stamp). Measured on a fresh database built from
-  this branch: {{COMPAT}}
+  this branch: main's own 970 database
+  tests ran and 966 passed; the four that failed are lists that pin "one
+  overload per function" or 0058's loosest phone, which this branch updates,
+  not behaviour of the live code.
 - **Wave 3 before the database step is an outage:** every review act on the
   client page (approve, ask for changes, confirm the budget) fails with 42883
   (no such function), and the payments card shows no receipts.
@@ -1548,7 +1551,7 @@ dependency (`package.json` and the lockfile are unchanged), so the installed
 cd C:\Users\HP\merta-main
 git fetch origin
 git switch --detach origin/validate/round-d-db
-git log --oneline -2    # line 1: "docs(deploy): ..." (this runbook); line 2 MUST start {{SHA}} (the code rehearsed); CI green
+git log --oneline -2    # line 1: "docs(deploy): ..." (this runbook); line 2 MUST start aa84dbd (the code rehearsed); CI green
 ```
 
 **2. Read-only, before** (Supabase SQL editor). Note the numbers:
@@ -1622,11 +1625,11 @@ Expected:
   overload shares its function's name, and the counts are by name. A fresh
   CI-shaped database printed exactly these on this branch, and a
   production-shaped rehearsal printed them verbatim, twice):
-  `{{APPLY_RLS_1}}`
+  `apply-rls: verified in the catalogues — 46 tables, 46 policies, 15 triggers, 44 functions, RLS forced on all of them, role metra_app present.`
   and
-  `{{APPLY_RLS_2}}`
+  `apply-rls: grants verified — design_engagements update narrowed to 19 columns with no table-level update, and 5 narrowed table(s) (boqs, document_categories, engagement_document_comments, engagement_milestones, workspace_entitlements) holding exactly what rls/roles.sql leaves them.`
 - `assert-schema-applied` exits 0, and its functions line reads
-  `{{ASSERT_FUNCTIONS}}` (its index and constraint lines are report only and
+  `assert-schema-applied: functions — 44 declared, all present.` (its index and constraint lines are report only and
   do not fail it).
 
 **If a command fails, it prints the SQLSTATE and what to do,** on two lines:
@@ -1714,7 +1717,7 @@ from (values ('public.app_delivery_respond_by_token(text, text, timestamptz, tex
              ('public.clear_rom_issue_on_band_change()')) as f(sig)
 join pg_proc p on p.oid = f.sig::regprocedure;
 
--- 1 row: {{TRIGGER_ROW}}
+-- 1 row: O | CREATE TRIGGER trg_design_engagements_rom_issue BEFORE UPDATE OF rom_low, rom_high ON public.design_engagements FOR EACH ROW EXECUTE FUNCTION clear_rom_issue_on_band_change()
 select tgenabled, pg_get_triggerdef(oid) as definition from pg_trigger
 where tgrelid = 'public.design_engagements'::regclass and tgname = 'trg_design_engagements_rom_issue';
 
