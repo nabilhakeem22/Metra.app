@@ -1486,7 +1486,10 @@ Why, one sentence each:
   fields of the client page snapshot, every function it calls keeps its exact
   arguments and result, and every value the live Settings card saves passes the
   tightened CHECKs (a test saves thousands of generated values through the
-  real Settings code against the new CHECKs, with no refusal).
+  real Settings code against the new CHECKs, with no refusal). Measured on a
+  fresh 0059 database: main's own 970 database tests ran and 966 passed; the
+  four that failed are lists that pin "one overload per function" or 0058's
+  loosest phone, which this branch updates, not behaviour of the live code.
 - **Wave 3 before the database step is an outage:** every review act on the
   client page (approve, ask for changes, confirm the budget) fails with 42883
   (no such function), and the payments card shows no receipts.
