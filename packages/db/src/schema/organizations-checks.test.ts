@@ -29,13 +29,15 @@ function codePointsOf(characterClass: string): number[] {
 /** The Braille blank and the Hangul fillers: letters and symbols that draw nothing. */
 const BLANK_LOOKING = [0x2800, 0x115f, 0x1160, 0x3164, 0xffa0];
 const SEEN_BY_THE_APP = /[\p{L}\p{N}\p{P}\p{S}]/u;
-const DRAWS_NOTHING = /[\p{Z}\p{Cc}\p{Cf}\p{M}]/u;
+const DRAWS_NOTHING = /[\p{Z}\p{Cc}\p{Cf}\p{M}\p{Co}\p{Cn}]/u;
 
 describe('NOT_VISIBLE (0059)', () => {
   const covered = codePointsOf(NOT_VISIBLE);
 
   it('covers the white space, NEL, the blank-looking characters and the Arabic marks', () => {
     expect(covered).toEqual(expect.arrayContaining([0x20, 0xa0, 0x3000, 0x85, ...BLANK_LOOKING, 0x651, 0x64b, 0x670]));
+    // Round D review (F2, L3): the selectors and fillers, private use and the noncharacters.
+    expect(covered).toEqual(expect.arrayContaining([0xfe0f, 0xe0100, 0x180b, 0x17b4, 0x16fe4, 0x13440, 0xe000, 0x10fffd, 0xfdd0, 0xffff]));
   });
 
   it('holds no letter, digit, punctuation mark or symbol but the five blank-looking ones', () => {
@@ -45,7 +47,7 @@ describe('NOT_VISIBLE (0059)', () => {
     expect(visible.map((codePoint) => codePoint.toString(16))).toEqual([]);
   });
 
-  it('holds only white space, controls, format characters and marks besides them', () => {
+  it('holds only white space, controls, format characters, marks, private use and noncharacters besides them', () => {
     const other = covered.filter(
       (codePoint) => !DRAWS_NOTHING.test(String.fromCodePoint(codePoint)) && !BLANK_LOOKING.includes(codePoint),
     );

@@ -27,17 +27,28 @@ const CONTROLS = String.raw`\u0001-\u001F\u007F-\u009F`;
 /** NEL, then the letters and symbols that draw nothing: the Braille blank and the Hangul fillers. */
 const BLANK_LOOKING = String.raw`\u0085\u2800\u115F\u1160\u3164\uFFA0`;
 
-/** Combining marks, which draw nothing on their own (Latin, Cyrillic, Arabic and the generic blocks). */
+/** Combining marks of the listed scripts, which draw nothing on their own (Latin, Cyrillic, Arabic and the generic blocks). */
 const COMBINING_MARKS = String.raw`\u0300-\u036F\u0483-\u0489\u0610-\u061A\u064B-\u065F\u0670\u06D6-\u06DC\u06DF-\u06E4\u06E7-\u06E8\u06EA-\u06ED\u1AB0-\u1ACE\u1DC0-\u1DFF\u20D0-\u20F0\uFE20-\uFE2F`;
 
 /**
- * What a reader cannot see on its own. INVARIANT (organizations-checks.test.ts):
- * only white space, controls, format characters, combining marks and the
- * blank-looking characters above, never another letter, digit, punctuation
- * mark or symbol. The app keeps a value only when it holds one of those, so
- * every value it accepts passes the visible-character rule.
+ * Marks that only select or fill (Round D review): the Khmer inherent vowels,
+ * the Mongolian variation selectors, the variation selectors and their
+ * supplement, the Egyptian hieroglyph mirror and the Khitan filler.
  */
-export const NOT_VISIBLE = `${WHITE_SPACE}${BLANK_LOOKING}${COMBINING_MARKS}`;
+const FILLERS_AND_SELECTORS = String.raw`\u17B4-\u17B5\u180B-\u180F\uFE00-\uFE0F\U00013440\U00016FE4\U000E0100-\U000E01EF`;
+
+/** Private use (the BMP area and planes 15 and 16) and the noncharacters: nothing a font is bound to draw. */
+const PRIVATE_USE_AND_NONCHARACTERS = String.raw`\uE000-\uF8FF\uFDD0-\uFDEF\uFFFE-\uFFFF\U0001FFFE-\U0001FFFF\U0002FFFE-\U0002FFFF\U0003FFFE-\U0003FFFF\U0004FFFE-\U0004FFFF\U0005FFFE-\U0005FFFF\U0006FFFE-\U0006FFFF\U0007FFFE-\U0007FFFF\U0008FFFE-\U0008FFFF\U0009FFFE-\U0009FFFF\U000AFFFE-\U000AFFFF\U000BFFFE-\U000BFFFF\U000CFFFE-\U000CFFFF\U000DFFFE-\U000DFFFF\U000EFFFE-\U000EFFFF\U000F0000-\U0010FFFF`;
+
+/**
+ * What a reader cannot see on its own. INVARIANT (organizations-checks.test.ts):
+ * only white space, controls, format characters, marks, private use,
+ * noncharacters and the blank-looking characters above, never another letter,
+ * digit, punctuation mark or symbol. The app keeps a value only when it holds
+ * one of those, so every value it accepts passes the visible-character rule
+ * (delivery-db-step-0059-differential.dbtest.ts checks every code point).
+ */
+export const NOT_VISIBLE = `${WHITE_SPACE}${BLANK_LOOKING}${COMBINING_MARKS}${FILLERS_AND_SELECTORS}${PRIVATE_USE_AND_NONCHARACTERS}`;
 
 /** `+` and the international digits: a country code that does not start with 0, 8 to 15 digits. */
 const INTERNATIONAL_NUMBER = String.raw`^\+[1-9][0-9]{7,14}$`;
