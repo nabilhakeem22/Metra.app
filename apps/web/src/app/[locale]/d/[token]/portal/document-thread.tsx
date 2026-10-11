@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { useCallback, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { portalCommentErrorKey } from '@/lib/engagements/portal-error-key';
+import { ownSentComment, threadMessagesOrThrow } from '@/lib/engagements/portal-thread-read';
 import type { PublicDocumentComment } from '@/lib/engagements/public-comments';
 import { useDocumentThread } from '@/lib/engagements/use-document-thread';
 import { addDeliveryComment, loadDeliveryDocumentComments } from '../actions';
@@ -51,7 +52,7 @@ export function DocumentThread({
   const [studioNotified, setStudioNotified] = useState(false);
 
   const load = useCallback(
-    () => loadDeliveryDocumentComments(token, documentId),
+    async () => threadMessagesOrThrow(await loadDeliveryDocumentComments(token, documentId)),
     [token, documentId],
   );
   const submit = useCallback(
@@ -65,7 +66,7 @@ export function DocumentThread({
     },
     [token, documentId, router],
   );
-  const thread = useDocumentThread<PublicDocumentComment>({ load, send: submit });
+  const thread = useDocumentThread<PublicDocumentComment>({ load, send: submit, echo: ownSentComment });
 
   // The server's count until the thread has really loaded, then its own length
   // (which reflects whatever was just sent).
@@ -90,10 +91,11 @@ export function DocumentThread({
               <Loader2 className="size-3.5 animate-spin" aria-hidden />
               {t('loading')}
             </p>
-          ) : thread.messages.length === 0 ? (
-            <p className="text-caption text-muted-foreground">{t('empty')}</p>
-          ) : (
+          ) : thread.messages.length > 0 ? (
             <DocumentThreadMessages messages={thread.messages} />
+          ) : (
+            // "No messages yet" only after a read completed: a refused read is not empty.
+            thread.loaded && <p className="text-caption text-muted-foreground">{t('empty')}</p>
           )}
 
           <div className="space-y-1.5">

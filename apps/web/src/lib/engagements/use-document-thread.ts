@@ -9,9 +9,10 @@ import { useState, useTransition } from 'react';
  * Headless on purpose. The two surfaces have genuinely different design systems
  * (the portal uses shadcn semantic classes, the cockpit uses Metra's `--token`
  * palette) and different server actions, so their MARKUP is legitimately separate.
- * Their behaviour is not: both are collapsed-by-default, both fetch lazily on the
- * first open only, both re-read after a send rather than appending locally, and both
- * wrap the await so a rejected action can never strand the spinner. That behaviour
+ * Their behaviour is not: both are collapsed-by-default, both fetch lazily on open
+ * until a read has completed, both re-read after a send rather than appending
+ * locally (a failed re-read keeps what is shown), and both wrap the await so a
+ * rejected action can never strand the spinner. That behaviour
  * lives here, once.
  *
  * Generic over the message type because the two readers return different shapes —
@@ -32,17 +33,21 @@ export interface DocumentThread<TMessage> {
   loading: boolean;
   /** A send is in flight. */
   sending: boolean;
-  /** Expand/collapse, fetching on the FIRST expand only. */
+  /** Expand/collapse, fetching on an expand while nothing has loaded yet. */
   toggle: () => void;
   /** Send the trimmed draft, then re-read. No-op on a blank draft. */
   send: () => void;
 }
 
 export function useDocumentThread<TMessage>(options: {
-  /** Read the thread. Must resolve to `[]` rather than throwing on a miss. */
+  /** Read the thread. Resolves to `[]` on a miss; REJECTS when the read was refused
+   *  (not an empty thread), which shows the generic error and keeps `loaded` false. */
   load: () => Promise<TMessage[]>;
   /** Append one message. Resolves with a coded result — never throws to the UI. */
   send: (body: string) => Promise<{ ok: boolean; error?: string }>;
+  /** The sender's own message as the thread shows it, used only when the re-read
+   *  after a SUCCESSFUL send fails, so a saved message never vanishes from view. */
+  echo?: (body: string) => TMessage;
 }): DocumentThread<TMessage> {
   const [open, setOpen] = useState(false);
   const [loaded, setLoaded] = useState(false);
@@ -69,8 +74,22 @@ export function useDocumentThread<TMessage>(options: {
     const next = !open;
     setOpen(next);
     setError(null);
-    // Fetch on the FIRST open only; re-opening reuses what we already hold.
+    // Fetch until a read has completed; after that, re-opening reuses what we hold.
     if (next && !loaded && !loading) fetchThread();
+  }
+
+  /** After a successful send: re-read, or keep what is shown plus the sent message. */
+  async function rereadAfterSend(body: string): Promise<void> {
+    try {
+      setMessages(await options.load());
+      setLoaded(true);
+    } catch {
+      // The message WAS saved, so no send error. Keep what is on screen, add the
+      // sender's own message, and let the next open read the thread again.
+      const echo = options.echo;
+      if (echo) setMessages((shown) => [...shown, echo(body)]);
+      setLoaded(false);
+    }
   }
 
   function send(): void {
@@ -88,8 +107,7 @@ export function useDocumentThread<TMessage>(options: {
         // Re-read rather than appending locally: the stored row carries the real
         // timestamp, and a refetch also surfaces anything the other side sent
         // while this message was being written.
-        setMessages(await options.load());
-        setLoaded(true);
+        await rereadAfterSend(body);
       } catch {
         setError('generic');
       }

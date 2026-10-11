@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { countingRateLimit, fakePortalRateLimitEnv } from '@/test/fake-rate-limit-env';
+import { PORTAL_READ_CEILING } from '@/test/wrangler-rate-limits';
 
 // Round C, AC 51 and 52: a gallery tile (?variant=thumb) is the 480 px
 // rendition's BYTES, streamed from the app whether the client has paid or not,
@@ -52,7 +53,10 @@ beforeEach(() => {
   fetchMock.mockReset().mockResolvedValue(new Response(new Uint8Array([1, 2, 3]), { headers: { 'content-type': 'image/jpeg' } }));
   vi.stubGlobal('fetch', fetchMock);
 });
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+  vi.unstubAllGlobals();
+  vi.restoreAllMocks();
+});
 
 describe('gallery tiles (?variant=thumb, AC 51, 52): streamed bytes, paid or not', () => {
   it.each([
@@ -83,12 +87,15 @@ describe('gallery tiles (?variant=thumb, AC 51, 52): streamed bytes, paid or not
 });
 
 describe('the per-link read brake (W4)', () => {
-  it('on Cloudflare, the 301st tile in a minute for one link is a 429, nothing looked up; another link is served', async () => {
+  it('on Cloudflare, the tile past the read ceiling for one link is a 429, nothing looked up; another link is served', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
     cf.isCloudflareRuntime.mockReturnValue(true);
     cf.cfEnv.mockReturnValue(fakePortalRateLimitEnv());
     documents.getDeliveryDocumentByToken.mockResolvedValue(UNPAID);
     fetchMock.mockImplementation(async () => new Response(new Uint8Array([1]), { headers: { 'content-type': 'image/jpeg' } }));
-    for (let index = 0; index < 300; index += 1) expect((await get('?variant=thumb', 'loop-token')).status).toBe(200);
+    for (let index = 0; index < PORTAL_READ_CEILING; index += 1) {
+      expect((await get('?variant=thumb', 'loop-token')).status).toBe(200);
+    }
     documents.getDeliveryDocumentByToken.mockClear();
     expectRefused(await get('?variant=thumb', 'loop-token'));
     expect(documents.getDeliveryDocumentByToken).not.toHaveBeenCalled();
@@ -96,9 +103,21 @@ describe('the per-link read brake (W4)', () => {
   });
 
   it('a refusing limiter refuses a download the same way', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
     cf.isCloudflareRuntime.mockReturnValue(true);
     cf.cfEnv.mockReturnValue({ PORTAL_READ_RATE_LIMITER: countingRateLimit(0) });
     expectRefused(await get(''));
     expect(documents.getDeliveryDocumentByToken).not.toHaveBeenCalled();
+  });
+
+  it('F2: a Worker without its read binding answers the unavailable 303, logs the binding, looks nothing up', async () => {
+    cf.isCloudflareRuntime.mockReturnValue(true);
+    cf.cfEnv.mockReturnValue({});
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {});
+    expectUnavailable(await get('?variant=thumb'));
+    expectUnavailable(await get(''));
+    expect(documents.getDeliveryDocumentByToken).not.toHaveBeenCalled();
+    expect(log).toHaveBeenCalledTimes(2);
+    expect(log.mock.calls[0][1]).toMatchObject({ binding: 'PORTAL_READ_RATE_LIMITER' });
   });
 });

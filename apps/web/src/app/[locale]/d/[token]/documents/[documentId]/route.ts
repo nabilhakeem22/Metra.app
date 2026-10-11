@@ -3,7 +3,7 @@ import { tokenPathSegment } from '@/lib/engagements/portal-path';
 import { getDeliveryDocumentByToken } from '@/lib/engagements/public-documents';
 import { LOCALES, routing } from '@/i18n/routing';
 import { isUuid } from '@/lib/uuid';
-import { PORTAL_RETRY_AFTER_SECONDS, portalReadAllowed } from '@/lib/share/portal-rate-limit';
+import { PORTAL_RETRY_AFTER_SECONDS, portalReadVerdict } from '@/lib/share/portal-rate-limit';
 import { DOCUMENT_HEADERS, documentResponse, type HandOver } from './document-response';
 
 // Client Deliverables — the session-less endpoint for ONE released document of a
@@ -19,11 +19,12 @@ import { DOCUMENT_HEADERS, documentResponse, type HandOver } from './document-re
 //
 // NO ORACLE: every failure — a non-uuid document id, a forged id, another delivery's
 // artifact, an unreleased artifact, an unknown/revoked/expired token, an unknown
-// variant, a withheld document, a Storage error, any throw — produces the
+// variant, a withheld document, a Storage error, a Worker deployed without its
+// read limiter binding (logged by name), any throw: produces the
 // IDENTICAL 303 back to the portal with `?document=unavailable`. Never a 404 body,
 // never a 500, never a distinguishable response, so a caller cannot probe which
 // documents or deliveries exist.
-// The one other answer is a 429 for a link past the per-link read brake
+// The one other answer is a 429 for a link past its per-link read budget
 // (../../../../../../lib/share/portal-rate-limit.ts): it is about the link the
 // caller already holds, never about a document.
 
@@ -56,8 +57,10 @@ export async function GET(
   { params }: { params: Promise<{ locale: string; token: string; documentId: string }> },
 ): Promise<NextResponse> {
   const { locale, token, documentId } = await params;
-  // More than 300 reads a minute for one link (per data centre) is a loop, not a client.
-  if (!(await portalReadAllowed(token))) {
+  // Past the link's read budget (per data centre) is a loop, not a client.
+  const verdict = await portalReadVerdict(token);
+  if (verdict === 'misdeployed') return unavailable(request, locale, token);
+  if (verdict === 'refused') {
     return new NextResponse(null, {
       status: 429,
       headers: { ...DOCUMENT_HEADERS, 'Retry-After': String(PORTAL_RETRY_AFTER_SECONDS) },

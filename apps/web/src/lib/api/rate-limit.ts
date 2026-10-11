@@ -1,6 +1,6 @@
 import 'server-only';
 import { createHash } from 'node:crypto';
-import { consumeRateLimit, rateLimitBinding, type CloudflareRateLimit } from '@/lib/cf/rate-limit-binding';
+import { consumeRateLimit, rateLimitBinding } from '@/lib/cf/rate-limit-binding';
 
 // Cloudflare Workers Rate Limiting bindings for the Public API (v1). Two buckets:
 //   API_RATE_LIMITER          100 requests / 60s per resolved KEY (post-auth).
@@ -98,8 +98,8 @@ function preAuthBucket(req: Request): string {
 const API_SURFACE = 'the Public API';
 
 /** One bucket's verdict as the API pipeline reads it. */
-async function consume(limiter: CloudflareRateLimit | null, key: string): Promise<RateLimitResult> {
-  return (await consumeRateLimit(limiter, key)) ? ALLOW : DENY;
+async function consume(bindingName: string, key: string): Promise<RateLimitResult> {
+  return (await consumeRateLimit(rateLimitBinding(bindingName, API_SURFACE), key, bindingName)) ? ALLOW : DENY;
 }
 
 // Both are `async` so a missing-binding throw surfaces as a REJECTED promise
@@ -108,8 +108,8 @@ async function consume(limiter: CloudflareRateLimit | null, key: string): Promis
 
 /** Per-KEY bucket: each API key gets its own budget once it has been resolved. */
 export const cloudflareRateLimiter: RateLimiter = async (keyId) =>
-  consume(rateLimitBinding('API_RATE_LIMITER', API_SURFACE), keyId);
+  consume('API_RATE_LIMITER', keyId);
 
 /** Per-CALLER bucket, charged BEFORE key resolution touches the database. */
 export const cloudflarePreAuthRateLimiter: PreAuthRateLimiter = async (req) =>
-  consume(rateLimitBinding('API_PREAUTH_RATE_LIMITER', API_SURFACE), preAuthBucket(req));
+  consume('API_PREAUTH_RATE_LIMITER', preAuthBucket(req));

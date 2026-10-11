@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fakePortalRateLimitEnv } from '@/test/fake-rate-limit-env';
+import { PORTAL_ACT_CEILING, PORTAL_READ_CEILING } from '@/test/wrangler-rate-limits';
 
 // Round D: the client portal's per-link brake on the Cloudflare Rate Limiting
 // bindings. The runtime probes are replaced so the on-platform path runs in Node.
@@ -9,7 +10,7 @@ const isCloudflareRuntime = vi.fn(() => true);
 const cfEnv = vi.fn(() => ({}) as Record<string, unknown>);
 vi.mock('@/lib/cf/context', () => ({ isCloudflareRuntime, cfEnv }));
 
-const { portalActAllowed, portalReadAllowed } = await import('./portal-rate-limit');
+const { portalActAllowed, portalReadAllowed, portalReadVerdict } = await import('./portal-rate-limit');
 
 const TOKEN = 'portal-link-token-AAAA';
 const OTHER_TOKEN = 'portal-link-token-BBBB';
@@ -24,26 +25,40 @@ async function calls(times: number, check: (token: unknown) => Promise<boolean>,
 beforeEach(() => {
   isCloudflareRuntime.mockReturnValue(true);
   cfEnv.mockReturnValue(fakePortalRateLimitEnv());
+  vi.spyOn(console, 'warn').mockImplementation(() => {});
 });
 afterEach(() => vi.restoreAllMocks());
 
 describe('the per-link ceilings (W4)', () => {
-  it('allows 30 acts a minute per link; the 31st is refused, another link is not', async () => {
-    const verdicts = await calls(31, portalActAllowed, TOKEN);
-    expect(verdicts.slice(0, 30).every(Boolean)).toBe(true);
-    expect(verdicts[30]).toBe(false);
+  it('allows the act ceiling per link; the next act is refused, another link is not', async () => {
+    const verdicts = await calls(PORTAL_ACT_CEILING + 1, portalActAllowed, TOKEN);
+    expect(verdicts.slice(0, PORTAL_ACT_CEILING).every(Boolean)).toBe(true);
+    expect(verdicts[PORTAL_ACT_CEILING]).toBe(false);
     expect(await portalActAllowed(OTHER_TOKEN)).toBe(true);
   });
 
-  it('allows 300 reads a minute per link; the 301st is refused, and reads do not spend acts', async () => {
-    const verdicts = await calls(301, portalReadAllowed, TOKEN);
-    expect(verdicts.slice(0, 300).every(Boolean)).toBe(true);
-    expect(verdicts[300]).toBe(false);
+  it('allows the read ceiling per link; the next read is refused, and reads do not spend acts', async () => {
+    const verdicts = await calls(PORTAL_READ_CEILING + 1, portalReadAllowed, TOKEN);
+    expect(verdicts.slice(0, PORTAL_READ_CEILING).every(Boolean)).toBe(true);
+    expect(verdicts[PORTAL_READ_CEILING]).toBe(false);
     expect(await portalActAllowed(TOKEN)).toBe(true);
   });
 
+  it('R6: each refusal logs one warning naming the binding and the kind, never the key or token', async () => {
+    const warn = vi.mocked(console.warn);
+    await calls(PORTAL_ACT_CEILING, portalActAllowed, TOKEN);
+    expect(warn).not.toHaveBeenCalled();
+    await portalActAllowed(TOKEN);
+    await portalActAllowed(TOKEN);
+    expect(warn.mock.calls).toEqual([
+      ['portal rate limit refused:', { binding: 'PORTAL_ACT_RATE_LIMITER', kind: 'act' }],
+      ['portal rate limit refused:', { binding: 'PORTAL_ACT_RATE_LIMITER', kind: 'act' }],
+    ]);
+    for (const secret of [TOKEN, sha256(TOKEN)]) expect(JSON.stringify(warn.mock.calls)).not.toContain(secret.slice(0, 32));
+  });
+
   it('counts a token with a stray space as the same link', async () => {
-    await calls(30, portalActAllowed, TOKEN);
+    await calls(PORTAL_ACT_CEILING, portalActAllowed, TOKEN);
     expect(await portalActAllowed(` ${TOKEN}\n`)).toBe(false);
   });
 
@@ -76,7 +91,7 @@ describe('the key (W6)', () => {
 describe('failure modes (W5)', () => {
   it('off-platform, everything is allowed and no binding is read', async () => {
     isCloudflareRuntime.mockReturnValue(false);
-    expect(await calls(40, portalActAllowed, TOKEN)).not.toContain(false);
+    expect(await calls(PORTAL_ACT_CEILING + 10, portalActAllowed, TOKEN)).not.toContain(false);
     expect(await portalReadAllowed(TOKEN)).toBe(true);
     expect(cfEnv).not.toHaveBeenCalled();
   });
@@ -99,5 +114,23 @@ describe('failure modes (W5)', () => {
     const logged = JSON.stringify(log.mock.calls[0]);
     expect(logged).toContain('failing open');
     for (const secret of [TOKEN, sha256(TOKEN), key]) expect(logged).not.toContain(secret);
+  });
+});
+
+describe('the route verdict (F2)', () => {
+  it('allowed, then refused past the read ceiling', async () => {
+    expect(await portalReadVerdict(TOKEN)).toBe('allowed');
+    await calls(PORTAL_READ_CEILING - 1, portalReadAllowed, TOKEN);
+    expect(await portalReadVerdict(TOKEN)).toBe('refused');
+  });
+
+  it('a missing read binding on Cloudflare is misdeployed, logged by binding name every time', async () => {
+    cfEnv.mockReturnValue({});
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {});
+    expect(await portalReadVerdict(TOKEN)).toBe('misdeployed');
+    expect(await portalReadVerdict(TOKEN)).toBe('misdeployed');
+    expect(log).toHaveBeenCalledTimes(2);
+    expect(log.mock.calls[0][1]).toMatchObject({ binding: 'PORTAL_READ_RATE_LIMITER' });
+    expect(JSON.stringify(log.mock.calls)).not.toContain(TOKEN);
   });
 });

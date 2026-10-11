@@ -45,8 +45,9 @@
   // refuses the act or read rather than serving the portal unlimited.
   //   PORTAL_ACT_RATE_LIMITER   30 req / 60s, keyed per share link (a sha256
   //     prefix of the token): every server action under /d/[token].
-  //   PORTAL_READ_RATE_LIMITER 300 req / 60s, keyed the same way: the document
-  //     and logo routes and a document's comment thread.
+  //   PORTAL_READ_RATE_LIMITER its "limit" below / 60s (the one line to change),
+  //     keyed the same way: the document and logo routes and a document's
+  //     comment thread.
   // Every counter here is PER DATA CENTRE, not global: a caller spread across k
   // colos gets k x the limit below. The numbers bound the work one colo can be
   // made to do; they are not a global quota.

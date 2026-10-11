@@ -1,4 +1,5 @@
 import { vi, type Mock } from 'vitest';
+import { PORTAL_ACT_CEILING, PORTAL_READ_CEILING } from './wrangler-rate-limits';
 
 // TEST-ONLY. Stand-ins for Cloudflare Workers Rate Limiting bindings, so a Node
 // test can drive the on-platform path. A binding here counts every call per key
@@ -28,7 +29,7 @@ export function fakePortalRateLimitEnv(): {
   PORTAL_READ_RATE_LIMITER: FakeRateLimit;
 } {
   return {
-    PORTAL_ACT_RATE_LIMITER: countingRateLimit(30),
-    PORTAL_READ_RATE_LIMITER: countingRateLimit(300),
+    PORTAL_ACT_RATE_LIMITER: countingRateLimit(PORTAL_ACT_CEILING),
+    PORTAL_READ_RATE_LIMITER: countingRateLimit(PORTAL_READ_CEILING),
   };
 }
