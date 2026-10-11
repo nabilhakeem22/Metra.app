@@ -1,9 +1,10 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { tokenPathSegment } from '@/lib/engagements/portal-path';
 import { getDeliveryDocumentByToken } from '@/lib/engagements/public-documents';
-import { LOCALES, routing } from '@/i18n/routing';
+import { LOCALE_COOKIE_NAME, LOCALES, routing } from '@/i18n/routing';
 import { isUuid } from '@/lib/uuid';
-import { PORTAL_RETRY_AFTER_SECONDS, portalReadVerdict } from '@/lib/share/portal-rate-limit';
+import { portalReadVerdict } from '@/lib/share/portal-rate-limit';
+import { PORTAL_RETRY_AFTER_SECONDS } from '@/lib/share/portal-retry-after';
 import { DOCUMENT_HEADERS, documentResponse, type HandOver } from './document-response';
 
 // Client Deliverables — the session-less endpoint for ONE released document of a
@@ -38,15 +39,26 @@ function isLocale(value: string): boolean {
   return (LOCALES as readonly string[]).includes(value);
 }
 
+/**
+ * The locale of the page a failure lands on: the visitor's own (their locale
+ * cookie), then the path's. A picture is fetched under one fixed locale segment
+ * (lib/engagements/portal-picture-path.ts) and an `<img>` follows this redirect,
+ * so landing on the path's locale would reset an English visitor's cookie.
+ */
+function landingLocale(request: NextRequest, locale: string): string {
+  const visitorLocale = request.cookies.get(LOCALE_COOKIE_NAME)?.value;
+  if (visitorLocale && isLocale(visitorLocale)) return visitorLocale;
+  return isLocale(locale) ? locale : routing.defaultLocale;
+}
+
 /** The single, indistinguishable failure response. */
 function unavailable(
   request: NextRequest,
   locale: string,
   token: string,
 ): NextResponse {
-  const safeLocale = isLocale(locale) ? locale : routing.defaultLocale;
   const target = new URL(
-    `/${safeLocale}/d/${tokenPathSegment(token)}?document=unavailable`,
+    `/${landingLocale(request, locale)}/d/${tokenPathSegment(token)}?document=unavailable`,
     request.url,
   );
   return NextResponse.redirect(target, { status: 303, headers: DOCUMENT_HEADERS });

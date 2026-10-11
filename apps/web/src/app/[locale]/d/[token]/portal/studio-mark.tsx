@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { tokenPathSegment } from '@/lib/engagements/portal-path';
+import { portalLogoPath } from '@/lib/engagements/portal-picture-path';
 
 /**
  * The studio's mark on the client page's bar: its logo when it has one, else
@@ -15,12 +15,10 @@ export function StudioMark({
   firmName,
   hasLogo,
   token,
-  locale,
 }: {
   firmName: string;
   hasLogo: boolean;
   token: string;
-  locale: string;
 }) {
   const [logoFailed, setLogoFailed] = useState(false);
   const logo = useRef<HTMLImageElement>(null);
@@ -32,7 +30,7 @@ export function StudioMark({
     return (
       <img
         ref={logo}
-        src={`/${locale}/d/${tokenPathSegment(token)}/logo`}
+        src={portalLogoPath(token)}
         width={40}
         height={40}
         alt=""

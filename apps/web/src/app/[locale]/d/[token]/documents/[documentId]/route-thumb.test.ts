@@ -121,3 +121,19 @@ describe('the per-link read brake (W4)', () => {
     expect(log.mock.calls[0][1]).toMatchObject({ binding: 'PORTAL_READ_RATE_LIMITER' });
   });
 });
+
+describe('the page a failed picture lands on (R2, fixed picture locale)', () => {
+  it.each([
+    ['NEXT_LOCALE=en', 'en'],
+    ['', 'ar-EG'],
+    ['NEXT_LOCALE=fr', 'ar-EG'],
+  ])('cookie %j lands on /%s, so the followed redirect never resets the visitor locale', async (cookie, landing) => {
+    documents.getDeliveryDocumentByToken.mockResolvedValue({ ...PAID_IMAGE, access: 'withheld' });
+    const request = new NextRequest(`https://app.test/ar-EG/d/tok/documents/${DOCUMENT_ID}?variant=thumb`, {
+      headers: cookie ? { cookie } : {},
+    });
+    const response = await GET(request, { params: Promise.resolve({ locale: 'ar-EG', token: 'tok', documentId: DOCUMENT_ID }) });
+    expect(response.status).toBe(303);
+    expect(response.headers.get('location')).toBe(`https://app.test/${landing}/d/tok?document=unavailable`);
+  });
+});

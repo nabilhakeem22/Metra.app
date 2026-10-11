@@ -1,6 +1,7 @@
 import createIntlMiddleware from 'next-intl/middleware';
-import type { NextRequest } from 'next/server';
+import { NextResponse, type NextRequest } from 'next/server';
 import { routing } from './i18n/routing';
+import { isPortalPicturePath } from './lib/engagements/portal-picture-path';
 import { updateSession } from './lib/supabase/middleware';
 
 const intlMiddleware = createIntlMiddleware(routing);
@@ -13,7 +14,10 @@ const TOKEN_ROUTE = /\/(d|p|c|v)\/[^/]+/;
 
 export async function middleware(request: NextRequest) {
   // i18n first (locale detection + redirect), then refresh Supabase cookies on it.
-  const response = intlMiddleware(request);
+  // A client-page picture is always fetched under one fixed locale segment, so it
+  // skips locale negotiation: it must never reset the visitor's locale cookie
+  // (lib/engagements/portal-picture-path.ts).
+  const response = isPortalPicturePath(request.nextUrl.pathname) ? NextResponse.next() : intlMiddleware(request);
   const result = await updateSession(request, response);
   if (TOKEN_ROUTE.test(request.nextUrl.pathname)) {
     result.headers.set('Referrer-Policy', 'no-referrer');

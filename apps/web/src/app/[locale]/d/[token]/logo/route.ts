@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { getDeliveryLogoByToken } from '@/lib/engagements/public-logo';
-import { PORTAL_RETRY_AFTER_SECONDS, portalReadVerdict } from '@/lib/share/portal-rate-limit';
+import { portalReadVerdict } from '@/lib/share/portal-rate-limit';
+import { PORTAL_RETRY_AFTER_SECONDS } from '@/lib/share/portal-retry-after';
 import { LOGO_HEADERS, logoNotFound, logoRenditionResponse } from '@/lib/storage/logo-rendition-response';
 
 // Round C: the studio's logo on the client page's studio bar. GET only; the

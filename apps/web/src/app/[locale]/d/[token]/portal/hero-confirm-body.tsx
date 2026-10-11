@@ -1,11 +1,11 @@
 'use client';
 
-import { useLocale, useTranslations } from 'next-intl';
+import { useTranslations } from 'next-intl';
 import type { PortalDocument } from '@/lib/engagements/portal-gallery';
 import type { HeroGroup } from '@/lib/engagements/portal-hero';
 import type { PublicDelivery } from '@/lib/engagements/public/types';
 import { BudgetRange } from './budget-range';
-import { documentUrl } from './document-url';
+import { pictureUrl } from './document-url';
 import { useImageLabel } from './image-tile';
 
 /**
@@ -28,13 +28,12 @@ export function HeroConfirmBody({
 }) {
   const tGroup = useTranslations(`delivery.hero.${group}`);
   const tDesign = useTranslations('delivery.hero.design');
-  const locale = useLocale();
   const labelOf = useImageLabel();
   return (
     <>
       {firstImage && (
         <img
-          src={documentUrl(locale, token, firstImage.id, 'thumb')}
+          src={pictureUrl(token, firstImage.id, 'thumb')}
           alt={labelOf(firstImage)}
           className="mx-auto max-h-40 rounded-item border bg-muted object-cover"
         />

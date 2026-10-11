@@ -25,9 +25,6 @@ import { hashShareToken } from './token';
 // binding, so the act is refused. Every refusal past the budget logs one
 // warning naming the binding and the kind (never the key or the token).
 
-/** The seconds a refused read is told to wait (the bindings' period). */
-export const PORTAL_RETRY_AFTER_SECONDS = 60;
-
 const PORTAL_SURFACE = 'the client portal';
 const LINK_KEY_LENGTH = 32;
 const PORTAL_BUDGETS = {

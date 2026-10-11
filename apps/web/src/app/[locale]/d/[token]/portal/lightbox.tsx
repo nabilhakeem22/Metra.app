@@ -5,7 +5,7 @@ import { ChevronLeft, ChevronRight, Download, X } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
 import type { KeyboardEvent } from 'react';
 import type { PortalDocument } from '@/lib/engagements/portal-gallery';
-import { documentUrl } from './document-url';
+import { documentUrl, pictureUrl } from './document-url';
 import { DocumentThread } from './document-thread';
 import { useImageLabel } from './image-tile';
 import { useReturnFocus } from './use-return-focus';
@@ -82,7 +82,7 @@ export function Lightbox({
               </div>
               <img
                 key={image.id}
-                src={documentUrl(locale, token, image.id, 'view')}
+                src={pictureUrl(token, image.id, 'view')}
                 alt={labelOf(image)}
                 className="max-h-[65vh] w-full rounded-item bg-muted object-contain"
               />

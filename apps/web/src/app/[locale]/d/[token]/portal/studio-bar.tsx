@@ -29,7 +29,7 @@ export function StudioBar({
   return (
     <header className="sticky top-0 z-20 border-b bg-background/95">
       <div className="mx-auto flex max-w-md items-center gap-2 px-4 py-2">
-        <StudioMark firmName={firmName} hasLogo={firm.hasLogo} token={token} locale={locale} />
+        <StudioMark firmName={firmName} hasLogo={firm.hasLogo} token={token} />
         <p className="ms-1 min-w-0 flex-1 truncate font-semibold leading-tight">
           <bdi>{firmName}</bdi>
         </p>

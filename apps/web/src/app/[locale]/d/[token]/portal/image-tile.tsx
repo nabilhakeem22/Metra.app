@@ -2,12 +2,12 @@
 
 import { ImageOff } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
-import { useState } from 'react';
 import type { PortalDocument } from '@/lib/engagements/portal-gallery';
 import { bidiIsolate } from '@/lib/format/bidi';
 import { formatDate } from '@/lib/format/date';
 import { cn } from '@/lib/utils';
-import { documentUrl } from './document-url';
+import { pictureUrl } from './document-url';
+import { usePictureRetry } from './use-picture-retry';
 
 /** A picture's name for a screen reader and a broken image: its category and share day. */
 export function useImageLabel(): (image: PortalDocument) => string {
@@ -25,8 +25,11 @@ export function useImageLabel(): (image: PortalDocument) => string {
  * One picture as a square tile that opens it (a button, 44 px and up). The
  * thumbnail is the document route's `thumb` variant: a small rendition
  * streamed by the app, never a storage URL. Lazy, so a long gallery costs
- * nothing until it scrolls into view; a thumbnail that fails (a type Storage
- * cannot transform) shows a plain image mark instead of a broken picture.
+ * nothing until it scrolls into view. A thumbnail that fails shows a plain
+ * image mark instead of a broken picture, and tries once more after the
+ * routes' Retry-After (./use-picture-retry.ts), so a tile the link's read
+ * budget refused still loads. The URL carries no page locale, so a language
+ * switch reuses the cached tile.
  */
 export function ImageTile({
   token,
@@ -39,30 +42,30 @@ export function ImageTile({
   onOpen: () => void;
   className?: string;
 }) {
-  const locale = useLocale();
   const label = useImageLabel()(image);
-  const [failed, setFailed] = useState(false);
+  const picture = usePictureRetry();
   return (
     <button
       type="button"
       onClick={onOpen}
-      aria-label={failed ? label : undefined}
+      aria-label={picture.showPicture ? undefined : label}
       title={label}
       className={cn(
         'relative aspect-square min-h-11 min-w-11 overflow-hidden rounded-item border bg-muted outline-none focus-ring-brand',
         className,
       )}
     >
-      {failed ? (
+      {!picture.showPicture ? (
         <ImageOff className="absolute inset-0 m-auto size-6 text-muted-foreground" aria-hidden />
       ) : (
         <img
-          src={documentUrl(locale, token, image.id, 'thumb')}
+          key={picture.attempt}
+          src={pictureUrl(token, image.id, 'thumb')}
           alt={label}
           loading="lazy"
           decoding="async"
           className="size-full object-cover"
-          onError={() => setFailed(true)}
+          onError={picture.onError}
         />
       )}
     </button>
