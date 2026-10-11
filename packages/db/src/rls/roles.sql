@@ -334,6 +334,11 @@ grant execute on function public.app_delivery_document_by_token(text, uuid) to m
 revoke execute on function public.app_delivery_document_by_token(text, uuid) from public;
 grant execute on function public.app_delivery_respond_by_token(text, text, text, text, text, text) to metra_app;
 revoke execute on function public.app_delivery_respond_by_token(text, text, text, text, text, text) from public;
+-- Round D (0059): the consent-guarded overload of the respond write (the
+-- six-argument one above is retired from Round D Wave 3). Also locked down in
+-- place, right after its CREATE (50-delivery-write.sql).
+grant execute on function public.app_delivery_respond_by_token(text, text, timestamptz, text, text, text, text) to metra_app;
+revoke execute on function public.app_delivery_respond_by_token(text, text, timestamptz, text, text, text, text) from public;
 grant execute on function public.app_delivery_claim_payment_by_token(text, text, text, text, text, text) to metra_app;
 revoke execute on function public.app_delivery_claim_payment_by_token(text, text, text, text, text, text) from public;
 grant execute on function public.app_delivery_document_comments_by_token(text, uuid) to metra_app;
@@ -478,6 +483,10 @@ begin
       );
       execute format(
         'revoke execute on function public.app_delivery_respond_by_token(text, text, text, text, text, text) from %I',
+        r
+      );
+      execute format(
+        'revoke execute on function public.app_delivery_respond_by_token(text, text, timestamptz, text, text, text, text) from %I',
         r
       );
       execute format(

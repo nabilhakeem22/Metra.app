@@ -42,6 +42,10 @@
 -- Every successful write also refreshes `design_engagements.updated_at`, so the
 -- studio's newest-first lists surface the delivery the client just acted on.
 -- Signature and return type are unchanged since Phase 2.
+--
+-- RETIRED for app use from Round D Wave 3; dropped at the next DB step. The
+-- seven-argument overload below is the same write plus the consent guard; this
+-- one stays only so the code deployed before Wave 3 keeps working.
 create or replace function public.app_delivery_respond_by_token(
   p_hash text,
   p_action text,
@@ -188,6 +192,193 @@ begin
 
   update public.design_engagements set updated_at = now() where id = eid;
   return 'ok';
+end
+$$;
+
+-- Round D (0059): THE CONSENT GUARD. The six-argument write above, plus
+-- p_expected_issue_at: the issuance the client SAW when they tapped, echoed
+-- back from app_delivery_by_token (rom.issued_at for the band,
+-- renders_issued_at for the render round). It is compared UNDER THE ROW LOCK,
+-- after the state checks and BEFORE the `already` pre-check:
+--   acknowledge_rom                          p_expected_issue_at must equal
+--                                            rom_issued_at (null while the band
+--                                            is issued is a mismatch)
+--   approve_design, request_design_changes   p_expected_issue_at must equal
+--                                            renders_ready_at (null equals null:
+--                                            a legacy delivery with no stamp)
+--   approve_concept, request_concept_changes,
+--   acknowledge_handoff                      the argument is ignored
+-- A mismatch answers `wrong_state` and writes nothing, so no row ever records
+-- consent to a band or a round the client did not see. Every edit of the band
+-- clears rom_issued_at and every release of renders re-stamps renders_ready_at,
+-- so the instant names the issuance exactly (microseconds; a caller must echo
+-- the snapshot's string, never re-format it through a JS Date).
+--
+-- THE TWO GUARDS ARE INDEPENDENT (owner decision, Round D): a design verb never
+-- reads the band and acknowledge_rom never reads the round, so the portal's
+-- one-tap "approve the design and confirm the budget" is two calls of this
+-- function, each saved or refused on its own issuance.
+--
+-- THE CALLER'S name/ip/ua are capped exactly like
+-- app_delivery_choose_concept_by_token (120 / 45 / 512) and the note at 2,000
+-- characters: this function is the trust boundary for what reaches the
+-- append-only ledger. Codes: ok | already | expired | not_active | wrong_state |
+-- invalid (the six-argument set, unchanged).
+--
+-- AN OVERLOAD, not a replacement: CREATE OR REPLACE cannot add an argument, and
+-- dropping the six-argument function in the same step would break the code
+-- deployed until Round D Wave 3.
+create or replace function public.app_delivery_respond_by_token(
+  p_hash text,
+  p_action text,
+  p_expected_issue_at timestamptz,
+  p_note text,
+  p_name text,
+  p_ip text,
+  p_ua text
+)
+returns text
+language plpgsql
+volatile
+security definer
+set search_path = ''
+as $$
+declare
+  v_kind    public.engagement_event_kind;
+  st        text;
+  exp       timestamptz;
+  eid       uuid;
+  oid       uuid;
+  rl        numeric;
+  rh        numeric;
+  ri        timestamptz;
+  rr        timestamptz;
+  ok_state  boolean;
+begin
+  v_kind := case p_action
+    when 'approve_concept'         then 'concept_approval'
+    when 'request_concept_changes' then 'concept_change_request'
+    when 'approve_design'          then 'design_approval'
+    when 'request_design_changes'  then 'design_change_request'
+    when 'acknowledge_rom'         then 'rom_acknowledgement'
+    when 'acknowledge_handoff'     then 'handoff_acknowledgement'
+    else null
+  end::public.engagement_event_kind;
+  if v_kind is null then return 'invalid'; end if;
+
+  -- The row lock, for the reasons the six-argument function gives. It also
+  -- pins rom_issued_at and renders_ready_at, so the instant the guard compares
+  -- is the instant the row records.
+  if p_action <> 'acknowledge_handoff' then
+    perform 1 from public.design_engagements where token_hash = p_hash for update;
+  end if;
+
+  select state, share_expires_at, id, org_id, rom_low, rom_high, rom_issued_at,
+         renders_ready_at
+    into st, exp, eid, oid, rl, rh, ri, rr
+    from public.design_engagements
+    where token_hash = p_hash;
+  if not found then return 'invalid'; end if;
+  if exp is not null and exp <= now() then return 'expired'; end if;
+  if st in ('closed_design_only', 'execution', 'abandoned') then
+    return 'not_active';
+  end if;
+
+  ok_state := case p_action
+    when 'approve_concept'         then st = 'concept_review'
+    when 'request_concept_changes' then st = 'concept_review'
+    when 'approve_design'          then st = 'final_approval'
+    when 'request_design_changes'  then st = 'final_approval'
+    when 'acknowledge_rom'         then rl is not null and rh is not null
+                                        and ri is not null
+    when 'acknowledge_handoff'     then st = 'design_only_handoff'
+    else false
+  end;
+  if not ok_state then return 'wrong_state'; end if;
+
+  -- THE GUARD: the issuance the client saw must be the one on file now.
+  if p_action = 'acknowledge_rom' and p_expected_issue_at is distinct from ri then
+    return 'wrong_state';
+  end if;
+  if p_action in ('approve_design', 'request_design_changes')
+     and p_expected_issue_at is distinct from rr then
+    return 'wrong_state';
+  end if;
+
+  -- The six-argument function's `already` rule, unchanged: one live client
+  -- decision per group (per render issuance for the design pair), one ROM
+  -- acknowledgement per issuance, and a retracted row answers nothing.
+  if exists (
+    select 1 from public.engagement_events ee
+    where ee.engagement_id = eid and ee.actor_channel = 'client'
+      and not exists (
+        select 1 from public.engagement_events c
+        where c.org_id = ee.org_id and c.supersedes_event_id = ee.id
+      )
+      and case
+        when v_kind in ('concept_approval', 'concept_change_request')
+          then ee.kind in ('concept_approval', 'concept_change_request')
+        when v_kind in ('design_approval', 'design_change_request')
+          then ee.kind in ('design_approval', 'design_change_request')
+           and (
+             ee.acknowledged_issue_at is not distinct from rr
+             or (ee.acknowledged_issue_at is null and rr is not null
+                 and ee.decided_at >= rr)
+           )
+        when v_kind = 'rom_acknowledgement'
+          then ee.kind = v_kind and ee.acknowledged_issue_at is not distinct from ri
+        else ee.kind = v_kind
+      end
+  ) then
+    return 'already';
+  end if;
+
+  begin
+    insert into public.engagement_events
+      (id, org_id, engagement_id, kind, actor_channel, actor_name, actor_ip,
+       actor_user_agent, note, range_low, range_high, acknowledged_issue_at)
+      values (
+        gen_random_uuid(), oid, eid, v_kind, 'client',
+        nullif(left(btrim(coalesce(p_name, '')), 120), ''),
+        nullif(left(coalesce(p_ip, ''), 45), ''),
+        nullif(left(coalesce(p_ua, ''), 512), ''),
+        left(p_note, 2000),
+        case when v_kind = 'rom_acknowledgement' then rl else null end,
+        case when v_kind = 'rom_acknowledgement' then rh else null end,
+        case
+          when v_kind = 'rom_acknowledgement' then ri
+          when v_kind in ('design_approval', 'design_change_request') then rr
+          else null
+        end
+      );
+  exception when unique_violation then
+    return 'already';
+  end;
+
+  update public.design_engagements set updated_at = now() where id = eid;
+  return 'ok';
+end
+$$;
+
+-- Same-transaction lockdown as app_delivery_choose_concept_by_token below, for
+-- the same reason: a NEW signature is executable by PUBLIC (and, on Supabase,
+-- by the API roles) from the moment CREATE commits.
+revoke all on function public.app_delivery_respond_by_token(text, text, timestamptz, text, text, text, text) from public;
+do $$
+declare
+  r text;
+begin
+  foreach r in array array['anon', 'authenticated', 'service_role'] loop
+    if exists (select 1 from pg_roles where rolname = r) then
+      execute format(
+        'revoke all on function public.app_delivery_respond_by_token(text, text, timestamptz, text, text, text, text) from %I',
+        r
+      );
+    end if;
+  end loop;
+  if exists (select 1 from pg_roles where rolname = 'metra_app') then
+    grant execute on function public.app_delivery_respond_by_token(text, text, timestamptz, text, text, text, text) to metra_app;
+  end if;
 end
 $$;
 
@@ -494,6 +685,18 @@ $$;
 -- (recipient, delivery, body key, milestone) makes two concurrent acts land
 -- one row with count 2, not two rows.
 --
+-- ONE ACT, ONE COUNT (Round D, 0059). The act a call reports is dated by
+-- app_client_act_anchor, the rule the repeat-tap repair and the hourly sweep
+-- read. A recipient who already has a row for this (delivery, body key,
+-- milestone) written or bumped at or after that instant, read or unread, has
+-- been told about this act: they are skipped (no bump, no new row, no email)
+-- and still counted in notified_count. So the sweep and a repeat tap repairing
+-- the same lost act, in either order or at the same moment, leave count 1. The
+-- check runs after the per-recipient lock is taken; this function is VOLATILE
+-- plpgsql, so that statement sees the row the previous lock holder committed.
+-- client_commented is exempt: every comment is a new act, and a second one
+-- while the row is unread still counts 2.
+--
 -- THE YEAR in the params is the delivery's creation year in Africa/Cairo, the
 -- studio's local time, which is the year the app's DE-YYYY-NNNN shows its users
 -- (docYear() formats in the browser's local time).
@@ -547,6 +750,7 @@ declare
   v_count           integer;
   v_notified        integer := 0;
   v_new_recipients  jsonb := '[]'::jsonb;
+  v_anchor          timestamptz;
 begin
   if p_body_key is null or not (p_body_key = any (v_allowed)) then
     return null;
@@ -575,6 +779,11 @@ begin
    where de.token_hash = p_hash
      and (de.share_expires_at is null or de.share_expires_at > now());
   if not found then return null; end if;
+  -- plpgsql resolves the call when it runs, so the anchor rule may be created
+  -- further down this file.
+  if p_body_key <> 'client_commented' then
+    v_anchor := public.app_client_act_anchor(v_engagement_id, v_org_id, p_body_key, v_milestone);
+  end if;
   v_base := v_params || jsonb_build_object(
     'number', v_number,
     'year', v_year,
@@ -617,6 +826,22 @@ begin
         || ':' || p_body_key || ':' || coalesce(v_milestone, ''),
       0
     ));
+
+    -- Already told about THIS act (see ONE ACT, ONE COUNT above).
+    if v_anchor is not null and exists (
+      select 1 from public.notifications n
+       where n.org_id = v_org_id
+         and n.recipient_user_id = v_member.user_id
+         and n.kind = 'client_responded'
+         and n.entity_type = 'engagement'
+         and n.entity_id = v_engagement_id
+         and n.body_key = p_body_key
+         and (n.params ->> 'milestoneKind') is not distinct from v_milestone
+         and n.created_at >= v_anchor
+    ) then
+      v_notified := v_notified + 1;
+      continue;
+    end if;
 
     -- FOR UPDATE re-checks `read_at is null` if the recipient is marking the
     -- row read right now: a row read meanwhile is not bumped, a new one lands.
@@ -712,8 +937,9 @@ $$;
 -- Any other key, an unknown delivery, or no anchor row: null.
 --
 -- INTERNAL. It takes a bare engagement id, so it is revoked from public, the
--- API roles AND metra_app, and only the two definer functions in this file call
--- it (they have already proven the token or the org). SECURITY INVOKER: under
+-- API roles AND metra_app, and only the definer functions in this file call it
+-- (they have already proven the token or the org): the two below, and the
+-- notifier above, which dates the act it reports by it (Round D, 0059). SECURITY INVOKER: under
 -- those callers it runs with their rights; nobody else may run it at all. It
 -- reads no money column (a claim's created_at only) and returns one instant.
 create or replace function public.app_client_act_anchor(
@@ -802,7 +1028,7 @@ end
 $$;
 
 -- Closed in the SAME implicit transaction as the CREATE above, and to EVERY
--- caller role: unlike the token functions, metra_app gets no grant. Its two
+-- caller role: unlike the token functions, metra_app gets no grant. Its three
 -- callers are SECURITY DEFINER functions, which run it as their owner.
 revoke all on function public.app_client_act_anchor(uuid, uuid, text, text) from public;
 do $$
@@ -1004,8 +1230,8 @@ $$;
 -- repaired act therefore has a notification at or after its anchor, and the
 -- next sweep finds nothing: no act is notified twice by the sweep. (A repeat
 -- tap repairing the same act in the same instant meets the notifier's own
--- per-recipient lock and bumps the unread row's count; it adds no row and no
--- email.)
+-- per-recipient lock, then finds the row the sweep wrote at or after the act
+-- and skips that recipient: no bump, no row, no email; Round D, 0059.)
 --
 -- THE KEYS. The nine client-act keys the notifier allows; client_payment_claimed
 -- is asked once per milestone (deposit, gate_a, gate_b, balance), because the

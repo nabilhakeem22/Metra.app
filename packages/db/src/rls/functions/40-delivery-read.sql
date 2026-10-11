@@ -295,6 +295,8 @@ $$;
 --     design_fee (as design_fee_total — the fee the CLIENT pays, not a cost),
 --     rom_low, rom_high (the budget band, and ONLY once rom_issued_at is
 --     stamped — an unissued band is the studio's private working state),
+--     rom_issued_at (Round D, 0059: as rom.issued_at, beside the band it
+--     dates), renders_ready_at (0059: as renders_issued_at),
 --     share_expires_at
 --   organizations (the firm): name_ar, name_en, logo_file_id;
 --     studio_phone, studio_whatsapp (Round C, 0058: firm.phone, firm.whatsapp,
@@ -309,7 +311,8 @@ $$;
 --   clients (the end client): name_ar, name_en
 --   engagement_milestones: kind, basis, sort_order, value (only as an input to
 --     the client's amount_due — the raw basis value is not leaked as cost)
---   payment_events: amount (aggregated per kind into amount_cleared)
+--   payment_events: amount (aggregated per kind into amount_cleared); and
+--     kind, amount, cleared_at per row in `receipts` and `timeline`
 --   engagement_artifacts (Client Deliverables Step 1, only where client_visible):
 --     id, kind, updated_at (as shared_at). `label`, `note`, `content_hash`,
 --     `attested_by` and files.original_name/size_bytes are NOT exposed — an
@@ -375,6 +378,18 @@ $$;
 --       as a scale-4 string, at = cleared_at): money the CLIENT paid.
 --     Never selected for the timeline: an actor id or name, a note, evidence
 --     text, a payment method or reference, the trigger name.
+--   receipts (Round D, 0059): { kind, amount, at } per payment_events row of
+--     this delivery and org (amount as a scale-4 string, at = cleared_at),
+--     newest first (at the same instant: amount, then id), with NO cap, so a
+--     payment never drops off the client's receipts behind 60 newer stage
+--     moves the way it does off the timeline.
+--   rom.issued_at, renders_issued_at (Round D, 0059): the ISSUANCE instants
+--     the client's review acts answer, as ISO strings with microseconds. The
+--     portal echoes them back unchanged into the seven-argument
+--     app_delivery_respond_by_token, which refuses an act whose instant is
+--     not the one on file (the band was re-issued, or the renders re-stamped,
+--     after the page loaded). Both null when nothing is issued; rom stays null
+--     while the band is unissued.
 --
 -- RETRACTED CLIENT DECISIONS (an event_correction points at them) answer
 --   nothing here, exactly as liveEvents() drops them in the studio's TS rule.
@@ -382,17 +397,18 @@ $$;
 --   verb whose insert would collide with it is not offered (the write would
 --   answer `already`); the other verb of the pair stays open.
 --
--- READ, NEVER RETURNED: design_engagements.renders_ready_at (Round B). The
---   design decision verbs in `client_actions` answer ONE render issuance, so
---   the predicate compares the client's design decisions against it; the value
---   itself does not cross the wire. Likewise client_expected_state (0058).
+-- READ, NEVER RETURNED: client_expected_state and client_expected_set_at
+--   (0058). renders_ready_at was in this list until Round D; it is returned
+--   now as renders_issued_at (above), because the client's design decision
+--   must name the render round it answers.
 --
 -- PHYSICALLY OMITTED (never referenced): design_engagements.render_manifest_hash,
 --   revision_count, free_revision_n, design_revision_count,
 --   free_design_revision_n, as_built_due,
 --   concept_locked_at, token_hash, token_nonce, updated_at, org_id, client_id,
 --   project_id;
---   payment_events.method/reference/note/recorded_by/idempotency_key; every
+--   payment_events.method/reference/note/recorded_by/idempotency_key (in the
+--   timeline AND in receipts); every
 --   proposal/contract/cost_item cost column (unit_cost/line_cost/total_cost/
 --   *_margin/supervision/BOQ build cost) — none are in this query's tables and
 --   none are joined in. No actor / internal-notes field is exposed.
@@ -419,8 +435,15 @@ as $$
     'rom', case
       when de.rom_issued_at is null then null
       when de.rom_low is null and de.rom_high is null then null
-      else jsonb_build_object('low', de.rom_low::text, 'high', de.rom_high::text)
+      else jsonb_build_object(
+        'low', de.rom_low::text,
+        'high', de.rom_high::text,
+        -- Round D (0059): which issuance this band is; acknowledge_rom names it.
+        'issued_at', de.rom_issued_at
+      )
     end,
+    -- Round D (0059): which render round the design verbs answer.
+    'renders_issued_at', de.renders_ready_at,
     'share_expires_at', de.share_expires_at,
     'firm', jsonb_build_object(
       'name_ar', o.name_ar,
@@ -466,7 +489,12 @@ as $$
            and tr.org_id = de.org_id
            and tr.to_state is not null
            and tr.to_state is distinct from tr.from_state
-           and tr.decided_at > de.client_expected_set_at
+           -- Round D (0059): compared at MILLISECOND precision, the
+           -- precision the studio's card reads (client-expected-view.ts goes
+           -- through a JS Date), so the two never disagree about a move
+           -- inside the millisecond the date was set in.
+           and date_trunc('milliseconds', tr.decided_at)
+               > date_trunc('milliseconds', de.client_expected_set_at)
        )
       then de.client_expected_on
     end,
@@ -841,6 +869,22 @@ as $$
           )
       )
     end,
+    -- Round D (0059): every payment the client made, newest first, uncapped.
+    -- Only kind, amount and cleared_at: no method, reference, note, recorder
+    -- or idempotency key.
+    'receipts', coalesce((
+      select jsonb_agg(
+        jsonb_build_object(
+          'kind', pe.kind,
+          'amount', pe.amount::numeric(18, 4)::text,
+          'at', pe.cleared_at
+        )
+        order by pe.cleared_at desc, pe.amount desc, pe.id desc
+      )
+      from public.payment_events pe
+      where pe.engagement_id = de.id
+        and pe.org_id = de.org_id
+    ), '[]'::jsonb),
     -- Round C (0058): what happened, dated, newest first, at most 60 entries.
     -- Only the fields listed in the header comment are selected: no actor,
     -- note, evidence text, method or reference. Same-instant entries are

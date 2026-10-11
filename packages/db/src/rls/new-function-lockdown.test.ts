@@ -34,6 +34,12 @@ const LOCKED_DOWN_IN_PLACE: readonly LockedDown[] = [
   {
     file: 'functions/50-delivery-write.sql',
     signature:
+      'public.app_delivery_respond_by_token(text, text, timestamptz, text, text, text, text)',
+    grantsApp: true,
+  },
+  {
+    file: 'functions/50-delivery-write.sql',
+    signature:
       'public.app_delivery_choose_concept_by_token(text, uuid, integer, text, text, text, text)',
     grantsApp: true,
   },
@@ -79,12 +85,25 @@ const LOCKED_DOWN_IN_PLACE: readonly LockedDown[] = [
   },
 ];
 
-/** The text from this function's CREATE to the next CREATE (or the end). */
-function sectionOf(sql: string, name: string): string {
-  const start = sql.indexOf(`create or replace function ${name}(`);
-  expect(start, `${name} is not created in this file`).toBeGreaterThanOrEqual(0);
-  const next = sql.indexOf('create or replace function', start + 1);
-  return sql.slice(start, next === -1 ? undefined : next);
+/** The argument types a CREATE declares, as `pg_proc` would list them: `text, uuid`. */
+function argumentTypesOf(create: string): string {
+  const list = create.slice(create.indexOf('(') + 1, create.indexOf(')'));
+  return list.split(',').map((parameter) => parameter.trim().split(/\s+/).pop()).filter(Boolean).join(', ');
+}
+
+/**
+ * The text from the CREATE of exactly this signature to the next CREATE (or
+ * the end). An overload shares its name, so the argument types pick the CREATE.
+ */
+function sectionOf(sql: string, signature: string): string {
+  const name = signature.slice(0, signature.indexOf('('));
+  const argumentTypes = signature.slice(signature.indexOf('(') + 1, -1);
+  const creates = sql.split('create or replace function ').slice(1);
+  const section = creates.find(
+    (create) => create.startsWith(`${name}(`) && argumentTypesOf(create) === argumentTypes,
+  );
+  expect(section, `${signature} is not created in this file`).toBeDefined();
+  return `create or replace function ${section}`;
 }
 
 describe('new token functions are locked down in the transaction that creates them', () => {
@@ -92,7 +111,7 @@ describe('new token functions are locked down in the transaction that creates th
     const name = signature.slice(0, signature.indexOf('('));
     const grant = grantsApp ? 'grant metra_app' : 'revoke metra_app too and grant nobody';
     it(`${name}: revoke from public and the API roles, ${grant}, right after CREATE`, () => {
-      const section = sectionOf(readFileSync(resolve(here, file), 'utf8'), name);
+      const section = sectionOf(readFileSync(resolve(here, file), 'utf8'), signature);
       const afterBody = section.slice(section.indexOf('\n$$;'));
       expect(afterBody).toContain(`revoke all on function ${signature} from public;`);
       expect(afterBody).toContain(`'revoke all on function ${signature} from %I'`);
