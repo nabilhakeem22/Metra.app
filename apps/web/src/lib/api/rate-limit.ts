@@ -1,7 +1,6 @@
 import 'server-only';
 import { createHash } from 'node:crypto';
-import { cfEnv, isCloudflareRuntime } from '@/lib/cf/context';
-import { loggableFailure } from '@/lib/actions/loggable-failure';
+import { consumeRateLimit, rateLimitBinding, type CloudflareRateLimit } from '@/lib/cf/rate-limit-binding';
 
 // Cloudflare Workers Rate Limiting bindings for the Public API (v1). Two buckets:
 //   API_RATE_LIMITER          100 requests / 60s per resolved KEY (post-auth).
@@ -10,7 +9,9 @@ import { loggableFailure } from '@/lib/actions/loggable-failure';
 // without it an unauthenticated flood of garbage bearer tokens is a free way to
 // hammer the database, and the per-key limiter can never see it because there is
 // no key. Off-platform (Node/Vitest, `next dev` on Node) the bindings are absent,
-// so this degrades to ALLOW — tests and local dev are never rate-limited.
+// so this degrades to ALLOW — tests and local dev are never rate-limited. The
+// binding lookup and the fail-open / fail-closed rule are in
+// lib/cf/rate-limit-binding.ts.
 //
 // BOTH BUDGETS ARE PER DATA CENTRE, NOT GLOBAL. A Workers Rate Limiting binding
 // counts within the colo that served the request, so a caller spread across k
@@ -34,63 +35,6 @@ const DENY: RateLimitResult = {
   allowed: false,
   retryAfterSeconds: RATE_LIMIT_WINDOW_SECONDS,
 };
-
-/** The Cloudflare Rate Limiting binding shape (subset used here). */
-interface CloudflareRateLimit {
-  limit(options: { key: string }): Promise<{ success: boolean }>;
-}
-
-/**
- * The named binding, or null OFF-platform. On Cloudflare a missing binding is a
- * deployment defect, not a degraded mode: silently returning null there would
- * serve the Public API with no limit at all, so it throws instead.
- */
-function binding(name: string): CloudflareRateLimit | null {
-  // Never reachable in production: off-platform means Node/Vitest/`next dev`.
-  if (!isCloudflareRuntime()) return null;
-  const env = cfEnv() as unknown as Record<string, CloudflareRateLimit | undefined>;
-  const limiter = env[name];
-  if (!limiter) {
-    throw new Error(
-      `Rate limiting binding ${name} is missing on the Cloudflare runtime. ` +
-        'Add it to apps/web/wrangler.jsonc. Refusing to serve the Public API unlimited.',
-    );
-  }
-  return limiter;
-}
-
-/**
- * Runs one bucket.
- *
- * OWNER DECISION, recorded so it is not silently reversed by whoever next reads
- * this and thinks it looks like a bug. The two failures are DIFFERENT and are
- * handled differently ON PURPOSE:
- *
- *  - A binding ERROR fails OPEN. An availability blip in Cloudflare's limiter
- *    would otherwise take the entire Public API down for every caller, and a
- *    few seconds of unmetered traffic is a smaller harm than a total outage.
- *    The blip is logged, so it is visible rather than merely survived.
- *  - A MISSING binding fails CLOSED, and never reaches this function at all:
- *    `binding()` throws and the request 500s. That is not an availability
- *    problem, it is a misdeployed Worker, and serving the API unlimited because
- *    somebody forgot a line in wrangler.jsonc is not a trade worth making.
- *
- * The same sentence is in docs/API.md, for the reader who is looking at the
- * behaviour rather than at the code.
- */
-async function consume(
-  limiter: CloudflareRateLimit | null,
-  key: string,
-): Promise<RateLimitResult> {
-  if (!limiter) return ALLOW;
-  try {
-    const { success } = await limiter.limit({ key });
-    return success ? ALLOW : DENY;
-  } catch (error) {
-    console.error('rate limiter error (failing open):', loggableFailure(error));
-    return ALLOW;
-  }
-}
 
 const IPV6_GROUPS = 8;
 const HEXTET_RE = /^[0-9a-f]{1,4}$/;
@@ -151,14 +95,21 @@ function preAuthBucket(req: Request): string {
   return 'anon';
 }
 
+const API_SURFACE = 'the Public API';
+
+/** One bucket's verdict as the API pipeline reads it. */
+async function consume(limiter: CloudflareRateLimit | null, key: string): Promise<RateLimitResult> {
+  return (await consumeRateLimit(limiter, key)) ? ALLOW : DENY;
+}
+
 // Both are `async` so a missing-binding throw surfaces as a REJECTED promise
 // rather than a synchronous throw at the call site, which is what every caller
 // (and every test) awaits.
 
 /** Per-KEY bucket: each API key gets its own budget once it has been resolved. */
 export const cloudflareRateLimiter: RateLimiter = async (keyId) =>
-  consume(binding('API_RATE_LIMITER'), keyId);
+  consume(rateLimitBinding('API_RATE_LIMITER', API_SURFACE), keyId);
 
 /** Per-CALLER bucket, charged BEFORE key resolution touches the database. */
 export const cloudflarePreAuthRateLimiter: PreAuthRateLimiter = async (req) =>
-  consume(binding('API_PREAUTH_RATE_LIMITER'), preAuthBucket(req));
+  consume(rateLimitBinding('API_PREAUTH_RATE_LIMITER', API_SURFACE), preAuthBucket(req));
