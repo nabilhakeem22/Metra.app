@@ -1784,6 +1784,79 @@ alter table public.organizations
     check ((instapay_address IS NULL OR (instapay_address ~ '[^\u0009-\u000D\u0020\u00A0\u1680\u2000-\u200A\u2028\u2029\u202F\u205F\u3000\uFEFF]' AND instapay_address !~ '[\u00AD\u0600-\u0605\u061C\u06DD\u070F\u0890-\u0891\u08E2\u180E\u200B-\u200F\u202A-\u202E\u2060-\u2064\u2066-\u206F\uFEFF\uFFF9-\uFFFB\U000110BD\U000110CD\U00013430-\U0001343F\U0001BCA0-\U0001BCA3\U0001D173-\U0001D17A\U000E0001\U000E0020-\U000E007F]')) AND (bank_name IS NULL OR (bank_name ~ '[^\u0009-\u000D\u0020\u00A0\u1680\u2000-\u200A\u2028\u2029\u202F\u205F\u3000\uFEFF]' AND bank_name !~ '[\u00AD\u0600-\u0605\u061C\u06DD\u070F\u0890-\u0891\u08E2\u180E\u200B-\u200F\u202A-\u202E\u2060-\u2064\u2066-\u206F\uFEFF\uFFF9-\uFFFB\U000110BD\U000110CD\U00013430-\U0001343F\U0001BCA0-\U0001BCA3\U0001D173-\U0001D17A\U000E0001\U000E0020-\U000E007F]')) AND (bank_account_holder IS NULL OR (bank_account_holder ~ '[^\u0009-\u000D\u0020\u00A0\u1680\u2000-\u200A\u2028\u2029\u202F\u205F\u3000\uFEFF]' AND bank_account_holder !~ '[\u00AD\u0600-\u0605\u061C\u06DD\u070F\u0890-\u0891\u08E2\u180E\u200B-\u200F\u202A-\u202E\u2060-\u2064\u2066-\u206F\uFEFF\uFFF9-\uFFFB\U000110BD\U000110CD\U00013430-\U0001343F\U0001BCA0-\U0001BCA3\U0001D173-\U0001D17A\U000E0001\U000E0020-\U000E007F]')));
 ```
 
+### Round D Wave 3 (the client page's consent guard): the deploy and its smoke test
+
+Wave 3 is app code only: no migration, no `apply-rls`. It is the code the 0059
+step above was for, so it merges ONLY after that step's step 4 matched and
+`validate/round-d-db` is on `main`. Merged before it, every review act on the
+client page fails with 42883 and the receipts disappear (see THE ORDER above).
+
+**What changes on the client page.**
+
+- Every design decision and every budget confirmation names the issuance the
+  client's page showed (the render round, the budget band). The database
+  refuses one whose issuance is no longer on file ("this changed, please look
+  again") and saves nothing. No check runs in the app before the write any more.
+- Approve the design together with the budget is two consents, each judged on
+  its own issuance (owner decision): a band re-issued after the page loaded
+  saves the design approval and asks the client to confirm the new range; new
+  renders with the same band save the budget confirmation alone and ask for
+  the design again; both changed saves neither.
+- A render the studio shows the client while the final design waits for
+  approval starts a new round: an approval taken on the page from before it
+  is refused.
+- The payments card lists the payments received from their own list (up to
+  200, with a note when there are more), not from the dated timeline.
+- Settings: "+20 00 10 ..." is saved as `+2010...` (every extra trunk zero
+  dropped), and a line or paragraph separator inside InstaPay, the bank name or
+  the account holder is refused.
+
+**What the studio sees.** When the design is approved but the budget part is
+not saved, the design notification (bell and email) says the budget range
+changed after the client opened the page and is not acknowledged yet. The
+cockpit's "Budget range acknowledged" guard stays open until the client
+confirms it.
+
+**Smoke test, right after the Deploy workflow is green (owner, 5 minutes).**
+Use one of the studio's own TEST deliveries, never a client's:
+
+1. In the cockpit, take the test delivery to the final approval with renders
+   shared, and issue a budget range.
+2. Open its client link in a private window. The design card offers Approve,
+   and its confirmation says it also confirms the budget range.
+3. Approve. Expected on the client page: "Design approved" and "You also
+   confirmed seeing the budget range." Expected in the cockpit: the design
+   approved AND "Budget range acknowledged" ticked, and the bell shows the
+   approval without a budget sentence.
+4. While it runs, watch the logs from `apps/web`:
+
+```powershell
+cd C:\Users\HP\merta-main\apps\web
+npx wrangler tail metra-web
+```
+
+   There must be no `42883`, and no line starting `approve design with budget:`.
+
+**If any expected line in steps 3 or 4 is not there:** roll the Worker back at
+once, then tell the lead what you saw. Leave the database alone: every Worker
+version runs on the 0059 database (the six-argument function stays until the
+next database step).
+
+```powershell
+cd C:\Users\HP\merta-main\apps\web
+npx wrangler rollback metra-web
+```
+
+**Before the next database step (read-only, owner).** The CHECK that refuses
+`+200` numbers waits for this count; anything above 0 is a studio number saved
+before Wave 3, and is fixed by re-saving it in Settings:
+
+```sql
+select count(*) as plus_200_numbers
+  from public.organizations
+ where studio_phone ~ '^\+200' or studio_whatsapp ~ '^\+200';
+```
+
 ## Rolling back
 
 **The lever is `wrangler`, not git.** A git revert has to go through CI and a
@@ -1825,6 +1898,11 @@ code serves (*0057 and the B12 database step*, "Undo, if ever needed").
 database alone, and never run `db:apply-rls` from an older `main` while C7 or
 later code serves (*0058 and the Round C database step*, "Undo, if ever
 needed").
+
+**Round D (0059, Wave 3) specifically:** the same. Roll back the Worker, leave
+the database alone, and never run `db:apply-rls` from an older `main` while
+Wave 3 code serves (*0059 and the Round D database step*, "Undo, if ever
+needed"; the smoke test is under *Round D Wave 3*).
 
 After rolling back, hit an authenticated page and watch `npx wrangler tail
 metra-web` for `42501` (a missing grant), `MT100` (an immutability trigger) and
