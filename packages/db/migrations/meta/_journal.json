@@ -414,6 +414,13 @@
       "when": 1791583616467,
       "tag": "0058_client_page_details",
       "breakpoints": true
+    },
+    {
+      "idx": 59,
+      "version": "7",
+      "when": 1791734529315,
+      "tag": "0059_client_page_checks_tightened",
+      "breakpoints": true
     }
   ]
 }
