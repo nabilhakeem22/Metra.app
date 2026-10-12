@@ -46,13 +46,22 @@ function routeFiles(scope: MessageScope): string[] {
     .flatMap((name) => filesUnder(join(LOCALE_DIRECTORY, name)));
 }
 
+/** Whether `namespace` is `ancestor` or lies under it. */
+function within(namespace: string, ancestor: string): boolean {
+  return namespace === ancestor || namespace.startsWith(`${ancestor}.`);
+}
+
+/** The sub-trees the client code under `scope` reads: each call's namespace,
+ *  less any that another one already contains ('proposals' takes in
+ *  'proposals.p'). One answer for one set of calls, so the list can be exact. */
 function usedNamespaces(scope: MessageScope): string[] {
   const calls = clientTranslationCalls(graph, routeFiles(scope));
-  return [...new Set(calls.map((call) => call.namespace).filter((namespace) => namespace !== null))].sort();
+  const named = new Set(calls.map((call) => call.namespace).filter((namespace) => namespace !== null));
+  return [...named].filter((namespace) => ![...named].some((other) => other !== namespace && within(namespace, other))).sort();
 }
 
 describe('the messages each scope hands the browser', () => {
-  it('every client useTranslations names its top-level namespace literally; no useMessages', () => {
+  it('every client useTranslations names at least its top-level namespace literally; no useMessages', () => {
     const unscoped = clientTranslationCalls(graph, [...graph.files.keys()])
       .filter((call) => call.namespace === null)
       .map((call) => `${call.path}: ${call.hook}(${call.argument})`);
@@ -74,8 +83,8 @@ describe('the messages each scope hands the browser', () => {
 
   it.each(scopes)('%s: every namespace exists in both catalogues', (scope) => {
     for (const namespace of CLIENT_NAMESPACES[scope]) {
-      expect(en, `en ${namespace}`).toHaveProperty([namespace]);
-      expect(ar, `ar-EG ${namespace}`).toHaveProperty([namespace]);
+      expect(en, `en ${namespace}`).toHaveProperty(namespace.split('.'));
+      expect(ar, `ar-EG ${namespace}`).toHaveProperty(namespace.split('.'));
     }
   });
 
@@ -92,6 +101,24 @@ describe('the messages each scope hands the browser', () => {
       expect.objectContaining({ path: 'app/[locale]/d/[token]/portal/delivery-notice.tsx', namespace: 'delivery' }),
     );
     expect(calls('studio')).toContainEqual(expect.objectContaining({ path: 'components/ui/field-hint.tsx', namespace: 'common' }));
+  });
+
+  it.each([
+    ['proposalLink', ['Margin is hidden for your role', 'Unit cost', 'Download internal PDF']],
+    ['variationLink', ['Internal approval', 'Internally approved']],
+  ] as const)('%s: only its own sub-tree, none of the studio wording around it (S1)', (scope, studioWords) => {
+    const sent = JSON.stringify(scopedMessages(en, scope));
+    for (const words of studioWords) {
+      expect(JSON.stringify(en)).toContain(words);
+      expect(sent).not.toContain(words);
+    }
+  });
+
+  it('a sub-tree is copied under its own path, and the catalogue is left as it was', () => {
+    const before = JSON.stringify(en);
+    expect(scopedMessages(en, 'proposalLink')).toEqual({ proposals: { p: en.proposals.p } });
+    expect(scopedMessages(en, 'auth').hints).toEqual({ auth: en.hints.auth });
+    expect(JSON.stringify(en)).toBe(before);
   });
 
   it('scopedMessages keeps exactly the listed namespaces', () => {

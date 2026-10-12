@@ -18,17 +18,19 @@ describe('the client translation scan', () => {
     ['a namespace import', "import * as intl from 'next-intl'; intl.useTranslations('settings');"],
     ['use-intl', "import { useTranslations } from 'use-intl'; useTranslations('settings.card');"],
   ])('finds %s', (_label, source) => {
-    expect(scan(source)).toEqual([['useTranslations', 'settings']]);
+    expect(scan(source).map(([hook, namespace]) => [hook, namespace?.split('.')[0]])).toEqual([['useTranslations', 'settings']]);
   });
 
   it('finds an aliased useMessages, with no namespace', () => {
     expect(scan("import { useMessages as useAll } from 'next-intl'; useAll();")).toEqual([['useMessages', null]]);
   });
 
-  it('a computed namespace is null; a literal top level under a template is kept', () => {
-    expect(scan("import { useTranslations } from 'next-intl'; useTranslations(name); useTranslations(`delivery.${x}`);")).toEqual([
+  it('a computed namespace is null; a dotted one is kept whole, a template up to its last literal dot', () => {
+    const source = "import { useTranslations } from 'next-intl'; useTranslations(name); useTranslations('proposals.p'); useTranslations(`delivery.hero.${x}`);";
+    expect(scan(source)).toEqual([
       ['useTranslations', null],
-      ['useTranslations', 'delivery'],
+      ['useTranslations', 'proposals.p'],
+      ['useTranslations', 'delivery.hero'],
     ]);
   });
 

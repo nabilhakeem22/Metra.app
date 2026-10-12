@@ -19,7 +19,7 @@ export function PublicContractView({
   token: string;
   contract: PublicContract | null;
 }) {
-  const t = useTranslations('contracts');
+  const t = useTranslations('contracts.ack');
   const locale = useLocale();
   const [pending, startTransition] = useTransition();
   const [outcome, setOutcome] = useState<
@@ -28,7 +28,7 @@ export function PublicContractView({
   const [name, setName] = useState('');
 
   if (!contract) {
-    return <Centered>{t('ack.invalid')}</Centered>;
+    return <Centered>{t('invalid')}</Centered>;
   }
 
   const m = (v: string) => formatMoney(v, locale);
@@ -50,12 +50,12 @@ export function PublicContractView({
   const decided = contract.status !== 'issued' || outcome !== null;
   const decidedMessage =
     outcome === 'signed' || contract.status === 'signed'
-      ? t('ack.done')
+      ? t('done')
       : outcome === 'expired'
-        ? t('ack.expired')
+        ? t('expired')
         : outcome === 'invalid'
-          ? t('ack.invalid')
-          : t('ack.already');
+          ? t('invalid')
+          : t('already');
 
   return (
     <div className="mx-auto max-w-3xl space-y-4 p-4 md:p-8">
@@ -64,7 +64,7 @@ export function PublicContractView({
           {pick(contract.org.name_ar, contract.org.name_en) || 'Metra'}
         </h1>
         <p className="text-body text-muted-foreground">
-          {t('contract')} · <span dir="ltr">{num}</span>
+          {t('heading')} · <span dir="ltr">{num}</span>
         </p>
         <p className="font-medium">{pick(contract.title_ar, contract.title_en)}</p>
       </header>
@@ -97,8 +97,8 @@ export function PublicContractView({
       <Card>
         <CardContent className="ms-auto max-w-xs space-y-1 py-4 text-body">
           <Row label={t('originalValue')} value={m(contract.total)} bold />
-          <Row label={t('header.advancePct')} value={formatPercent(contract.advance_pct, locale)} />
-          <Row label={t('header.retentionPct')} value={formatPercent(contract.retention_pct, locale)} />
+          <Row label={t('advancePct')} value={formatPercent(contract.advance_pct, locale)} />
+          <Row label={t('retentionPct')} value={formatPercent(contract.retention_pct, locale)} />
         </CardContent>
       </Card>
 
@@ -111,9 +111,9 @@ export function PublicContractView({
       ) : (
         <Card>
           <CardContent className="space-y-3 py-4">
-            <p className="text-body text-muted-foreground">{t('ack.intro')}</p>
+            <p className="text-body text-muted-foreground">{t('intro')}</p>
             <Input
-              placeholder={t('ack.nameLabel')}
+              placeholder={t('nameLabel')}
               value={name}
               onChange={(e) => setName(e.target.value)}
             />
@@ -124,11 +124,11 @@ export function PublicContractView({
                 ) : (
                   <Check className="size-4" aria-hidden />
                 )}
-                {t('ack.button')}
+                {t('button')}
               </Button>
             </div>
             <p className="text-center text-caption text-muted-foreground">
-              {t('ack.notSignature')}
+              {t('notSignature')}
             </p>
           </CardContent>
         </Card>

@@ -22,7 +22,7 @@ export function PublicProposalView({
   token: string;
   proposal: PublicProposal | null;
 }) {
-  const t = useTranslations('proposals');
+  const t = useTranslations('proposals.p');
   const locale = useLocale();
   const [pending, startTransition] = useTransition();
   const [outcome, setOutcome] = useState<
@@ -31,7 +31,7 @@ export function PublicProposalView({
   const [name, setName] = useState('');
 
   if (!proposal) {
-    return <Centered>{t('p.invalid')}</Centered>;
+    return <Centered>{t('invalid')}</Centered>;
   }
 
   const m = (v: string) => formatMoney(v, locale);
@@ -55,12 +55,12 @@ export function PublicProposalView({
   const decided = proposal.status !== 'sent' || outcome !== null;
   const decidedMessage =
     outcome === 'accepted' || proposal.status === 'accepted'
-      ? t('p.decisionAccepted')
+      ? t('decisionAccepted')
       : outcome === 'rejected' || proposal.status === 'rejected'
-        ? t('p.decisionRejected')
+        ? t('decisionRejected')
         : outcome === 'expired'
-          ? t('p.expired')
-          : t('p.alreadyResponded');
+          ? t('expired')
+          : t('alreadyResponded');
 
   return (
     <div className="mx-auto max-w-3xl space-y-4 p-4 md:p-8">
@@ -69,7 +69,7 @@ export function PublicProposalView({
           {pick(proposal.org.name_ar, proposal.org.name_en) || 'Metra'}
         </h1>
         <p className="text-body text-muted-foreground">
-          {t('p.quotation')} · <span dir="ltr">{num}</span>
+          {t('quotation')} · <span dir="ltr">{num}</span>
         </p>
         <p className="font-medium">{pick(proposal.title_ar, proposal.title_en)}</p>
       </header>
@@ -101,10 +101,10 @@ export function PublicProposalView({
 
       <Card>
         <CardContent className="ms-auto max-w-xs space-y-1 py-4 text-body">
-          <Row label={t('p.subtotal')} value={m(proposal.subtotal)} />
-          <Row label={t('p.discount')} value={m(proposal.discount_amount)} />
-          <Row label={`${t('p.tax')} (${formatPercent(proposal.tax_rate, locale)})`} value={m(proposal.tax_amount)} />
-          <Row label={t('p.total')} value={m(proposal.total)} bold />
+          <Row label={t('subtotal')} value={m(proposal.subtotal)} />
+          <Row label={t('discount')} value={m(proposal.discount_amount)} />
+          <Row label={`${t('tax')} (${formatPercent(proposal.tax_rate, locale)})`} value={m(proposal.tax_amount)} />
+          <Row label={t('total')} value={m(proposal.total)} bold />
         </CardContent>
       </Card>
 
@@ -118,7 +118,7 @@ export function PublicProposalView({
         <Card>
           <CardContent className="space-y-3 py-4">
             <Input
-              placeholder={t('p.yourName')}
+              placeholder={t('yourName')}
               value={name}
               onChange={(e) => setName(e.target.value)}
             />
@@ -129,11 +129,11 @@ export function PublicProposalView({
                 ) : (
                   <Check className="size-4" aria-hidden />
                 )}
-                {t('p.accept')}
+                {t('accept')}
               </Button>
               <Button variant="secondary" onClick={() => respond('reject')} disabled={pending}>
                 <X className="size-4" aria-hidden />
-                {t('p.reject')}
+                {t('reject')}
               </Button>
             </div>
           </CardContent>

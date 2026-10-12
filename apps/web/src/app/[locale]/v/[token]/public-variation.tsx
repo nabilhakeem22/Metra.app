@@ -23,14 +23,14 @@ export function PublicVariationView({
   token: string;
   variation: PublicVariation | null;
 }) {
-  const t = useTranslations('variations');
+  const t = useTranslations('variations.client');
   const locale = useLocale();
   const [pending, startTransition] = useTransition();
   const [outcome, setOutcome] = useState<VariationOutcome>(null);
   const [name, setName] = useState('');
 
   if (!variation) {
-    return <Centered>{t('client.invalid')}</Centered>;
+    return <Centered>{t('invalid')}</Centered>;
   }
 
   const m = (v: string) => formatMoney(v, locale);
@@ -60,7 +60,7 @@ export function PublicVariationView({
     rejectionChannel: variation.rejectionChannel,
   };
   const decided = variationIsDecided(decisionState);
-  const decidedMessage = t(`client.${variationDecidedKey(decisionState)}`);
+  const decidedMessage = t(variationDecidedKey(decisionState));
 
   return (
     <div className="mx-auto max-w-3xl space-y-4 p-4 md:p-8">
@@ -69,7 +69,7 @@ export function PublicVariationView({
           {pick(variation.org.name_ar, variation.org.name_en) || 'Metra'}
         </h1>
         <p className="text-body text-muted-foreground">
-          {t('variation')} · <span dir="ltr">{num}</span>
+          {t('heading')} · <span dir="ltr">{num}</span>
         </p>
         <p className="font-medium">{pick(variation.title_ar, variation.title_en)}</p>
         {(variation.reason_ar || variation.reason_en) && (
@@ -116,9 +116,9 @@ export function PublicVariationView({
       ) : (
         <Card>
           <CardContent className="space-y-3 py-4">
-            <p className="text-body text-muted-foreground">{t('client.intro')}</p>
+            <p className="text-body text-muted-foreground">{t('intro')}</p>
             <Input
-              placeholder={t('client.nameLabel')}
+              placeholder={t('nameLabel')}
               value={name}
               onChange={(e) => setName(e.target.value)}
             />
@@ -129,11 +129,11 @@ export function PublicVariationView({
                 ) : (
                   <Check className="size-4" aria-hidden />
                 )}
-                {t('client.approve')}
+                {t('approve')}
               </Button>
               <Button variant="secondary" onClick={() => respond('reject')} disabled={pending}>
                 <X className="size-4" aria-hidden />
-                {t('client.reject')}
+                {t('reject')}
               </Button>
             </div>
           </CardContent>

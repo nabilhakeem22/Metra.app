@@ -1558,7 +1558,11 @@
       "already": "This contract has already been acknowledged.",
       "expired": "This link has expired.",
       "invalid": "This link is not valid.",
-      "notSignature": "This is an electronic acknowledgement, not a binding signature."
+      "notSignature": "This is an electronic acknowledgement, not a binding signature.",
+      "heading": "Contract",
+      "originalValue": "Original value",
+      "advancePct": "Advance %",
+      "retentionPct": "Retention %"
     }
   },
   "variations": {
@@ -1601,7 +1605,9 @@
       "expired": "This link has expired.",
       "invalid": "This link is not valid.",
       "contractInactive": "This contract is no longer active, so this variation order can no longer be decided.",
-      "rejectedOnTermination": "This variation order was closed because the contract was terminated. You did not decide it."
+      "rejectedOnTermination": "This variation order was closed because the contract was terminated. You did not decide it.",
+      "heading": "Variation order",
+      "netDelta": "Net change"
     }
   },
   "engagements": {

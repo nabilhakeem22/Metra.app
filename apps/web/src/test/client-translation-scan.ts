@@ -14,7 +14,8 @@ export interface ClientTranslationCall {
   /** Relative to src, with '/'. */
   path: string;
   hook: 'useTranslations' | 'useMessages';
-  /** The top-level namespace, or null when it is not known statically. */
+  /** The namespace as far as it is static ('proposals.p', or 'delivery' for
+   *  `delivery.${notice}`), or null when not even its top level is. */
   namespace: string | null;
   /** The argument as written ('' when there is none). */
   argument: string;
@@ -56,12 +57,15 @@ function calledHook(callee: ts.Expression, bindings: ReturnType<typeof hookBindi
   return null;
 }
 
-/** The top-level namespace of a useTranslations argument, when it is static. */
-function topLevelNamespace(argument: ts.Expression | undefined): string | null {
+/** The static part of a useTranslations namespace: all of a literal, or a
+ *  template's literal head up to its last dot (`delivery.hero.${group}` reads
+ *  'delivery.hero'). Null when not even the top level is literal. */
+function staticNamespace(argument: ts.Expression | undefined): string | null {
   if (!argument) return null;
-  if (ts.isStringLiteral(argument) || ts.isNoSubstitutionTemplateLiteral(argument)) return argument.text.split('.')[0]!;
-  // `delivery.${notice}`: only the part below a literal top level is computed.
-  if (ts.isTemplateExpression(argument) && argument.head.text.includes('.')) return argument.head.text.split('.')[0]!;
+  if (ts.isStringLiteral(argument) || ts.isNoSubstitutionTemplateLiteral(argument)) return argument.text;
+  if (ts.isTemplateExpression(argument) && argument.head.text.includes('.')) {
+    return argument.head.text.slice(0, argument.head.text.lastIndexOf('.'));
+  }
   return null;
 }
 
@@ -76,7 +80,7 @@ export function translationCalls(file: ts.SourceFile, path: string): ClientTrans
       calls.push({
         path,
         hook,
-        namespace: hook === 'useTranslations' ? topLevelNamespace(argument) : null,
+        namespace: hook === 'useTranslations' ? staticNamespace(argument) : null,
         argument: argument ? argument.getText(file) : '',
       });
     }
