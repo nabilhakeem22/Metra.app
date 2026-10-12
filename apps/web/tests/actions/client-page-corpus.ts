@@ -30,6 +30,8 @@ export const NAMED_TEXTS = [
   cp(0x16fe4, 0x16fe4), cp(0xe000, 0xe000), cp(0xffff, 0xffff), cp(0xfffc, 0xfffc), `CIB${cp(0xfe0f)}`, `CIB${cp(0xe000)}`,
   // Round E (0060, K4): the musical null notehead beside a letter, and the line separators at the edges.
   `CIB${cp(0x1d159)}`, `${cp(0x2028)}CIB`, `CIB${cp(0x2028)}`, `${cp(0x2029)}CIB${cp(0x2028)}`,
+  // Round E (S3): the unassigned default-ignorables, alone and beside a letter.
+  cp(0xfff0, 0xfff8), cp(0xe0002, 0xe0080), cp(0xe01f0, 0xe0fff), `CIB${cp(0xe0002)}`, `CIB${cp(0xfff0)}`,
 ];
 
 /** A seeded generator (mulberry32), so a failing case is reproducible from its seed. */

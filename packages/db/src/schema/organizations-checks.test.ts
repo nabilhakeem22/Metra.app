@@ -38,6 +38,8 @@ describe('NOT_VISIBLE (0060)', () => {
     expect(covered).toEqual(expect.arrayContaining([0x20, 0xa0, 0x3000, 0x85, ...BLANK_LOOKING, 0x651, 0x64b, 0x670]));
     // Round D review (F2, L3): the selectors and fillers, private use and the noncharacters.
     expect(covered).toEqual(expect.arrayContaining([0xfe0f, 0xe0100, 0x180b, 0x17b4, 0x16fe4, 0x13440, 0xe000, 0x10fffd, 0xfdd0, 0xffff]));
+    // Round E (S3): the unassigned default-ignorables.
+    expect(covered).toEqual(expect.arrayContaining([0xfff0, 0xfff8, 0xe0000, 0xe0002, 0xe001f, 0xe0080, 0xe00ff, 0xe01f0, 0xe0fff]));
   });
 
   it('holds no letter, digit, punctuation mark or symbol but the six blank-looking ones', () => {

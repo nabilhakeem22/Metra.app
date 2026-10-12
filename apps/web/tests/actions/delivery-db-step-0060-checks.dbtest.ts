@@ -57,13 +57,16 @@ describe('K1, K2: no +200 number', () => {
   });
 });
 
-describe('K3: line separators anywhere, the null notehead alone', () => {
+/** Round E (S3): unassigned default-ignorables alone (U+FFF0, U+FFF8, U+E0000, U+E0002, U+E0080, U+E01F0, U+E0FFF). */
+const UNASSIGNED_ALONE = [65520, 65528, 917504, 917506, 917632, 917999, 921599].map((codePoint) => `repeat(chr(${codePoint}), 3)`);
+
+describe('K3: line separators anywhere, the null notehead alone, unassigned ignorables alone', () => {
   for (const column of ['instapay_address', 'bank_name', 'bank_account_holder']) {
     it(column, async () => {
-      for (const value of [`'CI' || chr(8232) || 'B'`, `'CI' || chr(8233) || 'B'`, 'repeat(chr(119129), 3)']) {
+      for (const value of [`'CI' || chr(8232) || 'B'`, `'CI' || chr(8233) || 'B'`, 'repeat(chr(119129), 3)', ...UNASSIGNED_ALONE]) {
         expect(await refusal(`${column} = ${value}`), value).toBe('organizations_payment_text_printable');
       }
-      for (const value of [`'CIB' || chr(119129)`, quoted('CIB'), quoted('studio@instapay'), quoted('بنك مصر')]) {
+      for (const value of [`'CIB' || chr(119129)`, `'CIB' || chr(917506)`, quoted('CIB'), quoted('studio@instapay'), quoted('بنك مصر')]) {
         expect(await refusal(`${column} = ${value}`), value).toBe('ok');
       }
       // Every 0059 C3 refusal still holds (delivery-db-step-0059-checks runs the full list on this database).

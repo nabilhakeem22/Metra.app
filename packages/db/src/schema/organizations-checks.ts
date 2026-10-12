@@ -48,14 +48,24 @@ const FILLERS_AND_SELECTORS = String.raw`\u17B4-\u17B5\u180B-\u180F\uFE00-\uFE0F
 const PRIVATE_USE_AND_NONCHARACTERS = String.raw`\uE000-\uF8FF\uFDD0-\uFDEF\uFFFE-\uFFFF\U0001FFFE-\U0001FFFF\U0002FFFE-\U0002FFFF\U0003FFFE-\U0003FFFF\U0004FFFE-\U0004FFFF\U0005FFFE-\U0005FFFF\U0006FFFE-\U0006FFFF\U0007FFFE-\U0007FFFF\U0008FFFE-\U0008FFFF\U0009FFFE-\U0009FFFF\U000AFFFE-\U000AFFFF\U000BFFFE-\U000BFFFF\U000CFFFE-\U000CFFFF\U000DFFFE-\U000DFFFF\U000EFFFE-\U000EFFFF\U000F0000-\U0010FFFF`;
 
 /**
+ * Unassigned code points Unicode reserves as default-ignorable (0060, Round E
+ * S3): the specials before U+FFF9 and the unassigned rest of the tag and
+ * variation-selector block. A renderer draws them as nothing, and the app
+ * refuses a value made only of them (none is a letter, digit, punctuation mark
+ * or symbol). Refused here only as a whole value, as the app does.
+ */
+const UNASSIGNED_IGNORABLES = String.raw`\uFFF0-\uFFF8\U000E0000\U000E0002-\U000E001F\U000E0080-\U000E00FF\U000E01F0-\U000E0FFF`;
+
+/**
  * What a reader cannot see on its own. INVARIANT (organizations-checks.test.ts):
  * only white space, controls, format characters, marks, private use,
- * noncharacters and the blank-looking characters above, never another letter,
- * digit, punctuation mark or symbol. The app keeps a value only when it holds
- * one of those, so every value it accepts passes the visible-character rule
- * (delivery-db-step-0059-differential.dbtest.ts checks every code point).
+ * noncharacters, unassigned code points and the blank-looking characters above,
+ * never another letter, digit, punctuation mark or symbol. The app keeps a
+ * value only when it holds one of those, so every value it accepts passes the
+ * visible-character rule (delivery-db-step-0059-differential.dbtest.ts checks
+ * every code point).
  */
-export const NOT_VISIBLE = `${WHITE_SPACE}${BLANK_LOOKING}${COMBINING_MARKS}${FILLERS_AND_SELECTORS}${PRIVATE_USE_AND_NONCHARACTERS}`;
+export const NOT_VISIBLE = `${WHITE_SPACE}${BLANK_LOOKING}${COMBINING_MARKS}${FILLERS_AND_SELECTORS}${PRIVATE_USE_AND_NONCHARACTERS}${UNASSIGNED_IGNORABLES}`;
 
 /** `+` and the international digits: a country code that does not start with 0, 8 to 15 digits. */
 const INTERNATIONAL_NUMBER = String.raw`^\+[1-9][0-9]{7,14}$`;
