@@ -10,7 +10,7 @@ import {
   engagementArtifacts,
   type MetraDb,
 } from '@metra/db';
-import { and, asc, eq, sql } from 'drizzle-orm';
+import { and, asc, eq } from 'drizzle-orm';
 import { createHash } from 'node:crypto';
 
 /** The render identity a manifest hash is built from (one approved-render row). */
@@ -70,17 +70,3 @@ export async function captureRenderManifest(
     .where(eq(designEngagements.id, engagementId));
 }
 
-/**
- * A NEW render round at the final approval (Round D, A1): the studio showed the
- * client a render it had not seen, so `renders_ready_at` moves to the database's
- * now. The client's design decision names the round it answers, so a page
- * loaded before this answers "changed" and a decision taken on the earlier set
- * no longer counts for this one. The baseline manifest hash is left as the
- * transition captured it. Caller's tx; RLS scopes the update to its org.
- */
-export async function restampRenderRound(tx: MetraDb, engagementId: string): Promise<void> {
-  await tx
-    .update(designEngagements)
-    .set({ rendersReadyAt: sql`now()`, updatedAt: new Date() })
-    .where(eq(designEngagements.id, engagementId));
-}

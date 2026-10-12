@@ -14,21 +14,18 @@ import { and, eq } from 'drizzle-orm';
 import { fail, mutateInOrg, requireInOrg } from '@/lib/actions/mutate';
 import type { ActionResult } from '@/lib/actions/result';
 import type { OrgContext } from '@/lib/db/context';
-import { restampRenderRound } from './renders';
-import { isTerminal, type DesignState } from './states';
+import { restampRoundAwaitingDecision } from './render-round-restamp';
+import { isTerminal } from './states';
 import { isUuid } from '@/lib/uuid';
 
 /**
- * True when this flip SHOWS the client a render while it is asked to approve
- * the final design: the round it is answering changed (Round D, A1). Hiding a
- * render, or showing one at any other stage, is not a new round.
+ * True when this flip SHOWS the client a render it could not see. Whether that
+ * starts a new round (the delivery is under review and the client has not
+ * decided) is the database's call (./render-round-restamp.ts). Hiding a render
+ * is never a new round.
  */
-function showsNewRenderUnderReview(
-  artifact: { kind: string; clientVisible: boolean },
-  state: DesignState,
-  visible: boolean,
-): boolean {
-  return artifact.kind === 'approved_render' && visible && !artifact.clientVisible && state === 'final_approval';
+function showsRender(artifact: { kind: string; clientVisible: boolean }, visible: boolean): boolean {
+  return artifact.kind === 'approved_render' && visible && !artifact.clientVisible;
 }
 
 export interface SetArtifactClientVisibilityInput {
@@ -47,7 +44,8 @@ export interface SetArtifactClientVisibilityInput {
  * (`engagement_not_found`) and not be terminal (`engagement_not_active`), matching
  * recordArtifactCore / createDeliverableUploadCore → flip `client_visible` and
  * stamp `updated_at` (the portal renders that as the "shared on" date) → a
- * render newly shown at the final approval re-stamps the render round → audit.
+ * render newly shown while the client has not decided on the final design
+ * re-stamps the render round → audit.
  *
  * Setting the value it already has is a harmless no-op write; the action stays
  * idempotent. Never throws to the client — coded ActionResult only.
@@ -98,9 +96,7 @@ export async function setArtifactClientVisibilityCore(
             eq(engagementArtifacts.id, artifact.id),
           ),
         );
-      if (showsNewRenderUnderReview(artifact, engagement.state, input.visible)) {
-        await restampRenderRound(tx, engagement.id);
-      }
+      if (showsRender(artifact, input.visible)) await restampRoundAwaitingDecision(tx, engagement.id);
 
       await audit({
         entity: 'design_engagement',
