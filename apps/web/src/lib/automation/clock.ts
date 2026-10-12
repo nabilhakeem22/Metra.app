@@ -3,6 +3,15 @@
 // cron tick at any UTC instant maps to the right Cairo calendar day/hour/week.
 
 const CAIRO = 'Africa/Cairo';
+/** Built once per isolate (mirrors doc-number.ts CAIRO_YEAR): a formatter costs
+ *  tens of microseconds to build and about one to use. */
+const CAIRO_DATE_PARTS = new Intl.DateTimeFormat('en-CA', {
+  timeZone: CAIRO,
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+});
+const CAIRO_HOUR = new Intl.DateTimeFormat('en-GB', { timeZone: CAIRO, hour: '2-digit', hourCycle: 'h23' });
 
 interface CairoYmd {
   year: number;
@@ -11,12 +20,7 @@ interface CairoYmd {
 }
 
 function cairoParts(now: Date): CairoYmd {
-  const parts = new Intl.DateTimeFormat('en-CA', {
-    timeZone: CAIRO,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).formatToParts(now);
+  const parts = CAIRO_DATE_PARTS.formatToParts(now);
   const get = (type: Intl.DateTimeFormatPartTypes) =>
     Number(parts.find((p) => p.type === type)?.value ?? '0');
   return { year: get('year'), month: get('month'), day: get('day') };
@@ -30,11 +34,7 @@ export function todayInCairo(now: Date): string {
 
 /** The Cairo wall-clock hour (0-23). */
 export function cairoHour(now: Date): number {
-  const parts = new Intl.DateTimeFormat('en-GB', {
-    timeZone: CAIRO,
-    hour: '2-digit',
-    hourCycle: 'h23',
-  }).formatToParts(now);
+  const parts = CAIRO_HOUR.formatToParts(now);
   return Number(parts.find((p) => p.type === 'hour')?.value ?? '0');
 }
 

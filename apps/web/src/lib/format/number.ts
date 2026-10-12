@@ -1,6 +1,7 @@
 // Western (Latin) digits everywhere, in BOTH locales (§4.1). The `-u-nu-latn`
 // Unicode extension forces the latn numbering system; ar-EG uses comma/period
 // separators, matching Egyptian business and tax documents.
+import { cachedNumberFormat } from './intl-cache';
 
 function latnLocale(locale: string): string {
   return locale.includes('-u-nu-') ? locale : `${locale}-u-nu-latn`;
@@ -13,7 +14,7 @@ export function formatNumber(
 ): string {
   const n = typeof value === 'string' ? Number(value) : value;
   if (!Number.isFinite(n)) return '';
-  return new Intl.NumberFormat(latnLocale(locale), options).format(n);
+  return cachedNumberFormat(latnLocale(locale), options).format(n);
 }
 
 /**

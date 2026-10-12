@@ -3,18 +3,20 @@
 // instant and a test is deterministic. Past six days it is a plain date: "8 days
 // ago" makes the reader do arithmetic a date would spare them.
 import { formatDate } from './date';
+import { cachedRelativeTimeFormat } from './intl-cache';
 import { latnLocale } from './number';
 
 const MINUTE_MS = 60_000;
 const HOUR_MS = 60 * MINUTE_MS;
 const DAY_MS = 24 * HOUR_MS;
 const RELATIVE_DAYS_MAX = 6;
+const RELATIVE_OPTIONS: Intl.RelativeTimeFormatOptions = { numeric: 'auto' };
 
 export function formatRelativeTime(iso: string, nowMs: number, locale: string): string {
   const instant = new Date(iso).getTime();
   if (Number.isNaN(instant)) return '';
   const elapsed = Math.max(0, nowMs - instant);
-  const relative = new Intl.RelativeTimeFormat(latnLocale(locale), { numeric: 'auto' });
+  const relative = cachedRelativeTimeFormat(latnLocale(locale), RELATIVE_OPTIONS);
   if (elapsed < MINUTE_MS) return relative.format(0, 'second');
   if (elapsed < HOUR_MS) return relative.format(-Math.floor(elapsed / MINUTE_MS), 'minute');
   if (elapsed < DAY_MS) return relative.format(-Math.floor(elapsed / HOUR_MS), 'hour');

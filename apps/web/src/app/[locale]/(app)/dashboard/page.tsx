@@ -13,6 +13,7 @@ import { loadDashboardFigures } from '@/lib/dashboard/load-dashboard';
 import { pickPrimaryCta } from '@/lib/dashboard/primary-cta';
 import { parseRange } from '@/lib/dashboard/range';
 import { deliveriesEmptyState } from '@/lib/dashboard/setup-step';
+import { cachedDateTimeFormat } from '@/lib/format/intl-cache';
 import { DashboardView } from './dashboard-view';
 
 // LOADING ONLY. Every figure this page shows is assembled here and handed to
@@ -49,10 +50,7 @@ export default async function DashboardPage({
   // request's locale. Every shaping decision is in `lib/dashboard/chart-columns`,
   // which has its own tests.
   const monthLabel = (month: string) =>
-    new Date(`${month}-01T00:00:00Z`).toLocaleDateString(locale, {
-      month: 'short',
-      timeZone: 'UTC',
-    });
+    cachedDateTimeFormat(locale, { month: 'short', timeZone: 'UTC' }).format(new Date(`${month}-01T00:00:00Z`));
 
   return (
     <DashboardView

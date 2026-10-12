@@ -1,18 +1,16 @@
 // Gregorian, DD/MM/YYYY, Latin digits. Store UTC, render in Africa/Cairo (§4.1).
+import { cachedDateTimeFormat } from './intl-cache';
 import { latnLocale } from './number';
 
 const CAIRO = 'Africa/Cairo';
+const DATE_OPTIONS: Intl.DateTimeFormatOptions = { timeZone: CAIRO, day: '2-digit', month: '2-digit', year: 'numeric' };
+const TIME_OPTIONS: Intl.DateTimeFormatOptions = { timeZone: CAIRO, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' };
 
 export function formatDate(input: Date | string | number, locale: string): string {
   const date = input instanceof Date ? input : new Date(input);
   if (Number.isNaN(date.getTime())) return '';
 
-  const parts = new Intl.DateTimeFormat(latnLocale(locale), {
-    timeZone: CAIRO,
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-  }).formatToParts(date);
+  const parts = cachedDateTimeFormat(latnLocale(locale), DATE_OPTIONS).formatToParts(date);
 
   const get = (type: Intl.DateTimeFormatPartTypes) =>
     parts.find((p) => p.type === type)?.value ?? '';
@@ -25,10 +23,5 @@ export function formatDate(input: Date | string | number, locale: string): strin
 export function formatTime(input: Date | string | number, locale: string): string {
   const date = input instanceof Date ? input : new Date(input);
   if (Number.isNaN(date.getTime())) return '';
-  return new Intl.DateTimeFormat(latnLocale(locale), {
-    timeZone: CAIRO,
-    hour: '2-digit',
-    minute: '2-digit',
-    hourCycle: 'h23',
-  }).format(date);
+  return cachedDateTimeFormat(latnLocale(locale), TIME_OPTIONS).format(date);
 }
