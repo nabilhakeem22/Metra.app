@@ -36,7 +36,7 @@
  * find the statement in the code; a log line carrying a client's phone number is
  * a retention problem in somebody else's jurisdiction.
  */
-import { driverErrorOf } from '@metra/db/sqlstate';
+import { causeChain, driverErrorOf } from '@metra/db/sqlstate';
 
 const LOGGABLE_ERROR_FIELDS = [
   'name',
@@ -61,8 +61,25 @@ const ORM_QUERY_WRAPPER = 'DrizzleQueryError';
  */
 function isOrmQueryWrapper(e: unknown): boolean {
   if (e === null || typeof e !== 'object') return false;
-  const own = Object.prototype.hasOwnProperty.bind(e);
-  return own('query') && own('params');
+  // A Proxy can throw from hasOwnProperty. FAIL CLOSED (Round E S3): an object
+  // that will not say what it carries is treated as carrying the parameters.
+  try {
+    const own = Object.prototype.hasOwnProperty.bind(e);
+    return own('query') && own('params');
+  } catch {
+    return true;
+  }
+}
+
+/**
+ * May `message` be read off `source`? Not when it, or anything it wraps,
+ * carries the bound parameters (Round E S3): a wrapper's message IS
+ * `Failed query: ... params: ...`, and an error built around one (a wrapper
+ * with its own `code`, an `Error(wrapper.message, { cause })`) can carry it
+ * too. The driver's own error below a wrapper is the server's text and stays.
+ */
+function messageIsSafe(source: unknown): boolean {
+  return !causeChain(source).some(isOrmQueryWrapper);
 }
 
 /** One field off a possibly-hostile object, or undefined if reading it threw. */
@@ -81,14 +98,15 @@ function readField(
 export function loggableFailure(e: unknown): Record<string, string> {
   const driver = driverErrorOf(e);
   if (!driver && isOrmQueryWrapper(e)) {
-    const name = (e as { name?: unknown }).name;
+    const name = readField(e as Record<string, unknown>, 'name');
     return typeof name === 'string' && name.length > 0
       ? { name, thrown: ORM_QUERY_WRAPPER }
       : { thrown: ORM_QUERY_WRAPPER };
   }
   const source = driver ?? (e as Record<string, unknown> | null | undefined);
+  const fields = messageIsSafe(source) ? LOGGABLE_ERROR_FIELDS : LOGGABLE_ERROR_FIELDS.filter((field) => field !== 'message');
   const safe: Record<string, string> = {};
-  for (const field of LOGGABLE_ERROR_FIELDS) {
+  for (const field of fields) {
     // Through a guarded read for the same reason `sqlstate.ts` does: this runs
     // inside somebody's `catch`, and a property that is an accessor can throw.
     // A redactor that can raise turns a handled failure into an unhandled one.

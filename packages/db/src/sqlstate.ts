@@ -83,7 +83,9 @@ function readProperty(source: unknown, field: string): unknown {
   }
 }
 
-function causeChain(error: unknown): Array<Record<string, unknown>> {
+/** Every object in the error's `cause` / `errors` tree, outermost first: cycles
+ *  visited once, at most MAX_ERROR_NODES, every read guarded. */
+export function causeChain(error: unknown): Array<Record<string, unknown>> {
   const chain: Array<Record<string, unknown>> = [];
   const visited = new Set<unknown>();
   const pending: unknown[] = [error];
