@@ -27,9 +27,12 @@
   ],
   // Workers TRACES off (Round E S2): a fetch span records the full URL, and a
   // signed Storage URL carries its token in the query, so a trace would hold a
-  // working (if short-lived) storage link. Only traces are named here: logs,
-  // invocation logs and `wrangler tail` are left as they are.
+  // working (if short-lived) storage link. `enabled: false` is exactly what
+  // every deploy sent before this key existed (wrangler 4.123 deploys a missing
+  // `observability` as `{ enabled: false }`), so persisted Workers Logs stay as
+  // they were. `wrangler tail` streams live and does not depend on either.
   "observability": {
+    "enabled": false,
     "traces": { "enabled": false }
   },
   // Cloudflare Browser Rendering binding used by lib/pdf/render.ts
