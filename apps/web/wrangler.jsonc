@@ -25,6 +25,13 @@
       "localConnectionString": "postgres://postgres:postgres@localhost:5432/metra_cf_spike"
     }
   ],
+  // Workers TRACES off (Round E S2): a fetch span records the full URL, and a
+  // signed Storage URL carries its token in the query, so a trace would hold a
+  // working (if short-lived) storage link. Only traces are named here: logs,
+  // invocation logs and `wrangler tail` are left as they are.
+  "observability": {
+    "traces": { "enabled": false }
+  },
   // Cloudflare Browser Rendering binding used by lib/pdf/render.ts
   // (@cloudflare/puppeteer) to render proposal PDFs.
   "browser": {

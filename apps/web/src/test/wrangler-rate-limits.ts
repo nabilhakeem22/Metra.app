@@ -15,12 +15,17 @@ export interface RateLimitEntry {
   simple: { limit: number; period: number };
 }
 
-/** The `ratelimits` array of wrangler.jsonc, parsed as JSONC (comments allowed). */
-export function configuredRateLimits(): RateLimitEntry[] {
+/** apps/web/wrangler.jsonc, parsed as JSONC (comments allowed). */
+export function wranglerConfig(): Record<string, unknown> {
   const path = resolve(WEB_ROOT, 'wrangler.jsonc');
   const parsed = ts.parseConfigFileTextToJson(path, readFileSync(path, 'utf8'));
   if (parsed.error) throw new Error(`wrangler.jsonc does not parse: ${String(parsed.error.messageText)}`);
-  return (parsed.config as { ratelimits: RateLimitEntry[] }).ratelimits;
+  return parsed.config as Record<string, unknown>;
+}
+
+/** The `ratelimits` array of wrangler.jsonc. */
+export function configuredRateLimits(): RateLimitEntry[] {
+  return (wranglerConfig() as { ratelimits: RateLimitEntry[] }).ratelimits;
 }
 
 /** The configured ceiling of one binding; throws when the binding is not declared. */
