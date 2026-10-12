@@ -33,22 +33,37 @@ async function atFinalApproval(suffix: string): Promise<RoundBDelivery> {
 const seenNow = async (d: RoundBDelivery) => reviewSeenOf((await deliveryOrNull(d.token))!);
 const decisionOnPage = async (d: RoundBDelivery) => (await deliveryOrNull(d.token))!.designDecision?.kind ?? null;
 
-/** Show a NEW render while `other` holds a transaction open on another connection; `other` commits mid-flight. */
+/**
+ * Show a NEW render while `other` holds a transaction open on another
+ * connection; `other` commits mid-flight. The flip starts only once `other`
+ * has run (no fixed sleep: a cold connection under load took longer than one,
+ * Round E F3), and the holder is let go whatever happens, so a failed
+ * expectation cannot leave a transaction open that hangs the teardown.
+ */
 async function showWhileHeld(d: RoundBDelivery, other: string): Promise<void> {
   const artifactId = await seedArtifact(d, 'approved_render', { release: false });
-  let release!: () => void;
+  let release: () => void = () => undefined;
+  const released = new Promise<void>((resolve) => (release = resolve));
+  let locked: () => void = () => undefined;
+  const isLocked = new Promise<void>((resolve) => (locked = resolve));
   const held = holder.begin(async (tx) => {
     await tx.unsafe(other);
-    await new Promise<void>((resolve) => (release = resolve));
+    locked();
+    await released;
   });
-  await new Promise((resolve) => setTimeout(resolve, 100));
-  let settled = false;
-  const flip = setArtifactClientVisibilityCore(d.ctx, { artifactId, visible: true }).finally(() => (settled = true));
-  await new Promise((resolve) => setTimeout(resolve, 300));
-  expect(settled).toBe(false); // it waits on the row the other transaction holds
-  release();
-  await held;
-  expect((await flip).ok).toBe(true);
+  try {
+    await Promise.race([isLocked, held]);
+    let settled = false;
+    const flip = setArtifactClientVisibilityCore(d.ctx, { artifactId, visible: true }).finally(() => (settled = true));
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    expect(settled).toBe(false); // it waits on the row the other transaction holds
+    release();
+    await held;
+    expect((await flip).ok).toBe(true);
+  } finally {
+    release();
+    await held.catch(() => undefined);
+  }
 }
 
 describe('a render shown BEFORE the client decided starts a new round', () => {
