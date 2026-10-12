@@ -1,6 +1,5 @@
-import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
-import { join, relative } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { workerSourceFiles } from '@/test/source-files';
 
 // Round D (AC A4): app code calls ONLY the seven-argument, consent-guarded
 // app_delivery_respond_by_token. The six-argument function stays in the
@@ -8,25 +7,14 @@ import { describe, expect, it } from 'vitest';
 // during the rollback window), and it records consent to whatever is on file
 // NOW, so a call to it would silently bring the stale-tab consent back. Read
 // from the source of the app, the packages and the scripts (.ts, .tsx, .js,
-// .mjs, .cjs; tests aside), and any spelling of the call: a quoted name, or
-// white space before the parenthesis (D3 F8, L3).
+// .mjs, .cjs; tests aside), and any spelling of the call: a quoted name, white
+// space before the parenthesis (D3 F8, L3), or any letter case (Postgres folds
+// an unquoted name to lower case; Round E).
 
-const REPO = join(__dirname, '..', '..', '..', '..', '..', '..');
 const ROOTS = ['apps/web/src', 'apps/web/scripts', 'packages', 'scripts'];
-const SKIPPED_DIRECTORIES = new Set(['node_modules', 'dist', '.next', '.open-next', '.wrangler']);
-const SOURCE = /\.(tsx?|[cm]?js)$/;
-const TEST = /\.(test|dbtest)\.[cm]?[jt]sx?$/;
 
-/** A call of the respond function: the name, optionally quoted, then optional white space and "(". */
-const RESPOND_CALL = /["']?app_delivery_respond_by_token["']?\s*\(/g;
-
-function sourceFiles(directory: string): string[] {
-  return readdirSync(directory).flatMap((name) => {
-    const path = join(directory, name);
-    if (statSync(path).isDirectory()) return SKIPPED_DIRECTORIES.has(name) ? [] : sourceFiles(path);
-    return SOURCE.test(name) && !TEST.test(name) ? [path] : [];
-  });
-}
+/** A call of the respond function: the name in any case, optionally quoted, then optional white space and "(". */
+const RESPOND_CALL = /["']?app_delivery_respond_by_token["']?\s*\(/gi;
 
 /** The argument list of every call of the respond function in `source`, split at its top-level commas. */
 function callArguments(source: string): string[][] {
@@ -52,10 +40,8 @@ function callArguments(source: string): string[][] {
 }
 
 describe('the respond function from app code', () => {
-  const callers = ROOTS.map((root) => join(REPO, root))
-    .filter((root) => existsSync(root))
-    .flatMap(sourceFiles)
-    .map((path) => ({ path: relative(REPO, path).replace(/\\/g, '/'), calls: callArguments(readFileSync(path, 'utf8')) }))
+  const callers = workerSourceFiles(ROOTS)
+    .map((file) => ({ path: file.path, calls: callArguments(file.text) }))
     .filter((file) => file.calls.length > 0);
 
   it('is called from respond.ts only, with seven arguments, the third cast ::timestamptz', () => {
@@ -77,6 +63,8 @@ describe('the respond function from app code', () => {
     ['a space before the parenthesis', 'select public.app_delivery_respond_by_token (${hash}, ${action}, ${note}, ${name}, ${ip}, ${ua})'],
     ['a line break before it', 'select public.app_delivery_respond_by_token\n  (${hash}, ${action}, ${note}, ${name}, ${ip}, ${ua})'],
     ['a quoted name', 'select public."app_delivery_respond_by_token"(${hash}, ${action}, ${note}, ${name}, ${ip}, ${ua})'],
+    ['an upper-case name', 'select public.APP_DELIVERY_RESPOND_BY_TOKEN(${a}, ${b}, ${c}, ${d}, ${e}, ${f})'],
+    ['a mixed-case name and a space', 'select App_Delivery_Respond_By_Token (${a}, ${b}, ${c}, ${d}, ${e}, ${f})'],
   ])('the counter is sound: it reads %s of the retired call as six', (_label, retired) => {
     expect(callArguments(retired).map((args) => args.length)).toEqual([6]);
   });
