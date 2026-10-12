@@ -1918,6 +1918,11 @@ Why the database first is safe, one sentence each:
   number and no payment text holding U+2028, U+2029 or U+1D159.
 - **The four timed functions keep their signatures,** so their grants are kept
   and every caller is unchanged.
+- **Measured** on a fresh database built from this branch: main `43f06c4`'s
+  own 1041 database tests ran and 1025 passed. The 16 that failed are pins
+  this branch updates (the dropped function's rows and calls, the new
+  `lock_timeout` setting, and `+200` numbers that 0059 still kept), not
+  behaviour of the live code.
 
 **What it changes.** No column, no row, no backfill.
 
@@ -1949,7 +1954,7 @@ cd C:\Users\HP\merta-main
 git fetch origin
 git switch --detach origin/validate/round-e-db
 git log --oneline -1    # a "docs(deploy): ..." commit (this runbook); CI green on it
-git diff --stat CODE_SHA HEAD    # MUST list only docs/DEPLOY.md: the code is exactly what was rehearsed (CODE_SHA)
+git diff --stat 2102531 HEAD    # MUST list only docs/DEPLOY.md: the code is exactly what was rehearsed (2102531)
 ```
 
 If the diff lists any other file, STOP and tell the lead.
@@ -1995,7 +2000,9 @@ from (
 where not (phone_ok and whatsapp_ok and payment_text_ok);
 ```
 
-(c) The client page functions. PREDICTED_2C
+(c) The client page functions. 12 rows today, TWO of them
+`app_delivery_respond_by_token` (the six-argument one is the row this step
+drops). Keep this output: step 4 (c) runs it again.
 
 ```sql
 -- 0060 step 2 (c): the client page functions. Run this one alone.
@@ -2006,7 +2013,26 @@ where n.nspname = 'public' and p.proname like 'app_delivery_%'
 order by 1, 2;
 ```
 
-(d) The four writes step 3 gives a `lock_timeout`. PREDICTED_2D
+Expected (`proname | args | result`):
+
+```text
+app_delivery_act_notified_by_token      | p_hash text, p_body_key text, p_milestone_kind text | boolean
+app_delivery_by_token                   | p_hash text | jsonb
+app_delivery_choose_concept_by_token    | p_hash text, p_artifact_id uuid, p_position integer, p_note text, p_name text, p_ip text, p_ua text | text
+app_delivery_claim_payment_by_token     | p_hash text, p_milestone_kind text, p_note text, p_name text, p_ip text, p_ua text | text
+app_delivery_close_target_by_token      | p_hash text | jsonb
+app_delivery_comment_by_token           | p_hash text, p_document_id uuid, p_body text, p_name text, p_ip text, p_ua text | text
+app_delivery_document_by_token          | p_hash text, p_document_id uuid | jsonb
+app_delivery_document_comments_by_token | p_hash text, p_document_id uuid | jsonb
+app_delivery_logo_by_token              | p_hash text | jsonb
+app_delivery_notify_studio_by_token     | p_hash text, p_body_key text, p_params jsonb, p_roles jsonb | jsonb
+app_delivery_respond_by_token           | p_hash text, p_action text, p_expected_issue_at timestamp with time zone, p_note text, p_name text, p_ip text, p_ua text | text
+app_delivery_respond_by_token           | p_hash text, p_action text, p_note text, p_name text, p_ip text, p_ua text | text   (DROPPED in step 3)
+```
+
+(d) The four writes step 3 gives a `lock_timeout`. 4 rows, in this order
+(`choose_concept`, `claim_payment`, `comment`, `respond`), and `config` holds
+ONE setting on each: `search_path=""`.
 
 ```sql
 -- 0060 step 2 (d): the settings of the four timed writes. Run this one alone.
@@ -2054,7 +2080,20 @@ npm run assert-schema-applied -w @metra/db
 
 **NOTICE blocks are normal.** `db:apply-rls` also prints routine NOTICE
 blocks (several lines each, with `severity: 'NOTICE'` and a `message:` line).
-They are not failures. NOTICES_3
+They are not failures. The production-shaped rehearsal printed these
+`message:` lines (on Supabase a line about a role may differ; any line that
+ends `does not exist, skipping` or `already exists, skipping` is the same
+kind):
+
+- `db:migrate`: `message: 'schema "drizzle" already exists, skipping',` and
+  `message: 'relation "__drizzle_migrations" already exists, skipping',`
+- `db:apply-rls`:
+  `message: 'function public.app_delivery_choose_concept_by_token(text,uuid,text,text,text,text) does not exist, skipping',`
+  then `message: 'role "postgres" has already been granted membership in role "metra_app" by role "postgres"',`
+  then `message: 'policy "self_memberships" for relation "public.memberships" does not exist, skipping',`.
+  If you ever run `db:apply-rls` a second time, it adds one more first:
+  `message: 'function public.app_delivery_respond_by_token(text,text,text,text,text,text) does not exist, skipping',`
+  (the drop has nothing left to drop).
 
 Only a line that starts `Migration failed:` or `apply-rls failed:` is a
 failure. Expected:
@@ -2067,7 +2106,9 @@ failure. Expected:
   goes on `46 tables, 46 policies, 15 triggers, 44 functions, RLS forced on
   all of them, role metra_app present.`; the second starts
   `apply-rls: grants verified` and goes on `design_engagements update narrowed to 19 columns with no table-level update, and 5 narrowed table(s) (boqs, document_categories, engagement_document_comments, engagement_milestones, workspace_entitlements) holding exactly what rls/roles.sql leaves them.`
-  VERIFIED_3
+  A production-shaped rehearsal (main `43f06c4`'s own migrate and apply-rls
+  on a database with the Supabase API roles and their default EXECUTE, then
+  this branch) printed exactly these, twice.
 - `assert-schema-applied` exits 0, and its functions line starts
   `assert-schema-applied: functions` and ends `44 declared, all present.` (its
   index and constraint lines are report only and do not fail it).
@@ -2080,11 +2121,15 @@ failure. Expected:
   A long query held `organizations` for more than 3 s. Re-run `db:migrate` a
   little later. The same two codes from `db:apply-rls` print `apply-rls
   failed: ...` and end `(this file rolled back; the files before it stay
-  applied).`: re-run `db:apply-rls`. FAIL55P03
+  applied).`: re-run `db:apply-rls`. (Rehearsed: a reader holding `organizations` gave
+  exactly the 55P03 lines, and the migration count stayed 60.)
 - `Migration failed: SQLSTATE 23514: ...` then `Migration failed: STOP, tell the lead (a CHECK refused existing rows; the whole batch rolled back, nothing was changed).`
   A studio's saved value breaks a new CHECK; every 0059 CHECK is still in
   place. Do not re-run yet: run step 2 (b), fix each studio it lists as it
-  says, tell the lead, and only then re-run `db:migrate`. FAIL23514
+  says, tell the lead, and only then re-run `db:migrate`. (Rehearsed: one planted
+  `+2001012345678` gave exactly these lines, naming
+  `organizations_studio_phone_format`; step 2 (b) listed that studio with
+  `phone_ok` false; after the number was saved again the migration ran.)
 - Any other code ends `tell the lead before running anything else`.
 
 **Locks.** `db:migrate` runs 0060 as ONE transaction: ACCESS EXCLUSIVE on
@@ -2107,7 +2152,10 @@ select count(*) as migrations, max(created_at) as newest
 from drizzle.__drizzle_migrations;
 ```
 
-(b) 3 rows, `tightened` true on every one. PREDICTED_4B
+(b) 3 rows, `tightened` true on every one:
+`organizations_payment_text_printable`, `organizations_studio_phone_format`,
+`organizations_studio_whatsapp_format`. (Before step 3, and after undo (3),
+all three read false.)
 
 ```sql
 -- 0060 step 4 (b): the three new CHECKs. Run this one alone.
@@ -2124,7 +2172,11 @@ where conname in ('organizations_studio_phone_format', 'organizations_studio_wha
 order by conname;
 ```
 
-(c) Step 2 (c) again, as its own block. PREDICTED_4C
+(c) Step 2 (c) again, as its own block. 11 rows: every row from before is
+IDENTICAL except that the LAST one (the six-argument
+`app_delivery_respond_by_token`) is gone. Exactly one
+`app_delivery_respond_by_token` row is left, the one with
+`p_expected_issue_at`.
 
 (d) NULL: the six-argument respond function is gone.
 
@@ -2133,7 +2185,8 @@ order by conname;
 select to_regprocedure('public.app_delivery_respond_by_token(text, text, text, text, text, text)') as dropped;
 ```
 
-(e) Step 2 (d) again, as its own block. PREDICTED_4E
+(e) Step 2 (d) again, as its own block. The same 4 rows, and `config` now
+holds TWO settings on each: `search_path=""` and `lock_timeout=4s`.
 
 (f) 1 row: `metra_app` true, `public_grants` 0, `anon`, `authenticated` and
 `service_role` false.
@@ -2189,7 +2242,11 @@ four `lock_timeout`s off). This is the ONE sanctioned run of an older
 `db:apply-rls`: `43f06c4`'s `rls/` is exactly what production ran before step
 3, and no live code needs what this step added. It is valid only until the
 next database step, and it leaves the 0060 CHECKs in place (see (3)).
-UNDO2_RESULT
+Rehearsed: it printed the same two `apply-rls:` lines as step 3; afterwards
+step 4 (d) named the six-argument function again (EXECUTE for `metra_app`
+only, as before step 3) and step 2 (d) showed `search_path=""` alone on all
+four. Running this branch's `db:apply-rls` again drops it and puts the four
+back.
 
 ```powershell
 cd C:\Users\HP\merta-main
@@ -2202,7 +2259,8 @@ git switch --detach origin/main
 **(2b) Only the `lock_timeout`s** (the log shows client taps failing with
 `55P03` because a studio transaction is legitimately long). Run this ONE
 block; each function keeps its grants. A later `db:apply-rls` from this
-branch or a newer `main` puts the four back. UNDO2B_RESULT
+branch or a newer `main` puts the four back. Rehearsed: step 2 (d) then
+shows `search_path=""` alone on all four.
 
 ```sql
 -- 0060 undo (2b): the four lock_timeouts off.
@@ -2216,7 +2274,8 @@ alter function public.app_delivery_comment_by_token(text, uuid, text, text, text
 CHECK (the Settings card then says "something went wrong" on save; the lead
 confirms it from the Worker logs as 23514). This ONE statement puts the three
 0059 CHECKs back (atomic on its own; it touches no row, and every value saved
-under 0060 also passes 0059). Then tell the lead. UNDO3_RESULT
+under 0060 also passes 0059). Then tell the lead. Rehearsed: step 4 (b)
+then reads false on all three, and the 0060 file run again brings them back.
 
 ```sql
 -- 0060 undo (3): the three 0059 CHECKs back, as ONE statement.
