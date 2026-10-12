@@ -1595,10 +1595,14 @@ select proname from pg_proc where proname = 'clear_rom_issue_on_band_change';
 phone, WhatsApp or payment text the tightened CHECKs would refuse, and which
 rule (`false` in that column). If it returns ANY row, do not run step 3: the
 migration would fail with 23514 and change nothing. Instead, for each studio
-listed, the owner or an admin of that studio opens Settings, clears the field
-whose column reads `false` and types it again (the Settings card stores the
-clean form, or says what is wrong with it), then run this query again until it
-returns 0 rows. Never fix it in the SQL editor: it is refused there with MT120,
+listed, the owner or an admin of that studio opens Settings and fixes the field
+whose column reads `false` (the Settings card stores the clean form, or says
+what is wrong with it). The sheet sends only the boxes that differ from what it
+opened with, so retyping the same text in place sends nothing: for a phone or
+WhatsApp number, clear it and save, then type it again and save; for a payment
+text, delete it and type it again by hand (a value typed by hand carries none
+of the hidden characters that made it fail, so it differs and is sent). Then
+run this query again until it returns 0 rows. Never fix it in the SQL editor: it is refused there with MT120,
 by design, and tell the lead which studios were listed.
 
 ```sql
@@ -1799,31 +1803,37 @@ client page fails with 42883 and the receipts disappear (see THE ORDER above).
   again") and saves nothing. No check runs in the app before the write any more.
 - Approve the design together with the budget is two consents, each judged on
   its own issuance (owner decision): a band re-issued after the page loaded
-  saves the design approval and asks the client to confirm the new range; new
-  renders with the same band save the budget confirmation alone and ask for
-  the design again; both changed saves neither.
-- A render the studio shows the client while the final design waits for
-  approval starts a new round: an approval taken on the page from before it
-  is refused.
+  saves the design approval and tells the client their budget confirmation
+  was not recorded; new renders with the same band save the budget
+  confirmation alone and ask for the design again; both changed saves neither.
+  Each line the client reads about the budget talks about the budget only.
+- A render the studio shows the client while the client has NOT yet answered
+  the final design (at the final approval, or during an as-built triage)
+  starts a new round: an approval taken on the page from before it is
+  refused. Once the client has approved (or asked for changes), a render shown
+  later leaves that decision standing (owner decision).
 - The payments card lists the payments received from their own list (up to
   200, with a note when there are more), not from the dated timeline.
 - Settings: "+20 00 10 ..." is saved as `+2010...` (every extra trunk zero
   dropped), and a line or paragraph separator inside InstaPay, the bank name or
   the account holder is refused.
 
-**What the studio sees.** When the design is approved but the budget part is
-not saved, the design notification (bell and email) says the budget range
-changed after the client opened the page and is not acknowledged yet. The
-cockpit's "Budget range acknowledged" guard stays open until the client
-confirms it.
+**What the studio sees.** When the design is approved but the client's budget
+confirmation was refused because the band changed after their page loaded,
+the design notification (bell and email) adds that the client has not
+acknowledged the budget range yet. The cockpit's "Budget range acknowledged"
+guard stays open until the client confirms it.
 
 **Smoke test, right after the Deploy workflow is green (owner, 5 minutes).**
-Use one of the studio's own TEST deliveries, never a client's:
+This run is ALSO the only proof that an issuance instant crosses Cloudflare's
+Hyperdrive with its microseconds intact: the tests prove the app, drizzle and
+Postgres, not the Hyperdrive hop. Use one of the studio's own TEST deliveries,
+never a client's:
 
 1. In the cockpit, take the test delivery to the final approval with renders
    shared, and issue a budget range.
-2. Open its client link in a private window. The design card offers Approve,
-   and its confirmation says it also confirms the budget range.
+2. Open its client link in a private window, freshly loaded. The design card
+   offers Approve, and its confirmation says it also confirms the budget range.
 3. Approve. Expected on the client page: "Design approved" and "You also
    confirmed seeing the budget range." Expected in the cockpit: the design
    approved AND "Budget range acknowledged" ticked, and the bell shows the
@@ -1835,12 +1845,24 @@ cd C:\Users\HP\merta-main\apps\web
 npx wrangler tail metra-web
 ```
 
-   There must be no `42883`, and no line starting `approve design with budget:`.
+**Reading the result.** Production runs on the Workers Free plan, so a request
+can now and then stop with "exceeded CPU" (error 1102) or a "something went
+wrong" page. That is a RETRY, not a failure: reload the page and approve again
+(a repeat tap is safe; it never records twice).
 
-**If any expected line in steps 3 or 4 is not there:** roll the Worker back at
-once, then tell the lead what you saw. Leave the database alone: every Worker
-version runs on the 0059 database (the six-argument function stays until the
-next database step).
+**Roll back only on one of these three:**
+
+- a `42883` in the log (the database step is missing: the code calls a
+  function that does not exist);
+- step 3 answers "this changed, please look again" on a page you loaded fresh
+  in step 2 (the instant did not survive the trip: every act on every client
+  page would answer the same);
+- a log line starting `approve design with budget:`.
+
+Then roll the Worker back at once and tell the lead what you saw. Leave the
+database alone. Rolling back to any version below this deploy is safe on the
+0059 database: the six-argument respond function the older code calls stays
+until the next database step.
 
 ```powershell
 cd C:\Users\HP\merta-main\apps\web
@@ -1848,8 +1870,11 @@ npx wrangler rollback metra-web
 ```
 
 **Before the next database step (read-only, owner).** The CHECK that refuses
-`+200` numbers waits for this count; anything above 0 is a studio number saved
-before Wave 3, and is fixed by re-saving it in Settings:
+`+200` numbers waits for this count. Anything above 0 is a studio number saved
+before Wave 3. To fix one, the studio's owner or an admin opens Settings,
+CLEARS the number and saves, then types it again and saves. (Saving without a
+change sends nothing: the sheet sends only the boxes that differ from what it
+opened with, and typing the same digits back is no difference.)
 
 ```sql
 select count(*) as plus_200_numbers
