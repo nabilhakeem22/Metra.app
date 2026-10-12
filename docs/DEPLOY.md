@@ -308,13 +308,22 @@ transformations (`render/image`). Until that changes:
 - **Unpaid previews and gallery thumbnails show "unavailable".** Both are
   downscaled renditions (`apps/web/src/lib/storage/image-rendition.ts`), Storage
   refuses to make them, and the client page answers "unavailable" instead. Paid
-  downloads are not affected. The fix is upgrading the plan or building preview
-  copies at upload time; nothing in code waits for either.
+  downloads are not affected. They stay "unavailable" until the plan is
+  upgraded: preview copies made in the browser at upload time were **declined
+  by the owner (Oct 2026)**. Nothing in code waits for either.
 - **The studio logo is served as its original bytes**
-  (`apps/web/src/lib/storage/stored-image.ts`), in Settings and on the client
+  (`apps/web/src/lib/storage/stored-image.ts`, answered by
+  `apps/web/src/lib/storage/logo-response.ts`), in Settings and on the client
   page alike: it is not payment-gated, it is a png, jpg or webp of at most 2 MB
   (checked at upload and again when attached), and the page scales it with CSS.
   The app streams the bytes; the browser never receives a storage URL.
+- **The logo is served again since Round E.** Before it, every logo answered
+  the empty 404 in production: the image fetch asked for `redirect: 'error'`,
+  which Cloudflare Workers throw on (Node, and so the unit tests, accept it).
+  It now asks for `redirect: 'manual'` and refuses any 3xx, so a redirect is
+  still never followed. A unit test
+  (`apps/web/src/lib/cf/fetch-redirect-mode.test.ts`) refuses `'error'`
+  anywhere in Worker source.
 
 ## The cron Worker is a separate deployment
 

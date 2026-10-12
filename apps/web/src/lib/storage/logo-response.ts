@@ -39,7 +39,7 @@ export function logoNotFound(): NextResponse {
  * holds, a share token say, can reach the log) and answers the 404. The
  * caller authenticates BEFORE this, so an auth redirect is never swallowed.
  */
-export async function logoRenditionResponse(
+export async function logoResponse(
   resolveLogo: () => Promise<LogoLocation | null>,
   failureBreadcrumb: string,
 ): Promise<NextResponse> {

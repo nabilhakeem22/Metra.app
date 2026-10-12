@@ -6,7 +6,7 @@ import { portalLogoPath } from '@/lib/engagements/portal-picture-path';
 /**
  * The studio's mark on the client page's bar: its logo when it has one, else
  * the first letter of its name. The logo is the logo route's streamed
- * rendition (never a storage URL); if it fails to load (no image logo after
+ * stored original (never a storage URL); if it fails to load (no image logo after
  * all, a revoked link, a Storage blip) the initial takes its place, including
  * a failure that happened before hydration, when `onError` had no listener
  * yet. Decorative: the studio's name is written right beside it.

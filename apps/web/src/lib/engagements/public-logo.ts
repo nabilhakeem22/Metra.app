@@ -6,11 +6,11 @@ import 'server-only';
 //
 // The SDF answers the logo's storage location only for a live link and only
 // when the logo is an image, joined in-org; the location never leaves the
-// server (the route streams a downscaled rendition of it).
+// server (the route streams the stored original's bytes).
 import { sql } from 'drizzle-orm';
 import { normalizeRawToken, readSdfJson } from '@/lib/share/sdf-call';
 import { hashShareToken } from '@/lib/share/token';
-import type { LogoLocation } from '@/lib/storage/logo-rendition-response';
+import type { LogoLocation } from '@/lib/storage/logo-response';
 
 /** The raw jsonb app_delivery_logo_by_token returns. Untrusted. */
 interface LogoSnapshot {
