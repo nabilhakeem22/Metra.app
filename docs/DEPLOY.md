@@ -18,7 +18,7 @@ Everything below assumes these. Nobody had written them down in one place.
 | Rate limit | the Workers Rate Limiting bindings in `apps/web/wrangler.jsonc` (`ratelimits`). It **fails open**; the contract is [API.md](API.md), which this file deliberately does not restate |
 | Cron | worker **`metra-cron`** (`workers/cron`), a separate wrangler project outside the npm workspaces. Needs `APP_ORIGIN` and a `CRON_SECRET` matching `metra-web`'s |
 | Deploy trigger | `deploy.yml`, on `workflow_run` of **CI** on `main`, gated on the repository variable **`DEPLOY_ENABLED == 'true'`** |
-| Rollback lever | **`npx wrangler rollback`** on the Worker - not a git revert. The command and what it does not undo are under *Rolling back* |
+| Rollback lever | **`npx wrangler rollback <version-id>`** on the Worker (from `apps/web`) - not a git revert. The command and what it does not undo are under *Rolling back* |
 | Logs | `npx wrangler tail metra-web` / `npx wrangler tail metra-cron` |
 
 ## How a deploy happens
@@ -852,8 +852,8 @@ is unchanged, but the database already behaves the Round B way:
 
 **Undo, if ever needed.** Undo the CODE, never the database:
 
-1. **Roll the Worker back** with `npx wrangler rollback metra-web` (see
-   *Rolling back* below). Every Worker version, before or after Round B, works
+1. **Roll the Worker back** with `npx wrangler rollback <version-id>` from
+   `apps\web` (see *Rolling back* below). Every Worker version, before or after Round B, works
    on the Round B database: older code never names the new columns, and the
    trigger clears a stale nonce when older code rotates or revokes a link.
 2. **Leave the database as it is.** Do NOT run `db:apply-rls` from an older
@@ -1111,7 +1111,7 @@ row). The lead's read-only check on production (Oct 2026) found 0
 `client_payment_claimed` notifications, so no existing row is affected.
 
 **Undo, if ever needed.** Undo the CODE, never the database: roll the Worker
-back with `npx wrangler rollback metra-web` (see *Rolling back*). Every Worker
+back with `npx wrangler rollback <version-id>` from `apps\web` (see *Rolling back*). Every Worker
 version runs on the 0057 database: older code never names `chosen_position`
 and never calls the concept-choice function. Do NOT run `db:apply-rls` from an
 older `main` while B12 code serves: it re-creates the 6-argument choice
@@ -1458,7 +1458,7 @@ the SQL editor is refused with MT120, because the editor carries no app
 session; that is the rule working, not a fault.
 
 **Undo, if ever needed.** Undo the CODE, never the database: roll the Worker
-back with `npx wrangler rollback metra-web` (see *Rolling back*). Every Worker
+back with `npx wrangler rollback <version-id>` from `apps\web` (see *Rolling back*). Every Worker
 version runs on the 0058 database: older code never names the new columns and
 never calls the new functions. Do NOT run `db:apply-rls` from an older `main`
 while C7-or-later code serves: it restores the older `app_delivery_by_token`
@@ -1757,7 +1757,7 @@ git switch --detach origin/main
 ```
 
 **Undo, if ever needed.** Undo the CODE, never the database: roll the Worker
-back with `npx wrangler rollback metra-web` (see *Rolling back*). Every Worker
+back with `npx wrangler rollback <version-id>` from `apps\web` (see *Rolling back*). Every Worker
 version runs on the 0059 database, because the six-argument respond function
 stays (until 0060, which drops it). Do NOT run `db:apply-rls` from a `main` older than this branch once
 Wave 3 serves: it restores the older `app_delivery_by_token` without the
@@ -1864,10 +1864,12 @@ database alone. Rolling back to any version below this deploy is safe on the
 0059 database (until 0060): the six-argument respond function the older code
 calls stays until the next database step. Once 0060 has run, this deploy is
 the oldest version a rollback may pick (*0060 and the Round E database step*).
+Pick the version by its id (see *Rolling back*):
 
 ```powershell
 cd C:\Users\HP\merta-main\apps\web
-npx wrangler rollback metra-web
+npx wrangler deployments list
+npx wrangler rollback <version-id>
 ```
 
 **Before the next database step (read-only, owner).** The CHECK that refuses
@@ -1892,12 +1894,15 @@ Round E has ONE database step, and this is it (Wave 1 had none): migration
 
 **THE ORDER (do not change it):**
 
-0. **You confirm the live Worker is the Round D Wave 3 deploy (main
-   `43f06c4`, Oct 12 2026) or a later one** (Round E Wave 1 counts). Step 2
-   (f) below lists them.
-1. **You run the database step on production**, from the
-   `validate/round-e-db` branch (steps 1 to 4 below).
-2. **Then** the lead merges `validate/round-e-db` (step 5).
+0. **The app goes first.** Round E Wave 1 and `validate/round-e-db` are merged
+   to `main` and deployed (the Deploy workflow green). This is safe: the
+   branch's app-side changes are tests and comments only, and no Worker code
+   in it needs 0060. You then confirm, in step 2 (f), that the live Worker is
+   that deploy, which is above the rollback floor.
+1. **Then you run the database step on production**, from the
+   `validate/round-e-db` branch (steps 1 to 4 below). The lead keeps that
+   branch until step 5 is done.
+2. **Then** you smoke-test and tell the lead (step 5).
 
 **FROM STEP 3 ON, NO WORKER VERSION OLDER THAN THE ROUND D WAVE 3 DEPLOY MAY
 EVER SERVE AGAIN.** Such a version calls the six-argument respond function
@@ -1905,8 +1910,10 @@ this step drops, so every review act on the client page (approve, ask for
 changes, confirm the budget) would fail with 42883 (no such function). Step 2
 (f) writes down the versions `wrangler rollback` may still pick.
 
-Why the database first is safe, one sentence each:
+Why this order is safe, one sentence each:
 
+- **The app before the database is safe:** the merged code changes no Worker
+  behaviour; it carries this step's database files, its tests and comments.
 - **The dropped function has no caller:** every Worker version since Round D
   Wave 3 calls only the seven-argument respond function
   (`respond-arity.test.ts` refuses any other form in the app's source).
@@ -1919,10 +1926,12 @@ Why the database first is safe, one sentence each:
 - **The four timed functions keep their signatures,** so their grants are kept
   and every caller is unchanged.
 - **Measured** on a fresh database built from this branch: main `43f06c4`'s
-  own 1041 database tests ran and 1025 passed. The 16 that failed are pins
-  this branch updates (the dropped function's rows and calls, the new
-  `lock_timeout` setting, and `+200` numbers that 0059 still kept), not
-  behaviour of the live code.
+  own 1041 database tests (with its own `packages/db`) ran and 1024 passed.
+  The 17 that failed are pins this branch updates (the dropped function's
+  rows and calls, the new `lock_timeout` setting, and `+200` numbers that 0059
+  still kept), not behaviour of the live code. One of them,
+  `delivery-db-step-0058-api-roles`, replays `43f06c4`'s `roles.sql` on its own,
+  which names the dropped function and so fails on 0060.
 
 **What it changes.** No column, no row, no backfill.
 
@@ -1930,13 +1939,15 @@ Why the database first is safe, one sentence each:
 |---|---|
 | `organizations_studio_phone_format` | an international number may no longer start `+200` (Egypt's code with its trunk 0 kept). Everything else as 0059 |
 | `organizations_studio_whatsapp_format` | the same `+200` rule. Everything else as 0059 |
-| `organizations_payment_text_printable` | InstaPay, bank name and account holder may no longer hold U+2028 or U+2029 (line and paragraph separators) anywhere, and a value made ONLY of U+1D159 (the musical null notehead) and the other invisible characters 0059 lists is refused. "CIB" followed by U+1D159 is kept, as the app keeps it |
+| `organizations_payment_text_printable` | InstaPay, bank name and account holder may no longer hold U+2028 or U+2029 (line and paragraph separators) anywhere, and a value made ONLY of U+1D159 (the musical null notehead) and the other invisible characters 0059 lists is refused. "CIB" followed by U+1D159 is kept, as the app keeps it. The same whole-value rule covers the unassigned default-ignorable code points (U+FFF0 to U+FFF8, U+E0000, U+E0002 to U+E001F, U+E0080 to U+E00FF, U+E01F0 to U+E0FFF), which the app already refuses as a whole value |
 | `app_delivery_respond_by_token(text, text, text, text, text, text)` | DROPPED. Retired from app use since Round D Wave 3 |
 | `app_delivery_respond_by_token(text, text, timestamptz, text, text, text, text)` | same signature, result and grants; waits at most 4 s for the delivery row (`lock_timeout`), then fails with 55P03 and saves nothing |
 | `app_delivery_claim_payment_by_token(text, text, text, text, text, text)` | the same 4 s `lock_timeout`; nothing else |
 | `app_delivery_choose_concept_by_token(text, uuid, integer, text, text, text, text)` | the same 4 s `lock_timeout`; nothing else |
 | `app_delivery_comment_by_token(text, uuid, text, text, text, text)` | the same 4 s `lock_timeout`; nothing else |
 | `rls/roles.sql` | the dropped function's grant, revoke and API-role revoke lines removed |
+| `app_current_user_orgs()`, `app_claim_invitation(uuid)` | same signatures, results and grants; every `db:apply-rls` drops and re-creates them (a return type change), and they are now locked down in the same transaction, not only files later in `roles.sql` |
+| `policies/40-engagements.sql` | same policies and trigger; `design_engagements` is now the LAST table the file touches |
 
 Why 4 s: the client page's one-tap "approve the design and confirm the budget"
 is two of these calls, and 2 x 4 s stays under the app's 15 s database
@@ -1954,7 +1965,7 @@ cd C:\Users\HP\merta-main
 git fetch origin
 git switch --detach origin/validate/round-e-db
 git log --oneline -1    # a "docs(deploy): ..." commit (this runbook); CI green on it
-git diff --stat 2102531 HEAD    # MUST list only docs/DEPLOY.md: the code is exactly what was rehearsed (2102531)
+git diff --stat dc6e381 HEAD    # MUST list only docs/DEPLOY.md: the code is exactly what was rehearsed (dc6e381)
 ```
 
 If the diff lists any other file, STOP and tell the lead.
@@ -2063,11 +2074,17 @@ npx wrangler deployments list
 cd C:\Users\HP\merta-main
 ```
 
-Write down the version id of the Round D Wave 3 deploy (Oct 12 2026, main
-`43f06c4`) and of every deploy after it. **From step 3 on, these are the ONLY
-versions `npx wrangler rollback metra-web` may ever pick.** If the newest
-deploy is OLDER than Round D Wave 3, STOP: this step needs that code live
-first.
+The dates in the list are UTC (Cairo is UTC+3). Each version id is printed
+after `(100%)` under `Version(s):`.
+
+**THE FLOOR is version `85fe5e0b-b59f-4a2b-bc4a-0dcbe6078627`**, the Round D
+Wave 3 deploy of main `43f06c4`, created `2026-10-12T00:35` UTC. It and every
+version created after it may serve; nothing older may, ever again, once step 3
+runs. The Round E app deploy (THE ORDER, 0) is later still and is the newest
+line: write down its version id too. **From step 3 on, `npx wrangler rollback
+<version-id>` may only ever be given one of these ids, and never run without
+one** (see *Rolling back*). If the newest deploy is not the Round E app deploy,
+STOP: the app goes first.
 
 **3. Migrate, then apply RLS, then prove it landed.** In this order, from
 `C:\Users\HP\merta-main` (its `.env` is the production connection):
@@ -2132,6 +2149,13 @@ failure. Expected:
   `phone_ok` false; after the number was saved again the migration ran.)
 - Any other code ends `tell the lead before running anything else`.
 
+**55P03 on the client page WHILE step 3 runs is the step itself.** From the
+moment `db:apply-rls` gives the four client writes their 4 s `lock_timeout`, a
+client tap that queues behind one of the step's own locks for more than 4 s is
+refused with 55P03 and saves nothing (the client reads "try again"). That is
+not a reason to undo anything: a retry after the step has finished succeeds.
+Undo (2) is only for 55P03 lines that keep coming AFTER step 3 is done.
+
 **Locks.** `db:migrate` runs 0060 as ONE transaction: ACCESS EXCLUSIVE on
 `organizations` from the first of its three CHECK swaps until the commit, with
 one scan of the table for each new CHECK. Almost every studio page and every
@@ -2139,7 +2163,10 @@ client page reads `organizations`, so pages opened in that window wait; none
 fails. At pilot size this is well under the migrator's 3 s `lock_timeout`;
 that is an estimate, not a production measurement. `db:apply-rls` replaces
 and drops functions without table locks; the policy files are the 33 s worst
-case described above.
+case described above. `policies/40-engagements.sql` now touches
+`design_engagements` LAST, so that table is never held while the file waits
+on another one (measured with a 2.5 s reader on another engagement table: held
+about 2,440 ms before this change, 3 to 16 ms after).
 
 **4. Read-only, after: expected results.** Again each block ON ITS OWN. First
 run step 2 (b) again: 0 rows.
@@ -2205,7 +2232,7 @@ where p.oid = 'public.app_delivery_respond_by_token(text, text, timestamptz, tex
 
 (g) Step 2 (e) again: the same number. Nothing was touched.
 
-**5. Afterwards: smoke test, merge, then return the checkout to main.**
+**5. Afterwards: smoke test, then return the checkout to main.**
 
 1. **Stop and do not merge** if any output in steps 3 or 4 differs from what
    is written there. Tell the lead what you saw instead.
@@ -2219,9 +2246,8 @@ where p.oid = 'public.app_delivery_respond_by_token(text, text, timestamptz, tex
    Expected: both are saved, and the log shows no `42883` and no `55P03`. An
    "exceeded CPU" page (error 1102) is a retry, not a failure (see *Round D
    Wave 3*).
-3. Tell the lead the step is done. The lead merges `validate/round-e-db`.
-   The merge carries no screen change (the schema description, the database
-   tests and this runbook).
+3. Tell the lead the step is done. The branch is already merged and deployed
+   (THE ORDER, 0); nothing is merged now.
 4. Put the production checkout back on main:
 
 ```powershell
@@ -2230,40 +2256,26 @@ git fetch origin
 git switch --detach origin/main
 ```
 
-**Undo, if ever needed.**
+**Undo, if ever needed.** There is no undo that brings the six-argument
+function back: no Worker allowed to serve calls it. Never run `db:apply-rls`
+from a tree older than this branch.
 
-**(1) The code.** Roll the Worker back with `npx wrangler rollback metra-web`
-(see *Rolling back*), and ONLY to a version you wrote down in step 2 (f).
-**A version older than the Round D Wave 3 deploy answers 42883 on every
-review act on the 0060 database.**
+**(1) The code.** From `C:\Users\HP\merta-main\apps\web`, run
+`npx wrangler rollback <version-id>` with an id you wrote down in step 2 (f):
+the floor `85fe5e0b-b59f-4a2b-bc4a-0dcbe6078627` or a later one. **Never run it
+without an id:** it then picks the deployment before the current one, which
+may be below the floor. **A version older than the floor answers 42883 on
+every review act on the 0060 database.**
 
-**(2) The `rls/` half** (brings the six-argument function back and takes the
-four `lock_timeout`s off). This is the ONE sanctioned run of an older
-`db:apply-rls`: `43f06c4`'s `rls/` is exactly what production ran before step
-3, and no live code needs what this step added. It is valid only until the
-next database step, and it leaves the 0060 CHECKs in place (see (3)).
-Rehearsed: it printed the same two `apply-rls:` lines as step 3; afterwards
-step 4 (d) named the six-argument function again (EXECUTE for `metra_app`
-only, as before step 3) and step 2 (d) showed `search_path=""` alone on all
-four. Running this branch's `db:apply-rls` again drops it and puts the four
-back.
-
-```powershell
-cd C:\Users\HP\merta-main
-git fetch origin
-git switch --detach 43f06c4
-npm run db:apply-rls
-git switch --detach origin/main
-```
-
-**(2b) Only the `lock_timeout`s** (the log shows client taps failing with
-`55P03` because a studio transaction is legitimately long). Run this ONE
+**(2) Only the `lock_timeout`s** (the log shows client taps failing with
+`55P03` because a studio transaction is legitimately long, AFTER step 3 is
+done; for 55P03 while step 3 runs, see step 3). Run this ONE
 block; each function keeps its grants. A later `db:apply-rls` from this
 branch or a newer `main` puts the four back. Rehearsed: step 2 (d) then
 shows `search_path=""` alone on all four.
 
 ```sql
--- 0060 undo (2b): the four lock_timeouts off.
+-- 0060 undo (2): the four lock_timeouts off.
 alter function public.app_delivery_respond_by_token(text, text, timestamptz, text, text, text, text) reset lock_timeout;
 alter function public.app_delivery_claim_payment_by_token(text, text, text, text, text, text) reset lock_timeout;
 alter function public.app_delivery_choose_concept_by_token(text, uuid, integer, text, text, text, text) reset lock_timeout;
@@ -2297,11 +2309,16 @@ alter table public.organizations
 rebuild before it changes anything a user sees; a Worker rollback is immediate
 and needs no build.
 
-```bash
-cd apps/web
-npx wrangler rollback metra-web            # interactive: pick the previous version
-npx wrangler deployments list              # what is deployed now, and what preceded it
+```powershell
+cd C:\Users\HP\merta-main\apps\web
+npx wrangler deployments list              # the 10 most recent deployments; Created is UTC
+npx wrangler rollback <version-id>         # roll back to THAT version (the id under "Version(s):")
 ```
+
+`<version-id>` is the id printed after `(100%)` under `Version(s):` in the
+list. **Never run `npx wrangler rollback` without an id after 0060:** it does
+not ask, it picks the deployment before the current one, and that may be
+below the rollback floor (*0060 and the Round E database step*, step 2 (f)).
 
 Three things a rollback does NOT undo, and they are the reason the pre-merge
 database step exists:
@@ -2339,13 +2356,14 @@ Wave 3 code serves (*0059 and the Round D database step*, "Undo, if ever
 needed"; the smoke test is under *Round D Wave 3*).
 
 **Round E (0060) specifically: a rollback FLOOR.** 0060 drops the
-six-argument respond function, so once it has run, `wrangler rollback` may
-pick only the Round D Wave 3 deploy (main `43f06c4`, Oct 12 2026) or a later
-version: the ones written down in step 2 (f) of *0060 and the Round E
-database step*. An older version answers 42883 on every review act on the
-client page. Leave the database alone; the one sanctioned older `db:apply-rls`
-(from `43f06c4`, until the next database step) is under that section's
-"Undo, if ever needed".
+six-argument respond function, so once it has run, `npx wrangler rollback
+<version-id>` may only be given the floor version
+`85fe5e0b-b59f-4a2b-bc4a-0dcbe6078627` (the Round D Wave 3 deploy of main
+`43f06c4`, created 2026-10-12T00:35 UTC) or a later one: the ids written down
+in step 2 (f) of *0060 and the Round E database step*. Never run it without an
+id. An older version answers 42883 on every review act on the client page.
+Leave the database alone, and never run `db:apply-rls` from a tree older than
+`validate/round-e-db`: it would re-create the six-argument function.
 
 After rolling back, hit an authenticated page and watch `npx wrangler tail
 metra-web` for `42501` (a missing grant), `MT100` (an immutability trigger) and
