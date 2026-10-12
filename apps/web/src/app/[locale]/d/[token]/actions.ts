@@ -83,7 +83,8 @@ export async function addDeliveryComment(
   body: string,
 ): Promise<DeliveryCommentActResult> {
   // Cap before the DB (the SDF also trims + caps at 2000 and CHECKs the length).
-  const trimmed = body?.trim().slice(0, 2000) ?? '';
+  // Directly invokable: a body that is not a string is an empty one, never a throw.
+  const trimmed = typeof body === 'string' ? body.trim().slice(0, 2000) : '';
   if (!trimmed) return { ok: false, error: 'empty', studioNotified: false };
   // A malformed id is refused here, as the core would, before it spends the budget.
   if (!isUuid(documentId)) return { ok: false, error: 'token_invalid', studioNotified: false };
@@ -109,6 +110,8 @@ export async function loadDeliveryDocumentComments(
   token: string,
   documentId: string,
 ): Promise<PortalThreadRead> {
-  if (!(await portalReadAllowed(token))) return THREAD_READ_REFUSED;
-  return getDeliveryDocumentCommentsByToken(token, documentId);
+  return answered('loadDeliveryDocumentComments', [], async () => {
+    if (!(await portalReadAllowed(token))) return THREAD_READ_REFUSED;
+    return getDeliveryDocumentCommentsByToken(token, documentId);
+  });
 }

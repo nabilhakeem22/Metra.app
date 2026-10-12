@@ -18,7 +18,8 @@ export async function respondToVariation(
   const h = await headers();
   const ip = h.get('x-forwarded-for')?.split(',')[0]?.trim().slice(0, 45) || null;
   const ua = h.get('user-agent')?.slice(0, 512) || null;
-  const name = actorName?.trim().slice(0, 120) || null;
+  // Directly invokable: a non-string name is no name, never a throw.
+  const name = (typeof actorName === 'string' ? actorName.trim().slice(0, 120) : '') || null;
   return respondToVariationByToken(token, {
     decision,
     actorName: name,

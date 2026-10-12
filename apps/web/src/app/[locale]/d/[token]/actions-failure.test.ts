@@ -20,7 +20,7 @@ const boom = vi.fn(async () => {
 });
 const notified = vi.fn();
 vi.mock('@/lib/engagements/public', () => ({ claimPaymentByToken: boom }));
-vi.mock('@/lib/engagements/public-comments', () => ({ addDeliveryCommentByToken: boom, getDeliveryDocumentCommentsByToken: vi.fn() }));
+vi.mock('@/lib/engagements/public-comments', () => ({ addDeliveryCommentByToken: boom, getDeliveryDocumentCommentsByToken: boom }));
 vi.mock('@/lib/engagements/client-acts/notify', () => ({ withStudioNotified: notified }));
 
 const portal = await import('./actions');
@@ -47,6 +47,21 @@ describe('a claim or a comment whose write fails underneath (55P03)', () => {
     expect(line).toContain(name);
     expect(line).toContain('55P03');
     for (const secret of ['SECRET-HASH', 'Is the wall moving?', '9.9.9.9', 'probe/1', TOKEN]) expect(line).not.toContain(secret);
+    logged.mockRestore();
+  });
+});
+
+describe('inputs a direct invocation can send (Round E F1)', () => {
+  it.each([[123], [{}], [['x']], [null], [undefined]])('a comment body of %j answers empty, never throws, writes nothing', async (body) => {
+    expect(await portal.addDeliveryComment(TOKEN, DOCUMENT, body as never)).toEqual({ ok: false, error: 'empty', studioNotified: false });
+    expect(boom).not.toHaveBeenCalled();
+  });
+
+  it('a thread read that fails underneath answers the empty thread and logs one redacted line', async () => {
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
+    expect(await portal.loadDeliveryDocumentComments(TOKEN, DOCUMENT)).toEqual([]);
+    expect(logged).toHaveBeenCalledTimes(1);
+    expect(JSON.stringify(logged.mock.calls)).not.toContain('SECRET-HASH');
     logged.mockRestore();
   });
 });
