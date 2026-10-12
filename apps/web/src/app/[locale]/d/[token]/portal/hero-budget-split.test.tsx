@@ -46,8 +46,18 @@ async function approveWithBudget(locale: TestLocale, outcome: DesignWithBudgetOu
 
 const LOCALES: TestLocale[] = ['en', 'ar-EG'];
 
+/** Every budget line talks about the budget ONLY: no clause about the design (D3 F1). */
+const BUDGET_LINES = ['budgetAcknowledged', 'budgetReviewAgain', 'budgetNotSaved', 'budgetAcknowledgedOnly'] as const;
+const DESIGN_CLAIM = { en: /approv|design/i, 'ar-EG': /اعتماد|التصميم/ } as const;
+
 describe('the budget half of approve+budget (S10)', () => {
-  it.each(LOCALES)('%s: approved + changed asks to review the new range, and the page re-reads', async (locale) => {
+  it.each(LOCALES)('%s: no budget line says anything about the design', (locale) => {
+    for (const key of BUDGET_LINES) {
+      expect(messageAt(locale, `delivery.hero.design.${key}`), key).not.toMatch(DESIGN_CLAIM[locale]);
+    }
+  });
+
+  it.each(LOCALES)('%s: approved + changed: the approval card, and the budget line asks for the current range', async (locale) => {
     const text = await approveWithBudget(locale, { kind: 'approved', studioNotified: true, budget: 'changed' });
     expect(text).toContain(messageAt(locale, 'delivery.hero.design.approvedTitle'));
     expect(text).toContain(messageAt(locale, 'delivery.hero.design.budgetReviewAgain'));
@@ -56,9 +66,17 @@ describe('the budget half of approve+budget (S10)', () => {
     expect(DASH.test(text) || ARABIC_INDIC.test(text)).toBe(false);
   });
 
-  it.each(LOCALES)('%s: approved + failed says the budget was not saved', async (locale) => {
+  it.each(LOCALES)('%s: F1: changes requested + changed never says an approval is on file', async (locale) => {
+    const text = await approveWithBudget(locale, { kind: 'changes_requested', studioNotified: true, budget: 'changed' });
+    expect(text).toContain(messageAt(locale, 'delivery.hero.design.changesTitle'));
+    expect(text).toContain(messageAt(locale, 'delivery.hero.design.budgetReviewAgain'));
+    expect(text).not.toContain(messageAt(locale, 'delivery.hero.design.approvedTitle'));
+  });
+
+  it.each(LOCALES)('%s: approved + failed says the budget was not saved, and points at no card', async (locale) => {
     const text = await approveWithBudget(locale, { kind: 'approved', studioNotified: false, budget: 'failed' });
     expect(text).toContain(messageAt(locale, 'delivery.hero.design.budgetNotSaved'));
+    expect(messageAt(locale, 'delivery.hero.design.budgetNotSaved')).not.toMatch(/card|below|بطاقة|أدناه/);
     expect(DASH.test(text) || ARABIC_INDIC.test(text)).toBe(false);
   });
 
@@ -68,13 +86,21 @@ describe('the budget half of approve+budget (S10)', () => {
     expect(text).not.toContain(messageAt(locale, 'delivery.hero.design.budgetReviewAgain'));
   });
 
-  it.each(LOCALES)('%s: changed + acknowledged says the design changed and the budget was recorded', async (locale) => {
+  it.each(LOCALES)('%s: F4: changed + acknowledged is ONE sentence: approval not sent, budget recorded', async (locale) => {
     await approveWithBudget(locale, { kind: 'changed', budget: 'acknowledged' });
     const alert = screen.getByRole('alert').textContent ?? '';
-    expect(alert).toContain(messageAt(locale, 'delivery.actions.changed'));
-    expect(alert).toContain(messageAt(locale, 'delivery.hero.design.budgetAcknowledgedOnly'));
+    expect(alert).toBe(messageAt(locale, 'delivery.hero.design.approvalNotSentBudgetSaved'));
     expect(router.refresh).toHaveBeenCalledTimes(1);
     expect(DASH.test(alert) || ARABIC_INDIC.test(alert)).toBe(false);
+  });
+
+  it.each(LOCALES)('%s: R4: a design failure after a saved budget is a try-again error, the budget line, and a refresh', async (locale) => {
+    await approveWithBudget(locale, { kind: 'error', error: 'generic', budget: 'acknowledged' });
+    const alert = screen.getByRole('alert').textContent ?? '';
+    expect(alert).toContain(messageAt(locale, 'delivery.actions.error.generic'));
+    expect(alert).toContain(messageAt(locale, 'delivery.hero.design.budgetAcknowledgedOnly'));
+    expect(alert).not.toContain(messageAt(locale, 'delivery.actions.changed'));
+    expect(router.refresh).toHaveBeenCalledTimes(1);
   });
 
   it.each(LOCALES)('%s: both changed says only that the step changed', async (locale) => {

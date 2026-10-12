@@ -95,8 +95,8 @@ describe('client_responded bodies', () => {
 
   it('S11: a design approval says the budget still waits only when params.budget is "pending"', () => {
     const pending = {
-      en: 'The budget range changed after they opened the page',
-      'ar-EG': 'بس نطاق الميزانية اتغيّر بعد ما فتح الصفحة',
+      en: 'but has not acknowledged the budget range yet',
+      'ar-EG': 'بس لسه ما أكّدش نطاق الميزانية',
     } as const;
     for (const locale of ['en', 'ar-EG'] as const) {
       const withPending = render(locale, 'client_design_approved', { ...DELIVERY, budget: 'pending' });

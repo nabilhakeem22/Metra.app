@@ -9,7 +9,6 @@ import { isBlankNote } from '@/lib/engagements/client-note';
 import { lockedWorkCount, workImages } from '@/lib/engagements/portal-gallery';
 import type { HeroGroup } from '@/lib/engagements/portal-hero';
 import type { PublicDelivery } from '@/lib/engagements/public/types';
-import type { BudgetPart } from '@/lib/engagements/review-outcome';
 import { reviewSeenOf } from '@/lib/engagements/review-seen';
 import { ChangesNote } from './changes-note';
 import { ConfirmActDialog } from './confirm-act-dialog';
@@ -54,7 +53,7 @@ export function ActionHero({
   const [pending, startTransition] = useTransition();
   const [note, setNote] = useState('');
   const [asking, setAsking] = useState<HeroButton | null>(null);
-  const [error, setError] = useState<{ error: HeroError; budget?: BudgetPart } | null>(null);
+  const [error, setError] = useState<{ error: HeroError; budget?: 'acknowledged' } | null>(null);
   const { clientActions, rom } = review;
   const buttons = GROUP_BUTTONS[group].filter((button) => clientActions.includes(button.verb));
   const noteBlank = isBlankNote(note);

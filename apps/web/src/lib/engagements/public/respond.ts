@@ -4,7 +4,8 @@ import 'server-only';
 // only a status code. A repeat is an idempotent SUCCESS (`code: 'already'`), which
 // is the whole difference between a signal and a document response — a client
 // double-tapping on a phone must not be shown an error.
-import { sql } from 'drizzle-orm';
+import { sqlstateOf } from '@metra/db/sqlstate';
+import { sql, type SQL } from 'drizzle-orm';
 import { normalizeRawToken, readSdfCode } from '@/lib/share/sdf-call';
 import {
   mapSignalSdfCode,
@@ -16,15 +17,27 @@ import { isUuid } from '@/lib/uuid';
 import { conceptLetter } from '../concept-letter';
 import { issuanceStamp } from './snapshot-values';
 
-/** Coded outcomes the portal maps to a bilingual message. `already` is NOT an
- *  error — a repeat signal resolves to `{ ok: true, code: 'already' }`, which is
- *  what mapSignalSdfCode does and is the whole difference between a SIGNAL and a
- *  document response. An alias of the shared union, not a narrower one: a code a
- *  newer SDF starts returning must still be a value this portal can hold, and
- *  every message chain here ends in a fall-through. */
+/** Coded outcomes the portal maps to a bilingual message (`already` is not an
+ *  error: mapSignalSdfCode). An alias of the shared union, not a narrower one: a
+ *  code a newer SDF starts returning must still be a value this portal can hold. */
 export type DeliveryActionError = TokenResponseError;
 
 export type DeliveryActionResult = SignalSdfResult;
+
+/** Postgres could not read the instant as a timestamptz (invalid format, field or zone). */
+const NOT_AN_INSTANT: ReadonlySet<string> = new Set(['22007', '22008', '22009']);
+
+/** A guarded respond write. A stamp-shaped value that is no instant (month 13,
+ *  30 February, zone +99) fails the cast: that is `wrong_state`, never a throw
+ *  carrying the call's parameters into a log (D3 F7, L1). */
+async function guardedRespondCode(query: SQL): Promise<string | undefined> {
+  try {
+    return await readSdfCode(query, { write: true });
+  } catch (error) {
+    if (NOT_AN_INSTANT.has(sqlstateOf(error) ?? '')) return 'wrong_state';
+    throw error;
+  }
+}
 
 /**
  * Session-less: record a client's APPEND-ONLY ADVISORY signal (approve /
@@ -43,8 +56,9 @@ export type DeliveryActionResult = SignalSdfResult;
  * travels as the TEXT the snapshot carried, cast by Postgres: drizzle's
  * postgres-js serializer passes a timestamptz parameter through untouched,
  * where postgres.js on its own would re-format it through a JS Date and lose
- * the microseconds. A value that is not a stamp never reaches the database: it
- * is that same `wrong_state`. The retired six-argument form is never called
+ * the microseconds. A value that is not a stamp never reaches the database, and
+ * one Postgres cannot read as an instant is refused by the cast: both are that
+ * same `wrong_state`. The retired six-argument form is never called
  * (respond-arity.test.ts).
  */
 export async function recordDeliveryActionByToken(
@@ -64,7 +78,7 @@ export async function recordDeliveryActionByToken(
     return mapSignalSdfCode('wrong_state');
   }
   const hash = hashShareToken(token);
-  const code = await readSdfCode(sql`select public.app_delivery_respond_by_token(
+  const code = await guardedRespondCode(sql`select public.app_delivery_respond_by_token(
     ${hash}, ${input.action}, ${input.expectedIssueAt}::timestamptz, ${input.note ?? null},
     ${input.actorName ?? null}, ${input.ip ?? null}, ${input.userAgent ?? null}
   ) as code`);
@@ -98,7 +112,7 @@ export async function claimPaymentByToken(
   const code = await readSdfCode(sql`select public.app_delivery_claim_payment_by_token(
     ${hash}, ${input.milestoneKind}, ${input.note ?? null},
     ${input.actorName ?? null}, ${input.ip ?? null}, ${input.userAgent ?? null}
-  ) as code`);
+  ) as code`, { write: true });
   return mapSignalSdfCode(code);
 }
 
@@ -131,6 +145,6 @@ export async function chooseConceptByToken(
   const code = await readSdfCode(sql`select public.app_delivery_choose_concept_by_token(
     ${hash}, ${input.artifactId}::uuid, ${input.position}::int, ${input.note ?? null},
     null, ${input.ip ?? null}, ${input.userAgent ?? null}
-  ) as code`);
+  ) as code`, { write: true });
   return mapSignalSdfCode(code);
 }

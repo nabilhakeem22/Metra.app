@@ -23,13 +23,15 @@ export interface HeroConfirmedState {
 }
 
 /** A portal error, `changed` (the concept letters moved), `reviewChanged` (what the
- *  client saw is not what is on file now) or `movedOn` (the review closed). */
-export type HeroError = PortalErrorKey | 'changed' | 'reviewChanged' | 'movedOn';
+ *  client saw is not what is on file now), `movedOn` (the review closed), or
+ *  `designChangedBudgetSaved` (approve+budget: the design changed so the
+ *  approval was not sent, but the budget confirmation was saved: one sentence). */
+export type HeroError = PortalErrorKey | 'changed' | 'reviewChanged' | 'movedOn' | 'designChangedBudgetSaved';
 
 export type HeroAnswer =
   | { confirmed: HeroConfirmedState }
-  /** `budget`: the one-tap approve+budget's budget half, said beside the error when it was saved. */
-  | { error: HeroError; refresh: boolean; budget?: BudgetPart };
+  /** `budget`: the one-tap approve+budget saved its budget half; said in a line of its own beside the error. */
+  | { error: HeroError; refresh: boolean; budget?: 'acknowledged' };
 
 const MOVED_ON: HeroAnswer = { error: 'movedOn', refresh: true };
 const REVIEW_CHANGED: HeroAnswer = { error: 'reviewChanged', refresh: true };
@@ -76,10 +78,16 @@ export function answerOfDesignOutcome(outcome: DesignOutcome): HeroAnswer {
 }
 
 /**
- * The answer to the one-tap approve+budget (owner decision 2): the design
- * decision SAVED with a line on its budget half, or the reason nothing of the
- * design was saved, still saying when the budget half was. An error before
- * any write (a dead or expired link) is the portal error alone.
+ * The answer to the one-tap approve+budget (owner decision 2). The design's
+ * status comes from the design outcome only; the budget's line talks only
+ * about the budget (D3 F1).
+ * - A decision on file: its card, with a budget line.
+ * - The design changed: "your approval was not sent", and, when the budget was
+ *   saved, ONE sentence that says both (F4).
+ * - The design half failed after a saved budget: the error, a budget line, and
+ *   a refresh so the page shows what was saved (R4).
+ * - A stop before the design (a dead link, a budget write that threw): the
+ *   portal error alone.
  */
 export function answerOfDesignWithBudgetOutcome(outcome: DesignWithBudgetOutcome): HeroAnswer {
   switch (outcome.kind) {
@@ -93,14 +101,11 @@ export function answerOfDesignWithBudgetOutcome(outcome: DesignWithBudgetOutcome
         },
       };
     case 'changed':
+      return outcome.budget === 'acknowledged' ? { error: 'designChangedBudgetSaved', refresh: true } : REVIEW_CHANGED;
     case 'moved_on':
-      return {
-        error: outcome.kind === 'changed' ? 'reviewChanged' : 'movedOn',
-        refresh: true,
-        ...(outcome.budget === 'acknowledged' ? { budget: outcome.budget } : {}),
-      };
+      return outcome.budget === 'acknowledged' ? { ...MOVED_ON, budget: 'acknowledged' } : MOVED_ON;
     case 'error':
-      return { error: outcome.error, refresh: false };
+      return outcome.budget ? { error: outcome.error, refresh: true, budget: outcome.budget } : { error: outcome.error, refresh: false };
   }
 }
 

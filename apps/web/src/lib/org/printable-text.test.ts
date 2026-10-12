@@ -19,7 +19,7 @@ describe('printable text (F8)', () => {
   });
 
   it('refuses text that draws nothing', () => {
-    for (const text of [cp(0x2800), cp(0x115f, 0x1160), cp(0x3164), cp(0xffa0), cp(0x651, 0x64e)]) {
+    for (const text of [cp(0x2800), cp(0x115f, 0x1160), cp(0x3164), cp(0xffa0), cp(0x651, 0x64e), cp(0x1d159, 0x1d159, 0x1d159)]) {
       expect(unprintableReason(text)).toBe('invisible');
     }
   });

@@ -50,8 +50,8 @@ describe('clientActEmailTemplate', () => {
 
   it('a design approval whose budget half was not saved says the range still waits (Round D)', () => {
     const pending: ClientAct = { kind: 'design_approved', budgetPending: true };
-    expect(render(pending, 'en').text).toContain('have not acknowledged the new range yet');
-    expect(render(pending, 'ar-EG').text).toContain('فلسه ما أكّدش النطاق الجديد');
+    expect(render(pending, 'en').text).toContain('The client has not acknowledged the budget range yet.');
+    expect(render(pending, 'ar-EG').text).toContain('العميل لسه ما أكّدش نطاق الميزانية.');
     expect(render({ kind: 'design_approved' }, 'en').text).not.toContain('range');
   });
 

@@ -1479,7 +1479,7 @@
       "client_concept_approved": "العميل وافق على الفكرة في {delivery}.",
       "client_concept_chosen": "العميل اختار {hasLetter, select, yes {البديل {letter}} other {بديل للفكرة}} في {delivery}.",
       "client_concept_changes_requested": "العميل طلب تعديلات على الفكرة في {delivery}.",
-      "client_design_approved": "{budget, select, pending {العميل وافق على التصميم في {delivery}، بس نطاق الميزانية اتغيّر بعد ما فتح الصفحة، فلسه ما أكّدش النطاق الجديد.} other {العميل وافق على التصميم في {delivery}.}}",
+      "client_design_approved": "{budget, select, pending {العميل وافق على التصميم في {delivery}، بس لسه ما أكّدش نطاق الميزانية.} other {العميل وافق على التصميم في {delivery}.}}",
       "client_design_changes_requested": "العميل طلب تعديلات على التصميم في {delivery}.",
       "client_budget_acknowledged": "العميل أكد نطاق الميزانية في {delivery}.",
       "client_handover_acknowledged": "العميل أكد استلام التسليم في {delivery}.",
@@ -2444,9 +2444,10 @@
         "changesBodyNotified": "تم تسجيل طلبك وإبلاغ مصممك، وسيعمل معك على تنقيح التصميم.",
         "confirmWithBudget": "اعتمادك يؤكد أيضًا اطّلاعك على نطاق الميزانية هذا.",
         "budgetAcknowledged": "وأكّدتَ أيضًا اطّلاعك على نطاق الميزانية.",
-        "budgetReviewAgain": "تم تسجيل اعتمادك للتصميم. وقد حُدِّث نطاق الميزانية بعد فتحك هذه الصفحة، لذا لم يُسجَّل تأكيدك له. يُرجى مراجعة النطاق الجديد أدناه وتأكيده.",
-        "budgetNotSaved": "تم تسجيل اعتمادك للتصميم، لكن تعذّر حفظ تأكيدك لنطاق الميزانية. يُرجى تأكيده من بطاقة الميزانية أدناه.",
-        "budgetAcknowledgedOnly": "وقد سُجِّل تأكيدك لنطاق الميزانية."
+        "budgetReviewAgain": "لم يُسجَّل تأكيدك لنطاق الميزانية، لأن النطاق تغيّر بعد فتحك هذه الصفحة. يُرجى تأكيد النطاق الحالي عند ظهوره في هذه الصفحة.",
+        "budgetNotSaved": "تعذّر حفظ تأكيدك لنطاق الميزانية من هذه الصفحة.",
+        "budgetAcknowledgedOnly": "وقد سُجِّل تأكيدك لنطاق الميزانية.",
+        "approvalNotSentBudgetSaved": "حُدِّث التصميم بعد فتحك هذه الصفحة، لذا لم يُرسَل اعتمادك. وقد سُجِّل تأكيدك لنطاق الميزانية. تعرض الصفحة الآن أحدث تصميم، يُرجى مراجعته مرة أخرى."
       },
       "handoff": {
         "headline": "حزمة التصميم جاهزة",

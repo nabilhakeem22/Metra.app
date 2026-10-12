@@ -20,7 +20,8 @@ const CONFIRM_KEYS = {
   },
 } as const satisfies Record<HeroOutcome, { title: string; body: string; notified: string }>;
 
-/** The `delivery.hero.design` line on the budget half of a one-tap approve+budget. */
+/** The `delivery.hero.design` line on the budget half of a one-tap approve+budget:
+ *  about the budget ONLY, whatever the design card above it says (D3 F1). */
 const BUDGET_LINE_KEY = {
   acknowledged: 'budgetAcknowledged',
   changed: 'budgetReviewAgain',
@@ -33,8 +34,9 @@ const BUDGET_LINE_KEY = {
  * otherwise it says the answer is recorded and the designer will see it, which
  * is always true. After a concept CHOICE it first names the option chosen, in
  * the letter the client tapped. After the one-tap approve+budget it says how
- * the budget half ended: confirmed, changed since the page loaded (review the
- * new range below), or not saved (confirm it from the budget card).
+ * the budget half ended, about the budget alone: confirmed, not recorded
+ * because the range changed (confirm the current one once it is on the page),
+ * or not saved.
  */
 export function HeroConfirmed({
   group,

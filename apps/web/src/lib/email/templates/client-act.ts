@@ -60,10 +60,10 @@ const ACT_LINE: Record<Exclude<ClientActKind, 'payment_claimed'>, Copy> = {
   },
 };
 
-/** A design approval whose budget half was NOT saved (Round D): the range still waits. */
+/** A design approval whose budget half was refused (Round D): the range is not acknowledged yet. */
 const BUDGET_PENDING_LINE: Copy = {
-  ar: 'نطاق الميزانية اتغيّر بعد ما العميل فتح الصفحة، فلسه ما أكّدش النطاق الجديد.',
-  en: 'The budget range changed after the client opened the page, so they have not acknowledged the new range yet.',
+  ar: 'العميل لسه ما أكّدش نطاق الميزانية.',
+  en: 'The client has not acknowledged the budget range yet.',
 };
 
 /** The milestone names, as the studio's own screens call them. */

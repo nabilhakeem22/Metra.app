@@ -26,9 +26,10 @@ export interface ClientAct {
   /** Only on `payment_claimed`: the milestone the client marked as paid. */
   milestoneKind?: MilestoneKind;
   /** Only on `design_approved`, from the one-tap approve+budget (Round D): the
-   *  budget acknowledgement of the same tap was NOT saved, so the studio's
-   *  sentence says the range still waits. The repeat-tap repair and the hourly
-   *  sweep never set it: a repaired notification reads as a plain approval. */
+   *  budget acknowledgement of the same tap was refused because the band
+   *  changed, so the studio's sentence says the range is not acknowledged yet.
+   *  The repeat-tap repair and the hourly sweep never set it: a repaired
+   *  notification reads as a plain approval. */
   budgetPending?: true;
 }
 

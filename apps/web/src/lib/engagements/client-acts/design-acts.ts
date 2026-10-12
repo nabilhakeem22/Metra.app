@@ -12,12 +12,11 @@ import 'server-only';
 // before a write.
 import { loggableFailure } from '@/lib/actions/loggable-failure';
 import { portalErrorKey } from '../portal-error-key';
-import { recordDeliveryActionByToken, type DeliveryActionResult } from '../public';
+import { recordDeliveryActionByToken } from '../public';
 import {
   ACT_OF_DESIGN_DECISION,
   OUTCOME_OF_DESIGN_VERB,
   answersFromSaved,
-  budgetPartOf,
   designOutcomeOfSaved,
   type BudgetPart,
   type DesignOutcome,
@@ -25,7 +24,7 @@ import {
   type DesignWithBudgetOutcome,
 } from '../review-outcome';
 import type { ReviewSeen } from '../review-seen';
-import { acknowledgeBudgetAndNotify } from './budget-acts';
+import { acknowledgeBudgetHalf } from './budget-acts';
 import { withStudioNotified } from './notify';
 import { savedDelivery } from './saved-delivery';
 
@@ -84,16 +83,6 @@ export async function respondToDesignAndNotify(
   return writeDesign(rawToken, input, { action, roundSeen: seen.rendersIssuedAt });
 }
 
-/** The budget half: what acknowledge_rom answered, or null when it threw. */
-async function acknowledgeBudgetHalf(rawToken: string, input: ReviewInput, romIssuedAt: string): Promise<DeliveryActionResult | null> {
-  try {
-    return await acknowledgeBudgetAndNotify(rawToken, { ...input, note: null }, romIssuedAt);
-  } catch (error) {
-    console.error('approve design with budget: the budget half failed', { error: loggableFailure(error) });
-    return null;
-  }
-}
-
 /** The design half's answer; a throw is the generic failure, so the budget part is still reported. */
 async function approveDesignHalf(rawToken: string, input: ReviewInput, write: DesignWrite): Promise<DesignOutcome> {
   try {
@@ -107,7 +96,7 @@ async function approveDesignHalf(rawToken: string, input: ReviewInput, write: De
 /** The design answer with the budget part. A design failure after a SAVED budget still says the budget was saved. */
 function withBudgetPart(design: DesignOutcome, budget: BudgetPart): DesignWithBudgetOutcome {
   if (design.kind !== 'error') return { ...design, budget };
-  return budget === 'acknowledged' ? { kind: 'changed', budget } : design;
+  return budget === 'acknowledged' ? { kind: 'error', error: design.error, budget } : design;
 }
 
 /**
@@ -115,8 +104,9 @@ function withBudgetPart(design: DesignOutcome, budget: BudgetPart): DesignWithBu
  * confirmation (owner decision 2, Round D): TWO consents, two writes, each
  * guarded by its own issuance alone. The budget goes first, so the design's
  * studio notification can say whether the budget still waits.
- * - A band re-issued since the page loaded: the design approval is saved and
- *   the budget answers `changed` (review the new range again).
+ * - A band re-issued since the page loaded: the design approval is saved, the
+ *   budget answers `changed`, and the design's notification says the budget
+ *   still waits (`budgetPending`: only then, D3 R1).
  * - Renders re-issued but the band the same: the budget acknowledgement alone
  *   is saved; the design answers `changed`.
  * - Both: neither is saved.
@@ -124,23 +114,20 @@ function withBudgetPart(design: DesignOutcome, budget: BudgetPart): DesignWithBu
  * one transaction: a transaction holding the budget's and the design's
  * notifier locks together deadlocks against the hourly sweep, which takes the
  * same locks (D2 reliability R1; design-acts-transactions.test.ts).
- * A dead or expired link stops after the first write: the second would fail
- * the same way.
+ * A dead or expired link, or a budget write that threw, stops after the first
+ * write (./budget-acts.ts): the design is never sent on top of an unknown budget.
  */
 export async function approveDesignWithBudgetAndNotify(
   rawToken: string,
   input: ReviewInput,
   seen: ReviewSeen & { romIssuedAt: string },
 ): Promise<DesignWithBudgetOutcome> {
-  const budgetResult = await acknowledgeBudgetHalf(rawToken, input, seen.romIssuedAt);
-  if (budgetResult?.error === 'token_invalid' || budgetResult?.error === 'token_expired') {
-    return { kind: 'error', error: budgetResult.error };
-  }
-  const budget = budgetPartOf(budgetResult);
+  const half = await acknowledgeBudgetHalf(rawToken, { ...input, note: null }, seen.romIssuedAt);
+  if ('stop' in half) return { kind: 'error', error: half.stop };
   const design = await approveDesignHalf(rawToken, input, {
     action: 'approve_design',
     roundSeen: seen.rendersIssuedAt,
-    ...(budget === 'acknowledged' ? {} : { budgetPending: true as const }),
+    ...(half.budget === 'changed' ? { budgetPending: true as const } : {}),
   });
-  return withBudgetPart(design, budget);
+  return withBudgetPart(design, half.budget);
 }

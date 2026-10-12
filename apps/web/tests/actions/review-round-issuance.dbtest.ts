@@ -1,17 +1,16 @@
 import { afterAll, describe, expect, it, vi } from 'vitest';
-import { setArtifactClientVisibilityCore } from '@/lib/engagements/client-visibility';
-import { respondToDesignAndNotify } from '@/lib/engagements/client-acts/design-acts';
+import { approveDesignWithBudgetAndNotify, respondToDesignAndNotify } from '@/lib/engagements/client-acts/design-acts';
 import { recordDeliveryActionByToken } from '@/lib/engagements/public';
 import { reviewSeenOf } from '@/lib/engagements/review-seen';
 import { deliveryOrNull } from './delivery-read';
 import { closeFixture, raw, teardown } from './fixture';
 import { forceState, rendersReadyAtText, seedArtifact, seedRoundBDelivery, stampRenders, type RoundBDelivery } from './round-b-fixture';
-import { clientEventCount, consentCounts, issueBand } from './round-d-db-fixture';
+import { clientEventCount, consentCounts, issueBand, pageSeenWithBand } from './round-d-db-fixture';
 
 // Round D, the issuance a review act names, through the real app path:
 // - the microsecond round trip app -> drizzle -> Postgres (lead addendum 3);
-// - A1: a render shown or replaced at the final approval is a new round
-//   (lead addendum 2), and no read comes before the write;
+// - A1: a render shown before the client decided is a new round (lead
+//   addendum 2), and no read comes before the write;
 // - A3: a page from before Round D (the old fingerprint) writes nothing.
 
 const order = vi.hoisted(() => ({ log: [] as string[] }));
@@ -68,14 +67,7 @@ describe('the microsecond round trip (app -> drizzle -> Postgres)', () => {
   });
 });
 
-describe('A1: what the client sees at the final approval is the round', () => {
-  it('a render recorded but not shown is not a new round', async () => {
-    const d = await atFinalApproval('a1-hidden');
-    const before = await rendersReadyAtText(d.engagementId);
-    await seedArtifact(d, 'approved_render', { release: false });
-    expect(await rendersReadyAtText(d.engagementId)).toBe(before);
-  });
-
+describe('A1: a render shown before the client decided starts a new round (render-round-restamp.dbtest.ts has the rest)', () => {
   it('a render ADDED (shown) after the stamp re-stamps the round: a decision on the earlier page is refused, nothing written, no read first', async () => {
     const d = await atFinalApproval('a1-added');
     const seen = reviewSeenOf(await page(d));
@@ -87,24 +79,33 @@ describe('A1: what the client sees at the final approval is the round', () => {
     expect(order.log[0]).toBe('write');
     expect(await clientEventCount(d.engagementId)).toBe(0);
   });
+});
 
-  it('a render REPLACED (the old one hidden, a new one shown) re-stamps the round too', async () => {
-    const d = await atFinalApproval('a1-replaced');
-    const old = await seedArtifact(d, 'approved_render');
-    const seen = reviewSeenOf(await page(d));
-    expect((await setArtifactClientVisibilityCore(d.ctx, { artifactId: old, visible: false })).ok).toBe(true);
-    await seedArtifact(d, 'approved_render');
-    expect(reviewSeenOf(await page(d)).rendersIssuedAt).not.toBe(seen.rendersIssuedAt);
-    expect(await respondToDesignAndNotify(d.token, { action: 'approve_design' }, seen)).toEqual({ kind: 'changed' });
-    expect(await respondToDesignAndNotify(d.token, { action: 'approve_design' }, reviewSeenOf(await page(d)))).toMatchObject({ kind: 'approved' });
-  });
+describe('an instant shaped like a stamp that Postgres cannot read (D3 F7, L1)', () => {
+  it.each(['2026-13-45T25:61:61Z', '2026-02-30T10:00:00Z', '2026-02-30', '2026-10-12T10:00:00+99:00', '0000-01-01T00:00:00Z'])(
+    '%s is wrong_state through the app and the server actions; nothing is written, nothing throws',
+    async (crafted) => {
+      const { acknowledgeDeliveryBudget, respondToDeliveryDesign } = await import('@/app/[locale]/d/[token]/review-actions');
+      const d = await atFinalApproval(`crafted-${crafted.slice(0, 10)}`);
+      for (const action of ['approve_design', 'acknowledge_rom']) {
+        expect(await recordDeliveryActionByToken(d.token, { action, expectedIssueAt: crafted })).toEqual({ ok: false, error: 'wrong_state' });
+      }
+      const seen = { romIssuedAt: null, rendersIssuedAt: crafted };
+      expect(await respondToDeliveryDesign(d.token, 'approve_design', 'note', seen)).toEqual({ kind: 'changed' });
+      expect(await acknowledgeDeliveryBudget(d.token, crafted)).toEqual({ kind: 'changed' });
+      expect(await clientEventCount(d.engagementId)).toBe(0);
+    },
+  );
+});
 
-  it('showing a render outside the final approval leaves the stamp alone', async () => {
-    const d = await atFinalApproval('a1-other-stage');
-    await forceState(d.engagementId, 'shop_drawings');
-    const before = await rendersReadyAtText(d.engagementId);
-    await seedArtifact(d, 'approved_render');
-    expect(await rendersReadyAtText(d.engagementId)).toBe(before);
+describe('F3: a stale approve+budget on a delivery that has ended', () => {
+  it('answers the budget acknowledgement on file for that band, never "could not be saved"', async () => {
+    const d = await atFinalApproval('f3-ended');
+    const seen = await pageSeenWithBand(d.token);
+    expect(await approveDesignWithBudgetAndNotify(d.token, {}, seen)).toMatchObject({ kind: 'approved', budget: 'acknowledged' });
+    await forceState(d.engagementId, 'execution');
+    expect(await approveDesignWithBudgetAndNotify(d.token, {}, seen)).toEqual({ kind: 'approved', studioNotified: true, budget: 'acknowledged' });
+    expect((await consentCounts(d.engagementId)).romAcknowledgements).toBe(1);
   });
 });
 

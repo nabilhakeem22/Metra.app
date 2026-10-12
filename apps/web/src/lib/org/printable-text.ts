@@ -24,9 +24,10 @@ const CONTROL = /[\p{Cc}\u{2028}\u{2029}]/u;
 /** Half of a surrogate pair with no other half: not a character at all. */
 const LONE_SURROGATE = /\p{Cs}/u;
 
-/** Letters and symbols that draw nothing: the Braille blank and the Hangul fillers (alternatives,
- * not a class: two Hangul fillers in a class would read as one syllable). */
-const BLANK_LOOKING = /\u{2800}|\u{115F}|\u{1160}|\u{3164}|\u{FFA0}/gu;
+/** Letters and symbols that draw nothing: the Braille blank, the Hangul fillers and the musical
+ * null notehead (D3 L5; alternatives, not a class: two Hangul fillers in a class would read as
+ * one syllable). Stricter than the 0059 CHECK, which is allowed: the app may refuse more. */
+const BLANK_LOOKING = /\u{2800}|\u{115F}|\u{1160}|\u{3164}|\u{FFA0}|\u{1D159}/gu;
 
 /** One character a reader sees: a letter, a digit, punctuation or a symbol. */
 const VISIBLE = /[\p{L}\p{N}\p{P}\p{S}]/u;

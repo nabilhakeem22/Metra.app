@@ -162,6 +162,7 @@ describe('normalizeClientPageChanges: printable text only (F8)', () => {
     ['Braille blanks', cp(0x2800, 0x2800)],
     ['Hangul fillers', cp(0x115f, 0x115f)],
     ['halfwidth Hangul fillers', cp(0xffa0, 0xffa0, 0xffa0)],
+    ['musical null noteheads (D3 L5)', cp(0x1d159, 0x1d159, 0x1d159)],
     ['a combining mark on its own', cp(0x651, 0x651, 0x651)],
   ])('refuses %s, with a field error', (_label, value) => {
     for (const field of ['bankName', 'bankAccountHolder', 'instapayAddress'] as const) {

@@ -2,11 +2,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { DeliveryActionResult } from '../public';
 import type { ClientAct } from './acts';
 
-// Round D, owner decision 2 (unit layer of AC S1 to S8): approve design +
-// budget is TWO guarded writes, the budget first, each naming its own
-// issuance. The design's studio notification says `budget: pending` exactly
-// when the budget half was not saved; a dead link stops after one call; no
-// read comes before a write.
+// Round D, owner decision 2 (unit layer of AC S1 to S8): two guarded writes,
+// the budget first, each naming its own issuance. `budget: pending` only when
+// the band changed; a dead link or a thrown budget stops; no read first.
 
 vi.mock('server-only', () => ({}));
 
@@ -33,12 +31,7 @@ vi.mock('./notify', () => ({
   },
 }));
 const saved = vi.hoisted(() => ({ delivery: null as unknown }));
-vi.mock('./saved-delivery', () => ({
-  savedDelivery: async () => {
-    calls.log.push('read');
-    return saved.delivery;
-  },
-}));
+vi.mock('./saved-delivery', () => ({ savedDelivery: async () => (calls.log.push('read'), saved.delivery) }));
 
 const { approveDesignWithBudgetAndNotify, respondToDesignAndNotify } = await import('./design-acts');
 
@@ -83,11 +76,7 @@ describe('approveDesignWithBudgetAndNotify', () => {
 
   it('S3: a decision on file for ANOTHER round is not this tap\'s answer', async () => {
     respond.answers.approve_design = { ok: false, error: 'wrong_state' };
-    saved.delivery = {
-      stageKey: 'finalApproval',
-      designDecision: { kind: 'approved', at: '2026-10-03T10:00:00.000Z' },
-      rendersIssuedAt: '2026-10-03T09:00:00.000001+00:00',
-    };
+    saved.delivery = { stageKey: 'finalApproval', designDecision: { kind: 'approved', at: '2026-10-03T10:00:00.000Z' }, rendersIssuedAt: '2026-10-03T09:00:00.000001+00:00' };
     expect(await approveDesignWithBudgetAndNotify('tok', INPUT, SEEN)).toEqual({ kind: 'changed', budget: 'acknowledged' });
   });
 
@@ -102,11 +91,7 @@ describe('approveDesignWithBudgetAndNotify', () => {
   it('S6: a double tap answers from what is on file', async () => {
     respond.answers.acknowledge_rom = { ok: true, code: 'already' };
     respond.answers.approve_design = { ok: true, code: 'already' };
-    saved.delivery = {
-      stageKey: 'finalApproval',
-      designDecision: { kind: 'approved', at: '2026-10-02T10:00:00.000Z' },
-      rendersIssuedAt: RENDERS,
-    };
+    saved.delivery = { stageKey: 'finalApproval', designDecision: { kind: 'approved', at: '2026-10-02T10:00:00.000Z' }, rendersIssuedAt: RENDERS };
     expect(await approveDesignWithBudgetAndNotify('tok', INPUT, SEEN)).toEqual({ kind: 'approved', studioNotified: true, budget: 'acknowledged' });
   });
 
@@ -122,15 +107,30 @@ describe('approveDesignWithBudgetAndNotify', () => {
     expect(await approveDesignWithBudgetAndNotify('tok', INPUT, SEEN)).toEqual({ kind: 'approved', studioNotified: true, budget: 'acknowledged' });
   });
 
-  it('a budget half that throws is `failed`: the design is still asked, with the budget pending', async () => {
+  it('R2: a budget half that THROWS stops the tap: the design is never sent, nobody is notified', async () => {
     respond.answers.acknowledge_rom = new Error('db blip');
+    expect(await approveDesignWithBudgetAndNotify('tok', INPUT, SEEN)).toEqual({ kind: 'error', error: 'generic' });
+    expect(respond.inputs.map((input) => input.action)).toEqual(['acknowledge_rom']);
+    expect(notified.acts).toEqual([]);
+  });
+
+  it('F3: an ended delivery with this band acknowledged on file answers acknowledged, not failed', async () => {
+    respond.answers.acknowledge_rom = { ok: false, error: 'not_active' };
+    respond.answers.approve_design = { ok: false, error: 'not_active' };
+    const decision = { kind: 'approved', at: '2026-10-02T10:00:00.000Z' };
+    saved.delivery = { stageKey: 'closed', designDecision: decision, rendersIssuedAt: RENDERS, romAcknowledgedAt: decision.at, rom: { issuedAt: ROM } };
+    expect(await approveDesignWithBudgetAndNotify('tok', INPUT, SEEN)).toEqual({ kind: 'approved', studioNotified: true, budget: 'acknowledged' });
+  });
+
+  it('R1/F5: a budget refusal that is not a band change never tells the studio the budget is pending', async () => {
+    respond.answers.acknowledge_rom = { ok: false, error: 'not_active' };
     expect(await approveDesignWithBudgetAndNotify('tok', INPUT, SEEN)).toEqual({ kind: 'approved', studioNotified: true, budget: 'failed' });
-    expect(notified.acts).toEqual([{ kind: 'design_approved', budgetPending: true }]);
+    expect(notified.acts).toEqual([{ kind: 'design_approved' }]);
   });
 
   it.each([
-    ['a generic design refusal after a saved budget', { ok: false }, 'acknowledged', { kind: 'changed', budget: 'acknowledged' }],
-    ['a thrown design write after a saved budget', new Error('db blip'), 'acknowledged', { kind: 'changed', budget: 'acknowledged' }],
+    ['R4: a generic design refusal after a saved budget', { ok: false }, 'acknowledged', { kind: 'error', error: 'generic', budget: 'acknowledged' }],
+    ['R4: a thrown design write after a saved budget', new Error('db blip'), 'acknowledged', { kind: 'error', error: 'generic', budget: 'acknowledged' }],
     ['a generic design refusal with nothing saved', { ok: false }, 'not_active', { kind: 'error', error: 'generic' }],
   ] as const)('%s', async (_label, designAnswer, budgetAnswer, expected) => {
     respond.answers.approve_design = designAnswer instanceof Error ? designAnswer : { ...designAnswer };

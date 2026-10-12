@@ -81,11 +81,8 @@ describe('answerOfDesignWithBudgetOutcome (S9)', () => {
       { kind: 'changes_requested', studioNotified: false, budget: 'acknowledged' },
       { confirmed: { outcome: 'changes', studioNotified: false, budget: 'acknowledged' } },
     ],
-    [
-      'changed + acknowledged',
-      { kind: 'changed', budget: 'acknowledged' },
-      { error: 'reviewChanged', refresh: true, budget: 'acknowledged' },
-    ],
+    // F4: one sentence says both: the approval was not sent, the budget was recorded.
+    ['changed + acknowledged', { kind: 'changed', budget: 'acknowledged' }, { error: 'designChangedBudgetSaved', refresh: true }],
     ['changed + changed', { kind: 'changed', budget: 'changed' }, { error: 'reviewChanged', refresh: true }],
     ['changed + failed', { kind: 'changed', budget: 'failed' }, { error: 'reviewChanged', refresh: true }],
     [
@@ -94,7 +91,13 @@ describe('answerOfDesignWithBudgetOutcome (S9)', () => {
       { error: 'movedOn', refresh: true, budget: 'acknowledged' },
     ],
     ['moved_on + changed', { kind: 'moved_on', budget: 'changed' }, { error: 'movedOn', refresh: true }],
-    ['error', { kind: 'error', error: 'token_expired' }, { error: 'token_expired', refresh: false }],
+    ['error before any write (stop)', { kind: 'error', error: 'token_expired' }, { error: 'token_expired', refresh: false }],
+    // R4: the design half failed after the budget was saved: the error, the budget line, and a refresh.
+    [
+      'design error after a saved budget',
+      { kind: 'error', error: 'generic', budget: 'acknowledged' },
+      { error: 'generic', refresh: true, budget: 'acknowledged' },
+    ],
   ];
 
   it.each(rows)('%s', (_label, outcome, answer) => {

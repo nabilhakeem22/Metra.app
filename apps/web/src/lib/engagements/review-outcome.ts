@@ -23,9 +23,11 @@ export type DesignOutcome =
 /**
  * How the budget half of a one-tap approve+budget ended (Round D, owner
  * decision 2: two consents, each guarded by its own issuance).
- * - acknowledged: acknowledge_rom answered ok or already (this band is on file);
- * - changed: it answered wrong_state (the band was re-issued or withdrawn since the page loaded);
- * - failed: any other refusal (not_active, or a thrown or generic failure).
+ * - acknowledged: the band the client saw is acknowledged on file (this tap's
+ *   ok, a repeat, or an acknowledgement found on file after a refusal);
+ * - changed: wrong_state (the band was re-issued or withdrawn since the page loaded);
+ * - failed: any other refusal with nothing on file for that band (a delivery
+ *   that has ended).
  */
 export type BudgetPart = 'acknowledged' | 'changed' | 'failed';
 
@@ -33,8 +35,10 @@ export type BudgetPart = 'acknowledged' | 'changed' | 'failed';
 export type DesignWithBudgetOutcome =
   | { kind: 'approved' | 'changes_requested'; studioNotified: boolean; budget: BudgetPart }
   | { kind: 'changed' | 'moved_on'; budget: BudgetPart }
-  // token_invalid or token_expired: nothing was attempted after the first call.
-  | { kind: 'error'; error: PortalErrorKey };
+  // Without `budget`: the tap stopped at the budget half (a dead or expired
+  // link, or a budget write that threw) and the design was never sent. With
+  // it: the design half failed after the budget acknowledgement was saved.
+  | { kind: 'error'; error: PortalErrorKey; budget?: 'acknowledged' };
 
 export type HandoverOutcome =
   | { kind: 'acknowledged'; studioNotified: boolean }
@@ -69,13 +73,6 @@ export const ACT_OF_DESIGN_DECISION = {
 
 /** The refusals after which the decision ON FILE is the answer, not an error. */
 const SAVED_DECISION_REFUSALS: ReadonlySet<string> = new Set(['wrong_state', 'not_active']);
-
-/** The budget half of a one-tap approve+budget, from what acknowledge_rom answered. */
-export function budgetPartOf(result: { ok: boolean; error?: string } | null): BudgetPart {
-  if (result === null) return 'failed';
-  if (result.ok) return 'acknowledged';
-  return result.error === 'wrong_state' ? 'changed' : 'failed';
-}
 
 /** True when a write's refusal means "nothing saved by this tap; ask the snapshot". */
 export function answersFromSaved(result: { ok: boolean; code?: string; error?: string }): boolean {

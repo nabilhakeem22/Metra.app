@@ -93,10 +93,14 @@ export async function readSdfJson<TPayload>(query: SQL): Promise<TPayload | null
  *
  * `undefined` when the function returned no row at all; the code mappers in
  * ./sdf-result.ts read that as `token_invalid`, same as any unrecognised code.
+ *
+ * `write`: the function WRITES (a client's response). On Cloudflare a deadline
+ * then rejects with DbWriteUncertainError, not DbDeadlineError: the abandoned
+ * call may still commit, so the caller must not read it as "nothing saved".
  */
-export async function readSdfCode(query: SQL): Promise<string | undefined> {
+export async function readSdfCode(query: SQL, opts: { write?: boolean } = {}): Promise<string | undefined> {
   assertTokenSdf(query);
-  const rows = (await withRequestDb((db) => db.execute(query))) as unknown as Array<{
+  const rows = (await withRequestDb((db) => db.execute(query), opts)) as unknown as Array<{
     code: string;
   }>;
   return rows[0]?.code;
