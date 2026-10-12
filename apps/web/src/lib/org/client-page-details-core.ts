@@ -45,7 +45,14 @@ export type ClientPageDetailsResult = ActionResult & {
   data?: { alert: ClientPageAlert | null };
 };
 
-/** The seven columns as they are now, locked so two saves audit in order. */
+/**
+ * The seven columns as they are now, locked so two saves audit in order.
+ * FOR NO KEY UPDATE, not FOR UPDATE (Round E R2): it still serialises two
+ * saves, and it does not conflict with the FOR KEY SHARE every client act's
+ * insert takes on this row for its org_id foreign key. FOR UPDATE made one slow
+ * or abandoned save fail every client act of the studio once the token writes
+ * wait at most 4 s (0060). Nothing here changes a key column.
+ */
 async function storedDetails(tx: MetraDb, orgId: string) {
   const [row] = await tx
     .select({
@@ -60,7 +67,7 @@ async function storedDetails(tx: MetraDb, orgId: string) {
     })
     .from(organizations)
     .where(eq(organizations.id, orgId))
-    .for('update');
+    .for('no key update');
   if (!row) fail('generic');
   const { defaultLocale, ...details } = row;
   return { details: details satisfies ClientPageDetails, locale: defaultLocale };
