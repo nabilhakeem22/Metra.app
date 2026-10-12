@@ -3,7 +3,7 @@ import { check } from 'drizzle-orm/pg-core';
 
 // The CHECKs on what the client page shows about the studio: its phone and
 // WhatsApp, and how to pay it (0058, the phone and printable rules tightened by
-// 0059). The app normalises every value before it writes
+// 0059 and 0060). The app normalises every value before it writes
 // (apps/web/src/lib/org/client-page-details.ts), so these are the database's
 // second word: each one may be LOOSER than the app, never stricter, or a
 // Settings save the app accepted would fail with 23514.
@@ -21,11 +21,18 @@ export const FORMAT_CHARACTERS = String.raw`\u00AD\u0600-\u0605\u061C\u06DD\u070
 /** Unicode white space. */
 const WHITE_SPACE = String.raw`\u0009-\u000D\u0020\u00A0\u1680\u2000-\u200A\u2028\u2029\u202F\u205F\u3000\uFEFF`;
 
-/** C0, DEL and C1 controls (NUL cannot be stored at all). */
-const CONTROLS = String.raw`\u0001-\u001F\u007F-\u009F`;
+/**
+ * C0, DEL and C1 controls (NUL cannot be stored at all), and the line and
+ * paragraph separators (0060): the app refuses those two anywhere, as controls.
+ */
+const CONTROLS = String.raw`\u0001-\u001F\u007F-\u009F\u2028\u2029`;
 
-/** NEL, then the letters and symbols that draw nothing: the Braille blank and the Hangul fillers. */
-const BLANK_LOOKING = String.raw`\u0085\u2800\u115F\u1160\u3164\uFFA0`;
+/**
+ * NEL, then the letters and symbols that draw nothing: the Braille blank, the
+ * Hangul fillers and (0060) the musical null notehead. Refused only as a whole
+ * value, exactly as the app treats them: "CIB" with one of them is kept.
+ */
+const BLANK_LOOKING = String.raw`\u0085\u2800\u115F\u1160\u3164\uFFA0\U0001D159`;
 
 /** Combining marks of the listed scripts, which draw nothing on their own (Latin, Cyrillic, Arabic and the generic blocks). */
 const COMBINING_MARKS = String.raw`\u0300-\u036F\u0483-\u0489\u0610-\u061A\u064B-\u065F\u0670\u06D6-\u06DC\u06DF-\u06E4\u06E7-\u06E8\u06EA-\u06ED\u1AB0-\u1ACE\u1DC0-\u1DFF\u20D0-\u20F0\uFE20-\uFE2F`;
@@ -59,6 +66,9 @@ const EGYPTIAN_NATIONAL_NUMBER = String.raw`^0[1-9][0-9]{7,9}$`;
 /** An Egyptian mobile with its trunk 0, the only national number WhatsApp can open. */
 const EGYPTIAN_MOBILE_NUMBER = String.raw`^01[0125][0-9]{8}$`;
 
+/** Egypt's country code with its trunk 0 kept (0060): the app drops every such 0, so it never stores one. */
+const EGYPT_TRUNK_ZERO = String.raw`^\+200`;
+
 /** The free-text payment columns a client copies into a banking app. */
 const PRINTABLE_PAYMENT_TEXT = ['instapay_address', 'bank_name', 'bank_account_holder'];
 
@@ -67,10 +77,15 @@ function printableText(column: string): string {
   return `(${column} IS NULL OR (${column} !~ '[${FORMAT_CHARACTERS}]' AND ${column} !~ '[${CONTROLS}]' AND ${column} ~ '[^${NOT_VISIBLE}]'))`;
 }
 
-/** Each client-page CHECK by name, as the SQL text 0058 and 0059 write. */
+/** An international number, but not Egypt's code followed by its trunk 0. */
+function internationalNumber(column: string): string {
+  return `(${column} ~ '${INTERNATIONAL_NUMBER}' AND ${column} !~ '${EGYPT_TRUNK_ZERO}')`;
+}
+
+/** Each client-page CHECK by name, as the SQL text 0058, 0059 and 0060 write. */
 export const CLIENT_PAGE_CHECKS = {
-  organizations_studio_phone_format: `studio_phone IS NULL OR studio_phone ~ '${INTERNATIONAL_NUMBER}' OR studio_phone ~ '${EGYPTIAN_NATIONAL_NUMBER}'`,
-  organizations_studio_whatsapp_format: `studio_whatsapp IS NULL OR studio_whatsapp ~ '${INTERNATIONAL_NUMBER}' OR studio_whatsapp ~ '${EGYPTIAN_MOBILE_NUMBER}'`,
+  organizations_studio_phone_format: `studio_phone IS NULL OR ${internationalNumber('studio_phone')} OR studio_phone ~ '${EGYPTIAN_NATIONAL_NUMBER}'`,
+  organizations_studio_whatsapp_format: `studio_whatsapp IS NULL OR ${internationalNumber('studio_whatsapp')} OR studio_whatsapp ~ '${EGYPTIAN_MOBILE_NUMBER}'`,
   organizations_instapay_address_length:
     'instapay_address IS NULL OR char_length(instapay_address) BETWEEN 3 AND 100',
   organizations_bank_text_length:

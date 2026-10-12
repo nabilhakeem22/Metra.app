@@ -421,6 +421,13 @@
       "when": 1791734529315,
       "tag": "0059_client_page_checks_tightened",
       "breakpoints": true
+    },
+    {
+      "idx": 60,
+      "version": "7",
+      "when": 1791767848859,
+      "tag": "0060_client_page_checks_round_e",
+      "breakpoints": true
     }
   ]
 }
