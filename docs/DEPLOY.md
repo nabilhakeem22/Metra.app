@@ -316,7 +316,8 @@ transformations (`render/image`). Until that changes:
   `apps/web/src/lib/storage/logo-response.ts`), in Settings and on the client
   page alike: it is not payment-gated, it is a png, jpg or webp of at most 2 MB
   (checked at upload and again when attached), and the page scales it with CSS.
-  The app streams the bytes; the browser never receives a storage URL.
+  The app reads at most 2 MB and sends the bytes (an object over that is the
+  empty 404, declared length or not); the browser never receives a storage URL.
 - **The logo is served again since Round E.** Before it, every logo answered
   the empty 404 in production: the image fetch asked for `redirect: 'error'`,
   which Cloudflare Workers throw on (Node, and so the unit tests, accept it).

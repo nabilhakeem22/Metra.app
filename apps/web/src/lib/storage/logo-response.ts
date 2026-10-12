@@ -3,12 +3,16 @@ import 'server-only';
 // and the studio's own Settings (/settings/logo) both answer through here, so
 // the two can never drift on how a logo is served.
 //
-// BYTES, NEVER A URL. The logo is streamed as its stored ORIGINAL
+// BYTES, NEVER A URL. The logo is served as its stored ORIGINAL
 // (./stored-image.ts): it is not payment-gated, it is at most LOGO_MAX_BYTES of
 // png, jpg or webp (checked at upload and again when attached), and the page
 // scales it with CSS. The plain object URL is signed and used on the server
 // only; no storage URL ever leaves it. (Storage image transformations are not
 // on the Supabase plan in use, so a rendition is not an option; docs/DEPLOY.md.)
+//
+// BUFFERED, NOT STREAMED (Round E F2): at most LOGO_MAX_BYTES are read before
+// the answer starts, so a logo over it answers the 404 even when Storage
+// declared no length, instead of a 200 whose body then aborts.
 //
 // NO ORACLE: no logo, a logo that is not an image, an oversized or failed fetch
 // and any throw all answer the same empty, uncached 404.
@@ -34,7 +38,7 @@ export function logoNotFound(): NextResponse {
 }
 
 /**
- * Resolves the logo and streams its stored bytes, or the empty 404. Never throws:
+ * Resolves the logo and answers its stored bytes, or the empty 404. Never throws:
  * a failure logs `failureBreadcrumb` (a fixed string, so nothing the caller
  * holds, a share token say, can reach the log) and answers the 404. The
  * caller authenticates BEFORE this, so an auth redirect is never swallowed.
@@ -48,7 +52,9 @@ export async function logoResponse(
     if (!logo) return logoNotFound();
     const image = await fetchStoredImage(logo.bucket, logo.objectKey, LOGO_MAX_BYTES);
     if (!image) return logoNotFound();
-    return new NextResponse(image.body, {
+    // The stream errors once past the ceiling, so this rejects into the 404 below.
+    const bytes = await new Response(image.body).arrayBuffer();
+    return new NextResponse(bytes, {
       status: 200,
       headers: {
         ...LOGO_HEADERS,

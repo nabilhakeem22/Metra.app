@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fakePortalRateLimitEnv } from '@/test/fake-rate-limit-env';
 import { PORTAL_READ_CEILING } from '@/test/wrangler-rate-limits';
 
-// AC 45: the studio logo is its stored original's BYTES, streamed from here: never a
+// AC 45: the studio logo is its stored original's BYTES, sent from here: never a
 // redirect and never a storage URL. Every miss is the same empty, uncached 404.
 
 vi.mock('server-only', () => ({}));
@@ -47,8 +47,37 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
+/** `total` bytes of png in 256 KB chunks, with NO declared length. */
+function undeclaredPng(total: number): Response {
+  let sent = 0;
+  const body = new ReadableStream<Uint8Array>({
+    pull(controller) {
+      if (sent >= total) return controller.close();
+      const size = Math.min(256 * 1024, total - sent);
+      sent += size;
+      controller.enqueue(new Uint8Array(size));
+    },
+  });
+  return new Response(body, { headers: { 'content-type': 'image/png' } });
+}
+
+describe('a logo whose length Storage did not declare (Round E F2)', () => {
+  it('over 2 MiB: the empty 404, never a 200 that aborts', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    fetchMock.mockResolvedValue(undeclaredPng(2 * 1024 * 1024 + 1));
+    await expectNotFound(await get());
+  });
+
+  it('exactly 2 MiB: the whole logo, 200', async () => {
+    fetchMock.mockResolvedValue(undeclaredPng(2 * 1024 * 1024));
+    const response = await get();
+    expect(response.status).toBe(200);
+    expect((await response.arrayBuffer()).byteLength).toBe(2 * 1024 * 1024);
+  });
+});
+
 describe('the logo route', () => {
-  it('streams the stored logo bytes, private (240 s, no shared cache), with no URL in the answer', async () => {
+  it('answers the stored logo bytes, private (240 s, no shared cache), with no URL in the answer', async () => {
     const response = await get();
     expect(response.status).toBe(200);
     expect(response.headers.get('location')).toBeNull();

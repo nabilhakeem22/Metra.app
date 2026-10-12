@@ -2,7 +2,7 @@ import { drizzle } from 'drizzle-orm/postgres-js';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // The studio's own logo for Settings: the signed-in member's ACTIVE org only,
-// streamed as the stored original's bytes (never a redirect, never a storage
+// sent as the stored original's bytes (never a redirect, never a storage
 // URL), and every miss the same empty, uncached 404. The real reader
 // (lib/org/own-logo.ts) runs: its query is built against a driverless drizzle so
 // the SQL it would send can be read, and the rows it would get back are supplied
@@ -56,7 +56,7 @@ afterEach(() => {
 });
 
 describe('the studio logo route', () => {
-  it('streams the saved logo as its stored bytes, private, sniff-proof, with no URL in the answer', async () => {
+  it('answers the saved logo as its stored bytes, private, sniff-proof, with no URL in the answer', async () => {
     const response = await GET();
     expect(response.status).toBe(200);
     expect(response.headers.get('location')).toBeNull();
