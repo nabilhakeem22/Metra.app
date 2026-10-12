@@ -26,12 +26,8 @@ export const TOKEN_SDFS: ReadonlyArray<{ name: string; args: string }> = [
   { name: 'app_variation_respond_by_token', args: 'text, text, text, text, text' },
   { name: 'app_delivery_by_token', args: 'text' },
   { name: 'app_delivery_document_by_token', args: 'text, uuid' },
-  {
-    name: 'app_delivery_respond_by_token',
-    args: 'text, text, text, text, text, text',
-  },
-  // Round D (0059): the consent-guarded overload. Same name, so BOTH rows are
-  // listed and each signature is checked.
+  // Round D (0059): the write names the issuance the client saw; its
+  // six-argument predecessor is dropped (Round E, 0060).
   {
     name: 'app_delivery_respond_by_token',
     args: 'text, text, timestamptz, text, text, text, text',

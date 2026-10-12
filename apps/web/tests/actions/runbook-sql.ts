@@ -12,6 +12,12 @@ export const RUNBOOK_0059 = {
   restore: '-- 0059 undo: the three 0058 CHECKs back, as ONE statement.',
 };
 
+/** The first lines of the 0060 runbook's blocks the dbtests run. */
+export const RUNBOOK_0060 = {
+  violators: '-- 0060 step 2 (b): the studios a new CHECK would refuse. Expect 0 rows.',
+  restore: '-- 0060 undo (3): the three 0059 CHECKs back, as ONE statement.',
+};
+
 /** The fenced ```sql block of docs/DEPLOY.md whose first line is `firstLine`. */
 export function runbookSql(firstLine: string): string {
   const deploy = readFileSync(resolve(repo, 'docs/DEPLOY.md'), 'utf8').replace(/\r\n/g, '\n');
