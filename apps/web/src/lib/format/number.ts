@@ -3,6 +3,10 @@
 // separators, matching Egyptian business and tax documents.
 import { cachedNumberFormat } from './intl-cache';
 
+// Frozen: the formatter cache works out a frozen options object's key once.
+const TWO_DECIMALS: Intl.NumberFormatOptions = Object.freeze({ minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const UP_TO_TWO_DECIMALS: Intl.NumberFormatOptions = Object.freeze({ minimumFractionDigits: 0, maximumFractionDigits: 2 });
+
 function latnLocale(locale: string): string {
   return locale.includes('-u-nu-') ? locale : `${locale}-u-nu-latn`;
 }
@@ -32,11 +36,7 @@ export function formatPercent(
   let n = typeof value === 'string' ? Number(value) : value;
   if (!Number.isFinite(n)) return '';
   if (Object.is(n, -0)) n = 0;
-  const amount = formatNumber(n, locale, {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
-  return `${amount}%`;
+  return `${formatNumber(n, locale, TWO_DECIMALS)}%`;
 }
 
 /**
@@ -53,10 +53,7 @@ export function formatQuantity(
   let n = typeof value === 'string' ? Number(value) : value;
   if (!Number.isFinite(n)) return '';
   if (Object.is(n, -0)) n = 0;
-  return formatNumber(n, locale, {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 2,
-  });
+  return formatNumber(n, locale, UP_TO_TWO_DECIMALS);
 }
 
 export { latnLocale };

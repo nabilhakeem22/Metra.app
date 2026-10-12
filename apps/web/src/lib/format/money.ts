@@ -1,5 +1,10 @@
 import { formatNumber } from './number';
 
+// Frozen: the formatter cache works out a frozen options object's key once.
+const TWO_DECIMALS: Intl.NumberFormatOptions = Object.freeze({ minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const NO_DECIMALS: Intl.NumberFormatOptions = Object.freeze({ minimumFractionDigits: 0, maximumFractionDigits: 0 });
+const TWO_TO_FOUR_DECIMALS: Intl.NumberFormatOptions = Object.freeze({ minimumFractionDigits: 2, maximumFractionDigits: 4 });
+
 // EGP only in v1. Stored as NUMERIC(18,4) / carried as string; formatted for
 // display with 2 decimals and Latin digits. Symbol: ج.م (ar) / EGP (en).
 //
@@ -46,11 +51,8 @@ export function formatMoneyAmount(
 ): string {
   const n = readMoneyNumber(value);
   if (n === null) return '';
-  const fractionDigits = options.trimWholeDecimals && isWholeAtTwoDecimals(n) ? 0 : 2;
-  return formatNumber(n, locale, {
-    minimumFractionDigits: fractionDigits,
-    maximumFractionDigits: fractionDigits,
-  });
+  const whole = options.trimWholeDecimals && isWholeAtTwoDecimals(n);
+  return formatNumber(n, locale, whole ? NO_DECIMALS : TWO_DECIMALS);
 }
 
 export function formatMoney(
@@ -74,9 +76,6 @@ export function formatMoneyExact(
 ): string {
   const n = readMoneyNumber(value);
   if (n === null) return '';
-  const amount = formatNumber(n, locale, {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 4,
-  });
+  const amount = formatNumber(n, locale, TWO_TO_FOUR_DECIMALS);
   return `${amount} ${moneySymbol(locale)}`;
 }

@@ -3,8 +3,9 @@ import { cachedDateTimeFormat } from './intl-cache';
 import { latnLocale } from './number';
 
 const CAIRO = 'Africa/Cairo';
-const DATE_OPTIONS: Intl.DateTimeFormatOptions = { timeZone: CAIRO, day: '2-digit', month: '2-digit', year: 'numeric' };
-const TIME_OPTIONS: Intl.DateTimeFormatOptions = { timeZone: CAIRO, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' };
+// Frozen: the formatter cache works out a frozen options object's key once.
+const DATE_OPTIONS: Intl.DateTimeFormatOptions = Object.freeze({ timeZone: CAIRO, day: '2-digit', month: '2-digit', year: 'numeric' });
+const TIME_OPTIONS: Intl.DateTimeFormatOptions = Object.freeze({ timeZone: CAIRO, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
 
 export function formatDate(input: Date | string | number, locale: string): string {
   const date = input instanceof Date ? input : new Date(input);

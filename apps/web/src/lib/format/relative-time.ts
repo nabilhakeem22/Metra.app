@@ -10,7 +10,7 @@ const MINUTE_MS = 60_000;
 const HOUR_MS = 60 * MINUTE_MS;
 const DAY_MS = 24 * HOUR_MS;
 const RELATIVE_DAYS_MAX = 6;
-const RELATIVE_OPTIONS: Intl.RelativeTimeFormatOptions = { numeric: 'auto' };
+const RELATIVE_OPTIONS: Intl.RelativeTimeFormatOptions = Object.freeze({ numeric: 'auto' });
 
 export function formatRelativeTime(iso: string, nowMs: number, locale: string): string {
   const instant = new Date(iso).getTime();

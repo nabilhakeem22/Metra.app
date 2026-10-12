@@ -55,4 +55,46 @@ describe('the Intl formatter cache', () => {
     expect(() => formatNumber(1, 'not a locale!!')).toThrow(RangeError);
     expect(() => cachedNumberFormat('en', { style: 'currency' })).toThrow(TypeError);
   });
+
+  describe('options a text key could confuse (Round E F3)', () => {
+    it('NaN, Infinity and null are not one key: each behaves as a fresh constructor', () => {
+      expect(cachedNumberFormat('en', { maximumFractionDigits: null as never }).format(1.5)).toBe(
+        new Intl.NumberFormat('en', { maximumFractionDigits: null as never }).format(1.5),
+      );
+      expect(() => cachedNumberFormat('en', { maximumFractionDigits: Number.NaN })).toThrow(RangeError);
+      expect(() => cachedNumberFormat('en', { maximumFractionDigits: Number.POSITIVE_INFINITY })).toThrow(RangeError);
+      expect(() => cachedNumberFormat('en', { maximumFractionDigits: Number.NaN })).toThrow(RangeError);
+    });
+
+    it('an inherited option is honoured (built uncached), never answered from a plain key', () => {
+      cachedNumberFormat('en-u-nu-latn', {});
+      const inherited = Object.create({ style: 'percent' }) as Intl.NumberFormatOptions;
+      expect(cachedNumberFormat('en-u-nu-latn', inherited).format(0.5)).toBe('50%');
+      expect(cachedNumberFormat('en-u-nu-latn', inherited)).not.toBe(cachedNumberFormat('en-u-nu-latn', inherited));
+    });
+
+    it('a non-enumerable option or a getter is honoured, built uncached', () => {
+      const hidden = Object.defineProperty({}, 'style', { value: 'percent', enumerable: false }) as Intl.NumberFormatOptions;
+      expect(cachedNumberFormat('en', hidden).format(0.5)).toBe('50%');
+      let reads = 0;
+      const getter = Object.defineProperty({}, 'maximumFractionDigits', { enumerable: true, get: () => (reads += 1) });
+      expect(cachedNumberFormat('en', getter as Intl.NumberFormatOptions)).not.toBe(cachedNumberFormat('en', getter as Intl.NumberFormatOptions));
+    });
+
+    it('an options object changed after use is keyed by its new values; a frozen one keeps its key', () => {
+      const options: Intl.NumberFormatOptions = { maximumFractionDigits: 1 };
+      expect(cachedNumberFormat('en', options).format(1.23456)).toBe('1.2');
+      options.maximumFractionDigits = 3;
+      expect(cachedNumberFormat('en', options).format(1.23456)).toBe('1.235');
+      const frozen = Object.freeze({ maximumFractionDigits: 2 });
+      expect(cachedNumberFormat('en', frozen)).toBe(cachedNumberFormat('en', { maximumFractionDigits: 2 }));
+    });
+
+    it('the same plain options in another key order are one formatter; a string "1" and the number 1 are two', () => {
+      expect(cachedNumberFormat('en', { minimumFractionDigits: 1, maximumFractionDigits: 3 })).toBe(
+        cachedNumberFormat('en', { maximumFractionDigits: 3, minimumFractionDigits: 1 }),
+      );
+      expect(cachedNumberFormat('en', { maximumFractionDigits: '1' as never })).not.toBe(cachedNumberFormat('en', { maximumFractionDigits: 1 }));
+    });
+  });
 });
