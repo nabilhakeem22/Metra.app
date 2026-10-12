@@ -134,7 +134,7 @@ export async function addDeliveryCommentByToken(
   const code = await readSdfCode(sql`select public.app_delivery_comment_by_token(
     ${hash}, ${input.documentId}::uuid, ${input.body}, ${input.actorName ?? null},
     ${input.ip ?? null}, ${input.userAgent ?? null}
-  ) as code`);
+  ) as code`, { write: true });
   switch (code) {
     case 'ok':
       return { ok: true };

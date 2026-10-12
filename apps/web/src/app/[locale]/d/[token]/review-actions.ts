@@ -1,6 +1,5 @@
 'use server';
 
-import { loggableFailure } from '@/lib/actions/loggable-failure';
 import { acknowledgeSeenBudgetAndNotify } from '@/lib/engagements/client-acts/budget-acts';
 import { chooseConceptAndNotify, respondToConceptAndNotify } from '@/lib/engagements/client-acts/concept-acts';
 import { approveDesignWithBudgetAndNotify, respondToDesignAndNotify } from '@/lib/engagements/client-acts/design-acts';
@@ -16,6 +15,7 @@ import {
 } from '@/lib/engagements/review-outcome';
 import { parseBandSeen, parseReviewSeen } from '@/lib/engagements/review-seen';
 import { portalActAllowed } from '@/lib/share/portal-rate-limit';
+import { answered } from './answered';
 import { requestProvenance } from './request-provenance';
 
 // The client's REVIEW acts on the portal: the concept, the final design, the
@@ -39,22 +39,9 @@ import { requestProvenance } from './request-provenance';
 // centre (../../../../lib/share/portal-rate-limit.ts); past it an act answers the
 // generic "something went wrong, try again" and writes nothing.
 //
-// NOTHING THROWS TO THE CLIENT (D3 L1). A failure answers the same generic error
-// and logs ONE line through loggableFailure, which copies the driver's error
-// fields and never the failed query's parameters: no token hash, IP, user agent
-// or note reaches the Worker log.
+// NOTHING THROWS TO THE CLIENT (D3 L1): every act runs through ./answered.ts.
 
 const GENERIC = { kind: 'error', error: 'generic' } as const;
-
-/** One act, answered: a throw is the generic error and one redacted log line. */
-async function answered<T>(act: string, run: () => Promise<T>): Promise<T | typeof GENERIC> {
-  try {
-    return await run();
-  } catch (error) {
-    console.error('portal review act failed', { act, error: loggableFailure(error) });
-    return GENERIC;
-  }
-}
 
 /** Choose one concept option, by the letter the client saw (1 = A). */
 export async function chooseDeliveryConcept(
@@ -63,7 +50,7 @@ export async function chooseDeliveryConcept(
   position: number,
   note?: string,
 ): Promise<ConceptChoiceOutcome> {
-  return answered('chooseDeliveryConcept', async () => {
+  return answered('chooseDeliveryConcept', GENERIC, async () => {
     if (!(await portalActAllowed(token))) return GENERIC;
     return chooseConceptAndNotify(token, { artifactId, position, note: clientNote(note), ...(await requestProvenance()) });
   });
@@ -71,7 +58,7 @@ export async function chooseDeliveryConcept(
 
 /** Approve the concept or ask for changes to it. */
 export async function respondToDeliveryConcept(token: string, verb: string, note?: string): Promise<ConceptChoiceOutcome> {
-  return answered('respondToDeliveryConcept', async () => {
+  return answered('respondToDeliveryConcept', GENERIC, async () => {
     if (!(await portalActAllowed(token))) return GENERIC;
     if (!isConceptVerb(verb)) return GENERIC;
     return respondToConceptAndNotify(token, { action: verb, note: clientNote(note), ...(await requestProvenance()) });
@@ -85,7 +72,7 @@ export async function respondToDeliveryDesign(
   note: string,
   seen: unknown,
 ): Promise<DesignOutcome> {
-  return answered('respondToDeliveryDesign', async () => {
+  return answered('respondToDeliveryDesign', GENERIC, async () => {
     if (!(await portalActAllowed(token))) return GENERIC;
     if (!isDesignVerb(verb)) return GENERIC;
     const parsed = parseReviewSeen(seen);
@@ -100,7 +87,7 @@ export async function respondToDeliveryDesign(
  * no band on the page there is no budget to confirm: nothing is written.
  */
 export async function approveDesignWithBudget(token: string, note: string, seen: unknown): Promise<DesignWithBudgetOutcome> {
-  return answered('approveDesignWithBudget', async () => {
+  return answered('approveDesignWithBudget', GENERIC, async () => {
     if (!(await portalActAllowed(token))) return GENERIC;
     const parsed = parseReviewSeen(seen);
     if (!parsed || parsed.romIssuedAt === null) return { kind: 'changed', budget: 'changed' };
@@ -114,7 +101,7 @@ export async function approveDesignWithBudget(token: string, note: string, seen:
 
 /** Acknowledge the band issuance the card showed (the budget card's own button). */
 export async function acknowledgeDeliveryBudget(token: string, bandSeen: unknown): Promise<BudgetOutcome> {
-  return answered('acknowledgeDeliveryBudget', async () => {
+  return answered('acknowledgeDeliveryBudget', GENERIC, async () => {
     if (!(await portalActAllowed(token))) return GENERIC;
     const band = parseBandSeen(bandSeen);
     if (typeof band !== 'string') return { kind: 'changed' };
@@ -124,7 +111,7 @@ export async function acknowledgeDeliveryBudget(token: string, bandSeen: unknown
 
 /** Confirm receiving the design package. */
 export async function acknowledgeDeliveryHandover(token: string, note?: string): Promise<HandoverOutcome> {
-  return answered('acknowledgeDeliveryHandover', async () => {
+  return answered('acknowledgeDeliveryHandover', GENERIC, async () => {
     if (!(await portalActAllowed(token))) return GENERIC;
     return acknowledgeHandoverAndNotify(token, { note: clientNote(note), ...(await requestProvenance()) });
   });

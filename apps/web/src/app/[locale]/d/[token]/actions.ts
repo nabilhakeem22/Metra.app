@@ -12,6 +12,7 @@ import {
 import { THREAD_READ_REFUSED, type PortalThreadRead } from '@/lib/engagements/portal-thread-read';
 import { portalActAllowed, portalReadAllowed } from '@/lib/share/portal-rate-limit';
 import { isUuid } from '@/lib/uuid';
+import { answered } from './answered';
 import { requestProvenance } from './request-provenance';
 
 // The client portal's payment claim and document comments. The review acts
@@ -25,9 +26,14 @@ import { requestProvenance } from './request-provenance';
 // comment. A thread read shares the read budget and, past it, answers the
 // REFUSED marker (../../../../lib/engagements/portal-thread-read.ts), never an
 // empty thread.
+//
+// NOTHING THROWS TO THE CLIENT (Round E R3): the claim and a comment run
+// through ./answered.ts, so a failure underneath (a lock wait that gave up with
+// 55P03, say) answers the generic failure and logs one redacted line.
 
-/** A refused claim: the generic failure, nothing written, nobody notified. */
-const THROTTLED = { ok: false, studioNotified: false } as const;
+/** The generic failure (refused or failed): nothing written, nobody notified.
+ *  With no error code the portal says "something went wrong, try again". */
+const GENERIC_FAILURE = { ok: false, studioNotified: false } as const;
 
 /** A portal write's answer, plus whether the studio heard about it: true only
  *  when a notification row was written for THIS act, which is the only time the
@@ -48,13 +54,15 @@ export async function markDeliveryPaymentPaid(
   milestoneKind: string,
   note?: string,
 ): Promise<DeliveryActResult> {
-  if (!(await portalActAllowed(token))) return THROTTLED;
-  const result = await claimPaymentByToken(token, {
-    milestoneKind,
-    note: clientNote(note),
-    ...(await requestProvenance()),
+  return answered('markDeliveryPaymentPaid', GENERIC_FAILURE, async () => {
+    if (!(await portalActAllowed(token))) return GENERIC_FAILURE;
+    const result = await claimPaymentByToken(token, {
+      milestoneKind,
+      note: clientNote(note),
+      ...(await requestProvenance()),
+    });
+    return withStudioNotified(token, result, paymentClaimedAct(milestoneKind));
   });
-  return withStudioNotified(token, result, paymentClaimedAct(milestoneKind));
 }
 
 /**
@@ -79,13 +87,15 @@ export async function addDeliveryComment(
   if (!trimmed) return { ok: false, error: 'empty', studioNotified: false };
   // A malformed id is refused here, as the core would, before it spends the budget.
   if (!isUuid(documentId)) return { ok: false, error: 'token_invalid', studioNotified: false };
-  if (!(await portalActAllowed(token))) return { ok: false, error: 'too_many', studioNotified: false };
-  const result = await addDeliveryCommentByToken(token, {
-    documentId,
-    body: trimmed,
-    ...(await requestProvenance()),
+  return answered('addDeliveryComment', GENERIC_FAILURE, async () => {
+    if (!(await portalActAllowed(token))) return { ok: false, error: 'too_many', studioNotified: false } as const;
+    const result = await addDeliveryCommentByToken(token, {
+      documentId,
+      body: trimmed,
+      ...(await requestProvenance()),
+    });
+    return withStudioNotified(token, result, { kind: 'commented' });
   });
-  return withStudioNotified(token, result, { kind: 'commented' });
 }
 
 /**
