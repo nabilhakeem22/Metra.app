@@ -21,6 +21,40 @@ export interface ClientTranslationCall {
 }
 
 const HOOKS = new Set(['useTranslations', 'useMessages']);
+const INTL_PACKAGES = new Set(['next-intl', 'use-intl']);
+
+/**
+ * How this file can name the hooks (Round E F4): the local name of each hook it
+ * imports from next-intl (an alias included: `useTranslations as useT`), and
+ * the names it imports the whole package under (`import * as intl`). OUT OF
+ * REACH, and so refused by review rather than this scan: a hook re-exported
+ * under another name by a module of our own, or passed around as a value.
+ */
+function hookBindings(file: ts.SourceFile): { hooks: Map<string, ClientTranslationCall['hook']>; packages: Set<string> } {
+  const hooks = new Map<string, ClientTranslationCall['hook']>();
+  const packages = new Set<string>();
+  for (const statement of file.statements) {
+    if (!ts.isImportDeclaration(statement) || !ts.isStringLiteral(statement.moduleSpecifier)) continue;
+    if (!INTL_PACKAGES.has(statement.moduleSpecifier.text)) continue;
+    const bindings = statement.importClause?.namedBindings;
+    if (bindings && ts.isNamespaceImport(bindings)) packages.add(bindings.name.text);
+    if (!bindings || !ts.isNamedImports(bindings)) continue;
+    for (const element of bindings.elements) {
+      const imported = (element.propertyName ?? element.name).text;
+      if (HOOKS.has(imported)) hooks.set(element.name.text, imported as ClientTranslationCall['hook']);
+    }
+  }
+  return { hooks, packages };
+}
+
+/** The hook a call invokes, when its callee is one of the file's hook bindings. */
+function calledHook(callee: ts.Expression, bindings: ReturnType<typeof hookBindings>): ClientTranslationCall['hook'] | null {
+  if (ts.isIdentifier(callee)) return bindings.hooks.get(callee.text) ?? null;
+  if (ts.isPropertyAccessExpression(callee) && ts.isIdentifier(callee.expression) && bindings.packages.has(callee.expression.text)) {
+    return HOOKS.has(callee.name.text) ? (callee.name.text as ClientTranslationCall['hook']) : null;
+  }
+  return null;
+}
 
 /** The top-level namespace of a useTranslations argument, when it is static. */
 function topLevelNamespace(argument: ts.Expression | undefined): string | null {
@@ -31,11 +65,13 @@ function topLevelNamespace(argument: ts.Expression | undefined): string | null {
   return null;
 }
 
-function translationCalls(file: ts.SourceFile, path: string): ClientTranslationCall[] {
+/** Every useTranslations / useMessages call in one file, however it names them. */
+export function translationCalls(file: ts.SourceFile, path: string): ClientTranslationCall[] {
+  const bindings = hookBindings(file);
   const calls: ClientTranslationCall[] = [];
   const visit = (node: ts.Node) => {
-    if (ts.isCallExpression(node) && ts.isIdentifier(node.expression) && HOOKS.has(node.expression.text)) {
-      const hook = node.expression.text as ClientTranslationCall['hook'];
+    const hook = ts.isCallExpression(node) ? calledHook(node.expression, bindings) : null;
+    if (hook && ts.isCallExpression(node)) {
       const [argument] = node.arguments;
       calls.push({
         path,

@@ -59,6 +59,12 @@ describe('the messages each scope hands the browser', () => {
     expect(unscoped).toEqual([]);
   });
 
+  it('no module of ours re-exports the hooks under another name (the scan could not follow it)', () => {
+    const reexport = /export\s*(\*|\{[^}]*\buse(Translations|Messages)\b[^}]*\})\s*from\s*['"](next|use)-intl['"]/;
+    const offenders = [...graph.files].filter(([, file]) => reexport.test(file.text)).map(([path]) => path);
+    expect(offenders).toEqual([]);
+  });
+
   it.each(scopes)('%s: the list equals what its client code reads', (scope) => {
     const used = usedNamespaces(scope);
     const declared: readonly string[] = CLIENT_NAMESPACES[scope];
