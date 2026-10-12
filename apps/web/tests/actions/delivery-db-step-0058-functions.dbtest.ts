@@ -20,10 +20,9 @@ const LIVE_SIGNATURES = [
   ['app_delivery_document_by_token', 'p_hash text, p_document_id uuid', 'jsonb'],
   ['app_delivery_document_comments_by_token', 'p_hash text, p_document_id uuid', 'jsonb'],
   ['app_delivery_notify_studio_by_token', 'p_hash text, p_body_key text, p_params jsonb, p_roles jsonb', 'jsonb'],
-  // Round D (0059) adds the consent-guarded overload beside the six-argument
-  // function the deployed code still calls; that one is unchanged.
+  // Round D (0059) added the write that names the issuance the client saw;
+  // Round E (0060) dropped the six-argument one it replaced.
   ['app_delivery_respond_by_token', 'p_hash text, p_action text, p_expected_issue_at timestamp with time zone, p_note text, p_name text, p_ip text, p_ua text', 'text'],
-  ['app_delivery_respond_by_token', 'p_hash text, p_action text, p_note text, p_name text, p_ip text, p_ua text', 'text'],
   ['app_document_access', 'p_kind engagement_artifact_kind, p_settled boolean, p_original_name text', 'text'],
 ];
 
@@ -55,7 +54,7 @@ async function signaturesOf(names: string[]): Promise<string[][]> {
 }
 
 describe('signatures (AC 41)', () => {
-  it('keeps every live delivery function exactly as 0057 left it (plus the 0059 respond overload)', async () => {
+  it('keeps every live delivery function exactly as 0057 left it (the respond write as 0059 and 0060 left it)', async () => {
     expect(await signaturesOf(LIVE_SIGNATURES.map(([name]) => name))).toEqual(LIVE_SIGNATURES);
   });
 

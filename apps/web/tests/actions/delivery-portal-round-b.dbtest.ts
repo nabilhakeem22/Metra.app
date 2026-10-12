@@ -757,8 +757,10 @@ describe('the functions the deployed app calls kept their signatures', () => {
   // each, same arguments, same return type.
   const EXPECTED: Record<string, { args: string; result: string }> = {
     app_delivery_by_token: { args: 'p_hash text', result: 'jsonb' },
+    // Round D (0059) added the issuance the client saw as the third argument;
+    // Round E (0060) dropped the six-argument version.
     app_delivery_respond_by_token: {
-      args: 'p_hash text, p_action text, p_note text, p_name text, p_ip text, p_ua text',
+      args: 'p_hash text, p_action text, p_expected_issue_at timestamp with time zone, p_note text, p_name text, p_ip text, p_ua text',
       result: 'text',
     },
     app_delivery_claim_payment_by_token: {
@@ -798,9 +800,6 @@ describe('the functions the deployed app calls kept their signatures', () => {
         where n.nspname = 'public' and p.proname in (${Object.keys(EXPECTED)
           .map((name) => `'${name}'`)
           .join(', ')})
-          -- Round D (0059) adds the consent-guarded respond overload beside the
-          -- one the deployed app calls; delivery-db-step-0059-functions pins it.
-          and p.oid <> 'public.app_delivery_respond_by_token(text, text, timestamptz, text, text, text, text)'::regprocedure
         order by p.proname`,
     );
     expect(rows).toHaveLength(Object.keys(EXPECTED).length);
@@ -811,6 +810,13 @@ describe('the functions the deployed app calls kept their signatures', () => {
       });
     }
   });
+
+  // Round E (0060): the concept choice waits at most 4 s on the delivery row.
+  const CONFIG: Record<string, string[]> = {
+    app_delivery_choose_concept_by_token: ['lock_timeout=4s', 'search_path=""'],
+    app_delivery_notify_studio_by_token: ['search_path=""'],
+    app_delivery_act_notified_by_token: ['search_path=""'],
+  };
 
   it('runs the token functions as SECURITY DEFINER with an empty search_path, metra_app only', async () => {
     const rows = await raw.query<{
@@ -835,7 +841,7 @@ describe('the functions the deployed app calls kept their signatures', () => {
     expect(rows).toHaveLength(3);
     for (const row of rows) {
       expect(row.definer).toBe(true);
-      expect(row.config).toEqual(['search_path=""']);
+      expect([...(row.config ?? [])].sort(), row.name).toEqual(CONFIG[row.name]);
       expect(row.app_can_execute).toBe(true);
       expect(Number(row.public_grants)).toBe(0);
     }

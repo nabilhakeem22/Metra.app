@@ -7,10 +7,10 @@ import { clientPageRevision } from '@/lib/org/client-page-revision';
 import { NAMED_PHONES, NAMED_TEXTS, randomPhones, randomTexts } from './client-page-corpus';
 import { closeFixture, ctxFor, raw, seedOrg, teardown } from './fixture';
 
-// Round D, PR-D2 (AC C4): the tightened CHECKs are never stricter than the app.
-// Every input the Settings normaliser accepts, from the named w3a and
-// normaliser cases and thousands of seeded random strings, is SAVED through
-// the real core on the 0059 database; not one save may fail.
+// Round D, PR-D2 (AC C4) and Round E (K4): the CHECKs are never stricter than
+// the app. Every input the Settings normaliser accepts, from the named w3a,
+// normaliser and 0060 cases and thousands of seeded random strings, is SAVED
+// through the real core on the 0060 database; not one save may fail.
 
 const orgIds: string[] = [];
 afterAll(async () => {
@@ -45,7 +45,7 @@ function saveRows(accepted: Map<ClientPageField, string[]>): Array<Partial<Recor
   );
 }
 
-describe('C4: whatever the app accepts, the 0059 CHECKs keep', () => {
+describe('C4, K4: whatever the app accepts, the 0060 CHECKs keep', () => {
   it('saves every accepted input of the corpus, with no refusal from the database', async () => {
     const phones = [...NAMED_PHONES, ...randomPhones(1000, SEED)];
     const texts = [...NAMED_TEXTS, ...randomTexts(2000, SEED)];
@@ -55,6 +55,14 @@ describe('C4: whatever the app accepts, the 0059 CHECKs keep', () => {
     ]);
     // The corpus must exercise the rules, not just pass through them.
     expect(accepted.get('studioPhone')).toContain('+20 00 1012345678');
+    // K4: the 0060 cases reach the database (the +200 forms stored without their zeros).
+    for (const phone of ['+20 00 10 1234 5678', '+20 000 1012345678', '0020 0 10 1234 5678', '+200 10 1234 5678']) {
+      expect(accepted.get('studioPhone'), phone).toContain(phone);
+      expect(accepted.get('studioWhatsapp'), phone).toContain(phone);
+    }
+    for (const text of [`CIB${String.fromCodePoint(0x1d159)}`, `${String.fromCodePoint(0x2028)}CIB`, `CIB${String.fromCodePoint(0x2028)}`]) {
+      for (const field of TEXT_FIELDS) expect(accepted.get(field), field).toContain(text);
+    }
     for (const field of TEXT_FIELDS) expect(accepted.get(field)!.length, field).toBeGreaterThan(500);
     for (const field of PHONE_FIELDS) expect(accepted.get(field)!.length, field).toBeGreaterThan(100);
 

@@ -32,14 +32,6 @@ export async function respondSeen(
   return row.code;
 }
 
-/** The retired write (six arguments), as the code deployed before Round D Wave 3 calls it. */
-export async function respondLegacy(hash: string, action: string): Promise<string> {
-  const [row] = await raw.query<{ code: string }>(
-    `select public.app_delivery_respond_by_token('${hash}', '${action}', null, 'Client Sam', '1.2.3.4', 'probe/1') as code`,
-  );
-  return row.code;
-}
-
 /** Issue a band (as issueRomCore leaves it): low, high and the issuance stamp. */
 export async function issueBand(engagementId: string, low: number, high: number, atSql = 'now()'): Promise<void> {
   await raw.query(

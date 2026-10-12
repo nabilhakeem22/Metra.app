@@ -26,6 +26,10 @@ interface LockedDown {
 }
 
 const LOCKED_DOWN_IN_PLACE: readonly LockedDown[] = [
+  // Round E (S2): not new, but DROPPED and re-created on every run (a return
+  // type change), which resets the ACL exactly as a new function's.
+  { file: 'functions/00-org-context.sql', signature: 'public.app_current_user_orgs()', grantsApp: true },
+  { file: 'functions/00-org-context.sql', signature: 'public.app_claim_invitation(uuid)', grantsApp: true },
   {
     file: 'functions/40-delivery-read.sql',
     signature: 'public.app_concept_option_positions(uuid)',

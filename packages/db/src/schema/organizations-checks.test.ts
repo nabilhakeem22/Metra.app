@@ -4,9 +4,9 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { CLIENT_PAGE_CHECKS, NOT_VISIBLE } from './organizations-checks';
 
-// The 0059 CHECKs may be looser than the app's normaliser, never stricter. The
+// The 0060 CHECKs may be looser than the app's normaliser, never stricter. The
 // app keeps free text only when it holds a letter, digit, punctuation mark or
-// symbol other than the five blank-looking ones; so the CHECK's "one visible
+// symbol other than the six blank-looking ones; so the CHECK's "one visible
 // character" rule is safe exactly when NOT_VISIBLE holds none of those.
 
 const here = dirname(fileURLToPath(import.meta.url)); // packages/db/src/schema
@@ -26,21 +26,23 @@ function codePointsOf(characterClass: string): number[] {
   return covered;
 }
 
-/** The Braille blank and the Hangul fillers: letters and symbols that draw nothing. */
-const BLANK_LOOKING = [0x2800, 0x115f, 0x1160, 0x3164, 0xffa0];
+/** The Braille blank, the Hangul fillers and the musical null notehead: letters and symbols that draw nothing. */
+const BLANK_LOOKING = [0x2800, 0x115f, 0x1160, 0x3164, 0xffa0, 0x1d159];
 const SEEN_BY_THE_APP = /[\p{L}\p{N}\p{P}\p{S}]/u;
 const DRAWS_NOTHING = /[\p{Z}\p{Cc}\p{Cf}\p{M}\p{Co}\p{Cn}]/u;
 
-describe('NOT_VISIBLE (0059)', () => {
+describe('NOT_VISIBLE (0060)', () => {
   const covered = codePointsOf(NOT_VISIBLE);
 
   it('covers the white space, NEL, the blank-looking characters and the Arabic marks', () => {
     expect(covered).toEqual(expect.arrayContaining([0x20, 0xa0, 0x3000, 0x85, ...BLANK_LOOKING, 0x651, 0x64b, 0x670]));
     // Round D review (F2, L3): the selectors and fillers, private use and the noncharacters.
     expect(covered).toEqual(expect.arrayContaining([0xfe0f, 0xe0100, 0x180b, 0x17b4, 0x16fe4, 0x13440, 0xe000, 0x10fffd, 0xfdd0, 0xffff]));
+    // Round E (S3): the unassigned default-ignorables.
+    expect(covered).toEqual(expect.arrayContaining([0xfff0, 0xfff8, 0xe0000, 0xe0002, 0xe001f, 0xe0080, 0xe00ff, 0xe01f0, 0xe0fff]));
   });
 
-  it('holds no letter, digit, punctuation mark or symbol but the five blank-looking ones', () => {
+  it('holds no letter, digit, punctuation mark or symbol but the six blank-looking ones', () => {
     const visible = covered.filter(
       (codePoint) => SEEN_BY_THE_APP.test(String.fromCodePoint(codePoint)) && !BLANK_LOOKING.includes(codePoint),
     );
@@ -56,7 +58,7 @@ describe('NOT_VISIBLE (0059)', () => {
 });
 
 describe('the migration and the schema say the same thing', () => {
-  const migration = readFileSync(resolve(here, '../../migrations/0059_client_page_checks_tightened.sql'), 'utf8')
+  const migration = readFileSync(resolve(here, '../../migrations/0060_client_page_checks_round_e.sql'), 'utf8')
     .replace(/\r\n/g, '\n');
 
   for (const name of [
@@ -64,8 +66,29 @@ describe('the migration and the schema say the same thing', () => {
     'organizations_studio_whatsapp_format',
     'organizations_payment_text_printable',
   ] as const) {
-    it(`0059 adds ${name} with the schema's exact text`, () => {
+    it(`0060 adds ${name} with the schema's exact text`, () => {
       expect(migration).toContain(`ADD CONSTRAINT ${name}\n    CHECK (${CLIENT_PAGE_CHECKS[name]});`);
+    });
+  }
+});
+
+describe("the runbook's pre-check tests exactly what 0060 adds", () => {
+  const deploy = readFileSync(resolve(here, '../../../../docs/DEPLOY.md'), 'utf8').replace(/\r\n/g, '\n');
+  const fence = '```';
+  const start = deploy.indexOf(`${fence}sql\n-- 0060 step 2 (b): the studios a new CHECK would refuse. Expect 0 rows.\n`);
+  const preCheck = deploy.slice(start, deploy.indexOf(`\n${fence}`, start + fence.length));
+
+  it('docs/DEPLOY.md holds the 0060 step 2 (b) block', () => {
+    expect(start).toBeGreaterThan(-1);
+  });
+
+  for (const [name, column] of [
+    ['organizations_studio_phone_format', 'phone_ok'],
+    ['organizations_studio_whatsapp_format', 'whatsapp_ok'],
+    ['organizations_payment_text_printable', 'payment_text_ok'],
+  ] as const) {
+    it(`its ${column} column is ${name}, verbatim`, () => {
+      expect(preCheck).toContain(`coalesce(${CLIENT_PAGE_CHECKS[name]}, true) as ${column}`);
     });
   }
 });

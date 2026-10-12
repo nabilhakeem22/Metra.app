@@ -196,6 +196,12 @@ $$;
 --
 -- Round B (0056): a written message also refreshes design_engagements.updated_at.
 -- Signature and return type are unchanged.
+--
+-- LOCK TIMEOUT (Round E, D3 R2): the comment's insert and its closing touch of
+-- the delivery row wait at most 4 s on a studio transaction holding that row,
+-- then the call fails with 55P03 and rolls back whole, before the app's 15 s
+-- database deadline (the same setting as the respond, claim and choice writes
+-- in 50-delivery-write.sql).
 create or replace function public.app_delivery_comment_by_token(
   p_hash text,
   p_document_id uuid,
@@ -209,6 +215,7 @@ language plpgsql
 volatile
 security definer
 set search_path = ''
+set lock_timeout = '4s'
 as $$
 declare
   v_body  text;

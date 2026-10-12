@@ -1,5 +1,5 @@
-// The differential corpus for migration 0059 (AC C4): inputs a studio could
-// type or paste into the Settings card. Not a test file. Every value is built
+// The differential corpus for migrations 0059 and 0060 (AC C4, K4): inputs a
+// studio could type or paste into the Settings card. Not a test file. Every value is built
 // from code points, so no invisible character hides in this source.
 
 const cp = (...points: number[]) => String.fromCodePoint(...points);
@@ -14,6 +14,8 @@ export const NAMED_PHONES = [
   `${RLM}+20 10 1234 5678${LRM}`, '+44 20 7946 0958', '12', '123456', '1234567', '+1234567890123456',
   '010 1234 567x', '20+1012345678', '++201012345678', '19999',
   '+20 00 1012345678', '0020 00 10 1234 5678', '+20 0 0 12345678', '+200012345678', '+2001012345678',
+  // Round E (0060, K4): the trunk zeros the +200 CHECK refuses, as people type them.
+  '+20 00 10 1234 5678', '+20 000 1012345678', '0020 0 10 1234 5678', '+200 10 1234 5678',
 ];
 
 /** The w3a F8 values and ordinary studio text, Arabic with its marks included. */
@@ -26,6 +28,10 @@ export const NAMED_TEXTS = [
   // Round D review (F2, L3): selectors, fillers, private use and noncharacters, alone and with a letter.
   cp(0xfe0f, 0xfe0f), cp(0x17b4, 0x17b5), cp(0x34f, 0x13440), cp(0xe0100, 0xe0100), cp(0x180b, 0x180f),
   cp(0x16fe4, 0x16fe4), cp(0xe000, 0xe000), cp(0xffff, 0xffff), cp(0xfffc, 0xfffc), `CIB${cp(0xfe0f)}`, `CIB${cp(0xe000)}`,
+  // Round E (0060, K4): the musical null notehead beside a letter, and the line separators at the edges.
+  `CIB${cp(0x1d159)}`, `${cp(0x2028)}CIB`, `CIB${cp(0x2028)}`, `${cp(0x2029)}CIB${cp(0x2028)}`,
+  // Round E (S3): the unassigned default-ignorables, alone and beside a letter.
+  cp(0xfff0, 0xfff8), cp(0xe0002, 0xe0080), cp(0xe01f0, 0xe0fff), `CIB${cp(0xe0002)}`, `CIB${cp(0xfff0)}`,
 ];
 
 /** A seeded generator (mulberry32), so a failing case is reproducible from its seed. */

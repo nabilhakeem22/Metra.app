@@ -5,36 +5,19 @@
 -- (`drop ... if exists` / `create or replace` / `alter table ... enable`).
 -- A table's triggers live in the SAME file as its policies.
 -- rls/**.sql is exempt from the 150-line rule (stack-profile.md).
+--
+-- design_engagements COMES LAST (Round E, R1). apply-rls runs this file as ONE
+-- implicit transaction, and every table's `alter table ... enable` takes ACCESS
+-- EXCLUSIVE, held to the commit. lock_timeout bounds each WAIT, not the file,
+-- so a table locked early stays locked while the file waits on every table
+-- after it. design_engagements is the row every client write locks (and, since
+-- 0060, waits on for at most 4 s), so it is locked last: it is held only from
+-- its own statements to the commit, never behind a wait on another table.
 
 -- =============================================================================
 -- Design Engagements (Design-Engagement Machine, Step 1) — org isolation for the
 -- engagement record + its append-only transition ledger.
 -- =============================================================================
-
--- design_engagements
-alter table public.design_engagements enable row level security;
-alter table public.design_engagements force  row level security;
-drop policy if exists org_isolation on public.design_engagements;
-create policy org_isolation on public.design_engagements
-  using (
-    org_id = nullif(current_setting('app.current_org_id', true), '')::uuid
-    and public.app_is_current_org_member()
-  )
-  with check (
-    org_id = nullif(current_setting('app.current_org_id', true), '')::uuid
-    and public.app_is_current_org_member()
-  );
-
--- Round B (0056): a share link's nonce never outlives its hash. Any UPDATE that
--- changes token_hash without setting token_nonce clears the old nonce (see
--- clear_token_nonce_on_hash_change in functions/50-delivery-write.sql), so a
--- writer that predates the column, a rolled-back Worker included, can rotate
--- or revoke a link without tripping design_engagements_token_nonce_needs_hash.
-drop trigger if exists trg_design_engagements_token_nonce on public.design_engagements;
-create trigger trg_design_engagements_token_nonce
-  before update on public.design_engagements
-  for each row
-  execute function public.clear_token_nonce_on_hash_change();
 
 -- engagement_transitions (append-only via grants; org-isolated + membership-gated)
 alter table public.engagement_transitions enable row level security;
@@ -177,3 +160,28 @@ create policy org_isolation on public.engagement_document_comments
     org_id = nullif(current_setting('app.current_org_id', true), '')::uuid
     and public.app_is_current_org_member()
   );
+
+-- design_engagements
+alter table public.design_engagements enable row level security;
+alter table public.design_engagements force  row level security;
+drop policy if exists org_isolation on public.design_engagements;
+create policy org_isolation on public.design_engagements
+  using (
+    org_id = nullif(current_setting('app.current_org_id', true), '')::uuid
+    and public.app_is_current_org_member()
+  )
+  with check (
+    org_id = nullif(current_setting('app.current_org_id', true), '')::uuid
+    and public.app_is_current_org_member()
+  );
+
+-- Round B (0056): a share link's nonce never outlives its hash. Any UPDATE that
+-- changes token_hash without setting token_nonce clears the old nonce (see
+-- clear_token_nonce_on_hash_change in functions/50-delivery-write.sql), so a
+-- writer that predates the column, a rolled-back Worker included, can rotate
+-- or revoke a link without tripping design_engagements_token_nonce_needs_hash.
+drop trigger if exists trg_design_engagements_token_nonce on public.design_engagements;
+create trigger trg_design_engagements_token_nonce
+  before update on public.design_engagements
+  for each row
+  execute function public.clear_token_nonce_on_hash_change();

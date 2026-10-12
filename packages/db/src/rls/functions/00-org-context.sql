@@ -128,6 +128,31 @@ as $$
   where m.user_id = nullif(current_setting('app.current_user_id', true), '')::uuid
 $$;
 
+-- Locked down in the SAME implicit transaction as the drop and CREATE above
+-- (Round E, S2): the drop resets the ACL to the default EXECUTE for PUBLIC (and,
+-- on Supabase, the API roles), and roles.sql, which revokes that too, runs
+-- several files later in its own transaction; a run that failed in between
+-- left it open. The metra_app grant is guarded because on a fresh database
+-- roles.sql, which creates that role, has not run yet.
+revoke all on function public.app_current_user_orgs() from public;
+do $$
+declare
+  r text;
+begin
+  foreach r in array array['anon', 'authenticated', 'service_role'] loop
+    if exists (select 1 from pg_roles where rolname = r) then
+      execute format(
+        'revoke all on function public.app_current_user_orgs() from %I',
+        r
+      );
+    end if;
+  end loop;
+  if exists (select 1 from pg_roles where rolname = 'metra_app') then
+    grant execute on function public.app_current_user_orgs() to metra_app;
+  end if;
+end
+$$;
+
 -- ===========================================================================
 -- Membership second factor for RLS. These run inside the request transaction
 -- (as metra_app, which is granted execute) and read the request GUCs. SECURITY
@@ -201,6 +226,32 @@ as $$
      and org_id = nullif(current_setting('app.current_org_id', true), '')::uuid
      and lower(email) = lower(nullif(current_setting('app.current_user_email', true), ''))
    returning id;
+$$;
+
+-- Locked down in the SAME implicit transaction as the drop and CREATE above,
+-- for the same reason as app_current_user_orgs
+-- (Round E, S2): the drop resets the ACL to the default EXECUTE for PUBLIC (and,
+-- on Supabase, the API roles), and roles.sql, which revokes that too, runs
+-- several files later in its own transaction; a run that failed in between
+-- left it open. The metra_app grant is guarded because on a fresh database
+-- roles.sql, which creates that role, has not run yet.
+revoke all on function public.app_claim_invitation(uuid) from public;
+do $$
+declare
+  r text;
+begin
+  foreach r in array array['anon', 'authenticated', 'service_role'] loop
+    if exists (select 1 from pg_roles where rolname = r) then
+      execute format(
+        'revoke all on function public.app_claim_invitation(uuid) from %I',
+        r
+      );
+    end if;
+  end loop;
+  if exists (select 1 from pg_roles where rolname = 'metra_app') then
+    grant execute on function public.app_claim_invitation(uuid) to metra_app;
+  end if;
+end
 $$;
 
 -- Account bootstrap (Epic A, A1). Mint ONE fresh, UNLINKED account row and return

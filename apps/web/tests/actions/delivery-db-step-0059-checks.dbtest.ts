@@ -40,8 +40,8 @@ describe('C1, C2: the studio numbers', () => {
     for (const refused of ['+0000000', '1234567', '+0201012345678', '12345678', '+1234567']) {
       expect(await refusal(`studio_phone = ${quoted(refused)}`), refused).toBe('organizations_studio_phone_format');
     }
-    // +2001012345678 is what the app stores for "+20 00 1012345678" (deviation D1): looser, never stricter.
-    for (const kept of ['+201012345678', '01012345678', '0223456789', '+447911123456', '022345678', '+2001012345678']) {
+    // Round E (0060) refuses +200...: the app has stored "+20 00 1012345678" as +201012345678 since Round D Wave 3.
+    for (const kept of ['+201012345678', '01012345678', '0223456789', '+447911123456', '022345678']) {
       expect(await refusal(`studio_phone = ${quoted(kept)}`), kept).toBe('ok');
     }
   });
@@ -50,7 +50,7 @@ describe('C1, C2: the studio numbers', () => {
     for (const refused of ['0223456789', '1012345678', '+0201012345678']) {
       expect(await refusal(`studio_whatsapp = ${quoted(refused)}`), refused).toBe('organizations_studio_whatsapp_format');
     }
-    for (const kept of ['01012345678', '+201012345678', '+447911123456', '+2001012345678']) {
+    for (const kept of ['01012345678', '+201012345678', '+447911123456']) {
       expect(await refusal(`studio_whatsapp = ${quoted(kept)}`), kept).toBe('ok');
     }
   });
