@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import type { CSSProperties, ReactNode } from 'react';
 import { LandingNav } from '@/components/landing/landing-nav';
+import { ScopedIntlProvider } from '@/i18n/scoped-intl-provider';
 import { PRIVATE_METADATA } from '@/lib/seo/private-metadata';
 import '../landing.css';
 
@@ -28,9 +29,11 @@ export const metadata: Metadata = PRIVATE_METADATA;
  */
 export default function AuthLayout({ children }: { children: ReactNode }) {
   return (
-    <div className="landing" style={{ '--auth-chrome': '64px' } as CSSProperties}>
-      <LandingNav variant="return" />
-      {children}
-    </div>
+    <ScopedIntlProvider scope="auth">
+      <div className="landing" style={{ '--auth-chrome': '64px' } as CSSProperties}>
+        <LandingNav variant="return" />
+        {children}
+      </div>
+    </ScopedIntlProvider>
   );
 }

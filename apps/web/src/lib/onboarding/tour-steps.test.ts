@@ -22,11 +22,11 @@ describe('TOUR_STEPS', () => {
     expect(stepsForPage('/engagements/').map((step) => step.id)).toEqual(['deliveries']);
   });
 
-  it('every step has its title and body in both catalogs', () => {
+  it('every step has its title and body under `tour` in both catalogs', () => {
     for (const step of TOUR_STEPS) {
       for (const key of [step.titleKey, step.bodyKey]) {
-        expect(typeof lookup(en, key), `en ${key}`).toBe('string');
-        expect(typeof lookup(ar, key), `ar ${key}`).toBe('string');
+        expect(typeof lookup(en.tour, key), `en tour.${key}`).toBe('string');
+        expect(typeof lookup(ar.tour, key), `ar tour.${key}`).toBe('string');
       }
     }
   });

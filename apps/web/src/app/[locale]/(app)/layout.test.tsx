@@ -16,10 +16,13 @@ vi.mock('@/lib/notifications/queries', () => bell);
 
 afterEach(() => vi.restoreAllMocks());
 
+/** The AppShell's props, inside the studio's message scope (src/i18n/client-namespaces.ts). */
 async function shellProps(): Promise<Record<string, unknown>> {
   const element = await AppLayout({ children: null });
   expect(isValidElement(element)).toBe(true);
-  return (element as ReactElement<Record<string, unknown>>).props;
+  const provider = element as ReactElement<{ scope: string; children: ReactElement<Record<string, unknown>> }>;
+  expect(provider.props.scope).toBe('studio');
+  return provider.props.children.props;
 }
 
 describe('AppLayout: the bell never takes the shell down (R6)', () => {

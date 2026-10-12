@@ -8,6 +8,7 @@ export interface TourStep {
   page: string;
   /** The `data-tour` value of the element to spotlight. */
   anchor: string;
+  /** Keys under the `tour` namespace (the coachmark reads only that one). */
   titleKey: string;
   bodyKey: string;
   placement?: 'top' | 'bottom' | 'start' | 'end';
@@ -15,10 +16,10 @@ export interface TourStep {
 }
 
 export const TOUR_STEPS: TourStep[] = [
-  { id: 'welcome', page: '/dashboard', anchor: 'dashboard-checklist', titleKey: 'tour.welcome.title', bodyKey: 'tour.welcome.body', placement: 'bottom', order: 1 },
-  { id: 'clients', page: '/clients', anchor: 'clients-new', titleKey: 'tour.clients.title', bodyKey: 'tour.clients.body', placement: 'bottom', order: 2 },
-  { id: 'projects', page: '/projects', anchor: 'projects-new', titleKey: 'tour.projects.title', bodyKey: 'tour.projects.body', placement: 'bottom', order: 3 },
-  { id: 'deliveries', page: '/engagements', anchor: 'engagements-new', titleKey: 'tour.deliveries.title', bodyKey: 'tour.deliveries.body', placement: 'bottom', order: 4 },
+  { id: 'welcome', page: '/dashboard', anchor: 'dashboard-checklist', titleKey: 'welcome.title', bodyKey: 'welcome.body', placement: 'bottom', order: 1 },
+  { id: 'clients', page: '/clients', anchor: 'clients-new', titleKey: 'clients.title', bodyKey: 'clients.body', placement: 'bottom', order: 2 },
+  { id: 'projects', page: '/projects', anchor: 'projects-new', titleKey: 'projects.title', bodyKey: 'projects.body', placement: 'bottom', order: 3 },
+  { id: 'deliveries', page: '/engagements', anchor: 'engagements-new', titleKey: 'deliveries.title', bodyKey: 'deliveries.body', placement: 'bottom', order: 4 },
 ];
 
 function normalizePath(pathname: string): string {

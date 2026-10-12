@@ -83,7 +83,7 @@ export function CoachmarkCard({
   total: number;
   controls: CoachmarkControls;
 }) {
-  const t = useTranslations();
+  const t = useTranslations('tour');
   useCoachmarkFocusTrap(cardRef, true, controls);
   const titleId = `tour-${step.id}-title`;
   const isLast = index >= total - 1;
@@ -103,19 +103,19 @@ export function CoachmarkCard({
       <p className="mt-1 text-body text-muted-foreground">{t(step.bodyKey)}</p>
       <div className="mt-3 flex items-center justify-between gap-2">
         <span className="text-caption text-muted-foreground">
-          {t('tour.stepOf', { current: index + 1, total })}
+          {t('stepOf', { current: index + 1, total })}
         </span>
         <div className="flex items-center gap-2">
           <Button type="button" variant="ghost" size="sm" onClick={controls.stop}>
-            {t('tour.skip')}
+            {t('skip')}
           </Button>
           {index > 0 && (
             <Button type="button" variant="secondary" size="sm" onClick={controls.prev}>
-              {t('tour.back')}
+              {t('back')}
             </Button>
           )}
           <Button variant="default" type="button" size="sm" onClick={controls.next}>
-            {isLast ? t('tour.done') : t('tour.next')}
+            {isLast ? t('done') : t('next')}
           </Button>
         </div>
       </div>

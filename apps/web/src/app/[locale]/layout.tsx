@@ -1,11 +1,11 @@
 import type { Metadata } from 'next';
-import { NextIntlClientProvider } from 'next-intl';
-import { getMessages, getTranslations } from 'next-intl/server';
+import { getTranslations } from 'next-intl/server';
 import { Manrope, Tajawal } from 'next/font/google';
 import { notFound } from 'next/navigation';
 import type { ReactNode } from 'react';
 import { ThemeProvider } from '@/components/theme-provider';
 import { LOCALES, dirFor, type Locale } from '@/i18n/routing';
+import { ScopedIntlProvider } from '@/i18n/scoped-intl-provider';
 import { getSiteUrl } from '@/lib/seo/site-url';
 import '../globals.css';
 
@@ -61,8 +61,6 @@ export default async function LocaleLayout({
     notFound();
   }
 
-  const messages = await getMessages();
-
   return (
     <html
       lang={locale}
@@ -78,9 +76,8 @@ export default async function LocaleLayout({
           disableTransitionOnChange
           value={{ light: 'light', dark: 'dark' }}
         >
-          <NextIntlClientProvider messages={messages}>
-            {children}
-          </NextIntlClientProvider>
+          {/* Each route group scopes its own (src/i18n/client-namespaces.ts). */}
+          <ScopedIntlProvider scope="root">{children}</ScopedIntlProvider>
         </ThemeProvider>
       </body>
     </html>

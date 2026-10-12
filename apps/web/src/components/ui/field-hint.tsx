@@ -31,7 +31,7 @@ export function FieldHint({
   id?: string;
   className?: string;
 }) {
-  const t = useTranslations();
+  const t = useTranslations('common');
   const [open, setOpen] = useState(false);
 
   return (
@@ -39,7 +39,7 @@ export function FieldHint({
       <Tooltip open={open} onOpenChange={setOpen}>
         <TooltipTrigger
           type="button"
-          aria-label={t('common.hint')}
+          aria-label={t('hint')}
           onClick={() => setOpen((v) => !v)}
           className={cn(
             'relative ms-1 inline-flex size-4 shrink-0 items-center justify-center rounded-full border border-border text-caption font-semibold leading-none text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',

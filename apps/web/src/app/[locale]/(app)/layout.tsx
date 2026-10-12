@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import type { ReactNode } from 'react';
 import { AppShell } from '@/components/shell/app-shell';
+import { ScopedIntlProvider } from '@/i18n/scoped-intl-provider';
 import { requireOrg } from '@/lib/auth/require-org';
 import { getSessionUser } from '@/lib/auth/session';
 import { loadShellNotificationFeed } from '@/lib/notifications/feed';
@@ -33,16 +34,18 @@ export default async function AppLayout({
   const onboarding = readOnboarding(user?.user_metadata);
 
   return (
-    <AppShell
-      email={user?.email}
-      role={ctx.role}
-      orgs={orgs}
-      activeOrgId={ctx.orgId}
-      notificationFeed={notificationFeed}
-      tourSeen={!!onboarding.tourSeen}
-      tourStep={onboarding.tourStep ?? null}
-    >
-      {children}
-    </AppShell>
+    <ScopedIntlProvider scope="studio">
+      <AppShell
+        email={user?.email}
+        role={ctx.role}
+        orgs={orgs}
+        activeOrgId={ctx.orgId}
+        notificationFeed={notificationFeed}
+        tourSeen={!!onboarding.tourSeen}
+        tourStep={onboarding.tourStep ?? null}
+      >
+        {children}
+      </AppShell>
+    </ScopedIntlProvider>
   );
 }
