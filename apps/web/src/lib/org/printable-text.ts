@@ -1,6 +1,6 @@
 // What counts as text a client can read and copy (Round C, C8 fix round F8).
-// PURE and CLIENT-SAFE. 0058's printable CHECK refuses format characters and
-// white-space-only values; this is stricter, so a value the app accepts always
+// PURE and CLIENT-SAFE. The database's printable CHECK (0060) mirrors these
+// rules and may be looser, never stricter; here, a value the app accepts always
 // shows the client something: no control characters (NUL included, which
 // Postgres refuses outright, and the line and paragraph separators), no lone
 // surrogates (which Postgres would quietly replace), and at least one visible character, which the blank-looking letters
@@ -26,7 +26,7 @@ const LONE_SURROGATE = /\p{Cs}/u;
 
 /** Letters and symbols that draw nothing: the Braille blank, the Hangul fillers and the musical
  * null notehead (D3 L5; alternatives, not a class: two Hangul fillers in a class would read as
- * one syllable). Stricter than the 0059 CHECK, which is allowed: the app may refuse more. */
+ * one syllable). The 0060 CHECK's BLANK_LOOKING holds the same six (organizations-checks.ts). */
 const BLANK_LOOKING = /\u{2800}|\u{115F}|\u{1160}|\u{3164}|\u{FFA0}|\u{1D159}/gu;
 
 /** One character a reader sees: a letter, a digit, punctuation or a symbol. */

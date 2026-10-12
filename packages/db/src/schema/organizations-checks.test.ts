@@ -69,3 +69,24 @@ describe('the migration and the schema say the same thing', () => {
     });
   }
 });
+
+describe("the runbook's pre-check tests exactly what 0060 adds", () => {
+  const deploy = readFileSync(resolve(here, '../../../../docs/DEPLOY.md'), 'utf8').replace(/\r\n/g, '\n');
+  const fence = '```';
+  const start = deploy.indexOf(`${fence}sql\n-- 0060 step 2 (b): the studios a new CHECK would refuse. Expect 0 rows.\n`);
+  const preCheck = deploy.slice(start, deploy.indexOf(`\n${fence}`, start + fence.length));
+
+  it('docs/DEPLOY.md holds the 0060 step 2 (b) block', () => {
+    expect(start).toBeGreaterThan(-1);
+  });
+
+  for (const [name, column] of [
+    ['organizations_studio_phone_format', 'phone_ok'],
+    ['organizations_studio_whatsapp_format', 'whatsapp_ok'],
+    ['organizations_payment_text_printable', 'payment_text_ok'],
+  ] as const) {
+    it(`its ${column} column is ${name}, verbatim`, () => {
+      expect(preCheck).toContain(`coalesce(${CLIENT_PAGE_CHECKS[name]}, true) as ${column}`);
+    });
+  }
+});

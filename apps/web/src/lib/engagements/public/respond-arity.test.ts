@@ -3,10 +3,10 @@ import { join, relative } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 // Round D (AC A4): app code calls ONLY the seven-argument, consent-guarded
-// app_delivery_respond_by_token. The six-argument function stays in the
-// database until the next DB step (an older Worker version still calls it
-// during the rollback window), and it records consent to whatever is on file
-// NOW, so a call to it would silently bring the stale-tab consent back. Read
+// app_delivery_respond_by_token. The six-argument function is DROPPED by the
+// Round E database step (0060), so a call to it fails with 42883; the guard
+// stays so such a call never comes back (and the SQL side has its own guard,
+// packages/db/src/rls/retired-functions.test.ts). Read
 // from the source of the app, the packages and the scripts (.ts, .tsx, .js,
 // .mjs, .cjs; tests aside), and any spelling of the call: a quoted name, or
 // white space before the parenthesis (D3 F8, L3).
