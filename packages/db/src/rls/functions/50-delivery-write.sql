@@ -41,165 +41,12 @@
 --
 -- Every successful write also refreshes `design_engagements.updated_at`, so the
 -- studio's newest-first lists surface the delivery the client just acted on.
--- Signature and return type are unchanged since Phase 2.
 --
--- RETIRED for app use from Round D Wave 3; dropped at the next DB step. The
--- seven-argument overload below is the same write plus the consent guard; this
--- one stays only so the code deployed before Wave 3 keeps working.
-create or replace function public.app_delivery_respond_by_token(
-  p_hash text,
-  p_action text,
-  p_note text,
-  p_name text,
-  p_ip text,
-  p_ua text
-)
-returns text
-language plpgsql
-volatile
-security definer
-set search_path = ''
-as $$
-declare
-  v_kind    public.engagement_event_kind;
-  st        text;
-  exp       timestamptz;
-  eid       uuid;
-  oid       uuid;
-  rl        numeric;
-  rh        numeric;
-  ri        timestamptz;
-  rr        timestamptz;
-  ok_state  boolean;
-begin
-  -- Map the client-facing verb to the ledger event kind (unknown verb -> invalid).
-  v_kind := case p_action
-    when 'approve_concept'         then 'concept_approval'
-    when 'request_concept_changes' then 'concept_change_request'
-    when 'approve_design'          then 'design_approval'
-    when 'request_design_changes'  then 'design_change_request'
-    when 'acknowledge_rom'         then 'rom_acknowledgement'
-    when 'acknowledge_handoff'     then 'handoff_acknowledgement'
-    else null
-  end::public.engagement_event_kind;
-  if v_kind is null then return 'invalid'; end if;
-
-  -- The row lock, taken BEFORE the read, for acknowledge_rom and for every
-  -- DECISION verb. acknowledge_rom: its precondition is that the band is issued,
-  -- and a concurrent setEngagementRom clears rom_issued_at, so an unlocked read
-  -- could witness the client's consent to a band that stopped existing between
-  -- the check and the INSERT. The decisions: approve and request-changes are
-  -- two KINDS, so the partial unique indexes cannot stop one of each landing in
-  -- the same round from two tabs; serialising on the delivery row makes the
-  -- `already` pre-check below see the first one. It also pins renders_ready_at
-  -- for the duration, so the round a decision records is the round it checked.
-  -- acknowledge_handoff gates only on `state`, which the transitions serialise.
-  if p_action <> 'acknowledge_handoff' then
-    perform 1 from public.design_engagements where token_hash = p_hash for update;
-  end if;
-
-  select state, share_expires_at, id, org_id, rom_low, rom_high, rom_issued_at,
-         renders_ready_at
-    into st, exp, eid, oid, rl, rh, ri, rr
-    from public.design_engagements
-    where token_hash = p_hash;
-  if not found then return 'invalid'; end if;
-  if exp is not null and exp <= now() then return 'expired'; end if;
-  if st in ('closed_design_only', 'execution', 'abandoned') then
-    return 'not_active';
-  end if;
-
-  -- Required precondition per action. Append-only either way: a change-request is a
-  -- witness, NOT a state move — the firm decides what to do about it.
-  ok_state := case p_action
-    when 'approve_concept'         then st = 'concept_review'
-    when 'request_concept_changes' then st = 'concept_review'
-    when 'approve_design'          then st = 'final_approval'
-    when 'request_design_changes'  then st = 'final_approval'
-    -- An unissued band is not acknowledgeable: falls through to 'wrong_state',
-    -- the same answer the client already gets for any verb offered too early.
-    when 'acknowledge_rom'         then rl is not null and rh is not null
-                                        and ri is not null
-    when 'acknowledge_handoff'     then st = 'design_only_handoff'
-    else false
-  end;
-  if not ok_state then return 'wrong_state'; end if;
-
-  -- At most one client DECISION per group per engagement: approve vs
-  -- request-changes on the same concept (or design) are mutually exclusive — the
-  -- read model + UI treat them as one decision, so the write path must too.
-  -- ROM/handoff acks are per-kind. This pre-check + the partial UNIQUE index
-  -- (0033, keyed on the decision group) make a concurrent double-click land
-  -- exactly one row.
-  --
-  -- Round B: only a LIVE client event repeats. One the studio retracted (an
-  -- event_correction points at it) answers nothing, exactly as liveEvents()
-  -- drops it in the studio's TS rule. A retracted row can still hold the unique
-  -- slot this insert would take; the insert then hits unique_violation and
-  -- answers `already`, and app_delivery_by_token does not offer that verb.
-  if exists (
-    select 1 from public.engagement_events ee
-    where ee.engagement_id = eid and ee.actor_channel = 'client'
-      and not exists (
-        select 1 from public.engagement_events c
-        where c.org_id = ee.org_id and c.supersedes_event_id = ee.id
-      )
-      and case
-        when v_kind in ('concept_approval', 'concept_change_request')
-          then ee.kind in ('concept_approval', 'concept_change_request')
-        -- Round B: a design decision is per RENDER ISSUANCE. A decision stamped
-        -- with this round's instant repeats; so does a legacy unstamped one made
-        -- at or after it. With no issuance at all both sides are NULL and the
-        -- first branch keeps the old one-per-delivery rule.
-        when v_kind in ('design_approval', 'design_change_request')
-          then ee.kind in ('design_approval', 'design_change_request')
-           and (
-             ee.acknowledged_issue_at is not distinct from rr
-             or (ee.acknowledged_issue_at is null and rr is not null
-                 and ee.decided_at >= rr)
-           )
-        -- 0049: a ROM acknowledgement is per ISSUANCE, not per engagement. Only
-        -- an acknowledgement of THIS issuance instant is a repeat; one against a
-        -- superseded band (or a legacy NULL) leaves the verb open.
-        when v_kind = 'rom_acknowledgement'
-          then ee.kind = v_kind and ee.acknowledged_issue_at is not distinct from ri
-        else ee.kind = v_kind
-      end
-  ) then
-    return 'already';
-  end if;
-
-  begin
-    insert into public.engagement_events
-      (id, org_id, engagement_id, kind, actor_channel, actor_name, actor_ip,
-       actor_user_agent, note, range_low, range_high, acknowledged_issue_at)
-      values (
-        gen_random_uuid(), oid, eid, v_kind, 'client', p_name, p_ip, p_ua,
-        left(p_note, 2000),
-        case when v_kind = 'rom_acknowledgement' then rl else null end,
-        case when v_kind = 'rom_acknowledgement' then rh else null end,
-        -- 0049: WHICH issuance this answers. `ri` and `rr` were read under the
-        -- row lock taken above, so each is the instant the pre-check compared.
-        case
-          when v_kind = 'rom_acknowledgement' then ri
-          when v_kind in ('design_approval', 'design_change_request') then rr
-          else null
-        end
-      );
-  exception when unique_violation then
-    return 'already';
-  end;
-
-  update public.design_engagements set updated_at = now() where id = eid;
-  return 'ok';
-end
-$$;
-
--- Round D (0059): THE CONSENT GUARD. The six-argument write above, plus
--- p_expected_issue_at: the issuance the client SAW when they tapped, echoed
--- back from app_delivery_by_token (rom.issued_at for the band,
--- renders_issued_at for the render round). It is compared UNDER THE ROW LOCK,
--- after the state checks and BEFORE the `already` pre-check:
+-- Round D (0059): THE CONSENT GUARD. p_expected_issue_at is the issuance the
+-- client SAW when they tapped, echoed back from app_delivery_by_token
+-- (rom.issued_at for the band, renders_issued_at for the render round). It is
+-- compared UNDER THE ROW LOCK, after the state checks and BEFORE the `already`
+-- pre-check:
 --   acknowledge_rom                          p_expected_issue_at must equal
 --                                            rom_issued_at (null while the band
 --                                            is issued is a mismatch)
@@ -223,11 +70,26 @@ $$;
 -- app_delivery_choose_concept_by_token (120 / 45 / 512) and the note at 2,000
 -- characters: this function is the trust boundary for what reaches the
 -- append-only ledger. Codes: ok | already | expired | not_active | wrong_state |
--- invalid (the six-argument set, unchanged).
+-- invalid (Phase 2's set, unchanged).
 --
--- AN OVERLOAD, not a replacement: CREATE OR REPLACE cannot add an argument, and
--- dropping the six-argument function in the same step would break the code
--- deployed until Round D Wave 3.
+-- THE DROP (0060, Round E). Phase 2's six-argument function (no
+-- p_expected_issue_at) was retired from app use by Round D Wave 3 and is
+-- dropped here: no Worker version since then calls it
+-- (apps/web/src/lib/engagements/public/respond-arity.test.ts), and left in
+-- place it could record consent to a band or a round nobody compared.
+-- CREATE OR REPLACE cannot remove an argument, so it is an explicit DROP;
+-- `if exists` keeps apply-rls re-runnable. packages/db/src/rls/
+-- retired-functions.test.ts keeps it from coming back. A Worker older than
+-- Round D Wave 3 answers 42883 on every review act from here on.
+--
+-- LOCK TIMEOUT (Round E, D3 R2). The row lock below waits at most 4 s, then
+-- the call fails with 55P03 and rolls back whole. The portal's one-tap
+-- approve and budget is two of these calls, so 2 x 4 s stays under the app's
+-- 15 s database deadline (CF_DB_DEADLINE_MS): the write fails and rolls back
+-- BEFORE the app gives up on it, and a client is never told "try again" about
+-- a write that later commits. The setting holds only inside this function;
+-- the caller's own lock_timeout is restored on exit.
+drop function if exists public.app_delivery_respond_by_token(text, text, text, text, text, text);
 create or replace function public.app_delivery_respond_by_token(
   p_hash text,
   p_action text,
@@ -242,6 +104,7 @@ language plpgsql
 volatile
 security definer
 set search_path = ''
+set lock_timeout = '4s'
 as $$
 declare
   v_kind    public.engagement_event_kind;
@@ -266,9 +129,17 @@ begin
   end::public.engagement_event_kind;
   if v_kind is null then return 'invalid'; end if;
 
-  -- The row lock, for the reasons the six-argument function gives. It also
-  -- pins rom_issued_at and renders_ready_at, so the instant the guard compares
-  -- is the instant the row records.
+  -- The row lock, taken BEFORE the read, for acknowledge_rom and for every
+  -- DECISION verb. acknowledge_rom: its precondition is that the band is issued,
+  -- and a concurrent setEngagementRom clears rom_issued_at, so an unlocked read
+  -- could witness the client's consent to a band that stopped existing between
+  -- the check and the INSERT. The decisions: approve and request-changes are
+  -- two KINDS, so the partial unique indexes cannot stop one of each landing in
+  -- the same round from two tabs; serialising on the delivery row makes the
+  -- `already` pre-check below see the first one. It also pins rom_issued_at
+  -- and renders_ready_at, so the round a decision records is the round it
+  -- checked, and the instant the guard compares is the instant the row records.
+  -- acknowledge_handoff gates only on `state`, which the transitions serialise.
   if p_action <> 'acknowledge_handoff' then
     perform 1 from public.design_engagements where token_hash = p_hash for update;
   end if;
@@ -305,9 +176,22 @@ begin
     return 'wrong_state';
   end if;
 
-  -- The six-argument function's `already` rule, unchanged: one live client
-  -- decision per group (per render issuance for the design pair), one ROM
-  -- acknowledgement per issuance, and a retracted row answers nothing.
+  -- At most one client DECISION per group per engagement: approve vs
+  -- request-changes on the same concept (or design) are mutually exclusive (the
+  -- read model and the UI treat them as one decision, so the write path must
+  -- too). ROM and handoff acks are per kind. This pre-check plus the partial
+  -- UNIQUE index (0033, keyed on the decision group) make a concurrent
+  -- double-click land exactly one row.
+  --
+  -- Round B: only a LIVE client event repeats. One the studio retracted (an
+  -- event_correction points at it) answers nothing, exactly as liveEvents()
+  -- drops it in the studio's TS rule. A retracted row can still hold the unique
+  -- slot this insert would take; the insert then hits unique_violation and
+  -- answers `already`, and app_delivery_by_token does not offer that verb.
+  -- A design decision is per RENDER ISSUANCE (a legacy unstamped one made at or
+  -- after it repeats too; with no issuance at all both sides are NULL and the
+  -- old one-per-delivery rule holds), and a ROM acknowledgement per band
+  -- ISSUANCE (0049).
   if exists (
     select 1 from public.engagement_events ee
     where ee.engagement_id = eid and ee.actor_channel = 'client'
@@ -398,6 +282,11 @@ $$;
 -- milestone is a real, unsettled milestone with remaining due > 0", NOT on "is it
 -- the first unsettled". At most one OPEN claim per (engagement, milestone) — the
 -- exists pre-check + the partial UNIQUE index (0034) make a double-click land one row.
+--
+-- LOCK TIMEOUT (Round E, D3 R2): the claim's insert and its closing touch of
+-- the delivery row wait at most 4 s on a studio transaction holding that row,
+-- then the call fails with 55P03 and rolls back whole, before the app's 15 s
+-- database deadline, exactly as app_delivery_respond_by_token above.
 create or replace function public.app_delivery_claim_payment_by_token(
   p_hash text,
   p_milestone_kind text,
@@ -411,6 +300,7 @@ language plpgsql
 volatile
 security definer
 set search_path = ''
+set lock_timeout = '4s'
 as $$
 declare
   st        text;
@@ -532,6 +422,10 @@ $$;
 -- dropped rather than left as an overload that could save a choice without the
 -- letter the client saw (the pairs CHECK would refuse that insert anyway).
 -- CREATE OR REPLACE cannot add an argument: a new signature is a new function.
+--
+-- LOCK TIMEOUT (Round E, D3 R2): the row lock waits at most 4 s, then the call
+-- fails with 55P03 and rolls back whole, before the app's 15 s database
+-- deadline, exactly as app_delivery_respond_by_token above.
 drop function if exists public.app_delivery_choose_concept_by_token(text, uuid, text, text, text, text);
 create or replace function public.app_delivery_choose_concept_by_token(
   p_hash text,
@@ -547,6 +441,7 @@ language plpgsql
 volatile
 security definer
 set search_path = ''
+set lock_timeout = '4s'
 as $$
 declare
   st   text;

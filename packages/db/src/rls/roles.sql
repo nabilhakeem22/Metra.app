@@ -338,10 +338,8 @@ grant execute on function public.app_delivery_by_token(text) to metra_app;
 revoke execute on function public.app_delivery_by_token(text) from public;
 grant execute on function public.app_delivery_document_by_token(text, uuid) to metra_app;
 revoke execute on function public.app_delivery_document_by_token(text, uuid) from public;
-grant execute on function public.app_delivery_respond_by_token(text, text, text, text, text, text) to metra_app;
-revoke execute on function public.app_delivery_respond_by_token(text, text, text, text, text, text) from public;
--- Round D (0059): the consent-guarded overload of the respond write (the
--- six-argument one above is retired from Round D Wave 3). Also locked down in
+-- The respond write takes the issuance the client saw (Round D, 0059); its
+-- six-argument predecessor is dropped (Round E, 0060). Also locked down in
 -- place, right after its CREATE (50-delivery-write.sql).
 grant execute on function public.app_delivery_respond_by_token(text, text, timestamptz, text, text, text, text) to metra_app;
 revoke execute on function public.app_delivery_respond_by_token(text, text, timestamptz, text, text, text, text) from public;
@@ -485,10 +483,6 @@ begin
       );
       execute format(
         'revoke execute on function public.app_delivery_document_by_token(text, uuid) from %I',
-        r
-      );
-      execute format(
-        'revoke execute on function public.app_delivery_respond_by_token(text, text, text, text, text, text) from %I',
         r
       );
       execute format(
