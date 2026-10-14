@@ -1,3 +1,4 @@
+import type { ShownFailure } from '@/lib/actions/error-message';
 import type { ActionCode } from '@/lib/actions/result';
 import type { DeliveryReminder } from '@/lib/engagements/reminder/prepare';
 
@@ -12,7 +13,12 @@ export type ReminderView =
   | { status: 'notShared' }
   | { status: 'notConfigured' }
   | { status: 'unrecoverable' }
-  | { status: 'failed'; error: ActionCode };
+  | { status: 'failed'; failure: ShownFailure };
+
+/** A reminder load as it came back: an answer, or a promise that never answered. */
+export type ReminderLoad =
+  | { ok: boolean; error?: ActionCode; reference?: string; data?: DeliveryReminder }
+  | { ok: false; rejection: unknown };
 
 export const VIEW_OF_REFUSAL: Partial<Record<ActionCode, ReminderView>> = {
   delivery_link_not_shared: { status: 'notShared' },
@@ -24,12 +30,11 @@ export const VIEW_OF_REFUSAL: Partial<Record<ActionCode, ReminderView>> = {
  * The view a reminder load answers. `afterReplace`: a link just replaced that
  * STILL cannot be re-created is a dead end, not an invitation to replace again.
  */
-export function reminderViewOf(
-  result: { ok: boolean; error?: ActionCode; data?: DeliveryReminder },
-  afterReplace: boolean,
-): ReminderView {
+export function reminderViewOf(result: ReminderLoad, afterReplace: boolean): ReminderView {
+  if ('rejection' in result) return { status: 'failed', failure: { rejection: result.rejection } };
   if (result.ok && result.data) return { status: 'ready', reminder: result.data };
-  const error = result.error ?? 'generic';
+  const { error, reference } = result;
   const loops = afterReplace && error === 'delivery_link_unrecoverable';
-  return (!loops && VIEW_OF_REFUSAL[error]) || { status: 'failed', error };
+  const refusalView = error && !loops ? VIEW_OF_REFUSAL[error] : undefined;
+  return refusalView ?? { status: 'failed', failure: { error, reference } };
 }

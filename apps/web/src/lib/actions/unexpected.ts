@@ -1,7 +1,6 @@
 import 'server-only';
 import { newFailureReference } from './failure-reference';
 import { loggableFailure } from './loggable-failure';
-import type { ActionResult } from './result';
 
 /**
  * The answer to a failure nothing more specific can describe. With the mutation
@@ -15,7 +14,7 @@ import type { ActionResult } from './result';
 export function unexpectedFailure(
   label: string,
   error?: unknown,
-): ActionResult & { error: 'generic'; reference: string } {
+): { ok: false; error: 'generic'; reference: string } {
   const reference = newFailureReference();
   console.error(label, { reference, failure: loggableFailure(error) });
   return { ok: false, error: 'generic', reference };

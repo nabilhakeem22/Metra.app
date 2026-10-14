@@ -51,7 +51,7 @@ async function lockDraftProposal(
     .where(eq(proposals.id, id))
     .limit(1)
     .for('update');
-  if (!locked) fail('invalid');
+  if (!locked) fail('record_not_found');
   if (locked.proposal.status !== 'draft') fail('proposal_not_draft');
   if (expectedRevision !== undefined && locked.revision !== expectedRevision) {
     fail('draft_changed_elsewhere');
@@ -78,7 +78,7 @@ export async function saveProposalDraftCore(
   ctx: OrgContext,
   input: SaveDraftInput,
 ): Promise<ActionResult & { data?: DraftSaveReceipt }> {
-  if (!isSaveDraftInputShape(input)) return err('invalid');
+  if (!isSaveDraftInputShape(input)) return err('malformed');
   return mutateInOrg(
     ctx,
     {

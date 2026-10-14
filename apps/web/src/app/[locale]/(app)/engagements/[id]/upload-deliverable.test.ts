@@ -130,9 +130,9 @@ describe('uploadDeliverableFile', () => {
   });
 
   test('R3: a renewal Storage could not sign is retryable on the SAME row', async () => {
-    actions.renewDeliverableUpload.mockResolvedValueOnce({ ok: false, error: 'generic' });
+    actions.renewDeliverableUpload.mockResolvedValueOnce({ ok: false, error: 'storage_unavailable' });
     const outcome = await uploadDeliverableFile('e-1', 'layout', pdf, { resume: { fileId: 'f-1', stage: 'put' } });
-    expect(outcome).toEqual({ ok: false, reason: 'generic', resume: { fileId: 'f-1', stage: 'put' } });
+    expect(outcome).toEqual({ ok: false, reason: 'storage_unavailable', resume: { fileId: 'f-1', stage: 'put' } });
     expect(isRetryableOutcome(outcome)).toBe(true);
     expect(actions.createDeliverableUpload).not.toHaveBeenCalled();
   });

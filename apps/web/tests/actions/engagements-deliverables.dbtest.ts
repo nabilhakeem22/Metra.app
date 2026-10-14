@@ -116,7 +116,7 @@ describe('attachDeliverable — foreign / cross-org file id', () => {
       category: 'layout',
       fileId: foreignFileId,
     });
-    expect(res).toEqual({ ok: false, error: 'invalid' });
+    expect(res).toEqual({ ok: false, error: 'record_not_found' });
 
     const artifacts = await getEngagementArtifacts(ctxA, engA);
     expect(artifacts).toHaveLength(0);
@@ -134,7 +134,7 @@ describe('attachDeliverable — foreign / cross-org file id', () => {
       category: 'boq',
       fileId: otherEngagementFileId,
     });
-    expect(res).toEqual({ ok: false, error: 'invalid' });
+    expect(res).toEqual({ ok: false, error: 'record_not_found' });
   });
 });
 
@@ -198,7 +198,7 @@ describe('getDeliverableUrl — foreign file guard', () => {
     const foreignFileId = await seedEngagementFile(ctxB.orgId, engB, ctxB.userId);
 
     const res = await getDeliverableUrlCore(ctxA, foreignFileId);
-    expect(res).toEqual({ ok: false, error: 'invalid' });
+    expect(res).toEqual({ ok: false, error: 'record_not_found' });
   });
 });
 
@@ -245,14 +245,14 @@ describe('renewDeliverableUpload reuses the files row of a failed upload (R3)', 
     expect(Number(after.count)).toBe(Number(before.count));
   });
 
-  it('a Storage failure is a coded generic, never a throw through the action', async () => {
+  it('a Storage failure is storage_unavailable, never a throw through the action', async () => {
     const { ctx, engagementId } = await setupEngagement();
     const fileId = await seedEngagementFile(ctx.orgId, engagementId, ctx.userId);
     storage.renewSignedUploadUrl.mockRejectedValueOnce(new Error('storage down'));
     const quiet = vi.spyOn(console, 'error').mockImplementation(() => {});
     await expect(renewDeliverableUploadCore(ctx, { engagementId, fileId })).resolves.toEqual({
       ok: false,
-      error: 'generic',
+      error: 'storage_unavailable',
     });
     quiet.mockRestore();
   });
@@ -261,11 +261,11 @@ describe('renewDeliverableUpload reuses the files row of a failed upload (R3)', 
     const { ctx, engagementId } = await setupEngagement();
     const attached = await seedEngagementFile(ctx.orgId, engagementId, ctx.userId);
     await attachDeliverableCore(ctx, { engagementId, category: 'layout', fileId: attached });
-    expect(await renewDeliverableUploadCore(ctx, { engagementId, fileId: attached })).toEqual({ ok: false, error: 'invalid' });
+    expect(await renewDeliverableUploadCore(ctx, { engagementId, fileId: attached })).toEqual({ ok: false, error: 'record_not_found' });
 
     const { ctx: other, engagementId: otherEngagement } = await setupEngagement();
     const foreign = await seedEngagementFile(other.orgId, otherEngagement, other.userId);
-    expect(await renewDeliverableUploadCore(ctx, { engagementId, fileId: foreign })).toEqual({ ok: false, error: 'invalid' });
+    expect(await renewDeliverableUploadCore(ctx, { engagementId, fileId: foreign })).toEqual({ ok: false, error: 'record_not_found' });
 
     const pending = await seedEngagementFile(ctx.orgId, engagementId, ctx.userId);
     await raw.query(`update public.design_engagements set state = 'abandoned' where id = '${engagementId}'`);

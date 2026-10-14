@@ -23,7 +23,7 @@ export async function expireProposalCore(
         .set({ status: 'expired', updatedAt: new Date() })
         .where(and(eq(proposals.id, input.id), eq(proposals.status, 'sent')))
         .returning({ id: proposals.id });
-      if (!updated[0]) fail('invalid');
+      if (!updated[0]) fail('record_not_found');
 
       await tx.insert(proposalEvents).values({
         orgId: ctx.orgId,

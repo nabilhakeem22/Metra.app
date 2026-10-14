@@ -1,6 +1,7 @@
 import 'server-only';
 import { designEngagements, files } from '@metra/db';
 import { and, eq } from 'drizzle-orm';
+import { loggableFailure } from '@/lib/actions/loggable-failure';
 import { err, type ActionResult } from '@/lib/actions/result';
 import type { OrgContext } from '@/lib/db/context';
 import { withOrgContext } from '@/lib/db/context';
@@ -58,8 +59,9 @@ export async function createDeliverableUploadCore(
   input: CreateDeliverableUploadInput,
 ): Promise<SignedUpload | ActionResult> {
   if (!can(ctx.role, 'engagements_design', 'create')) return err('forbidden');
-  if (!isUuid(input.engagementId)) return err('invalid');
-  if (!isWorkingFileCategory(input.category)) return err('invalid');
+  // A forged id or a category no picker offers: no form can send these.
+  if (!isUuid(input.engagementId)) return err('malformed');
+  if (!isWorkingFileCategory(input.category)) return err('malformed');
 
   const [engagement] = await withOrgContext(ctx, (tx) =>
     tx
@@ -107,9 +109,9 @@ export async function attachDeliverableCore(
 ): Promise<ActionResult & { data?: string }> {
   if (!can(ctx.role, 'engagements_design', 'create')) return err('forbidden');
   if (!isUuid(input.engagementId) || !isUuid(input.fileId)) {
-    return err('invalid');
+    return err('malformed');
   }
-  if (!isWorkingFileCategory(input.category)) return err('invalid');
+  if (!isWorkingFileCategory(input.category)) return err('malformed');
 
   const [owned] = await withOrgContext(ctx, (tx) =>
     tx
@@ -124,7 +126,7 @@ export async function attachDeliverableCore(
       )
       .limit(1),
   );
-  if (!owned) return err('invalid');
+  if (!owned) return err('record_not_found');
 
   return recordArtifactCore(ctx, {
     engagementId: input.engagementId,
@@ -153,7 +155,7 @@ export async function getDeliverableUrlCore(
       .where(and(eq(files.id, fileId), eq(files.entity, 'engagement')))
       .limit(1),
   );
-  if (!owned) return err('invalid');
+  if (!owned) return err('record_not_found');
   try {
     // The download NAME is the point, not a nicety: `contentType` is taken
     // verbatim from the caller at upload, so a file NAMED `x.pdf` can be STORED
@@ -166,7 +168,9 @@ export async function getDeliverableUrlCore(
       download: safeDownloadName(owned.originalName),
     });
     return { ok: true, url };
-  } catch {
-    return err('invalid');
+  } catch (error) {
+    // Storage did not sign: an outage, not a missing file (that is answered above).
+    console.error('deliverable url mint failed', { fileId, failure: loggableFailure(error) });
+    return err('storage_unavailable');
   }
 }

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState, useTransition } from 'react';
 import { useRouter } from '@/i18n/routing';
 import type { Locale } from '@/i18n/routing';
+import type { ShownFailure } from '@/lib/actions/error-message';
 import type { ActionCode } from '@/lib/actions/result';
 import {
   emailDeliveryReminder,
@@ -37,19 +38,28 @@ export interface DeliveryReminderApi {
   sendEmail: () => void;
   emailing: boolean;
   /** The last email's outcome in this dialog, or null. */
-  emailResult: { ok: true } | { ok: false; error: ActionCode } | null;
+  emailResult: { ok: true } | { ok: false; failure: ShownFailure } | null;
   copied: boolean;
   copy: () => void;
 }
 
-type Result<T = undefined> = { ok: boolean; error?: ActionCode; data?: T };
+type Result<T = undefined> = { ok: boolean; error?: ActionCode; reference?: string; data?: T };
 
-/** Wrap an action so a rejected promise is a coded failure, never a stuck spinner. */
-async function settled<T>(action: () => Promise<Result<T>>): Promise<Result<T>> {
+/** An action's answer, or the rejection of a promise that never answered. */
+type Settled<T> = Result<T> | { ok: false; rejection: unknown };
+
+function failureOf<T>(settledResult: Settled<T>): ShownFailure {
+  return 'rejection' in settledResult
+    ? { rejection: settledResult.rejection }
+    : { error: settledResult.error, reference: settledResult.reference };
+}
+
+/** Wrap an action so a rejected promise is a kept failure, never a stuck spinner. */
+async function settled<T>(action: () => Promise<Result<T>>): Promise<Settled<T>> {
   try {
     return await action();
-  } catch {
-    return { ok: false, error: 'generic' };
+  } catch (rejection) {
+    return { ok: false, rejection };
   }
 }
 
@@ -78,7 +88,7 @@ export function useDeliveryReminder(engagementId: string): DeliveryReminderApi {
       setCopied(false);
       markRefreshed();
       const result = await settled(() => prepareDeliveryReminder(engagementId));
-      if (result.ok && result.data) setLocale(result.data.defaultLocale);
+      if (!('rejection' in result) && result.ok && result.data) setLocale(result.data.defaultLocale);
       setView(reminderViewOf(result, afterReplace));
     },
     [engagementId, markRefreshed],
@@ -107,7 +117,7 @@ export function useDeliveryReminder(engagementId: string): DeliveryReminderApi {
     startChangingLink(async () => {
       const written = await settled(write);
       if (!written.ok) {
-        setView({ status: 'failed', error: written.error ?? 'generic' });
+        setView({ status: 'failed', failure: failureOf(written) });
         return;
       }
       announceDeliveryLinkChanged({ shared: true, source: 'reminder' });
@@ -120,7 +130,7 @@ export function useDeliveryReminder(engagementId: string): DeliveryReminderApi {
     setEmailResult(null);
     startEmailing(async () => {
       const result = await settled(() => emailDeliveryReminder(engagementId, locale));
-      setEmailResult(result.ok ? { ok: true } : { ok: false, error: result.error ?? 'generic' });
+      setEmailResult(result.ok ? { ok: true } : { ok: false, failure: failureOf(result) });
     });
   }
 

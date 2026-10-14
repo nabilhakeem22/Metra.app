@@ -40,7 +40,7 @@ async function loadVariationAndContractStatus(
     )
     .where(eq(variationOrders.id, variationOrderId))
     .limit(1);
-  if (!row) fail('invalid');
+  if (!row) fail('record_not_found');
   return row;
 }
 

@@ -43,7 +43,7 @@ async function loadAcceptedProposal(
     .from(proposals)
     .where(eq(proposals.id, proposalId))
     .limit(1);
-  if (!proposal) fail('invalid');
+  if (!proposal) fail('record_not_found');
   if (proposal.status !== 'accepted') fail('proposal_not_accepted');
 
   const existing = await tx
@@ -121,7 +121,7 @@ export async function generateContractCore(
   input: GenerateContractInput,
 ): Promise<ActionResult> {
   const proposalId = input.proposalId?.trim();
-  if (!proposalId || !isUuid(proposalId)) return err('invalid');
+  if (!proposalId || !isUuid(proposalId)) return err('malformed');
 
   return mutateInOrg(
     ctx,

@@ -220,7 +220,7 @@ describe('sendProposalAsBoqCore refusals before any render (AC13)', () => {
         proposalId: (quote as { data?: string }).data!,
         locale: 'en',
       }),
-    ).toEqual({ ok: false, error: 'invalid' });
+    ).toEqual({ ok: false, error: 'record_not_found' });
 
     expect(
       await sendProposalAsBoqCore(org.viewerCtx, { proposalId: empty.data!, locale: 'en' }),

@@ -101,9 +101,10 @@ export async function removeMemberCore(
 /**
  * The withOrgContext half of acceptInvite: atomically claim the invite (via the
  * SECURITY DEFINER app_claim_invitation), insert the caller's own membership,
- * audit, and F4-recheck for an already-member re-opener. Every failure -> the
- * SAME generic 'declined' (no oracle). `ctx` MUST carry the invite's org, the
- * caller's userId + email, and the invited role.
+ * audit, and F4-recheck for an already-member re-opener. An invitation that
+ * cannot be claimed (used, revoked, or not this caller's) is `invite_not_found`:
+ * the wrapper has already told expiry and a wrong account apart. `ctx` MUST
+ * carry the invite's org, the caller's userId + email, and the invited role.
  */
 export async function acceptInviteCore(
   ctx: OrgContext,
@@ -111,7 +112,7 @@ export async function acceptInviteCore(
 ): Promise<ActionResult> {
   const outcome = await withOrgContext(
     ctx,
-    async (tx): Promise<'joined' | 'already' | 'declined'> => {
+    async (tx): Promise<'joined' | 'already' | 'unclaimable'> => {
       const claimed = (await tx.execute(
         sql`select id from public.app_claim_invitation(${invitationId})`,
       )) as unknown as unknown[];
@@ -158,10 +159,10 @@ export async function acceptInviteCore(
         .limit(1);
 
       if (current?.status === 'accepted' && mine) return 'already';
-      return 'declined';
+      return 'unclaimable';
     },
   );
 
-  if (outcome === 'declined') return err('declined');
+  if (outcome === 'unclaimable') return err('invite_not_found');
   return outcome === 'already' ? ok({ already: true }) : ok();
 }

@@ -37,7 +37,7 @@ export async function setClientExpectedDateCore(
   input: SetClientExpectedDateInput,
   now: Date = new Date(),
 ): Promise<ActionResult> {
-  if (typeof input !== 'object' || input === null || !isUuid(input.engagementId)) return err('invalid');
+  if (typeof input !== 'object' || input === null || !isUuid(input.engagementId)) return err('malformed');
   const read = readExpectedOn(input.expectedOn, now);
   if (!read.ok) return fieldsFailed({ expectedOn: read.error });
   const expectedOn = read.value;

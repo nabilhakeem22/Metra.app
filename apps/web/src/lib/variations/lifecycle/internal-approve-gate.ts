@@ -34,7 +34,7 @@ export async function lockDraftVariation(
     .where(eq(variationOrders.id, variationOrderId))
     .for('update')
     .limit(1);
-  if (!locked) fail('invalid');
+  if (!locked) fail('record_not_found');
   if (locked.status !== 'draft') fail('variation_not_draft');
   return locked;
 }
@@ -92,7 +92,7 @@ export async function assertContractStillLive(
     contracts,
     contractId,
     { status: contracts.status },
-    'invalid',
+    'record_not_found',
   );
   if (!canInternalApproveVariation(variationStatus, contract.status)) {
     fail('contract_not_issued');

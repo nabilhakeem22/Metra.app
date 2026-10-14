@@ -86,9 +86,9 @@ function extensionOf(originalName: string): string | null {
 /**
  * Validate a candidate deliverable against its category BEFORE any Storage write.
  * Returns an `ActionCode` to reject with, or `null` when the file is acceptable:
- *   'invalid'         — missing or not-allowed extension for this category
+ *   'file_type_not_allowed' — missing or not-allowed extension for this category
  *   'file_too_large'  — known size exceeds MAX_DELIVERABLE_BYTES
- * Extension is checked first, so a wrong-type file is `invalid` regardless of
+ * Extension is checked first, so a wrong-type file is `file_type_not_allowed` regardless of
  * size. `sizeBytes` is optional (the browser always knows it; a raw API caller
  * may not) — when absent, the size gate is skipped and Storage enforces nothing
  * beyond the extension contract.
@@ -100,7 +100,7 @@ export function validateDeliverableFile(
 ): ActionCode | null {
   const extension = extensionOf(originalName ?? '');
   if (extension === null || !ALLOWED_EXTENSIONS[category].includes(extension)) {
-    return 'invalid';
+    return 'file_type_not_allowed';
   }
   if (sizeBytes != null && sizeBytes > MAX_DELIVERABLE_BYTES) {
     return 'file_too_large';

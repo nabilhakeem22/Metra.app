@@ -4,7 +4,7 @@ import { Copy, Loader2, Mail, MessageCircle } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
 import { dirFor, LOCALES } from '@/i18n/routing';
-import { resolveActionError } from '@/lib/actions/error-message';
+import { describeShownFailure } from '@/lib/actions/error-message';
 import { whatsappUrl } from '@/lib/engagements/reminder/whatsapp';
 import { cn } from '@/lib/utils';
 import type { DeliveryReminderApi } from './use-delivery-reminder';
@@ -98,7 +98,7 @@ export function DeliveryReminderReady({
         {api.emailResult
           ? api.emailResult.ok
             ? t('emailSent')
-            : resolveActionError(api.emailResult.error, terrors)
+            : describeShownFailure(api.emailResult.failure, terrors)
           : reminder.clientEmail === null
             ? t('noEmail')
             : t('emailTo', { email: reminder.clientEmail })}

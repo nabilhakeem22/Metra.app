@@ -2,8 +2,8 @@
 
 import { revalidatePath } from 'next/cache';
 import { BELL_FEED_LIMIT, type NotificationFeed } from '@/components/notifications/feed-item';
-import { loggableFailure } from '@/lib/actions/loggable-failure';
 import type { ActionCode, ActionResult } from '@/lib/actions/result';
+import { unexpectedFailure } from '@/lib/actions/unexpected';
 import { requireOrg } from '@/lib/auth/require-org';
 import {
   markAllNotificationsReadCore,
@@ -38,14 +38,13 @@ function isNavigationSignal(error: unknown): boolean {
  * code and the bell keeps what it had. Revalidates nothing.
  */
 export async function pollNotificationFeed(): Promise<
-  { ok: true; data: NotificationFeed } | { ok: false; error: ActionCode }
+  { ok: true; data: NotificationFeed } | { ok: false; error: ActionCode; reference?: string }
 > {
   try {
     const ctx = await requireOrg();
     return { ok: true, data: await loadNotificationFeed(ctx, BELL_FEED_LIMIT) };
   } catch (error) {
     if (isNavigationSignal(error)) return { ok: false, error: 'forbidden' };
-    console.error('notification poll failed:', loggableFailure(error));
-    return { ok: false, error: 'generic' };
+    return unexpectedFailure('notification poll failed', error);
   }
 }

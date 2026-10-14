@@ -373,7 +373,7 @@ describe('executeTransition — an idempotency key names ONE attempt (0050)', ()
     for (const bad of ['not-a-uuid', '123', 'select 1']) {
       expect(await revise(ctx, engagementId, bad)).toEqual({
         ok: false,
-        error: 'invalid',
+        error: 'malformed',
       });
     }
     expect(await revisionCountOf(engagementId)).toBe(0);

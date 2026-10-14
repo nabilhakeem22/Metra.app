@@ -84,7 +84,7 @@ export async function sendProposal(id: string): Promise<
   // resolve must not leave behind a committed transition whose link the caller
   // never receives.
   const origin = await resolveRequestOrigin();
-  if (!origin) return { ok: false, error: 'generic' };
+  if (!origin) return unexpectedFailure('sendProposal: no request origin');
   const res = await sendProposalCore(ctx, { id });
   if (!res.ok) return res;
   if (!res.data) return unexpectedFailure('sendProposalCore answered ok without a token');

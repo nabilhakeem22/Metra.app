@@ -49,7 +49,7 @@ export async function setEngagementRomCore(
   // reaches Postgres, raises on the `::uuid` cast, and is swallowed as `generic`
   // after a console.error -- so the caller learns nothing and the log fills up.
   // The same guard `recordArtifactCore` already applies.
-  if (!isUuid(input.engagementId)) return Promise.resolve(err('invalid'));
+  if (!isUuid(input.engagementId)) return Promise.resolve(err('malformed'));
 
   return mutateInOrg(
     ctx,

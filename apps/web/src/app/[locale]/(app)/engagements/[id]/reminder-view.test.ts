@@ -22,13 +22,20 @@ describe('reminderViewOf', () => {
   it('a link still unrecoverable right after a replace is a failure, not another replace', () => {
     expect(reminderViewOf({ ok: false, error: 'delivery_link_unrecoverable' }, true)).toEqual({
       status: 'failed',
-      error: 'delivery_link_unrecoverable',
+      failure: { error: 'delivery_link_unrecoverable' },
     });
   });
 
-  it('any other refusal, or none named, fails with its code', () => {
-    expect(reminderViewOf({ ok: false, error: 'forbidden' }, false)).toEqual({ status: 'failed', error: 'forbidden' });
-    expect(reminderViewOf({ ok: false }, false)).toEqual({ status: 'failed', error: 'generic' });
-    expect(reminderViewOf({ ok: true }, false)).toEqual({ status: 'failed', error: 'generic' });
+  it('any other refusal fails with its code and reference; a lost answer keeps its rejection', () => {
+    expect(reminderViewOf({ ok: false, error: 'forbidden' }, false)).toEqual({
+      status: 'failed',
+      failure: { error: 'forbidden' },
+    });
+    expect(reminderViewOf({ ok: false, error: 'generic', reference: 'K7Q29MXD' }, false)).toEqual({
+      status: 'failed',
+      failure: { error: 'generic', reference: 'K7Q29MXD' },
+    });
+    const rejection = new TypeError('fetch failed');
+    expect(reminderViewOf({ ok: false, rejection }, false)).toEqual({ status: 'failed', failure: { rejection } });
   });
 });

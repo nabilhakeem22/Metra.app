@@ -13,7 +13,7 @@ describe('validateDeliverableFile — per-category extension gate', () => {
   });
 
   it('rejects XLSX on the render slot but accepts it on BOQ', () => {
-    expect(validateDeliverableFile('render', 'boq.xlsx', 1024)).toBe('invalid');
+    expect(validateDeliverableFile('render', 'boq.xlsx', 1024)).toBe('file_type_not_allowed');
     expect(validateDeliverableFile('boq', 'boq.xlsx', 1024)).toBeNull();
   });
 
@@ -22,11 +22,11 @@ describe('validateDeliverableFile — per-category extension gate', () => {
   });
 
   it('rejects an unknown extension as invalid', () => {
-    expect(validateDeliverableFile('layout', 'notes.txt', 1024)).toBe('invalid');
+    expect(validateDeliverableFile('layout', 'notes.txt', 1024)).toBe('file_type_not_allowed');
   });
 
   it('rejects a filename with no extension as invalid', () => {
-    expect(validateDeliverableFile('boq', 'estimate', 1024)).toBe('invalid');
+    expect(validateDeliverableFile('boq', 'estimate', 1024)).toBe('file_type_not_allowed');
   });
 });
 
@@ -46,7 +46,7 @@ describe('validateDeliverableFile — size gate', () => {
   it('checks extension before size — a huge wrong-type file is invalid', () => {
     expect(
       validateDeliverableFile('render', 'sheet.xlsx', MAX_DELIVERABLE_BYTES + 1),
-    ).toBe('invalid');
+    ).toBe('file_type_not_allowed');
   });
 
   it('skips the size gate when size is unknown', () => {
@@ -75,20 +75,20 @@ describe('CATEGORY_WRITE_KIND', () => {
   it('shopDrawing is an upload category WITHOUT a pinned tray slot', () => {
     expect(WORKING_FILE_CATEGORIES).not.toContain('shopDrawing');
     expect(validateDeliverableFile('shopDrawing', 'wall-section.dwg', 1024)).toBeNull();
-    expect(validateDeliverableFile('shopDrawing', 'boq.xlsx', 1024)).toBe('invalid');
+    expect(validateDeliverableFile('shopDrawing', 'boq.xlsx', 1024)).toBe('file_type_not_allowed');
   });
 
   it('conceptOption is an upload category WITHOUT a pinned tray slot', () => {
     expect(WORKING_FILE_CATEGORIES).not.toContain('conceptOption');
     expect(validateDeliverableFile('conceptOption', 'option-a.pdf', 1024)).toBeNull();
-    expect(validateDeliverableFile('conceptOption', 'boq.xlsx', 1024)).toBe('invalid');
+    expect(validateDeliverableFile('conceptOption', 'boq.xlsx', 1024)).toBe('file_type_not_allowed');
   });
 
   it('survey is an upload category WITHOUT a pinned tray slot', () => {
     expect(WORKING_FILE_CATEGORIES).not.toContain('survey');
     expect(validateDeliverableFile('survey', 'site-measure.dwg', 1024)).toBeNull();
     expect(validateDeliverableFile('survey', 'survey.pdf', 1024)).toBeNull();
-    expect(validateDeliverableFile('survey', 'boq.xlsx', 1024)).toBe('invalid');
+    expect(validateDeliverableFile('survey', 'boq.xlsx', 1024)).toBe('file_type_not_allowed');
   });
 
   // The survey category adds NO new extension, so the derived client-download

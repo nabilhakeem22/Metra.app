@@ -159,7 +159,7 @@ describe('readStoredDraft: telling a lost answer of our own from another tab', (
     const blind = await readStoredDraftCore(pm, id);
     expect(blind.ok).toBe(true);
     expect('unitCost' in blind.data!.sections[0].lines[0]).toBe(false);
-    expect(await readStoredDraftCore(ctx, 'not-a-uuid')).toEqual({ ok: false, error: 'invalid' });
+    expect(await readStoredDraftCore(ctx, 'not-a-uuid')).toEqual({ ok: false, error: 'malformed' });
   });
 });
 
@@ -271,7 +271,7 @@ describe('proportionate audit (R4) and the payload boundary (S1)', () => {
     const odd = { ...lines(1, 'a', '10')[0], id: { toString: () => 'x' } } as unknown as Line;
     expect(await saveProposalDraftCore(ctx, { id, sections: [{ titleEn: 'A', lines: [odd] }] })).toEqual({
       ok: false,
-      error: 'invalid',
+      error: 'malformed',
     });
   });
 });

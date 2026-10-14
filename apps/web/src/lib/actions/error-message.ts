@@ -60,3 +60,11 @@ export function describeRejection(rejection: unknown, t: Translate): string {
   if (rejection instanceof TypeError || isOffline()) return t('unreachable');
   return t('generic');
 }
+
+/** A failure kept for display: a coded answer, or a promise that never answered. */
+export type ShownFailure = Pick<ActionResult, 'error' | 'params' | 'reference'> | { readonly rejection: unknown };
+
+/** The sentence for a kept failure, whichever way it failed. */
+export function describeShownFailure(failure: ShownFailure, t: Translate): string {
+  return 'rejection' in failure ? describeRejection(failure.rejection, t) : describeFailure(failure, t);
+}

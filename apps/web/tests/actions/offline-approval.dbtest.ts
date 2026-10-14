@@ -260,11 +260,11 @@ describe('Client approved offline at final_approval', () => {
   it('an unknown channel, or an option named on a DESIGN approval, is invalid', async () => {
     const { ctx, engagementId } = await seedFinalApproval();
     await recordPaymentCore(ctx, { engagementId, kind: 'gate_b', amount: '20000' });
-    for (const approval of [
-      { channel: 'fax' },
-      { channel: 'phone', chosenArtifactId: '11111111-1111-4111-8111-111111111111' },
-    ]) {
-      expect(await approveOffline(ctx, engagementId, approval)).toEqual({ ok: false, error: 'invalid' });
+    for (const [approval, error] of [
+      [{ channel: 'fax' }, 'malformed'],
+      [{ channel: 'phone', chosenArtifactId: '11111111-1111-4111-8111-111111111111' }, 'malformed'],
+    ] as const) {
+      expect(await approveOffline(ctx, engagementId, approval)).toEqual({ ok: false, error });
     }
     expect(await stateOf(engagementId)).toBe('final_approval');
   });

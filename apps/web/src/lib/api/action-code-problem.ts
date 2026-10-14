@@ -32,7 +32,9 @@ export const ACTION_CODE_PROBLEM: Record<ActionCode, ApiProblemKind> = {
   self: 'bad-request',
   already_member: 'bad-request',
   pending_exists: 'bad-request',
-  declined: 'forbidden',
+  invite_expired: 'unauthorized',
+  invite_wrong_account: 'forbidden',
+  invite_not_found: 'not-found',
   otp_verify_failed: 'bad-request',
   otp_rate_limited: 'rate-limited',
   otp_sms_unavailable: 'internal',
@@ -151,6 +153,7 @@ export const ACTION_CODE_PROBLEM: Record<ActionCode, ApiProblemKind> = {
   claim_already_settled: 'conflict',
   claim_pending_for_milestone: 'conflict',
   file_too_large: 'bad-request',
+  file_type_not_allowed: 'bad-request',
   // Editing a draft BOQ line by line.
   line_not_found: 'not-found',
   section_not_found: 'not-found',

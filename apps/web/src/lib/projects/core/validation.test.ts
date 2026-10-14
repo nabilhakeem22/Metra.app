@@ -44,7 +44,7 @@ describe('validate (projects)', () => {
         clientId: { code: 'client_required' },
         startDate: { code: 'start_date_required' },
         notes: { code: 'too_long', params: { max: 2000 } },
-        advancePct: { code: 'invalid_percentage' },
+        advancePct: { code: 'out_of_range', params: { min: 0, max: 100 } },
       },
     });
   });

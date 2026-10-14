@@ -66,7 +66,7 @@ export async function saveContractDraftCore(
   input: SaveContractDraftInput,
 ): Promise<ActionResult> {
   const id = input.id?.trim();
-  if (!id || !isUuid(id)) return err('invalid');
+  if (!id || !isUuid(id)) return err('malformed');
   const header = input.header ?? {};
   const read = validateContractHeader(header);
   if (!read.ok) return fieldsFailed(read.errors);
@@ -81,7 +81,7 @@ export async function saveContractDraftCore(
         contracts,
         id,
         { status: contracts.status },
-        'invalid',
+        'record_not_found',
       );
       if (row.status !== 'draft') fail('contract_not_draft');
       await tx

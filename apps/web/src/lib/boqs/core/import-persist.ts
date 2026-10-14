@@ -9,7 +9,8 @@
 // validate / price / persist seam is the division that was already there.
 import { boqLines, boqSections, boqs } from '@metra/db';
 import { eq, sql } from 'drizzle-orm';
-import { fail, mutateInOrg } from '@/lib/actions/mutate';
+import { mutateInOrg } from '@/lib/actions/mutate';
+import { invariant } from '@/lib/actions/invariant';
 import { insertLinesInChunks } from '@/lib/lines/insert-chunked';
 import type { ImportedLine } from '../import/map';
 import { bilingualFor } from '../bilingual';
@@ -47,7 +48,7 @@ export async function persistImportSections(
         sortOrder,
       })
       .returning({ id: boqSections.id });
-    if (!section) fail('invalid');
+    invariant(section, 'BOQ import: the section insert returned no row');
 
     groupLines.forEach((line, i) => {
       pendingLines.push(buildImportedLine({ ...context, sectionId: section.id }, line, i));

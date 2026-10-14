@@ -28,7 +28,7 @@ export async function createContactCore(
     async (tx, audit) => {
       // An existence assertion, not a read: the call IS the check, and it
       // fails with a coded error for an id that is absent or another tenant's.
-      await requireInOrg(tx, clients, input.clientId, { id: clients.id }, 'invalid');
+      await requireInOrg(tx, clients, input.clientId, { id: clients.id }, 'record_not_found');
 
       return insertClientContactInTx(tx, ctx, audit, {
         clientId: input.clientId,
@@ -57,7 +57,7 @@ export async function updateContactCore(
     async (tx, audit) => {
       // An existence assertion, not a read: the call IS the check, and it
       // fails with a coded error for an id that is absent or another tenant's.
-      await requireInOrg(tx, clientContacts, input.id, { id: clientContacts.id }, 'invalid');
+      await requireInOrg(tx, clientContacts, input.id, { id: clientContacts.id }, 'record_not_found');
 
       // is_primary is NOT touched here — use setPrimaryContactCore for that.
       await tx

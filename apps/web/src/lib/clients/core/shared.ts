@@ -3,10 +3,11 @@
 // still lands under the field.
 import { CLIENT_TYPES, type ClientType } from '@metra/db';
 import type { ConstraintRefusal } from '@/lib/actions/mutation-failure';
+import { PERCENT_REFUSAL } from '@/lib/validation/number-field-rules';
 
 export const CLIENT_PERCENT_REFUSALS: readonly ConstraintRefusal[] = [
-  { constraint: 'clients_advance_pct_range', field: 'advancePct', error: { code: 'invalid_percentage' } },
-  { constraint: 'clients_retention_pct_range', field: 'retentionPct', error: { code: 'invalid_percentage' } },
+  { constraint: 'clients_advance_pct_range', field: 'advancePct', error: PERCENT_REFUSAL },
+  { constraint: 'clients_retention_pct_range', field: 'retentionPct', error: PERCENT_REFUSAL },
 ];
 
 /** A type outside the select: no form can send it (`malformed`). */

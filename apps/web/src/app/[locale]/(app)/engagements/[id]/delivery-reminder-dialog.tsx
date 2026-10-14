@@ -5,7 +5,7 @@ import { Loader2, X } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { useEffect } from 'react';
 import { IconButton } from '@/components/ui/icon-button';
-import { resolveActionError } from '@/lib/actions/error-message';
+import { describeShownFailure } from '@/lib/actions/error-message';
 import { DeliveryReminderReady } from './delivery-reminder-ready';
 import {
   ReminderNotConfigured,
@@ -70,7 +70,7 @@ function ReminderBody({ api }: { api: DeliveryReminderApi }) {
   if (view.status === 'failed') {
     return (
       <p className="text-body text-destructive" role="alert">
-        {resolveActionError(view.error, terrors)}
+        {describeShownFailure(view.failure, terrors)}
       </p>
     );
   }

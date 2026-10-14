@@ -44,7 +44,7 @@ describe('acceptInviteCore', () => {
     expect(second).toEqual({ ok: true, already: true });
   });
 
-  it('declines when the caller email does not match the invite', async () => {
+  it('answers invite_not_found when the invite cannot be claimed by this caller', async () => {
     const { orgId, ownerIds } = await seedOrg({ owners: 1 });
     orgIds.push(orgId);
     const invId = await seedPendingInvite(
@@ -58,6 +58,6 @@ describe('acceptInviteCore', () => {
       ctxFor(orgId, randomUUID(), 'viewer', 'wrong@example.com'),
       invId,
     );
-    expect(res).toEqual({ ok: false, error: 'declined' });
+    expect(res).toEqual({ ok: false, error: 'invite_not_found' });
   });
 });

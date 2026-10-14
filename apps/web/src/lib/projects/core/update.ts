@@ -36,7 +36,7 @@ export async function updateProjectCore(
         projects,
         input.id,
         { id: projects.id, clientId: projects.clientId },
-        'invalid',
+        'record_not_found',
       );
 
       const [dup] = await tx
@@ -91,7 +91,7 @@ export async function setProjectActiveCore(
         projects,
         input.id,
         { id: projects.id, active: projects.active },
-        'invalid',
+        'record_not_found',
       );
 
       await tx

@@ -224,7 +224,7 @@ describe('reminders never rotate the link (AC 38)', () => {
     });
     expect(
       await emailDeliveryReminderCore(d.ctx, { engagementId: d.engagementId, locale: 'fr' }, ORIGIN),
-    ).toEqual({ ok: false, error: 'invalid' });
+    ).toEqual({ ok: false, error: 'malformed' });
   });
 
   it('a closed delivery has nobody to remind', async () => {
@@ -238,7 +238,7 @@ describe('reminders never rotate the link (AC 38)', () => {
 
   it('a second mint on a shared delivery is still refused (the link is never replaced silently)', async () => {
     const d = await seed('reminder-mint-twice');
-    expect(await mintDeliveryLinkCore(d.ctx, d.engagementId)).toEqual({ ok: false, error: 'invalid' });
+    expect(await mintDeliveryLinkCore(d.ctx, d.engagementId)).toEqual({ ok: false, error: 'engagement_state_conflict' });
     expect((await linkColumns(d.engagementId)).token_hash).toBe(d.hash);
   });
 

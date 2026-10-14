@@ -71,4 +71,6 @@ export type EngagementActionCode =
   | 'project_delivery_limit_reached'
   | 'claim_not_found'
   | 'claim_already_settled'
-  | 'claim_pending_for_milestone';
+  | 'claim_pending_for_milestone'
+  // A working file whose extension its category does not accept (deliverable-files.ts).
+  | 'file_type_not_allowed';

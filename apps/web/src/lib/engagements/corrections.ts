@@ -51,7 +51,7 @@ export async function recordEventCorrectionCore(
   input: RecordEventCorrectionInput,
 ): Promise<ActionResult & { data?: string }> {
   if (!isUuid(input.engagementId) || !isUuid(input.eventId)) {
-    return err('invalid');
+    return err('malformed');
   }
   const reasonErrors = correctionFieldErrors(input);
   if (hasFieldErrors(reasonErrors)) return fieldsFailed(reasonErrors);
@@ -89,7 +89,7 @@ export async function recordEventCorrectionCore(
       // A correction is bookkeeping about the ledger, not an event in it. Letting
       // one be retracted would mean un-retracting the row beneath it by a side
       // effect nobody reading the ledger would expect.
-      if (target.kind === 'event_correction') fail('invalid');
+      if (target.kind === 'event_correction') fail('malformed');
 
       // Retracting twice would write a second correction that changes nothing and
       // muddies the record with a decision that was already taken.
