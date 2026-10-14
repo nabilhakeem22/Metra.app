@@ -808,8 +808,7 @@
       "deactivated": "تم إلغاء تفعيل البند",
       "starterLoaded": "تم تحميل الكتالوج المبدئي ({count} بند)",
       "starterExists": "البنود المبدئية موجودة بالفعل",
-      "sectionAdded": "تم إضافة القسم",
-      "importFailed": "فشل الاستيراد"
+      "sectionAdded": "تم إضافة القسم"
     },
     "confirmDeactivate": {
       "title": "توقف تفعيل البند ده؟",
@@ -1583,6 +1582,15 @@
     "title_": "العنوان",
     "reason": "السبب",
     "netDelta": "التغيير الصافي",
+    "line": {
+      "add": "إضافة بند",
+      "baseline": "بند العقد",
+      "description": "الوصف",
+      "qty": "الكمية",
+      "remove": "حذف البند",
+      "unit": "الوحدة",
+      "unitPrice": "سعر الوحدة"
+    },
     "saveDraft": "حفظ مسودة",
     "saved": "تم الحفظ",
     "internalApprove": "الموافقة الداخلية",

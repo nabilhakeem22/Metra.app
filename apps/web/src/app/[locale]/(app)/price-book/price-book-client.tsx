@@ -26,7 +26,6 @@ const NO_FILTER: PriceBookFilter = { query: '', sectionId: 'all', activeOnly: fa
 
 export function PriceBookClient({ items, sections, canManage }: PriceBookClientProps) {
   const [filter, setFilter] = useState<PriceBookFilter>(NO_FILTER);
-  const [newSection, setNewSection] = useState('');
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<PriceBookItem | null>(null);
   const [bulkOpen, setBulkOpen] = useState(false);
@@ -86,10 +85,6 @@ export function PriceBookClient({ items, sections, canManage }: PriceBookClientP
         onActiveOnlyChange={(activeOnly) => setFilter({ ...filter, activeOnly })}
         sections={sections}
         canManage={canManage}
-        newSection={newSection}
-        onNewSectionChange={setNewSection}
-        onAddSection={() => actions.addNewSection(newSection, () => setNewSection(''))}
-        pending={actions.pending}
         onBulkUpdate={() => setBulkOpen(true)}
         onImport={() => setImportOpen(true)}
         onNew={() => {

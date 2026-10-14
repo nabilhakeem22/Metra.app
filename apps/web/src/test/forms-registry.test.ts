@@ -10,9 +10,8 @@ import { loadSourceGraph, SRC_ROOT, srcRelative } from '@/test/source-graph';
 // FORM_COVERAGE: a file that renders <FormField> or uses useFieldErrors, and the
 // test file that runs `expectFieldErrorsRenderUnderFields` for it (AC 19: every
 // field of its tuple, answered `required`, shows its sentence under its own
-// control, focus on the first, no alert, typed values kept).
-// PENDING_FORMS: the ones not migrated yet. It only shrinks, and the last W2
-// migration deletes it.
+// control, focus on the first, no alert, typed values kept). Every form is
+// migrated, so there is no pending list: an unregistered form fails here.
 
 /** Form file (from src) to the test that proves its fields' refusals render under them. */
 const FORM_COVERAGE: Readonly<Record<string, string>> = {
@@ -21,6 +20,10 @@ const FORM_COVERAGE: Readonly<Record<string, string>> = {
   'app/[locale]/(app)/clients/[id]/use-client-details-form.ts': 'app/[locale]/(app)/clients/[id]/details-tab.test.tsx',
   'app/[locale]/(app)/clients/client-form-fields.tsx': 'app/[locale]/(app)/clients/client-form.test.tsx',
   'app/[locale]/(app)/clients/client-form.tsx': 'app/[locale]/(app)/clients/client-form.test.tsx',
+  'app/[locale]/(app)/contracts/[id]/contract-header-form.tsx': 'app/[locale]/(app)/contracts/[id]/contract-forms.test.tsx',
+  'app/[locale]/(app)/contracts/[id]/use-variation-create.ts': 'app/[locale]/(app)/contracts/[id]/contract-forms.test.tsx',
+  'app/[locale]/(app)/contracts/[id]/variation-create-form.tsx': 'app/[locale]/(app)/contracts/[id]/contract-forms.test.tsx',
+  'app/[locale]/(app)/contracts/[id]/variation-line-row.tsx': 'app/[locale]/(app)/contracts/[id]/contract-forms.test.tsx',
   'app/[locale]/(app)/engagements/[id]/acknowledgement-form.tsx': 'app/[locale]/(app)/engagements/[id]/cockpit-forms-under-fields.test.tsx',
   'app/[locale]/(app)/engagements/[id]/client-expected-date.tsx': 'app/[locale]/(app)/engagements/[id]/cockpit-forms-under-fields.test.tsx',
   'app/[locale]/(app)/engagements/[id]/command-card-claim-row.tsx': 'app/[locale]/(app)/engagements/[id]/cockpit-forms-under-fields.test.tsx',
@@ -35,8 +38,12 @@ const FORM_COVERAGE: Readonly<Record<string, string>> = {
   'app/[locale]/(app)/engagements/[id]/offline-approval-form.tsx': 'app/[locale]/(app)/engagements/[id]/cockpit-forms-under-fields.test.tsx',
   'app/[locale]/(app)/engagements/engagement-create-fields.tsx': 'app/[locale]/(app)/engagements/engagement-create-form.test.tsx',
   'app/[locale]/(app)/engagements/use-delivery-form.ts': 'app/[locale]/(app)/engagements/engagement-create-form.test.tsx',
+  'app/[locale]/(app)/price-book/bulk-update-dialog.tsx': 'app/[locale]/(app)/price-book/price-book-forms.test.tsx',
   'app/[locale]/(app)/price-book/cost-item-form-fields.tsx': 'app/[locale]/(app)/price-book/cost-item-form.test.tsx',
   'app/[locale]/(app)/price-book/cost-item-form.tsx': 'app/[locale]/(app)/price-book/cost-item-form.test.tsx',
+  'app/[locale]/(app)/price-book/import-wizard-map-step.tsx': 'app/[locale]/(app)/price-book/price-book-forms.test.tsx',
+  'app/[locale]/(app)/price-book/use-import-wizard.ts': 'app/[locale]/(app)/price-book/price-book-forms.test.tsx',
+  'app/[locale]/(app)/price-book/use-section-adder.ts': 'app/[locale]/(app)/price-book/price-book-forms.test.tsx',
   'app/[locale]/(app)/projects/[id]/boq-start.tsx': 'app/[locale]/(app)/projects/[id]/boq-start.test.tsx',
   'app/[locale]/(app)/projects/[id]/details-fields.tsx': 'app/[locale]/(app)/projects/[id]/details-tab.test.tsx',
   'app/[locale]/(app)/projects/[id]/details-type-field.tsx': 'app/[locale]/(app)/projects/[id]/details-tab.test.tsx',
@@ -66,9 +73,6 @@ const FORM_COVERAGE: Readonly<Record<string, string>> = {
   'components/documents/document-upload-control.tsx': 'components/documents/document-upload-control.test.tsx',
 };
 
-/** Forms still on the old one-error-at-a-time shape. Only ever shrinks. */
-const PENDING_FORMS: readonly string[] = [];
-
 const graph = loadSourceGraph();
 const textOf = (path: string) => graph.files.get(path)!.getFullText();
 
@@ -88,16 +92,15 @@ describe('every form is registered (AC 20)', () => {
     expect(formFiles.length).toBeGreaterThan(0);
   });
 
-  it.each(formFiles)('%s is covered or pending', (file) => {
+  it.each(formFiles)('%s is covered', (file) => {
     expect(
-      file in FORM_COVERAGE || PENDING_FORMS.includes(file),
+      file in FORM_COVERAGE,
       `${file} renders <FormField> or uses useFieldErrors: add it to FORM_COVERAGE with the test that runs expectFieldErrorsRenderUnderFields`,
     ).toBe(true);
   });
 
-  it('lists no form twice and no file that is gone', () => {
-    for (const file of PENDING_FORMS) expect(file in FORM_COVERAGE, `${file} is in both lists`).toBe(false);
-    for (const file of [...Object.keys(FORM_COVERAGE), ...PENDING_FORMS]) {
+  it('lists no file that is gone', () => {
+    for (const file of Object.keys(FORM_COVERAGE)) {
       expect(formFiles, `${file} is registered but renders no field`).toContain(file);
     }
   });

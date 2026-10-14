@@ -4,6 +4,7 @@ import { unexpectedFailure } from '@/lib/actions/unexpected';
 import { getLocale } from 'next-intl/server';
 import { refreshApp } from '@/lib/actions/refresh';
 import type { ActionResult } from '@/lib/actions/result';
+import { unexpectedFailure } from '@/lib/actions/unexpected';
 import { requireOrg } from '@/lib/auth/require-org';
 import { resolveRequestOrigin } from '@/lib/http/request-origin';
 import {
@@ -28,8 +29,9 @@ export async function saveContractDraft(
 ): Promise<ActionResult> {
   const ctx = await requireOrg();
   const res = await saveContractDraftCore(ctx, input);
-  if (res.ok) refreshApp();
-  return { ok: res.ok, error: res.error };
+  if (!res.ok) return res;
+  refreshApp();
+  return { ok: true };
 }
 
 export async function issueContract(
@@ -42,7 +44,8 @@ export async function issueContract(
   const origin = await resolveRequestOrigin();
   if (!origin) return unexpectedFailure('issueContract: no request origin');
   const res = await issueContractCore(ctx, { id });
-  if (!res.ok || !res.data) return { ok: res.ok, error: res.error };
+  if (!res.ok) return res;
+  if (!res.data) return unexpectedFailure('issueContractCore answered ok without a token');
   let locale = 'ar-EG';
   try {
     locale = await getLocale();
@@ -57,6 +60,7 @@ export async function issueContract(
 export async function terminateContract(id: string): Promise<ActionResult> {
   const ctx = await requireOrg();
   const res = await terminateContractCore(ctx, { id });
-  if (res.ok) refreshApp();
-  return { ok: res.ok, error: res.error };
+  if (!res.ok) return res;
+  refreshApp();
+  return { ok: true };
 }

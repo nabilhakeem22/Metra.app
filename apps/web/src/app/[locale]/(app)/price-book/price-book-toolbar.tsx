@@ -12,6 +12,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { pickLocale } from '@/lib/i18n/pick-locale';
+import { PriceBookSectionAdder } from './price-book-section-adder';
 import type { SectionOption } from './types';
 
 export function PriceBookToolbar({
@@ -23,10 +24,6 @@ export function PriceBookToolbar({
   onActiveOnlyChange,
   sections,
   canManage,
-  newSection,
-  onNewSectionChange,
-  onAddSection,
-  pending,
   onBulkUpdate,
   onImport,
   onNew,
@@ -39,10 +36,6 @@ export function PriceBookToolbar({
   onActiveOnlyChange: (value: boolean) => void;
   sections: SectionOption[];
   canManage: boolean;
-  newSection: string;
-  onNewSectionChange: (value: string) => void;
-  onAddSection: () => void;
-  pending: boolean;
   onBulkUpdate: () => void;
   onImport: () => void;
   onNew: () => void;
@@ -92,26 +85,7 @@ export function PriceBookToolbar({
 
       {canManage && (
         <div className="ms-auto flex flex-wrap items-center gap-2">
-          <div className="flex items-center gap-1">
-            <Input
-              value={newSection}
-              onChange={(e) => onNewSectionChange(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') onAddSection();
-              }}
-              placeholder={t('addSectionPlaceholder')}
-              className="h-10 w-40"
-              aria-label={t('addSection')}
-            />
-            <Button
-              variant="secondary"
-              onClick={onAddSection}
-              disabled={pending || newSection.trim() === ''}
-            >
-              <Plus className="size-4" aria-hidden />
-              {t('addSection')}
-            </Button>
-          </div>
+          <PriceBookSectionAdder />
           <Button variant="secondary" onClick={onBulkUpdate}>
             <Percent className="size-4" aria-hidden />
             {t('actions.bulkUpdate')}

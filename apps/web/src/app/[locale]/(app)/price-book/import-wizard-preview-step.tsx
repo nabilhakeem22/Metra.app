@@ -13,6 +13,7 @@ export function ImportWizardPreviewStep({
   preview,
   pending,
   validCount,
+  formError,
   onBack,
   runImport,
 }: {
@@ -20,6 +21,8 @@ export function ImportWizardPreviewStep({
   preview: ValidatedRow[];
   pending: boolean;
   validCount: number;
+  /** Why the import did not run, by its cause. */
+  formError: string | null;
   onBack: () => void;
   runImport: () => void;
 }) {
@@ -66,6 +69,11 @@ export function ImportWizardPreviewStep({
         </table>
       </div>
 
+      {formError && (
+        <p className="text-body text-destructive" role="alert">
+          {formError}
+        </p>
+      )}
       <div className="flex justify-between pt-2">
         <Button
           type="button"

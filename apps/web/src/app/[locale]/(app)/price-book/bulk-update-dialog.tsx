@@ -1,30 +1,17 @@
 'use client';
 
-import { Loader2 } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
-import { useState, useTransition } from 'react';
-import { Button } from '@/components/ui/button';
+import { useEffect, useState, useTransition } from 'react';
 import { FieldHint } from '@/components/ui/field-hint';
+import { FormField } from '@/components/ui/form-field';
+import { FormSheet } from '@/components/ui/form-sheet';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetTitle,
-} from '@/components/ui/sheet';
+import { SelectControl } from '@/components/ui/select-control';
+import { useFieldErrors } from '@/hooks/use-field-errors';
 import { toast } from '@/hooks/use-toast';
-import { resolveActionError } from '@/lib/actions/error-message';
-import type { ActionCode } from '@/lib/actions/result';
 import { pickLocale } from '@/lib/i18n/pick-locale';
 import { bulkUpdatePrices } from '@/lib/price-book/actions';
+import { bulkPercentError } from '@/lib/price-book/percent';
 import type { SectionOption } from './types';
 
 export interface BulkUpdateDialogProps {
@@ -35,140 +22,110 @@ export interface BulkUpdateDialogProps {
 
 type Target = 'cost' | 'price' | 'both';
 
-export function BulkUpdateDialog({
-  open,
-  onOpenChange,
-  sections,
-}: BulkUpdateDialogProps) {
+const BULK_FIELDS = ['sectionId', 'pct'] as const;
+const TARGETS: { value: Target; label: string }[] = [
+  { value: 'cost', label: 'bulk.targetCost' },
+  { value: 'price', label: 'bulk.targetPrice' },
+  { value: 'both', label: 'bulk.targetBoth' },
+];
+
+/**
+ * Change one category's costs and/or prices by a percentage, now. A
+ * percentage that is missing, not a number or outside -100 to 1000 is said
+ * under the box before anything is sent; a category deleted meanwhile is said
+ * under the category.
+ */
+export function BulkUpdateDialog({ open, onOpenChange, sections }: BulkUpdateDialogProps) {
   const t = useTranslations('priceBook');
   const th = useTranslations('hints.priceBook');
   const te = useTranslations('errors');
+  const tc = useTranslations('common');
   const locale = useLocale();
   const [sectionId, setSectionId] = useState<string>(sections[0]?.id ?? '');
   const [pct, setPct] = useState('0');
   const [target, setTarget] = useState<Target>('both');
-  const [effectiveDate, setEffectiveDate] = useState(
-    new Date().toISOString().slice(0, 10),
-  );
+  const [effectiveDate, setEffectiveDate] = useState(new Date().toISOString().slice(0, 10));
   const [pending, startTransition] = useTransition();
+  const errors = useFieldErrors({ fields: BULK_FIELDS, translate: te });
+  const { clear } = errors;
+
+  useEffect(() => {
+    if (open) clear();
+  }, [open, clear]);
 
   function apply() {
+    const pctError = bulkPercentError(pct);
+    if (errors.applyLocal(pctError ? { pct: pctError } : {})) return;
     startTransition(async () => {
-      const res = await bulkUpdatePrices({
-        sectionId,
-        pct,
-        target,
-        effectiveDate,
-      });
-      if (res.ok) {
-        toast({
-          title: t('bulk.applied', { count: res.data?.itemCount ?? 0 }),
-        });
+      try {
+        const res = await bulkUpdatePrices({ sectionId, pct, target, effectiveDate });
+        if (errors.applyResult(res)) return;
+        toast({ title: t('bulk.applied', { count: res.data?.itemCount ?? 0 }) });
         onOpenChange(false);
-      } else {
-        toast({
-          title: resolveActionError(res.error as ActionCode, te),
-          variant: 'destructive',
-        });
+      } catch (rejection) {
+        errors.applyRejection(rejection);
       }
     });
   }
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="w-full sm:max-w-md">
-        <SheetTitle>{t('bulk.title')}</SheetTitle>
-        <SheetDescription>{t('bulk.description')}</SheetDescription>
+    <FormSheet
+      open={open}
+      onOpenChange={onOpenChange}
+      title={t('bulk.title')}
+      description={t('bulk.description')}
+      onSubmit={apply}
+      submitLabel={t('bulk.apply')}
+      cancelLabel={t('bulk.cancel')}
+      closeLabel={tc('close')}
+      pending={pending}
+      formError={errors.formError}
+      invalidAttempt={errors.invalidAttempt}
+    >
+      <FormField id="bulk-category" label={t('bulk.category')} hint={th('category')} {...errors.bind('sectionId')}>
+        <SelectControl
+          value={sectionId}
+          onValueChange={setSectionId}
+          options={sections.map((s) => ({
+            value: s.id,
+            label: pickLocale({ nameAr: s.nameAr, nameEn: s.nameEn }, 'name', locale).value,
+          }))}
+        />
+      </FormField>
 
-        <div className="mt-4 space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="bulk-category" className="flex items-center">
-              {t('bulk.category')}
-              <FieldHint id="bulk-category-hint" hint={th('category')} />
-            </Label>
-            <Select value={sectionId} onValueChange={setSectionId}>
-              <SelectTrigger id="bulk-category" aria-describedby="bulk-category-hint">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {sections.map((s) => (
-                  <SelectItem key={s.id} value={s.id}>
-                    {pickLocale({ nameAr: s.nameAr, nameEn: s.nameEn }, 'name', locale).value}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+      <FormField id="bulk-pct" label={t('bulk.percentage')} hint={th('pctChange')} {...errors.bind('pct')}>
+        <Input dir="ltr" inputMode="decimal" value={pct} onChange={(e) => setPct(e.target.value)} />
+      </FormField>
 
-          <div className="space-y-2">
-            <Label htmlFor="bulk-pct" className="flex items-center">
-              {t('bulk.percentage')}
-              <FieldHint id="bulk-pct-hint" hint={th('pctChange')} />
-            </Label>
-            <Input
-              id="bulk-pct"
-              dir="ltr"
-              inputMode="decimal"
-              aria-describedby="bulk-pct-hint"
-              value={pct}
-              onChange={(e) => setPct(e.target.value)}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <span className="inline-flex items-center text-body font-medium">
-              {t('bulk.target')}
-              <FieldHint hint={th('target')} />
-            </span>
-            <div className="flex gap-4">
-              {(['cost', 'price', 'both'] as Target[]).map((tg) => (
-                <label key={tg} className="flex items-center gap-2 text-body">
-                  <input
-                    type="radio"
-                    name="bulk-target"
-                    value={tg}
-                    checked={target === tg}
-                    onChange={() => setTarget(tg)}
-                  />
-                  {t(
-                    tg === 'cost'
-                      ? 'bulk.targetCost'
-                      : tg === 'price'
-                        ? 'bulk.targetPrice'
-                        : 'bulk.targetBoth',
-                  )}
-                </label>
-              ))}
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="bulk-date">{t('bulk.effectiveDate')}</Label>
-            <Input
-              id="bulk-date"
-              type="date"
-              dir="ltr"
-              value={effectiveDate}
-              onChange={(e) => setEffectiveDate(e.target.value)}
-            />
-          </div>
-
-          <div className="flex justify-end gap-2 pt-2">
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={() => onOpenChange(false)}
-              disabled={pending}
-            >
-              {t('bulk.cancel')}
-            </Button>
-            <Button variant="default" type="button" onClick={apply} disabled={pending}>
-              {pending && <Loader2 className="size-4 animate-spin" aria-hidden />}
-              {t('bulk.apply')}
-            </Button>
-          </div>
+      <div className="space-y-2">
+        <span className="inline-flex items-center text-body font-medium">
+          {t('bulk.target')}
+          <FieldHint hint={th('target')} />
+        </span>
+        <div className="flex gap-4">
+          {TARGETS.map((option) => (
+            <label key={option.value} className="flex items-center gap-2 text-body">
+              <input
+                type="radio"
+                name="bulk-target"
+                value={option.value}
+                checked={target === option.value}
+                onChange={() => setTarget(option.value)}
+              />
+              {t(option.label)}
+            </label>
+          ))}
         </div>
-      </SheetContent>
-    </Sheet>
+      </div>
+
+      <FormField id="bulk-date" label={t('bulk.effectiveDate')}>
+        <Input
+          type="date"
+          dir="ltr"
+          value={effectiveDate}
+          onChange={(e) => setEffectiveDate(e.target.value)}
+        />
+      </FormField>
+    </FormSheet>
   );
 }

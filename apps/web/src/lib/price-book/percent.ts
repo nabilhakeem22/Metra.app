@@ -1,6 +1,7 @@
 // The bulk price-change percentage validator. PURE and CLIENT-SAFE: the same
 // shape gate the rest of the money path uses, kept here so the rule that stands
 // between a pasted string and a numeric multiply is unit-testable on its own.
+import type { FieldError } from '@/lib/actions/field-errors';
 import { MONEY_RE } from '@/lib/aggregates/proposal-totals';
 
 /** A bulk change may not wipe more than the whole price, nor multiply it by 11. */
@@ -23,4 +24,13 @@ export function isBulkPercent(value: unknown): value is string {
   return (
     Number.isFinite(parsed) && parsed >= BULK_PCT_MIN && parsed <= BULK_PCT_MAX
   );
+}
+
+/** Why `value` is not a usable bulk percentage, as the refusal under its box. */
+export function bulkPercentError(value: unknown): FieldError | null {
+  if (isBulkPercent(value)) return null;
+  if (typeof value !== 'string' || value.trim() === '') return { code: 'required' };
+  return MONEY_RE.test(value)
+    ? { code: 'out_of_range', params: { min: BULK_PCT_MIN, max: BULK_PCT_MAX } }
+    : { code: 'not_a_number' };
 }

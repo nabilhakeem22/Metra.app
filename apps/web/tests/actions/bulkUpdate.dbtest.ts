@@ -1,7 +1,8 @@
 import { sql } from 'drizzle-orm';
 import { afterAll, describe, expect, it } from 'vitest';
 import { withOrgContext } from '@/lib/db/context';
-import { bulkUpdatePricesCore, loadStarterCatalogueCore } from '@/lib/price-book/bulk-core';
+import { bulkUpdatePricesCore } from '@/lib/price-book/bulk-core';
+import { loadStarterCatalogueCore } from '@/lib/price-book/starter-core';
 import { createCostItemCore } from '@/lib/price-book/core';
 import { listCostItems } from '@/lib/price-book/queries';
 import { closeFixture, ctxFor, raw, seedOrg, teardown } from './fixture';
@@ -68,10 +69,10 @@ describe('bulkUpdatePricesCore — piastre-exact', () => {
     const civil = await raw.sectionId(orgId, 'civil');
     expect(
       await bulkUpdatePricesCore(ctx, { sectionId: civil, pct: '2000', target: 'both' }),
-    ).toEqual({ ok: false, error: 'invalid_percentage' });
+    ).toEqual({ ok: false, error: 'check_fields', fields: { pct: { code: 'out_of_range', params: { min: -100, max: 1000 } } } });
     expect(
       await bulkUpdatePricesCore(ctx, { sectionId: civil, pct: '-150', target: 'cost' }),
-    ).toEqual({ ok: false, error: 'invalid_percentage' });
+    ).toEqual({ ok: false, error: 'check_fields', fields: { pct: { code: 'out_of_range', params: { min: -100, max: 1000 } } } });
   });
 
   // Number() read these as 100, 26 and 5, so a string that never looked like a
@@ -85,10 +86,18 @@ describe('bulkUpdatePricesCore — piastre-exact', () => {
       code: 'PCT-1', nameEn: 'P', sectionId: civil, unit: 'sqm',
       defaultUnitCost: '100', defaultUnitPrice: '200',
     });
-    for (const pct of ['1e2', '0x1A', ' 5 ', '', '1001', '-100.1']) {
+    const said: Record<string, object> = {
+      '1e2': { code: 'not_a_number' },
+      '0x1A': { code: 'not_a_number' },
+      ' 5 ': { code: 'not_a_number' },
+      '': { code: 'required' },
+      '1001': { code: 'out_of_range', params: { min: -100, max: 1000 } },
+      '-100.1': { code: 'out_of_range', params: { min: -100, max: 1000 } },
+    };
+    for (const [pct, refusal] of Object.entries(said)) {
       expect(
         await bulkUpdatePricesCore(ctx, { sectionId: civil, pct, target: 'both' }),
-      ).toEqual({ ok: false, error: 'invalid_percentage' });
+      ).toEqual({ ok: false, error: 'check_fields', fields: { pct: refusal } });
     }
     expect(await raw.count('price_changes', orgId)).toBe(0);
     expect(await raw.count('price_change_lines', orgId)).toBe(0);

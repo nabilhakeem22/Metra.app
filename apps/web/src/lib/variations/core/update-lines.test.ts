@@ -18,9 +18,19 @@ const line = (patch: Partial<VariationLineInput> = {}): VariationLineInput => ({
   ...patch,
 });
 
+/** The whole-VO refusal code ('check_fields' when cells were refused). */
 const errorOf = (lines: VariationLineInput[]) => {
   const result = validateVariationLines(lines);
-  return result.ok ? null : result.error;
+  return result.ok ? null : result.refusal.error;
+};
+
+/** Every cell refusal, by path, as its code. */
+const fieldsOf = (lines: VariationLineInput[]) => {
+  const result = validateVariationLines(lines);
+  if (result.ok) return null;
+  return Object.fromEntries(
+    Object.entries(result.refusal.fields ?? {}).map(([path, error]) => [path, error?.code]),
+  );
 };
 
 describe('validateVariationLines', () => {
@@ -67,29 +77,33 @@ describe('validateVariationLines', () => {
   });
 
   it('requires a description in at least one language', () => {
-    expect(errorOf([line({ descriptionEn: '  ', descriptionAr: null })])).toBe(
-      'line_required',
-    );
+    expect(fieldsOf([line({ descriptionEn: '  ', descriptionAr: null })])).toEqual({
+      'lines.0.description': 'line_required',
+    });
     expect(validateVariationLines([line({ descriptionEn: null, descriptionAr: 'باب' })]).ok).toBe(
       true,
     );
   });
 
   it('refuses a line with no unit', () => {
-    expect(errorOf([line({ unit: null })])).toBe('invalid');
+    expect(fieldsOf([line({ unit: null })])).toEqual({ 'lines.0.unit': 'line_required' });
   });
 
   it('tells an unreadable figure apart from one past the cap', () => {
     // A bare `invalid` on a quantity of 1e13 tells the studio nothing it can act
     // on — it can see perfectly well that the cell IS a number.
-    expect(errorOf([line({ qty: 'abc' })])).toBe('invalid');
-    expect(errorOf([line({ qty: '10000000000000' })])).toBe('amount_too_large');
-    expect(errorOf([line({ unitPrice: '99999999999999' })])).toBe('amount_too_large');
+    expect(fieldsOf([line({ qty: 'abc' })])).toEqual({ 'lines.0.qty': 'not_a_number' });
+    expect(fieldsOf([line({ qty: '10000000000000' })])).toEqual({ 'lines.0.qty': 'amount_too_large' });
+    expect(fieldsOf([line({ unitPrice: '99999999999999' })])).toEqual({
+      'lines.0.unitPrice': 'amount_too_large',
+    });
   });
 
   it('refuses a discount outside [0,100]', () => {
-    expect(errorOf([line({ discountPct: '101' })])).toBe('discount_out_of_range');
-    expect(errorOf([line({ discountPct: '-1' })])).toBe('invalid'); // not even a percentage
+    expect(fieldsOf([line({ discountPct: '101' })])).toEqual({
+      'lines.0.discountPct': 'discount_out_of_range',
+    });
+    expect(fieldsOf([line({ discountPct: '-1' })])).toEqual({ 'lines.0.discountPct': 'not_negative' });
     expect(validateVariationLines([line({ discountPct: '100' })]).ok).toBe(true);
   });
 
@@ -97,8 +111,8 @@ describe('validateVariationLines', () => {
     // qty and unitPrice are each legal; qty * unitPrice is not. The per-factor
     // checks do not imply this one.
     expect(
-      errorOf([line({ qty: '999999999', unitPrice: '999999999', unitCost: '0' })]),
-    ).toBe('amount_too_large');
+      fieldsOf([line({ qty: '999999999', unitPrice: '999999999', unitCost: '0' })]),
+    ).toEqual({ 'lines.0.qty': 'amount_too_large' });
   });
 
   it('refuses a SUM past the cap even when every line is inside it', () => {
@@ -121,7 +135,12 @@ describe('validateVariationLines', () => {
     expect(result.netDelta).toBe('0.0000');
   });
 
-  it('stops at the FIRST bad line — a partially-saved variation is not a state', () => {
-    expect(errorOf([line(), line({ qty: 'abc' }), line({ unit: null })])).toBe('invalid');
+  it('refuses every bad cell at once, each under its own line', () => {
+    expect(errorOf([line(), line({ qty: 'abc' })])).toBe('check_fields');
+    expect(fieldsOf([line(), line({ qty: 'abc', unitPrice: 'x' }), line({ unit: null })])).toEqual({
+      'lines.1.qty': 'not_a_number',
+      'lines.1.unitPrice': 'not_a_number',
+      'lines.2.unit': 'line_required',
+    });
   });
 });

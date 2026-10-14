@@ -6,8 +6,8 @@
 // title_ar and title_en unconditionally would trip the bilingual CHECK on a save
 // that never meant to touch the title, and storing an omitted retention as a zero
 // would quietly rewrite a commercial term.
-import type { ActionCode } from '@/lib/actions/result';
-import { readMoneyString } from '@/lib/money/read';
+import type { FieldError, FieldErrors } from '@/lib/actions/field-errors';
+import { collectFieldErrors, readMoneyField, type FieldRead } from '@/lib/validation/field-rules';
 import { validIsoDate } from '@/lib/validation/iso-date';
 import { isPercentInRange } from '@/lib/validation/percent';
 import { clean } from '@/lib/validation/text';
@@ -38,40 +38,55 @@ const TEXT_COLUMNS = [
   'termsEn',
 ] as const;
 
+/** A percentage the caller sent (`undefined` = not sent), read inside 0 to 100. */
+function readHeaderPercent(sent: string | null | undefined): FieldRead<string | undefined> {
+  if (sent == null) return { ok: true, value: undefined };
+  const read = readMoneyField(sent, { blank: '0' });
+  if (!read.ok) return read;
+  return isPercentInRange(read.value)
+    ? read
+    : { ok: false, error: { code: 'out_of_range', params: { min: 0, max: 100 } } };
+}
+
+const dateRefusal = (date: string | null): FieldError | null =>
+  date && !validIsoDate(date) ? { code: 'invalid_date' } : null;
+
 /**
- * Validate the two percentages and the three dates BEFORE the transaction opens.
- *
- * `undefined` = the field was not sent. `null` back from `readMoneyString` = it
- * was sent and is unreadable. Confusing the two would store an omitted retention
- * as a refusal, or a refused one as an omission.
+ * Validate the two percentages and the three dates BEFORE the transaction opens,
+ * every refusal at once under its field. `undefined` = the field was not sent;
+ * confusing it with a refused value would store an omitted retention as a
+ * refusal, or a refused one as an omission. An end before the start is said
+ * under the end date: that is the one to change.
  */
 export function validateContractHeader(
   header: ContractHeaderInput,
-): ValidatedContractHeader | ActionCode {
-  const retentionPct =
-    header.retentionPct != null
-      ? readMoneyString(header.retentionPct, { blank: '0' })
-      : undefined;
-  const advancePct =
-    header.advancePct != null
-      ? readMoneyString(header.advancePct, { blank: '0' })
-      : undefined;
-  if (retentionPct === null || advancePct === null) return 'invalid_percentage';
-  if (retentionPct !== undefined && !isPercentInRange(retentionPct)) {
-    return 'invalid_percentage';
-  }
-  if (advancePct !== undefined && !isPercentInRange(advancePct)) {
-    return 'invalid_percentage';
-  }
-
+): { ok: true; value: ValidatedContractHeader } | { ok: false; errors: FieldErrors } {
+  const retentionPct = readHeaderPercent(header.retentionPct);
+  const advancePct = readHeaderPercent(header.advancePct);
   const signatureDate = clean(header.signatureDate);
   const startDate = clean(header.startDate);
   const endDate = clean(header.endDate);
-  for (const date of [signatureDate, startDate, endDate]) {
-    if (date && !validIsoDate(date)) return 'invalid_date';
-  }
-  if (startDate && endDate && endDate < startDate) return 'invalid_dates';
-  return { retentionPct, advancePct, signatureDate, startDate, endDate };
+  const endRefusal =
+    dateRefusal(endDate) ??
+    (startDate && endDate && endDate < startDate ? { code: 'invalid_dates' as const } : null);
+  const errors = collectFieldErrors({
+    retentionPct: retentionPct.ok ? null : retentionPct.error,
+    advancePct: advancePct.ok ? null : advancePct.error,
+    signatureDate: dateRefusal(signatureDate),
+    startDate: dateRefusal(startDate),
+    endDate: endRefusal,
+  });
+  if (!retentionPct.ok || !advancePct.ok || Object.keys(errors).length > 0) return { ok: false, errors };
+  return {
+    ok: true,
+    value: {
+      retentionPct: retentionPct.value,
+      advancePct: advancePct.value,
+      signatureDate,
+      startDate,
+      endDate,
+    },
+  };
 }
 
 /** The columns to write — ONLY the ones the caller actually provided. */

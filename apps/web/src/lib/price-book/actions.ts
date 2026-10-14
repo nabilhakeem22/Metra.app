@@ -5,10 +5,8 @@ import { err, type ActionResult } from '@/lib/actions/result';
 import { requireOrg } from '@/lib/auth/require-org';
 import {
   bulkUpdatePricesCore,
-  loadStarterCatalogueCore,
   type BulkUpdateInput,
   type BulkUpdateSummary,
-  type StarterLoadSummary,
 } from './bulk-core';
 import {
   createCostItemCore,
@@ -17,7 +15,9 @@ import {
   type CostItemInput,
 } from './core';
 import type { ColumnMapping } from './import';
+import { loadStarterCatalogueCore, type StarterLoadSummary } from './starter-core';
 import {
+  fileRefused,
   importCostItemsCore,
   parseCostImportCore,
   type ImportSummary,
@@ -77,9 +77,9 @@ export async function parseCostImport(
 ): Promise<ActionResult & { data?: ParsedSheet }> {
   const ctx = await requireOrg();
   const file = formData.get('file');
-  if (!(file instanceof File)) return err('invalid');
+  if (!(file instanceof File)) return err('malformed');
   // Reject oversize BEFORE buffering the whole file into memory.
-  if (file.size > MAX_IMPORT_BYTES) return err('import_too_large');
+  if (file.size > MAX_IMPORT_BYTES) return fileRefused('import_too_large');
   const bytes = new Uint8Array(await file.arrayBuffer());
   return parseCostImportCore(ctx, { bytes });
 }

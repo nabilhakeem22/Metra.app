@@ -9,10 +9,12 @@
 // crossed between phases.
 import { contractLines, variationOrders, type MetraDb } from '@metra/db';
 import { and, eq, inArray } from 'drizzle-orm';
+import { failFields, type FieldError } from '@/lib/actions/field-errors';
 import { fail, mutateInOrg } from '@/lib/actions/mutate';
 import { err, type ActionResult } from '@/lib/actions/result';
 import type { OrgContext } from '@/lib/db/context';
 import { isUuid } from '@/lib/uuid';
+import { variationLinePath } from '../line-fields';
 import type { PreparedVariationLine, SaveVariationDraftInput } from './types';
 import { validateVariationLines } from './update-lines';
 import { persistVariationHeader, persistVariationLines } from './update-persist';
@@ -36,15 +38,15 @@ async function loadDraftVariationForUpdate(
     .where(eq(variationOrders.id, variationOrderId))
     .for('update')
     .limit(1);
-  if (!variation) fail('invalid');
+  if (!variation) fail('record_not_found');
   if (variation.status !== 'draft') fail('variation_not_draft');
   return { contractId: variation.contractId };
 }
 
 /**
  * Every baseline line id the studio referenced must belong to THIS VO's own
- * contract — rejecting another contract's line before the composite FK would,
- * with a coded error instead of a constraint violation.
+ * contract, refused before the composite FK would be, under the line's baseline
+ * choice: a line the contract no longer has (or never had) says so there.
  */
 async function validateBaselineLines(
   tx: MetraDb,
@@ -68,7 +70,14 @@ async function validateBaselineLines(
         eq(contractLines.contractId, contractId),
       ),
     );
-  if (found.length !== baselineIds.length) fail('invalid');
+  const known = new Set(found.map((row) => row.id));
+  const errors: Record<string, FieldError> = {};
+  lines.forEach((line, index) => {
+    if (line.contractLineId !== null && !known.has(line.contractLineId)) {
+      errors[variationLinePath(index, 'contractLineId')] = { code: 'no_longer_exists' };
+    }
+  });
+  if (Object.keys(errors).length > 0) failFields(errors);
 }
 
 /**
@@ -85,10 +94,10 @@ export async function saveVariationDraftCore(
   input: SaveVariationDraftInput,
 ): Promise<ActionResult> {
   const id = input.id?.trim();
-  if (!id || !isUuid(id)) return err('invalid');
+  if (!id || !isUuid(id)) return err('malformed');
 
   const validated = validateVariationLines(input.lines ?? []);
-  if (!validated.ok) return err(validated.error);
+  if (!validated.ok) return validated.refusal;
   const { lines, netDelta } = validated;
 
   return mutateInOrg(

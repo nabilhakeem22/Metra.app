@@ -116,8 +116,10 @@ describe.each<TestLocale>(['en', 'ar-EG'])('contract screens say the cause, not 
       { locale },
     );
     await press(at('variations.create'));
-    fireEvent.change(screen.getByPlaceholderText(at('variations.title_')), { target: { value: 'Extra door' } });
-    fireEvent.click(screen.getAllByRole('button').find((b) => b.textContent === '')!);
+    fireEvent.change(screen.getByLabelText(at('variations.title_'), { exact: false }), {
+      target: { value: 'Extra door' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: at('variations.line.add') }));
     await press(at('variations.saveDraft'));
     expectSaid(locale, code);
   });
