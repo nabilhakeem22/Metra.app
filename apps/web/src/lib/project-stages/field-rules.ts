@@ -3,6 +3,7 @@
 import type { StageStatus } from '@metra/db';
 import type { FieldError, FieldErrors } from '@/lib/actions/field-errors';
 import { collectFieldErrors } from '@/lib/validation/field-rules';
+import { PERCENT_REFUSAL } from '@/lib/validation/number-field-rules';
 import { normalizePercent } from '@/lib/validation/percent';
 import { clean } from '@/lib/validation/text';
 import { bilingualNameErrors, type BilingualNameField } from '@/lib/validation/text-field-rules';
@@ -42,7 +43,7 @@ export function stageFieldErrors(input: StageInput, mode: 'add' | 'update'): Fie
   return {
     ...nameErrors(input, mode),
     ...collectFieldErrors<Exclude<StageField, BilingualNameField>>({
-      progressPct: progressSent && normalizePercent(input.progressPct) === null ? { code: 'invalid_percentage' } : null,
+      progressPct: progressSent && normalizePercent(input.progressPct) === null ? PERCENT_REFUSAL : null,
       startDate: dateRefusal(input.startDate),
       endDate: dateRefusal(input.endDate),
     }),

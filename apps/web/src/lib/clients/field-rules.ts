@@ -3,6 +3,7 @@
 // broken rule is reported at once, under its own field.
 import { hasFieldErrors, type FieldErrors } from '@/lib/actions/field-errors';
 import { collectFieldErrors } from '@/lib/validation/field-rules';
+import { PERCENT_REFUSAL } from '@/lib/validation/number-field-rules';
 import { normalizePercent } from '@/lib/validation/percent';
 import { clean } from '@/lib/validation/text';
 import { bilingualNameErrors, maxCharacters, type BilingualNameField } from '@/lib/validation/text-field-rules';
@@ -75,8 +76,8 @@ export function readClientInput(input: ClientInput, rules: { phoneRequired: bool
       address: maxCharacters(v.address, CLIENT_LIMITS.address),
       taxRegistrationNumber: maxCharacters(v.taxRegistrationNumber, CLIENT_LIMITS.taxRegistrationNumber),
       notes: maxCharacters(v.notes, CLIENT_LIMITS.notes),
-      advancePct: advancePct === null ? { code: 'invalid_percentage' } : null,
-      retentionPct: retentionPct === null ? { code: 'invalid_percentage' } : null,
+      advancePct: advancePct === null ? PERCENT_REFUSAL : null,
+      retentionPct: retentionPct === null ? PERCENT_REFUSAL : null,
     }),
   };
   if (hasFieldErrors(errors) || advancePct === null || retentionPct === null) return { ok: false, errors };

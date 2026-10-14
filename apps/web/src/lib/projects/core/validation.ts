@@ -7,6 +7,7 @@ import { clients, PROJECT_STATUSES, type MetraDb, type ProjectStatus } from '@me
 import { eq } from 'drizzle-orm';
 import { failFields, fieldsFailed } from '@/lib/actions/field-errors';
 import type { ConstraintRefusal } from '@/lib/actions/mutation-failure';
+import { PERCENT_REFUSAL } from '@/lib/validation/number-field-rules';
 import { err, type ActionResult } from '@/lib/actions/result';
 import { isUuid } from '@/lib/uuid';
 import { clean } from '@/lib/validation/text';
@@ -18,8 +19,8 @@ export type Validated = ProjectValues & { status: ProjectStatus };
 /** Named constraints a write can lose a race on, each answered under its field. */
 export const PROJECT_REFUSALS: readonly ConstraintRefusal[] = [
   { constraint: 'projects_org_id_code_unique', field: 'code', error: { code: 'code_taken' } },
-  { constraint: 'projects_advance_pct_range', field: 'advancePct', error: { code: 'invalid_percentage' } },
-  { constraint: 'projects_retention_pct_range', field: 'retentionPct', error: { code: 'invalid_percentage' } },
+  { constraint: 'projects_advance_pct_range', field: 'advancePct', error: PERCENT_REFUSAL },
+  { constraint: 'projects_retention_pct_range', field: 'retentionPct', error: PERCENT_REFUSAL },
   { constraint: 'projects_client_same_org_fk', field: 'clientId', error: { code: 'no_longer_exists' } },
   { constraint: 'projects_type_same_org_fk', field: 'typeId', error: { code: 'no_longer_exists' } },
 ];

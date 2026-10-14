@@ -5,6 +5,7 @@
 import { hasFieldErrors, type FieldError, type FieldErrors } from '@/lib/actions/field-errors';
 import { isUuid } from '@/lib/uuid';
 import { collectFieldErrors } from '@/lib/validation/field-rules';
+import { PERCENT_REFUSAL } from '@/lib/validation/number-field-rules';
 import { normalizePercent } from '@/lib/validation/percent';
 import { clean } from '@/lib/validation/text';
 import { bilingualNameErrors, maxCharacters, type BilingualNameField } from '@/lib/validation/text-field-rules';
@@ -83,8 +84,8 @@ export function readProjectInput(input: ProjectInput, rules: ProjectRules = {}):
       code: codeRefusal(code, rules),
       clientId: isUuid(clientId) ? null : { code: 'client_required' },
       description: maxCharacters(text.description, PROJECT_LIMITS.description),
-      advancePct: advancePct === null ? { code: 'invalid_percentage' } : null,
-      retentionPct: retentionPct === null ? { code: 'invalid_percentage' } : null,
+      advancePct: advancePct === null ? PERCENT_REFUSAL : null,
+      retentionPct: retentionPct === null ? PERCENT_REFUSAL : null,
       startDate: rules.requireStartDate && !startDate ? { code: 'start_date_required' } : null,
       endDate: endsBeforeStart(startDate, endDate) ? { code: 'invalid_dates' } : null,
       city: maxCharacters(text.city, PROJECT_LIMITS.city),

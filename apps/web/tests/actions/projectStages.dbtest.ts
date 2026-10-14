@@ -65,7 +65,7 @@ describe('project stages — start from any phase (no linear guard)', () => {
 describe('project stages — progress bounds', () => {
   it('addStage/updateStage reject progress outside [0,100] under the progress field', async () => {
     const { ctx, projectId } = await setup();
-    const outOfRange = { ok: false, error: 'check_fields', fields: { progressPct: { code: 'invalid_percentage' } } };
+    const outOfRange = { ok: false, error: 'check_fields', fields: { progressPct: { code: 'out_of_range', params: { min: 0, max: 100 } } } };
     expect(await addStageCore(ctx, { projectId, nameEn: 'Extra', progressPct: '150' })).toEqual(outOfRange);
     const [s0] = await listStages(ctx, projectId);
     expect(await updateStageCore(ctx, { id: s0.id, progressPct: '-5' })).toEqual(outOfRange);
