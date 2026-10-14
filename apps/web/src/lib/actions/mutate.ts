@@ -2,7 +2,6 @@ import type { MetraDb } from '@metra/db';
 import { eq } from 'drizzle-orm';
 import type { PgColumn, PgTable } from 'drizzle-orm/pg-core';
 import { recordAudit, type AuditEntry } from '@/lib/audit';
-import { DbWriteUncertainError } from '@/lib/db/client';
 import { withOrgContext, type OrgContext } from '@/lib/db/context';
 import {
   canUseFlow,
@@ -11,12 +10,8 @@ import {
 import type { Flow } from '@/lib/entitlements/flows';
 import { can } from '@/lib/permissions/can';
 import type { Capability, PermissionAction } from '@/lib/permissions/roles';
-import { isImmutabilityViolation, isUniqueViolationOf } from './db-conflict';
-import { isAmbiguousDbOutcome } from './db-failure';
-import { loggableFailure } from './loggable-failure';
-import { ActionError, type ActionCode, type ActionResult } from './result';
-
-import { fail } from './result';
+import { mutationFailure, type MutationFailureOptions } from './mutation-failure';
+import { ActionError, fail, type ActionCode, type ActionResult } from './result';
 
 export { ActionError, fail } from './result';
 
@@ -25,35 +20,20 @@ export { ActionError, fail } from './result';
  * opening a tx, then runs `fn` inside withOrgContext with an `audit` helper. When
  * `opts.flow` is set, the workspace's entitlements are checked INSIDE the tx
  * (before `fn`) and the mutation is refused with `flow_not_enabled` if the plan
- * doesn't turn that guided flow on. ActionError -> its coded failure; anything
- * else -> logged + 'generic'.
+ * doesn't turn that guided flow on.
  *
- * `conflict` / `immutableCode` let a mutation NAME the race it can lose. Both
- * are optional and both are per-mutation on purpose: 23505 means "a contract
- * already exists" at contracts/generate and something else entirely at
- * team/invite, so the wrapper cannot know the sentence — only the caller can.
- *
- * `conflict` names the CONSTRAINT as well as the code, because a mutation is
- * several statements and only one of them is the race the caller means. The
- * first version took a bare code and answered it for ANY 23505 in the
- * transaction: `generateContractCore` would have called a collision on the
- * contract NUMBER "a contract already exists", and removed the one log line
- * that recorded it.
+ * A failure is answered by `mutationFailure` (its order is the contract): an
+ * ActionError with its code and fields, an ambiguous outcome as `uncertain`, a
+ * deadlock as `busy`, a constraint the caller named in `refusals` as its code or
+ * field error, an MT100 as `immutableCode ?? 'immutable'`, and anything else
+ * logged with a reference and answered `generic`.
  */
 export async function mutateInOrg<T = void>(
   ctx: OrgContext,
-  opts: {
+  opts: MutationFailureOptions & {
     capability?: Capability;
     action?: PermissionAction;
     flow?: Flow;
-    /**
-     * The code a 23505 from ONE NAMED constraint means. Any other 23505 —
-     * including one from a different constraint on the same table — stays
-     * `generic` and is logged, because it is not the race the caller named.
-     */
-    conflict?: { constraint: string; code: ActionCode };
-    /** The code an MT100 from THIS mutation means (the row locked under us). */
-    immutableCode?: ActionCode;
   },
   fn: (tx: MetraDb, audit: (e: AuditEntry) => Promise<void>) => Promise<T>,
 ): Promise<ActionResult & { data?: T }> {
@@ -80,53 +60,8 @@ export async function mutateInOrg<T = void>(
     );
     return { ok: true, data };
   } catch (e) {
-    return { ok: false, error: mutationFailureCode(e, opts) };
+    return mutationFailure(e, opts);
   }
-}
-
-/**
- * The code a caught mutation failure answers with. THE ORDER IS THE CONTRACT.
- *
- * `ActionError` first: a coded refusal the mutation raised itself outranks any
- * SQLSTATE reading.
- *
- * AMBIGUOUS second, and it must stay ahead of the two named conflicts below.
- * Two families are ambiguous rather than failed, and both surface as `uncertain`
- * so the cockpit HOLDS the attempt's idempotency key instead of retrying under a
- * fresh one: a write deadline (the abandoned tx may still COMMIT — see
- * DbWriteUncertainError) and a lock timeout / cancelled statement / dropped
- * connection (see isAmbiguousDbOutcome — the attempt being retried may be the
- * very thing holding that lock, and it is still free to commit). Re-labelling
- * one of those a REFUSAL would tell a caller the write is dead when it is not.
- *
- * Then the caller's own names for 23505 and MT100, if it gave any — and the
- * 23505 only when the CONSTRAINT matches too. An unexpected unique violation
- * inside a mutation that named a different one is not a refusal the product has
- * a sentence for; it belongs in the tail, with the log line.
- *
- * A MAPPED CODE IS NOT LOGGED AS AN ERROR, and neither is an ambiguous one:
- * they are expected races the product has a sentence for, and a false defect
- * line in the log is half of what this exists to remove. Only the unclassified
- * tail reaches `console.error` + `generic`, and what it logs is a WHITELIST —
- * see `loggableFailure`, and never the error object itself.
- */
-function mutationFailureCode(
-  e: unknown,
-  opts: {
-    conflict?: { constraint: string; code: ActionCode };
-    immutableCode?: ActionCode;
-  },
-): ActionCode {
-  if (e instanceof ActionError) return e.code;
-  if (e instanceof DbWriteUncertainError || isAmbiguousDbOutcome(e)) {
-    return 'uncertain';
-  }
-  if (opts.conflict && isUniqueViolationOf(e, opts.conflict.constraint)) {
-    return opts.conflict.code;
-  }
-  if (opts.immutableCode && isImmutabilityViolation(e)) return opts.immutableCode;
-  console.error('mutateInOrg failed:', loggableFailure(e));
-  return 'generic';
 }
 
 /**

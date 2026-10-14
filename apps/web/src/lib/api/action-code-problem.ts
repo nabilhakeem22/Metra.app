@@ -15,6 +15,8 @@ export const ACTION_CODE_PROBLEM: Record<ActionCode, ApiProblemKind> = {
   uncertain: 'internal',
   // Field errors; the Public API keeps the code, not the field map.
   check_fields: 'bad-request',
+  // A deadlock: another write held what this one needed. Repeat after a refresh.
+  busy: 'conflict',
   name_required: 'bad-request',
   phone_required: 'bad-request',
   start_date_required: 'bad-request',

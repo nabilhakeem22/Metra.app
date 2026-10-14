@@ -8,6 +8,9 @@ export type CommonActionCode =
   | 'uncertain'
   // The input broke field rules; `fields` says which, under each field.
   | 'check_fields'
+  // A deadlock rolled this attempt back; its partner may be an earlier attempt
+  // of the same act, so it is not a definite refusal (retry-policy.ts).
+  | 'busy'
   | 'name_required'
   | 'phone_required'
   | 'start_date_required'

@@ -3,13 +3,13 @@
  *
  * The sibling of `db-failure.ts`, and deliberately its opposite. That module
  * classifies AMBIGUOUS outcomes — a statement whose twin may still be about to
- * commit — which must never be re-labelled a refusal. These two SQLSTATEs are
+ * commit — which must never be re-labelled a refusal. The SQLSTATEs here are
  * the other kind: the write definitely did not happen, and it did not happen for
  * a reason the caller often knows the name of. A `mutateInOrg` that says which
  * code its own race means turns "something went wrong" into a sentence, and
  * stops an expected race writing a false defect line into the Worker log.
  *
- * Pure and dependency-free so it is unit-testable without a database: both read
+ * Pure and dependency-free so it is unit-testable without a database: each reads
  * the error's SQLSTATE through `sqlstateOf`, which finds it whether postgres.js
  * threw it directly or drizzle wrapped it in a `DrizzleQueryError` first.
  */
@@ -35,16 +35,23 @@ export function isUniqueViolation(error: unknown): boolean {
 }
 
 /**
- * SQLSTATE 23505 raised by ONE named constraint — the only 23505 a caller may
- * translate into its own sentence.
+ * The constraint-violation SQLSTATEs a caller may name by constraint: unique
+ * (23505), check (23514) and foreign key (23503). Each one is a definite
+ * refusal of the statement, and each one names the constraint that refused.
+ */
+const NAMEABLE_REFUSALS: ReadonlySet<string> = new Set(['23505', '23514', '23503']);
+
+/**
+ * A unique, check or foreign-key violation raised by ONE named constraint — the
+ * only one a caller may translate into its own sentence.
  *
- * `isUniqueViolation` alone is not enough for that job. A mutation is usually
- * several statements in one transaction, and "the 23505 I expected" and "a 23505
- * I did not expect" are indistinguishable by SQLSTATE: `generateContractCore`
- * races on (org_id, source_proposal_id), but the same transaction also inserts
- * a contract NUMBER under its own unique index. Naming the constraint is what
- * keeps an unexpected collision in the unclassified tail, where it is logged,
- * instead of being answered "a contract already exists".
+ * The SQLSTATE alone is not enough for that job. A mutation is usually several
+ * statements in one transaction, and "the 23505 I expected" and "a 23505 I did
+ * not expect" are indistinguishable by SQLSTATE: `generateContractCore` races on
+ * (org_id, source_proposal_id), but the same transaction also inserts a contract
+ * NUMBER under its own unique index. Naming the constraint is what keeps an
+ * unexpected collision in the unclassified tail, where it is logged, instead of
+ * being answered "a contract already exists".
  *
  * BOTH READS COME OFF ONE OBJECT (`driverRefusalOf`). Asking twice — once for
  * the code, once for the name — lets the two answers come from two different
@@ -53,9 +60,13 @@ export function isUniqueViolation(error: unknown): boolean {
  * prevent. postgres.js writes `constraint_name` itself (snake_case, as the wire
  * protocol spells it); it is not something a caller or an attacker chooses.
  */
-export function isUniqueViolationOf(error: unknown, constraint: string): boolean {
+export function isConstraintRefusalOf(error: unknown, constraint: string): boolean {
   const refusal = driverRefusalOf(error);
-  return refusal?.code === UNIQUE_VIOLATION && refusal.constraintName === constraint;
+  return (
+    refusal !== undefined &&
+    NAMEABLE_REFUSALS.has(refusal.code) &&
+    refusal.constraintName === constraint
+  );
 }
 
 /**

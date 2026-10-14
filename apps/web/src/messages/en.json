@@ -469,6 +469,7 @@
     "generic": "We could not finish this because of a problem on our side. What you entered is still here; try again in a moment.",
     "uncertain": "We could not confirm your change was saved: the server was busy or the connection dropped. Refresh the page to check before trying again.",
     "check_fields": "Some fields need fixing. Look for the message under each one.",
+    "busy": "Someone was changing the same record at that moment. Refresh the page to see the latest, then try again.",
     "reference": "If it keeps happening, send us this code: {reference}.",
     "unreachable": "We could not reach Metra. Check your internet connection, then try again. What you entered is still here.",
     "field": {

@@ -42,11 +42,19 @@ function wrapped(driverError: Record<string, unknown>): Error {
 }
 
 const CONTRACT_RACE: MutateOptions = {
-  conflict: {
-    constraint: 'contracts_org_id_source_proposal_unique',
-    code: 'contract_exists',
-  },
+  refusals: [{ constraint: 'contracts_org_id_source_proposal_unique', code: 'contract_exists' }],
 };
+
+/** The reference an unknown failure carries: 8 Crockford base32 characters. */
+const REFERENCE = /^[0-9A-HJKMNP-TV-Z]{8}$/;
+
+/** The answer of the logged tail. */
+const GENERIC = { ok: false, error: 'generic', reference: expect.stringMatching(REFERENCE) };
+
+/** The one tail log line: a label, the reference, and the whitelisted failure. */
+function tailLine(failure: Record<string, string>) {
+  return ['mutateInOrg failed', { reference: expect.stringMatching(REFERENCE), failure }];
+}
 
 describe('mutateInOrg failure mapping', () => {
   beforeEach(() => {
@@ -108,17 +116,14 @@ describe('mutateInOrg failure mapping', () => {
         { code: '23505', constraint_name: 'contracts_org_id_number_unique' },
         CONTRACT_RACE,
       ),
-    ).resolves.toEqual({ ok: false, error: 'generic' });
+    ).resolves.toEqual(GENERIC);
     expect(logged).toHaveBeenCalledOnce();
     logged.mockRestore();
   });
 
   it('leaves an UNATTRIBUTED 23505 in the tail too', async () => {
     const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
-    await expect(rejectWith({ code: '23505' }, CONTRACT_RACE)).resolves.toEqual({
-      ok: false,
-      error: 'generic',
-    });
+    await expect(rejectWith({ code: '23505' }, CONTRACT_RACE)).resolves.toEqual(GENERIC);
     expect(logged).toHaveBeenCalledOnce();
     logged.mockRestore();
   });
@@ -127,7 +132,7 @@ describe('mutateInOrg failure mapping', () => {
     const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
     await expect(
       rejectWith({ code: '23505', constraint_name: 'clients_org_id_phone_unique' }),
-    ).resolves.toEqual({ ok: false, error: 'generic' });
+    ).resolves.toEqual(GENERIC);
     expect(logged).toHaveBeenCalledOnce();
     logged.mockRestore();
   });
@@ -156,14 +161,14 @@ describe('mutateInOrg failure mapping', () => {
         where: 'PL/pgSQL function do_something() line 3',
         schema_name: 'public',
       }),
-    ).resolves.toEqual({ ok: false, error: 'generic' });
-    expect(logged).toHaveBeenCalledWith('mutateInOrg failed:', {
+    ).resolves.toEqual(GENERIC);
+    expect(logged).toHaveBeenCalledWith(...tailLine({
       name: 'PostgresError',
       code: '23505',
       constraint_name: 'clients_org_id_phone_unique',
       table_name: 'clients',
       message: 'duplicate key value violates unique constraint',
-    });
+    }));
     logged.mockRestore();
   });
 
@@ -175,10 +180,10 @@ describe('mutateInOrg failure mapping', () => {
       constraint_name: { toString: () => 'not a string' },
       table_name: '',
     });
-    expect(logged).toHaveBeenCalledWith('mutateInOrg failed:', {
+    expect(logged).toHaveBeenCalledWith(...tailLine({
       code: '42703',
       message: 'column "nope" does not exist',
-    });
+    }));
     logged.mockRestore();
   });
 
@@ -224,14 +229,14 @@ describe('mutateInOrg failure mapping', () => {
           detail: 'Key (org_id, phone)=(…, 01000000000) already exists.',
         }),
       ),
-    ).resolves.toEqual({ ok: false, error: 'generic' });
-    expect(logged).toHaveBeenCalledWith('mutateInOrg failed:', {
+    ).resolves.toEqual(GENERIC);
+    expect(logged).toHaveBeenCalledWith(...tailLine({
       name: 'PostgresError',
       code: '23505',
       constraint_name: 'clients_org_id_phone_unique',
       table_name: 'clients',
       message: 'duplicate key value violates unique constraint',
-    });
+    }));
     expect(JSON.stringify(logged.mock.calls)).not.toContain('01000000000');
     logged.mockRestore();
   });
@@ -242,11 +247,11 @@ describe('mutateInOrg failure mapping', () => {
     const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
     await expect(
       rejectWith(Object.assign(new Error('socket hang up'), { name: 'TypeError' })),
-    ).resolves.toEqual({ ok: false, error: 'generic' });
-    expect(logged).toHaveBeenCalledWith('mutateInOrg failed:', {
+    ).resolves.toEqual(GENERIC);
+    expect(logged).toHaveBeenCalledWith(...tailLine({
       name: 'TypeError',
       message: 'socket hang up',
-    });
+    }));
     logged.mockRestore();
   });
 
@@ -262,7 +267,7 @@ describe('mutateInOrg failure mapping', () => {
     const PARAMS = ['org-uuid', 'victim@example.com', '+201001234567', 'أحمد المصري'];
 
     const loggedObject = (spy: ReturnType<typeof vi.spyOn>) =>
-      spy.mock.calls.at(-1)?.[1] as Record<string, string>;
+      (spy.mock.calls.at(-1)?.[1] as { failure: Record<string, string> }).failure;
 
     /** Nothing a bound parameter, a row or a statement could have put there. */
     function expectNoRowValues(spy: ReturnType<typeof vi.spyOn>) {
@@ -281,10 +286,7 @@ describe('mutateInOrg failure mapping', () => {
         PARAMS,
         new Error('Network connection lost.'),
       );
-      await expect(rejectWith(thrown)).resolves.toEqual({
-        ok: false,
-        error: 'generic',
-      });
+      await expect(rejectWith(thrown)).resolves.toEqual(GENERIC);
       expect(loggedObject(logged)).toEqual({
         name: 'Error',
         thrown: 'DrizzleQueryError',
@@ -351,16 +353,13 @@ describe('mutateInOrg failure mapping', () => {
   it('says what it got when a non-object was thrown', async () => {
     const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
     await rejectWith('just a string');
-    expect(logged).toHaveBeenCalledWith('mutateInOrg failed:', { thrown: 'string' });
+    expect(logged).toHaveBeenCalledWith(...tailLine({ thrown: 'string' }));
     logged.mockRestore();
   });
 
   it('keeps generic for a failure it cannot classify', async () => {
     const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
-    await expect(rejectWith(new Error('boom'))).resolves.toEqual({
-      ok: false,
-      error: 'generic',
-    });
+    await expect(rejectWith(new Error('boom'))).resolves.toEqual(GENERIC);
     // A definite refusal is silent; an unclassified failure must leave a trace.
     expect(logged).toHaveBeenCalledOnce();
     logged.mockRestore();

@@ -2,8 +2,6 @@ import 'server-only';
 // Writing the contract's own row, from the accepted proposal it is generated
 // from. Nothing here is recomputed — see `contractTotalsFromProposal`.
 import { contracts, proposals, type MetraDb } from '@metra/db';
-import { isUniqueViolationOf } from '@/lib/actions/db-conflict';
-import { fail } from '@/lib/actions/mutate';
 import { formatDocNumber } from '@/lib/format/doc-number';
 
 type ProposalRow = typeof proposals.$inferSelect;
@@ -53,7 +51,13 @@ function contractTitleEn(proposal: ProposalRow, number: number): string | null {
   return formatDocNumber('C', number, new Date(proposal.createdAt).getFullYear());
 }
 
-/** Insert the contract row and return its id. */
+/**
+ * Insert the contract row and return its id. Losing the race for
+ * (org_id, source_proposal_id) is answered `contract_exists` by the generate
+ * mutation's `refusals`, which names THAT constraint only: a collision on
+ * contracts_org_id_number_unique means the allocator failed, and stays in the
+ * logged tail.
+ */
 export async function persistContractHeader(
   tx: MetraDb,
   orgId: string,
@@ -61,30 +65,20 @@ export async function persistContractHeader(
   number: number,
   percentages: { advancePct: string; retentionPct: string },
 ): Promise<string> {
-  try {
-    const [row] = await tx
-      .insert(contracts)
-      .values({
-        orgId,
-        number,
-        titleAr: proposal.titleAr,
-        titleEn: contractTitleEn(proposal, number),
-        sourceProposalId: proposal.id,
-        clientId: proposal.clientId,
-        projectId: proposal.projectId,
-        currency: proposal.currency,
-        ...percentages,
-        ...contractTotalsFromProposal(proposal),
-      })
-      .returning({ id: contracts.id });
-    return row.id;
-  } catch (e) {
-    // Lost the race for (org_id, source_proposal_id): one contract already
-    // exists. NAMED, not any 23505: this same INSERT also carries
-    // contracts_org_id_number_unique, and a collision there means the number
-    // allocator failed — a defect, which must reach the unclassified tail and
-    // its log line rather than be answered "a contract already exists".
-    if (isUniqueViolationOf(e, CONTRACT_PER_PROPOSAL_CONSTRAINT)) fail('contract_exists');
-    throw e;
-  }
+  const [row] = await tx
+    .insert(contracts)
+    .values({
+      orgId,
+      number,
+      titleAr: proposal.titleAr,
+      titleEn: contractTitleEn(proposal, number),
+      sourceProposalId: proposal.id,
+      clientId: proposal.clientId,
+      projectId: proposal.projectId,
+      currency: proposal.currency,
+      ...percentages,
+      ...contractTotalsFromProposal(proposal),
+    })
+    .returning({ id: contracts.id });
+  return row.id;
 }

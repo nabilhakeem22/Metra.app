@@ -4,7 +4,6 @@
 // engine and executor are Step 2 — nothing here writes engagement_transitions or
 // moves state off `created`.
 import { clients, designEngagements, projects } from '@metra/db';
-import { driverRefusalOf } from '@metra/db/sqlstate';
 import { fail, mutateInOrg, requireInOrg } from '@/lib/actions/mutate';
 import { err, type ActionResult } from '@/lib/actions/result';
 import { allocateNumber } from '@/lib/db/allocate-number';
@@ -13,24 +12,11 @@ import { clean } from '@/lib/validation/text';
 import { isUuid } from '@/lib/uuid';
 import { assertProjectHasDeliverySlot } from './delivery-slot';
 
-// Postgres unique-violation SQLSTATE + the one-active-delivery backstop index
-// (migration 0032). A 23505 on THIS named index means a concurrent create won the
-// race for the project's single active slot — map it to the friendly
-// `project_delivery_exists`. Any other 23505 (or a missing constraint name)
-// rethrows so it surfaces as `generic` rather than being silently misreported.
-// Both reads come off ONE object: this insert runs through the ORM, so from
-// drizzle 0.44 the SQLSTATE and the constraint name sit one level down the
-// `cause` chain — and asking for them separately would let them answer from two
-// different levels, pairing a code from one error with a name from another.
-const UNIQUE_VIOLATION = '23505';
+// The one-active-delivery backstop index (migration 0032). A 23505 on THIS named
+// index means a concurrent create won the race for the project's single active
+// slot: the same answer the read-guard gives. Any other 23505 stays in the
+// logged tail rather than being misreported.
 const ONE_ACTIVE_INDEX = 'design_engagements_one_active_per_project_uniq';
-
-function isActiveDeliveryConflict(e: unknown): boolean {
-  const refusal = driverRefusalOf(e);
-  return (
-    refusal?.code === UNIQUE_VIOLATION && refusal.constraintName === ONE_ACTIVE_INDEX
-  );
-}
 
 export interface CreateEngagementInput {
   titleAr?: string | null;
@@ -66,7 +52,12 @@ export async function createEngagementCore(
 
   return mutateInOrg(
     ctx,
-    { capability: 'engagements_design', action: 'create', flow: 'interior' },
+    {
+      capability: 'engagements_design',
+      action: 'create',
+      flow: 'interior',
+      refusals: [{ constraint: ONE_ACTIVE_INDEX, code: 'project_delivery_exists' }],
+    },
     async (tx, audit) => {
       // Existence assertions, not reads: the call IS the check, and it fails with
       // a coded error if the id belongs to another tenant or to nothing.
@@ -95,28 +86,21 @@ export async function createEngagementCore(
 
       // The INSERT can still race the read-guard above: two concurrent creates on
       // an empty project both pass the read, both allocate a number, then contend
-      // on the one-active-per-project unique index (0032). The loser's 23505 on
-      // THAT index maps to `project_delivery_exists`; anything else rethrows ->
-      // mutateInOrg -> generic.
-      let row: { id: string };
-      try {
-        [row] = await tx
-          .insert(designEngagements)
-          .values({
-            orgId: ctx.orgId,
-            number,
-            titleAr,
-            titleEn,
-            clientId,
-            projectId,
-            state: 'created',
-            offPlan: input.offPlan ?? false,
-          })
-          .returning({ id: designEngagements.id });
-      } catch (e) {
-        if (isActiveDeliveryConflict(e)) return fail('project_delivery_exists');
-        throw e;
-      }
+      // on the one-active-per-project unique index (0032); `refusals` answers the
+      // loser.
+      const [row] = await tx
+        .insert(designEngagements)
+        .values({
+          orgId: ctx.orgId,
+          number,
+          titleAr,
+          titleEn,
+          clientId,
+          projectId,
+          state: 'created',
+          offPlan: input.offPlan ?? false,
+        })
+        .returning({ id: designEngagements.id });
 
       await audit({
         entity: 'design_engagement',

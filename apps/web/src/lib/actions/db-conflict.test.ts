@@ -4,7 +4,7 @@ import {
   isImmutabilityViolation,
   isOwnerOnlyColumnViolation,
   isUniqueViolation,
-  isUniqueViolationOf,
+  isConstraintRefusalOf,
 } from './db-conflict';
 
 describe('isUniqueViolation', () => {
@@ -21,12 +21,12 @@ describe('isUniqueViolation', () => {
   });
 });
 
-describe('isUniqueViolationOf', () => {
+describe('isConstraintRefusalOf', () => {
   const CONSTRAINT = 'contracts_org_id_source_proposal_unique';
 
   it('is true only when the SQLSTATE and the constraint name both match', () => {
     expect(
-      isUniqueViolationOf({ code: '23505', constraint_name: CONSTRAINT }, CONSTRAINT),
+      isConstraintRefusalOf({ code: '23505', constraint_name: CONSTRAINT }, CONSTRAINT),
     ).toBe(true);
   });
 
@@ -36,7 +36,7 @@ describe('isUniqueViolationOf', () => {
     // failed. Answering it "a contract already exists" would dress a defect as
     // an expected race and delete its log line.
     expect(
-      isUniqueViolationOf(
+      isConstraintRefusalOf(
         { code: '23505', constraint_name: 'contracts_org_id_number_unique' },
         CONSTRAINT,
       ),
@@ -44,20 +44,27 @@ describe('isUniqueViolationOf', () => {
   });
 
   it('is false when the server attributed the error to no constraint at all', () => {
-    expect(isUniqueViolationOf({ code: '23505' }, CONSTRAINT)).toBe(false);
-    expect(isUniqueViolationOf({ code: '23505', constraint_name: '' }, CONSTRAINT)).toBe(
+    expect(isConstraintRefusalOf({ code: '23505' }, CONSTRAINT)).toBe(false);
+    expect(isConstraintRefusalOf({ code: '23505', constraint_name: '' }, CONSTRAINT)).toBe(
       false,
     );
-    expect(isUniqueViolationOf({ code: '23505', constraint_name: 7 }, CONSTRAINT)).toBe(
+    expect(isConstraintRefusalOf({ code: '23505', constraint_name: 7 }, CONSTRAINT)).toBe(
       false,
     );
   });
 
+  it('also names a CHECK (23514) and a FOREIGN KEY (23503) violation', () => {
+    expect(isConstraintRefusalOf({ code: '23514', constraint_name: 'c' }, 'c')).toBe(true);
+    expect(isConstraintRefusalOf({ code: '23503', constraint_name: 'c' }, 'c')).toBe(true);
+    // A data error (string too long) names no refusal the caller can own.
+    expect(isConstraintRefusalOf({ code: '22001', constraint_name: 'c' }, 'c')).toBe(false);
+  });
+
   it('is false for the right constraint under the WRONG SQLSTATE', () => {
     expect(
-      isUniqueViolationOf({ code: 'MT100', constraint_name: CONSTRAINT }, CONSTRAINT),
+      isConstraintRefusalOf({ code: 'MT100', constraint_name: CONSTRAINT }, CONSTRAINT),
     ).toBe(false);
-    expect(isUniqueViolationOf(null, CONSTRAINT)).toBe(false);
+    expect(isConstraintRefusalOf(null, CONSTRAINT)).toBe(false);
   });
 
   it('refuses a code and a constraint name that came from DIFFERENT errors (S3)', () => {
@@ -70,18 +77,18 @@ describe('isUniqueViolationOf', () => {
       code: '23505',
       cause: { code: '23514', constraint_name: CONSTRAINT },
     };
-    expect(isUniqueViolationOf(mixedNodes, CONSTRAINT)).toBe(false);
+    expect(isConstraintRefusalOf(mixedNodes, CONSTRAINT)).toBe(false);
 
     // The mirror: the name on the OUTER node, the 23505 on the inner one.
     const mirrored = {
       constraint_name: CONSTRAINT,
       cause: { code: '23505', constraint_name: 'some_other_index' },
     };
-    expect(isUniqueViolationOf(mirrored, CONSTRAINT)).toBe(false);
+    expect(isConstraintRefusalOf(mirrored, CONSTRAINT)).toBe(false);
 
     // ...and the control: one node carrying both is still answered.
     expect(
-      isUniqueViolationOf({ cause: { code: '23505', constraint_name: CONSTRAINT } }, CONSTRAINT),
+      isConstraintRefusalOf({ cause: { code: '23505', constraint_name: CONSTRAINT } }, CONSTRAINT),
     ).toBe(true);
   });
 });
@@ -130,7 +137,7 @@ describe('a drizzle-wrapped driver error reads exactly like a bare one', () => {
 
   it('sees the constraint name through the wrapper', () => {
     expect(
-      isUniqueViolationOf(
+      isConstraintRefusalOf(
         wrap({ code: '23505', constraint_name: CONSTRAINT }),
         CONSTRAINT,
       ),
@@ -139,7 +146,7 @@ describe('a drizzle-wrapped driver error reads exactly like a bare one', () => {
 
   it('still refuses a wrapped 23505 raised by a DIFFERENT constraint', () => {
     expect(
-      isUniqueViolationOf(
+      isConstraintRefusalOf(
         wrap({ code: '23505', constraint_name: 'contracts_org_id_number_unique' }),
         CONSTRAINT,
       ),
@@ -149,13 +156,13 @@ describe('a drizzle-wrapped driver error reads exactly like a bare one', () => {
   it('is false for the wrapper alone — it carries no SQLSTATE of its own', () => {
     expect(isUniqueViolation(wrap(undefined))).toBe(false);
     expect(isImmutabilityViolation(wrap(undefined))).toBe(false);
-    expect(isUniqueViolationOf(wrap(undefined), CONSTRAINT)).toBe(false);
+    expect(isConstraintRefusalOf(wrap(undefined), CONSTRAINT)).toBe(false);
   });
 });
 
 describe('a refusal is never confused with an ambiguous outcome', () => {
   it('55P03 stays AMBIGUOUS and reaches neither classifier', () => {
-    // The ordering inside mutationFailureCode depends on this: a lock timeout
+    // The ordering inside mutationFailure depends on this: a lock timeout
     // must surface as `uncertain` so the caller HOLDS its idempotency key. If it
     // could also read as a named conflict, a retry would mint a fresh key.
     expect(isAmbiguousDbOutcome({ code: '55P03' })).toBe(true);

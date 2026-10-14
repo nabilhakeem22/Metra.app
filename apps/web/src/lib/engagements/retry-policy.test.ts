@@ -15,6 +15,8 @@ describe('isDefiniteRefusal', () => {
     expect(isDefiniteRefusal('engagement_not_found')).toBe(true);
     expect(isDefiniteRefusal('gate_b_not_cleared')).toBe(true);
     expect(isDefiniteRefusal('invalid')).toBe(true);
+    // Field rules refused the input before anything was written.
+    expect(isDefiniteRefusal('check_fields')).toBe(true);
   });
 
   it('is false for every AMBIGUOUS answer — the key must be held', () => {
@@ -22,6 +24,9 @@ describe('isDefiniteRefusal', () => {
     // 'generic' is the one that mattered: an unmapped Postgres error arrives
     // here, and the first attempt may still commit.
     expect(isDefiniteRefusal('generic')).toBe(false);
+    // A deadlock rolled THIS attempt back, but its partner may be the abandoned
+    // first attempt of the same act, still free to commit.
+    expect(isDefiniteRefusal('busy')).toBe(false);
   });
 
   it('holds on a code it has never heard of', () => {
@@ -34,6 +39,7 @@ describe('isDefiniteRefusal', () => {
   it('never lists a code that means "we do not know"', () => {
     expect(DEFINITE_REFUSALS.has('uncertain')).toBe(false);
     expect(DEFINITE_REFUSALS.has('generic')).toBe(false);
+    expect(DEFINITE_REFUSALS.has('busy')).toBe(false);
   });
 });
 

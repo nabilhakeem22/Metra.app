@@ -139,10 +139,7 @@ export async function generateContractCore(
       // "a contract already exists" to a collision on
       // contracts_org_id_number_unique — a broken allocator wearing a sentence
       // about something else, with its log line removed.
-      conflict: {
-        constraint: CONTRACT_PER_PROPOSAL_CONSTRAINT,
-        code: 'contract_exists',
-      },
+      refusals: [{ constraint: CONTRACT_PER_PROPOSAL_CONSTRAINT, code: 'contract_exists' }],
     },
     async (tx, audit) => {
       const proposal = await loadAcceptedProposal(tx, proposalId);

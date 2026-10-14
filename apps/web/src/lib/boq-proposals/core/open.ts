@@ -105,7 +105,7 @@ export async function openBoqProposalCore(
     {
       capability: 'proposals_build',
       action: 'create',
-      conflict: { constraint: 'proposals_org_engagement_unique', code: 'boq_send_conflict' },
+      refusals: [{ constraint: 'proposals_org_engagement_unique', code: 'boq_send_conflict' }],
     },
     async (tx, audit) => {
       const engagement = await requireActiveEngagement(tx, input.engagementId);
