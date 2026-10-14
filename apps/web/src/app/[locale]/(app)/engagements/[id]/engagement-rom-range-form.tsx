@@ -1,12 +1,16 @@
 'use client';
 
 import { useTranslations } from 'next-intl';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
+import { FormField } from '@/components/ui/form-field';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import type { ActionResult } from '@/lib/actions/result';
+import { useFieldErrors } from '@/hooks/use-field-errors';
+import { useFocusFirstInvalid } from '@/hooks/use-focus-first-invalid';
 import { setEngagementRom } from '@/lib/engagements/actions';
+import { ROM_FIELDS, romFieldErrors } from '@/lib/engagements/rom-field-rules';
 import { FormActions } from './engagement-form-actions';
+import { FormRefusal } from './form-refusal';
+import type { RunAction } from './run-action';
 
 /**
  * Set the indicative build-cost range — the non-binding bracket the client must
@@ -30,51 +34,56 @@ export function RomRangeForm({
 }: {
   engagementId: string;
   pending: boolean;
-  runAction: (fn: () => Promise<ActionResult>) => void;
+  runAction: RunAction;
   onDone: () => void;
 }) {
   const t = useTranslations('engagements.controls');
   const [low, setLow] = useState('');
   const [high, setHigh] = useState('');
+  const te = useTranslations('errors');
+  const errors = useFieldErrors({ fields: ROM_FIELDS, translate: te });
+  const formRef = useRef<HTMLDivElement>(null);
+  useFocusFirstInvalid(formRef, errors.invalidAttempt);
 
   function save() {
-    runAction(async () => {
-      const res = await setEngagementRom({
-        engagementId,
-        romLow: low.trim(),
-        romHigh: high.trim(),
-      });
-      if (res.ok) onDone();
-      return res;
-    });
+    const range = { romLow: low.trim(), romHigh: high.trim() };
+    if (errors.applyLocal(romFieldErrors(range))) return;
+    runAction(
+      async () => {
+        const res = await setEngagementRom({ engagementId, ...range });
+        if (res.ok) onDone();
+        return res;
+      },
+      undefined,
+      undefined,
+      errors,
+    );
   }
 
+  const amount = (value: string, onChange: (value: string) => void) => (
+    <Input
+      dir="ltr"
+      inputMode="decimal"
+      className="tabular-nums"
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+    />
+  );
+
   return (
-    <div className="space-y-3 rounded-item border border-[color:var(--rule)] bg-[color:var(--track)] p-4">
+    <div
+      ref={formRef}
+      className="space-y-3 rounded-item border border-[color:var(--rule)] bg-[color:var(--track)] p-4"
+    >
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <div className="space-y-1.5">
-          <Label htmlFor="rom-low">{t('low')}</Label>
-          <Input
-            id="rom-low"
-            dir="ltr"
-            inputMode="decimal"
-            className="tabular-nums"
-            value={low}
-            onChange={(e) => setLow(e.target.value)}
-          />
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="rom-high">{t('high')}</Label>
-          <Input
-            id="rom-high"
-            dir="ltr"
-            inputMode="decimal"
-            className="tabular-nums"
-            value={high}
-            onChange={(e) => setHigh(e.target.value)}
-          />
-        </div>
+        <FormField id="rom-low" label={t('low')} required {...errors.bind('romLow')}>
+          {amount(low, setLow)}
+        </FormField>
+        <FormField id="rom-high" label={t('high')} required {...errors.bind('romHigh')}>
+          {amount(high, setHigh)}
+        </FormField>
       </div>
+      <FormRefusal message={errors.formError} />
       <FormActions
         pending={pending}
         onCancel={onDone}

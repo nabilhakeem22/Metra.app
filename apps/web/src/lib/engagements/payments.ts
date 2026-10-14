@@ -50,7 +50,7 @@ export async function recordPaymentCore(
   input: RecordPaymentInput,
 ): Promise<ActionResult & { data?: string; already?: boolean }> {
   const clean = normalizePayment(input);
-  if (!clean.ok) return { ok: false, error: clean.error };
+  if (!clean.ok) return clean.refusal;
   const payment = clean.value;
 
   // Set inside the tx when a keyed insert loses the ON CONFLICT race (or replays

@@ -77,11 +77,19 @@ describe('setClientExpectedDateCore', () => {
     const d = await atConceptReview('expected-bad');
     for (const expectedOn of [addDays(today, -1), addDays(today, 366)]) {
       const result = await setClientExpectedDateCore(d.ctx, { engagementId: d.engagementId, expectedOn });
-      expect(result, expectedOn).toEqual({ ok: false, error: 'expected_date_out_of_range' });
+      expect(result, expectedOn).toEqual({
+        ok: false,
+        error: 'check_fields',
+        fields: { expectedOn: { code: 'expected_date_out_of_range' } },
+      });
     }
     for (const expectedOn of ['2026-02-30', '20261020', 42 as never]) {
       const result = await setClientExpectedDateCore(d.ctx, { engagementId: d.engagementId, expectedOn });
-      expect(result, String(expectedOn)).toEqual({ ok: false, error: 'invalid_date' });
+      expect(result, String(expectedOn)).toEqual({
+        ok: false,
+        error: 'check_fields',
+        fields: { expectedOn: { code: 'invalid_date' } },
+      });
     }
     expect((await setClientExpectedDateCore(d.ctx, { engagementId: d.engagementId, expectedOn: today })).ok).toBe(true);
     expect(

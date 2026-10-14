@@ -2,7 +2,7 @@
 
 import { useTranslations } from 'next-intl';
 import { useState } from 'react';
-import type { ActionResult } from '@/lib/actions/result';
+import type { RunAction } from './run-action';
 import type {
   EngagementClientActivityRecord,
   EngagementEventRecord,
@@ -58,7 +58,7 @@ export function TimelineTab({
   /** The band has been issued to the client. Until then they have seen nothing. */
   romIssued: boolean;
   pending: boolean;
-  runAction: (fn: () => Promise<ActionResult>) => void;
+  runAction: RunAction;
 }) {
   const tp = useTranslations('engagements.panels');
   const tpa = useTranslations('engagements.panelActions');

@@ -515,6 +515,7 @@
     "tax_out_of_range": "VAT rate must be between 0 and 100",
     "too_many_lines": "This document has too many lines.",
     "invalid_date": "Enter a valid date",
+    "date_in_future": "That date is in the future. Pick today or an earlier day.",
     "amount_too_large": "That amount is too large",
     "last_primary_contact": "Set another contact as primary before removing this one",
     "contract_exists": "A contract already exists for this proposal",

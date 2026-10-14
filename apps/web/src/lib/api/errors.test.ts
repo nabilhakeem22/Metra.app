@@ -48,6 +48,7 @@ const ALL_CODES: ActionCode[] = [
   'tax_out_of_range',
   'too_many_lines',
   'invalid_date',
+  'date_in_future',
   'amount_too_large',
   'last_primary_contact',
   'contract_exists',

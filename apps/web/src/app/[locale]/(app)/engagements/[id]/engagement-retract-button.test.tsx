@@ -11,13 +11,13 @@ afterEach(() => actions.recordEventCorrection.mockClear());
 const en = (path: string) => messageAt('en', path);
 
 function openWithReason() {
-  const runAction = vi.fn((fn: () => Promise<unknown>) => void fn());
+  const runAction = vi.fn((fn: (idempotencyKey: string) => Promise<unknown>) => void fn('k'));
   renderWithIntl(
     <RetractButton engagementId="e-1" eventId="ev-1" pending={false} runAction={runAction} />,
     { locale: 'en' },
   );
   fireEvent.click(screen.getByRole('button', { name: en('engagements.timeline.retract') }));
-  fireEvent.change(screen.getByLabelText(en('engagements.timeline.retractReason')), {
+  fireEvent.change(screen.getByRole('textbox', { name: new RegExp(en('engagements.timeline.retractReason')) }), {
     target: { value: 'Logged on the wrong delivery' },
   });
   fireEvent.click(screen.getByRole('button', { name: en('engagements.timeline.retractConfirm') }));

@@ -6,16 +6,12 @@
 // writes. Mirrors `recordRomAcknowledgementCore` (rom-acknowledgement.ts).
 import { designEngagements, engagementEvents, type MetraDb } from '@metra/db';
 import { and, eq, inArray } from 'drizzle-orm';
+import { fieldsFailed } from '@/lib/actions/field-errors';
 import { fail, mutateInOrg } from '@/lib/actions/mutate';
 import { err, type ActionResult } from '@/lib/actions/result';
 import type { OrgContext } from '@/lib/db/context';
-import {
-  MAX_LABEL_CHARS,
-  MAX_NOTE_CHARS,
-  TOO_LONG,
-  optionalText,
-} from '@/lib/validation/text';
-import { isValidOccurredOn, liveEvents } from './event-provenance';
+import { readAcknowledgementFields } from './acknowledgement-field-rules';
+import { liveEvents } from './event-provenance';
 import { mayRecordHandoverConfirmation } from './handover-recorders';
 import { isTerminal } from './states';
 
@@ -56,23 +52,11 @@ export async function recordHandoffAcknowledgementCore(
   input: RecordHandoffAcknowledgementInput,
 ): Promise<ActionResult & { data?: string }> {
   if (!mayRecordHandoverConfirmation(ctx.role)) return err('forbidden');
-  const note = optionalText(input.note, MAX_NOTE_CHARS);
-  const evidence = optionalText(input.evidence, MAX_NOTE_CHARS);
-  // Same provenance rule as the ROM acknowledgement, validated before the
-  // transaction opens: a future date is a typo or a fabrication.
-  const occurredOn = optionalText(input.occurredOn, MAX_LABEL_CHARS);
-  // An over-long field is a REFUSAL, not a truncation: silently storing the
-  // first 2000 characters of what the studio typed would lose the rest of an
-  // evidentiary note without telling anyone.
-  if (note === TOO_LONG || evidence === TOO_LONG || occurredOn === TOO_LONG) {
-    return err('invalid');
-  }
-  if (
-    occurredOn !== null &&
-    !isValidOccurredOn(occurredOn, new Date().toISOString().slice(0, 10))
-  ) {
-    return err('invalid');
-  }
+  // Same provenance rules as the ROM acknowledgement, validated before the
+  // transaction opens, every refusal under its field.
+  const typed = readAcknowledgementFields(input, new Date().toISOString().slice(0, 10));
+  if (!typed.ok) return fieldsFailed(typed.errors);
+  const { note, occurredOn, evidence } = typed.values;
 
   return mutateInOrg(
     ctx,

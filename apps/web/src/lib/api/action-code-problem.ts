@@ -53,6 +53,7 @@ export const ACTION_CODE_PROBLEM: Record<ActionCode, ApiProblemKind> = {
   tax_out_of_range: 'bad-request',
   too_many_lines: 'bad-request',
   invalid_date: 'bad-request',
+  date_in_future: 'bad-request',
   amount_too_large: 'bad-request',
   last_primary_contact: 'bad-request',
   contract_exists: 'bad-request',

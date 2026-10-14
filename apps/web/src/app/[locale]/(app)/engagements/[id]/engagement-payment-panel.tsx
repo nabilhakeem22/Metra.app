@@ -1,33 +1,28 @@
 'use client';
 
 import { useTranslations } from 'next-intl';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import type { MilestoneKind, PaymentEventKind } from '@metra/db';
+import { FormField } from '@/components/ui/form-field';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { SelectControl } from '@/components/ui/select-control';
+import { useFieldErrors } from '@/hooks/use-field-errors';
+import { useFocusFirstInvalid } from '@/hooks/use-focus-first-invalid';
 import { toast } from '@/hooks/use-toast';
 import { recordPayment } from '@/lib/engagements/actions';
 import { PAYMENT_HELD_TRIGGER, actOf } from '@/lib/engagements/held-act';
+import { paymentFieldErrors } from '@/lib/engagements/payment-field-rules';
 import type { RecordPaymentInput } from '@/lib/engagements/payments';
 import { FormActions } from './engagement-form-actions';
+import { FormRefusal } from './form-refusal';
 import type { RunAction } from './use-engagement-action';
+
+/** The panel renders the amount; a refusal about anything else is said above Save. */
+const PANEL_FIELDS = ['amount'] as const;
 
 // Enum values declared locally (typed by the type-only @metra/db import) — a
 // client component must never import a runtime @metra/db value.
-const PAYMENT_KINDS: PaymentEventKind[] = [
-  'deposit',
-  'gate_a',
-  'gate_b',
-  'balance',
-  'revision_co',
-];
+const PAYMENT_KINDS: PaymentEventKind[] = ['deposit', 'gate_a', 'gate_b', 'balance', 'revision_co'];
 
 /**
  * Standalone "record a payment" panel. Owns its own kind/amount state; the
@@ -47,7 +42,8 @@ const PAYMENT_KINDS: PaymentEventKind[] = [
  * refused. CHANGING THE AMOUNT AFTER AN 'uncertain' IS A NEW ACT and gets a new
  * key: the refusal tells the studio to refresh and check before trying again, so
  * a studio who comes back and types a different figure is recording something
- * else — see HeldKey.act.
+ * else — see HeldKey.act. An amount the rules refuse is said under the box
+ * before anything is sent, so it never claims a key.
  */
 export function PaymentPanel({
   engagementId,
@@ -69,11 +65,16 @@ export function PaymentPanel({
 }) {
   const t = useTranslations('engagements.controls');
   const tk = useTranslations('engagements.paymentKind');
+  const te = useTranslations('errors');
   const [payKind, setPayKind] = useState<PaymentEventKind>('deposit');
   const [payAmount, setPayAmount] = useState('');
   const claimPending = (claimedMilestones as readonly PaymentEventKind[]).includes(payKind);
+  const errors = useFieldErrors({ fields: PANEL_FIELDS, translate: te });
+  const panelRef = useRef<HTMLDivElement>(null);
+  useFocusFirstInvalid(panelRef, errors.invalidAttempt);
 
   function save() {
+    if (errors.applyLocal(paymentFieldErrors({ amount: payAmount }))) return;
     // THE REQUEST, minus its key: one object, used twice. The three fields this
     // panel does not offer are `undefined` rather than absent — `actOf` is typed
     // against the request, so the day one of them is added here it must be named
@@ -103,44 +104,36 @@ export function PaymentPanel({
       },
       PAYMENT_HELD_TRIGGER,
       actOf<Omit<RecordPaymentInput, 'idempotencyKey'>>(submitted),
+      errors,
     );
   }
 
   return (
-    <div className="space-y-3 rounded-item border border-[color:var(--rule)] bg-[color:var(--track)] p-4">
+    <div
+      ref={panelRef}
+      className="space-y-3 rounded-item border border-[color:var(--rule)] bg-[color:var(--track)] p-4"
+    >
       {/* Kind is UP FRONT alongside amount — it drives the milestone gates and the
           ledger is append-only, so it is not optional metadata to be tucked away. */}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <div className="space-y-1.5">
-          <Label htmlFor="pay-kind">{t('kind')}</Label>
-          <Select
+        <FormField id="pay-kind" label={t('kind')}>
+          <SelectControl
             value={payKind}
             onValueChange={(v) => setPayKind(v as PaymentEventKind)}
-          >
-            <SelectTrigger id="pay-kind">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {PAYMENT_KINDS.map((k) => (
-                <SelectItem key={k} value={k}>
-                  {tk(k)}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="pay-amount">{t('amount')}</Label>
+            options={PAYMENT_KINDS.map((k) => ({ value: k, label: tk(k) }))}
+          />
+        </FormField>
+        <FormField id="pay-amount" label={t('amount')} {...errors.bind('amount')}>
           <Input
-            id="pay-amount"
             dir="ltr"
             inputMode="decimal"
             className="tabular-nums"
             value={payAmount}
             onChange={(e) => setPayAmount(e.target.value)}
           />
-        </div>
+        </FormField>
       </div>
+      <FormRefusal message={errors.formError} />
       {claimPending && (
         <p className="text-small text-[color:var(--text-muted)]">{t('claimPending')}</p>
       )}

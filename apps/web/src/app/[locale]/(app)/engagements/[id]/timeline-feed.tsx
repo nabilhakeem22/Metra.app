@@ -1,7 +1,7 @@
 'use client';
 
 import { useTranslations } from 'next-intl';
-import type { ActionResult } from '@/lib/actions/result';
+import type { RunAction } from './run-action';
 import type {
   EngagementClientActivityRecord,
   EngagementEventRecord,
@@ -26,7 +26,7 @@ export function TimelineFeed({
   clientActivity?: EngagementClientActivityRecord[];
   canRetract: boolean;
   pending: boolean;
-  runAction: (fn: () => Promise<ActionResult>) => void;
+  runAction: RunAction;
 }) {
   const t = useTranslations('engagements');
   const entries = buildTimelineEntries(

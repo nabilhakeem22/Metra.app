@@ -38,6 +38,8 @@ export type CommonActionCode =
   | 'token_expired'
   | 'already_responded'
   | 'invalid_date'
+  // A day that has not happened yet, where only a past day can be true.
+  | 'date_in_future'
   | 'amount_too_large'
   | 'last_primary_contact'
   | 'firm_type_unavailable'

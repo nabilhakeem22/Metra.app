@@ -4,22 +4,12 @@ import { useRef, useState, useTransition } from 'react';
 import { useRouter } from '@/i18n/routing';
 import type { ActionCode, ActionResult } from '@/lib/actions/result';
 import type { HeldKeyTrigger } from '@/lib/engagements/held-act';
+import type { RefusalSink, RunAction } from './run-action';
 import { releasesKey } from '@/lib/engagements/retry-policy';
 import { loggableFailure } from '@/lib/actions/loggable-failure';
 import { useHeldKeys } from './use-held-keys';
 
-/**
- * Runs ONE server action with the idempotency key held for the act it belongs to
- * (0050). `trigger` names the CONTROL — the two money controls are not lifecycle
- * triggers and hold their keys under their own names (held-act.ts); `act`
- * describes WHICH act it was, where the name does not (see HeldKey.act). An edge
- * that needs no key passes neither and ignores the argument.
- */
-export type RunAction = (
-  fn: (idempotencyKey: string) => Promise<ActionResult>,
-  trigger?: HeldKeyTrigger,
-  act?: string,
-) => void;
+export type { RefusalSink, RunAction } from './run-action';
 
 export interface EngagementActionApi {
   pending: boolean;
@@ -90,6 +80,7 @@ export function useEngagementAction(
     trigger: HeldKeyTrigger | undefined,
     act: string | undefined,
     result: ActionResult,
+    sink: RefusalSink | undefined,
   ): void {
     // Only THIS ACT's key at THIS trigger on THIS engagement is ever touched —
     // another act at the same control may still be in doubt — and only when the
@@ -99,6 +90,7 @@ export function useEngagementAction(
     // mean the write landed and the answer was lost, so they hold.
     if (trigger && releasesKey(result)) heldKeys.release(engagementId, trigger, act);
     if (result.ok) router.refresh();
+    else if (sink) sink.applyResult(result);
     else setError((result.error as ActionCode) ?? 'generic');
   }
 
@@ -106,6 +98,7 @@ export function useEngagementAction(
     fn: (idempotencyKey: string) => Promise<ActionResult>,
     trigger?: HeldKeyTrigger,
     act?: string,
+    sink?: RefusalSink,
   ): void {
     if (inFlight.current) return;
     inFlight.current = true;
@@ -124,7 +117,7 @@ export function useEngagementAction(
     const idempotencyKey = heldKeys.claim(engagementId, trigger, mintKey, act);
     startTransition(async () => {
       try {
-        settle(engagementId, trigger, act, await fn(idempotencyKey));
+        settle(engagementId, trigger, act, await fn(idempotencyKey), sink);
       } catch (cause) {
         // A rejection is the client-side twin of 'uncertain' — the request may
         // have reached Postgres and committed, and only the response was lost.
@@ -134,7 +127,8 @@ export function useEngagementAction(
           'engagement action failed before returning a result',
           loggableFailure(cause),
         );
-        setError('generic');
+        if (sink) sink.applyRejection(cause);
+        else setError('generic');
       } finally {
         inFlight.current = false;
       }

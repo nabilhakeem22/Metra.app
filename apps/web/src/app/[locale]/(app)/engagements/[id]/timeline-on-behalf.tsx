@@ -3,9 +3,9 @@
 import { UserCheck } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
-import type { ActionResult } from '@/lib/actions/result';
 import { HandoffAckPanel } from './engagement-handoff-ack-panel';
 import { RomAckPanel } from './engagement-rom-ack-panel';
+import type { RunAction } from './run-action';
 
 // The ONE action in this cockpit that asserts somebody ELSE acted: recording a
 // client acknowledgement the studio took offline. It is drawn as a WARNING rather
@@ -91,7 +91,7 @@ export function OnBehalfPanelBox({
   panel: OnBehalfPanel;
   engagementId: string;
   pending: boolean;
-  runAction: (fn: () => Promise<ActionResult>) => void;
+  runAction: RunAction;
   onDone: () => void;
 }) {
   const tpa = useTranslations('engagements.panelActions');

@@ -2,13 +2,20 @@
 
 import { Undo2 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { useConfirm } from '@/components/ui/confirm-dialog';
+import { FormField } from '@/components/ui/form-field';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import type { ActionResult } from '@/lib/actions/result';
+import { useFieldErrors } from '@/hooks/use-field-errors';
+import { useFocusFirstInvalid } from '@/hooks/use-focus-first-invalid';
 import { recordEventCorrection } from '@/lib/engagements/actions';
+import {
+  CORRECTION_FIELDS,
+  correctionFieldErrors,
+} from '@/lib/engagements/correction-field-rules';
+import { FormRefusal } from './form-refusal';
+import type { RunAction } from './run-action';
 
 /**
  * Retract one ledger row.
@@ -19,7 +26,8 @@ import { recordEventCorrection } from '@/lib/engagements/actions';
  * grants INSERT and SELECT and nothing else, so the retraction is itself
  * permanent. There is no undoing an undo.
  *
- * The reason is REQUIRED, not optional — the server rejects a blank one. A
+ * The reason is REQUIRED, not optional — the server rejects a blank one, and
+ * pressing Retract with none says so under the box before anything is asked. A
  * retraction with no stated cause is just a disappearance, and the entire reason
  * to correct rather than delete is that the record explains itself to whoever
  * reads it next.
@@ -37,16 +45,21 @@ export function RetractButton({
   engagementId: string;
   eventId: string;
   pending: boolean;
-  runAction: (fn: () => Promise<ActionResult>) => void;
+  runAction: RunAction;
 }) {
   const t = useTranslations('engagements.timeline');
   const tc = useTranslations('engagements.controls');
   const tcommon = useTranslations('common');
+  const te = useTranslations('errors');
   const [open, setOpen] = useState(false);
   const [reason, setReason] = useState('');
   const { confirm, dialog } = useConfirm();
+  const errors = useFieldErrors({ fields: CORRECTION_FIELDS, translate: te });
+  const groupRef = useRef<HTMLDivElement>(null);
+  useFocusFirstInvalid(groupRef, errors.invalidAttempt);
 
   async function retract(): Promise<void> {
+    if (errors.applyLocal(correctionFieldErrors({ reason }))) return;
     const confirmed = await confirm({
       title: t('retractTitle'),
       description: t('retractHint'),
@@ -55,11 +68,16 @@ export function RetractButton({
       variant: 'destructive',
     });
     if (!confirmed) return;
-    runAction(async () => {
-      const res = await recordEventCorrection({ engagementId, eventId, reason });
-      if (res.ok) setOpen(false);
-      return res;
-    });
+    runAction(
+      async () => {
+        const res = await recordEventCorrection({ engagementId, eventId, reason });
+        if (res.ok) setOpen(false);
+        return res;
+      },
+      undefined,
+      undefined,
+      errors,
+    );
   }
 
   if (!open) {
@@ -78,25 +96,27 @@ export function RetractButton({
 
   return (
     <div
+      ref={groupRef}
       className="mt-2 space-y-2 rounded-item border border-[color:var(--rule)] p-3"
       role="group"
       aria-label={t('retractTitle')}
     >
       {dialog}
-      <div className="space-y-1.5">
-        <Label htmlFor={`retract-${eventId}`}>{t('retractReason')}</Label>
-        <Input
-          id={`retract-${eventId}`}
-          value={reason}
-          onChange={(e) => setReason(e.target.value)}
-        />
-      </div>
+      <FormField
+        id={`retract-${eventId}`}
+        label={t('retractReason')}
+        required
+        {...errors.bind('reason')}
+      >
+        <Input value={reason} onChange={(e) => setReason(e.target.value)} />
+      </FormField>
+      <FormRefusal message={errors.formError} />
       <div className="flex flex-wrap gap-2">
         <Button
           type="button"
           variant="secondary"
           size="sm"
-          disabled={pending || reason.trim().length === 0}
+          disabled={pending}
           onClick={() => void retract()}
         >
           {t('retractConfirm')}

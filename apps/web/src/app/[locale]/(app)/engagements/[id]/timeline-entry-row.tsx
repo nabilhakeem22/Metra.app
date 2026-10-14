@@ -1,7 +1,7 @@
 'use client';
 
 import { useLocale, useTranslations } from 'next-intl';
-import type { ActionResult } from '@/lib/actions/result';
+import type { RunAction } from './run-action';
 import { conceptLetter } from '@/lib/engagements/concept-letter';
 import { bidiIsolate } from '@/lib/format/bidi';
 import { formatDate } from '@/lib/format/date';
@@ -51,7 +51,7 @@ export function TimelineEntryRow({
   engagementId: string;
   canRetract: boolean;
   pending: boolean;
-  runAction: (fn: () => Promise<ActionResult>) => void;
+  runAction: RunAction;
 }) {
   const t = useTranslations('engagements');
   const locale = useLocale();

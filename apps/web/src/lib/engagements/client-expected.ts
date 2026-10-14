@@ -6,13 +6,12 @@
 // (app_delivery_by_token); a stage move retires it without any write here.
 import { designEngagements } from '@metra/db';
 import { and, eq, notInArray, sql } from 'drizzle-orm';
+import { fieldsFailed } from '@/lib/actions/field-errors';
 import { fail, mutateInOrg } from '@/lib/actions/mutate';
 import { err, type ActionResult } from '@/lib/actions/result';
-import { addDays, todayInCairo } from '@/lib/automation/clock';
 import type { OrgContext } from '@/lib/db/context';
 import { isUuid } from '@/lib/uuid';
-import { validIsoDate } from '@/lib/validation/iso-date';
-import { CLIENT_EXPECTED_MAX_DAYS_AHEAD } from './client-expected-view';
+import { readExpectedOn } from './client-expected-field-rules';
 import { TERMINAL_STATES } from './states';
 
 const TERMINAL_STATE_LIST = [...TERMINAL_STATES];
@@ -21,14 +20,6 @@ export interface SetClientExpectedDateInput {
   engagementId: string;
   /** `YYYY-MM-DD`, today to a year ahead in Cairo; null clears the date. */
   expectedOn: string | null;
-}
-
-/** The date as stored, or a refusal: not a real day, or outside today to a year ahead. */
-function expectedDateOf(value: unknown, now: Date): string | null | 'invalid_date' | 'expected_date_out_of_range' {
-  if (value === null) return null;
-  if (typeof value !== 'string' || !validIsoDate(value)) return 'invalid_date';
-  const today = todayInCairo(now);
-  return value < today || value > addDays(today, CLIENT_EXPECTED_MAX_DAYS_AHEAD) ? 'expected_date_out_of_range' : value;
 }
 
 /**
@@ -47,8 +38,9 @@ export async function setClientExpectedDateCore(
   now: Date = new Date(),
 ): Promise<ActionResult> {
   if (typeof input !== 'object' || input === null || !isUuid(input.engagementId)) return err('invalid');
-  const expectedOn = expectedDateOf(input.expectedOn, now);
-  if (expectedOn === 'invalid_date' || expectedOn === 'expected_date_out_of_range') return err(expectedOn);
+  const read = readExpectedOn(input.expectedOn, now);
+  if (!read.ok) return fieldsFailed({ expectedOn: read.error });
+  const expectedOn = read.value;
 
   return mutateInOrg(
     ctx,

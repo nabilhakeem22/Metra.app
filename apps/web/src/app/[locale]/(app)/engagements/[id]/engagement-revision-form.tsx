@@ -1,19 +1,21 @@
 'use client';
 
-import { Loader2 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
-import { useState } from 'react';
-import { Button } from '@/components/ui/button';
+import { useRef, useState } from 'react';
+import { FormField } from '@/components/ui/form-field';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import type { ActionResult } from '@/lib/actions/result';
-import type { Trigger } from '@/lib/engagements/transitions';
+import { useFieldErrors } from '@/hooks/use-field-errors';
+import { useFocusFirstInvalid } from '@/hooks/use-focus-first-invalid';
 import { designChangeRaised, requestRevision } from '@/lib/engagements/actions';
 import {
   revisionAmountRequired,
   type RevisionAllowances,
   type RevisionTrigger,
 } from '@/lib/engagements/revision-allowance';
+import { REVISION_FIELDS, revisionFieldErrors } from '@/lib/engagements/revision-field-rules';
+import { FormActions } from './engagement-form-actions';
+import { FormRefusal } from './form-refusal';
+import type { RunAction } from './run-action';
 
 // The revision payload form (an optional reason + the change-order amount that
 // becomes required once a revision crosses the free allowance). Extracted from the
@@ -43,16 +45,17 @@ export function EngagementRevisionForm({
   pending: boolean;
   /** Runs one server action with the per-attempt idempotency key held for THIS
    *  trigger (0050). Ignore the argument on an edge that does not need one. */
-  runAction: (
-    fn: (idempotencyKey: string) => Promise<ActionResult>,
-    trigger?: Trigger,
-  ) => void;
+  runAction: RunAction;
   onCancel: () => void;
 }) {
   const t = useTranslations('engagements.revisionForm');
   const tc = useTranslations('engagements.controls');
+  const te = useTranslations('errors');
   const [reason, setReason] = useState('');
   const [amount, setAmount] = useState('');
+  const errors = useFieldErrors({ fields: REVISION_FIELDS, translate: te });
+  const formRef = useRef<HTMLDivElement>(null);
+  useFocusFirstInvalid(formRef, errors.invalidAttempt);
   // This next revision crosses ITS OWN free allowance → it will raise a change
   // order, which requires a positive amount. Within the allowance the field is
   // omitted. The server re-decides; this only chooses what to solicit.
@@ -60,6 +63,7 @@ export function EngagementRevisionForm({
   const isDesignChange = trigger === 'designChangeRaised';
 
   function submit() {
+    if (errors.applyLocal(revisionFieldErrors({ changeOrderAmount: amount }, amountRequired))) return;
     const payload = {
       reason: reason.trim() || undefined,
       changeOrderAmount: amountRequired ? amount.trim() || undefined : undefined,
@@ -70,41 +74,44 @@ export function EngagementRevisionForm({
           ? designChangeRaised(engagementId, payload)
           : requestRevision(engagementId, payload, idempotencyKey),
       trigger,
+      undefined,
+      errors,
     );
   }
 
   return (
-    <div className="space-y-3 rounded-item border border-[color:var(--rule)] bg-[color:var(--track)] p-4">
+    <div
+      ref={formRef}
+      className="space-y-3 rounded-item border border-[color:var(--rule)] bg-[color:var(--track)] p-4"
+    >
       <p className="text-body font-medium">
         {isDesignChange ? t('designChangeTitle') : t('title')}
       </p>
-      <div className="space-y-1.5">
-        <Label htmlFor="rev-reason">{t('reason')}</Label>
-        <Input id="rev-reason" value={reason} onChange={(e) => setReason(e.target.value)} />
-      </div>
+      <FormField id="rev-reason" label={t('reason')}>
+        <Input value={reason} onChange={(e) => setReason(e.target.value)} />
+      </FormField>
       {amountRequired && (
         <div className="space-y-1.5">
-          <Label htmlFor="rev-amount">{t('addAmount')}</Label>
-          <Input
-            id="rev-amount"
-            dir="ltr"
-            inputMode="decimal"
-            className="tabular-nums"
-            value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-          />
+          <FormField id="rev-amount" label={t('addAmount')} required {...errors.bind('changeOrderAmount')}>
+            <Input
+              dir="ltr"
+              inputMode="decimal"
+              className="tabular-nums"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+            />
+          </FormField>
           <p className="text-caption text-muted-foreground">{t('hint')}</p>
         </div>
       )}
-      <div className="flex justify-end gap-2">
-        <Button type="button" variant="secondary" onClick={onCancel} disabled={pending}>
-          {tc('cancel')}
-        </Button>
-        <Button variant="default" type="button" onClick={submit} disabled={pending}>
-          {pending && <Loader2 className="size-4 animate-spin" aria-hidden />}
-          {isDesignChange ? t('designChangeSubmit') : t('submit')}
-        </Button>
-      </div>
+      <FormRefusal message={errors.formError} />
+      <FormActions
+        pending={pending}
+        onCancel={onCancel}
+        onSave={submit}
+        saveLabel={isDesignChange ? t('designChangeSubmit') : t('submit')}
+        cancelLabel={tc('cancel')}
+      />
     </div>
   );
 }
