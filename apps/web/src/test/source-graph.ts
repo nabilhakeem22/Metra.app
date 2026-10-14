@@ -15,7 +15,8 @@ const TEST = /\.(test|dbtest)\.tsx?$/;
 export interface SourceGraph {
   /** Absolute path to parsed module. */
   files: ReadonlyMap<string, ts.SourceFile>;
-  /** The modules under src that `path` loads at runtime (packages aside). */
+  /** The modules under src that `path` loads at runtime (packages aside). A
+   *  file outside `files` (a test) is parsed on demand. */
   importsOf(path: string): string[];
   /** The file's leading directive ('use client', 'use server'), or null. */
   directiveOf(path: string): string | null;
@@ -54,16 +55,19 @@ function runtimeSpecifiers(file: ts.SourceFile): string[] {
   return specifiers;
 }
 
+function parse(path: string): ts.SourceFile {
+  return ts.createSourceFile(path, readFileSync(path, 'utf8'), ts.ScriptTarget.Latest, true);
+}
+
 export function loadSourceGraph(): SourceGraph {
-  const files = new Map(
-    sourcePaths(SRC_ROOT).map((path) => [path, ts.createSourceFile(path, readFileSync(path, 'utf8'), ts.ScriptTarget.Latest, true)]),
-  );
+  const files = new Map(sourcePaths(SRC_ROOT).map((path) => [path, parse(path)]));
   const imports = new Map<string, string[]>();
   return {
     files,
     importsOf(path) {
       if (!imports.has(path)) {
-        const targets = runtimeSpecifiers(files.get(path)!).map((specifier) => resolveImport(path, specifier));
+        const file = files.get(path) ?? parse(path);
+        const targets = runtimeSpecifiers(file).map((specifier) => resolveImport(path, specifier));
         imports.set(path, targets.filter((target): target is string => target !== null && files.has(target)));
       }
       return imports.get(path)!;

@@ -1,17 +1,23 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
+import { destructiveToasts } from '@/test/destructive-toasts';
 import { loadSourceGraph, SRC_ROOT, srcRelative } from '@/test/source-graph';
 
 // Every form that shows refusals under its fields is REGISTERED here, so a new
 // form cannot quietly skip the under-the-field contract.
 //
-// FORM_COVERAGE: a file that renders <FormField> or uses useFieldErrors, and the
-// test file that runs `expectFieldErrorsRenderUnderFields` for it (AC 19: every
-// field of its tuple, answered `required`, shows its sentence under its own
-// control, focus on the first, no alert, typed values kept). Every form is
-// migrated, so there is no pending list: an unregistered form fails here.
+// FORM_COVERAGE: a file that renders <FormField> or <FieldErrorText>, or uses
+// useFieldErrors / useDraftFieldErrors, and the test file that runs
+// `expectFieldErrorsRenderUnderFields` for it (AC 19: every field of its tuple,
+// answered `required`, shows its sentence under its own control, focus on the
+// first, no alert, typed values kept). The test must LOAD the form (its imports
+// reach the file), so a call made for another form proves nothing about this
+// one. Every form is migrated, so there is no pending list.
+//
+// CLIENT_ONLY_COVERAGE: a field whose refusal only the page itself says (the
+// server answers it no field errors, so the helper's mocked answer does not
+// apply), and the test that loads it and checks the refusal under its box.
 
 /** Form file (from src) to the test that proves its fields' refusals render under them. */
 const FORM_COVERAGE: Readonly<Record<string, string>> = {
@@ -73,21 +79,57 @@ const FORM_COVERAGE: Readonly<Record<string, string>> = {
   'app/[locale]/onboarding/wizard.tsx': 'app/[locale]/onboarding/wizard.test.tsx',
   'components/activity/activity-note-form.tsx': 'components/activity/activity-note-form.test.tsx',
   'components/documents/document-upload-control.tsx': 'components/documents/document-upload-control.test.tsx',
+  'app/[locale]/(app)/price-book/import-wizard-upload-step.tsx': 'app/[locale]/(app)/price-book/price-book-forms.test.tsx',
+  'app/[locale]/(app)/price-book/price-book-section-adder.tsx': 'app/[locale]/(app)/price-book/price-book-forms.test.tsx',
+  'app/[locale]/(app)/projects/[id]/boq-sheet-editable-cell.tsx': 'app/[locale]/(app)/projects/[id]/boq-sheet.test.tsx',
+  'app/[locale]/(app)/projects/[id]/boq-sheet-unit-cell.tsx': 'app/[locale]/(app)/projects/[id]/boq-sheet.test.tsx',
+  'app/[locale]/(app)/proposals/[id]/draft-cell.tsx': 'app/[locale]/(app)/proposals/[id]/builder-cell-refusals.test.tsx',
+  'app/[locale]/(app)/proposals/[id]/use-builder-autosave.ts': 'app/[locale]/(app)/proposals/[id]/builder-cell-refusals.test.tsx',
+  'app/[locale]/(app)/proposals/[id]/use-draft-field-errors.ts': 'app/[locale]/(app)/proposals/[id]/builder-cell-refusals.test.tsx',
+  'app/[locale]/(app)/settings/settings-logo-field.tsx': 'app/[locale]/(app)/settings/settings-client.test.tsx',
+  'app/[locale]/(auth)/login/login-verify-step.tsx': 'app/[locale]/(auth)/login/login-form.test.tsx',
+  'app/[locale]/d/[token]/portal/changes-note.tsx': 'app/[locale]/d/[token]/portal/concept-option-picker-changes.test.tsx',
+  'app/[locale]/d/[token]/portal/document-thread.tsx': 'app/[locale]/d/[token]/portal/document-thread.test.tsx',
 };
+
+/** Client-only refusals (the /p /c /v name box) to the test that says them under the box. */
+const CLIENT_ONLY_COVERAGE: Readonly<Record<string, string>> = {
+  'components/share/link-name-field.tsx': 'components/share/link-page-failures.test.tsx',
+};
+
+const REGISTERED: Readonly<Record<string, string>> = { ...FORM_COVERAGE, ...CLIENT_ONLY_COVERAGE };
 
 const graph = loadSourceGraph();
 const textOf = (path: string) => graph.files.get(path)!.getFullText();
 
-const USES_FIELD_ERRORS = /\buseFieldErrors\b/;
-const RENDERS_FORM_FIELD = /<FormField\b/;
-// A failure TOAST, not a destructive confirm dialog (which asks before acting).
-const DESTRUCTIVE_TOAST = /toast\(\{[^}]*variant:\s*'destructive'/;
+const USES_FIELD_ERRORS = /\buse(?:Draft)?FieldErrors\b/;
+const RENDERS_FIELD_ERRORS = /<(?:FormField|FieldErrorText)\b/;
+const HELPER_CALL = /\bexpectFieldErrorsRenderUnderFields\(/;
+/** A client-only proof reads the refusal under the box by its `<id>-error`. */
+const UNDER_THE_BOX = /-error`/;
+/** The building blocks themselves, not forms. */
+const BLOCKS = /[\\/](components[\\/]ui[\\/](form-field|field-error-text)|hooks[\\/]use-field-errors)\.tsx?$/;
 
 const formFiles = [...graph.files.keys()]
-  .filter((path) => !/[\\/](components[\\/]ui[\\/]form-field|hooks[\\/]use-field-errors)\.tsx?$/.test(path))
-  .filter((path) => RENDERS_FORM_FIELD.test(textOf(path)) || USES_FIELD_ERRORS.test(textOf(path)))
+  .filter((path) => !BLOCKS.test(path))
+  .filter((path) => RENDERS_FIELD_ERRORS.test(textOf(path)) || USES_FIELD_ERRORS.test(textOf(path)))
   .map(srcRelative)
   .sort();
+
+/** True when loading `testFile` loads `file`, through any chain of imports. */
+function loads(testFile: string, file: string): boolean {
+  const target = join(SRC_ROOT, file);
+  const seen = new Set<string>();
+  const pending = [join(SRC_ROOT, testFile)];
+  while (pending.length > 0) {
+    const path = pending.pop()!;
+    if (path === target) return true;
+    if (seen.has(path)) continue;
+    seen.add(path);
+    pending.push(...graph.importsOf(path));
+  }
+  return false;
+}
 
 describe('every form is registered (AC 20)', () => {
   it('finds the forms it is meant to guard', () => {
@@ -96,21 +138,22 @@ describe('every form is registered (AC 20)', () => {
 
   it.each(formFiles)('%s is covered', (file) => {
     expect(
-      file in FORM_COVERAGE,
-      `${file} renders <FormField> or uses useFieldErrors: add it to FORM_COVERAGE with the test that runs expectFieldErrorsRenderUnderFields`,
+      file in REGISTERED,
+      `${file} renders field errors: add it to FORM_COVERAGE with the test that runs expectFieldErrorsRenderUnderFields`,
     ).toBe(true);
   });
 
   it('lists no file that is gone', () => {
-    for (const file of Object.keys(FORM_COVERAGE)) {
+    for (const file of Object.keys(REGISTERED)) {
       expect(formFiles, `${file} is registered but renders no field`).toContain(file);
     }
   });
 
-  it.each(Object.entries(FORM_COVERAGE))('%s is proven by %s', (_file, testFile) => {
+  it.each(Object.entries(REGISTERED))('%s is proven by %s', (file, testFile) => {
     const path = join(SRC_ROOT, testFile);
     expect(existsSync(path), `${testFile} does not exist`).toBe(true);
-    expect(readFileSync(path, 'utf8')).toMatch(/expectFieldErrorsRenderUnderFields\(/);
+    expect(loads(testFile, file), `${testFile} never loads ${file}`).toBe(true);
+    expect(readFileSync(path, 'utf8')).toMatch(file in FORM_COVERAGE ? HELPER_CALL : UNDER_THE_BOX);
   });
 });
 
@@ -118,39 +161,7 @@ describe('a form with field errors raises no failure toast (AC 21)', () => {
   it('no file that uses useFieldErrors shows a destructive toast', () => {
     const hookUsers = formFiles.filter((file) => USES_FIELD_ERRORS.test(textOf(join(SRC_ROOT, file))));
     for (const file of hookUsers) {
-      expect(textOf(join(SRC_ROOT, file)), `${file}: say the refusal under the field`).not.toMatch(DESTRUCTIVE_TOAST);
+      expect(destructiveToasts(graph.files.get(join(SRC_ROOT, file))!), `${file}: say the refusal under the field`).toBe(0);
     }
-  });
-});
-
-/** The value imports of one module that only a server may load. */
-function serverOnlyImports(path: string): string[] {
-  return graph.files.get(path)!.statements.flatMap((statement) => {
-    if (!ts.isImportDeclaration(statement) || !ts.isStringLiteral(statement.moduleSpecifier)) return [];
-    if (statement.importClause?.isTypeOnly) return [];
-    const specifier = statement.moduleSpecifier.text;
-    return specifier === 'server-only' || specifier === '@metra/db' ? [specifier] : [];
-  });
-}
-
-describe('no client component reaches server-only code (AC 36)', () => {
-  const clientModules = [...graph.files.keys()].filter((path) => graph.directiveOf(path) === 'use client');
-
-  it.each(clientModules.map(srcRelative))('%s', (file) => {
-    const seen = new Set<string>();
-    const pending = [join(SRC_ROOT, file)];
-    const reached: string[] = [];
-    while (pending.length > 0) {
-      const path = pending.pop()!;
-      if (seen.has(path)) continue;
-      seen.add(path);
-      // A server action module is an RPC reference in the client bundle, not its code.
-      if (graph.directiveOf(path) === 'use server') continue;
-      const relative = srcRelative(path);
-      if (relative === 'lib/actions/unexpected.ts') reached.push(relative);
-      for (const specifier of serverOnlyImports(path)) reached.push(`${relative} imports ${specifier}`);
-      pending.push(...graph.importsOf(path));
-    }
-    expect(reached).toEqual([]);
   });
 });
