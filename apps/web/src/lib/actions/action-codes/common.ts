@@ -37,7 +37,6 @@ export type CommonActionCode =
   | 'immutable'
   | 'code_required'
   | 'code_taken'
-  | 'invalid_percentage'
   | 'import_empty'
   | 'import_too_large'
   | 'client_required'

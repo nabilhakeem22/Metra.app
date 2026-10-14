@@ -94,14 +94,20 @@ describe('the one-screen onboarding', () => {
     expect(router.push).not.toHaveBeenCalled();
   });
 
-  test('F5: each field stops at the server cap and says so under itself', () => {
+  test('F5: each field stops at the server cap and says so under itself, as a note (F14)', () => {
     renderWithIntl(<OnboardingWizard />, { locale: 'ar-EG' });
     const input = (id: string) => document.getElementById(id) as HTMLInputElement;
     expect([input('nameAr').maxLength, input('nameEn').maxLength, input('city').maxLength]).toEqual([200, 200, 120]);
     fireEvent.change(input('city'), { target: { value: 'ج'.repeat(120) } });
-    const message = messageAt('ar-EG', 'onboarding.tooLong').replace('{max}', '120');
-    expect(document.getElementById('city-error')?.textContent).toBe(message);
-    expect(input('city').getAttribute('aria-invalid')).toBe('true');
+    fireEvent.change(input('nameAr'), { target: { value: 'ا'.repeat(200) } });
+    for (const [field, max] of [['city', '120'], ['nameAr', '200']] as const) {
+      const note = document.getElementById(`${field}-limit`);
+      expect(note?.textContent).toBe(messageAt('ar-EG', 'onboarding.atLimit').replace('{max}', max));
+      expect(input(field).getAttribute('aria-describedby')).toContain(`${field}-limit`);
+      // Exactly at the cap is VALID: not red, not invalid, nothing in the error slot.
+      expect(input(field).getAttribute('aria-invalid')).toBeNull();
+      expect(document.getElementById(`${field}-error`)?.textContent ?? '').toBe('');
+    }
   });
 
   test('F5: a value past the cap (a paste the input did not stop) is never sent', async () => {

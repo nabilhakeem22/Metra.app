@@ -9,6 +9,7 @@ import { FormField } from '@/components/ui/form-field';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { LOGO_ACCEPT } from '@/lib/org/logo-rules';
+import { CapNote, capNoteId, describedBy } from './cap-note';
 import { FIELD_MAX_LENGTH, type ONBOARDING_FIELDS, type OnboardingField } from './profile-field-limits';
 
 type FieldBinding = (field: (typeof ONBOARDING_FIELDS)[number]) => { error: string | undefined; onEdit: () => void };
@@ -24,9 +25,10 @@ export interface OnboardingProfileValues {
  * required), its city and its logo, all optional beyond a name. Presentational:
  * the values, the logo file and every setter live in OnboardingWizard. The tax
  * number is not asked here; it stays in Settings, where nothing blocks on it.
- * Each text field stops at the server's cap and says so under itself; a refused
- * save says why under the field (the missing name under the Arabic name, the
- * first, marking both).
+ * Each text field stops at the server's cap and says so under itself, as a
+ * note the field is described by, never as its error: a value exactly at the
+ * cap is valid (F14). A refused save says why under the field (the missing name
+ * under the Arabic name, the first, marking both), and replaces the note.
  */
 export function OnboardingProfileFields({
   values,
@@ -52,9 +54,13 @@ export function OnboardingProfileFields({
   const t = useTranslations('onboarding');
   const th = useTranslations('hints.onboarding');
   const pair = bind('name');
-  /** A refused save outranks the at-the-cap notice. */
-  const messageFor = (field: OnboardingField) =>
-    bind(field).error ?? (atLimit.includes(field) ? t('tooLong', { max: FIELD_MAX_LENGTH[field] }) : null);
+  const errorOf = (field: OnboardingField) => (field === 'nameAr' ? pair.error : undefined) ?? bind(field).error;
+  /** The at-the-cap note's id while it shows: at the cap, and no refusal there. */
+  const noteOf = (field: OnboardingField) =>
+    atLimit.includes(field) && !errorOf(field) ? capNoteId(field) : undefined;
+  const capNote = (field: OnboardingField) => (
+    <CapNote id={noteOf(field)} text={t('atLimit', { max: FIELD_MAX_LENGTH[field] })} />
+  );
   const editOf = (field: OnboardingField) => () => {
     bind(field).onEdit();
     if (field !== 'city') pair.onEdit();
@@ -62,37 +68,48 @@ export function OnboardingProfileFields({
 
   return (
     <div className="space-y-4">
-      <FormField
-        id="nameAr"
-        label={t('nameArLabel')}
-        hint={th('orgName')}
-        error={pair.error ?? messageFor('nameAr')}
-        onEdit={editOf('nameAr')}
-      >
-        <Input
-          dir="rtl"
-          maxLength={FIELD_MAX_LENGTH.nameAr}
-          value={values.nameAr}
-          onChange={(event) => onChange('nameAr', event.target.value)}
-        />
-      </FormField>
-      <FormField id="nameEn" label={t('nameEnLabel')} hint={th('orgName')} error={messageFor('nameEn')} onEdit={editOf('nameEn')}>
-        <Input
-          dir="ltr"
-          maxLength={FIELD_MAX_LENGTH.nameEn}
-          aria-invalid={pair.error ? true : undefined}
-          aria-describedby={pair.error ? fieldErrorId('nameAr') : undefined}
-          value={values.nameEn}
-          onChange={(event) => onChange('nameEn', event.target.value)}
-        />
-      </FormField>
-      <FormField id="city" label={t('cityLabel')} error={messageFor('city')} onEdit={editOf('city')}>
-        <Input
-          maxLength={FIELD_MAX_LENGTH.city}
-          value={values.city}
-          onChange={(event) => onChange('city', event.target.value)}
-        />
-      </FormField>
+      <div className="space-y-2">
+        <FormField
+          id="nameAr"
+          label={t('nameArLabel')}
+          hint={th('orgName')}
+          error={errorOf('nameAr')}
+          onEdit={editOf('nameAr')}
+        >
+          <Input
+            dir="rtl"
+            maxLength={FIELD_MAX_LENGTH.nameAr}
+            aria-describedby={noteOf('nameAr')}
+            value={values.nameAr}
+            onChange={(event) => onChange('nameAr', event.target.value)}
+          />
+        </FormField>
+        {capNote('nameAr')}
+      </div>
+      <div className="space-y-2">
+        <FormField id="nameEn" label={t('nameEnLabel')} hint={th('orgName')} error={errorOf('nameEn')} onEdit={editOf('nameEn')}>
+          <Input
+            dir="ltr"
+            maxLength={FIELD_MAX_LENGTH.nameEn}
+            aria-invalid={pair.error ? true : undefined}
+            aria-describedby={describedBy(pair.error ? fieldErrorId('nameAr') : undefined, noteOf('nameEn'))}
+            value={values.nameEn}
+            onChange={(event) => onChange('nameEn', event.target.value)}
+          />
+        </FormField>
+        {capNote('nameEn')}
+      </div>
+      <div className="space-y-2">
+        <FormField id="city" label={t('cityLabel')} error={errorOf('city')} onEdit={editOf('city')}>
+          <Input
+            maxLength={FIELD_MAX_LENGTH.city}
+            aria-describedby={noteOf('city')}
+            value={values.city}
+            onChange={(event) => onChange('city', event.target.value)}
+          />
+        </FormField>
+        {capNote('city')}
+      </div>
 
       <div className="space-y-2">
         <Label>{t('logoLabel')}</Label>

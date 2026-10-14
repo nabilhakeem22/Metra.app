@@ -41,7 +41,6 @@ export const ACTION_CODE_PROBLEM: Record<ActionCode, ApiProblemKind> = {
   immutable: 'bad-request',
   code_required: 'bad-request',
   code_taken: 'bad-request',
-  invalid_percentage: 'bad-request',
   import_empty: 'bad-request',
   import_too_large: 'bad-request',
   client_required: 'bad-request',
