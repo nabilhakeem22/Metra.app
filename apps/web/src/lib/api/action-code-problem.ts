@@ -13,6 +13,8 @@ export const ACTION_CODE_PROBLEM: Record<ActionCode, ApiProblemKind> = {
   // Ambiguous write timeout: server-side and may-or-may-not have applied — a 5xx,
   // never a clean 4xx, so a client can't assume the write failed.
   uncertain: 'internal',
+  // Field errors; the Public API keeps the code, not the field map.
+  check_fields: 'bad-request',
   name_required: 'bad-request',
   phone_required: 'bad-request',
   start_date_required: 'bad-request',
@@ -62,7 +64,6 @@ export const ACTION_CODE_PROBLEM: Record<ActionCode, ApiProblemKind> = {
   contract_not_signable: 'bad-request',
   variation_not_draft: 'bad-request',
   variation_not_internal_approved: 'bad-request',
-  variation_not_issued: 'bad-request',
   engagement_title_required: 'bad-request',
   engagement_client_required: 'bad-request',
   engagement_project_required: 'bad-request',

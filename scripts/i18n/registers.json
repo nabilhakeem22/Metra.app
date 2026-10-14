@@ -43,6 +43,11 @@
       "why": "The client-facing quotation: accept, reject, VAT, totals."
     },
     {
+      "prefix": "portal.",
+      "register": "msa",
+      "why": "Client-facing errors on every link page."
+    },
+    {
       "prefix": "errors.token_invalid",
       "register": "msa",
       "why": "Rendered on the client token pages, so it must match their register."

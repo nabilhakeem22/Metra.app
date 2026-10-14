@@ -464,12 +464,26 @@
     "system": "System"
   },
   "errors": {
-    "forbidden": "You don't have permission to do that.",
+    "forbidden": "Your role in this workspace cannot do this. Ask an owner or admin to do it, or to change your role.",
     "invalid": "That didn't work. Please try again.",
-    "generic": "Something went wrong. Please try again.",
-    "uncertain": "We couldn't confirm whether that saved. Refresh to check before trying again.",
+    "generic": "We could not finish this because of a problem on our side. What you entered is still here; try again in a moment.",
+    "uncertain": "We could not confirm your change was saved: the server was busy or the connection dropped. Refresh the page to check before trying again.",
+    "check_fields": "Some fields need fixing. Look for the message under each one.",
+    "reference": "If it keeps happening, send us this code: {reference}.",
+    "unreachable": "We could not reach Metra. Check your internet connection, then try again. What you entered is still here.",
+    "field": {
+      "required": "This is required. Fill it in to continue.",
+      "too_long": "Too long. Keep it to {max} characters or fewer.",
+      "too_short": "Too short. Write at least {min} characters.",
+      "out_of_range": "Enter a number from {min} to {max}.",
+      "not_a_number": "That is not a number. Use digits, with a dot for decimals, like 1250.50.",
+      "not_negative": "This cannot be below zero. Enter 0 or more.",
+      "email_format": "That email does not look right. Write it like name@example.com.",
+      "no_longer_exists": "That choice no longer exists; it may have been deleted. Pick another one.",
+      "unprintable": "This has hidden or control characters. Clear it and type it again instead of pasting."
+    },
     "file_too_large": "That file is too large. The limit is 100 MB.",
-    "name_required": "Enter a name.",
+    "name_required": "Write the name in Arabic or English; one of them is enough.",
     "last_owner": "You can't remove or demote the last owner.",
     "owner_immutable": "Only an owner can change an owner.",
     "self": "You can't change your own role or remove yourself here.",
@@ -477,7 +491,7 @@
     "pending_exists": "There's already a pending invite for that email.",
     "declined": "This link can't be used.",
     "otp_send_failed": "Could not send the code. Please try again.",
-    "otp_verify_failed": "That code did not work. Please try again.",
+    "otp_verify_failed": "That code is wrong or has expired. Type the newest code we sent, or ask for a new one.",
     "immutable": "This record is locked and can't be changed.",
     "code_required": "Code is required",
     "code_taken": "This code is already used",
@@ -508,7 +522,6 @@
     "contract_not_signable": "This contract can't be terminated in its current state",
     "variation_not_draft": "This variation order is no longer a draft",
     "variation_not_internal_approved": "The variation order must be internally approved first",
-    "variation_not_issued": "This variation order has not been issued yet",
     "engagement_title_required": "Enter a title in Arabic or English",
     "engagement_client_required": "Select a client",
     "engagement_project_required": "Select a project",
@@ -2648,6 +2661,21 @@
       "next": "Next image",
       "close": "Close",
       "position": "{current} of {total}"
+    }
+  },
+  "portal": {
+    "errors": {
+      "field": {
+        "required": "This field is required. Please fill it in to continue.",
+        "too_long": "This is too long. Please shorten it to {max} characters or fewer.",
+        "too_short": "This is too short. Please write at least {min} characters.",
+        "out_of_range": "Please enter a number from {min} to {max}.",
+        "not_a_number": "This is not a number. Please use digits, with a dot for decimals, such as 1250.50.",
+        "not_negative": "This cannot be below zero. Please enter 0 or more.",
+        "email_format": "This email address does not look right. Please write it like name@example.com.",
+        "no_longer_exists": "This choice is no longer available. Please choose another one.",
+        "unprintable": "This contains hidden or control characters. Please clear it and type it again instead of pasting."
+      }
     }
   }
 }

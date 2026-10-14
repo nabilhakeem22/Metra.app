@@ -29,6 +29,8 @@ export const DEFINITE_REFUSALS: ReadonlySet<ActionCode> = new Set<ActionCode>([
   // The draft moved on under a stale tab; the save rolled back.
   'draft_changed_elsewhere',
   'invalid',
+  // Field rules refused the input before anything was written.
+  'check_fields',
   'flow_not_enabled',
   'illegal_trigger',
   // The row was not visible, or it moved under us.

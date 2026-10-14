@@ -6,6 +6,8 @@ export type CommonActionCode =
   | 'invalid'
   | 'generic'
   | 'uncertain'
+  // The input broke field rules; `fields` says which, under each field.
+  | 'check_fields'
   | 'name_required'
   | 'phone_required'
   | 'start_date_required'

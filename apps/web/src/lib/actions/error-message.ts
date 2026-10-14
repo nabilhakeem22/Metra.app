@@ -1,13 +1,62 @@
-import type { ActionCode } from './result';
+// From a failed action to the sentence a person reads. Pure, so the studio and
+// the client portal share it: pass `useTranslations('errors')` in the studio and
+// `useTranslations('portal.errors')` on a link page; both carry the same keys.
+import type { MessageParams } from './field-errors';
+import type { ActionCode, ActionResult } from './result';
+
+/** A translator scoped to an errors namespace. */
+export type Translate = (key: string, values?: MessageParams) => string;
 
 /**
- * The one mapper from an ActionResult error CODE to a localized string. Pass a
- * translator scoped to the `errors` namespace (useTranslations('errors')).
- * Unknown/absent codes fall back to `errors.generic`.
+ * The one mapper from an ActionResult error CODE to a localized string.
+ * Unknown/absent codes fall back to `generic`.
  */
 export function resolveActionError(
   code: ActionCode | undefined,
-  t: (key: string) => string,
+  t: Translate,
+  params?: MessageParams,
 ): string {
-  return t(code ?? 'generic');
+  return params ? t(code ?? 'generic', params) : t(code ?? 'generic');
+}
+
+/** `generic` followed by the sentence that hands the person its reference. */
+function genericWithReference(reference: string, t: Translate): string {
+  return `${t('generic')} ${t('reference', { reference })}`;
+}
+
+/**
+ * A failed result as one sentence. An unknown failure that carries a reference
+ * says so, so support can find its log line; any other code is its own message.
+ */
+export function describeFailure(
+  result: Pick<ActionResult, 'error' | 'params' | 'reference'>,
+  t: Translate,
+): string {
+  if (result.error === 'generic' && result.reference) {
+    return genericWithReference(result.reference, t);
+  }
+  return resolveActionError(result.error, t, result.params);
+}
+
+/** Next attaches a `digest` to an error a server action threw; it finds the log line. */
+function digestOf(rejection: unknown): string | undefined {
+  if (rejection === null || typeof rejection !== 'object') return undefined;
+  const digest = (rejection as { digest?: unknown }).digest;
+  return typeof digest === 'string' && digest.length > 0 ? digest : undefined;
+}
+
+function isOffline(): boolean {
+  return typeof navigator !== 'undefined' && navigator.onLine === false;
+}
+
+/**
+ * A rejected action promise: the answer never came back as a result. A server
+ * throw carries Next's digest, which works as a reference; a failed fetch (a
+ * TypeError) or an offline browser never reached Metra at all.
+ */
+export function describeRejection(rejection: unknown, t: Translate): string {
+  const digest = digestOf(rejection);
+  if (digest) return genericWithReference(digest, t);
+  if (rejection instanceof TypeError || isOffline()) return t('unreachable');
+  return t('generic');
 }
