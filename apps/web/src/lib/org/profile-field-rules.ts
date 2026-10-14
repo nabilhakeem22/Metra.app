@@ -5,7 +5,7 @@
 import { hasFieldErrors, type FieldErrors } from '@/lib/actions/field-errors';
 import { collectFieldErrors } from '@/lib/validation/field-rules';
 import { clean } from '@/lib/validation/text';
-import { maxCharacters } from '@/lib/validation/text-field-rules';
+import { bilingualNameErrors, maxCharacters, type BilingualNameField } from '@/lib/validation/text-field-rules';
 import { ORG_PROFILE_LIMITS } from './profile-limits';
 
 /** Every path a profile refusal can name; `name` is the Arabic/English pair. */
@@ -40,13 +40,13 @@ export function readOrgProfile(input: OrgProfileText): OrgProfileRead {
     city: clean(input.city),
     taxRegistrationNumber: clean(input.taxRegistrationNumber),
   };
-  const errors = collectFieldErrors<OrgProfileField>({
-    name: values.nameEn || values.nameAr ? null : { code: 'name_required' },
-    nameEn: maxCharacters(values.nameEn, ORG_PROFILE_LIMITS.name),
-    nameAr: maxCharacters(values.nameAr, ORG_PROFILE_LIMITS.name),
-    city: maxCharacters(values.city, ORG_PROFILE_LIMITS.city),
-    taxRegistrationNumber: maxCharacters(values.taxRegistrationNumber, ORG_PROFILE_LIMITS.taxReg),
-  });
+  const errors: FieldErrors<OrgProfileField> = {
+    ...bilingualNameErrors(values.nameEn, values.nameAr, ORG_PROFILE_LIMITS.name),
+    ...collectFieldErrors<Exclude<OrgProfileField, BilingualNameField>>({
+      city: maxCharacters(values.city, ORG_PROFILE_LIMITS.city),
+      taxRegistrationNumber: maxCharacters(values.taxRegistrationNumber, ORG_PROFILE_LIMITS.taxReg),
+    }),
+  };
   return hasFieldErrors(errors) ? { ok: false, errors } : { ok: true, values };
 }
 

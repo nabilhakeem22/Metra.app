@@ -2,10 +2,12 @@ import 'server-only';
 import { createHash, randomBytes } from 'node:crypto';
 import { apiKeys } from '@metra/db';
 import { and, eq, isNull } from 'drizzle-orm';
+import { fieldsFailed, hasFieldErrors } from '@/lib/actions/field-errors';
 import { fail, mutateInOrg } from '@/lib/actions/mutate';
 import { err, type ActionResult } from '@/lib/actions/result';
 import type { OrgContext } from '@/lib/db/context';
-import { MAX_API_KEY_LABEL_LEN } from './constants';
+import { isUuid } from '@/lib/uuid';
+import { apiKeyFieldErrors } from './field-rules';
 import { API_KEY_PREFIX, API_KEY_PREFIX_LEN } from './resolve';
 
 // Mint/revoke cores for public API keys. Both are gated to the settings
@@ -36,8 +38,9 @@ export async function mintApiKeyCore(
   ctx: OrgContext,
   input: MintApiKeyInput,
 ): Promise<ActionResult & { data?: MintedApiKey }> {
-  const label = input.label?.trim();
-  if (!label || label.length > MAX_API_KEY_LABEL_LEN) return err('invalid');
+  const errors = apiKeyFieldErrors(input);
+  if (hasFieldErrors(errors)) return fieldsFailed(errors);
+  const label = input.label.trim();
 
   return mutateInOrg(ctx, API_KEY_CAPABILITY, async (tx, audit) => {
     const { raw, hash, prefix } = mintRawKey();
@@ -68,14 +71,16 @@ export async function revokeApiKeyCore(
   ctx: OrgContext,
   id: string,
 ): Promise<ActionResult> {
+  if (!isUuid(id)) return err('malformed');
   return mutateInOrg(ctx, API_KEY_CAPABILITY, async (tx, audit) => {
-    // Revoke = stamp revoked_at (never DELETE). Only a live key can be revoked.
+    // Revoke = stamp revoked_at (never DELETE). Only a live key can be revoked:
+    // one gone or already revoked meanwhile is record_not_found.
     const [row] = await tx
       .update(apiKeys)
       .set({ revokedAt: new Date(), updatedAt: new Date() })
       .where(and(eq(apiKeys.id, id), isNull(apiKeys.revokedAt)))
       .returning({ id: apiKeys.id });
-    if (!row) fail('invalid');
+    if (!row) fail('record_not_found');
 
     await audit({
       entity: 'api_key',

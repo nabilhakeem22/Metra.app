@@ -3,9 +3,11 @@
 import { projectTypes } from '@metra/db';
 import { and, eq, ilike, or } from 'drizzle-orm';
 import { mutateInOrg } from '@/lib/actions/mutate';
-import { err, type ActionResult } from '@/lib/actions/result';
+import { fieldsFailed, hasFieldErrors } from '@/lib/actions/field-errors';
+import type { ActionResult } from '@/lib/actions/result';
 import type { OrgContext } from '@/lib/db/context';
 import { clean } from '@/lib/validation/text';
+import { bilingualNameErrors } from '@/lib/validation/text-field-rules';
 
 export interface ProjectTypeInput {
   nameEn?: string | null;
@@ -17,7 +19,8 @@ const NAME_MAX = 200;
 /**
  * Create-on-use project type. Idempotent: an active type matching the trimmed
  * name in either language (case-insensitive) returns its id, no new row. Both
- * blank -> name_required. User-created rows carry key=null.
+ * blank is name_required under `name`, a name past the cap too_long under its
+ * own field. User-created rows carry key=null.
  */
 export async function upsertProjectTypeCore(
   ctx: OrgContext,
@@ -25,10 +28,8 @@ export async function upsertProjectTypeCore(
 ): Promise<ActionResult & { data?: string }> {
   const nameEn = clean(input.nameEn);
   const nameAr = clean(input.nameAr);
-  if (!nameEn && !nameAr) return err('name_required');
-  if ((nameEn?.length ?? 0) > NAME_MAX || (nameAr?.length ?? 0) > NAME_MAX) {
-    return err('invalid');
-  }
+  const errors = bilingualNameErrors(nameEn, nameAr, NAME_MAX);
+  if (hasFieldErrors(errors)) return fieldsFailed(errors);
 
   return mutateInOrg(
     ctx,

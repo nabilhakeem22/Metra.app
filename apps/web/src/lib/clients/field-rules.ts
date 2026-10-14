@@ -5,13 +5,12 @@ import { hasFieldErrors, type FieldErrors } from '@/lib/actions/field-errors';
 import { collectFieldErrors } from '@/lib/validation/field-rules';
 import { normalizePercent } from '@/lib/validation/percent';
 import { clean } from '@/lib/validation/text';
-import { maxCharacters } from '@/lib/validation/text-field-rules';
+import { bilingualNameErrors, maxCharacters, type BilingualNameField } from '@/lib/validation/text-field-rules';
 import type { ClientField, ClientInput } from './fields';
 
 /** Boundary length caps (defense-in-depth), mirroring org/core profileWithinLimits. */
+const CLIENT_NAME_MAX = 200;
 const CLIENT_LIMITS = {
-  nameEn: 200,
-  nameAr: 200,
   contactName: 200,
   email: 254,
   phone: 40,
@@ -65,21 +64,21 @@ export function readClientInput(input: ClientInput, rules: { phoneRequired: bool
   const v = normalizedClient(input);
   const advancePct = sentPercent(input.advancePct);
   const retentionPct = sentPercent(input.retentionPct);
-  const errors = collectFieldErrors<ClientField>({
-    name: v.nameEn || v.nameAr ? null : { code: 'name_required' },
-    phone: rules.phoneRequired && !v.phone ? { code: 'phone_required' } : maxCharacters(v.phone, CLIENT_LIMITS.phone),
-    nameEn: maxCharacters(v.nameEn, CLIENT_LIMITS.nameEn),
-    nameAr: maxCharacters(v.nameAr, CLIENT_LIMITS.nameAr),
-    contactName: maxCharacters(v.contactName, CLIENT_LIMITS.contactName),
-    email: maxCharacters(v.email, CLIENT_LIMITS.email),
-    city: maxCharacters(v.city, CLIENT_LIMITS.city),
-    country: maxCharacters(v.country, CLIENT_LIMITS.country),
-    address: maxCharacters(v.address, CLIENT_LIMITS.address),
-    taxRegistrationNumber: maxCharacters(v.taxRegistrationNumber, CLIENT_LIMITS.taxRegistrationNumber),
-    notes: maxCharacters(v.notes, CLIENT_LIMITS.notes),
-    advancePct: advancePct === null ? { code: 'invalid_percentage' } : null,
-    retentionPct: retentionPct === null ? { code: 'invalid_percentage' } : null,
-  });
+  const errors: FieldErrors<ClientField> = {
+    ...bilingualNameErrors(v.nameEn, v.nameAr, CLIENT_NAME_MAX),
+    ...collectFieldErrors<Exclude<ClientField, BilingualNameField>>({
+      phone: rules.phoneRequired && !v.phone ? { code: 'phone_required' } : maxCharacters(v.phone, CLIENT_LIMITS.phone),
+      contactName: maxCharacters(v.contactName, CLIENT_LIMITS.contactName),
+      email: maxCharacters(v.email, CLIENT_LIMITS.email),
+      city: maxCharacters(v.city, CLIENT_LIMITS.city),
+      country: maxCharacters(v.country, CLIENT_LIMITS.country),
+      address: maxCharacters(v.address, CLIENT_LIMITS.address),
+      taxRegistrationNumber: maxCharacters(v.taxRegistrationNumber, CLIENT_LIMITS.taxRegistrationNumber),
+      notes: maxCharacters(v.notes, CLIENT_LIMITS.notes),
+      advancePct: advancePct === null ? { code: 'invalid_percentage' } : null,
+      retentionPct: retentionPct === null ? { code: 'invalid_percentage' } : null,
+    }),
+  };
   if (hasFieldErrors(errors) || advancePct === null || retentionPct === null) return { ok: false, errors };
   return { ok: true, values: { ...v, advancePct, retentionPct } };
 }

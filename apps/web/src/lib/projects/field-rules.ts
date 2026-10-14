@@ -7,7 +7,7 @@ import { isUuid } from '@/lib/uuid';
 import { collectFieldErrors } from '@/lib/validation/field-rules';
 import { normalizePercent } from '@/lib/validation/percent';
 import { clean } from '@/lib/validation/text';
-import { maxCharacters } from '@/lib/validation/text-field-rules';
+import { bilingualNameErrors, maxCharacters, type BilingualNameField } from '@/lib/validation/text-field-rules';
 import type { ProjectField, ProjectInput } from './fields';
 
 /** Boundary length caps (defense-in-depth), mirroring org/core profileWithinLimits. */
@@ -77,21 +77,21 @@ export function readProjectInput(input: ProjectInput, rules: ProjectRules = {}):
     address: clean(input.address),
     notes: clean(input.notes),
   };
-  const errors = collectFieldErrors<RuledField>({
-    code: codeRefusal(code, rules),
-    name: nameEn || nameAr ? null : { code: 'name_required' },
-    nameEn: maxCharacters(nameEn, PROJECT_LIMITS.name),
-    nameAr: maxCharacters(nameAr, PROJECT_LIMITS.name),
-    clientId: isUuid(clientId) ? null : { code: 'client_required' },
-    description: maxCharacters(text.description, PROJECT_LIMITS.description),
-    advancePct: advancePct === null ? { code: 'invalid_percentage' } : null,
-    retentionPct: retentionPct === null ? { code: 'invalid_percentage' } : null,
-    startDate: rules.requireStartDate && !startDate ? { code: 'start_date_required' } : null,
-    endDate: endsBeforeStart(startDate, endDate) ? { code: 'invalid_dates' } : null,
-    city: maxCharacters(text.city, PROJECT_LIMITS.city),
-    address: maxCharacters(text.address, PROJECT_LIMITS.address),
-    notes: maxCharacters(text.notes, PROJECT_LIMITS.notes),
-  });
+  const errors: FieldErrors<ProjectField> = {
+    ...bilingualNameErrors(nameEn, nameAr, PROJECT_LIMITS.name),
+    ...collectFieldErrors<Exclude<RuledField, BilingualNameField>>({
+      code: codeRefusal(code, rules),
+      clientId: isUuid(clientId) ? null : { code: 'client_required' },
+      description: maxCharacters(text.description, PROJECT_LIMITS.description),
+      advancePct: advancePct === null ? { code: 'invalid_percentage' } : null,
+      retentionPct: retentionPct === null ? { code: 'invalid_percentage' } : null,
+      startDate: rules.requireStartDate && !startDate ? { code: 'start_date_required' } : null,
+      endDate: endsBeforeStart(startDate, endDate) ? { code: 'invalid_dates' } : null,
+      city: maxCharacters(text.city, PROJECT_LIMITS.city),
+      address: maxCharacters(text.address, PROJECT_LIMITS.address),
+      notes: maxCharacters(text.notes, PROJECT_LIMITS.notes),
+    }),
+  };
   if (hasFieldErrors(errors) || advancePct === null || retentionPct === null) return { ok: false, errors };
   const typeId = clean(input.typeId);
   return {

@@ -63,13 +63,14 @@ describe('adding and retiring', () => {
 
   it('requires a name in at least one locale', async () => {
     const { ctx } = await seedWorkspace();
-    expect(await createDocumentCategoryCore(ctx, {})).toEqual({
+    const nameRequired = { ok: false, error: 'check_fields', fields: { name: { code: 'name_required' } } };
+    expect(await createDocumentCategoryCore(ctx, {})).toEqual(nameRequired);
+    expect(await createDocumentCategoryCore(ctx, { nameAr: '   ', nameEn: '' })).toEqual(nameRequired);
+    expect(await createDocumentCategoryCore(ctx, { nameEn: 'x'.repeat(81) })).toEqual({
       ok: false,
-      error: 'name_required',
+      error: 'check_fields',
+      fields: { nameEn: { code: 'too_long', params: { max: 80 } } },
     });
-    expect(
-      await createDocumentCategoryCore(ctx, { nameAr: '   ', nameEn: '' }),
-    ).toEqual({ ok: false, error: 'name_required' });
   });
 
   it('retires a category without touching what is filed under it', async () => {

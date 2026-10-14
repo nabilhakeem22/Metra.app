@@ -2,9 +2,11 @@
 // by the 'use server' wrapper; this validates + writes inside an RLS tx and audits.
 import { automationSettings } from '@metra/db';
 import { eq } from 'drizzle-orm';
+import { fieldsFailed, hasFieldErrors } from '@/lib/actions/field-errors';
 import { mutateInOrg } from '@/lib/actions/mutate';
 import { err, type ActionResult } from '@/lib/actions/result';
 import type { OrgContext } from '@/lib/db/context';
+import { automationFieldErrors } from './settings-field-rules';
 
 export interface AutomationSettingsInput {
   expireEnabled: boolean;
@@ -17,32 +19,21 @@ export interface AutomationSettingsInput {
   stageRemindersEnabled: boolean;
 }
 
-// Mirror the DB CHECK constraints so a bad value fails with a coded error, not a
-// raw constraint violation.
-const LEAD_MIN = 1;
-const LEAD_MAX = 30;
-const THRESHOLD_MIN = 1;
-const THRESHOLD_MAX = 90;
+// The day counts mirror the DB CHECK constraints (./settings-field-rules.ts), so
+// a bad value is said under its box, not answered by a raw constraint violation.
 const CADENCES = ['daily', 'weekly'] as const;
-
-function isValidInt(n: number, min: number, max: number): boolean {
-  return Number.isInteger(n) && n >= min && n <= max;
-}
 
 /** Validate + persist the org's automation settings row. Owner/admin only. */
 export async function updateAutomationSettingsCore(
   ctx: OrgContext,
   input: AutomationSettingsInput,
 ): Promise<ActionResult> {
-  if (!isValidInt(input.expireNudgeLeadDays, LEAD_MIN, LEAD_MAX)) {
-    return err('invalid');
-  }
-  if (!isValidInt(input.followupThresholdDays, THRESHOLD_MIN, THRESHOLD_MAX)) {
-    return err('invalid');
-  }
+  // A cadence outside the select: no form can send it.
   if (!CADENCES.includes(input.digestCadence as (typeof CADENCES)[number])) {
-    return err('invalid');
+    return err('malformed');
   }
+  const errors = automationFieldErrors(input);
+  if (hasFieldErrors(errors)) return fieldsFailed(errors);
 
   return mutateInOrg(
     ctx,

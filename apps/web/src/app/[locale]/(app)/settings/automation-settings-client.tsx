@@ -2,106 +2,36 @@
 
 import { Loader2 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
-import { useState, useTransition } from 'react';
+import { useRef } from 'react';
 import { Button } from '@/components/ui/button';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { FormField } from '@/components/ui/form-field';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { toast } from '@/hooks/use-toast';
-import { resolveActionError } from '@/lib/actions/error-message';
-import type { ActionCode } from '@/lib/actions/result';
-import { updateAutomationSettings } from '@/lib/automation/settings-actions';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useFocusFirstInvalid } from '@/hooks/use-focus-first-invalid';
+import type { AutomationSettingsInput } from '@/lib/automation/settings-actions';
+import { AUTOMATION_DAY_BOUNDS, type AutomationField } from '@/lib/automation/settings-field-rules';
+import { useAutomationForm } from './use-automation-form';
 
-export interface AutomationInitial {
-  expireEnabled: boolean;
-  expireNudgeEnabled: boolean;
-  expireNudgeLeadDays: number;
-  followupEnabled: boolean;
-  followupThresholdDays: number;
-  digestEnabled: boolean;
-  digestCadence: string;
-  stageRemindersEnabled: boolean;
-}
+export type AutomationInitial = AutomationSettingsInput;
 
-export function AutomationSettingsClient({
-  canManage,
-  initial,
-}: {
-  canManage: boolean;
-  initial: AutomationInitial;
-}) {
+export function AutomationSettingsClient({ canManage, initial }: { canManage: boolean; initial: AutomationInitial }) {
   const t = useTranslations('automation');
   const ts = useTranslations('settings');
-  const te = useTranslations('errors');
-  const [saving, start] = useTransition();
-
-  const [expireEnabled, setExpireEnabled] = useState(initial.expireEnabled);
-  const [expireNudgeEnabled, setExpireNudgeEnabled] = useState(
-    initial.expireNudgeEnabled,
-  );
-  const [expireNudgeLeadDays, setLead] = useState(
-    String(initial.expireNudgeLeadDays),
-  );
-  const [followupEnabled, setFollowupEnabled] = useState(
-    initial.followupEnabled,
-  );
-  const [followupThresholdDays, setThreshold] = useState(
-    String(initial.followupThresholdDays),
-  );
-  const [digestEnabled, setDigestEnabled] = useState(initial.digestEnabled);
-  const [digestCadence, setCadence] = useState(initial.digestCadence);
-  const [stageRemindersEnabled, setStageEnabled] = useState(
-    initial.stageRemindersEnabled,
-  );
-
+  const form = useAutomationForm(initial);
+  const { draft, set } = form;
+  const cardRef = useRef<HTMLDivElement>(null);
+  useFocusFirstInvalid(cardRef, form.errors.invalidAttempt);
   const disabled = !canManage;
-  const errorMessage = (code?: ActionCode) => resolveActionError(code, te);
 
-  function save() {
-    start(async () => {
-      const res = await updateAutomationSettings({
-        expireEnabled,
-        expireNudgeEnabled,
-        expireNudgeLeadDays: Number(expireNudgeLeadDays),
-        followupEnabled,
-        followupThresholdDays: Number(followupThresholdDays),
-        digestEnabled,
-        digestCadence,
-        stageRemindersEnabled,
-      });
-      toast(
-        res.ok
-          ? { title: ts('saved') }
-          : { title: errorMessage(res.error), variant: 'destructive' },
-      );
-    });
-  }
-
-  const check = (
-    checked: boolean,
-    onChange: (v: boolean) => void,
-    label: string,
-    desc: string,
-  ) => (
+  const check = (key: 'expireEnabled' | 'expireNudgeEnabled' | 'followupEnabled' | 'digestEnabled' | 'stageRemindersEnabled', label: string, desc: string) => (
     <label className="flex items-start gap-3">
       <input
         type="checkbox"
         className="mt-1 size-4"
-        checked={checked}
-        onChange={(e) => onChange(e.target.checked)}
+        checked={draft[key]}
+        onChange={(e) => set(key, e.target.checked)}
         disabled={disabled}
       />
       <span>
@@ -111,74 +41,45 @@ export function AutomationSettingsClient({
     </label>
   );
 
+  const dayBox = (field: AutomationField, label: string, enabled: boolean) => (
+    <div className="max-w-40 ps-7">
+      <FormField id={field} label={label} {...form.errors.bind(field)}>
+        <Input
+          type="number"
+          inputMode="numeric"
+          min={AUTOMATION_DAY_BOUNDS[field].min}
+          max={AUTOMATION_DAY_BOUNDS[field].max}
+          dir="ltr"
+          value={draft[field]}
+          onChange={(e) => set(field, e.target.value)}
+          disabled={disabled || !enabled}
+        />
+      </FormField>
+    </div>
+  );
+
   return (
     <Card>
       <CardHeader>
         <CardTitle>{t('title')}</CardTitle>
         <CardDescription>{t('subtitle')}</CardDescription>
       </CardHeader>
-      <CardContent className="space-y-5">
-        {check(
-          expireEnabled,
-          setExpireEnabled,
-          t('expireLabel'),
-          t('expireDesc'),
-        )}
+      <CardContent ref={cardRef} className="space-y-5">
+        {check('expireEnabled', t('expireLabel'), t('expireDesc'))}
 
-        {check(
-          expireNudgeEnabled,
-          setExpireNudgeEnabled,
-          t('expireNudgeLabel'),
-          t('expireNudgeDesc'),
-        )}
-        <div className="max-w-40 space-y-2 ps-7">
-          <Label htmlFor="expireNudgeLeadDays">{t('leadDaysLabel')}</Label>
-          <Input
-            id="expireNudgeLeadDays"
-            type="number"
-            inputMode="numeric"
-            min={1}
-            max={30}
-            dir="ltr"
-            value={expireNudgeLeadDays}
-            onChange={(e) => setLead(e.target.value)}
-            disabled={disabled || !expireNudgeEnabled}
-          />
-        </div>
+        {check('expireNudgeEnabled', t('expireNudgeLabel'), t('expireNudgeDesc'))}
+        {dayBox('expireNudgeLeadDays', t('leadDaysLabel'), draft.expireNudgeEnabled)}
 
-        {check(
-          followupEnabled,
-          setFollowupEnabled,
-          t('followupLabel'),
-          t('followupDesc'),
-        )}
-        <div className="max-w-40 space-y-2 ps-7">
-          <Label htmlFor="followupThresholdDays">{t('thresholdLabel')}</Label>
-          <Input
-            id="followupThresholdDays"
-            type="number"
-            inputMode="numeric"
-            min={1}
-            max={90}
-            dir="ltr"
-            value={followupThresholdDays}
-            onChange={(e) => setThreshold(e.target.value)}
-            disabled={disabled || !followupEnabled}
-          />
-        </div>
+        {check('followupEnabled', t('followupLabel'), t('followupDesc'))}
+        {dayBox('followupThresholdDays', t('thresholdLabel'), draft.followupEnabled)}
 
-        {check(
-          digestEnabled,
-          setDigestEnabled,
-          t('digestLabel'),
-          t('digestDesc'),
-        )}
+        {check('digestEnabled', t('digestLabel'), t('digestDesc'))}
         <div className="max-w-40 space-y-2 ps-7">
           <Label htmlFor="digestCadence">{t('cadenceLabel')}</Label>
           <Select
-            value={digestCadence}
-            onValueChange={setCadence}
-            disabled={disabled || !digestEnabled}
+            value={draft.digestCadence}
+            onValueChange={(value) => set('digestCadence', value)}
+            disabled={disabled || !draft.digestEnabled}
           >
             <SelectTrigger id="digestCadence" className="h-9 w-full">
               <SelectValue />
@@ -190,16 +91,16 @@ export function AutomationSettingsClient({
           </Select>
         </div>
 
-        {check(
-          stageRemindersEnabled,
-          setStageEnabled,
-          t('stageLabel'),
-          t('stageDesc'),
-        )}
+        {check('stageRemindersEnabled', t('stageLabel'), t('stageDesc'))}
 
+        {form.errors.formError && (
+          <p className="text-body text-destructive" role="alert">
+            {form.errors.formError}
+          </p>
+        )}
         {canManage && (
-          <Button variant="secondary" onClick={save} disabled={saving}>
-            {saving && <Loader2 className="size-4 animate-spin" aria-hidden />}
+          <Button variant="secondary" onClick={form.save} disabled={form.saving}>
+            {form.saving && <Loader2 className="size-4 animate-spin" aria-hidden />}
             {ts('save')}
           </Button>
         )}

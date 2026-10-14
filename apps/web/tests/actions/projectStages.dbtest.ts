@@ -63,15 +63,16 @@ describe('project stages — start from any phase (no linear guard)', () => {
 });
 
 describe('project stages — progress bounds', () => {
-  it('addStage/updateStage reject progress outside [0,100] -> invalid_percentage', async () => {
+  it('addStage/updateStage reject progress outside [0,100] under the progress field', async () => {
     const { ctx, projectId } = await setup();
-    expect(
-      await addStageCore(ctx, { projectId, nameEn: 'Extra', progressPct: '150' }),
-    ).toEqual({ ok: false, error: 'invalid_percentage' });
+    const outOfRange = { ok: false, error: 'check_fields', fields: { progressPct: { code: 'invalid_percentage' } } };
+    expect(await addStageCore(ctx, { projectId, nameEn: 'Extra', progressPct: '150' })).toEqual(outOfRange);
     const [s0] = await listStages(ctx, projectId);
-    expect(
-      await updateStageCore(ctx, { id: s0.id, progressPct: '-5' }),
-    ).toEqual({ ok: false, error: 'invalid_percentage' });
+    expect(await updateStageCore(ctx, { id: s0.id, progressPct: '-5' })).toEqual(outOfRange);
+    expect(await updateStageCore(ctx, { id: '00000000-0000-4000-8000-000000000999', progressPct: '5' })).toEqual({
+      ok: false,
+      error: 'record_not_found',
+    });
   });
 
   it('DB CHECK independently rejects progress_pct = 150 (23514)', async () => {

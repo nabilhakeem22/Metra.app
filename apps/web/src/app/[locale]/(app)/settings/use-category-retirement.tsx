@@ -4,7 +4,7 @@ import { useTranslations } from 'next-intl';
 import { useActiveToggle } from '@/hooks/use-active-toggle';
 import { toast } from '@/hooks/use-toast';
 import { useRouter } from '@/i18n/routing';
-import { resolveActionError } from '@/lib/actions/error-message';
+import { describeFailure } from '@/lib/actions/error-message';
 import { updateDocumentCategory } from '@/lib/document-categories/actions';
 import type { DocumentCategoryRow } from './document-categories-card';
 
@@ -20,7 +20,8 @@ export function useCategoryRetirement(categories: DocumentCategoryRow[]) {
   return useActiveToggle({
     setActive: (id, active) => {
       const category = categories.find((candidate) => candidate.id === id);
-      if (!category) return Promise.resolve({ ok: false, error: 'invalid' });
+      // A row the page no longer lists: gone since it was rendered.
+      if (!category) return Promise.resolve({ ok: false, error: 'record_not_found' });
       return updateDocumentCategory({ ...category, active });
     },
     copy: {
@@ -33,7 +34,7 @@ export function useCategoryRetirement(categories: DocumentCategoryRow[]) {
       undo: tc('undo'),
     },
     onError: (result) =>
-      toast({ title: resolveActionError(result.error, te), variant: 'destructive' }),
+      toast({ title: describeFailure(result, te), variant: 'destructive' }),
     onChanged: () => router.refresh(),
   });
 }
