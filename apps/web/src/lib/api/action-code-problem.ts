@@ -22,6 +22,7 @@ export const ACTION_CODE_PROBLEM: Record<ActionCode, ApiProblemKind> = {
   logo_image_unsupported: 'bad-request',
   // Storage failed under us: the server's side, and the file may still land.
   storage_unavailable: 'internal',
+  import_unreadable: 'bad-request',
   name_required: 'bad-request',
   phone_required: 'bad-request',
   start_date_required: 'bad-request',

@@ -6,6 +6,7 @@ import { formatMoney } from '@/lib/format/money';
 import type { Column, EditableLine } from './boq-sheet-columns';
 import { focusNextInColumn } from './boq-sheet-focus';
 import type { BoqSheetRowApi } from './boq-sheet-row-api';
+import type { BoqCellErrorsApi } from './use-boq-cell-errors';
 import type { BoqEditsApi } from './use-boq-edits';
 import type { BoqWritesApi } from './use-boq-writes';
 
@@ -13,6 +14,8 @@ export interface BoqRowApiOptions {
   canEdit: boolean;
   edits: BoqEditsApi;
   writes: BoqWritesApi;
+  /** Typing in a refused cell clears that cell's refusal (D3). */
+  clearRefusal: BoqCellErrorsApi['clear'];
   /** The table, for Enter-walks-down-the-column. */
   gridRef: RefObject<HTMLTableElement | null>;
 }
@@ -50,8 +53,16 @@ function columnKeyHandler(
  */
 export function useBoqRowApi(options: BoqRowApiOptions): BoqSheetRowApi {
   const locale = useLocale();
-  const { canEdit, edits, writes, gridRef } = options;
-  const { setCell, clearColumns } = edits;
+  const { canEdit, edits, writes, clearRefusal, gridRef } = options;
+  const { clearColumns } = edits;
+  const typeInto = edits.setCell;
+  const setCell = useCallback<BoqSheetRowApi['setCell']>(
+    (lineId, column, value) => {
+      clearRefusal(lineId, column);
+      typeInto(lineId, column, value);
+    },
+    [clearRefusal, typeInto],
+  );
   const { onCellBlur, saveLine, onDeleteLine, onAddLine } = writes;
 
   const money = useCallback((value: string) => formatMoney(value, locale), [locale]);

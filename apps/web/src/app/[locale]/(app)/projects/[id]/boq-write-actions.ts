@@ -10,8 +10,8 @@ import {
 } from '@/lib/boqs/actions';
 import type { BoqLinePatch } from '@/lib/boqs/edit-input';
 import type { BoqDetail } from '@/lib/boqs/queries';
-import { resolveActionError } from '@/lib/actions/error-message';
-import type { ActionCode } from '@/lib/actions/result';
+import { describeFailure, describeRejection } from '@/lib/actions/error-message';
+import type { ActionResult } from '@/lib/actions/result';
 import {
   recordValue,
   trimNumber,
@@ -21,6 +21,7 @@ import {
 } from './boq-sheet-columns';
 import { loggableFailure } from '@/lib/actions/loggable-failure';
 import type { CellWriteLatch } from './cell-write-latch';
+import type { BoqCellErrorsApi } from './use-boq-cell-errors';
 import type { BoqEditsApi } from './use-boq-edits';
 
 /**
@@ -30,26 +31,26 @@ import type { BoqEditsApi } from './use-boq-edits';
  * SAVE IS PER LINE, ON BLUR. Not per keystroke — a half-typed rate ("15" on the
  * way to "1500") must never be written to a document a client will sign.
  *
- * Coded server refusals resolve through the SHARED errors catalogue. This screen
- * used to map eight of them by hand and send everything else to "That change was
- * not saved", which is what an over-length description or a vanished line looked
- * like to the studio.
+ * A refused CELL is said under that cell (use-boq-cell-errors.ts); any other
+ * refusal, and a write that never answered, is a toast naming its cause. This
+ * screen used to map eight codes by hand and send everything else to "That
+ * change was not saved", which is what an over-length description or a vanished
+ * line looked like to the studio.
  */
 export interface WriteContext {
   boq: BoqDetail;
   edits: BoqEditsApi;
+  cellErrors: Pick<BoqCellErrorsApi, 'show'>;
   start: TransitionStartFunction;
   /** Orders two saves of the SAME cell — see cell-write-latch.ts. */
   latch: CellWriteLatch;
   sheetText: (key: string) => string;
-  errorText: (key: string) => string;
+  errorText: (key: string, values?: Record<string, string | number>) => string;
 }
 
-export function refuse(context: WriteContext, code: ActionCode | undefined): void {
-  toast({
-    title: resolveActionError(code, context.errorText),
-    variant: 'destructive',
-  });
+/** A refusal that belongs to no cell, as a toast naming its cause. */
+export function refuse(context: WriteContext, result: Pick<ActionResult, 'error' | 'params' | 'reference'>): void {
+  toast({ title: describeFailure(result, context.errorText), variant: 'destructive' });
 }
 
 /** What this write carries for the cells it names, to compare against later. */
@@ -110,7 +111,8 @@ export function saveLine(
                 columns,
                 code: result.error,
               });
-              refuse(context, result.error);
+              const underCells = result.fields && context.cellErrors.show(line.id, result.fields);
+              if (!underCells) refuse(context, result);
             }
           } catch (cause) {
             // A REJECTION LEAVES NO TRACE ANYWHERE ELSE: `mutateInOrg` never saw
@@ -122,7 +124,7 @@ export function saveLine(
               { lineId: line.id, columns },
               loggableFailure(cause),
             );
-            toast({ title: context.sheetText('saveFailed'), variant: 'destructive' });
+            toast({ title: describeRejection(cause, context.errorText), variant: 'destructive' });
           }
         },
         onDeadline: () => {
@@ -162,7 +164,7 @@ export function addLine(context: WriteContext, sectionId: string): void {
       sectionId,
       description: context.sheetText('newLine'),
     });
-    if (!result.ok) refuse(context, result.error);
+    if (!result.ok) refuse(context, result);
   });
 }
 
@@ -172,7 +174,7 @@ export function addSection(context: WriteContext): void {
       boqId: context.boq.id,
       title: context.sheetText('newSection'),
     });
-    if (!result.ok) refuse(context, result.error);
+    if (!result.ok) refuse(context, result);
   });
 }
 
@@ -192,7 +194,7 @@ export function discountBlur(context: WriteContext, typed: string): void {
       discountPct: typed,
     });
     if (result.ok) context.edits.setDiscount(null);
-    else refuse(context, result.error);
+    else refuse(context, result);
   });
 }
 

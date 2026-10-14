@@ -13,7 +13,8 @@ import 'server-only';
 // roles can open would be a way to write a number you cannot read.
 import { boqLines } from '@metra/db';
 import { eq } from 'drizzle-orm';
-import { fail, mutateInOrg, requireInOrg } from '@/lib/actions/mutate';
+import { failFields, fieldsFailed } from '@/lib/actions/field-errors';
+import { mutateInOrg, requireInOrg } from '@/lib/actions/mutate';
 import { err, type ActionResult } from '@/lib/actions/result';
 import { computeLine } from '@/lib/aggregates/proposal-totals';
 import { withinMagnitude } from '@/lib/money/read';
@@ -76,13 +77,14 @@ function applyLinePatch(
   });
   // The FACTORS are each inside the cap; their PRODUCT need not be. Same check
   // the import makes on every line it writes — the cost side included, because
-  // unitCost is not editable here and the sheet never showed it.
+  // unitCost is not editable here and the sheet never showed it. Said under the
+  // figure this edit typed (the quantity when it typed both).
   if (
     !withinMagnitude(totals.lineTotal) ||
     !withinMagnitude(totals.lineCost) ||
     !withinMagnitude(totals.lineMargin)
   ) {
-    fail('amount_too_large');
+    failFields({ [patch.qty !== undefined ? 'qty' : 'unitPrice']: { code: 'amount_too_large' } });
   }
   return {
     ...(patch.itemCode !== undefined ? { itemCode: patch.itemCode } : {}),
@@ -107,7 +109,7 @@ export async function updateBoqLineCore(
   input: UpdateBoqLineInput,
 ): Promise<ActionResult> {
   const clean = normalizeLinePatch(input.patch);
-  if (!clean.ok) return err(clean.error);
+  if (!clean.ok) return 'errors' in clean ? fieldsFailed(clean.errors) : err(clean.error);
 
   return mutateInOrg(ctx, { capability: 'boq_build', action: 'update' }, async (tx) => {
     const { boqId, discountPct } = await loadDraftForLine(tx, input.lineId);

@@ -129,7 +129,11 @@ describe('editing a draft BOQ', () => {
       lineId: line.id,
       patch: { unitPrice: '1,5OO' },
     });
-    expect(res).toEqual({ ok: false, error: 'invalid_price' });
+    expect(res).toEqual({
+      ok: false,
+      error: 'check_fields',
+      fields: { unitPrice: { code: 'invalid_price' } },
+    });
 
     // The rate — and therefore the document total — is untouched.
     const after = await read(ctx, projectId);
@@ -148,7 +152,7 @@ describe('editing a draft BOQ', () => {
         lineId: line.id,
         patch: { qty: '1000000000', unitPrice: '1000000000' },
       }),
-    ).toEqual({ ok: false, error: 'amount_too_large' });
+    ).toEqual({ ok: false, error: 'check_fields', fields: { qty: { code: 'amount_too_large' } } });
 
     const after = await read(ctx, projectId);
     expect(Number(after!.sections[0].lines[0].qty)).toBe(100);
@@ -161,7 +165,7 @@ describe('editing a draft BOQ', () => {
     const line = (await read(ctx, projectId))!.sections[0].lines[0];
     expect(
       await updateBoqLineCore(ctx, { lineId: line.id, patch: { qty: '-5' } }),
-    ).toEqual({ ok: false, error: 'invalid_qty' });
+    ).toEqual({ ok: false, error: 'check_fields', fields: { qty: { code: 'invalid_qty' } } });
   });
 
   it('reads the separators a studio actually types', async () => {

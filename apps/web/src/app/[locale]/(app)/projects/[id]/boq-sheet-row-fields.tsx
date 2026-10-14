@@ -1,11 +1,12 @@
 'use client';
 
 import { useLocale, useTranslations } from 'next-intl';
-import { BOQ_UNITS } from '@/lib/boqs/edit-input';
 import { formatQuantity } from '@/lib/format/number';
-import { EditableCell, Td } from './boq-sheet-cells';
+import { Td } from './boq-sheet-cells';
 import { cellValueOf, type EditableLine, type RowEdits } from './boq-sheet-columns';
+import { EditableCell, useCellRefusal } from './boq-sheet-editable-cell';
 import type { BoqSheetRowApi } from './boq-sheet-row-api';
+import type { BoqRowRefusals } from './use-boq-cell-errors';
 
 // The four cells of a BOQ row that HOLD A VALUE: code, description, unit and the
 // two numbers. The two that ACT — the provisional toggle and the delete control —
@@ -16,18 +17,20 @@ import type { BoqSheetRowApi } from './boq-sheet-row-api';
 
 const READ_ONLY_CODE = 'block p-3 text-small text-[color:var(--text-muted)] ltr:font-mono';
 const READ_ONLY_NUMBER = 'block whitespace-nowrap p-3 text-end font-mono tabular-nums';
-const UNIT_SELECT =
-  'w-full cursor-pointer rounded-item border border-transparent bg-transparent p-3 field-text text-[color:var(--text)] hover:bg-[color:var(--track)] outline-none focus-visible:border-[color:hsl(var(--brand))]';
 
 export interface BoqFieldProps {
   line: EditableLine;
   api: BoqSheetRowApi;
   /** What the studio has typed into THIS row and not yet committed. */
   typed: RowEdits | undefined;
+  /** What the server refused in THIS row. */
+  refused: BoqRowRefusals | undefined;
 }
 
-export function BoqCodeCell({ line, api, typed }: BoqFieldProps) {
+
+export function BoqCodeCell({ line, api, typed, refused }: BoqFieldProps) {
   const t = useTranslations('projects.profile.boq');
+  const refusal = useCellRefusal(refused, 'itemCode');
   return (
     <Td sticky="code" dirty={typed !== undefined}>
       {api.canEdit ? (
@@ -38,6 +41,7 @@ export function BoqCodeCell({ line, api, typed }: BoqFieldProps) {
           value={cellValueOf(line, 'itemCode', typed)}
           api={api}
           mono
+          refusal={refusal}
         />
       ) : (
         <span className={READ_ONLY_CODE}>{line.itemCode}</span>
@@ -46,8 +50,9 @@ export function BoqCodeCell({ line, api, typed }: BoqFieldProps) {
   );
 }
 
-export function BoqDescriptionCell({ line, api, typed }: BoqFieldProps) {
+export function BoqDescriptionCell({ line, api, typed, refused }: BoqFieldProps) {
   const t = useTranslations('projects.profile.boq');
+  const refusal = useCellRefusal(refused, 'description');
   return (
     <Td sticky="description">
       {api.canEdit ? (
@@ -57,42 +62,11 @@ export function BoqDescriptionCell({ line, api, typed }: BoqFieldProps) {
           label={t('col.description')}
           value={cellValueOf(line, 'description', typed)}
           api={api}
+          refusal={refusal}
         />
       ) : (
         <span className="block p-3" dir="auto">
           {line.description}
-        </span>
-      )}
-    </Td>
-  );
-}
-
-export function BoqUnitCell({ line, api, typed }: BoqFieldProps) {
-  const t = useTranslations('projects.profile.boq');
-  // A unit is a CHOICE, so it saves on change rather than on blur: there is no
-  // half-typed state to protect the document from.
-  return (
-    <Td>
-      {api.canEdit ? (
-        <select
-          value={cellValueOf(line, 'unit', typed)}
-          data-col="unit"
-          aria-label={t('col.unit')}
-          onChange={(event) => {
-            api.setCell(line.id, 'unit', event.target.value);
-            api.saveLine(line, { unit: event.target.value }, ['unit']);
-          }}
-          className={UNIT_SELECT}
-        >
-          {BOQ_UNITS.map((unit) => (
-            <option key={unit} value={unit}>
-              {t(`unit.${unit}`)}
-            </option>
-          ))}
-        </select>
-      ) : (
-        <span className="block p-3 text-[color:var(--text-muted)]">
-          {t(`unit.${line.unit}`)}
         </span>
       )}
     </Td>
@@ -104,8 +78,10 @@ export function BoqNumberCell({
   column,
   api,
   typed,
+  refused,
 }: BoqFieldProps & { column: 'qty' | 'unitPrice' }) {
   const t = useTranslations('projects.profile.boq');
+  const refusal = useCellRefusal(refused, column);
   const locale = useLocale();
   const label = column === 'qty' ? t('col.qty') : t('col.rate');
   return (
@@ -119,6 +95,7 @@ export function BoqNumberCell({
           api={api}
           mono
           numeric
+          refusal={refusal}
         />
       ) : (
         // FORMATTED INSIDE THE BRANCH THAT RENDERS IT. Hoisted out, an editable

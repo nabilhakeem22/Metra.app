@@ -5,7 +5,8 @@
  * directly — a hostile sheet is exactly the input one wants to assert on without
  * a session, and the action wrapper's only remaining job is `requireOrg()`.
  */
-import type { ActionCode } from '@/lib/actions/result';
+import { fieldsFailed } from '@/lib/actions/field-errors';
+import { err, type ActionCode, type ActionResult } from '@/lib/actions/result';
 import { decodeCsv, type DecodeNote } from './decode';
 import {
   autoDetectMapping,
@@ -19,11 +20,9 @@ import {
   type ImportParseReason,
 } from '@/lib/import/limits';
 
-export interface ImportPreview {
-  ok: boolean;
-  /** An ActionCode, so the page resolves it through the shared errors catalogue
-   *  instead of showing one blanket "could not read that sheet" for every cause. */
-  error?: ActionCode;
+/** The preview, or why the FILE cannot be read, said under the file box
+ *  (`fields.file`) by its cause rather than one blanket "could not read that". */
+export interface ImportPreview extends ActionResult {
   /** Lines that would be created. */
   lines?: ImportedLine[];
   /** Row number + coded reasons for everything that would not. */
@@ -37,10 +36,12 @@ export interface ImportPreview {
  * importer the studio went through.
  */
 function previewErrorFor(reason: ImportParseReason): ActionCode {
-  return reason === 'empty' || reason === 'unreadable'
-    ? 'invalid'
-    : 'import_too_large';
+  if (reason === 'empty') return 'import_empty';
+  return reason === 'unreadable' ? 'import_unreadable' : 'import_too_large';
 }
+
+/** A refusal of the uploaded file itself. */
+const fileRefused = (code: ActionCode): ImportPreview => fieldsFailed({ file: { code } });
 
 /**
  * Decode and validate an uploaded sheet WITHOUT writing anything.
@@ -60,11 +61,9 @@ function previewErrorFor(reason: ImportParseReason): ActionCode {
  * just to ask whether it is blank.
  */
 export function previewBoqImportText(csvText: string): ImportPreview {
-  if (typeof csvText !== 'string') return { ok: false, error: 'invalid' };
-  if (csvText.length > MAX_IMPORT_BYTES) {
-    return { ok: false, error: 'import_too_large' };
-  }
-  if (csvText.trim() === '') return { ok: false, error: 'invalid' };
+  if (typeof csvText !== 'string') return err('malformed');
+  if (csvText.length > MAX_IMPORT_BYTES) return fileRefused('import_too_large');
+  if (csvText.trim() === '') return fileRefused('import_empty');
 
   let decoded;
   try {
@@ -74,12 +73,12 @@ export function previewBoqImportText(csvText: string): ImportPreview {
     // refusal rather than a rejected server action, which the page could only
     // show as its generic failure toast.
     if (cause instanceof ImportParseError) {
-      return { ok: false, error: previewErrorFor(cause.reason) };
+      return fileRefused(previewErrorFor(cause.reason));
     }
     throw cause;
   }
   const header = decoded.grid.rows[0];
-  if (!header) return { ok: false, error: 'invalid' };
+  if (!header) return fileRefused('import_empty');
 
   const result = mapRows(decoded.grid, autoDetectMapping(header));
   return {

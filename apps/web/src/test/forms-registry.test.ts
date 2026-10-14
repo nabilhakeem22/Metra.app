@@ -37,6 +37,7 @@ const FORM_COVERAGE: Readonly<Record<string, string>> = {
   'app/[locale]/(app)/engagements/use-delivery-form.ts': 'app/[locale]/(app)/engagements/engagement-create-form.test.tsx',
   'app/[locale]/(app)/price-book/cost-item-form-fields.tsx': 'app/[locale]/(app)/price-book/cost-item-form.test.tsx',
   'app/[locale]/(app)/price-book/cost-item-form.tsx': 'app/[locale]/(app)/price-book/cost-item-form.test.tsx',
+  'app/[locale]/(app)/projects/[id]/boq-start.tsx': 'app/[locale]/(app)/projects/[id]/boq-start.test.tsx',
   'app/[locale]/(app)/projects/[id]/details-fields.tsx': 'app/[locale]/(app)/projects/[id]/details-tab.test.tsx',
   'app/[locale]/(app)/projects/[id]/details-type-field.tsx': 'app/[locale]/(app)/projects/[id]/details-tab.test.tsx',
   'app/[locale]/(app)/projects/[id]/use-add-project-type.ts': 'app/[locale]/(app)/projects/[id]/details-tab.test.tsx',

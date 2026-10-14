@@ -17,6 +17,7 @@ const ALL_CODES: ActionCode[] = [
   'record_not_found',
   'logo_image_unsupported',
   'storage_unavailable',
+  'import_unreadable',
   'name_required',
   'phone_required',
   'start_date_required',

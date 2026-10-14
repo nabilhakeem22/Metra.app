@@ -40,7 +40,7 @@ export interface CommitImportInput {
 
 /** The two answers available BEFORE the transaction opens, or null to proceed. */
 function validateImportedLines(lines: ImportedLine[]): ActionResult | null {
-  if (lines.length === 0) return err('invalid');
+  if (lines.length === 0) return err('import_empty');
   if (lines.length > MAX_BOQ_LINES) return err('too_many_lines');
   return null;
 }

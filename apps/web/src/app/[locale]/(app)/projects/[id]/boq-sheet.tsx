@@ -11,6 +11,7 @@ import { BoqSheetHead } from './boq-sheet-head';
 import { countVisibleLines, searchNeedle, visibleLines } from './boq-sheet-search';
 import { BoqSectionBody } from './boq-sheet-section';
 import { BoqTotals } from './boq-sheet-totals';
+import { useBoqCellErrors } from './use-boq-cell-errors';
 import { useBoqEdits } from './use-boq-edits';
 import { useBoqRowApi } from './use-boq-row-api';
 import { useBoqWrites } from './use-boq-writes';
@@ -41,11 +42,12 @@ export function BoqSheet({
   actions?: (shown: BoqDetail) => ReactNode;
 }) {
   const edits = useBoqEdits();
-  const writes = useBoqWrites({ boq, edits });
+  const cellErrors = useBoqCellErrors();
+  const writes = useBoqWrites({ boq, edits, cellErrors });
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [query, setQuery] = useState('');
   const gridRef = useRef<HTMLTableElement>(null);
-  const rowApi = useBoqRowApi({ canEdit, edits, writes, gridRef });
+  const rowApi = useBoqRowApi({ canEdit, edits, writes, clearRefusal: cellErrors.clear, gridRef });
 
   const needle = searchNeedle(query);
   // A line deleted inside its Undo window is gone from the studio's point of
@@ -113,6 +115,7 @@ export function BoqSheet({
               searching={needle !== ''}
               api={rowApi}
               cells={edits.cells}
+              refused={cellErrors.refused}
               savingIds={edits.savingIds}
               pending={writes.pending}
               onToggle={() => toggleSection(section.id)}

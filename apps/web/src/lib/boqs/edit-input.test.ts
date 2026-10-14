@@ -100,14 +100,14 @@ describe('normalizeLinePatch', () => {
     });
     expect(normalizeLinePatch({ description: '   ' })).toEqual({
       ok: false,
-      error: 'description_required',
+      errors: { description: { code: 'description_required' } },
     });
   });
 
   it('refuses a unit outside the enum', () => {
     expect(normalizeLinePatch({ unit: 'sqft' })).toEqual({
       ok: false,
-      error: 'invalid_unit',
+      errors: { unit: { code: 'invalid_unit' } },
     });
   });
 
@@ -115,22 +115,22 @@ describe('normalizeLinePatch', () => {
     expect(normalizeLinePatch({ qty: 'ten' }).ok).toBe(false);
     expect(normalizeLinePatch({ qty: 'ten' })).toEqual({
       ok: false,
-      error: 'invalid_qty',
+      errors: { qty: { code: 'invalid_qty' } },
     });
     expect(normalizeLinePatch({ unitPrice: '£5' })).toEqual({
       ok: false,
-      error: 'invalid_price',
+      errors: { unitPrice: { code: 'invalid_price' } },
     });
   });
 
   it('caps the free-text columns', () => {
     expect(normalizeLinePatch({ itemCode: 'x'.repeat(MAX_ITEM_CODE + 1) })).toEqual({
       ok: false,
-      error: 'item_code_too_long',
+      errors: { itemCode: { code: 'item_code_too_long' } },
     });
     expect(
       normalizeLinePatch({ description: 'x'.repeat(MAX_DESCRIPTION + 1) }),
-    ).toEqual({ ok: false, error: 'description_too_long' });
+    ).toEqual({ ok: false, errors: { description: { code: 'description_too_long' } } });
   });
 
   // F2 (wave-5 remediation). W3-9 moved the description cap to code points and
@@ -155,7 +155,7 @@ describe('normalizeLinePatch', () => {
     });
     expect(
       normalizeLinePatch({ itemCode: '\u{1F9F1}'.repeat(MAX_ITEM_CODE + 1) }),
-    ).toEqual({ ok: false, error: 'item_code_too_long' });
+    ).toEqual({ ok: false, errors: { itemCode: { code: 'item_code_too_long' } } });
   });
 
   // W3-9. The cap counts CODE POINTS, the unit Postgres counts — not UTF-16
@@ -173,7 +173,7 @@ describe('normalizeLinePatch', () => {
     });
     expect(
       normalizeLinePatch({ description: '\u{1F9F1}'.repeat(MAX_DESCRIPTION + 1) }),
-    ).toEqual({ ok: false, error: 'description_too_long' });
+    ).toEqual({ ok: false, errors: { description: { code: 'description_too_long' } } });
   });
 
   it('refuses an amount past the magnitude cap the import already enforces', () => {
@@ -189,28 +189,39 @@ describe('normalizeLinePatch', () => {
     // overflows from factors which each fit.
     expect(normalizeLinePatch({ qty: '100000000000000000' })).toEqual({
       ok: false,
-      error: 'amount_too_large',
+      errors: { qty: { code: 'amount_too_large' } },
     });
     expect(normalizeLinePatch({ unitPrice: String(MAX_AMOUNT + 1) })).toEqual({
       ok: false,
-      error: 'amount_too_large',
+      errors: { unitPrice: { code: 'amount_too_large' } },
     });
     // A cell that genuinely holds no number still gets the field's own code.
     expect(normalizeLinePatch({ qty: 'twelve' })).toEqual({
       ok: false,
-      error: 'invalid_qty',
+      errors: { qty: { code: 'invalid_qty' } },
     });
     // The cap itself is still acceptable.
     expect(normalizeLinePatch({ qty: String(MAX_AMOUNT) }).ok).toBe(true);
   });
 
   it('refuses an empty patch instead of answering ok to a no-op', () => {
-    expect(normalizeLinePatch({})).toEqual({ ok: false, error: 'invalid' });
+    expect(normalizeLinePatch({})).toEqual({ ok: false, error: 'malformed' });
   });
 
   it('refuses a non-boolean provisional', () => {
     expect(
       normalizeLinePatch({ provisional: 'yes' as unknown as boolean }),
-    ).toEqual({ ok: false, error: 'invalid' });
+    ).toEqual({ ok: false, error: 'malformed' });
+  });
+
+  it('says every refused column at once, each under its own cell (D1)', () => {
+    expect(normalizeLinePatch({ description: ' ', qty: 'ten', unitPrice: '£5' })).toEqual({
+      ok: false,
+      errors: {
+        description: { code: 'description_required' },
+        qty: { code: 'invalid_qty' },
+        unitPrice: { code: 'invalid_price' },
+      },
+    });
   });
 });

@@ -27,7 +27,7 @@ describe('previewBoqImportText caps', () => {
     const elapsed = millisecondsFor(() => {
       preview = previewBoqImportText(oversized);
     });
-    expect(preview).toEqual({ ok: false, error: 'import_too_large' });
+    expect(preview).toEqual({ ok: false, error: 'check_fields', fields: { file: { code: 'import_too_large' } } });
     // "Before decoding" is the claim, so it has to be fast: parsing 5 MiB took
     // tens of milliseconds and tens of megabytes.
     expect(elapsed).toBeLessThan(50);
@@ -38,7 +38,7 @@ describe('previewBoqImportText caps', () => {
     // row, and 1,048,577 fields (+17.6 MiB of heap) before this cap existed.
     const oneWideRow = ','.repeat(1024 * 1024);
     const preview = previewBoqImportText(oneWideRow);
-    expect(preview).toEqual({ ok: false, error: 'import_too_large' });
+    expect(preview).toEqual({ ok: false, error: 'check_fields', fields: { file: { code: 'import_too_large' } } });
   });
 
   it('bounds an unterminated quote too', () => {
@@ -49,7 +49,8 @@ describe('previewBoqImportText caps', () => {
     expect(previewBoqImportText(openQuote).ok).toBe(true);
     expect(previewBoqImportText(`"${'x'.repeat(MAX_IMPORT_BYTES)}`)).toEqual({
       ok: false,
-      error: 'import_too_large',
+      error: 'check_fields',
+      fields: { file: { code: 'import_too_large' } },
     });
   });
 
@@ -60,15 +61,20 @@ describe('previewBoqImportText caps', () => {
     expect(previewBoqImportText(row(MAX_IMPORT_CELLS)).error).toBeUndefined();
     expect(previewBoqImportText(row(MAX_IMPORT_CELLS + 1))).toEqual({
       ok: false,
-      error: 'import_too_large',
+      error: 'check_fields',
+      fields: { file: { code: 'import_too_large' } },
     });
   });
 
-  it('still refuses an empty or non-string body as invalid', () => {
-    expect(previewBoqImportText('   ')).toEqual({ ok: false, error: 'invalid' });
+  it('says an empty file is empty, and refuses a non-string body as malformed', () => {
+    expect(previewBoqImportText('   ')).toEqual({
+      ok: false,
+      error: 'check_fields',
+      fields: { file: { code: 'import_empty' } },
+    });
     expect(previewBoqImportText(42 as unknown as string)).toEqual({
       ok: false,
-      error: 'invalid',
+      error: 'malformed',
     });
   });
 });

@@ -5,6 +5,8 @@ export type DocumentActionCode =
   | 'proposal_not_draft'
   // Storage could not take or describe a file; nothing was attached.
   | 'storage_unavailable'
+  // An uploaded sheet that does not read as CSV at all.
+  | 'import_unreadable'
   // The proposal builder (proposals/core/draft-save*.ts, the autosave hook).
   | 'draft_changed_elsewhere'
   | 'draft_too_large'

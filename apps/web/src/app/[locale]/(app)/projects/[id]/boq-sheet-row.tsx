@@ -6,13 +6,10 @@ import { formatPercent } from '@/lib/format/number';
 import { Td } from './boq-sheet-cells';
 import { amountOf, type EditableLine, type RowEdits } from './boq-sheet-columns';
 import type { BoqSheetRowApi } from './boq-sheet-row-api';
+import type { BoqRowRefusals } from './use-boq-cell-errors';
 import { BoqProvisionalCell, BoqRowActionsCell } from './boq-sheet-row-controls';
-import {
-  BoqCodeCell,
-  BoqDescriptionCell,
-  BoqNumberCell,
-  BoqUnitCell,
-} from './boq-sheet-row-fields';
+import { BoqCodeCell, BoqDescriptionCell, BoqNumberCell } from './boq-sheet-row-fields';
+import { BoqUnitCell } from './boq-sheet-unit-cell';
 
 // One BOQ line, as a row. Named BoqSheetRow and not BoqLineRow: BoqLineRow is
 // already the RECORD type imported from @/lib/boqs/queries, and two different
@@ -23,6 +20,8 @@ export interface BoqSheetRowProps {
   api: BoqSheetRowApi;
   /** What the studio has typed into THIS row and not yet committed. */
   typed: RowEdits | undefined;
+  /** What the server refused in THIS row, cell by cell. */
+  refused: BoqRowRefusals | undefined;
   /** THIS row is mid-save. */
   saving: boolean;
   /** SOME write on the sheet is in flight, so its controls are disabled. */
@@ -62,17 +61,19 @@ export const BoqSheetRow = memo(function BoqSheetRow({
   line,
   api,
   typed,
+  refused,
   saving,
   pending,
   discounted,
 }: BoqSheetRowProps) {
+  const cell = { line, api, typed, refused };
   return (
     <tr className="group border-b border-[color:var(--rule-soft)]">
-      <BoqCodeCell line={line} api={api} typed={typed} />
-      <BoqDescriptionCell line={line} api={api} typed={typed} />
-      <BoqUnitCell line={line} api={api} typed={typed} />
-      <BoqNumberCell line={line} column="qty" api={api} typed={typed} />
-      <BoqNumberCell line={line} column="unitPrice" api={api} typed={typed} />
+      <BoqCodeCell {...cell} />
+      <BoqDescriptionCell {...cell} />
+      <BoqUnitCell {...cell} />
+      <BoqNumberCell {...cell} column="qty" />
+      <BoqNumberCell {...cell} column="unitPrice" />
       {discounted && <BoqDiscountCell discountPct={line.discountPct} />}
       <Td num>
         <span
