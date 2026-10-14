@@ -20,7 +20,7 @@ export async function deleteDraftProposalCore(
         proposals,
         input.id,
         { status: proposals.status, kind: proposals.kind },
-        'invalid',
+        'record_not_found',
       );
       // The delivery's BOQ working copy is not deletable: it is where every
       // version of the delivery's BOQ is edited from.

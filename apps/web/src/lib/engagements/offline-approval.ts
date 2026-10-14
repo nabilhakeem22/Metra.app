@@ -72,7 +72,7 @@ export type ParsedOfflineApproval =
  * the studio typed (no channel chosen, a day outside the round under review or
  * not a real day, a note over MAX_NOTE_CHARS) comes back as `fields`, under the
  * box to change. The shape no form can send (not an object, an unknown channel,
- * a non-string field, a `chosenArtifactId` that is not a uuid) is `invalid`.
+ * a non-string field, a `chosenArtifactId` that is not a uuid) is `malformed`.
  */
 export function parseOfflineApproval(
   payload: unknown,
@@ -80,23 +80,23 @@ export function parseOfflineApproval(
 ): ParsedOfflineApproval {
   const refuse = (code: ActionCode): ParsedOfflineApproval => ({ ok: false, code });
   if (typeof payload !== 'object' || payload === null || Array.isArray(payload)) {
-    return refuse('invalid');
+    return refuse('malformed');
   }
   const input = payload as Record<string, unknown>;
   const rawNote = textOrAbsent(input.note);
   const rawOccurredOn = textOrAbsent(input.occurredOn);
   const rawChosen = textOrAbsent(input.chosenArtifactId);
-  if (rawNote === false || rawOccurredOn === false || rawChosen === false) return refuse('invalid');
+  if (rawNote === false || rawOccurredOn === false || rawChosen === false) return refuse('malformed');
 
   const typed = readOfflineApprovalFields(
     { channel: input.channel, occurredOn: rawOccurredOn, note: rawNote },
     bounds,
   );
   if (!typed.ok) return { ok: false, fields: typed.errors };
-  if (!isOfflineApprovalChannel(input.channel)) return refuse('invalid');
+  if (!isOfflineApprovalChannel(input.channel)) return refuse('malformed');
   const chosenArtifactId = optionalText(rawChosen, MAX_LABEL_CHARS);
   if (chosenArtifactId === TOO_LONG || (chosenArtifactId !== null && !isUuid(chosenArtifactId))) {
-    return refuse('invalid');
+    return refuse('malformed');
   }
 
   const { occurredOn, note } = typed.values;

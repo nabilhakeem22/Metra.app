@@ -84,7 +84,7 @@ async function readActiveEngagement(
     .from(designEngagements)
     .where(eq(designEngagements.id, engagementId))
     .limit(1);
-  if (!row) return 'invalid';
+  if (!row) return 'record_not_found';
   if (isTerminal(row.state)) return 'engagement_not_active';
   return { id: row.id, clientId: row.clientId, projectId: row.projectId };
 }
@@ -103,7 +103,7 @@ function readSnapshotRows(
 ): Promise<Omit<SendSnapshot, 'names' | 'renderYear'> | AlreadySent | ActionCode> {
   return withOrgContext(ctx, async (tx) => {
     const header = await readBoqProposal(tx, proposalId);
-    if (!header) return 'invalid';
+    if (!header) return 'record_not_found';
     const sent = await findSentRevision(tx, proposalId, header.revision);
     if (sent) return { alreadySent: sent, engagementId: header.engagementId };
     const engagement = await readActiveEngagement(tx, header.engagementId);
@@ -120,10 +120,11 @@ function readSnapshotRows(
 
 /**
  * Read everything Send as BOQ needs, outside any write transaction.
- * `invalid`: missing, another org's, or not a BOQ proposal.
+ * `record_not_found`: missing, another org's, or not a BOQ proposal; `malformed`:
+ * an id that is no id.
  * `engagement_not_active`: the engagement is terminal.
  * `line_required` / `too_many_lines`: nothing, or too much, to send.
- * `invalid` also: a negative quantity, which a BOQ line cannot hold.
+ * `invalid_qty`: a negative quantity, which a BOQ line cannot hold.
  * `alreadySent`: this exact revision is already out (a replayed send), so the
  * caller answers with that BOQ and renders nothing.
  */
@@ -131,7 +132,7 @@ export async function loadSendSnapshot(
   ctx: OrgContext,
   proposalId: string,
 ): Promise<SendSnapshot | AlreadySent | ActionCode> {
-  if (!isUuid(proposalId)) return 'invalid';
+  if (!isUuid(proposalId)) return 'malformed';
   const rows = await readSnapshotRows(ctx, proposalId);
   if (typeof rows === 'string' || 'alreadySent' in rows) return rows;
 
@@ -141,10 +142,10 @@ export async function loadSendSnapshot(
   // A negative quantity is a de-scope in a variation order, never a BOQ line
   // (`boq_lines_qty_non_negative`); refused here, before the render, by code.
   if (rows.source.some((section) => section.lines.some((line) => line.qty.startsWith('-')))) {
-    return 'invalid';
+    return 'invalid_qty';
   }
 
   const names = await loadDocumentNames(ctx, rows.engagement);
-  if (!names) return 'invalid';
+  if (!names) return 'record_not_found';
   return { ...rows, names, renderYear: new Date().getUTCFullYear() };
 }

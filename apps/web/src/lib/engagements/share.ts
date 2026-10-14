@@ -61,7 +61,8 @@ export async function mintDeliveryLinkCore(
           .from(designEngagements)
           .where(eq(designEngagements.id, id))
           .limit(1);
-        fail(exists ? 'invalid' : 'engagement_not_found');
+        // Someone shared it meanwhile: the page is behind the delivery.
+        fail(exists ? 'engagement_state_conflict' : 'engagement_not_found');
       }
       await audit({
         entity: 'design_engagement',

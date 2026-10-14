@@ -105,7 +105,7 @@ async function loadIssueSource(
   // The client copy never prints cost, so cost is not fetched for it.
   const detail = await getBoqDetail(ctx, boqId, { showCost: false });
   if (!detail) return 'boq_not_found';
-  if (detail.lineCount === 0) return 'invalid';
+  if (detail.lineCount === 0) return 'line_required';
 
   // An engagement is required: the artifact hangs off one, and it is how the
   // client ever sees this document.

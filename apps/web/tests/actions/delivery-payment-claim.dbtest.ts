@@ -435,7 +435,7 @@ describe('confirmPaymentClaimCore (AC7)', () => {
         amount: '30000',
         idempotencyKey: `claim:${claim.id}`,
       }),
-    ).toEqual({ ok: false, error: 'invalid' });
+    ).toEqual({ ok: false, error: 'malformed' });
     expect(await paymentRows(engagementId)).toHaveLength(0);
   });
 

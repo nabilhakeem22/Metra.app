@@ -112,7 +112,7 @@ describe('setClientExpectedDateCore', () => {
     });
     expect(await setClientExpectedDateCore(d.ctx, { engagementId: 'nope', expectedOn: day })).toEqual({
       ok: false,
-      error: 'invalid',
+      error: 'malformed',
     });
     const accountant = ctxFor(other.orgId, other.memberIds[1], 'accountant');
     expect(await setClientExpectedDateCore(accountant, { engagementId: other.engagementId, expectedOn: day })).toEqual({

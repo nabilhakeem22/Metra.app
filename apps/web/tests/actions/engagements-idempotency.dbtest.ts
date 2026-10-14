@@ -194,7 +194,7 @@ describe('recordPayment idempotency — the partial unique key', () => {
       amount: '30000',
       idempotencyKey: 'not-a-uuid',
     });
-    expect(res).toEqual({ ok: false, error: 'invalid' });
+    expect(res).toEqual({ ok: false, error: 'malformed' });
     expect(await paymentRowCount(engagementId)).toBe(0);
   });
 

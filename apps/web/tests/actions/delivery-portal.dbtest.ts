@@ -208,7 +208,7 @@ describe('delivery portal — cost-safe token snapshot', () => {
     const first = await mintDeliveryLinkCore(ctx, engagementId);
     expect(first.ok).toBe(true);
     const second = await mintDeliveryLinkCore(ctx, engagementId);
-    expect(second).toEqual({ ok: false, error: 'invalid' });
+    expect(second).toEqual({ ok: false, error: 'engagement_state_conflict' });
   });
 
   it('a non-owner/admin role cannot mint a link', async () => {

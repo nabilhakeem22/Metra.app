@@ -48,11 +48,12 @@ export async function loadCostItemMap(
     .from(costItems)
     .where(inArray(costItems.id, costItemIds));
   for (const costItem of costItemRows) {
-    if (!costItem.active) fail('invalid');
+    // Retired or deleted in the price book since the line picked it.
+    if (!costItem.active) fail('record_not_found');
     costItemMap.set(costItem.id, costItem);
   }
   for (const costItemId of costItemIds) {
-    if (!costItemMap.has(costItemId)) fail('invalid');
+    if (!costItemMap.has(costItemId)) fail('record_not_found');
   }
   return costItemMap;
 }

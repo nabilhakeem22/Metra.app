@@ -20,7 +20,7 @@ export async function setPrimaryContactCore(
         clientContacts,
         input.id,
         { id: clientContacts.id, clientId: clientContacts.clientId },
-        'invalid',
+        'record_not_found',
       );
 
       // Clear every primary for this client first, then set the target — so the
@@ -62,7 +62,7 @@ export async function deleteContactCore(
         clientContacts,
         input.id,
         { id: clientContacts.id, isPrimary: clientContacts.isPrimary },
-        'invalid',
+        'record_not_found',
       );
       // The primary can't be deleted out from under a client — promote another
       // contact first. Deletes nothing.

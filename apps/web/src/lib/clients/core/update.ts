@@ -42,7 +42,7 @@ export async function updateClientCore(
         clients,
         input.id,
         { id: clients.id, phone: clients.phone },
-        'invalid',
+        'record_not_found',
       );
       // Forward-only tightening, and it must distinguish OMITTED from CLEARED.
       // `normalizedClient()` maps both `undefined` and `''` to null, so checking
@@ -87,7 +87,7 @@ export async function setClientActiveCore(
         clients,
         input.id,
         { id: clients.id, active: clients.active },
-        'invalid',
+        'record_not_found',
       );
 
       await tx

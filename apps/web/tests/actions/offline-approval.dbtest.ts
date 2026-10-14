@@ -261,7 +261,7 @@ describe('Client approved offline at final_approval', () => {
     const { ctx, engagementId } = await seedFinalApproval();
     await recordPaymentCore(ctx, { engagementId, kind: 'gate_b', amount: '20000' });
     for (const [approval, error] of [
-      [{ channel: 'fax' }, 'invalid'],
+      [{ channel: 'fax' }, 'malformed'],
       [{ channel: 'phone', chosenArtifactId: '11111111-1111-4111-8111-111111111111' }, 'malformed'],
     ] as const) {
       expect(await approveOffline(ctx, engagementId, approval)).toEqual({ ok: false, error });

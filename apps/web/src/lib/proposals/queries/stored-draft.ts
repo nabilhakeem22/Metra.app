@@ -18,9 +18,9 @@ export async function readStoredDraftCore(
   id: string,
 ): Promise<ActionResult & { data?: ProposalDetail }> {
   if (!can(ctx.role, 'proposals_build', 'read')) return err('forbidden');
-  if (!isUuid(id)) return err('invalid');
+  if (!isUuid(id)) return err('malformed');
   const detail = await getProposalWithLines(ctx, id, await resolveSeeMargin(ctx));
-  if (!detail) return err('invalid');
+  if (!detail) return err('record_not_found');
   if (detail.status !== 'draft') return err('proposal_not_draft');
   return { ok: true, data: detail };
 }

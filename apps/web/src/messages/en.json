@@ -472,6 +472,7 @@
       "unprintable": "This has hidden or control characters. Clear it and type it again instead of pasting."
     },
     "file_too_large": "That file is too large; the limit is 100 MB. Choose a smaller file or compress it.",
+    "file_type_not_allowed": "This file type is not accepted for this kind of file. Choose a file in one of the accepted formats.",
     "name_required": "Write the name in Arabic or English; one of them is enough.",
     "last_owner": "This is the last owner of the workspace. Make someone else an owner first, then try again.",
     "owner_immutable": "Only an owner can change or remove an owner. Ask an owner to do it.",
@@ -585,7 +586,7 @@
     "description_too_long": "That description is too long. Shorten it, or split it over two lines.",
     "item_code_too_long": "That item code is too long. Use a shorter code.",
     "invalid_unit": "That is not one of the units Metra knows. Pick a unit from the list.",
-    "invalid_qty": "That quantity is not a number. Use digits, with a dot for decimals, like 12.5.",
+    "invalid_qty": "That quantity is not a usable number. Enter 0 or more, with digits and a dot for decimals, like 12.5.",
     "invalid_price": "That rate is not a number. Use digits, with a dot for decimals, like 1250.50.",
     "invalid_discount": "The discount is outside 0 to 100. Enter a percentage from 0 to 100.",
     "section_name_required": "This section has no name. Write a name for it.",

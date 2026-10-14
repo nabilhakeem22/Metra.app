@@ -125,6 +125,7 @@ const ALL_CODES: ActionCode[] = [
   'claim_already_settled',
   'claim_pending_for_milestone',
   'file_too_large',
+  'file_type_not_allowed',
   'line_not_found',
   'section_not_found',
   'section_name_required',

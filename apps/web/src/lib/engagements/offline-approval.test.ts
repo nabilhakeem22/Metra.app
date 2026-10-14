@@ -69,8 +69,8 @@ describe('parseOfflineApproval', () => {
     ['an unknown channel', { channel: 'fax' }],
     ['a non-string note', { channel: 'phone', note: 42 }],
     ['a chosen option that is not a uuid', { channel: 'phone', chosenArtifactId: 'option-a' }],
-  ])('refuses %s as invalid', (_label, payload) => {
-    expect(parse(payload)).toEqual({ ok: false, code: 'invalid' });
+  ])('refuses %s as malformed', (_label, payload) => {
+    expect(parse(payload)).toEqual({ ok: false, code: 'malformed' });
   });
 
   test('no channel chosen is required under the channel', () => {

@@ -47,16 +47,16 @@ export function normalizePayment(
   input: RawPaymentFields,
 ): { ok: true; value: CleanPayment } | { ok: false; refusal: ActionResult } {
   if (typeof input.kind !== 'string' || !KIND_SET.has(input.kind)) {
-    return { ok: false, refusal: err('invalid') };
+    return { ok: false, refusal: err('malformed') };
   }
   const typed = readPaymentFields(input);
   if (!typed.ok) return { ok: false, refusal: fieldsFailed(typed.errors) };
 
   // Normalise the idempotency key: trim; empty/whitespace/undefined -> null (a
-  // plain append). A present-but-malformed key is a coded 'invalid', and so is a
+  // plain append). A present-but-malformed key is a coded 'malformed', and so is a
   // present-but-non-string one — see optionalUuid for why that is reachable.
   const idempotencyKey = optionalUuid(input.idempotencyKey);
-  if (idempotencyKey === NOT_UUID) return { ok: false, refusal: err('invalid') };
+  if (idempotencyKey === NOT_UUID) return { ok: false, refusal: err('malformed') };
 
   // The amount is persisted canonical so the STORED amount is exactly the one
   // the app validated (and the depositCleared guard later trusts): the DB
