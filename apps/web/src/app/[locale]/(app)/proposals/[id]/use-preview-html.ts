@@ -3,8 +3,7 @@
 import { useTranslations } from 'next-intl';
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from '@/hooks/use-toast';
-import { resolveActionError } from '@/lib/actions/error-message';
-import type { ActionCode } from '@/lib/actions/result';
+import { describeFailure, describeRejection } from '@/lib/actions/error-message';
 import { getProposalPreviewHtml } from '@/lib/proposals/actions';
 
 export type PreviewVariant = 'client' | 'internal';
@@ -33,14 +32,11 @@ export function usePreviewHtml(
         if (res.ok && res.html) {
           setHtml(res.html);
         } else {
-          toast({
-            title: resolveActionError(res.error as ActionCode, te),
-            variant: 'destructive',
-          });
+          toast({ title: describeFailure(res, te), variant: 'destructive' });
         }
-      } catch {
+      } catch (rejection) {
         // Never leave the spinner hanging if the action rejects.
-        toast({ title: resolveActionError('generic', te), variant: 'destructive' });
+        toast({ title: describeRejection(rejection, te), variant: 'destructive' });
       } finally {
         setLoading(false);
       }

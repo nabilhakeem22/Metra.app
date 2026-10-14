@@ -63,7 +63,7 @@ export function useDeliverableUpload(engagementId: string): {
     if (outcome.ok) return null;
     if (outcome.reason === 'too_large') return t('tooLarge');
     if (outcome.reason === 'wrong_type') return t('wrongType');
-    if (outcome.reason === 'put_failed') return te('generic');
+    if (outcome.reason === 'put_failed') return te('storage_unavailable');
     return resolveActionError(outcome.reason as ActionCode, te);
   }
 

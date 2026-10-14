@@ -4,7 +4,7 @@ import { useTranslations } from 'next-intl';
 import { useTransition } from 'react';
 import { toast } from '@/hooks/use-toast';
 import { useRouter } from '@/i18n/routing';
-import { resolveActionError } from '@/lib/actions/error-message';
+import { describeFailure, describeRejection } from '@/lib/actions/error-message';
 import type { SaveDraftResult } from './persist-draft';
 
 /**
@@ -28,9 +28,9 @@ export function useBoqBack(options: {
           router.push(`/engagements/${options.engagementId}`);
           return;
         }
-        toast({ title: resolveActionError(saved.error, te), variant: 'destructive' });
-      } catch {
-        toast({ title: resolveActionError('generic', te), variant: 'destructive' });
+        toast({ title: describeFailure(saved, te), variant: 'destructive' });
+      } catch (rejection) {
+        toast({ title: describeRejection(rejection, te), variant: 'destructive' });
       }
     });
   }
