@@ -6,6 +6,8 @@ import { useState, useTransition } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { Centered, Row } from '@/components/share/link-page-parts';
+import { PortalFailureAlert } from '@/components/share/portal-failure-alert';
 import { formatMoney } from '@/lib/format/money';
 import { formatPercent, formatQuantity } from '@/lib/format/number';
 import {
@@ -13,7 +15,9 @@ import {
   proposalYear,
 } from '@/lib/format/proposal-number';
 import type { PublicProposal } from '@/lib/proposals/public';
+import { unansweredFailure, type ShownPortalFailure } from '@/lib/share/portal-failure';
 import { respondToProposal } from './actions';
+import { proposalDecidedKey, proposalOutcomeOf, type ProposalOutcome } from './proposal-outcome';
 
 export function PublicProposalView({
   token,
@@ -25,9 +29,9 @@ export function PublicProposalView({
   const t = useTranslations('proposals.p');
   const locale = useLocale();
   const [pending, startTransition] = useTransition();
-  const [outcome, setOutcome] = useState<
-    'accepted' | 'rejected' | 'already' | 'expired' | null
-  >(null);
+  const [outcome, setOutcome] = useState<ProposalOutcome>(null);
+  // An answer that never landed: the decision stays open, the buttons stay.
+  const [failure, setFailure] = useState<ShownPortalFailure | null>(null);
   const [name, setName] = useState('');
 
   if (!proposal) {
@@ -44,23 +48,21 @@ export function PublicProposalView({
   );
 
   function respond(decision: 'accept' | 'reject') {
+    setFailure(null);
     startTransition(async () => {
-      const res = await respondToProposal(token, decision, name);
-      if (res.ok) setOutcome(decision === 'accept' ? 'accepted' : 'rejected');
-      else if (res.error === 'token_expired') setOutcome('expired');
-      else setOutcome('already');
+      try {
+        const res = await respondToProposal(token, decision, name);
+        const failed = unansweredFailure(res);
+        if (failed) setFailure(failed);
+        else setOutcome(proposalOutcomeOf(res, decision));
+      } catch (rejection) {
+        setFailure({ rejection });
+      }
     });
   }
 
   const decided = proposal.status !== 'sent' || outcome !== null;
-  const decidedMessage =
-    outcome === 'accepted' || proposal.status === 'accepted'
-      ? t('decisionAccepted')
-      : outcome === 'rejected' || proposal.status === 'rejected'
-        ? t('decisionRejected')
-        : outcome === 'expired'
-          ? t('expired')
-          : t('alreadyResponded');
+  const decidedMessage = t(proposalDecidedKey(proposal.status, outcome));
 
   return (
     <div className="mx-auto max-w-3xl space-y-4 p-4 md:p-8">
@@ -120,8 +122,10 @@ export function PublicProposalView({
             <Input
               placeholder={t('yourName')}
               value={name}
+              maxLength={120}
               onChange={(e) => setName(e.target.value)}
             />
+            <PortalFailureAlert failure={failure} />
             <div className="flex justify-center gap-3">
               <Button variant="default" onClick={() => respond('accept')} disabled={pending}>
                 {pending ? (
@@ -139,23 +143,6 @@ export function PublicProposalView({
           </CardContent>
         </Card>
       )}
-    </div>
-  );
-}
-
-function Centered({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="flex min-h-screen items-center justify-center p-6 text-center text-muted-foreground">
-      {children}
-    </div>
-  );
-}
-
-function Row({ label, value, bold }: { label: string; value: string; bold?: boolean }) {
-  return (
-    <div className={`flex justify-between ${bold ? 'font-semibold' : ''}`}>
-      <span className="text-muted-foreground">{label}</span>
-      <span dir="ltr">{value}</span>
     </div>
   );
 }

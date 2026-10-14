@@ -1,7 +1,7 @@
 import { DrizzleQueryError } from 'drizzle-orm/errors';
 import postgres from 'postgres';
 import { describe, expect, it, vi } from 'vitest';
-import { answered } from '@/app/[locale]/d/[token]/answered';
+import { answered } from '@/lib/share/portal-act-failure';
 import { loggableFailure } from './loggable-failure';
 
 // Round E S3 (the security tester's shapes, scratchpad e1-ts/r3-*.test.ts): the

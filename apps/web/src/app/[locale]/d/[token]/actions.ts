@@ -13,9 +13,8 @@ import {
 } from '@/lib/engagements/public-comments';
 import { THREAD_READ_REFUSED, type PortalThreadRead } from '@/lib/engagements/portal-thread-read';
 import { portalActAllowed, portalReadAllowed } from '@/lib/share/portal-rate-limit';
-import type { PortalFailure } from '@/lib/share/portal-act-failure';
+import { answered, type PortalFailure } from '@/lib/share/portal-act-failure';
 import { isUuid } from '@/lib/uuid';
-import { answered } from './answered';
 import { requestProvenance } from './request-provenance';
 
 // The client portal's payment claim and document comments. The review acts
@@ -29,9 +28,9 @@ import { requestProvenance } from './request-provenance';
 // an empty thread.
 //
 // NOTHING THROWS TO THE CLIENT (Round E R3): the claim and a comment run
-// through ./answered.ts, so a failure underneath answers `uncertain` (a lock
-// wait that gave up with 55P03: it may still commit) or `generic` with the
-// reference of its one redacted log line.
+// through `answered` (../../../../lib/share/portal-act-failure.ts), so a
+// failure underneath answers `uncertain` (a lock wait that gave up with 55P03:
+// it may still commit) or `generic` with the reference of its one log line.
 
 /** A write that never reached the database, or failed underneath: nothing
  *  written that anybody can confirm, nobody notified. */

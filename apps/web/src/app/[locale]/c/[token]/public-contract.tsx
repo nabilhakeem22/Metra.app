@@ -6,11 +6,15 @@ import { useState, useTransition } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { Centered, Row } from '@/components/share/link-page-parts';
+import { PortalFailureAlert } from '@/components/share/portal-failure-alert';
 import { formatMoney } from '@/lib/format/money';
 import { formatPercent, formatQuantity } from '@/lib/format/number';
 import { docYear, formatDocNumber } from '@/lib/format/doc-number';
 import type { PublicContract } from '@/lib/contracts/public';
+import { unansweredFailure, type ShownPortalFailure } from '@/lib/share/portal-failure';
 import { acknowledgeContract } from './actions';
+import { contractDecidedKey, contractOutcomeOf, type ContractOutcome } from './contract-outcome';
 
 export function PublicContractView({
   token,
@@ -22,9 +26,9 @@ export function PublicContractView({
   const t = useTranslations('contracts.ack');
   const locale = useLocale();
   const [pending, startTransition] = useTransition();
-  const [outcome, setOutcome] = useState<
-    'signed' | 'already' | 'expired' | 'invalid' | null
-  >(null);
+  const [outcome, setOutcome] = useState<ContractOutcome>(null);
+  // An answer that never landed: the acknowledgement stays open, the button stays.
+  const [failure, setFailure] = useState<ShownPortalFailure | null>(null);
   const [name, setName] = useState('');
 
   if (!contract) {
@@ -38,24 +42,21 @@ export function PublicContractView({
   const num = formatDocNumber('C', contract.number, docYear(null, new Date()));
 
   function acknowledge() {
+    setFailure(null);
     startTransition(async () => {
-      const res = await acknowledgeContract(token, name);
-      if (res.ok) setOutcome('signed');
-      else if (res.error === 'token_expired') setOutcome('expired');
-      else if (res.error === 'already_responded') setOutcome('already');
-      else setOutcome('invalid');
+      try {
+        const res = await acknowledgeContract(token, name);
+        const failed = unansweredFailure(res);
+        if (failed) setFailure(failed);
+        else setOutcome(contractOutcomeOf(res));
+      } catch (rejection) {
+        setFailure({ rejection });
+      }
     });
   }
 
   const decided = contract.status !== 'issued' || outcome !== null;
-  const decidedMessage =
-    outcome === 'signed' || contract.status === 'signed'
-      ? t('done')
-      : outcome === 'expired'
-        ? t('expired')
-        : outcome === 'invalid'
-          ? t('invalid')
-          : t('already');
+  const decidedMessage = t(contractDecidedKey(contract.status, outcome));
 
   return (
     <div className="mx-auto max-w-3xl space-y-4 p-4 md:p-8">
@@ -115,8 +116,10 @@ export function PublicContractView({
             <Input
               placeholder={t('nameLabel')}
               value={name}
+              maxLength={120}
               onChange={(e) => setName(e.target.value)}
             />
+            <PortalFailureAlert failure={failure} />
             <div className="flex justify-center">
               <Button variant="default" onClick={acknowledge} disabled={pending || !name.trim()}>
                 {pending ? (
@@ -133,23 +136,6 @@ export function PublicContractView({
           </CardContent>
         </Card>
       )}
-    </div>
-  );
-}
-
-function Centered({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="flex min-h-screen items-center justify-center p-6 text-center text-muted-foreground">
-      {children}
-    </div>
-  );
-}
-
-function Row({ label, value, bold }: { label: string; value: string; bold?: boolean }) {
-  return (
-    <div className={`flex justify-between ${bold ? 'font-semibold' : ''}`}>
-      <span className="text-muted-foreground">{label}</span>
-      <span dir="ltr">{value}</span>
     </div>
   );
 }

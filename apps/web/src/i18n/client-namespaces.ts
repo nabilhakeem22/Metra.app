@@ -37,13 +37,13 @@ export const CLIENT_NAMESPACES = {
   /** app/[locale]/invite: accepting a team invitation. */
   invite: ['accept', 'app', 'errors'],
   /** app/[locale]/c: the client's contract link. */
-  contractLink: ['contracts.ack'],
+  contractLink: ['contracts.ack', 'portal.errors'],
   /** app/[locale]/d: the client's delivery page. */
   deliveryLink: ['app', 'delivery', 'portal.errors'],
   /** app/[locale]/p: the client's proposal link. */
-  proposalLink: ['proposals.p'],
+  proposalLink: ['portal.errors', 'proposals.p'],
   /** app/[locale]/v: the client's variation link. */
-  variationLink: ['variations.client'],
+  variationLink: ['portal.errors', 'variations.client'],
 } as const satisfies Record<string, readonly string[]>;
 
 export type MessageScope = keyof typeof CLIENT_NAMESPACES;

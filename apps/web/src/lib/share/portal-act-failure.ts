@@ -26,3 +26,21 @@ export function portalActFailure(act: string, error: unknown): PortalFailure {
   console.error('portal act failed', { act, reference, failure: loggableFailure(error) });
   return { error: 'generic', reference };
 }
+
+/**
+ * One client act, answered: NOTHING THROWS TO THE CLIENT (D3 L1, Round E R3).
+ * Every link page's server actions (/d, /p, /c, /v) run through it, so a
+ * failure underneath answers `failureOf(failure)`, the act's own shape of
+ * `uncertain` or `generic` with the reference of its one redacted log line.
+ */
+export async function answered<T, F>(
+  act: string,
+  failureOf: (failure: PortalFailure) => F,
+  run: () => Promise<T>,
+): Promise<T | F> {
+  try {
+    return await run();
+  } catch (error) {
+    return failureOf(portalActFailure(act, error));
+  }
+}

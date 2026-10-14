@@ -92,6 +92,22 @@ export function variationDecidedKey(
   return 'already';
 }
 
+/**
+ * A landed answer as the client's outcome. A failed act (`uncertain`, or
+ * `generic` with a reference) never gets here: the page keeps the decision
+ * open and says the failure instead (unansweredFailure).
+ */
+export function variationOutcomeOf(
+  result: { ok: boolean; error?: string },
+  decision: 'approve' | 'reject',
+): Exclude<VariationOutcome, null> {
+  if (result.ok) return decision === 'approve' ? 'approved' : 'rejected';
+  if (result.error === 'token_expired') return 'expired';
+  if (result.error === 'already_responded') return 'already';
+  if (result.error === 'contract_inactive') return 'contractInactive';
+  return 'invalid';
+}
+
 /** Is the page past the point of accepting a decision at all? */
 export function variationIsDecided(state: VariationDecisionState): boolean {
   return !state.contractActive || state.status !== 'issued' || state.outcome !== null;

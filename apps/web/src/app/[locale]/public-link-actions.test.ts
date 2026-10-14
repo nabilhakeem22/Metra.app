@@ -4,6 +4,8 @@ import { describe, expect, it, vi } from 'vitest';
 // invokable with any JSON. A name that is not a string is no name: the act goes
 // ahead without one and nothing throws before it.
 
+// The actions now run through `answered`, a server-only module.
+vi.mock('server-only', () => ({}));
 vi.mock('next/headers', () => ({ headers: async () => new Headers({ 'user-agent': 'probe/1' }) }));
 const respond = vi.fn(async () => ({ ok: true }));
 vi.mock('@/lib/proposals/public', () => ({ respondToProposalByToken: respond }));

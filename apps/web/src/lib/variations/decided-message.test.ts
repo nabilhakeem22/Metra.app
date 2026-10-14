@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   variationDecidedKey,
   variationIsDecided,
+  variationOutcomeOf,
   type VariationDecidedKey,
   type VariationDecisionState,
   type VariationOutcome,
@@ -242,5 +243,16 @@ describe('variationIsDecided', () => {
     expect(variationIsDecided(state({ contractActive: false }))).toBe(true);
     expect(variationIsDecided(state({ status: 'approved' }))).toBe(true);
     expect(variationIsDecided(state({ outcome: 'invalid' }))).toBe(true);
+  });
+});
+
+describe('variationOutcomeOf (W3.6)', () => {
+  it('names each landed answer; a code the page has no sentence for reads as invalid', () => {
+    expect(variationOutcomeOf({ ok: true }, 'approve')).toBe('approved');
+    expect(variationOutcomeOf({ ok: true }, 'reject')).toBe('rejected');
+    expect(variationOutcomeOf({ ok: false, error: 'token_expired' }, 'approve')).toBe('expired');
+    expect(variationOutcomeOf({ ok: false, error: 'already_responded' }, 'approve')).toBe('already');
+    expect(variationOutcomeOf({ ok: false, error: 'contract_inactive' }, 'reject')).toBe('contractInactive');
+    expect(variationOutcomeOf({ ok: false, error: 'token_invalid' }, 'reject')).toBe('invalid');
   });
 });

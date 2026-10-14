@@ -116,7 +116,7 @@ describe('the messages each scope hands the browser', () => {
 
   it('a sub-tree is copied under its own path, and the catalogue is left as it was', () => {
     const before = JSON.stringify(en);
-    expect(scopedMessages(en, 'proposalLink')).toEqual({ proposals: { p: en.proposals.p } });
+    expect(scopedMessages(en, 'proposalLink')).toEqual({ portal: { errors: en.portal.errors }, proposals: { p: en.proposals.p } });
     expect(scopedMessages(en, 'auth').hints).toEqual({ auth: en.hints.auth });
     expect(JSON.stringify(en)).toBe(before);
   });

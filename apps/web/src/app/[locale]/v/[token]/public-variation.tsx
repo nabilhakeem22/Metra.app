@@ -6,11 +6,15 @@ import { useState, useTransition } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { Centered, Row } from '@/components/share/link-page-parts';
+import { PortalFailureAlert } from '@/components/share/portal-failure-alert';
 import { formatMoney } from '@/lib/format/money';
 import { formatDocNumber } from '@/lib/format/doc-number';
+import { unansweredFailure, type ShownPortalFailure } from '@/lib/share/portal-failure';
 import {
   variationDecidedKey,
   variationIsDecided,
+  variationOutcomeOf,
   type VariationOutcome,
 } from '@/lib/variations/decided-message';
 import type { PublicVariation } from '@/lib/variations/public';
@@ -27,6 +31,8 @@ export function PublicVariationView({
   const locale = useLocale();
   const [pending, startTransition] = useTransition();
   const [outcome, setOutcome] = useState<VariationOutcome>(null);
+  // An answer that never landed: the decision stays open, the buttons stay.
+  const [failure, setFailure] = useState<ShownPortalFailure | null>(null);
   const [name, setName] = useState('');
 
   if (!variation) {
@@ -40,19 +46,20 @@ export function PublicVariationView({
   const num = formatDocNumber('VO', variation.number, new Date().getFullYear());
 
   function respond(decision: 'approve' | 'reject') {
+    setFailure(null);
     startTransition(async () => {
-      const res = await respondToVariation(token, decision, name);
-      if (res.ok) setOutcome(decision === 'approve' ? 'approved' : 'rejected');
-      else if (res.error === 'token_expired') setOutcome('expired');
-      else if (res.error === 'already_responded') setOutcome('already');
-      else if (res.error === 'contract_inactive') setOutcome('contractInactive');
-      else setOutcome('invalid');
+      try {
+        const res = await respondToVariation(token, decision, name);
+        const failed = unansweredFailure(res);
+        if (failed) setFailure(failed);
+        else setOutcome(variationOutcomeOf(res, decision));
+      } catch (rejection) {
+        setFailure({ rejection });
+      }
     });
   }
 
-  // The ladder lives in lib/variations/decided-message.ts: its ORDER is a
-  // product decision about what a client is told, and an order spelled out
-  // inline in JSX is one nobody can test and everybody edits.
+  // The ladder's ORDER is a product decision: lib/variations/decided-message.ts.
   const decisionState = {
     status: variation.status,
     contractActive: variation.contractActive,
@@ -100,10 +107,7 @@ export function PublicVariationView({
 
       <Card>
         <CardContent className="ms-auto max-w-xs py-4 text-body">
-          <div className="flex justify-between font-semibold">
-            <span className="text-muted-foreground">{t('netDelta')}</span>
-            <span dir="ltr">{m(variation.net_delta)}</span>
-          </div>
+          <Row label={t('netDelta')} value={m(variation.net_delta)} bold />
         </CardContent>
       </Card>
 
@@ -120,8 +124,10 @@ export function PublicVariationView({
             <Input
               placeholder={t('nameLabel')}
               value={name}
+              maxLength={120}
               onChange={(e) => setName(e.target.value)}
             />
+            <PortalFailureAlert failure={failure} />
             <div className="flex justify-center gap-3">
               <Button variant="default" onClick={() => respond('approve')} disabled={pending}>
                 {pending ? (
@@ -139,14 +145,6 @@ export function PublicVariationView({
           </CardContent>
         </Card>
       )}
-    </div>
-  );
-}
-
-function Centered({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="flex min-h-screen items-center justify-center p-6 text-center text-muted-foreground">
-      {children}
     </div>
   );
 }

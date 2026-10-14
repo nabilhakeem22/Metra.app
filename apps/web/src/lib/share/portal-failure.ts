@@ -39,3 +39,15 @@ export function describePortalFailure(failure: ShownPortalFailure, t: Translate)
   if (failure.error === 'generic') return describeFailure({ error: failure.error, reference: failure.reference }, t);
   return t(failure.error);
 }
+
+/**
+ * The failure a link page's answer carries when the act never landed
+ * (`uncertain`, or `generic` with its reference), or null when the answer is an
+ * outcome the page says in its own words (a decision, a dead link).
+ */
+export function unansweredFailure(result: { ok: boolean; error?: string; reference?: string }): ShownPortalFailure | null {
+  if (result.ok) return null;
+  if (result.error === 'uncertain') return { error: result.error };
+  if (result.error === 'generic') return { error: result.error, reference: result.reference };
+  return null;
+}

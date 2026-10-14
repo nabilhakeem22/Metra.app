@@ -14,9 +14,8 @@ import {
   type HandoverOutcome,
 } from '@/lib/engagements/review-outcome';
 import { parseBandSeen, parseReviewSeen } from '@/lib/engagements/review-seen';
-import type { PortalFailure } from '@/lib/share/portal-act-failure';
+import { answered, type PortalFailure } from '@/lib/share/portal-act-failure';
 import { portalActAllowed } from '@/lib/share/portal-rate-limit';
-import { answered } from './answered';
 import { requestProvenance } from './request-provenance';
 
 // The client's REVIEW acts on the portal: the concept, the final design, the
@@ -41,7 +40,7 @@ import { requestProvenance } from './request-provenance';
 // centre (../../../../lib/share/portal-rate-limit.ts); past it an act answers
 // `too_many` ("wait a minute") and writes nothing.
 //
-// NOTHING THROWS TO THE CLIENT (D3 L1): every act runs through ./answered.ts,
+// NOTHING THROWS TO THE CLIENT (D3 L1): every act runs through `answered`,
 // which answers `uncertain` or `generic` with a reference.
 
 const TOO_MANY = { kind: 'error', error: 'too_many' } as const;
