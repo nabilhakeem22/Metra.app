@@ -43,6 +43,12 @@ describe('readCostItemInput', () => {
     });
   });
 
+  test('a negative figure is said as below zero, not as not-a-number', () => {
+    expect(costItemFieldErrors({ ...VALID, defaultUnitCost: '-5' })).toEqual({
+      defaultUnitCost: { code: 'not_negative' },
+    });
+  });
+
   test('one name of the pair is enough', () => {
     expect(costItemFieldErrors({ ...VALID, nameEn: null, nameAr: 'لوح' })).toEqual({});
   });

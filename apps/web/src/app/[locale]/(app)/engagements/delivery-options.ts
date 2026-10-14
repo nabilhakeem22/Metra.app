@@ -9,5 +9,4 @@ export interface ProjectOption {
   clientId: string;
 }
 
-/** A project's names, which the delivery title defaults to. */
-export type ProjectNames = { nameEn: string | null; nameAr: string | null };
+export type { ProjectNames } from '@/lib/engagements/create-fields';

@@ -4,12 +4,34 @@
 import { costItems } from '@metra/db';
 import { eq } from 'drizzle-orm';
 import { fail, mutateInOrg, requireInOrg } from '@/lib/actions/mutate';
+import type { ConstraintRefusal } from '@/lib/actions/mutation-failure';
 import type { ActionResult } from '@/lib/actions/result';
 import type { OrgContext } from '@/lib/db/context';
 import { costItemColumns, requireWritable } from './cost-item-write';
 import type { CostItemInput } from './fields';
 
 export type { CostItemInput } from './fields';
+
+/** A race the read checks in requireWritable can lose, or a CHECK the typed-
+ *  value rules already enforce, each answered under its own field. */
+const COST_ITEM_REFUSALS = [
+  { constraint: 'cost_items_org_id_code_unique', field: 'code', error: { code: 'code_taken' } },
+  {
+    constraint: 'cost_items_section_same_org_fk',
+    field: 'sectionId',
+    error: { code: 'no_longer_exists' },
+  },
+  {
+    constraint: 'cost_items_default_unit_cost_nonneg',
+    field: 'defaultUnitCost',
+    error: { code: 'not_negative' },
+  },
+  {
+    constraint: 'cost_items_default_unit_price_nonneg',
+    field: 'defaultUnitPrice',
+    error: { code: 'not_negative' },
+  },
+] as const satisfies readonly ConstraintRefusal[];
 
 export async function createCostItemCore(
   ctx: OrgContext,
@@ -21,7 +43,7 @@ export async function createCostItemCore(
 
   return mutateInOrg(
     ctx,
-    { capability: 'price_book', action: 'create' },
+    { capability: 'price_book', action: 'create', refusals: COST_ITEM_REFUSALS },
     async (tx, audit) => {
       await requireWritable(tx, columns);
       const [row] = await tx
@@ -57,7 +79,7 @@ export async function updateCostItemCore(
 
   return mutateInOrg(
     ctx,
-    { capability: 'price_book', action: 'update' },
+    { capability: 'price_book', action: 'update', refusals: COST_ITEM_REFUSALS },
     async (tx, audit) => {
       const [before] = await tx
         .select()

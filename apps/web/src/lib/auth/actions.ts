@@ -2,10 +2,13 @@
 
 import { sql } from 'drizzle-orm';
 import { redirect } from 'next/navigation';
-import { err, ok, type ActionResult } from '@/lib/actions/result';
+import { fieldsFailed, hasFieldErrors } from '@/lib/actions/field-errors';
+import { ok, type ActionResult } from '@/lib/actions/result';
 import { withUserContext } from '@/lib/db/context';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { loggableFailure } from '@/lib/actions/loggable-failure';
+import { otpSendFailure, otpVerifyFailure } from './otp-failure';
+import { otpCodeErrors, otpIdentifierErrors, type OtpChannel } from './otp-field-rules';
 import { getSessionUser } from './session';
 
 // Single source of the result type (A4). Re-exported for back-compat imports.
@@ -33,62 +36,57 @@ export async function resolvePostLoginPath(): Promise<string> {
   }
 }
 
-// Coded results only — the client localizes via resolveActionError. Supabase
-// error detail is logged server-side, never returned to the browser.
+// Coded results only: the client localizes via describeFailure, and a refusal
+// about the typed address or code comes back under that box. Supabase's own
+// error text is never returned and never logged (it can echo the address);
+// otp-failure.ts logs its code and HTTP status only.
+
+/** The pre-check the form already ran, run again on what arrived. */
+function identifierRefusal(channel: OtpChannel, identifier: string): ActionResult | null {
+  const errors = otpIdentifierErrors(channel, identifier);
+  return hasFieldErrors(errors) ? fieldsFailed(errors) : null;
+}
+
+function codeRefusal(token: string): ActionResult | null {
+  const errors = otpCodeErrors(token);
+  return hasFieldErrors(errors) ? fieldsFailed(errors) : null;
+}
 
 // --- Email OTP -------------------------------------------------------------
 export async function sendEmailOtp(email: string): Promise<ActionResult> {
+  const refused = identifierRefusal('email', email);
+  if (refused) return refused;
   const supabase = await createSupabaseServerClient();
   const { error } = await supabase.auth.signInWithOtp({
     email,
     options: { shouldCreateUser: true },
   });
-  if (error) {
-    console.error('sendEmailOtp failed:', error.message);
-    return err('otp_send_failed');
-  }
-  return ok();
+  return error ? otpSendFailure('sendEmailOtp failed', error, 'email') : ok();
 }
 
-export async function verifyEmailOtp(
-  email: string,
-  token: string,
-): Promise<ActionResult> {
+export async function verifyEmailOtp(email: string, token: string): Promise<ActionResult> {
+  const refused = codeRefusal(token);
+  if (refused) return refused;
   const supabase = await createSupabaseServerClient();
-  const { error } = await supabase.auth.verifyOtp({
-    email,
-    token,
-    type: 'email',
-  });
-  if (error) {
-    console.error('verifyEmailOtp failed:', error.message);
-    return err('otp_verify_failed');
-  }
-  return ok();
+  const { error } = await supabase.auth.verifyOtp({ email, token, type: 'email' });
+  return error ? otpVerifyFailure('verifyEmailOtp failed', error) : ok();
 }
 
-// --- Phone OTP (site engineers) — path in place ----------------------------
+// --- Phone OTP (site engineers) ---------------------------------------------
 export async function sendPhoneOtp(phone: string): Promise<ActionResult> {
+  const refused = identifierRefusal('phone', phone);
+  if (refused) return refused;
   const supabase = await createSupabaseServerClient();
   const { error } = await supabase.auth.signInWithOtp({ phone });
-  if (error) {
-    console.error('sendPhoneOtp failed:', error.message);
-    return err('otp_send_failed');
-  }
-  return ok();
+  return error ? otpSendFailure('sendPhoneOtp failed', error, 'phone') : ok();
 }
 
-export async function verifyPhoneOtp(
-  phone: string,
-  token: string,
-): Promise<ActionResult> {
+export async function verifyPhoneOtp(phone: string, token: string): Promise<ActionResult> {
+  const refused = codeRefusal(token);
+  if (refused) return refused;
   const supabase = await createSupabaseServerClient();
   const { error } = await supabase.auth.verifyOtp({ phone, token, type: 'sms' });
-  if (error) {
-    console.error('verifyPhoneOtp failed:', error.message);
-    return err('otp_verify_failed');
-  }
-  return ok();
+  return error ? otpVerifyFailure('verifyPhoneOtp failed', error) : ok();
 }
 
 export async function signOut(): Promise<void> {

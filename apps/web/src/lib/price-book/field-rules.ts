@@ -1,9 +1,8 @@
 // The rules a cost item's typed values must keep. Pure and client-safe: the
 // form runs them before sending, and the core runs them again on what arrived.
 import type { FieldErrors } from '@/lib/actions/field-errors';
-import { readMoney } from '@/lib/money/read';
 import { clean } from '@/lib/validation/text';
-import { collectFieldErrors, moneyRefusal } from '@/lib/validation/field-rules';
+import { collectFieldErrors, readMoneyField } from '@/lib/validation/field-rules';
 import type { CostItemField, CostItemInput } from './fields';
 
 /** A price-book cost/price box: the studio may type '1,500', and a cleared box
@@ -28,8 +27,8 @@ export function readCostItemInput(input: CostItemInput): CostItemRead {
   const code = clean(input.code);
   const nameEn = clean(input.nameEn);
   const nameAr = clean(input.nameAr);
-  const cost = readMoney(input.defaultUnitCost, MONEY_FIELD);
-  const price = readMoney(input.defaultUnitPrice, MONEY_FIELD);
+  const cost = readMoneyField(input.defaultUnitCost, MONEY_FIELD);
+  const price = readMoneyField(input.defaultUnitPrice, MONEY_FIELD);
   if (code && (nameEn || nameAr) && cost.ok && price.ok) {
     return {
       ok: true,
@@ -41,8 +40,8 @@ export function readCostItemInput(input: CostItemInput): CostItemRead {
     errors: collectFieldErrors({
       code: code ? null : { code: 'code_required' },
       name: nameEn || nameAr ? null : { code: 'name_required' },
-      defaultUnitCost: moneyRefusal(cost),
-      defaultUnitPrice: moneyRefusal(price),
+      defaultUnitCost: cost.ok ? null : cost.error,
+      defaultUnitPrice: price.ok ? null : price.error,
     }),
   };
 }

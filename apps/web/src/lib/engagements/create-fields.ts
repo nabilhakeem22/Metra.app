@@ -4,3 +4,6 @@
 export const ENGAGEMENT_CREATE_FIELDS = ['title', 'clientId', 'projectId'] as const;
 
 export type EngagementCreateField = (typeof ENGAGEMENT_CREATE_FIELDS)[number];
+
+/** A project's names, which a delivery's title defaults to. */
+export type ProjectNames = { nameEn: string | null; nameAr: string | null };

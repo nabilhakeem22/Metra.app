@@ -5,7 +5,7 @@
 // for the race between them and the insert, and stays in the core.
 import { designEngagements, type MetraDb } from '@metra/db';
 import { and, count, eq, inArray, ne } from 'drizzle-orm';
-import { fail } from '@/lib/actions/mutate';
+import { failFields } from '@/lib/actions/field-errors';
 import { ACTIVE_STATES } from './states';
 
 // The non-terminal (in-flight) states a Delivery can occupy — materialized once for
@@ -21,9 +21,9 @@ const ACTIVE_ENGAGEMENT_STATES = [...ACTIVE_STATES];
 const PROJECT_DELIVERY_CAP = 2;
 
 /**
- * Throws `project_delivery_exists` when the project already holds an in-flight
- * delivery, and `project_delivery_limit_reached` when it has used its two
- * non-abandoned deliveries. Writes nothing.
+ * Refuses under the project select: `project_delivery_exists` when the project
+ * already holds an in-flight delivery, and `project_delivery_limit_reached` when
+ * it has used its two non-abandoned deliveries. Writes nothing.
  */
 export async function assertProjectHasDeliverySlot(
   tx: MetraDb,
@@ -44,7 +44,7 @@ export async function assertProjectHasDeliverySlot(
       ),
     )
     .limit(1);
-  if (existing) fail('project_delivery_exists');
+  if (existing) failFields({ projectId: { code: 'project_delivery_exists' } });
 
   // Lifetime cap (Slice C2-hardening): at most TWO NON-abandoned deliveries per
   // project (original + one extension). Abandoned rows do NOT count toward the
@@ -61,6 +61,6 @@ export async function assertProjectHasDeliverySlot(
       ),
     );
   if (countedDeliveries >= PROJECT_DELIVERY_CAP) {
-    fail('project_delivery_limit_reached');
+    failFields({ projectId: { code: 'project_delivery_limit_reached' } });
   }
 }

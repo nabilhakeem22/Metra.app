@@ -3,14 +3,17 @@
 import { ArrowLeft, Loader2 } from 'lucide-react';
 import type { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
+import { FieldErrorText, fieldErrorId } from '@/components/ui/field-error-text';
 import { FieldHint } from '@/components/ui/field-hint';
 import { OtpInput } from '@/components/ui/otp-input';
 import type { useCountdown } from '@/hooks/use-countdown';
 
 // The OTP verify step: code entry + verify button + resend countdown. All state
-// and the verify/send/change-identifier handlers live in the parent
-// (LoginForm); this child is presentational, driven by the passed value +
-// callbacks.
+// and the verify/send/change-identifier handlers live in the flow (useOtpFlow);
+// this child is presentational, driven by the passed value + callbacks. A
+// refused code is said under the boxes, which are marked and point at it.
+const CODE_ID = 'otp-code';
+
 export function LoginVerifyStep({
   t,
   th,
@@ -18,6 +21,7 @@ export function LoginVerifyStep({
   changeIdentifier,
   code,
   setCode,
+  codeError,
   verify,
   send,
   busy,
@@ -31,6 +35,7 @@ export function LoginVerifyStep({
   changeIdentifier: () => void;
   code: string;
   setCode: (value: string) => void;
+  codeError: string | undefined;
   verify: (fullCode?: string) => void;
   send: () => void;
   busy: boolean;
@@ -67,14 +72,16 @@ export function LoginVerifyStep({
         onComplete={(v) => verify(v)}
         disabled={busy}
         ariaLabel={t('codeLabel')}
+        errorId={codeError ? fieldErrorId(CODE_ID) : undefined}
         autoFocus
       />
+      <FieldErrorText id={fieldErrorId(CODE_ID)} message={codeError} />
 
       <Button
         variant="default"
         className="h-11 w-full"
         onClick={() => verify()}
-        disabled={busy || code.length < otpLength}
+        disabled={busy}
       >
         {verifying && (
           <Loader2 className="size-4 animate-spin" aria-hidden />

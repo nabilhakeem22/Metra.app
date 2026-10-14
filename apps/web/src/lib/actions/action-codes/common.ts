@@ -27,8 +27,11 @@ export type CommonActionCode =
   | 'already_member'
   | 'pending_exists'
   | 'declined'
-  | 'otp_send_failed'
   | 'otp_verify_failed'
+  // Supabase refused to send a sign-in code, by cause (lib/auth/otp-failure.ts).
+  | 'otp_rate_limited'
+  | 'otp_sms_unavailable'
+  | 'otp_email_unavailable'
   | 'immutable'
   | 'code_required'
   | 'code_taken'

@@ -15,6 +15,9 @@ export interface OtpInputProps {
   onComplete?: (value: string) => void;
   disabled?: boolean;
   ariaLabel: string;
+  /** The id of the refusal said under the boxes: marks each box invalid and
+   *  points it there, so focus on any box reads it. */
+  errorId?: string;
   autoFocus?: boolean;
   className?: string;
 }
@@ -26,6 +29,7 @@ export function OtpInput({
   onComplete,
   disabled,
   ariaLabel,
+  errorId,
   autoFocus,
   className,
 }: OtpInputProps) {
@@ -114,6 +118,8 @@ export function OtpInput({
           maxLength={1}
           autoFocus={autoFocus && i === 0}
           aria-label={`digit ${i + 1} of ${length}`}
+          aria-invalid={errorId ? true : undefined}
+          aria-describedby={errorId}
           className="size-12 rounded-item border border-input bg-background text-center text-title font-semibold tabular-nums outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
         />
       ))}
