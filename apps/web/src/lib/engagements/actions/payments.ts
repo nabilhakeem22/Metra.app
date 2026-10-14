@@ -6,6 +6,7 @@ import { requireOrg } from '@/lib/auth/require-org';
 import {
   logPaymentAndAdvanceCore,
   type LogPaymentAndAdvanceInput,
+  type LogPaymentAndAdvanceResult,
 } from '../pay-and-advance';
 import { confirmPaymentClaimAndAdvanceCore } from '../confirm-claim-and-advance';
 import {
@@ -36,20 +37,17 @@ export async function recordPayment(
  * "Log payment & advance" (Epic D, Slice 3). Resolves the org context, runs the
  * sequential core (record payment → advance), and revalidates the shell WHENEVER
  * the payment persisted (even if the advance guard still blocks), so the ledger +
- * re-checked gate preview refresh. Returns the transition's ActionResult (or the
- * payment error) — never throws to the client.
+ * re-checked gate preview refresh. Returns the core's answer whole, `paymentRecorded`
+ * included, so the cockpit can tell a saved payment from a refused one. Never
+ * throws to the client.
  */
 export async function logPaymentAndAdvance(
   engagementId: string,
   input: LogPaymentAndAdvanceInput,
-): Promise<ActionResult & { waitingOn?: ActionCode }> {
+): Promise<LogPaymentAndAdvanceResult> {
   const ctx = await requireOrg();
-  const { paymentRecorded, ...result } = await logPaymentAndAdvanceCore(
-    ctx,
-    engagementId,
-    input,
-  );
-  if (paymentRecorded) revalidatePath('/', 'layout');
+  const result = await logPaymentAndAdvanceCore(ctx, engagementId, input);
+  if (result.paymentRecorded) revalidatePath('/', 'layout');
   return result;
 }
 

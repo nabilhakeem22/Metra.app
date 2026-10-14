@@ -17,16 +17,13 @@ import {
   type MilestoneKind,
 } from '@metra/db';
 import { eq } from 'drizzle-orm';
-import { failFields } from '@/lib/actions/field-errors';
+import { failFields, type FieldError } from '@/lib/actions/field-errors';
 import { fail } from '@/lib/actions/mutate';
 import type { ActionCode } from '@/lib/actions/result';
-import {
-  formatMoney4,
-  isMoneyString,
-  parseMoney4,
-} from '@/lib/aggregates/proposal-totals';
+import { formatMoney4, parseMoney4 } from '@/lib/aggregates/proposal-totals';
 import type { OrgContext } from '@/lib/db/context';
 import { isRecord } from '@/lib/guards/is-record';
+import { readPositiveAmount, readTypedMoney } from '@/lib/validation/amount-field';
 
 /** 100.0000 in scale-4 units (the required sum of a percent split). */
 const HUNDRED_PERCENT_4 = parseMoney4('100');
@@ -49,17 +46,27 @@ export type FeeScheduleField = 'designFee' | 'milestones';
 
 type FeeScheduleValidation =
   | { ok: true; schedule: ValidatedFeeSchedule }
-  | { ok: false; code: ActionCode; field?: FeeScheduleField };
+  | { ok: false; code: ActionCode; field?: undefined }
+  | { ok: false; field: FeeScheduleField; error: FieldError };
 
-const FEE_REQUIRED = { ok: false, code: 'design_fee_required', field: 'designFee' } as const;
-const SPLIT_INVALID = { ok: false, code: 'milestone_split_invalid', field: 'milestones' } as const;
+const FEE_MISSING: FieldError = { code: 'design_fee_required' };
+const FEE_REQUIRED = { ok: false, field: 'designFee', error: FEE_MISSING } as const;
+const SPLIT_INVALID = { ok: false, field: 'milestones', error: { code: 'milestone_split_invalid' } } as const;
+
+/** A split value: a typed money figure at scale 4, never below zero; null when not one. */
+function splitValue4(value: unknown): bigint | null {
+  if (typeof value !== 'string') return null;
+  const read = readTypedMoney(value);
+  return read.ok ? parseMoney4(read.value) : null;
+}
 
 const KIND_SET = new Set<string>(MILESTONE_KINDS);
 const BASIS_SET = new Set<string>(MILESTONE_BASES);
 
 /**
  * Validate a fee-schedule payload with exact scale-4 BigInt math. Rules:
- *  - `designFee` is a well-formed money string > 0                → design_fee_required
+ *  - `designFee` is a typed amount > 0 (amount-field.ts)          → design_fee_required,
+ *    or not_a_number / amount_too_large when it is typed but unreadable
  *  - at least one milestone, and a `deposit` milestone is present → milestone_split_invalid
  *  - every `value` is a well-formed money string ≥ 0             → milestone_split_invalid
  *  - a `kind` may appear at most once                            → milestone_kind_duplicate
@@ -74,9 +81,9 @@ export function validateFeeSchedule(payload: unknown): FeeScheduleValidation {
 
   const { designFee, milestones } = payload;
 
-  if (!isMoneyString(designFee)) return FEE_REQUIRED;
-  const designFee4 = parseMoney4(designFee);
-  if (designFee4 <= 0n) return FEE_REQUIRED;
+  const fee = readPositiveAmount(designFee, FEE_MISSING);
+  if (!fee.ok) return { ok: false, field: 'designFee', error: fee.error };
+  const designFee4 = parseMoney4(fee.value);
 
   if (!Array.isArray(milestones) || milestones.length === 0) {
     return SPLIT_INVALID;
@@ -96,11 +103,8 @@ export function validateFeeSchedule(payload: unknown): FeeScheduleValidation {
     if (typeof basis !== 'string' || !BASIS_SET.has(basis)) {
       return SPLIT_INVALID;
     }
-    if (!isMoneyString(value)) {
-      return SPLIT_INVALID;
-    }
-    const value4 = parseMoney4(value);
-    if (value4 < 0n) return SPLIT_INVALID;
+    const value4 = splitValue4(value);
+    if (value4 === null) return SPLIT_INVALID;
 
     const kindTyped = kind as MilestoneKind;
     if (seenKinds.has(kindTyped)) {
@@ -155,7 +159,7 @@ export async function generateFeeSchedule(
 ): Promise<void> {
   const result = validateFeeSchedule(payload);
   if (!result.ok) {
-    if (result.field) failFields({ [result.field]: { code: result.code } });
+    if (result.field) failFields({ [result.field]: result.error });
     fail(result.code);
   }
   const { designFee, milestones } = result.schedule;

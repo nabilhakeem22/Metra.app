@@ -31,6 +31,24 @@ describe('validate (projects)', () => {
     });
   });
 
+  it('a date that names no real day, or a control character, is refused under its field (F15)', () => {
+    expect(
+      validate(
+        { ...BASE, startDate: '2026-02-30', endDate: '12026-01-01', city: 'Cairo\u0000', country: 'Egypt\u0007' },
+        { requireStartDate: true },
+      ),
+    ).toEqual({
+      ok: false,
+      error: 'check_fields',
+      fields: {
+        startDate: { code: 'invalid_date' },
+        endDate: { code: 'invalid_date' },
+        city: { code: 'unprintable' },
+        country: { code: 'unprintable' },
+      },
+    });
+  });
+
   it('says every broken rule at once (D1)', () => {
     const result = validate(
       { ...BASE, nameEn: ' ', clientId: '', startDate: null, notes: 'x'.repeat(2001), advancePct: '101' },

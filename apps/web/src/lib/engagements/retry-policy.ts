@@ -96,6 +96,7 @@ export const DEFINITE_REFUSALS: ReadonlySet<ActionCode> = new Set<ActionCode>([
   // The studio's client page details: refused before or by the one UPDATE,
   // which rolled back (Round C, C8; MT120 is the database's owner/admin gate).
   'phone_invalid',
+  'studio_phone_invalid',
   'whatsapp_invalid',
   'iban_invalid',
   'bank_name_required',

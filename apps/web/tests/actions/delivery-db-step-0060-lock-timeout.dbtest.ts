@@ -79,7 +79,7 @@ describe('T2, T3: a held delivery row fails the write in about 4 s, and nothing 
 });
 
 describe('T4: the one-tap approve and budget behind a held row (D3 R2 closed)', () => {
-  it('answers the generic failure in under 6 s, and nothing commits after the answer', async () => {
+  it('answers uncertain (the lock wait may still commit) in under 6 s, and nothing commits after the answer', async () => {
     const d = await seedRoundBDelivery(orgIds, 't4');
     await forceState(d.engagementId, 'final_approval');
     await stampRenders(d.engagementId, `now() - interval '2 hours'`);
@@ -90,7 +90,9 @@ describe('T4: the one-tap approve and budget behind a held row (D3 R2 closed)', 
     const answer = await approveDesignWithBudgetAndNotify(d.token, { note: 'Lovely' }, seen);
     const ms = performance.now() - started;
     await held.release({ commit: true });
-    expect(answer).toEqual({ kind: 'error', error: 'generic' });
+    // 55P03 is ambiguous by contract (db-failure.ts): the client is told to
+    // refresh and check, never "a problem on our side, try again".
+    expect(answer).toEqual({ kind: 'error', error: 'uncertain' });
     expect(ms).toBeLessThan(6000);
     await new Promise((resolve) => setTimeout(resolve, 2000));
     const counts = await consentCounts(d.engagementId);

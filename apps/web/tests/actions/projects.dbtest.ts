@@ -9,8 +9,9 @@ import { listProjects } from '@/lib/projects/queries';
 import { closeFixture, ctxFor, raw, seedOrg, teardown } from './fixture';
 import type { OrgContext } from '@/lib/db/context';
 
-/** A client that is missing, archived or no id at all: pick a client. */
+/** No client picked, or no id at all: pick a client. A deleted or archived one: it is gone (F10). */
 const CLIENT_REQUIRED = { ok: false, error: 'check_fields', fields: { clientId: { code: 'client_required' } } };
+const CLIENT_GONE = { ok: false, error: 'check_fields', fields: { clientId: { code: 'no_longer_exists' } } };
 
 const orgIds: string[] = [];
 afterAll(async () => {
@@ -92,7 +93,7 @@ describe('createProjectCore', () => {
     });
   });
 
-  it('rejects a missing or inactive client with client_required', async () => {
+  it('answers no_longer_exists under the client for a deleted or archived one (F10)', async () => {
     const { ctx, clientId } = await orgWithClient();
     // Unknown client id.
     expect(
@@ -100,13 +101,13 @@ describe('createProjectCore', () => {
         ...baseProject(clientId),
         clientId: '00000000-0000-4000-8000-000000000999',
       }),
-    ).toEqual(CLIENT_REQUIRED);
+    ).toEqual(CLIENT_GONE);
 
     // Deactivate the client -> now unusable.
     await setClientActiveCore(ctx, { id: clientId, active: false });
     expect(
       await createProjectCore(ctx, { ...baseProject(clientId), code: 'P-2' }),
-    ).toEqual(CLIENT_REQUIRED);
+    ).toEqual(CLIENT_GONE);
   });
 
   it('lets a project_manager create, forbids site_engineer/accountant/viewer', async () => {
@@ -184,6 +185,22 @@ describe('date + client-id edge cases', () => {
       endDate: '2026-10-01',
     });
     expect(res.ok).toBe(true);
+  });
+
+  // Fix round F15: a day that does not exist, and a NUL pasted into a text box,
+  // are said under their fields before the write (no 22008 / 22021 generic).
+  it('refuses an impossible date and a control character under their fields', async () => {
+    const { ctx, clientId } = await orgWithClient();
+    const res = await createProjectCore(ctx, {
+      ...baseProject(clientId),
+      startDate: '2026-02-30',
+      city: 'Cairo\u0000',
+    });
+    expect(res).toEqual({
+      ok: false,
+      error: 'check_fields',
+      fields: { startDate: { code: 'invalid_date' }, city: { code: 'unprintable' } },
+    });
   });
 
   // F2: a malformed (non-UUID) client id -> client_required, no DB uuid-cast.

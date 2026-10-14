@@ -57,4 +57,16 @@ describe.each<TestLocale>(['en', 'ar-EG'])('AutomationSettingsClient (%s)', (loc
     });
     expect(toast).not.toHaveBeenCalled();
   });
+
+  test('a switched-off automation does not block Save with its day count (F8)', async () => {
+    actions.updateAutomationSettings.mockResolvedValue({ ok: true });
+    renderWithIntl(<AutomationSettingsClient canManage initial={INITIAL} />, { locale });
+    fireEvent.change(document.getElementById('followupThresholdDays')!, { target: { value: '' } });
+    fireEvent.click(screen.getByRole('checkbox', { name: new RegExp(messageAt(locale, 'automation.followupLabel')) }));
+    await save(locale);
+    expect(actions.updateAutomationSettings).toHaveBeenCalledWith(
+      expect.objectContaining({ followupEnabled: false, followupThresholdDays: 7 }),
+    );
+    expect(document.getElementById('followupThresholdDays-error')).toBeNull();
+  });
 });

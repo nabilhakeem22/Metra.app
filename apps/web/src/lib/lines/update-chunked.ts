@@ -25,6 +25,7 @@ export async function updateRowsInChunks<Row extends { id: string }>(
   const tableColumns = getTableColumns(table) as Record<string, PgColumn>;
   const columnOf = (key: string): PgColumn => {
     const column = tableColumns[key];
+    // developer-only: `key` is a column name from the caller's code.
     if (!column) throw new Error(`updateRowsInChunks: no column ${key}`);
     return column;
   };

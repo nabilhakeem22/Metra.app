@@ -2,12 +2,13 @@
 // form runs them before sending, and the core runs them again on what arrived.
 import type { FieldErrors } from '@/lib/actions/field-errors';
 import { clean } from '@/lib/validation/text';
-import { collectFieldErrors, readMoneyField } from '@/lib/validation/field-rules';
+import { readTypedMoney } from '@/lib/validation/amount-field';
+import { collectFieldErrors } from '@/lib/validation/field-rules';
 import type { CostItemField, CostItemInput } from './fields';
 
-/** A price-book cost/price box: the studio may type '1,500', and a cleared box
- *  is a zero rather than a refusal (the column is NOT NULL). */
-const MONEY_FIELD = { allowGroupSeparators: true, blank: '0' } as const;
+/** A cleared cost/price box is a zero rather than a refusal (the column is NOT
+ *  NULL); the figure is read as every money box reads it (amount-field.ts). */
+const BLANK_IS_ZERO = '0';
 
 /** The typed values as the database stores them. */
 export interface CostItemValues {
@@ -27,8 +28,8 @@ export function readCostItemInput(input: CostItemInput): CostItemRead {
   const code = clean(input.code);
   const nameEn = clean(input.nameEn);
   const nameAr = clean(input.nameAr);
-  const cost = readMoneyField(input.defaultUnitCost, MONEY_FIELD);
-  const price = readMoneyField(input.defaultUnitPrice, MONEY_FIELD);
+  const cost = readTypedMoney(input.defaultUnitCost, BLANK_IS_ZERO);
+  const price = readTypedMoney(input.defaultUnitPrice, BLANK_IS_ZERO);
   if (code && (nameEn || nameAr) && cost.ok && price.ok) {
     return {
       ok: true,

@@ -5,7 +5,7 @@
 import { hasFieldErrors, type FieldErrors } from '@/lib/actions/field-errors';
 import { collectFieldErrors } from '@/lib/validation/field-rules';
 import { clean } from '@/lib/validation/text';
-import { bilingualNameErrors, maxCharacters, type BilingualNameField } from '@/lib/validation/text-field-rules';
+import { bilingualNameErrors, boundedText, type BilingualNameField } from '@/lib/validation/text-field-rules';
 import { ORG_PROFILE_LIMITS } from './profile-limits';
 
 /** Every path a profile refusal can name; `name` is the Arabic/English pair. */
@@ -43,8 +43,8 @@ export function readOrgProfile(input: OrgProfileText): OrgProfileRead {
   const errors: FieldErrors<OrgProfileField> = {
     ...bilingualNameErrors(values.nameEn, values.nameAr, ORG_PROFILE_LIMITS.name),
     ...collectFieldErrors<Exclude<OrgProfileField, BilingualNameField>>({
-      city: maxCharacters(values.city, ORG_PROFILE_LIMITS.city),
-      taxRegistrationNumber: maxCharacters(values.taxRegistrationNumber, ORG_PROFILE_LIMITS.taxReg),
+      city: boundedText(values.city, ORG_PROFILE_LIMITS.city),
+      taxRegistrationNumber: boundedText(values.taxRegistrationNumber, ORG_PROFILE_LIMITS.taxReg),
     }),
   };
   return hasFieldErrors(errors) ? { ok: false, errors } : { ok: true, values };

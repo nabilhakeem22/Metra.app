@@ -104,6 +104,7 @@ export const ACTION_CODE_PROBLEM: Record<ActionCode, ApiProblemKind> = {
   balance_not_cleared: 'bad-request',
   handoff_not_acknowledged: 'bad-request',
   client_review_pending: 'conflict',
+  advance_unconfirmed: 'conflict',
   offline_approval_date_out_of_range: 'bad-request',
   // The client answered first: a state conflict, not malformed input.
   client_review_answered: 'conflict',
@@ -138,6 +139,7 @@ export const ACTION_CODE_PROBLEM: Record<ActionCode, ApiProblemKind> = {
   ending_requires_explicit_choice: 'bad-request',
   firm_type_unavailable: 'bad-request',
   phone_invalid: 'bad-request',
+  studio_phone_invalid: 'bad-request',
   whatsapp_invalid: 'bad-request',
   iban_invalid: 'bad-request',
   bank_name_required: 'bad-request',

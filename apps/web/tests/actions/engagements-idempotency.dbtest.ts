@@ -213,62 +213,59 @@ describe('recordPayment idempotency — the partial unique key', () => {
 });
 
 describe('logPaymentAndAdvance idempotency + kind-guard', () => {
-  it('(5) combined same key + SHORT deposit: ONE row, guard re-checked, stays design_proposal', async () => {
+  it('(5) R1 path 1: a SHORT deposit is recorded and answered ok, so a re-submit is ONE row', async () => {
     const { ctx, engagementId } = await setupProposal();
     const key = randomUUID();
+    const submit = () =>
+      logPaymentAndAdvanceCore(ctx, engagementId, {
+        paymentKind: 'deposit',
+        amount: '29999',
+        advanceTrigger: 'confirmAndPayDeposit',
+        idempotencyKey: key,
+      });
 
-    // 29,999 is short of the 30,000 deposit -> the advance guard blocks.
-    const first = await logPaymentAndAdvanceCore(ctx, engagementId, {
-      paymentKind: 'deposit',
-      amount: '29999',
-      advanceTrigger: 'confirmAndPayDeposit',
-      idempotencyKey: key,
+    // 29,999 is short of the 30,000 deposit: the payment stands, the stage
+    // waits, and the answer is a SUCCESS (the form closes), never the guard's
+    // refusal, which used to release the key with the amount still typed.
+    const first = await submit();
+    expect(first).toEqual({
+      ok: true,
+      already: false,
+      paymentRecorded: true,
+      waitingOn: 'deposit_not_cleared',
     });
-    const second = await logPaymentAndAdvanceCore(ctx, engagementId, {
-      paymentKind: 'deposit',
-      amount: '29999',
-      advanceTrigger: 'confirmAndPayDeposit',
-      idempotencyKey: key,
+    // The studio presses Save again before the form closes: the held key.
+    const second = await submit();
+    expect(second).toEqual({
+      ok: true,
+      already: true,
+      paymentRecorded: true,
+      waitingOn: 'deposit_not_cleared',
     });
-
-    // Both persisted the (same) payment; both blocked on deposit_not_cleared.
-    expect(first.paymentRecorded).toBe(true);
-    expect(second.paymentRecorded).toBe(true);
-    expect(first.ok).toBe(false);
-    expect(second.ok).toBe(false);
-    expect(first.error).toBe('deposit_not_cleared');
-    expect(second.error).toBe('deposit_not_cleared');
-    // Deterministic: one payment row, still in design_proposal.
     expect(await paymentRowCount(engagementId)).toBe(1);
     expect(await stateOf(engagementId)).toBe('design_proposal');
   });
 
-  it('(6) combined key that CLEARS + retry same key: ONE row, advanced, no error thrown', async () => {
+  it('(6) R1 path 2: the answer is lost, the retry with the held key is a SUCCESS, ONE row', async () => {
     const { ctx, engagementId } = await setupProposal();
     const key = randomUUID();
+    const submit = () =>
+      logPaymentAndAdvanceCore(ctx, engagementId, {
+        paymentKind: 'deposit',
+        amount: '30000',
+        advanceTrigger: 'confirmAndPayDeposit',
+        idempotencyKey: key,
+      });
 
-    const first = await logPaymentAndAdvanceCore(ctx, engagementId, {
-      paymentKind: 'deposit',
-      amount: '30000',
-      advanceTrigger: 'confirmAndPayDeposit',
-      idempotencyKey: key,
-    });
-    expect(first.ok).toBe(true);
-    expect(first.paymentRecorded).toBe(true);
+    const first = await submit();
+    expect(first).toEqual({ ok: true, already: false, paymentRecorded: true });
     expect(await stateOf(engagementId)).toBe('survey');
 
-    // Retry with the same key: the payment dedups (one row) and the transition is
-    // a benign no-op (engagement already left design_proposal -> illegal_trigger),
-    // never a throw.
-    const second = await logPaymentAndAdvanceCore(ctx, engagementId, {
-      paymentKind: 'deposit',
-      amount: '30000',
-      advanceTrigger: 'confirmAndPayDeposit',
-      idempotencyKey: key,
-    });
-    expect(second.paymentRecorded).toBe(true);
-    expect(second.ok).toBe(false);
-    expect(second.error).toBe('illegal_trigger');
+    // The first answer never reached the browser. The retry finds the payment
+    // (already) and the trigger spent: that is the first attempt's advance,
+    // so it is said as done, never as "this step is not allowed".
+    const second = await submit();
+    expect(second).toEqual({ ok: true, already: true, paymentRecorded: true });
     expect(await paymentRowCount(engagementId)).toBe(1);
     expect(await stateOf(engagementId)).toBe('survey');
   });

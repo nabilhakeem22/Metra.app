@@ -1,8 +1,8 @@
 // The typed half of recording a payment: the amount, and the optional method,
 // reference and note. Pure and client-safe: the payment forms run it on submit
 // and normalizePayment runs it again on arrival.
-import { MONEY_RE, formatMoney4, parseMoney4 } from '@/lib/aggregates/proposal-totals';
 import type { FieldErrors } from '@/lib/actions/field-errors';
+import { readPositiveAmount } from '@/lib/validation/amount-field';
 import {
   readFields,
   readOptionalText,
@@ -20,14 +20,12 @@ export interface TypedPayment {
   note?: string | null;
 }
 
-/** A positive amount, canonical at scale 4 so the stored figure is the checked one. */
+/** A positive amount, canonical at scale 4 so the stored figure is the checked
+ *  one. Typed as studios type it ("1,500", Arabic digits, "EGP"); empty or zero
+ *  is payment_amount_invalid, unreadable not_a_number, past the cap
+ *  amount_too_large (never a numeric overflow at the write). */
 export function readPaymentAmount(amount: unknown): FieldRead<string> {
-  if (typeof amount !== 'string' || !MONEY_RE.test(amount.trim())) {
-    return { ok: false, error: { code: 'payment_amount_invalid' } };
-  }
-  const amount4 = parseMoney4(amount);
-  if (amount4 <= 0n) return { ok: false, error: { code: 'payment_amount_invalid' } };
-  return { ok: true, value: formatMoney4(amount4) };
+  return readPositiveAmount(amount, { code: 'payment_amount_invalid' });
 }
 
 /**

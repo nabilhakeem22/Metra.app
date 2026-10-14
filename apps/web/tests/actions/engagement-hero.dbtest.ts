@@ -263,10 +263,12 @@ describe('logPaymentAndAdvanceCore — sequential record-then-advance', () => {
       amount: '19999.9999',
       advanceTrigger: 'selectConcept',
     });
-    expect(res).toMatchObject({
-      ok: false,
-      error: 'gate_a_not_cleared',
+    // The money is saved, so the answer is ok; the guard is why the stage waits.
+    expect(res).toEqual({
+      ok: true,
+      already: false,
       paymentRecorded: true,
+      waitingOn: 'gate_a_not_cleared',
     });
     // The payment genuinely persisted; the state stayed put (guard re-checks).
     expect(await gateAPaymentCount(engagementId)).toBe(1);

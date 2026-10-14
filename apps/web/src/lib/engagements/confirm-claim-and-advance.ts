@@ -23,6 +23,7 @@ import { MONEY_GUARD_MILESTONE, moneyGuardOf } from './guards';
 import { confirmPaymentClaimCore, type ConfirmPaymentClaimInput } from './payment-claims';
 import type { DesignState } from './states';
 import type { Trigger } from './transitions';
+import { isDefiniteRefusal } from './retry-policy';
 import { canRunTrigger } from './ui';
 
 /**
@@ -127,7 +128,7 @@ export async function confirmPaymentClaimAndAdvanceCore(
     gate = await loadClaimGate(ctx, input.claimId);
   } catch (error) {
     console.error('confirmPaymentClaimAndAdvance read failed:', loggableFailure(error));
-    return { ...recorded, advanced: false, waitingOn: 'generic' };
+    return { ...recorded, advanced: false, waitingOn: 'advance_unconfirmed' };
   }
   const advanceTrigger = gate ? triggerPaidBy(ctx, gate) : null;
   if (!gate || advanceTrigger === null) return { ...recorded, advanced: false };
@@ -137,7 +138,7 @@ export async function confirmPaymentClaimAndAdvanceCore(
     reviewHold = await clientReviewHold(ctx, gate.engagementId);
   } catch (error) {
     console.error('confirmPaymentClaimAndAdvance review read failed:', loggableFailure(error));
-    return { ...recorded, advanced: false, waitingOn: 'generic' };
+    return { ...recorded, advanced: false, waitingOn: 'advance_unconfirmed' };
   }
   if (reviewHold !== null) return { ...recorded, advanced: false, waitingOn: reviewHold };
 
@@ -146,5 +147,8 @@ export async function confirmPaymentClaimAndAdvanceCore(
     trigger: advanceTrigger,
   });
   if (advance.ok) return { ...recorded, advanced: true };
-  return { ...recorded, advanced: false, waitingOn: advance.error ?? 'generic' };
+  // The payment is saved whatever the advance said: a definite refusal is why
+  // the stage waits; anything else is never "could not finish, try again".
+  const waitingOn = isDefiniteRefusal(advance.error) ? advance.error : 'advance_unconfirmed';
+  return { ...recorded, advanced: false, waitingOn };
 }

@@ -6,7 +6,7 @@ import { collectFieldErrors } from '@/lib/validation/field-rules';
 import { PERCENT_REFUSAL } from '@/lib/validation/number-field-rules';
 import { normalizePercent } from '@/lib/validation/percent';
 import { clean } from '@/lib/validation/text';
-import { bilingualNameErrors, maxCharacters, type BilingualNameField } from '@/lib/validation/text-field-rules';
+import { bilingualNameErrors, boundedText, type BilingualNameField } from '@/lib/validation/text-field-rules';
 import type { ClientField, ClientInput } from './fields';
 
 /** Boundary length caps (defense-in-depth), mirroring org/core profileWithinLimits. */
@@ -68,14 +68,14 @@ export function readClientInput(input: ClientInput, rules: { phoneRequired: bool
   const errors: FieldErrors<ClientField> = {
     ...bilingualNameErrors(v.nameEn, v.nameAr, CLIENT_NAME_MAX),
     ...collectFieldErrors<Exclude<ClientField, BilingualNameField>>({
-      phone: rules.phoneRequired && !v.phone ? { code: 'phone_required' } : maxCharacters(v.phone, CLIENT_LIMITS.phone),
-      contactName: maxCharacters(v.contactName, CLIENT_LIMITS.contactName),
-      email: maxCharacters(v.email, CLIENT_LIMITS.email),
-      city: maxCharacters(v.city, CLIENT_LIMITS.city),
-      country: maxCharacters(v.country, CLIENT_LIMITS.country),
-      address: maxCharacters(v.address, CLIENT_LIMITS.address),
-      taxRegistrationNumber: maxCharacters(v.taxRegistrationNumber, CLIENT_LIMITS.taxRegistrationNumber),
-      notes: maxCharacters(v.notes, CLIENT_LIMITS.notes),
+      phone: rules.phoneRequired && !v.phone ? { code: 'phone_required' } : boundedText(v.phone, CLIENT_LIMITS.phone),
+      contactName: boundedText(v.contactName, CLIENT_LIMITS.contactName),
+      email: boundedText(v.email, CLIENT_LIMITS.email),
+      city: boundedText(v.city, CLIENT_LIMITS.city),
+      country: boundedText(v.country, CLIENT_LIMITS.country),
+      address: boundedText(v.address, CLIENT_LIMITS.address),
+      taxRegistrationNumber: boundedText(v.taxRegistrationNumber, CLIENT_LIMITS.taxRegistrationNumber),
+      notes: boundedText(v.notes, CLIENT_LIMITS.notes),
       advancePct: advancePct === null ? PERCENT_REFUSAL : null,
       retentionPct: retentionPct === null ? PERCENT_REFUSAL : null,
     }),

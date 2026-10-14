@@ -52,5 +52,6 @@ export async function assertClientUsable(tx: MetraDb, clientId: string): Promise
     .from(clients)
     .where(eq(clients.id, clientId))
     .limit(1);
-  if (!client || !client.active) failFields({ clientId: { code: 'client_required' } });
+  // Deleted, or archived since the picker loaded (F10): that choice is gone.
+  if (!client || !client.active) failFields({ clientId: { code: 'no_longer_exists' } });
 }
