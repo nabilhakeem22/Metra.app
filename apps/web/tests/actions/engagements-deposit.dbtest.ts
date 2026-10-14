@@ -134,7 +134,11 @@ describe('recordPayment — append-only ledger', () => {
         kind: 'deposit',
         amount,
       });
-      expect(res).toEqual({ ok: false, error: 'payment_amount_invalid' });
+      expect(res).toEqual({
+        ok: false,
+        error: 'check_fields',
+        fields: { amount: { code: 'payment_amount_invalid' } },
+      });
     }
     expect(await getEngagementPayments(ctx, engagementId)).toHaveLength(0);
   });

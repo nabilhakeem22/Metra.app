@@ -98,7 +98,6 @@ export const ACTION_CODE_PROBLEM: Record<ActionCode, ApiProblemKind> = {
   handoff_not_acknowledged: 'bad-request',
   client_review_pending: 'conflict',
   offline_approval_date_out_of_range: 'bad-request',
-  offline_approval_note_too_long: 'bad-request',
   // The client answered first: a state conflict, not malformed input.
   client_review_answered: 'conflict',
   concept_option_not_found: 'bad-request',

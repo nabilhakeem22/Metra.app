@@ -92,7 +92,6 @@ const ALL_CODES: ActionCode[] = [
   'handoff_not_acknowledged',
   'client_review_pending',
   'offline_approval_date_out_of_range',
-  'offline_approval_note_too_long',
   'client_review_answered',
   'concept_option_not_found',
   'delivery_link_unrecoverable',

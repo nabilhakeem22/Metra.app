@@ -593,13 +593,21 @@ describe('waiting for the client to answer the review', () => {
     expect(offlineButton()).not.toBeNull();
   });
 
-  test('saving needs a channel, then sends the offline approval with it', async () => {
+  test('saving says a missing channel under it, then sends the offline approval with it', async () => {
     actions.recordOfflineConceptApproval.mockResolvedValue({ ok: true });
     renderWaiting();
     fireEvent.click(offlineButton()!);
     const save = button('engagements.offlineApproval.save') as HTMLButtonElement;
-    expect(save.disabled).toBe(true);
-    fireEvent.change(screen.getByLabelText(ar('engagements.offlineApproval.channelLabel')), {
+    // Save is not disabled to say "not yet": pressing it says what is missing.
+    expect(save.disabled).toBe(false);
+    await act(async () => {
+      fireEvent.click(save);
+    });
+    expect(actions.recordOfflineConceptApproval).not.toHaveBeenCalled();
+    expect(document.getElementById('offline-approval-channel-error')?.textContent).toBe(
+      ar('errors.field.required'),
+    );
+    fireEvent.change(document.getElementById('offline-approval-channel')!, {
       target: { value: 'whatsapp' },
     });
     fireEvent.change(screen.getByLabelText(ar('engagements.offlineApproval.note')), {
@@ -634,7 +642,7 @@ describe('waiting for the client to answer the review', () => {
     expect(options[2].textContent).toBe(
       ar('engagements.conceptOption.letter').replace('{letter}', '⁨B⁩'),
     );
-    fireEvent.change(screen.getByLabelText(ar('engagements.offlineApproval.channelLabel')), {
+    fireEvent.change(document.getElementById('offline-approval-channel')!, {
       target: { value: 'phone' },
     });
     fireEvent.change(select, { target: { value: 'opt-b' } });
@@ -659,7 +667,7 @@ describe('waiting for the client to answer the review', () => {
       screen.getByText(ar('engagements.command.waitingClient.final_approval.headline')),
     ).toBeTruthy();
     fireEvent.click(offlineButton()!);
-    fireEvent.change(screen.getByLabelText(ar('engagements.offlineApproval.channelLabel')), {
+    fireEvent.change(document.getElementById('offline-approval-channel')!, {
       target: { value: 'phone' },
     });
     await act(async () => {

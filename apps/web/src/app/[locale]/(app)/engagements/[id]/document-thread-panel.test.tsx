@@ -68,3 +68,25 @@ describe('DocumentThreadPanel when a read fails', () => {
     expect(screen.queryByText(en('engagements.comments.empty'))).toBeNull();
   });
 });
+
+describe('DocumentThreadPanel when a reply is refused', () => {
+  it('an empty reply is said under the box and never sent', async () => {
+    actions.listDocumentComments.mockResolvedValue([]);
+    open();
+    await screen.findByText(en('engagements.comments.empty'));
+    fireEvent.click(screen.getByRole('button', { name: en('engagements.comments.reply') }));
+    expect(actions.replyToDocument).not.toHaveBeenCalled();
+    expect(document.getElementById(`reply-${ARTIFACT}-error`)?.textContent).toBe(en('errors.field.required'));
+    expect(screen.getByRole('textbox').getAttribute('aria-invalid')).toBe('true');
+  });
+
+  it('a server refusal with no field is said above the box, by its cause', async () => {
+    actions.listDocumentComments.mockResolvedValue([]);
+    actions.replyToDocument.mockResolvedValue({ ok: false, error: 'engagement_not_active' });
+    open();
+    await screen.findByText(en('engagements.comments.empty'));
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Hello' } });
+    fireEvent.click(screen.getByRole('button', { name: en('engagements.comments.reply') }));
+    expect((await screen.findByRole('alert')).textContent).toBe(en('errors.engagement_not_active'));
+  });
+});

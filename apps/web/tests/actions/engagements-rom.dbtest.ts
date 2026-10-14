@@ -133,32 +133,40 @@ describe('setEngagementRom — coarse build-cost band entry', () => {
     expect(rom).toEqual({ romLow: '2000000.0000', romHigh: '2000000.0000' });
   });
 
-  it('rejects romHigh < romLow with rom_range_invalid, writing nothing', async () => {
+  it('rejects romHigh < romLow with rom_range_invalid under the high, writing nothing', async () => {
     const { ctx, engagementId } = await setup();
     const res = await setEngagementRomCore(ctx, {
       engagementId,
       romLow: '2400000',
       romHigh: '1800000',
     });
-    expect(res).toEqual({ ok: false, error: 'rom_range_invalid' });
+    expect(res).toEqual({
+      ok: false,
+      error: 'check_fields',
+      fields: { romHigh: { code: 'rom_range_invalid' } },
+    });
     expect(await getEngagementRom(ctx, engagementId)).toEqual({
       romLow: null,
       romHigh: null,
     });
   });
 
-  it('rejects a zero or malformed (comma-decimal) value with rom_range_invalid', async () => {
+  it('rejects a zero or malformed (comma-decimal) value with rom_range_invalid under that box', async () => {
     const { ctx, engagementId } = await setup();
-    const bad: { romLow: string; romHigh: string }[] = [
-      { romLow: '0', romHigh: '2400000' },
-      { romLow: '1800000', romHigh: '0' },
-      { romLow: '1,5', romHigh: '2400000' },
-      { romLow: '1800000', romHigh: 'abc' },
-      { romLow: '-1800000', romHigh: '2400000' },
+    const bad: { romLow: string; romHigh: string; refused: 'romLow' | 'romHigh' }[] = [
+      { romLow: '0', romHigh: '2400000', refused: 'romLow' },
+      { romLow: '1800000', romHigh: '0', refused: 'romHigh' },
+      { romLow: '1,5', romHigh: '2400000', refused: 'romLow' },
+      { romLow: '1800000', romHigh: 'abc', refused: 'romHigh' },
+      { romLow: '-1800000', romHigh: '2400000', refused: 'romLow' },
     ];
-    for (const range of bad) {
+    for (const { refused, ...range } of bad) {
       const res = await setEngagementRomCore(ctx, { engagementId, ...range });
-      expect(res).toEqual({ ok: false, error: 'rom_range_invalid' });
+      expect(res).toEqual({
+        ok: false,
+        error: 'check_fields',
+        fields: { [refused]: { code: 'rom_range_invalid' } },
+      });
     }
     expect(await getEngagementRom(ctx, engagementId)).toEqual({
       romLow: null,

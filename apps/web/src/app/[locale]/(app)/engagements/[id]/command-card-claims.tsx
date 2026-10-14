@@ -1,24 +1,16 @@
 'use client';
 
 import { useLocale, useTranslations } from 'next-intl';
-import { useState } from 'react';
-import { Button } from '@/components/ui/button';
 import { useConfirm } from '@/components/ui/confirm-dialog';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { toast } from '@/hooks/use-toast';
 import { resolveActionError } from '@/lib/actions/error-message';
-import { confirmPaymentClaim, dismissPaymentClaim } from '@/lib/engagements/actions';
+import { confirmPaymentClaim } from '@/lib/engagements/actions';
 import { claimAdvancesTo } from '@/lib/engagements/claim-advance';
 import type { EngagementGatePreview } from '@/lib/engagements/gate-preview';
 import type { EngagementPaymentClaimRecord } from '@/lib/engagements/queries';
 import { formatMoney } from '@/lib/format/money';
-import type { RunAction } from './use-engagement-action';
-
-/** Strip trailing scale-4 zeros for a clean, editable pre-fill ("30000.0000" -> "30000"). */
-function editablePrefill(scale4: string): string {
-  return scale4.includes('.') ? scale4.replace(/\.?0+$/, '') : scale4;
-}
+import { CommandCardClaimRow } from './command-card-claim-row';
+import type { RefusalSink, RunAction } from './run-action';
 
 /**
  * A pending client "mark as paid" claim is the card's ONE action. Confirm records
@@ -43,19 +35,18 @@ export function CommandCardClaims({
   runAction: RunAction;
 }) {
   const t = useTranslations('engagements.paymentClaims');
-  const tk = useTranslations('engagements.paymentKind');
   const tcmd = useTranslations('engagements.command');
   const tstate = useTranslations('engagements.state');
   const te = useTranslations('errors');
   const locale = useLocale();
   const { confirm, dialog } = useConfirm();
-  const [amounts, setAmounts] = useState<Record<string, string>>(() =>
-    Object.fromEntries(claims.map((claim) => [claim.id, editablePrefill(claim.claimedAmount)])),
-  );
 
   /** Confirm one claim. When it would also change the stage, say so and ask first. */
-  async function confirmClaim(claim: EngagementPaymentClaimRecord): Promise<void> {
-    const amount = (amounts[claim.id] ?? '').trim();
+  async function confirmClaim(
+    claim: EngagementPaymentClaimRecord,
+    amount: string,
+    form: RefusalSink,
+  ): Promise<void> {
     const nextState = claimAdvancesTo(preview, claim.milestoneKind, amount, canAdvance);
     if (nextState) {
       const proceed = await confirm({
@@ -66,75 +57,38 @@ export function CommandCardClaims({
       });
       if (!proceed) return;
     }
-    runAction(async () => {
-      const res = await confirmPaymentClaim({ claimId: claim.id, amount });
-      // The payment is recorded even when the delivery could not move yet: say so,
-      // and name what it is still waiting for, rather than raising an error.
-      if (res.ok) {
-        toast({
-          title: tcmd('claim.recorded'),
-          description:
-            !res.advanced && res.waitingOn ? resolveActionError(res.waitingOn, te) : undefined,
-        });
-      }
-      return res;
-    });
+    runAction(
+      async () => {
+        const res = await confirmPaymentClaim({ claimId: claim.id, amount });
+        // The payment is recorded even when the delivery could not move yet: say
+        // so, and name what it is still waiting for, rather than raising an error.
+        if (res.ok) {
+          toast({
+            title: tcmd('claim.recorded'),
+            description:
+              !res.advanced && res.waitingOn ? resolveActionError(res.waitingOn, te) : undefined,
+          });
+        }
+        return res;
+      },
+      undefined,
+      undefined,
+      form,
+    );
   }
 
   return (
     <div className="space-y-3">
       <ul className="space-y-3">
         {claims.map((claim, index) => (
-          <li
+          <CommandCardClaimRow
             key={claim.id}
-            className="space-y-2 rounded-item border border-[color:var(--rule)] bg-[color:var(--track)] p-3"
-          >
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <span className="text-body font-medium">{tk(claim.milestoneKind)}</span>
-              <span dir="ltr" className="text-body tabular-nums text-[color:var(--text-muted)]">
-                {formatMoney(claim.claimedAmount, locale)}
-              </span>
-            </div>
-            {claim.actorName && (
-              <p className="text-caption text-[color:var(--text-muted)]">
-                {t('claimedBy', { name: claim.actorName })}
-              </p>
-            )}
-            {claim.note && <p className="text-caption text-[color:var(--text-muted)]">{claim.note}</p>}
-            <div className="space-y-1.5">
-              <Label htmlFor={`claim-amount-${claim.id}`}>{t('amount')}</Label>
-              <Input
-                id={`claim-amount-${claim.id}`}
-                dir="ltr"
-                inputMode="decimal"
-                className="tabular-nums"
-                value={amounts[claim.id] ?? ''}
-                onChange={(event) =>
-                  setAmounts((prev) => ({ ...prev, [claim.id]: event.target.value }))
-                }
-              />
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <Button
-                variant="default"
-                type="button"
-                // One primary anchor per page: the first claim's confirm.
-                data-primary-action={index === 0 ? '' : undefined}
-                disabled={pending}
-                onClick={() => void confirmClaim(claim)}
-              >
-                {t('confirm')}
-              </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                disabled={pending}
-                onClick={() => runAction(() => dismissPaymentClaim({ claimId: claim.id }))}
-              >
-                {t('dismiss')}
-              </Button>
-            </div>
-          </li>
+            claim={claim}
+            primary={index === 0}
+            pending={pending}
+            runAction={runAction}
+            onConfirm={(confirmed, amount, form) => void confirmClaim(confirmed, amount, form)}
+          />
         ))}
       </ul>
       <p className="text-small text-[color:var(--text-muted)]">{tcmd('claim.note')}</p>

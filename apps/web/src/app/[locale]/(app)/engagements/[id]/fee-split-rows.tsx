@@ -17,11 +17,14 @@ export function FeeSplitRows({
   onChange,
   onAdd,
   onRemove,
+  errorId,
 }: {
   rows: FeeSplitRow[];
   onChange: (index: number, value: string) => void;
   onAdd: (kind: MilestoneKind) => void;
   onRemove: (kind: MilestoneKind) => void;
+  /** The split's refusal, said under the rows: every row box points at it. */
+  errorId?: string;
 }) {
   const t = useTranslations('engagements.feeForm');
   const tk = useTranslations('engagements.milestoneKind');
@@ -39,6 +42,8 @@ export function FeeSplitRows({
             inputMode="decimal"
             className="tabular-nums"
             aria-label={`${tk(row.kind)} ${t('value')}`}
+            aria-invalid={errorId ? true : undefined}
+            aria-describedby={errorId}
             value={row.value}
             onChange={(event) => onChange(index, event.target.value)}
           />

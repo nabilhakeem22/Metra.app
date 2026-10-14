@@ -50,7 +50,7 @@ export function CommandCardForms({
             engagementId={engagementId}
             prefill={feeSplitPrefill}
             pending={pending}
-            onSubmit={(fn) => handlers.runAction(fn)}
+            onSubmit={(fn, form) => handlers.runAction(fn, undefined, undefined, form)}
             onCancel={handlers.closeFee}
           />
         </div>

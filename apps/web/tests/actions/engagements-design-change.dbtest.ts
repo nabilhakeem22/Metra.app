@@ -346,7 +346,8 @@ describe('the 3D allowance is INDEPENDENT of the concept allowance', () => {
     // Only the 4th 3D revision is priced — the allowance is 3, counted on its own.
     expect(await designChangeRaised(ctx, engagementId)).toEqual({
       ok: false,
-      error: 'revision_co_amount_required',
+      error: 'check_fields',
+      fields: { changeOrderAmount: { code: 'revision_co_amount_required' } },
     });
     expect(await stateOf(engagementId)).toBe('final_approval');
     expect(await designRevisionCountOf(engagementId)).toBe(3);
@@ -427,7 +428,11 @@ describe('designChangeRaised — past the 3D free allowance (N=3)', () => {
     expect(await designRevisionCountOf(engagementId)).toBe(3);
 
     const res = await designChangeRaised(ctx, engagementId);
-    expect(res).toEqual({ ok: false, error: 'revision_co_amount_required' });
+    expect(res).toEqual({
+      ok: false,
+      error: 'check_fields',
+      fields: { changeOrderAmount: { code: 'revision_co_amount_required' } },
+    });
     // The state move, the counter increment and the transition row all roll back.
     expect(await stateOf(engagementId)).toBe('final_approval');
     expect(await designRevisionCountOf(engagementId)).toBe(3);
@@ -440,7 +445,11 @@ describe('designChangeRaised — past the 3D free allowance (N=3)', () => {
     const res = await designChangeRaised(ctx, engagementId, {
       changeOrderAmount: '1,5',
     });
-    expect(res).toEqual({ ok: false, error: 'revision_co_amount_required' });
+    expect(res).toEqual({
+      ok: false,
+      error: 'check_fields',
+      fields: { changeOrderAmount: { code: 'revision_co_amount_required' } },
+    });
     expect(await stateOf(engagementId)).toBe('final_approval');
     expect(await designRevisionCountOf(engagementId)).toBe(3);
     expect(await changeOrderCount(engagementId)).toBe(0);

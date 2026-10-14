@@ -1,7 +1,7 @@
 import type { MilestoneBasis, MilestoneKind } from '@metra/db';
 import { describe, expect, it, vi } from 'vitest';
 import { validateFeeSchedule } from './fee-schedule';
-import { summarizeFeeSplit } from './fee-split-total';
+import { feeSplitFieldErrors, summarizeFeeSplit } from './fee-split-total';
 
 // `validateFeeSchedule` is pure; its module also holds the executor-only runner,
 // whose `fail` import reaches the server-only mutate stack.
@@ -27,22 +27,23 @@ function payloadOf(basis: MilestoneBasis, designFee: string, rows: Row[]) {
 describe('summarizeFeeSplit', () => {
   it('50/30/20 percent with a fee may submit', () => {
     const summary = summarizeFeeSplit({ basis: 'percent', designFee: '90000', rows: split('50', '30', '20') });
-    expect(summary).toMatchObject({ total: '100.0000', target: '100.0000', balanced: true, canSubmit: true });
+    expect(summary).toMatchObject({ total: '100.0000', target: '100.0000', balanced: true });
+    expect(feeSplitFieldErrors(summary)).toEqual({});
   });
 
   it('is held back by an empty fee, an empty deposit, or a total short of 100%', () => {
     expect(summarizeFeeSplit({ basis: 'percent', designFee: '', rows: split('50', '30', '20') }))
-      .toMatchObject({ hasFee: false, canSubmit: false });
+      .toMatchObject({ hasFee: false });
     expect(summarizeFeeSplit({ basis: 'percent', designFee: '90000', rows: split('', '50', '50') }))
-      .toMatchObject({ hasDeposit: false, canSubmit: false });
+      .toMatchObject({ hasDeposit: false });
     expect(summarizeFeeSplit({ basis: 'percent', designFee: '90000', rows: split('50', '30', '10') }))
-      .toMatchObject({ total: '90.0000', balanced: false, canSubmit: false });
+      .toMatchObject({ total: '90.0000', balanced: false });
   });
 
   it('an amount split must equal the fee to the piastre', () => {
     expect(
       summarizeFeeSplit({ basis: 'amount', designFee: '100000', rows: split('50000', '30000', '20000') }),
-    ).toMatchObject({ target: '100000.0000', canSubmit: true });
+    ).toMatchObject({ target: '100000.0000' });
     expect(
       summarizeFeeSplit({ basis: 'amount', designFee: '100000', rows: split('50000', '30000', '19999.99') }),
     ).toMatchObject({ balanced: false });
@@ -59,7 +60,17 @@ describe('summarizeFeeSplit', () => {
   });
 });
 
-describe('canSubmit agrees with validateFeeSchedule', () => {
+describe('feeSplitFieldErrors', () => {
+  it('says a missing fee and a split without a deposit at once, each under its box', () => {
+    const summary = summarizeFeeSplit({ basis: 'percent', designFee: '', rows: split('', '50', '50') });
+    expect(feeSplitFieldErrors(summary)).toEqual({
+      designFee: { code: 'design_fee_required' },
+      milestones: { code: 'milestone_split_invalid' },
+    });
+  });
+});
+
+describe('feeSplitFieldErrors agrees with validateFeeSchedule', () => {
   const FIXTURES: { basis: MilestoneBasis; designFee: string; rows: Row[] }[] = [
     { basis: 'percent', designFee: '90000', rows: split('50', '30', '20') },
     { basis: 'percent', designFee: '90000', rows: split(' 50 ', '30', '20') },
@@ -89,6 +100,6 @@ describe('canSubmit agrees with validateFeeSchedule', () => {
   it.each(FIXTURES)('$basis $designFee %#', ({ basis, designFee, rows }) => {
     const summary = summarizeFeeSplit({ basis, designFee, rows });
     const server = validateFeeSchedule(payloadOf(basis, designFee, rows));
-    expect(summary.canSubmit).toBe(server.ok);
+    expect(Object.keys(feeSplitFieldErrors(summary)).length === 0).toBe(server.ok);
   });
 });

@@ -557,7 +557,6 @@
     "handoff_not_acknowledged": "The recipient must acknowledge the handoff before closing",
     "client_review_pending": "The client has not answered the review yet",
     "offline_approval_date_out_of_range": "Pick a date between the start of this review and today",
-    "offline_approval_note_too_long": "The note is too long: 2000 characters at most",
     "client_review_answered": "The client answered the review in the meantime. Reload the page to see their answer.",
     "concept_option_not_found": "That option is not released to the client. Choose one of the lettered options.",
     "delivery_link_unrecoverable": "This client link can't be shown again. Replace it to send a reminder.",
@@ -2191,11 +2190,6 @@
       "advisory": "A reply doesn't move the stage.",
       "partial": "Some messages may not be showing. Close and reopen the thread to load them all.",
       "error": {
-        "generic": "That didn't send. Please try again.",
-        "invalid": "That didn't send. Please try again.",
-        "forbidden": "You don't have permission to reply.",
-        "engagement_not_found": "This project is no longer available.",
-        "engagement_not_active": "This project is closed.",
         "load_failed": "Couldn't load the messages. Try again in a bit."
       }
     },

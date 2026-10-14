@@ -65,7 +65,6 @@ export const DEFINITE_REFUSALS: ReadonlySet<ActionCode> = new Set<ActionCode>([
   'client_review_pending',
   // Input the side-effect refused, rolling the whole transition back.
   'offline_approval_date_out_of_range',
-  'offline_approval_note_too_long',
   // Re-checked under the delivery row lock: the client answered first.
   'client_review_answered',
   // An offline choice of an option that is not released (no letter).

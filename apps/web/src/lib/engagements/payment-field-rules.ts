@@ -21,7 +21,7 @@ export interface TypedPayment {
 }
 
 /** A positive amount, canonical at scale 4 so the stored figure is the checked one. */
-function readPaymentAmount(amount: unknown): FieldRead<string> {
+export function readPaymentAmount(amount: unknown): FieldRead<string> {
   if (typeof amount !== 'string' || !MONEY_RE.test(amount.trim())) {
     return { ok: false, error: { code: 'payment_amount_invalid' } };
   }

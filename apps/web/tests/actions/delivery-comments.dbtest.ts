@@ -280,12 +280,12 @@ describe('studio replies — RLS and tenancy', () => {
     ).toHaveLength(1);
   });
 
-  it('rejects a blank reply and a malformed artifact id', async () => {
+  it('refuses a blank reply under the box, and a malformed artifact id', async () => {
     const delivery = await seedDelivery('reply-invalid');
     const documentId = await seedDocument(delivery);
     expect(
       await replyToDocumentCore(delivery.ctx, { artifactId: documentId, body: '  ' }),
-    ).toEqual({ ok: false, error: 'invalid' });
+    ).toEqual({ ok: false, error: 'check_fields', fields: { body: { code: 'required' } } });
     expect(
       await replyToDocumentCore(delivery.ctx, { artifactId: 'nope', body: 'hi' }),
     ).toEqual({ ok: false, error: 'invalid' });

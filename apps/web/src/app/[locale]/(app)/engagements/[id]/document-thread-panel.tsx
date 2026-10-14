@@ -4,15 +4,21 @@ import { Loader2, MessageSquare, Send } from 'lucide-react';
 import { useCallback } from 'react';
 import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
+import { FieldErrorText, fieldErrorId } from '@/components/ui/field-error-text';
+import { Textarea } from '@/components/ui/textarea';
+import { useFieldErrors } from '@/hooks/use-field-errors';
+import type { ActionResult } from '@/lib/actions/result';
 import {
   listDocumentComments,
   replyToDocument,
 } from '@/lib/engagements/actions/deliverables';
+import { COMMENT_FIELDS, commentFieldErrors } from '@/lib/engagements/comment-field-rules';
 import type { StudioDocumentComment } from '@/lib/engagements/document-comments';
 import { ownStudioReply } from '@/lib/engagements/studio-reply-echo';
+import { unansweredClientMessages } from '@/lib/engagements/thread-unanswered';
 import { useDocumentThread } from '@/lib/engagements/use-document-thread';
-import { Textarea } from '@/components/ui/textarea';
 import { DocumentThreadPanelBody } from './document-thread-panel-body';
+import { FormRefusal } from './form-refusal';
 
 /** Mirrors the SDF cap and the table's CHECK. Enforced here so the studio sees the
  *  limit while typing rather than after a rejected send. */
@@ -29,7 +35,8 @@ const BODY_MAX = 2000;
  * REPLIES — opening a thread deliberately does not clear it.
  *
  * A reply whose re-read fails stays on screen (ownStudioReply), and a read that
- * fails says so to every viewer, reply rights or not.
+ * fails says so to every viewer, reply rights or not. A reply the server refuses
+ * is said under the reply box, or above it when it is about something else.
  *
  * Logical CSS only, so it mirrors in ar-EG RTL.
  */
@@ -41,28 +48,28 @@ export function DocumentThreadPanel({
   canReply: boolean;
 }) {
   const t = useTranslations('engagements.comments');
+  const te = useTranslations('errors');
+  const replyId = `reply-${artifactId}`;
+  const errors = useFieldErrors({ fields: COMMENT_FIELDS, translate: te });
 
   const load = useCallback(() => listDocumentComments(artifactId), [artifactId]);
   const submit = useCallback(
     (body: string) => replyToDocument({ artifactId, body }),
     [artifactId],
   );
-  const thread = useDocumentThread<StudioDocumentComment>({ load, send: submit, echo: ownStudioReply });
+  const thread = useDocumentThread<StudioDocumentComment, ActionResult>({
+    load,
+    send: submit,
+    echo: ownStudioReply,
+    refusals: errors,
+  });
+  const bodyRefusal = errors.messageFor('body');
+  function send() {
+    if (errors.applyLocal(commentFieldErrors(thread.draft))) return;
+    thread.send();
+  }
 
-  // Unanswered on THIS thread: client messages with no staff message after them.
-  // The same rule as countAwaitingReplyCore, applied to the thread already in hand.
-  const lastStaffAt = thread.messages.reduce<number>(
-    (latest, message) =>
-      message.channel === 'staff'
-        ? Math.max(latest, new Date(message.createdAt).getTime())
-        : latest,
-    0,
-  );
-  const unanswered = thread.messages.filter(
-    (message) =>
-      message.channel === 'client' &&
-      new Date(message.createdAt).getTime() > lastStaffAt,
-  ).length;
+  const unanswered = unansweredClientMessages(thread.messages);
 
   return (
     <div>
@@ -87,19 +94,26 @@ export function DocumentThreadPanel({
 
           {canReply && (
             <div className="space-y-1.5">
-              <label htmlFor={`reply-${artifactId}`} className="sr-only">
+              <label htmlFor={replyId} className="sr-only">
                 {t('placeholder')}
               </label>
               <Textarea
-                id={`reply-${artifactId}`}
+                id={replyId}
                 value={thread.draft}
                 maxLength={BODY_MAX}
-                onChange={(event) => thread.setDraft(event.target.value)}
+                aria-invalid={bodyRefusal ? true : undefined}
+                aria-describedby={bodyRefusal ? fieldErrorId(replyId) : undefined}
+                onChange={(event) => {
+                  errors.bind('body').onEdit();
+                  thread.setDraft(event.target.value);
+                }}
                 placeholder={t('placeholder')}
                 rows={2}
                 dir="auto"
                 className="resize-y"
               />
+              <FieldErrorText id={fieldErrorId(replyId)} message={bodyRefusal} />
+              <FormRefusal message={errors.formError} />
               <div className="flex items-center justify-between gap-2">
                 <p className="text-caption text-[color:var(--text-muted)]">
                   {t('advisory')}
@@ -107,8 +121,8 @@ export function DocumentThreadPanel({
                 <Button
                   variant="secondary"
                   size="sm"
-                  disabled={thread.sending || !thread.draft.trim()}
-                  onClick={thread.send}
+                  disabled={thread.sending}
+                  onClick={send}
                 >
                   {thread.sending ? (
                     <Loader2 className="size-3.5 animate-spin" aria-hidden />

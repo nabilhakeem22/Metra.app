@@ -227,18 +227,23 @@ describe('Client approved offline at final_approval', () => {
     await recordPaymentCore(ctx, { engagementId, kind: 'gate_b', amount: '20000' });
 
     const res = await approveOffline(ctx, engagementId, { channel: 'phone', occurredOn: day() });
-    expect(res).toEqual({ ok: false, error: 'offline_approval_date_out_of_range' });
+    expect(res).toEqual({
+      ok: false,
+      error: 'check_fields',
+      fields: { occurredOn: { code: 'offline_approval_date_out_of_range' } },
+    });
     expect(await stateOf(engagementId)).toBe('final_approval');
     expect(await approvalRows(engagementId, 'design_approval')).toHaveLength(0);
     expect(await transitionCount(engagementId, 'approveDesign')).toBe(0);
   });
 
-  it('a note over the cap is named, not "try again"', async () => {
+  it('a note over the cap is said under the note with its cap, not "try again"', async () => {
     const { ctx, engagementId } = await seedFinalApproval();
     await recordPaymentCore(ctx, { engagementId, kind: 'gate_b', amount: '20000' });
     expect(await approveOffline(ctx, engagementId, { channel: 'phone', note: 'x'.repeat(2001) })).toEqual({
       ok: false,
-      error: 'offline_approval_note_too_long',
+      error: 'check_fields',
+      fields: { note: { code: 'too_long', params: { max: 2000 } } },
     });
     expect(await stateOf(engagementId)).toBe('final_approval');
   });
@@ -290,7 +295,11 @@ describe('Client approved offline at concept_review', () => {
         trigger: 'selectConcept',
         approval: { channel: 'phone', occurredOn: yesterday() },
       }),
-    ).toEqual({ ok: false, error: 'offline_approval_date_out_of_range' });
+    ).toEqual({
+      ok: false,
+      error: 'check_fields',
+      fields: { occurredOn: { code: 'offline_approval_date_out_of_range' } },
+    });
     expect(await stateOf(engagementId)).toBe('concept_review');
   });
 

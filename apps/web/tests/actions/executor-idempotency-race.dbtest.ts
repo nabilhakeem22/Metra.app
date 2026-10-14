@@ -192,7 +192,11 @@ describe('the DOUBLE TAP: two concurrent self-loops carrying ONE idempotency key
       trigger: 'requestRevision',
       idempotencyKey: KEY,
     });
-    expect(refused).toEqual({ ok: false, error: 'revision_co_amount_required' });
+    expect(refused).toEqual({
+      ok: false,
+      error: 'check_fields',
+      fields: { changeOrderAmount: { code: 'revision_co_amount_required' } },
+    });
     expect(await revisionCountOf(engagementId)).toBe(3);
 
     const retried = await executeTransition(ctx, {

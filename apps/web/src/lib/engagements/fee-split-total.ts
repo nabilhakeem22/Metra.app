@@ -1,9 +1,12 @@
 // Design-Engagement Machine — the fee form's LIVE TOTAL. PURE and CLIENT-SAFE:
 // exact scale-4 BigInt math (never float), and the same acceptance rules as
-// `validateFeeSchedule` (fee-schedule.ts), so a form whose Submit is enabled
-// sends a payload the server accepts.
+// `validateFeeSchedule` (fee-schedule.ts), so a split the form lets through is
+// one the server accepts, and one it holds back is said under its box.
 import type { MilestoneBasis, MilestoneKind } from '@metra/db';
+import type { FieldErrors } from '@/lib/actions/field-errors';
 import { formatMoney4, isMoneyString, parseMoney4 } from '@/lib/aggregates/proposal-totals';
+import { collectFieldErrors } from '@/lib/validation/field-rules';
+import type { FeeScheduleField } from './fee-schedule';
 
 const HUNDRED_PERCENT_4 = parseMoney4('100');
 
@@ -15,11 +18,10 @@ export interface FeeSplitSummary {
   hasFee: boolean;
   hasDeposit: boolean;
   balanced: boolean;
-  canSubmit: boolean;
 }
 
 /**
- * Sum the split and say whether it may be submitted. Rows left empty are
+ * Sum the split and say whether it balances. Rows left empty are
  * skipped, exactly as the form omits them from the payload; any other value
  * that is not a non-negative money string unbalances the split.
  */
@@ -58,6 +60,14 @@ export function summarizeFeeSplit(input: {
     hasFee,
     hasDeposit,
     balanced,
-    canSubmit: hasFee && hasDeposit && balanced,
   };
+}
+
+/** What Submit must say before sending: no fee, and a split without a deposit
+ *  or off its target, each under its own box, both at once (D1). */
+export function feeSplitFieldErrors(summary: FeeSplitSummary): FieldErrors<FeeScheduleField> {
+  return collectFieldErrors({
+    designFee: summary.hasFee ? null : { code: 'design_fee_required' },
+    milestones: summary.hasDeposit && summary.balanced ? null : { code: 'milestone_split_invalid' },
+  });
 }

@@ -48,4 +48,22 @@ describe('retracting a ledger row', () => {
       reason: 'Logged on the wrong delivery',
     });
   });
+
+  test('no reason: Retract says so under the box, before any confirm, and writes nothing', async () => {
+    const runAction = vi.fn();
+    renderWithIntl(
+      <RetractButton engagementId="e-1" eventId="ev-1" pending={false} runAction={runAction} />,
+      { locale: 'en' },
+    );
+    fireEvent.click(screen.getByRole('button', { name: en('engagements.timeline.retract') }));
+    const retract = screen.getByRole('button', { name: en('engagements.timeline.retractConfirm') });
+    expect((retract as HTMLButtonElement).disabled).toBe(false);
+    await act(async () => {
+      fireEvent.click(retract);
+    });
+    expect(screen.queryByRole('alertdialog')).toBeNull();
+    expect(runAction).not.toHaveBeenCalled();
+    expect(document.getElementById('retract-ev-1-error')?.textContent).toBe(en('errors.field.required'));
+    expect(document.activeElement?.id).toBe('retract-ev-1');
+  });
 });

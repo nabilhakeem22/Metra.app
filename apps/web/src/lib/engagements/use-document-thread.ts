@@ -44,12 +44,24 @@ export interface DocumentThread<TMessage> {
   send: () => void;
 }
 
-export function useDocumentThread<TMessage>(options: {
+/** Where a refused or failed send is said, when the caller says it under the
+ *  message box (useFieldErrors is one) rather than as the thread's coded error. */
+export interface ThreadSendRefusals<TResult> {
+  applyResult(result: TResult): boolean;
+  applyRejection(rejection: unknown): void;
+}
+
+export function useDocumentThread<
+  TMessage,
+  TResult extends { ok: boolean; error?: string } = { ok: boolean; error?: string },
+>(options: {
   /** Read the thread. Resolves to `[]` on a miss; REJECTS when the read was refused
    *  (not an empty thread), which shows THREAD_LOAD_FAILED and keeps `loaded` false. */
   load: () => Promise<TMessage[]>;
   /** Append one message. Resolves with a coded result — never throws to the UI. */
-  send: (body: string) => Promise<{ ok: boolean; error?: string }>;
+  send: (body: string) => Promise<TResult>;
+  /** Given, a send that fails is said there instead of in `error`. */
+  refusals?: ThreadSendRefusals<TResult>;
   /** The sender's own message as the thread shows it, used only when the re-read
    *  after a SUCCESSFUL send fails, so a saved message never vanishes from view.
    *  Without it, that failure shows THREAD_LOAD_FAILED instead of saying nothing. */
@@ -107,6 +119,7 @@ export function useDocumentThread<TMessage>(options: {
     startSending(async () => {
       try {
         const result = await options.send(body);
+        if (options.refusals?.applyResult(result)) return;
         if (!result.ok) {
           setError(result.error ?? 'generic');
           return;
@@ -116,8 +129,9 @@ export function useDocumentThread<TMessage>(options: {
         // timestamp, and a refetch also surfaces anything the other side sent
         // while this message was being written.
         await rereadAfterSend(body);
-      } catch {
-        setError('generic');
+      } catch (rejection) {
+        if (options.refusals) options.refusals.applyRejection(rejection);
+        else setError('generic');
       }
     });
   }

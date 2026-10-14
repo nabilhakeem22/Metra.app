@@ -10,6 +10,7 @@ import {
   type MetraDb,
 } from '@metra/db';
 import { and, desc, eq } from 'drizzle-orm';
+import { failFields } from '@/lib/actions/field-errors';
 import { fail } from '@/lib/actions/result';
 import type { OrgContext } from '@/lib/db/context';
 import { currentRoundClientDecision } from './client-review';
@@ -102,7 +103,10 @@ export async function readOfflineApproval(input: {
     createdAt: engagement.createdAt,
   });
   const parsed = parseOfflineApproval(payload, offlineApprovalBounds(roundStartedAt, new Date()));
-  if (!parsed.ok) fail(parsed.code);
+  if (!parsed.ok) {
+    if ('fields' in parsed) failFields(parsed.fields);
+    fail(parsed.code);
+  }
   await refuseIfClientAnswered(tx, engagement);
   return parsed.approval;
 }
