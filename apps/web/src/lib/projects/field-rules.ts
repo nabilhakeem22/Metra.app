@@ -7,7 +7,7 @@ import { isUuid } from '@/lib/uuid';
 import { collectFieldErrors } from '@/lib/validation/field-rules';
 import { PERCENT_REFUSAL } from '@/lib/validation/number-field-rules';
 import { normalizePercent } from '@/lib/validation/percent';
-import { validIsoDate } from '@/lib/validation/iso-date';
+import { namesRealDay } from '@/lib/validation/iso-date';
 import { clean } from '@/lib/validation/text';
 import { bilingualNameErrors, boundedText, type BilingualNameField } from '@/lib/validation/text-field-rules';
 import type { ProjectField, ProjectInput } from './fields';
@@ -61,7 +61,7 @@ function endsBeforeStart(startDate: string | null, endDate: string | null): bool
 
 /** A typed date that names no real day (2026-02-30, a five-digit year). */
 function dateRefusal(date: string | null): FieldError | null {
-  return date !== null && !validIsoDate(date) ? { code: 'invalid_date' } : null;
+  return date !== null && !namesRealDay(date) ? { code: 'invalid_date' } : null;
 }
 
 /** The end date's refusal: not a real day, or before the start. */

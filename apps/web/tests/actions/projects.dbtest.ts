@@ -187,6 +187,22 @@ describe('date + client-id edge cases', () => {
     expect(res.ok).toBe(true);
   });
 
+  // Fix round F15: a day that does not exist, and a NUL pasted into a text box,
+  // are said under their fields before the write (no 22008 / 22021 generic).
+  it('refuses an impossible date and a control character under their fields', async () => {
+    const { ctx, clientId } = await orgWithClient();
+    const res = await createProjectCore(ctx, {
+      ...baseProject(clientId),
+      startDate: '2026-02-30',
+      city: 'Cairo\u0000',
+    });
+    expect(res).toEqual({
+      ok: false,
+      error: 'check_fields',
+      fields: { startDate: { code: 'invalid_date' }, city: { code: 'unprintable' } },
+    });
+  });
+
   // F2: a malformed (non-UUID) client id -> client_required, no DB uuid-cast.
   it('rejects a malformed client id with client_required', async () => {
     const { ctx } = await orgWithClient();

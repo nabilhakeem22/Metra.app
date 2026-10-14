@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { validIsoDate } from './iso-date';
+import { namesRealDay, validIsoDate } from './iso-date';
 
 // Moved verbatim from lib/proposals/validation.test.ts when the function left the
 // proposals module. Contracts and proposals both date documents; neither owns the
@@ -24,5 +24,16 @@ describe('validIsoDate', () => {
     for (const value of ['2026-2-8', '26-02-08', '2026/02/08', '', 'today']) {
       expect(validIsoDate(value)).toBe(false);
     }
+  });
+});
+
+describe('namesRealDay', () => {
+  it('accepts a real day, padded or not', () => {
+    for (const value of ['2026-09-01', '2026-9-01', '2026-9-1', '2024-2-29']) expect(namesRealDay(value), value).toBe(true);
+  });
+
+  it('refuses a day that does not exist, a five-digit year and anything else', () => {
+    for (const value of ['2026-02-30', '2026-2-30', '12026-01-01', '2026-13-1', '2026-09-01T00:00', 'today', ''])
+      expect(namesRealDay(value), value).toBe(false);
   });
 });

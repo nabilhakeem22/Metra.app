@@ -5,19 +5,21 @@
 // gate they enforce — the `engagements_finance`/design capability, the
 // `flow:'interior'` entitlement, and terminal-state rejection — still applies; this
 // core adds NO new authority. The payment genuinely persists even when step 2's
-// guard still blocks (e.g. a short amount): that is acceptable, the next gate
-// preview re-checks and shows the remaining shortfall. Kept as a pure
+// guard still blocks (e.g. a short amount): that is acceptable, the answer is
+// still `ok` (the money is saved) with the guard as `waitingOn`, and the next
+// gate preview shows the remaining shortfall. Kept as a pure
 // `*Core(ctx,input)` (API-ready) so its thin server-action wrapper only resolves
 // the org context + revalidates.
 import type { PaymentEventKind } from '@metra/db';
 import type { ActionCode, ActionResult } from '@/lib/actions/result';
-import { unexpectedFailure } from '@/lib/actions/unexpected';
+import { loggableFailure } from '@/lib/actions/loggable-failure';
 import type { OrgContext } from '@/lib/db/context';
 import { executeTransition } from './executor';
 import { isEndingTrigger } from './forward-trigger';
 import { getEngagementGatePreview } from './gate-preview';
 import { MONEY_GUARD_MILESTONE, moneyGuardOf } from './guards';
 import { recordPaymentCore } from './payments';
+import { isDefiniteRefusal } from './retry-policy';
 import type { Trigger } from './transitions';
 
 export interface LogPaymentAndAdvanceInput {
@@ -47,15 +49,17 @@ export interface LogPaymentAndAdvanceInput {
  */
 export type LogPaymentAndAdvanceResult = ActionResult & {
   paymentRecorded: boolean;
-  /** Recorded, not advanced: what the delivery still waits on (the client's review). */
+  /** Recorded, not advanced: why the stage waits (the client's review, a guard
+   *  still unmet, or `advance_unconfirmed` when the advance gave no answer). */
   waitingOn?: ActionCode;
 };
 
 /**
  * Record a cleared payment, then advance. If the payment core fails, its coded
  * error is returned UNCHANGED and the transition is never attempted
- * (`paymentRecorded: false`). Otherwise the transition result is returned — ok, or
- * the (re-checked) guard error — with `paymentRecorded: true`. Never throws.
+ * (`paymentRecorded: false`). Otherwise the answer is `ok` with
+ * `paymentRecorded: true`, and `waitingOn` says why the stage did not move when
+ * it did not. Never throws.
  */
 export async function logPaymentAndAdvanceCore(
   ctx: OrgContext,
@@ -88,30 +92,44 @@ export async function logPaymentAndAdvanceCore(
   });
   if (!recorded.ok) return { ...recorded, paymentRecorded: false };
 
+  // FROM HERE THE PAYMENT IS IN THE LEDGER, so every answer is `ok`: the form
+  // closes and the studio reads "payment recorded" plus why the stage did not
+  // move (`waitingOn`). A refusal here used to travel as a definite refusal,
+  // which released the held key with the form still open and the amount still
+  // typed, so the next Save recorded the payment a second time (R1).
+  const already = recorded.already === true;
+  const stands = { ok: true, already, paymentRecorded: true } as const;
+
   // Never past a review the client has not answered, whatever card sent this:
   // the payment stands, the delivery waits for the client (or for an approval
   // the studio records as taken offline), as confirm-claim-and-advance does.
-  const already = recorded.already === true;
   try {
     if ((await getEngagementGatePreview(ctx, engagementId)).awaitingClientReview) {
-      return { ok: true, already, paymentRecorded: true, waitingOn: 'client_review_pending' };
+      return { ...stands, waitingOn: 'client_review_pending' };
     }
   } catch (error) {
-    return { ...unexpectedFailure('logPaymentAndAdvance review read failed', error), already, paymentRecorded: true };
+    console.error('logPaymentAndAdvance review read failed:', loggableFailure(error));
+    return { ...stands, waitingOn: 'advance_unconfirmed' };
   }
 
-  // Falls through even on an idempotent hit (`recorded.already`): the guard
-  // re-checks and the advance is a no-op (or the still-valid forward move) — the
-  // machine converges on retry.
+  // Runs even on an idempotent hit (`recorded.already`): the guard re-checks
+  // and the machine converges on retry. `already` IS THE PAYMENT'S and is
+  // carried out deliberately (`executeTransition` never sets it), so both money
+  // controls can say no second row was written.
   const advanced = await executeTransition(ctx, {
     engagementId,
     trigger: input.advanceTrigger,
   });
-  // `already` IS THE PAYMENT'S, and it is carried out of here deliberately. The
-  // server knew it had appended nothing and said so, and for five waves no screen
-  // looked: both money controls closed on `ok` whether a row was written or the
-  // original was merely handed back. `executeTransition` never sets `already` —
-  // a replayed attempt returns a plain `ok` on purpose (executor/index.ts) — so
-  // there is no second meaning for this flag to collide with here.
-  return { ...advanced, already, paymentRecorded: true };
+  return { ...stands, ...advanceOutcome(advanced, already) };
+}
+
+/**
+ * What the advance after a recorded payment says next to it. A replay whose
+ * trigger no longer applies is the first attempt's advance, already made: it
+ * is a success, not "this step is not allowed". A definite refusal is the
+ * reason the stage waits; anything else could not be confirmed either way.
+ */
+function advanceOutcome(advanced: ActionResult, already: boolean): { waitingOn?: ActionCode } {
+  if (advanced.ok || (already && advanced.error === 'illegal_trigger')) return {};
+  return { waitingOn: isDefiniteRefusal(advanced.error) ? advanced.error : 'advance_unconfirmed' };
 }

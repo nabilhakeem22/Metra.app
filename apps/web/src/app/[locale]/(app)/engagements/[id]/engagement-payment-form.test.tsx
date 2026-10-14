@@ -157,12 +157,10 @@ describe('PaymentForm — one key per deliberate act', () => {
     const heldKey = sent()[0]!.key;
 
     // A typo the rules catch is said under the box and never sent: it cannot
-    // claim a key at all.
+    // claim a key at all. Unreadable is "not a number", never "missing or zero".
     setNow(START + 60_000);
     await record('5o,ooo');
-    expect(document.getElementById('hero-pay-amount-error')?.textContent).toBe(
-      ar('errors.payment_amount_invalid'),
-    );
+    expect(document.getElementById('hero-pay-amount-error')?.textContent).toBe(ar('errors.field.not_a_number'));
 
     // One the server refuses definitely is its own act, and releases only its own key.
     actions.logPaymentAndAdvance.mockResolvedValue(

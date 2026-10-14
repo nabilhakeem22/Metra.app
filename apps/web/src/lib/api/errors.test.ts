@@ -97,6 +97,7 @@ const ALL_CODES: ActionCode[] = [
   'balance_not_cleared',
   'handoff_not_acknowledged',
   'client_review_pending',
+  'advance_unconfirmed',
   'offline_approval_date_out_of_range',
   'client_review_answered',
   'concept_option_not_found',

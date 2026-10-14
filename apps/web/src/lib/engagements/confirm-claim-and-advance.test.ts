@@ -63,4 +63,23 @@ describe('confirmPaymentClaimAndAdvanceCore: the review read is spent only when 
     expect(res).toMatchObject({ advanced: true });
     expect(io.execute).toHaveBeenCalledWith(CTX, { engagementId: 'e-1', trigger: 'selectConcept' });
   });
+
+  test('after the payment is saved, an advance that gave no answer is never "try again" (F12)', async () => {
+    io.gate = { engagementId: 'e-1', milestoneKind: 'gate_a', state: 'concept_review' };
+    io.preview.mockResolvedValue({ awaitingClientReview: false, items: [] });
+    io.execute.mockResolvedValue({ ok: false, error: 'uncertain' });
+    const uncertain = await confirmPaymentClaimAndAdvanceCore(CTX, CLAIM);
+    expect(uncertain).toMatchObject({ ok: true, paymentRecorded: true, advanced: false, waitingOn: 'advance_unconfirmed' });
+
+    io.execute.mockResolvedValue({ ok: false, error: 'gate_a_not_cleared' });
+    const refused = await confirmPaymentClaimAndAdvanceCore(CTX, CLAIM);
+    expect(refused).toMatchObject({ ok: true, advanced: false, waitingOn: 'gate_a_not_cleared' });
+
+    const log = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    io.preview.mockRejectedValue(new Error('connection reset'));
+    const unread = await confirmPaymentClaimAndAdvanceCore(CTX, CLAIM);
+    expect(unread).toMatchObject({ ok: true, paymentRecorded: true, waitingOn: 'advance_unconfirmed' });
+    expect(log).toHaveBeenCalledOnce();
+    log.mockRestore();
+  });
 });

@@ -33,6 +33,9 @@ export type EngagementActionCode =
   // The client has not answered the review round (client-review.ts): a payment
   // was recorded, the implicit advance waits for them.
   | 'client_review_pending'
+  // The payment is recorded but the advance after it gave no definite answer
+  // (pay-and-advance.ts, confirm-claim-and-advance.ts): never "try again".
+  | 'advance_unconfirmed'
   // "Client approved offline" input a retry can never fix (offline-approval.ts).
   | 'offline_approval_date_out_of_range'
   // The client answered the review on the portal while the studio was recording

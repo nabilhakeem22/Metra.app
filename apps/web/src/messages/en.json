@@ -548,6 +548,7 @@
     "balance_not_cleared": "The final balance has not been fully paid yet. Record that payment, then continue.",
     "handoff_not_acknowledged": "The recipient has not acknowledged the handoff yet. Record the acknowledgement before closing.",
     "client_review_pending": "The client has not answered the review yet. Wait for the answer, or record an offline approval.",
+    "advance_unconfirmed": "The payment is recorded, but we could not confirm the delivery moved to the next stage. Refresh the page, and if it is still waiting, press Advance to the next stage. Do not record the payment again.",
     "offline_approval_date_out_of_range": "That date is outside this review. Pick a date between the start of this review and today.",
     "client_review_answered": "The client answered the review in the meantime. Reload the page to see their answer.",
     "concept_option_not_found": "That option is not released to the client. Choose one of the lettered options.",
