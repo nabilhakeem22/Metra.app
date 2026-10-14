@@ -9,6 +9,7 @@ export type SharedPortalError =
   | 'token_expired'
   | 'not_active'
   | 'too_many'
+  | 'comments_too_many'
   | 'uncertain'
   | 'generic';
 
@@ -20,6 +21,7 @@ const SHARED: ReadonlySet<string> = new Set<SharedPortalError>([
   'token_expired',
   'not_active',
   'too_many',
+  'comments_too_many',
   'uncertain',
   'generic',
 ]);

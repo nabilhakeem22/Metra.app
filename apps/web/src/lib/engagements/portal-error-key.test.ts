@@ -5,7 +5,7 @@ import { portalErrorKey } from './portal-error-key';
 
 describe('portalErrorKey', () => {
   it('keeps the codes the portal has copy for', () => {
-    for (const code of ['token_invalid', 'token_expired', 'not_active', 'wrong_state', 'too_many', 'uncertain']) {
+    for (const code of ['token_invalid', 'token_expired', 'not_active', 'wrong_state', 'too_many', 'comments_too_many', 'uncertain']) {
       expect(portalErrorKey(code)).toBe(code);
     }
   });
@@ -18,7 +18,7 @@ describe('portalErrorKey', () => {
   });
 
   it('only ever answers a key portal.errors holds, or wrong_state, which each act says itself', () => {
-    const codes = ['token_invalid', 'token_expired', 'not_active', 'wrong_state', 'too_many', 'uncertain', 'x', undefined];
+    const codes = ['token_invalid', 'token_expired', 'not_active', 'wrong_state', 'too_many', 'comments_too_many', 'uncertain', 'x', undefined];
     for (const code of codes) {
       const key = portalErrorKey(code);
       if (isSharedPortalError(key)) expect(en.portal.errors).toHaveProperty(key);
