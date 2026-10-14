@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const refreshApp = vi.hoisted(() => vi.fn());
 const saveProposalDraftCore = vi.hoisted(() => vi.fn());
+vi.mock('server-only', () => ({}));
 vi.mock('@/lib/actions/refresh', () => ({ refreshApp }));
 vi.mock('@/lib/auth/require-org', () => ({ requireOrg: vi.fn().mockResolvedValue({ orgId: 'o-1' }) }));
 vi.mock('./core', () => ({ saveProposalDraftCore }));
@@ -24,14 +25,19 @@ beforeEach(() => {
 
 describe('autosaveProposalDraft', () => {
   it('saves through saveProposalDraftCore and never refreshes the app', async () => {
-    await expect(autosaveProposalDraft(input)).resolves.toEqual({ ok: true, error: undefined });
+    await expect(autosaveProposalDraft(input)).resolves.toEqual({ ok: true });
     expect(saveProposalDraftCore).toHaveBeenCalledWith({ orgId: 'o-1' }, input);
     expect(refreshApp).not.toHaveBeenCalled();
   });
 
-  it('passes a refusal through unchanged', async () => {
-    saveProposalDraftCore.mockResolvedValue({ ok: false, error: 'line_required' });
-    await expect(autosaveProposalDraft(input)).resolves.toEqual({ ok: false, error: 'line_required' });
+  it('passes a refusal through unchanged, with the fields it names', async () => {
+    const refused = {
+      ok: false,
+      error: 'check_fields',
+      fields: { 'lines.0.0.qty': { code: 'not_a_number' } },
+    };
+    saveProposalDraftCore.mockResolvedValue(refused);
+    await expect(autosaveProposalDraft(input)).resolves.toEqual(refused);
   });
 
   it('the explicit save still refreshes once', async () => {

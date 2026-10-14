@@ -24,26 +24,24 @@ import {
 import { withinMagnitude } from '@/lib/money/read';
 
 /**
- * A line's three PERSISTED products. All three are checked, not just the total: a
- * cheap price with an absurd cost overflows line_cost (and line_margin with it)
- * exactly the same way, and only the document total used to catch that — after
- * the lines had already been written.
+ * A line's three PERSISTED products, or null when one is past the cap. All
+ * three are checked, not just the total: a cheap price with an absurd cost
+ * overflows line_cost (and line_margin with it) exactly the same way, and only
+ * the document total used to catch that, after the lines had been written. Null
+ * rather than a throw, so the caller can say it under the line it is about.
  */
-export function computeLineWithinCap(factors: {
+export function lineTotalsWithinCap(factors: {
   qty: string;
   unitCost: string;
   unitPrice: string;
   discountPct: string;
-}): LineTotals {
+}): LineTotals | null {
   const totals = computeLine(factors);
-  if (
-    !withinMagnitude(totals.lineTotal) ||
-    !withinMagnitude(totals.lineCost) ||
-    !withinMagnitude(totals.lineMargin)
-  ) {
-    fail('amount_too_large');
-  }
-  return totals;
+  const within =
+    withinMagnitude(totals.lineTotal) &&
+    withinMagnitude(totals.lineCost) &&
+    withinMagnitude(totals.lineMargin);
+  return within ? totals : null;
 }
 
 /**

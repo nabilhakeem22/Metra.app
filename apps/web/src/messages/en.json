@@ -1387,8 +1387,7 @@
       "expired": "Proposal marked expired",
       "superseded": "Version 2 created",
       "deleted": "Proposal deleted",
-      "linkCopied": "Link copied",
-      "error": "Something went wrong"
+      "linkCopied": "Link copied"
     },
     "p": {
       "quotation": "Quotation",

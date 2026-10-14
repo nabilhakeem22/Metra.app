@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useUnsavedChangesPrompt } from '@/hooks/use-unsaved-changes-prompt';
-import type { ActionCode } from '@/lib/actions/result';
 import { firstIncompleteField, type DraftField } from './draft-completeness';
 import { createDraftSaveFlight } from './draft-save-flight';
 import { storedIdsByKey, withStoredIds } from './draft-save-receipt';
@@ -22,7 +21,8 @@ export interface DraftAutosaveApi {
   /** Unsaved, and waiting for a field the server would refuse (draft-completeness.ts). */
   incomplete: boolean;
   lastSavedAt: Date | null;
-  error: ActionCode | null;
+  /** Why the last save did not store, with the reference of an unknown failure. */
+  failure: Pick<SaveDraftResult, 'error' | 'reference'> | null;
   flush: () => Promise<SaveDraftResult>;
   retry: () => void;
 }
@@ -41,6 +41,8 @@ export function useDraftAutosave(input: {
   enabled: boolean;
   onStored: (idsByKey: ReadonlyMap<string, string>) => void;
   onIncomplete: (field: DraftField) => void;
+  /** A save the server refused; `explicit` when the studio asked for it (Send). */
+  onRefused: (result: SaveDraftResult, sent: ProposalDraftState, explicit: boolean) => void;
   debounceMs?: number;
   maxWaitMs?: number;
 }): DraftAutosaveApi {
@@ -52,7 +54,7 @@ export function useDraftAutosave(input: {
   );
   const latest = useRef({ draft, snapshot, enabled, callbacks: input });
   const [storedSnapshot, setStoredSnapshot] = useState(snapshot);
-  const [failure, setFailure] = useState<{ code: ActionCode; snapshot: string } | null>(null);
+  const [failure, setFailure] = useState<{ answer: Pick<SaveDraftResult, 'error' | 'reference'>; snapshot: string } | null>(null);
   const [saving, setSaving] = useState(false);
   const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -61,10 +63,10 @@ export function useDraftAutosave(input: {
   );
 
   /** Store the latest draft through `save` and adopt what the server answered. */
-  async function saveLatest(save: SaveDraft): Promise<SaveDraftResult> {
+  async function saveLatest(save: SaveDraft, explicit: boolean): Promise<SaveDraftResult> {
     const savedAs = latest.current.snapshot;
     if (exceedsDraftSaveLimit(savedAs)) {
-      setFailure({ code: 'draft_too_large', snapshot: savedAs });
+      setFailure({ answer: { error: 'draft_too_large' }, snapshot: savedAs });
       return { ok: false, error: 'draft_too_large' };
     }
     setSaving(true);
@@ -73,7 +75,8 @@ export function useDraftAutosave(input: {
     );
     setSaving(false);
     if (!result.ok) {
-      setFailure({ code: (result.error as ActionCode | undefined) ?? 'generic', snapshot: savedAs });
+      setFailure({ answer: { error: result.error, reference: result.reference }, snapshot: savedAs });
+      latest.current.callbacks.onRefused(result, sent, explicit);
       return result;
     }
     const idsByKey = result.data ? storedIdsByKey(sent.sections, result.data) : new Map<string, string>();
@@ -90,7 +93,7 @@ export function useDraftAutosave(input: {
   function startAutosave(): Promise<SaveDraftResult> | null {
     const { draft: current, snapshot: now } = latest.current;
     if (now === flight.stored || firstIncompleteField(current.sections)) return null;
-    return saveLatest(autosaveDraft);
+    return saveLatest(autosaveDraft, false);
   }
 
   function flush(): Promise<SaveDraftResult> {
@@ -99,8 +102,8 @@ export function useDraftAutosave(input: {
       const { draft: current, snapshot: now } = latest.current;
       if (now === flight.stored) return { ok: true };
       const field = firstIncompleteField(current.sections);
-      if (!field) return saveLatest(persistDraft);
-      setFailure({ code: 'draft_incomplete', snapshot: now });
+      if (!field) return saveLatest(persistDraft, true);
+      setFailure({ answer: { error: 'draft_incomplete' }, snapshot: now });
       latest.current.callbacks.onIncomplete(field);
       return { ok: false, error: 'draft_incomplete' };
     });
@@ -143,7 +146,7 @@ export function useDraftAutosave(input: {
     saveState,
     incomplete: saveState === 'dirty' && firstIncompleteField(sections) !== null,
     lastSavedAt,
-    error: saveState === 'failed' ? (failure?.code ?? null) : null,
+    failure: saveState === 'failed' ? (failure?.answer ?? null) : null,
     flush,
     retry,
   };

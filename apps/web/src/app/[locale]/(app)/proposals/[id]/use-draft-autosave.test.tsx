@@ -58,12 +58,13 @@ function heldSave(mock = saves.autosaveDraft) {
 }
 
 const onIncomplete = vi.fn();
+const onRefused = vi.fn();
 
 /** The hook driven by props: each rerender is an edit. */
 function renderAutosave(enabled = true) {
   return renderHook(
     ({ draft }) =>
-      useDraftAutosave({ draft, revision: 'r-0', enabled, onStored: () => {}, onIncomplete }),
+      useDraftAutosave({ draft, revision: 'r-0', enabled, onStored: () => {}, onIncomplete, onRefused }),
     { initialProps: { draft: draftWith('1') } },
   );
 }
@@ -77,6 +78,7 @@ function useAdoptingBuilder(initial: ProposalDraftState) {
     enabled: true,
     onStored: (ids) => setSections((current) => withStoredIds(current, ids)),
     onIncomplete,
+    onRefused,
   });
   return { autosave, sections, setSections };
 }
@@ -205,22 +207,22 @@ describe('useDraftAutosave: failures and the state it shows', () => {
     hook.rerender({ draft: draftWith('2') });
     await advance(1500);
     expect(hook.result.current.saveState).toBe('failed');
-    expect(hook.result.current.error).toBe('draft_changed_elsewhere');
+    expect(hook.result.current.failure?.error ?? null).toBe('draft_changed_elsewhere');
     await advance(60_000);
     expect(saves.autosaveDraft).toHaveBeenCalledTimes(1);
     await act(async () => hook.result.current.retry());
     expect(saves.autosaveDraft).toHaveBeenCalledTimes(2);
     expect(hook.result.current.saveState).toBe('saved');
-    expect(hook.result.current.error).toBeNull();
+    expect(hook.result.current.failure?.error ?? null).toBeNull();
   });
 
-  it('a save that throws is a generic failure', async () => {
+  it('a save that throws is uncertain: its answer was lost, so it may have committed', async () => {
     saves.autosaveDraft.mockRejectedValueOnce(new Error('network'));
     const hook = renderAutosave();
     hook.rerender({ draft: draftWith('2') });
     await advance(1500);
     expect(hook.result.current.saveState).toBe('failed');
-    expect(hook.result.current.error).toBe('generic');
+    expect(hook.result.current.failure?.error ?? null).toBe('uncertain');
   });
 
   it('F6: editing back to the stored value after a failure is saved again, and the tab-close prompt disarms', async () => {
@@ -249,7 +251,7 @@ describe('useDraftAutosave: failures and the state it shows', () => {
     expect(saves.autosaveDraft).not.toHaveBeenCalled();
     expect(hook.result.current.saveState).toBe('dirty');
     expect(hook.result.current.incomplete).toBe(true);
-    expect(hook.result.current.error).toBeNull();
+    expect(hook.result.current.failure?.error ?? null).toBeNull();
   });
 
   it('F3: flush() with a blank line names the field and stores nothing', async () => {
@@ -271,7 +273,7 @@ describe('useDraftAutosave: failures and the state it shows', () => {
     hook.rerender({ draft: draftWith('1', [huge]) });
     await advance(1500);
     expect(saves.autosaveDraft).not.toHaveBeenCalled();
-    expect(hook.result.current.error).toBe('draft_too_large');
+    expect(hook.result.current.failure?.error ?? null).toBe('draft_too_large');
   });
 });
 
@@ -325,7 +327,7 @@ describe('useDraftAutosave: a save that committed but lost its answer', () => {
     expect(saves.autosaveDraft.mock.calls.map((call) => call[1])).toEqual(['r-0', 'r-0', 'r-9']);
     expect(saves.autosaveDraft.mock.calls[2][0].sections[0].lines[0].qty).toBe('3');
     expect(hook.result.current.saveState).toBe('saved');
-    expect(hook.result.current.error).toBeNull();
+    expect(hook.result.current.failure?.error ?? null).toBeNull();
   });
 
   it('another tab really wrote: the conflict is shown as before, nothing is sent again', async () => {
@@ -340,7 +342,7 @@ describe('useDraftAutosave: a save that committed but lost its answer', () => {
     await advance(1500);
     expect(saves.autosaveDraft).toHaveBeenCalledTimes(2);
     expect(hook.result.current.saveState).toBe('failed');
-    expect(hook.result.current.error).toBe('draft_changed_elsewhere');
+    expect(hook.result.current.failure?.error ?? null).toBe('draft_changed_elsewhere');
   });
 
   it('a stale refusal with no unanswered save of ours reads nothing and is a conflict', async () => {
@@ -349,7 +351,7 @@ describe('useDraftAutosave: a save that committed but lost its answer', () => {
     hook.rerender({ draft: draftWith('2') });
     await advance(1500);
     expect(saves.readStoredDraftState).not.toHaveBeenCalled();
-    expect(hook.result.current.error).toBe('draft_changed_elsewhere');
+    expect(hook.result.current.failure?.error ?? null).toBe('draft_changed_elsewhere');
   });
 });
 

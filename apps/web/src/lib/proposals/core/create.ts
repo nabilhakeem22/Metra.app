@@ -8,22 +8,24 @@
 // insert. The kernels now live in lib/{lines,money,validation,share}.
 import { clients, projects, proposals, type MetraDb } from '@metra/db';
 import { eq } from 'drizzle-orm';
-import { fail, mutateInOrg } from '@/lib/actions/mutate';
+import { failFields, type FieldError } from '@/lib/actions/field-errors';
+import { mutateInOrg } from '@/lib/actions/mutate';
 import type { AuditEntry } from '@/lib/audit';
 import { allocateNumber } from '@/lib/db/allocate-number';
-import { err, type ActionResult } from '@/lib/actions/result';
+import type { ActionResult } from '@/lib/actions/result';
 import type { OrgContext } from '@/lib/db/context';
 import { formatProposalNumber, proposalYear } from '@/lib/format/proposal-number';
 import { clean } from '@/lib/validation/text';
 import {
   validateCreateInput,
   type ValidatedCreateInput,
-} from './create-input';
+} from '../create-fields';
 import type { CreateProposalInput } from './types';
 
 export type { CreateProposalInput } from './types';
 
-/** Both parents must exist IN THIS ORG and be active before a proposal names them. */
+/** Both parents must exist IN THIS ORG and be active before a proposal names
+ *  them; one that is gone or archived is said under its own select. */
 async function assertClientProjectUsable(
   tx: MetraDb,
   clientId: string,
@@ -34,13 +36,17 @@ async function assertClientProjectUsable(
     .from(clients)
     .where(eq(clients.id, clientId))
     .limit(1);
-  if (!client || !client.active) fail('client_required');
   const [project] = await tx
     .select({ active: projects.active })
     .from(projects)
     .where(eq(projects.id, projectId))
     .limit(1);
-  if (!project || !project.active) fail('invalid');
+  const gone: FieldError = { code: 'no_longer_exists' };
+  const clientGone = !client || !client.active;
+  const projectGone = !project || !project.active;
+  if (clientGone || projectGone) {
+    failFields({ ...(clientGone ? { clientId: gone } : {}), ...(projectGone ? { projectId: gone } : {}) });
+  }
 }
 
 /**
@@ -114,8 +120,9 @@ export async function createProposalCore(
   ctx: OrgContext,
   input: CreateProposalInput,
 ): Promise<ActionResult> {
-  const validated = validateCreateInput(input);
-  if (typeof validated === 'string') return err(validated);
+  const read = validateCreateInput(input);
+  if (!read.ok) return read.refusal;
+  const validated = read.value;
 
   return mutateInOrg(
     ctx,

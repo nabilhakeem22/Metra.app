@@ -7,6 +7,8 @@ import { FigureInput } from './figure-input';
 import type { DocTotals } from '@/lib/aggregates/proposal-totals';
 import { formatMoney } from '@/lib/format/money';
 import { INPUT_CLASS } from './builder-model';
+import { CellError, cellA11y } from './draft-cell';
+import type { DraftFieldErrorsApi } from './use-draft-field-errors';
 
 /**
  * `mode: 'boq'` prices before VAT and supervision (both are added at the
@@ -22,6 +24,7 @@ export function BuilderTotalsPanel({
   onSupervisionPctChange,
   doc,
   seeMargin,
+  cells,
 }: {
   mode: 'quote' | 'boq';
   discountPct: string;
@@ -32,34 +35,51 @@ export function BuilderTotalsPanel({
   onSupervisionPctChange: (value: string) => void;
   doc: DocTotals;
   seeMargin: boolean;
+  /** The header refusals of the last save, under each percentage. */
+  cells: DraftFieldErrorsApi;
 }) {
   const t = useTranslations('proposals');
   const th = useTranslations('hints.proposal');
   const locale = useLocale();
   const inp = INPUT_CLASS;
   const quote = mode === 'quote';
+  const percent = (
+    path: 'discountPct' | 'taxRate' | 'supervisionPct',
+    value: string,
+    onChange: (value: string) => void,
+  ) => {
+    const cell = cells.cell(path);
+    const id = `doc-${path}`;
+    return (
+      <div className="space-y-1">
+        <label className="flex items-center gap-1.5 text-body">
+          {t(`builder.${path}`)}
+          <FieldHint hint={th(path)} />
+          <FigureInput
+            id={id}
+            value={value}
+            onValueChange={(next) => {
+              cell.clear();
+              onChange(next);
+            }}
+            className={`${inp} w-20`}
+            {...cellA11y(id, cell)}
+          />
+        </label>
+        <CellError id={id} error={cell} />
+      </div>
+    );
+  };
 
   return (
     <Card>
       <CardContent className="space-y-2 py-4">
         <div className="flex flex-wrap items-center gap-3">
-          <label className="flex items-center gap-1.5 text-body">
-            {t('builder.discountPct')}
-            <FieldHint hint={th('discountPct')} />
-            <FigureInput value={discountPct} onValueChange={onDiscountPctChange} className={`${inp} w-20`} />
-          </label>
+          {percent('discountPct', discountPct, onDiscountPctChange)}
           {quote && (
             <>
-              <label className="flex items-center gap-1.5 text-body">
-                {t('builder.taxRate')}
-                <FieldHint hint={th('taxRate')} />
-                <FigureInput value={taxRate} onValueChange={onTaxRateChange} className={`${inp} w-20`} />
-              </label>
-              <label className="flex items-center gap-1.5 text-body">
-                {t('builder.supervisionPct')}
-                <FieldHint hint={th('supervisionPct')} />
-                <FigureInput value={supervisionPct} onValueChange={onSupervisionPctChange} className={`${inp} w-20`} />
-              </label>
+              {percent('taxRate', taxRate, onTaxRateChange)}
+              {percent('supervisionPct', supervisionPct, onSupervisionPctChange)}
             </>
           )}
         </div>

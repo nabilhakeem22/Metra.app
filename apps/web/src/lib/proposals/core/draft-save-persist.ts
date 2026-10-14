@@ -12,7 +12,7 @@ import { fail } from '@/lib/actions/mutate';
 import { insertLinesInChunks } from '@/lib/lines/insert-chunked';
 import { updateRowsInChunks } from '@/lib/lines/update-chunked';
 import type { DocTotals } from '@/lib/aggregates/proposal-totals';
-import type { ResolvedHeader } from './draft-save-validate';
+import type { ResolvedHeader } from './draft-save-header';
 import { proposalRevision } from '../revision';
 import { LINE_COLUMNS, SECTION_COLUMNS, type DraftWritePlan } from './draft-save-diff';
 

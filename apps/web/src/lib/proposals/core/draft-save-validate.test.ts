@@ -8,7 +8,8 @@ vi.mock('@/lib/actions/mutate', () => ({
   },
 }));
 
-import { pricingForKind, type ResolvedHeader } from './draft-save-validate';
+import type { ResolvedHeader } from './draft-save-header';
+import { pricingForKind } from './draft-save-validate';
 
 const header: ResolvedHeader = {
   discountPct: '5',

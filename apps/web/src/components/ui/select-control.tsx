@@ -31,6 +31,8 @@ export function SelectControl({
   options: SelectControlOption[];
   placeholder?: string;
   disabled?: boolean;
+  /** Sizes the trigger where the default full width does not fit (a table cell). */
+  className?: string;
   id?: string;
   'aria-invalid'?: boolean | 'true' | 'false';
   'aria-describedby'?: string;

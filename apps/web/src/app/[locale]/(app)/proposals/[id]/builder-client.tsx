@@ -1,15 +1,15 @@
 'use client';
 
-import { Plus } from 'lucide-react';
 import { useTranslations } from 'next-intl';
-import { Button } from '@/components/ui/button';
+import { useRef } from 'react';
 import { useConfirm } from '@/components/ui/confirm-dialog';
+import { useFocusFirstInvalid } from '@/hooks/use-focus-first-invalid';
 import { countSendable } from '@/lib/boq-proposals/count';
 import type { ProposalDetail } from '@/lib/proposals/queries';
 import { BoqModeBar } from './boq-mode-bar';
 import { useBuilderActions } from './builder-actions';
 import type { CostItemOption } from './builder-model';
-import { BuilderSectionCard } from './builder-section-card';
+import { BuilderSections } from './builder-sections';
 import { BuilderShareLink } from './builder-share-link';
 import { BuilderToolbar } from './builder-toolbar';
 import { BuilderTotalsPanel } from './builder-totals-panel';
@@ -82,12 +82,20 @@ export function ProposalBuilder({
     confirm,
   });
   const busy = actions.pending || boq.busy;
+  // Only Send, Send as BOQ and Back move the caret to a refused cell (D4).
+  const builderRef = useRef<HTMLFieldSetElement>(null);
+  useFocusFirstInvalid(builderRef, autosave.cells.invalidAttempt);
 
   return (
     <div className="space-y-4">
       {dialog}
 
-      <fieldset disabled={busy} aria-busy={busy} className="m-0 min-w-0 space-y-4 border-0 p-0">
+      <fieldset
+        ref={builderRef}
+        disabled={busy}
+        aria-busy={busy}
+        className="m-0 min-w-0 space-y-4 border-0 p-0"
+      >
         {boqMode && (
           <BoqModeBar onBack={boq.back} pending={boq.backPending} disabled={busy} />
         )}
@@ -114,29 +122,13 @@ export function ProposalBuilder({
           )}
         </BuilderToolbar>
 
-        {draft.sections.map((section, sectionIndex) => (
-          <BuilderSectionCard
-            key={sectionIndex}
-            section={section}
-            sectionIndex={sectionIndex}
-            sectionTotal={draft.totals.sectionTotals[sectionIndex]}
-            seeMargin={seeMargin}
-            costItems={costItems}
-            sectionLibrary={sectionLibrary}
-            patchSection={draft.patchSection}
-            patchLine={draft.patchLine}
-            addLine={draft.addLine}
-            removeLine={draft.removeLine}
-            onMoveUp={() => draft.moveSection(sectionIndex, -1)}
-            onMoveDown={() => draft.moveSection(sectionIndex, 1)}
-            onRemoveSection={() => draft.removeSection(sectionIndex)}
-          />
-        ))}
-
-        <Button variant="secondary" onClick={draft.addSection}>
-          <Plus className="size-4" aria-hidden />
-          {t('builder.addSection')}
-        </Button>
+        <BuilderSections
+          draft={draft}
+          seeMargin={seeMargin}
+          costItems={costItems}
+          sectionLibrary={sectionLibrary}
+          cells={autosave.cells}
+        />
 
         {/* Totals + margin panel */}
         <BuilderTotalsPanel
@@ -149,6 +141,7 @@ export function ProposalBuilder({
           onSupervisionPctChange={draft.setSupervisionPct}
           doc={draft.totals.doc}
           seeMargin={seeMargin}
+          cells={autosave.cells}
         />
       </fieldset>
     </div>

@@ -44,6 +44,8 @@ const FORM_COVERAGE: Readonly<Record<string, string>> = {
   'app/[locale]/(app)/projects/project-form-fields.tsx': 'app/[locale]/(app)/projects/project-form.test.tsx',
   'app/[locale]/(app)/projects/project-form-schedule.tsx': 'app/[locale]/(app)/projects/project-form.test.tsx',
   'app/[locale]/(app)/projects/project-form.tsx': 'app/[locale]/(app)/projects/project-form.test.tsx',
+  'app/[locale]/(app)/proposals/new/create-form-fields.tsx': 'app/[locale]/(app)/proposals/new/create-form.test.tsx',
+  'app/[locale]/(app)/proposals/new/create-form.tsx': 'app/[locale]/(app)/proposals/new/create-form.test.tsx',
   'app/[locale]/(app)/settings/account/account-client.tsx': 'app/[locale]/(app)/settings/account/account-client.test.tsx',
   'app/[locale]/(app)/settings/api-keys/api-keys-create-card.tsx': 'app/[locale]/(app)/settings/api-keys/api-keys-client.test.tsx',
   'app/[locale]/(app)/settings/api-keys/use-api-key-create.ts': 'app/[locale]/(app)/settings/api-keys/api-keys-client.test.tsx',

@@ -486,7 +486,7 @@ describe('supervision fee (after VAT, untaxed; persisted + guarded)', () => {
     const id = ((await createProposalCore(ctx, { clientId, projectId })) as { data?: string }).data!;
     expect(
       await saveProposalDraftCore(ctx, { id, header: { supervisionPct: '150' }, sections: [] }),
-    ).toEqual({ ok: false, error: 'supervision_out_of_range' });
+    ).toEqual({ ok: false, error: 'check_fields', fields: { 'supervisionPct': { code: 'supervision_out_of_range' } } });
     const d = await getProposalWithLines(ctx, id, true);
     expect(d!.supervisionPct).toBe('0.0000');
   });
@@ -506,7 +506,7 @@ describe('supervision fee (after VAT, untaxed; persisted + guarded)', () => {
     const id = ((await createProposalCore(ctx, { clientId, projectId })) as { data?: string }).data!;
     expect(
       await saveProposalDraftCore(ctx, { id, header: { taxRate: '150' }, sections: [] }),
-    ).toEqual({ ok: false, error: 'tax_out_of_range' });
+    ).toEqual({ ok: false, error: 'check_fields', fields: { 'taxRate': { code: 'tax_out_of_range' } } });
     const d = await getProposalWithLines(ctx, id, true);
     expect(d!.taxRate).toBe('14.0000');
   });
@@ -539,15 +539,27 @@ describe('supervision fee (after VAT, untaxed; persisted + guarded)', () => {
 });
 
 describe('F2 — discount out of range', () => {
-  it('rejects line + doc discount > 100; nothing persists', async () => {
+  it('rejects line + doc discount > 100 under the cell it is in; nothing persists', async () => {
     const { ctx, clientId, projectId } = await setup();
     const id = ((await createProposalCore(ctx, { clientId, projectId })) as { data?: string }).data!;
     expect(
       await saveProposalDraftCore(ctx, { id, sections: [{ titleEn: 'S', lines: [{ descriptionEn: 'x', qty: '1', unit: 'sqm', unitCost: '0', unitPrice: '100', discountPct: '150' }] }] }),
-    ).toEqual({ ok: false, error: 'discount_out_of_range' });
+    ).toEqual({ ok: false, error: 'check_fields', fields: { 'lines.0.0.discountPct': { code: 'discount_out_of_range' } } });
     expect(
       await saveProposalDraftCore(ctx, { id, header: { discountPct: '150' }, sections: [] }),
-    ).toEqual({ ok: false, error: 'discount_out_of_range' });
+    ).toEqual({ ok: false, error: 'check_fields', fields: { 'discountPct': { code: 'discount_out_of_range' } } });
+    // Both at once, in one answer (D1).
+    expect(
+      await saveProposalDraftCore(ctx, { id, header: { discountPct: '150' }, sections: [{ titleEn: ' ', lines: [{ descriptionEn: 'x', qty: '1', unit: 'sqm', unitCost: '0', unitPrice: '100', discountPct: '150' }] }] }),
+    ).toEqual({
+      ok: false,
+      error: 'check_fields',
+      fields: {
+        discountPct: { code: 'discount_out_of_range' },
+        'sections.0.name': { code: 'name_required' },
+        'lines.0.0.discountPct': { code: 'discount_out_of_range' },
+      },
+    });
     const d = await getProposalWithLines(ctx, id, true);
     expect(d!.sections).toHaveLength(0);
   });
@@ -614,19 +626,24 @@ describe('R2 — line caps + batching', () => {
 describe('F4 — date + amount bounds', () => {
   it('invalid date and oversized amount are coded (not generic)', async () => {
     const { ctx, clientId, projectId } = await setup();
-    expect(await createProposalCore(ctx, { clientId, projectId, issueDate: '2026-13-40' })).toEqual({ ok: false, error: 'invalid_date' });
+    expect(await createProposalCore(ctx, { clientId, projectId, issueDate: '2026-13-40' })).toEqual({
+      ok: false,
+      error: 'check_fields',
+      fields: { issueDate: { code: 'invalid_date' } },
+    });
     const id = ((await createProposalCore(ctx, { clientId, projectId })) as { data?: string }).data!;
-    // A single FACTOR above 1e12 says so. For one wave it answered
-    // 'line_required' — "this line is missing something" for a line whose
-    // problem was a price of 1e13 — because the reader returned one undifferentiated
-    // null. readMoney now reports `too_large` and the draft save passes it on.
+    // A single FACTOR above 1e12 says so, under its own cell.
     expect(
       await saveProposalDraftCore(ctx, { id, sections: [{ titleEn: 'S', lines: [{ descriptionEn: 'x', qty: '1', unit: 'sqm', unitCost: '0', unitPrice: '9999999999999', discountPct: '0' }] }] }),
-    ).toEqual({ ok: false, error: 'amount_too_large' });
-    // A line that is genuinely incomplete still says line_required.
+    ).toEqual({ ok: false, error: 'check_fields', fields: { 'lines.0.0.unitPrice': { code: 'amount_too_large' } } });
+    // A figure that is not a number says that, under its cell; a line with no
+    // description says line_required under the description.
     expect(
       await saveProposalDraftCore(ctx, { id, sections: [{ titleEn: 'S', lines: [{ descriptionEn: 'x', qty: 'twelve', unit: 'sqm', unitCost: '0', unitPrice: '10', discountPct: '0' }] }] }),
-    ).toEqual({ ok: false, error: 'line_required' });
+    ).toEqual({ ok: false, error: 'check_fields', fields: { 'lines.0.0.qty': { code: 'not_a_number' } } });
+    expect(
+      await saveProposalDraftCore(ctx, { id, sections: [{ titleEn: 'S', lines: [{ qty: '1', unit: 'sqm', unitCost: '0', unitPrice: '10', discountPct: '0' }] }] }),
+    ).toEqual({ ok: false, error: 'check_fields', fields: { 'lines.0.0.description': { code: 'line_required' } } });
   });
 
   // Each FACTOR passes the cap; their PRODUCT does not. Before the line-total
@@ -639,7 +656,7 @@ describe('F4 — date + amount bounds', () => {
         id,
         sections: [{ titleEn: 'S', lines: [{ descriptionEn: 'x', qty: '1000000000000', unit: 'sqm', unitCost: '0', unitPrice: '1000000000000', discountPct: '0' }] }],
       }),
-    ).toEqual({ ok: false, error: 'amount_too_large' });
+    ).toEqual({ ok: false, error: 'check_fields', fields: { 'lines.0.0.qty': { code: 'amount_too_large' } } });
   });
 
   // The COST side overflows on its own: a nominal price keeps line_total tiny
@@ -653,7 +670,7 @@ describe('F4 — date + amount bounds', () => {
         id,
         sections: [{ titleEn: 'S', lines: [{ descriptionEn: 'x', qty: '1000000000000', unit: 'sqm', unitCost: '1000000000000', unitPrice: '0.0001', discountPct: '0' }] }],
       }),
-    ).toEqual({ ok: false, error: 'amount_too_large' });
+    ).toEqual({ ok: false, error: 'check_fields', fields: { 'lines.0.0.qty': { code: 'amount_too_large' } } });
   });
 
   // …and each LINE passes while the document SUM does not.
