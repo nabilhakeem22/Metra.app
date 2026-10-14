@@ -1,5 +1,6 @@
 'use server';
 
+import { unexpectedFailure } from '@/lib/actions/unexpected';
 import { getLocale } from 'next-intl/server';
 import { refreshApp } from '@/lib/actions/refresh';
 import type { ActionResult } from '@/lib/actions/result';
@@ -39,7 +40,7 @@ export async function issueContract(
   // resolve must not leave behind a committed transition whose link the caller
   // never receives.
   const origin = await resolveRequestOrigin();
-  if (!origin) return { ok: false, error: 'generic' };
+  if (!origin) return unexpectedFailure('issueContract: no request origin');
   const res = await issueContractCore(ctx, { id });
   if (!res.ok || !res.data) return { ok: res.ok, error: res.error };
   let locale = 'ar-EG';

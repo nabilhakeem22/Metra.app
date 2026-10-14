@@ -3,6 +3,8 @@
 import { useTranslations } from 'next-intl';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from '@/hooks/use-toast';
+import { describeFailure, describeRejection } from '@/lib/actions/error-message';
+import type { ActionResult } from '@/lib/actions/result';
 import {
   markAllNotificationsRead,
   markNotificationRead,
@@ -38,7 +40,7 @@ export interface NotificationFeedApi {
  * refusal says so and re-polls the truth.
  */
 export function useNotificationFeed(initialFeed: NotificationFeed): NotificationFeedApi {
-  const t = useTranslations('notifications');
+  const te = useTranslations('errors');
   const [feed, setFeed] = useState(initialFeed);
   const [adoptedFeed, setAdoptedFeed] = useState(initialFeed);
   if (initialFeed !== adoptedFeed) {
@@ -92,15 +94,17 @@ export function useNotificationFeed(initialFeed: NotificationFeed): Notification
     };
   }, [poll]);
 
-  async function tellServer(mark: () => Promise<{ ok: boolean }>): Promise<void> {
-    let ok = false;
+  /** Tell the server; a refusal or a lost answer toasts its cause, then the feed re-reads. */
+  async function tellServer(mark: () => Promise<ActionResult>): Promise<void> {
+    let cause: string | null = null;
     try {
-      ok = (await mark()).ok;
-    } catch {
-      ok = false;
+      const result = await mark();
+      if (!result.ok) cause = describeFailure(result, te);
+    } catch (rejection) {
+      cause = describeRejection(rejection, te);
     }
-    if (ok) return;
-    toast({ title: t('markFailed'), variant: 'destructive' });
+    if (cause === null) return;
+    toast({ title: cause, variant: 'destructive' });
     await poll();
   }
 

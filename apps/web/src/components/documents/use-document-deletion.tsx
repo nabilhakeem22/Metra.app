@@ -6,7 +6,7 @@ import { useConfirm } from '@/components/ui/confirm-dialog';
 import { toast } from '@/hooks/use-toast';
 import { useUndoableRemoval } from '@/hooks/use-undoable-removal';
 import { useRouter } from '@/i18n/routing';
-import { resolveActionError } from '@/lib/actions/error-message';
+import { describeFailure } from '@/lib/actions/error-message';
 import type { ActionResult } from '@/lib/actions/result';
 
 /**
@@ -36,7 +36,7 @@ export function useDocumentDeletion(options: {
     messages: { removed: t('deleted'), undo: tc('undo') },
     onCommitted: () => router.refresh(),
     onFailed: (result) => {
-      toast({ title: resolveActionError(result.error, te), variant: 'destructive' });
+      toast({ title: describeFailure(result, te), variant: 'destructive' });
       router.refresh();
     },
   });

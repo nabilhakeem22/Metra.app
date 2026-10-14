@@ -4,7 +4,7 @@ import 'server-only';
 // `freeze.ts#freezeAndRecordIssue` opens, after the BOQ row is frozen.
 import { designEngagements, engagementArtifacts, type MetraDb } from '@metra/db';
 import { and, eq, inArray, ne, or } from 'drizzle-orm';
-import { fail } from '@/lib/actions/mutate';
+import { invariant } from '@/lib/actions/invariant';
 import type { OrgContext } from '@/lib/db/context';
 import type { FreezeIssueInput } from './freeze';
 
@@ -26,7 +26,7 @@ export async function recordArtifact(
       clientVisible: true,
     })
     .returning({ id: engagementArtifacts.id });
-  if (!artifact) fail('generic');
+  invariant(artifact, 'BOQ publish: the artifact insert returned no row');
   return artifact.id;
 }
 

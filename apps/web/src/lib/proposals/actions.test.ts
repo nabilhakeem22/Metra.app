@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const refreshApp = vi.hoisted(() => vi.fn());
 const saveProposalDraftCore = vi.hoisted(() => vi.fn());
+vi.mock('server-only', () => ({}));
 vi.mock('@/lib/actions/refresh', () => ({ refreshApp }));
 vi.mock('@/lib/auth/require-org', () => ({ requireOrg: vi.fn().mockResolvedValue({ orgId: 'o-1' }) }));
 vi.mock('./core', () => ({ saveProposalDraftCore }));

@@ -439,8 +439,7 @@
     "workspaceUnnamed": "Untitled workspace",
     "switcherLabel": "Switch workspace",
     "yourWorkspaces": "Your workspaces",
-    "createOrJoin": "Create or join another workspace",
-    "switchError": "Couldn't switch workspace. Please try again."
+    "createOrJoin": "Create or join another workspace"
   },
   "theme": {
     "label": "Theme",
@@ -1466,7 +1465,6 @@
     "bellWithCount": "Notifications, {count} unread",
     "markAll": "Mark all read",
     "markRead": "Mark read",
-    "markFailed": "Could not update the notification.",
     "empty": "You have no notifications yet.",
     "kinds": {
       "followup_reminder": "Follow-up reminder",
@@ -2026,8 +2024,7 @@
         "hidden": "Hidden from client",
         "show": "Show to client",
         "hide": "Hide from client",
-        "saving": "Saving…",
-        "error": "Couldn't change visibility. Try again."
+        "saving": "Saving…"
       }
     },
     "fee": {
@@ -2310,7 +2307,6 @@
       "showLink": "Show link",
       "rotate": "Replace the link",
       "revoke": "Revoke",
-      "error": "Something went wrong. Please try again.",
       "unrecoverable": "This link was made before links could be shown again, so it cannot be shown. Replace it to get one you can copy: the client's current link stops working.",
       "notConfigured": "This server can't show client links again yet. The client's link keeps working; ask your Metra administrator.",
       "rotateHint": "Replacing the link stops the current one working.",

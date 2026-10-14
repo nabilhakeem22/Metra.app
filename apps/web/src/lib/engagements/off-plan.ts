@@ -37,7 +37,7 @@ export async function setEngagementOffPlanCore(
     ctx,
     { capability: 'engagements_design', action: 'update', flow: 'interior' },
     async (tx, audit) => {
-      if (typeof input.offPlan !== 'boolean') fail('invalid');
+      if (typeof input.offPlan !== 'boolean') fail('malformed');
 
       const engagement = await requireInOrg(
         tx,

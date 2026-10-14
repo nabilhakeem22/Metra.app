@@ -54,8 +54,8 @@ export async function setArtifactClientVisibilityCore(
   ctx: OrgContext,
   input: SetArtifactClientVisibilityInput,
 ): Promise<ActionResult> {
-  if (!isUuid(input.artifactId)) return { ok: false, error: 'invalid' };
-  if (typeof input.visible !== 'boolean') return { ok: false, error: 'invalid' };
+  if (!isUuid(input.artifactId)) return { ok: false, error: 'malformed' };
+  if (typeof input.visible !== 'boolean') return { ok: false, error: 'malformed' };
 
   return mutateInOrg(
     ctx,
@@ -74,9 +74,10 @@ export async function setArtifactClientVisibilityCore(
           kind: engagementArtifacts.kind,
           clientVisible: engagementArtifacts.clientVisible,
         },
-        'invalid',
+        'record_not_found',
       );
-      if (!artifact.fileId) fail('invalid');
+      // A record with no file has nothing the client could download.
+      if (!artifact.fileId) fail('malformed');
 
       const engagement = await requireInOrg(
         tx,

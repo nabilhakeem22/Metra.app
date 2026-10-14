@@ -113,7 +113,7 @@ export async function issueRomCore(
 ): Promise<ActionResult> {
   // Shape-check the id BEFORE opening a transaction: a malformed one otherwise
   // raises on the ::uuid cast and is swallowed as `generic`.
-  if (!isUuid(input.engagementId)) return Promise.resolve(err('invalid'));
+  if (!isUuid(input.engagementId)) return Promise.resolve(err('malformed'));
 
   return mutateInOrg(
     ctx,

@@ -60,8 +60,10 @@ export function useActiveToggle(options: {
 
   function write(id: string, active: boolean, onDone: () => void) {
     startTransition(async () => {
+      // The answer never came back: the write may or may not have landed, so
+      // the person is told to refresh and check (`uncertain`), not "try again".
       const result = await setActive(id, active).catch(
-        (): ActionResult => ({ ok: false, error: 'generic' }),
+        (): ActionResult => ({ ok: false, error: 'uncertain' }),
       );
       if (!result.ok) {
         onError(result);

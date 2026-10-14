@@ -224,7 +224,7 @@ describe('reminders never rotate the link (AC 38)', () => {
     });
     expect(
       await emailDeliveryReminderCore(d.ctx, { engagementId: d.engagementId, locale: 'fr' }, ORIGIN),
-    ).toEqual({ ok: false, error: 'invalid' });
+    ).toEqual({ ok: false, error: 'malformed' });
   });
 
   it('a closed delivery has nobody to remind', async () => {

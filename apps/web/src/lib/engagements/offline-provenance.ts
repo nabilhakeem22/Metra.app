@@ -20,7 +20,7 @@ function channelProvenance(offline: OfflineApproval) {
 /** A design approval: no option to name, so one that names an option is refused. */
 export function designApprovalProvenance(offline: OfflineApproval | null) {
   if (offline === null) return {};
-  if (offline.chosenArtifactId !== null) fail('invalid');
+  if (offline.chosenArtifactId !== null) fail('malformed');
   return channelProvenance(offline);
 }
 

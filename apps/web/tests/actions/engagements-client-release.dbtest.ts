@@ -326,7 +326,7 @@ describe('manual override — setArtifactClientVisibilityCore', () => {
     const artifactId = await recordArtifact(ctx, engagementId, 'boq', null);
     expect(
       await setArtifactClientVisibilityCore(ctx, { artifactId, visible: true }),
-    ).toEqual({ ok: false, error: 'invalid' });
+    ).toEqual({ ok: false, error: 'malformed' });
   });
 
   it('a FOREIGN artifact reads as invalid and is NOT flipped', async () => {
@@ -344,7 +344,7 @@ describe('manual override — setArtifactClientVisibilityCore', () => {
 
     expect(
       await setArtifactClientVisibilityCore(ctxB, { artifactId, visible: true }),
-    ).toEqual({ ok: false, error: 'invalid' });
+    ).toEqual({ ok: false, error: 'record_not_found' });
     const visibility = await visibilityMap(engagementId);
     expect(visibility.get(artifactId)!.visible).toBe(false);
   });
@@ -356,13 +356,13 @@ describe('manual override — setArtifactClientVisibilityCore', () => {
         artifactId: randomUUID(),
         visible: true,
       }),
-    ).toEqual({ ok: false, error: 'invalid' });
+    ).toEqual({ ok: false, error: 'record_not_found' });
     expect(
       await setArtifactClientVisibilityCore(ctx, {
         artifactId: 'not-a-uuid',
         visible: true,
       }),
-    ).toEqual({ ok: false, error: 'invalid' });
+    ).toEqual({ ok: false, error: 'malformed' });
   });
 
   it('a viewer is forbidden and the artifact stays hidden', async () => {

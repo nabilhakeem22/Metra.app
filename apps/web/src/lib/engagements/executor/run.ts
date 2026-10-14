@@ -84,7 +84,7 @@ export async function runGatedTransition(
   // than a key quietly dropped on the floor. A present-but-NON-STRING key is
   // `invalid` too rather than a TypeError escaping the action — see optionalUuid.
   const idempotencyKey = optionalUuid(input.idempotencyKey);
-  if (idempotencyKey === NOT_UUID) return err('invalid');
+  if (idempotencyKey === NOT_UUID) return err('malformed');
 
   return mutateInOrg(
     ctx,

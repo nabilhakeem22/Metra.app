@@ -3,7 +3,7 @@
 // transaction's shape (fences, replay, issue), this is its inserts. Split along
 // the same seam as `boqs/core/import-persist.ts`.
 import { boqLines, boqSections, boqs, type MetraDb } from '@metra/db';
-import { fail } from '@/lib/actions/mutate';
+import { invariant } from '@/lib/actions/invariant';
 import { insertLinesInChunks } from '@/lib/lines/insert-chunked';
 import type { MappedBoq } from '../map';
 import type { SendSnapshot } from '../snapshot';
@@ -42,7 +42,7 @@ export async function insertBoqHeader(
       sourceRevision: input.revision,
     })
     .returning({ id: boqs.id });
-  if (!row) fail('generic');
+  invariant(row, 'BOQ commit: the BOQ insert returned no row');
   return row.id;
 }
 
@@ -72,7 +72,7 @@ async function insertSections(
       })),
     )
     .returning({ id: boqSections.id });
-  if (rows.length !== mapped.sections.length) fail('generic');
+  invariant(rows.length === mapped.sections.length, 'BOQ commit: not every section was inserted');
   return rows.map((row) => row.id);
 }
 

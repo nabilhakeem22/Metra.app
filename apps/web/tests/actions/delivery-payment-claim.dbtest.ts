@@ -743,6 +743,6 @@ describe('confirmPaymentClaimAndAdvanceCore — results and fences (round A1 fix
     const owner = ctxFor(orgId, memberIds[0], 'owner');
     expect(
       await confirmPaymentClaimAndAdvanceCore(owner, { claimId: 'not-a-uuid', amount: '1' }),
-    ).toEqual({ ok: false, error: 'invalid', paymentRecorded: false, advanced: false });
+    ).toEqual({ ok: false, error: 'malformed', paymentRecorded: false, advanced: false });
   });
 });

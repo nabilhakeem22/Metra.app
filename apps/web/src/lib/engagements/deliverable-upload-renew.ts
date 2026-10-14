@@ -27,7 +27,7 @@ export async function renewDeliverableUploadCore(
   input: RenewDeliverableUploadInput,
 ): Promise<{ fileId: string; signedUrl: string } | ActionResult> {
   if (!can(ctx.role, 'engagements_design', 'create')) return err('forbidden');
-  if (!isUuid(input.engagementId) || !isUuid(input.fileId)) return err('invalid');
+  if (!isUuid(input.engagementId) || !isUuid(input.fileId)) return err('malformed');
 
   const [upload] = await withOrgContext(ctx, (tx) =>
     tx
@@ -48,14 +48,15 @@ export async function renewDeliverableUploadCore(
       )
       .limit(1),
   );
-  if (!upload || upload.artifactId !== null) return err('invalid');
+  // Gone, another engagement's, or already attached: there is no upload to renew.
+  if (!upload || upload.artifactId !== null) return err('record_not_found');
   if (isTerminal(upload.state)) return err('engagement_not_active');
   try {
     return { fileId: input.fileId, ...(await renewSignedUploadUrl(upload.objectKey)) };
   } catch (error) {
-    // Storage refused or did not answer: a coded `generic` the queue retries on
-    // the same row, never an exception through the action.
+    // Storage refused or did not answer: `storage_unavailable`, which the queue
+    // retries on the same row, never an exception through the action.
     console.error('deliverable upload renewal failed:', loggableFailure(error));
-    return err('generic');
+    return err('storage_unavailable');
   }
 }

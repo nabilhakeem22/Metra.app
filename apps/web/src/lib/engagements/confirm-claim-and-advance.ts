@@ -106,7 +106,7 @@ export async function confirmPaymentClaimAndAdvanceCore(
     return { ok: false, error: 'forbidden', paymentRecorded: false, advanced: false };
   }
   if (typeof input.claimId !== 'string' || !isUuid(input.claimId)) {
-    return { ok: false, error: 'invalid', paymentRecorded: false, advanced: false };
+    return { ok: false, error: 'malformed', paymentRecorded: false, advanced: false };
   }
 
   const confirmed = await confirmPaymentClaimCore(ctx, input);

@@ -11,12 +11,12 @@ import 'server-only';
 // there is nothing on the object for the template to leak.
 import { organizations } from '@metra/db';
 import type { ActionResult } from '@/lib/actions/result';
+import { unexpectedFailure } from '@/lib/actions/unexpected';
 import { withOrgContext, type OrgContext } from '@/lib/db/context';
 import { renderBoqProposalPreviewHtml } from '@/lib/boq-proposals/preview';
 import { pickBilingual } from '@/lib/pdf/html';
 import { buildProposalHtml } from '@/lib/pdf/proposal-template';
 import { can, canSeeMargin } from '@/lib/permissions/can';
-import { loggableFailure } from '@/lib/actions/loggable-failure';
 import { getProposalForPdf } from './queries';
 
 /** The firm's branding and its margin policy, in one read. */
@@ -54,7 +54,7 @@ export async function renderProposalPreviewHtml(
       return { ok: false, error: 'forbidden' };
     }
     const detail = await getProposalForPdf(ctx, id, variant === 'internal');
-    if (!detail) return { ok: false, error: 'invalid' };
+    if (!detail) return { ok: false, error: 'record_not_found' };
     const locale = org?.defaultLocale ?? 'ar-EG';
 
     // The delivery's BOQ working copy previews as the BOQ it will become.
@@ -75,7 +75,6 @@ export async function renderProposalPreviewHtml(
     });
     return { ok: true, html };
   } catch (err) {
-    console.error('getProposalPreviewHtml failed:', loggableFailure(err));
-    return { ok: false, error: 'generic' };
+    return unexpectedFailure('getProposalPreviewHtml failed', err);
   }
 }

@@ -3,6 +3,7 @@
 import { designEngagements, proposals, type MetraDb } from '@metra/db';
 import { eq } from 'drizzle-orm';
 import { fail, mutateInOrg, requireInOrg } from '@/lib/actions/mutate';
+import { invariant } from '@/lib/actions/invariant';
 import { err, type ActionResult } from '@/lib/actions/result';
 import type { AuditEntry } from '@/lib/audit';
 import { allocateNumber } from '@/lib/db/allocate-number';
@@ -68,7 +69,7 @@ async function insertBoqProposal(
       titleAr: 'مقايسة الأعمال',
     })
     .returning({ id: proposals.id });
-  if (!row) fail('generic');
+  invariant(row, 'BOQ proposal open: the insert returned no row');
   return row.id;
 }
 
@@ -98,7 +99,7 @@ export async function openBoqProposalCore(
   input: { engagementId: string },
 ): Promise<ActionResult & { data?: string }> {
   if (!can(ctx.role, 'boq_build', 'create')) return err('forbidden');
-  if (!isUuid(input.engagementId)) return err('invalid');
+  if (!isUuid(input.engagementId)) return err('malformed');
 
   return mutateInOrg(
     ctx,

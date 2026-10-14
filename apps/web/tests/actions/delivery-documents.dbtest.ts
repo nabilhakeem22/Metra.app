@@ -332,7 +332,7 @@ describe('portal documents — the download resolver has no oracle', () => {
         kind: 'approved_render',
         fileId: foreignFileId,
       }),
-    ).toEqual({ ok: false, error: 'invalid' });
+    ).toEqual({ ok: false, error: 'record_not_found' });
 
     // …and a file stamped to a DIFFERENT engagement in the caller's own org.
     const otherEngagementFile = await seedFile(a.orgId, randomUUID());
@@ -342,7 +342,7 @@ describe('portal documents — the download resolver has no oracle', () => {
         kind: 'approved_render',
         fileId: otherEngagementFile,
       }),
-    ).toEqual({ ok: false, error: 'invalid' });
+    ).toEqual({ ok: false, error: 'record_not_found' });
 
     // …and a malformed file id is `invalid`, never a cast error.
     expect(
@@ -351,7 +351,7 @@ describe('portal documents — the download resolver has no oracle', () => {
         kind: 'approved_render',
         fileId: 'not-a-uuid',
       }),
-    ).toEqual({ ok: false, error: 'invalid' });
+    ).toEqual({ ok: false, error: 'malformed' });
 
     const rows = await raw.query<{ n: number }>(
       `select count(*)::int as n from public.engagement_artifacts

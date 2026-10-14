@@ -123,7 +123,7 @@ describe('recordArtifact — attest an engagement artifact', () => {
       engagementId,
       kind: 'not_a_kind' as never,
     });
-    expect(res).toEqual({ ok: false, error: 'invalid' });
+    expect(res).toEqual({ ok: false, error: 'malformed' });
     expect(await getEngagementArtifacts(ctx, engagementId)).toHaveLength(0);
   });
 

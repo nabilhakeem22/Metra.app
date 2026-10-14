@@ -579,13 +579,13 @@ describe('R1/R3 — atomic transition gates', () => {
     expect(Number(ev.n)).toBe(1);
   });
 
-  it('R1: double-supersede -> 2nd invalid, exactly one v2 + one event', async () => {
+  it('R1: double-supersede -> 2nd record_not_found, exactly one v2 + one event', async () => {
     const { ctx, clientId, projectId } = await setup();
     const id = ((await createProposalCore(ctx, { clientId, projectId })) as { data?: string }).data!;
     await saveProposalDraftCore(ctx, { id, sections: twoSections });
     await sendProposalCore(ctx, { id });
     expect((await supersedeProposalCore(ctx, { id })).ok).toBe(true);
-    expect(await supersedeProposalCore(ctx, { id })).toEqual({ ok: false, error: 'invalid' });
+    expect(await supersedeProposalCore(ctx, { id })).toEqual({ ok: false, error: 'record_not_found' });
     const [copies] = await raw.query<{ n: number }>(`select count(*)::int as n from public.proposals where supersedes_id='${id}'`);
     expect(Number(copies.n)).toBe(1);
     const [ev] = await raw.query<{ n: number }>(`select count(*)::int as n from public.proposal_events where proposal_id='${id}' and kind='superseded'`);

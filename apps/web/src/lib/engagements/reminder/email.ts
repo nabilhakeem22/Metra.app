@@ -36,7 +36,7 @@ export async function emailDeliveryReminderCore(
   origin: string,
 ): Promise<ActionResult> {
   const locale = portalLocale(input.locale);
-  if (!locale) return err('invalid');
+  if (!locale) return err('malformed');
 
   const read = await mutateInOrg(ctx, DELIVERY_LINK_GATE, async (tx, audit) => {
     const link = await readLiveDeliveryLink(tx, input.engagementId, { activeOnly: true });

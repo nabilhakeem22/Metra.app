@@ -70,13 +70,13 @@ describe('the client link menu', () => {
   });
 
   test('a link that cannot be re-created says so, and points at Replace', () => {
-    const share = { ...sharedLink(), error: 'delivery_link_unrecoverable' };
+    const share = { ...sharedLink(), error: { error: 'delivery_link_unrecoverable' as const } };
     renderWithIntl(<ShareLinkPanel share={share} />, { locale: 'en' });
     expect(screen.getByRole('alert').textContent).toBe(en('delivery.share.unrecoverable'));
   });
 
   test('F9: a server without the link secret says so instead of "try again"', () => {
-    const share = { ...sharedLink(), error: 'delivery_links_not_configured' };
+    const share = { ...sharedLink(), error: { error: 'delivery_links_not_configured' as const } };
     renderWithIntl(<ShareLinkPanel share={share} />, { locale: 'en' });
     expect(screen.getByRole('alert').textContent).toBe(en('delivery.share.notConfigured'));
   });

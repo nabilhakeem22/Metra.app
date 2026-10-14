@@ -12,6 +12,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { toast } from '@/hooks/use-toast';
+import { describeFailure, describeRejection } from '@/lib/actions/error-message';
 import { Link, useRouter } from '@/i18n/routing';
 import { pickLocale } from '@/lib/i18n/pick-locale';
 import { setActiveOrg } from '@/lib/org/active-org-actions';
@@ -38,6 +39,7 @@ export function OrgSwitcher({
   activeOrgId: string;
 }) {
   const t = useTranslations('org');
+  const te = useTranslations('errors');
   const locale = useLocale();
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -58,11 +60,12 @@ export function OrgSwitcher({
   function switchTo(orgId: string) {
     if (orgId === activeOrgId) return;
     startTransition(async () => {
-      const res = await setActiveOrg(orgId);
-      if (res.ok) {
-        router.refresh();
-      } else {
-        toast({ title: t('switchError'), variant: 'destructive' });
+      try {
+        const res = await setActiveOrg(orgId);
+        if (res.ok) router.refresh();
+        else toast({ title: describeFailure(res, te), variant: 'destructive' });
+      } catch (rejection) {
+        toast({ title: describeRejection(rejection, te), variant: 'destructive' });
       }
     });
   }

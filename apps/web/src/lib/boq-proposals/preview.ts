@@ -58,9 +58,9 @@ export async function renderBoqProposalPreviewHtml(
 ): Promise<ActionResult & { html?: string }> {
   const internal = input.variant === 'internal';
   const read = await readPreviewSource(ctx, input.proposalId, internal);
-  if (!read) return { ok: false, error: 'invalid' };
+  if (!read) return { ok: false, error: 'record_not_found' };
   const names = await loadDocumentNames(ctx, read.header);
-  if (!names) return { ok: false, error: 'invalid' };
+  if (!names) return { ok: false, error: 'record_not_found' };
 
   const { header } = read;
   const detail = toBoqDetail(

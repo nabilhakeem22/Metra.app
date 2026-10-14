@@ -30,7 +30,8 @@ async function supersedeSentProposal(
     .set({ status: 'superseded', updatedAt: new Date() })
     .where(and(eq(proposals.id, proposalId), eq(proposals.status, 'sent')))
     .returning();
-  if (!original) fail('invalid');
+  // Answered, withdrawn or gone since the page loaded: nothing to revise.
+  if (!original) fail('record_not_found');
   return original;
 }
 

@@ -100,7 +100,7 @@ describe('setEngagementOffPlan — proposal-window toggle', () => {
       engagementId,
       offPlan: 'yes' as unknown as boolean,
     });
-    expect(res).toEqual({ ok: false, error: 'invalid' });
+    expect(res).toEqual({ ok: false, error: 'malformed' });
     expect(await offPlanOf(engagementId)).toBe(false);
   });
 });

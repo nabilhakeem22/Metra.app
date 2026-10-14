@@ -1,5 +1,6 @@
 'use server';
 
+import { unexpectedFailure } from '@/lib/actions/unexpected';
 import { refreshApp } from '@/lib/actions/refresh';
 import type { ActionResult } from '@/lib/actions/result';
 import { requireOrg } from '@/lib/auth/require-org';
@@ -30,7 +31,7 @@ export async function shareDeliveryLink(
   // resolve must not leave behind a committed transition whose link the caller
   // never receives.
   const origin = await resolveRequestOrigin();
-  if (!origin) return { ok: false, error: 'generic' };
+  if (!origin) return unexpectedFailure('shareDeliveryLink: no request origin');
   const res = await mintDeliveryLinkCore(ctx, engagementId);
   if (!res.ok || !res.data) return { ok: res.ok, error: res.error };
   const link = await deliveryLink(origin, res.data);
@@ -51,7 +52,7 @@ export async function rotateDeliveryLink(
   // resolve must not leave behind a committed transition whose link the caller
   // never receives.
   const origin = await resolveRequestOrigin();
-  if (!origin) return { ok: false, error: 'generic' };
+  if (!origin) return unexpectedFailure('rotateDeliveryLink: no request origin');
   const res = await rotateDeliveryLinkCore(ctx, engagementId);
   if (!res.ok || !res.data) return { ok: res.ok, error: res.error };
   const link = await deliveryLink(origin, res.data);

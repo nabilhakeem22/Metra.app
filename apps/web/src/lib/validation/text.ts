@@ -67,7 +67,7 @@ export const MAX_LABEL_CHARS = 200;
  * Call site:
  * ```ts
  * const note = optionalText(input.note, MAX_NOTE_CHARS);
- * if (note === TOO_LONG) return fail('invalid');
+ * if (note === TOO_LONG) failFields({ note: { code: 'too_long', params: { max: MAX_NOTE_CHARS } } });
  * ```
  */
 export function optionalText(

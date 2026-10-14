@@ -15,7 +15,9 @@ export interface UndoableRemovalOptions {
   onFailed: (result: ActionResult) => void;
 }
 
-const FAILED: ActionResult = { ok: false, error: 'generic' };
+/** The delete's answer never came back: it may or may not have landed, so the
+ *  row comes back and the person is told to refresh and check (`uncertain`). */
+const ANSWER_LOST: ActionResult = { ok: false, error: 'uncertain' };
 
 /**
  * A DEFERRED delete with Undo, for content rows (documents, contacts, BOQ lines).
@@ -60,7 +62,7 @@ export function useUndoableRemoval(options: UndoableRemovalOptions): {
 
   const sendDelete = useCallback(
     async (id: string): Promise<boolean> => {
-      const result = await latest.current.commit(id).catch(() => FAILED);
+      const result = await latest.current.commit(id).catch(() => ANSWER_LOST);
       if (result.ok) {
         latest.current.onCommitted?.();
         return true;

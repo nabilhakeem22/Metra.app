@@ -5,6 +5,7 @@ import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
 import { useConfirm } from '@/components/ui/confirm-dialog';
 import { OverflowMenu } from '@/components/ui/overflow-menu';
+import { describeShownFailure, type ShownFailure } from '@/lib/actions/error-message';
 import type { DeliveryShareApi } from './use-delivery-share';
 
 /** The revealed link, its copy button, and what to do with it. */
@@ -122,8 +123,19 @@ const SHARE_ERROR_KEY: Partial<Record<string, 'unrecoverable' | 'notConfigured'>
 };
 
 /** Everything the disclosure reveals when it is open. */
+/** The two refusals with a way out of their own say it; anything else says its cause. */
+function useShareErrorText(): (failure: ShownFailure) => string {
+  const t = useTranslations('delivery.share');
+  const te = useTranslations('errors');
+  return (failure) => {
+    const own = 'error' in failure && failure.error ? SHARE_ERROR_KEY[failure.error] : undefined;
+    return own ? t(own) : describeShownFailure(failure, te);
+  };
+}
+
 export function ShareLinkPanel({ share }: { share: DeliveryShareApi }) {
   const t = useTranslations('delivery.share');
+  const errorText = useShareErrorText();
   return (
     <div className="space-y-3 px-4 pb-4">
       <p className="text-body text-muted-foreground">
@@ -132,7 +144,7 @@ export function ShareLinkPanel({ share }: { share: DeliveryShareApi }) {
 
       {share.error && (
         <p className="text-body text-destructive" role="alert">
-          {t(SHARE_ERROR_KEY[share.error] ?? 'error')}
+          {errorText(share.error)}
         </p>
       )}
 

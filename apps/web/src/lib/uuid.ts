@@ -53,7 +53,7 @@ export type NotUuid = typeof NOT_UUID;
  * Call site:
  * ```ts
  * const idempotencyKey = optionalUuid(input.idempotencyKey);
- * if (idempotencyKey === NOT_UUID) return err('invalid');
+ * if (idempotencyKey === NOT_UUID) return err('malformed');
  * ```
  */
 export function optionalUuid(value: unknown): string | null | NotUuid {

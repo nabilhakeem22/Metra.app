@@ -1,5 +1,6 @@
 'use server';
 
+import { unexpectedFailure } from '@/lib/actions/unexpected';
 import type { ActionResult } from '@/lib/actions/result';
 import { requireOrg } from '@/lib/auth/require-org';
 import { resolveRequestOrigin } from '@/lib/http/request-origin';
@@ -19,7 +20,7 @@ export async function revealDeliveryLink(
 ): Promise<ActionResult & { link?: string }> {
   const ctx = await requireOrg();
   const origin = await resolveRequestOrigin();
-  if (!origin) return { ok: false, error: 'generic' };
+  if (!origin) return unexpectedFailure('revealDeliveryLink: no request origin');
   const res = await revealDeliveryLinkCore(ctx, engagementId);
   if (!res.ok || !res.data) return { ok: false, error: res.error ?? 'generic' };
   return { ok: true, link: deliveryPortalUrl(origin, await requestLocaleOrDefault(), res.data) };
@@ -31,7 +32,7 @@ export async function prepareDeliveryReminder(
 ): Promise<ActionResult & { data?: DeliveryReminder }> {
   const ctx = await requireOrg();
   const origin = await resolveRequestOrigin();
-  if (!origin) return { ok: false, error: 'generic' };
+  if (!origin) return unexpectedFailure('prepareDeliveryReminder: no request origin');
   return prepareDeliveryReminderCore(ctx, engagementId, origin);
 }
 
@@ -42,6 +43,6 @@ export async function emailDeliveryReminder(
 ): Promise<ActionResult> {
   const ctx = await requireOrg();
   const origin = await resolveRequestOrigin();
-  if (!origin) return { ok: false, error: 'generic' };
+  if (!origin) return unexpectedFailure('emailDeliveryReminder: no request origin');
   return emailDeliveryReminderCore(ctx, { engagementId, locale }, origin);
 }

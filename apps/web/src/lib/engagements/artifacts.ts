@@ -26,7 +26,9 @@ import type { ActionResult } from '@/lib/actions/result';
 import type { OrgContext } from '@/lib/db/context';
 import { artifactRecordingFile, assertConceptOptionSlot } from './artifact-fences';
 import { isTerminal } from './states';
+import { fieldsFailed } from '@/lib/actions/field-errors';
 import { isUuid } from '@/lib/uuid';
+import { collectFieldErrors } from '@/lib/validation/field-rules';
 import {
   MAX_LABEL_CHARS,
   MAX_NOTE_CHARS,
@@ -59,22 +61,27 @@ export async function recordArtifactCore(
   ctx: OrgContext,
   input: RecordArtifactInput,
 ): Promise<ActionResult & { data?: string }> {
+  // A kind no picker offers, or a file id that is no id: no form can send these.
   if (typeof input.kind !== 'string' || !KIND_SET.has(input.kind)) {
-    return { ok: false, error: 'invalid' };
+    return { ok: false, error: 'malformed' };
   }
 
   const fileId = input.fileId ?? null;
   if (fileId !== null && !isUuid(fileId)) {
-    return { ok: false, error: 'invalid' };
+    return { ok: false, error: 'malformed' };
   }
   const contentHash = optionalText(input.contentHash, MAX_LABEL_CHARS);
   const label = optionalText(input.label, MAX_LABEL_CHARS);
   const note = optionalText(input.note, MAX_NOTE_CHARS);
   // An over-long field is a REFUSAL, not a truncation: storing the first 200
-  // characters of a label would quietly rename the studio's artifact.
-  if (contentHash === TOO_LONG || label === TOO_LONG || note === TOO_LONG) {
-    return { ok: false, error: 'invalid' };
-  }
+  // characters of a label would quietly rename the studio's artifact. Each is
+  // said under its own field.
+  const tooLong = collectFieldErrors({
+    contentHash: contentHash === TOO_LONG ? { code: 'too_long', params: { max: MAX_LABEL_CHARS } } : null,
+    label: label === TOO_LONG ? { code: 'too_long', params: { max: MAX_LABEL_CHARS } } : null,
+    note: note === TOO_LONG ? { code: 'too_long', params: { max: MAX_NOTE_CHARS } } : null,
+  });
+  if (contentHash === TOO_LONG || label === TOO_LONG || note === TOO_LONG) return fieldsFailed(tooLong);
 
   return mutateInOrg(
     ctx,
@@ -114,7 +121,7 @@ export async function recordArtifactCore(
             ),
           )
           .limit(1);
-        if (!owned) fail('invalid');
+        if (!owned) fail('record_not_found');
       }
 
       const [row] = await tx

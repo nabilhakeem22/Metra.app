@@ -2,6 +2,8 @@
 
 import { useEffect, useState, useTransition } from 'react';
 import { useRouter } from '@/i18n/routing';
+import type { ShownFailure } from '@/lib/actions/error-message';
+import type { ActionCode } from '@/lib/actions/result';
 import {
   revealDeliveryLink,
   revokeDeliveryLink,
@@ -38,7 +40,8 @@ export interface DeliveryShareApi {
   copied: boolean;
   open: boolean;
   setOpen: (open: boolean) => void;
-  error: string | null;
+  /** The last refusal, or the rejection of an action that never answered. */
+  error: ShownFailure | null;
   share: () => void;
   /** Show the existing link again. Never rotates. */
   reveal: () => void;
@@ -47,7 +50,7 @@ export interface DeliveryShareApi {
   copy: () => void;
 }
 
-type ShareResult = { ok: boolean; error?: string; link?: string };
+type ShareResult = { ok: boolean; error?: ActionCode; reference?: string; link?: string };
 
 export function useDeliveryShare(options: {
   engagementId: string;
@@ -58,7 +61,7 @@ export function useDeliveryShare(options: {
   const [shared, setShared] = useState(options.initialShared);
   const [link, setLink] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<ShownFailure | null>(null);
   const [open, setOpen] = useState(false);
 
   // The server's answer after a refresh is the truth about whether a link exists.
@@ -97,8 +100,10 @@ export function useDeliveryShare(options: {
       let result: ShareResult;
       try {
         result = await action();
-      } catch {
-        result = { ok: false, error: 'generic' };
+      } catch (rejection) {
+        setError({ rejection });
+        setOpen(true);
+        return;
       }
       if (result.ok) {
         onOk(result.link);
@@ -111,7 +116,7 @@ export function useDeliveryShare(options: {
         setShared(false);
         setLink(null);
       } else {
-        setError(result.error ?? 'generic');
+        setError({ error: result.error, reference: result.reference });
         // A refusal belongs on screen, not behind a closed dialog.
         setOpen(true);
       }

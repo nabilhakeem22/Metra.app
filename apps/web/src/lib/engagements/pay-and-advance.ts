@@ -10,8 +10,8 @@
 // `*Core(ctx,input)` (API-ready) so its thin server-action wrapper only resolves
 // the org context + revalidates.
 import type { PaymentEventKind } from '@metra/db';
-import { loggableFailure } from '@/lib/actions/loggable-failure';
 import type { ActionCode, ActionResult } from '@/lib/actions/result';
+import { unexpectedFailure } from '@/lib/actions/unexpected';
 import type { OrgContext } from '@/lib/db/context';
 import { executeTransition } from './executor';
 import { isEndingTrigger } from './forward-trigger';
@@ -97,8 +97,7 @@ export async function logPaymentAndAdvanceCore(
       return { ok: true, already, paymentRecorded: true, waitingOn: 'client_review_pending' };
     }
   } catch (error) {
-    console.error('logPaymentAndAdvance review read failed:', loggableFailure(error));
-    return { ok: false, error: 'generic', already, paymentRecorded: true };
+    return { ...unexpectedFailure('logPaymentAndAdvance review read failed', error), already, paymentRecorded: true };
   }
 
   // Falls through even on an idempotent hit (`recorded.already`): the guard

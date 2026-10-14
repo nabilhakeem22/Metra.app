@@ -12,6 +12,7 @@ import 'server-only';
 import { clientPaymentClaims, paymentEvents } from '@metra/db';
 import { and, eq, sql } from 'drizzle-orm';
 import { fail, mutateInOrg } from '@/lib/actions/mutate';
+import { invariant } from '@/lib/actions/invariant';
 import type { ActionResult } from '@/lib/actions/result';
 import { MONEY_RE, formatMoney4, parseMoney4 } from '@/lib/aggregates/proposal-totals';
 import type { OrgContext } from '@/lib/db/context';
@@ -86,7 +87,7 @@ export async function confirmPaymentClaimCore(
       if (claim.status === 'confirmed') {
         // Idempotent: already confirmed. A confirmed claim MUST carry its payment
         // ref — a NULL is a data-integrity error, never a '' money sentinel.
-        if (!claim.confirmedPaymentEventId) fail('generic');
+        invariant(claim.confirmedPaymentEventId, 'confirmed claim without its payment event');
         already = true;
         return claim.confirmedPaymentEventId;
       }
@@ -183,7 +184,7 @@ export async function confirmPaymentClaimCore(
           existing.kind !== claim.milestoneKind ||
           parseMoney4(existing.amount) !== amount4
         ) {
-          fail('generic');
+          invariant(false, 'claim payment event does not match the claim');
         }
         paymentId = existing.id;
         already = true;
@@ -209,7 +210,7 @@ export async function confirmPaymentClaimCore(
           ),
         )
         .returning({ id: clientPaymentClaims.id });
-      if (flipped.length === 0) fail('generic');
+      if (flipped.length === 0) fail('claim_not_found');
 
       return paymentId;
     },
@@ -272,7 +273,7 @@ export async function dismissPaymentClaimCore(
         .returning({ id: clientPaymentClaims.id });
       // Under the row lock this always matches; a 0-row result means the row changed
       // under us -> THROW so the tx rolls back (never a silent no-op).
-      if (updated.length === 0) fail('generic');
+      if (updated.length === 0) fail('claim_not_found');
 
       await audit({
         entity: 'design_engagement',

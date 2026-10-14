@@ -3,6 +3,7 @@
 import { useState, useTransition } from 'react';
 import { useTranslations } from 'next-intl';
 import { toast } from '@/hooks/use-toast';
+import { describeFailure, describeRejection } from '@/lib/actions/error-message';
 import { setArtifactClientVisibility } from '@/lib/engagements/actions';
 
 /**
@@ -12,7 +13,7 @@ import { setArtifactClientVisibility } from '@/lib/engagements/actions';
  *
  * Optimistic and reload-free: the flipped value is held locally the moment the user
  * clicks, so the row updates instantly; a failed action reverts that row and toasts
- * the localized reason. There is deliberately NO `router.refresh()` — the studio can
+ * its cause (a row has no field to say it under, D11). There is deliberately NO `router.refresh()` — the studio can
  * flip several files in a row without the page reloading under them. The server
  * action is the real authorization gate; a hidden control is not a gate.
  */
@@ -24,7 +25,7 @@ export function useClientVisibility(): {
   isVisible: (artifactId: string, serverValue: boolean) => boolean;
   toggle: (artifactId: string, next: boolean) => void;
 } {
-  const t = useTranslations('engagements.files.visibility');
+  const te = useTranslations('errors');
   const [, startTransition] = useTransition();
   const [overrides, setOverrides] = useState<Record<string, boolean>>({});
   const [savingId, setSavingId] = useState<string | null>(null);
@@ -42,11 +43,11 @@ export function useClientVisibility(): {
         const result = await setArtifactClientVisibility({ artifactId, visible: next });
         if (!result.ok) {
           setOverrides((prev) => ({ ...prev, [artifactId]: !next }));
-          toast({ title: t('error'), variant: 'destructive' });
+          toast({ title: describeFailure(result, te), variant: 'destructive' });
         }
-      } catch {
+      } catch (rejection) {
         setOverrides((prev) => ({ ...prev, [artifactId]: !next }));
-        toast({ title: t('error'), variant: 'destructive' });
+        toast({ title: describeRejection(rejection, te), variant: 'destructive' });
       } finally {
         setSavingId(null);
       }

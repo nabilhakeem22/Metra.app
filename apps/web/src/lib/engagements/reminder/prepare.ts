@@ -5,7 +5,8 @@ import 'server-only';
 // and whether an email can be sent. Owner/admin only, server-enforced; every
 // preparation is audited, because it reveals the client's link.
 import { mutateInOrg } from '@/lib/actions/mutate';
-import { err, type ActionResult } from '@/lib/actions/result';
+import type { ActionResult } from '@/lib/actions/result';
+import { unexpectedFailure } from '@/lib/actions/unexpected';
 import type { OrgContext } from '@/lib/db/context';
 import type { Locale } from '@/i18n/routing';
 import { DELIVERY_LINK_GATE, readLiveDeliveryLink } from '../share-reveal';
@@ -61,8 +62,8 @@ export async function prepareDeliveryReminderCore(
       },
     };
   } catch {
-    // A fixed line: whatever failed was formatting a text that carries the link.
-    console.error('delivery reminder text failed');
-    return err('generic');
+    // A fixed label and no caught value: whatever failed was formatting a text
+    // that carries the link.
+    return unexpectedFailure('delivery reminder text failed');
   }
 }

@@ -1,5 +1,6 @@
 'use server';
 
+import { unexpectedFailure } from '@/lib/actions/unexpected';
 // 'use server' wrappers ONLY: session work + delegate. No SQL here.
 //
 // Every export in this file is a callable RPC endpoint, so the two heavy bodies
@@ -84,7 +85,7 @@ export async function sendProposal(id: string): Promise<
   // resolve must not leave behind a committed transition whose link the caller
   // never receives.
   const origin = await resolveRequestOrigin();
-  if (!origin) return { ok: false, error: 'generic' };
+  if (!origin) return unexpectedFailure('sendProposal: no request origin');
   const res = await sendProposalCore(ctx, { id });
   if (!res.ok || !res.data) return { ok: res.ok, error: res.error };
 
