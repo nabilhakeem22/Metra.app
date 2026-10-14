@@ -4,6 +4,7 @@ import { Loader2, X } from 'lucide-react';
 import { useRef, type FormEvent, type ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
 import { IconButton } from '@/components/ui/icon-button';
+import { useFocusFirstInvalid } from '@/hooks/use-focus-first-invalid';
 import {
   Sheet,
   SheetClose,
@@ -25,10 +26,12 @@ const FIRST_FIELD = [
 /**
  * The one shape every create/edit form takes: a sheet from the inline-END, the
  * title with a close button, the fields, and a footer that stays in view with
- * Cancel and Save. It is a real `<form>`, so Enter in a field submits; a submit
- * while `pending` or while `canSubmit` is false does nothing. A refusal that
+ * Cancel and Save. It is a real `<form>`, so Enter in a field submits; only a
+ * submit while `pending` does nothing, because Save is never disabled to say
+ * "not yet": pressing it is how a person learns what is missing. A refusal that
  * belongs to no single field (`formError`) is said above the footer. Opening
- * puts the caret in the first field.
+ * puts the caret in the first field; each new `invalidAttempt` puts it in the
+ * first refused one.
  */
 export function FormSheet({
   open,
@@ -40,8 +43,8 @@ export function FormSheet({
   cancelLabel,
   closeLabel,
   pending,
-  canSubmit = true,
   formError,
+  invalidAttempt = 0,
   children,
 }: {
   open: boolean;
@@ -53,15 +56,16 @@ export function FormSheet({
   cancelLabel: string;
   closeLabel: string;
   pending: boolean;
-  canSubmit?: boolean;
   formError?: string | null;
+  invalidAttempt?: number;
   children: ReactNode;
 }) {
   const formRef = useRef<HTMLFormElement>(null);
+  useFocusFirstInvalid(formRef, invalidAttempt);
 
   function submit(event: FormEvent<HTMLFormElement>): void {
     event.preventDefault();
-    if (pending || !canSubmit) return;
+    if (pending) return;
     onSubmit();
   }
 
@@ -103,7 +107,7 @@ export function FormSheet({
               <Button type="button" variant="secondary" onClick={() => onOpenChange(false)}>
                 {cancelLabel}
               </Button>
-              <Button type="submit" variant="default" disabled={pending || !canSubmit}>
+              <Button type="submit" variant="default" disabled={pending}>
                 {pending && <Loader2 className="size-4 animate-spin" aria-hidden />}
                 {submitLabel}
               </Button>

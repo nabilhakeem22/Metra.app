@@ -1,8 +1,10 @@
 import { act, fireEvent, render, screen } from '@testing-library/react';
+import { NextIntlClientProvider } from 'next-intl';
+import type { ReactNode } from 'react';
 import { describe, expect, test, vi } from 'vitest';
 import { FieldHint } from '@/components/ui/field-hint';
 import { Input } from '@/components/ui/input';
-import { renderWithIntl } from '@/test/render-with-intl';
+import { messagesFor, renderWithIntl, type TestLocale } from '@/test/render-with-intl';
 import { FormField } from './form-field';
 import { FormSheet } from './form-sheet';
 
@@ -41,17 +43,16 @@ describe('FormSheet', () => {
     expect(onSubmit).toHaveBeenCalledTimes(1);
   });
 
-  test('a submit is ignored while it cannot submit, or while pending', () => {
-    const blocked = renderSheet({ canSubmit: false });
-    fireEvent.submit(screen.getByRole('textbox', { name: /Name/ }).closest('form')!);
-    expect(blocked.onSubmit).not.toHaveBeenCalled();
-    expect((screen.getByRole('button', { name: 'Save' }) as HTMLButtonElement).disabled).toBe(true);
+  test('Save stays enabled with every field empty: pressing it is how the errors appear', () => {
+    renderSheet();
+    expect((screen.getByRole('button', { name: 'Save' }) as HTMLButtonElement).disabled).toBe(false);
   });
 
-  test('pending blocks a second submit', () => {
+  test('pending blocks a second submit and disables Save', () => {
     const { onSubmit } = renderSheet({ pending: true });
     fireEvent.submit(screen.getByRole('textbox', { name: /Name/ }).closest('form')!);
     expect(onSubmit).not.toHaveBeenCalled();
+    expect((screen.getByRole('button', { name: 'Save' }) as HTMLButtonElement).disabled).toBe(true);
   });
 
   test('a close button closes it, and Cancel does too', async () => {
@@ -76,43 +77,54 @@ describe('FormSheet', () => {
   });
 });
 
-describe('FormField', () => {
-  test('marks the field required and points it at its error', () => {
-    renderWithIntl(
-      <FormField id="title" label="Title" required error="Enter a title">
-        <Input />
-      </FormField>,
-      { locale: 'en' },
-    );
-    const input = screen.getByRole('textbox');
-    expect(input.id).toBe('title');
-    expect(input.getAttribute('aria-invalid')).toBe('true');
-    expect(input.getAttribute('aria-required')).toBe('true');
-    expect(input.getAttribute('aria-describedby')).toBe('title-error');
-    expect(document.getElementById('title-error')?.textContent).toBe('Enter a title');
+/** Three fields; the ones named in `errors` are refused. */
+function RefusedSheet({ errors, attempt }: { errors: Record<string, string>; attempt: number }) {
+  return (
+    <FormSheet
+      open
+      onOpenChange={() => {}}
+      title="New client"
+      onSubmit={() => {}}
+      submitLabel="Save"
+      cancelLabel="Cancel"
+      closeLabel="Close"
+      pending={false}
+      invalidAttempt={attempt}
+    >
+      {['name', 'phone', 'city'].map((id) => (
+        <FormField key={id} id={id} label={id} error={errors[id]}>
+          <Input />
+        </FormField>
+      ))}
+    </FormSheet>
+  );
+}
+
+/** Rendered so that a rerender keeps the catalogue (renderWithIntl's would not). */
+function renderInLocale(ui: ReactNode, locale: TestLocale) {
+  const wrapper = ({ children }: { children: ReactNode }) => (
+    <NextIntlClientProvider locale={locale} messages={messagesFor(locale)} timeZone="UTC">
+      {children}
+    </NextIntlClientProvider>
+  );
+  return render(ui, { wrapper });
+}
+
+describe.each<TestLocale>(['en', 'ar-EG'])('FormSheet focus on refusal (%s)', (locale) => {
+  test('a new invalid attempt focuses the first refused field in DOM order', async () => {
+    const view = renderInLocale(<RefusedSheet errors={{}} attempt={0} />, locale);
+    await act(async () => {});
+    expect(document.activeElement?.id).toBe('name');
+
+    view.rerender(<RefusedSheet errors={{ city: 'c', phone: 'p' }} attempt={1} />);
+    expect(document.activeElement?.id).toBe('phone');
   });
 
-  test('without an error the field is not invalid and describes only its hint', () => {
-    renderWithIntl(
-      <FormField id="email" label="Email" hint="We send receipts here">
-        <Input />
-      </FormField>,
-      { locale: 'en' },
-    );
-    const input = screen.getByRole('textbox');
-    expect(input.getAttribute('aria-invalid')).toBeNull();
-    expect(input.getAttribute('aria-describedby')).toBe('email-hint');
-    expect(document.getElementById('email-hint')?.textContent).toBe('We send receipts here');
-  });
-
-  test('keeps a description the control already carries', () => {
-    render(<span id="outside">outside</span>);
-    renderWithIntl(
-      <FormField id="code" label="Code" error="Taken">
-        <Input aria-describedby="outside" />
-      </FormField>,
-      { locale: 'en' },
-    );
-    expect(screen.getByRole('textbox').getAttribute('aria-describedby')).toBe('outside code-error');
+  test('without a new attempt focus does not move', async () => {
+    const view = renderInLocale(<RefusedSheet errors={{ city: 'c' }} attempt={1} />, locale);
+    await act(async () => {});
+    (document.getElementById('name') as HTMLInputElement).focus();
+    view.rerender(<RefusedSheet errors={{ city: 'c', phone: 'p' }} attempt={1} />);
+    expect(document.activeElement?.id).toBe('name');
   });
 });

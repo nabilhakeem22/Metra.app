@@ -3,7 +3,6 @@ import { act, renderHook, screen } from '@testing-library/react';
 import { messageAt, renderWithIntl } from '@/test/render-with-intl';
 import { EngagementCreateFields } from './engagement-create-fields';
 import { EngagementCreateForm } from './engagement-create-form';
-import { canSubmitDelivery } from './engagement-create-validation';
 import { useDeliveryForm } from './use-delivery-form';
 
 const router = vi.hoisted(() => ({
@@ -27,7 +26,7 @@ const CLIENTS = [{ id: 'c-1', nameEn: 'Acme', nameAr: null, city: null, country:
 const PROJECTS = [{ id: 'p-1', nameEn: 'Tower', nameAr: 'البرج', clientId: 'c-1' }];
 
 describe('EngagementCreateForm', () => {
-  test('nothing is preselected: Submit is disabled and both selects are required', () => {
+  test('nothing is preselected: Submit stays enabled and both selects are required', () => {
     renderWithIntl(
       <EngagementCreateForm
         open
@@ -38,7 +37,7 @@ describe('EngagementCreateForm', () => {
       { locale: 'en' },
     );
     const submit = screen.getByRole('button', { name: en('engagements.startDelivery') });
-    expect((submit as HTMLButtonElement).disabled).toBe(true);
+    expect((submit as HTMLButtonElement).disabled).toBe(false);
     expect(screen.getByText(en('engagements.form.chooseClient'))).toBeTruthy();
     for (const id of ['eng-client', 'eng-project']) {
       expect(document.getElementById(id)?.getAttribute('aria-required')).toBe('true');
@@ -72,10 +71,8 @@ describe('useDeliveryForm', () => {
   test('the title follows the chosen project until one is typed', () => {
     const { result } = setup();
     act(() => result.current.onChange.clientId('c-1'));
-    expect(canSubmitDelivery(result.current.values)).toBe(false);
     act(() => result.current.onChange.projectId('p-1'));
     expect(result.current.values).toMatchObject({ titleEn: 'Tower', titleAr: 'البرج' });
-    expect(canSubmitDelivery(result.current.values)).toBe(true);
 
     act(() => result.current.onChange.titleEn('Villa'));
     act(() => result.current.onChange.projectId('p-1'));
@@ -111,9 +108,10 @@ describe('EngagementCreateFields', () => {
       />,
       { locale: 'en' },
     );
-    const alert = screen.getByRole('alert');
-    expect(alert.textContent).toBe(en('errors.project_delivery_exists'));
+    const refusal = document.getElementById('eng-project-error');
+    expect(refusal?.textContent).toBe(en('errors.project_delivery_exists'));
+    expect(refusal?.hasAttribute('role')).toBe(false);
     const projectField = document.getElementById('eng-project')?.parentElement;
-    expect(projectField?.contains(alert)).toBe(true);
+    expect(projectField?.contains(refusal ?? null)).toBe(true);
   });
 });
