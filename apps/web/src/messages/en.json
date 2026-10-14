@@ -591,6 +591,7 @@
     "section_name_required": "This section has no name. Write a name for it.",
     "section_name_too_long": "That section name is too long. Use a shorter name.",
     "phone_invalid": "That phone number does not look right. Write it with digits only, 7 to 15 of them.",
+    "studio_phone_invalid": "That number cannot be dialled as written. Write an Egyptian number with its leading 0, like 0223456789 or 01012345678, or + and the country code, like +442079460958.",
     "whatsapp_invalid": "WhatsApp cannot reach that number. Write a mobile number: an Egyptian mobile, or the number with its country code, like +44.",
     "iban_invalid": "This IBAN does not look right. Check it against your bank statement; it starts with two letters, like EG.",
     "bank_name_required": "An account number or IBAN needs the bank name too. Add the bank name.",

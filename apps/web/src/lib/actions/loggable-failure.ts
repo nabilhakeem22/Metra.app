@@ -82,6 +82,17 @@ function messageIsSafe(source: unknown): boolean {
   return !causeChain(source).some(isOrmQueryWrapper);
 }
 
+/**
+ * Postgres echoes the offending VALUE in a data exception (class 22): `invalid
+ * input syntax for type uuid: "someone@example.com"`, `value too long for type
+ * character varying(40)` after a typed phone. Its message is never logged; the
+ * code says the class (Round field-errors S1).
+ */
+function isDataException(source: unknown): boolean {
+  const code = readField(source as Record<string, unknown> | null | undefined, 'code');
+  return typeof code === 'string' && code.startsWith('22');
+}
+
 /** One field off a possibly-hostile object, or undefined if reading it threw. */
 function readField(
   source: Record<string, unknown> | null | undefined,
@@ -104,7 +115,10 @@ export function loggableFailure(e: unknown): Record<string, string> {
       : { thrown: ORM_QUERY_WRAPPER };
   }
   const source = driver ?? (e as Record<string, unknown> | null | undefined);
-  const fields = messageIsSafe(source) ? LOGGABLE_ERROR_FIELDS : LOGGABLE_ERROR_FIELDS.filter((field) => field !== 'message');
+  const fields =
+    messageIsSafe(source) && !isDataException(source)
+      ? LOGGABLE_ERROR_FIELDS
+      : LOGGABLE_ERROR_FIELDS.filter((field) => field !== 'message');
   const safe: Record<string, string> = {};
   for (const field of fields) {
     // Through a guarded read for the same reason `sqlstate.ts` does: this runs

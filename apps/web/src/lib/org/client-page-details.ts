@@ -65,7 +65,7 @@ function normalizeField(field: ClientPageField, text: string): FieldResult {
     case 'studioPhone':
     case 'studioWhatsapp': {
       const phone = studioPhoneOf(text);
-      if (!phone) return { error: { code: 'phone_invalid' } };
+      if (!phone) return { error: { code: 'studio_phone_invalid' } };
       // The client page opens wa.me with it: a number WhatsApp cannot place
       // (a landline) would never show a button.
       return field === 'studioWhatsapp' && !reachableOnWhatsapp(phone)

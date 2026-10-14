@@ -54,6 +54,8 @@ export type CommonActionCode =
   | 'file_too_large'
   // The studio's client page details (Round C, C8).
   | 'phone_invalid'
+  // The studio phone on the client page: the rule of org/studio-phone.ts.
+  | 'studio_phone_invalid'
   | 'whatsapp_invalid'
   | 'iban_invalid'
   | 'bank_name_required'

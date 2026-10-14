@@ -3,8 +3,9 @@
 // `validateFeeSchedule` (fee-schedule.ts), so a split the form lets through is
 // one the server accepts, and one it holds back is said under its box.
 import type { MilestoneBasis, MilestoneKind } from '@metra/db';
-import type { FieldErrors } from '@/lib/actions/field-errors';
-import { formatMoney4, isMoneyString, parseMoney4 } from '@/lib/aggregates/proposal-totals';
+import type { FieldError, FieldErrors } from '@/lib/actions/field-errors';
+import { formatMoney4, parseMoney4 } from '@/lib/aggregates/proposal-totals';
+import { readPositiveAmount, readTypedMoney } from '@/lib/validation/amount-field';
 import { collectFieldErrors } from '@/lib/validation/field-rules';
 import type { FeeScheduleField } from './fee-schedule';
 
@@ -16,6 +17,8 @@ export interface FeeSplitSummary {
   /** What the rows must add up to (scale-4): 100 for percent, the fee for amount; null with no fee. */
   target: string | null;
   hasFee: boolean;
+  /** Why the fee box is refused (empty or zero, unreadable, too large), or null. */
+  feeRefusal: FieldError | null;
   hasDeposit: boolean;
   balanced: boolean;
 }
@@ -30,8 +33,8 @@ export function summarizeFeeSplit(input: {
   designFee: string;
   rows: { kind: MilestoneKind; value: string }[];
 }): FeeSplitSummary {
-  const fee = input.designFee.trim();
-  const hasFee = isMoneyString(fee) && parseMoney4(fee) > 0n;
+  const fee = readPositiveAmount(input.designFee, { code: 'design_fee_required' });
+  const hasFee = fee.ok;
 
   let sum4 = 0n;
   let invalid = false;
@@ -42,22 +45,24 @@ export function summarizeFeeSplit(input: {
     if (value === '') continue;
     filled += 1;
     if (row.kind === 'deposit') hasDeposit = true;
-    if (!isMoneyString(value) || parseMoney4(value) < 0n) {
+    const read = readTypedMoney(value);
+    if (!read.ok) {
       invalid = true;
       continue;
     }
-    sum4 += parseMoney4(value);
+    sum4 += parseMoney4(read.value);
   }
 
   let target4: bigint | null = null;
   if (input.basis === 'percent') target4 = HUNDRED_PERCENT_4;
-  else if (hasFee) target4 = parseMoney4(fee);
+  else if (fee.ok) target4 = parseMoney4(fee.value);
 
   const balanced = !invalid && filled > 0 && target4 !== null && sum4 === target4;
   return {
     total: formatMoney4(sum4),
     target: target4 === null ? null : formatMoney4(target4),
     hasFee,
+    feeRefusal: fee.ok ? null : fee.error,
     hasDeposit,
     balanced,
   };
@@ -67,7 +72,7 @@ export function summarizeFeeSplit(input: {
  *  or off its target, each under its own box, both at once (D1). */
 export function feeSplitFieldErrors(summary: FeeSplitSummary): FieldErrors<FeeScheduleField> {
   return collectFieldErrors({
-    designFee: summary.hasFee ? null : { code: 'design_fee_required' },
+    designFee: summary.feeRefusal,
     milestones: summary.hasDeposit && summary.balanced ? null : { code: 'milestone_split_invalid' },
   });
 }

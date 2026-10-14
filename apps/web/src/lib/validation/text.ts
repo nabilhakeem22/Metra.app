@@ -36,6 +36,17 @@ export function clean(value: string | null | undefined): string | null {
   return value?.trim() || null;
 }
 
+/** Control characters no box should hold (NUL fails a text column outright,
+ *  22021). Tab, line feed and carriage return are not among them: a note may
+ *  carry them. */
+// eslint-disable-next-line no-control-regex -- matching control characters is the point
+const CONTROL_CHARACTERS = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/u;
+
+/** True when `text` holds a control character (a paste out of another app). */
+export function hasControlCharacter(text: string): boolean {
+  return CONTROL_CHARACTERS.test(text);
+}
+
 /**
  * The over-length signal from {@link optionalText}. A distinct `unique symbol`
  * rather than `null`, because the two outcomes must not be confused: `null` means

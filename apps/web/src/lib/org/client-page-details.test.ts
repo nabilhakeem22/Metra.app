@@ -72,7 +72,7 @@ describe('normalizeClientPageChanges: a save is a set of changes (F1)', () => {
     expect(normalizeClientPageChanges({ studioPhone: '12', bankIban: 'EG38', bankName: 'a' })).toEqual({
       ok: false,
       errors: {
-        studioPhone: { code: 'phone_invalid' },
+        studioPhone: { code: 'studio_phone_invalid' },
         bankName: { code: 'too_short', params: { min: 2 } },
         bankIban: { code: 'iban_invalid' },
       },
@@ -107,8 +107,8 @@ describe('normalizeClientPageChanges: phones dial (F2)', () => {
   it.each(['12', '123456', '1234567', '+0000000', '+1234567890123456', '010 1234 567x', '20+1012345678', '++201012345678', '19999'])(
     'refuses the implausible phone %j',
     (typed) => {
-      expect(refusal({ studioPhone: typed })).toEqual({ field: 'studioPhone', code: 'phone_invalid' });
-      expect(refusal({ studioWhatsapp: typed })).toEqual({ field: 'studioWhatsapp', code: 'phone_invalid' });
+      expect(refusal({ studioPhone: typed })).toEqual({ field: 'studioPhone', code: 'studio_phone_invalid' });
+      expect(refusal({ studioWhatsapp: typed })).toEqual({ field: 'studioWhatsapp', code: 'studio_phone_invalid' });
     },
   );
 

@@ -7,8 +7,9 @@ import { isUuid } from '@/lib/uuid';
 import { collectFieldErrors } from '@/lib/validation/field-rules';
 import { PERCENT_REFUSAL } from '@/lib/validation/number-field-rules';
 import { normalizePercent } from '@/lib/validation/percent';
+import { validIsoDate } from '@/lib/validation/iso-date';
 import { clean } from '@/lib/validation/text';
-import { bilingualNameErrors, maxCharacters, type BilingualNameField } from '@/lib/validation/text-field-rules';
+import { bilingualNameErrors, boundedText, type BilingualNameField } from '@/lib/validation/text-field-rules';
 import type { ProjectField, ProjectInput } from './fields';
 
 /** Boundary length caps (defense-in-depth), mirroring org/core profileWithinLimits. */
@@ -43,9 +44,12 @@ export interface ProjectValues {
 
 export type ProjectRead = { ok: true; values: ProjectValues } | { ok: false; errors: FieldErrors<ProjectField> };
 
-/** The fields a typed rule can refuse; the type id and country carry none (the
- *  type's existence is the database's foreign key, the country is uncapped). */
-type RuledField = Exclude<ProjectField, 'typeId' | 'country'>;
+/** The fields a typed rule can refuse; the type id carries none (its existence
+ *  is the database's foreign key). */
+type RuledField = Exclude<ProjectField, 'typeId'>;
+
+/** The country is uncapped, but a control character still fails the column. */
+const UNCAPPED = Number.POSITIVE_INFINITY;
 
 /** An end date before the start, compared as dates (not as text). */
 function endsBeforeStart(startDate: string | null, endDate: string | null): boolean {
@@ -55,9 +59,19 @@ function endsBeforeStart(startDate: string | null, endDate: string | null): bool
   return Number.isFinite(start) && Number.isFinite(end) && end < start;
 }
 
+/** A typed date that names no real day (2026-02-30, a five-digit year). */
+function dateRefusal(date: string | null): FieldError | null {
+  return date !== null && !validIsoDate(date) ? { code: 'invalid_date' } : null;
+}
+
+/** The end date's refusal: not a real day, or before the start. */
+function endDateRefusal(startDate: string | null, endDate: string | null): FieldError | null {
+  return dateRefusal(endDate) ?? (endsBeforeStart(startDate, endDate) ? { code: 'invalid_dates' } : null);
+}
+
 function codeRefusal(code: string | null, rules: ProjectRules): FieldError | null {
   if (!code) return rules.requireCode ? { code: 'code_required' } : null;
-  return maxCharacters(code, PROJECT_LIMITS.code);
+  return boundedText(code, PROJECT_LIMITS.code);
 }
 
 /** Read every typed value at once, or say what is wrong with each of them. */
@@ -83,14 +97,15 @@ export function readProjectInput(input: ProjectInput, rules: ProjectRules = {}):
     ...collectFieldErrors<Exclude<RuledField, BilingualNameField>>({
       code: codeRefusal(code, rules),
       clientId: isUuid(clientId) ? null : { code: 'client_required' },
-      description: maxCharacters(text.description, PROJECT_LIMITS.description),
+      description: boundedText(text.description, PROJECT_LIMITS.description),
       advancePct: advancePct === null ? PERCENT_REFUSAL : null,
       retentionPct: retentionPct === null ? PERCENT_REFUSAL : null,
-      startDate: rules.requireStartDate && !startDate ? { code: 'start_date_required' } : null,
-      endDate: endsBeforeStart(startDate, endDate) ? { code: 'invalid_dates' } : null,
-      city: maxCharacters(text.city, PROJECT_LIMITS.city),
-      address: maxCharacters(text.address, PROJECT_LIMITS.address),
-      notes: maxCharacters(text.notes, PROJECT_LIMITS.notes),
+      startDate: rules.requireStartDate && !startDate ? { code: 'start_date_required' } : dateRefusal(startDate),
+      endDate: endDateRefusal(startDate, endDate),
+      city: boundedText(text.city, PROJECT_LIMITS.city),
+      country: boundedText(text.country, UNCAPPED),
+      address: boundedText(text.address, PROJECT_LIMITS.address),
+      notes: boundedText(text.notes, PROJECT_LIMITS.notes),
     }),
   };
   if (hasFieldErrors(errors) || advancePct === null || retentionPct === null) return { ok: false, errors };

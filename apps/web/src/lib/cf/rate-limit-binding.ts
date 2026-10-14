@@ -23,6 +23,7 @@ export function rateLimitBinding(name: string, surface: string): CloudflareRateL
   const env = cfEnv() as unknown as Record<string, CloudflareRateLimit | undefined>;
   const limiter = env[name];
   if (!limiter) {
+    // developer-only: a binding name and a surface label, both constants.
     throw new Error(
       `Rate limiting binding ${name} is missing on the Cloudflare runtime. ` +
         `Add it to apps/web/wrangler.jsonc. Refusing to serve ${surface} unlimited.`,

@@ -3,6 +3,7 @@ import { sqlstateOf } from '@metra/db/sqlstate';
 import { isConstraintRefusalOf, isImmutabilityViolation } from './db-conflict';
 import { isAmbiguousDbOutcome } from './db-failure';
 import { fieldsFailed, type FieldError } from './field-errors';
+import { loggableFailure } from './loggable-failure';
 import { DbWriteUncertainError } from '@/lib/db/client';
 import { ActionError, type ActionCode, type ActionResult } from './result';
 import { unexpectedFailure } from './unexpected';
@@ -32,6 +33,25 @@ export interface MutationFailureOptions {
 /** Deadlock: Postgres aborted one of two transactions waiting on each other. */
 const DEADLOCK_DETECTED = '40P01';
 
+/**
+ * `value instanceof type`, or false when asking THROWS (a Proxy whose
+ * getPrototypeOf trap throws). This runs inside somebody's `catch`: failing
+ * closed sends the value to the logged tail instead of rejecting mutateInOrg.
+ */
+function isInstance(value: unknown, type: abstract new (...args: never[]) => unknown): boolean {
+  try {
+    return value instanceof type;
+  } catch {
+    return false;
+  }
+}
+
+/** A deadlock or a lost immutability race: expected, answered with its own
+ *  code, and still worth one redacted line (a deadlock is a lock-ordering smell). */
+function noteRace(kind: 'busy' | 'immutable', e: unknown): void {
+  console.warn(`mutateInOrg ${kind}`, { failure: loggableFailure(e) });
+}
+
 function refusalAnswer(refusal: ConstraintRefusal): ActionResult {
   if ('field' in refusal) return fieldsFailed({ [refusal.field]: refusal.error });
   return { ok: false, error: refusal.code };
@@ -55,18 +75,27 @@ function refusalAnswer(refusal: ConstraintRefusal): ActionResult {
  * 6. The tail: logged with a reference (a WHITELIST of the failure, never the
  *    object), answered `generic` with the same reference.
  *
- * Steps 1 to 5 are NOT logged: they are expected outcomes the product has a
- * sentence for, and a false defect line in the log is half of what this removes.
+ * Steps 1, 2 and 4 are NOT logged: they are expected outcomes the product has a
+ * sentence for. Steps 3 and 5 leave one redacted `console.warn` line (no
+ * reference): never a defect line, but a deadlock or a lost lock race is worth
+ * seeing in `wrangler tail`.
  */
 export function mutationFailure(e: unknown, opts: MutationFailureOptions): ActionResult {
-  if (e instanceof ActionError) return { ok: false, error: e.code, ...e.detail };
-  if (e instanceof DbWriteUncertainError || isAmbiguousDbOutcome(e)) {
+  if (isInstance(e, ActionError)) {
+    const coded = e as ActionError;
+    return { ok: false, error: coded.code, ...coded.detail };
+  }
+  if (isInstance(e, DbWriteUncertainError) || isAmbiguousDbOutcome(e)) {
     return { ok: false, error: 'uncertain' };
   }
-  if (sqlstateOf(e) === DEADLOCK_DETECTED) return { ok: false, error: 'busy' };
+  if (sqlstateOf(e) === DEADLOCK_DETECTED) {
+    noteRace('busy', e);
+    return { ok: false, error: 'busy' };
+  }
   const refusal = opts.refusals?.find((named) => isConstraintRefusalOf(e, named.constraint));
   if (refusal) return refusalAnswer(refusal);
   if (isImmutabilityViolation(e)) {
+    noteRace('immutable', e);
     return { ok: false, error: opts.immutableCode ?? 'immutable' };
   }
   return unexpectedFailure('mutateInOrg failed', e);

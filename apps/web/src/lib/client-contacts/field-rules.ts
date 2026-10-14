@@ -3,7 +3,7 @@
 import { hasFieldErrors, type FieldErrors } from '@/lib/actions/field-errors';
 import { collectFieldErrors } from '@/lib/validation/field-rules';
 import { clean } from '@/lib/validation/text';
-import { maxCharacters, requiredText } from '@/lib/validation/text-field-rules';
+import { boundedText, requiredText } from '@/lib/validation/text-field-rules';
 import type { ContactField, ContactInput } from './fields';
 
 /** Boundary length caps, equal to the client's own (a client's first contact is
@@ -30,11 +30,11 @@ export type ContactRead =
 export function readContactInput(input: ContactInput): ContactRead {
   const v = normalizedContact(input);
   const errors = collectFieldErrors<ContactField>({
-    name: requiredText(v.name) ?? maxCharacters(v.name, CONTACT_LIMITS.name),
-    role: maxCharacters(v.role, CONTACT_LIMITS.role),
-    phone: maxCharacters(v.phone, CONTACT_LIMITS.phone),
-    email: maxCharacters(v.email, CONTACT_LIMITS.email),
-    whatsapp: maxCharacters(v.whatsapp, CONTACT_LIMITS.whatsapp),
+    name: requiredText(v.name) ?? boundedText(v.name, CONTACT_LIMITS.name),
+    role: boundedText(v.role, CONTACT_LIMITS.role),
+    phone: boundedText(v.phone, CONTACT_LIMITS.phone),
+    email: boundedText(v.email, CONTACT_LIMITS.email),
+    whatsapp: boundedText(v.whatsapp, CONTACT_LIMITS.whatsapp),
   });
   const name = v.name;
   if (hasFieldErrors(errors) || name === null) return { ok: false, errors };

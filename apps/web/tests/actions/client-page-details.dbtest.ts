@@ -117,7 +117,7 @@ describe('updateClientPageDetailsCore: who and what', () => {
 
   it('names the field a refusal is about; a malformed save names none', async () => {
     const { owner } = await studio();
-    expect(await save(owner, { studioPhone: '+0000000' })).toEqual({ ok: false, error: 'check_fields', fields: { studioPhone: { code: 'phone_invalid' } } });
+    expect(await save(owner, { studioPhone: '+0000000' })).toEqual({ ok: false, error: 'check_fields', fields: { studioPhone: { code: 'studio_phone_invalid' } } });
     expect(await save(owner, { bankAccountNumber: '1234' })).toEqual({ ok: false, error: 'check_fields', fields: { bankName: { code: 'bank_name_required' } } });
     expect(await save(owner, { bankName: `CIB${String.fromCodePoint(0)}` })).toEqual({ ok: false, error: 'check_fields', fields: { bankName: { code: 'unprintable' } } });
     for (const input of [null, [], 'x', { changes: {} }, { revision: 'r', changes: [] }]) {

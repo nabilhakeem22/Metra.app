@@ -58,3 +58,15 @@ describe('what the line keeps', () => {
     expect(line.message).toBeUndefined();
   });
 });
+
+describe('a data exception never logs the value Postgres echoed (S1)', () => {
+  it.each(['22P02', '22001', '22003', '22008', '22021'])('%s keeps its code, drops its message', (code) => {
+    const failure = loggableFailure({
+      name: 'PostgresError',
+      code,
+      message: 'invalid input syntax for type uuid: "someone@example.com"',
+    });
+    expect(failure).toEqual({ name: 'PostgresError', code });
+    expect(JSON.stringify(failure)).not.toContain('someone@example.com');
+  });
+});

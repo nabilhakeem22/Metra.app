@@ -18,6 +18,7 @@ export async function settleWithConcurrency<Item, Outcome>(
   worker: (item: Item) => Promise<Outcome>,
 ): Promise<PromiseSettledResult<Outcome>[]> {
   if (!Number.isInteger(limit) || limit < 1) {
+    // developer-only: the limit is a constant at the call site, never user data.
     throw new RangeError(`concurrency limit must be a positive integer, got ${limit}`);
   }
   const outcomes = new Array<PromiseSettledResult<Outcome>>(items.length);

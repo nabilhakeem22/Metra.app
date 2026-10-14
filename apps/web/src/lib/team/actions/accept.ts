@@ -43,8 +43,9 @@ export async function acceptInvite(rawToken: string): Promise<ActionResult> {
 
     const invitation = rows[0];
     if (!invitation) return err('invite_not_found');
-    if (new Date(invitation.expires_at).getTime() <= Date.now()) return err('invite_expired');
     if (invitation.email.toLowerCase() !== user.email.toLowerCase()) return err('invite_wrong_account');
+    // Only the invitee learns the link has expired (S2): the account match comes first.
+    if (new Date(invitation.expires_at).getTime() <= Date.now()) return err('invite_expired');
 
     const result = await acceptInviteCore(
       { orgId: invitation.org_id, userId: user.id, role: invitation.role, email: user.email },

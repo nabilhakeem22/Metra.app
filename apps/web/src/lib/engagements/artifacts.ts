@@ -28,13 +28,8 @@ import { artifactRecordingFile, assertConceptOptionSlot } from './artifact-fence
 import { isTerminal } from './states';
 import { fieldsFailed } from '@/lib/actions/field-errors';
 import { isUuid } from '@/lib/uuid';
-import { collectFieldErrors } from '@/lib/validation/field-rules';
-import {
-  MAX_LABEL_CHARS,
-  MAX_NOTE_CHARS,
-  TOO_LONG,
-  optionalText,
-} from '@/lib/validation/text';
+import { readFields, readOptionalText } from '@/lib/validation/field-rules';
+import { MAX_LABEL_CHARS, MAX_NOTE_CHARS } from '@/lib/validation/text';
 
 const KIND_SET = new Set<string>(ENGAGEMENT_ARTIFACT_KINDS);
 
@@ -70,18 +65,16 @@ export async function recordArtifactCore(
   if (fileId !== null && !isUuid(fileId)) {
     return { ok: false, error: 'malformed' };
   }
-  const contentHash = optionalText(input.contentHash, MAX_LABEL_CHARS);
-  const label = optionalText(input.label, MAX_LABEL_CHARS);
-  const note = optionalText(input.note, MAX_NOTE_CHARS);
-  // An over-long field is a REFUSAL, not a truncation: storing the first 200
-  // characters of a label would quietly rename the studio's artifact. Each is
-  // said under its own field.
-  const tooLong = collectFieldErrors({
-    contentHash: contentHash === TOO_LONG ? { code: 'too_long', params: { max: MAX_LABEL_CHARS } } : null,
-    label: label === TOO_LONG ? { code: 'too_long', params: { max: MAX_LABEL_CHARS } } : null,
-    note: note === TOO_LONG ? { code: 'too_long', params: { max: MAX_NOTE_CHARS } } : null,
+  // An over-long or unprintable field is a REFUSAL, not a truncation: storing
+  // the first 200 characters of a label would quietly rename the studio's
+  // artifact. Each is said under its own field.
+  const text = readFields({
+    contentHash: readOptionalText(input.contentHash, MAX_LABEL_CHARS),
+    label: readOptionalText(input.label, MAX_LABEL_CHARS),
+    note: readOptionalText(input.note, MAX_NOTE_CHARS),
   });
-  if (contentHash === TOO_LONG || label === TOO_LONG || note === TOO_LONG) return fieldsFailed(tooLong);
+  if (!text.ok) return fieldsFailed(text.errors);
+  const { contentHash, label, note } = text.values;
 
   return mutateInOrg(
     ctx,

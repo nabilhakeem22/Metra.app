@@ -51,12 +51,12 @@ describe.each<TestLocale>(['en', 'ar-EG'])('ClientPageSheet (%s)', (locale) => {
 
   test('a phone and a bank name refused together are both said, each under its field', async () => {
     actions.updateClientPageDetails.mockResolvedValue(
-      fieldsFailed({ studioPhone: { code: 'phone_invalid' }, bankName: { code: 'bank_name_required' } }),
+      fieldsFailed({ studioPhone: { code: 'studio_phone_invalid' }, bankName: { code: 'bank_name_required' } }),
     );
     renderSheet(locale);
     await save(locale);
     expect(document.getElementById('client-page-studioPhone-error')?.textContent).toBe(
-      messageAt(locale, 'errors.phone_invalid'),
+      messageAt(locale, 'errors.studio_phone_invalid'),
     );
     expect(document.getElementById('client-page-bankName-error')?.textContent).toBe(
       messageAt(locale, 'errors.bank_name_required'),

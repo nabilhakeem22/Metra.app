@@ -97,10 +97,30 @@ describe('a constraint the caller named', () => {
 });
 
 describe('the other SQLSTATE answers', () => {
-  it('answers a deadlock busy, logs nothing, and busy holds the key (AC 4)', async () => {
-    await expect(rejectWith({ code: '40P01' })).resolves.toEqual({ ok: false, error: 'busy' });
+  it('answers a deadlock busy, with one redacted warning and no error line; busy holds the key (AC 4, R7)', async () => {
+    const warned = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    await expect(rejectWith({ code: '40P01', detail: 'Process 1 waits for secret-row' })).resolves.toEqual({
+      ok: false,
+      error: 'busy',
+    });
     expect(logged).not.toHaveBeenCalled();
+    expect(warned).toHaveBeenCalledOnce();
+    expect(warned).toHaveBeenCalledWith('mutateInOrg busy', { failure: { code: '40P01' } });
     expect(isDefiniteRefusal('busy')).toBe(false);
+    warned.mockRestore();
+  });
+
+  it('never throws on a hostile value, failing closed to the logged tail (R8)', async () => {
+    const hostile = new Proxy(
+      {},
+      {
+        getPrototypeOf() {
+          throw new Error('trap');
+        },
+      },
+    );
+    await expect(rejectWith(hostile)).resolves.toMatchObject({ ok: false, error: 'generic' });
+    expect(logged).toHaveBeenCalledOnce();
   });
 
   it.each(['55P03', '57014', '57P01', '08006', 'ECONNRESET'])(
@@ -118,6 +138,14 @@ describe('the other SQLSTATE answers', () => {
       error: 'contract_not_draft',
     });
     expect(logged).not.toHaveBeenCalled();
+  });
+
+  it('leaves one redacted warning for an immutability race (R7)', async () => {
+    const warned = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    await rejectWith({ code: 'MT100' });
+    expect(warned).toHaveBeenCalledOnce();
+    expect(warned).toHaveBeenCalledWith('mutateInOrg immutable', { failure: { code: 'MT100' } });
+    warned.mockRestore();
   });
 });
 

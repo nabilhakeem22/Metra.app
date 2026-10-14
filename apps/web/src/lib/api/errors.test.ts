@@ -137,6 +137,7 @@ const ALL_CODES: ActionCode[] = [
   'invalid_price',
   'invalid_discount',
   'phone_invalid',
+  'studio_phone_invalid',
   'whatsapp_invalid',
   'iban_invalid',
   'bank_name_required',

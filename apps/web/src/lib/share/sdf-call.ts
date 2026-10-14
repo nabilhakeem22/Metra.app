@@ -65,6 +65,7 @@ function leadingSqlText(query: SQL): string {
 function assertTokenSdf(query: SQL): void {
   const leading = leadingSqlText(query);
   if (TOKEN_SDF_CALL.test(leading)) return;
+  // developer-only: the refused text is the caller's own SQL, never a parameter.
   throw new Error(
     `sdf-call runs token SECURITY DEFINER functions only; refused: ${leading.trim().slice(0, 80)}`,
   );

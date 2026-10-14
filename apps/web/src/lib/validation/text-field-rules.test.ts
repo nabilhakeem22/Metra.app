@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { bilingualNameErrors, maxCharacters, requiredText } from './text-field-rules';
+import { readOptionalText } from './field-rules';
+import { bilingualNameErrors, boundedText, requiredText } from './text-field-rules';
 
 describe('text field rules', () => {
   it('requiredText refuses blank and whitespace, nothing else', () => {
@@ -7,13 +8,21 @@ describe('text field rules', () => {
     expect(requiredText(' a ')).toBeNull();
   });
 
-  it('maxCharacters counts code points of the trimmed value and says the cap', () => {
-    expect(maxCharacters('abc', 3)).toBeNull();
-    expect(maxCharacters('  abc  ', 3)).toBeNull();
-    expect(maxCharacters('abcd', 3)).toEqual({ code: 'too_long', params: { max: 3 } });
+  it('boundedText counts code points of the trimmed value and says the cap', () => {
+    expect(boundedText('abc', 3)).toBeNull();
+    expect(boundedText('  abc  ', 3)).toBeNull();
+    expect(boundedText('abcd', 3)).toEqual({ code: 'too_long', params: { max: 3 } });
     // Two astral characters are two characters, not four UTF-16 units.
-    expect(maxCharacters('😀😀', 2)).toBeNull();
-    expect(maxCharacters(null, 3)).toBeNull();
+    expect(boundedText('😀😀', 2)).toBeNull();
+    expect(boundedText(null, 3)).toBeNull();
+  });
+
+  it('boundedText refuses a control character under the field, keeps tab and line breaks (F15)', () => {
+    for (const pasted of ['Villa\u0000', 'a\u0007b', 'x\u001Fy', 'del\u007F'])
+      expect(boundedText(pasted, 200), JSON.stringify(pasted)).toEqual({ code: 'unprintable' });
+    expect(boundedText('line one\nline two\r\n\tindented', 200)).toBeNull();
+    expect(readOptionalText('note\u0000', 2000)).toEqual({ ok: false, error: { code: 'unprintable' } });
+    expect(readOptionalText('note\nmore', 2000)).toEqual({ ok: true, value: 'note\nmore' });
   });
 
   it('bilingualNameErrors: one name is enough, each is capped', () => {

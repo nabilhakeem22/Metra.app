@@ -1,0 +1,75 @@
+import { describe, expect, it, vi } from 'vitest';
+import { readPaymentAmount } from '@/lib/engagements/payment-field-rules';
+import { validateFeeSchedule } from '@/lib/engagements/fee-schedule';
+import { readRomRange } from '@/lib/engagements/rom-field-rules';
+import { formatMoney4, parseMoney4 } from '@/lib/aggregates/proposal-totals';
+import { readPositiveAmount, readTypedMoney } from './amount-field';
+
+// validateFeeSchedule sits beside its server-only runner; the reader under test is pure.
+vi.mock('server-only', () => ({}));
+
+const MISSING = { code: 'payment_amount_invalid' } as const;
+
+describe('readTypedMoney: what studios type', () => {
+  it.each(['1500', '1,500', '١٥٠٠', '١,٥٠٠', '1500 EGP', 'EGP 1,500', '1500 ج.م', '1500ج.م', ' 1,500.00 LE '])(
+    'reads %j as 1500',
+    (typed) => {
+      const read = readTypedMoney(typed);
+      expect(read.ok && formatMoney4(parseMoney4(read.value))).toBe('1500.0000');
+      expect(readPositiveAmount(typed, MISSING)).toEqual({ ok: true, value: '1500.0000' });
+    },
+  );
+
+  it('still refuses the ambiguous comma, and says why', () => {
+    expect(readTypedMoney('1,5')).toEqual({ ok: false, error: { code: 'not_a_number' } });
+    expect(readTypedMoney('abc')).toEqual({ ok: false, error: { code: 'not_a_number' } });
+    expect(readTypedMoney('-5')).toEqual({ ok: false, error: { code: 'not_negative' } });
+  });
+
+  it('refuses a figure past the column cap before any write (22003)', () => {
+    expect(readTypedMoney('123456789012345')).toEqual({ ok: false, error: { code: 'amount_too_large' } });
+  });
+});
+
+describe('readPositiveAmount', () => {
+  it('says "enter an amount" only for an empty box or a zero', () => {
+    expect(readPositiveAmount('', MISSING)).toEqual({ ok: false, error: MISSING });
+    expect(readPositiveAmount('0', MISSING)).toEqual({ ok: false, error: MISSING });
+    expect(readPositiveAmount('1,5', MISSING)).toEqual({ ok: false, error: { code: 'not_a_number' } });
+  });
+});
+
+describe('every money box reads the same way (F2, F6)', () => {
+  it('payment amount', () => {
+    expect(readPaymentAmount('1,500')).toEqual({ ok: true, value: '1500.0000' });
+    expect(readPaymentAmount('١٥٠٠ ج.م')).toEqual({ ok: true, value: '1500.0000' });
+    expect(readPaymentAmount('123456789012345')).toEqual({ ok: false, error: { code: 'amount_too_large' } });
+  });
+
+  it('design fee', () => {
+    const split = [{ kind: 'deposit', basis: 'percent', value: '100' }];
+    expect(validateFeeSchedule({ designFee: '1,500', milestones: split }).ok).toBe(true);
+    expect(validateFeeSchedule({ designFee: 'abc', milestones: split })).toEqual({
+      ok: false,
+      field: 'designFee',
+      error: { code: 'not_a_number' },
+    });
+    expect(validateFeeSchedule({ designFee: '123456789012345', milestones: split })).toEqual({
+      ok: false,
+      field: 'designFee',
+      error: { code: 'amount_too_large' },
+    });
+  });
+
+  it('build-cost range', () => {
+    expect(readRomRange({ romLow: '900,000', romHigh: '1,200,000 EGP' })).toEqual({
+      ok: true,
+      romLow: '900000.0000',
+      romHigh: '1200000.0000',
+    });
+    expect(readRomRange({ romLow: '1', romHigh: '123456789012345' })).toEqual({
+      ok: false,
+      errors: { romHigh: { code: 'amount_too_large' } },
+    });
+  });
+});
