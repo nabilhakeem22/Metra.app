@@ -247,14 +247,14 @@ describe('useEngagementAction — settling', () => {
   // The stuck-spinner path. `pending` gates the command card, all five tab
   // headers and every panel form; an unguarded rejection would leave all of them
   // disabled with no way back but a reload.
-  test("a rejection leaves pending false and sets error 'generic'", async () => {
+  test("a rejection leaves pending false and sets error 'uncertain' (the answer was lost, the key is held)", async () => {
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
     mountProbe();
     answers.set('requestRevision', 'throw');
     await press('requestRevision');
 
     expect(screen.getByTestId('pending').textContent).toBe('false');
-    expect(screen.getByTestId('error').textContent).toBe('generic');
+    expect(screen.getByTestId('error').textContent).toBe('uncertain');
     expect(consoleError).toHaveBeenCalled();
     consoleError.mockRestore();
   });

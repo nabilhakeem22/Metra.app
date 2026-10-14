@@ -91,7 +91,8 @@ export function useEngagementAction(
     if (trigger && releasesKey(result)) heldKeys.release(engagementId, trigger, act);
     if (result.ok) router.refresh();
     else if (sink) sink.applyResult(result);
-    else setError((result.error as ActionCode) ?? 'generic');
+    // A refusal with no code cannot be read as definite: say "refresh and check".
+    else setError(result.error ?? 'uncertain');
   }
 
   function runAction(
@@ -128,7 +129,7 @@ export function useEngagementAction(
           loggableFailure(cause),
         );
         if (sink) sink.applyRejection(cause);
-        else setError('generic');
+        else setError('uncertain');
       } finally {
         inFlight.current = false;
       }

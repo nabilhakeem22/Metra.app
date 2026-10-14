@@ -4,7 +4,7 @@ import { useTranslations } from 'next-intl';
 import { useTransition } from 'react';
 import { toast } from '@/hooks/use-toast';
 import { useRouter } from '@/i18n/routing';
-import { resolveActionError } from '@/lib/actions/error-message';
+import { describeFailure, describeRejection } from '@/lib/actions/error-message';
 import { openBoqProposal } from '@/lib/boq-proposals/actions';
 import { boqProposalHref } from '@/lib/boqs/step';
 
@@ -29,9 +29,9 @@ export function useOpenBoqProposal(engagementId: string): {
           router.push(boqProposalHref(res.data));
           return;
         }
-        toast({ title: resolveActionError(res.error, te), variant: 'destructive' });
-      } catch {
-        toast({ title: resolveActionError('generic', te), variant: 'destructive' });
+        toast({ title: describeFailure(res, te), variant: 'destructive' });
+      } catch (rejection) {
+        toast({ title: describeRejection(rejection, te), variant: 'destructive' });
       }
     });
   }

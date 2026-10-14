@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ActionError, err, fail, ok } from './result';
+import { ActionError, err, fail, ok, type ActionCode } from './result';
 
 describe('action result', () => {
   it('ok() and err() build the flat shape', () => {
@@ -21,5 +21,11 @@ describe('action result', () => {
       expect((e as ActionError).code).toBe('immutable');
       expect((e as ActionError).message).toBe('immutable');
     }
+  });
+
+  it('has no vague `invalid` code any more (AC 23)', () => {
+    // @ts-expect-error `invalid` was removed: a refusal names its cause.
+    const vague: ActionCode = 'invalid';
+    expect(vague).toBe('invalid');
   });
 });

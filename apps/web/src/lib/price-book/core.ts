@@ -86,7 +86,7 @@ export async function updateCostItemCore(
         .from(costItems)
         .where(eq(costItems.id, input.id))
         .limit(1);
-      if (!before) fail('invalid');
+      if (!before) fail('record_not_found');
       await requireWritable(tx, { ...columns, exceptId: input.id });
 
       await tx
@@ -126,7 +126,7 @@ export async function setCostItemActiveCore(
         costItems,
         input.id,
         { id: costItems.id, active: costItems.active },
-        'invalid',
+        'record_not_found',
       );
 
       await tx

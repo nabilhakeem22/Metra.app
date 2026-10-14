@@ -5,7 +5,7 @@ import { useTransition } from 'react';
 import type { ConfirmOptions } from '@/components/ui/confirm-dialog';
 import { toast } from '@/hooks/use-toast';
 import { useRouter } from '@/i18n/routing';
-import { resolveActionError } from '@/lib/actions/error-message';
+import { describeFailure, describeRejection } from '@/lib/actions/error-message';
 import type { ActionCode } from '@/lib/actions/result';
 import { sendProposalAsBoq } from '@/lib/boq-proposals/actions';
 import { countSendable } from '@/lib/boq-proposals/count';
@@ -66,8 +66,13 @@ export function useSendAsBoq(options: {
   const router = useRouter();
   const [pending, start] = useTransition();
 
-  const refuse = (code: ActionCode | undefined): void => {
-    toast({ title: resolveActionError(code, te), variant: 'destructive' });
+  /** A refusal, said with its cause (and its reference, when it has one). */
+  const refuse = (result: { error?: ActionCode; reference?: string }): void => {
+    toast({ title: describeFailure(result, te), variant: 'destructive' });
+  };
+  /** An action that never answered: unreachable, or a server throw with its digest. */
+  const lost = (rejection: unknown): void => {
+    toast({ title: describeRejection(rejection, te), variant: 'destructive' });
   };
 
   const showRealState = (): void => {
@@ -80,8 +85,8 @@ export function useSendAsBoq(options: {
     let sent: Awaited<ReturnType<typeof sendProposalAsBoq>>;
     try {
       sent = await sendProposalAsBoq(options.proposalId);
-    } catch {
-      refuse('generic');
+    } catch (rejection) {
+      lost(rejection);
       showRealState();
       return;
     }
@@ -90,7 +95,7 @@ export function useSendAsBoq(options: {
       router.push(`/engagements/${options.engagementId}`);
       return;
     }
-    refuse(sent.error);
+    refuse(sent);
     if (UNKNOWN_OUTCOME.has(sent.error)) showRealState();
   }
 
@@ -122,11 +127,11 @@ export function useSendAsBoq(options: {
       try {
         const saved = await options.flush();
         if (!saved.ok) {
-          refuse(saved.error);
+          refuse(saved);
           return;
         }
-      } catch {
-        refuse('generic');
+      } catch (rejection) {
+        lost(rejection);
         return;
       }
       await sendSaved();

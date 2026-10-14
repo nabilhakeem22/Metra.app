@@ -3,7 +3,6 @@
 // The full union is `ActionCode` in `lib/actions/result.ts`.
 export type CommonActionCode =
   | 'forbidden'
-  | 'invalid'
   | 'generic'
   | 'uncertain'
   // The input broke field rules; `fields` says which, under each field.

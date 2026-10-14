@@ -8,7 +8,6 @@ import type { ActionCode } from '@/lib/actions/result';
 // missing code already fails tsc; this asserts the runtime map too.)
 const ALL_CODES: ActionCode[] = [
   'forbidden',
-  'invalid',
   'generic',
   'uncertain',
   'check_fields',
@@ -187,9 +186,9 @@ describe('ActionCode -> problem mapping', () => {
     );
   });
 
-  it('forbidden -> 403, invalid -> 400, generic -> 500', () => {
+  it('forbidden -> 403, malformed -> 400, generic -> 500', () => {
     expect(problemFromActionCode('forbidden').status).toBe(403);
-    expect(problemFromActionCode('invalid').status).toBe(400);
+    expect(problemFromActionCode('malformed').status).toBe(400);
     expect(problemFromActionCode('generic').status).toBe(500);
   });
 });
