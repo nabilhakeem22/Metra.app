@@ -1556,6 +1556,7 @@
       "title": "Electronic acknowledgement",
       "intro": "Please review this contract and confirm your electronic acknowledgement.",
       "nameLabel": "Your full name",
+      "nameRequired": "Write your full name to acknowledge the contract.",
       "button": "Acknowledge electronically",
       "done": "Your acknowledgement has been recorded. Thank you.",
       "already": "This contract has already been acknowledged.",

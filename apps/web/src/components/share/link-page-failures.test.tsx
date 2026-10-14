@@ -117,3 +117,36 @@ describe.each<TestLocale>(['en', 'ar-EG'])('a link page whose answer never lande
     expectStillOpen(page, withReference('4242'));
   });
 });
+
+// F7: every link page labels its name box; /c never disables Acknowledge for a
+// blank name, and pressing it says, under the labelled box, to write the name.
+describe.each<TestLocale>(['en', 'ar-EG'])('the signer name (%s)', (locale) => {
+  const at = (key: string) => messageAt(locale, key);
+
+  test.each([
+    ['/p', () => renderWithIntl(<PublicProposalView token="t" proposal={PROPOSAL} />, { locale }), 'proposals.p.yourName'],
+    ['/c', () => renderWithIntl(<PublicContractView token="t" contract={CONTRACT} />, { locale }), 'contracts.ack.nameLabel'],
+    ['/v', () => renderWithIntl(<PublicVariationView token="t" variation={VARIATION} />, { locale }), 'variations.client.nameLabel'],
+  ])('%s labels its name box', (_page, show, label) => {
+    show();
+    expect(screen.getByLabelText(at(label)).tagName).toBe('INPUT');
+  });
+
+  test('/c: a blank name is said under the box, with focus there, and nothing is sent', async () => {
+    renderWithIntl(<PublicContractView token="t" contract={CONTRACT} />, { locale });
+    const button = screen.getByRole('button', { name: at('contracts.ack.button') });
+    expect(button.hasAttribute('disabled')).toBe(false);
+    await act(async () => {
+      fireEvent.click(button);
+    });
+    const box = screen.getByLabelText(at('contracts.ack.nameLabel'));
+    expect(answers.acknowledgeContract).not.toHaveBeenCalled();
+    expect(document.getElementById(`${box.id}-error`)?.textContent).toBe(at('contracts.ack.nameRequired'));
+    expect(document.getElementById(`${box.id}-error`)?.hasAttribute('role')).toBe(false);
+    expect(box.getAttribute('aria-invalid')).toBe('true');
+    expect(box.getAttribute('aria-describedby')).toBe(`${box.id}-error`);
+    expect(document.activeElement).toBe(box);
+    fireEvent.change(box, { target: { value: 'Mona' } });
+    expect(document.getElementById(`${box.id}-error`)).toBeNull();
+  });
+});

@@ -55,6 +55,19 @@ describe.each<TestLocale>(['en', 'ar-EG'])('BoqStart import refusals (%s)', (loc
     expect(document.getElementById('boq-import-file-error')?.textContent).toBe(at('errors.import_unreadable'));
   });
 
+  test('Import is never disabled: a sheet with no usable line says so under the upload control', async () => {
+    actions.previewBoqImport.mockResolvedValue({ ok: true, lines: [], problems: [], notes: [] });
+    renderStart();
+    await upload('Description,Unit,Qty,Rate\n');
+    const commit = screen.getByRole('button', { name: at('projects.profile.boq.commitImport') });
+    expect(commit.hasAttribute('disabled')).toBe(false);
+    await act(async () => {
+      fireEvent.click(commit);
+    });
+    expect(actions.commitBoqImport).not.toHaveBeenCalled();
+    expect(document.getElementById('boq-import-file-error')?.textContent).toBe(at('errors.import_empty'));
+  });
+
   test('a commit that fails is said above the buttons by its cause', async () => {
     actions.previewBoqImport.mockResolvedValue({ ok: true, lines: [{ description: 'Walls' }], problems: [], notes: [] });
     actions.createBoq.mockResolvedValue({ ok: true, data: 'b-1' });
