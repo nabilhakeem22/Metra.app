@@ -13,6 +13,10 @@ export type CommonActionCode =
   | 'busy'
   // Input no form can produce (a forged id, an enum outside its select).
   | 'malformed'
+  // The row is gone or moved to another workspace (someone deleted it).
+  | 'record_not_found'
+  // A logo that is not a PNG, JPG or WebP image of at most 2 MB.
+  | 'logo_image_unsupported'
   | 'name_required'
   | 'phone_required'
   | 'start_date_required'
@@ -46,6 +50,7 @@ export type CommonActionCode =
   | 'whatsapp_invalid'
   | 'iban_invalid'
   | 'bank_name_required'
+  | 'account_number_invalid'
   | 'client_page_details_owner_only'
   | 'client_page_details_stale'
   | 'expected_date_out_of_range';
