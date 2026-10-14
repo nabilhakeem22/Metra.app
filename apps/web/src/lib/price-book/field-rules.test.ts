@@ -1,0 +1,49 @@
+import { describe, expect, test } from 'vitest';
+import { costItemFieldErrors, readCostItemInput } from './field-rules';
+import type { CostItemInput } from './fields';
+
+const VALID: CostItemInput = {
+  code: ' PB-1 ',
+  nameEn: 'Board',
+  nameAr: null,
+  sectionId: 's-1',
+  unit: 'sqm',
+  defaultUnitCost: '1,500',
+  defaultUnitPrice: '',
+};
+
+describe('readCostItemInput', () => {
+  test('reads trimmed text, grouped thousands, and a cleared box as zero', () => {
+    expect(readCostItemInput(VALID)).toEqual({
+      ok: true,
+      values: {
+        code: 'PB-1',
+        nameEn: 'Board',
+        nameAr: null,
+        defaultUnitCost: '1500',
+        defaultUnitPrice: '0',
+      },
+    });
+  });
+
+  test('says every broken rule at once, each under its own field', () => {
+    expect(
+      costItemFieldErrors({
+        ...VALID,
+        code: '  ',
+        nameEn: ' ',
+        defaultUnitCost: '1,5',
+        defaultUnitPrice: '9999999999999',
+      }),
+    ).toEqual({
+      code: { code: 'code_required' },
+      name: { code: 'name_required' },
+      defaultUnitCost: { code: 'not_a_number' },
+      defaultUnitPrice: { code: 'amount_too_large' },
+    });
+  });
+
+  test('one name of the pair is enough', () => {
+    expect(costItemFieldErrors({ ...VALID, nameEn: null, nameAr: 'لوح' })).toEqual({});
+  });
+});

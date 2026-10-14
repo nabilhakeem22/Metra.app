@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { describeFailure, describeRejection, type Translate } from '@/lib/actions/error-message';
 import { describeFieldError } from '@/lib/actions/field-error-message';
 import { hasFieldErrors, type FieldError, type FieldErrors } from '@/lib/actions/field-errors';
@@ -71,9 +71,8 @@ export function useFieldErrors<F extends string>({
     });
   }
 
-  function clear(): void {
-    setShown(NOTHING_SHOWN);
-  }
+  /** Stable, so a form can clear on open from an effect. */
+  const clear = useCallback((): void => setShown(NOTHING_SHOWN), []);
 
   /** Show what a failed result says; true when it carried an error. */
   function applyResult(result: ActionResult): boolean {

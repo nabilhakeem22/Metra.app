@@ -29,8 +29,9 @@ export async function createCostItem(
 ): Promise<ActionResult> {
   const ctx = await requireOrg();
   const res = await createCostItemCore(ctx, input);
-  if (res.ok) refreshApp();
-  return { ok: res.ok, error: res.error };
+  if (!res.ok) return res;
+  refreshApp();
+  return { ok: true };
 }
 
 export async function updateCostItem(
@@ -38,8 +39,9 @@ export async function updateCostItem(
 ): Promise<ActionResult> {
   const ctx = await requireOrg();
   const res = await updateCostItemCore(ctx, input);
-  if (res.ok) refreshApp();
-  return { ok: res.ok, error: res.error };
+  if (!res.ok) return res;
+  refreshApp();
+  return { ok: true };
 }
 
 export async function setCostItemActive(
