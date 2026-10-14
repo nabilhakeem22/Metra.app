@@ -17,6 +17,7 @@ import {
   type MilestoneKind,
 } from '@metra/db';
 import { eq } from 'drizzle-orm';
+import { failFields } from '@/lib/actions/field-errors';
 import { fail } from '@/lib/actions/mutate';
 import type { ActionCode } from '@/lib/actions/result';
 import {
@@ -43,9 +44,15 @@ interface ValidatedFeeSchedule {
   milestones: ValidatedMilestone[];
 }
 
+/** The fee form's two boxes a refusal can sit under: the fee, and the split. */
+export type FeeScheduleField = 'designFee' | 'milestones';
+
 type FeeScheduleValidation =
   | { ok: true; schedule: ValidatedFeeSchedule }
-  | { ok: false; code: ActionCode };
+  | { ok: false; code: ActionCode; field?: FeeScheduleField };
+
+const FEE_REQUIRED = { ok: false, code: 'design_fee_required', field: 'designFee' } as const;
+const SPLIT_INVALID = { ok: false, code: 'milestone_split_invalid', field: 'milestones' } as const;
 
 const KIND_SET = new Set<string>(MILESTONE_KINDS);
 const BASIS_SET = new Set<string>(MILESTONE_BASES);
@@ -59,19 +66,20 @@ const BASIS_SET = new Set<string>(MILESTONE_BASES);
  *  - all milestones share ONE basis (no mixing)                  → milestone_split_invalid
  *  - basis=percent: Σ percent = exactly 100.0000                 → milestone_split_invalid
  *  - basis=amount:  Σ amount  = designFee to the piastre         → milestone_split_invalid
- * On success returns canonical (scale-4, kind-ordered) rows to persist.
+ * On success returns canonical (scale-4, kind-ordered) rows to persist. The two
+ * codes the fee form can fix carry the box they belong under (`field`).
  */
 export function validateFeeSchedule(payload: unknown): FeeScheduleValidation {
-  if (!isRecord(payload)) return { ok: false, code: 'design_fee_required' };
+  if (!isRecord(payload)) return FEE_REQUIRED;
 
   const { designFee, milestones } = payload;
 
-  if (!isMoneyString(designFee)) return { ok: false, code: 'design_fee_required' };
+  if (!isMoneyString(designFee)) return FEE_REQUIRED;
   const designFee4 = parseMoney4(designFee);
-  if (designFee4 <= 0n) return { ok: false, code: 'design_fee_required' };
+  if (designFee4 <= 0n) return FEE_REQUIRED;
 
   if (!Array.isArray(milestones) || milestones.length === 0) {
-    return { ok: false, code: 'milestone_split_invalid' };
+    return SPLIT_INVALID;
   }
 
   const seenKinds = new Set<MilestoneKind>();
@@ -80,19 +88,19 @@ export function validateFeeSchedule(payload: unknown): FeeScheduleValidation {
     [];
 
   for (const raw of milestones) {
-    if (!isRecord(raw)) return { ok: false, code: 'milestone_split_invalid' };
+    if (!isRecord(raw)) return SPLIT_INVALID;
     const { kind, basis, value } = raw;
     if (typeof kind !== 'string' || !KIND_SET.has(kind)) {
-      return { ok: false, code: 'milestone_split_invalid' };
+      return SPLIT_INVALID;
     }
     if (typeof basis !== 'string' || !BASIS_SET.has(basis)) {
-      return { ok: false, code: 'milestone_split_invalid' };
+      return SPLIT_INVALID;
     }
     if (!isMoneyString(value)) {
-      return { ok: false, code: 'milestone_split_invalid' };
+      return SPLIT_INVALID;
     }
     const value4 = parseMoney4(value);
-    if (value4 < 0n) return { ok: false, code: 'milestone_split_invalid' };
+    if (value4 < 0n) return SPLIT_INVALID;
 
     const kindTyped = kind as MilestoneKind;
     if (seenKinds.has(kindTyped)) {
@@ -104,16 +112,16 @@ export function validateFeeSchedule(payload: unknown): FeeScheduleValidation {
   }
 
   if (!seenKinds.has('deposit')) {
-    return { ok: false, code: 'milestone_split_invalid' };
+    return SPLIT_INVALID;
   }
 
   // A schedule may not mix percent and amount milestones.
-  if (bases.size !== 1) return { ok: false, code: 'milestone_split_invalid' };
+  if (bases.size !== 1) return SPLIT_INVALID;
   const basis = [...bases][0];
 
   const sum4 = parsed.reduce((acc, m) => acc + m.value4, 0n);
   const target4 = basis === 'percent' ? HUNDRED_PERCENT_4 : designFee4;
-  if (sum4 !== target4) return { ok: false, code: 'milestone_split_invalid' };
+  if (sum4 !== target4) return SPLIT_INVALID;
 
   // Canonicalize: stable kind order (deposit, gate_a, gate_b, balance) as sortOrder.
   const kindOrder = new Map<MilestoneKind, number>(
@@ -146,7 +154,10 @@ export async function generateFeeSchedule(
   payload: unknown,
 ): Promise<void> {
   const result = validateFeeSchedule(payload);
-  if (!result.ok) fail(result.code);
+  if (!result.ok) {
+    if (result.field) failFields({ [result.field]: { code: result.code } });
+    fail(result.code);
+  }
   const { designFee, milestones } = result.schedule;
 
   await tx

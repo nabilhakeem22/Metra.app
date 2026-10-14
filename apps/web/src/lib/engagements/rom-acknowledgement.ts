@@ -4,16 +4,11 @@
 // snapshotting the current ROM into the event so the acknowledged range is frozen.
 import { designEngagements, engagementEvents } from '@metra/db';
 import { sql } from 'drizzle-orm';
+import { fieldsFailed } from '@/lib/actions/field-errors';
 import { fail, mutateInOrg, requireInOrg } from '@/lib/actions/mutate';
-import { err, type ActionResult } from '@/lib/actions/result';
+import type { ActionResult } from '@/lib/actions/result';
 import type { OrgContext } from '@/lib/db/context';
-import {
-  MAX_LABEL_CHARS,
-  MAX_NOTE_CHARS,
-  TOO_LONG,
-  optionalText,
-} from '@/lib/validation/text';
-import { isValidOccurredOn } from './event-provenance';
+import { readAcknowledgementFields } from './acknowledgement-field-rules';
 import { isTerminal } from './states';
 
 export interface RecordRomAcknowledgementInput {
@@ -50,25 +45,12 @@ export async function recordRomAcknowledgementCore(
   ctx: OrgContext,
   input: RecordRomAcknowledgementInput,
 ): Promise<ActionResult & { data?: string }> {
-  const note = optionalText(input.note, MAX_NOTE_CHARS);
-  const evidence = optionalText(input.evidence, MAX_NOTE_CHARS);
-  // Provenance, validated before the transaction opens. A future date is either
-  // a typo or a fabrication, and either way has no business on an evidentiary
-  // record. `toISOString` gives today in UTC, which is the same calendar day the
-  // `<input type="date">` offered.
-  const occurredOn = optionalText(input.occurredOn, MAX_LABEL_CHARS);
-  // An over-long field is a REFUSAL, not a truncation: silently storing the
-  // first 2000 characters of what the studio typed would lose the rest of an
-  // evidentiary note without telling anyone.
-  if (note === TOO_LONG || evidence === TOO_LONG || occurredOn === TOO_LONG) {
-    return err('invalid');
-  }
-  if (
-    occurredOn !== null &&
-    !isValidOccurredOn(occurredOn, new Date().toISOString().slice(0, 10))
-  ) {
-    return err('invalid');
-  }
+  // Provenance, validated before the transaction opens, every refusal under its
+  // field. `toISOString` gives today in UTC, the calendar day the date input
+  // offered.
+  const typed = readAcknowledgementFields(input, new Date().toISOString().slice(0, 10));
+  if (!typed.ok) return fieldsFailed(typed.errors);
+  const { note, occurredOn, evidence } = typed.values;
 
   return mutateInOrg(
     ctx,

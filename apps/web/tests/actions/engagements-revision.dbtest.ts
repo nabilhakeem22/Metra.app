@@ -205,7 +205,11 @@ describe('requestRevision — crossing the free allowance raises a change order'
     expect(await requestRevisionTransitionCount(engagementId)).toBe(3);
 
     const res = await requestRevision(ctx, engagementId);
-    expect(res).toEqual({ ok: false, error: 'revision_co_amount_required' });
+    expect(res).toEqual({
+      ok: false,
+      error: 'check_fields',
+      fields: { changeOrderAmount: { code: 'revision_co_amount_required' } },
+    });
     // The whole transition rolled back: counter unchanged, no CO, no 4th row.
     expect(await revisionCountOf(engagementId)).toBe(3);
     expect(await changeOrderCount(engagementId)).toBe(0);
@@ -259,7 +263,11 @@ describe('requestRevision — crossing the free allowance raises a change order'
     const res = await requestRevision(ctx, engagementId, {
       changeOrderAmount: '1,5',
     });
-    expect(res).toEqual({ ok: false, error: 'revision_co_amount_required' });
+    expect(res).toEqual({
+      ok: false,
+      error: 'check_fields',
+      fields: { changeOrderAmount: { code: 'revision_co_amount_required' } },
+    });
     expect(await revisionCountOf(engagementId)).toBe(3);
     expect(await changeOrderCount(engagementId)).toBe(0);
   });
@@ -272,7 +280,11 @@ describe('requestRevision — crossing the free allowance raises a change order'
     const res = await requestRevision(ctx, engagementId, {
       changeOrderAmount: '0',
     });
-    expect(res).toEqual({ ok: false, error: 'revision_co_amount_required' });
+    expect(res).toEqual({
+      ok: false,
+      error: 'check_fields',
+      fields: { changeOrderAmount: { code: 'revision_co_amount_required' } },
+    });
     expect(await changeOrderCount(engagementId)).toBe(0);
   });
 });

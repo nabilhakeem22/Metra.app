@@ -35,7 +35,6 @@ export type EngagementActionCode =
   | 'client_review_pending'
   // "Client approved offline" input a retry can never fix (offline-approval.ts).
   | 'offline_approval_date_out_of_range'
-  | 'offline_approval_note_too_long'
   // The client answered the review on the portal while the studio was recording
   // an offline approval (offline-approval-input.ts): reload and read their answer.
   | 'client_review_answered'

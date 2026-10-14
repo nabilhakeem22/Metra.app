@@ -11,13 +11,13 @@ afterEach(() => actions.recordEventCorrection.mockClear());
 const en = (path: string) => messageAt('en', path);
 
 function openWithReason() {
-  const runAction = vi.fn((fn: () => Promise<unknown>) => void fn());
+  const runAction = vi.fn((fn: (idempotencyKey: string) => Promise<unknown>) => void fn('k'));
   renderWithIntl(
     <RetractButton engagementId="e-1" eventId="ev-1" pending={false} runAction={runAction} />,
     { locale: 'en' },
   );
   fireEvent.click(screen.getByRole('button', { name: en('engagements.timeline.retract') }));
-  fireEvent.change(screen.getByLabelText(en('engagements.timeline.retractReason')), {
+  fireEvent.change(screen.getByRole('textbox', { name: new RegExp(en('engagements.timeline.retractReason')) }), {
     target: { value: 'Logged on the wrong delivery' },
   });
   fireEvent.click(screen.getByRole('button', { name: en('engagements.timeline.retractConfirm') }));
@@ -47,5 +47,23 @@ describe('retracting a ledger row', () => {
       eventId: 'ev-1',
       reason: 'Logged on the wrong delivery',
     });
+  });
+
+  test('no reason: Retract says so under the box, before any confirm, and writes nothing', async () => {
+    const runAction = vi.fn();
+    renderWithIntl(
+      <RetractButton engagementId="e-1" eventId="ev-1" pending={false} runAction={runAction} />,
+      { locale: 'en' },
+    );
+    fireEvent.click(screen.getByRole('button', { name: en('engagements.timeline.retract') }));
+    const retract = screen.getByRole('button', { name: en('engagements.timeline.retractConfirm') });
+    expect((retract as HTMLButtonElement).disabled).toBe(false);
+    await act(async () => {
+      fireEvent.click(retract);
+    });
+    expect(screen.queryByRole('alertdialog')).toBeNull();
+    expect(runAction).not.toHaveBeenCalled();
+    expect(document.getElementById('retract-ev-1-error')?.textContent).toBe(en('errors.field.required'));
+    expect(document.activeElement?.id).toBe('retract-ev-1');
   });
 });

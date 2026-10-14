@@ -13,7 +13,7 @@
 //      (that pair's count / allowance) — pure arithmetic, no float.
 //   3) When the new count crosses the free allowance a change order is DUE: the
 //      payload's changeOrderAmount must be a well-formed scale-4 money string > 0
-//      (else `fail('revision_co_amount_required')` rolls the whole tx back,
+//      (else `revision_co_amount_required` under the amount rolls the whole tx back,
 //      counter increment included), and exactly one `raised` change-order row is
 //      written with the canonical amount. The change-order ROW is identical either
 //      way — a CO is a CO, and `revisionCosSettled` aggregates them all.
@@ -25,15 +25,11 @@ import {
 } from '@metra/db';
 import { eq, sql } from 'drizzle-orm';
 import type { PgUpdateSetSource } from 'drizzle-orm/pg-core';
-import { fail } from '@/lib/actions/mutate';
-import {
-  formatMoney4,
-  isMoneyString,
-  parseMoney4,
-} from '@/lib/aggregates/proposal-totals';
+import { failFields } from '@/lib/actions/field-errors';
 import type { OrgContext } from '@/lib/db/context';
 import { isRecord } from '@/lib/guards/is-record';
 import type { RevisionTrigger } from './revision-allowance';
+import { readChangeOrderAmount } from './revision-field-rules';
 
 /** Either revision counter column — both are `integer not null`. */
 type RevisionCountColumn =
@@ -113,9 +109,8 @@ export async function applyRevision(
   const changeOrderAmount = isRecord(payload)
     ? payload.changeOrderAmount
     : undefined;
-  if (!isMoneyString(changeOrderAmount)) fail('revision_co_amount_required');
-  const amount4 = parseMoney4(changeOrderAmount);
-  if (amount4 <= 0n) fail('revision_co_amount_required');
+  const amount = readChangeOrderAmount(changeOrderAmount);
+  if (!amount.ok) failFields({ changeOrderAmount: amount.error });
 
   const reason =
     isRecord(payload) && typeof payload.reason === 'string'
@@ -125,7 +120,7 @@ export async function applyRevision(
   await tx.insert(engagementChangeOrders).values({
     orgId: ctx.orgId,
     engagementId: engagement.id,
-    amount: formatMoney4(amount4),
+    amount: amount.value,
     reason,
     status: 'raised',
     raisedByUserId: ctx.userId,

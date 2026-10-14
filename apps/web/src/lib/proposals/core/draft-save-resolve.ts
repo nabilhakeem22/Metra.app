@@ -1,8 +1,10 @@
 // Stage 2 of the draft save: resolve every section and its lines in memory, and
 // compute each section total. PURE (no DB) — the caller batches the writes
-// afterwards, so a coded refusal here costs nothing.
-import { fail } from '@/lib/actions/mutate';
-import type { SectionTotals } from '@/lib/aggregates/proposal-totals';
+// afterwards, so a refusal here costs nothing. Every refusal comes back at once,
+// by POSITION on the wire (`sections.<s>.name`, `lines.<s>.<l>.<cell>`): the
+// builder maps each position to its row's key using the draft it sent.
+import type { FieldError, FieldErrors } from '@/lib/actions/field-errors';
+import type { LineTotals, SectionTotals } from '@/lib/aggregates/proposal-totals';
 import { clean } from '@/lib/validation/text';
 import { computeSectionWithinCap } from './draft-save-caps';
 import type { CostItemResolved } from './draft-save-cost-items';
@@ -28,21 +30,29 @@ function sectionIdOf(section: SectionInput): string | undefined {
   return id || undefined;
 }
 
-/** One section and every line under it. `sortOrder` falls back to its position. */
+/** One section and every line under it, or the refusals they carry (added to
+ *  `errors`). `sortOrder` falls back to its position. */
 function resolveDraftSection(
   section: SectionInput,
   index: number,
-  costItemMap: Map<string, CostItemResolved>,
-  costSnapshot: Map<string, string>,
-  seeMargin: boolean,
-): { section: ResolvedSection; totals: SectionTotals } {
+  lookups: { costItemMap: Map<string, CostItemResolved>; costSnapshot: Map<string, string>; seeMargin: boolean },
+  errors: Record<string, FieldError>,
+): { section: ResolvedSection; totals: SectionTotals } | null {
   const titleEn = clean(section.titleEn);
   const titleAr = clean(section.titleAr);
-  if (!titleEn && !titleAr) fail('name_required');
+  if (!titleEn && !titleAr) errors[`sections.${index}.name`] = { code: 'name_required' };
 
-  const resolved = section.lines.map((line, lineIndex) =>
-    resolveDraftLine(line, lineIndex, costItemMap, costSnapshot, seeMargin),
-  );
+  const resolved: { line: ResolvedLine; totals: LineTotals }[] = [];
+  section.lines.forEach((line, lineIndex) => {
+    const entry = resolveDraftLine(line, lineIndex, lookups.costItemMap, lookups.costSnapshot, lookups.seeMargin);
+    if (entry.ok) resolved.push(entry);
+    else {
+      for (const [cell, error] of Object.entries(entry.errors)) {
+        errors[`lines.${index}.${lineIndex}.${cell}`] = error;
+      }
+    }
+  });
+  if ((!titleEn && !titleAr) || resolved.length < section.lines.length) return null;
   const totals = computeSectionWithinCap(resolved.map((entry) => entry.totals));
   return {
     totals,
@@ -81,19 +91,24 @@ function keepEachStoredIdOnce(sections: ResolvedSection[]): ResolvedSection[] {
  * Resolve every section + line (cost by the F1 stable-id rule, price/unit from
  * the line or the price book), computing each line + section total. A stored
  * line keeps its id, so a builder that saves again without reloading (autosave)
- * still names lines the server knows.
+ * still names lines the server knows. `errors` holds every refusal; when it is
+ * not empty the sections are incomplete and must not be stored.
  */
 export function resolveDraftLines(
   sections: SectionInput[],
   costItemMap: Map<string, CostItemResolved>,
   costSnapshot: Map<string, string>,
   seeMargin: boolean,
-): { resolvedSections: ResolvedSection[]; sectionTotals: SectionTotals[] } {
-  const resolved = sections.map((section, index) =>
-    resolveDraftSection(section, index, costItemMap, costSnapshot, seeMargin),
-  );
+): { resolvedSections: ResolvedSection[]; sectionTotals: SectionTotals[]; errors: FieldErrors } {
+  const errors: Record<string, FieldError> = {};
+  const lookups = { costItemMap, costSnapshot, seeMargin };
+  const resolved = sections.flatMap((section, index) => {
+    const entry = resolveDraftSection(section, index, lookups, errors);
+    return entry ? [entry] : [];
+  });
   return {
     resolvedSections: keepEachStoredIdOnce(resolved.map((entry) => entry.section)),
     sectionTotals: resolved.map((entry) => entry.totals),
+    errors,
   };
 }

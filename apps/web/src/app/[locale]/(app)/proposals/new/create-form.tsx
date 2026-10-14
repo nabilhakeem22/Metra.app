@@ -1,34 +1,25 @@
 'use client';
 
-import { Loader2 } from 'lucide-react';
-import { useLocale, useTranslations } from 'next-intl';
-import { useState, useTransition } from 'react';
-import { Button } from '@/components/ui/button';
+import { useTranslations } from 'next-intl';
+import { useRef, useState, useTransition } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { useFieldErrors } from '@/hooks/use-field-errors';
+import { useFocusFirstInvalid } from '@/hooks/use-focus-first-invalid';
 import { toast } from '@/hooks/use-toast';
-import { resolveActionError } from '@/lib/actions/error-message';
-import type { ActionCode } from '@/lib/actions/result';
 import { useRouter } from '@/i18n/routing';
-import { pickLocale } from '@/lib/i18n/pick-locale';
 import { createProposal } from '@/lib/proposals/actions';
+import {
+  PROPOSAL_CREATE_FIELDS,
+  proposalCreateFieldErrors,
+} from '@/lib/proposals/create-fields';
+import { CreateFormActions } from './create-form-actions';
+import { ProposalCreateFields, type CreateTyped, type Option } from './create-form-fields';
 
-interface Option {
-  id: string;
-  nameEn: string | null;
-  nameAr: string | null;
-  code?: string;
-  clientId?: string;
-}
-
+/**
+ * "New proposal": a client and a project (required), optional titles and
+ * dates. Submit says under each field what is missing or wrong, before and
+ * after the server is asked; anything else is said above the buttons.
+ */
 export function ProposalCreateForm({
   clients,
   projects,
@@ -41,52 +32,44 @@ export function ProposalCreateForm({
 }) {
   const t = useTranslations('proposals');
   const te = useTranslations('errors');
-  const locale = useLocale();
   const router = useRouter();
   const [pending, startTransition] = useTransition();
+  const errors = useFieldErrors({ fields: PROPOSAL_CREATE_FIELDS, translate: te });
+  const formRef = useRef<HTMLDivElement>(null);
+  useFocusFirstInvalid(formRef, errors.invalidAttempt);
 
   // Arriving from a project's "new proposal" CTA: preselect that project (and
   // its client), else fall back to the first option.
-  const preselected =
-    defaultProjectId && projects.some((p) => p.id === defaultProjectId)
-      ? projects.find((p) => p.id === defaultProjectId)
-      : undefined;
-  const [clientId, setClientId] = useState(
-    preselected?.clientId ?? clients[0]?.id ?? '',
-  );
-  const [projectId, setProjectId] = useState(
-    preselected?.id ?? projects[0]?.id ?? '',
-  );
-  const [titleEn, setTitleEn] = useState('');
-  const [titleAr, setTitleAr] = useState('');
-  const [issueDate, setIssueDate] = useState('');
-  const [expiryDate, setExpiryDate] = useState('');
-
-  const label = (o: Option) =>
-    pickLocale({ nameAr: o.nameAr, nameEn: o.nameEn }, 'name', locale).value ||
-    o.code ||
-    o.id;
-
-  const missing = clients.length === 0 || projects.length === 0;
+  const preselected = defaultProjectId ? projects.find((p) => p.id === defaultProjectId) : undefined;
+  const [typed, setTyped] = useState<CreateTyped>({
+    clientId: preselected?.clientId ?? clients[0]?.id ?? '',
+    projectId: preselected?.id ?? projects[0]?.id ?? '',
+    titleEn: '',
+    titleAr: '',
+    issueDate: '',
+    expiryDate: '',
+  });
+  const set = (key: keyof CreateTyped) => (value: string) =>
+    setTyped((current) => ({ ...current, [key]: value }));
 
   function submit() {
+    const input = {
+      clientId: typed.clientId,
+      projectId: typed.projectId,
+      titleEn: typed.titleEn || null,
+      titleAr: typed.titleAr || null,
+      issueDate: typed.issueDate || null,
+      expiryDate: typed.expiryDate || null,
+    };
+    if (errors.applyLocal(proposalCreateFieldErrors(input))) return;
     startTransition(async () => {
-      const res = await createProposal({
-        clientId,
-        projectId,
-        titleEn: titleEn || null,
-        titleAr: titleAr || null,
-        issueDate: issueDate || null,
-        expiryDate: expiryDate || null,
-      });
-      if (res.ok && res.data) {
+      try {
+        const res = await createProposal(input);
+        if (errors.applyResult(res)) return;
         toast({ title: t('toast.created') });
         router.push(`/proposals/${res.data}`);
-      } else {
-        toast({
-          title: resolveActionError(res.error as ActionCode, te),
-          variant: 'destructive',
-        });
+      } catch (rejection) {
+        errors.applyRejection(rejection);
       }
     });
   }
@@ -94,76 +77,24 @@ export function ProposalCreateForm({
   return (
     <Card>
       <CardContent className="space-y-4 py-4">
-        {missing ? (
+        {clients.length === 0 || projects.length === 0 ? (
           <p className="text-body text-muted-foreground">{t('create.needFirst')}</p>
         ) : (
-          <>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="np-client">{t('create.client')}</Label>
-                <Select value={clientId} onValueChange={setClientId}>
-                  <SelectTrigger id="np-client">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {clients.map((c) => (
-                      <SelectItem key={c.id} value={c.id}>
-                        {label(c)}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="np-project">{t('create.project')}</Label>
-                <Select value={projectId} onValueChange={setProjectId}>
-                  <SelectTrigger id="np-project">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {projects.map((p) => (
-                      <SelectItem key={p.id} value={p.id}>
-                        {p.code ? `${p.code} · ` : ''}
-                        {label(p)}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="np-titleEn">{t('create.titleEn')}</Label>
-                <Input id="np-titleEn" dir="ltr" value={titleEn} onChange={(e) => setTitleEn(e.target.value)} />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="np-titleAr">{t('create.titleAr')}</Label>
-                <Input id="np-titleAr" dir="rtl" value={titleAr} onChange={(e) => setTitleAr(e.target.value)} />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="np-issue">{t('create.issueDate')}</Label>
-                <Input id="np-issue" type="date" dir="ltr" value={issueDate} onChange={(e) => setIssueDate(e.target.value)} />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="np-expiry">{t('create.expiryDate')}</Label>
-                <Input id="np-expiry" type="date" dir="ltr" value={expiryDate} onChange={(e) => setExpiryDate(e.target.value)} />
-              </div>
-            </div>
-
-            <div className="flex justify-end gap-2">
-              <Button variant="secondary" onClick={() => router.push('/proposals')} disabled={pending}>
-                {t('create.cancel')}
-              </Button>
-              <Button variant="default" onClick={submit} disabled={pending}>
-                {pending && <Loader2 className="size-4 animate-spin" aria-hidden />}
-                {t('create.submit')}
-              </Button>
-            </div>
-          </>
+          <div ref={formRef} className="space-y-4">
+            <ProposalCreateFields
+              typed={typed}
+              set={set}
+              clients={clients}
+              projects={projects}
+              bind={errors.bind}
+            />
+            <CreateFormActions
+              formError={errors.formError}
+              pending={pending}
+              onCancel={() => router.push('/proposals')}
+              onSubmit={submit}
+            />
+          </div>
         )}
       </CardContent>
     </Card>

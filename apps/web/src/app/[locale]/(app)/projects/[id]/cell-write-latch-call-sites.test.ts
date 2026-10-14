@@ -71,7 +71,7 @@ const PRODUCTION_CALL_SITES = [
   // toggles of one boolean are a lost update that races nothing else.
   `${SHEET}/boq-sheet-row-controls.tsx []`,
   // The unit select — the one control that saves a named cell directly.
-  `${SHEET}/boq-sheet-row-fields.tsx ['unit']`,
+  `${SHEET}/boq-sheet-unit-cell.tsx ['unit']`,
   // The blur path: exactly the one column that changed, never a pair.
   `${SHEET}/boq-write-actions.ts [column]`,
   // A FORWARD, not a fourth list: `use-boq-writes.ts` hands the row API's own
@@ -318,7 +318,7 @@ describe('every saveLine call site passes at most ONE column (wave 7 L1)', () =>
         .map((site) => [site.path, site.columnCount]),
     );
     expect(lengths.get(`${SHEET}/boq-sheet-row-controls.tsx`)).toBe(0);
-    expect(lengths.get(`${SHEET}/boq-sheet-row-fields.tsx`)).toBe(1);
+    expect(lengths.get(`${SHEET}/boq-sheet-unit-cell.tsx`)).toBe(1);
     expect(lengths.get(`${SHEET}/boq-write-actions.ts`)).toBe(1);
     expect(lengths.size).toBe(3);
   });

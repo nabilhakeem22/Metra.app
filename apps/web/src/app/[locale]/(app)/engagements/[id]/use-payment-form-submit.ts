@@ -15,7 +15,7 @@ import {
 import type { LogPaymentAndAdvanceInput } from '@/lib/engagements/pay-and-advance';
 import type { RecordPaymentInput } from '@/lib/engagements/payments';
 import type { PaymentEventKind } from '@metra/db';
-import type { RunAction } from './use-engagement-action';
+import type { RefusalSink, RunAction } from './use-engagement-action';
 
 /** What the studio typed: the amount, plus the optional method and reference. */
 export interface PaymentFormFields {
@@ -36,7 +36,8 @@ export interface PaymentFormFields {
  * Either way the key comes from `runAction`: claimed at submit, named by every
  * field the request carries, held across a retry after an answer that could not
  * say what happened. `already` means the ledger was NOT appended (the original
- * row was handed back), and the studio is told so.
+ * row was handed back), and the studio is told so. A refusal goes to `form`,
+ * the form's field errors, so it is said under the field it is about.
  */
 export function usePaymentFormSubmit(options: {
   engagementId: string;
@@ -45,7 +46,7 @@ export function usePaymentFormSubmit(options: {
   advanceTrigger: EngagementGatePreview['primaryTrigger'];
   runAction: RunAction;
   onDone: () => void;
-}): (fields: PaymentFormFields) => void {
+}): (fields: PaymentFormFields, form: RefusalSink) => void {
   const tc = useTranslations('engagements.controls');
   const tcmd = useTranslations('engagements.command');
   const te = useTranslations('errors');
@@ -62,7 +63,7 @@ export function usePaymentFormSubmit(options: {
     return res;
   }
 
-  function submitRecordOnly(fields: PaymentFormFields): void {
+  function submitRecordOnly(fields: PaymentFormFields, form: RefusalSink): void {
     const submitted = {
       engagementId,
       kind: paymentKind,
@@ -75,10 +76,11 @@ export function usePaymentFormSubmit(options: {
       async (idempotencyKey) => settle(await recordPayment({ ...submitted, idempotencyKey })),
       PAYMENT_HELD_TRIGGER,
       actOf<Omit<RecordPaymentInput, 'idempotencyKey'>>(submitted),
+      form,
     );
   }
 
-  function submitPayAndAdvance(fields: PaymentFormFields): void {
+  function submitPayAndAdvance(fields: PaymentFormFields, form: RefusalSink): void {
     if (!advanceTrigger) return;
     // THE REQUEST, minus its key: one object, used twice. `actOf` is typed
     // against the same shape, so a field added to the request and forgotten in
@@ -95,6 +97,7 @@ export function usePaymentFormSubmit(options: {
         settle(await logPaymentAndAdvance(engagementId, { ...submitted, idempotencyKey })),
       PAY_AND_ADVANCE_HELD_TRIGGER,
       actOf<Omit<LogPaymentAndAdvanceInput, 'idempotencyKey'>>(submitted),
+      form,
     );
   }
 

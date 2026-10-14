@@ -3,15 +3,14 @@
 // CLIENT-SAFE: the executor's side-effect parses the transition payload with it,
 // and the form offers exactly these channels.
 import { isUuid } from '@/lib/uuid';
-import {
-  MAX_LABEL_CHARS,
-  MAX_NOTE_CHARS,
-  TOO_LONG,
-  optionalText,
-} from '@/lib/validation/text';
+import { MAX_LABEL_CHARS, TOO_LONG, optionalText } from '@/lib/validation/text';
+import type { FieldErrors } from '@/lib/actions/field-errors';
 import type { ActionCode } from '@/lib/actions/result';
 import type { MemberRole } from '@/lib/permissions/roles';
-import { isCalendarDay } from './event-provenance';
+import {
+  readOfflineApprovalFields,
+  type OfflineApprovalField,
+} from './offline-approval-field-rules';
 import type { OfflineApprovalBounds } from './review-round';
 import { ENDING_DECIDERS } from './transitions/trigger-roles';
 
@@ -65,16 +64,15 @@ function textOrAbsent(value: unknown): string | null | undefined | false {
 
 export type ParsedOfflineApproval =
   | { ok: true; approval: OfflineApproval }
+  | { ok: false; fields: FieldErrors<OfflineApprovalField> }
   | { ok: false; code: ActionCode };
 
 /**
- * The offline approval a transition payload carries, or the code that refuses
- * it. `invalid`: not an object, an unknown channel, a non-string field, a date
- * that is not a real `YYYY-MM-DD`, or a `chosenArtifactId` that is not a uuid.
- * `offline_approval_note_too_long`: a note over MAX_NOTE_CHARS.
- * `offline_approval_date_out_of_range`: a real day before the round under
- * review or after today (review-round.ts). The two named codes are the ones a
- * retry can never fix, so the studio is told which field to change.
+ * The offline approval a transition payload carries, or what refuses it. What
+ * the studio typed (no channel chosen, a day outside the round under review or
+ * not a real day, a note over MAX_NOTE_CHARS) comes back as `fields`, under the
+ * box to change. The shape no form can send (not an object, an unknown channel,
+ * a non-string field, a `chosenArtifactId` that is not a uuid) is `invalid`.
  */
 export function parseOfflineApproval(
   payload: unknown,
@@ -85,26 +83,22 @@ export function parseOfflineApproval(
     return refuse('invalid');
   }
   const input = payload as Record<string, unknown>;
-  if (!isOfflineApprovalChannel(input.channel)) return refuse('invalid');
-
   const rawNote = textOrAbsent(input.note);
   const rawOccurredOn = textOrAbsent(input.occurredOn);
   const rawChosen = textOrAbsent(input.chosenArtifactId);
   if (rawNote === false || rawOccurredOn === false || rawChosen === false) return refuse('invalid');
 
-  const note = optionalText(rawNote, MAX_NOTE_CHARS);
-  if (note === TOO_LONG) return refuse('offline_approval_note_too_long');
-  const occurredOn = optionalText(rawOccurredOn, MAX_LABEL_CHARS);
-  if (occurredOn === TOO_LONG || (occurredOn !== null && !isCalendarDay(occurredOn))) {
-    return refuse('invalid');
-  }
-  if (occurredOn !== null && (occurredOn < bounds.earliest || occurredOn > bounds.latest)) {
-    return refuse('offline_approval_date_out_of_range');
-  }
+  const typed = readOfflineApprovalFields(
+    { channel: input.channel, occurredOn: rawOccurredOn, note: rawNote },
+    bounds,
+  );
+  if (!typed.ok) return { ok: false, fields: typed.errors };
+  if (!isOfflineApprovalChannel(input.channel)) return refuse('invalid');
   const chosenArtifactId = optionalText(rawChosen, MAX_LABEL_CHARS);
   if (chosenArtifactId === TOO_LONG || (chosenArtifactId !== null && !isUuid(chosenArtifactId))) {
     return refuse('invalid');
   }
 
+  const { occurredOn, note } = typed.values;
   return { ok: true, approval: { channel: input.channel, occurredOn, note, chosenArtifactId } };
 }

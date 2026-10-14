@@ -22,6 +22,7 @@ export const ACTION_CODE_PROBLEM: Record<ActionCode, ApiProblemKind> = {
   logo_image_unsupported: 'bad-request',
   // Storage failed under us: the server's side, and the file may still land.
   storage_unavailable: 'internal',
+  import_unreadable: 'bad-request',
   name_required: 'bad-request',
   phone_required: 'bad-request',
   start_date_required: 'bad-request',
@@ -60,6 +61,7 @@ export const ACTION_CODE_PROBLEM: Record<ActionCode, ApiProblemKind> = {
   tax_out_of_range: 'bad-request',
   too_many_lines: 'bad-request',
   invalid_date: 'bad-request',
+  date_in_future: 'bad-request',
   amount_too_large: 'bad-request',
   last_primary_contact: 'bad-request',
   contract_exists: 'bad-request',
@@ -104,7 +106,6 @@ export const ACTION_CODE_PROBLEM: Record<ActionCode, ApiProblemKind> = {
   handoff_not_acknowledged: 'bad-request',
   client_review_pending: 'conflict',
   offline_approval_date_out_of_range: 'bad-request',
-  offline_approval_note_too_long: 'bad-request',
   // The client answered first: a state conflict, not malformed input.
   client_review_answered: 'conflict',
   concept_option_not_found: 'bad-request',

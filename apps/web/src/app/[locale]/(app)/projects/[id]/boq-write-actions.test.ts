@@ -68,6 +68,7 @@ function harness() {
   const context: WriteContext = {
     boq: { id: 'boq-1' } as BoqDetail,
     edits: edits.api,
+    cellErrors: { show: vi.fn(() => true) },
     start: (callback) => {
       started.push(Promise.resolve(callback() as unknown));
     },
@@ -200,7 +201,21 @@ describe('saveLine', () => {
     expect(logged.mock.calls[0]![0]).toBe('boq line save failed before returning a result');
     // F7: with the row, so a failed save on a 2,000-line sheet can be tied to one.
     expect(logged.mock.calls[0]![1]).toEqual({ lineId: 'line-1', columns: ['qty'] });
-    expect(toasts).toEqual([{ title: 'sheet.saveFailed', variant: 'destructive' }]);
+    // The toast names the cause (describeRejection), not "that change was not saved".
+    expect(toasts).toEqual([{ title: 'errors.generic', variant: 'destructive' }]);
+  });
+
+  it('a refused cell is said under the cell, not in a toast', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const { context, settle } = harness();
+    const fields = { qty: { code: 'invalid_qty' } } as const;
+    actions.updateBoqLine.mockResolvedValueOnce({ ok: false, error: 'check_fields', fields });
+
+    saveLine(context, LINE, { qty: '1,5' }, ['qty']);
+    await settle();
+
+    expect(context.cellErrors.show).toHaveBeenCalledWith('line-1', fields);
+    expect(toasts).toEqual([]);
   });
 
   it('a rejected save does not strand the next edit of the same cell', async () => {

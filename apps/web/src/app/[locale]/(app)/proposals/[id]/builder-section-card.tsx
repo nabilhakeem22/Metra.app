@@ -1,30 +1,28 @@
 'use client';
 
-import { ArrowDown, ArrowUp, Plus, Trash2 } from 'lucide-react';
+import { ArrowDown, ArrowUp, Trash2 } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { fieldErrorId } from '@/components/ui/field-error-text';
 import { FieldHint } from '@/components/ui/field-hint';
 import { Input } from '@/components/ui/input';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import type { SectionTotals } from '@/lib/aggregates/proposal-totals';
-import { formatMoney } from '@/lib/format/money';
-import { pickLocale } from '@/lib/i18n/pick-locale';
 import { addSection as recordSection } from '@/lib/sections/actions';
 import { BuilderLineRow } from './builder-line-row';
-import {
-  type CostItemOption,
-  type LineState,
-  type SectionState,
-} from './builder-model';
+import { BuilderLineTableHead } from './builder-line-table-head';
+import type { CostItemOption, LineState, SectionState } from './builder-model';
+import { BuilderSectionFooter } from './builder-section-footer';
+import { CellError, cellA11y } from './draft-cell';
+import { linePath, sectionPath } from './draft-field-errors';
 import { SectionCombobox, type SectionOption } from './section-combobox';
+import type { DraftFieldErrorsApi } from './use-draft-field-errors';
 
+/**
+ * One builder section: its bilingual title, its lines and the add-line footer.
+ * A title the last save was refused for is said under the title row; a refused
+ * cell under its cell (draft-field-errors.ts).
+ */
 export function BuilderSectionCard({
   section,
   sectionIndex,
@@ -39,6 +37,7 @@ export function BuilderSectionCard({
   onMoveUp,
   onMoveDown,
   onRemoveSection,
+  cells,
 }: {
   section: SectionState;
   sectionIndex: number;
@@ -53,6 +52,8 @@ export function BuilderSectionCard({
   onMoveUp: () => void;
   onMoveDown: () => void;
   onRemoveSection: () => void;
+  /** The cell refusals of the last save (use-draft-field-errors.ts). */
+  cells: DraftFieldErrorsApi;
 }) {
   const t = useTranslations('proposals');
   const th = useTranslations('hints.proposal');
@@ -60,7 +61,12 @@ export function BuilderSectionCard({
   const isAr = locale.startsWith('ar');
   const si = sectionIndex;
   const sec = section;
-  const st = sectionTotal;
+  const name = cells.cell(sectionPath(sec.key));
+  const nameId = `section-${sec.key}-name`;
+  const rename = (patch: Partial<SectionState>) => {
+    name.clear();
+    patchSection(si, patch);
+  };
 
   return (
     <Card>
@@ -72,31 +78,23 @@ export function BuilderSectionCard({
             valueEn={sec.titleEn}
             valueAr={sec.titleAr}
             options={sectionLibrary}
-            placeholder={
-              isAr ? t('builder.sectionTitleAr') : t('builder.sectionTitleEn')
-            }
-            onChange={(patch) => patchSection(si, patch)}
-            onCreate={(name) => {
+            placeholder={isAr ? t('builder.sectionTitleAr') : t('builder.sectionTitleEn')}
+            onChange={rename}
+            onCreate={(created) => {
               // Fire-and-forget: recording the title never blocks the build.
-              void recordSection(name);
+              void recordSection(created);
             }}
-            aria-describedby={`sec-hint-${si}`}
+            aria-describedby={
+              name.message ? `sec-hint-${si} ${fieldErrorId(nameId)}` : `sec-hint-${si}`
+            }
           />
           <Input
             dir={isAr ? 'ltr' : 'rtl'}
-            placeholder={
-              isAr ? t('builder.sectionTitleEn') : t('builder.sectionTitleAr')
-            }
+            placeholder={isAr ? t('builder.sectionTitleEn') : t('builder.sectionTitleAr')}
             value={isAr ? sec.titleEn : sec.titleAr}
-            onChange={(e) =>
-              patchSection(
-                si,
-                isAr
-                  ? { titleEn: e.target.value }
-                  : { titleAr: e.target.value },
-              )
-            }
+            onChange={(e) => rename(isAr ? { titleEn: e.target.value } : { titleAr: e.target.value })}
             className="min-w-40 flex-1"
+            {...cellA11y(nameId, name)}
           />
           <FieldHint id={`sec-hint-${si}`} hint={th('sectionTitle')} />
           <Button variant="ghost" size="icon" aria-label={t('builder.moveUp')} onClick={onMoveUp}>
@@ -109,43 +107,11 @@ export function BuilderSectionCard({
             <Trash2 className="size-4" aria-hidden />
           </Button>
         </div>
+        <CellError id={nameId} error={name} />
 
         <div className="overflow-x-auto">
           <table className="w-full text-body">
-            <thead>
-              <tr className="text-caption text-muted-foreground">
-                <th className="px-1 py-1 text-start font-medium">{t('builder.description')}</th>
-                <th className="px-1 py-1 font-medium">
-                  <span className="inline-flex items-center">
-                    {t('builder.qty')}
-                    <FieldHint hint={th('lineQty')} />
-                  </span>
-                </th>
-                <th className="px-1 py-1 font-medium">{t('builder.unit')}</th>
-                {seeMargin && (
-                  <th className="px-1 py-1 font-medium">
-                    <span className="inline-flex items-center">
-                      {t('builder.unitCost')}
-                      <FieldHint hint={th('lineUnitCost')} />
-                    </span>
-                  </th>
-                )}
-                <th className="px-1 py-1 font-medium">
-                  <span className="inline-flex items-center">
-                    {t('builder.unitPrice')}
-                    <FieldHint hint={th('lineUnitPrice')} />
-                  </span>
-                </th>
-                <th className="px-1 py-1 font-medium">
-                  <span className="inline-flex items-center">
-                    {t('builder.discount')}
-                    <FieldHint hint={th('lineDiscountPct')} />
-                  </span>
-                </th>
-                <th className="px-1 py-1 text-end font-medium">{t('builder.sectionSubtotal')}</th>
-                <th className="px-1 py-1" />
-              </tr>
-            </thead>
+            <BuilderLineTableHead seeMargin={seeMargin} />
             <tbody>
               {sec.lines.map((l, li) => (
                 <BuilderLineRow
@@ -156,44 +122,18 @@ export function BuilderSectionCard({
                   seeMargin={seeMargin}
                   patchLine={patchLine}
                   removeLine={removeLine}
+                  cellOf={(cell) => cells.cell(linePath(l.key, cell))}
                 />
               ))}
             </tbody>
           </table>
         </div>
 
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="flex flex-wrap items-center gap-2">
-            <Button variant="secondary" size="sm" onClick={() => addLine(si)}>
-              <Plus className="size-4" aria-hidden />
-              {t('builder.addLine')}
-            </Button>
-            {costItems.length > 0 && (
-              <Select
-                value=""
-                onValueChange={(v) => {
-                  const ci = costItems.find((c) => c.id === v);
-                  if (ci) addLine(si, ci);
-                }}
-              >
-                <SelectTrigger className="w-auto min-w-48">
-                  <SelectValue placeholder={t('builder.fromPriceBook')} />
-                </SelectTrigger>
-                <SelectContent>
-                  {costItems.map((c) => (
-                    <SelectItem key={c.id} value={c.id}>
-                      {c.code} · {pickLocale({ nameAr: c.nameAr, nameEn: c.nameEn }, 'name', locale).value}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
-          </div>
-          <span className="text-body font-medium">
-            {t('builder.sectionSubtotal')}:{' '}
-            <span dir="ltr">{formatMoney(st.sectionSubtotal, locale)}</span>
-          </span>
-        </div>
+        <BuilderSectionFooter
+          costItems={costItems}
+          onAddLine={(ci) => addLine(si, ci)}
+          sectionSubtotal={sectionTotal.sectionSubtotal}
+        />
       </CardContent>
     </Card>
   );

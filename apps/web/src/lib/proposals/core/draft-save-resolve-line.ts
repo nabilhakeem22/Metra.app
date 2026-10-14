@@ -1,17 +1,15 @@
 // Stage 2b of the draft save: ONE line resolved and priced.
 //
-// PURE (no DB) — throws coded ActionErrors via `fail`. Where a line's unit, price
-// and description come from (the line, or the price-book item it points at) and
-// what its cost is allowed to be (the F1 stable-id rule) are the two decisions
-// that make a saved proposal differ from what the studio typed, so they are named
-// rather than inlined.
+// PURE (no DB). Where a line's unit, price and description come from (the line,
+// or the price-book item it points at) and what its cost is allowed to be (the
+// F1 stable-id rule) are the two decisions that make a saved proposal differ
+// from what the studio typed, so they are named rather than inlined. A line the
+// save cannot store comes back as every refusal under the cell it is about.
 import type { CostItemUnit } from '@metra/db';
-import { fail } from '@/lib/actions/mutate';
 import type { LineTotals } from '@/lib/aggregates/proposal-totals';
-import { readMoney } from '@/lib/money/read';
-import { computeLineWithinCap } from './draft-save-caps';
-import { isPercentInRange } from '@/lib/validation/percent';
+import { lineTotalsWithinCap } from './draft-save-caps';
 import { clean } from '@/lib/validation/text';
+import { readLineFactors, type LineErrors } from './draft-save-line-factors';
 import type { CostItemResolved } from './draft-save-cost-items';
 import type { LineInput } from './types';
 
@@ -88,38 +86,16 @@ function resolveLineCost(
   return identity.costItemId ? identity.costItem!.defaultUnitCost : '0';
 }
 
-/** The four priced figures, read. Range-checking the discount is the CALLER's
- *  job, because its position among the other refusals is observable. */
-function readLineFactors(
-  line: LineInput,
-  identity: LineIdentity,
-  rawCost: string | null,
-): { qty: string; unitCost: string; unitPrice: string; discountPct: string } {
-  const qty = readMoney(line.qty, { blank: '0' });
-  const unitCost = readMoney(rawCost, { blank: '0' });
-  const unitPrice = readMoney(identity.unitPrice, { blank: '0' });
-  const discountPct = readMoney(line.discountPct, { blank: '0' });
-  const factors = [qty, unitCost, unitPrice, discountPct];
-  if (!qty.ok || !unitCost.ok || !unitPrice.ok || !discountPct.ok) {
-    // A factor PAST THE CAP says so. It reached here as a plain `line_required`
-    // — "this line is missing something" for a line whose problem was that one
-    // of its numbers is 1e13.
-    const tooLarge = factors.some((f) => !f.ok && f.reason === 'too_large');
-    fail(tooLarge ? 'amount_too_large' : 'line_required');
-  }
-  return {
-    qty: qty.value,
-    unitCost: unitCost.value,
-    unitPrice: unitPrice.value,
-    discountPct: discountPct.value,
-  };
-}
+/** What one line resolves to: the row to store and its totals, or its refusals. */
+export type ResolvedDraftLine =
+  | { ok: true; line: ResolvedLine; totals: LineTotals }
+  | { ok: false; errors: LineErrors };
 
 /**
- * One draft line, resolved and priced. `sortOrder` falls back to its position.
- *
- * The refusal ORDER is observable and unchanged: a missing figure, then a missing
- * unit or description, then an out-of-range discount, then an overflowing product.
+ * One draft line, resolved and priced, or every refusal under the cell it is
+ * about: a figure that does not read, a missing unit or description, a discount
+ * out of range; and, only once those are right, a product past the cap (said
+ * under the quantity). `sortOrder` falls back to its position.
  */
 export function resolveDraftLine(
   line: LineInput,
@@ -127,16 +103,24 @@ export function resolveDraftLine(
   costItemMap: Map<string, CostItemResolved>,
   costSnapshot: Map<string, string>,
   seeMargin: boolean,
-): { line: ResolvedLine; totals: LineTotals } {
+): ResolvedDraftLine {
   const identity = resolveLineIdentity(line, costItemMap);
   const rawCost = resolveLineCost(line, identity, costSnapshot, seeMargin);
-  const factors = readLineFactors(line, identity, rawCost);
-  if (!identity.unit || (!identity.descriptionEn && !identity.descriptionAr)) {
-    fail('line_required');
-  }
-  if (!isPercentInRange(factors.discountPct)) fail('discount_out_of_range');
-  const totals = computeLineWithinCap(factors);
+  const read = readLineFactors({
+    qty: line.qty,
+    unitCost: rawCost,
+    unitPrice: identity.unitPrice,
+    discountPct: line.discountPct,
+  });
+  const errors: LineErrors = read.ok ? {} : { ...read.errors };
+  if (!identity.unit) errors.unit = { code: 'line_required' };
+  if (!identity.descriptionEn && !identity.descriptionAr) errors.description = { code: 'line_required' };
+  if (!read.ok || !identity.unit || Object.keys(errors).length > 0) return { ok: false, errors };
+  const { factors } = read;
+  const totals = lineTotalsWithinCap(factors);
+  if (!totals) return { ok: false, errors: { qty: { code: 'amount_too_large' } } };
   return {
+    ok: true,
     totals,
     line: {
       id: storedLineId(line, costSnapshot) ?? undefined,

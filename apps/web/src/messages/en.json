@@ -491,6 +491,7 @@
     "invalid_percentage": "Enter a percentage between -100 and 1000",
     "import_empty": "There are no rows to import",
     "import_too_large": "The file is too large or has too many rows",
+    "import_unreadable": "We could not read that file. Save it as CSV (comma separated) and upload it again.",
     "client_required": "Select a client",
     "invalid_dates": "End date must be on or after the start date",
     "proposal_not_draft": "This proposal is no longer a draft",
@@ -506,6 +507,7 @@
     "tax_out_of_range": "VAT rate must be between 0 and 100",
     "too_many_lines": "This document has too many lines.",
     "invalid_date": "Enter a valid date",
+    "date_in_future": "That date is in the future. Pick today or an earlier day.",
     "amount_too_large": "That amount is too large",
     "last_primary_contact": "Set another contact as primary before removing this one",
     "contract_exists": "A contract already exists for this proposal",
@@ -547,7 +549,6 @@
     "handoff_not_acknowledged": "The recipient must acknowledge the handoff before closing",
     "client_review_pending": "The client has not answered the review yet",
     "offline_approval_date_out_of_range": "Pick a date between the start of this review and today",
-    "offline_approval_note_too_long": "The note is too long: 2000 characters at most",
     "client_review_answered": "The client answered the review in the meantime. Reload the page to see their answer.",
     "concept_option_not_found": "That option is not released to the client. Choose one of the lettered options.",
     "delivery_link_unrecoverable": "This client link can't be shown again. Replace it to send a reminder.",
@@ -1185,7 +1186,6 @@
         "commitImport": "Import lines",
         "cancel": "Cancel",
         "imported": "Imported {count} lines",
-        "importFailed": "Could not read that sheet",
         "lineCount": "{count, plural, =0 {No lines} one {# line} other {# lines}}",
         "total": "Total",
         "provisional": "Provisional",
@@ -1387,8 +1387,7 @@
       "expired": "Proposal marked expired",
       "superseded": "Version 2 created",
       "deleted": "Proposal deleted",
-      "linkCopied": "Link copied",
-      "error": "Something went wrong"
+      "linkCopied": "Link copied"
     },
     "p": {
       "quotation": "Quotation",
@@ -2180,11 +2179,6 @@
       "advisory": "A reply doesn't move the stage.",
       "partial": "Some messages may not be showing. Close and reopen the thread to load them all.",
       "error": {
-        "generic": "That didn't send. Please try again.",
-        "invalid": "That didn't send. Please try again.",
-        "forbidden": "You don't have permission to reply.",
-        "engagement_not_found": "This project is no longer available.",
-        "engagement_not_active": "This project is closed.",
         "load_failed": "Couldn't load the messages. Try again in a bit."
       }
     },

@@ -6,7 +6,6 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { useConfirm } from '@/components/ui/confirm-dialog';
 import { OverflowMenu } from '@/components/ui/overflow-menu';
-import type { ActionResult } from '@/lib/actions/result';
 import {
   isRevisionTrigger,
   type RevisionAllowances,
@@ -15,6 +14,7 @@ import {
 import type { Trigger } from '@/lib/engagements/transitions';
 import { triggerNeedsForm } from '@/lib/engagements/ui';
 import { EngagementRevisionForm } from './engagement-revision-form';
+import type { RunAction } from './run-action';
 import { DIRECT_TRIGGER_ACTIONS } from './trigger-actions';
 import { SectionLabel } from '@/components/ui/section-label';
 
@@ -46,10 +46,7 @@ export function EngagementSecondaryActions({
   pending: boolean;
   /** Runs one server action with the page's per-attempt idempotency key
    *  (0050). Ignore the argument on an edge that does not need one. */
-  runAction: (
-    fn: (idempotencyKey: string) => Promise<ActionResult>,
-    trigger?: Trigger,
-  ) => void;
+  runAction: RunAction;
 }) {
   const tcmd = useTranslations('engagements.command');
   const tt = useTranslations('engagements.trigger');

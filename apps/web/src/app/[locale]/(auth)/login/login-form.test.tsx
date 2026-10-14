@@ -1,6 +1,7 @@
 import { act, fireEvent, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { fieldsFailed } from '@/lib/actions/field-errors';
+import { expectFieldErrorsRenderUnderFields } from '@/test/field-coverage';
 import { messageAt, renderWithIntl, type TestLocale } from '@/test/render-with-intl';
 import { LoginForm } from './login-form';
 
@@ -66,6 +67,23 @@ describe.each<TestLocale>(['en', 'ar-EG'])('LoginForm refusals (%s)', (locale) =
     expect(under('identifier')).toBe(at('errors.field.email_format'));
     expect(identifier().getAttribute('aria-invalid')).toBe('true');
     expect(status()).toBe('');
+  });
+
+  test('a refusal of the address is said under the box that holds it (AC 19)', async () => {
+    renderLogin();
+    fireEvent.change(identifier(), { target: { value: 'mona@firm.example' } });
+    await expectFieldErrorsRenderUnderFields({
+      fields: ['email'],
+      controlIdOf: () => 'identifier',
+      answerWith: (result) => actions.sendEmailOtp.mockResolvedValue(result),
+      submit: async () => {
+        await act(async () => {
+          fireEvent.click(sendButton());
+        });
+      },
+      locale,
+      typed: { identifier: 'mona@firm.example' },
+    });
   });
 
   test('a rate limit is said in the status line (AC 28)', async () => {

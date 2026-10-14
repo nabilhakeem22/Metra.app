@@ -15,6 +15,7 @@
 // copy (`draft_changed_elsewhere`) instead of overwriting.
 import { organizations, proposals } from '@metra/db';
 import { eq } from 'drizzle-orm';
+import { failFields, hasFieldErrors } from '@/lib/actions/field-errors';
 import { fail, mutateInOrg } from '@/lib/actions/mutate';
 import { err, type ActionResult } from '@/lib/actions/result';
 import type { MetraDb } from '@metra/db';
@@ -26,11 +27,8 @@ import type { DraftSaveReceipt, SaveDraftInput } from './types';
 import { auditDraftSaved } from './draft-save-audit';
 import { computeTotalsWithinCap } from './draft-save-caps';
 import { loadCostItemMap } from './draft-save-cost-items';
-import {
-  enforceLineCaps,
-  pricingForKind,
-  validateDraftHeader,
-} from './draft-save-validate';
+import { readDraftHeader } from './draft-save-header';
+import { enforceLineCaps, pricingForKind } from './draft-save-validate';
 import { resolveDraftLines } from './draft-save-resolve';
 import { planDraftWrite } from './draft-save-diff';
 import { applyDraftWritePlan, persistDraftHeaderAndTotals } from './draft-save-persist';
@@ -96,20 +94,21 @@ export async function saveProposalDraftCore(
     async (tx, audit) => {
       const proposal = await lockDraftProposal(tx, input.id, input.revision);
       const seeMargin = await loadMarginVisibility(tx, ctx);
-      const header = pricingForKind(
-        proposal.kind,
-        validateDraftHeader(proposal, input.header ?? {}),
-      );
+      const headerRead = readDraftHeader(proposal, input.header ?? {});
       enforceLineCaps(input.sections);
 
       const stored = await loadStoredDraft(tx, input.id);
       const costItemMap = await loadCostItemMap(tx, input.sections);
-      const { resolvedSections, sectionTotals } = resolveDraftLines(
+      const { resolvedSections, sectionTotals, errors } = resolveDraftLines(
         input.sections,
         costItemMap,
         storedCostsById(stored),
         seeMargin,
       );
+      // Every refusal at once (D1): the header's and every cell's.
+      const fields = { ...(headerRead.ok ? {} : headerRead.errors), ...errors };
+      if (!headerRead.ok || hasFieldErrors(fields)) failFields(fields);
+      const header = pricingForKind(proposal.kind, headerRead.header);
       const plan = planDraftWrite(resolvedSections, stored);
       await applyDraftWritePlan(tx, ctx.orgId, input.id, plan);
       const totals = computeTotalsWithinCap(sectionTotals, header);

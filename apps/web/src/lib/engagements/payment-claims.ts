@@ -11,16 +11,18 @@ import 'server-only';
 // the amount at confirm time, so it is re-validated here, not trusted from the claim.
 import { clientPaymentClaims, paymentEvents } from '@metra/db';
 import { and, eq, sql } from 'drizzle-orm';
+import { fieldsFailed } from '@/lib/actions/field-errors';
 import { fail, mutateInOrg } from '@/lib/actions/mutate';
 import { invariant } from '@/lib/actions/invariant';
 import type { ActionResult } from '@/lib/actions/result';
-import { MONEY_RE, formatMoney4, parseMoney4 } from '@/lib/aggregates/proposal-totals';
+import { parseMoney4 } from '@/lib/aggregates/proposal-totals';
 import type { OrgContext } from '@/lib/db/context';
 // LEAF module (states.ts is itself the leaf — not a barrel): the terminal-state
 // predicate, so a claim made while active can't record money after the engagement
 // went terminal — mirroring recordPaymentCore.
 import { isTerminal } from '@/lib/engagements/states';
 import { lockEngagementForMoney, milestoneOutstanding4 } from './milestone-settlement';
+import { readPaymentAmount } from './payment-field-rules';
 
 export interface ConfirmPaymentClaimInput {
   claimId: string;
@@ -49,16 +51,11 @@ export async function confirmPaymentClaimCore(
   ctx: OrgContext,
   input: ConfirmPaymentClaimInput,
 ): Promise<ActionResult & { data?: string; already?: boolean }> {
-  if (typeof input.amount !== 'string' || !MONEY_RE.test(input.amount.trim())) {
-    return { ok: false, error: 'payment_amount_invalid' };
-  }
-  const amount4 = parseMoney4(input.amount);
-  if (amount4 <= 0n) {
-    return { ok: false, error: 'payment_amount_invalid' };
-  }
-  // Persist the canonical scale-4 value so the STORED amount is exactly the one the
-  // app validated (the DB numeric would otherwise round a >4-decimal input).
-  const amount = formatMoney4(amount4);
+  // The canonical scale-4 value is persisted, so the STORED amount is exactly the
+  // one the app validated (the DB numeric would otherwise round a >4-decimal input).
+  const typed = readPaymentAmount(input.amount);
+  if (!typed.ok) return fieldsFailed({ amount: typed.error });
+  const amount = typed.value;
 
   let already = false;
 
@@ -182,7 +179,7 @@ export async function confirmPaymentClaimCore(
         if (
           !existing ||
           existing.kind !== claim.milestoneKind ||
-          parseMoney4(existing.amount) !== amount4
+          parseMoney4(existing.amount) !== parseMoney4(amount)
         ) {
           invariant(false, 'claim payment event does not match the claim');
         }

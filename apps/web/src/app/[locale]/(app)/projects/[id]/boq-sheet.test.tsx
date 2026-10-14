@@ -167,8 +167,8 @@ describe('BoqSheet — the refusal paths', () => {
     expect(toasts[0]).toEqual({ title: ar('errors.generic'), variant: 'destructive' });
   });
 
-  test('a THROWN action toasts projects.profile.boq.saveFailed, not a coded refusal', async () => {
-    actions.updateBoqLine.mockRejectedValue(new Error('network died'));
+  test('a THROWN action toasts what failed (describeRejection), not a coded refusal', async () => {
+    actions.updateBoqLine.mockRejectedValue(new TypeError('fetch failed'));
     renderSheet();
 
     typeDescriptionAndBlur('كرانيش');
@@ -176,10 +176,30 @@ describe('BoqSheet — the refusal paths', () => {
     await waitFor(() => {
       expect(toasts).toHaveLength(1);
     });
-    expect(toasts[0]).toEqual({
-      title: ar('projects.profile.boq.saveFailed'),
-      variant: 'destructive',
+    expect(toasts[0]).toEqual({ title: ar('errors.unreachable'), variant: 'destructive' });
+  });
+
+  test('a refused CELL is said under that cell, the caret stays, and typing clears it', async () => {
+    actions.updateBoqLine.mockResolvedValue({
+      ok: false,
+      error: 'check_fields',
+      fields: { description: { code: 'description_too_long' } },
     });
+    renderSheet();
+    const cell = descriptionCell();
+    cell.focus();
+    typeDescriptionAndBlur('نص طويل جدا');
+    cell.focus();
+
+    await waitFor(() => expect(cell.getAttribute('aria-invalid')).toBe('true'));
+    const refusal = document.getElementById(cell.getAttribute('aria-describedby')!);
+    expect(refusal?.textContent).toBe(ar('errors.description_too_long'));
+    expect(toasts).toHaveLength(0);
+    expect(cell.value).toBe('نص طويل جدا');
+    expect(document.activeElement).toBe(cell);
+
+    fireEvent.change(cell, { target: { value: 'نص' } });
+    expect(cell.getAttribute('aria-invalid')).toBeNull();
   });
 
   test('AFTER A REFUSAL THE TYPED VALUE IS STILL IN THE INPUT', async () => {

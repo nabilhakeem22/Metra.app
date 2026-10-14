@@ -4,7 +4,7 @@ import { Ruler } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import type { ActionResult } from '@/lib/actions/result';
+import type { RunAction } from './run-action';
 import { romHistory } from '@/lib/engagements/rom-history';
 import type {
   EngagementEventRecord,
@@ -44,7 +44,7 @@ export function BudgetTab({
   canSetRom: boolean;
   canIssueRom: boolean;
   pending: boolean;
-  runAction: (fn: () => Promise<ActionResult>) => void;
+  runAction: RunAction;
 }) {
   const t = useTranslations('engagements');
   const tp = useTranslations('engagements.panels');

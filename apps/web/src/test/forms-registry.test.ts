@@ -21,10 +21,23 @@ const FORM_COVERAGE: Readonly<Record<string, string>> = {
   'app/[locale]/(app)/clients/[id]/use-client-details-form.ts': 'app/[locale]/(app)/clients/[id]/details-tab.test.tsx',
   'app/[locale]/(app)/clients/client-form-fields.tsx': 'app/[locale]/(app)/clients/client-form.test.tsx',
   'app/[locale]/(app)/clients/client-form.tsx': 'app/[locale]/(app)/clients/client-form.test.tsx',
+  'app/[locale]/(app)/engagements/[id]/acknowledgement-form.tsx': 'app/[locale]/(app)/engagements/[id]/cockpit-forms-under-fields.test.tsx',
+  'app/[locale]/(app)/engagements/[id]/client-expected-date.tsx': 'app/[locale]/(app)/engagements/[id]/cockpit-forms-under-fields.test.tsx',
+  'app/[locale]/(app)/engagements/[id]/command-card-claim-row.tsx': 'app/[locale]/(app)/engagements/[id]/cockpit-forms-under-fields.test.tsx',
+  'app/[locale]/(app)/engagements/[id]/document-thread-panel.tsx': 'app/[locale]/(app)/engagements/[id]/document-thread-panel.test.tsx',
+  'app/[locale]/(app)/engagements/[id]/engagement-fee-form.tsx': 'app/[locale]/(app)/engagements/[id]/cockpit-forms-under-fields.test.tsx',
+  'app/[locale]/(app)/engagements/[id]/engagement-payment-form.tsx': 'app/[locale]/(app)/engagements/[id]/cockpit-forms-under-fields.test.tsx',
+  'app/[locale]/(app)/engagements/[id]/engagement-payment-panel.tsx': 'app/[locale]/(app)/engagements/[id]/cockpit-forms-under-fields.test.tsx',
+  'app/[locale]/(app)/engagements/[id]/engagement-retract-button.tsx': 'app/[locale]/(app)/engagements/[id]/cockpit-forms-under-fields.test.tsx',
+  'app/[locale]/(app)/engagements/[id]/engagement-revision-form.tsx': 'app/[locale]/(app)/engagements/[id]/cockpit-forms-under-fields.test.tsx',
+  'app/[locale]/(app)/engagements/[id]/engagement-rom-range-form.tsx': 'app/[locale]/(app)/engagements/[id]/cockpit-forms-under-fields.test.tsx',
+  'app/[locale]/(app)/engagements/[id]/offline-approval-fields.tsx': 'app/[locale]/(app)/engagements/[id]/cockpit-forms-under-fields.test.tsx',
+  'app/[locale]/(app)/engagements/[id]/offline-approval-form.tsx': 'app/[locale]/(app)/engagements/[id]/cockpit-forms-under-fields.test.tsx',
   'app/[locale]/(app)/engagements/engagement-create-fields.tsx': 'app/[locale]/(app)/engagements/engagement-create-form.test.tsx',
   'app/[locale]/(app)/engagements/use-delivery-form.ts': 'app/[locale]/(app)/engagements/engagement-create-form.test.tsx',
   'app/[locale]/(app)/price-book/cost-item-form-fields.tsx': 'app/[locale]/(app)/price-book/cost-item-form.test.tsx',
   'app/[locale]/(app)/price-book/cost-item-form.tsx': 'app/[locale]/(app)/price-book/cost-item-form.test.tsx',
+  'app/[locale]/(app)/projects/[id]/boq-start.tsx': 'app/[locale]/(app)/projects/[id]/boq-start.test.tsx',
   'app/[locale]/(app)/projects/[id]/details-fields.tsx': 'app/[locale]/(app)/projects/[id]/details-tab.test.tsx',
   'app/[locale]/(app)/projects/[id]/details-type-field.tsx': 'app/[locale]/(app)/projects/[id]/details-tab.test.tsx',
   'app/[locale]/(app)/projects/[id]/use-add-project-type.ts': 'app/[locale]/(app)/projects/[id]/details-tab.test.tsx',
@@ -32,6 +45,8 @@ const FORM_COVERAGE: Readonly<Record<string, string>> = {
   'app/[locale]/(app)/projects/project-form-fields.tsx': 'app/[locale]/(app)/projects/project-form.test.tsx',
   'app/[locale]/(app)/projects/project-form-schedule.tsx': 'app/[locale]/(app)/projects/project-form.test.tsx',
   'app/[locale]/(app)/projects/project-form.tsx': 'app/[locale]/(app)/projects/project-form.test.tsx',
+  'app/[locale]/(app)/proposals/new/create-form-fields.tsx': 'app/[locale]/(app)/proposals/new/create-form.test.tsx',
+  'app/[locale]/(app)/proposals/new/create-form.tsx': 'app/[locale]/(app)/proposals/new/create-form.test.tsx',
   'app/[locale]/(app)/settings/account/account-client.tsx': 'app/[locale]/(app)/settings/account/account-client.test.tsx',
   'app/[locale]/(app)/settings/api-keys/api-keys-create-card.tsx': 'app/[locale]/(app)/settings/api-keys/api-keys-client.test.tsx',
   'app/[locale]/(app)/settings/api-keys/use-api-key-create.ts': 'app/[locale]/(app)/settings/api-keys/api-keys-client.test.tsx',
@@ -43,6 +58,8 @@ const FORM_COVERAGE: Readonly<Record<string, string>> = {
   'app/[locale]/(app)/settings/use-automation-form.ts': 'app/[locale]/(app)/settings/automation-settings-client.test.tsx',
   'app/[locale]/(app)/team/team-invite-form.tsx': 'app/[locale]/(app)/team/team-client.test.tsx',
   'app/[locale]/(app)/team/use-invite-form.ts': 'app/[locale]/(app)/team/team-client.test.tsx',
+  'app/[locale]/(auth)/login/login-request-step.tsx': 'app/[locale]/(auth)/login/login-form.test.tsx',
+  'app/[locale]/(auth)/login/use-otp-flow.ts': 'app/[locale]/(auth)/login/login-form.test.tsx',
   'app/[locale]/onboarding/onboarding-profile-fields.tsx': 'app/[locale]/onboarding/wizard.test.tsx',
   'app/[locale]/onboarding/wizard.tsx': 'app/[locale]/onboarding/wizard.test.tsx',
   'components/activity/activity-note-form.tsx': 'components/activity/activity-note-form.test.tsx',
@@ -50,19 +67,15 @@ const FORM_COVERAGE: Readonly<Record<string, string>> = {
 };
 
 /** Forms still on the old one-error-at-a-time shape. Only ever shrinks. */
-const PENDING_FORMS: readonly string[] = [
-  // Sign-in (W1.7): its refusals are under the boxes, but login-form.test.tsx
-  // does not run expectFieldErrorsRenderUnderFields yet.
-  'app/[locale]/(auth)/login/login-request-step.tsx',
-  'app/[locale]/(auth)/login/use-otp-flow.ts',
-];
+const PENDING_FORMS: readonly string[] = [];
 
 const graph = loadSourceGraph();
 const textOf = (path: string) => graph.files.get(path)!.getFullText();
 
 const USES_FIELD_ERRORS = /\buseFieldErrors\b/;
 const RENDERS_FORM_FIELD = /<FormField\b/;
-const DESTRUCTIVE_TOAST = /variant:\s*'destructive'/;
+// A failure TOAST, not a destructive confirm dialog (which asks before acting).
+const DESTRUCTIVE_TOAST = /toast\(\{[^}]*variant:\s*'destructive'/;
 
 const formFiles = [...graph.files.keys()]
   .filter((path) => !/[\\/](components[\\/]ui[\\/]form-field|hooks[\\/]use-field-errors)\.tsx?$/.test(path))

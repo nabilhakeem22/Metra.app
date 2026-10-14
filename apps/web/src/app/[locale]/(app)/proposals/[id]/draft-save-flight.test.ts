@@ -78,7 +78,7 @@ describe('createDraftSaveFlight', () => {
     });
     const flight = createDraftSaveFlight(() => null, { revision: 'r7', stored: '' });
     const { result } = await flight.send(save, draft, 'snap', () => undefined);
-    expect(result).toEqual({ ok: false, error: 'generic' });
+    expect(result).toEqual({ ok: false, error: 'uncertain' });
     expect(save).toHaveBeenCalledWith(draft, 'r7');
   });
 

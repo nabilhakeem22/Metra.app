@@ -10,6 +10,7 @@ import { unexpectedFailure } from '@/lib/actions/unexpected';
 import { getLocale } from 'next-intl/server';
 import { refreshApp } from '@/lib/actions/refresh';
 import type { ActionResult } from '@/lib/actions/result';
+import { unexpectedFailure } from '@/lib/actions/unexpected';
 import { requireOrg } from '@/lib/auth/require-org';
 import { resolveRequestOrigin } from '@/lib/http/request-origin';
 import {
@@ -53,7 +54,7 @@ export async function saveProposalDraft(input: SaveDraftInput): Promise<SaveDraf
   const ctx = await requireOrg();
   const res = await saveProposalDraftCore(ctx, input);
   if (res.ok) refreshApp();
-  return res.ok ? { ok: true, data: res.data } : { ok: false, error: res.error };
+  return res;
 }
 
 /**
@@ -64,8 +65,7 @@ export async function saveProposalDraft(input: SaveDraftInput): Promise<SaveDraf
  */
 export async function autosaveProposalDraft(input: SaveDraftInput): Promise<SaveDraftActionResult> {
   const ctx = await requireOrg();
-  const res = await saveProposalDraftCore(ctx, input);
-  return res.ok ? { ok: true, data: res.data } : { ok: false, error: res.error };
+  return saveProposalDraftCore(ctx, input);
 }
 
 /** The draft as stored now (see readStoredDraftCore). Read-only. */
@@ -87,7 +87,8 @@ export async function sendProposal(id: string): Promise<
   const origin = await resolveRequestOrigin();
   if (!origin) return unexpectedFailure('sendProposal: no request origin');
   const res = await sendProposalCore(ctx, { id });
-  if (!res.ok || !res.data) return { ok: res.ok, error: res.error };
+  if (!res.ok) return res;
+  if (!res.data) return unexpectedFailure('sendProposalCore answered ok without a token');
 
   const locale = await currentLocale();
   const link = `${origin}/${locale}/p/${res.data}`;

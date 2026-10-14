@@ -17,11 +17,17 @@ export function FeeSplitRows({
   onChange,
   onAdd,
   onRemove,
+  firstInputId,
+  errorId,
 }: {
   rows: FeeSplitRow[];
   onChange: (index: number, value: string) => void;
   onAdd: (kind: MilestoneKind) => void;
   onRemove: (kind: MilestoneKind) => void;
+  /** The first row box's id: where the caret goes when the split is refused. */
+  firstInputId: string;
+  /** The split's refusal, said under the rows: every row box points at it. */
+  errorId?: string;
 }) {
   const t = useTranslations('engagements.feeForm');
   const tk = useTranslations('engagements.milestoneKind');
@@ -35,10 +41,13 @@ export function FeeSplitRows({
         <div key={row.kind} className="flex items-center gap-2">
           <span className="w-40 shrink-0 text-body">{tk(row.kind)}</span>
           <Input
+            id={index === 0 ? firstInputId : undefined}
             dir="ltr"
             inputMode="decimal"
             className="tabular-nums"
             aria-label={`${tk(row.kind)} ${t('value')}`}
+            aria-invalid={errorId ? true : undefined}
+            aria-describedby={errorId}
             value={row.value}
             onChange={(event) => onChange(index, event.target.value)}
           />

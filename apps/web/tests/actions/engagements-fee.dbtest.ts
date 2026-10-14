@@ -130,7 +130,15 @@ describe('submitDesignFee fee schedule — invalid splits roll back atomically',
   ): Promise<void> {
     const { ctx, engagementId } = await setup();
     const res = await submit(ctx, engagementId, payload);
-    expect(res).toEqual({ ok: false, error: code });
+    // The two refusals the fee form can fix come back under their box.
+    const fieldOf: Record<string, string | undefined> = {
+      design_fee_required: 'designFee',
+      milestone_split_invalid: 'milestones',
+    };
+    const field = fieldOf[code];
+    expect(res).toEqual(
+      field ? { ok: false, error: 'check_fields', fields: { [field]: { code } } } : { ok: false, error: code },
+    );
     expect(await stateOf(engagementId)).toBe('created');
     expect(await milestoneCount(engagementId)).toBe(0);
   }

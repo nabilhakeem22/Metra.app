@@ -11,10 +11,12 @@
 // the gate it opened. Without that half this is bookkeeping theatre.
 import { designEngagements, engagementEvents } from '@metra/db';
 import { and, eq } from 'drizzle-orm';
+import { fieldsFailed, hasFieldErrors } from '@/lib/actions/field-errors';
 import { fail, mutateInOrg, requireInOrg } from '@/lib/actions/mutate';
 import { err, type ActionResult } from '@/lib/actions/result';
 import type { OrgContext } from '@/lib/db/context';
 import { isUuid } from '@/lib/uuid';
+import { correctionFieldErrors } from './correction-field-rules';
 import { isTerminal } from './states';
 
 export interface RecordEventCorrectionInput {
@@ -51,10 +53,9 @@ export async function recordEventCorrectionCore(
   if (!isUuid(input.engagementId) || !isUuid(input.eventId)) {
     return err('invalid');
   }
-  const reason = input.reason?.trim();
-  // A retraction without a stated reason is just a disappearance. The whole
-  // point of correcting rather than deleting is that the record explains itself.
-  if (!reason) return err('invalid');
+  const reasonErrors = correctionFieldErrors(input);
+  if (hasFieldErrors(reasonErrors)) return fieldsFailed(reasonErrors);
+  const reason = input.reason.trim();
 
   return mutateInOrg(
     ctx,

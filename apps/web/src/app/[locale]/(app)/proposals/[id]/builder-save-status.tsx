@@ -2,7 +2,7 @@
 
 import { useLocale, useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
-import { resolveActionError } from '@/lib/actions/error-message';
+import { describeFailure } from '@/lib/actions/error-message';
 import { formatTime } from '@/lib/format/date';
 import type { DraftAutosaveApi } from './use-draft-autosave';
 
@@ -12,9 +12,9 @@ import type { DraftAutosaveApi } from './use-draft-autosave';
  * Save button: the draft saves itself.
  */
 export function BuilderSaveStatus({
-  autosave: { saveState, incomplete, lastSavedAt, error, retry },
+  autosave: { saveState, incomplete, lastSavedAt, failure, retry },
 }: {
-  autosave: Pick<DraftAutosaveApi, 'saveState' | 'incomplete' | 'lastSavedAt' | 'error' | 'retry'>;
+  autosave: Pick<DraftAutosaveApi, 'saveState' | 'incomplete' | 'lastSavedAt' | 'failure' | 'retry'>;
 }) {
   const t = useTranslations('proposals.builder.autosave');
   const te = useTranslations('errors');
@@ -24,7 +24,7 @@ export function BuilderSaveStatus({
     return (
       <span className="flex flex-wrap items-center gap-2">
         <span role="alert" className="text-small font-semibold text-destructive">
-          {t('failed', { reason: resolveActionError(error ?? 'generic', te) })}
+          {t('failed', { reason: describeFailure(failure ?? {}, te) })}
         </span>
         <Button type="button" variant="secondary" size="sm" onClick={retry}>
           {t('retry')}

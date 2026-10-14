@@ -4,14 +4,21 @@ import { Download, Loader2, Upload } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { useRef, useState, useTransition } from 'react';
 import { Button } from '@/components/ui/button';
+import { FieldErrorText, fieldErrorId } from '@/components/ui/field-error-text';
+import { useFieldErrors } from '@/hooks/use-field-errors';
+import { useFocusFirstInvalid } from '@/hooks/use-focus-first-invalid';
 import { toast } from '@/hooks/use-toast';
-import { resolveActionError } from '@/lib/actions/error-message';
 import {
   commitBoqImport,
   createBoq,
   previewBoqImport,
   type ImportPreview,
 } from '@/lib/boqs/actions';
+import { BoqImportPreview } from './boq-import-preview';
+
+/** The upload control is the one field: the file itself. */
+const BOQ_IMPORT_FIELDS = ['file'] as const;
+const FILE_ID = 'boq-import-file';
 
 /**
  * The two ways a BOQ starts: download the template and upload it back, or create
@@ -24,65 +31,61 @@ import {
  */
 export function BoqStart({ projectId }: { projectId: string }) {
   const t = useTranslations('projects.profile.boq');
-  // Coded refusals from the preview resolve through the shared errors catalogue:
-  // a sheet over the size cap and a sheet that will not parse are different
-  // problems, and `importFailed` said the same thing about both.
+  // A sheet over the size cap, an empty one and one that will not parse are
+  // different problems: each is said under the upload control by its cause.
   const te = useTranslations('errors');
   const [pending, start] = useTransition();
   const [preview, setPreview] = useState<ImportPreview | null>(null);
   const [boqId, setBoqId] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const errors = useFieldErrors({ fields: BOQ_IMPORT_FIELDS, translate: te });
+  const fileRefusal = errors.messageFor('file');
+  const startRef = useRef<HTMLDivElement>(null);
+  // The upload control is disabled while a read is in flight, and a disabled
+  // control cannot take the caret: move it once the read has settled.
+  useFocusFirstInvalid(startRef, pending ? 0 : errors.invalidAttempt);
 
   function onFile(file: File): void {
+    errors.clear();
     start(async () => {
       try {
-        const text = await file.text();
-        const res = await previewBoqImport(text);
-        if (!res.ok) {
-          toast({
-            title: resolveActionError(res.error, te),
-            variant: 'destructive',
-          });
-          return;
-        }
-        setPreview(res);
-      } catch {
-        toast({ title: t('importFailed'), variant: 'destructive' });
+        const res = await previewBoqImport(await file.text());
+        if (!errors.applyResult(res)) setPreview(res);
+      } catch (rejection) {
+        errors.applyRejection(rejection);
       }
     });
   }
 
+  /** Create the document only once the studio has seen what will land in it:
+   *  an abandoned preview should not leave an empty BOQ behind. */
+  async function boqToFill(): Promise<string | null> {
+    if (boqId) return boqId;
+    const created = await createBoq({ projectId, titleEn: 'Bill of Quantities' });
+    if (errors.applyResult(created) || !created.data) return null;
+    setBoqId(created.data);
+    return created.data;
+  }
+
   function onCommit(): void {
     if (!preview?.lines?.length) return;
+    errors.clear();
     start(async () => {
       try {
-        // Create the document only once the studio has seen what will land in
-        // it — an abandoned preview should not leave an empty BOQ behind.
-        let id = boqId;
-        if (!id) {
-          const created = await createBoq({ projectId, titleEn: 'Bill of Quantities' });
-          if (!created.ok || !created.data) {
-            toast({ title: t('importFailed'), variant: 'destructive' });
-            return;
-          }
-          id = created.data;
-          setBoqId(id);
-        }
+        const id = await boqToFill();
+        if (!id) return;
         const res = await commitBoqImport({ boqId: id, lines: preview.lines ?? [] });
-        if (!res.ok) {
-          toast({ title: t('importFailed'), variant: 'destructive' });
-          return;
-        }
+        if (errors.applyResult(res)) return;
         toast({ title: t('imported', { count: String(res.data ?? 0) }) });
         setPreview(null);
-      } catch {
-        toast({ title: t('importFailed'), variant: 'destructive' });
+      } catch (rejection) {
+        errors.applyRejection(rejection);
       }
     });
   }
 
   return (
-    <div className="glass space-y-4 p-5">
+    <div ref={startRef} className="glass space-y-4 p-5">
       <div>
         <p className="font-semibold text-[color:var(--text)]">{t('startTitle')}</p>
         <p className="text-body text-[color:var(--text-muted)]">{t('startBody')}</p>
@@ -97,8 +100,11 @@ export function BoqStart({ projectId }: { projectId: string }) {
         </Button>
 
         <Button
+          id={FILE_ID}
           variant="secondary"
           disabled={pending}
+          aria-invalid={fileRefusal ? true : undefined}
+          aria-describedby={fileRefusal ? fieldErrorId(FILE_ID) : undefined}
           onClick={() => fileRef.current?.click()}
         >
           {pending ? (
@@ -123,51 +129,20 @@ export function BoqStart({ projectId }: { projectId: string }) {
           }}
         />
       </div>
+      <FieldErrorText id={fieldErrorId(FILE_ID)} message={fileRefusal} />
+      {errors.formError && (
+        <p className="text-body text-destructive" role="alert">
+          {errors.formError}
+        </p>
+      )}
 
       {preview && (
-        <div className="space-y-3 rounded-item border border-[color:var(--rule)] p-4">
-          <p className="text-body font-semibold text-[color:var(--text)]">
-            {t('previewTitle', { count: String(preview.lines?.length ?? 0) })}
-          </p>
-
-          {preview.notes?.map((note) => (
-            <p key={note} className="text-caption text-[color:var(--text-muted)]">
-              {t(`importNotes.${note}`)}
-            </p>
-          ))}
-
-          {preview.problems && preview.problems.length > 0 && (
-            <div className="space-y-1">
-              <p
-                className="text-caption font-semibold"
-                style={{ color: 'var(--danger)' }}
-              >
-                {t('previewProblems', { count: String(preview.problems.length) })}
-              </p>
-              <ul className="max-h-40 space-y-0.5 overflow-y-auto text-caption text-[color:var(--text-muted)]">
-                {preview.problems.slice(0, 20).map((p) => (
-                  <li key={p.rowNumber}>
-                    {t('rowLabel', { row: String(p.rowNumber) })} —{' '}
-                    {p.issues
-                      .map((issue) =>
-                        t(`importErrors.${issue.code}`, { value: issue.value ?? '' }),
-                      )
-                      .join('; ')}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-
-          <div className="flex gap-2">
-            <Button variant="default" onClick={onCommit} disabled={pending || !preview.lines?.length}>
-              {t('commitImport')}
-            </Button>
-            <Button variant="ghost" onClick={() => setPreview(null)} disabled={pending}>
-              {t('cancel')}
-            </Button>
-          </div>
-        </div>
+        <BoqImportPreview
+          preview={preview}
+          pending={pending}
+          onCommit={onCommit}
+          onCancel={() => setPreview(null)}
+        />
       )}
     </div>
   );

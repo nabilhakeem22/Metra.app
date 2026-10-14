@@ -6,6 +6,7 @@ import type { BoqSectionRow } from '@/lib/boqs/queries';
 import { leadingColumnCount, type CellEdits, type EditableLine } from './boq-sheet-columns';
 import { BoqSheetRow } from './boq-sheet-row';
 import type { BoqSheetRowApi } from './boq-sheet-row-api';
+import type { BoqRowRefusals } from './use-boq-cell-errors';
 
 // ONE TABLE, NOT ONE PER SECTION. Sections are rows in the same sheet, so reading
 // the document top to bottom is one scroll, and the section subtotal lands in the
@@ -77,6 +78,7 @@ export function BoqSectionBody({
   searching,
   api,
   cells,
+  refused,
   savingIds,
   pending,
   onToggle,
@@ -96,6 +98,8 @@ export function BoqSectionBody({
    *  identity changes only when that row changes — which is what lets a memoised
    *  row skip a keystroke typed into a different one. */
   cells: CellEdits;
+  /** The whole sheet's refused cells; each row is handed only its own slice. */
+  refused: Record<string, BoqRowRefusals>;
   /** The rows mid-save. */
   savingIds: ReadonlySet<string>;
   /** SOME write on the sheet is in flight. */
@@ -120,6 +124,7 @@ export function BoqSectionBody({
             line={line}
             api={api}
             typed={cells[line.id]}
+            refused={refused[line.id]}
             saving={savingIds.has(line.id)}
             pending={pending}
             discounted={discounted}

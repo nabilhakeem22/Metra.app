@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { act, fireEvent, screen } from '@testing-library/react';
 import type { MilestoneKind } from '@metra/db';
+import { fieldsFailed } from '@/lib/actions/field-errors';
 import { messageAt, renderWithIntl } from '@/test/render-with-intl';
 import { PaymentPanel } from './engagement-payment-panel';
 import { useEngagementAction } from './use-engagement-action';
@@ -164,16 +165,26 @@ describe('PaymentPanel — one key per deliberate act', () => {
     await record('50000');
     const heldKey = sent()[0]!.key;
 
+    // A typo the rules catch is said under the box and never sent: it cannot
+    // claim a key at all.
     setNow(START + 60_000);
-    actions.recordPayment.mockResolvedValue({ ok: false, error: 'payment_amount_invalid' });
     await record('50,000');
+    expect(document.getElementById('pay-amount-error')?.textContent).toBe(
+      ar('errors.payment_amount_invalid'),
+    );
+
+    // One the server refuses definitely is its own act, and releases only its own key.
+    actions.recordPayment.mockResolvedValue(
+      fieldsFailed({ amount: { code: 'payment_amount_invalid' } }),
+    );
+    await record('60000');
 
     setNow(START + 120_000);
     actions.recordPayment.mockResolvedValue({ ok: false, error: 'uncertain' });
     await record('50000');
 
     const payments = sent();
-    expect(payments.map((payment) => payment.amount)).toEqual(['50000', '50,000', '50000']);
+    expect(payments.map((payment) => payment.amount)).toEqual(['50000', '60000', '50000']);
     expect(payments[1]!.key).not.toBe(heldKey);
     expect(payments[2]!.key).toBe(heldKey);
   });

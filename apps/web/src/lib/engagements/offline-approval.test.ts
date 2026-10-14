@@ -48,14 +48,14 @@ describe('parseOfflineApproval', () => {
   ])('a date %s is out of range, named as such', (_label, occurredOn) => {
     expect(parse({ channel: 'phone', occurredOn })).toEqual({
       ok: false,
-      code: 'offline_approval_date_out_of_range',
+      fields: { occurredOn: { code: 'offline_approval_date_out_of_range' } },
     });
   });
 
-  test('a note over the cap is named as too long; exactly at the cap is accepted', () => {
+  test('a note over the cap is too long under the note, with its cap; exactly at the cap is accepted', () => {
     expect(parse({ channel: 'phone', note: 'x'.repeat(2001) })).toEqual({
       ok: false,
-      code: 'offline_approval_note_too_long',
+      fields: { note: { code: 'too_long', params: { max: 2000 } } },
     });
     const atCap = parse({ channel: 'other', note: 'x'.repeat(2000) });
     expect(atCap.ok && atCap.approval.note).toHaveLength(2000);
@@ -67,13 +67,24 @@ describe('parseOfflineApproval', () => {
     ['an array', ['phone']],
     ['a string', 'phone'],
     ['an unknown channel', { channel: 'fax' }],
-    ['a missing channel', { note: 'yes' }],
-    ['a day the calendar does not have', { channel: 'phone', occurredOn: '2026-02-31' }],
-    ['a date that is not YYYY-MM-DD', { channel: 'phone', occurredOn: '05/10/2026' }],
     ['a non-string note', { channel: 'phone', note: 42 }],
     ['a chosen option that is not a uuid', { channel: 'phone', chosenArtifactId: 'option-a' }],
   ])('refuses %s as invalid', (_label, payload) => {
     expect(parse(payload)).toEqual({ ok: false, code: 'invalid' });
+  });
+
+  test('no channel chosen is required under the channel', () => {
+    expect(parse({ note: 'yes' })).toEqual({ ok: false, fields: { channel: { code: 'required' } } });
+  });
+
+  test.each([
+    ['a day the calendar does not have', '2026-02-31'],
+    ['a date that is not YYYY-MM-DD', '05/10/2026'],
+  ])('%s is invalid_date under the day', (_label, occurredOn) => {
+    expect(parse({ channel: 'phone', occurredOn })).toEqual({
+      ok: false,
+      fields: { occurredOn: { code: 'invalid_date' } },
+    });
   });
 });
 

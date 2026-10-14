@@ -63,8 +63,10 @@ export function createDraftSaveFlight(
       else if (result.error === 'generic' || result.error === 'uncertain') unconfirmed = draft;
       return result;
     } catch {
+      // The answer never came back, so the save may or may not have committed:
+      // exactly what `uncertain` says, and lost-commit.ts settles which.
       unconfirmed = draft;
-      return { ok: false, error: 'generic' };
+      return { ok: false, error: 'uncertain' };
     }
   }
 

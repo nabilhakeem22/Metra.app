@@ -9,6 +9,7 @@
 // first, and a request that skips the browser entirely still cannot write a
 // value the browser would have rejected.
 
+import type { FieldError } from '@/lib/actions/field-errors';
 import type { ActionCode } from '@/lib/actions/result';
 import { readMoney } from '@/lib/money/read';
 import { countCharacters } from '@/lib/validation/text';
@@ -52,9 +53,16 @@ export interface CleanLinePatch {
   provisional?: boolean;
 }
 
+/** The sheet columns a refusal can sit under. */
+export type BoqLineColumn = 'itemCode' | 'description' | 'unit' | 'qty' | 'unitPrice';
+export type BoqLineErrors = Partial<Record<BoqLineColumn, FieldError>>;
+
+/** The patch as stored; or every refused column at once, each under its cell;
+ *  or `malformed`, a patch no sheet can send. */
 export type PatchResult =
   | { ok: true; value: CleanLinePatch }
-  | { ok: false; error: ActionCode };
+  | { ok: false; errors: BoqLineErrors }
+  | { ok: false; error: 'malformed' };
 
 /**
  * A number the studio TYPED into the sheet.
@@ -102,67 +110,59 @@ function isBoqUnit(value: string): value is BoqUnit {
  */
 export function normalizeLinePatch(patch: BoqLinePatch): PatchResult {
   const value: CleanLinePatch = {};
-  const textError = readTextFields(patch, value);
-  if (textError) return { ok: false, error: textError };
-  const amountError = readAmountFields(patch, value);
-  if (amountError) return { ok: false, error: amountError };
+  const errors: BoqLineErrors = {};
+  readTextFields(patch, value, errors);
+  readAmountFields(patch, value, errors);
+  if (Object.keys(errors).length > 0) return { ok: false, errors };
 
   if (patch.provisional !== undefined) {
-    if (typeof patch.provisional !== 'boolean') return { ok: false, error: 'invalid' };
+    if (typeof patch.provisional !== 'boolean') return { ok: false, error: 'malformed' };
     value.provisional = patch.provisional;
   }
 
-  if (Object.keys(value).length === 0) return { ok: false, error: 'invalid' };
+  if (Object.keys(value).length === 0) return { ok: false, error: 'malformed' };
   return { ok: true, value };
 }
 
-/** The columns that hold text: code, description, unit. Null = all accepted. */
-function readTextFields(
-  patch: BoqLinePatch,
-  value: CleanLinePatch,
-): ActionCode | null {
+/** The columns that hold text: code, description, unit. Refusals go to `errors`. */
+function readTextFields(patch: BoqLinePatch, value: CleanLinePatch, errors: BoqLineErrors): void {
   if (patch.itemCode !== undefined) {
     const code = (patch.itemCode ?? '').trim();
     // CODE POINTS, like the description cap ten lines below and every other cap
     // in the codebase (lib/validation/text.ts: "one rule, one home"). W3-9 moved
     // the description and left this one counting UTF-16 units, so 21 astral
     // characters were refused against a cap of 40.
-    if (countCharacters(code) > MAX_ITEM_CODE) return 'item_code_too_long';
+    if (countCharacters(code) > MAX_ITEM_CODE) errors.itemCode = { code: 'item_code_too_long' };
     // An emptied code is a real edit — the line simply stops carrying one.
-    value.itemCode = code === '' ? null : code;
+    else value.itemCode = code === '' ? null : code;
   }
 
   if (patch.description !== undefined) {
     const text = patch.description.trim();
     // The bilingual CHECK demands one side be present, so a blank description is
     // not a value this table can hold.
-    if (text === '') return 'description_required';
-    if (countCharacters(text) > MAX_DESCRIPTION) return 'description_too_long';
-    value.description = text;
+    if (text === '') errors.description = { code: 'description_required' };
+    else if (countCharacters(text) > MAX_DESCRIPTION) errors.description = { code: 'description_too_long' };
+    else value.description = text;
   }
 
   if (patch.unit !== undefined) {
-    if (!isBoqUnit(patch.unit)) return 'invalid_unit';
-    value.unit = patch.unit;
+    if (!isBoqUnit(patch.unit)) errors.unit = { code: 'invalid_unit' };
+    else value.unit = patch.unit;
   }
-  return null;
 }
 
-/** The columns that hold money: quantity and rate. Null = both accepted. */
-function readAmountFields(
-  patch: BoqLinePatch,
-  value: CleanLinePatch,
-): ActionCode | null {
+/** The columns that hold money: quantity and rate. Refusals go to `errors`. */
+function readAmountFields(patch: BoqLinePatch, value: CleanLinePatch, errors: BoqLineErrors): void {
   if (patch.qty !== undefined) {
     const qty = readAmountField(patch.qty, 'invalid_qty');
-    if ('error' in qty) return qty.error;
-    value.qty = qty.value;
+    if ('error' in qty) errors.qty = { code: qty.error };
+    else value.qty = qty.value;
   }
 
   if (patch.unitPrice !== undefined) {
     const price = readAmountField(patch.unitPrice, 'invalid_price');
-    if ('error' in price) return price.error;
-    value.unitPrice = price.value;
+    if ('error' in price) errors.unitPrice = { code: price.error };
+    else value.unitPrice = price.value;
   }
-  return null;
 }

@@ -1,5 +1,6 @@
-import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { expectFieldErrorsRenderUnderFields } from '@/test/field-coverage';
 import { messageAt, renderWithIntl } from '@/test/render-with-intl';
 import { DocumentThreadPanel } from './document-thread-panel';
 
@@ -66,5 +67,47 @@ describe('DocumentThreadPanel when a read fails', () => {
     open(canReply);
     expect((await screen.findByRole('alert')).textContent).toBe(en('engagements.comments.error.load_failed'));
     expect(screen.queryByText(en('engagements.comments.empty'))).toBeNull();
+  });
+});
+
+describe('DocumentThreadPanel when a reply is refused', () => {
+  it('an empty reply is said under the box and never sent', async () => {
+    actions.listDocumentComments.mockResolvedValue([]);
+    open();
+    await screen.findByText(en('engagements.comments.empty'));
+    fireEvent.click(screen.getByRole('button', { name: en('engagements.comments.reply') }));
+    expect(actions.replyToDocument).not.toHaveBeenCalled();
+    expect(document.getElementById(`reply-${ARTIFACT}-error`)?.textContent).toBe(en('errors.field.required'));
+    expect(screen.getByRole('textbox').getAttribute('aria-invalid')).toBe('true');
+  });
+
+  it.each(['en', 'ar-EG'] as const)('a refused reply is said under the box (%s)', async (locale) => {
+    actions.listDocumentComments.mockResolvedValue([]);
+    renderWithIntl(<DocumentThreadPanel artifactId={ARTIFACT} canReply />, { locale });
+    fireEvent.click(screen.getByRole('button', { name: messageAt(locale, 'engagements.comments.open') }));
+    await screen.findByText(messageAt(locale, 'engagements.comments.empty'));
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Is this oak?' } });
+    await expectFieldErrorsRenderUnderFields({
+      fields: ['body'],
+      controlIdOf: () => `reply-${ARTIFACT}`,
+      answerWith: (result) => actions.replyToDocument.mockResolvedValue(result),
+      submit: async () => {
+        await act(async () => {
+          fireEvent.click(screen.getByRole('button', { name: messageAt(locale, 'engagements.comments.reply') }));
+        });
+      },
+      locale,
+      typed: { [`reply-${ARTIFACT}`]: 'Is this oak?' },
+    });
+  });
+
+  it('a server refusal with no field is said above the box, by its cause', async () => {
+    actions.listDocumentComments.mockResolvedValue([]);
+    actions.replyToDocument.mockResolvedValue({ ok: false, error: 'engagement_not_active' });
+    open();
+    await screen.findByText(en('engagements.comments.empty'));
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Hello' } });
+    fireEvent.click(screen.getByRole('button', { name: en('engagements.comments.reply') }));
+    expect((await screen.findByRole('alert')).textContent).toBe(en('errors.engagement_not_active'));
   });
 });

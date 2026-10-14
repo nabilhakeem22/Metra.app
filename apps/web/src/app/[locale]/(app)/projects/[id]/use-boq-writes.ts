@@ -17,6 +17,7 @@ import {
   type WriteContext,
 } from './boq-write-actions';
 import { createCellWriteLatch } from './cell-write-latch';
+import type { BoqCellErrorsApi } from './use-boq-cell-errors';
 import type { BoqEditsApi } from './use-boq-edits';
 
 /**
@@ -57,6 +58,7 @@ export interface BoqWritesApi extends BoqWriteHandlers {
 export function useBoqWrites(options: {
   boq: BoqDetail;
   edits: BoqEditsApi;
+  cellErrors: BoqCellErrorsApi;
 }): BoqWritesApi {
   const sheetText = useTranslations('projects.profile.boq');
   const errorText = useTranslations('errors');
@@ -70,7 +72,7 @@ export function useBoqWrites(options: {
   const lineRemoval = useUndoableRemoval({
     commit: (lineId) => deleteBoqLine({ lineId }),
     messages: { removed: sheetText('lineDeleted'), undo: commonText('undo') },
-    onFailed: (result) => refuse(context.current, result.error),
+    onFailed: (result) => refuse(context.current, result),
   });
   const removeLine = useRef(lineRemoval.remove);
   removeLine.current = lineRemoval.remove;
