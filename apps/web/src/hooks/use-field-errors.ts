@@ -111,3 +111,6 @@ export function useFieldErrors<F extends string>({
     clear,
   };
 }
+
+/** What a form holds from useFieldErrors, for a child that renders its fields. */
+export type FieldErrorsApi<F extends string> = ReturnType<typeof useFieldErrors<F>>;

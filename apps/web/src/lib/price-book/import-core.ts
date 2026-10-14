@@ -5,8 +5,9 @@
 // is NEVER rejected.
 import { costItems, sections } from '@metra/db';
 import { eq } from 'drizzle-orm';
+import { fieldsFailed } from '@/lib/actions/field-errors';
 import { mutateInOrg } from '@/lib/actions/mutate';
-import { err, type ActionResult } from '@/lib/actions/result';
+import { err, type ActionCode, type ActionResult } from '@/lib/actions/result';
 import type { OrgContext } from '@/lib/db/context';
 import { can } from '@/lib/permissions/can';
 import {
@@ -29,21 +30,28 @@ export async function parseCostImportCore(
   if (!can(ctx.role, 'price_book', 'create')) return err('forbidden');
   try {
     const sheet = await parseSpreadsheet(input.bytes);
-    if (sheet.data.length === 0) return err('import_empty');
+    if (sheet.data.length === 0) return fileRefused('import_empty');
     return { ok: true, data: sheet };
   } catch (e) {
     if (e instanceof SpreadsheetError) {
-      if (e.reason === 'empty') return err('import_empty');
+      if (e.reason === 'empty') return fileRefused('import_empty');
       // Both parser ceilings — too many rows, too many cells — are the same
       // sentence to the studio: the sheet is bigger than the importer takes.
       if (e.reason === 'too_many_rows' || e.reason === 'too_many_cells') {
-        return err('import_too_large');
+        return fileRefused('import_too_large');
       }
-      return err('invalid');
+      return fileRefused('import_unreadable');
     }
+    // A parser that threw something of its own still means this file could not
+    // be read; the log line keeps the shape of what it threw.
     console.error('parseCostImportCore failed:', loggableFailure(e));
-    return err('generic');
+    return fileRefused('import_unreadable');
   }
+}
+
+/** A refusal of the uploaded file itself, said under the file box. */
+export function fileRefused(code: ActionCode): ActionResult {
+  return fieldsFailed({ file: { code } });
 }
 
 export interface ImportSummary {

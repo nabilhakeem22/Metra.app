@@ -10,6 +10,7 @@ import { err, type ActionResult } from '@/lib/actions/result';
 import type { OrgContext } from '@/lib/db/context';
 import { isUuid } from '@/lib/uuid';
 import { contractHeaderPatch, validateContractHeader } from './update-header';
+import { fieldsFailed } from '@/lib/actions/field-errors';
 
 export interface ContractHeaderInput {
   titleAr?: string | null;
@@ -67,8 +68,9 @@ export async function saveContractDraftCore(
   const id = input.id?.trim();
   if (!id || !isUuid(id)) return err('invalid');
   const header = input.header ?? {};
-  const validated = validateContractHeader(header);
-  if (typeof validated === 'string') return err(validated);
+  const read = validateContractHeader(header);
+  if (!read.ok) return fieldsFailed(read.errors);
+  const validated = read.value;
 
   return mutateInOrg(
     ctx,

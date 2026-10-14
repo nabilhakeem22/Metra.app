@@ -2,19 +2,41 @@
 
 import { Loader2 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
-import { useState, useTransition } from 'react';
+import { useRef, useState, useTransition } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { FormField } from '@/components/ui/form-field';
 import { Input } from '@/components/ui/input';
+import { useFieldErrors } from '@/hooks/use-field-errors';
+import { useFocusFirstInvalid } from '@/hooks/use-focus-first-invalid';
 import { useRouter } from '@/i18n/routing';
-import { describeFailure, describeRejection } from '@/lib/actions/error-message';
 import { saveContractDraft } from '@/lib/contracts/actions';
 import type { ContractDetail } from '@/lib/contracts/queries';
+import {
+  CONTRACT_HEADER_FIELDS,
+  contractHeaderInput,
+  headerFormOf,
+  type HeaderForm,
+} from './contract-header-input';
+
+type HeaderKey = keyof HeaderForm;
+
+const KIND: Partial<Record<HeaderKey, 'date' | 'number'>> = {
+  advancePct: 'number',
+  retentionPct: 'number',
+  signatureDate: 'date',
+  startDate: 'date',
+  endDate: 'date',
+  paymentTermsDays: 'number',
+  defectsLiabilityDays: 'number',
+};
 
 /**
  * Draft-only header editor — wires the tested saveContractDraftCore so staff set
- * retention/advance/terms/dates/payment terms before issuing. Fields are frozen
- * once the contract leaves draft (server enforces `contract_not_draft`).
+ * retention/advance/terms/dates/payment terms before issuing. Each refused field
+ * is said under it (a percentage outside 0 to 100, a day that is not one, an end
+ * before the start); a refusal of the contract itself (`contract_not_draft`:
+ * it was issued meanwhile) is said above the fields.
  */
 export function ContractHeaderForm({ detail }: { detail: ContractDetail }) {
   const t = useTranslations('contracts');
@@ -23,93 +45,59 @@ export function ContractHeaderForm({ detail }: { detail: ContractDetail }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [saved, setSaved] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [form, setForm] = useState({
-    signatureDate: detail.signatureDate ?? '',
-    startDate: detail.startDate ?? '',
-    endDate: detail.endDate ?? '',
-    advancePct: detail.advancePct,
-    retentionPct: detail.retentionPct,
-    paymentTermsDays:
-      detail.paymentTermsDays != null ? String(detail.paymentTermsDays) : '',
-    defectsLiabilityDays:
-      detail.defectsLiabilityDays != null ? String(detail.defectsLiabilityDays) : '',
-    termsEn: detail.termsEn ?? '',
-    termsAr: detail.termsAr ?? '',
-  });
-
-  function set<K extends keyof typeof form>(key: K, value: string) {
-    setForm((f) => ({ ...f, [key]: value }));
-    setSaved(false);
-  }
+  const [form, setForm] = useState<HeaderForm>(() => headerFormOf(detail));
+  const errors = useFieldErrors({ fields: CONTRACT_HEADER_FIELDS, translate: te });
+  const formRef = useRef<HTMLDivElement>(null);
+  useFocusFirstInvalid(formRef, errors.invalidAttempt);
 
   function save() {
-    setError(null);
+    errors.clear();
     startTransition(async () => {
       try {
-        const res = await saveContractDraft({
-          id: detail.id,
-          header: {
-            signatureDate: form.signatureDate || null,
-            startDate: form.startDate || null,
-            endDate: form.endDate || null,
-            advancePct: form.advancePct,
-            retentionPct: form.retentionPct,
-            paymentTermsDays: form.paymentTermsDays
-              ? Number(form.paymentTermsDays)
-              : null,
-            defectsLiabilityDays: form.defectsLiabilityDays
-              ? Number(form.defectsLiabilityDays)
-              : null,
-            termsEn: form.termsEn || null,
-            termsAr: form.termsAr || null,
-          },
-        });
-        if (res.ok) {
-          setSaved(true);
-          router.refresh();
-        } else {
-          setError(describeFailure(res, te));
-        }
+        const res = await saveContractDraft({ id: detail.id, header: contractHeaderInput(form) });
+        if (errors.applyResult(res)) return;
+        setSaved(true);
+        router.refresh();
       } catch (rejection) {
-        setError(describeRejection(rejection, te));
+        errors.applyRejection(rejection);
       }
     });
   }
 
-  const field = (
-    key: keyof typeof form,
-    label: string,
-    type: 'text' | 'date' | 'number' = 'text',
-  ) => (
-    <label className="flex flex-col gap-1 text-body">
-      <span className="text-muted-foreground">{label}</span>
-      <Input
-        type={type}
-        dir={type === 'text' ? undefined : 'ltr'}
-        value={form[key]}
-        onChange={(e) => set(key, e.target.value)}
-      />
-    </label>
-  );
+  const field = (key: HeaderKey, label: string) => {
+    const kind = KIND[key];
+    return (
+      <FormField id={`ch-${key}`} label={label} {...errors.bind(key)}>
+        <Input
+          type={kind ?? 'text'}
+          dir={kind ? 'ltr' : undefined}
+          value={form[key]}
+          onChange={(e) => {
+            setForm((f) => ({ ...f, [key]: e.target.value }));
+            setSaved(false);
+          }}
+        />
+      </FormField>
+    );
+  };
 
   return (
     <Card>
-      <CardContent className="space-y-3 py-4">
+      <CardContent ref={formRef} className="space-y-3 py-4">
         <h2 className="text-body font-semibold">{t('contract')}</h2>
-        {error && (
+        {errors.formError && (
           <p className="text-body text-destructive" role="alert">
-            {error}
+            {errors.formError}
           </p>
         )}
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          {field('advancePct', th('advancePct'), 'number')}
-          {field('retentionPct', th('retentionPct'), 'number')}
-          {field('signatureDate', th('signatureDate'), 'date')}
-          {field('startDate', th('startDate'), 'date')}
-          {field('endDate', th('endDate'), 'date')}
-          {field('paymentTermsDays', th('paymentTermsDays'), 'number')}
-          {field('defectsLiabilityDays', th('defectsLiabilityDays'), 'number')}
+          {field('advancePct', th('advancePct'))}
+          {field('retentionPct', th('retentionPct'))}
+          {field('signatureDate', th('signatureDate'))}
+          {field('startDate', th('startDate'))}
+          {field('endDate', th('endDate'))}
+          {field('paymentTermsDays', th('paymentTermsDays'))}
+          {field('defectsLiabilityDays', th('defectsLiabilityDays'))}
         </div>
         {field('termsEn', th('terms'))}
         {field('termsAr', th('terms'))}

@@ -37,7 +37,7 @@ export async function saveVariationDraft(
   const ctx = await requireOrg();
   const res = await saveVariationDraftCore(ctx, input);
   if (res.ok) refreshApp();
-  return { ok: res.ok, error: res.error };
+  return res;
 }
 
 /**
@@ -55,7 +55,7 @@ export async function internalApproveVariation(
   const origin = await resolveRequestOrigin();
   if (!origin) return { ok: false, error: 'generic' };
   const res = await internalApproveVariationCore(ctx, { id });
-  if (!res.ok || !res.data) return { ok: res.ok, error: res.error };
+  if (!res.ok || !res.data) return res;
   const link = `${origin}/${await localeSafe()}/v/${res.data}`;
   refreshApp();
   return { ok: true, link };
@@ -65,5 +65,5 @@ export async function issueVariation(id: string): Promise<ActionResult> {
   const ctx = await requireOrg();
   const res = await issueVariationCore(ctx, { id });
   if (res.ok) refreshApp();
-  return { ok: res.ok, error: res.error };
+  return res;
 }

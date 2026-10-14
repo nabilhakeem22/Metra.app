@@ -395,21 +395,21 @@ describe('M10: a variation total past the money cap is coded, not generic', () =
     const { contractId } = await issuedContract(ctx, clientId, projectId);
     const voId = ((await createVariationDraftCore(ctx, { contractId, titleEn: 'Huge' })) as { data?: string }).data!;
 
-    // A FACTOR past the cap is its own answer. It used to be a bare 'invalid',
-    // which tells a studio looking at a quantity of 1e13 nothing it can act on.
+    // A FACTOR past the cap is its own answer, under its cell: a bare 'invalid'
+    // tells a studio looking at a quantity of 1e13 nothing it can act on.
     expect(
       await saveVariationDraftCore(ctx, {
         id: voId,
         lines: [{ descriptionEn: 'x', qty: '10000000000000', unit: 'lump_sum', unitCost: '0', unitPrice: '1', discountPct: '0' }],
       }),
-    ).toEqual({ ok: false, error: 'amount_too_large' });
-    // ...and a cell that is not a number at all still answers 'invalid'.
+    ).toEqual({ ok: false, error: 'check_fields', fields: { 'lines.0.qty': { code: 'amount_too_large' } } });
+    // ...and a cell that is not a number at all says that, under it.
     expect(
       await saveVariationDraftCore(ctx, {
         id: voId,
         lines: [{ descriptionEn: 'x', qty: 'twelve', unit: 'lump_sum', unitCost: '0', unitPrice: '1', discountPct: '0' }],
       }),
-    ).toEqual({ ok: false, error: 'invalid' });
+    ).toEqual({ ok: false, error: 'check_fields', fields: { 'lines.0.qty': { code: 'not_a_number' } } });
 
     // Each factor is inside the cap; the product is not.
     expect(
@@ -417,7 +417,7 @@ describe('M10: a variation total past the money cap is coded, not generic', () =
         id: voId,
         lines: [{ descriptionEn: 'x', qty: '1000000000000', unit: 'lump_sum', unitCost: '0', unitPrice: '1000000000000', discountPct: '0' }],
       }),
-    ).toEqual({ ok: false, error: 'amount_too_large' });
+    ).toEqual({ ok: false, error: 'check_fields', fields: { 'lines.0.qty': { code: 'amount_too_large' } } });
 
     // The cost side alone: the price is nominal, the cost is not.
     expect(
@@ -425,7 +425,7 @@ describe('M10: a variation total past the money cap is coded, not generic', () =
         id: voId,
         lines: [{ descriptionEn: 'x', qty: '1000000000000', unit: 'lump_sum', unitCost: '1000000000000', unitPrice: '0.0001', discountPct: '0' }],
       }),
-    ).toEqual({ ok: false, error: 'amount_too_large' });
+    ).toEqual({ ok: false, error: 'check_fields', fields: { 'lines.0.qty': { code: 'amount_too_large' } } });
 
     // Each line is inside the cap; their sum is not.
     expect(
@@ -437,6 +437,50 @@ describe('M10: a variation total past the money cap is coded, not generic', () =
         })),
       }),
     ).toEqual({ ok: false, error: 'amount_too_large' });
+  });
+});
+
+describe('W2.8: a variation refusal is said under the field it is about', () => {
+  it('names the missing title, and every bad line cell at once', async () => {
+    const { ctx, clientId, projectId } = await setup();
+    const { contractId } = await issuedContract(ctx, clientId, projectId);
+    expect(await createVariationDraftCore(ctx, { contractId, titleEn: '  ' })).toEqual({
+      ok: false,
+      error: 'check_fields',
+      fields: { title: { code: 'name_required' } },
+    });
+    const voId = ((await createVariationDraftCore(ctx, { contractId, titleEn: 'Cells' })) as { data?: string }).data!;
+    const good = { descriptionEn: 'x', qty: '1', unit: 'lump_sum' as const, unitCost: '0', unitPrice: '1', discountPct: '0' };
+    expect(
+      await saveVariationDraftCore(ctx, {
+        id: voId,
+        lines: [good, { ...good, descriptionEn: ' ', qty: 'two' }, { ...good, discountPct: '101' }],
+      }),
+    ).toEqual({
+      ok: false,
+      error: 'check_fields',
+      fields: {
+        'lines.1.description': { code: 'line_required' },
+        'lines.1.qty': { code: 'not_a_number' },
+        'lines.2.discountPct': { code: 'discount_out_of_range' },
+      },
+    });
+  });
+
+  it('says a baseline line the contract does not have under that line', async () => {
+    const { ctx, clientId, projectId } = await setup();
+    const { contractId } = await issuedContract(ctx, clientId, projectId);
+    const voId = ((await createVariationDraftCore(ctx, { contractId, titleEn: 'Gone' })) as { data?: string }).data!;
+    expect(
+      await saveVariationDraftCore(ctx, {
+        id: voId,
+        lines: [{ contractLineId: crypto.randomUUID(), descriptionEn: 'x', qty: '1', unit: 'lump_sum', unitPrice: '1' }],
+      }),
+    ).toEqual({
+      ok: false,
+      error: 'check_fields',
+      fields: { 'lines.0.contractLineId': { code: 'no_longer_exists' } },
+    });
   });
 });
 

@@ -1,21 +1,19 @@
 'use client';
 
 import type { useTranslations } from 'next-intl';
+import { useRef } from 'react';
 import { Button } from '@/components/ui/button';
-import { Label } from '@/components/ui/label';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { FormField } from '@/components/ui/form-field';
+import { SelectControl } from '@/components/ui/select-control';
+import type { FieldErrorsApi } from '@/hooks/use-field-errors';
+import { useFocusFirstInvalid } from '@/hooks/use-focus-first-invalid';
 import type { ColumnMapping } from '@/lib/price-book/import';
 import { FIELDS, NONE, REQUIRED, type FieldKey } from './import-wizard-fields';
 
 // The wizard's second step: map spreadsheet columns onto cost-item fields. All
-// state (`mapping`, `header`) and mutations (`setField`, `reset`, step change)
-// live in the parent (ImportWizard); this child is presentational.
+// state and mutations live in the wizard's hook; this child is presentational.
+// Preview is never disabled: pressing it says under each required column that
+// is still unmapped that it is required, and puts the caret on the first.
 export function ImportWizardMapStep({
   t,
   mapping,
@@ -23,7 +21,7 @@ export function ImportWizardMapStep({
   setField,
   reset,
   onPreview,
-  mappingReady,
+  errors,
 }: {
   t: ReturnType<typeof useTranslations<'priceBook'>>;
   mapping: ColumnMapping;
@@ -31,42 +29,38 @@ export function ImportWizardMapStep({
   setField: (field: FieldKey, col: number) => void;
   reset: () => void;
   onPreview: () => void;
-  mappingReady: boolean;
+  errors: FieldErrorsApi<FieldKey>;
 }) {
+  const stepRef = useRef<HTMLDivElement>(null);
+  useFocusFirstInvalid(stepRef, errors.invalidAttempt);
+  const options = [
+    { value: String(NONE), label: t('import.none') },
+    ...header.map((h, i) => ({ value: String(i), label: h || `#${i + 1}` })),
+  ];
   return (
-    <div className="space-y-3">
+    <div ref={stepRef} className="space-y-3">
       {FIELDS.map((field) => (
-        <div key={field} className="grid grid-cols-2 items-center gap-2">
-          <Label htmlFor={`map-${field}`}>
-            {t(`import.fields.${field}`)}
-            {REQUIRED.includes(field) && (
-              <span className="text-destructive"> *</span>
-            )}
-          </Label>
-          <Select
+        <FormField
+          key={field}
+          id={`map-${field}`}
+          label={t(`import.fields.${field}`)}
+          required={REQUIRED.includes(field)}
+          {...errors.bind(field)}
+        >
+          <SelectControl
+            className="h-9"
             value={String(mapping[field] ?? NONE)}
             onValueChange={(v) => setField(field, Number(v))}
-          >
-            <SelectTrigger id={`map-${field}`} className="h-9">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={String(NONE)}>{t('import.none')}</SelectItem>
-              {header.map((h, i) => (
-                <SelectItem key={i} value={String(i)}>
-                  {h || `#${i + 1}`}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+            options={options}
+          />
+        </FormField>
       ))}
 
       <div className="flex justify-between pt-2">
         <Button type="button" variant="secondary" onClick={reset}>
           {t('import.back')}
         </Button>
-        <Button variant="default" type="button" onClick={onPreview} disabled={!mappingReady}>
+        <Button variant="default" type="button" onClick={onPreview}>
           {t('import.preview')}
         </Button>
       </div>

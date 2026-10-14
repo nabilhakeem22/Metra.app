@@ -807,8 +807,7 @@
       "deactivated": "Item deactivated",
       "starterLoaded": "Starter catalogue loaded ({count} items)",
       "starterExists": "Starter items are already present",
-      "sectionAdded": "Section added",
-      "importFailed": "Import failed"
+      "sectionAdded": "Section added"
     },
     "confirmDeactivate": {
       "title": "Deactivate this item?",
@@ -1583,6 +1582,15 @@
     "title_": "Title",
     "reason": "Reason",
     "netDelta": "Net change",
+    "line": {
+      "add": "Add line",
+      "baseline": "Contract line",
+      "description": "Description",
+      "qty": "Quantity",
+      "remove": "Remove line",
+      "unit": "Unit",
+      "unitPrice": "Unit price"
+    },
     "saveDraft": "Save draft",
     "saved": "Saved",
     "internalApprove": "Internal approval",

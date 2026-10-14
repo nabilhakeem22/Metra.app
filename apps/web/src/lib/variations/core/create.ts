@@ -1,6 +1,7 @@
 // Variation-order creation: createVariationDraftCore. Opens a DRAFT VO against an
 // ISSUED or SIGNED contract and allocates the per-org VO number (VO-YYYY-NNNN).
 import { contracts, variationOrders, type MetraDb } from '@metra/db';
+import { fieldsFailed } from '@/lib/actions/field-errors';
 import { fail, mutateInOrg, requireInOrg } from '@/lib/actions/mutate';
 import type { AuditEntry } from '@/lib/audit';
 import { err, type ActionResult } from '@/lib/actions/result';
@@ -32,7 +33,7 @@ async function loadLiveContract(
     contracts,
     contractId,
     { status: contracts.status, projectId: contracts.projectId },
-    'invalid',
+    'record_not_found',
   );
   if (contract.status !== 'issued' && contract.status !== 'signed') {
     fail('contract_not_issued');
@@ -95,9 +96,11 @@ export async function createVariationDraftCore(
   input: CreateVariationDraftInput,
 ): Promise<ActionResult> {
   const contractId = input.contractId?.trim();
-  if (!contractId || !isUuid(contractId)) return err('invalid');
-  // Bilingual check: a VO needs a title in at least ONE language.
-  if (!clean(input.titleAr) && !clean(input.titleEn)) return err('name_required');
+  if (!contractId || !isUuid(contractId)) return err('malformed');
+  // Bilingual check: a VO needs a title in at least ONE language, said under it.
+  if (!clean(input.titleAr) && !clean(input.titleEn)) {
+    return fieldsFailed({ title: { code: 'name_required' } });
+  }
 
   return mutateInOrg(
     ctx,

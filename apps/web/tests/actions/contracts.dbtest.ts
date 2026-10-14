@@ -266,7 +266,11 @@ describe('contract draft header edit', () => {
     const base = await setup();
     const { id: proposalId } = await acceptedProposal(base.ctx, base.clientId, base.projectId);
     const contractId = ((await generateContractCore(base.ctx, { proposalId })) as { data?: string }).data!;
-    expect(await saveContractDraftCore(base.ctx, { id: contractId, header: { retentionPct: '150' } })).toEqual({ ok: false, error: 'invalid_percentage' });
+    expect(await saveContractDraftCore(base.ctx, { id: contractId, header: { retentionPct: '150' } })).toEqual({
+      ok: false,
+      error: 'check_fields',
+      fields: { retentionPct: { code: 'out_of_range', params: { min: 0, max: 100 } } },
+    });
   });
 });
 

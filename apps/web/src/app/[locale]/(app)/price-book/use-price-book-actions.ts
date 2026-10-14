@@ -1,23 +1,22 @@
 'use client';
 
 import { useTransition, type ReactNode } from 'react';
-import { useLocale, useTranslations } from 'next-intl';
+import { useTranslations } from 'next-intl';
 import { deactivationCopy, useActiveToggle } from '@/hooks/use-active-toggle';
 import { toast } from '@/hooks/use-toast';
-import { useRouter } from '@/i18n/routing';
-import { resolveActionError } from '@/lib/actions/error-message';
-import type { ActionCode } from '@/lib/actions/result';
+import { describeFailure, describeRejection } from '@/lib/actions/error-message';
+import type { ActionResult } from '@/lib/actions/result';
 import { loadStarterCatalogue, setCostItemActive } from '@/lib/price-book/actions';
-import { addSection } from '@/lib/sections/actions';
 import type { PriceBookItem } from './types';
 
-// Every server write the price book makes, and every toast it raises.
+// The price book's row and page actions (activate, load the starter list), and
+// the toast each raises: neither has a field to say its refusal under. Adding a
+// category lives with its box (./use-section-adder).
 
 export interface PriceBookActionsApi {
   pending: boolean;
   /** The deactivate confirm; rendered once by the page. */
   confirmDialog: ReactNode;
-  addNewSection: (name: string, onAdded: () => void) => void;
   toggleActive: (item: PriceBookItem) => void;
   loadStarter: () => void;
 }
@@ -26,36 +25,17 @@ export function usePriceBookActions(): PriceBookActionsApi {
   const t = useTranslations('priceBook');
   const te = useTranslations('errors');
   const tc = useTranslations('common');
-  const locale = useLocale();
-  const router = useRouter();
   const [pending, startTransition] = useTransition();
 
-  const refuse = (code: ActionCode | undefined) =>
-    toast({ title: resolveActionError(code, te), variant: 'destructive' });
-
-  /** A new section is named in ONE language — the one the studio is working in.
-   *  The other side stays null until somebody translates it. */
-  function addNewSection(name: string, onAdded: () => void): void {
-    const trimmed = name.trim();
-    if (!trimmed) return;
-    startTransition(async () => {
-      const result = await addSection(
-        locale.startsWith('ar') ? { nameAr: trimmed } : { nameEn: trimmed },
-      );
-      if (result.ok) {
-        onAdded();
-        toast({ title: t('toast.sectionAdded') });
-        router.refresh();
-      } else {
-        refuse(result.error as ActionCode);
-      }
-    });
-  }
+  const refuse = (result: Pick<ActionResult, 'error' | 'params' | 'reference'>) =>
+    toast({ title: describeFailure(result, te), variant: 'destructive' });
+  const unreachable = (rejection: unknown) =>
+    toast({ title: describeRejection(rejection, te), variant: 'destructive' });
 
   const activeToggle = useActiveToggle({
     setActive: setCostItemActive,
     copy: deactivationCopy(t, tc),
-    onError: (result) => refuse(result.error),
+    onError: refuse,
   });
 
   /** Deactivating is confirmed and undoable; activating runs at once. */
@@ -67,9 +47,15 @@ export function usePriceBookActions(): PriceBookActionsApi {
    *  studio is told which of the two happened. */
   function loadStarter(): void {
     startTransition(async () => {
-      const result = await loadStarterCatalogue();
+      let result;
+      try {
+        result = await loadStarterCatalogue();
+      } catch (rejection) {
+        unreachable(rejection);
+        return;
+      }
       if (!result.ok) {
-        refuse(result.error as ActionCode);
+        refuse(result);
         return;
       }
       const inserted = result.data?.inserted ?? 0;
@@ -83,7 +69,6 @@ export function usePriceBookActions(): PriceBookActionsApi {
   return {
     pending: pending || activeToggle.pending,
     confirmDialog: activeToggle.dialog,
-    addNewSection,
     toggleActive,
     loadStarter,
   };
