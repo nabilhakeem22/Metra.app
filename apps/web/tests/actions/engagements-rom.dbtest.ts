@@ -151,21 +151,23 @@ describe('setEngagementRom — coarse build-cost band entry', () => {
     });
   });
 
-  it('rejects a zero or malformed (comma-decimal) value with rom_range_invalid under that box', async () => {
+  // Fix round F2: a zero is rom_range_invalid; an unreadable or negative
+  // figure says so under its box.
+  it('rejects a zero, unreadable or negative value under that box, with its reason', async () => {
     const { ctx, engagementId } = await setup();
-    const bad: { romLow: string; romHigh: string; refused: 'romLow' | 'romHigh' }[] = [
-      { romLow: '0', romHigh: '2400000', refused: 'romLow' },
-      { romLow: '1800000', romHigh: '0', refused: 'romHigh' },
-      { romLow: '1,5', romHigh: '2400000', refused: 'romLow' },
-      { romLow: '1800000', romHigh: 'abc', refused: 'romHigh' },
-      { romLow: '-1800000', romHigh: '2400000', refused: 'romLow' },
+    const bad: { romLow: string; romHigh: string; refused: 'romLow' | 'romHigh'; code: string }[] = [
+      { romLow: '0', romHigh: '2400000', refused: 'romLow', code: 'rom_range_invalid' },
+      { romLow: '1800000', romHigh: '0', refused: 'romHigh', code: 'rom_range_invalid' },
+      { romLow: '1,5', romHigh: '2400000', refused: 'romLow', code: 'not_a_number' },
+      { romLow: '1800000', romHigh: 'abc', refused: 'romHigh', code: 'not_a_number' },
+      { romLow: '-1800000', romHigh: '2400000', refused: 'romLow', code: 'not_negative' },
     ];
-    for (const { refused, ...range } of bad) {
+    for (const { refused, code, ...range } of bad) {
       const res = await setEngagementRomCore(ctx, { engagementId, ...range });
       expect(res).toEqual({
         ok: false,
         error: 'check_fields',
-        fields: { [refused]: { code: 'rom_range_invalid' } },
+        fields: { [refused]: { code } },
       });
     }
     expect(await getEngagementRom(ctx, engagementId)).toEqual({

@@ -126,18 +126,26 @@ describe('recordPayment — append-only ledger', () => {
     expect(payments[0].reference).toBe('TXN-1');
   });
 
-  it('rejects a non-positive / malformed amount with payment_amount_invalid', async () => {
+  // Fix round F2: each refusal says WHY (a zero is "enter an amount", an
+  // unreadable figure is "not a number", never "missing or zero").
+  it('rejects a zero, negative or unreadable amount, each with its own reason', async () => {
     const { ctx, engagementId } = await setupProposal({ split: AMOUNT_SPLIT });
-    for (const amount of ['0', '-5', '1,5', 'abc']) {
+    const refusals: [string, string][] = [
+      ['0', 'payment_amount_invalid'],
+      ['-5', 'not_negative'],
+      ['1,5', 'not_a_number'],
+      ['abc', 'not_a_number'],
+    ];
+    for (const [amount, code] of refusals) {
       const res = await recordPaymentCore(ctx, {
         engagementId,
         kind: 'deposit',
         amount,
       });
-      expect(res).toEqual({
+      expect(res, amount).toEqual({
         ok: false,
         error: 'check_fields',
-        fields: { amount: { code: 'payment_amount_invalid' } },
+        fields: { amount: { code } },
       });
     }
     expect(await getEngagementPayments(ctx, engagementId)).toHaveLength(0);

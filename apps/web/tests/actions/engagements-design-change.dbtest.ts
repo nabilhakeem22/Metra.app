@@ -445,10 +445,11 @@ describe('designChangeRaised — past the 3D free allowance (N=3)', () => {
     const res = await designChangeRaised(ctx, engagementId, {
       changeOrderAmount: '1,5',
     });
+    // "1,5" is ambiguous, so it is refused as not a number, never read as 15 (F2).
     expect(res).toEqual({
       ok: false,
       error: 'check_fields',
-      fields: { changeOrderAmount: { code: 'revision_co_amount_required' } },
+      fields: { changeOrderAmount: { code: 'not_a_number' } },
     });
     expect(await stateOf(engagementId)).toBe('final_approval');
     expect(await designRevisionCountOf(engagementId)).toBe(3);
