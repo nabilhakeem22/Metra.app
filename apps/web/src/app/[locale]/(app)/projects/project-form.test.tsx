@@ -1,7 +1,12 @@
 import { describe, expect, test, vi } from 'vitest';
 import { act, fireEvent, screen } from '@testing-library/react';
-import { messageAt, renderWithIntl } from '@/test/render-with-intl';
+import { fieldsFailed } from '@/lib/actions/field-errors';
+import type { ActionResult } from '@/lib/actions/result';
+import { PROJECT_CREATE_FIELDS } from '@/lib/projects/fields';
+import { expectFieldErrorsRenderUnderFields } from '@/test/field-coverage';
+import { messageAt, renderWithIntl, type TestLocale } from '@/test/render-with-intl';
 import { ProjectForm } from './project-form';
+import { projectControlId } from './project-form-controls';
 import { todayIsoLocal } from './project-form-state';
 
 const actions = vi.hoisted(() => ({ createProject: vi.fn(), updateProject: vi.fn() }));
@@ -15,6 +20,7 @@ vi.mock('@/hooks/use-toast', () => ({
 
 const en = (path: string) => messageAt('en', path);
 const CLIENTS = [{ id: 'c-1', nameEn: 'Acme', nameAr: null, city: 'Giza', country: null }];
+const CLIENT_ID = '33333333-3333-4333-8333-333333333333';
 
 describe('ProjectForm (new)', () => {
   test('no client chosen, today as start, no Status field, no required mark on the end date', () => {
@@ -49,13 +55,14 @@ describe('ProjectForm (new)', () => {
   });
 });
 
-describe('ProjectForm refusals', () => {
+describe.each<TestLocale>(['en', 'ar-EG'])('ProjectForm refusals (%s)', (locale) => {
+  const at = (key: string) => messageAt(locale, key);
   const ITEM = {
     id: 'p-1',
     code: 'P-2026-0001',
     nameEn: 'Tower',
     nameAr: null,
-    clientId: 'c-1',
+    clientId: CLIENT_ID,
     status: 'active',
     startDate: '2026-01-01',
     endDate: null,
@@ -64,28 +71,56 @@ describe('ProjectForm refusals', () => {
     address: null,
     notes: null,
   };
-  const submitEdit = async (error: string) => {
-    actions.updateProject.mockResolvedValue({ ok: false, error });
-    renderWithIntl(
-      <ProjectForm open onOpenChange={() => {}} clientOptions={CLIENTS} item={ITEM as never} />,
-      { locale: 'en' },
-    );
+  const clients = [{ ...CLIENTS[0], id: CLIENT_ID }];
+  const save = async () => {
     await act(async () => {
-      fireEvent.submit(document.getElementById('pr-nameEn')!.closest('form')!);
+      fireEvent.click(screen.getByRole('button', { name: at('projects.form.save') }));
     });
   };
-
-  test('start_date_required is said under the start date, which is marked invalid', async () => {
-    await submitEdit('start_date_required');
-    expect(document.getElementById('pr-start-error')?.textContent).toBe(
-      en('errors.start_date_required'),
+  const renderForm = (item?: typeof ITEM) => {
+    document.documentElement.dir = locale === 'ar-EG' ? 'rtl' : 'ltr';
+    renderWithIntl(
+      <ProjectForm open onOpenChange={() => {}} clientOptions={clients} defaultClientId={CLIENT_ID} item={item as never} />,
+      { locale },
     );
-    expect(document.getElementById('pr-start')?.getAttribute('aria-invalid')).toBe('true');
+  };
+
+  test('every field the server refuses is said under its own control (AC 19)', async () => {
+    renderForm();
+    fireEvent.change(document.getElementById('pr-nameEn')!, { target: { value: 'Tower' } });
+    await expectFieldErrorsRenderUnderFields({
+      fields: PROJECT_CREATE_FIELDS,
+      controlIdOf: projectControlId,
+      answerWith: (result: ActionResult) => actions.createProject.mockResolvedValue(result),
+      submit: save,
+      locale,
+      typed: { 'pr-nameEn': 'Tower' },
+    });
+  });
+
+  test('a blank name and no client are refused before anything is sent', async () => {
+    renderWithIntl(<ProjectForm open onOpenChange={() => {}} clientOptions={clients} />, { locale });
+    actions.createProject.mockReset();
+    await save();
+    expect(actions.createProject).not.toHaveBeenCalled();
+    expect(document.getElementById('pr-nameEn-error')?.textContent).toBe(at('errors.name_required'));
+    expect(document.getElementById('pr-nameAr')?.getAttribute('aria-describedby')).toContain('pr-nameEn-error');
+    expect(document.getElementById('pr-client-error')?.textContent).toBe(at('errors.client_required'));
     expect(toasts.filter((raised) => raised.variant === 'destructive')).toHaveLength(0);
   });
 
   test('an end date before the start is said under the end date', async () => {
-    await submitEdit('invalid_dates');
-    expect(document.getElementById('pr-end-error')?.textContent).toBe(en('errors.invalid_dates'));
+    actions.updateProject.mockResolvedValue(fieldsFailed({ endDate: { code: 'invalid_dates' } }));
+    renderForm(ITEM);
+    await save();
+    expect(document.getElementById('pr-end-error')?.textContent).toBe(at('errors.invalid_dates'));
+    expect(document.getElementById('pr-end')?.getAttribute('aria-invalid')).toBe('true');
+  });
+
+  test('a field this sheet does not show (notes) is said above the footer, never dropped', async () => {
+    actions.updateProject.mockResolvedValue(fieldsFailed({ notes: { code: 'too_long', params: { max: 2000 } } }));
+    renderForm(ITEM);
+    await save();
+    expect(screen.getByRole('alert').textContent).toBe(at('errors.field.too_long').replace('{max}', '2000'));
   });
 });

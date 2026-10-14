@@ -9,6 +9,9 @@ import { listProjects } from '@/lib/projects/queries';
 import { closeFixture, ctxFor, raw, seedOrg, teardown } from './fixture';
 import type { OrgContext } from '@/lib/db/context';
 
+/** A client that is missing, archived or no id at all: pick a client. */
+const CLIENT_REQUIRED = { ok: false, error: 'check_fields', fields: { clientId: { code: 'client_required' } } };
+
 const orgIds: string[] = [];
 afterAll(async () => {
   await teardown(orgIds);
@@ -42,7 +45,7 @@ describe('createProjectCore', () => {
     expect(await raw.count('projects', orgId)).toBe(1);
   });
 
-  it('validates name_required / invalid status / client_required / invalid_dates', async () => {
+  it('validates name_required / malformed status / client_required / invalid_dates', async () => {
     const { ctx, clientId } = await orgWithClient();
     expect(
       await createProjectCore(ctx, {
@@ -50,31 +53,42 @@ describe('createProjectCore', () => {
         nameEn: '',
         nameAr: '',
       }),
-    ).toEqual({ ok: false, error: 'name_required' });
+    ).toEqual({ ok: false, error: 'check_fields', fields: { name: { code: 'name_required' } } });
     expect(
       await createProjectCore(ctx, {
         ...baseProject(clientId),
         status: 'nope' as never,
       }),
-    ).toEqual({ ok: false, error: 'invalid' });
+    ).toEqual({ ok: false, error: 'malformed' });
     expect(
       await createProjectCore(ctx, { ...baseProject(clientId), clientId: '' }),
-    ).toEqual({ ok: false, error: 'client_required' });
+    ).toEqual(CLIENT_REQUIRED);
     expect(
       await createProjectCore(ctx, {
         ...baseProject(clientId),
         startDate: '2026-05-01',
         endDate: '2026-04-01',
       }),
-    ).toEqual({ ok: false, error: 'invalid_dates' });
+    ).toEqual({ ok: false, error: 'check_fields', fields: { endDate: { code: 'invalid_dates' } } });
   });
 
   it('rejects a duplicate code with code_taken', async () => {
     const { ctx, clientId } = await orgWithClient();
     await createProjectCore(ctx, baseProject(clientId));
-    expect(await createProjectCore(ctx, baseProject(clientId))).toEqual({
+    expect(await createProjectCore(ctx, baseProject(clientId))).toEqual({ ok: false, error: 'check_fields', fields: { code: { code: 'code_taken' } } });
+  });
+
+  it('two concurrent creates with one code: one wins, the other is told under Code', async () => {
+    // Whichever path loses (the read-check or the unique index racing past it,
+    // projects_org_id_code_unique), the answer is the same field error.
+    const { ctx, clientId } = await orgWithClient();
+    const project = { ...baseProject(clientId), code: 'RACE-1' };
+    const results = await Promise.all([createProjectCore(ctx, project), createProjectCore(ctx, project)]);
+    expect(results.filter((result) => result.ok)).toHaveLength(1);
+    expect(results.find((result) => !result.ok)).toEqual({
       ok: false,
-      error: 'code_taken',
+      error: 'check_fields',
+      fields: { code: { code: 'code_taken' } },
     });
   });
 
@@ -86,13 +100,13 @@ describe('createProjectCore', () => {
         ...baseProject(clientId),
         clientId: '00000000-0000-4000-8000-000000000999',
       }),
-    ).toEqual({ ok: false, error: 'client_required' });
+    ).toEqual(CLIENT_REQUIRED);
 
     // Deactivate the client -> now unusable.
     await setClientActiveCore(ctx, { id: clientId, active: false });
     expect(
       await createProjectCore(ctx, { ...baseProject(clientId), code: 'P-2' }),
-    ).toEqual({ ok: false, error: 'client_required' });
+    ).toEqual(CLIENT_REQUIRED);
   });
 
   it('lets a project_manager create, forbids site_engineer/accountant/viewer', async () => {
@@ -179,7 +193,7 @@ describe('date + client-id edge cases', () => {
       ...baseProject('not-a-uuid'),
       code: 'BADUUID',
     });
-    expect(res).toEqual({ ok: false, error: 'client_required' });
+    expect(res).toEqual(CLIENT_REQUIRED);
   });
 });
 
@@ -225,10 +239,7 @@ describe('the start date is required forward-only (round A1: the end date is opt
   it('refuses to CREATE without a start date, and creates without an end date', async () => {
     const { ctx, clientId } = await orgWithClient();
     const { startDate: _s, endDate: _e, ...noDates } = baseProject(clientId);
-    expect(await createProjectCore(ctx, noDates)).toEqual({
-      ok: false,
-      error: 'start_date_required',
-    });
+    expect(await createProjectCore(ctx, noDates)).toEqual({ ok: false, error: 'check_fields', fields: { startDate: { code: 'start_date_required' } } });
     expect((await createProjectCore(ctx, { ...noDates, startDate: '2026-01-01' })).ok).toBe(true);
   });
 

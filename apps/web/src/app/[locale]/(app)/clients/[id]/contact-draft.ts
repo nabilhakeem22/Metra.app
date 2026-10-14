@@ -1,9 +1,8 @@
 import type { ClientContact } from '@metra/db';
 
-// The contact form's editable shape, and the two rules over it. PURE and
-// server-safe: no React, no db write. "A contact needs a name" and "an emptied box
-// is absent, not the empty string" are both product rules, and neither was
-// callable from anywhere.
+// The contact form's editable shape, and what Save sends. PURE and server-safe:
+// no React, no db write. "An emptied box is absent, not the empty string" is a
+// product rule; the field rules live in lib/client-contacts/field-rules.
 
 export interface ContactDraft {
   /** Null while adding; the contact's id while editing. */

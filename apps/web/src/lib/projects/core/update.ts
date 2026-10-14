@@ -4,10 +4,12 @@
 // client_id.
 import { projects } from '@metra/db';
 import { and, eq, ne } from 'drizzle-orm';
-import { fail, mutateInOrg, requireInOrg } from '@/lib/actions/mutate';
-import { err, type ActionResult } from '@/lib/actions/result';
+import { failFields, fieldsFailed } from '@/lib/actions/field-errors';
+import { mutateInOrg, requireInOrg } from '@/lib/actions/mutate';
+import type { ActionResult } from '@/lib/actions/result';
 import type { OrgContext } from '@/lib/db/context';
-import { assertClientUsable, isErr, validate, type ProjectInput } from './validation';
+import type { ProjectInput } from '../fields';
+import { assertClientUsable, isErr, PROJECT_REFUSALS, validate } from './validation';
 
 export async function updateProjectCore(
   ctx: OrgContext,
@@ -15,8 +17,9 @@ export async function updateProjectCore(
 ): Promise<ActionResult> {
   const v = validate(input, { requireCode: true });
   if (isErr(v)) return v;
-  // `requireCode` already guaranteed this; restate it so the type narrows too.
-  if (!v.code) return err('code_required');
+  // `requireCode` already refused a blank code under its field; restated so the
+  // type narrows too.
+  if (!v.code) return fieldsFailed({ code: { code: 'code_required' } });
   const code = v.code;
   // Same partial-update guard as clients: the Details form stopped sending these
   // when they moved to Financials, and `validate` normalizes an absent percentage to
@@ -26,7 +29,7 @@ export async function updateProjectCore(
 
   return mutateInOrg(
     ctx,
-    { capability: 'projects', action: 'update' },
+    { capability: 'projects', action: 'update', refusals: PROJECT_REFUSALS },
     async (tx, audit) => {
       const before = await requireInOrg(
         tx,
@@ -41,7 +44,7 @@ export async function updateProjectCore(
         .from(projects)
         .where(and(eq(projects.code, code), ne(projects.id, input.id)))
         .limit(1);
-      if (dup) fail('code_taken');
+      if (dup) failFields({ code: { code: 'code_taken' } });
       // Only require an active client when REASSIGNING to a different one.
       // Editing other fields with the same (possibly now-archived) client is
       // allowed; the composite FK still enforces same-org either way.

@@ -1,25 +1,30 @@
 'use client';
 
 import { useTranslations } from 'next-intl';
-import { useEffect, useState, useTransition } from 'react';
+import { useEffect, useTransition } from 'react';
 import { FormField } from '@/components/ui/form-field';
 import { FormSheet } from '@/components/ui/form-sheet';
 import { Input } from '@/components/ui/input';
+import { useFieldErrors } from '@/hooks/use-field-errors';
 import { useRouter } from '@/i18n/routing';
-import { resolveActionError } from '@/lib/actions/error-message';
-import type { ActionCode } from '@/lib/actions/result';
 import { createContact, updateContact } from '@/lib/client-contacts/actions';
-import { contactFieldFor, type ContactFormField } from './contact-form-errors';
+import { contactFieldErrors } from '@/lib/client-contacts/field-rules';
+import { CONTACT_FIELDS, type ContactField } from '@/lib/client-contacts/fields';
 import { contactPayload, type ContactDraft } from './contact-draft';
 
 /** The boxes that differ only in their key and their direction. */
-const TEXT_FIELDS = [
+const TEXT_FIELDS: ReadonlyArray<{ key: ContactField; ltr: boolean }> = [
   { key: 'name', ltr: false },
   { key: 'role', ltr: false },
   { key: 'phone', ltr: true },
   { key: 'email', ltr: true },
   { key: 'whatsapp', ltr: true },
-] as const;
+];
+
+/** The control a contact field's refusal sits under. */
+export function contactControlId(field: ContactField): string {
+  return `ct-${field}`;
+}
 
 /** Add or edit one contact, in the app's form sheet. The tab owns the draft. */
 export function ContactForm({
@@ -40,32 +45,26 @@ export function ContactForm({
   const tc = useTranslations('common');
   const router = useRouter();
   const [pending, startTransition] = useTransition();
-  const [error, setError] = useState<{ code: ActionCode; field: ContactFormField } | null>(null);
+  const errors = useFieldErrors({ fields: CONTACT_FIELDS, translate: te });
+  const { clear } = errors;
 
   useEffect(() => {
-    if (open) setError(null);
-  }, [open]);
-
-  const messageFor = (field: ContactFormField) =>
-    error?.field === field ? resolveActionError(error.code, te) : undefined;
+    if (open) clear();
+  }, [open, clear]);
 
   function submit() {
-    setError(null);
+    const payload = contactPayload(draft);
+    if (errors.applyLocal(contactFieldErrors(payload))) return;
     startTransition(async () => {
-      const payload = contactPayload(draft);
       try {
         const result = draft.id
           ? await updateContact({ id: draft.id, ...payload })
           : await createContact({ clientId, ...payload, isPrimary: draft.isPrimary });
-        if (result.ok) {
-          onOpenChange(false);
-          router.refresh();
-          return;
-        }
-        const code = (result.error as ActionCode) ?? 'generic';
-        setError({ code, field: contactFieldFor(code) });
-      } catch {
-        setError({ code: 'generic', field: 'form' });
+        if (errors.applyResult(result)) return;
+        onOpenChange(false);
+        router.refresh();
+      } catch (rejection) {
+        errors.applyRejection(rejection);
       }
     });
   }
@@ -80,15 +79,16 @@ export function ContactForm({
       cancelLabel={t('cancel')}
       closeLabel={tc('close')}
       pending={pending}
-      formError={messageFor('form')}
+      formError={errors.formError}
+      invalidAttempt={errors.invalidAttempt}
     >
       {TEXT_FIELDS.map((field) => (
         <FormField
           key={field.key}
-          id={`ct-${field.key}`}
+          id={contactControlId(field.key)}
           label={t(field.key)}
           required={field.key === 'name'}
-          error={field.key === 'name' ? messageFor('name') : undefined}
+          {...errors.bind(field.key)}
         >
           <Input
             dir={field.ltr ? 'ltr' : 'auto'}

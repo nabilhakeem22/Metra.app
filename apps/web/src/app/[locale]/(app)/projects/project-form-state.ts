@@ -1,6 +1,6 @@
 // The project form's state and rules, as plain functions (no React, no
 // 'use client') so each rule is testable: what a NEW project starts with, how
-// picking a client fills the location, and when Save is allowed.
+// picking a client fills the location, and what Save sends.
 import type { ProjectStatus } from '@metra/db';
 import type { ClientOption, ProjectListItem } from './types';
 
@@ -93,3 +93,18 @@ export function withClient(
   return { ...form, clientId, ...locationFromClient(client, defaultCountry) };
 }
 
+/** What Save sends: an emptied box is absent (null); the code only once it exists. */
+export function projectPayload(form: ProjectFormState) {
+  return {
+    ...(form.code ? { code: form.code } : {}),
+    nameEn: form.nameEn || null,
+    nameAr: form.nameAr || null,
+    clientId: form.clientId,
+    startDate: form.startDate || null,
+    endDate: form.endDate || null,
+    city: form.city || null,
+    country: form.country || null,
+    address: form.address || null,
+    notes: form.notes || null,
+  };
+}

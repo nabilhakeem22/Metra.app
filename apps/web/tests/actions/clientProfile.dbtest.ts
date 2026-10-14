@@ -40,10 +40,10 @@ describe('client profile — type + advance/retention validation', () => {
     const [c] = await listClients(ctx, {});
     expect(
       await updateClientCore(ctx, { id: c.id, nameEn: 'X', advancePct: '150' }),
-    ).toEqual({ ok: false, error: 'invalid' });
+    ).toEqual({ ok: false, error: 'check_fields', fields: { advancePct: { code: 'invalid_percentage' } } });
     expect(
       await updateClientCore(ctx, { id: c.id, nameEn: 'X', retentionPct: '-5' }),
-    ).toEqual({ ok: false, error: 'invalid' });
+    ).toEqual({ ok: false, error: 'check_fields', fields: { retentionPct: { code: 'invalid_percentage' } } });
   });
 
   it('DB CHECK independently rejects advance_pct = 150 (23514)', async () => {

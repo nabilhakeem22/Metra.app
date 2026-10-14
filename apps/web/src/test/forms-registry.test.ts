@@ -16,18 +16,20 @@ import { loadSourceGraph, SRC_ROOT, srcRelative } from '@/test/source-graph';
 
 /** Form file (from src) to the test that proves its fields' refusals render under them. */
 const FORM_COVERAGE: Readonly<Record<string, string>> = {
+  'app/[locale]/(app)/clients/[id]/contact-form.tsx': 'app/[locale]/(app)/clients/[id]/contact-form.test.tsx',
+  'app/[locale]/(app)/clients/client-form-fields.tsx': 'app/[locale]/(app)/clients/client-form.test.tsx',
+  'app/[locale]/(app)/clients/client-form.tsx': 'app/[locale]/(app)/clients/client-form.test.tsx',
   'app/[locale]/(app)/engagements/engagement-create-fields.tsx': 'app/[locale]/(app)/engagements/engagement-create-form.test.tsx',
   'app/[locale]/(app)/engagements/use-delivery-form.ts': 'app/[locale]/(app)/engagements/engagement-create-form.test.tsx',
   'app/[locale]/(app)/price-book/cost-item-form-fields.tsx': 'app/[locale]/(app)/price-book/cost-item-form.test.tsx',
   'app/[locale]/(app)/price-book/cost-item-form.tsx': 'app/[locale]/(app)/price-book/cost-item-form.test.tsx',
+  'app/[locale]/(app)/projects/project-form-fields.tsx': 'app/[locale]/(app)/projects/project-form.test.tsx',
+  'app/[locale]/(app)/projects/project-form-schedule.tsx': 'app/[locale]/(app)/projects/project-form.test.tsx',
+  'app/[locale]/(app)/projects/project-form.tsx': 'app/[locale]/(app)/projects/project-form.test.tsx',
 };
 
 /** Forms still on the old one-error-at-a-time shape. Only ever shrinks. */
 const PENDING_FORMS: readonly string[] = [
-  'app/[locale]/(app)/clients/[id]/contact-form.tsx',
-  'app/[locale]/(app)/clients/client-form-fields.tsx',
-  'app/[locale]/(app)/projects/project-form-fields.tsx',
-  'app/[locale]/(app)/projects/project-form-schedule.tsx',
   'app/[locale]/(app)/settings/client-page-sheet.tsx',
   'app/[locale]/onboarding/onboarding-profile-fields.tsx',
 ];
