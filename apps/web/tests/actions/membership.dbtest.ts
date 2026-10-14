@@ -56,6 +56,24 @@ describe('removeMemberCore', () => {
   });
 });
 
+describe('a member that is not there, a role no select offers', () => {
+  it('answers record_not_found for someone not in this org, malformed for an unknown role', async () => {
+    const { orgId, ownerIds } = await seedOrg({ owners: 1 });
+    orgIds.push(orgId);
+    const ctx = ctxFor(orgId, ownerIds[0], 'owner');
+    const stranger = '00000000-0000-4000-8000-000000000777';
+    expect(await removeMemberCore(ctx, stranger)).toEqual({ ok: false, error: 'record_not_found' });
+    expect(await changeMemberRoleCore(ctx, { userId: stranger, role: 'viewer' })).toEqual({
+      ok: false,
+      error: 'record_not_found',
+    });
+    expect(await changeMemberRoleCore(ctx, { userId: stranger, role: 'emperor' as never })).toEqual({
+      ok: false,
+      error: 'malformed',
+    });
+  });
+});
+
 describe('mutateInOrg capability gate', () => {
   it('refuses a viewer and writes nothing (removeMemberCore + changeMemberRoleCore)', async () => {
     const { orgId, ownerIds, memberIds } = await seedOrg({

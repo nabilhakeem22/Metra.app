@@ -278,8 +278,7 @@
     "confirmRevokeTitle": "عايز تلغي الدعوة؟",
     "confirmRevokeDesc": "لينك الدعوة ده مش هيشتغل تاني.",
     "confirmRemoveTitle": "عايز تشيل العضو ده؟",
-    "confirmRemoveDesc": "{name} هيفقد صلاحية الدخول للشركة دي.",
-    "errorGeneric": "حصلت مشكلة. جرب تاني."
+    "confirmRemoveDesc": "{name} هيفقد صلاحية الدخول للشركة دي."
   },
   "roles": {
     "owner": {

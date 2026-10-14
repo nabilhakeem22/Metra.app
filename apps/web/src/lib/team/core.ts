@@ -22,7 +22,7 @@ export async function changeMemberRoleCore(
   ctx: OrgContext,
   input: { userId: string; role: MemberRole },
 ): Promise<ActionResult> {
-  if (!isMemberRole(input.role)) return err('invalid');
+  if (!isMemberRole(input.role)) return err('malformed');
   if (input.userId === ctx.userId) return err('self');
   const role = input.role;
 
@@ -36,7 +36,7 @@ export async function changeMemberRoleCore(
         .from(memberships)
         .where(eq(memberships.userId, input.userId))
         .limit(1);
-      if (!target) fail('invalid');
+      if (!target) fail('record_not_found');
 
       if ((target.role === 'owner' || role === 'owner') && ctx.role !== 'owner') {
         fail('owner_immutable');
@@ -77,7 +77,7 @@ export async function removeMemberCore(
         .from(memberships)
         .where(eq(memberships.userId, userId))
         .limit(1);
-      if (!target) fail('invalid');
+      if (!target) fail('record_not_found');
 
       if (target.role === 'owner' && ctx.role !== 'owner') {
         fail('owner_immutable');

@@ -278,8 +278,7 @@
     "confirmRevokeTitle": "Revoke invitation?",
     "confirmRevokeDesc": "This invitation link will stop working.",
     "confirmRemoveTitle": "Remove member?",
-    "confirmRemoveDesc": "{name} will lose access to this firm.",
-    "errorGeneric": "Something went wrong. Please try again."
+    "confirmRemoveDesc": "{name} will lose access to this firm."
   },
   "roles": {
     "owner": {

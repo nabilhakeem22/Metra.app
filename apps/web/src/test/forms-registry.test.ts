@@ -30,6 +30,8 @@ const FORM_COVERAGE: Readonly<Record<string, string>> = {
   'app/[locale]/(app)/settings/client-page-sheet.tsx': 'app/[locale]/(app)/settings/client-page-sheet.test.tsx',
   'app/[locale]/(app)/settings/settings-client.tsx': 'app/[locale]/(app)/settings/settings-client.test.tsx',
   'app/[locale]/(app)/settings/settings-profile-card.tsx': 'app/[locale]/(app)/settings/settings-client.test.tsx',
+  'app/[locale]/(app)/team/team-invite-form.tsx': 'app/[locale]/(app)/team/team-client.test.tsx',
+  'app/[locale]/(app)/team/use-invite-form.ts': 'app/[locale]/(app)/team/team-client.test.tsx',
   'app/[locale]/onboarding/onboarding-profile-fields.tsx': 'app/[locale]/onboarding/wizard.test.tsx',
   'app/[locale]/onboarding/wizard.tsx': 'app/[locale]/onboarding/wizard.test.tsx',
 };
