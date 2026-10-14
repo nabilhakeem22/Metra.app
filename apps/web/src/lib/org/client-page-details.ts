@@ -11,6 +11,7 @@
 // left as stored; clearing one is an explicit null (or a blank string). So a
 // Settings sheet opened before a colleague's save can never quietly put the
 // colleague's fields back.
+import { hasFieldErrors, type FieldError, type FieldErrors } from '@/lib/actions/field-errors';
 import { toLatinNumerals } from '@/lib/money/separators';
 import { ibanChecksumHolds } from '@/lib/validation/iban';
 import { countCharacters } from '@/lib/validation/text';
@@ -30,15 +31,12 @@ export const CLIENT_PAGE_FIELDS = [
 export type ClientPageField = (typeof CLIENT_PAGE_FIELDS)[number];
 export type ClientPageDetails = Record<ClientPageField, string | null>;
 
-export type ClientPageDetailsCode =
-  | 'phone_invalid'
-  | 'whatsapp_invalid'
-  | 'iban_invalid'
-  | 'bank_name_required'
-  | 'invalid';
-
-/** A refusal; `field` is null when the input as a whole is malformed. */
-export type ClientPageRefusal = { ok: false; field: ClientPageField | null; code: ClientPageDetailsCode };
+/** What a save asks for: the changes, every field refusal at once, or input no
+ *  form can send (not an object, an unknown key, a value that is not text). */
+export type ClientPageChanges =
+  | { ok: true; value: Partial<ClientPageDetails> }
+  | { ok: false; errors: FieldErrors<ClientPageField> }
+  | { ok: false; malformed: true };
 
 /** Longer than any field can be once spaces are gone: refused before any work. */
 const MAX_RAW_CHARS = 300;
@@ -53,67 +51,78 @@ const TEXT_BOUNDS: Partial<Record<ClientPageField, readonly [number, number]>> =
   bankAccountHolder: [2, 120],
 };
 
-type FieldResult = { value: string } | { code: ClientPageDetailsCode };
+type FieldResult = { value: string } | { error: FieldError };
+
+function textBounded(field: ClientPageField, text: string): FieldResult {
+  const [min, max] = TEXT_BOUNDS[field] ?? [1, 0];
+  const length = countCharacters(text);
+  if (length < min) return { error: { code: 'too_short', params: { min } } };
+  return length > max ? { error: { code: 'too_long', params: { max } } } : { value: text };
+}
 
 function normalizeField(field: ClientPageField, text: string): FieldResult {
   switch (field) {
     case 'studioPhone':
     case 'studioWhatsapp': {
       const phone = studioPhoneOf(text);
-      if (!phone) return { code: 'phone_invalid' };
+      if (!phone) return { error: { code: 'phone_invalid' } };
       // The client page opens wa.me with it: a number WhatsApp cannot place
       // (a landline) would never show a button.
-      return field === 'studioWhatsapp' && !reachableOnWhatsapp(phone) ? { code: 'whatsapp_invalid' } : { value: phone };
+      return field === 'studioWhatsapp' && !reachableOnWhatsapp(phone)
+        ? { error: { code: 'whatsapp_invalid' } }
+        : { value: phone };
     }
     case 'bankAccountNumber': {
       const account = toLatinNumerals(text).replace(/\s/g, '');
-      return ACCOUNT_NUMBER.test(account) && /[0-9]/.test(account) ? { value: account } : { code: 'invalid' };
+      return ACCOUNT_NUMBER.test(account) && /[0-9]/.test(account)
+        ? { value: account }
+        : { error: { code: 'account_number_invalid' } };
     }
     case 'bankIban': {
       const iban = toLatinNumerals(text).replace(/\s/g, '').toUpperCase();
-      return IBAN.test(iban) && ibanChecksumHolds(iban) ? { value: iban } : { code: 'iban_invalid' };
+      return IBAN.test(iban) && ibanChecksumHolds(iban) ? { value: iban } : { error: { code: 'iban_invalid' } };
     }
-    default: {
-      const [min, max] = TEXT_BOUNDS[field] ?? [1, 0];
-      const length = countCharacters(text);
-      return length >= min && length <= max ? { value: text } : { code: 'invalid' };
-    }
+    default:
+      return textBounded(field, text);
   }
 }
 
-/** One sent value: null or blank clears it; anything else is checked by its field's rule. */
-function normalizeValue(field: ClientPageField, raw: unknown): { value: string | null } | ClientPageRefusal {
-  if (raw === null) return { value: null };
-  if (typeof raw !== 'string' || raw.length > MAX_RAW_CHARS) return { ok: false, field, code: 'invalid' };
+/** One sent text: blank clears it; anything else is checked by its field's rule. */
+function normalizeText(field: ClientPageField, raw: string): { value: string | null } | { error: FieldError } {
+  // Past any field's length: said with the field's own rule, before any work.
+  if (raw.length > MAX_RAW_CHARS) return normalizeField(field, raw.slice(0, MAX_RAW_CHARS + 1));
   const text = strippedText(raw);
   if (text === '') return { value: null };
-  if (unprintableReason(text) !== null) return { ok: false, field, code: 'invalid' };
-  const result = normalizeField(field, text);
-  return 'code' in result ? { ok: false, field, code: result.code } : result;
+  if (unprintableReason(text) !== null) return { error: { code: 'unprintable' } };
+  return normalizeField(field, text);
 }
 
 /**
  * The changes a save asks for, each normalised. `input` must be a plain object
- * whose keys are client-page fields; a key that is absent is unchanged. The
- * first refusal names its field; a malformed input as a whole names none.
+ * whose keys are client-page fields and whose values are text or null; a key
+ * that is absent is unchanged. Every refused field is named at once.
  */
-export function normalizeClientPageChanges(
-  input: unknown,
-): { ok: true; value: Partial<ClientPageDetails> } | ClientPageRefusal {
-  if (typeof input !== 'object' || input === null || Array.isArray(input)) {
-    return { ok: false, field: null, code: 'invalid' };
-  }
-  if (Object.keys(input).some((key) => !(CLIENT_PAGE_FIELDS as readonly string[]).includes(key))) {
-    return { ok: false, field: null, code: 'invalid' };
+export function normalizeClientPageChanges(input: unknown): ClientPageChanges {
+  if (typeof input !== 'object' || input === null || Array.isArray(input)) return { ok: false, malformed: true };
+  const sent = input as Record<string, unknown>;
+  if (Object.keys(sent).some((key) => !(CLIENT_PAGE_FIELDS as readonly string[]).includes(key))) {
+    return { ok: false, malformed: true };
   }
   const value: Partial<ClientPageDetails> = {};
+  const errors: Partial<Record<ClientPageField, FieldError>> = {};
   for (const field of CLIENT_PAGE_FIELDS) {
-    if (!Object.hasOwn(input, field)) continue;
-    const result = normalizeValue(field, (input as Record<string, unknown>)[field]);
-    if ('ok' in result) return result;
-    value[field] = result.value;
+    if (!Object.hasOwn(sent, field)) continue;
+    const raw = sent[field];
+    if (raw === null) {
+      value[field] = null;
+      continue;
+    }
+    if (typeof raw !== 'string') return { ok: false, malformed: true };
+    const result = normalizeText(field, raw);
+    if ('error' in result) errors[field] = result.error;
+    else value[field] = result.value;
   }
-  return { ok: true, value };
+  return hasFieldErrors(errors) ? { ok: false, errors } : { ok: true, value };
 }
 
 /**
@@ -124,10 +133,10 @@ export function normalizeClientPageChanges(
 export function detailsAfter(
   stored: ClientPageDetails,
   changes: Partial<ClientPageDetails>,
-): { ok: true; value: ClientPageDetails } | ClientPageRefusal {
+): { ok: true; value: ClientPageDetails } | { ok: false; errors: FieldErrors<ClientPageField> } {
   const value = { ...stored, ...changes };
   if ((value.bankAccountNumber !== null || value.bankIban !== null) && value.bankName === null) {
-    return { ok: false, field: 'bankName', code: 'bank_name_required' };
+    return { ok: false, errors: { bankName: { code: 'bank_name_required' } } };
   }
   return { ok: true, value };
 }

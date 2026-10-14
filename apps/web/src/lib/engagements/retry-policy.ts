@@ -31,6 +31,10 @@ export const DEFINITE_REFUSALS: ReadonlySet<ActionCode> = new Set<ActionCode>([
   'invalid',
   // Field rules refused the input before anything was written.
   'check_fields',
+  // Refused at the boundary: the input could not have come from a form.
+  'malformed',
+  // The row was not there to change.
+  'record_not_found',
   'flow_not_enabled',
   'illegal_trigger',
   // The row was not visible, or it moved under us.
@@ -95,6 +99,7 @@ export const DEFINITE_REFUSALS: ReadonlySet<ActionCode> = new Set<ActionCode>([
   'whatsapp_invalid',
   'iban_invalid',
   'bank_name_required',
+  'account_number_invalid',
   'client_page_details_owner_only',
   'client_page_details_stale',
   'expected_date_out_of_range',

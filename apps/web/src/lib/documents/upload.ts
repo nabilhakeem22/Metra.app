@@ -5,6 +5,7 @@ import 'server-only';
 // URL, so a transaction with an audit entry would record an intent rather than a
 // change — the file's row is written when the browser finishes the PUT.
 import { eq } from 'drizzle-orm';
+import { fieldsFailed } from '@/lib/actions/field-errors';
 import { err, type ActionResult } from '@/lib/actions/result';
 import { withOrgContext, type OrgContext } from '@/lib/db/context';
 import { can } from '@/lib/permissions/can';
@@ -64,14 +65,14 @@ export async function createDocumentUploadCore(
   },
 ): Promise<SignedUpload | ActionResult> {
   if (!can(ctx.role, spec.writeCapability, 'create')) return err('forbidden');
-  if (!isUuid(input.parentId)) return err('invalid');
-  if (!(await parentLoadsInOrg(ctx, spec, input.parentId))) return err('invalid');
+  if (!isUuid(input.parentId)) return err('malformed');
+  if (!(await parentLoadsInOrg(ctx, spec, input.parentId))) return err('record_not_found');
 
   // A category id is only trusted after it resolves IN THIS ORG under RLS — the
-  // same-org FK is the DB backstop, but rejecting here returns a coded error
-  // instead of a constraint violation.
+  // same-org FK is the DB backstop, but refusing here says it under the picker:
+  // the category was retired or deleted since the page loaded.
   const categoryId = await resolveCategoryId(ctx, input.categoryId);
-  if (categoryId === INVALID_CATEGORY) return err('invalid');
+  if (categoryId === INVALID_CATEGORY) return fieldsFailed({ categoryId: { code: 'no_longer_exists' } });
 
   await ensureFilesBucket();
   return createSignedUploadUrl(ctx, spec.entity, {

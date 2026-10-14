@@ -58,7 +58,7 @@ describe.each(deleteActions)('%s', (_name, deleteDocument, entity) => {
     expect(refreshApp).toHaveBeenCalledTimes(1);
   });
 
-  it.each(['forbidden', 'invalid', 'generic'] as const)(
+  it.each(['forbidden', 'record_not_found', 'generic'] as const)(
     'does not revalidate on `%s` — nothing was written',
     async (code) => {
       deleteDocumentCore.mockResolvedValue({ ok: false, error: code });

@@ -30,7 +30,7 @@ describe('createClientCore', () => {
     const ctx = ctxFor(orgId, ownerIds[0], 'owner');
     expect(
       await createClientCore(ctx, { phone: '01000000000', nameEn: '  ', nameAr: '' }),
-    ).toEqual({ ok: false, error: 'name_required' });
+    ).toEqual({ ok: false, error: 'check_fields', fields: { name: { code: 'name_required' } } });
   });
 
   it('lets a project_manager create, forbids site_engineer/accountant/viewer', async () => {
@@ -87,14 +87,9 @@ describe('phone is required forward-only', () => {
     const { orgId, ownerIds } = await seedOrg({ owners: 1 });
     orgIds.push(orgId);
     const ctx = ctxFor(orgId, ownerIds[0], 'owner');
-    expect(await createClientCore(ctx, { nameEn: 'No Phone Co' })).toEqual({
-      ok: false,
-      error: 'phone_required',
-    });
-    expect(await createClientCore(ctx, { nameEn: 'Blank', phone: '   ' })).toEqual({
-      ok: false,
-      error: 'phone_required',
-    });
+    const phoneRequired = { ok: false, error: 'check_fields', fields: { phone: { code: 'phone_required' } } };
+    expect(await createClientCore(ctx, { nameEn: 'No Phone Co' })).toEqual(phoneRequired);
+    expect(await createClientCore(ctx, { nameEn: 'Blank', phone: '   ' })).toEqual(phoneRequired);
   });
 
   it('preserves a phone that the update simply does not mention', async () => {
@@ -146,7 +141,7 @@ describe('phone is required forward-only', () => {
 
     expect(
       await updateClientCore(ctx, { id: client.id, nameEn: 'Has Phone', phone: '' }),
-    ).toEqual({ ok: false, error: 'phone_required' });
+    ).toEqual({ ok: false, error: 'check_fields', fields: { phone: { code: 'phone_required' } } });
   });
 
   it('does NOT zero advance/retention when the form omits them', async () => {

@@ -15,25 +15,16 @@
 // leaves everything already filed exactly where it is.
 import { documentCategories, type MetraDb } from '@metra/db';
 import { and, desc, eq } from 'drizzle-orm';
+import { fieldsFailed, hasFieldErrors } from '@/lib/actions/field-errors';
 import { mutateInOrg, requireInOrg } from '@/lib/actions/mutate';
 import type { AuditEntry } from '@/lib/audit';
 import { err, type ActionResult } from '@/lib/actions/result';
 import type { OrgContext } from '@/lib/db/context';
 import { clean } from '@/lib/validation/text';
 import { isUuid } from '@/lib/uuid';
+import { documentCategoryNameErrors, type DocumentCategoryInput } from './field-rules';
 
-const NAME_MAX = 80;
-
-export interface DocumentCategoryInput {
-  nameEn?: string | null;
-  nameAr?: string | null;
-}
-
-/** At least one locale, neither over the cap — mirrors the bilingual DB CHECK. */
-function validNames(nameEn: string | null, nameAr: string | null): boolean {
-  if (!nameEn && !nameAr) return false;
-  return (nameEn?.length ?? 0) <= NAME_MAX && (nameAr?.length ?? 0) <= NAME_MAX;
-}
+export type { DocumentCategoryInput } from './field-rules';
 
 /**
  * The next position at the end of the firm's list.
@@ -78,9 +69,10 @@ export async function createDocumentCategoryCore(
   ctx: OrgContext,
   input: DocumentCategoryInput,
 ): Promise<ActionResult & { data?: string }> {
+  const errors = documentCategoryNameErrors(input);
+  if (hasFieldErrors(errors)) return fieldsFailed(errors);
   const nameEn = clean(input.nameEn);
   const nameAr = clean(input.nameAr);
-  if (!validNames(nameEn, nameAr)) return err('name_required');
 
   return mutateInOrg(
     ctx,
@@ -138,10 +130,11 @@ export async function updateDocumentCategoryCore(
   ctx: OrgContext,
   input: UpdateDocumentCategoryInput,
 ): Promise<ActionResult> {
-  if (!isUuid(input.id)) return err('invalid');
+  if (!isUuid(input.id)) return err('malformed');
+  const errors = documentCategoryNameErrors(input);
+  if (hasFieldErrors(errors)) return fieldsFailed(errors);
   const nameEn = clean(input.nameEn);
   const nameAr = clean(input.nameAr);
-  if (!validNames(nameEn, nameAr)) return err('name_required');
 
   return mutateInOrg(
     ctx,
@@ -152,7 +145,7 @@ export async function updateDocumentCategoryCore(
         documentCategories,
         input.id,
         { id: documentCategories.id, active: documentCategories.active },
-        'invalid',
+        'record_not_found',
       );
 
       await applyCategoryPatch(tx, ctx.orgId, input, { nameEn, nameAr });

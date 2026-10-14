@@ -4,21 +4,25 @@ import { useLocale, useTranslations } from 'next-intl';
 import { useEffect, useState, useTransition } from 'react';
 import { Button } from '@/components/ui/button';
 import { FormSheet } from '@/components/ui/form-sheet';
+import { useFieldErrors } from '@/hooks/use-field-errors';
 import { toast } from '@/hooks/use-toast';
 import { Link } from '@/i18n/routing';
-import { resolveActionError } from '@/lib/actions/error-message';
-import type { ActionCode } from '@/lib/actions/result';
 import { createProject, updateProject } from '@/lib/projects/actions';
-import { projectFieldFor, type ProjectFormField } from './project-form-errors';
+import { projectFieldErrors } from '@/lib/projects/field-rules';
+import { PROJECT_CREATE_FIELDS, type ProjectField } from '@/lib/projects/fields';
 import { ProjectFormFields } from './project-form-fields';
 import {
   emptyProjectForm,
   projectFormOf,
+  projectPayload,
   todayIsoLocal,
   withClient,
   type ProjectFormState,
 } from './project-form-state';
 import type { ClientOption, ProjectListItem } from './types';
+
+/** An edit also shows the (read-only) code. */
+const PROJECT_EDIT_FIELDS: readonly ProjectField[] = [...PROJECT_CREATE_FIELDS, 'code'];
 
 export interface ProjectFormProps {
   open: boolean;
@@ -31,6 +35,12 @@ export interface ProjectFormProps {
   canAddClient?: boolean;
 }
 
+/**
+ * Add or edit one project. Save checks the typed values first and says what is
+ * wrong under each field; what only the server knows (a client archived
+ * meanwhile, a code taken) comes back the same way. With no client to pick,
+ * every refusal is said above the footer.
+ */
 export function ProjectForm({
   open,
   onOpenChange,
@@ -48,18 +58,23 @@ export function ProjectForm({
   const [form, setForm] = useState<ProjectFormState>(() =>
     emptyProjectForm(clientOptions, undefined, '', defaultCountry),
   );
-  const [error, setError] = useState<{ code: ActionCode; field: ProjectFormField } | null>(null);
   const [pending, startTransition] = useTransition();
+  const noClients = clientOptions.length === 0;
+  const errors = useFieldErrors<ProjectField>({
+    fields: noClients ? [] : item ? PROJECT_EDIT_FIELDS : PROJECT_CREATE_FIELDS,
+    translate: te,
+  });
+  const { clear } = errors;
 
   useEffect(() => {
     if (!open) return;
-    setError(null);
+    clear();
     setForm(
       item
         ? projectFormOf(item)
         : emptyProjectForm(clientOptions, defaultClientId, todayIsoLocal(new Date()), defaultCountry),
     );
-  }, [open, item, clientOptions, defaultClientId, defaultCountry]);
+  }, [open, item, clientOptions, defaultClientId, defaultCountry, clear]);
 
   const set = (key: keyof ProjectFormState) => (value: string) =>
     setForm((prev) => {
@@ -67,43 +82,27 @@ export function ProjectForm({
       const locationEdited = prev.locationEdited || key === 'city' || key === 'country';
       return { ...prev, [key]: value, locationEdited };
     });
-  const messageFor = (field: ProjectFormField) =>
-    error?.field === field ? resolveActionError(error.code, te) : undefined;
 
   function submit() {
-    setError(null);
+    const payload = projectPayload(form);
+    // The start date is required on create only; an edit sends its stored code back.
+    const rules = item ? { requireCode: true } : { requireStartDate: true };
+    if (errors.applyLocal(projectFieldErrors(payload, rules))) return;
     startTransition(async () => {
-      const payload = {
-        ...(form.code ? { code: form.code } : {}),
-        nameEn: form.nameEn || null,
-        nameAr: form.nameAr || null,
-        clientId: form.clientId,
-        startDate: form.startDate || null,
-        endDate: form.endDate || null,
-        city: form.city || null,
-        country: form.country || null,
-        address: form.address || null,
-        notes: form.notes || null,
-      };
       try {
         // A new project is created ACTIVE by the server; only an edit sends a status.
-        const res = item
+        const result = item
           ? await updateProject({ id: item.id, ...payload, status: form.status })
           : await createProject(payload);
-        if (res.ok) {
-          toast({ title: t(item ? 'toast.updated' : 'toast.created') });
-          onOpenChange(false);
-          return;
-        }
-        const code = (res.error as ActionCode) ?? 'generic';
-        setError({ code, field: projectFieldFor(code) });
-      } catch {
-        setError({ code: 'generic', field: 'form' });
+        if (errors.applyResult(result)) return;
+        toast({ title: t(item ? 'toast.updated' : 'toast.created') });
+        onOpenChange(false);
+      } catch (rejection) {
+        errors.applyRejection(rejection);
       }
     });
   }
 
-  const noClients = clientOptions.length === 0;
   return (
     <FormSheet
       open={open}
@@ -114,7 +113,8 @@ export function ProjectForm({
       cancelLabel={t('form.cancel')}
       closeLabel={tc('close')}
       pending={pending}
-      formError={noClients ? (messageFor('client') ?? messageFor('form')) : messageFor('form')}
+      formError={errors.formError}
+      invalidAttempt={errors.invalidAttempt}
     >
       {noClients ? (
         <div className="space-y-2 rounded-item border bg-muted/40 p-3 text-body text-muted-foreground">
@@ -133,13 +133,7 @@ export function ProjectForm({
           form={form}
           set={set}
           clientOptions={clientOptions}
-          errors={{
-            name: messageFor('name'),
-            code: messageFor('code'),
-            client: messageFor('client'),
-            startDate: messageFor('startDate'),
-            endDate: messageFor('endDate'),
-          }}
+          bind={errors.bind}
         />
       )}
     </FormSheet>

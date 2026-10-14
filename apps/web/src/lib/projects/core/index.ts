@@ -5,6 +5,6 @@
 // IDENTICAL public surface so every `@/lib/projects/core` import site keeps
 // resolving unchanged; the validation helpers stay internal. Pure structural
 // refactor — no query, type, or behaviour changed.
-export type { ProjectInput } from './validation';
+export type { ProjectInput } from '../fields';
 export * from './create';
 export * from './update';

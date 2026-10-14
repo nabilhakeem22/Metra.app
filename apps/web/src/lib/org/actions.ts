@@ -5,18 +5,15 @@ import { organizations } from '@metra/db';
 import { eq, sql } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
-import { recordAudit } from '@/lib/audit';
-import type { ActionResult } from '@/lib/actions/result';
+import { fieldsFailed } from '@/lib/actions/field-errors';
+import { mutateInOrg } from '@/lib/actions/mutate';
+import { err, type ActionResult } from '@/lib/actions/result';
 import { requireOrg } from '@/lib/auth/require-org';
 import { getSessionUser } from '@/lib/auth/session';
-import { withOrgContext, withUserContext } from '@/lib/db/context';
+import { withUserContext } from '@/lib/db/context';
 import { canManageOrg } from '@/lib/permissions/can';
-import { clean } from '@/lib/validation/text';
-import {
-  createOrgCore,
-  profileWithinLimits,
-  type OrgProfileInput,
-} from './core';
+import { createOrgCore, type OrgProfileInput } from './core';
+import { readOrgProfile, type OrgProfileText } from './profile-field-rules';
 
 export type { OrgProfileInput };
 
@@ -53,23 +50,18 @@ export async function createOrg(input: OrgProfileInput): Promise<ActionResult> {
 }
 
 // --- Org settings (owner/admin only) ---------------------------------------
+// Both writes run through mutateInOrg, so a failure is answered with its cause
+// (a lost connection as `uncertain`, a deadlock as `busy`, anything else with a
+// reference) instead of a rejected promise.
 
-export async function updateOrgProfile(
-  input: OrgProfileInput,
-): Promise<ActionResult> {
+export async function updateOrgProfile(input: OrgProfileText): Promise<ActionResult> {
   const ctx = await requireOrg();
-  if (!canManageOrg(ctx.role)) return { ok: false, error: 'forbidden' };
+  if (!canManageOrg(ctx.role)) return err('forbidden');
+  const profile = readOrgProfile(input);
+  if (!profile.ok) return fieldsFailed(profile.errors);
+  const after = profile.values;
 
-  const nameEn = clean(input.nameEn);
-  const nameAr = clean(input.nameAr);
-  if (!nameEn && !nameAr) return { ok: false, error: 'name_required' };
-  const city = clean(input.city);
-  const taxRegistrationNumber = clean(input.taxRegistrationNumber);
-  if (!profileWithinLimits(nameEn, nameAr, city, taxRegistrationNumber)) {
-    return { ok: false, error: 'invalid' };
-  }
-
-  await withOrgContext(ctx, async (tx) => {
+  const result = await mutateInOrg(ctx, {}, async (tx, audit) => {
     const [before] = await tx
       .select({
         nameEn: organizations.nameEn,
@@ -80,23 +72,14 @@ export async function updateOrgProfile(
       .from(organizations)
       .where(eq(organizations.id, ctx.orgId))
       .limit(1);
-
     await tx
       .update(organizations)
-      .set({ nameEn, nameAr, city, taxRegistrationNumber, updatedAt: new Date() })
+      .set({ ...after, updatedAt: new Date() })
       .where(eq(organizations.id, ctx.orgId));
-
-    await recordAudit(tx, {
-      entity: 'organization',
-      entityId: ctx.orgId,
-      action: 'update',
-      before: before ?? null,
-      after: { nameEn, nameAr, city, taxRegistrationNumber },
-    });
+    await audit({ entity: 'organization', entityId: ctx.orgId, action: 'update', before: before ?? null, after });
   });
-
-  revalidatePath('/', 'layout');
-  return { ok: true };
+  if (result.ok) revalidatePath('/', 'layout');
+  return result;
 }
 
 export async function updateOrgSettings(input: {
@@ -104,12 +87,13 @@ export async function updateOrgSettings(input: {
   restrictFirmDashboard: boolean;
 }): Promise<ActionResult> {
   const ctx = await requireOrg();
-  if (!canManageOrg(ctx.role)) return { ok: false, error: 'forbidden' };
+  if (!canManageOrg(ctx.role)) return err('forbidden');
+  const after = {
+    hideMarginFromPm: !!input.hideMarginFromPm,
+    restrictFirmDashboard: !!input.restrictFirmDashboard,
+  };
 
-  const hideMarginFromPm = !!input.hideMarginFromPm;
-  const restrictFirmDashboard = !!input.restrictFirmDashboard;
-
-  await withOrgContext(ctx, async (tx) => {
+  const result = await mutateInOrg(ctx, {}, async (tx, audit) => {
     const [before] = await tx
       .select({
         hideMarginFromPm: organizations.hideMarginFromPm,
@@ -118,21 +102,12 @@ export async function updateOrgSettings(input: {
       .from(organizations)
       .where(eq(organizations.id, ctx.orgId))
       .limit(1);
-
     await tx
       .update(organizations)
-      .set({ hideMarginFromPm, restrictFirmDashboard, updatedAt: new Date() })
+      .set({ ...after, updatedAt: new Date() })
       .where(eq(organizations.id, ctx.orgId));
-
-    await recordAudit(tx, {
-      entity: 'organization',
-      entityId: ctx.orgId,
-      action: 'update',
-      before: before ?? null,
-      after: { hideMarginFromPm, restrictFirmDashboard },
-    });
+    await audit({ entity: 'organization', entityId: ctx.orgId, action: 'update', before: before ?? null, after });
   });
-
-  revalidatePath('/', 'layout');
-  return { ok: true };
+  if (result.ok) revalidatePath('/', 'layout');
+  return result;
 }

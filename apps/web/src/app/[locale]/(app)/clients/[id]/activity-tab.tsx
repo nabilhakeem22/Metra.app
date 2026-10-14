@@ -1,19 +1,12 @@
 'use client';
 
-import { History, Loader2 } from 'lucide-react';
+import { History } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
-import { useState, useTransition } from 'react';
-import { Button } from '@/components/ui/button';
+import { ActivityNoteForm } from '@/components/activity/activity-note-form';
 import { Card, CardContent } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
-import { toast } from '@/hooks/use-toast';
-import { useRouter } from '@/i18n/routing';
-import { resolveActionError } from '@/lib/actions/error-message';
-import type { ActionCode } from '@/lib/actions/result';
-import { addActivity } from '@/lib/activities/actions';
 import type { LogEntry } from '@/lib/logs/entries';
 import { formatDate } from '@/lib/format/date';
-import { Textarea } from '@/components/ui/textarea';
 
 export function ActivityTab({
   clientId,
@@ -27,53 +20,12 @@ export function ActivityTab({
   canActivity: boolean;
 }) {
   const t = useTranslations('clients.profile.activity');
-  const te = useTranslations('errors');
   const locale = useLocale();
-  const router = useRouter();
-  const [note, setNote] = useState('');
-  const [pending, startTransition] = useTransition();
-
-  function submit() {
-    if (!note.trim()) return;
-    startTransition(async () => {
-      const res = await addActivity({
-        entityType: 'client',
-        entityId: clientId,
-        note,
-      });
-      if (res.ok) {
-        setNote('');
-        router.refresh();
-      } else {
-        toast({
-          title: resolveActionError(res.error as ActionCode, te),
-          variant: 'destructive',
-        });
-      }
-    });
-  }
 
   return (
     <div className="space-y-4">
       {canActivity && (
-        <Card>
-          <CardContent className="space-y-2 py-4">
-            <Textarea
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-              placeholder={t('notePlaceholder')}
-              rows={3}
-              dir="auto"
-              aria-label={t('add')}
-            />
-            <div className="flex justify-end">
-              <Button variant="default" type="button" onClick={submit} disabled={pending || !note.trim()}>
-                {pending && <Loader2 className="size-4 animate-spin" aria-hidden />}
-                {t('add')}
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+        <ActivityNoteForm entityType="client" entityId={clientId} placeholder={t('notePlaceholder')} addLabel={t('add')} />
       )}
 
       <Card>

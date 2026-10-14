@@ -3,6 +3,7 @@
 // new project's stages from the org's active stage templates (start-from-any-phase).
 import { projects, projectStages, stageTemplates } from '@metra/db';
 import { asc, eq, sql } from 'drizzle-orm';
+import { failFields } from '@/lib/actions/field-errors';
 import { fail, mutateInOrg } from '@/lib/actions/mutate';
 import { allocateNumber } from '@/lib/db/allocate-number';
 import { loadWorkspaceEntitlements } from '@/lib/entitlements/entitlements';
@@ -11,7 +12,8 @@ import { formatDocNumber } from '@/lib/format/doc-number';
 import type { ActionResult } from '@/lib/actions/result';
 import { appendSystemActivity } from '@/lib/activities/core';
 import type { OrgContext } from '@/lib/db/context';
-import { assertClientUsable, isErr, validate, type ProjectInput } from './validation';
+import type { ProjectInput } from '../fields';
+import { assertClientUsable, isErr, PROJECT_REFUSALS, validate } from './validation';
 
 export async function createProjectCore(
   ctx: OrgContext,
@@ -24,7 +26,7 @@ export async function createProjectCore(
 
   return mutateInOrg(
     ctx,
-    { capability: 'projects', action: 'create' },
+    { capability: 'projects', action: 'create', refusals: PROJECT_REFUSALS },
     async (tx, audit) => {
       // Plan cap (spec AC: "projects will be limited with the plan"). Counted
       // INSIDE the transaction, so two concurrent creates cannot both squeeze past
@@ -53,7 +55,7 @@ export async function createProjectCore(
         .from(projects)
         .where(eq(projects.code, code))
         .limit(1);
-      if (dup) fail('code_taken');
+      if (dup) failFields({ code: { code: 'code_taken' } });
       await assertClientUsable(tx, v.clientId);
 
       const [row] = await tx

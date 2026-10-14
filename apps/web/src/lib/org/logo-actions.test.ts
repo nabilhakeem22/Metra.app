@@ -39,8 +39,8 @@ describe('createLogoUpload', () => {
   });
 
   it.each([
-    [{ contentType: 'image/svg+xml', originalName: 'logo.svg', size: 10 }, 'invalid'],
-    [{ contentType: 'text/html', originalName: 'logo.png', size: 10 }, 'invalid'],
+    [{ contentType: 'image/svg+xml', originalName: 'logo.svg', size: 10 }, 'logo_image_unsupported'],
+    [{ contentType: 'text/html', originalName: 'logo.png', size: 10 }, 'logo_image_unsupported'],
     [{ contentType: 'image/png', originalName: 'logo.png', size: 3 * 1024 * 1024 }, 'file_too_large'],
   ])('refuses %j before signing anything', async (input, error) => {
     expect(await createLogoUpload(input)).toEqual({ ok: false, error });
@@ -56,14 +56,20 @@ describe('setOrgLogo', () => {
   });
 
   it.each([
-    ['stored as SVG under a PNG name', { contentType: 'image/svg+xml', size: 10 }, 'invalid'],
+    ['stored as SVG under a PNG name', { contentType: 'image/svg+xml', size: 10 }, 'logo_image_unsupported'],
     ['over 2 MB whatever was declared', { contentType: 'image/png', size: 5 * 1024 * 1024 }, 'file_too_large'],
-    ['that Storage cannot describe', null, 'invalid'],
+    ['that Storage cannot describe', null, 'storage_unavailable'],
   ])('refuses a logo %s, removes it, and does not attach it', async (_label, stored, error) => {
     deps.storedObjectInfo.mockResolvedValue(stored);
     expect(await setOrgLogo('f-1')).toEqual({ ok: false, error });
     expect(deps.removeStoredObject).toHaveBeenCalledWith(FILE.bucket, FILE.objectKey);
     expect(deps.withOrgContext).toHaveBeenCalledTimes(1);
+  });
+
+  it('a file that is not in this workspace is not found, and nothing is removed', async () => {
+    deps.withOrgContext.mockReset().mockResolvedValueOnce([]);
+    expect(await setOrgLogo('f-1')).toEqual({ ok: false, error: 'record_not_found' });
+    expect(deps.removeStoredObject).not.toHaveBeenCalled();
   });
 
   it('a viewer is refused before anything is read', async () => {

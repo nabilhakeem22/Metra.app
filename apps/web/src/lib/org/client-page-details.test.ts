@@ -20,13 +20,19 @@ const NONE = Object.fromEntries(CLIENT_PAGE_FIELDS.map((field) => [field, null])
 
 function saved(input: Partial<Record<ClientPageField, unknown>>): Partial<ClientPageDetails> {
   const result = normalizeClientPageChanges(input);
-  if (!result.ok) throw new Error(`refused ${String(result.field)}: ${result.code}`);
+  if (!result.ok) throw new Error(`refused: ${JSON.stringify(result)}`);
   return result.value;
 }
 
+/** The one refusal a save got: a field and its code, or `malformed` naming none. */
 function refusal(input: unknown) {
   const result = normalizeClientPageChanges(input);
-  return result.ok ? null : { field: result.field, code: result.code };
+  if (result.ok) return null;
+  if ('malformed' in result) return { field: null, code: 'malformed' };
+  const entries = Object.entries(result.errors);
+  if (entries.length !== 1) throw new Error(`expected one refusal: ${JSON.stringify(result.errors)}`);
+  const [field, error] = entries[0]!;
+  return { field, code: error!.code };
 }
 
 describe('normalizeClientPageChanges: a save is a set of changes (F1)', () => {
@@ -43,16 +49,34 @@ describe('normalizeClientPageChanges: a save is a set of changes (F1)', () => {
     });
   });
 
-  it.each([null, undefined, [], ['studioPhone'], 'x', 42])('refuses %j as a whole, naming no field', (input) => {
-    expect(refusal(input)).toEqual({ field: null, code: 'invalid' });
+  it.each([null, undefined, [], ['studioPhone'], 'x', 42])('refuses %j as a whole, as malformed', (input) => {
+    expect(refusal(input)).toEqual({ field: null, code: 'malformed' });
   });
 
   it('refuses a key that is not a field', () => {
-    expect(refusal({ studioPhone: '01012345678', bankBalance: '9' })).toEqual({ field: null, code: 'invalid' });
+    expect(refusal({ studioPhone: '01012345678', bankBalance: '9' })).toEqual({ field: null, code: 'malformed' });
   });
 
-  it.each([42, true, {}, ['x'], undefined, 'x'.repeat(301)])('refuses %j on its field', (bad) => {
-    expect(refusal({ bankName: bad })).toEqual({ field: 'bankName', code: 'invalid' });
+  it.each([42, true, {}, ['x'], undefined])('refuses %j, a value no box can hold, as malformed', (bad) => {
+    expect(refusal({ bankName: bad })).toEqual({ field: null, code: 'malformed' });
+  });
+
+  it('refuses a pasted wall of text under its field with the field cap', () => {
+    expect(normalizeClientPageChanges({ bankName: 'x'.repeat(301) })).toEqual({
+      ok: false,
+      errors: { bankName: { code: 'too_long', params: { max: 120 } } },
+    });
+  });
+
+  it('names every refused field at once (D1)', () => {
+    expect(normalizeClientPageChanges({ studioPhone: '12', bankIban: 'EG38', bankName: 'a' })).toEqual({
+      ok: false,
+      errors: {
+        studioPhone: { code: 'phone_invalid' },
+        bankName: { code: 'too_short', params: { min: 2 } },
+        bankIban: { code: 'iban_invalid' },
+      },
+    });
   });
 });
 
@@ -110,8 +134,8 @@ describe('normalizeClientPageChanges: bank and InstaPay', () => {
   it('stores an account number without spaces, and refuses one without a digit', () => {
     expect(saved({ bankAccountNumber: ' 1234 5678-90 ' }).bankAccountNumber).toBe('12345678-90');
     expect(saved({ bankAccountNumber: '١٢٣٤٥' }).bankAccountNumber).toBe('12345');
-    expect(refusal({ bankAccountNumber: 'ABCD' })).toEqual({ field: 'bankAccountNumber', code: 'invalid' });
-    expect(refusal({ bankAccountNumber: '12/34' })).toEqual({ field: 'bankAccountNumber', code: 'invalid' });
+    expect(refusal({ bankAccountNumber: 'ABCD' })).toEqual({ field: 'bankAccountNumber', code: 'account_number_invalid' });
+    expect(refusal({ bankAccountNumber: '12/34' })).toEqual({ field: 'bankAccountNumber', code: 'account_number_invalid' });
   });
 
   it('strips the invisible marks a pasted Arabic name carries, and trims', () => {
@@ -139,10 +163,10 @@ describe('normalizeClientPageChanges: bank and InstaPay', () => {
   it('holds the database length bounds, in characters', () => {
     expect(saved({ bankName: 'ab' }).bankName).toBe('ab');
     expect(saved({ bankName: 'ب'.repeat(120) }).bankName).toHaveLength(120);
-    expect(refusal({ bankName: 'a' })).toEqual({ field: 'bankName', code: 'invalid' });
-    expect(refusal({ bankAccountHolder: 'x'.repeat(121) })).toEqual({ field: 'bankAccountHolder', code: 'invalid' });
+    expect(refusal({ bankName: 'a' })).toEqual({ field: 'bankName', code: 'too_short' });
+    expect(refusal({ bankAccountHolder: 'x'.repeat(121) })).toEqual({ field: 'bankAccountHolder', code: 'too_long' });
     expect(saved({ instapayAddress: 'abc' }).instapayAddress).toBe('abc');
-    expect(refusal({ instapayAddress: 'ab' })).toEqual({ field: 'instapayAddress', code: 'invalid' });
+    expect(refusal({ instapayAddress: 'ab' })).toEqual({ field: 'instapayAddress', code: 'too_short' });
     expect(saved({ instapayAddress: '😀'.repeat(60) }).instapayAddress).toBe('😀'.repeat(60));
   });
 });
@@ -166,7 +190,7 @@ describe('normalizeClientPageChanges: printable text only (F8)', () => {
     ['a combining mark on its own', cp(0x651, 0x651, 0x651)],
   ])('refuses %s, with a field error', (_label, value) => {
     for (const field of ['bankName', 'bankAccountHolder', 'instapayAddress'] as const) {
-      expect(refusal({ [field]: value }), field).toEqual({ field, code: 'invalid' });
+      expect(refusal({ [field]: value }), field).toEqual({ field, code: 'unprintable' });
     }
   });
 
@@ -185,13 +209,10 @@ describe('detailsAfter', () => {
   });
 
   it('asks for the bank name when a number or an IBAN would be left without one', () => {
-    expect(detailsAfter(NONE, { bankAccountNumber: '12345678' })).toEqual({
-      ok: false,
-      field: 'bankName',
-      code: 'bank_name_required',
-    });
+    const bankNameRequired = { ok: false, errors: { bankName: { code: 'bank_name_required' } } };
+    expect(detailsAfter(NONE, { bankAccountNumber: '12345678' })).toEqual(bankNameRequired);
     const stored = { ...NONE, bankName: 'CIB', bankIban: 'EG380019000500000000263180002' };
-    expect(detailsAfter(stored, { bankName: null })).toMatchObject({ ok: false, field: 'bankName' });
+    expect(detailsAfter(stored, { bankName: null })).toEqual(bankNameRequired);
   });
 });
 

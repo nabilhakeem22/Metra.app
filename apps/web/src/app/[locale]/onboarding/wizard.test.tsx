@@ -1,6 +1,9 @@
 import { act, fireEvent, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
+import type { ActionResult } from '@/lib/actions/result';
+import { expectFieldErrorsRenderUnderFields } from '@/test/field-coverage';
 import { messageAt, renderWithIntl, type TestLocale } from '@/test/render-with-intl';
+import { ONBOARDING_FIELDS } from './profile-field-limits';
 import { OnboardingWizard } from './wizard';
 
 const actions = vi.hoisted(() => ({
@@ -52,21 +55,42 @@ describe('the one-screen onboarding', () => {
     expect(router.push).toHaveBeenCalledWith('/dashboard');
   });
 
-  test('without a name it asks for one under the form and sends nothing', () => {
+  test('without a name it asks for one under the first name, marks both, and sends nothing', () => {
     renderWithIntl(<OnboardingWizard />, { locale: 'en' });
     fireEvent.submit(form());
-    expect(screen.getByRole('alert').textContent).toBe(messageAt('en', 'onboarding.errorRequired'));
+    expect(document.getElementById('nameAr-error')?.textContent).toBe(messageAt('en', 'errors.name_required'));
+    expect(document.getElementById('nameEn')?.getAttribute('aria-describedby')).toContain('nameAr-error');
+    expect(document.activeElement?.id).toBe('nameAr');
+    expect(screen.queryByRole('alert')).toBeNull();
     expect(actions.createOrg).not.toHaveBeenCalled();
   });
 
-  test('a refusal renders under the form and the studio stays on the page', async () => {
-    actions.createOrg.mockResolvedValue({ ok: false, error: 'name_required' });
+  test('every field the server refuses is said under its own control (AC 19)', async () => {
+    renderWithIntl(<OnboardingWizard />, { locale: 'ar-EG' });
+    fireEvent.change(document.getElementById('nameAr')!, { target: { value: 'النيل' } });
+    await expectFieldErrorsRenderUnderFields({
+      fields: ONBOARDING_FIELDS,
+      controlIdOf: (field) => (field === 'name' ? 'nameAr' : field),
+      answerWith: (result: ActionResult) => actions.createOrg.mockResolvedValue(result),
+      submit: async () => {
+        await act(async () => {
+          fireEvent.submit(form('ar-EG'));
+        });
+      },
+      locale: 'ar-EG',
+      typed: { nameAr: 'النيل' },
+    });
+    expect(router.push).not.toHaveBeenCalled();
+  });
+
+  test('a refusal no field owns is said under the form and the studio stays on the page', async () => {
+    actions.createOrg.mockResolvedValue({ ok: false, error: 'firm_type_unavailable' });
     renderWithIntl(<OnboardingWizard />, { locale: 'ar-EG' });
     fireEvent.change(document.getElementById('nameEn')!, { target: { value: 'Nile' } });
     await act(async () => {
       fireEvent.submit(form('ar-EG'));
     });
-    expect(screen.getByRole('alert').textContent).toBe(messageAt('ar-EG', 'errors.name_required'));
+    expect(screen.getByRole('alert').textContent).toBe(messageAt('ar-EG', 'errors.firm_type_unavailable'));
     expect(router.push).not.toHaveBeenCalled();
   });
 
@@ -87,6 +111,8 @@ describe('the one-screen onboarding', () => {
       fireEvent.submit(form());
     });
     expect(actions.createOrg).not.toHaveBeenCalled();
-    expect(screen.getByText(messageAt('en', 'onboarding.tooLong').replace('{max}', '200'))).toBeTruthy();
+    expect(document.getElementById('nameAr-error')?.textContent).toBe(
+      messageAt('en', 'errors.field.too_long').replace('{max}', '200'),
+    );
   });
 });

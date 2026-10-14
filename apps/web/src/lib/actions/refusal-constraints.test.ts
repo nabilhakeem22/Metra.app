@@ -50,54 +50,61 @@ function arrayLiteralOf(node: ts.Expression): ts.ArrayLiteralExpression | undefi
   return ts.isArrayLiteralExpression(node) ? node : undefined;
 }
 
-/** A file's `const NAME = [...]`, so `refusals: NAME` is checked like an inline list. */
-function arrayConstants(file: ts.SourceFile): Map<string, ts.ArrayLiteralExpression> {
-  const arrays = new Map<string, ts.ArrayLiteralExpression>();
-  const visit = (node: ts.Node): void => {
-    if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && node.initializer) {
-      const array = arrayLiteralOf(node.initializer);
-      if (array) arrays.set(node.name.text, array);
-    }
-    ts.forEachChild(node, visit);
-  };
-  visit(file);
-  return arrays;
-}
+interface DeclaredArray { array: ts.ArrayLiteralExpression; path: string; file: ts.SourceFile }
 
-function refusalList(
-  initializer: ts.Expression,
-  arrays: Map<string, ts.ArrayLiteralExpression>,
-): ts.ArrayLiteralExpression | undefined {
-  return ts.isIdentifier(initializer) ? arrays.get(initializer.text) : arrayLiteralOf(initializer);
-}
-
-function refusalConstraints(): NamedConstraint[] {
-  const constants = stringConstants();
-  const found: NamedConstraint[] = [];
+/** Every `const NAME = [...]` in the app, so `refusals: NAME` is checked like an
+ *  inline list, also when NAME is imported from another module. */
+function arrayConstants(): Map<string, DeclaredArray> {
+  const arrays = new Map<string, DeclaredArray>();
   for (const { path, file } of parsed) {
-    const arrays = arrayConstants(file);
     const visit = (node: ts.Node): void => {
-      const list =
-        ts.isPropertyAssignment(node) && node.name.getText(file) === 'refusals'
-          ? refusalList(node.initializer, arrays)
-          : undefined;
-      if (list) {
-        for (const entry of list.elements) {
-          const constraint = ts.isObjectLiteralExpression(entry)
-            ? entry.properties.find((p) => p.name?.getText(file) === 'constraint')
-            : undefined;
-          const value = constraint && ts.isPropertyAssignment(constraint) ? constraint.initializer : undefined;
-          const where = `${relative(SRC, path)}:${file.getLineAndCharacterOfPosition(entry.getStart()).line + 1}`;
-          if (value && ts.isStringLiteral(value)) found.push({ where, name: value.text });
-          else if (value && ts.isIdentifier(value)) found.push({ where, name: constants.get(value.text) ?? null });
-          else found.push({ where, name: null });
-        }
+      if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && node.initializer) {
+        const array = arrayLiteralOf(node.initializer);
+        if (array) arrays.set(node.name.text, { array, path, file });
       }
       ts.forEachChild(node, visit);
     };
     visit(file);
   }
-  return found;
+  return arrays;
+}
+
+function refusalList(
+  initializer: ts.Expression,
+  arrays: Map<string, DeclaredArray>,
+  here: { path: string; file: ts.SourceFile },
+): DeclaredArray | undefined {
+  if (ts.isIdentifier(initializer)) return arrays.get(initializer.text);
+  const array = arrayLiteralOf(initializer);
+  return array ? { array, ...here } : undefined;
+}
+
+function refusalConstraints(): NamedConstraint[] {
+  const constants = stringConstants();
+  const arrays = arrayConstants();
+  // Keyed by where the entry is written: a list passed by two mutations is checked once.
+  const found = new Map<string, NamedConstraint>();
+  for (const { path, file } of parsed) {
+    const visit = (node: ts.Node): void => {
+      const list =
+        ts.isPropertyAssignment(node) && node.name.getText(file) === 'refusals'
+          ? refusalList(node.initializer, arrays, { path, file })
+          : undefined;
+      for (const entry of list?.array.elements ?? []) {
+        const constraint = ts.isObjectLiteralExpression(entry)
+          ? entry.properties.find((p) => p.name?.getText(list!.file) === 'constraint')
+          : undefined;
+        const value = constraint && ts.isPropertyAssignment(constraint) ? constraint.initializer : undefined;
+        const where = `${relative(SRC, list!.path)}:${list!.file.getLineAndCharacterOfPosition(entry.getStart()).line + 1}`;
+        if (value && ts.isStringLiteral(value)) found.set(where, { where, name: value.text });
+        else if (value && ts.isIdentifier(value)) found.set(where, { where, name: constants.get(value.text) ?? null });
+        else found.set(where, { where, name: null });
+      }
+      ts.forEachChild(node, visit);
+    };
+    visit(file);
+  }
+  return [...found.values()];
 }
 
 const migrationText = readdirSync(MIGRATIONS)
@@ -108,8 +115,11 @@ const migrationText = readdirSync(MIGRATIONS)
 describe('every refusals constraint exists in a migration (AC 34)', () => {
   const constraints = refusalConstraints();
 
-  it('finds the refusals it is meant to guard', () => {
-    expect(constraints.length).toBeGreaterThanOrEqual(3);
+  it('finds the refusals it is meant to guard, inline and imported', () => {
+    const names = constraints.map((constraint) => constraint.name);
+    for (const known of ['contracts_org_id_source_proposal_unique', 'projects_org_id_code_unique', 'clients_advance_pct_range']) {
+      expect(names).toContain(known);
+    }
   });
 
   it.each(constraints.map((c) => [c.where, c.name] as const))('%s names %s', (where, name) => {

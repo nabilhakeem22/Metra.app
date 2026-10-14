@@ -2,87 +2,62 @@
 
 import { Copy, Loader2, Send } from 'lucide-react';
 import { useTranslations } from 'next-intl';
+import { useRef } from 'react';
 import { Button } from '@/components/ui/button';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { FieldHint } from '@/components/ui/field-hint';
+import { FormField } from '@/components/ui/form-field';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useFocusFirstInvalid } from '@/hooks/use-focus-first-invalid';
 import type { MemberRole } from '@/lib/permissions/roles';
 import { INVITABLE_ROLES } from '@/lib/team/invitable';
+import type { useInviteForm } from './use-invite-form';
 
+/** The invite card. Send stays enabled (except while sending): pressing it is
+ *  how a missing or malformed address is explained, under Email. */
 export function TeamInviteForm({
-  email,
-  onEmailChange,
-  inviteRole,
-  onInviteRoleChange,
+  invite,
   lastLink,
-  isPending,
-  onSubmit,
   onCopy,
 }: {
-  email: string;
-  onEmailChange: (value: string) => void;
-  inviteRole: MemberRole;
-  onInviteRoleChange: (role: MemberRole) => void;
+  invite: ReturnType<typeof useInviteForm>;
   lastLink: string | null;
-  isPending: boolean;
-  onSubmit: () => void;
   onCopy: (link: string) => void;
 }) {
   const t = useTranslations('team');
   const th = useTranslations('hints.team');
   const roles = useTranslations('roles');
+  const fieldsRef = useRef<HTMLDivElement>(null);
+  useFocusFirstInvalid(fieldsRef, invite.errors.invalidAttempt);
 
   return (
     <Card>
       <CardHeader>
         <CardTitle>{t('inviteTitle')}</CardTitle>
-        <CardDescription>{roles(`${inviteRole}.desc`)}</CardDescription>
+        <CardDescription>{roles(`${invite.role}.desc`)}</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
-          <div className="flex-1 space-y-2">
-            <Label htmlFor="inviteEmail" className="flex items-center">
-              {t('emailLabel')}
-              <FieldHint id="inviteEmail-hint" hint={th('email')} />
-            </Label>
-            <Input
-              id="inviteEmail"
-              type="email"
-              dir="ltr"
-              aria-describedby="inviteEmail-hint"
-              placeholder={t('emailPlaceholder')}
-              value={email}
-              onChange={(e) => onEmailChange(e.target.value)}
-            />
+        <div ref={fieldsRef} className="flex flex-col gap-3 sm:flex-row sm:items-start">
+          <div className="flex-1">
+            <FormField id="inviteEmail" label={t('emailLabel')} hint={th('email')} {...invite.errors.bind('email')}>
+              <Input
+                type="email"
+                dir="ltr"
+                placeholder={t('emailPlaceholder')}
+                value={invite.email}
+                onChange={(e) => invite.setEmail(e.target.value)}
+              />
+            </FormField>
           </div>
           <div className="space-y-2">
             <Label htmlFor="inviteRole" className="flex items-center">
               {t('roleLabel')}
               <FieldHint id="inviteRole-hint" hint={th('role')} />
             </Label>
-            <Select
-              value={inviteRole}
-              onValueChange={(v) => onInviteRoleChange(v as MemberRole)}
-            >
-              <SelectTrigger
-                id="inviteRole"
-                aria-describedby="inviteRole-hint"
-                className="w-full sm:w-48"
-              >
+            <Select value={invite.role} onValueChange={(v) => invite.setRole(v as MemberRole)}>
+              <SelectTrigger id="inviteRole" aria-describedby="inviteRole-hint" className="w-full sm:w-48">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -94,8 +69,8 @@ export function TeamInviteForm({
               </SelectContent>
             </Select>
           </div>
-          <Button variant="default" onClick={onSubmit} disabled={isPending || email.trim() === ''}>
-            {isPending ? (
+          <Button variant="default" className="sm:mt-7" onClick={invite.send} disabled={invite.sending}>
+            {invite.sending ? (
               <Loader2 className="size-4 animate-spin" aria-hidden />
             ) : (
               <Send className="size-4" aria-hidden />
@@ -103,12 +78,15 @@ export function TeamInviteForm({
             {t('sendInvite')}
           </Button>
         </div>
+        {invite.errors.formError && (
+          <p className="text-body text-destructive" role="alert">
+            {invite.errors.formError}
+          </p>
+        )}
 
         {lastLink && (
           <div className="space-y-1 rounded-item border bg-muted/40 p-3">
-            <p className="text-caption font-medium text-muted-foreground">
-              {t('inviteLink')}
-            </p>
+            <p className="text-caption font-medium text-muted-foreground">{t('inviteLink')}</p>
             <div className="flex items-center gap-2">
               <Input readOnly dir="ltr" value={lastLink} />
               <Button

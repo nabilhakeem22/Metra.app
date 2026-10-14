@@ -20,12 +20,12 @@ describe('logoRefusal (S3)', () => {
     ['no name', undefined, 'image/png'],
     ['no type', 'logo.png', undefined],
   ])('%s is refused as invalid', (_label, originalName, contentType) => {
-    expect(logoRefusal({ originalName, contentType })).toBe('invalid');
+    expect(logoRefusal({ originalName, contentType })).toBe('logo_image_unsupported');
   });
 
   it('a logo over 2 MB is too large; an empty one is invalid', () => {
     expect(logoRefusal({ originalName: 'logo.png', contentType: 'image/png', size: LOGO_MAX_BYTES + 1 })).toBe('file_too_large');
-    expect(logoRefusal({ originalName: 'logo.png', contentType: 'image/png', size: 0 })).toBe('invalid');
+    expect(logoRefusal({ originalName: 'logo.png', contentType: 'image/png', size: 0 })).toBe('logo_image_unsupported');
   });
 });
 

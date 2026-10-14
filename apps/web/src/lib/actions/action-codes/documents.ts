@@ -3,6 +3,8 @@
 // The full union is `ActionCode` in `lib/actions/result.ts`.
 export type DocumentActionCode =
   | 'proposal_not_draft'
+  // Storage could not take or describe a file; nothing was attached.
+  | 'storage_unavailable'
   // The proposal builder (proposals/core/draft-save*.ts, the autosave hook).
   | 'draft_changed_elsewhere'
   | 'draft_too_large'

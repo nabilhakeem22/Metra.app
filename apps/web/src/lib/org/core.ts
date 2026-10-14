@@ -16,39 +16,19 @@ import {
   workspaceEntitlements,
 } from '@metra/db';
 import { sql } from 'drizzle-orm';
+import { fieldsFailed } from '@/lib/actions/field-errors';
 import { mutateInOrg } from '@/lib/actions/mutate';
 import { err, type ActionResult } from '@/lib/actions/result';
 import type { OrgContext } from '@/lib/db/context';
 import { FLOWS } from '@/lib/entitlements/flows';
 import { firmTypeDef, type FirmTypeKey } from '@/lib/entitlements/firm-types';
-import { clean } from '@/lib/validation/text';
-import { ORG_PROFILE_LIMITS } from './profile-limits';
+import { readOrgProfile, type OrgProfileText } from './profile-field-rules';
 
-export interface OrgProfileInput {
-  nameEn?: string | null;
-  nameAr?: string | null;
-  city?: string | null;
-  taxRegistrationNumber?: string | null;
+export interface OrgProfileInput extends OrgProfileText {
   // The chosen firm-type preset (Epic B1). Resolves server-side to the
   // workspace's enabled_flows set — the client NEVER supplies a raw flow array.
   // Defaults to 'interior' so existing callers keep their behaviour.
   firmType?: FirmTypeKey;
-}
-
-// Cap user-supplied text at the boundary (defense-in-depth): ./profile-limits.ts.
-
-export function profileWithinLimits(
-  nameEn: string | null,
-  nameAr: string | null,
-  city: string | null,
-  tax: string | null,
-): boolean {
-  return (
-    (nameEn?.length ?? 0) <= ORG_PROFILE_LIMITS.name &&
-    (nameAr?.length ?? 0) <= ORG_PROFILE_LIMITS.name &&
-    (city?.length ?? 0) <= ORG_PROFILE_LIMITS.city &&
-    (tax?.length ?? 0) <= ORG_PROFILE_LIMITS.taxReg
-  );
 }
 
 /**
@@ -59,14 +39,10 @@ export async function createOrgCore(
   ctx: OrgContext,
   input: OrgProfileInput,
 ): Promise<ActionResult> {
-  const nameEn = clean(input.nameEn);
-  const nameAr = clean(input.nameAr);
-  if (!nameEn && !nameAr) return err('name_required');
-  const city = clean(input.city);
-  const taxRegistrationNumber = clean(input.taxRegistrationNumber);
-  if (!profileWithinLimits(nameEn, nameAr, city, taxRegistrationNumber)) {
-    return err('invalid');
-  }
+  // Every text cap and the either-or name, each under its own field.
+  const profile = readOrgProfile(input);
+  if (!profile.ok) return fieldsFailed(profile.errors);
+  const { nameEn, nameAr, city, taxRegistrationNumber } = profile.values;
 
   // Resolve + validate the firm type SERVER-SIDE (defense-in-depth: the action is
   // directly invokable, so a hidden/disabled UI option is not a gate). We only

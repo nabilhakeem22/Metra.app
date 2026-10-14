@@ -17,6 +17,11 @@ export const ACTION_CODE_PROBLEM: Record<ActionCode, ApiProblemKind> = {
   check_fields: 'bad-request',
   // A deadlock: another write held what this one needed. Repeat after a refresh.
   busy: 'conflict',
+  malformed: 'bad-request',
+  record_not_found: 'not-found',
+  logo_image_unsupported: 'bad-request',
+  // Storage failed under us: the server's side, and the file may still land.
+  storage_unavailable: 'internal',
   name_required: 'bad-request',
   phone_required: 'bad-request',
   start_date_required: 'bad-request',
@@ -134,6 +139,7 @@ export const ACTION_CODE_PROBLEM: Record<ActionCode, ApiProblemKind> = {
   whatsapp_invalid: 'bad-request',
   iban_invalid: 'bad-request',
   bank_name_required: 'bad-request',
+  account_number_invalid: 'bad-request',
   // The database's own owner/admin gate (MT120) refused the write.
   client_page_details_owner_only: 'forbidden',
   client_page_details_stale: 'conflict',

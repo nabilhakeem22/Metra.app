@@ -101,15 +101,15 @@ describe('documents: the upload gate', () => {
 
   it('lets an operational role through the capability gate', async () => {
     // A site_engineer holds client_activity:create, so the refusal it gets for a
-    // FORGED parent id is `invalid` — proving the capability check passed and the
-    // parent lookup is what refused.
+    // FORGED parent id is `record_not_found` — proving the capability check passed
+    // and the parent lookup is what refused.
     const { orgId, memberIds } = await seedOrgWithParents();
     const engineer = ctxFor(orgId, memberIds[0], 'site_engineer');
     expect(
       await createDocumentUploadCore(engineer, DOCUMENT_ENTITIES.client, {
         parentId: randomUUID(),
       }),
-    ).toEqual({ ok: false, error: 'invalid' });
+    ).toEqual({ ok: false, error: 'record_not_found' });
   });
 
   it('refuses a parent id that is not a uuid, before any query', async () => {
@@ -118,7 +118,7 @@ describe('documents: the upload gate', () => {
       await createDocumentUploadCore(ctx, DOCUMENT_ENTITIES.client, {
         parentId: 'not-a-uuid',
       }),
-    ).toEqual({ ok: false, error: 'invalid' });
+    ).toEqual({ ok: false, error: 'malformed' });
   });
 
   it('refuses a parent that belongs to ANOTHER org', async () => {
@@ -130,7 +130,7 @@ describe('documents: the upload gate', () => {
       await createDocumentUploadCore(mine.ctx, DOCUMENT_ENTITIES.client, {
         parentId: theirs.clientId,
       }),
-    ).toEqual({ ok: false, error: 'invalid' });
+    ).toEqual({ ok: false, error: 'record_not_found' });
   });
 
   it('refuses a parent of the WRONG entity — a project id is not a client', async () => {
@@ -139,7 +139,7 @@ describe('documents: the upload gate', () => {
       await createDocumentUploadCore(ctx, DOCUMENT_ENTITIES.client, {
         parentId: projectId,
       }),
-    ).toEqual({ ok: false, error: 'invalid' });
+    ).toEqual({ ok: false, error: 'record_not_found' });
   });
 
   it('refuses a category id from another org', async () => {
@@ -149,7 +149,7 @@ describe('documents: the upload gate', () => {
         parentId: clientId,
         categoryId: randomUUID(),
       }),
-    ).toEqual({ ok: false, error: 'invalid' });
+    ).toEqual({ ok: false, error: 'check_fields', fields: { categoryId: { code: 'no_longer_exists' } } });
   });
 });
 
@@ -188,7 +188,7 @@ describe('documents: the cross-entity guard', () => {
     const projectFile = await seedFile(orgId, 'project', projectId);
     expect(
       await deleteDocumentCore(ctx, DOCUMENT_ENTITIES.client, projectFile),
-    ).toEqual({ ok: false, error: 'invalid' });
+    ).toEqual({ ok: false, error: 'record_not_found' });
     // And it is still there.
     expect(
       await raw.query(`select id from public.files where id = '${projectFile}'`),
@@ -203,7 +203,7 @@ describe('documents: the cross-entity guard', () => {
     const clientFile = await seedFile(orgId, 'client', clientId);
     expect(
       await deleteDocumentCore(ctx, DOCUMENT_ENTITIES.project, clientFile),
-    ).toEqual({ ok: false, error: 'invalid' });
+    ).toEqual({ ok: false, error: 'record_not_found' });
     expect(
       await raw.query(`select id from public.files where id = '${clientFile}'`),
     ).toHaveLength(1);
@@ -218,7 +218,7 @@ describe('documents: the cross-entity guard', () => {
     const projectFile = await seedFile(orgId, 'project', projectId);
     expect(
       await getDocumentUrlCore(ctx, DOCUMENT_ENTITIES.client, projectFile),
-    ).toEqual({ ok: false, error: 'invalid' });
+    ).toEqual({ ok: false, error: 'record_not_found' });
   });
 
   it('refuses a file id from another org to the URL mint', async () => {
@@ -227,7 +227,7 @@ describe('documents: the cross-entity guard', () => {
     const theirFile = await seedFile(theirs.orgId, 'client', theirs.clientId);
     expect(
       await getDocumentUrlCore(mine.ctx, DOCUMENT_ENTITIES.client, theirFile),
-    ).toEqual({ ok: false, error: 'invalid' });
+    ).toEqual({ ok: false, error: 'record_not_found' });
   });
 
   it('refuses the URL mint to a role without the entity READ capability', async () => {
@@ -249,7 +249,7 @@ describe('documents: delete', () => {
     const theirFile = await seedFile(theirs.orgId, 'client', theirs.clientId);
     expect(
       await deleteDocumentCore(mine.ctx, DOCUMENT_ENTITIES.client, theirFile),
-    ).toEqual({ ok: false, error: 'invalid' });
+    ).toEqual({ ok: false, error: 'record_not_found' });
     expect(
       await raw.query(`select id from public.files where id = '${theirFile}'`),
     ).toHaveLength(1);
@@ -291,7 +291,7 @@ describe('documents: delete', () => {
     );
     expect(
       await deleteDocumentCore(ctx, DOCUMENT_ENTITIES.client, file),
-    ).toEqual({ ok: false, error: 'invalid' });
+    ).toEqual({ ok: false, error: 'record_not_found' });
     // Still exactly one audit row: the refused second call wrote nothing.
     expect(await auditRowsFor(orgId, file)).toHaveLength(1);
   });

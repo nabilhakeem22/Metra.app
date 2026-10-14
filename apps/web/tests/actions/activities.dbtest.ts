@@ -35,14 +35,14 @@ const roleOf = async (orgId: string, uid: string) =>
   (await raw.memberships(orgId)).find((m) => m.user_id === uid)!.role as MemberRole;
 
 describe('addActivityCore — validation', () => {
-  it('a note without text -> invalid', async () => {
+  it('a note without text is refused under the note', async () => {
     const { ctx, clientId } = await setupClient();
     expect(
       await addActivityCore(ctx, { entityType: 'client', entityId: clientId, kind: 'note', note: '   ' }),
-    ).toEqual({ ok: false, error: 'invalid' });
+    ).toEqual({ ok: false, error: 'check_fields', fields: { note: { code: 'required' } } });
   });
 
-  it('an entity_id not in this org -> invalid (loads the parent first)', async () => {
+  it('an entity_id not in this org -> record_not_found (loads the parent first)', async () => {
     const { ctx } = await setupClient();
     expect(
       await addActivityCore(ctx, {
@@ -50,7 +50,7 @@ describe('addActivityCore — validation', () => {
         entityId: randomUUID(),
         note: 'hello',
       }),
-    ).toEqual({ ok: false, error: 'invalid' });
+    ).toEqual({ ok: false, error: 'record_not_found' });
   });
 
   it('a valid note is recorded with actorUserId', async () => {

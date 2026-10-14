@@ -1,23 +1,16 @@
 'use client';
 
 import type { useTranslations } from 'next-intl';
+import { fieldErrorId } from '@/components/ui/field-error-text';
 import { FormField } from '@/components/ui/form-field';
 import { Input } from '@/components/ui/input';
 import { SelectControl } from '@/components/ui/select-control';
 import { pickLocale } from '@/lib/i18n/pick-locale';
 import { PROJECT_STATUSES } from '@/lib/projects/statuses';
+import { projectControlId, type ProjectFieldBinding } from './project-form-controls';
 import { ProjectScheduleFields } from './project-form-schedule';
 import type { ProjectFormState } from './project-form-state';
 import type { ClientOption } from './types';
-
-/** A refusal resolved to text, under the field it is about. */
-export interface ProjectFieldErrors {
-  name?: string;
-  code?: string;
-  client?: string;
-  startDate?: string;
-  endDate?: string;
-}
 
 // The project field groups (code · names · client · status; the dates and the
 // location are `project-form-schedule.tsx`). All
@@ -30,7 +23,7 @@ export function ProjectFormFields({
   form,
   set,
   clientOptions,
-  errors,
+  bind,
 }: {
   t: ReturnType<typeof useTranslations<'projects'>>;
   th: ReturnType<typeof useTranslations<'hints.project'>>;
@@ -38,8 +31,14 @@ export function ProjectFormFields({
   form: ProjectFormState;
   set: (k: Exclude<keyof ProjectFormState, 'locationEdited'>) => (v: string) => void;
   clientOptions: ClientOption[];
-  errors: ProjectFieldErrors;
+  /** The refusal under each field, and the edit that clears it. */
+  bind: ProjectFieldBinding;
 }) {
+  // One name is enough, so a missing name is said once, under the first, and
+  // marks both; typing in either clears it.
+  const pair = bind('name');
+  const nameEn = bind('nameEn');
+  const nameAr = bind('nameAr');
   return (
     <>
       {/* The code is AUTO-GENERATED (P-YYYY-NNNN) when the project is created, so
@@ -47,22 +46,38 @@ export function ProjectFormFields({
           existing one it is shown read-only, because it is the reference people
           have already quoted in emails and on drawings. */}
       {form.code && (
-        <FormField id="pr-code" label={t('form.code')} error={errors.code}>
+        <FormField id={projectControlId('code')} label={t('form.code')} {...bind('code')}>
           <Input dir="ltr" value={form.code} readOnly disabled />
         </FormField>
       )}
 
-      {/* One name is enough, so a missing name is said once, under the first,
-          and marks both. */}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <FormField id="pr-nameEn" label={t('form.nameEn')} hint={th('name')} error={errors.name}>
+        <FormField
+          id={projectControlId('nameEn')}
+          label={t('form.nameEn')}
+          hint={th('name')}
+          error={pair.error ?? nameEn.error}
+          onEdit={() => {
+            nameEn.onEdit();
+            pair.onEdit();
+          }}
+        >
           <Input dir="ltr" value={form.nameEn} onChange={(e) => set('nameEn')(e.target.value)} />
         </FormField>
-        <FormField id="pr-nameAr" label={t('form.nameAr')} hint={th('name')}>
+        <FormField
+          id={projectControlId('nameAr')}
+          label={t('form.nameAr')}
+          hint={th('name')}
+          error={nameAr.error}
+          onEdit={() => {
+            nameAr.onEdit();
+            pair.onEdit();
+          }}
+        >
           <Input
             dir="rtl"
-            aria-invalid={errors.name ? true : undefined}
-            aria-describedby={errors.name ? 'pr-nameEn-error' : undefined}
+            aria-invalid={pair.error ? true : undefined}
+            aria-describedby={pair.error ? fieldErrorId(projectControlId('name')) : undefined}
             value={form.nameAr}
             onChange={(e) => set('nameAr')(e.target.value)}
           />
@@ -70,11 +85,11 @@ export function ProjectFormFields({
       </div>
 
       <FormField
-        id="pr-client"
+        id={projectControlId('clientId')}
         label={t('form.client')}
         required
         hint={th('client')}
-        error={errors.client}
+        {...bind('clientId')}
       >
         <SelectControl
           value={form.clientId}
@@ -98,7 +113,7 @@ export function ProjectFormFields({
         </FormField>
       )}
 
-      <ProjectScheduleFields t={t} form={form} set={set} errors={errors} />
+      <ProjectScheduleFields t={t} form={form} set={set} bind={bind} />
     </>
   );
 }

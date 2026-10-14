@@ -1,17 +1,13 @@
 'use client';
 
-import { useLocale, useTranslations } from 'next-intl';
-import { useState, useTransition } from 'react';
-import type { ProjectStatus } from '@metra/db';
+import { useTranslations } from 'next-intl';
+import { useRef } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
-import { toast } from '@/hooks/use-toast';
-import { useRouter } from '@/i18n/routing';
-import { resolveActionError } from '@/lib/actions/error-message';
-import type { ActionCode } from '@/lib/actions/result';
-import { addProjectType } from '@/lib/project-types/actions';
-import { updateProject } from '@/lib/projects/actions';
+import { useFocusFirstInvalid } from '@/hooks/use-focus-first-invalid';
 import type { ProjectWithType } from '@/lib/projects/queries';
 import { DetailsFields } from './details-fields';
+import { useAddProjectType } from './use-add-project-type';
+import { useProjectDetailsForm } from './use-project-details-form';
 
 export interface DetailsOption {
   id: string;
@@ -19,20 +15,8 @@ export interface DetailsOption {
   nameAr: string | null;
 }
 
-export interface FormState {
-  code: string;
-  nameEn: string;
-  nameAr: string;
-  clientId: string;
-  typeId: string;
-  status: ProjectStatus;
-  description: string;
-  city: string;
-  country: string;
-  address: string;
-  notes: string;
-}
-
+/** The project's Details tab: its fields, Save, and the add-a-type box, each
+ *  refusal said under the box it is about. */
 export function DetailsTab({
   project,
   clientOptions,
@@ -45,100 +29,21 @@ export function DetailsTab({
   canManage: boolean;
 }) {
   const t = useTranslations('projects');
-  const tp = useTranslations('projects.profile.details');
-  const th = useTranslations('hints.project');
-  const te = useTranslations('errors');
-  const locale = useLocale();
-  const router = useRouter();
-  const [pending, startTransition] = useTransition();
-  const [newType, setNewType] = useState('');
-  const [form, setForm] = useState<FormState>({
-    code: project.code,
-    nameEn: project.nameEn ?? '',
-    nameAr: project.nameAr ?? '',
-    clientId: project.clientId,
-    typeId: project.typeId ?? '',
-    status: project.status,
-    description: project.description ?? '',
-    city: project.city ?? '',
-    country: project.country ?? '',
-    address: project.address ?? '',
-    notes: project.notes ?? '',
-  });
-
-  const set = (k: keyof FormState) => (v: string) =>
-    setForm((f) => ({ ...f, [k]: v }));
-
-  function onAddType() {
-    const name = newType.trim();
-    if (!name) return;
-    startTransition(async () => {
-      const res = await addProjectType(
-        locale.startsWith('ar') ? { nameAr: name } : { nameEn: name },
-      );
-      if (res.ok) {
-        setNewType('');
-        toast({ title: t('toast.typeAdded') });
-        router.refresh();
-      } else {
-        toast({
-          title: resolveActionError(res.error as ActionCode, te),
-          variant: 'destructive',
-        });
-      }
-    });
-  }
-
-  function submit() {
-    startTransition(async () => {
-      const res = await updateProject({
-        id: project.id,
-        code: form.code,
-        nameEn: form.nameEn || null,
-        nameAr: form.nameAr || null,
-        clientId: form.clientId,
-        typeId: form.typeId || null,
-        status: form.status,
-        description: form.description || null,
-        // advancePct / retentionPct are deliberately ABSENT: they are derived from
-        // the project's contracts and shown on Financials. updateProjectCore leaves
-        // an omitted percentage untouched.
-        startDate: project.startDate,
-        endDate: project.endDate,
-        city: form.city || null,
-        country: form.country || null,
-        address: form.address || null,
-        notes: form.notes || null,
-      });
-      toast(
-        res.ok
-          ? { title: tp('saved') }
-          : {
-              title: resolveActionError(res.error as ActionCode, te),
-              variant: 'destructive',
-            },
-      );
-    });
-  }
+  const details = useProjectDetailsForm(project);
+  const addType = useAddProjectType();
+  const fieldsRef = useRef<HTMLDivElement>(null);
+  useFocusFirstInvalid(fieldsRef, details.errors.invalidAttempt);
 
   return (
     <Card>
-      <CardContent className="space-y-4 py-4">
+      <CardContent ref={fieldsRef} className="space-y-4 py-4">
         <DetailsFields
           t={t}
-          tp={tp}
-          th={th}
-          locale={locale}
-          form={form}
-          set={set}
+          details={details}
+          addType={addType}
           canManage={canManage}
-          pending={pending}
           clientOptions={clientOptions}
           projectTypes={projectTypes}
-          newType={newType}
-          setNewType={setNewType}
-          onAddType={onAddType}
-          submit={submit}
         />
       </CardContent>
     </Card>

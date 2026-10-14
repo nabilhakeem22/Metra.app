@@ -2,6 +2,7 @@ import { act, fireEvent, screen } from '@testing-library/react';
 import { describe, expect, test, vi } from 'vitest';
 import type { ClientContact } from '@metra/db';
 import { messageAt, renderWithIntl } from '@/test/render-with-intl';
+import { fieldsFailed } from '@/lib/actions/field-errors';
 import { ContactsTab } from './contacts-tab';
 
 const actions = vi.hoisted(() => ({
@@ -54,13 +55,15 @@ describe('ContactsTab', () => {
   });
 
   test('a refused name is said under the name, and the sheet stays open', async () => {
-    actions.updateContact.mockResolvedValue({ ok: false, error: 'name_required' });
+    actions.updateContact.mockResolvedValue(fieldsFailed({ name: { code: 'too_long', params: { max: 200 } } }));
     renderTab();
     fireEvent.click(screen.getByRole('button', { name: en('clients.profile.contacts.editTitle') }));
     await act(async () => {
       fireEvent.submit(field('name')!.closest('form')!);
     });
-    expect(document.getElementById('ct-name-error')?.textContent).toBe(en('errors.name_required'));
+    expect(document.getElementById('ct-name-error')?.textContent).toBe(
+      en('errors.field.too_long').replace('{max}', '200'),
+    );
     expect(field('name')?.getAttribute('aria-invalid')).toBe('true');
     expect(screen.getByRole('dialog')).toBeTruthy();
   });

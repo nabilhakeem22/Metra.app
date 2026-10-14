@@ -77,10 +77,11 @@ describe('a constraint the caller named', () => {
     'leaves an UNLISTED %s in the tail: generic, a reference, one whitelisted log line (AC 3)',
     async (code) => {
       const result = await rejectWith(
-        Object.assign(new Error('Failed query: insert ... params: 0100'), {
+        // Lower-case markers: a reference is upper-case Crockford, so it can never contain one.
+        Object.assign(new Error('Failed query: insert ... params: secret-phone'), {
           query: 'insert into cost_items ...',
-          params: ['org', '0100'],
-          cause: { code, constraint_name: 'cost_items_other', detail: 'Key (code)=(X1) exists.' },
+          params: ['org', 'secret-phone'],
+          cause: { code, constraint_name: 'cost_items_other', detail: 'Key (code)=(secret-code) exists.' },
         }),
         COST_ITEM_CODE,
       );
@@ -90,7 +91,7 @@ describe('a constraint the caller named', () => {
       expect(label).toBe('mutateInOrg failed');
       expect(payload.reference).toBe(result.reference);
       const printed = JSON.stringify(payload);
-      for (const leak of ['detail', 'params', 'query', 'X1', '0100']) expect(printed).not.toContain(leak);
+      for (const leak of ['detail', 'params', 'query', 'secret-code', 'secret-phone']) expect(printed).not.toContain(leak);
     },
   );
 });

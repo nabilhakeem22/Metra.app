@@ -50,12 +50,13 @@ export async function setOrgLogo(fileId: string): Promise<ActionResult> {
       .where(eq(files.id, fileId))
       .limit(1),
   );
-  if (!owned) return err('invalid');
+  if (!owned) return err('record_not_found');
 
+  // Storage that cannot describe the object is the restrictive answer: refused.
   const stored = await storedObjectInfo(owned.bucket, owned.objectKey);
   const refusal = stored
     ? logoRefusal({ originalName: owned.originalName, contentType: stored.contentType, size: stored.size ?? 0 })
-    : 'invalid';
+    : 'storage_unavailable';
   if (refusal) {
     await removeStoredObject(owned.bucket, owned.objectKey).catch(() => undefined);
     return err(refusal);

@@ -7,8 +7,10 @@
 import { organizations, type MetraDb } from '@metra/db';
 import { eq } from 'drizzle-orm';
 import { isOwnerOnlyColumnViolation } from '@/lib/actions/db-conflict';
+import { failFields, fieldsFailed } from '@/lib/actions/field-errors';
+import { invariant } from '@/lib/actions/invariant';
 import { fail, mutateInOrg } from '@/lib/actions/mutate';
-import type { ActionResult } from '@/lib/actions/result';
+import { err, type ActionResult } from '@/lib/actions/result';
 import { orgOwnerAdminIds } from '@/lib/automation/due-work';
 import type { OrgContext } from '@/lib/db/context';
 import { insertNotifications } from '@/lib/notifications/core';
@@ -39,8 +41,6 @@ export interface ClientPageDetailsSave {
 }
 
 export type ClientPageDetailsResult = ActionResult & {
-  /** The field a refusal is about, so the card can say it under that field. */
-  field?: ClientPageField;
   /** Set when the change should be emailed: the caller emails these people. */
   data?: { alert: ClientPageAlert | null };
 };
@@ -63,7 +63,8 @@ async function storedDetails(tx: MetraDb, orgId: string) {
     .from(organizations)
     .where(eq(organizations.id, orgId))
     .for('no key update');
-  if (!row) fail('generic');
+  // The org is the caller's own (the RLS context was opened for it).
+  invariant(row, 'client page details: the org row is not visible');
   const { defaultLocale, ...details } = row;
   return { details: details satisfies ClientPageDetails, locale: defaultLocale };
 }
@@ -112,7 +113,7 @@ async function alertOwners(
  * (`users_settings` update, refused before any transaction opens; MT120 is the
  * database's second word on it). Only the sent fields change, and only when
  * the stored values still match the `revision` the sheet loaded (else
- * `client_page_details_stale`). A refusal names its field. Saving what is
+ * `client_page_details_stale`). Every refused field is named at once. Saving what is
  * already stored writes nothing. A change is audited masked and fingerprinted
  * and alerts every owner and admin; `data.alert` lists whom to email.
  */
@@ -123,18 +124,18 @@ export async function updateClientPageDetailsCore(
 ): Promise<ClientPageDetailsResult> {
   // A server action is directly invokable: its argument may be anything.
   const save = (typeof input === 'object' && input !== null ? input : {}) as Partial<ClientPageDetailsSave>;
-  if (typeof save.revision !== 'string') return { ok: false, error: 'invalid' };
+  if (typeof save.revision !== 'string') return err('malformed');
   const normalized = normalizeClientPageChanges(save.changes);
-  if (!normalized.ok) return { ok: false, error: normalized.code, ...(normalized.field ? { field: normalized.field } : {}) };
+  if (!normalized.ok) return 'errors' in normalized ? fieldsFailed(normalized.errors) : err('malformed');
 
-  const result = await mutateInOrg(
+  return mutateInOrg(
     ctx,
     { capability: 'users_settings', action: 'update' },
     async (tx, audit): Promise<{ alert: ClientPageAlert | null }> => {
       const stored = await storedDetails(tx, ctx.orgId);
       if (clientPageRevision(stored.details) !== save.revision) fail('client_page_details_stale');
       const after = detailsAfter(stored.details, normalized.value);
-      if (!after.ok) fail(after.code);
+      if (!after.ok) failFields(after.errors);
       const fields = changedFields(stored.details, after.value);
       if (fields.length === 0) return { alert: null };
 
@@ -148,6 +149,4 @@ export async function updateClientPageDetailsCore(
       return { alert: await alertOwners(tx, ctx, fields, stored.locale, now) };
     },
   );
-  // The one cross-field refusal is always the bank name's.
-  return result.error === 'bank_name_required' ? { ...result, field: 'bankName' } : result;
 }

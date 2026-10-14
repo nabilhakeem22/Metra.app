@@ -56,7 +56,7 @@ describe('createProjectCore — seeds stages + project_created activity', () => 
     const { ctx, clientId } = await setup();
     expect(
       await createProjectCore(ctx, { startDate: '2026-01-01', endDate: '2026-06-30', code: 'BAD-1', nameEn: 'x', clientId, status: 'active', advancePct: '150' }),
-    ).toEqual({ ok: false, error: 'invalid' });
+    ).toEqual({ ok: false, error: 'check_fields', fields: { advancePct: { code: 'invalid_percentage' } } });
 
     const id = await makeProject(ctx, clientId);
     await expect(

@@ -18,7 +18,7 @@ const LOGO_TYPE_BY_EXTENSION: Readonly<Record<string, string>> = {
 /** The accept list for a logo picker, from the same table. */
 export const LOGO_ACCEPT = 'image/png,image/jpeg,image/webp';
 
-export type LogoRefusal = 'invalid' | 'file_too_large';
+export type LogoRefusal = 'logo_image_unsupported' | 'file_too_large';
 
 export interface LogoFacts {
   originalName?: string | null;
@@ -47,8 +47,8 @@ export function hasLogoImageName(originalName: string | null | undefined): boole
 /** Why this logo is refused, or null when it may be used. */
 export function logoRefusal({ originalName, contentType, size }: LogoFacts): LogoRefusal | null {
   const expected = logoTypeOfName(originalName);
-  if (!expected || mediaTypeOf(contentType) !== expected) return 'invalid';
+  if (!expected || mediaTypeOf(contentType) !== expected) return 'logo_image_unsupported';
   if (size === undefined || size === null) return null;
-  if (!Number.isFinite(size) || size <= 0) return 'invalid';
+  if (!Number.isFinite(size) || size <= 0) return 'logo_image_unsupported';
   return size > LOGO_MAX_BYTES ? 'file_too_large' : null;
 }

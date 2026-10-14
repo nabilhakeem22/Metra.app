@@ -51,7 +51,7 @@ describe('upsertSectionCore (create-on-use, idempotent)', () => {
     const ctx = ctxFor(orgId, ownerIds[0], 'owner');
     expect(
       await upsertSectionCore(ctx, { nameEn: '  ', nameAr: '' }),
-    ).toEqual({ ok: false, error: 'name_required' });
+    ).toEqual({ ok: false, error: 'check_fields', fields: { name: { code: 'name_required' } } });
   });
 
   it('forbids a viewer', async () => {

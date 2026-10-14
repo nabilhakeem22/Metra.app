@@ -3,7 +3,7 @@
 import type { useTranslations } from 'next-intl';
 import { FormField } from '@/components/ui/form-field';
 import { Input } from '@/components/ui/input';
-import type { ProjectFieldErrors } from './project-form-fields';
+import { projectControlId, type ProjectFieldBinding } from './project-form-controls';
 import type { ProjectFormState } from './project-form-state';
 
 // When and where: the dates (start required on create, end optional) and the
@@ -12,17 +12,17 @@ export function ProjectScheduleFields({
   t,
   form,
   set,
-  errors,
+  bind,
 }: {
   t: ReturnType<typeof useTranslations<'projects'>>;
   form: ProjectFormState;
   set: (k: Exclude<keyof ProjectFormState, 'locationEdited'>) => (v: string) => void;
-  errors: Pick<ProjectFieldErrors, 'startDate' | 'endDate'>;
+  bind: ProjectFieldBinding;
 }) {
   return (
     <>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <FormField id="pr-start" label={t('form.startDate')} required error={errors.startDate}>
+        <FormField id={projectControlId('startDate')} label={t('form.startDate')} required {...bind('startDate')}>
           <Input
             type="date"
             dir="ltr"
@@ -31,7 +31,7 @@ export function ProjectScheduleFields({
             onChange={(e) => set('startDate')(e.target.value)}
           />
         </FormField>
-        <FormField id="pr-end" label={t('form.endDate')} error={errors.endDate}>
+        <FormField id={projectControlId('endDate')} label={t('form.endDate')} {...bind('endDate')}>
           <Input
             type="date"
             dir="ltr"
@@ -44,10 +44,10 @@ export function ProjectScheduleFields({
       <p className="-mt-2 text-caption text-muted-foreground">{t('form.endDateNote')}</p>
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <FormField id="pr-city" label={t('form.city')}>
+        <FormField id={projectControlId('city')} label={t('form.city')} {...bind('city')}>
           <Input value={form.city} onChange={(e) => set('city')(e.target.value)} />
         </FormField>
-        <FormField id="pr-country" label={t('form.country')}>
+        <FormField id={projectControlId('country')} label={t('form.country')} {...bind('country')}>
           <Input value={form.country} onChange={(e) => set('country')(e.target.value)} />
         </FormField>
       </div>

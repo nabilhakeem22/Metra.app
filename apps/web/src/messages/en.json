@@ -183,7 +183,6 @@
     "creating": "Creating…",
     "createdTitle": "Firm created",
     "logoUploadFailed": "Logo upload failed, but your firm was created.",
-    "errorRequired": "Enter at least one company name.",
     "tooLong": "Keep it to {max} characters or fewer.",
     "title": "Get started",
     "subtitle": "A few steps to set up your firm.",
@@ -279,8 +278,7 @@
     "confirmRevokeTitle": "Revoke invitation?",
     "confirmRevokeDesc": "This invitation link will stop working.",
     "confirmRemoveTitle": "Remove member?",
-    "confirmRemoveDesc": "{name} will lose access to this firm.",
-    "errorGeneric": "Something went wrong. Please try again."
+    "confirmRemoveDesc": "{name} will lose access to this firm."
   },
   "roles": {
     "owner": {
@@ -345,7 +343,6 @@
     "hideMarginDesc": "PMs won't see cost or margin figures.",
     "restrictDashLabel": "Restrict the firm-level dashboard",
     "restrictDashDesc": "Limit firm-wide figures to owners and admins.",
-    "errorGeneric": "Something went wrong. Please try again.",
     "apiKeysCardTitle": "API keys",
     "apiKeysCardDesc": "Create and manage keys for the Metra Public API.",
     "documentCategories": {
@@ -385,15 +382,6 @@
         "bankAccountHolder": "Account holder",
         "bankAccountNumber": "Account number",
         "bankIban": "IBAN"
-      },
-      "fieldInvalid": {
-        "studioPhone": "Write the phone with digits only, 7 to 15 of them.",
-        "studioWhatsapp": "Write the WhatsApp number with digits only, 7 to 15 of them.",
-        "instapayAddress": "Write the InstaPay address, 3 to 100 characters.",
-        "bankName": "Write the bank name, 2 to 120 characters.",
-        "bankAccountHolder": "Write the account holder's name, 2 to 120 characters.",
-        "bankAccountNumber": "Write the account number: 4 to 34 letters or digits, with at least one digit.",
-        "bankIban": "This IBAN does not look right. It starts with two letters, like EG."
       },
       "alertNote": "Every owner and admin is told when any of these change."
     }
@@ -445,8 +433,7 @@
     "save": "Save",
     "saved": "Saved",
     "sessionTitle": "Session",
-    "signOut": "Sign out",
-    "errorGeneric": "Something went wrong. Please try again."
+    "signOut": "Sign out"
   },
   "org": {
     "account": "Account",
@@ -469,6 +456,10 @@
     "uncertain": "We could not confirm your change was saved: the server was busy or the connection dropped. Refresh the page to check before trying again.",
     "check_fields": "Some fields need fixing. Look for the message under each one.",
     "busy": "Someone was changing the same record at that moment. Refresh the page to see the latest, then try again.",
+    "malformed": "This page sent something we did not expect. Refresh the page and try again.",
+    "record_not_found": "This no longer exists; someone may have deleted it. Refresh the page.",
+    "logo_image_unsupported": "This file cannot be used as a logo. Choose a PNG, JPG or WebP image of 2 MB or less.",
+    "storage_unavailable": "We could not store the file right now. Try again in a moment; if it keeps failing, contact us.",
     "reference": "If it keeps happening, send us this code: {reference}.",
     "unreachable": "We could not reach Metra. Check your internet connection, then try again. What you entered is still here.",
     "field": {
@@ -602,6 +593,7 @@
     "whatsapp_invalid": "WhatsApp needs a mobile number: an Egyptian mobile, or the number with its country code, like +44.",
     "iban_invalid": "This IBAN does not look right. It starts with two letters, like EG.",
     "bank_name_required": "Add the bank name too.",
+    "account_number_invalid": "This account number does not look right. Write 4 to 34 letters or digits, with at least one digit.",
     "client_page_details_owner_only": "Only the owner or an admin can change what your clients see.",
     "client_page_details_stale": "Someone else changed these details while you were editing. Reload to see them, then make your change again.",
     "expected_date_out_of_range": "Pick a date from today to a year from now."

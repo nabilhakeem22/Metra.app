@@ -2,18 +2,15 @@
 
 import { useTranslations } from 'next-intl';
 import { useState, useTransition } from 'react';
+import { useFieldErrors } from '@/hooks/use-field-errors';
 import { toast } from '@/hooks/use-toast';
-import { resolveActionError } from '@/lib/actions/error-message';
-import type { ActionCode } from '@/lib/actions/result';
-import { updateOrgProfile, updateOrgSettings } from '@/lib/org/actions';
-import { SettingsProfileCard } from './settings-profile-card';
+import { updateOrgProfile } from '@/lib/org/actions';
+import { ORG_PROFILE_FIELDS, orgProfileFieldErrors } from '@/lib/org/profile-field-rules';
+import { SettingsProfileCard, type ProfileDraft } from './settings-profile-card';
 import { SettingsVisibilityCard } from './settings-visibility-card';
+import { useSaveVisibility } from './use-save-visibility';
 
-interface Initial {
-  nameEn: string;
-  nameAr: string;
-  city: string;
-  taxRegistrationNumber: string;
+interface Initial extends ProfileDraft {
   hideMarginFromPm: boolean;
   restrictFirmDashboard: boolean;
 }
@@ -32,44 +29,27 @@ export function SettingsClient({
   const th = useTranslations('hints.org');
   const te = useTranslations('errors');
   const [savingProfile, startProfile] = useTransition();
-  const [savingSettings, startSettings] = useTransition();
+  const visibility = useSaveVisibility();
+  const profileErrors = useFieldErrors({ fields: ORG_PROFILE_FIELDS, translate: te });
 
-  const [nameEn, setNameEn] = useState(initial.nameEn);
-  const [nameAr, setNameAr] = useState(initial.nameAr);
-  const [city, setCity] = useState(initial.city);
-  const [tax, setTax] = useState(initial.taxRegistrationNumber);
+  const [profile, setProfile] = useState<ProfileDraft>({
+    nameEn: initial.nameEn,
+    nameAr: initial.nameAr,
+    city: initial.city,
+    taxRegistrationNumber: initial.taxRegistrationNumber,
+  });
   const [hideMargin, setHideMargin] = useState(initial.hideMarginFromPm);
   const [restrictDash, setRestrictDash] = useState(initial.restrictFirmDashboard);
 
-  const errorMessage = (code?: ActionCode) => resolveActionError(code, te);
-
   function saveProfile() {
+    if (profileErrors.applyLocal(orgProfileFieldErrors(profile))) return;
     startProfile(async () => {
-      const res = await updateOrgProfile({
-        nameEn,
-        nameAr,
-        city,
-        taxRegistrationNumber: tax,
-      });
-      toast(
-        res.ok
-          ? { title: t('saved') }
-          : { title: errorMessage(res.error), variant: 'destructive' },
-      );
-    });
-  }
-
-  function saveSettings() {
-    startSettings(async () => {
-      const res = await updateOrgSettings({
-        hideMarginFromPm: hideMargin,
-        restrictFirmDashboard: restrictDash,
-      });
-      toast(
-        res.ok
-          ? { title: t('saved') }
-          : { title: errorMessage(res.error), variant: 'destructive' },
-      );
+      try {
+        const result = await updateOrgProfile(profile);
+        if (!profileErrors.applyResult(result)) toast({ title: t('saved') });
+      } catch (rejection) {
+        profileErrors.applyRejection(rejection);
+      }
     });
   }
 
@@ -88,14 +68,11 @@ export function SettingsClient({
         th={th}
         savedLogoId={savedLogoId}
         disabled={disabled}
-        nameEn={nameEn}
-        setNameEn={setNameEn}
-        nameAr={nameAr}
-        setNameAr={setNameAr}
-        city={city}
-        setCity={setCity}
-        tax={tax}
-        setTax={setTax}
+        draft={profile}
+        setField={(field, value) => setProfile((current) => ({ ...current, [field]: value }))}
+        bind={profileErrors.bind}
+        formError={profileErrors.formError}
+        invalidAttempt={profileErrors.invalidAttempt}
         canManage={canManage}
         saveProfile={saveProfile}
         savingProfile={savingProfile}
@@ -110,8 +87,8 @@ export function SettingsClient({
         setRestrictDash={setRestrictDash}
         disabled={disabled}
         canManage={canManage}
-        saveSettings={saveSettings}
-        savingSettings={savingSettings}
+        saveSettings={() => visibility.save({ hideMarginFromPm: hideMargin, restrictFirmDashboard: restrictDash })}
+        savingSettings={visibility.saving}
       />
     </div>
   );

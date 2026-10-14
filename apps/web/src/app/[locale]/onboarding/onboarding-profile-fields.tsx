@@ -4,11 +4,14 @@ import { Upload, X } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import type { ChangeEvent } from 'react';
 import { Button } from '@/components/ui/button';
+import { fieldErrorId } from '@/components/ui/field-error-text';
 import { FormField } from '@/components/ui/form-field';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { LOGO_ACCEPT } from '@/lib/org/logo-rules';
-import { FIELD_MAX_LENGTH, type OnboardingField } from './profile-field-limits';
+import { FIELD_MAX_LENGTH, type ONBOARDING_FIELDS, type OnboardingField } from './profile-field-limits';
+
+type FieldBinding = (field: (typeof ONBOARDING_FIELDS)[number]) => { error: string | undefined; onEdit: () => void };
 
 export interface OnboardingProfileValues {
   nameEn: string;
@@ -21,12 +24,15 @@ export interface OnboardingProfileValues {
  * required), its city and its logo, all optional beyond a name. Presentational:
  * the values, the logo file and every setter live in OnboardingWizard. The tax
  * number is not asked here; it stays in Settings, where nothing blocks on it.
- * Each text field stops at the server's cap and says so under itself.
+ * Each text field stops at the server's cap and says so under itself; a refused
+ * save says why under the field (the missing name under the Arabic name, the
+ * first, marking both).
  */
 export function OnboardingProfileFields({
   values,
   onChange,
   atLimit,
+  bind,
   logo,
   logoPreview,
   pickLogo,
@@ -36,6 +42,8 @@ export function OnboardingProfileFields({
   onChange: (field: keyof OnboardingProfileValues, value: string) => void;
   /** Fields at their length cap, each told so under itself. */
   atLimit: readonly OnboardingField[];
+  /** The refusal under each field, and the edit that clears it. */
+  bind: FieldBinding;
   logo: File | null;
   logoPreview: string | null;
   pickLogo: (event: ChangeEvent<HTMLInputElement>) => void;
@@ -43,12 +51,24 @@ export function OnboardingProfileFields({
 }) {
   const t = useTranslations('onboarding');
   const th = useTranslations('hints.onboarding');
-  const tooLong = (field: OnboardingField) =>
-    atLimit.includes(field) ? t('tooLong', { max: FIELD_MAX_LENGTH[field] }) : null;
+  const pair = bind('name');
+  /** A refused save outranks the at-the-cap notice. */
+  const messageFor = (field: OnboardingField) =>
+    bind(field).error ?? (atLimit.includes(field) ? t('tooLong', { max: FIELD_MAX_LENGTH[field] }) : null);
+  const editOf = (field: OnboardingField) => () => {
+    bind(field).onEdit();
+    if (field !== 'city') pair.onEdit();
+  };
 
   return (
     <div className="space-y-4">
-      <FormField id="nameAr" label={t('nameArLabel')} hint={th('orgName')} error={tooLong('nameAr')}>
+      <FormField
+        id="nameAr"
+        label={t('nameArLabel')}
+        hint={th('orgName')}
+        error={pair.error ?? messageFor('nameAr')}
+        onEdit={editOf('nameAr')}
+      >
         <Input
           dir="rtl"
           maxLength={FIELD_MAX_LENGTH.nameAr}
@@ -56,15 +76,17 @@ export function OnboardingProfileFields({
           onChange={(event) => onChange('nameAr', event.target.value)}
         />
       </FormField>
-      <FormField id="nameEn" label={t('nameEnLabel')} hint={th('orgName')} error={tooLong('nameEn')}>
+      <FormField id="nameEn" label={t('nameEnLabel')} hint={th('orgName')} error={messageFor('nameEn')} onEdit={editOf('nameEn')}>
         <Input
           dir="ltr"
           maxLength={FIELD_MAX_LENGTH.nameEn}
+          aria-invalid={pair.error ? true : undefined}
+          aria-describedby={pair.error ? fieldErrorId('nameAr') : undefined}
           value={values.nameEn}
           onChange={(event) => onChange('nameEn', event.target.value)}
         />
       </FormField>
-      <FormField id="city" label={t('cityLabel')} error={tooLong('city')}>
+      <FormField id="city" label={t('cityLabel')} error={messageFor('city')} onEdit={editOf('city')}>
         <Input
           maxLength={FIELD_MAX_LENGTH.city}
           value={values.city}

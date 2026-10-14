@@ -3,54 +3,34 @@
 // writes gate on `projects`/update. The parent project must be in-org.
 import { STAGE_STATUSES, projectStages, projects, type StageStatus } from '@metra/db';
 import { eq } from 'drizzle-orm';
+import { fieldsFailed, hasFieldErrors } from '@/lib/actions/field-errors';
 import { mutateInOrg, requireInOrg } from '@/lib/actions/mutate';
 import { err, type ActionResult } from '@/lib/actions/result';
 import type { OrgContext } from '@/lib/db/context';
 import { isUuid } from '@/lib/uuid';
 import { clean } from '@/lib/validation/text';
 import { normalizePercent } from '@/lib/validation/percent';
+import { stageFieldErrors, type StageInput } from './field-rules';
 
-const NAME_MAX = 200;
-const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+export type { StageInput } from './field-rules';
 
+/** A status outside the select: no form can send it (`malformed`). */
 function validStatus(s: unknown): s is StageStatus {
   return STAGE_STATUSES.includes(s as StageStatus);
-}
-
-function validDate(v: string | null | undefined): boolean {
-  const s = v?.trim();
-  if (!s) return true;
-  return ISO_DATE_RE.test(s);
-}
-
-export interface StageInput {
-  nameEn?: string | null;
-  nameAr?: string | null;
-  status?: StageStatus | null;
-  progressPct?: string | null;
-  sortOrder?: number | null;
-  startDate?: string | null;
-  endDate?: string | null;
 }
 
 export async function addStageCore(
   ctx: OrgContext,
   input: { projectId: string } & StageInput,
 ): Promise<ActionResult & { data?: string }> {
-  if (!isUuid(input.projectId)) return err('invalid');
+  if (!isUuid(input.projectId)) return err('malformed');
+  const status = input.status ?? 'not_started';
+  if (!validStatus(status)) return err('malformed');
+  const errors = stageFieldErrors(input, 'add');
+  const progressPct = normalizePercent(input.progressPct);
+  if (hasFieldErrors(errors) || progressPct === null) return fieldsFailed(errors);
   const nameEn = clean(input.nameEn);
   const nameAr = clean(input.nameAr);
-  if (!nameEn && !nameAr) return err('name_required');
-  if ((nameEn?.length ?? 0) > NAME_MAX || (nameAr?.length ?? 0) > NAME_MAX) {
-    return err('invalid');
-  }
-  const status = input.status ?? 'not_started';
-  if (!validStatus(status)) return err('invalid');
-  const progressPct = normalizePercent(input.progressPct);
-  if (progressPct === null) return err('invalid_percentage');
-  if (!validDate(input.startDate) || !validDate(input.endDate)) {
-    return err('invalid_date');
-  }
 
   return mutateInOrg(
     ctx,
@@ -58,7 +38,7 @@ export async function addStageCore(
     async (tx, audit) => {
       // An existence assertion, not a read: the call IS the check, and it
       // fails with a coded error for an id that is absent or another tenant's.
-      await requireInOrg(tx, projects, input.projectId, { id: projects.id }, 'invalid');
+      await requireInOrg(tx, projects, input.projectId, { id: projects.id }, 'record_not_found');
 
       // Default sort: append to the end.
       let sortOrder = input.sortOrder ?? null;
@@ -101,23 +81,14 @@ export async function updateStageCore(
   ctx: OrgContext,
   input: { id: string } & StageInput,
 ): Promise<ActionResult> {
-  if (!isUuid(input.id)) return err('invalid');
+  if (!isUuid(input.id)) return err('malformed');
+  const status = input.status ?? undefined;
+  if (status !== undefined && !validStatus(status)) return err('malformed');
+  const errors = stageFieldErrors(input, 'update');
+  if (hasFieldErrors(errors)) return fieldsFailed(errors);
   const nameEn = input.nameEn !== undefined ? clean(input.nameEn) : undefined;
   const nameAr = input.nameAr !== undefined ? clean(input.nameAr) : undefined;
-  if (nameEn !== undefined && nameAr !== undefined && !nameEn && !nameAr) {
-    return err('name_required');
-  }
-  const status = input.status ?? undefined;
-  if (status !== undefined && !validStatus(status)) return err('invalid');
-  let progressPct: string | undefined;
-  if (input.progressPct !== undefined) {
-    const p = normalizePercent(input.progressPct);
-    if (p === null) return err('invalid_percentage');
-    progressPct = p;
-  }
-  if (!validDate(input.startDate) || !validDate(input.endDate)) {
-    return err('invalid_date');
-  }
+  const progressPct = input.progressPct !== undefined ? (normalizePercent(input.progressPct) ?? undefined) : undefined;
 
   return mutateInOrg(
     ctx,
@@ -125,7 +96,7 @@ export async function updateStageCore(
     async (tx, audit) => {
       // An existence assertion, not a read: the call IS the check, and it
       // fails with a coded error for an id that is absent or another tenant's.
-      await requireInOrg(tx, projectStages, input.id, { id: projectStages.id }, 'invalid');
+      await requireInOrg(tx, projectStages, input.id, { id: projectStages.id }, 'record_not_found');
 
       const patch: Record<string, unknown> = { updatedAt: new Date() };
       if (nameEn !== undefined) patch.nameEn = nameEn;

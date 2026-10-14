@@ -1,102 +1,96 @@
 'use client';
 
 import { Plus } from 'lucide-react';
-import type { useTranslations } from 'next-intl';
+import { useTranslations } from 'next-intl';
+import { useRef } from 'react';
 import { Button } from '@/components/ui/button';
-import { FieldHint } from '@/components/ui/field-hint';
+import { FieldErrorText, fieldErrorId } from '@/components/ui/field-error-text';
+import { FormField } from '@/components/ui/form-field';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { SelectControl } from '@/components/ui/select-control';
+import { useFocusFirstInvalid } from '@/hooks/use-focus-first-invalid';
 import type { DetailsOption } from './details-tab';
+import type { useAddProjectType } from './use-add-project-type';
+
+/** The add-a-type box; its refusal sits under it. */
+export const NEW_TYPE_ID = 'p-new-type';
+
+// Radix Select forbids an empty-string item value, so "no type" (persisted as
+// '') rides a sentinel mapped back to '' when writing form state.
+const NO_TYPE = '__no_type__';
 
 // The project-type picker cell: a type Select plus the inline "add new type"
-// control. All state/handlers live in the parent (DetailsTab); this child is
-// presentational, driven by the passed value + callbacks.
+// control. The add box's state and its refusal live in useAddProjectType.
 export function DetailsTypeField({
-  t,
-  tp,
-  th,
   typeId,
   onTypeIdChange,
+  typeRefusal,
   projectTypes,
   label,
   canManage,
-  pending,
-  newType,
-  setNewType,
-  onAddType,
+  addType,
 }: {
-  t: ReturnType<typeof useTranslations<'projects'>>;
-  tp: ReturnType<typeof useTranslations<'projects.profile.details'>>;
-  th: ReturnType<typeof useTranslations<'hints.project'>>;
   typeId: string;
   onTypeIdChange: (value: string) => void;
+  /** A type deleted meanwhile, said under the picker. */
+  typeRefusal: { error: string | undefined; onEdit: () => void };
   projectTypes: DetailsOption[];
   label: (o: DetailsOption) => string;
   canManage: boolean;
-  pending: boolean;
-  newType: string;
-  setNewType: (value: string) => void;
-  onAddType: () => void;
+  addType: ReturnType<typeof useAddProjectType>;
 }) {
-  // Radix Select forbids an empty-string item value, so "no type" (persisted as
-  // '') rides a sentinel mapped back to '' when writing form state.
-  const NO_TYPE = '__no_type__';
+  const t = useTranslations('projects');
+  const tp = useTranslations('projects.profile.details');
+  const th = useTranslations('hints.project');
+  const addRef = useRef<HTMLDivElement>(null);
+  useFocusFirstInvalid(addRef, addType.errors.invalidAttempt);
 
   return (
     <div className="space-y-2">
-      <Label htmlFor="p-type" className="flex items-center">
-        {tp('type')}
-        <FieldHint id="p-type-hint" hint={th('type')} />
-      </Label>
-      <Select
-        value={typeId || NO_TYPE}
-        onValueChange={(v) => onTypeIdChange(v === NO_TYPE ? '' : v)}
-        disabled={!canManage || pending}
-      >
-        <SelectTrigger id="p-type" aria-describedby="p-type-hint">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value={NO_TYPE}>{t('profile.noType')}</SelectItem>
-          {projectTypes.map((ty) => (
-            <SelectItem key={ty.id} value={ty.id}>
-              {label(ty)}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+      <FormField id="p-type" label={tp('type')} hint={th('type')} {...typeRefusal}>
+        <SelectControl
+          value={typeId || NO_TYPE}
+          onValueChange={(v) => onTypeIdChange(v === NO_TYPE ? '' : v)}
+          options={[
+            { value: NO_TYPE, label: t('profile.noType') },
+            ...projectTypes.map((type) => ({ value: type.id, label: label(type) })),
+          ]}
+          disabled={!canManage}
+        />
+      </FormField>
       {canManage && (
-        <div className="flex items-center gap-1">
-          <Input
-            value={newType}
-            onChange={(e) => setNewType(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                e.preventDefault();
-                onAddType();
-              }
-            }}
-            placeholder={tp('addTypePlaceholder')}
-            aria-label={tp('addType')}
-            className="h-9"
-          />
-          <Button
-            type="button"
-            variant="secondary"
-            size="sm"
-            onClick={onAddType}
-            disabled={pending || newType.trim() === ''}
-          >
-            <Plus className="size-4" aria-hidden />
-            {tp('addType')}
-          </Button>
+        <div ref={addRef} className="space-y-1">
+          <div className="flex items-center gap-1">
+            <Input
+              id={NEW_TYPE_ID}
+              value={addType.name}
+              onChange={(e) => {
+                addType.clearOnEdit();
+                addType.setName(e.target.value);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  addType.add();
+                }
+              }}
+              placeholder={tp('addTypePlaceholder')}
+              aria-label={tp('addType')}
+              aria-invalid={addType.error ? true : undefined}
+              aria-describedby={addType.error ? fieldErrorId(NEW_TYPE_ID) : undefined}
+              className="h-9"
+            />
+            <Button type="button" variant="secondary" size="sm" onClick={addType.add} disabled={addType.adding}>
+              <Plus className="size-4" aria-hidden />
+              {tp('addType')}
+            </Button>
+          </div>
+          <FieldErrorText id={fieldErrorId(NEW_TYPE_ID)} message={addType.error} />
+          {addType.errors.formError && (
+            <p className="text-body text-destructive" role="alert">
+              {addType.errors.formError}
+            </p>
+          )}
         </div>
       )}
     </div>

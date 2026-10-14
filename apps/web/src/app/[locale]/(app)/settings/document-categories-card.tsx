@@ -1,19 +1,10 @@
 'use client';
 
-import { Loader2, Plus } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
-import { useState, useTransition } from 'react';
-import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { OverflowMenu } from '@/components/ui/overflow-menu';
-import { toast } from '@/hooks/use-toast';
-import { useRouter } from '@/i18n/routing';
-import { resolveActionError } from '@/lib/actions/error-message';
-import type { ActionCode } from '@/lib/actions/result';
-import { createDocumentCategory } from '@/lib/document-categories/actions';
 import { pickLocale } from '@/lib/i18n/pick-locale';
+import { DocumentCategoryAddForm } from './document-category-add-form';
 import { useCategoryRetirement } from './use-category-retirement';
 
 export interface DocumentCategoryRow {
@@ -38,33 +29,8 @@ export function DocumentCategoriesCard({
   categories: DocumentCategoryRow[];
 }) {
   const t = useTranslations('settings.documentCategories');
-  const te = useTranslations('errors');
   const tc = useTranslations('common');
   const locale = useLocale();
-  const router = useRouter();
-  const [pending, startTransition] = useTransition();
-  const [newAr, setNewAr] = useState('');
-  const [newEn, setNewEn] = useState('');
-
-  function run(fn: () => Promise<{ ok: boolean; error?: string }>, done?: () => void) {
-    startTransition(async () => {
-      try {
-        const res = await fn();
-        if (res.ok) {
-          done?.();
-          router.refresh();
-        } else {
-          toast({
-            title: resolveActionError(res.error as ActionCode, te),
-            variant: 'destructive',
-          });
-        }
-      } catch {
-        toast({ title: te('generic'), variant: 'destructive' });
-      }
-    });
-  }
-
   const retirement = useCategoryRetirement(categories);
 
   return (
@@ -89,7 +55,7 @@ export function DocumentCategoriesCard({
               )}
               <OverflowMenu
                 label={tc('moreActions')}
-                disabled={pending || retirement.pending}
+                disabled={retirement.pending}
                 actions={[
                   {
                     key: 'active',
@@ -103,51 +69,7 @@ export function DocumentCategoriesCard({
           ))}
         </ul>
 
-        <div className="flex flex-wrap items-end gap-2">
-          <div className="min-w-40 flex-1 space-y-1.5">
-            <Label htmlFor="dc-ar">{t('nameAr')}</Label>
-            <Input
-              id="dc-ar"
-              dir="rtl"
-              value={newAr}
-              onChange={(e) => setNewAr(e.target.value)}
-            />
-          </div>
-          <div className="min-w-40 flex-1 space-y-1.5">
-            <Label htmlFor="dc-en">{t('nameEn')}</Label>
-            <Input
-              id="dc-en"
-              dir="ltr"
-              value={newEn}
-              onChange={(e) => setNewEn(e.target.value)}
-            />
-          </div>
-          <Button
-            variant="secondary"
-            type="button"
-            disabled={pending || (!newAr.trim() && !newEn.trim())}
-            onClick={() =>
-              run(
-                () =>
-                  createDocumentCategory({
-                    nameAr: newAr.trim() || null,
-                    nameEn: newEn.trim() || null,
-                  }),
-                () => {
-                  setNewAr('');
-                  setNewEn('');
-                },
-              )
-            }
-          >
-            {pending ? (
-              <Loader2 className="size-4 animate-spin" aria-hidden />
-            ) : (
-              <Plus className="size-4" aria-hidden />
-            )}
-            {t('add')}
-          </Button>
-        </div>
+        <DocumentCategoryAddForm />
         <p className="text-caption text-muted-foreground">{t('retireNote')}</p>
       </CardContent>
     </Card>
