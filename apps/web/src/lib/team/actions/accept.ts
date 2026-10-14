@@ -4,30 +4,34 @@ import { createHash } from 'node:crypto';
 import { type MemberRole } from '@metra/db';
 import { sql } from 'drizzle-orm';
 import { cookies } from 'next/headers';
-import {
-  ACTIVE_ORG_COOKIE,
-  activeOrgCookieOptions,
-} from '@/lib/auth/active-org';
+import { err, type ActionResult } from '@/lib/actions/result';
+import { unexpectedFailure } from '@/lib/actions/unexpected';
+import { ACTIVE_ORG_COOKIE, activeOrgCookieOptions } from '@/lib/auth/active-org';
 import { getSessionUser } from '@/lib/auth/session';
 import { withUserContext } from '@/lib/db/context';
-import { loggableFailure } from '@/lib/actions/loggable-failure';
 import { acceptInviteCore } from '../core';
-import { type ActionResult } from '@/lib/actions/result';
+
+interface InvitationRow {
+  id: string;
+  org_id: string;
+  email: string;
+  role: MemberRole;
+  status: string;
+  expires_at: string;
+}
 
 // --- Accept invite ---------------------------------------------------------
-// Wrapper does session + token lookup + expiry/email validation, then delegates
-// the claim/membership/F4 to acceptInviteCore. Every failure -> generic
-// 'declined' (no oracle for wrong-email vs expired etc.). On success, sets the
-// active-org cookie.
+// Session + token lookup, then the cause a person can act on (D9): the link
+// expired (ask for a new one), it was sent to another account (sign in with
+// that one), or it is not valid any more (used, revoked, unknown). The invited
+// address is never sent back. The claim/membership/F4 recheck is the core's.
+// On success, sets the active-org cookie.
 export async function acceptInvite(rawToken: string): Promise<ActionResult> {
-  const DECLINED: ActionResult = { ok: false, error: 'declined' };
-
   const user = await getSessionUser();
-  if (!user?.email) return DECLINED;
+  // A phone-only session can never be the invited email address.
+  if (!user?.email) return err('invite_wrong_account');
 
-  const tokenHash = createHash('sha256')
-    .update(String(rawToken ?? ''))
-    .digest('hex');
+  const tokenHash = createHash('sha256').update(String(rawToken ?? '')).digest('hex');
 
   try {
     const rows = (await withUserContext(user.id, (tx) =>
@@ -35,31 +39,23 @@ export async function acceptInvite(rawToken: string): Promise<ActionResult> {
         sql`select id, org_id, email, role, status, expires_at
             from public.app_invitation_by_token(${tokenHash})`,
       ),
-    )) as unknown as Array<{
-      id: string;
-      org_id: string;
-      email: string;
-      role: MemberRole;
-      status: string;
-      expires_at: string;
-    }>;
+    )) as unknown as InvitationRow[];
 
-    const inv = rows[0];
-    if (!inv) return DECLINED;
-    if (new Date(inv.expires_at).getTime() <= Date.now()) return DECLINED;
-    if (inv.email.toLowerCase() !== user.email.toLowerCase()) return DECLINED;
+    const invitation = rows[0];
+    if (!invitation) return err('invite_not_found');
+    if (new Date(invitation.expires_at).getTime() <= Date.now()) return err('invite_expired');
+    if (invitation.email.toLowerCase() !== user.email.toLowerCase()) return err('invite_wrong_account');
 
-    const res = await acceptInviteCore(
-      { orgId: inv.org_id, userId: user.id, role: inv.role, email: user.email },
-      inv.id,
+    const result = await acceptInviteCore(
+      { orgId: invitation.org_id, userId: user.id, role: invitation.role, email: user.email },
+      invitation.id,
     );
-    if (!res.ok) return DECLINED;
+    if (!result.ok) return result;
 
     const cookieStore = await cookies();
-    cookieStore.set(ACTIVE_ORG_COOKIE, inv.org_id, activeOrgCookieOptions());
-    return res;
+    cookieStore.set(ACTIVE_ORG_COOKIE, invitation.org_id, activeOrgCookieOptions());
+    return result;
   } catch (e) {
-    console.error('acceptInvite failed:', loggableFailure(e));
-    return DECLINED;
+    return unexpectedFailure('acceptInvite failed', e);
   }
 }

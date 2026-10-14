@@ -35,7 +35,7 @@ export const CLIENT_NAMESPACES = {
   /** app/[locale]/onboarding. */
   onboarding: ['app', 'common', 'errors', 'hints.onboarding', 'onboarding'],
   /** app/[locale]/invite: accepting a team invitation. */
-  invite: ['accept', 'app'],
+  invite: ['accept', 'app', 'errors'],
   /** app/[locale]/c: the client's contract link. */
   contractLink: ['contracts.ack'],
   /** app/[locale]/d: the client's delivery page. */

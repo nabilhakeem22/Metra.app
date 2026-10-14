@@ -26,7 +26,10 @@ export type CommonActionCode =
   | 'self'
   | 'already_member'
   | 'pending_exists'
-  | 'declined'
+  // Accepting an invitation (team/actions/accept.ts): each cause its own sentence.
+  | 'invite_expired'
+  | 'invite_wrong_account'
+  | 'invite_not_found'
   | 'otp_verify_failed'
   // Supabase refused to send a sign-in code, by cause (lib/auth/otp-failure.ts).
   | 'otp_rate_limited'
