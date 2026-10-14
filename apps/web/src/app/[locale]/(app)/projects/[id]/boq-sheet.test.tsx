@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { useState } from 'react';
 import { fireEvent, screen, waitFor } from '@testing-library/react';
-import { messageAt, renderWithIntl } from '@/test/render-with-intl';
+import { expectFieldErrorsRenderUnderFields } from '@/test/field-coverage';
+import { messageAt, renderWithIntl, type TestLocale } from '@/test/render-with-intl';
 import type { CapturedToast } from '@/test/doubles';
 import type { BoqDetail } from '@/lib/boqs/queries';
 import { formatMoney } from '@/lib/format/money';
@@ -427,6 +428,31 @@ describe('BoqSheet — the discount editor after a blur that wrote nothing', () 
         boqId: 'boq-1',
         discountPct: '7',
       });
+    });
+  });
+});
+
+// AC 19 on the sheet, in both locales: a cell the server refuses is said under
+// that cell. A cell is written on blur, so the caret is back in it when the
+// answer lands (the sheet never moves it).
+describe.each<TestLocale>(['en', 'ar-EG'])('BoqSheet cells (%s)', (locale) => {
+  test('a refused description is said under its cell', async () => {
+    document.documentElement.dir = locale === 'ar-EG' ? 'rtl' : 'ltr';
+    renderWithIntl(<BoqSheet boq={boqFixture()} canEdit />, { locale });
+    const cell = screen.getByLabelText(messageAt(locale, 'projects.profile.boq.col.description')) as HTMLInputElement;
+    await expectFieldErrorsRenderUnderFields({
+      fields: ['description'],
+      controlIdOf: () => cell.id,
+      answerWith: (result) => actions.updateBoqLine.mockResolvedValue(result),
+      submit: async () => {
+        cell.focus();
+        fireEvent.change(cell, { target: { value: 'Board' } });
+        fireEvent.blur(cell);
+        cell.focus();
+        await waitFor(() => expect(cell.getAttribute('aria-invalid')).toBe('true'));
+      },
+      locale,
+      typed: { [cell.id]: 'Board' },
     });
   });
 });

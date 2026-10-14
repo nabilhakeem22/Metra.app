@@ -119,6 +119,23 @@ describe.each<TestLocale>(['en', 'ar-EG'])('LoginForm refusals (%s)', (locale) =
     }
   });
 
+  test('a refused code is said under the code boxes (AC 19)', async () => {
+    actions.sendEmailOtp.mockResolvedValue({ ok: true });
+    renderLogin();
+    await sendTo('mona@firm.example');
+    await expectFieldErrorsRenderUnderFields({
+      fields: ['token'],
+      controlIdOf: () => 'otp-code',
+      answerWith: (result) => actions.verifyEmailOtp.mockResolvedValue(result),
+      submit: async () => {
+        await act(async () => {
+          fireEvent.paste(screen.getAllByRole('textbox')[0], { clipboardData: { getData: () => '123456' } });
+        });
+      },
+      locale,
+    });
+  });
+
   test('pressing Verify on a short code says how many digits, without sending', async () => {
     actions.sendEmailOtp.mockResolvedValue({ ok: true });
     renderLogin();

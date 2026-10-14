@@ -72,6 +72,7 @@ export function LoginVerifyStep({
         onComplete={(v) => verify(v)}
         disabled={busy}
         ariaLabel={t('codeLabel')}
+        id={CODE_ID}
         errorId={codeError ? fieldErrorId(CODE_ID) : undefined}
         autoFocus
       />
