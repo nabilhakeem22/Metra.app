@@ -5,7 +5,7 @@ import { useMemo, useState } from 'react';
 import { deactivationCopy, useActiveToggle } from '@/hooks/use-active-toggle';
 import { useOpenOnArrival } from '@/hooks/use-open-on-arrival';
 import { toast } from '@/hooks/use-toast';
-import { resolveActionError } from '@/lib/actions/error-message';
+import { describeFailure } from '@/lib/actions/error-message';
 import { formatDate } from '@/lib/format/date';
 import { setProjectActive } from '@/lib/projects/actions';
 import { ProjectForm } from './project-form';
@@ -71,7 +71,7 @@ export function ProjectsClient({
     setActive: setProjectActive,
     copy: deactivationCopy(t, tc),
     onError: (result) =>
-      toast({ title: resolveActionError(result.error, te), variant: 'destructive' }),
+      toast({ title: describeFailure(result, te), variant: 'destructive' }),
   });
 
   const dateRange = (p: ProjectListItem): string => {

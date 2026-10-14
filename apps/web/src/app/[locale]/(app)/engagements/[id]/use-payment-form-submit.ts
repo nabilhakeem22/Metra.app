@@ -2,7 +2,7 @@
 
 import { useTranslations } from 'next-intl';
 import { toast } from '@/hooks/use-toast';
-import { resolveActionError } from '@/lib/actions/error-message';
+import { describeFailure } from '@/lib/actions/error-message';
 import type { ActionCode, ActionResult } from '@/lib/actions/result';
 import type { PayCtaMode } from '@/lib/engagements/command-card-ctas';
 import { logPaymentAndAdvance, recordPayment } from '@/lib/engagements/actions';
@@ -52,12 +52,13 @@ export function usePaymentFormSubmit(options: {
   const te = useTranslations('errors');
   const { engagementId, paymentKind, mode, advanceTrigger, runAction, onDone } = options;
 
-  function settle(res: ActionResult & { waitingOn?: ActionCode }): ActionResult {
+  function settle(res: ActionResult & { waitingOn?: ActionCode; waitingOnReference?: string }): ActionResult {
     if (res.ok && res.already) {
       toast({ title: tc('alreadyRecorded'), description: tc('alreadyRecordedHint') });
     } else if (res.ok && res.waitingOn) {
       // Recorded, not advanced: say so, and what the delivery still waits on.
-      toast({ title: tcmd('claim.recorded'), description: resolveActionError(res.waitingOn, te) });
+      toast({ title: tcmd('claim.recorded'), description: describeFailure({ error: res.waitingOn, reference: res.waitingOnReference }, te),
+      });
     }
     if (res.ok) onDone();
     return res;

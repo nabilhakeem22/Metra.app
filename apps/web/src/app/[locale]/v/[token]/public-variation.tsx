@@ -5,8 +5,8 @@ import { useLocale, useTranslations } from 'next-intl';
 import { useState, useTransition } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
 import { Centered, Row } from '@/components/share/link-page-parts';
+import { LinkNameField } from '@/components/share/link-name-field';
 import { PortalFailureAlert } from '@/components/share/portal-failure-alert';
 import { formatMoney } from '@/lib/format/money';
 import { formatDocNumber } from '@/lib/format/doc-number';
@@ -121,12 +121,7 @@ export function PublicVariationView({
         <Card>
           <CardContent className="space-y-3 py-4">
             <p className="text-body text-muted-foreground">{t('intro')}</p>
-            <Input
-              placeholder={t('nameLabel')}
-              value={name}
-              maxLength={120}
-              onChange={(e) => setName(e.target.value)}
-            />
+            <LinkNameField id="v-name" label={t('nameLabel')} value={name} onChange={setName} />
             <PortalFailureAlert failure={failure} />
             <div className="flex justify-center gap-3">
               <Button variant="default" onClick={() => respond('approve')} disabled={pending}>

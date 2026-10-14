@@ -61,7 +61,7 @@ export async function logPaymentAndAdvance(
  */
 export async function confirmPaymentClaim(
   input: ConfirmPaymentClaimInput,
-): Promise<ActionResult & { data?: string; advanced?: boolean; waitingOn?: ActionCode }> {
+): Promise<ActionResult & { data?: string; advanced?: boolean; waitingOn?: ActionCode; waitingOnReference?: string }> {
   const ctx = await requireOrg();
   const { paymentRecorded, ...result } = await confirmPaymentClaimAndAdvanceCore(ctx, input);
   if (paymentRecorded) revalidatePath('/', 'layout');

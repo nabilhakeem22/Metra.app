@@ -73,6 +73,13 @@ describe('DocumentThread', () => {
     expect(router.refresh).not.toHaveBeenCalled();
   });
 
+  it('F11: the hourly comment ceiling says to try again within the hour, not in a minute', async () => {
+    actions.addDeliveryComment.mockResolvedValue({ ok: false, error: 'comments_too_many', studioNotified: false });
+    await openAndSend('ar-EG');
+    expect((await screen.findByRole('alert')).textContent).toBe(messageAt('ar-EG', 'portal.errors.comments_too_many'));
+    expect(messageAt('ar-EG', 'portal.errors.comments_too_many')).not.toBe(messageAt('ar-EG', 'portal.errors.too_many'));
+  });
+
   it('a code the portal has no copy for reads as the generic error', async () => {
     actions.addDeliveryComment.mockResolvedValue({ ok: false, error: 'already_responded' });
     await openAndSend('ar-EG');

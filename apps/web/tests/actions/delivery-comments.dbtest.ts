@@ -174,7 +174,7 @@ describe('client comments — the token write path', () => {
     }
     expect(
       await addDeliveryCommentByToken(delivery.token, { documentId, body: 'one too many' }),
-    ).toEqual({ ok: false, error: 'too_many' });
+    ).toEqual({ ok: false, error: 'comments_too_many' });
     expect(await listDocumentCommentsCore(delivery.ctx, documentId)).toHaveLength(20);
   });
 });

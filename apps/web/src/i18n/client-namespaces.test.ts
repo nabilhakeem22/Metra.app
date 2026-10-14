@@ -60,6 +60,36 @@ function usedNamespaces(scope: MessageScope): string[] {
   return [...named].filter((namespace) => ![...named].some((other) => other !== namespace && within(namespace, other))).sort();
 }
 
+/** Every module the route files load, server or client. */
+function modulesReached(entries: readonly string[]): string[] {
+  const seen = new Set<string>();
+  const pending = [...entries];
+  while (pending.length > 0) {
+    const path = pending.pop()!;
+    if (seen.has(path)) continue;
+    seen.add(path);
+    pending.push(...graph.importsOf(path));
+  }
+  return [...seen];
+}
+
+/** The `errors.*` keys a quoted code in those modules can resolve to: a top
+ *  level code, or a field code under `errors.field`. Generous on purpose (a
+ *  literal that only looks like a code counts), so a missing key cannot slip. */
+function errorKeysReached(entries: readonly string[]): Set<string> {
+  const top = new Set(Object.keys(en.errors).filter((key) => typeof (en.errors as Record<string, unknown>)[key] === 'string'));
+  const field = new Set(Object.keys(en.errors.field));
+  const keys = new Set<string>(['errors.generic', 'errors.reference', 'errors.unreachable', 'errors.uncertain']);
+  // The scope lists themselves name codes; they are the answer, not a source.
+  for (const path of modulesReached(entries).filter((module) => !module.endsWith('client-namespaces.ts'))) {
+    for (const [, literal] of graph.files.get(path)!.text.matchAll(/['"`]([a-z][a-z0-9_]*)['"`]/g)) {
+      if (top.has(literal)) keys.add(`errors.${literal}`);
+      if (field.has(literal)) keys.add('errors.field');
+    }
+  }
+  return keys;
+}
+
 describe('the messages each scope hands the browser', () => {
   it('every client useTranslations names at least its top-level namespace literally; no useMessages', () => {
     const unscoped = clientTranslationCalls(graph, [...graph.files.keys()])
@@ -77,8 +107,25 @@ describe('the messages each scope hands the browser', () => {
   it.each(scopes)('%s: the list equals what its client code reads', (scope) => {
     const used = usedNamespaces(scope);
     const declared: readonly string[] = CLIENT_NAMESPACES[scope];
-    expect(used.filter((namespace) => !declared.includes(namespace)), 'used, not handed over').toEqual([]);
-    expect(declared.filter((namespace) => !used.includes(namespace)), 'handed over, not used').toEqual([]);
+    // A namespace may be handed over whole, or (`errors` on the small routes)
+    // as the sub-trees its code can show; the next test proves those suffice.
+    const handedOver = (namespace: string) =>
+      declared.includes(namespace) || declared.some((entry) => within(entry, namespace));
+    expect(used.filter((namespace) => !handedOver(namespace)), 'used, not handed over').toEqual([]);
+    expect(
+      declared.filter((entry) => !used.some((namespace) => within(entry, namespace))),
+      'handed over, not used',
+    ).toEqual([]);
+  });
+
+  it.each(scopes)('%s: a partly handed-over errors namespace is exactly the codes its segment can show (R5)', (scope) => {
+    const declared: readonly string[] = CLIENT_NAMESPACES[scope];
+    const partial = declared.filter((entry) => entry.startsWith('errors.'));
+    if (partial.length === 0) return;
+    const reached = [...errorKeysReached(routeFiles(scope))];
+    const missing = reached.filter((key) => !partial.some((entry) => within(key, entry)));
+    expect(missing, 'codes the segment can answer that its scope does not hand over').toEqual([]);
+    expect(partial.filter((entry) => !reached.includes(entry)), 'handed over, never answered').toEqual([]);
   });
 
   it.each(scopes)('%s: every namespace exists in both catalogues', (scope) => {

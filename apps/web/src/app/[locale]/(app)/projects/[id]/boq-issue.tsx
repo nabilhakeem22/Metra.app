@@ -7,16 +7,10 @@ import { Button } from '@/components/ui/button';
 import { useConfirm } from '@/components/ui/confirm-dialog';
 import { flushPendingRemovals } from '@/hooks/pending-removals';
 import { toast } from '@/hooks/use-toast';
-import { resolveActionError } from '@/lib/actions/error-message';
-import type { ActionCode } from '@/lib/actions/result';
+import { describeFailure, describeRejection } from '@/lib/actions/error-message';
+import type { ActionResult } from '@/lib/actions/result';
 import { issueBoq } from '@/lib/boqs/actions';
 import type { BoqStepCompletion } from '@/lib/engagements/boq-step-complete';
-
-/** Refusals whose own catalog sentence tells the studio what to do next. */
-const SPEAKS_FOR_ITSELF: ReadonlySet<ActionCode | undefined> = new Set<ActionCode | undefined>([
-  'boq_send_conflict',
-  'renderer_busy',
-]);
 
 /**
  * The toast after an issue, by what became of the delivery's BOQ step: done, or
@@ -36,6 +30,11 @@ const ISSUED_TOAST: Record<BoqStepCompletion, 'issued' | 'issuedStepDone' | 'iss
  * Behind a confirm because it is not reversible — an issued BOQ is frozen, and
  * changing it afterwards means a new version rather than an edit. The dialog says
  * that, rather than asking "are you sure".
+ *
+ * A refusal says its own cause (no lines yet, not a draft any more, your role,
+ * the renderer busy, someone else editing), an unknown failure its reference,
+ * and a request that never answered that Metra could not be reached. Lines are
+ * refused when they are written, under their cells; Issue checks the document.
  */
 export function BoqIssue({
   boqId,
@@ -52,10 +51,8 @@ export function BoqIssue({
   const te = useTranslations('errors');
   const [pending, start] = useTransition();
 
-  const failureMessage = (code: ActionCode | undefined): string => {
-    if (code === 'engagement_not_found') return t('issueNoEngagement');
-    return SPEAKS_FOR_ITSELF.has(code) ? resolveActionError(code, te) : t('issueFailed');
-  };
+  const failureMessage = (res: Pick<ActionResult, 'error' | 'params' | 'reference'>): string =>
+    res.error === 'engagement_not_found' ? t('issueNoEngagement') : describeFailure(res, te);
   const { confirm, dialog } = useConfirm();
 
   // The confirm is awaited OUTSIDE the transition, and only the server action is
@@ -84,9 +81,9 @@ export function BoqIssue({
           toast({ title: t(res.data ? ISSUED_TOAST[res.data.boqStep] : 'issued') });
           return;
         }
-        toast({ title: failureMessage(res.error), variant: 'destructive' });
-      } catch {
-        toast({ title: t('issueFailed'), variant: 'destructive' });
+        toast({ title: failureMessage(res), variant: 'destructive' });
+      } catch (rejection) {
+        toast({ title: describeRejection(rejection, te), variant: 'destructive' });
       }
     });
   }

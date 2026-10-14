@@ -45,7 +45,7 @@ export function deactivationCopy(t: Translate, common: Translate): ActiveToggleC
 export function useActiveToggle(options: {
   setActive: (id: string, active: boolean) => Promise<ActionResult>;
   copy: ActiveToggleCopy;
-  /** A refused write: the caller shows `resolveActionError(...)`. */
+  /** A refused write: the caller shows `describeFailure(result, te)`. */
   onError: (result: ActionResult) => void;
   /** After any write lands, e.g. `router.refresh()` where the page needs it. */
   onChanged?: () => void;

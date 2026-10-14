@@ -5,6 +5,7 @@ import { act, fireEvent, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fieldsFailed } from '@/lib/actions/field-errors';
 import type { ProposalDetail } from '@/lib/proposals/queries';
+import { expectFieldErrorsRenderUnderFields } from '@/test/field-coverage';
 import { messageAt, renderWithIntl, type TestLocale } from '@/test/render-with-intl';
 import { ProposalBuilder } from './builder-client';
 
@@ -117,6 +118,26 @@ describe.each<TestLocale>(['en', 'ar-EG'])('builder cell refusals (%s)', (locale
     expect(input('qty').getAttribute('aria-invalid')).toBeNull();
   });
 
+  it('every cell of a line refused on Send is said under that cell (AC 19)', async () => {
+    renderBuilder(locale);
+    await expectFieldErrorsRenderUnderFields({
+      fields: ['lines.0.0.description', 'lines.0.0.qty', 'lines.0.0.unitPrice'],
+      controlIdOf: (path) => input(path.split('.')[3]).id,
+      answerWith: (result) => proposalActions.saveProposalDraft.mockResolvedValue(result),
+      submit: async () => {
+        // An edit, so Send has a draft to store first.
+        fireEvent.change(input('qty'), { target: { value: '11' } });
+        fireEvent.click(screen.getByRole('button', { name: at('proposals.boqMode.send') }));
+        const dialog = await screen.findByRole('alertdialog');
+        await act(async () => {
+          fireEvent.click(within(dialog).getByRole('button', { name: at('proposals.boqMode.confirm') }));
+        });
+        await waitFor(() => expect(input('qty').getAttribute('aria-invalid')).toBe('true'));
+      },
+      locale,
+    });
+  });
+
   it('Send refused for a section name and a price marks both and puts the caret in the first', async () => {
     proposalActions.saveProposalDraft.mockResolvedValue(
       fieldsFailed({
@@ -133,7 +154,8 @@ describe.each<TestLocale>(['en', 'ar-EG'])('builder cell refusals (%s)', (locale
     expect(under(input('unitPrice'))).toBe(at('errors.field.not_a_number'));
     const sectionTitle = document.querySelector<HTMLElement>('[data-draft-section="0"] input[aria-invalid="true"]')!;
     expect(under(sectionTitle)).toBe(at('errors.name_required'));
-    expect(document.activeElement).toBe(sectionTitle);
+    // The caret moves in the effect after the cells mark: wait for it, not for the mark.
+    await waitFor(() => expect(document.activeElement).toBe(sectionTitle));
     expect(boqActions.sendProposalAsBoq).not.toHaveBeenCalled();
   });
 
@@ -149,7 +171,7 @@ describe.each<TestLocale>(['en', 'ar-EG'])('builder cell refusals (%s)', (locale
       expect(control.getAttribute('aria-invalid')).toBe('true');
       return control;
     });
-    expect(under(blank)).toBe(at('errors.line_required'));
+    expect(under(blank)).toBe(at('errors.description_required'));
     expect(under(input('qty'))).toBe(at('errors.field.not_a_number'));
     expect(proposalActions.saveProposalDraft).not.toHaveBeenCalled();
   });

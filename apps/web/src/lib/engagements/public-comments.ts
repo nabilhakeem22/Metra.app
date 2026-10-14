@@ -94,10 +94,12 @@ export async function getDeliveryDocumentCommentsByToken(
   }
 }
 
-/** Coded outcomes of a client comment. `too_many` is the SDF's flood ceiling — a
- *  "try again in a bit", not something the client did wrong. `empty` never reaches
+/** Coded outcomes of a client comment. `comments_too_many` is the SDF's flood
+ *  ceiling (20 messages a client in the last hour): "try again later, within the
+ *  hour", not something the client did wrong, and NOT the per-link act limit's
+ *  `too_many` ("wait a minute"), so the two are said apart. `empty` never reaches
  *  the DB: a blank message is rejected in TS. */
-export type DeliveryCommentError = DeliveryActionError | 'too_many' | 'empty';
+export type DeliveryCommentError = DeliveryActionError | 'comments_too_many' | 'empty';
 
 export interface DeliveryCommentResult {
   ok: boolean;
@@ -139,7 +141,7 @@ export async function addDeliveryCommentByToken(
     case 'ok':
       return { ok: true };
     case 'too_many':
-      return { ok: false, error: 'too_many' };
+      return { ok: false, error: 'comments_too_many' };
     case 'expired':
       return { ok: false, error: 'token_expired' };
     case 'not_active':

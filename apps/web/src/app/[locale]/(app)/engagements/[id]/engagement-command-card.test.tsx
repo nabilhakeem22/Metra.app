@@ -502,10 +502,21 @@ describe('the act sits above the checklist, with one primary action', () => {
     expect(primaries(container)).toHaveLength(0);
   });
 
+  test('an unknown failure on the card carries its reference (F4)', () => {
+    renderWithIntl(
+      <EngagementCommandCard
+        {...props({ state: 'concept_review', preview: readyPreview, actionError: { error: 'generic', reference: 'K7Q29MXD' } })}
+      />,
+    );
+    expect(screen.getByRole('alert').textContent).toBe(
+      `${ar('errors.generic')} ${ar('errors.reference').replace('{reference}', 'K7Q29MXD')}`,
+    );
+  });
+
   test('a refused action is said inside the card, right under the act', () => {
     const { container } = renderWithIntl(
       <EngagementCommandCard
-        {...props({ state: 'concept_review', preview: readyPreview, actionError: 'gate_a_not_cleared' })}
+        {...props({ state: 'concept_review', preview: readyPreview, actionError: { error: 'gate_a_not_cleared' } })}
       />,
     );
     const alert = screen.getByRole('alert');

@@ -2,19 +2,17 @@
 
 import { Check, Loader2 } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
-import { useState, useTransition } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
 import { Centered, Row } from '@/components/share/link-page-parts';
+import { LinkNameField } from '@/components/share/link-name-field';
 import { PortalFailureAlert } from '@/components/share/portal-failure-alert';
 import { formatMoney } from '@/lib/format/money';
 import { formatPercent, formatQuantity } from '@/lib/format/number';
 import { docYear, formatDocNumber } from '@/lib/format/doc-number';
 import type { PublicContract } from '@/lib/contracts/public';
-import { unansweredFailure, type ShownPortalFailure } from '@/lib/share/portal-failure';
-import { acknowledgeContract } from './actions';
-import { contractDecidedKey, contractOutcomeOf, type ContractOutcome } from './contract-outcome';
+import { contractDecidedKey } from './contract-outcome';
+import { useContractAck } from './use-contract-ack';
 
 export function PublicContractView({
   token,
@@ -25,11 +23,7 @@ export function PublicContractView({
 }) {
   const t = useTranslations('contracts.ack');
   const locale = useLocale();
-  const [pending, startTransition] = useTransition();
-  const [outcome, setOutcome] = useState<ContractOutcome>(null);
-  // An answer that never landed: the acknowledgement stays open, the button stays.
-  const [failure, setFailure] = useState<ShownPortalFailure | null>(null);
-  const [name, setName] = useState('');
+  const ack = useContractAck(token);
 
   if (!contract) {
     return <Centered>{t('invalid')}</Centered>;
@@ -41,22 +35,8 @@ export function PublicContractView({
     (wantAr ? ar || en : en || ar) ?? '';
   const num = formatDocNumber('C', contract.number, docYear(null, new Date()));
 
-  function acknowledge() {
-    setFailure(null);
-    startTransition(async () => {
-      try {
-        const res = await acknowledgeContract(token, name);
-        const failed = unansweredFailure(res);
-        if (failed) setFailure(failed);
-        else setOutcome(contractOutcomeOf(res));
-      } catch (rejection) {
-        setFailure({ rejection });
-      }
-    });
-  }
-
-  const decided = contract.status !== 'issued' || outcome !== null;
-  const decidedMessage = t(contractDecidedKey(contract.status, outcome));
+  const decided = contract.status !== 'issued' || ack.outcome !== null;
+  const decidedMessage = t(contractDecidedKey(contract.status, ack.outcome));
 
   return (
     <div className="mx-auto max-w-3xl space-y-4 p-4 md:p-8">
@@ -113,16 +93,18 @@ export function PublicContractView({
         <Card>
           <CardContent className="space-y-3 py-4">
             <p className="text-body text-muted-foreground">{t('intro')}</p>
-            <Input
-              placeholder={t('nameLabel')}
-              value={name}
-              maxLength={120}
-              onChange={(e) => setName(e.target.value)}
+            <LinkNameField
+              ref={ack.nameRef}
+              id="c-name"
+              label={t('nameLabel')}
+              value={ack.name}
+              onChange={ack.setName}
+              error={ack.nameMissing ? t('nameRequired') : null}
             />
-            <PortalFailureAlert failure={failure} />
+            <PortalFailureAlert failure={ack.failure} />
             <div className="flex justify-center">
-              <Button variant="default" onClick={acknowledge} disabled={pending || !name.trim()}>
-                {pending ? (
+              <Button variant="default" onClick={ack.acknowledge} disabled={ack.pending}>
+                {ack.pending ? (
                   <Loader2 className="size-4 animate-spin" aria-hidden />
                 ) : (
                   <Check className="size-4" aria-hidden />

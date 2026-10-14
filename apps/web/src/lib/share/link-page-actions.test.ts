@@ -16,6 +16,7 @@ vi.mock('@/lib/contracts/public', () => ({
   contractPayloadHash: () => 'hash',
 }));
 
+const { DbWriteUncertainError } = await import('@/lib/db/client');
 const { respondToProposal } = await import('@/app/[locale]/p/[token]/actions');
 const { acknowledgeContract } = await import('@/app/[locale]/c/[token]/actions');
 const { respondToVariation } = await import('@/app/[locale]/v/[token]/actions');
@@ -40,6 +41,13 @@ describe('a link page action whose write fails underneath', () => {
     const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
     expect(await call()).toEqual({ ok: false, error: 'uncertain' });
     expect(logged).toHaveBeenCalledTimes(1);
+    logged.mockRestore();
+  });
+
+  it.each(ACTS)('%s: a write past the Workers deadline answers uncertain, never generic (R2)', async (_name, call) => {
+    boom.mockRejectedValue(new DbWriteUncertainError());
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
+    expect(await call()).toEqual({ ok: false, error: 'uncertain' });
     logged.mockRestore();
   });
 

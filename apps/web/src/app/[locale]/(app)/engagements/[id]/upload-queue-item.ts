@@ -34,15 +34,15 @@ export const SKIPPED_PATCH: Partial<UploadQueueItem> = {
 };
 
 /**
- * A broken transfer (the Storage PUT, Storage not signing a renewal, or a server
- * action that never answered) is
+ * A broken transfer (the Storage PUT, Storage not signing a renewal, an unknown
+ * failure, or a server action that never answered) is
  * worth a retry. A refusal (wrong type, too large, a coded server answer) would
  * only be refused again, so it offers none.
  */
 export function isRetryableOutcome(outcome: DeliverableUploadOutcome): boolean {
   return (
     !outcome.ok &&
-    (outcome.reason === 'put_failed' || outcome.reason === 'storage_unavailable' || outcome.reason === 'generic')
+    ['put_failed', 'storage_unavailable', 'generic', 'uncertain', 'rejected'].includes(outcome.reason)
   );
 }
 

@@ -78,7 +78,7 @@ describe('validateVariationLines', () => {
 
   it('requires a description in at least one language', () => {
     expect(fieldsOf([line({ descriptionEn: '  ', descriptionAr: null })])).toEqual({
-      'lines.0.description': 'line_required',
+      'lines.0.description': 'description_required',
     });
     expect(validateVariationLines([line({ descriptionEn: null, descriptionAr: 'باب' })]).ok).toBe(
       true,
@@ -86,7 +86,7 @@ describe('validateVariationLines', () => {
   });
 
   it('refuses a line with no unit', () => {
-    expect(fieldsOf([line({ unit: null })])).toEqual({ 'lines.0.unit': 'line_required' });
+    expect(fieldsOf([line({ unit: null })])).toEqual({ 'lines.0.unit': 'required' });
   });
 
   it('tells an unreadable figure apart from one past the cap', () => {
@@ -140,7 +140,7 @@ describe('validateVariationLines', () => {
     expect(fieldsOf([line(), line({ qty: 'abc', unitPrice: 'x' }), line({ unit: null })])).toEqual({
       'lines.1.qty': 'not_a_number',
       'lines.1.unitPrice': 'not_a_number',
-      'lines.2.unit': 'line_required',
+      'lines.2.unit': 'required',
     });
   });
 });

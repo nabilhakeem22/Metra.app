@@ -5,8 +5,8 @@ import { useLocale, useTranslations } from 'next-intl';
 import { useState, useTransition } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
 import { Centered, Row } from '@/components/share/link-page-parts';
+import { LinkNameField } from '@/components/share/link-name-field';
 import { PortalFailureAlert } from '@/components/share/portal-failure-alert';
 import { formatMoney } from '@/lib/format/money';
 import { formatPercent, formatQuantity } from '@/lib/format/number';
@@ -119,12 +119,7 @@ export function PublicProposalView({
       ) : (
         <Card>
           <CardContent className="space-y-3 py-4">
-            <Input
-              placeholder={t('yourName')}
-              value={name}
-              maxLength={120}
-              onChange={(e) => setName(e.target.value)}
-            />
+            <LinkNameField id="p-name" label={t('yourName')} value={name} onChange={setName} />
             <PortalFailureAlert failure={failure} />
             <div className="flex justify-center gap-3">
               <Button variant="default" onClick={() => respond('accept')} disabled={pending}>

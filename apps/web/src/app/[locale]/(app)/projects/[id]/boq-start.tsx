@@ -68,13 +68,13 @@ export function BoqStart({ projectId }: { projectId: string }) {
   }
 
   function onCommit(): void {
-    if (!preview?.lines?.length) return;
-    errors.clear();
+    // Never a disabled Import: a file with no usable line says so under the file box.
+    if (errors.applyLocal(preview?.lines?.length ? {} : { file: { code: 'import_empty' } })) return;
     start(async () => {
       try {
         const id = await boqToFill();
         if (!id) return;
-        const res = await commitBoqImport({ boqId: id, lines: preview.lines ?? [] });
+        const res = await commitBoqImport({ boqId: id, lines: preview?.lines ?? [] });
         if (errors.applyResult(res)) return;
         toast({ title: t('imported', { count: String(res.data ?? 0) }) });
         setPreview(null);

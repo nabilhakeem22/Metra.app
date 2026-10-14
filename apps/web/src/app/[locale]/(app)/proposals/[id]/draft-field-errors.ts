@@ -52,7 +52,7 @@ export function incompleteDraftErrors(sections: readonly SectionState[]): FieldE
     }
     for (const line of section.lines) {
       if (!line.costItemId && blank(line.descriptionEn) && blank(line.descriptionAr)) {
-        errors[linePath(line.key, 'description')] = { code: 'line_required' };
+        errors[linePath(line.key, 'description')] = { code: 'description_required' };
       }
       for (const figure of FIGURES) {
         if (!blank(line[figure]) && !isValidMoneyInput(figureOf(line[figure]))) {

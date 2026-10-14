@@ -55,6 +55,7 @@ export function ClientPageSheet({
   // server's own (studio-phone.ts, printable-text.ts), and it names every
   // refused field at once.
   function submit() {
+    clear();
     startTransition(async () => {
       try {
         const result = await updateClientPageDetails({ revision, changes: changedDraftFields(initial, draft) });

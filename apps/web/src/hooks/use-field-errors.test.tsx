@@ -24,6 +24,8 @@ function Harness({
   const errors = useFieldErrors({ fields: FIELDS, translate: te });
   async function submit() {
     if (local && errors.applyLocal(local)) return;
+    // Every form starts a send this way: the edit record begins here.
+    if (!local) errors.clear();
     try {
       errors.applyResult(await answer());
     } catch (rejection) {
@@ -147,5 +149,22 @@ describe.each<TestLocale>(['en', 'ar-EG'])('useFieldErrors (%s)', (locale) => {
     await save();
     expect(sent).toBe(0);
     expect(under('city')).toBe(at('errors.field.required'));
+  });
+
+  test('R6: an edit made while the save is in flight keeps its field clear, and the caret stays', async () => {
+    let answerNow: (result: ActionResult) => void = () => {};
+    renderWithIntl(<Harness answer={() => new Promise((resolve) => (answerNow = resolve))} />, { locale });
+    await save();
+    const city = document.getElementById('city') as HTMLInputElement;
+    city.focus();
+    fireEvent.change(city, { target: { value: 'Giza' } });
+    const before = screen.getByTestId('attempt').textContent;
+    await act(async () => {
+      answerNow(fieldsFailed({ city: { code: 'required' }, name: { code: 'required' } }));
+    });
+    expect(under('city')).toBeUndefined();
+    expect(under('name')).toBe(at('errors.field.required'));
+    expect(screen.getByTestId('attempt').textContent).toBe(before);
+    expect(document.activeElement).toBe(city);
   });
 });

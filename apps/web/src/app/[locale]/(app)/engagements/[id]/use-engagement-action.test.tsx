@@ -84,7 +84,7 @@ function ActionProbe({
         doubleClick
       </button>
       <p data-testid="pending">{String(pending)}</p>
-      <p data-testid="error">{error ?? 'none'}</p>
+      <p data-testid="error">{error?.error ?? 'none'}</p>
     </div>
   );
 }

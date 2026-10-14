@@ -3,14 +3,17 @@
 import type { ActionResult } from '@/lib/actions/result';
 import type { HeldKeyTrigger } from '@/lib/engagements/held-act';
 
+/** A refused card action as the card keeps it: its code, and an unknown failure's reference. */
+export type ActionFailure = Pick<ActionResult, 'error' | 'params' | 'reference'>;
+
 /**
  * A form that says its own refusals under its fields (the field-errors hook is one).
- * Given one, a failed answer or a rejection goes to it instead of the card's
- * error line, so a field error is said under the field and nowhere else.
+ * Given one, a failed answer goes to it instead of the card's error line, so a
+ * field error is said under the field and nowhere else. A lost answer (the
+ * promise rejected) reaches it as `uncertain`: the write may have landed.
  */
 export interface RefusalSink {
   applyResult(result: ActionResult): boolean;
-  applyRejection(rejection: unknown): void;
 }
 
 /**

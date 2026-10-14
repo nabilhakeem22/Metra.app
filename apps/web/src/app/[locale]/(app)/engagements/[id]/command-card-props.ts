@@ -1,4 +1,4 @@
-import type { ActionCode } from '@/lib/actions/result';
+import type { ActionFailure } from './run-action';
 import type { BoqStepData } from '@/lib/boqs/step';
 import type { ClientExpectedCard } from './client-expected-card';
 import type { LetteredConceptOption } from '@/lib/engagements/concept-choice';
@@ -67,7 +67,7 @@ export interface EngagementCommandCardProps {
    *  Ignore the argument on an edge that does not need one. */
   runAction: RunAction;
   /** The last card action's refusal, shown inside the card under the action. */
-  actionError: ActionCode | null;
+  actionError: ActionFailure | null;
   /** Opens the "Send reminder" dialog (the nudge pill, the waiting card). */
   onNudge: () => void;
   /** The client's expected date for the next step; null when not offered. */

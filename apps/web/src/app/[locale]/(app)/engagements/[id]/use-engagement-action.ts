@@ -2,18 +2,18 @@
 
 import { useRef, useState, useTransition } from 'react';
 import { useRouter } from '@/i18n/routing';
-import type { ActionCode, ActionResult } from '@/lib/actions/result';
+import type { ActionResult } from '@/lib/actions/result';
 import type { HeldKeyTrigger } from '@/lib/engagements/held-act';
-import type { RefusalSink, RunAction } from './run-action';
+import type { ActionFailure, RefusalSink, RunAction } from './run-action';
 import { releasesKey } from '@/lib/engagements/retry-policy';
 import { loggableFailure } from '@/lib/actions/loggable-failure';
 import { useHeldKeys } from './use-held-keys';
 
-export type { RefusalSink, RunAction } from './run-action';
+export type { ActionFailure, RefusalSink, RunAction } from './run-action';
 
 export interface EngagementActionApi {
   pending: boolean;
-  error: ActionCode | null;
+  error: ActionFailure | null;
   runAction: RunAction;
 }
 
@@ -54,7 +54,7 @@ export interface EngagementActionOptions {
  * offline, a Worker rolling mid-request, a half-open origin -- an unguarded
  * transition never settles and all of them stay disabled with no way back but a
  * reload. A rejection is a transport failure rather than a coded refusal, so it
- * surfaces as `generic`; the action's own failures already return
+ * surfaces as `uncertain` (the write may have landed); the action's own failures already return
  * `{ok:false, error}`. It is logged because otherwise it leaves no trace
  * anywhere: `mutateInOrg` never saw it, so the server has nothing either.
  *
@@ -62,12 +62,15 @@ export interface EngagementActionOptions {
  * instead would strand the page forever on any path where a transition never
  * starts.
  */
+/** A lost answer: the write may have landed, so the person refreshes and checks. */
+const UNCERTAIN = { ok: false, error: 'uncertain' } as const;
+
 export function useEngagementAction(
   options: EngagementActionOptions,
 ): EngagementActionApi {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
-  const [error, setError] = useState<ActionCode | null>(null);
+  const [error, setError] = useState<ActionFailure | null>(null);
   // Guards the frame-sized window `pending` cannot -- see above.
   const inFlight = useRef(false);
   // The keys of the attempts currently in doubt, per trigger and per
@@ -92,7 +95,8 @@ export function useEngagementAction(
     if (result.ok) router.refresh();
     else if (sink) sink.applyResult(result);
     // A refusal with no code cannot be read as definite: say "refresh and check".
-    else setError(result.error ?? 'uncertain');
+    // An unknown failure keeps its reference for the card to show.
+    else setError(result.error ? result : UNCERTAIN);
   }
 
   function runAction(
@@ -128,8 +132,10 @@ export function useEngagementAction(
           'engagement action failed before returning a result',
           loggableFailure(cause),
         );
-        if (sink) sink.applyRejection(cause);
-        else setError('uncertain');
+        // Said as `uncertain` ("refresh and check before trying again"), never
+        // "could not reach Metra, try again": a blind retry could pay twice.
+        if (sink) sink.applyResult(UNCERTAIN);
+        else setError(UNCERTAIN);
       } finally {
         inFlight.current = false;
       }

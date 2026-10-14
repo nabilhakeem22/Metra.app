@@ -113,8 +113,8 @@ export function resolveDraftLine(
     discountPct: line.discountPct,
   });
   const errors: LineErrors = read.ok ? {} : { ...read.errors };
-  if (!identity.unit) errors.unit = { code: 'line_required' };
-  if (!identity.descriptionEn && !identity.descriptionAr) errors.description = { code: 'line_required' };
+  if (!identity.unit) errors.unit = { code: 'required' };
+  if (!identity.descriptionEn && !identity.descriptionAr) errors.description = { code: 'description_required' };
   if (!read.ok || !identity.unit || Object.keys(errors).length > 0) return { ok: false, errors };
   const { factors } = read;
   const totals = lineTotalsWithinCap(factors);

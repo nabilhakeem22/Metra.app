@@ -40,6 +40,8 @@ export type ConfirmClaimAndAdvanceResult = ActionResult & {
   paymentRecorded: boolean;
   advanced: boolean;
   waitingOn?: ActionCode;
+  /** With `waitingOn: 'generic'`: the reference of its log line, for the studio to quote. */
+  waitingOnReference?: string;
 };
 
 interface ClaimGate {

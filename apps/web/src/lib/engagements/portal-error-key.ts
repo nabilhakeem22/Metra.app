@@ -29,6 +29,7 @@ export function portalErrorKey(code: string | null | undefined): PortalErrorKey 
     case 'not_active':
     case 'wrong_state':
     case 'too_many':
+    case 'comments_too_many':
     case 'uncertain':
       return code;
     // Answered already: the act has moved on, in the act's own words.

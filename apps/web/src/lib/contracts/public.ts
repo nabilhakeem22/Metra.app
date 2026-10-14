@@ -108,6 +108,6 @@ export async function acknowledgeContractByToken(
   const code = await readSdfCode(sql`select public.app_contract_ack_by_token(
     ${hash}, ${input.actorName ?? null}, ${input.ip ?? null},
     ${input.userAgent ?? null}, ${input.pdfHash ?? null}
-  ) as code`);
+  ) as code`, { write: true });
   return mapDocumentSdfCode(code);
 }

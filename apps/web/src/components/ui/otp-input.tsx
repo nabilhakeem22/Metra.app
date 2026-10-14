@@ -18,6 +18,8 @@ export interface OtpInputProps {
   /** The id of the refusal said under the boxes: marks each box invalid and
    *  points it there, so focus on any box reads it. */
   errorId?: string;
+  /** The first box's id: the control the code's refusal is said under. */
+  id?: string;
   autoFocus?: boolean;
   className?: string;
 }
@@ -30,6 +32,7 @@ export function OtpInput({
   disabled,
   ariaLabel,
   errorId,
+  id,
   autoFocus,
   className,
 }: OtpInputProps) {
@@ -105,6 +108,7 @@ export function OtpInput({
       {chars.map((c, i) => (
         <input
           key={i}
+          id={i === 0 ? id : undefined}
           ref={(el) => {
             refs.current[i] = el;
           }}

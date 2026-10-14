@@ -165,7 +165,7 @@ describe('PublicVariationView — the open decision', () => {
     );
 
     fireEvent.change(
-      screen.getByPlaceholderText(messageAt('ar-EG', 'variations.client.nameLabel')),
+      screen.getByLabelText(messageAt('ar-EG', 'variations.client.nameLabel')),
       { target: { value: 'منى' } },
     );
     fireEvent.click(

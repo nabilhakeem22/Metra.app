@@ -19,6 +19,15 @@ import type { AbstractIntlMessages } from 'next-intl';
 // walks the imports of every route file into the client bundle and fails until
 // each list equals the sub-trees the client code there calls useTranslations
 // with (less any that another one already contains).
+/** The `errors` sub-trees a small route hands over instead of the whole
+ *  catalogue (R5): exactly the codes its server actions can answer, which
+ *  client-namespaces.test.ts proves by scanning everything the route loads. */
+const errorsOf = (...keys: string[]) => keys.map((key) => `errors.${key}`);
+
+const AUTH_ERRORS = errorsOf('check_fields', 'code_taken', 'field', 'generic', 'otp_email_unavailable', 'otp_rate_limited', 'otp_sms_unavailable', 'otp_verify_failed', 'phone_invalid', 'phone_required', 'reference', 'uncertain', 'unreachable');
+const ONBOARDING_ERRORS = errorsOf('amount_too_large', 'busy', 'check_fields', 'code_taken', 'contract_exists', 'engagement_not_found', 'field', 'file_too_large', 'firm_type_unavailable', 'flow_not_enabled', 'forbidden', 'generic', 'immutable', 'logo_image_unsupported', 'name_required', 'phone_required', 'record_not_found', 'reference', 'storage_unavailable', 'uncertain', 'unreachable');
+const INVITE_ERRORS = errorsOf('already_member', 'amount_too_large', 'busy', 'check_fields', 'code_taken', 'contract_exists', 'engagement_not_found', 'field', 'flow_not_enabled', 'forbidden', 'generic', 'immutable', 'invite_expired', 'invite_not_found', 'invite_wrong_account', 'last_owner', 'malformed', 'owner_immutable', 'pending_exists', 'record_not_found', 'reference', 'self', 'token_invalid', 'uncertain', 'unreachable');
+
 export const CLIENT_NAMESPACES = {
   /** app/[locale]/layout.tsx: the landing page and anything not scoped below. */
   root: ['app'],
@@ -31,11 +40,11 @@ export const CLIENT_NAMESPACES = {
     'tour', 'variations',
   ],
   /** app/[locale]/(auth): sign-in. */
-  auth: ['app', 'common', 'errors', 'hints.auth', 'home', 'login'],
+  auth: ['app', 'common', ...AUTH_ERRORS, 'hints.auth', 'home', 'login'],
   /** app/[locale]/onboarding. */
-  onboarding: ['app', 'common', 'errors', 'hints.onboarding', 'onboarding'],
+  onboarding: ['app', 'common', ...ONBOARDING_ERRORS, 'hints.onboarding', 'onboarding'],
   /** app/[locale]/invite: accepting a team invitation. */
-  invite: ['accept', 'app', 'errors'],
+  invite: ['accept', 'app', ...INVITE_ERRORS],
   /** app/[locale]/c: the client's contract link. */
   contractLink: ['contracts.ack', 'portal.errors'],
   /** app/[locale]/d: the client's delivery page. */

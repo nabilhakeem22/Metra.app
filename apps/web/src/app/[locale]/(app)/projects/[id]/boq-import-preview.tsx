@@ -54,7 +54,7 @@ export function BoqImportPreview({
       )}
 
       <div className="flex gap-2">
-        <Button variant="default" onClick={onCommit} disabled={pending || !preview.lines?.length}>
+        <Button variant="default" onClick={onCommit} disabled={pending}>
           {t('commitImport')}
         </Button>
         <Button variant="ghost" onClick={onCancel} disabled={pending}>

@@ -52,6 +52,8 @@ export type LogPaymentAndAdvanceResult = ActionResult & {
   /** Recorded, not advanced: why the stage waits (the client's review, a guard
    *  still unmet, or `advance_unconfirmed` when the advance gave no answer). */
   waitingOn?: ActionCode;
+  /** With `waitingOn: 'generic'`: the reference of its log line, for the studio to quote. */
+  waitingOnReference?: string;
 };
 
 /**
