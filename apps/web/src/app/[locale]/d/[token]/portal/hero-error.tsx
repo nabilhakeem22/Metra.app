@@ -18,7 +18,7 @@ function ownKeyOf(error: Exclude<HeroError, SharedPortalError>) {
 /**
  * The line an actionable hero shows when its act did not land. A failure every
  * link page shares (a dead link, too many taps, an unknown failure with its
- * reference, a promise that never answered) is said from `portal.errors`; the
+ * reference, an answer that never came back) is said from `portal.errors`; the
  * hero's own outcomes from its catalogue. Every code has been narrowed already,
  * so no key is ever built from a raw server code. When the one-tap
  * approve+budget saved its budget half all the same, a second line says so.
@@ -29,14 +29,13 @@ export function HeroErrorText({ failure }: { failure: HeroFailure }) {
   const tPicker = useTranslations('delivery.conceptPicker');
   const tDesign = useTranslations('delivery.hero.design');
   let message: string;
-  if ('rejection' in failure) message = describePortalFailure(failure, tErrors);
-  else if (isSharedPortalError(failure.error)) {
+  if (isSharedPortalError(failure.error)) {
     message = describePortalFailure({ error: failure.error, reference: failure.reference }, tErrors);
   } else {
     const { scope, key } = ownKeyOf(failure.error);
     message = { picker: tPicker, actions: tActions, design: tDesign }[scope](key);
   }
-  const budgetSaved = !('rejection' in failure) && failure.budget === 'acknowledged';
+  const budgetSaved = failure.budget === 'acknowledged';
   return (
     <div role="alert" className="space-y-1">
       <p className="text-body text-destructive">{message}</p>

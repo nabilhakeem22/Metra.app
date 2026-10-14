@@ -100,8 +100,9 @@ describe('BudgetCard', () => {
     actions.acknowledgeDeliveryBudget.mockRejectedValue(new Error('network'));
     renderCard(ROM, 'en');
     fireEvent.click(screen.getByRole('button', { name: messageAt('en', 'delivery.budget.acknowledge') }));
+    // It may have been saved: refresh and check before sending it again.
     expect((await screen.findByRole('alert')).textContent).toBe(
-      messageAt('en', 'portal.errors.generic'),
+      messageAt('en', 'portal.errors.uncertain'),
     );
     await waitFor(() => expect(screen.getByRole('button').hasAttribute('disabled')).toBe(false));
   });

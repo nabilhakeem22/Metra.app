@@ -1,7 +1,7 @@
 'use client';
 
 import { useRef, useState, useTransition } from 'react';
-import { unansweredFailure, type ShownPortalFailure } from '@/lib/share/portal-failure';
+import { UNCONFIRMED_WRITE, unansweredFailure, type ShownPortalFailure } from '@/lib/share/portal-failure';
 import { acknowledgeContract } from './actions';
 import { contractOutcomeOf, type ContractOutcome } from './contract-outcome';
 
@@ -32,8 +32,9 @@ export function useContractAck(token: string) {
         const failed = unansweredFailure(res);
         if (failed) setFailure(failed);
         else setOutcome(contractOutcomeOf(res));
-      } catch (rejection) {
-        setFailure({ rejection });
+      } catch {
+        // The answer never came back: it may have been recorded (UNCONFIRMED_WRITE).
+        setFailure(UNCONFIRMED_WRITE);
       }
     });
   }

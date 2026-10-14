@@ -2664,8 +2664,7 @@
       "token_expired": "This link has expired. Please contact your design team.",
       "token_invalid": "This link is no longer available. Please contact your design team.",
       "too_many": "You sent many requests in the last minute. Wait a minute, then try again.",
-      "uncertain": "We could not confirm that your answer was recorded. Refresh the page to check before trying again.",
-      "unreachable": "We could not connect. Check your internet connection, then try again."
+      "uncertain": "We could not confirm your answer was received. Refresh the page to check before sending it again."
     }
   }
 }

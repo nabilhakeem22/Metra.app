@@ -1,7 +1,7 @@
 // The failures every client link page (/d, /p, /c, /v) says the same way, from
 // the shared `portal.errors` catalogue (فصحى). PURE and CLIENT-SAFE: the server
 // actions build these, the pages render them.
-import { describeFailure, describeRejection, type Translate } from '@/lib/actions/error-message';
+import { describeFailure, type Translate } from '@/lib/actions/error-message';
 
 /** Every key `portal.errors` holds for a failed act. */
 export type SharedPortalError =
@@ -13,8 +13,16 @@ export type SharedPortalError =
   | 'uncertain'
   | 'generic';
 
-/** A failure as a page keeps it for display: a coded answer, or a promise that never answered. */
-export type ShownPortalFailure = { error: SharedPortalError; reference?: string } | { rejection: unknown };
+/** A failure as a page keeps it for display. */
+export type ShownPortalFailure = { error: SharedPortalError; reference?: string };
+
+/**
+ * A client WRITE whose request rejected (the answer never came back). It may
+ * have reached the server and been saved, so it is never said as "could not
+ * reach": the client is told to refresh and check before sending it again.
+ * Only a READ (loading a thread) may say it failed outright.
+ */
+export const UNCONFIRMED_WRITE: ShownPortalFailure = { error: 'uncertain' };
 
 const SHARED: ReadonlySet<string> = new Set<SharedPortalError>([
   'token_invalid',
@@ -33,11 +41,9 @@ export function isSharedPortalError(error: string): error is SharedPortalError {
 
 /**
  * The sentence for a shared portal failure, with `t = useTranslations('portal.errors')`.
- * An unknown failure hands the client its reference; a promise that never
- * answered says the connection failed, or the server did (with Next's digest).
+ * An unknown failure hands the client its reference.
  */
 export function describePortalFailure(failure: ShownPortalFailure, t: Translate): string {
-  if ('rejection' in failure) return describeRejection(failure.rejection, t);
   if (failure.error === 'generic') return describeFailure({ error: failure.error, reference: failure.reference }, t);
   return t(failure.error);
 }

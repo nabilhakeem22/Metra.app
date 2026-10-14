@@ -7,12 +7,13 @@ import { useFocusFirstInvalid } from '@/hooks/use-focus-first-invalid';
 import { COMMENT_FIELDS, commentFieldErrors } from '@/lib/engagements/comment-field-rules';
 import { actFailureOf, describeActFailure, type ShownActFailure } from '@/lib/engagements/portal-error-key';
 import type { ThreadSendRefusals } from '@/lib/engagements/use-document-thread';
+import { UNCONFIRMED_WRITE } from '@/lib/share/portal-failure';
 import type { DeliveryCommentActResult } from '../actions';
 
 // Where the client's comment box says a refused send: a blank or too-long
 // message under the box (checked before sending, and again by the server); any
 // other failure (too many messages, a closed delivery, an unknown failure with
-// its reference, a connection that dropped) in the line just below it.
+// its reference, an answer that never came back) in the line just below it.
 
 export function useCommentRefusals() {
   const t = useTranslations('delivery.comments');
@@ -37,9 +38,10 @@ export function useCommentRefusals() {
       }
       return true;
     },
-    applyRejection(rejection) {
+    applyRejection() {
+      // The message may have been saved: refresh and check before sending it again.
       errors.clear();
-      setFailure({ rejection });
+      setFailure(UNCONFIRMED_WRITE);
     },
   };
 

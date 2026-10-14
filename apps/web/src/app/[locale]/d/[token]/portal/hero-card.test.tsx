@@ -132,7 +132,7 @@ describe('a refusal always reads from the catalog', () => {
     expect(screen.getByRole('button', { name: en('delivery.hero.design.approve') }).hasAttribute('disabled')).toBe(false);
   });
 
-  it('a rejected action leaves no spinner stuck and shows the generic message', async () => {
+  it('a rejected action leaves no spinner stuck and says refresh and check (it may have been saved)', async () => {
     actions.acknowledgeDeliveryHandover.mockRejectedValue(new Error('network'));
     renderCommandCard({
       hero: { kind: 'action', group: 'handoff', showRomAck: false },
@@ -140,7 +140,7 @@ describe('a refusal always reads from the catalog', () => {
     });
     fireEvent.click(screen.getByRole('button', { name: en('delivery.hero.handoff.acknowledge') }));
     await answerDialog('en', 'confirm');
-    expect((await screen.findByRole('alert')).textContent).toBe(en('portal.errors.generic'));
+    expect((await screen.findByRole('alert')).textContent).toBe(en('portal.errors.uncertain'));
     await waitFor(() =>
       expect(screen.getByRole('button', { name: en('delivery.hero.handoff.acknowledge') }).hasAttribute('disabled')).toBe(false),
     );
