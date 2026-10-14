@@ -76,7 +76,7 @@ describe('the one-screen onboarding', () => {
     expect([input('nameAr').maxLength, input('nameEn').maxLength, input('city').maxLength]).toEqual([200, 200, 120]);
     fireEvent.change(input('city'), { target: { value: 'ج'.repeat(120) } });
     const message = messageAt('ar-EG', 'onboarding.tooLong').replace('{max}', '120');
-    expect(screen.getByRole('alert').textContent).toBe(message);
+    expect(document.getElementById('city-error')?.textContent).toBe(message);
     expect(input('city').getAttribute('aria-invalid')).toBe('true');
   });
 

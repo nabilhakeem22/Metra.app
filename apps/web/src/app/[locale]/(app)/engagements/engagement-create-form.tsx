@@ -7,7 +7,6 @@ import type { ClientOption } from '@/lib/clients/queries';
 import { NeedFirst } from './delivery-form-parts';
 import { EngagementCreateFields } from './engagement-create-fields';
 import {
-  canSubmitDelivery,
   type DeliveryFormField,
   type ProjectNames,
   type ProjectOption,
@@ -111,7 +110,6 @@ export function EngagementCreateForm({
       cancelLabel={t('cancel')}
       closeLabel={tc('close')}
       pending={form.pending}
-      canSubmit={canSubmitDelivery(form.values)}
       formError={messageFor('form')}
     >
       {body}

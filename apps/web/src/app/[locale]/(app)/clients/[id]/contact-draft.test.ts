@@ -4,7 +4,6 @@ import {
   EMPTY_CONTACT_DRAFT,
   contactPayload,
   draftFromContact,
-  validateDraft,
 } from './contact-draft';
 
 function contact(overrides: Partial<ClientContact> = {}): ClientContact {
@@ -32,10 +31,6 @@ describe('EMPTY_CONTACT_DRAFT', () => {
       isPrimary: false,
     });
   });
-
-  test('it is not submittable', () => {
-    expect(validateDraft(EMPTY_CONTACT_DRAFT)).toBe(false);
-  });
 });
 
 describe('draftFromContact', () => {
@@ -61,22 +56,6 @@ describe('draftFromContact', () => {
   test('editing carries the id, which is what makes the form an UPDATE', () => {
     expect(draftFromContact(contact()).id).toBe('contact-1');
     expect(EMPTY_CONTACT_DRAFT.id).toBeNull();
-  });
-});
-
-describe('validateDraft', () => {
-  test('a name is the only requirement', () => {
-    expect(validateDraft({ ...EMPTY_CONTACT_DRAFT, name: 'Mona' })).toBe(true);
-  });
-
-  test.each(['', ' ', '\t', '\n', '   '])('%j is not a name', (name) => {
-    expect(validateDraft({ ...EMPTY_CONTACT_DRAFT, name })).toBe(false);
-  });
-
-  test('a firm may know only a name — no phone, no email, no role', () => {
-    expect(
-      validateDraft({ ...EMPTY_CONTACT_DRAFT, name: 'Mona', role: '', phone: '', email: '' }),
-    ).toBe(true);
   });
 });
 

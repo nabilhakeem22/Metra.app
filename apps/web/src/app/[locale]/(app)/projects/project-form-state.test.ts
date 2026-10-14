@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import {
-  canSaveProject,
   emptyProjectForm,
   locationFromClient,
   todayIsoLocal,
@@ -57,21 +56,6 @@ describe('location from the client', () => {
     };
     const changed = withClient(typed, 'c-2', CLIENTS, EGYPT);
     expect(changed).toMatchObject({ clientId: 'c-2', city: 'New Cairo', country: 'Egypt' });
-  });
-});
-
-describe('canSaveProject', () => {
-  const base = { ...emptyProjectForm(CLIENTS, 'c-1', TODAY, EGYPT), nameEn: 'Tower' };
-
-  it('needs a name, a client and (on create) a start date', () => {
-    expect(canSaveProject(base, true)).toBe(true);
-    expect(canSaveProject({ ...base, nameEn: ' ' }, true)).toBe(false);
-    expect(canSaveProject({ ...base, clientId: '' }, true)).toBe(false);
-    expect(canSaveProject({ ...base, startDate: '' }, true)).toBe(false);
-  });
-
-  it('an edit may keep a legacy project without dates', () => {
-    expect(canSaveProject({ ...base, startDate: '' }, false)).toBe(true);
   });
 });
 

@@ -10,7 +10,7 @@ import { resolveActionError } from '@/lib/actions/error-message';
 import type { ActionCode } from '@/lib/actions/result';
 import { createContact, updateContact } from '@/lib/client-contacts/actions';
 import { contactFieldFor, type ContactFormField } from './contact-form-errors';
-import { contactPayload, validateDraft, type ContactDraft } from './contact-draft';
+import { contactPayload, type ContactDraft } from './contact-draft';
 
 /** The boxes that differ only in their key and their direction. */
 const TEXT_FIELDS = [
@@ -80,7 +80,6 @@ export function ContactForm({
       cancelLabel={t('cancel')}
       closeLabel={tc('close')}
       pending={pending}
-      canSubmit={validateDraft(draft)}
       formError={messageFor('form')}
     >
       {TEXT_FIELDS.map((field) => (

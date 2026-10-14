@@ -93,8 +93,3 @@ export function withClient(
   return { ...form, clientId, ...locationFromClient(client, defaultCountry) };
 }
 
-/** Save needs a name, a client and, on create, a start date (the server agrees). */
-export function canSaveProject(form: ProjectFormState, isCreate: boolean): boolean {
-  const hasName = form.nameEn.trim() !== '' || form.nameAr.trim() !== '';
-  return hasName && form.clientId !== '' && (!isCreate || form.startDate !== '');
-}

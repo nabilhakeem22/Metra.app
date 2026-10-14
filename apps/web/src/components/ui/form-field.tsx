@@ -2,14 +2,38 @@
 
 import { useTranslations } from 'next-intl';
 import { cloneElement, type ReactElement, type ReactNode } from 'react';
+import { FieldErrorText, fieldErrorId } from '@/components/ui/field-error-text';
 import { FieldHint } from '@/components/ui/field-hint';
 import { Label } from '@/components/ui/label';
+
+type ChangeHandler = (...args: never[]) => void;
 
 interface DescribableProps {
   id?: string;
   'aria-invalid'?: boolean | 'true' | 'false';
   'aria-describedby'?: string;
   'aria-required'?: boolean | 'true' | 'false';
+  onChange?: ChangeHandler;
+  onValueChange?: ChangeHandler;
+}
+
+/**
+ * The child's own change handler with `onEdit` run first. A Radix-style control
+ * reports through `onValueChange`; every other control through `onChange`.
+ */
+function withEdit(
+  props: DescribableProps,
+  onEdit: (() => void) | undefined,
+): Pick<DescribableProps, 'onChange' | 'onValueChange'> {
+  if (!onEdit) return {};
+  const key = props.onValueChange ? 'onValueChange' : 'onChange';
+  const own = props[key];
+  return {
+    [key]: (...args: never[]) => {
+      onEdit();
+      own?.(...args);
+    },
+  };
 }
 
 /**
@@ -19,6 +43,8 @@ interface DescribableProps {
  * the field's `id`, `aria-invalid` while there is an error, and
  * `aria-describedby` pointing at the hint and the error text. A string hint
  * becomes the standard "?" FieldHint; any other node is rendered as given.
+ * `onEdit` runs before the child's own change handler, so editing the field can
+ * clear its refusal.
  */
 export function FormField({
   id,
@@ -26,6 +52,7 @@ export function FormField({
   required = false,
   error,
   hint,
+  onEdit,
   children,
 }: {
   id: string;
@@ -33,11 +60,12 @@ export function FormField({
   required?: boolean;
   error?: string | null;
   hint?: ReactNode;
+  onEdit?: () => void;
   children: ReactElement<DescribableProps>;
 }) {
   const t = useTranslations('common');
   const hintId = typeof hint === 'string' ? `${id}-hint` : undefined;
-  const errorId = error ? `${id}-error` : undefined;
+  const errorId = error ? fieldErrorId(id) : undefined;
   const describedBy =
     [children.props['aria-describedby'], hintId, errorId].filter(Boolean).join(' ') || undefined;
 
@@ -60,12 +88,9 @@ export function FormField({
         'aria-invalid': error ? true : children.props['aria-invalid'],
         'aria-describedby': describedBy,
         'aria-required': required || children.props['aria-required'],
+        ...withEdit(children.props, onEdit),
       })}
-      {error && (
-        <p id={errorId} className="text-body text-destructive" role="alert">
-          {error}
-        </p>
-      )}
+      <FieldErrorText id={fieldErrorId(id)} message={error} />
     </div>
   );
 }

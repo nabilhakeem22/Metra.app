@@ -32,10 +32,10 @@ describe('ProjectForm (new)', () => {
     expect((document.getElementById('pr-country') as HTMLInputElement).value).toBe(
       en('projects.form.countryDefault'),
     );
-    // Save waits for a name and a client.
+    // Save never waits: pressing it is how a missing name or client is explained.
     expect(
       (screen.getByRole('button', { name: en('projects.form.save') }) as HTMLButtonElement).disabled,
-    ).toBe(true);
+    ).toBe(false);
   });
 
   test('with zero clients it links to /clients?new=1 for a role that may add one', () => {
