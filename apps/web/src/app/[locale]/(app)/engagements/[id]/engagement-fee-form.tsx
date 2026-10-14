@@ -120,6 +120,7 @@ export function EngagementFeeForm({
         onChange={setRow}
         onAdd={addRow}
         onRemove={removeRow}
+        firstInputId={SPLIT_ID}
         errorId={splitRefusal ? fieldErrorId(SPLIT_ID) : undefined}
       />
 

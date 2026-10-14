@@ -1,4 +1,4 @@
-import { act, fireEvent, screen } from '@testing-library/react';
+import { act, fireEvent, screen, within } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import type { ActionResult } from '@/lib/actions/result';
@@ -6,9 +6,11 @@ import { expectFieldErrorsRenderUnderFields } from '@/test/field-coverage';
 import { messageAt, renderWithIntl, type TestLocale } from '@/test/render-with-intl';
 import { ClientExpectedDate } from './client-expected-date';
 import { CommandCardClaims } from './command-card-claims';
+import { EngagementFeeForm } from './engagement-fee-form';
 import { HandoffAckPanel } from './engagement-handoff-ack-panel';
 import { PaymentForm } from './engagement-payment-form';
 import { PaymentPanel } from './engagement-payment-panel';
+import { RetractButton } from './engagement-retract-button';
 import { EngagementRevisionForm } from './engagement-revision-form';
 import { RomAckPanel } from './engagement-rom-ack-panel';
 import { RomRangeForm } from './engagement-rom-range-form';
@@ -38,6 +40,8 @@ const actions = vi.hoisted(() => ({
   setClientExpectedDate: vi.fn(),
   confirmPaymentClaim: vi.fn(),
   dismissPaymentClaim: vi.fn(),
+  submitDesignFee: vi.fn(),
+  recordEventCorrection: vi.fn(),
 }));
 vi.mock('@/lib/engagements/actions', () => actions);
 
@@ -230,6 +234,51 @@ describe.each<TestLocale>(['en', 'ar-EG'])('cockpit forms say refusals under the
       submit: press('engagements.paymentClaims.confirm'),
       locale,
       typed: { 'claim-amount-c-1': '30000' },
+    });
+  });
+
+  test('design fee: the fee and the split (the first row box carries the split)', async () => {
+    show(({ pending, runAction }) => (
+      <EngagementFeeForm
+        engagementId="e-1"
+        prefill={null}
+        pending={pending}
+        onSubmit={(fn, form) => runAction(fn, undefined, undefined, form)}
+        onCancel={() => {}}
+      />
+    ));
+    type('fee-amount', '90000');
+    const rows = screen.getAllByRole('textbox').filter((box) => box.id !== 'fee-amount');
+    ['50', '30', '20'].forEach((value, index) => fireEvent.change(rows[index], { target: { value } }));
+    await expectFieldErrorsRenderUnderFields({
+      fields: ['designFee', 'milestones'],
+      controlIdOf: (field) => (field === 'designFee' ? 'fee-amount' : 'fee-milestones'),
+      answerWith: answer(actions.submitDesignFee),
+      submit: press('engagements.feeForm.submit'),
+      locale,
+      typed: { 'fee-amount': '90000' },
+    });
+  });
+
+  test('retract: the reason (said before the confirm is asked, answered after it)', async () => {
+    show(({ pending, runAction }) => (
+      <RetractButton engagementId="e-1" eventId="ev-1" pending={pending} runAction={runAction} />
+    ));
+    fireEvent.click(screen.getByRole('button', { name: at('engagements.timeline.retract') }));
+    type('retract-ev-1', 'Logged on the wrong delivery');
+    await expectFieldErrorsRenderUnderFields({
+      fields: ['reason'],
+      controlIdOf: () => 'retract-ev-1',
+      answerWith: answer(actions.recordEventCorrection),
+      submit: async () => {
+        await press('engagements.timeline.retractConfirm')();
+        const dialog = await screen.findByRole('alertdialog');
+        await act(async () => {
+          fireEvent.click(within(dialog).getByRole('button', { name: at('engagements.timeline.retractConfirm') }));
+        });
+      },
+      locale,
+      typed: { 'retract-ev-1': 'Logged on the wrong delivery' },
     });
   });
 

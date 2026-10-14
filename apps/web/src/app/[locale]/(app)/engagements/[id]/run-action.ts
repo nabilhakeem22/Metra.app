@@ -4,7 +4,7 @@ import type { ActionResult } from '@/lib/actions/result';
 import type { HeldKeyTrigger } from '@/lib/engagements/held-act';
 
 /**
- * A form that says its own refusals under its fields (useFieldErrors is one).
+ * A form that says its own refusals under its fields (the field-errors hook is one).
  * Given one, a failed answer or a rejection goes to it instead of the card's
  * error line, so a field error is said under the field and nowhere else.
  */

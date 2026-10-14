@@ -1,5 +1,6 @@
-import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { expectFieldErrorsRenderUnderFields } from '@/test/field-coverage';
 import { messageAt, renderWithIntl } from '@/test/render-with-intl';
 import { DocumentThreadPanel } from './document-thread-panel';
 
@@ -78,6 +79,26 @@ describe('DocumentThreadPanel when a reply is refused', () => {
     expect(actions.replyToDocument).not.toHaveBeenCalled();
     expect(document.getElementById(`reply-${ARTIFACT}-error`)?.textContent).toBe(en('errors.field.required'));
     expect(screen.getByRole('textbox').getAttribute('aria-invalid')).toBe('true');
+  });
+
+  it.each(['en', 'ar-EG'] as const)('a refused reply is said under the box (%s)', async (locale) => {
+    actions.listDocumentComments.mockResolvedValue([]);
+    renderWithIntl(<DocumentThreadPanel artifactId={ARTIFACT} canReply />, { locale });
+    fireEvent.click(screen.getByRole('button', { name: messageAt(locale, 'engagements.comments.open') }));
+    await screen.findByText(messageAt(locale, 'engagements.comments.empty'));
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Is this oak?' } });
+    await expectFieldErrorsRenderUnderFields({
+      fields: ['body'],
+      controlIdOf: () => `reply-${ARTIFACT}`,
+      answerWith: (result) => actions.replyToDocument.mockResolvedValue(result),
+      submit: async () => {
+        await act(async () => {
+          fireEvent.click(screen.getByRole('button', { name: messageAt(locale, 'engagements.comments.reply') }));
+        });
+      },
+      locale,
+      typed: { [`reply-${ARTIFACT}`]: 'Is this oak?' },
+    });
   });
 
   it('a server refusal with no field is said above the box, by its cause', async () => {

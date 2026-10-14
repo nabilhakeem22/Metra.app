@@ -45,7 +45,7 @@ export interface DocumentThread<TMessage> {
 }
 
 /** Where a refused or failed send is said, when the caller says it under the
- *  message box (useFieldErrors is one) rather than as the thread's coded error. */
+ *  message box (the field-errors hook is one) rather than as the thread's coded error. */
 export interface ThreadSendRefusals<TResult> {
   applyResult(result: TResult): boolean;
   applyRejection(rejection: unknown): void;

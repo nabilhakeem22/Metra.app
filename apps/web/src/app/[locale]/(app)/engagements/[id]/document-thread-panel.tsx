@@ -1,12 +1,13 @@
 'use client';
 
 import { Loader2, MessageSquare, Send } from 'lucide-react';
-import { useCallback } from 'react';
+import { useCallback, useRef } from 'react';
 import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
 import { FieldErrorText, fieldErrorId } from '@/components/ui/field-error-text';
 import { Textarea } from '@/components/ui/textarea';
 import { useFieldErrors } from '@/hooks/use-field-errors';
+import { useFocusFirstInvalid } from '@/hooks/use-focus-first-invalid';
 import type { ActionResult } from '@/lib/actions/result';
 import {
   listDocumentComments,
@@ -51,6 +52,8 @@ export function DocumentThreadPanel({
   const te = useTranslations('errors');
   const replyId = `reply-${artifactId}`;
   const errors = useFieldErrors({ fields: COMMENT_FIELDS, translate: te });
+  const replyRef = useRef<HTMLDivElement>(null);
+  useFocusFirstInvalid(replyRef, errors.invalidAttempt);
 
   const load = useCallback(() => listDocumentComments(artifactId), [artifactId]);
   const submit = useCallback(
@@ -93,7 +96,7 @@ export function DocumentThreadPanel({
           <DocumentThreadPanelBody thread={thread} />
 
           {canReply && (
-            <div className="space-y-1.5">
+            <div ref={replyRef} className="space-y-1.5">
               <label htmlFor={replyId} className="sr-only">
                 {t('placeholder')}
               </label>
