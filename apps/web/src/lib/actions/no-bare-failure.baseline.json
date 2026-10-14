@@ -1,7 +1,0 @@
-{
-  "app/[locale]/d/[token]/portal/hero-action.tsx": 1,
-  "app/[locale]/d/[token]/portal/hero-verbs.ts": 1,
-  "app/[locale]/d/[token]/portal/use-payment-claim.ts": 1,
-  "app/[locale]/d/[token]/review-actions.ts": 1,
-  "lib/engagements/client-acts/design-acts.ts": 1
-}
