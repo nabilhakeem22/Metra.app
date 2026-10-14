@@ -2,27 +2,16 @@
 
 import { useTranslations } from 'next-intl';
 import { useSearchParams } from 'next/navigation';
-import { useState, useTransition } from 'react';
-import { resolveActionError } from '@/lib/actions/error-message';
+import { useRef } from 'react';
 import { AuthShell } from '@/components/auth/auth-shell';
-import { useCountdown } from '@/hooks/use-countdown';
-import { Link, useRouter } from '@/i18n/routing';
-import {
-  resolvePostLoginPath,
-  sendEmailOtp,
-  sendPhoneOtp,
-  verifyEmailOtp,
-  verifyPhoneOtp,
-} from '@/lib/auth/actions';
+import { useFocusFirstInvalid } from '@/hooks/use-focus-first-invalid';
+import { Link } from '@/i18n/routing';
+import { OTP_LENGTH } from '@/lib/auth/otp-field-rules';
 import { LoginRequestStep } from './login-request-step';
 import { LoginVerifyStep } from './login-verify-step';
+import { useOtpFlow } from './use-otp-flow';
 
-export type Channel = 'email' | 'phone';
-type Status = 'idle' | 'sending' | 'code-sent' | 'verifying' | 'error' | 'success';
 type Mode = 'signin' | 'signup';
-
-const OTP_LENGTH = 6;
-const RESEND_SECONDS = 60;
 
 /**
  * Passwordless auth form. A `?mode=signup` / `?mode=signin` (default) search
@@ -34,80 +23,15 @@ const RESEND_SECONDS = 60;
 export function LoginForm() {
   const t = useTranslations('login');
   const th = useTranslations('hints.auth');
-  const te = useTranslations('errors');
-  const router = useRouter();
   const searchParams = useSearchParams();
-  const [, startTransition] = useTransition();
-  const countdown = useCountdown(RESEND_SECONDS);
+  const flow = useOtpFlow();
+  const stepRef = useRef<HTMLDivElement>(null);
+  useFocusFirstInvalid(stepRef, flow.errors.invalidAttempt);
 
   const mode: Mode = searchParams.get('mode') === 'signup' ? 'signup' : 'signin';
-
-  const [channel, setChannel] = useState<Channel>('email');
-  const [phase, setPhase] = useState<'request' | 'verify'>('request');
-  const [status, setStatus] = useState<Status>('idle');
-  const [identifier, setIdentifier] = useState('');
-  const [code, setCode] = useState('');
-  const [error, setError] = useState<string | null>(null);
-
-  const sending = status === 'sending';
-  const verifying = status === 'verifying';
-  const busy = sending || verifying || status === 'success';
-
-  function send() {
-    setError(null);
-    setStatus('sending');
-    startTransition(async () => {
-      const res =
-        channel === 'email'
-          ? await sendEmailOtp(identifier)
-          : await sendPhoneOtp(identifier);
-      if (res.ok) {
-        setPhase('verify');
-        setStatus('code-sent');
-        setCode('');
-        countdown.start(RESEND_SECONDS);
-      } else {
-        setStatus('error');
-        setError(resolveActionError(res.error, te));
-      }
-    });
-  }
-
-  function verify(fullCode?: string) {
-    const value = fullCode ?? code;
-    if (value.length < OTP_LENGTH) return;
-    setError(null);
-    setStatus('verifying');
-    startTransition(async () => {
-      const res =
-        channel === 'email'
-          ? await verifyEmailOtp(identifier, value)
-          : await verifyPhoneOtp(identifier, value);
-      if (res.ok) {
-        setStatus('success');
-        // Route by membership: dashboard if they already have an org, else onboarding.
-        const path = await resolvePostLoginPath();
-        router.push(path);
-      } else {
-        // Stay on the verify step; show a localized error.
-        setStatus('error');
-        setError(resolveActionError(res.error, te));
-      }
-    });
-  }
-
-  function changeIdentifier() {
-    setPhase('request');
-    setStatus('idle');
-    setCode('');
-    setError(null);
-    countdown.reset();
-  }
-
-  function switchChannel(next: Channel) {
-    setChannel(next);
-    changeIdentifier();
-  }
+  const sending = flow.status === 'sending';
+  const verifying = flow.status === 'verifying';
+  const busy = sending || verifying || flow.status === 'success';
 
   return (
     <AuthShell showValueProp>
@@ -116,48 +40,52 @@ export function LoginForm() {
           <h1 className="text-heading font-bold">
             {mode === 'signup' ? t('signUpTitle') : t('signInTitle')}
           </h1>
-          {phase === 'request' && (
+          {flow.phase === 'request' && (
             <p className="text-body text-muted-foreground">
               {mode === 'signup' ? t('signUpSubtitle') : t('signInSubtitle')}
             </p>
           )}
         </div>
 
-        {phase === 'request' ? (
-          <LoginRequestStep
-            t={t}
-            th={th}
-            channel={channel}
-            switchChannel={switchChannel}
-            identifier={identifier}
-            setIdentifier={setIdentifier}
-            send={send}
-            busy={busy}
-            sending={sending}
-          />
-        ) : (
-          <LoginVerifyStep
-            t={t}
-            th={th}
-            identifier={identifier}
-            changeIdentifier={changeIdentifier}
-            code={code}
-            setCode={setCode}
-            verify={verify}
-            send={send}
-            busy={busy}
-            verifying={verifying}
-            otpLength={OTP_LENGTH}
-            countdown={countdown}
-          />
-        )}
+        <div ref={stepRef}>
+          {flow.phase === 'request' ? (
+            <LoginRequestStep
+              t={t}
+              th={th}
+              channel={flow.channel}
+              switchChannel={flow.switchChannel}
+              identifier={flow.identifier}
+              setIdentifier={flow.setIdentifier}
+              identifierError={flow.errors.messageFor(flow.channel)}
+              send={flow.send}
+              busy={busy}
+              sending={sending}
+            />
+          ) : (
+            <LoginVerifyStep
+              t={t}
+              th={th}
+              identifier={flow.identifier}
+              changeIdentifier={flow.changeIdentifier}
+              code={flow.code}
+              setCode={flow.setCode}
+              codeError={flow.errors.messageFor('token')}
+              verify={flow.verify}
+              send={flow.send}
+              busy={busy}
+              verifying={verifying}
+              otpLength={OTP_LENGTH}
+              countdown={flow.countdown}
+            />
+          )}
+        </div>
 
         <p
           role="status"
           aria-live="polite"
           className="min-h-[1.25rem] text-body text-destructive"
         >
-          {error}
+          {flow.errors.formError}
         </p>
 
         <p className="text-center text-body text-muted-foreground">

@@ -7,6 +7,7 @@ import { requireOrg } from '@/lib/auth/require-org';
 import { withOrgContext } from '@/lib/db/context';
 import { sendInviteEmail } from '@/lib/email/resend';
 import { canManageOrg } from '@/lib/permissions/can';
+import { isValidEmail, normalizeEmail } from '@/lib/validation/email';
 import { isUniqueViolation } from '@/lib/actions/db-conflict';
 import { type ActionResult } from '@/lib/actions/result';
 import { loggableFailure } from '@/lib/actions/loggable-failure';
@@ -16,9 +17,7 @@ import {
   INVITE_TTL_DAYS,
   buildAcceptUrl,
   currentLocale,
-  isValidEmail,
   mintShareToken,
-  normalizeEmail,
   orgDisplayName,
 } from './helpers';
 

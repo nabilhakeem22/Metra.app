@@ -1,6 +1,6 @@
 import 'server-only';
-// Shared internals for the team server-action modules (invite token minting, email
-// normalization, origin/link building, org display name). Extracted from the
+// Shared internals for the team server-action modules (invite token minting,
+// origin/link building, org display name). Extracted from the
 // original `'use server'` actions file so the invite/member/accept action modules
 // can share them: a `'use server'` module may only export async functions, so these
 // sync helpers must live in a plain server-only module. NOT part of the
@@ -17,14 +17,6 @@ import { mintShareToken } from '@/lib/share/token';
 export { mintShareToken };
 
 export const INVITE_TTL_DAYS = 7;
-
-export function normalizeEmail(email: string): string {
-  return email.trim().toLowerCase();
-}
-
-export function isValidEmail(email: string): boolean {
-  return /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email);
-}
 
 export async function currentLocale(): Promise<string> {
   try {
