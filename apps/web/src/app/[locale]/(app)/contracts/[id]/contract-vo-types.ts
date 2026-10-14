@@ -1,6 +1,7 @@
 // Shared view-model types for the contract detail + variation-order UI
 // (server-safe: types only).
 import type { CostItemUnit } from '@metra/db';
+import type { ActionResult } from '@/lib/actions/result';
 
 export interface BaselineLine {
   id: string;
@@ -16,7 +17,5 @@ export interface DraftVoLine {
   discountPct: string;
 }
 
-/** Runs a server action, refreshing on success and surfacing a coded error. */
-export type ContractAction = (
-  fn: () => Promise<{ ok: boolean; error?: string; link?: string }>,
-) => void;
+/** Runs a server action, refreshing on success and saying why it failed. */
+export type ContractAction = (fn: () => Promise<ActionResult>) => void;

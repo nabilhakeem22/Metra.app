@@ -7,6 +7,8 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { StatusChip } from '@/components/ui/status-chip';
 import { useRouter } from '@/i18n/routing';
+import { describeFailure, describeRejection } from '@/lib/actions/error-message';
+import type { ActionResult } from '@/lib/actions/result';
 import { docYear, formatDocNumber } from '@/lib/format/doc-number';
 import { pickLocale } from '@/lib/i18n/pick-locale';
 import {
@@ -49,6 +51,7 @@ export function VariationRegister({
   act: ContractAction;
 }) {
   const tv = useTranslations('variations');
+  const te = useTranslations('errors');
   const locale = useLocale();
   const router = useRouter();
   const [creating, setCreating] = useState(false);
@@ -68,35 +71,39 @@ export function VariationRegister({
     ]);
   }
 
+  async function createWithLines(): Promise<ActionResult> {
+    const created = await createVariationDraft({
+      contractId,
+      titleEn: title,
+      reasonEn: reason || null,
+    });
+    if (!created.ok || !created.data || lines.length === 0) return created;
+    return saveVariationDraft({
+      id: created.data,
+      lines: lines.map((l, i) => ({
+        contractLineId: l.contractLineId || null,
+        descriptionEn: l.descriptionEn || 'Variation line',
+        qty: l.qty,
+        unit: l.unit,
+        unitPrice: l.unitPrice,
+        discountPct: l.discountPct,
+        sortOrder: i,
+      })),
+    });
+  }
+
   function createAndSave() {
     setError(null);
     startLocal(async () => {
-      const created = await createVariationDraft({
-        contractId,
-        titleEn: title,
-        reasonEn: reason || null,
-      });
-      if (!created.ok || !created.data) {
-        setError(created.error ?? 'generic');
-        return;
-      }
-      if (lines.length) {
-        const saved = await saveVariationDraft({
-          id: created.data,
-          lines: lines.map((l, i) => ({
-            contractLineId: l.contractLineId || null,
-            descriptionEn: l.descriptionEn || 'Variation line',
-            qty: l.qty,
-            unit: l.unit,
-            unitPrice: l.unitPrice,
-            discountPct: l.discountPct,
-            sortOrder: i,
-          })),
-        });
-        if (!saved.ok) {
-          setError(saved.error ?? 'generic');
+      try {
+        const result = await createWithLines();
+        if (!result.ok) {
+          setError(describeFailure(result, te));
           return;
         }
+      } catch (rejection) {
+        setError(describeRejection(rejection, te));
+        return;
       }
       setCreating(false);
       setTitle('');

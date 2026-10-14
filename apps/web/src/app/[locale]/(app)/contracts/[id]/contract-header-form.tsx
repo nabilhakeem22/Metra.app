@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { useRouter } from '@/i18n/routing';
+import { describeFailure, describeRejection } from '@/lib/actions/error-message';
 import { saveContractDraft } from '@/lib/contracts/actions';
 import type { ContractDetail } from '@/lib/contracts/queries';
 
@@ -18,6 +19,7 @@ import type { ContractDetail } from '@/lib/contracts/queries';
 export function ContractHeaderForm({ detail }: { detail: ContractDetail }) {
   const t = useTranslations('contracts');
   const th = useTranslations('contracts.header');
+  const te = useTranslations('errors');
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [saved, setSaved] = useState(false);
@@ -44,29 +46,33 @@ export function ContractHeaderForm({ detail }: { detail: ContractDetail }) {
   function save() {
     setError(null);
     startTransition(async () => {
-      const res = await saveContractDraft({
-        id: detail.id,
-        header: {
-          signatureDate: form.signatureDate || null,
-          startDate: form.startDate || null,
-          endDate: form.endDate || null,
-          advancePct: form.advancePct,
-          retentionPct: form.retentionPct,
-          paymentTermsDays: form.paymentTermsDays
-            ? Number(form.paymentTermsDays)
-            : null,
-          defectsLiabilityDays: form.defectsLiabilityDays
-            ? Number(form.defectsLiabilityDays)
-            : null,
-          termsEn: form.termsEn || null,
-          termsAr: form.termsAr || null,
-        },
-      });
-      if (res.ok) {
-        setSaved(true);
-        router.refresh();
-      } else {
-        setError(res.error ?? 'generic');
+      try {
+        const res = await saveContractDraft({
+          id: detail.id,
+          header: {
+            signatureDate: form.signatureDate || null,
+            startDate: form.startDate || null,
+            endDate: form.endDate || null,
+            advancePct: form.advancePct,
+            retentionPct: form.retentionPct,
+            paymentTermsDays: form.paymentTermsDays
+              ? Number(form.paymentTermsDays)
+              : null,
+            defectsLiabilityDays: form.defectsLiabilityDays
+              ? Number(form.defectsLiabilityDays)
+              : null,
+            termsEn: form.termsEn || null,
+            termsAr: form.termsAr || null,
+          },
+        });
+        if (res.ok) {
+          setSaved(true);
+          router.refresh();
+        } else {
+          setError(describeFailure(res, te));
+        }
+      } catch (rejection) {
+        setError(describeRejection(rejection, te));
       }
     });
   }
