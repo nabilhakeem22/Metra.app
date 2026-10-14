@@ -31,6 +31,8 @@ export const DEFINITE_REFUSALS: ReadonlySet<ActionCode> = new Set<ActionCode>([
   'invalid',
   // Field rules refused the input before anything was written.
   'check_fields',
+  // Refused at the boundary: the input could not have come from a form.
+  'malformed',
   'flow_not_enabled',
   'illegal_trigger',
   // The row was not visible, or it moved under us.

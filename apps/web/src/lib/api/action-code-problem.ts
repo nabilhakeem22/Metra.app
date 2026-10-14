@@ -17,6 +17,7 @@ export const ACTION_CODE_PROBLEM: Record<ActionCode, ApiProblemKind> = {
   check_fields: 'bad-request',
   // A deadlock: another write held what this one needed. Repeat after a refresh.
   busy: 'conflict',
+  malformed: 'bad-request',
   name_required: 'bad-request',
   phone_required: 'bad-request',
   start_date_required: 'bad-request',

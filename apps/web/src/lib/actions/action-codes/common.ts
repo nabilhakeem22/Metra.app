@@ -11,6 +11,8 @@ export type CommonActionCode =
   // A deadlock rolled this attempt back; its partner may be an earlier attempt
   // of the same act, so it is not a definite refusal (retry-policy.ts).
   | 'busy'
+  // Input no form can produce (a forged id, an enum outside its select).
+  | 'malformed'
   | 'name_required'
   | 'phone_required'
   | 'start_date_required'

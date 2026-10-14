@@ -13,6 +13,7 @@ const ALL_CODES: ActionCode[] = [
   'uncertain',
   'check_fields',
   'busy',
+  'malformed',
   'name_required',
   'phone_required',
   'start_date_required',
