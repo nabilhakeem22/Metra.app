@@ -30,8 +30,12 @@ export type DeliverableUploadOutcome =
   | {
       ok: false;
       reason: 'too_large' | 'wrong_type' | 'put_failed' | 'aborted' | ActionCode;
+      /** An unknown failure's reference, for the studio to quote. */
+      reference?: string;
       resume?: UploadResume;
-    };
+    }
+  /** A server action that rejected (transport) rather than answering. */
+  | { ok: false; reason: 'rejected'; rejection: unknown; resume?: UploadResume };
 
 /** The friendly client-side pre-flight: a refusal before any signed URL, or null. */
 export function preflightRefusal(
@@ -65,10 +69,11 @@ export async function uploadDeliverableFile(
             sizeBytes: file.size,
           });
       if ('ok' in signed) {
-        const reason = (signed.error as ActionCode) ?? 'generic';
+        // A refusal with no code cannot be read as definite: "refresh and check".
+        const reason = (signed.error as ActionCode | undefined) ?? 'uncertain';
         // A renewal Storage could not sign is still the same row: retry it there.
         const resume = fileId && reason === 'storage_unavailable' ? { fileId, stage: 'put' as const } : undefined;
-        return { ok: false, reason, resume };
+        return { ok: false, reason, reference: signed.reference, resume };
       }
       fileId = signed.fileId;
       stage = 'put';
@@ -78,12 +83,15 @@ export async function uploadDeliverableFile(
     }
     stage = 'attach';
     const attached = await attachDeliverable({ engagementId, category, fileId: fileId!, label: file.name });
-    if (!attached.ok) return { ok: false, reason: (attached.error as ActionCode) ?? 'generic' };
+    if (!attached.ok) {
+      return { ok: false, reason: (attached.error as ActionCode | undefined) ?? 'uncertain', reference: attached.reference };
+    }
     return { ok: true };
-  } catch {
-    // A server action that rejected (transport) rather than answering: resume
-    // from the step it was on, with the row it already has.
+  } catch (rejection) {
+    // A server action that rejected (transport) rather than answering: said as
+    // what it was (Metra could not be reached, or the server's digest), and it
+    // resumes from the step it was on, with the row it already has.
     const resume = fileId && stage !== 'sign' ? { fileId, stage } : undefined;
-    return { ok: false, reason: 'generic', resume };
+    return { ok: false, reason: 'rejected', rejection, resume };
   }
 }

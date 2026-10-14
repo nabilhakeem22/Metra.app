@@ -9,7 +9,7 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { deactivationCopy, useActiveToggle } from '@/hooks/use-active-toggle';
 import { useOpenOnArrival } from '@/hooks/use-open-on-arrival';
 import { toast } from '@/hooks/use-toast';
-import { resolveActionError } from '@/lib/actions/error-message';
+import { describeFailure } from '@/lib/actions/error-message';
 import { setClientActive } from '@/lib/clients/actions';
 import { cityOptions, filterClients, type ClientFilter } from './client-filters';
 import { ClientForm } from './client-form';
@@ -50,7 +50,7 @@ export function ClientsClient({ items, canManage, openCreateOnArrival }: Clients
     setActive: setClientActive,
     copy: deactivationCopy(t, tc),
     onError: (result) =>
-      toast({ title: resolveActionError(result.error, te), variant: 'destructive' }),
+      toast({ title: describeFailure(result, te), variant: 'destructive' }),
   });
 
   const form = canManage && (

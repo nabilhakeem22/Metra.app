@@ -4,12 +4,11 @@ import { useLocale, useTranslations } from 'next-intl';
 import { useEffect, useRef, useState, useTransition } from 'react';
 import { toast } from '@/hooks/use-toast';
 import { useRouter } from '@/i18n/routing';
-import { resolveActionError } from '@/lib/actions/error-message';
-import type { ActionCode } from '@/lib/actions/result';
 import { getDeliverableUrl } from '@/lib/engagements/actions';
 import type { WorkingFileCategory } from '@/lib/engagements/working-files';
 import { formatNumber } from '@/lib/format/number';
 import { uploadDeliverableFile, type DeliverableUploadOutcome } from './upload-deliverable';
+import { uploadOutcomeMessage } from './upload-outcome-message';
 import {
   queuedItem,
   settledPatch,
@@ -59,13 +58,7 @@ export function useDeliverableUpload(engagementId: string): {
     return () => controller.abort();
   }, []);
 
-  function messageOf(outcome: DeliverableUploadOutcome): string | null {
-    if (outcome.ok) return null;
-    if (outcome.reason === 'too_large') return t('tooLarge');
-    if (outcome.reason === 'wrong_type') return t('wrongType');
-    if (outcome.reason === 'put_failed') return te('storage_unavailable');
-    return resolveActionError(outcome.reason as ActionCode, te);
-  }
+  const messageOf = (outcome: DeliverableUploadOutcome) => uploadOutcomeMessage(outcome, t, te);
 
   function setItem(key: string, patch: Partial<UploadQueueItem>): void {
     setQueue((items) => items.map((item) => (item.key === key ? { ...item, ...patch } : item)));

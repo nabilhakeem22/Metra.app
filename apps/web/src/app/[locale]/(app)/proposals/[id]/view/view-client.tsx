@@ -2,19 +2,14 @@
 
 import { FileDown, FileSignature, Loader2 } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
-import { useTransition } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { toast } from '@/hooks/use-toast';
-import { Link, useRouter } from '@/i18n/routing';
-import { resolveActionError } from '@/lib/actions/error-message';
-import type { ActionCode } from '@/lib/actions/result';
-import { generateContract } from '@/lib/contracts/actions';
+import { Link } from '@/i18n/routing';
 import { formatMoney } from '@/lib/format/money';
 import { pickLocale } from '@/lib/i18n/pick-locale';
-import { expireProposal, supersedeProposal } from '@/lib/proposals/actions';
 import type { ProposalDetail } from '@/lib/proposals/queries';
 import { PreviewModal } from '../preview-modal';
+import { useProposalViewActions } from './use-proposal-view-actions';
 
 export function ProposalView({
   detail,
@@ -33,49 +28,11 @@ export function ProposalView({
 }) {
   const t = useTranslations('proposals');
   const tc = useTranslations('contracts');
-  const te = useTranslations('errors');
   const locale = useLocale();
-  const router = useRouter();
-  const [pending, startTransition] = useTransition();
-
-  function onGenerateContract() {
-    startTransition(async () => {
-      const res = await generateContract(detail.id);
-      if (res.ok && res.data) {
-        toast({ title: tc('generated') });
-        router.push(`/contracts/${res.data}`);
-      } else {
-        toast({ title: resolveActionError(res.error as ActionCode, te), variant: 'destructive' });
-      }
-    });
-  }
-
+  const { pending, onGenerateContract, onSupersede, onExpire } = useProposalViewActions(detail.id);
   const money = (v: string) => formatMoney(v, locale);
   const loc = (ar: string | null, en: string | null) =>
     pickLocale({ nameAr: ar, nameEn: en }, 'name', locale).value;
-
-  function onSupersede() {
-    startTransition(async () => {
-      const res = await supersedeProposal(detail.id);
-      if (res.ok && res.data) {
-        toast({ title: t('toast.superseded') });
-        router.push(`/proposals/${res.data}`);
-      } else {
-        toast({ title: resolveActionError(res.error as ActionCode, te), variant: 'destructive' });
-      }
-    });
-  }
-  function onExpire() {
-    startTransition(async () => {
-      const res = await expireProposal(detail.id);
-      toast(
-        res.ok
-          ? { title: t('toast.expired') }
-          : { title: resolveActionError(res.error as ActionCode, te), variant: 'destructive' },
-      );
-      if (res.ok) router.refresh();
-    });
-  }
 
   return (
     <div className="space-y-4">

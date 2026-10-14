@@ -9,8 +9,8 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { toast } from '@/hooks/use-toast';
 import { useUndoableRemoval } from '@/hooks/use-undoable-removal';
 import { useRouter } from '@/i18n/routing';
-import { resolveActionError } from '@/lib/actions/error-message';
-import type { ActionCode } from '@/lib/actions/result';
+import { describeFailure } from '@/lib/actions/error-message';
+import type { ActionResult } from '@/lib/actions/result';
 import { deleteContact, setPrimaryContact } from '@/lib/client-contacts/actions';
 import { ContactRowActions } from './contact-row-actions';
 
@@ -31,8 +31,8 @@ export function ContactsList({
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const { confirm, dialog } = useConfirm();
-  const refuse = (result: { error?: ActionCode }) =>
-    toast({ title: resolveActionError(result.error, te), variant: 'destructive' });
+  const refuse = (result: ActionResult) =>
+    toast({ title: describeFailure(result, te), variant: 'destructive' });
   // Confirmed, then held for the Undo window before the delete really runs.
   const removal = useUndoableRemoval({
     commit: deleteContact,

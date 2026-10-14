@@ -142,7 +142,7 @@ describe('uploadDeliverableFile', () => {
     const first = uploadDeliverableFile('e-1', 'conceptOption', pdf);
     (await untilSent()).answer(200);
     const outcome = await first;
-    expect(outcome).toEqual({ ok: false, reason: 'generic', resume: { fileId: 'f-1', stage: 'attach' } });
+    expect(outcome).toEqual({ ok: false, reason: 'rejected', rejection: expect.anything(), resume: { fileId: 'f-1', stage: 'attach' } });
 
     const retried = await uploadDeliverableFile('e-1', 'conceptOption', pdf, {
       resume: outcome.ok ? undefined : outcome.resume,
@@ -190,7 +190,7 @@ describe('uploadDeliverableFile', () => {
 
     actions.createDeliverableUpload.mockRejectedValueOnce(new Error('network'));
     const transport = await uploadDeliverableFile('e-1', 'layout', pdf);
-    expect(transport).toEqual({ ok: false, reason: 'generic', resume: undefined });
+    expect(transport).toEqual({ ok: false, reason: 'rejected', rejection: expect.anything(), resume: undefined });
     expect(isRetryableOutcome(transport)).toBe(true);
   });
 });

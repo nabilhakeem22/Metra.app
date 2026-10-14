@@ -6,8 +6,7 @@ import { useTranslations } from 'next-intl';
 import { useState, useTransition } from 'react';
 import { Button } from '@/components/ui/button';
 import { toast } from '@/hooks/use-toast';
-import { resolveActionError } from '@/lib/actions/error-message';
-import type { ActionCode } from '@/lib/actions/result';
+import { describeFailure, describeRejection } from '@/lib/actions/error-message';
 import { sendProposal } from '@/lib/proposals/actions';
 import { cn } from '@/lib/utils';
 import { PreviewFooter } from './preview-footer';
@@ -47,15 +46,16 @@ export function PreviewModal({
 
   function onSend() {
     startSend(async () => {
-      const res = await sendProposal(proposalId);
-      if (res.ok) {
-        toast({ title: t('send') });
-        setOpen(false);
-      } else {
-        toast({
-          title: resolveActionError(res.error as ActionCode, te),
-          variant: 'destructive',
-        });
+      try {
+        const res = await sendProposal(proposalId);
+        if (res.ok) {
+          toast({ title: t('send') });
+          setOpen(false);
+        } else {
+          toast({ title: describeFailure(res, te), variant: 'destructive' });
+        }
+      } catch (rejection) {
+        toast({ title: describeRejection(rejection, te), variant: 'destructive' });
       }
     });
   }

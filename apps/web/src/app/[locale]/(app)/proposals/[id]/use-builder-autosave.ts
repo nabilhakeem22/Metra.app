@@ -3,7 +3,7 @@
 import { useTranslations } from 'next-intl';
 import type { ConfirmOptions } from '@/components/ui/confirm-dialog';
 import { useInAppLeaveGuard } from '@/hooks/use-in-app-leave-guard';
-import { resolveActionError } from '@/lib/actions/error-message';
+import { describeFailure } from '@/lib/actions/error-message';
 import { draftFieldSelector, type DraftField } from './draft-completeness';
 import { incompleteDraftErrors, keyedDraftErrors } from './draft-field-errors';
 import type { ProposalDraftState } from './proposal-payload';
@@ -60,7 +60,7 @@ export function useBuilderAutosave(input: {
       if (saved.ok) return true;
       return input.confirm({
         title: t('title'),
-        description: t('body', { reason: resolveActionError(saved.error, te) }),
+        description: t('body', { reason: describeFailure(saved, te) }),
         confirmLabel: t('confirm'),
         cancelLabel: t('stay'),
         variant: 'destructive',

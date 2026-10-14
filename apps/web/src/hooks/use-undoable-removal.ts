@@ -11,7 +11,7 @@ export interface UndoableRemovalOptions {
   messages: { removed: string; undo: string };
   /** After a delete lands, e.g. `router.refresh()` (also after a flush on leave). */
   onCommitted?: () => void;
-  /** A delete the server refused: the caller shows `resolveActionError(...)`. */
+  /** A delete the server refused: the caller shows `describeFailure(result, te)`. */
   onFailed: (result: ActionResult) => void;
 }
 

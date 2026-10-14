@@ -49,6 +49,8 @@ export type LogPaymentAndAdvanceResult = ActionResult & {
   paymentRecorded: boolean;
   /** Recorded, not advanced: what the delivery still waits on (the client's review). */
   waitingOn?: ActionCode;
+  /** With `waitingOn: 'generic'`: the reference of its log line, for the studio to quote. */
+  waitingOnReference?: string;
 };
 
 /**

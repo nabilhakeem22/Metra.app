@@ -3,7 +3,7 @@
 import { useLocale, useTranslations } from 'next-intl';
 import { useConfirm } from '@/components/ui/confirm-dialog';
 import { toast } from '@/hooks/use-toast';
-import { resolveActionError } from '@/lib/actions/error-message';
+import { describeFailure } from '@/lib/actions/error-message';
 import { confirmPaymentClaim } from '@/lib/engagements/actions';
 import { claimAdvancesTo } from '@/lib/engagements/claim-advance';
 import type { EngagementGatePreview } from '@/lib/engagements/gate-preview';
@@ -66,7 +66,9 @@ export function CommandCardClaims({
           toast({
             title: tcmd('claim.recorded'),
             description:
-              !res.advanced && res.waitingOn ? resolveActionError(res.waitingOn, te) : undefined,
+              !res.advanced && res.waitingOn
+                ? describeFailure({ error: res.waitingOn, reference: res.waitingOnReference }, te)
+                : undefined,
           });
         }
         return res;
