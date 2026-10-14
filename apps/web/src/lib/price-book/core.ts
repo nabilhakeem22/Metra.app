@@ -1,93 +1,32 @@
 // PURE price-book CRUD cores — no next/*, no getSessionUser, no cookies. Take an
 // OrgContext + validated input; the 'use server' wrappers in ./actions do the
 // session/requireOrg work and delegate. Exercised directly by *.dbtest.ts.
-import { costItems, sections, type CostItemUnit, type MetraDb } from '@metra/db';
-import { and, eq, ne } from 'drizzle-orm';
+import { costItems } from '@metra/db';
+import { eq } from 'drizzle-orm';
 import { fail, mutateInOrg, requireInOrg } from '@/lib/actions/mutate';
-import { err, type ActionResult } from '@/lib/actions/result';
+import type { ActionResult } from '@/lib/actions/result';
 import type { OrgContext } from '@/lib/db/context';
-import { UNIT_TOKENS } from './import';
-import { isUuid } from '@/lib/uuid';
-import { readMoneyString } from '@/lib/money/read';
+import { costItemColumns, requireWritable } from './cost-item-write';
+import type { CostItemInput } from './fields';
 
-/** A price-book cost/price field: the studio may type '1,500', and a cleared
- *  field is a zero rather than a refusal (the column is NOT NULL). */
-const MONEY_FIELD = { allowGroupSeparators: true, blank: '0' } as const;
-
-export interface CostItemInput {
-  code: string;
-  nameEn?: string | null;
-  nameAr?: string | null;
-  sectionId: string;
-  unit: CostItemUnit;
-  defaultUnitCost?: string | null;
-  defaultUnitPrice?: string | null;
-  taxCode?: string | null;
-  etaItemCode?: string | null;
-  etaCodeType?: string | null;
-}
-
-function isUnit(v: unknown): v is CostItemUnit {
-  return UNIT_TOKENS.includes(v as CostItemUnit);
-}
-
-/** The section must exist in THIS org (RLS-scoped tx). Returns true if usable. */
-async function sectionUsable(
-  tx: MetraDb,
-  sectionId: string,
-): Promise<boolean> {
-  const [row] = await tx
-    .select({ id: sections.id })
-    .from(sections)
-    .where(eq(sections.id, sectionId))
-    .limit(1);
-  return !!row;
-}
+export type { CostItemInput } from './fields';
 
 export async function createCostItemCore(
   ctx: OrgContext,
   input: CostItemInput,
 ): Promise<ActionResult> {
-  const code = input.code?.trim();
-  if (!code) return err('code_required');
-  const nameEn = input.nameEn?.trim() || null;
-  const nameAr = input.nameAr?.trim() || null;
-  if (!nameEn && !nameAr) return err('name_required');
-  if (!isUuid(input.sectionId) || !isUnit(input.unit)) {
-    return err('invalid');
-  }
-  const cost = readMoneyString(input.defaultUnitCost, MONEY_FIELD);
-  const price = readMoneyString(input.defaultUnitPrice, MONEY_FIELD);
-  if (cost === null || price === null) return err('invalid');
+  const read = costItemColumns(input);
+  if ('refusal' in read) return read.refusal;
+  const { columns } = read;
 
   return mutateInOrg(
     ctx,
     { capability: 'price_book', action: 'create' },
     async (tx, audit) => {
-      if (!(await sectionUsable(tx, input.sectionId))) fail('invalid');
-
-      const [dup] = await tx
-        .select({ id: costItems.id })
-        .from(costItems)
-        .where(eq(costItems.code, code))
-        .limit(1);
-      if (dup) fail('code_taken');
-
+      await requireWritable(tx, columns);
       const [row] = await tx
         .insert(costItems)
-        .values({
-          orgId: ctx.orgId,
-          code,
-          nameEn,
-          nameAr,
-          sectionId: input.sectionId,
-          unit: input.unit,
-          defaultUnitCost: cost,
-          defaultUnitPrice: price,
-          taxCode: input.taxCode?.trim() || null,
-          etaItemCode: input.etaItemCode?.trim() || null,
-          etaCodeType: input.etaCodeType?.trim() || null,
-        })
+        .values({ orgId: ctx.orgId, ...columns })
         .returning({ id: costItems.id });
 
       await audit({
@@ -95,7 +34,13 @@ export async function createCostItemCore(
         entityId: row.id,
         action: 'create',
         before: null,
-        after: { code, nameEn, nameAr, section_id: input.sectionId, unit: input.unit },
+        after: {
+          code: columns.code,
+          nameEn: columns.nameEn,
+          nameAr: columns.nameAr,
+          section_id: columns.sectionId,
+          unit: columns.unit,
+        },
       });
       return row.id;
     },
@@ -106,17 +51,9 @@ export async function updateCostItemCore(
   ctx: OrgContext,
   input: { id: string } & CostItemInput,
 ): Promise<ActionResult> {
-  const code = input.code?.trim();
-  if (!code) return err('code_required');
-  const nameEn = input.nameEn?.trim() || null;
-  const nameAr = input.nameAr?.trim() || null;
-  if (!nameEn && !nameAr) return err('name_required');
-  if (!isUuid(input.sectionId) || !isUnit(input.unit)) {
-    return err('invalid');
-  }
-  const cost = readMoneyString(input.defaultUnitCost, MONEY_FIELD);
-  const price = readMoneyString(input.defaultUnitPrice, MONEY_FIELD);
-  if (cost === null || price === null) return err('invalid');
+  const read = costItemColumns(input);
+  if ('refusal' in read) return read.refusal;
+  const { columns } = read;
 
   return mutateInOrg(
     ctx,
@@ -128,31 +65,11 @@ export async function updateCostItemCore(
         .where(eq(costItems.id, input.id))
         .limit(1);
       if (!before) fail('invalid');
-      if (!(await sectionUsable(tx, input.sectionId))) fail('invalid');
-
-      // Code must stay unique within the org (excluding this row).
-      const [dup] = await tx
-        .select({ id: costItems.id })
-        .from(costItems)
-        .where(and(eq(costItems.code, code), ne(costItems.id, input.id)))
-        .limit(1);
-      if (dup) fail('code_taken');
+      await requireWritable(tx, { ...columns, exceptId: input.id });
 
       await tx
         .update(costItems)
-        .set({
-          code,
-          nameEn,
-          nameAr,
-          sectionId: input.sectionId,
-          unit: input.unit,
-          defaultUnitCost: cost,
-          defaultUnitPrice: price,
-          taxCode: input.taxCode?.trim() || null,
-          etaItemCode: input.etaItemCode?.trim() || null,
-          etaCodeType: input.etaCodeType?.trim() || null,
-          updatedAt: new Date(),
-        })
+        .set({ ...columns, updatedAt: new Date() })
         .where(eq(costItems.id, input.id));
 
       await audit({
@@ -164,7 +81,11 @@ export async function updateCostItemCore(
           default_unit_cost: before.defaultUnitCost,
           default_unit_price: before.defaultUnitPrice,
         },
-        after: { code, default_unit_cost: cost, default_unit_price: price },
+        after: {
+          code: columns.code,
+          default_unit_cost: columns.defaultUnitCost,
+          default_unit_price: columns.defaultUnitPrice,
+        },
       });
     },
   );

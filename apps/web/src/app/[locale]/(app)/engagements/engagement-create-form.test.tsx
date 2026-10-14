@@ -1,6 +1,13 @@
 import { describe, expect, test, vi } from 'vitest';
-import { act, renderHook, screen } from '@testing-library/react';
-import { messageAt, renderWithIntl } from '@/test/render-with-intl';
+import { act, fireEvent, renderHook, screen } from '@testing-library/react';
+import { NextIntlClientProvider } from 'next-intl';
+import type { ReactNode } from 'react';
+import { fieldsFailed } from '@/lib/actions/field-errors';
+import type { ActionResult } from '@/lib/actions/result';
+import { ENGAGEMENT_CREATE_FIELDS } from '@/lib/engagements/create-fields';
+import { expectFieldErrorsRenderUnderFields } from '@/test/field-coverage';
+import { pickOption } from '@/test/pick-option';
+import { messageAt, messagesFor, renderWithIntl, type TestLocale } from '@/test/render-with-intl';
 import { EngagementCreateFields } from './engagement-create-fields';
 import { EngagementCreateForm } from './engagement-create-form';
 import { useDeliveryForm } from './use-delivery-form';
@@ -63,9 +70,15 @@ describe('EngagementCreateForm', () => {
 });
 
 describe('useDeliveryForm', () => {
+  const wrapper = ({ children }: { children: ReactNode }) => (
+    <NextIntlClientProvider locale="en" messages={messagesFor('en')} timeZone="UTC">
+      {children}
+    </NextIntlClientProvider>
+  );
   const setup = () =>
-    renderHook(() =>
-      useDeliveryForm({ open: true, projectOptions: PROJECTS, lock: {}, onCreated: () => {} }),
+    renderHook(
+      () => useDeliveryForm({ open: true, projectOptions: PROJECTS, lock: {}, onCreated: () => {} }),
+      { wrapper },
     );
 
   test('the title follows the chosen project until one is typed', () => {
@@ -80,12 +93,80 @@ describe('useDeliveryForm', () => {
   });
 
   test('project_delivery_exists is filed under the project field', async () => {
-    actions.createEngagement.mockResolvedValue({ ok: false, error: 'project_delivery_exists' });
+    actions.createEngagement.mockResolvedValue(
+      fieldsFailed({ projectId: { code: 'project_delivery_exists' } }),
+    );
     const { result } = setup();
     act(() => result.current.onChange.clientId('c-1'));
     act(() => result.current.onChange.projectId('p-1'));
     await act(async () => result.current.submit());
-    expect(result.current.error).toEqual({ code: 'project_delivery_exists', field: 'project' });
+    expect(result.current.errors.messageFor('projectId')).toBe(en('errors.project_delivery_exists'));
+    expect(result.current.errors.formError).toBeNull();
+  });
+
+  test('while client and project are locked, a refusal about them is said above the form', async () => {
+    actions.createEngagement.mockResolvedValue(
+      fieldsFailed({ projectId: { code: 'project_delivery_exists' } }),
+    );
+    const { result } = renderHook(
+      () =>
+        useDeliveryForm({
+          open: true,
+          projectOptions: [],
+          lock: { clientId: 'c-1', projectId: 'p-1' },
+          onCreated: () => {},
+        }),
+      { wrapper },
+    );
+    await act(async () => result.current.submit());
+    expect(result.current.errors.formError).toBe(en('errors.project_delivery_exists'));
+  });
+});
+
+describe.each<TestLocale>(['en', 'ar-EG'])('EngagementCreateForm refusals (%s)', (locale) => {
+  const at = (path: string) => messageAt(locale, path);
+  const renderForm = () => {
+    document.documentElement.dir = locale === 'ar-EG' ? 'rtl' : 'ltr';
+    renderWithIntl(
+      <EngagementCreateForm open onOpenChange={() => {}} clientOptions={CLIENTS} projectOptions={PROJECTS} />,
+      { locale },
+    );
+  };
+  const save = async () => {
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: at('engagements.startDelivery') }));
+    });
+  };
+
+  test('Save with nothing chosen says what is missing under each select and sends nothing', async () => {
+    actions.createEngagement.mockReset();
+    renderForm();
+    await save();
+    expect(actions.createEngagement).not.toHaveBeenCalled();
+    expect(document.getElementById('eng-client-error')?.textContent).toBe(
+      at('errors.engagement_client_required'),
+    );
+    expect(document.getElementById('eng-project-error')?.textContent).toBe(
+      at('errors.engagement_project_required'),
+    );
+    expect(document.activeElement?.id).toBe('eng-client');
+  });
+
+  test('every field the server refuses is said under its own control', async () => {
+    renderForm();
+    await pickOption('eng-client', 'Acme');
+    await pickOption('eng-project', locale === 'ar-EG' ? 'البرج' : 'Tower');
+    await expectFieldErrorsRenderUnderFields({
+      fields: ENGAGEMENT_CREATE_FIELDS,
+      controlIdOf: (field) =>
+        ({ title: 'eng-titleEn', clientId: 'eng-client', projectId: 'eng-project' })[field],
+      answerWith: (result: ActionResult) => actions.createEngagement.mockResolvedValue(result),
+      submit: save,
+      locale,
+    });
+    expect(document.getElementById('eng-titleAr')?.getAttribute('aria-describedby')).toContain(
+      'eng-titleEn-error',
+    );
   });
 });
 
@@ -104,7 +185,10 @@ describe('EngagementCreateFields', () => {
         locked={false}
         clientOptions={CLIENTS}
         projectsForClient={PROJECTS}
-        fieldErrors={{ project: en('errors.project_delivery_exists') }}
+        bind={(field) => ({
+          error: field === 'projectId' ? en('errors.project_delivery_exists') : undefined,
+          onEdit: () => {},
+        })}
       />,
       { locale: 'en' },
     );

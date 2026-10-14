@@ -34,14 +34,18 @@ describe('createCostItemCore', () => {
     expect(await raw.count('audit_log', orgId)).toBe(1);
   });
 
-  it('rejects a duplicate code with code_taken', async () => {
+  it('rejects a duplicate code with code_taken under the code field', async () => {
     const { orgId, ownerIds } = await seedOrg({ owners: 1 });
     orgIds.push(orgId);
     const ctx = ctxFor(orgId, ownerIds[0], 'owner');
     const sectionId = await raw.sectionId(orgId);
     await createCostItemCore(ctx, { code: 'DUP', sectionId, ...base });
     const res = await createCostItemCore(ctx, { code: 'DUP', sectionId, ...base });
-    expect(res).toEqual({ ok: false, error: 'code_taken' });
+    expect(res).toEqual({
+      ok: false,
+      error: 'check_fields',
+      fields: { code: { code: 'code_taken' } },
+    });
     expect(await raw.count('cost_items', orgId)).toBe(1);
   });
 
@@ -54,7 +58,8 @@ describe('createCostItemCore', () => {
       await createCostItemCore(ctx, { code: '  ', sectionId, ...base }),
     ).toEqual({
       ok: false,
-      error: 'code_required',
+      error: 'check_fields',
+      fields: { code: { code: 'code_required' } },
     });
     expect(
       await createCostItemCore(ctx, {
@@ -64,10 +69,10 @@ describe('createCostItemCore', () => {
         nameEn: '',
         nameAr: '',
       }),
-    ).toEqual({ ok: false, error: 'name_required' });
+    ).toEqual({ ok: false, error: 'check_fields', fields: { name: { code: 'name_required' } } });
   });
 
-  it('rejects a section from another org (invalid)', async () => {
+  it('refuses a section from another org as one that no longer exists', async () => {
     const a = await seedOrg({ owners: 1 });
     const b = await seedOrg({ owners: 1 });
     orgIds.push(a.orgId, b.orgId);
@@ -78,7 +83,11 @@ describe('createCostItemCore', () => {
       sectionId: foreignSection,
       ...base,
     });
-    expect(res).toEqual({ ok: false, error: 'invalid' });
+    expect(res).toEqual({
+      ok: false,
+      error: 'check_fields',
+      fields: { sectionId: { code: 'no_longer_exists' } },
+    });
     expect(await raw.count('cost_items', a.orgId)).toBe(0);
   });
 

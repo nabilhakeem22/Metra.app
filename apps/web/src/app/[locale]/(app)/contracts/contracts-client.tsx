@@ -8,6 +8,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { StatusChip } from '@/components/ui/status-chip';
 import { Link, useRouter } from '@/i18n/routing';
+import { describeFailure, describeRejection } from '@/lib/actions/error-message';
 import { docYear, formatDocNumber } from '@/lib/format/doc-number';
 import { formatMoney } from '@/lib/format/money';
 import { formatProposalNumber, proposalYear } from '@/lib/format/proposal-number';
@@ -35,6 +36,7 @@ export function ContractsClient({
   canManage: boolean;
 }) {
   const t = useTranslations('contracts');
+  const te = useTranslations('errors');
   const locale = useLocale();
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -44,12 +46,16 @@ export function ContractsClient({
   function generate(proposalId: string) {
     setError(null);
     startTransition(async () => {
-      const res = await generateContract(proposalId);
-      if (res.ok && res.data) {
-        setPicking(false);
-        router.push(`/contracts/${res.data}`);
-      } else {
-        setError(res.error ?? 'generic');
+      try {
+        const res = await generateContract(proposalId);
+        if (res.ok && res.data) {
+          setPicking(false);
+          router.push(`/contracts/${res.data}`);
+        } else {
+          setError(describeFailure(res, te));
+        }
+      } catch (rejection) {
+        setError(describeRejection(rejection, te));
       }
     });
   }

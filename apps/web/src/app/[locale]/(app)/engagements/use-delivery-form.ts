@@ -1,16 +1,14 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import { useEffect, useMemo, useState, useTransition } from 'react';
+import { useFieldErrors } from '@/hooks/use-field-errors';
 import { useRouter } from '@/i18n/routing';
-import type { ActionCode } from '@/lib/actions/result';
 import { createEngagement } from '@/lib/engagements/actions';
+import { engagementCreateFieldErrors } from '@/lib/engagements/create-field-rules';
+import { ENGAGEMENT_CREATE_FIELDS } from '@/lib/engagements/create-fields';
 import type { DeliveryFormValues } from './engagement-create-fields';
-import {
-  deliveryFieldFor,
-  type DeliveryFormField,
-  type ProjectNames,
-  type ProjectOption,
-} from './engagement-create-validation';
+import type { ProjectNames, ProjectOption } from './delivery-options';
 
 const EMPTY_VALUES: DeliveryFormValues = {
   titleEn: '',
@@ -31,6 +29,10 @@ export interface DeliveryFormLock {
   projectName?: ProjectNames;
 }
 
+/** While the caller locks client and project, their selects are hidden: a
+ *  refusal about either is said above the form instead. */
+const LOCKED_FIELDS = ['title'] as const;
+
 /**
  * The "Start delivery" form's state and submit. Nothing is chosen for the
  * studio: client and project start empty unless the caller locks them. The
@@ -45,9 +47,14 @@ export function useDeliveryForm(options: {
 }) {
   const { open, projectOptions, lock, onCreated } = options;
   const router = useRouter();
+  const te = useTranslations('errors');
   const locked = Boolean(lock.clientId && lock.projectId);
   const [pending, startTransition] = useTransition();
-  const [error, setError] = useState<{ code: ActionCode; field: DeliveryFormField } | null>(null);
+  const errors = useFieldErrors({
+    fields: locked ? LOCKED_FIELDS : ENGAGEMENT_CREATE_FIELDS,
+    translate: te,
+  });
+  const { clear } = errors;
   const [values, setValues] = useState<DeliveryFormValues>(EMPTY_VALUES);
   const [titleTyped, setTitleTyped] = useState(false);
 
@@ -62,7 +69,7 @@ export function useDeliveryForm(options: {
   const lockedNameAr = lock.projectName?.nameAr ?? null;
   useEffect(() => {
     if (!open) return;
-    setError(null);
+    clear();
     setTitleTyped(false);
     setValues({
       ...EMPTY_VALUES,
@@ -70,7 +77,7 @@ export function useDeliveryForm(options: {
       clientId: lock.clientId ?? '',
       projectId: lock.projectId ?? '',
     });
-  }, [open, locked, lock.clientId, lock.projectId, lockedNameEn, lockedNameAr]);
+  }, [open, locked, lock.clientId, lock.projectId, lockedNameEn, lockedNameAr, clear]);
 
   const onChange = {
     titleEn: (titleEn: string) => {
@@ -98,7 +105,7 @@ export function useDeliveryForm(options: {
   };
 
   function submit(): void {
-    setError(null);
+    if (errors.applyLocal(engagementCreateFieldErrors(values))) return;
     startTransition(async () => {
       try {
         const res = await createEngagement({
@@ -108,19 +115,14 @@ export function useDeliveryForm(options: {
           projectId: values.projectId,
           offPlan: values.offPlan,
         });
-        if (res.ok && res.data) {
-          onCreated();
-          router.push(`/engagements/${res.data}`);
-          return;
-        }
-        const code = (res.error as ActionCode) ?? 'generic';
-        const field = deliveryFieldFor(code);
-        setError({ code, field: locked && field !== 'title' ? 'form' : field });
-      } catch {
-        setError({ code: 'generic', field: 'form' });
+        if (errors.applyResult(res) || !res.data) return;
+        onCreated();
+        router.push(`/engagements/${res.data}`);
+      } catch (rejection) {
+        errors.applyRejection(rejection);
       }
     });
   }
 
-  return { values, onChange, projectsForClient, error, pending, submit, locked };
+  return { values, onChange, projectsForClient, errors, pending, submit, locked };
 }

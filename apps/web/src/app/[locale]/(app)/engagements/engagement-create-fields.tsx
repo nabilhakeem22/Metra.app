@@ -2,12 +2,14 @@
 
 import { useLocale, useTranslations } from 'next-intl';
 import type { ReactNode } from 'react';
+import { fieldErrorId } from '@/components/ui/field-error-text';
 import { FormField } from '@/components/ui/form-field';
 import { Input } from '@/components/ui/input';
 import { SelectControl } from '@/components/ui/select-control';
 import type { ClientOption } from '@/lib/clients/queries';
+import type { EngagementCreateField } from '@/lib/engagements/create-fields';
 import { pickLocale } from '@/lib/i18n/pick-locale';
-import type { ProjectOption } from './engagement-create-validation';
+import type { ProjectOption } from './delivery-options';
 
 export interface DeliveryFormValues {
   titleEn: string;
@@ -24,7 +26,7 @@ export function EngagementCreateFields({
   locked,
   clientOptions,
   projectsForClient,
-  fieldErrors,
+  bind,
   projectHint,
 }: {
   values: DeliveryFormValues;
@@ -39,8 +41,8 @@ export function EngagementCreateFields({
   locked: boolean;
   clientOptions: ClientOption[];
   projectsForClient: ProjectOption[];
-  /** Resolved refusal text, shown under the field it is about. */
-  fieldErrors: { title?: string; client?: string; project?: string };
+  /** Each field's refusal and the edit that clears it (useFieldErrors). */
+  bind: (field: EngagementCreateField) => { error: string | undefined; onEdit: () => void };
   /** Shown under the project select (e.g. the chosen client has no project yet). */
   projectHint?: ReactNode;
 }) {
@@ -49,6 +51,7 @@ export function EngagementCreateFields({
   const nameOf = (option: { id: string; nameAr: string | null; nameEn: string | null }) =>
     pickLocale({ nameAr: option.nameAr, nameEn: option.nameEn }, 'name', locale).value ||
     option.id.slice(0, 8);
+  const title = bind('title');
 
   return (
     <>
@@ -56,18 +59,18 @@ export function EngagementCreateFields({
         {/* One title is enough, so a refused title is said once, under the
             first, and marks both. */}
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <FormField id="eng-titleEn" label={t('titleEn')} error={fieldErrors.title}>
+          <FormField id="eng-titleEn" label={t('titleEn')} {...title}>
             <Input
               dir="ltr"
               value={values.titleEn}
               onChange={(event) => onChange.titleEn(event.target.value)}
             />
           </FormField>
-          <FormField id="eng-titleAr" label={t('titleAr')}>
+          <FormField id="eng-titleAr" label={t('titleAr')} onEdit={title.onEdit}>
             <Input
               dir="rtl"
-              aria-invalid={fieldErrors.title ? true : undefined}
-              aria-describedby={fieldErrors.title ? 'eng-titleEn-error' : undefined}
+              aria-invalid={title.error ? true : undefined}
+              aria-describedby={title.error ? fieldErrorId('eng-titleEn') : undefined}
               value={values.titleAr}
               onChange={(event) => onChange.titleAr(event.target.value)}
             />
@@ -77,7 +80,7 @@ export function EngagementCreateFields({
       </div>
 
       {!locked && (
-        <FormField id="eng-client" label={t('client')} required error={fieldErrors.client}>
+        <FormField id="eng-client" label={t('client')} required {...bind('clientId')}>
           <SelectControl
             value={values.clientId}
             onValueChange={onChange.clientId}
@@ -89,7 +92,7 @@ export function EngagementCreateFields({
 
       {!locked && (
         <div className="space-y-2">
-          <FormField id="eng-project" label={t('project')} required error={fieldErrors.project}>
+          <FormField id="eng-project" label={t('project')} required {...bind('projectId')}>
             <SelectControl
               value={values.projectId}
               onValueChange={onChange.projectId}

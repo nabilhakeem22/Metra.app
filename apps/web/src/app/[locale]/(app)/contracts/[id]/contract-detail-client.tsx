@@ -5,13 +5,14 @@ import { useState, useTransition } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { useRouter } from '@/i18n/routing';
+import { describeFailure, describeRejection } from '@/lib/actions/error-message';
 import { formatMoney } from '@/lib/format/money';
 import { pickLocale } from '@/lib/i18n/pick-locale';
 import { issueContract, terminateContract } from '@/lib/contracts/actions';
 import type { ContractDetail } from '@/lib/contracts/queries';
 import type { VariationListRow } from '@/lib/variations/queries';
 import { ContractOverview } from './contract-overview';
-import type { BaselineLine } from './contract-vo-types';
+import type { BaselineLine, ContractAction } from './contract-vo-types';
 import { CONTRACT_TABS, type ContractTab } from './tabs';
 import { VariationRegister } from './variation-register';
 
@@ -32,6 +33,7 @@ export function ContractDetailClient({
 }) {
   const t = useTranslations('contracts');
   const tv = useTranslations('variations');
+  const te = useTranslations('errors');
   const locale = useLocale();
   const router = useRouter();
   const [tab, setTab] = useState<ContractTab>('overview');
@@ -49,18 +51,22 @@ export function ContractDetailClient({
     })),
   );
 
-  function act(fn: () => Promise<{ ok: boolean; error?: string; link?: string }>) {
+  const act: ContractAction = (fn) => {
     setError(null);
     startTransition(async () => {
-      const res = await fn();
-      if (res.ok) {
-        if (res.link) setLink(res.link);
-        router.refresh();
-      } else {
-        setError(res.error ?? 'generic');
+      try {
+        const res = await fn();
+        if (res.ok) {
+          if (res.link) setLink(res.link);
+          router.refresh();
+        } else {
+          setError(describeFailure(res, te));
+        }
+      } catch (rejection) {
+        setError(describeRejection(rejection, te));
       }
     });
-  }
+  };
 
   return (
     <div className="space-y-4">

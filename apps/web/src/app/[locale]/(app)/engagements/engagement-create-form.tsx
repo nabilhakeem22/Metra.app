@@ -2,23 +2,19 @@
 
 import { useTranslations } from 'next-intl';
 import { FormSheet } from '@/components/ui/form-sheet';
-import { resolveActionError } from '@/lib/actions/error-message';
 import type { ClientOption } from '@/lib/clients/queries';
 import { NeedFirst } from './delivery-form-parts';
 import { EngagementCreateFields } from './engagement-create-fields';
-import {
-  type DeliveryFormField,
-  type ProjectNames,
-  type ProjectOption,
-} from './engagement-create-validation';
+import type { ProjectNames, ProjectOption } from './delivery-options';
 import { useDeliveryForm } from './use-delivery-form';
 
-export type { ProjectOption } from './engagement-create-validation';
+export type { ProjectOption } from './delivery-options';
 
 /**
- * "Start delivery". Client and project are required and marked, Submit waits
- * for both, a refusal shows under its field, and a missing client or project is
- * an empty state with the button that adds it (for a role that may).
+ * "Start delivery". Client and project are required and marked; Save says
+ * under each one what is missing, a server refusal shows under its field, and
+ * a missing client or project is an empty state with the button that adds it
+ * (for a role that may).
  */
 export function EngagementCreateForm({
   open,
@@ -47,7 +43,6 @@ export function EngagementCreateForm({
   setupLinks?: { canAddClient: boolean; canAddProject: boolean };
 }) {
   const t = useTranslations('engagements.form');
-  const te = useTranslations('errors');
   const tStart = useTranslations('engagements');
   const tc = useTranslations('common');
   const form = useDeliveryForm({
@@ -57,8 +52,6 @@ export function EngagementCreateForm({
     onCreated: () => onOpenChange(false),
   });
 
-  const messageFor = (field: DeliveryFormField) =>
-    form.error?.field === field ? resolveActionError(form.error.code, te) : undefined;
   const needProject = (
     <NeedFirst
       message={t('needProject')}
@@ -86,11 +79,7 @@ export function EngagementCreateForm({
         locked={form.locked}
         clientOptions={clientOptions}
         projectsForClient={form.projectsForClient}
-        fieldErrors={{
-          title: messageFor('title'),
-          client: messageFor('client'),
-          project: messageFor('project'),
-        }}
+        bind={form.errors.bind}
         projectHint={
           form.values.clientId !== '' && form.projectsForClient.length === 0
             ? needProject
@@ -110,7 +99,8 @@ export function EngagementCreateForm({
       cancelLabel={t('cancel')}
       closeLabel={tc('close')}
       pending={form.pending}
-      formError={messageFor('form')}
+      formError={form.errors.formError}
+      invalidAttempt={form.errors.invalidAttempt}
     >
       {body}
     </FormSheet>
