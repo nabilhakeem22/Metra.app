@@ -50,8 +50,8 @@ export function useFieldErrors<F extends string>({
 }) {
   const [shown, setShown] = useState<Shown<F>>(NOTHING_SHOWN);
   const [invalidAttempt, setInvalidAttempt] = useState(0);
-  // The fields edited since the last submit (a `clear` or `applyLocal`, which
-  // every form runs as it sends). A server answer about the OLD value of one of
+  // The fields edited since the last submit. A form starts every send with
+  // `clear()` or `applyLocal()` (its pre-check): that is the snapshot. A server answer about the OLD value of one of
   // them is dropped, and once the person has moved on the caret stays put.
   const edited = useRef(new Set<string>());
 

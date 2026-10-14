@@ -51,6 +51,7 @@ export function DocumentUploadControl({
   function onUpload(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     if (!file) return;
+    errors.clear();
     startTransition(async () => {
       try {
         const signed = await createUpload({ contentType: file.type, originalName: file.name, categoryId: categoryId || null });

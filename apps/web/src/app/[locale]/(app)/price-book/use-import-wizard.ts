@@ -59,6 +59,7 @@ export function useImportWizard(options: { existingCodes: string[]; sections: Se
   }
 
   function onFile(file: File) {
+    fileErrors.clear();
     const fd = new FormData();
     fd.append('file', file);
     startTransition(async () => {
