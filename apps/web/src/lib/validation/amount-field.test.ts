@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { readPaymentAmount } from '@/lib/engagements/payment-field-rules';
 import { validateFeeSchedule } from '@/lib/engagements/fee-schedule';
+import { readChangeOrderAmount } from '@/lib/engagements/revision-field-rules';
 import { readRomRange } from '@/lib/engagements/rom-field-rules';
 import { formatMoney4, parseMoney4 } from '@/lib/aggregates/proposal-totals';
 import { readPositiveAmount, readTypedMoney } from './amount-field';
@@ -71,5 +72,11 @@ describe('every money box reads the same way (F2, F6)', () => {
       ok: false,
       errors: { romHigh: { code: 'amount_too_large' } },
     });
+  });
+
+  it('a revision change order', () => {
+    expect(readChangeOrderAmount('5,000 ج.م')).toEqual({ ok: true, value: '5000.0000' });
+    expect(readChangeOrderAmount('5o')).toEqual({ ok: false, error: { code: 'not_a_number' } });
+    expect(readChangeOrderAmount('0')).toEqual({ ok: false, error: { code: 'revision_co_amount_required' } });
   });
 });

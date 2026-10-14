@@ -1,5 +1,6 @@
 // The ONE reader for an amount a studio TYPES into a money box (a payment, the
-// design fee and its split, the build-cost range, the price book). Pure and
+// design fee and its split, the build-cost range, a revision's change order,
+// the price book). Pure and
 // client-safe: the form's pre-check and the server core read the same figure.
 //
 // It accepts what Egyptian studios actually type, and refuses what is

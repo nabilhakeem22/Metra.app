@@ -80,10 +80,16 @@ describe('DocumentThread', () => {
     expect(messageAt('ar-EG', 'portal.errors.comments_too_many')).not.toBe(messageAt('ar-EG', 'portal.errors.too_many'));
   });
 
-  it('a code the portal has no copy for reads as the generic error', async () => {
-    actions.addDeliveryComment.mockResolvedValue({ ok: false, error: 'already_responded' });
+  it('a code nobody sends reads as the generic error', async () => {
+    actions.addDeliveryComment.mockResolvedValue({ ok: false, error: 'not_a_portal_code' });
     await openAndSend('ar-EG');
     expect((await screen.findByRole('alert')).textContent).toBe(messageAt('ar-EG', 'portal.errors.generic'));
+  });
+
+  it('an answer already given reads as the act having moved on, never generic (F12)', async () => {
+    actions.addDeliveryComment.mockResolvedValue({ ok: false, error: 'already_responded' });
+    await openAndSend('ar-EG');
+    expect((await screen.findByRole('alert')).textContent).toBe(messageAt('ar-EG', 'delivery.comments.error.wrong_state'));
   });
 });
 
