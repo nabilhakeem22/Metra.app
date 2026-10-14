@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import en from '@/messages/en.json';
 import { isSharedPortalError } from '@/lib/share/portal-failure';
-import { portalErrorKey } from './portal-error-key';
+import { actFailureOf, portalErrorKey } from './portal-error-key';
 
 describe('portalErrorKey', () => {
   it('keeps the codes the portal has copy for', () => {
@@ -10,11 +10,16 @@ describe('portalErrorKey', () => {
     }
   });
 
-  it('folds codes the portal has no copy for, and absent codes, into generic', () => {
-    expect(portalErrorKey('already_responded')).toBe('generic');
-    expect(portalErrorKey('contract_inactive')).toBe('generic');
+  it('says what a known code means, never generic (F12)', () => {
+    expect(portalErrorKey('already_responded')).toBe('wrong_state');
+    expect(portalErrorKey('contract_inactive')).toBe('not_active');
+  });
+
+  it('folds only a code nobody sent, or none, into generic, keeping the reference', () => {
+    expect(portalErrorKey('x')).toBe('generic');
     expect(portalErrorKey(undefined)).toBe('generic');
     expect(portalErrorKey(null)).toBe('generic');
+    expect(actFailureOf({ error: 'generic', reference: 'K7Q29MXD' })).toEqual({ error: 'generic', reference: 'K7Q29MXD' });
   });
 
   it('only ever answers a key portal.errors holds, or wrong_state, which each act says itself', () => {

@@ -3,6 +3,7 @@ import 'server-only';
 // the client's address carrying the link they ALREADY hold. Owner/admin only,
 // server-enforced, audited, at most once per delivery per cooldown; never
 // rotates the link.
+import { failureOf } from '@/lib/actions/failure-of';
 import { fail, mutateInOrg } from '@/lib/actions/mutate';
 import { err, ok, type ActionResult } from '@/lib/actions/result';
 import type { OrgContext } from '@/lib/db/context';
@@ -52,7 +53,7 @@ export async function emailDeliveryReminderCore(
     });
     return { rawToken: link.raw, recipient, to: recipient.email };
   });
-  if (!read.ok || !read.data) return { ok: false, error: read.error ?? 'generic' };
+  if (!read.ok || !read.data) return failureOf(read, 'emailDeliveryReminder read');
 
   const { rawToken, recipient, to } = read.data;
   const { sent } = await sendDeliveryReminderEmail({

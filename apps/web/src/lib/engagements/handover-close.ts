@@ -51,7 +51,7 @@ export async function closeAcknowledgedHandover(
     });
     if (closed.ok) return 'closed';
     if (closed.error && NOT_CLOSABLE.has(closed.error)) return 'not_closable';
-    console.error('handover close failed:', { code: closed.error ?? 'generic' });
+    console.error('handover close failed:', { code: closed.error, reference: closed.reference });
     return 'failed';
   } catch (e) {
     console.error('handover close failed:', loggableFailure(e));

@@ -82,11 +82,11 @@ describe('sendProposalAsBoqCore', () => {
     expect(renderAndStoreClientBoqPdf).not.toHaveBeenCalled();
   });
 
-  it('returns generic and never commits when the renderer throws', async () => {
+  it('returns generic with its reference and never commits when the renderer throws', async () => {
     loadSendSnapshot.mockResolvedValue(snapshot);
     renderAndStoreClientBoqPdf.mockRejectedValue(new Error('503 at the renderer cap'));
     const res = await sendProposalAsBoqCore(ctx('owner'), { proposalId: 'p1', locale: 'en' });
-    expect(res).toEqual({ ok: false, error: 'generic' });
+    expect(res).toEqual({ ok: false, error: 'generic', reference: expect.stringMatching(/^[0-9A-Z]{8}$/) });
     expect(commitProposalBoqCore).not.toHaveBeenCalled();
   });
 

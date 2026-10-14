@@ -38,7 +38,7 @@ export async function completeBoqStep(ctx: OrgContext, engagementId: string): Pr
     const moved = await executeConsequence(ctx, { engagementId, consequence: 'boqSent' });
     if (moved.ok) return 'completed';
     if (moved.error === 'illegal_trigger' || moved.error === 'engagement_state_conflict') return 'not_at_boq';
-    console.error('BOQ step completion failed:', { code: moved.error ?? 'generic' });
+    console.error('BOQ step completion failed:', { code: moved.error, reference: moved.reference });
     return 'failed';
   } catch (e) {
     console.error('BOQ step completion failed:', loggableFailure(e));

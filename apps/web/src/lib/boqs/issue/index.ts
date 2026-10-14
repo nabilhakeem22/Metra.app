@@ -6,7 +6,7 @@ import { err, type ActionCode, type ActionResult } from '@/lib/actions/result';
 import type { OrgContext } from '@/lib/db/context';
 import { withOrgContext } from '@/lib/db/context';
 import { completeBoqStep, type BoqStepCompletion } from '@/lib/engagements/boq-step-complete';
-import { renderFailureCode } from '@/lib/pdf/render-failure-code';
+import { renderFailure } from '@/lib/pdf/render-failure';
 import { can } from '@/lib/permissions/can';
 import { getBoqDetail, type BoqDetail } from '../queries';
 import { loadDocumentNames, type DocumentNames } from './document-names';
@@ -53,7 +53,7 @@ export async function issueBoqCore(
   try {
     file = await renderAndStoreClientBoqPdf(ctx, { ...source, locale: input.locale });
   } catch (e) {
-    return err(renderFailureCode(e, 'BOQ issue'));
+    return renderFailure(e, 'BOQ issue');
   }
 
   const issued = await mutateInOrg(ctx, { capability: 'boq_build', action: 'update' }, async (tx) => {

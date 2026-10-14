@@ -4,6 +4,7 @@ import 'server-only';
 // ALREADY holds (re-derived, never rotated), the number to open WhatsApp on,
 // and whether an email can be sent. Owner/admin only, server-enforced; every
 // preparation is audited, because it reveals the client's link.
+import { failureOf } from '@/lib/actions/failure-of';
 import { mutateInOrg } from '@/lib/actions/mutate';
 import type { ActionResult } from '@/lib/actions/result';
 import { unexpectedFailure } from '@/lib/actions/unexpected';
@@ -48,7 +49,7 @@ export async function prepareDeliveryReminderCore(
     });
     return { rawToken: link.raw, recipient };
   });
-  if (!read.ok || !read.data) return { ok: false, error: read.error ?? 'generic' };
+  if (!read.ok || !read.data) return failureOf(read, 'prepareDeliveryReminder read');
 
   const { rawToken, recipient } = read.data;
   try {

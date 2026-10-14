@@ -1,5 +1,6 @@
 'use server';
 
+import { failureOf } from '@/lib/actions/failure-of';
 import { unexpectedFailure } from '@/lib/actions/unexpected';
 import type { ActionResult } from '@/lib/actions/result';
 import { requireOrg } from '@/lib/auth/require-org';
@@ -22,7 +23,7 @@ export async function revealDeliveryLink(
   const origin = await resolveRequestOrigin();
   if (!origin) return unexpectedFailure('revealDeliveryLink: no request origin');
   const res = await revealDeliveryLinkCore(ctx, engagementId);
-  if (!res.ok || !res.data) return { ok: false, error: res.error ?? 'generic' };
+  if (!res.ok || !res.data) return failureOf(res, 'revealDeliveryLink');
   return { ok: true, link: deliveryPortalUrl(origin, await requestLocaleOrDefault(), res.data) };
 }
 

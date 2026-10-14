@@ -32,8 +32,9 @@ export interface DocumentThread<TMessage> {
   partial: boolean;
   draft: string;
   setDraft: (value: string) => void;
-  /** A coded error for the caller to localize, or null. */
-  error: string | null;
+  /** THREAD_LOAD_FAILED while the last read failed, or null. A refused send is
+   *  never here: it is said through `refusals`. */
+  error: typeof THREAD_LOAD_FAILED | null;
   /** A first load is in flight. */
   loading: boolean;
   /** A send is in flight. */
@@ -44,9 +45,10 @@ export interface DocumentThread<TMessage> {
   send: () => void;
 }
 
-/** Where a refused or failed send is said, when the caller says it under the
- *  message box (the field-errors hook is one) rather than as the thread's coded error. */
+/** Where a refused or failed send is said: under the message box (the
+ *  field-errors hook is one), with the reference of an unknown failure. */
 export interface ThreadSendRefusals<TResult> {
+  /** Says a failed result and answers true; answers false for a success. */
   applyResult(result: TResult): boolean;
   applyRejection(rejection: unknown): void;
 }
@@ -60,8 +62,8 @@ export function useDocumentThread<
   load: () => Promise<TMessage[]>;
   /** Append one message. Resolves with a coded result — never throws to the UI. */
   send: (body: string) => Promise<TResult>;
-  /** Given, a send that fails is said there instead of in `error`. */
-  refusals?: ThreadSendRefusals<TResult>;
+  /** Where a send that fails is said. Required: the hook has no copy of its own. */
+  refusals: ThreadSendRefusals<TResult>;
   /** The sender's own message as the thread shows it, used only when the re-read
    *  after a SUCCESSFUL send fails, so a saved message never vanishes from view.
    *  Without it, that failure shows THREAD_LOAD_FAILED instead of saying nothing. */
@@ -71,7 +73,7 @@ export function useDocumentThread<
   const [loaded, setLoaded] = useState(false);
   const [messages, setMessages] = useState<TMessage[]>([]);
   const [draft, setDraft] = useState('');
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<typeof THREAD_LOAD_FAILED | null>(null);
   const [loading, startLoading] = useTransition();
   const [sending, startSending] = useTransition();
 
@@ -119,19 +121,14 @@ export function useDocumentThread<
     startSending(async () => {
       try {
         const result = await options.send(body);
-        if (options.refusals?.applyResult(result)) return;
-        if (!result.ok) {
-          setError(result.error ?? 'generic');
-          return;
-        }
+        if (options.refusals.applyResult(result)) return;
         setDraft('');
         // Re-read rather than appending locally: the stored row carries the real
         // timestamp, and a refetch also surfaces anything the other side sent
         // while this message was being written.
         await rereadAfterSend(body);
       } catch (rejection) {
-        if (options.refusals) options.refusals.applyRejection(rejection);
-        else setError('generic');
+        options.refusals.applyRejection(rejection);
       }
     });
   }

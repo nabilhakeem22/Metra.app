@@ -1,11 +1,12 @@
 // "Send as BOQ": snapshot, map, render, then ONE write. PURE core — the
 // 'use server' wrapper in ../actions does the session work.
 import 'server-only';
-import { err, type ActionCode, type ActionResult } from '@/lib/actions/result';
+import { failureOf } from '@/lib/actions/failure-of';
+import { err, type ActionResult } from '@/lib/actions/result';
 import { renderAndStoreClientBoqPdf } from '@/lib/boqs/issue';
 import type { OrgContext } from '@/lib/db/context';
 import { completeBoqStep, type BoqStepCompletion } from '@/lib/engagements/boq-step-complete';
-import { renderFailureCode } from '@/lib/pdf/render-failure-code';
+import { renderFailure } from '@/lib/pdf/render-failure';
 import { can } from '@/lib/permissions/can';
 import { toBoqDetail } from '../detail';
 import { mapProposalToBoq, type MappedBoq } from '../map';
@@ -21,13 +22,13 @@ async function sentAsBoq(ctx: OrgContext, engagementId: string, documentNumber: 
 }
 
 /** The client PDF, numbered with the number the commit must allocate, or the
- *  refusal code (`renderer_busy` when it is worth retrying). */
+ *  render's failure (`renderer_busy` when it is worth retrying). */
 async function renderClientCopy(
   ctx: OrgContext,
   snapshot: SendSnapshot,
   mapped: MappedBoq,
   locale: string,
-): Promise<StoredFile | ActionCode> {
+): Promise<StoredFile | ActionResult> {
   const { proposal } = snapshot;
   const preferred = locale.startsWith('ar') ? proposal.titleAr : proposal.titleEn;
   const detail = toBoqDetail(
@@ -50,7 +51,7 @@ async function renderClientCopy(
       year: snapshot.renderYear,
     });
   } catch (e) {
-    return renderFailureCode(e, 'Send as BOQ');
+    return renderFailure(e, 'Send as BOQ');
   }
 }
 
@@ -102,9 +103,9 @@ export async function sendProposalAsBoqCore(
   const mapped = mapProposalToBoq(snapshot.source, snapshot.proposal.discountPct);
 
   const file = await renderClientCopy(ctx, snapshot, mapped, input.locale);
-  if (typeof file === 'string') return err(file);
+  if ('ok' in file) return file;
 
   const committed = await commitProposalBoqCore(ctx, commitInput(snapshot, mapped, file));
-  if (!committed.ok || !committed.data) return { ok: false, error: committed.error ?? 'generic' };
+  if (!committed.ok || !committed.data) return failureOf(committed, 'Send as BOQ commit');
   return sentAsBoq(ctx, snapshot.engagement.id, committed.data.documentNumber);
 }

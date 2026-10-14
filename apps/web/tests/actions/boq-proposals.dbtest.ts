@@ -237,9 +237,11 @@ describe('sendProposalAsBoqCore refusals before any render (AC13)', () => {
     const id = await boqProposalWith(org.ctx, engagementId, TWO_SECTIONS);
     vi.spyOn(console, 'error').mockImplementation(() => {});
 
+    // Unexpected, so the studio gets the reference of its one log line (F12).
     expect(await sendProposalAsBoqCore(org.ctx, { proposalId: id, locale: 'en' })).toEqual({
       ok: false,
       error: 'generic',
+      reference: expect.stringMatching(/^[0-9A-Z]{8}$/),
     });
     const [counts] = await raw.query<{ boqs: number; artifacts: number }>(
       `select (select count(*)::int from public.boqs where org_id = '${org.orgId}') as boqs,
