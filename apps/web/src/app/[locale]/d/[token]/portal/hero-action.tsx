@@ -5,6 +5,7 @@ import { useTranslations } from 'next-intl';
 import { useRouter } from 'next/navigation';
 import { useId, useState, useTransition } from 'react';
 import { Button } from '@/components/ui/button';
+import { UNCONFIRMED_WRITE } from '@/lib/share/portal-failure';
 import { lockedWorkCount, workImages } from '@/lib/engagements/portal-gallery';
 import type { HeroGroup } from '@/lib/engagements/portal-hero';
 import type { PublicDelivery } from '@/lib/engagements/public/types';
@@ -73,8 +74,9 @@ export function ActionHero({
         const { refresh, ...refusal } = answer;
         setFailure(refusal);
         if (refresh) router.refresh();
-      } catch (rejection) {
-        setFailure({ rejection });
+      } catch {
+        // The answer never came back: it may have been saved (UNCONFIRMED_WRITE).
+        setFailure(UNCONFIRMED_WRITE);
       } finally {
         setAsking(null);
       }

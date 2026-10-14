@@ -4,6 +4,7 @@ import { useTranslations } from 'next-intl';
 import { useRouter } from 'next/navigation';
 import { useId, useState, useTransition } from 'react';
 import { Button } from '@/components/ui/button';
+import { UNCONFIRMED_WRITE } from '@/lib/share/portal-failure';
 import { useConfirm } from '@/components/ui/confirm-dialog';
 import type { PublicDelivery } from '@/lib/engagements/public/types';
 import { bidiIsolate } from '@/lib/format/bidi';
@@ -64,8 +65,9 @@ export function ConceptOptionPicker({
         const { refresh, ...refusal } = answer;
         setFailure(refusal);
         if (refresh) router.refresh();
-      } catch (rejection) {
-        setFailure({ rejection });
+      } catch {
+        // The answer never came back: it may have been saved (UNCONFIRMED_WRITE).
+        setFailure(UNCONFIRMED_WRITE);
       }
     });
   }

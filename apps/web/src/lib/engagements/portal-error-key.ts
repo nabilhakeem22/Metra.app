@@ -43,8 +43,8 @@ export function portalErrorKey(code: string | null | undefined): PortalErrorKey 
   }
 }
 
-/** A failed delivery act as a page keeps it: its answer, or a promise that never answered. */
-export type ShownActFailure = { error: PortalErrorKey; reference?: string } | { rejection: unknown };
+/** A failed delivery act as a page keeps it (a lost answer is `uncertain`: UNCONFIRMED_WRITE). */
+export type ShownActFailure = { error: PortalErrorKey; reference?: string };
 
 /** The failure a refused act's answer carries, narrowed to a key the portal says. */
 export function actFailureOf(result: { error?: string | null; reference?: string }): ShownActFailure {
@@ -54,7 +54,6 @@ export function actFailureOf(result: { error?: string | null; reference?: string
 
 /** Its sentence: a shared failure from `portal.errors` (`tErrors`), `wrong_state` in the act's own words. */
 export function describeActFailure(failure: ShownActFailure, tErrors: Translate, wrongState: () => string): string {
-  if ('rejection' in failure) return describePortalFailure(failure, tErrors);
   if (failure.error === 'wrong_state') return wrongState();
   return describePortalFailure({ error: failure.error, reference: failure.reference }, tErrors);
 }

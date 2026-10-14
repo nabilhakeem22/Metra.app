@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useState, useTransition } from 'react';
 import { actFailureOf, type ShownActFailure } from '@/lib/engagements/portal-error-key';
+import { UNCONFIRMED_WRITE } from '@/lib/share/portal-failure';
 import { markDeliveryPaymentPaid } from '../actions';
 
 export interface PaymentClaimSubmission {
@@ -18,8 +19,8 @@ export interface PaymentClaimSubmission {
   /** Of those, the ones whose claim really reached the studio (a notification
    *  row was written): only these may say the team has been notified. */
   notifiedKinds: ReadonlySet<string>;
-  /** The last failed claim (its answer narrowed to a key the portal says, or a
-   *  promise that never answered), and the milestone it was for. */
+  /** The last failed claim (its answer narrowed to a key the portal says; a lost
+   *  answer is `uncertain`), and the milestone it was for. */
   failure: { kind: string; shown: ShownActFailure } | null;
   /** A milestone whose confirmation a refresh made moot (it stopped being
    *  claimable while the dialog was open): nothing was sent, and the card says so. */
@@ -69,8 +70,9 @@ export function usePaymentClaim(token: string): PaymentClaimSubmission {
         } else {
           setFailure({ kind: milestoneKind, shown: actFailureOf(result) });
         }
-      } catch (rejection) {
-        setFailure({ kind: milestoneKind, shown: { rejection } });
+      } catch {
+        // The claim may have been saved: refresh and check (UNCONFIRMED_WRITE).
+        setFailure({ kind: milestoneKind, shown: UNCONFIRMED_WRITE });
       } finally {
         setSubmittingKind(null);
         setAskingKind(null);

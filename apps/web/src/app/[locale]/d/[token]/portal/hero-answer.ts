@@ -39,8 +39,8 @@ export interface HeroRefusal {
 
 export type HeroAnswer = { confirmed: HeroConfirmedState } | (HeroRefusal & { refresh: boolean });
 
-/** What a hero shows when its act did not land: the answer, or a promise that never answered. */
-export type HeroFailure = HeroRefusal | { rejection: unknown };
+/** What a hero shows when its act did not land (a lost answer is `uncertain`). */
+export type HeroFailure = HeroRefusal;
 
 const MOVED_ON: HeroAnswer = { error: 'movedOn', refresh: true };
 const REVIEW_CHANGED: HeroAnswer = { error: 'reviewChanged', refresh: true };

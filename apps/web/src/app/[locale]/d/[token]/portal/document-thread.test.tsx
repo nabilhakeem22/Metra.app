@@ -120,7 +120,7 @@ describe.each<TestLocale>(['en', 'ar-EG'])('the comment box (%s)', (locale) => {
     expect(document.activeElement?.id).toBe(BOX);
   });
 
-  it('an unknown failure says so with its reference; a dropped connection says to check it', async () => {
+  it('an unknown failure says so with its reference; a lost send says refresh and check, never "could not reach"', async () => {
     actions.addDeliveryComment.mockResolvedValue({ ok: false, error: 'generic', reference: 'K7Q29MXD' });
     await openAndSend(locale);
     expect((await screen.findByRole('alert')).textContent).toBe(
@@ -128,6 +128,6 @@ describe.each<TestLocale>(['en', 'ar-EG'])('the comment box (%s)', (locale) => {
     );
     actions.addDeliveryComment.mockRejectedValue(new TypeError('Failed to fetch'));
     await press(locale);
-    expect(screen.getByRole('alert').textContent).toBe(at('portal.errors.unreachable'));
+    expect(screen.getByRole('alert').textContent).toBe(at('portal.errors.uncertain'));
   });
 });

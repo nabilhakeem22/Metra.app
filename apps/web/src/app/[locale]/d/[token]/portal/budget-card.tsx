@@ -5,6 +5,7 @@ import { useLocale, useTranslations } from 'next-intl';
 import { useRouter } from 'next/navigation';
 import { useState, useTransition } from 'react';
 import { Button } from '@/components/ui/button';
+import { UNCONFIRMED_WRITE } from '@/lib/share/portal-failure';
 import type { PublicDelivery } from '@/lib/engagements/public';
 import { describeActFailure, type ShownActFailure } from '@/lib/engagements/portal-error-key';
 import { bandSeenOf } from '@/lib/engagements/review-seen';
@@ -66,8 +67,9 @@ export function BudgetCard({
         if (outcome.kind === 'error') return setFailure(outcome);
         setConfirmed({ studioNotified: outcome.studioNotified });
         router.refresh();
-      } catch (rejection) {
-        setFailure({ rejection });
+      } catch {
+        // The answer never came back: it may have been saved (UNCONFIRMED_WRITE).
+        setFailure(UNCONFIRMED_WRITE);
       }
     });
   }

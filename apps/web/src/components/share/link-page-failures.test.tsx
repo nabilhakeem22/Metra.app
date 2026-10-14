@@ -8,10 +8,12 @@ import type { PublicProposal } from '@/lib/proposals/public';
 import type { PublicVariation } from '@/lib/variations/public';
 import { messageAt, renderWithIntl, type TestLocale } from '@/test/render-with-intl';
 
-// W3.6 (AC 30): on /p, /c and /v an answer that never landed is said from
-// portal.errors (فصحى), with the reference of an unknown failure; the decision
-// stays open with its buttons enabled, and the page never claims the client
-// already answered or that the link is not valid.
+// W3.6 (AC 30, as the lead ruled against R4): on /p, /c and /v an answer that
+// never landed is said from portal.errors (فصحى), with the reference of an
+// unknown failure; a request that rejected may have been recorded, so it says
+// `uncertain` (refresh and check before sending again), never "could not
+// reach". The decision stays open with its buttons enabled, and the page never
+// claims the client already answered or that the link is not valid.
 
 const answers = vi.hoisted(() => ({
   respondToProposal: vi.fn(),
@@ -107,14 +109,14 @@ describe.each<TestLocale>(['en', 'ar-EG'])('a link page whose answer never lande
     expectStillOpen(page, at('portal.errors.uncertain'));
   });
 
-  test.each(PAGES)('$name: a dropped connection says to check it', async (page) => {
+  test.each(PAGES)('$name: a dropped connection may have been recorded: refresh and check', async (page) => {
     await answerWith(page, (answer) => answer.mockRejectedValue(new TypeError('Failed to fetch')));
-    expectStillOpen(page, at('portal.errors.unreachable'));
+    expectStillOpen(page, at('portal.errors.uncertain'));
   });
 
-  test.each(PAGES)('$name: a server throw hands over its digest as the reference', async (page) => {
+  test.each(PAGES)('$name: a server throw is the same unconfirmed answer', async (page) => {
     await answerWith(page, (answer) => answer.mockRejectedValue(Object.assign(new Error('boom'), { digest: '4242' })));
-    expectStillOpen(page, withReference('4242'));
+    expectStillOpen(page, at('portal.errors.uncertain'));
   });
 });
 
