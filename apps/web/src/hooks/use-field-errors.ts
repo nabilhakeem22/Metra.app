@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { describeFailure, describeRejection, type Translate } from '@/lib/actions/error-message';
 import { describeFieldError } from '@/lib/actions/field-error-message';
 import { hasFieldErrors, type FieldError, type FieldErrors } from '@/lib/actions/field-errors';
@@ -50,11 +50,19 @@ export function useFieldErrors<F extends string>({
 }) {
   const [shown, setShown] = useState<Shown<F>>(NOTHING_SHOWN);
   const [invalidAttempt, setInvalidAttempt] = useState(0);
+  // The fields edited since the last submit (a `clear` or `applyLocal`, which
+  // every form runs as it sends). A server answer about the OLD value of one of
+  // them is dropped, and once the person has moved on the caret stays put.
+  const edited = useRef(new Set<string>());
 
-  function showFieldErrors(errors: FieldErrors): void {
-    const next = splitByRendered(errors, rendered, translate);
+  function showFieldErrors(errors: FieldErrors, answeredLate: boolean): void {
+    const current = answeredLate
+      ? Object.fromEntries(Object.entries(errors).filter(([path]) => !edited.current.has(path)))
+      : errors;
+    const next = splitByRendered(current, rendered, translate);
     setShown(next);
-    if (hasFieldErrors(next.fields)) setInvalidAttempt((attempt) => attempt + 1);
+    const typingElsewhere = answeredLate && edited.current.size > 0;
+    if (hasFieldErrors(next.fields) && !typingElsewhere) setInvalidAttempt((attempt) => attempt + 1);
   }
 
   function messageFor(field: F): string | undefined {
@@ -63,6 +71,7 @@ export function useFieldErrors<F extends string>({
   }
 
   function clearField(field: F): void {
+    edited.current.add(field);
     setShown((current) => {
       if (!current.fields[field]) return current;
       const fields = { ...current.fields };
@@ -72,7 +81,10 @@ export function useFieldErrors<F extends string>({
   }
 
   /** Stable, so a form can clear on open from an effect. */
-  const clear = useCallback((): void => setShown(NOTHING_SHOWN), []);
+  const clear = useCallback((): void => {
+    edited.current = new Set();
+    setShown(NOTHING_SHOWN);
+  }, []);
 
   /** Show what a failed result says; true when it carried an error. */
   function applyResult(result: ActionResult): boolean {
@@ -80,7 +92,7 @@ export function useFieldErrors<F extends string>({
       clear();
       return false;
     }
-    if (result.fields && hasFieldErrors(result.fields)) showFieldErrors(result.fields);
+    if (result.fields && hasFieldErrors(result.fields)) showFieldErrors(result.fields, true);
     else setShown({ fields: {}, formError: describeFailure(result, translate) });
     return true;
   }
@@ -96,7 +108,8 @@ export function useFieldErrors<F extends string>({
       clear();
       return false;
     }
-    showFieldErrors(errors);
+    edited.current = new Set();
+    showFieldErrors(errors, false);
     return true;
   }
 

@@ -108,6 +108,6 @@ export async function respondToVariationByToken(
   const code = await readSdfCode(sql`select public.app_variation_respond_by_token(
     ${hash}, ${input.decision}, ${input.actorName ?? null},
     ${input.ip ?? null}, ${input.userAgent ?? null}
-  ) as code`);
+  ) as code`, { write: true });
   return mapDocumentSdfCode(code);
 }
