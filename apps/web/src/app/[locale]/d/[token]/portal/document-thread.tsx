@@ -5,33 +5,28 @@ import { useTranslations } from 'next-intl';
 import { useRouter } from 'next/navigation';
 import { useCallback, useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { portalCommentErrorKey } from '@/lib/engagements/portal-error-key';
+import { FieldErrorText, fieldErrorId } from '@/components/ui/field-error-text';
+import { Textarea } from '@/components/ui/textarea';
+import { COMMENT_MAX } from '@/lib/engagements/comment-field-rules';
 import { ownSentComment, threadMessagesOrThrow } from '@/lib/engagements/portal-thread-read';
 import type { PublicDocumentComment } from '@/lib/engagements/public-comments';
 import { useDocumentThread } from '@/lib/engagements/use-document-thread';
-import { addDeliveryComment, loadDeliveryDocumentComments } from '../actions';
+import { addDeliveryComment, loadDeliveryDocumentComments, type DeliveryCommentActResult } from '../actions';
 import { DocumentThreadBody } from './document-thread-messages';
-import { Textarea } from '@/components/ui/textarea';
-
-/** Hard cap, mirrored from the SDF and the table's CHECK. Enforced here only so the
- *  client sees the limit while typing rather than after a rejected send. */
-const BODY_MAX = 2000;
+import { useCommentRefusals } from './use-comment-refusals';
 
 /**
- * Client Deliverables Step 2 — ONE released document's comment thread, on the client
- * portal. Presentation only: the collapsed/lazy/re-read behaviour lives in the
- * shared `useDocumentThread` hook, which the studio's panel uses too, so the two
- * surfaces can never drift apart on behaviour while keeping their own design system.
+ * Client Deliverables Step 2: ONE released document's comment thread, on the client
+ * portal. The collapsed/lazy/re-read behaviour lives in the shared
+ * `useDocumentThread` hook, which the studio's panel uses too.
  *
  * ADVISORY, and the copy says so: a comment is a question about this drawing, NOT a
- * revision request. The stage approve / request-changes buttons remain the only way
- * to move anything, so a client who comments can never end up waiting on a stage
- * that is in fact waiting on them.
+ * revision request; the stage buttons remain the only way to move anything.
  *
- * The messages render in DocumentThreadBody. After a send, the thread says
- * the team has been notified only when the portal action says it was, and the
- * page re-reads itself from the server. Logical
- * CSS only, so it mirrors correctly in RTL.
+ * After a send, the thread says the team has been notified only when the portal
+ * action says it was, and the page re-reads itself. Send is never disabled for an
+ * empty box: pressing it says, under the box, what is missing
+ * (./use-comment-refusals.ts). Logical CSS only, so it mirrors in RTL.
  */
 export function DocumentThread({
   token,
@@ -66,7 +61,18 @@ export function DocumentThread({
     },
     [token, documentId, router],
   );
-  const thread = useDocumentThread<PublicDocumentComment>({ load, send: submit, echo: ownSentComment });
+  const refused = useCommentRefusals();
+  const thread = useDocumentThread<PublicDocumentComment, DeliveryCommentActResult>({
+    load,
+    send: submit,
+    echo: ownSentComment,
+    refusals: refused.refusals,
+  });
+  const boxId = `comment-${documentId}`;
+  function send() {
+    if (refused.precheck(thread.draft)) return;
+    thread.send();
+  }
 
   // The server's count until the thread has really loaded, then its own length
   // (which reflects whatever was just sent).
@@ -88,28 +94,29 @@ export function DocumentThread({
         <div className="mt-2 space-y-3 rounded-item border bg-muted/30 p-3">
           <DocumentThreadBody thread={thread} />
 
-          <div className="space-y-1.5">
-            <label htmlFor={`comment-${documentId}`} className="sr-only">
+          <div ref={refused.boxRef} className="space-y-1.5">
+            <label htmlFor={boxId} className="sr-only">
               {t('placeholder')}
             </label>
             <Textarea
-              id={`comment-${documentId}`}
+              id={boxId}
               value={thread.draft}
-              maxLength={BODY_MAX}
-              onChange={(event) => thread.setDraft(event.target.value)}
+              maxLength={COMMENT_MAX}
+              aria-invalid={refused.bodyError ? true : undefined}
+              aria-describedby={refused.bodyError ? fieldErrorId(boxId) : undefined}
+              onChange={(event) => {
+                refused.onBodyEdit();
+                thread.setDraft(event.target.value);
+              }}
               placeholder={t('placeholder')}
               rows={2}
               dir="auto"
               className="resize-y"
             />
+            <FieldErrorText id={fieldErrorId(boxId)} message={refused.bodyError} />
             <div className="flex items-center justify-between gap-2">
               <p className="text-caption text-muted-foreground">{t(inLightbox ? 'advisoryLightbox' : 'advisory')}</p>
-              <Button
-                variant="secondary"
-                size="sm"
-                disabled={thread.sending || !thread.draft.trim()}
-                onClick={thread.send}
-              >
+              <Button variant="secondary" size="sm" disabled={thread.sending} onClick={send}>
                 {thread.sending ? (
                   <Loader2 className="size-3.5 animate-spin" aria-hidden />
                 ) : (
@@ -118,14 +125,19 @@ export function DocumentThread({
                 {t('send')}
               </Button>
             </div>
-            {studioNotified && !thread.error && (
+            {studioNotified && !thread.error && !refused.failureText && (
               <p className="text-caption text-muted-foreground" role="status">
                 {t('notified')}
               </p>
             )}
+            {refused.failureText && (
+              <p className="text-caption text-destructive" role="alert">
+                {refused.failureText}
+              </p>
+            )}
             {thread.error && (
               <p className="text-caption text-destructive" role="alert">
-                {t(`error.${portalCommentErrorKey(thread.error)}`)}
+                {t('error.load_failed')}
               </p>
             )}
           </div>

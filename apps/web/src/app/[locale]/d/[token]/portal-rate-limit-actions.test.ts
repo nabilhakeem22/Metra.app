@@ -3,8 +3,8 @@ import { fakePortalRateLimitEnv } from '@/test/fake-rate-limit-env';
 import { PORTAL_ACT_CEILING, PORTAL_READ_CEILING } from '@/test/wrangler-rate-limits';
 
 // Round D (W4): every server action under /d/[token] spends the link's act
-// budget before it reaches a write; past it the action answers its refusal and
-// the write module is never called. A comment is charged only once it is a valid
+// budget before it reaches a write; past it the action answers `too_many`
+// (W3.5, AC 31: "wait a minute") and the write module is never called. A comment is charged only once it is a valid
 // comment. A thread read spends the read budget and past it answers the REFUSED
 // marker, never an empty thread. Ceilings come from wrangler.jsonc.
 
@@ -43,18 +43,17 @@ const BAND_SEEN = '2026-10-01T09:00:00.123456+00:00';
 const SEEN = { romIssuedAt: BAND_SEEN, rendersIssuedAt: '2026-10-02T09:00:00.000001+00:00' };
 
 type Act = [name: string, call: () => Promise<unknown>, write: keyof typeof writes, refused: unknown];
-const GENERIC_OUTCOME = { kind: 'error', error: 'generic' };
-const GENERIC_RESULT = { ok: false, studioNotified: false };
-const TOO_MANY_COMMENTS = { ok: false, error: 'too_many', studioNotified: false };
+const TOO_MANY_OUTCOME = { kind: 'error', error: 'too_many' };
+const TOO_MANY_RESULT = { ok: false, error: 'too_many', studioNotified: false };
 const ACTS: Act[] = [
-  ['chooseDeliveryConcept', () => review.chooseDeliveryConcept(TOKEN, DOCUMENT_ID, 1), 'chooseConceptAndNotify', GENERIC_OUTCOME],
-  ['respondToDeliveryConcept', () => review.respondToDeliveryConcept(TOKEN, 'approve_concept'), 'respondToConceptAndNotify', GENERIC_OUTCOME],
-  ['respondToDeliveryDesign', () => review.respondToDeliveryDesign(TOKEN, 'approve_design', '', SEEN), 'respondToDesignAndNotify', GENERIC_OUTCOME],
-  ['approveDesignWithBudget', () => review.approveDesignWithBudget(TOKEN, '', SEEN), 'approveDesignWithBudgetAndNotify', GENERIC_OUTCOME],
-  ['acknowledgeDeliveryBudget', () => review.acknowledgeDeliveryBudget(TOKEN, BAND_SEEN), 'acknowledgeSeenBudgetAndNotify', GENERIC_OUTCOME],
-  ['acknowledgeDeliveryHandover', () => review.acknowledgeDeliveryHandover(TOKEN), 'acknowledgeHandoverAndNotify', GENERIC_OUTCOME],
-  ['markDeliveryPaymentPaid', () => portal.markDeliveryPaymentPaid(TOKEN, 'deposit'), 'claimPaymentByToken', GENERIC_RESULT],
-  ['addDeliveryComment', () => portal.addDeliveryComment(TOKEN, DOCUMENT_ID, 'Looks good'), 'addDeliveryCommentByToken', TOO_MANY_COMMENTS],
+  ['chooseDeliveryConcept', () => review.chooseDeliveryConcept(TOKEN, DOCUMENT_ID, 1), 'chooseConceptAndNotify', TOO_MANY_OUTCOME],
+  ['respondToDeliveryConcept', () => review.respondToDeliveryConcept(TOKEN, 'approve_concept'), 'respondToConceptAndNotify', TOO_MANY_OUTCOME],
+  ['respondToDeliveryDesign', () => review.respondToDeliveryDesign(TOKEN, 'approve_design', '', SEEN), 'respondToDesignAndNotify', TOO_MANY_OUTCOME],
+  ['approveDesignWithBudget', () => review.approveDesignWithBudget(TOKEN, '', SEEN), 'approveDesignWithBudgetAndNotify', TOO_MANY_OUTCOME],
+  ['acknowledgeDeliveryBudget', () => review.acknowledgeDeliveryBudget(TOKEN, BAND_SEEN), 'acknowledgeSeenBudgetAndNotify', TOO_MANY_OUTCOME],
+  ['acknowledgeDeliveryHandover', () => review.acknowledgeDeliveryHandover(TOKEN), 'acknowledgeHandoverAndNotify', TOO_MANY_OUTCOME],
+  ['markDeliveryPaymentPaid', () => portal.markDeliveryPaymentPaid(TOKEN, 'deposit'), 'claimPaymentByToken', TOO_MANY_RESULT],
+  ['addDeliveryComment', () => portal.addDeliveryComment(TOKEN, DOCUMENT_ID, 'Looks good'), 'addDeliveryCommentByToken', TOO_MANY_RESULT],
 ];
 
 beforeEach(() => {
@@ -76,7 +75,7 @@ describe('the act budget on every portal server action', () => {
 
   it('the budget is per link, shared by every act of that link', async () => {
     for (let index = 0; index < PORTAL_ACT_CEILING; index += 1) await review.acknowledgeDeliveryHandover(TOKEN);
-    expect(await portal.markDeliveryPaymentPaid(TOKEN, 'deposit')).toEqual(GENERIC_RESULT);
+    expect(await portal.markDeliveryPaymentPaid(TOKEN, 'deposit')).toEqual(TOO_MANY_RESULT);
     expect(await portal.markDeliveryPaymentPaid('another-link', 'deposit')).toEqual({ ok: true, studioNotified: true });
   });
 });
@@ -86,7 +85,12 @@ describe('R5: a comment is validated before it is charged', () => {
     const env = fakePortalRateLimitEnv();
     cf.cfEnv.mockReturnValue(env);
     for (let index = 0; index < PORTAL_ACT_CEILING + 5; index += 1) {
-      expect(await portal.addDeliveryComment(TOKEN, DOCUMENT_ID, '   ')).toEqual({ ok: false, error: 'empty', studioNotified: false });
+      expect(await portal.addDeliveryComment(TOKEN, DOCUMENT_ID, '   ')).toEqual({
+        ok: false,
+        error: 'check_fields',
+        fields: { body: { code: 'required' } },
+        studioNotified: false,
+      });
       expect(await portal.addDeliveryComment(TOKEN, 'not-a-uuid', 'Hi')).toMatchObject({ ok: false, error: 'token_invalid' });
     }
     expect(env.PORTAL_ACT_RATE_LIMITER.limit).not.toHaveBeenCalled();

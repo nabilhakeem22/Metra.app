@@ -5,18 +5,18 @@ import { useTranslations } from 'next-intl';
 import { useRouter } from 'next/navigation';
 import { useId, useState, useTransition } from 'react';
 import { Button } from '@/components/ui/button';
-import { isBlankNote } from '@/lib/engagements/client-note';
 import { lockedWorkCount, workImages } from '@/lib/engagements/portal-gallery';
 import type { HeroGroup } from '@/lib/engagements/portal-hero';
 import type { PublicDelivery } from '@/lib/engagements/public/types';
 import { reviewSeenOf } from '@/lib/engagements/review-seen';
 import { ChangesNote } from './changes-note';
 import { ConfirmActDialog } from './confirm-act-dialog';
-import type { HeroConfirmedState, HeroError } from './hero-answer';
+import type { HeroConfirmedState, HeroFailure } from './hero-answer';
 import { GROUP_BUTTONS, type HeroButton } from './hero-buttons';
 import { HeroConfirmBody } from './hero-confirm-body';
 import { HeroErrorText } from './hero-error';
 import { sendHeroVerb } from './hero-verbs';
+import { useChangesNote } from './use-changes-note';
 import { HeroWorkStrip } from './hero-work-strip';
 
 /** What the action hero reads off the delivery. */
@@ -50,29 +50,31 @@ export function ActionHero({
   const tActions = useTranslations('delivery.actions');
   const router = useRouter();
   const hintId = useId();
+  const noteId = useId();
   const [pending, startTransition] = useTransition();
-  const [note, setNote] = useState('');
+  const notes = useChangesNote();
   const [asking, setAsking] = useState<HeroButton | null>(null);
-  const [error, setError] = useState<{ error: HeroError; budget?: 'acknowledged' } | null>(null);
+  const [failure, setFailure] = useState<HeroFailure | null>(null);
   const { clientActions, rom } = review;
   const buttons = GROUP_BUTTONS[group].filter((button) => clientActions.includes(button.verb));
-  const noteBlank = isBlankNote(note);
+  const noteBlank = notes.noteBlank;
   const offersChanges = buttons.some((button) => !button.confirms);
   const work = workImages(review.documents, group);
   const budget = group === 'design' && clientActions.includes('acknowledge_rom') && rom && (rom.low || rom.high) ? rom : null;
   const seen = reviewSeenOf(review);
 
   function submit(button: HeroButton) {
-    setError(null);
+    setFailure(null);
     startTransition(async () => {
       // Wrap the await so a rejected action can never leave the spinner stuck.
       try {
-        const answer = await sendHeroVerb(token, button.verb, note, { withBudget: budget !== null, seen });
+        const answer = await sendHeroVerb(token, button.verb, notes.note, { withBudget: budget !== null, seen });
         if ('confirmed' in answer) return onAnswered(answer.confirmed);
-        setError({ error: answer.error, budget: answer.budget });
-        if (answer.refresh) router.refresh();
-      } catch {
-        setError({ error: 'generic' });
+        const { refresh, ...refusal } = answer;
+        setFailure(refusal);
+        if (refresh) router.refresh();
+      } catch (rejection) {
+        setFailure({ rejection });
       } finally {
         setAsking(null);
       }
@@ -84,9 +86,9 @@ export function ActionHero({
       key={button.verb}
       variant={button.variant}
       className="min-h-11"
-      disabled={pending || (!button.confirms && noteBlank)}
-      aria-describedby={!button.confirms && noteBlank ? hintId : undefined}
-      onClick={() => (button.confirms ? setAsking(button) : submit(button))}
+      disabled={pending}
+      aria-describedby={!button.confirms && noteBlank && !notes.noteError ? hintId : undefined}
+      onClick={() => (button.confirms ? setAsking(button) : notes.readyForChanges() && submit(button))}
     >
       {pending && !asking && !button.confirms && <Loader2 className="size-4 animate-spin" aria-hidden />}
       {tGroup(button.labelKey)}
@@ -105,9 +107,9 @@ export function ActionHero({
       {group !== 'handoff' && (
         <HeroWorkStrip token={token} images={work} lockedCount={lockedWorkCount(review.documents, group)} />
       )}
-      <ChangesNote note={note} onChange={setNote} hintId={hintId} showHint={offersChanges && noteBlank} />
+      <ChangesNote id={noteId} state={notes} hintId={hintId} showHint={offersChanges && noteBlank} />
       {offersChanges && <div className="flex flex-col gap-2">{buttons.filter((button) => !button.confirms).map(buttonOf)}</div>}
-      {error && <HeroErrorText error={error.error} budget={error.budget} />}
+      {failure && <HeroErrorText failure={failure} />}
       <ConfirmActDialog
         open={asking !== null}
         title={tGroup('confirmTitle')}

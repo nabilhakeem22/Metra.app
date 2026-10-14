@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { useState, useTransition } from 'react';
 import { Button } from '@/components/ui/button';
 import type { PublicDelivery } from '@/lib/engagements/public';
-import type { PortalErrorKey } from '@/lib/engagements/portal-error-key';
+import { describeActFailure, type ShownActFailure } from '@/lib/engagements/portal-error-key';
 import { bandSeenOf } from '@/lib/engagements/review-seen';
 import { bidiIsolate } from '@/lib/format/bidi';
 import { formatDate } from '@/lib/format/date';
@@ -43,29 +43,31 @@ export function BudgetCard({
 }) {
   const t = useTranslations('delivery.budget');
   const tActions = useTranslations('delivery.actions');
+  const tErrors = useTranslations('portal.errors');
   const locale = useLocale();
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   // Non-null once acknowledged; says whether the studio was really notified.
   const [confirmed, setConfirmed] = useState<{ studioNotified: boolean } | null>(null);
-  const [error, setError] = useState<PortalErrorKey | 'changed' | null>(null);
+  // `changed`: another band was issued since the page loaded; the page re-reads.
+  const [failure, setFailure] = useState<ShownActFailure | 'changed' | null>(null);
 
   function acknowledge() {
-    setError(null);
+    setFailure(null);
     startTransition(async () => {
       // Wrap the await so a rejected action can never leave the spinner stuck.
       try {
         // The band this card shows: another band issued meanwhile writes nothing (F1).
         const outcome = await acknowledgeDeliveryBudget(token, bandSeenOf({ rom }));
         if (outcome.kind === 'changed') {
-          setError('changed');
+          setFailure('changed');
           return router.refresh();
         }
-        if (outcome.kind === 'error') return setError(outcome.error);
+        if (outcome.kind === 'error') return setFailure(outcome);
         setConfirmed({ studioNotified: outcome.studioNotified });
         router.refresh();
-      } catch {
-        setError('generic');
+      } catch (rejection) {
+        setFailure({ rejection });
       }
     });
   }
@@ -103,9 +105,11 @@ export function BudgetCard({
             {pending && <Loader2 className="size-4 animate-spin" aria-hidden />}
             {t('acknowledge')}
           </Button>
-          {error && (
+          {failure && (
             <p className="text-body text-destructive" role="alert">
-              {error === 'changed' ? tActions('changed') : tActions(`error.${error}`)}
+              {failure === 'changed'
+                ? tActions('changed')
+                : describeActFailure(failure, tErrors, () => tActions('error.wrong_state'))}
             </p>
           )}
         </>

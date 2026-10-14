@@ -97,7 +97,7 @@ describe('the budget half of approve+budget (S10)', () => {
   it.each(LOCALES)('%s: R4: a design failure after a saved budget is a try-again error, the budget line, and a refresh', async (locale) => {
     await approveWithBudget(locale, { kind: 'error', error: 'generic', budget: 'acknowledged' });
     const alert = screen.getByRole('alert').textContent ?? '';
-    expect(alert).toContain(messageAt(locale, 'delivery.actions.error.generic'));
+    expect(alert).toContain(messageAt(locale, 'portal.errors.generic'));
     expect(alert).toContain(messageAt(locale, 'delivery.hero.design.budgetAcknowledgedOnly'));
     expect(alert).not.toContain(messageAt(locale, 'delivery.actions.changed'));
     expect(router.refresh).toHaveBeenCalledTimes(1);

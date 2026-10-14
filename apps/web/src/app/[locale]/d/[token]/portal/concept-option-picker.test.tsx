@@ -141,7 +141,7 @@ describe('ConceptOptionPicker', () => {
     actions.chooseDeliveryConcept.mockResolvedValue({ kind: 'error', error: 'token_expired' });
     renderPicker();
     await chooseAndConfirm('A');
-    expect((await screen.findByRole('alert')).textContent).toBe(en('delivery.actions.error.token_expired'));
+    expect((await screen.findByRole('alert')).textContent).toBe(en('portal.errors.token_expired'));
     expect(router.refresh).not.toHaveBeenCalled();
   });
 });

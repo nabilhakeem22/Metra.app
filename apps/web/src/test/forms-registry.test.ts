@@ -65,6 +65,8 @@ const FORM_COVERAGE: Readonly<Record<string, string>> = {
   'app/[locale]/(app)/settings/use-automation-form.ts': 'app/[locale]/(app)/settings/automation-settings-client.test.tsx',
   'app/[locale]/(app)/team/team-invite-form.tsx': 'app/[locale]/(app)/team/team-client.test.tsx',
   'app/[locale]/(app)/team/use-invite-form.ts': 'app/[locale]/(app)/team/team-client.test.tsx',
+  'app/[locale]/d/[token]/portal/use-changes-note.ts': 'app/[locale]/d/[token]/portal/concept-option-picker-changes.test.tsx',
+  'app/[locale]/d/[token]/portal/use-comment-refusals.ts': 'app/[locale]/d/[token]/portal/document-thread.test.tsx',
   'app/[locale]/(auth)/login/login-request-step.tsx': 'app/[locale]/(auth)/login/login-form.test.tsx',
   'app/[locale]/(auth)/login/use-otp-flow.ts': 'app/[locale]/(auth)/login/login-form.test.tsx',
   'app/[locale]/onboarding/onboarding-profile-fields.tsx': 'app/[locale]/onboarding/wizard.test.tsx',

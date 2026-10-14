@@ -10,7 +10,7 @@ import 'server-only';
 // issuance of the page it was tapped on, and the seven-argument SDF refuses it
 // (`wrong_state`, nothing written) once renders were re-issued. No read comes
 // before a write.
-import { loggableFailure } from '@/lib/actions/loggable-failure';
+import { portalActFailure } from '@/lib/share/portal-act-failure';
 import { portalErrorKey } from '../portal-error-key';
 import { recordDeliveryActionByToken } from '../public';
 import {
@@ -83,20 +83,20 @@ export async function respondToDesignAndNotify(
   return writeDesign(rawToken, input, { action, roundSeen: seen.rendersIssuedAt });
 }
 
-/** The design half's answer; a throw is the generic failure, so the budget part is still reported. */
+/** The design half's answer; a throw is a failed act (uncertain, or generic
+ *  with a reference), so the budget part is still reported. */
 async function approveDesignHalf(rawToken: string, input: ReviewInput, write: DesignWrite): Promise<DesignOutcome> {
   try {
     return await writeDesign(rawToken, input, write);
   } catch (error) {
-    console.error('approve design with budget: the design half failed', { error: loggableFailure(error) });
-    return { kind: 'error', error: 'generic' };
+    return { kind: 'error', ...portalActFailure('approveDesignWithBudget: the design half', error) };
   }
 }
 
 /** The design answer with the budget part. A design failure after a SAVED budget still says the budget was saved. */
 function withBudgetPart(design: DesignOutcome, budget: BudgetPart): DesignWithBudgetOutcome {
   if (design.kind !== 'error') return { ...design, budget };
-  return budget === 'acknowledged' ? { kind: 'error', error: design.error, budget } : design;
+  return budget === 'acknowledged' ? { ...design, budget } : design;
 }
 
 /**
@@ -123,7 +123,7 @@ export async function approveDesignWithBudgetAndNotify(
   seen: ReviewSeen & { romIssuedAt: string },
 ): Promise<DesignWithBudgetOutcome> {
   const half = await acknowledgeBudgetHalf(rawToken, { ...input, note: null }, seen.romIssuedAt);
-  if ('stop' in half) return { kind: 'error', error: half.stop };
+  if ('stop' in half) return { kind: 'error', ...half.stop };
   const design = await approveDesignHalf(rawToken, input, {
     action: 'approve_design',
     roundSeen: seen.rendersIssuedAt,

@@ -14,6 +14,7 @@ import {
   type HandoverOutcome,
 } from '@/lib/engagements/review-outcome';
 import { parseBandSeen, parseReviewSeen } from '@/lib/engagements/review-seen';
+import type { PortalFailure } from '@/lib/share/portal-act-failure';
 import { portalActAllowed } from '@/lib/share/portal-rate-limit';
 import { answered } from './answered';
 import { requestProvenance } from './request-provenance';
@@ -26,7 +27,8 @@ import { requestProvenance } from './request-provenance';
 // invisible note is no note (clientNote). Every answer names only a decision
 // that is SAVED (../../../../lib/engagements/review-outcome.ts): a repeat reports
 // the decision on file, never the verb just tapped. A verb outside an act's
-// own pair is refused here: a server action is directly invokable.
+// own pair is refused here as `wrong_state` (nothing written): a server action
+// is directly invokable.
 //
 // WHAT WAS SEEN (Round D): the design and budget acts carry the issuance
 // instants the client's page showed (the render round, the band;
@@ -36,12 +38,15 @@ import { requestProvenance } from './request-provenance';
 // nothing is written and the page re-reads.
 //
 // A PER-LINK BRAKE (Round D): 30 acts a minute per link, per Cloudflare data
-// centre (../../../../lib/share/portal-rate-limit.ts); past it an act answers the
-// generic "something went wrong, try again" and writes nothing.
+// centre (../../../../lib/share/portal-rate-limit.ts); past it an act answers
+// `too_many` ("wait a minute") and writes nothing.
 //
-// NOTHING THROWS TO THE CLIENT (D3 L1): every act runs through ./answered.ts.
+// NOTHING THROWS TO THE CLIENT (D3 L1): every act runs through ./answered.ts,
+// which answers `uncertain` or `generic` with a reference.
 
-const GENERIC = { kind: 'error', error: 'generic' } as const;
+const TOO_MANY = { kind: 'error', error: 'too_many' } as const;
+const NOT_THIS_ACT = { kind: 'error', error: 'wrong_state' } as const;
+const failed = (failure: PortalFailure) => ({ kind: 'error' as const, ...failure });
 
 /** Choose one concept option, by the letter the client saw (1 = A). */
 export async function chooseDeliveryConcept(
@@ -50,17 +55,17 @@ export async function chooseDeliveryConcept(
   position: number,
   note?: string,
 ): Promise<ConceptChoiceOutcome> {
-  return answered('chooseDeliveryConcept', GENERIC, async () => {
-    if (!(await portalActAllowed(token))) return GENERIC;
+  return answered('chooseDeliveryConcept', failed, async () => {
+    if (!(await portalActAllowed(token))) return TOO_MANY;
     return chooseConceptAndNotify(token, { artifactId, position, note: clientNote(note), ...(await requestProvenance()) });
   });
 }
 
 /** Approve the concept or ask for changes to it. */
 export async function respondToDeliveryConcept(token: string, verb: string, note?: string): Promise<ConceptChoiceOutcome> {
-  return answered('respondToDeliveryConcept', GENERIC, async () => {
-    if (!(await portalActAllowed(token))) return GENERIC;
-    if (!isConceptVerb(verb)) return GENERIC;
+  return answered('respondToDeliveryConcept', failed, async () => {
+    if (!(await portalActAllowed(token))) return TOO_MANY;
+    if (!isConceptVerb(verb)) return NOT_THIS_ACT;
     return respondToConceptAndNotify(token, { action: verb, note: clientNote(note), ...(await requestProvenance()) });
   });
 }
@@ -72,9 +77,9 @@ export async function respondToDeliveryDesign(
   note: string,
   seen: unknown,
 ): Promise<DesignOutcome> {
-  return answered('respondToDeliveryDesign', GENERIC, async () => {
-    if (!(await portalActAllowed(token))) return GENERIC;
-    if (!isDesignVerb(verb)) return GENERIC;
+  return answered('respondToDeliveryDesign', failed, async () => {
+    if (!(await portalActAllowed(token))) return TOO_MANY;
+    if (!isDesignVerb(verb)) return NOT_THIS_ACT;
     const parsed = parseReviewSeen(seen);
     if (!parsed) return { kind: 'changed' };
     return respondToDesignAndNotify(token, { action: verb, note: clientNote(note), ...(await requestProvenance()) }, parsed);
@@ -87,8 +92,8 @@ export async function respondToDeliveryDesign(
  * no band on the page there is no budget to confirm: nothing is written.
  */
 export async function approveDesignWithBudget(token: string, note: string, seen: unknown): Promise<DesignWithBudgetOutcome> {
-  return answered('approveDesignWithBudget', GENERIC, async () => {
-    if (!(await portalActAllowed(token))) return GENERIC;
+  return answered('approveDesignWithBudget', failed, async () => {
+    if (!(await portalActAllowed(token))) return TOO_MANY;
     const parsed = parseReviewSeen(seen);
     if (!parsed || parsed.romIssuedAt === null) return { kind: 'changed', budget: 'changed' };
     return approveDesignWithBudgetAndNotify(
@@ -101,8 +106,8 @@ export async function approveDesignWithBudget(token: string, note: string, seen:
 
 /** Acknowledge the band issuance the card showed (the budget card's own button). */
 export async function acknowledgeDeliveryBudget(token: string, bandSeen: unknown): Promise<BudgetOutcome> {
-  return answered('acknowledgeDeliveryBudget', GENERIC, async () => {
-    if (!(await portalActAllowed(token))) return GENERIC;
+  return answered('acknowledgeDeliveryBudget', failed, async () => {
+    if (!(await portalActAllowed(token))) return TOO_MANY;
     const band = parseBandSeen(bandSeen);
     if (typeof band !== 'string') return { kind: 'changed' };
     return acknowledgeSeenBudgetAndNotify(token, await requestProvenance(), band);
@@ -111,8 +116,8 @@ export async function acknowledgeDeliveryBudget(token: string, bandSeen: unknown
 
 /** Confirm receiving the design package. */
 export async function acknowledgeDeliveryHandover(token: string, note?: string): Promise<HandoverOutcome> {
-  return answered('acknowledgeDeliveryHandover', GENERIC, async () => {
-    if (!(await portalActAllowed(token))) return GENERIC;
+  return answered('acknowledgeDeliveryHandover', failed, async () => {
+    if (!(await portalActAllowed(token))) return TOO_MANY;
     return acknowledgeHandoverAndNotify(token, { note: clientNote(note), ...(await requestProvenance()) });
   });
 }

@@ -1,7 +1,8 @@
 import { act, fireEvent, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderCommandCard } from '@/test/portal-command-card';
-import { messageAt } from '@/test/render-with-intl';
+import { expectFieldErrorsRenderUnderFields } from '@/test/field-coverage';
+import { messageAt, type TestLocale } from '@/test/render-with-intl';
 
 // The picker's "Request changes": offered while the SDF offers it, sent with the
 // client's note (a request for changes needs one), and confirmed only as the
@@ -20,14 +21,14 @@ const OPTIONS = [
 ];
 const en = (path: string) => messageAt('en', path);
 
-function renderPicker(canRequestChanges = true) {
+function renderPicker(canRequestChanges = true, locale: TestLocale = 'en') {
   return renderCommandCard(
     {
       hero: { kind: 'action', group: 'concept', showRomAck: false },
       clientActions: canRequestChanges ? ['approve_concept', 'request_concept_changes'] : ['approve_concept'],
       conceptOptions: OPTIONS,
     },
-    { token: 'tok/1' },
+    { token: 'tok/1', locale },
   );
 }
 
@@ -44,11 +45,31 @@ beforeEach(() => {
 });
 
 describe('ConceptOptionPicker: Request changes', () => {
-  it('is disabled while the note is blank, with the hint', () => {
+  it('is offered while the note is blank, with the hint', () => {
     renderPicker();
     const changes = screen.getByRole('button', { name: en('delivery.hero.concept.changes') });
-    expect(changes.hasAttribute('disabled')).toBe(true);
+    expect(changes.hasAttribute('disabled')).toBe(false);
     expect(screen.getByText(en('delivery.actions.changesNeedNote')).id).toBe(changes.getAttribute('aria-describedby'));
+  });
+
+  // W3.7 (AC 19): pressed with a blank note, it sends nothing and says, under
+  // the note and in فصحى, that the note is required. The note is checked here,
+  // before sending: the review acts store whatever note they are given.
+  it.each<TestLocale>(['en', 'ar-EG'])('a blank note is refused under it (%s)', async (locale) => {
+    document.documentElement.dir = locale === 'ar-EG' ? 'rtl' : 'ltr';
+    renderPicker(true, locale);
+    await expectFieldErrorsRenderUnderFields({
+      fields: ['note'],
+      controlIdOf: () => screen.getByRole('textbox').id,
+      answerWith: () => {},
+      submit: async () => {
+        fireEvent.click(screen.getByRole('button', { name: messageAt(locale, 'delivery.hero.concept.changes') }));
+        await act(async () => {});
+      },
+      locale,
+      namespace: 'portal.errors',
+    });
+    expect(actions.respondToDeliveryConcept).not.toHaveBeenCalled();
   });
 
   it('stays while offered, through the concept respond action, with the note', async () => {

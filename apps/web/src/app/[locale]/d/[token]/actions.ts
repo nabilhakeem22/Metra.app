@@ -1,6 +1,8 @@
 'use server';
 
+import { hasFieldErrors, type FieldErrors } from '@/lib/actions/field-errors';
 import { paymentClaimedAct } from '@/lib/engagements/client-acts/acts';
+import { commentFieldErrors, type CommentField } from '@/lib/engagements/comment-field-rules';
 import { clientNote } from '@/lib/engagements/client-note';
 import { withStudioNotified } from '@/lib/engagements/client-acts/notify';
 import { claimPaymentByToken, type DeliveryActionResult } from '@/lib/engagements/public';
@@ -11,6 +13,7 @@ import {
 } from '@/lib/engagements/public-comments';
 import { THREAD_READ_REFUSED, type PortalThreadRead } from '@/lib/engagements/portal-thread-read';
 import { portalActAllowed, portalReadAllowed } from '@/lib/share/portal-rate-limit';
+import type { PortalFailure } from '@/lib/share/portal-act-failure';
 import { isUuid } from '@/lib/uuid';
 import { answered } from './answered';
 import { requestProvenance } from './request-provenance';
@@ -19,27 +22,33 @@ import { requestProvenance } from './request-provenance';
 // (concept, design, budget, handover) are in ./review-actions.ts.
 //
 // THE PER-LINK BRAKE (Round D, ../../../../lib/share/portal-rate-limit.ts): the
-// claim and a comment share the link's act budget and, past it, write nothing.
-// A refused claim answers the generic failure (no error code, so the portal
-// shows "something went wrong, try again"); a refused comment answers
-// `too_many` ("try again shortly"), and is charged only once it is a valid
-// comment. A thread read shares the read budget and, past it, answers the
-// REFUSED marker (../../../../lib/engagements/portal-thread-read.ts), never an
-// empty thread.
+// claim and a comment share the link's act budget and, past it, write nothing
+// and answer `too_many` ("wait a minute"); a comment is charged only once it is
+// a valid comment. A thread read shares the read budget and, past it, answers
+// the REFUSED marker (../../../../lib/engagements/portal-thread-read.ts), never
+// an empty thread.
 //
 // NOTHING THROWS TO THE CLIENT (Round E R3): the claim and a comment run
-// through ./answered.ts, so a failure underneath (a lock wait that gave up with
-// 55P03, say) answers the generic failure and logs one redacted line.
+// through ./answered.ts, so a failure underneath answers `uncertain` (a lock
+// wait that gave up with 55P03: it may still commit) or `generic` with the
+// reference of its one redacted log line.
 
-/** The generic failure (refused or failed): nothing written, nobody notified.
- *  With no error code the portal says "something went wrong, try again". */
-const GENERIC_FAILURE = { ok: false, studioNotified: false } as const;
+/** A write that never reached the database, or failed underneath: nothing
+ *  written that anybody can confirm, nobody notified. */
+type UnansweredAct = { ok: false; error: 'too_many' } | ({ ok: false } & PortalFailure);
+
+const TOO_MANY = { ok: false, error: 'too_many', studioNotified: false } as const;
+const failed = (failure: PortalFailure) => ({ ok: false as const, ...failure, studioNotified: false });
 
 /** A portal write's answer, plus whether the studio heard about it: true only
  *  when a notification row was written for THIS act, which is the only time the
  *  portal may say "your designer has been notified". */
-export type DeliveryActResult = DeliveryActionResult & { studioNotified?: boolean };
-export type DeliveryCommentActResult = DeliveryCommentResult & { studioNotified?: boolean };
+export type DeliveryActResult = (DeliveryActionResult | UnansweredAct) & { studioNotified?: boolean };
+/** A comment refused before anything is sent: blank, or past the thread's cap. */
+type CommentRefused = { ok: false; error: 'check_fields'; fields: FieldErrors<CommentField> };
+export type DeliveryCommentActResult = (DeliveryCommentResult | UnansweredAct | CommentRefused) & {
+  studioNotified?: boolean;
+};
 
 /**
  * Public (no-session) client delivery-portal action (Phase 3): the client "mark as
@@ -54,8 +63,8 @@ export async function markDeliveryPaymentPaid(
   milestoneKind: string,
   note?: string,
 ): Promise<DeliveryActResult> {
-  return answered('markDeliveryPaymentPaid', GENERIC_FAILURE, async () => {
-    if (!(await portalActAllowed(token))) return GENERIC_FAILURE;
+  return answered('markDeliveryPaymentPaid', failed, async () => {
+    if (!(await portalActAllowed(token))) return TOO_MANY;
     const result = await claimPaymentByToken(token, {
       milestoneKind,
       note: clientNote(note),
@@ -82,14 +91,16 @@ export async function addDeliveryComment(
   documentId: string,
   body: string,
 ): Promise<DeliveryCommentActResult> {
-  // Cap before the DB (the SDF also trims + caps at 2000 and CHECKs the length).
-  // Directly invokable: a body that is not a string is an empty one, never a throw.
-  const trimmed = typeof body === 'string' ? body.trim().slice(0, 2000) : '';
-  if (!trimmed) return { ok: false, error: 'empty', studioNotified: false };
+  // Refused before the DB, under the box: blank, or past the cap the table's
+  // CHECK holds (never silently cut). Directly invokable: a body that is not a
+  // string is an empty one, never a throw.
+  const bodyErrors = commentFieldErrors(body);
+  if (hasFieldErrors(bodyErrors)) return { ok: false, error: 'check_fields', fields: bodyErrors, studioNotified: false };
+  const trimmed = body.trim();
   // A malformed id is refused here, as the core would, before it spends the budget.
   if (!isUuid(documentId)) return { ok: false, error: 'token_invalid', studioNotified: false };
-  return answered('addDeliveryComment', GENERIC_FAILURE, async () => {
-    if (!(await portalActAllowed(token))) return { ok: false, error: 'too_many', studioNotified: false } as const;
+  return answered('addDeliveryComment', failed, async () => {
+    if (!(await portalActAllowed(token))) return TOO_MANY;
     const result = await addDeliveryCommentByToken(token, {
       documentId,
       body: trimmed,
@@ -110,7 +121,7 @@ export async function loadDeliveryDocumentComments(
   token: string,
   documentId: string,
 ): Promise<PortalThreadRead> {
-  return answered('loadDeliveryDocumentComments', [], async () => {
+  return answered('loadDeliveryDocumentComments', () => [], async () => {
     if (!(await portalReadAllowed(token))) return THREAD_READ_REFUSED;
     return getDeliveryDocumentCommentsByToken(token, documentId);
   });

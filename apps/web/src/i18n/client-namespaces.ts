@@ -39,7 +39,7 @@ export const CLIENT_NAMESPACES = {
   /** app/[locale]/c: the client's contract link. */
   contractLink: ['contracts.ack'],
   /** app/[locale]/d: the client's delivery page. */
-  deliveryLink: ['app', 'delivery'],
+  deliveryLink: ['app', 'delivery', 'portal.errors'],
   /** app/[locale]/p: the client's proposal link. */
   proposalLink: ['proposals.p'],
   /** app/[locale]/v: the client's variation link. */
@@ -48,6 +48,12 @@ export const CLIENT_NAMESPACES = {
 
 export type MessageScope = keyof typeof CLIENT_NAMESPACES;
 
+function valueAt(messages: AbstractIntlMessages, path: readonly string[]): unknown {
+  let node: unknown = messages;
+  for (const segment of path) node = typeof node === 'object' && node !== null ? (node as AbstractIntlMessages)[segment] : undefined;
+  return node;
+}
+
 /** The part of `messages` the client components under `scope` read: each listed
  *  sub-tree, under its own path. Never mutates `messages` (shared by every
  *  request): a parent object on the path is a fresh one. */
@@ -55,6 +61,8 @@ export function scopedMessages(messages: AbstractIntlMessages, scope: MessageSco
   const scoped: AbstractIntlMessages = {};
   namespaces: for (const namespace of CLIENT_NAMESPACES[scope]) {
     const path = namespace.split('.');
+    // A sub-tree the catalogue does not hold adds nothing, not even its parents.
+    if (valueAt(messages, path) === undefined) continue;
     const leaf = path.pop()!;
     let source: AbstractIntlMessages | undefined = messages;
     let target = scoped;

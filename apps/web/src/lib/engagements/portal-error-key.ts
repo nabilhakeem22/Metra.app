@@ -2,17 +2,22 @@
 //
 // The SDF result union is shared across every tokenised surface, so it carries
 // codes the delivery portal has no copy for (`already_responded`,
-// `contract_inactive`). Rendering `error.${code}` for one of those would throw
-// MISSING_MESSAGE in the browser; this narrows every code to a key the
-// `delivery.actions.error` and `delivery.payments.error` catalogs both hold.
+// `contract_inactive`). Rendering a key built from one of those would throw
+// MISSING_MESSAGE in the browser; this narrows every code to one the portal
+// says: a shared failure (`portal.errors`, ../share/portal-failure.ts), or
+// `wrong_state`, which each act says in its own words.
+import type { Translate } from '@/lib/actions/error-message';
+import { describePortalFailure, type SharedPortalError } from '@/lib/share/portal-failure';
 
-/** The error keys the delivery portal's catalogs define. */
-export type PortalErrorKey =
-  | 'token_invalid'
-  | 'token_expired'
-  | 'not_active'
-  | 'wrong_state'
-  | 'generic';
+/** The error keys a delivery act can answer. */
+export type PortalErrorKey = SharedPortalError | 'wrong_state';
+
+/** The error side of a review act's outcome; an unknown failure carries its reference. */
+export interface PortalActError {
+  kind: 'error';
+  error: PortalErrorKey;
+  reference?: string;
+}
 
 /** Map an action's error code to a portal error key; anything unknown is generic. */
 export function portalErrorKey(code: string | null | undefined): PortalErrorKey {
@@ -21,18 +26,26 @@ export function portalErrorKey(code: string | null | undefined): PortalErrorKey 
     case 'token_expired':
     case 'not_active':
     case 'wrong_state':
+    case 'too_many':
+    case 'uncertain':
       return code;
     default:
       return 'generic';
   }
 }
 
-/** The error keys a document thread's catalog (`delivery.comments.error`) defines.
- *  `load_failed` is the shared thread hook's THREAD_LOAD_FAILED: a READ failed and
- *  nothing was sent, so it must never read as "that didn't send". */
-export type PortalCommentErrorKey = PortalErrorKey | 'empty' | 'too_many' | 'load_failed';
+/** A failed delivery act as a page keeps it: its answer, or a promise that never answered. */
+export type ShownActFailure = { error: PortalErrorKey; reference?: string } | { rejection: unknown };
 
-/** Map a comment send/read error code to a key the comments catalog holds. */
-export function portalCommentErrorKey(code: string | null | undefined): PortalCommentErrorKey {
-  return code === 'empty' || code === 'too_many' || code === 'load_failed' ? code : portalErrorKey(code);
+/** The failure a refused act's answer carries, narrowed to a key the portal says. */
+export function actFailureOf(result: { error?: string | null; reference?: string }): ShownActFailure {
+  const error = portalErrorKey(result.error);
+  return result.reference ? { error, reference: result.reference } : { error };
+}
+
+/** Its sentence: a shared failure from `portal.errors` (`tErrors`), `wrong_state` in the act's own words. */
+export function describeActFailure(failure: ShownActFailure, tErrors: Translate, wrongState: () => string): string {
+  if ('rejection' in failure) return describePortalFailure(failure, tErrors);
+  if (failure.error === 'wrong_state') return wrongState();
+  return describePortalFailure({ error: failure.error, reference: failure.reference }, tErrors);
 }

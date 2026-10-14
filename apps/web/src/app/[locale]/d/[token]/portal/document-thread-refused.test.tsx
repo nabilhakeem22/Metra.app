@@ -45,7 +45,7 @@ describe('DocumentThread when the read budget refuses', () => {
     renderThread();
     toggle();
     expect((await screen.findByRole('alert')).textContent).toBe(en('delivery.comments.error.load_failed'));
-    expect(en('delivery.comments.error.load_failed')).not.toBe(en('delivery.comments.error.generic'));
+    expect(en('delivery.comments.error.load_failed')).not.toBe(en('portal.errors.generic'));
     expect(screen.queryByText(en('delivery.comments.empty'))).toBeNull();
     expect(screen.getByRole('button', { name: /3/ })).toBeTruthy();
   });

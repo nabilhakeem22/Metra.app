@@ -122,8 +122,10 @@ describe('the messages each scope hands the browser', () => {
   });
 
   it('scopedMessages keeps exactly the listed namespaces', () => {
-    expect(Object.keys(scopedMessages(en, 'deliveryLink')).sort()).toEqual(['app', 'delivery']);
+    expect(Object.keys(scopedMessages(en, 'deliveryLink')).sort()).toEqual(['app', 'delivery', 'portal']);
     expect(scopedMessages(en, 'deliveryLink').delivery).toBe(en.delivery);
+    // A dotted entry copies only its sub-tree: the portal's errors, nothing else under `portal`.
+    expect(scopedMessages(en, 'deliveryLink').portal).toEqual({ errors: en.portal.errors });
     expect(scopedMessages({ app: { name: 'x' } }, 'deliveryLink')).toEqual({ app: { name: 'x' } });
   });
 });

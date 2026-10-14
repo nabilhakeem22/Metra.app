@@ -10,7 +10,7 @@
 // answer says why: `moved_on` only when the delivery really left the review
 // stage, `changed` when it is still there (the studio withdrew a decision, or
 // what the client saw is no longer what is issued).
-import type { PortalErrorKey } from './portal-error-key';
+import type { PortalActError } from './portal-error-key';
 import type { PortalStageKey } from './portal-stage';
 import type { PublicDelivery } from './public/types';
 
@@ -18,7 +18,7 @@ export type DesignOutcome =
   | { kind: 'approved' | 'changes_requested'; studioNotified: boolean }
   | { kind: 'changed' }
   | { kind: 'moved_on' }
-  | { kind: 'error'; error: PortalErrorKey };
+  | PortalActError;
 
 /**
  * How the budget half of a one-tap approve+budget ended (Round D, owner
@@ -38,18 +38,18 @@ export type DesignWithBudgetOutcome =
   // Without `budget`: the tap stopped at the budget half (a dead or expired
   // link, or a budget write that threw) and the design was never sent. With
   // it: the design half failed after the budget acknowledgement was saved.
-  | { kind: 'error'; error: PortalErrorKey; budget?: 'acknowledged' };
+  | (PortalActError & { budget?: 'acknowledged' });
 
 export type HandoverOutcome =
   | { kind: 'acknowledged'; studioNotified: boolean }
   | { kind: 'changed' }
   | { kind: 'moved_on' }
-  | { kind: 'error'; error: PortalErrorKey };
+  | PortalActError;
 
 export type BudgetOutcome =
   | { kind: 'acknowledged'; studioNotified: boolean }
   | { kind: 'changed' }
-  | { kind: 'error'; error: PortalErrorKey };
+  | PortalActError;
 
 /** The two respond verbs of the final design (app_delivery_respond_by_token). */
 export const DESIGN_VERBS = ['approve_design', 'request_design_changes'] as const;

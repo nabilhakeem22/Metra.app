@@ -2,7 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useState, useTransition } from 'react';
-import { portalErrorKey, type PortalErrorKey } from '@/lib/engagements/portal-error-key';
+import { actFailureOf, type ShownActFailure } from '@/lib/engagements/portal-error-key';
 import { markDeliveryPaymentPaid } from '../actions';
 
 export interface PaymentClaimSubmission {
@@ -18,8 +18,9 @@ export interface PaymentClaimSubmission {
   /** Of those, the ones whose claim really reached the studio (a notification
    *  row was written): only these may say the team has been notified. */
   notifiedKinds: ReadonlySet<string>;
-  /** The last failed claim, already narrowed to a key the catalog holds. */
-  failure: { kind: string; error: PortalErrorKey } | null;
+  /** The last failed claim (its answer narrowed to a key the portal says, or a
+   *  promise that never answered), and the milestone it was for. */
+  failure: { kind: string; shown: ShownActFailure } | null;
   /** A milestone whose confirmation a refresh made moot (it stopped being
    *  claimable while the dialog was open): nothing was sent, and the card says so. */
   changedKind: string | null;
@@ -66,10 +67,10 @@ export function usePaymentClaim(token: string): PaymentClaimSubmission {
           }
           router.refresh();
         } else {
-          setFailure({ kind: milestoneKind, error: portalErrorKey(result.error) });
+          setFailure({ kind: milestoneKind, shown: actFailureOf(result) });
         }
-      } catch {
-        setFailure({ kind: milestoneKind, error: 'generic' });
+      } catch (rejection) {
+        setFailure({ kind: milestoneKind, shown: { rejection } });
       } finally {
         setSubmittingKind(null);
         setAskingKind(null);

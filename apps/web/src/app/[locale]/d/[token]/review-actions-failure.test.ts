@@ -2,8 +2,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // D3 L1: no review action throws to the client. A failure underneath (a
 // database error whose message carries the failed query's parameters: the
-// token hash, the client's IP and user agent, the note) answers the generic
-// error, and the ONE log line it writes carries none of them.
+// token hash, the client's IP and user agent, the note) answers `uncertain`
+// when it may still have committed (57014, a statement timeout), and the ONE
+// log line it writes carries none of them (W3.5, AC 31).
 
 vi.mock('server-only', () => ({}));
 vi.mock('./request-provenance', () => ({ requestProvenance: async () => ({ ip: '9.9.9.9', userAgent: 'probe/1' }) }));
@@ -39,14 +40,27 @@ beforeEach(() => {
 });
 
 describe('a review action that fails underneath', () => {
-  it.each(ACTS)('%s answers the generic error and logs one redacted line', async (name, call) => {
+  it.each(ACTS)('%s answers uncertain and logs one redacted line', async (name, call) => {
     const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
-    expect(await call()).toEqual({ kind: 'error', error: 'generic' });
+    expect(await call()).toEqual({ kind: 'error', error: 'uncertain' });
     expect(boom).toHaveBeenCalledTimes(1);
     expect(logged).toHaveBeenCalledTimes(1);
     const line = JSON.stringify(logged.mock.calls);
     expect(line).toContain(name);
     for (const secret of ['SECRET-HASH', 'my private note', '9.9.9.9', 'probe/1', TOKEN]) expect(line).not.toContain(secret);
+    logged.mockRestore();
+  });
+});
+
+describe('a review action that fails for any other reason', () => {
+  it('answers generic with the reference its one log line carries', async () => {
+    boom.mockImplementationOnce(async () => {
+      throw new Error('renderer crashed');
+    });
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const answer = (await review.acknowledgeDeliveryHandover(TOKEN, 'my private note')) as { reference?: string };
+    expect(answer).toEqual({ kind: 'error', error: 'generic', reference: expect.stringMatching(/^[0-9A-Z]{8}$/) });
+    expect(logged.mock.calls[0][1]).toMatchObject({ act: 'acknowledgeDeliveryHandover', reference: answer.reference });
     logged.mockRestore();
   });
 });

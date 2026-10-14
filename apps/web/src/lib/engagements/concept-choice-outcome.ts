@@ -8,7 +8,7 @@
 // different option, a plain approval or a request for changes. A `wrong_state`
 // is either a letter that moved under the client (the options changed) or a
 // review that is no longer open (the step moved on).
-import type { PortalErrorKey } from './portal-error-key';
+import type { PortalActError } from './portal-error-key';
 import type { ConceptLetter } from './concept-letter';
 import type { PublicDelivery } from './public/types';
 
@@ -19,7 +19,7 @@ export type ConceptChoiceOutcome =
   | { kind: 'options_changed' }
   | { kind: 'changed' }
   | { kind: 'moved_on' }
-  | { kind: 'error'; error: PortalErrorKey };
+  | PortalActError;
 
 /** The two respond verbs of the concept review (app_delivery_respond_by_token). */
 export const CONCEPT_VERBS = ['approve_concept', 'request_concept_changes'] as const;

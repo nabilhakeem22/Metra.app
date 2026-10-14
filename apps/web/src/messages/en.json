@@ -2538,11 +2538,7 @@
         "other": "Payment"
       },
       "error": {
-        "token_invalid": "This link is no longer available. Please contact your design team.",
-        "token_expired": "This link has expired. Please contact your design team.",
-        "not_active": "This delivery is closed. Please contact your design team.",
-        "wrong_state": "This payment isn't available to mark right now. Please refresh the page.",
-        "generic": "Something went wrong. Please try again."
+        "wrong_state": "This payment isn't available to mark right now. Please refresh the page."
       },
       "claimedOn": "Thanks, we are confirming your payment. Sent on {date}. It is usually confirmed within one working day.",
       "instructions": {
@@ -2570,11 +2566,7 @@
       "confirm": "Confirm",
       "cancel": "Cancel",
       "error": {
-        "token_invalid": "This link is no longer available. Please contact your design team.",
-        "token_expired": "This link has expired. Please contact your design team.",
-        "not_active": "This delivery is closed. Please contact your design team.",
-        "wrong_state": "This action isn't available right now. Please refresh the page.",
-        "generic": "Something went wrong. Please try again."
+        "wrong_state": "This action isn't available right now. Please refresh the page."
       },
       "movedOn": "This step has already moved on. The page now shows where things stand.",
       "changed": "Something on this step changed since you opened it, so nothing was sent. The page now shows the latest; please review it again."
@@ -2611,12 +2603,6 @@
       "notified": "Your design team has been notified of your message.",
       "partial": "Some messages may not be showing. Close and reopen this thread to load them all.",
       "error": {
-        "generic": "That didn't send. Please try again.",
-        "empty": "Write a message first.",
-        "too_many": "You've sent a lot of messages just now. Please try again shortly.",
-        "token_invalid": "This link is no longer available. Please contact your design team.",
-        "token_expired": "This link has expired. Please contact your design team.",
-        "not_active": "This delivery is closed. Please contact your design team.",
         "wrong_state": "This isn't available right now.",
         "load_failed": "We couldn't load the messages. Please try again shortly."
       },
@@ -2669,7 +2655,15 @@
         "email_format": "This email address does not look right. Please write it like name@example.com.",
         "no_longer_exists": "This choice is no longer available. Please choose another one.",
         "unprintable": "This contains hidden or control characters. Please clear it and type it again instead of pasting."
-      }
+      },
+      "generic": "We could not complete your request because of a problem on our side. Nothing you entered was lost; please try again shortly.",
+      "not_active": "This delivery is closed. Please contact your design team.",
+      "reference": "If it happens again, send this code to your design team: {reference}.",
+      "token_expired": "This link has expired. Please contact your design team.",
+      "token_invalid": "This link is no longer available. Please contact your design team.",
+      "too_many": "You sent many requests in the last minute. Wait a minute, then try again.",
+      "uncertain": "We could not confirm that your answer was recorded. Refresh the page to check before trying again.",
+      "unreachable": "We could not connect. Check your internet connection, then try again."
     }
   }
 }

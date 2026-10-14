@@ -4,7 +4,7 @@
 // step that moved on reads the same for every hero (`movedOn`) and re-reads the
 // page.
 import type { ConceptChoiceOutcome } from '@/lib/engagements/concept-choice-outcome';
-import type { PortalErrorKey } from '@/lib/engagements/portal-error-key';
+import type { PortalActError, PortalErrorKey } from '@/lib/engagements/portal-error-key';
 import type {
   BudgetPart,
   DesignOutcome,
@@ -28,13 +28,27 @@ export interface HeroConfirmedState {
  *  approval was not sent, but the budget confirmation was saved: one sentence). */
 export type HeroError = PortalErrorKey | 'changed' | 'reviewChanged' | 'movedOn' | 'designChangedBudgetSaved';
 
-export type HeroAnswer =
-  | { confirmed: HeroConfirmedState }
-  /** `budget`: the one-tap approve+budget saved its budget half; said in a line of its own beside the error. */
-  | { error: HeroError; refresh: boolean; budget?: 'acknowledged' };
+/** An act that did not land. `reference`: an unknown failure's, for the client
+ *  to quote. `budget`: the one-tap approve+budget saved its budget half; said in
+ *  a line of its own beside the error. */
+export interface HeroRefusal {
+  error: HeroError;
+  reference?: string;
+  budget?: 'acknowledged';
+}
+
+export type HeroAnswer = { confirmed: HeroConfirmedState } | (HeroRefusal & { refresh: boolean });
+
+/** What a hero shows when its act did not land: the answer, or a promise that never answered. */
+export type HeroFailure = HeroRefusal | { rejection: unknown };
 
 const MOVED_ON: HeroAnswer = { error: 'movedOn', refresh: true };
 const REVIEW_CHANGED: HeroAnswer = { error: 'reviewChanged', refresh: true };
+
+/** A failed act's answer, keeping the reference of an unknown failure. */
+function failedAct({ error, reference }: PortalActError, refresh: boolean, budget?: 'acknowledged'): HeroAnswer {
+  return { error, refresh, ...(reference ? { reference } : {}), ...(budget ? { budget } : {}) };
+}
 
 /**
  * The answer to a concept-review action (choose, approve, request changes): it
@@ -57,7 +71,7 @@ export function answerOfConceptOutcome(outcome: ConceptChoiceOutcome): HeroAnswe
     case 'moved_on':
       return MOVED_ON;
     case 'error':
-      return { error: outcome.error, refresh: false };
+      return failedAct(outcome, false);
   }
 }
 
@@ -73,7 +87,7 @@ export function answerOfDesignOutcome(outcome: DesignOutcome): HeroAnswer {
     case 'moved_on':
       return MOVED_ON;
     case 'error':
-      return { error: outcome.error, refresh: false };
+      return failedAct(outcome, false);
   }
 }
 
@@ -105,7 +119,7 @@ export function answerOfDesignWithBudgetOutcome(outcome: DesignWithBudgetOutcome
     case 'moved_on':
       return outcome.budget === 'acknowledged' ? { ...MOVED_ON, budget: 'acknowledged' } : MOVED_ON;
     case 'error':
-      return outcome.budget ? { error: outcome.error, refresh: true, budget: outcome.budget } : { error: outcome.error, refresh: false };
+      return outcome.budget ? failedAct(outcome, true, outcome.budget) : failedAct(outcome, false);
   }
 }
 
@@ -119,6 +133,6 @@ export function answerOfHandoverOutcome(outcome: HandoverOutcome): HeroAnswer {
     case 'moved_on':
       return MOVED_ON;
     case 'error':
-      return { error: outcome.error, refresh: false };
+      return failedAct(outcome, false);
   }
 }

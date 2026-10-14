@@ -109,7 +109,7 @@ describe('approveDesignWithBudgetAndNotify', () => {
 
   it('R2: a budget half that THROWS stops the tap: the design is never sent, nobody is notified', async () => {
     respond.answers.acknowledge_rom = new Error('db blip');
-    expect(await approveDesignWithBudgetAndNotify('tok', INPUT, SEEN)).toEqual({ kind: 'error', error: 'generic' });
+    expect(await approveDesignWithBudgetAndNotify('tok', INPUT, SEEN)).toEqual({ kind: 'error', error: 'generic', reference: expect.any(String) });
     expect(respond.inputs.map((input) => input.action)).toEqual(['acknowledge_rom']);
     expect(notified.acts).toEqual([]);
   });
@@ -130,7 +130,7 @@ describe('approveDesignWithBudgetAndNotify', () => {
 
   it.each([
     ['R4: a generic design refusal after a saved budget', { ok: false }, 'acknowledged', { kind: 'error', error: 'generic', budget: 'acknowledged' }],
-    ['R4: a thrown design write after a saved budget', new Error('db blip'), 'acknowledged', { kind: 'error', error: 'generic', budget: 'acknowledged' }],
+    ['R4: a thrown design write after a saved budget', new Error('db blip'), 'acknowledged', { kind: 'error', error: 'generic', reference: expect.any(String), budget: 'acknowledged' }],
     ['a generic design refusal with nothing saved', { ok: false }, 'not_active', { kind: 'error', error: 'generic' }],
   ] as const)('%s', async (_label, designAnswer, budgetAnswer, expected) => {
     respond.answers.approve_design = designAnswer instanceof Error ? designAnswer : { ...designAnswer };

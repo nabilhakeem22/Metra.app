@@ -33,9 +33,10 @@ const SHAPES: Array<[string, () => unknown]> = [
 ];
 
 describe('a failure of any shape, through answered()', () => {
-  it.each(SHAPES)('%s: the generic answer, one line, no hash, IP or body', async (_label, make) => {
+  it.each(SHAPES)('%s: a failed-act answer, one line, no hash, IP or body', async (_label, make) => {
     const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
-    expect(await answered('act', 'GENERIC', async () => { throw make(); })).toBe('GENERIC');
+    const answer = await answered('act', (failure) => failure, async () => { throw make(); });
+    expect(['uncertain', 'generic']).toContain((answer as { error: string }).error);
     expect(logged).toHaveBeenCalledTimes(1);
     const line = JSON.stringify(logged.mock.calls);
     for (const secret of [HASH, IP, BODY]) expect(line).not.toContain(secret);

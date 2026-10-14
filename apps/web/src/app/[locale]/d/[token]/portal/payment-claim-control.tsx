@@ -3,6 +3,7 @@
 import { Clock, Loader2 } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
+import { describeActFailure } from '@/lib/engagements/portal-error-key';
 import type { PaymentClaimState } from '@/lib/engagements/portal-payments';
 import { bidiIsolate } from '@/lib/format/bidi';
 import { formatDate } from '@/lib/format/date';
@@ -28,6 +29,7 @@ export function PaymentClaimControl({
   prominent: boolean;
 }) {
   const t = useTranslations('delivery.payments');
+  const tErrors = useTranslations('portal.errors');
   const locale = useLocale();
   if (claimState.kind === 'none') return null;
 
@@ -47,7 +49,7 @@ export function PaymentClaimControl({
   }
 
   const submitting = submission.submittingKind === milestoneKind;
-  const failure = submission.failure?.kind === milestoneKind ? submission.failure.error : null;
+  const failure = submission.failure?.kind === milestoneKind ? submission.failure.shown : null;
   return (
     <div className="flex flex-col gap-1.5">
       <Button
@@ -62,7 +64,7 @@ export function PaymentClaimControl({
       </Button>
       {failure && (
         <p className="text-caption text-destructive" role="alert">
-          {t(`error.${failure}`)}
+          {describeActFailure(failure, tErrors, () => t('error.wrong_state'))}
         </p>
       )}
     </div>

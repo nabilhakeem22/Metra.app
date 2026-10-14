@@ -4,8 +4,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 // the token write gives up on a lock (55P03, once 0060's 4 s lock_timeout is
 // live) the driver's error carries the failed query's parameters: the token
 // hash, the client's IP and user agent, the comment body. The action answers
-// the generic failure, and its ONE log line names the act and the SQLSTATE and
-// carries none of them.
+// `uncertain` (W3.5, AC 31: the write may still commit, so the client is told
+// to refresh and check), and its ONE log line names the act and the SQLSTATE
+// and carries none of them. Any other throw answers `generic` with a reference,
+// the same one its log line carries.
 
 vi.mock('server-only', () => ({}));
 vi.mock('./request-provenance', () => ({ requestProvenance: async () => ({ ip: '9.9.9.9', userAgent: 'probe/1' }) }));
@@ -15,7 +17,7 @@ const LEAKY = Object.assign(
   new Error('Failed query: select public.app_delivery_comment_by_token(...) params: SECRET-HASH,doc,Is the wall moving?,,9.9.9.9,probe/1'),
   { cause: Object.assign(new Error('canceling statement due to lock timeout'), { code: '55P03', severity: 'ERROR' }) },
 );
-const boom = vi.fn(async () => {
+const boom = vi.fn(async (): Promise<never> => {
   throw LEAKY;
 });
 const notified = vi.fn();
@@ -33,13 +35,15 @@ beforeEach(() => {
   notified.mockClear();
 });
 
+const CALLS: Array<[string, () => Promise<unknown>]> = [
+  ['markDeliveryPaymentPaid', () => portal.markDeliveryPaymentPaid(TOKEN, 'deposit', 'Is the wall moving?')],
+  ['addDeliveryComment', () => portal.addDeliveryComment(TOKEN, DOCUMENT, 'Is the wall moving?')],
+];
+
 describe('a claim or a comment whose write fails underneath (55P03)', () => {
-  it.each([
-    ['markDeliveryPaymentPaid', () => portal.markDeliveryPaymentPaid(TOKEN, 'deposit', 'Is the wall moving?')],
-    ['addDeliveryComment', () => portal.addDeliveryComment(TOKEN, DOCUMENT, 'Is the wall moving?')],
-  ])('%s answers the generic failure and logs one redacted line', async (name, call) => {
+  it.each(CALLS)('%s answers uncertain and logs one redacted line', async (name, call) => {
     const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
-    expect(await call()).toEqual({ ok: false, studioNotified: false });
+    expect(await call()).toEqual({ ok: false, error: 'uncertain', studioNotified: false });
     expect(boom).toHaveBeenCalledTimes(1);
     expect(notified).not.toHaveBeenCalled();
     expect(logged).toHaveBeenCalledTimes(1);
@@ -51,9 +55,39 @@ describe('a claim or a comment whose write fails underneath (55P03)', () => {
   });
 });
 
+describe('a claim or a comment whose write fails for any other reason', () => {
+  it.each(CALLS)('%s answers generic with the reference its one log line carries', async (name, call) => {
+    boom.mockImplementationOnce(async () => {
+      throw new Error('renderer crashed');
+    });
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const answer = (await call()) as { error: string; reference: string };
+    expect(answer).toEqual({ ok: false, error: 'generic', reference: expect.stringMatching(/^[0-9A-Z]{8}$/), studioNotified: false });
+    expect(logged).toHaveBeenCalledTimes(1);
+    expect(logged.mock.calls[0][0]).toBe('portal act failed');
+    expect(logged.mock.calls[0][1]).toMatchObject({ act: name, reference: answer.reference });
+    logged.mockRestore();
+  });
+});
+
 describe('inputs a direct invocation can send (Round E F1)', () => {
-  it.each([[123], [{}], [['x']], [null], [undefined]])('a comment body of %j answers empty, never throws, writes nothing', async (body) => {
-    expect(await portal.addDeliveryComment(TOKEN, DOCUMENT, body as never)).toEqual({ ok: false, error: 'empty', studioNotified: false });
+  it.each([[123], [{}], [['x']], [null], [undefined]])('a comment body of %j is refused under the box, never throws, writes nothing', async (body) => {
+    expect(await portal.addDeliveryComment(TOKEN, DOCUMENT, body as never)).toEqual({
+      ok: false,
+      error: 'check_fields',
+      fields: { body: { code: 'required' } },
+      studioNotified: false,
+    });
+    expect(boom).not.toHaveBeenCalled();
+  });
+
+  it('a comment past the cap is refused under the box, not cut short', async () => {
+    expect(await portal.addDeliveryComment(TOKEN, DOCUMENT, 'x'.repeat(2001))).toEqual({
+      ok: false,
+      error: 'check_fields',
+      fields: { body: { code: 'too_long', params: { max: 2000 } } },
+      studioNotified: false,
+    });
     expect(boom).not.toHaveBeenCalled();
   });
 

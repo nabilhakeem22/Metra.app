@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation';
 import { useId, useState, useTransition } from 'react';
 import { Button } from '@/components/ui/button';
 import { useConfirm } from '@/components/ui/confirm-dialog';
-import { isBlankNote } from '@/lib/engagements/client-note';
 import type { PublicDelivery } from '@/lib/engagements/public/types';
 import { bidiIsolate } from '@/lib/format/bidi';
 import { chooseDeliveryConcept, respondToDeliveryConcept } from '../review-actions';
@@ -13,11 +12,12 @@ import {
   answerOfConceptOutcome,
   type HeroAnswer,
   type HeroConfirmedState,
-  type HeroError,
+  type HeroFailure,
 } from './hero-answer';
 import { ChangesNote } from './changes-note';
 import { ConceptOptionCard } from './concept-option-card';
 import { HeroErrorText } from './hero-error';
+import { useChangesNote } from './use-changes-note';
 
 type ConceptOption = PublicDelivery['conceptOptions'][number];
 
@@ -48,22 +48,24 @@ export function ConceptOptionPicker({
   const tGroup = useTranslations('delivery.hero.concept');
   const router = useRouter();
   const hintId = useId();
+  const noteId = useId();
   const { confirm, dialog } = useConfirm();
   const [pending, startTransition] = useTransition();
-  const [note, setNote] = useState('');
-  const [error, setError] = useState<HeroError | null>(null);
-  const noteBlank = isBlankNote(note);
+  const notes = useChangesNote();
+  const [failure, setFailure] = useState<HeroFailure | null>(null);
+  const noteBlank = notes.noteBlank;
 
   function run(act: () => Promise<HeroAnswer>) {
-    setError(null);
+    setFailure(null);
     startTransition(async () => {
       try {
         const answer = await act();
         if ('confirmed' in answer) return onAnswered(answer.confirmed);
-        setError(answer.error);
-        if (answer.refresh) router.refresh();
-      } catch {
-        setError('generic');
+        const { refresh, ...refusal } = answer;
+        setFailure(refusal);
+        if (refresh) router.refresh();
+      } catch (rejection) {
+        setFailure({ rejection });
       }
     });
   }
@@ -77,7 +79,7 @@ export function ConceptOptionPicker({
       cancelLabel: t('cancel'),
     });
     if (!accepted) return;
-    run(async () => answerOfConceptOutcome(await chooseDeliveryConcept(token, option.id, option.position, note)));
+    run(async () => answerOfConceptOutcome(await chooseDeliveryConcept(token, option.id, option.position, notes.note)));
   }
 
   return (
@@ -99,23 +101,24 @@ export function ConceptOptionPicker({
           />
         ))}
       </ul>
-      <ChangesNote note={note} onChange={setNote} hintId={hintId} showHint={canRequestChanges && noteBlank} />
+      <ChangesNote id={noteId} state={notes} hintId={hintId} showHint={canRequestChanges && noteBlank} />
       {canRequestChanges && (
         <Button
           variant="ghost"
           className="min-h-11 w-full"
-          disabled={pending || noteBlank}
-          aria-describedby={noteBlank ? hintId : undefined}
+          disabled={pending}
+          aria-describedby={noteBlank && !notes.noteError ? hintId : undefined}
           onClick={() =>
+            notes.readyForChanges() &&
             run(async () =>
-              answerOfConceptOutcome(await respondToDeliveryConcept(token, 'request_concept_changes', note)),
+              answerOfConceptOutcome(await respondToDeliveryConcept(token, 'request_concept_changes', notes.note)),
             )
           }
         >
           {tGroup('changes')}
         </Button>
       )}
-      {error && <HeroErrorText error={error} />}
+      {failure && <HeroErrorText failure={failure} />}
       {dialog}
     </section>
   );

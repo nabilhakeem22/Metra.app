@@ -89,7 +89,7 @@ describe('BudgetCard', () => {
     renderCard(ROM, 'en');
     fireEvent.click(screen.getByRole('button', { name: messageAt('en', 'delivery.budget.acknowledge') }));
     const alert = await screen.findByRole('alert');
-    expect(alert.textContent).toBe(messageAt('en', 'delivery.actions.error.generic'));
+    expect(alert.textContent).toBe(messageAt('en', 'portal.errors.generic'));
     expect(router.refresh).not.toHaveBeenCalled();
     await waitFor(() =>
       expect(screen.getByRole('button', { name: messageAt('en', 'delivery.budget.acknowledge') })).toBeTruthy(),
@@ -101,7 +101,7 @@ describe('BudgetCard', () => {
     renderCard(ROM, 'en');
     fireEvent.click(screen.getByRole('button', { name: messageAt('en', 'delivery.budget.acknowledge') }));
     expect((await screen.findByRole('alert')).textContent).toBe(
-      messageAt('en', 'delivery.actions.error.generic'),
+      messageAt('en', 'portal.errors.generic'),
     );
     await waitFor(() => expect(screen.getByRole('button').hasAttribute('disabled')).toBe(false));
   });

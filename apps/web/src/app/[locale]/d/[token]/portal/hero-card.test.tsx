@@ -105,10 +105,31 @@ describe('a refusal always reads from the catalog', () => {
     fireEvent.click(screen.getByRole('button', { name: en('delivery.hero.design.approve') }));
     await answerDialog('en', 'confirm');
     await act(async () => {});
-    expect((await screen.findByRole('alert')).textContent).toBe(en('delivery.actions.error.generic'));
+    expect((await screen.findByRole('alert')).textContent).toBe(en('portal.errors.generic'));
     // The hero stays, so the client can try again; nothing was confirmed.
     expect(screen.getByRole('button', { name: en('delivery.hero.design.approve') })).toBeTruthy();
     expect(router.refresh).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['too many taps', { kind: 'error', error: 'too_many' }, () => en('portal.errors.too_many')],
+    ['an unconfirmed write', { kind: 'error', error: 'uncertain' }, () => en('portal.errors.uncertain')],
+    [
+      'an unknown failure, with its reference',
+      { kind: 'error', error: 'generic', reference: 'K7Q29MXD' },
+      () => `${en('portal.errors.generic')} ${en('portal.errors.reference').replace('{reference}', 'K7Q29MXD')}`,
+    ],
+  ])('W3.5 (AC 31): %s is said from portal.errors and the hero stays', async (_label, outcome, message) => {
+    actions.respondToDeliveryDesign.mockResolvedValue(outcome);
+    renderCommandCard({
+      hero: { kind: 'action', group: 'design', showRomAck: false },
+      clientActions: ['approve_design', 'request_design_changes'],
+    });
+    fireEvent.click(screen.getByRole('button', { name: en('delivery.hero.design.approve') }));
+    await answerDialog('en', 'confirm');
+    await act(async () => {});
+    expect((await screen.findByRole('alert')).textContent).toBe(message());
+    expect(screen.getByRole('button', { name: en('delivery.hero.design.approve') }).hasAttribute('disabled')).toBe(false);
   });
 
   it('a rejected action leaves no spinner stuck and shows the generic message', async () => {
@@ -119,7 +140,7 @@ describe('a refusal always reads from the catalog', () => {
     });
     fireEvent.click(screen.getByRole('button', { name: en('delivery.hero.handoff.acknowledge') }));
     await answerDialog('en', 'confirm');
-    expect((await screen.findByRole('alert')).textContent).toBe(en('delivery.actions.error.generic'));
+    expect((await screen.findByRole('alert')).textContent).toBe(en('portal.errors.generic'));
     await waitFor(() =>
       expect(screen.getByRole('button', { name: en('delivery.hero.handoff.acknowledge') }).hasAttribute('disabled')).toBe(false),
     );

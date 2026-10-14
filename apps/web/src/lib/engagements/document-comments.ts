@@ -25,9 +25,6 @@ import { commentFieldErrors } from './comment-field-rules';
 import { isTerminal } from './states';
 import { isUuid } from '@/lib/uuid';
 
-/** Mirrors the SDF cap and the table's CHECK. */
-const BODY_MAX = 2000;
-
 /** How many messages one thread read returns. A thread is a conversation, not a
  *  feed; the cap keeps a runaway thread from turning one panel read unbounded. */
 const THREAD_LIMIT = 200;
@@ -95,10 +92,10 @@ export async function replyToDocumentCore(
   ctx: OrgContext,
   input: ReplyToDocumentInput,
 ): Promise<ActionResult> {
-  if (!isUuid(input.artifactId)) return { ok: false, error: 'invalid' };
+  if (!isUuid(input.artifactId)) return { ok: false, error: 'malformed' };
   const bodyErrors = commentFieldErrors(input.body);
   if (hasFieldErrors(bodyErrors)) return fieldsFailed(bodyErrors);
-  const body = input.body.trim().slice(0, BODY_MAX);
+  const body = input.body.trim();
 
   return mutateInOrg(
     ctx,
@@ -112,7 +109,7 @@ export async function replyToDocumentCore(
           id: engagementArtifacts.id,
           engagementId: engagementArtifacts.engagementId,
         },
-        'invalid',
+        'record_not_found',
       );
 
       const engagement = await requireInOrg(

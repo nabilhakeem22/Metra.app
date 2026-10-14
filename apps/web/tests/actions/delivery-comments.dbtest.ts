@@ -254,7 +254,7 @@ describe('studio replies — RLS and tenancy', () => {
 
     expect(
       await replyToDocumentCore(mine.ctx, { artifactId: foreignId, body: 'trespass' }),
-    ).toEqual({ ok: false, error: 'invalid' });
+    ).toEqual({ ok: false, error: 'record_not_found' });
     expect(await listDocumentCommentsCore(theirs.ctx, foreignId)).toHaveLength(0);
     // And the foreign thread stays invisible to the other tenant's own read.
     expect(await listDocumentCommentsCore(mine.ctx, foreignId)).toHaveLength(0);
@@ -280,15 +280,19 @@ describe('studio replies — RLS and tenancy', () => {
     ).toHaveLength(1);
   });
 
-  it('refuses a blank reply under the box, and a malformed artifact id', async () => {
+  it('refuses a blank or too-long reply under the box, and a malformed artifact id', async () => {
     const delivery = await seedDelivery('reply-invalid');
     const documentId = await seedDocument(delivery);
     expect(
       await replyToDocumentCore(delivery.ctx, { artifactId: documentId, body: '  ' }),
     ).toEqual({ ok: false, error: 'check_fields', fields: { body: { code: 'required' } } });
     expect(
+      await replyToDocumentCore(delivery.ctx, { artifactId: documentId, body: 'x'.repeat(2001) }),
+    ).toEqual({ ok: false, error: 'check_fields', fields: { body: { code: 'too_long', params: { max: 2000 } } } });
+    expect(await listDocumentCommentsCore(delivery.ctx, documentId)).toHaveLength(0);
+    expect(
       await replyToDocumentCore(delivery.ctx, { artifactId: 'nope', body: 'hi' }),
-    ).toEqual({ ok: false, error: 'invalid' });
+    ).toEqual({ ok: false, error: 'malformed' });
   });
 });
 

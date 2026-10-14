@@ -98,7 +98,7 @@ describe('approve and acknowledge ask first', () => {
 });
 
 describe('Request changes needs a note', () => {
-  it.each(['concept', 'design'] as const)('%s: disabled while blank, with the hint; no dialog', async (group) => {
+  it.each(['concept', 'design'] as const)('%s: refused under the note while blank, with the hint; no dialog', async (group) => {
     actions.respondToDeliveryConcept.mockResolvedValue({ kind: 'changes_requested', studioNotified: false });
     actions.respondToDeliveryDesign.mockResolvedValue({ kind: 'changes_requested', studioNotified: false });
     renderCommandCard({
@@ -106,17 +106,23 @@ describe('Request changes needs a note', () => {
       clientActions: group === 'concept' ? ['approve_concept', 'request_concept_changes'] : ['approve_design', 'request_design_changes'],
     });
     const changes = screen.getByRole('button', { name: en(`delivery.hero.${group}.changes`) });
-    expect(changes.hasAttribute('disabled')).toBe(true);
+    expect(changes.hasAttribute('disabled')).toBe(false);
     const hint = screen.getByText(en('delivery.actions.changesNeedNote'));
     expect(changes.getAttribute('aria-describedby')).toBe(hint.id);
 
     const note = screen.getByRole('textbox');
     for (const invisible of ['   ', '​', '‏⁠', '؜ ']) {
       fireEvent.change(note, { target: { value: invisible } });
-      expect(changes.hasAttribute('disabled'), JSON.stringify(invisible)).toBe(true);
+      fireEvent.click(changes);
+      expect(document.getElementById(`${note.id}-error`)?.textContent, JSON.stringify(invisible)).toBe(
+        en('portal.errors.field.required'),
+      );
+      expect(note.getAttribute('aria-invalid')).toBe('true');
     }
+    await act(async () => {});
+    expect(document.activeElement).toBe(note);
     fireEvent.change(note, { target: { value: 'A bigger window' } });
-    expect(changes.hasAttribute('disabled')).toBe(false);
+    expect(document.getElementById(`${note.id}-error`)).toBeNull();
     expect(screen.queryByText(en('delivery.actions.changesNeedNote'))).toBeNull();
 
     fireEvent.click(changes);

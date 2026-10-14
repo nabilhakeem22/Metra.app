@@ -21,8 +21,13 @@ const SRC = resolve(here, '../..');
 
 const BARE_FAILURE = /(err|fail)\('(generic|invalid)'\)|error:\s*'(generic|invalid)'/g;
 
-/** The two modules whose job is to build `generic` (with a reference). */
-const SANCTIONED = new Set(['lib/actions/unexpected.ts', 'lib/actions/mutation-failure.ts']);
+/** The modules whose job is to build `generic` (with a reference): the studio's
+ *  two, and the client link pages' one (it logs `{ act, reference, failure }`). */
+const SANCTIONED = new Set([
+  'lib/actions/unexpected.ts',
+  'lib/actions/mutation-failure.ts',
+  'lib/share/portal-act-failure.ts',
+]);
 
 function sourceFiles(dir: string): string[] {
   return readdirSync(dir).flatMap((name) => {

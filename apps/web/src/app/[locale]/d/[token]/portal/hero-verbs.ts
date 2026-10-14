@@ -1,6 +1,6 @@
 // Which server action an actionable hero's button sends, and how its answer
-// reads. One typed action per review act (./review-actions.ts); a verb outside
-// the hero's groups sends nothing.
+// reads. One typed action per review act (./review-actions.ts), one per verb a
+// hero button can carry (./hero-buttons.ts).
 import { isConceptVerb } from '@/lib/engagements/concept-choice-outcome';
 import { isDesignVerb } from '@/lib/engagements/review-outcome';
 import type { ReviewSeen } from '@/lib/engagements/review-seen';
@@ -17,6 +17,7 @@ import {
   answerOfHandoverOutcome,
   type HeroAnswer,
 } from './hero-answer';
+import type { HeroVerb } from './hero-buttons';
 
 /**
  * Send one hero verb and read the answer. `withBudget`: the final approval also
@@ -26,7 +27,7 @@ import {
  */
 export async function sendHeroVerb(
   token: string,
-  verb: string,
+  verb: HeroVerb,
   note: string,
   { withBudget, seen }: { withBudget: boolean; seen: ReviewSeen },
 ): Promise<HeroAnswer> {
@@ -35,6 +36,5 @@ export async function sendHeroVerb(
     return answerOfDesignWithBudgetOutcome(await approveDesignWithBudget(token, note, seen));
   }
   if (isDesignVerb(verb)) return answerOfDesignOutcome(await respondToDeliveryDesign(token, verb, note, seen));
-  if (verb === 'acknowledge_handoff') return answerOfHandoverOutcome(await acknowledgeDeliveryHandover(token, note));
-  return { error: 'generic', refresh: false };
+  return answerOfHandoverOutcome(await acknowledgeDeliveryHandover(token, note));
 }

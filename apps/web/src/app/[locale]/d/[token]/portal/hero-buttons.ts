@@ -1,9 +1,14 @@
 // The one-action-never-a-menu button set per hero group. PURE (no React): the
 // action hero renders it and a unit test can read it.
+import type { ConceptVerb } from '@/lib/engagements/concept-choice-outcome';
 import type { HeroGroup } from '@/lib/engagements/portal-hero';
+import type { DesignVerb } from '@/lib/engagements/review-outcome';
+
+/** Every verb a hero button sends: the concept and design pairs, and the handover. */
+export type HeroVerb = ConceptVerb | DesignVerb | 'acknowledge_handoff';
 
 export interface HeroButton {
-  verb: string;
+  verb: HeroVerb;
   /** Key under `delivery.hero.<group>` for the button label. */
   labelKey: 'approve' | 'changes' | 'acknowledge';
   variant: 'default' | 'ghost';
