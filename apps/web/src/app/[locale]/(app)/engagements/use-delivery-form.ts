@@ -4,6 +4,7 @@ import { useTranslations } from 'next-intl';
 import { useEffect, useMemo, useState, useTransition } from 'react';
 import { useFieldErrors } from '@/hooks/use-field-errors';
 import { useRouter } from '@/i18n/routing';
+import { invariant } from '@/lib/actions/invariant';
 import { createEngagement } from '@/lib/engagements/actions';
 import { engagementCreateFieldErrors } from '@/lib/engagements/create-field-rules';
 import { ENGAGEMENT_CREATE_FIELDS } from '@/lib/engagements/create-fields';
@@ -115,7 +116,8 @@ export function useDeliveryForm(options: {
           projectId: values.projectId,
           offPlan: values.offPlan,
         });
-        if (errors.applyResult(res) || !res.data) return;
+        if (errors.applyResult(res)) return;
+        invariant(res.data, 'createEngagement answered ok without an id');
         onCreated();
         router.push(`/engagements/${res.data}`);
       } catch (rejection) {

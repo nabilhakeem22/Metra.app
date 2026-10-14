@@ -44,13 +44,45 @@ function stringConstants(): Map<string, string> {
 
 interface NamedConstraint { where: string; name: string | null }
 
+/** `[...]`, also through `as const` / `satisfies` wrappers. */
+function arrayLiteralOf(node: ts.Expression): ts.ArrayLiteralExpression | undefined {
+  if (ts.isAsExpression(node) || ts.isSatisfiesExpression(node)) return arrayLiteralOf(node.expression);
+  return ts.isArrayLiteralExpression(node) ? node : undefined;
+}
+
+/** A file's `const NAME = [...]`, so `refusals: NAME` is checked like an inline list. */
+function arrayConstants(file: ts.SourceFile): Map<string, ts.ArrayLiteralExpression> {
+  const arrays = new Map<string, ts.ArrayLiteralExpression>();
+  const visit = (node: ts.Node): void => {
+    if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && node.initializer) {
+      const array = arrayLiteralOf(node.initializer);
+      if (array) arrays.set(node.name.text, array);
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(file);
+  return arrays;
+}
+
+function refusalList(
+  initializer: ts.Expression,
+  arrays: Map<string, ts.ArrayLiteralExpression>,
+): ts.ArrayLiteralExpression | undefined {
+  return ts.isIdentifier(initializer) ? arrays.get(initializer.text) : arrayLiteralOf(initializer);
+}
+
 function refusalConstraints(): NamedConstraint[] {
   const constants = stringConstants();
   const found: NamedConstraint[] = [];
   for (const { path, file } of parsed) {
+    const arrays = arrayConstants(file);
     const visit = (node: ts.Node): void => {
-      if (ts.isPropertyAssignment(node) && node.name.getText(file) === 'refusals' && ts.isArrayLiteralExpression(node.initializer)) {
-        for (const entry of node.initializer.elements) {
+      const list =
+        ts.isPropertyAssignment(node) && node.name.getText(file) === 'refusals'
+          ? refusalList(node.initializer, arrays)
+          : undefined;
+      if (list) {
+        for (const entry of list.elements) {
           const constraint = ts.isObjectLiteralExpression(entry)
             ? entry.properties.find((p) => p.name?.getText(file) === 'constraint')
             : undefined;

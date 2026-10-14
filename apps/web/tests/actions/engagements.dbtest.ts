@@ -116,7 +116,11 @@ describe('createEngagementCore (Design-Engagement Machine, Step 1)', () => {
         clientId: b.clientId,
         projectId: a.projectId,
       }),
-    ).toEqual({ ok: false, error: 'engagement_client_required' });
+    ).toEqual({
+      ok: false,
+      error: 'check_fields',
+      fields: { clientId: { code: 'no_longer_exists' } },
+    });
   });
 
   it('rejects a foreign-org projectId (not visible in-org)', async () => {
@@ -128,7 +132,11 @@ describe('createEngagementCore (Design-Engagement Machine, Step 1)', () => {
         clientId: a.clientId,
         projectId: b.projectId,
       }),
-    ).toEqual({ ok: false, error: 'engagement_project_required' });
+    ).toEqual({
+      ok: false,
+      error: 'check_fields',
+      fields: { projectId: { code: 'no_longer_exists' } },
+    });
   });
 
   // Round A1: a delivery with no title of its own takes its project's names

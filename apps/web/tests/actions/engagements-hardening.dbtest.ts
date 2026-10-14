@@ -90,7 +90,7 @@ describe('one-active-delivery backstop (Slice C2-hardening)', () => {
 
     // Both creates pass the read-guard (empty project) and contend on the partial
     // unique index (migration 0032). Exactly one INSERT wins; the other's 23505 on
-    // the named index maps to `project_delivery_exists`.
+    // the named index maps to `project_delivery_exists` under the project.
     const [a, b] = await Promise.all([
       createEngagementCore(ctx, { titleEn: 'A', clientId, projectId }),
       createEngagementCore(ctx, { titleEn: 'B', clientId, projectId }),
@@ -98,7 +98,7 @@ describe('one-active-delivery backstop (Slice C2-hardening)', () => {
 
     const oks = [a, b].filter((r) => r.ok).length;
     const conflicts = [a, b].filter(
-      (r) => !r.ok && r.error === 'project_delivery_exists',
+      (r) => !r.ok && r.fields?.projectId?.code === 'project_delivery_exists',
     ).length;
     expect(oks).toBe(1);
     expect(conflicts).toBe(1);
@@ -153,7 +153,8 @@ describe('two-delivery lifetime cap (Slice C2-hardening, abandoned excluded)', (
     });
     expect(third).toEqual({
       ok: false,
-      error: 'project_delivery_limit_reached',
+      error: 'check_fields',
+      fields: { projectId: { code: 'project_delivery_limit_reached' } },
     });
     // Nothing written on the project…
     expect(await totalDeliveries(projectId)).toBe(2);
@@ -232,7 +233,8 @@ describe('two-delivery lifetime cap (Slice C2-hardening, abandoned excluded)', (
     });
     expect(fourth).toEqual({
       ok: false,
-      error: 'project_delivery_limit_reached',
+      error: 'check_fields',
+      fields: { projectId: { code: 'project_delivery_limit_reached' } },
     });
     expect(await totalDeliveries(projectId)).toBe(3);
   });

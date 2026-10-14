@@ -143,7 +143,11 @@ describe('one-delivery-per-project guard (Slice C2)', () => {
       clientId,
       projectId,
     });
-    expect(second).toEqual({ ok: false, error: 'project_delivery_exists' });
+    expect(second).toEqual({
+      ok: false,
+      error: 'check_fields',
+      fields: { projectId: { code: 'project_delivery_exists' } },
+    });
     // Nothing written: still exactly one delivery on the project.
     expect(await deliveryCount(projectId)).toBe(1);
   });
