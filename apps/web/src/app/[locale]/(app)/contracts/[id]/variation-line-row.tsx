@@ -16,9 +16,9 @@ import type { VariationCreateApi, VoLineColumn } from './use-variation-create';
 // state boundary: the persisted contractLineId stays byte-identical.
 const NET_DELTA = '__net_delta__';
 
-/** The DOM id of one line cell; its refusal sits under it. */
-export function variationLineControlId(index: number, column: VoLineColumn): string {
-  return `vo-line-${index}-${column}`;
+/** The DOM id of one line cell (by row key); its refusal sits under it. */
+export function variationLineControlId(key: string, column: VoLineColumn): string {
+  return `vo-line-${key}-${column}`;
 }
 
 /** One line of a new variation order: each cell labelled, its refusal under it. */
@@ -35,8 +35,8 @@ export function VariationLineRow({
 }) {
   const tv = useTranslations('variations');
   const cell = (column: VoLineColumn) => ({
-    id: variationLineControlId(index, column),
-    ...create.errors.bind(variationLinePath(index, column)),
+    id: variationLineControlId(line.key, column),
+    ...create.errors.bind(variationLinePath(line.key, column)),
   });
   const update = (patch: Partial<DraftVoLine>) => create.updateLine(index, patch);
 

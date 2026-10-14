@@ -637,13 +637,13 @@ describe('F4 — date + amount bounds', () => {
       await saveProposalDraftCore(ctx, { id, sections: [{ titleEn: 'S', lines: [{ descriptionEn: 'x', qty: '1', unit: 'sqm', unitCost: '0', unitPrice: '9999999999999', discountPct: '0' }] }] }),
     ).toEqual({ ok: false, error: 'check_fields', fields: { 'lines.0.0.unitPrice': { code: 'amount_too_large' } } });
     // A figure that is not a number says that, under its cell; a line with no
-    // description says line_required under the description.
+    // description says description_required under the description.
     expect(
       await saveProposalDraftCore(ctx, { id, sections: [{ titleEn: 'S', lines: [{ descriptionEn: 'x', qty: 'twelve', unit: 'sqm', unitCost: '0', unitPrice: '10', discountPct: '0' }] }] }),
     ).toEqual({ ok: false, error: 'check_fields', fields: { 'lines.0.0.qty': { code: 'not_a_number' } } });
     expect(
       await saveProposalDraftCore(ctx, { id, sections: [{ titleEn: 'S', lines: [{ qty: '1', unit: 'sqm', unitCost: '0', unitPrice: '10', discountPct: '0' }] }] }),
-    ).toEqual({ ok: false, error: 'check_fields', fields: { 'lines.0.0.description': { code: 'line_required' } } });
+    ).toEqual({ ok: false, error: 'check_fields', fields: { 'lines.0.0.description': { code: 'description_required' } } });
   });
 
   // Each FACTOR passes the cap; their PRODUCT does not. Before the line-total

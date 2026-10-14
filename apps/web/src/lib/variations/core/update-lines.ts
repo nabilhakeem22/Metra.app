@@ -82,8 +82,8 @@ function validateVariationLine(
   const descriptionEn = clean(line.descriptionEn);
   const read = readLineFactors(line);
   const errors: LineErrors = read.ok ? {} : { ...read.errors };
-  if (!descriptionAr && !descriptionEn) errors.description = { code: 'line_required' };
-  if (!line.unit) errors.unit = { code: 'line_required' };
+  if (!descriptionAr && !descriptionEn) errors.description = { code: 'description_required' };
+  if (!line.unit) errors.unit = { code: 'required' };
   if (!read.ok || !line.unit || Object.keys(errors).length > 0) return { ok: false, errors };
 
   const totals = computeLine(read.factors);

@@ -460,7 +460,7 @@ describe('W2.8: a variation refusal is said under the field it is about', () => 
       ok: false,
       error: 'check_fields',
       fields: {
-        'lines.1.description': { code: 'line_required' },
+        'lines.1.description': { code: 'description_required' },
         'lines.1.qty': { code: 'not_a_number' },
         'lines.2.discountPct': { code: 'discount_out_of_range' },
       },

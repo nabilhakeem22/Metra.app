@@ -43,7 +43,7 @@ export function VariationCreateForm({
         <div className="space-y-2">
           {create.lines.map((line, index) => (
             <VariationLineRow
-              key={index}
+              key={line.key}
               index={index}
               line={line}
               baselineLines={baselineLines}

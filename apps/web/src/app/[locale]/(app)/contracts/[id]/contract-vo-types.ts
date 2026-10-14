@@ -9,6 +9,8 @@ export interface BaselineLine {
 }
 
 export interface DraftVoLine {
+  /** The row's own key: its refusals stay on it when another row is removed. */
+  key: string;
   contractLineId: string;
   descriptionEn: string;
   qty: string;

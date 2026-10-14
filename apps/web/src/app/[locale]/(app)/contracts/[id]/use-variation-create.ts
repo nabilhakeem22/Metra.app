@@ -6,7 +6,7 @@ import { useFieldErrors } from '@/hooks/use-field-errors';
 import { useRouter } from '@/i18n/routing';
 import type { ActionResult } from '@/lib/actions/result';
 import { createVariationDraft, saveVariationDraft } from '@/lib/variations/actions';
-import { variationLinePath, type VariationLineColumn } from '@/lib/variations/line-fields';
+import { keyedLineErrors, variationLinePath, type VariationLineColumn } from '@/lib/variations/line-fields';
 import type { DraftVoLine } from './contract-vo-types';
 
 // The "new variation order" flow: its typed state, and the two writes it makes
@@ -25,7 +25,7 @@ export const VO_LINE_COLUMNS = [
 
 export type VoLineColumn = (typeof VO_LINE_COLUMNS)[number];
 
-const NEW_LINE: DraftVoLine = {
+const NEW_LINE: Omit<DraftVoLine, 'key'> = {
   contractLineId: '',
   descriptionEn: '',
   qty: '1',
@@ -34,12 +34,14 @@ const NEW_LINE: DraftVoLine = {
   discountPct: '0',
 };
 
-function renderedFields(lineCount: number): string[] {
-  const paths = ['title', 'reason'];
-  for (let index = 0; index < lineCount; index += 1) {
-    for (const column of VO_LINE_COLUMNS) paths.push(variationLinePath(index, column));
-  }
-  return paths;
+function renderedFields(lines: readonly DraftVoLine[]): string[] {
+  return ['title', 'reason', ...lines.flatMap((line) => VO_LINE_COLUMNS.map((column) => variationLinePath(line.key, column)))];
+}
+
+/** The answer with its line refusals on the keys of the rows that were sent. */
+function onSentRows(result: ActionResult, sent: readonly DraftVoLine[]): ActionResult {
+  if (!result.fields) return result;
+  return { ...result, fields: keyedLineErrors(result.fields, sent.map((line) => line.key)) };
 }
 
 export function useVariationCreate(contractId: string) {
@@ -53,7 +55,8 @@ export function useVariationCreate(contractId: string) {
   // The draft this form already opened. When its lines are refused, the retry
   // saves THAT draft again rather than opening a second variation order.
   const createdId = useRef<string | null>(null);
-  const errors = useFieldErrors({ fields: renderedFields(lines.length), translate: te });
+  const nextKey = useRef(0);
+  const errors = useFieldErrors({ fields: renderedFields(lines), translate: te });
 
   function reset() {
     setTitle('');
@@ -73,9 +76,10 @@ export function useVariationCreate(contractId: string) {
   }
 
   function removeLine(index: number) {
+    const removed = lines[index];
+    // The other rows keep their refusals: they are held by row key.
+    if (removed) for (const column of VO_LINE_COLUMNS) errors.bind(variationLinePath(removed.key, column)).onEdit();
     setLines((current) => current.filter((_, at) => at !== index));
-    // The refusals name lines by position, and the positions just moved.
-    errors.clear();
   }
 
   async function send(): Promise<ActionResult> {
@@ -105,7 +109,8 @@ export function useVariationCreate(contractId: string) {
     if (errors.applyLocal(title.trim() ? {} : { title: { code: 'name_required' } })) return;
     startTransition(async () => {
       try {
-        if (errors.applyResult(await send())) return;
+        const sent = lines;
+        if (errors.applyResult(onSentRows(await send(), sent))) return;
       } catch (rejection) {
         errors.applyRejection(rejection);
         return;
@@ -124,7 +129,7 @@ export function useVariationCreate(contractId: string) {
     reason,
     setReason,
     lines,
-    addLine: () => setLines((current) => [...current, NEW_LINE]),
+    addLine: () => setLines((current) => [...current, { ...NEW_LINE, key: `vo-${(nextKey.current += 1)}` }]),
     updateLine,
     removeLine,
     save,

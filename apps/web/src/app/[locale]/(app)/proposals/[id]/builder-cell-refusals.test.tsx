@@ -149,7 +149,7 @@ describe.each<TestLocale>(['en', 'ar-EG'])('builder cell refusals (%s)', (locale
       expect(control.getAttribute('aria-invalid')).toBe('true');
       return control;
     });
-    expect(under(blank)).toBe(at('errors.line_required'));
+    expect(under(blank)).toBe(at('errors.description_required'));
     expect(under(input('qty'))).toBe(at('errors.field.not_a_number'));
     expect(proposalActions.saveProposalDraft).not.toHaveBeenCalled();
   });

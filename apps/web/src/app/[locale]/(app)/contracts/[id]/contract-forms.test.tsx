@@ -46,6 +46,10 @@ const DETAIL = {
 
 const LINE_PATHS = VO_LINE_COLUMNS.map((column) => variationLinePath(0, column));
 const columnOf = (path: string) => path.split('.')[2] as VoLineColumn;
+/** The first row the form adds; its refusals are held by this key, not by position. */
+const FIRST_ROW = 'vo-1';
+const errorUnder = (row: string, column: VoLineColumn) =>
+  document.getElementById(`${variationLineControlId(row, column)}-error`)?.textContent;
 
 beforeEach(() => {
   for (const action of [...Object.values(contracts), ...Object.values(variations)]) action.mockReset();
@@ -113,11 +117,37 @@ describe.each<TestLocale>(['en', 'ar-EG'])('contract forms (%s)', (locale) => {
     await press(at('variations.line.add'))();
     await expectFieldErrorsRenderUnderFields({
       fields: LINE_PATHS,
-      controlIdOf: (path) => variationLineControlId(0, columnOf(path)),
+      controlIdOf: (path) => variationLineControlId(FIRST_ROW, columnOf(path)),
       answerWith: (result: ActionResult) => variations.saveVariationDraft.mockResolvedValue(result),
       submit: press(at('variations.saveDraft')),
       locale,
     });
+  });
+
+  test('removing a line keeps the refusals of the other lines and of the title (C2)', async () => {
+    variations.createVariationDraft.mockResolvedValue({ ok: true, data: 'v-1' });
+    variations.saveVariationDraft.mockResolvedValue({
+      ok: false,
+      error: 'check_fields',
+      fields: {
+        title: { code: 'name_required' },
+        [variationLinePath(0, 'qty')]: { code: 'not_a_number' },
+        [variationLinePath(1, 'qty')]: { code: 'amount_too_large' },
+        [variationLinePath(2, 'unitPrice')]: { code: 'not_negative' },
+      },
+    });
+    await openRegister();
+    typeTitle();
+    for (let added = 0; added < 3; added += 1) await press(at('variations.line.add'))();
+    await press(at('variations.saveDraft'))();
+    const remove = () => screen.getAllByRole('button', { name: at('variations.line.remove') });
+    fireEvent.click(remove()[1]);
+    expect(errorUnder('vo-1', 'qty')).toBe(at('errors.field.not_a_number'));
+    expect(document.getElementById(variationLineControlId('vo-2', 'qty'))).toBeNull();
+    expect(errorUnder('vo-3', 'unitPrice')).toBe(at('errors.field.not_negative'));
+    fireEvent.click(remove()[0]);
+    expect(errorUnder('vo-3', 'unitPrice')).toBe(at('errors.field.not_negative'));
+    expect(document.getElementById(`${VO_TITLE_ID}-error`)?.textContent).toBe(at('errors.name_required'));
   });
 
   test('a missing title is said under it before anything is sent', async () => {
@@ -140,7 +170,7 @@ describe.each<TestLocale>(['en', 'ar-EG'])('contract forms (%s)', (locale) => {
     typeTitle();
     await press(at('variations.line.add'))();
     await press(at('variations.saveDraft'))();
-    expect(document.getElementById(`${variationLineControlId(0, 'qty')}-error`)?.textContent).toBe(
+    expect(document.getElementById(`${variationLineControlId(FIRST_ROW, 'qty')}-error`)?.textContent).toBe(
       at('errors.field.not_a_number'),
     );
     await press(at('variations.saveDraft'))();
