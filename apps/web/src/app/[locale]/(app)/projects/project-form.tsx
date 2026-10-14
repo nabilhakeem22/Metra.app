@@ -12,7 +12,6 @@ import { createProject, updateProject } from '@/lib/projects/actions';
 import { projectFieldFor, type ProjectFormField } from './project-form-errors';
 import { ProjectFormFields } from './project-form-fields';
 import {
-  canSaveProject,
   emptyProjectForm,
   projectFormOf,
   todayIsoLocal,
@@ -115,8 +114,7 @@ export function ProjectForm({
       cancelLabel={t('form.cancel')}
       closeLabel={tc('close')}
       pending={pending}
-      canSubmit={!noClients && canSaveProject(form, !item)}
-      formError={messageFor('form')}
+      formError={noClients ? (messageFor('client') ?? messageFor('form')) : messageFor('form')}
     >
       {noClients ? (
         <div className="space-y-2 rounded-item border bg-muted/40 p-3 text-body text-muted-foreground">

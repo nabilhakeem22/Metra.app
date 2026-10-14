@@ -40,17 +40,6 @@ export function draftFromContact(contact: ClientContact): ContactDraft {
   };
 }
 
-/**
- * Is this draft submittable at all?
- *
- * A name is the only thing a contact cannot be without: everything else is a way
- * to reach them, and a firm may genuinely know only a name. Whitespace does not
- * count — a space bar is not a name.
- */
-export function validateDraft(draft: ContactDraft): boolean {
-  return draft.name.trim() !== '';
-}
-
 /** The four optional columns, as the database stores them: '' becomes NULL, so
  *  "the user cleared the box" and "the user never filled it in" are one value. */
 export function contactPayload(draft: ContactDraft): {
