@@ -11,12 +11,13 @@ import {
   type MetraDb,
 } from '@metra/db';
 import { eq } from 'drizzle-orm';
+import { fieldsFailed, hasFieldErrors } from '@/lib/actions/field-errors';
 import { fail, mutateInOrg } from '@/lib/actions/mutate';
 import { err, type ActionResult } from '@/lib/actions/result';
 import type { OrgContext } from '@/lib/db/context';
 import { isUuid } from '@/lib/uuid';
+import { activityNoteErrors } from './field-rules';
 
-const NOTE_MAX = 4000;
 
 export interface SystemActivityInput {
   entityType: ActivityEntityType;
@@ -60,19 +61,21 @@ export interface AddActivityInput {
 /**
  * Manual activity (a note) on a client or project. Gated by the matrix
  * capability that matches the subject — `client_activity` for clients,
- * `project_activity` for projects. A note MUST carry text. The parent entity
- * MUST exist in-org (RLS-scoped load) — else `invalid`, so a caller can't spray
- * activities at arbitrary/foreign ids. actorUserId = ctx.userId.
+ * `project_activity` for projects. A note MUST carry text (refused under the
+ * note). The parent entity MUST exist in-org (RLS-scoped load), else
+ * `record_not_found`, so a caller can't spray activities at arbitrary/foreign
+ * ids. actorUserId = ctx.userId.
  */
 export async function addActivityCore(
   ctx: OrgContext,
   input: AddActivityInput,
 ): Promise<ActionResult & { data?: string }> {
-  if (!isUuid(input.entityId)) return err('invalid');
+  if (!isUuid(input.entityId)) return err('malformed');
   const kind = input.kind ?? 'note';
   const note = input.note?.trim() || null;
-  if (kind === 'note' && !note) return err('invalid');
-  if ((note?.length ?? 0) > NOTE_MAX) return err('invalid');
+  // A note needs text; any other kind may carry one, within the same cap.
+  const errors = kind === 'note' || note ? activityNoteErrors(note) : {};
+  if (hasFieldErrors(errors)) return fieldsFailed(errors);
 
   const capability =
     input.entityType === 'project' ? 'project_activity' : 'client_activity';
@@ -89,7 +92,7 @@ export async function addActivityCore(
         .from(parentTable)
         .where(eq(parentTable.id, input.entityId))
         .limit(1);
-      if (!parent) fail('invalid');
+      if (!parent) fail('record_not_found');
 
       const [row] = await tx
         .insert(activities)

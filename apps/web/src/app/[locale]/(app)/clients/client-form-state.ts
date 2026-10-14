@@ -1,7 +1,6 @@
 // The client sheet's state as plain functions (no React, no 'use client'): what
 // a new client starts with, what an edit loads, and what Save sends.
 import type { ClientField } from '@/lib/clients/fields';
-import type { ClientRow } from './types';
 
 export interface ClientFormState {
   nameEn: string;
@@ -32,8 +31,11 @@ export const EMPTY_CLIENT_FORM: ClientFormState = {
 /** The fields under "More details": an error on one of them unfolds it (D6). */
 export const FOLDED_CLIENT_FIELDS: readonly ClientField[] = ['taxRegistrationNumber', 'address', 'notes'];
 
+/** An existing client's text columns (a list row or the stored client). */
+export type ClientText = { readonly [K in keyof ClientFormState]: string | null };
+
 /** An existing client, as the sheet edits it. Absent columns become empty boxes. */
-export function clientFormOf(item: ClientRow): ClientFormState {
+export function clientFormOf(item: ClientText): ClientFormState {
   return {
     nameEn: item.nameEn ?? '',
     nameAr: item.nameAr ?? '',

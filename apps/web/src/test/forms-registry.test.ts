@@ -17,12 +17,18 @@ import { loadSourceGraph, SRC_ROOT, srcRelative } from '@/test/source-graph';
 /** Form file (from src) to the test that proves its fields' refusals render under them. */
 const FORM_COVERAGE: Readonly<Record<string, string>> = {
   'app/[locale]/(app)/clients/[id]/contact-form.tsx': 'app/[locale]/(app)/clients/[id]/contact-form.test.tsx',
+  'app/[locale]/(app)/clients/[id]/details-tab.tsx': 'app/[locale]/(app)/clients/[id]/details-tab.test.tsx',
+  'app/[locale]/(app)/clients/[id]/use-client-details-form.ts': 'app/[locale]/(app)/clients/[id]/details-tab.test.tsx',
   'app/[locale]/(app)/clients/client-form-fields.tsx': 'app/[locale]/(app)/clients/client-form.test.tsx',
   'app/[locale]/(app)/clients/client-form.tsx': 'app/[locale]/(app)/clients/client-form.test.tsx',
   'app/[locale]/(app)/engagements/engagement-create-fields.tsx': 'app/[locale]/(app)/engagements/engagement-create-form.test.tsx',
   'app/[locale]/(app)/engagements/use-delivery-form.ts': 'app/[locale]/(app)/engagements/engagement-create-form.test.tsx',
   'app/[locale]/(app)/price-book/cost-item-form-fields.tsx': 'app/[locale]/(app)/price-book/cost-item-form.test.tsx',
   'app/[locale]/(app)/price-book/cost-item-form.tsx': 'app/[locale]/(app)/price-book/cost-item-form.test.tsx',
+  'app/[locale]/(app)/projects/[id]/details-fields.tsx': 'app/[locale]/(app)/projects/[id]/details-tab.test.tsx',
+  'app/[locale]/(app)/projects/[id]/details-type-field.tsx': 'app/[locale]/(app)/projects/[id]/details-tab.test.tsx',
+  'app/[locale]/(app)/projects/[id]/use-add-project-type.ts': 'app/[locale]/(app)/projects/[id]/details-tab.test.tsx',
+  'app/[locale]/(app)/projects/[id]/use-project-details-form.ts': 'app/[locale]/(app)/projects/[id]/details-tab.test.tsx',
   'app/[locale]/(app)/projects/project-form-fields.tsx': 'app/[locale]/(app)/projects/project-form.test.tsx',
   'app/[locale]/(app)/projects/project-form-schedule.tsx': 'app/[locale]/(app)/projects/project-form.test.tsx',
   'app/[locale]/(app)/projects/project-form.tsx': 'app/[locale]/(app)/projects/project-form.test.tsx',
@@ -39,6 +45,8 @@ const FORM_COVERAGE: Readonly<Record<string, string>> = {
   'app/[locale]/(app)/team/use-invite-form.ts': 'app/[locale]/(app)/team/team-client.test.tsx',
   'app/[locale]/onboarding/onboarding-profile-fields.tsx': 'app/[locale]/onboarding/wizard.test.tsx',
   'app/[locale]/onboarding/wizard.tsx': 'app/[locale]/onboarding/wizard.test.tsx',
+  'components/activity/activity-note-form.tsx': 'components/activity/activity-note-form.test.tsx',
+  'components/documents/document-upload-control.tsx': 'components/documents/document-upload-control.test.tsx',
 };
 
 /** Forms still on the old one-error-at-a-time shape. Only ever shrinks. */

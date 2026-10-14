@@ -135,15 +135,15 @@ describe('getDocumentUrlCore', () => {
     });
   });
 
-  it('answers `invalid` for a file this entity does not own — and never signs', async () => {
+  it('answers `record_not_found` for a file this entity does not own — and never signs', async () => {
     ownedRow.mockReturnValue(undefined);
     await expect(
       getDocumentUrlCore(ctx, DOCUMENT_ENTITIES.project, 'file-1'),
-    ).resolves.toEqual({ ok: false, error: 'invalid' });
+    ).resolves.toEqual({ ok: false, error: 'record_not_found' });
     expect(getSignedUrl).not.toHaveBeenCalled();
   });
 
-  it('answers `generic` and LOGS when Storage fails, not `invalid`', async () => {
+  it('answers `storage_unavailable` and LOGS when Storage fails, not not-found', async () => {
     // The not-found answer is decided before the try. An outage answering
     // `invalid` told the studio the file no longer exists — and told the log
     // nothing at all, so on-call could not tell an outage from a junk id.
@@ -151,7 +151,7 @@ describe('getDocumentUrlCore', () => {
     getSignedUrl.mockRejectedValue(new Error('storage 503'));
     await expect(
       getDocumentUrlCore(ctx, DOCUMENT_ENTITIES.client, 'file-1'),
-    ).resolves.toEqual({ ok: false, error: 'generic' });
+    ).resolves.toEqual({ ok: false, error: 'storage_unavailable' });
     expect(console.error).toHaveBeenCalledWith(
       'document url mint failed',
       expect.objectContaining({ fileId: 'file-1', entity: 'client' }),
@@ -313,12 +313,12 @@ describe('deleteDocumentCore', () => {
     }
   });
 
-  it('answers `invalid` and removes NOTHING when the gated delete returns no row', async () => {
+  it('answers `record_not_found` and removes NOTHING when the gated delete returns no row', async () => {
     // Another org's file (RLS), another entity's file, or one already deleted.
     deletedRows.mockReturnValue([]);
     await expect(
       deleteDocumentCore(ctx, DOCUMENT_ENTITIES.client, 'file-1'),
-    ).resolves.toEqual({ ok: false, error: 'invalid' });
+    ).resolves.toEqual({ ok: false, error: 'record_not_found' });
     expect(removeStoredObject).not.toHaveBeenCalled();
     expect(auditEntries).toHaveLength(0);
   });

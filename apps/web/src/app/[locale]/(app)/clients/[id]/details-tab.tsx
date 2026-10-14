@@ -2,165 +2,90 @@
 
 import { Loader2 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
-import { useState, useTransition } from 'react';
+import { useRef } from 'react';
 import type { Client, ClientType } from '@metra/db';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { FieldHint } from '@/components/ui/field-hint';
+import { fieldErrorId } from '@/components/ui/field-error-text';
+import { FormField } from '@/components/ui/form-field';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { toast } from '@/hooks/use-toast';
-import { useRouter } from '@/i18n/routing';
-import { resolveActionError } from '@/lib/actions/error-message';
-import type { ActionCode } from '@/lib/actions/result';
-import { updateClient } from '@/lib/clients/actions';
+import { SelectControl } from '@/components/ui/select-control';
+import { useFocusFirstInvalid } from '@/hooks/use-focus-first-invalid';
+import type { CLIENT_FORM_FIELDS } from '@/lib/clients/fields';
+import type { ClientFormState } from '../client-form-state';
+import { useClientDetailsForm } from './use-client-details-form';
 
 const TYPES: ClientType[] = ['individual', 'company', 'consultant'];
 
-interface FormState {
-  nameEn: string;
-  nameAr: string;
-  type: ClientType;
-  contactName: string;
-  email: string;
-  phone: string;
-  city: string;
-  country: string;
-  address: string;
-  taxRegistrationNumber: string;
-  notes: string;
+type DetailsField = (typeof CLIENT_FORM_FIELDS)[number];
+
+/** The control a field's refusal sits under: the pair under the English name. */
+export function detailsControlId(field: DetailsField): string {
+  return `d-${field === 'name' ? 'nameEn' : field}`;
 }
 
-function fromClient(c: Client): FormState {
-  return {
-    nameEn: c.nameEn ?? '',
-    nameAr: c.nameAr ?? '',
-    type: c.type,
-    contactName: c.contactName ?? '',
-    email: c.email ?? '',
-    phone: c.phone ?? '',
-    city: c.city ?? '',
-    country: c.country ?? '',
-    address: c.address ?? '',
-    taxRegistrationNumber: c.taxRegistrationNumber ?? '',
-    notes: c.notes ?? '',
-  };
-}
-
-export function DetailsTab({
-  client,
-  canManage,
-}: {
-  client: Client;
-  canManage: boolean;
-}) {
+export function DetailsTab({ client, canManage }: { client: Client; canManage: boolean }) {
   const t = useTranslations('clients');
   const th = useTranslations('hints.client');
-  const te = useTranslations('errors');
-  const router = useRouter();
-  const [form, setForm] = useState<FormState>(fromClient(client));
-  const [pending, startTransition] = useTransition();
-
-  const set = (k: keyof FormState) => (v: string) =>
-    setForm((f) => ({ ...f, [k]: v }));
-
-  function submit() {
-    startTransition(async () => {
-      const res = await updateClient({
-        id: client.id,
-        nameEn: form.nameEn || null,
-        nameAr: form.nameAr || null,
-        type: form.type,
-        contactName: form.contactName || null,
-        email: form.email || null,
-        phone: form.phone || null,
-        city: form.city || null,
-        country: form.country || null,
-        address: form.address || null,
-        taxRegistrationNumber: form.taxRegistrationNumber || null,
-        // advancePct / retentionPct are deliberately ABSENT: this form no longer
-        // owns them. updateClientCore leaves an omitted percentage untouched, so
-        // the stored value (still served by Public API v1) survives an edit here.
-        notes: form.notes || null,
-      });
-      if (res.ok) {
-        toast({ title: t('profile.details.saved') });
-        router.refresh();
-      } else {
-        toast({
-          title: resolveActionError(res.error as ActionCode, te),
-          variant: 'destructive',
-        });
-      }
-    });
-  }
+  const details = useClientDetailsForm(client);
+  const { form, errors } = details;
+  const fieldsRef = useRef<HTMLDivElement>(null);
+  useFocusFirstInvalid(fieldsRef, errors.invalidAttempt);
+  // Not disabled while saving: a refusal moves the caret into its field, and a
+  // disabled box cannot take it.
+  const disabled = !canManage;
+  // One name is enough: a missing name is said once, under the English name.
+  const pair = errors.bind('name');
 
   const field = (
-    k: keyof FormState,
+    key: keyof ClientFormState,
     label: string,
-    opts?: { dir?: 'ltr' | 'rtl' | 'auto'; hint?: string; inputMode?: 'decimal'; required?: boolean },
-  ) => (
-    <div className="space-y-2">
-      <Label htmlFor={`d-${k}`} className="flex items-center">
-        {label}
-        {opts?.required && (
-          <span className="ms-1 text-[color:var(--danger)]" aria-hidden>
-            *
-          </span>
-        )}
-        {opts?.hint && <FieldHint id={`d-${k}-hint`} hint={opts.hint} />}
-      </Label>
-      <Input
-        id={`d-${k}`}
-        dir={opts?.dir ?? 'ltr'}
-        inputMode={opts?.inputMode}
-        aria-required={opts?.required || undefined}
-        aria-describedby={opts?.hint ? `d-${k}-hint` : undefined}
-        value={form[k]}
-        onChange={(e) => set(k)(e.target.value)}
-        disabled={!canManage || pending}
-      />
-    </div>
-  );
+    options: { dir?: 'ltr' | 'rtl' | 'auto'; hint?: string; required?: boolean } = {},
+  ) => {
+    const own = errors.bind(key);
+    const isPair = key === 'nameEn' || key === 'nameAr';
+    const sharesPairError = key === 'nameAr' && Boolean(pair.error);
+    return (
+      <FormField
+        id={detailsControlId(key)}
+        label={label}
+        hint={options.hint}
+        required={options.required}
+        error={(key === 'nameEn' ? pair.error : undefined) ?? own.error}
+        onEdit={() => {
+          own.onEdit();
+          if (isPair) pair.onEdit();
+        }}
+      >
+        <Input
+          dir={options.dir ?? 'ltr'}
+          aria-invalid={sharesPairError ? true : undefined}
+          aria-describedby={sharesPairError ? fieldErrorId(detailsControlId('name')) : undefined}
+          value={form[key]}
+          onChange={(e) => details.set(key, e.target.value)}
+          disabled={disabled}
+        />
+      </FormField>
+    );
+  };
 
   return (
     <Card>
-      <CardContent className="space-y-4 py-4">
+      <CardContent ref={fieldsRef} className="space-y-4 py-4">
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           {field('nameEn', t('form.nameEn'), { hint: th('name'), required: true })}
           {field('nameAr', t('form.nameAr'), { dir: 'rtl', hint: th('name'), required: true })}
         </div>
 
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <div className="space-y-2">
-            <Label htmlFor="d-type" className="flex items-center">
-              {t('form.type')}
-              <FieldHint id="d-type-hint" hint={th('type')} />
-            </Label>
-            <Select
+          <FormField id="d-type" label={t('form.type')} hint={th('type')}>
+            <SelectControl
               value={form.type}
-              onValueChange={(v) => set('type')(v)}
-              disabled={!canManage || pending}
-            >
-              <SelectTrigger id="d-type" aria-describedby="d-type-hint">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {TYPES.map((ty) => (
-                  <SelectItem key={ty} value={ty}>
-                    {t(`types.${ty}`)}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+              onValueChange={(value) => details.set('type', value as ClientType)}
+              options={TYPES.map((type) => ({ value: type, label: t(`types.${type}`) }))}
+              disabled={disabled}
+            />
+          </FormField>
           {field('contactName', t('form.contactName'), { dir: 'auto', hint: th('contactName') })}
         </div>
 
@@ -180,10 +105,15 @@ export function DetailsTab({
         </div>
         {field('notes', t('form.notes'), { dir: 'auto' })}
 
+        {errors.formError && (
+          <p className="text-body text-destructive" role="alert">
+            {errors.formError}
+          </p>
+        )}
         {canManage && (
           <div className="flex justify-end">
-            <Button variant="default" type="button" onClick={submit} disabled={pending}>
-              {pending && <Loader2 className="size-4 animate-spin" aria-hidden />}
+            <Button variant="default" type="button" onClick={details.save} disabled={details.saving}>
+              {details.saving && <Loader2 className="size-4 animate-spin" aria-hidden />}
               {t('profile.details.save')}
             </Button>
           </div>

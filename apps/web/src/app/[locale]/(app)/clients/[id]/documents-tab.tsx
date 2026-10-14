@@ -1,16 +1,14 @@
 'use client';
 
-import { Download, FileText, Loader2, Trash2, Upload } from 'lucide-react';
+import { Download, FileText, Trash2 } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
-import { useRef, useState, useTransition, type ChangeEvent } from 'react';
+import { useTransition } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { OverflowMenu } from '@/components/ui/overflow-menu';
 import { toast } from '@/hooks/use-toast';
-import { useRouter } from '@/i18n/routing';
-import { resolveActionError } from '@/lib/actions/error-message';
-import type { ActionCode } from '@/lib/actions/result';
+import { describeFailure, describeRejection } from '@/lib/actions/error-message';
 import {
   createClientDocumentUpload,
   deleteClientDocument,
@@ -18,6 +16,7 @@ import {
 } from '@/lib/documents/actions';
 import type { EntityDocument } from '@/lib/documents/queries';
 import { groupByCategory } from '@/components/documents/document-groups';
+import { DocumentUploadControl } from '@/components/documents/document-upload-control';
 import { useDocumentDeletion } from '@/components/documents/use-document-deletion';
 import { formatDate } from '@/lib/format/date';
 import { pickLocale } from '@/lib/i18n/pick-locale';
@@ -38,55 +37,21 @@ export function DocumentsTab({
   const te = useTranslations('errors');
   const tc = useTranslations('common');
   const locale = useLocale();
-  const router = useRouter();
   const [pending, startTransition] = useTransition();
-  const inputRef = useRef<HTMLInputElement>(null);
-  // Chosen BEFORE picking the file, so the document is filed at the moment it
-  // arrives rather than needing a second step nobody comes back to do.
-  const [categoryId, setCategoryId] = useState('');
 
-  function onUpload(e: ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    startTransition(async () => {
-      try {
-        const signed = await createClientDocumentUpload({
-          clientId,
-          contentType: file.type,
-          originalName: file.name,
-          categoryId: categoryId || null,
-        });
-        if ('ok' in signed) {
-          toast({
-            title: resolveActionError(signed.error as ActionCode, te),
-            variant: 'destructive',
-          });
-          return;
-        }
-        const put = await fetch(signed.signedUrl, {
-          method: 'PUT',
-          headers: { 'content-type': file.type, 'x-upsert': 'true' },
-          body: file,
-        });
-        if (!put.ok) throw new Error('put_failed');
-        toast({ title: t('uploaded') });
-        router.refresh();
-      } catch {
-        toast({ title: te('generic'), variant: 'destructive' });
-      } finally {
-        if (inputRef.current) inputRef.current.value = '';
-      }
-    });
-  }
-
+  // A row act with no field: the toast names the cause (D11).
   function onDownload(id: string) {
     startTransition(async () => {
-      const res = await getClientDocumentUrl(id);
-      if (res.ok && res.url) {
-        window.open(res.url, '_blank', 'noopener');
-        return;
+      try {
+        const res = await getClientDocumentUrl(id);
+        if (res.ok && res.url) {
+          window.open(res.url, '_blank', 'noopener');
+          return;
+        }
+        toast({ title: describeFailure(res, te), variant: 'destructive' });
+      } catch (rejection) {
+        toast({ title: describeRejection(rejection, te), variant: 'destructive' });
       }
-      toast({ title: resolveActionError(res.error, te), variant: 'destructive' });
     });
   }
 
@@ -97,44 +62,11 @@ export function DocumentsTab({
     <div className="space-y-4">
       {deletion.dialog}
       {canManage && (
-        <div>
-          <input
-            ref={inputRef}
-            type="file"
-            className="hidden"
-            onChange={onUpload}
-            disabled={pending}
-          />
-          {categories.length > 0 && (
-            <select
-              value={categoryId}
-              onChange={(e) => setCategoryId(e.target.value)}
-              aria-label={t('category')}
-              disabled={pending}
-              className="h-9 rounded-item border bg-background px-2 field-text"
-            >
-              <option value="">{t('uncategorised')}</option>
-              {categories.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {pickLocale({ nameAr: c.nameAr, nameEn: c.nameEn }, 'name', locale).value}
-                </option>
-              ))}
-            </select>
-          )}
-          <Button
-            type="button"
-            variant="secondary"
-            onClick={() => inputRef.current?.click()}
-            disabled={pending}
-          >
-            {pending ? (
-              <Loader2 className="size-4 animate-spin" aria-hidden />
-            ) : (
-              <Upload className="size-4" aria-hidden />
-            )}
-            {t('upload')}
-          </Button>
-        </div>
+        <DocumentUploadControl
+          categories={categories}
+          createUpload={(upload) => createClientDocumentUpload({ clientId, ...upload })}
+          t={t}
+        />
       )}
 
       <Card>

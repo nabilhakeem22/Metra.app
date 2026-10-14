@@ -56,7 +56,8 @@ async function ownedDocument(
  * vanishingly, a row deleted between the two reads). Answering `invalid` made an
  * outage indistinguishable from a deleted file, on screen ("that no longer
  * exists") and in the log, which said nothing. It logs the error and answers
- * `generic`, so on-call can tell "Storage is down" from "this id is junk".
+ * `storage_unavailable`, so the studio reads "try again in a moment" and on-call
+ * can tell "Storage is down" from "this id is junk" (`record_not_found`).
  */
 export async function getDocumentUrlCore(
   ctx: OrgContext,
@@ -67,7 +68,7 @@ export async function getDocumentUrlCore(
   const owned = await withOrgContext(ctx, (tx) =>
     ownedDocument(tx, spec, fileId),
   );
-  if (!owned) return err('invalid');
+  if (!owned) return err('record_not_found');
   try {
     const url = await getSignedUrl(ctx, fileId, {
       download: safeDownloadName(owned.originalName),
@@ -79,7 +80,7 @@ export async function getDocumentUrlCore(
       entity: spec.entity,
       error: loggableFailure(error),
     });
-    return err('generic');
+    return err('storage_unavailable');
   }
 }
 
@@ -103,8 +104,8 @@ interface DeletedObject {
  *
  * The DELETE carries the cross-entity guard in its own `where` and RETURNS the
  * row it removed, so one statement both gates and reports: no row back means the
- * file is another org's (RLS), another entity's, or already gone — `invalid`,
- * before any audit entry is written.
+ * file is another org's (RLS), another entity's, or already gone —
+ * `record_not_found`, before any audit entry is written.
  */
 export async function deleteDocumentCore(
   ctx: OrgContext,
@@ -119,7 +120,7 @@ export async function deleteDocumentCore(
         .delete(files)
         .where(and(eq(files.id, fileId), eq(files.entity, spec.entity)))
         .returning({ bucket: files.bucket, objectKey: files.objectKey });
-      if (!removed) fail('invalid');
+      if (!removed) fail('record_not_found');
       await audit({
         entity: 'file',
         entityId: fileId,
@@ -130,7 +131,8 @@ export async function deleteDocumentCore(
       return removed;
     },
   );
-  if (!deleted.ok) return err(deleted.error ?? 'generic');
+  // A refusal keeps its whole answer (a reference, when it has one).
+  if (!deleted.ok) return deleted;
   await discardStoredBytes(deleted.data);
   // The `data` the spine carried is the object key. It is server-side plumbing,
   // not an answer, and this is a server ACTION's return value — so it stops here.

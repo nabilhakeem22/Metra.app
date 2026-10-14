@@ -7,14 +7,9 @@ import { fieldsFailed, hasFieldErrors } from '@/lib/actions/field-errors';
 import type { ActionResult } from '@/lib/actions/result';
 import type { OrgContext } from '@/lib/db/context';
 import { clean } from '@/lib/validation/text';
-import { bilingualNameErrors } from '@/lib/validation/text-field-rules';
+import { projectTypeNameErrors, type ProjectTypeInput } from './field-rules';
 
-export interface ProjectTypeInput {
-  nameEn?: string | null;
-  nameAr?: string | null;
-}
-
-const NAME_MAX = 200;
+export type { ProjectTypeInput } from './field-rules';
 
 /**
  * Create-on-use project type. Idempotent: an active type matching the trimmed
@@ -26,10 +21,10 @@ export async function upsertProjectTypeCore(
   ctx: OrgContext,
   input: ProjectTypeInput,
 ): Promise<ActionResult & { data?: string }> {
+  const errors = projectTypeNameErrors(input);
+  if (hasFieldErrors(errors)) return fieldsFailed(errors);
   const nameEn = clean(input.nameEn);
   const nameAr = clean(input.nameAr);
-  const errors = bilingualNameErrors(nameEn, nameAr, NAME_MAX);
-  if (hasFieldErrors(errors)) return fieldsFailed(errors);
 
   return mutateInOrg(
     ctx,

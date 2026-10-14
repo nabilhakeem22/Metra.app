@@ -61,14 +61,14 @@ async function confirmDelete(contract: DocumentsTabContract): Promise<void> {
 
 /**
  * Wave 3's F1: a refused download used to open a tab at nothing and say nothing.
- * `invalid` is what `getDocumentUrlCore` actually returns for a file that is not
+ * `record_not_found` is what `getDocumentUrlCore` returns for a file that is not
  * this org's — the coded refusal must reach the screen as the CATALOGUE string.
  */
 async function downloadRefusalIsToldAndDoesNotNavigate(
   contract: DocumentsTabContract,
 ): Promise<void> {
   const open = vi.spyOn(window, 'open').mockReturnValue(null);
-  contract.actions.getDocumentUrl.mockResolvedValue({ ok: false, error: 'invalid' });
+  contract.actions.getDocumentUrl.mockResolvedValue({ ok: false, error: 'record_not_found' });
   contract.renderTab();
 
   clickDownload(contract);
@@ -77,7 +77,7 @@ async function downloadRefusalIsToldAndDoesNotNavigate(
     expect(contract.toasts).toHaveLength(1);
   });
   expect(lastToast(contract.toasts)).toEqual({
-    title: ar('errors.invalid'),
+    title: ar('errors.record_not_found'),
     variant: 'destructive',
   });
   expect(open).not.toHaveBeenCalled();
