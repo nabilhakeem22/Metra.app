@@ -26,13 +26,16 @@ const FORM_COVERAGE: Readonly<Record<string, string>> = {
   'app/[locale]/(app)/projects/project-form-fields.tsx': 'app/[locale]/(app)/projects/project-form.test.tsx',
   'app/[locale]/(app)/projects/project-form-schedule.tsx': 'app/[locale]/(app)/projects/project-form.test.tsx',
   'app/[locale]/(app)/projects/project-form.tsx': 'app/[locale]/(app)/projects/project-form.test.tsx',
+  'app/[locale]/(app)/settings/account/account-client.tsx': 'app/[locale]/(app)/settings/account/account-client.test.tsx',
+  'app/[locale]/(app)/settings/client-page-sheet.tsx': 'app/[locale]/(app)/settings/client-page-sheet.test.tsx',
+  'app/[locale]/(app)/settings/settings-client.tsx': 'app/[locale]/(app)/settings/settings-client.test.tsx',
+  'app/[locale]/(app)/settings/settings-profile-card.tsx': 'app/[locale]/(app)/settings/settings-client.test.tsx',
+  'app/[locale]/onboarding/onboarding-profile-fields.tsx': 'app/[locale]/onboarding/wizard.test.tsx',
+  'app/[locale]/onboarding/wizard.tsx': 'app/[locale]/onboarding/wizard.test.tsx',
 };
 
 /** Forms still on the old one-error-at-a-time shape. Only ever shrinks. */
-const PENDING_FORMS: readonly string[] = [
-  'app/[locale]/(app)/settings/client-page-sheet.tsx',
-  'app/[locale]/onboarding/onboarding-profile-fields.tsx',
-];
+const PENDING_FORMS: readonly string[] = [];
 
 const graph = loadSourceGraph();
 const textOf = (path: string) => graph.files.get(path)!.getFullText();

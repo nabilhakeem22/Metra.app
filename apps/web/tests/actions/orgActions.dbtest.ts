@@ -21,6 +21,6 @@ describe('createOrg (action wrapper)', () => {
     // Next.js digest the wizard cannot localize.
     await expect(
       createOrg({ nameEn: null, nameAr: null, firmType: 'interior' }),
-    ).resolves.toEqual({ ok: false, error: 'name_required' });
+    ).resolves.toEqual({ ok: false, error: 'check_fields', fields: { name: { code: 'name_required' } } });
   });
 });

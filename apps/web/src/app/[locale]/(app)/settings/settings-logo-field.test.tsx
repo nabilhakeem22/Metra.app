@@ -76,8 +76,8 @@ describe('the Settings logo', () => {
   });
 
   test('a new pick shows its preview while it uploads, then the NEW saved logo once attached', async () => {
-    let finishUpload: (attached: boolean) => void = () => {};
-    upload.uploadOrgLogo.mockReturnValue(new Promise<boolean>((resolve) => (finishUpload = resolve)));
+    let finishUpload: (attached: { ok: boolean }) => void = () => {};
+    upload.uploadOrgLogo.mockReturnValue(new Promise((resolve) => (finishUpload = resolve)));
     renderWithIntl(<SettingsPage savedLogoId="file-1" />, { locale: 'en' });
 
     await act(async () => pick());
@@ -85,21 +85,30 @@ describe('the Settings logo', () => {
     expect(logoInput().disabled).toBe(true);
     expect(upload.uploadOrgLogo).toHaveBeenCalledWith(expect.objectContaining({ name: 'new.png' }));
 
-    await act(async () => finishUpload(true));
+    await act(async () => finishUpload({ ok: true }));
     expect(router.refresh).toHaveBeenCalledTimes(1);
     expect(toasts).toEqual([{ title: messageAt('en', 'settings.logoUpdated') }]);
     expect(logoImage()?.getAttribute('src')).toBe('/en/settings/logo?v=file-2');
     expect(logoInput().disabled).toBe(false);
   });
 
-  test('a failed upload toasts, drops the preview and shows the saved logo again', async () => {
-    upload.uploadOrgLogo.mockResolvedValue(false);
+  test('a refused upload says why under the picker, drops the preview and shows the saved logo again', async () => {
+    upload.uploadOrgLogo.mockResolvedValue({ ok: false, error: 'logo_image_unsupported' });
     renderWithIntl(<SettingsPage savedLogoId="file-1" />, { locale: 'en' });
     await act(async () => pick());
     expect(router.refresh).not.toHaveBeenCalled();
-    expect(toasts).toEqual([{ title: messageAt('en', 'settings.errorGeneric'), variant: 'destructive' }]);
+    expect(toasts).toEqual([]);
+    expect(document.getElementById('logo-error')?.textContent).toBe(messageAt('en', 'errors.logo_image_unsupported'));
+    expect(logoInput().getAttribute('aria-describedby')).toBe('logo-error');
     expect(logoImage()?.getAttribute('src')).toBe('/en/settings/logo?v=file-1');
     expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:preview');
+  });
+
+  test('an upload that never answered says Metra could not be reached', async () => {
+    upload.uploadOrgLogo.mockRejectedValue(new TypeError('fetch failed'));
+    renderWithIntl(<SettingsPage savedLogoId="file-1" />, { locale: 'en' });
+    await act(async () => pick());
+    expect(document.getElementById('logo-error')?.textContent).toBe(messageAt('en', 'errors.unreachable'));
   });
 
   test('a read-only member cannot pick a logo', () => {

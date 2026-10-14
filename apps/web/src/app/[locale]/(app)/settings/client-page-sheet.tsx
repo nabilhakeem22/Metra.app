@@ -6,20 +6,22 @@ import { FormField } from '@/components/ui/form-field';
 import { FormSheet } from '@/components/ui/form-sheet';
 import { Input } from '@/components/ui/input';
 import { SectionLabel } from '@/components/ui/section-label';
+import { useFieldErrors } from '@/hooks/use-field-errors';
 import { toast } from '@/hooks/use-toast';
 import { useRouter } from '@/i18n/routing';
-import { resolveActionError } from '@/lib/actions/error-message';
-import type { ActionCode } from '@/lib/actions/result';
 import { updateClientPageDetails } from '@/lib/org/client-page-actions';
-import type { ClientPageField } from '@/lib/org/client-page-details';
+import { CLIENT_PAGE_FIELDS, type ClientPageField } from '@/lib/org/client-page-details';
 import { CLIENT_PAGE_FIELD_SPECS, changedDraftFields, type ClientPageDraft } from './client-page-fields';
 
-type Refusal = { code: ActionCode; field: ClientPageField | null };
+/** The control a client-page field's refusal sits under. */
+export function clientPageControlId(field: ClientPageField): string {
+  return `client-page-${field}`;
+}
 
 /**
  * Edit what the client page shows about the studio, in the app's form sheet.
- * A refusal is said under the field it names (no toast); one that names no
- * field is said above the footer. Owner/admin only: the card opens it only
+ * Every refusal is said under the field it names, all at once (no toast); one
+ * that names no field is said above the footer. Owner/admin only: the card opens it only
  * for them, and the server action re-checks.
  */
 export function ClientPageSheet({
@@ -40,31 +42,28 @@ export function ClientPageSheet({
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [draft, setDraft] = useState(initial);
-  const [refusal, setRefusal] = useState<Refusal | null>(null);
+  const errors = useFieldErrors({ fields: CLIENT_PAGE_FIELDS, translate: te });
+  const { clear } = errors;
 
   useEffect(() => {
     if (!open) return;
     setDraft(initial);
-    setRefusal(null);
-  }, [open, initial]);
+    clear();
+  }, [open, initial, clear]);
 
-  const messageOf = (found: Refusal) =>
-    found.code === 'invalid' && found.field ? t(`fieldInvalid.${found.field}`) : resolveActionError(found.code, te);
-
+  // No client pre-check: the phone, IBAN and printable-text rules are the
+  // server's own (studio-phone.ts, printable-text.ts), and it names every
+  // refused field at once.
   function submit() {
-    setRefusal(null);
     startTransition(async () => {
       try {
         const result = await updateClientPageDetails({ revision, changes: changedDraftFields(initial, draft) });
-        if (result.ok) {
-          toast({ title: t('saved') });
-          onOpenChange(false);
-          router.refresh();
-          return;
-        }
-        setRefusal({ code: result.error ?? 'generic', field: result.field ?? null });
-      } catch {
-        setRefusal({ code: 'generic', field: null });
+        if (errors.applyResult(result)) return;
+        toast({ title: t('saved') });
+        onOpenChange(false);
+        router.refresh();
+      } catch (rejection) {
+        errors.applyRejection(rejection);
       }
     });
   }
@@ -80,7 +79,8 @@ export function ClientPageSheet({
       cancelLabel={tc('cancel')}
       closeLabel={tc('close')}
       pending={pending}
-      formError={refusal && !refusal.field ? messageOf(refusal) : null}
+      formError={errors.formError}
+      invalidAttempt={errors.invalidAttempt}
     >
       <p className="text-caption text-muted-foreground">{t('alertNote')}</p>
       {(['contact', 'payment'] as const).map((group) => (
@@ -89,9 +89,9 @@ export function ClientPageSheet({
           {CLIENT_PAGE_FIELD_SPECS.filter((spec) => spec.group === group).map((spec) => (
             <FormField
               key={spec.field}
-              id={`client-page-${spec.field}`}
+              id={clientPageControlId(spec.field)}
               label={t(`fields.${spec.field}`)}
-              error={refusal?.field === spec.field ? messageOf(refusal) : null}
+              {...errors.bind(spec.field)}
             >
               <Input
                 dir={spec.ltr ? 'ltr' : 'auto'}

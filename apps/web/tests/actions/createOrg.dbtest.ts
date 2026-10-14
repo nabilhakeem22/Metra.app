@@ -47,7 +47,7 @@ describe('createOrgCore', () => {
 
   it('rejects when no name is provided', async () => {
     const res = await createOrgCore(ctxFor(randomUUID(), randomUUID(), 'owner'), {});
-    expect(res).toEqual({ ok: false, error: 'name_required' });
+    expect(res).toEqual({ ok: false, error: 'check_fields', fields: { name: { code: 'name_required' } } });
   });
 
   it('firmType interior enables the {interior} flow + provisions the workspace', async () => {
