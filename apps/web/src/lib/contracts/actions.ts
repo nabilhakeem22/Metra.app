@@ -1,6 +1,5 @@
 'use server';
 
-import { unexpectedFailure } from '@/lib/actions/unexpected';
 import { getLocale } from 'next-intl/server';
 import { refreshApp } from '@/lib/actions/refresh';
 import type { ActionResult } from '@/lib/actions/result';

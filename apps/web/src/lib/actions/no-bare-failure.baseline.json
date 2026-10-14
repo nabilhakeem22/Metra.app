@@ -3,13 +3,5 @@
   "app/[locale]/d/[token]/portal/hero-verbs.ts": 1,
   "app/[locale]/d/[token]/portal/use-payment-claim.ts": 1,
   "app/[locale]/d/[token]/review-actions.ts": 1,
-  "lib/engagements/client-acts/design-acts.ts": 1,
-  "lib/engagements/document-comments.ts": 1,
-  "lib/price-book/actions.ts": 1,
-  "lib/price-book/bulk-core.ts": 2,
-  "lib/price-book/core.ts": 1,
-  "lib/price-book/cost-item-write.ts": 1,
-  "lib/price-book/import-core.ts": 2,
-  "lib/variations/core/create.ts": 1,
-  "lib/variations/core/update.ts": 3
+  "lib/engagements/client-acts/design-acts.ts": 1
 }

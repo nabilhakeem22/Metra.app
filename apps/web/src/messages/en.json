@@ -449,7 +449,6 @@
   },
   "errors": {
     "forbidden": "Your role in this workspace cannot do this. Ask an owner or admin to do it, or to change your role.",
-    "invalid": "That didn't work. Please try again.",
     "generic": "We could not finish this because of a problem on our side. What you entered is still here; try again in a moment.",
     "uncertain": "We could not confirm your change was saved: the server was busy or the connection dropped. Refresh the page to check before trying again.",
     "check_fields": "Some fields need fixing. Look for the message under each one.",

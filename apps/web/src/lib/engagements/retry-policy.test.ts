@@ -14,7 +14,8 @@ describe('isDefiniteRefusal', () => {
     expect(isDefiniteRefusal('engagement_state_conflict')).toBe(true);
     expect(isDefiniteRefusal('engagement_not_found')).toBe(true);
     expect(isDefiniteRefusal('gate_b_not_cleared')).toBe(true);
-    expect(isDefiniteRefusal('invalid')).toBe(true);
+    expect(isDefiniteRefusal('malformed')).toBe(true);
+    expect(isDefiniteRefusal('record_not_found')).toBe(true);
     // Field rules refused the input before anything was written.
     expect(isDefiniteRefusal('check_fields')).toBe(true);
   });

@@ -254,7 +254,7 @@ describe('studio replies — RLS and tenancy', () => {
 
     expect(
       await replyToDocumentCore(mine.ctx, { artifactId: foreignId, body: 'trespass' }),
-    ).toEqual({ ok: false, error: 'invalid' });
+    ).toEqual({ ok: false, error: 'record_not_found' });
     expect(await listDocumentCommentsCore(theirs.ctx, foreignId)).toHaveLength(0);
     // And the foreign thread stays invisible to the other tenant's own read.
     expect(await listDocumentCommentsCore(mine.ctx, foreignId)).toHaveLength(0);
@@ -288,7 +288,7 @@ describe('studio replies — RLS and tenancy', () => {
     ).toEqual({ ok: false, error: 'check_fields', fields: { body: { code: 'required' } } });
     expect(
       await replyToDocumentCore(delivery.ctx, { artifactId: 'nope', body: 'hi' }),
-    ).toEqual({ ok: false, error: 'invalid' });
+    ).toEqual({ ok: false, error: 'malformed' });
   });
 });
 

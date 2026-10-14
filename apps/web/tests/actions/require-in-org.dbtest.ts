@@ -32,7 +32,7 @@ describe('requireInOrg — the RLS transaction is the boundary', () => {
   it('returns the row for its own org', async () => {
     const { ctx, clientId } = await seedClient('Acme');
     const row = await withOrgContext(ctx, (tx) =>
-      requireInOrg(tx, clients, clientId, { id: clients.id, nameEn: clients.nameEn }, 'invalid'),
+      requireInOrg(tx, clients, clientId, { id: clients.id, nameEn: clients.nameEn }, 'record_not_found'),
     );
     expect(row).toEqual({ id: clientId, nameEn: 'Acme' });
   });
@@ -45,14 +45,14 @@ describe('requireInOrg — the RLS transaction is the boundary', () => {
 
     await expect(
       withOrgContext(a.ctx, (tx) =>
-        requireInOrg(tx, clients, b.clientId, { id: clients.id }, 'invalid'),
+        requireInOrg(tx, clients, b.clientId, { id: clients.id }, 'record_not_found'),
       ),
     ).rejects.toBeInstanceOf(ActionError);
 
     // ...and org B still sees its own row, so nothing was hidden by accident.
     await expect(
       withOrgContext(b.ctx, (tx) =>
-        requireInOrg(tx, clients, b.clientId, { id: clients.id }, 'invalid'),
+        requireInOrg(tx, clients, b.clientId, { id: clients.id }, 'record_not_found'),
       ),
     ).resolves.toEqual({ id: b.clientId });
   });
@@ -68,10 +68,10 @@ describe('requireInOrg — the RLS transaction is the boundary', () => {
           clients,
           '00000000-0000-4000-8000-000000000000',
           { id: clients.id },
-          'invalid',
+          'record_not_found',
         ),
       ),
-    ).rejects.toMatchObject({ code: 'invalid' });
+    ).rejects.toMatchObject({ code: 'record_not_found' });
   });
 
   it('preserves nullability: a null column comes back as null, not missing', async () => {
@@ -82,7 +82,7 @@ describe('requireInOrg — the RLS transaction is the boundary', () => {
         clients,
         clientId,
         { id: clients.id, nameAr: clients.nameAr, advancePct: clients.advancePct },
-        'invalid',
+        'record_not_found',
       ),
     );
     expect(row.nameAr).toBeNull();

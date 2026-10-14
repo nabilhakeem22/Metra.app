@@ -31,7 +31,7 @@ export function costItemColumns(
 ): { refusal: ActionResult } | { columns: CostItemColumns } {
   const read = readCostItemInput(input);
   if (!read.ok) return { refusal: fieldsFailed(read.errors) };
-  if (!isUuid(input.sectionId) || !isUnit(input.unit)) return { refusal: err('invalid') };
+  if (!isUuid(input.sectionId) || !isUnit(input.unit)) return { refusal: err('malformed') };
   return {
     columns: {
       ...read.values,

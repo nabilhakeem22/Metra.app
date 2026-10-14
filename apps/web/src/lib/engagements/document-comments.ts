@@ -95,7 +95,7 @@ export async function replyToDocumentCore(
   ctx: OrgContext,
   input: ReplyToDocumentInput,
 ): Promise<ActionResult> {
-  if (!isUuid(input.artifactId)) return { ok: false, error: 'invalid' };
+  if (!isUuid(input.artifactId)) return { ok: false, error: 'malformed' };
   const bodyErrors = commentFieldErrors(input.body);
   if (hasFieldErrors(bodyErrors)) return fieldsFailed(bodyErrors);
   const body = input.body.trim().slice(0, BODY_MAX);
@@ -112,7 +112,7 @@ export async function replyToDocumentCore(
           id: engagementArtifacts.id,
           engagementId: engagementArtifacts.engagementId,
         },
-        'invalid',
+        'record_not_found',
       );
 
       const engagement = await requireInOrg(
