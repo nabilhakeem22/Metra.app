@@ -207,7 +207,7 @@
   border-radius: 50%;
   background: #6d9af5;
 }
-.landing h1 {
+.landing-hero h1 {
   font-size: clamp(38px, 5.6vw, 62px);
   line-height: 1.02;
   letter-spacing: var(--tracking-display);
@@ -216,7 +216,7 @@
   text-wrap: balance;
   color: #fff;
 }
-.landing h1 .landing-accent {
+.landing-hero h1 .landing-accent {
   background: linear-gradient(120deg, #8fb3ff, #5a8df2);
   -webkit-background-clip: text;
   background-clip: text;
