@@ -26,6 +26,11 @@ export const BOQ_UNITS = [
   'pcs',
   'lump_sum',
   'day',
+  'kg',
+  'ton',
+  'liter',
+  'cbm',
+  'roll',
 ] as const;
 export type BoqUnit = (typeof BOQ_UNITS)[number];
 

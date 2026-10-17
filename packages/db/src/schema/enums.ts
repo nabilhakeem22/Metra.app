@@ -47,13 +47,22 @@ export const COST_ITEM_CATEGORIES = [
   'preliminaries',
 ] as const;
 
-/** Cost-item units of measure. Labels localized (not stored). */
+/**
+ * Cost-item units of measure. Labels localized (not stored). APPEND ONLY: the
+ * last five arrived with the market price book (D3, migration 0061) so supply
+ * items priced by weight, volume or roll can sit in a price book.
+ */
 export const COST_ITEM_UNITS = [
   'sqm',
   'linear_meter',
   'pcs',
   'lump_sum',
   'day',
+  'kg',
+  'ton',
+  'liter',
+  'cbm',
+  'roll',
 ] as const;
 
 export const costItemUnit = pgEnum('cost_item_unit', COST_ITEM_UNITS);
@@ -356,6 +365,46 @@ export const clientPaymentClaimStatus = pgEnum(
   CLIENT_PAYMENT_CLAIM_STATUSES,
 );
 
+/**
+ * Market price book (platform-level reference data, migration 0061). Order is a
+ * contract; append only. `mhuc_cabm` = the Ministry of Housing's Central
+ * Administration for Building Materials; `capmas` may be appended later.
+ */
+export const MARKET_PUBLISHERS = ['mhuc_cabm'] as const;
+export const marketPublisher = pgEnum('market_publisher', MARKET_PUBLISHERS);
+
+export const MARKET_BULLETIN_STATUSES = ['published', 'withdrawn'] as const;
+export const marketBulletinStatus = pgEnum('market_bulletin_status', MARKET_BULLETIN_STATUSES);
+
+/**
+ * A `roll` always carries its pack size on the item (market_items.pack_*): a
+ * 100 m roll and a 45 m roll are different items. `thousand_bricks` = «ألف طوبة».
+ */
+export const MARKET_UNITS = [
+  'ton',
+  'kg',
+  'sqm',
+  'cbm',
+  'linear_meter',
+  'liter',
+  'pcs',
+  'roll',
+  'bag',
+  'pack',
+  'thousand_bricks',
+] as const;
+export const marketUnit = pgEnum('market_unit', MARKET_UNITS);
+
+export const MARKET_ITEM_STATUSES = ['active', 'discontinued'] as const;
+export const marketItemStatus = pgEnum('market_item_status', MARKET_ITEM_STATUSES);
+
+/** `suspended` = the bulletin's «التسعير متوقف» stamp: a month with no price on purpose. */
+export const MARKET_OBSERVATION_STATUSES = ['priced', 'suspended'] as const;
+export const marketObservationStatus = pgEnum(
+  'market_observation_status',
+  MARKET_OBSERVATION_STATUSES,
+);
+
 export type MemberRole = (typeof MEMBER_ROLES)[number];
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];
 export type InvitationStatus = (typeof INVITATION_STATUSES)[number];
@@ -381,3 +430,8 @@ export type EngagementEventKind = (typeof ENGAGEMENT_EVENT_KINDS)[number];
 export type ChangeOrderStatus = (typeof CHANGE_ORDER_STATUSES)[number];
 export type ClientPaymentClaimStatus =
   (typeof CLIENT_PAYMENT_CLAIM_STATUSES)[number];
+export type MarketPublisher = (typeof MARKET_PUBLISHERS)[number];
+export type MarketBulletinStatus = (typeof MARKET_BULLETIN_STATUSES)[number];
+export type MarketUnit = (typeof MARKET_UNITS)[number];
+export type MarketItemStatus = (typeof MARKET_ITEM_STATUSES)[number];
+export type MarketObservationStatus = (typeof MARKET_OBSERVATION_STATUSES)[number];

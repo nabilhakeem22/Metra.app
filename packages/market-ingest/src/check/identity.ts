@@ -1,6 +1,7 @@
 // B3 units map, B4 taxonomy and key shape, B5 uniqueness of row ids and keys.
 import { finding, type Finding } from '../findings';
 import { isLeafCategory } from '../taxonomy';
+import { looksLikeRoll } from '../roll-pack';
 import { marketUnitOf } from '../units';
 import { pageIdOf, type CheckContext } from './context';
 
@@ -33,7 +34,10 @@ export function checkIdentity(context: CheckContext): Finding[] {
   for (const { row, page, pageId, itemKey } of context.rows) {
     const at = { rowId: row.rowId, page: pageId };
     if (marketUnitOf(row.unitLabelAr) === null) {
-      findings.push(finding('B3', `unit "${row.unitLabelAr}" is not in the unit map (src/units.ts)`, at));
+      const reason = looksLikeRoll(row.unitLabelAr)
+        ? 'is a roll without a readable pack size (src/roll-pack.ts)'
+        : 'is not in the unit map (src/units.ts)';
+      findings.push(finding('B3', `unit "${row.unitLabelAr}" ${reason}`, at));
     }
     if (!ITEM_KEY.test(itemKey)) {
       findings.push(finding('B4', `key "${itemKey}" must match ${ITEM_KEY.source}`, at));

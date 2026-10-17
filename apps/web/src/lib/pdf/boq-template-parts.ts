@@ -3,17 +3,28 @@
 // so each half stays readable as the layout grew a conditional column.
 import { formatMoney } from '@/lib/format/money';
 import { formatPercent, formatQuantity } from '@/lib/format/number';
+import type { BoqUnit } from '@/lib/boqs/edit-input';
 import type { BoqDetail, BoqLineRow } from '@/lib/boqs/queries/types';
 import { lineDiscountTotals } from '@/lib/boqs/line-discounts';
 import { esc } from '@/lib/pdf/html';
 
-const UNIT_LABEL: Record<string, [string, string]> = {
+const UNIT_LABEL: Record<BoqUnit, [string, string]> = {
   sqm: ['م²', 'm²'],
   linear_meter: ['م.ط', 'm.l'],
   pcs: ['عدد', 'pcs'],
   lump_sum: ['مقطوعية', 'lump sum'],
   day: ['يوم', 'day'],
+  kg: ['كجم', 'kg'],
+  ton: ['طن', 'ton'],
+  liter: ['لتر', 'liter'],
+  cbm: ['م³', 'm³'],
+  roll: ['لفة', 'roll'],
 };
+
+/** A stored unit's [ar, en] label; a unit the list does not know prints as stored. */
+function unitLabel(unit: string): [string, string] {
+  return (UNIT_LABEL as Record<string, [string, string]>)[unit] ?? [unit, unit];
+}
 
 /** What varies the layout of ONE document. */
 export interface BoqLayout {
@@ -35,7 +46,7 @@ export function boqColumnCount(layout: BoqLayout): number {
 function lineRowHtml(line: BoqLineRow, layout: BoqLayout): string {
   const { locale } = layout;
   const m = (value: string) => formatMoney(value, locale);
-  const unit = UNIT_LABEL[line.unit] ?? [line.unit, line.unit];
+  const unit = unitLabel(line.unit);
   const flag = line.provisional
     ? ` <span class="prov">${pickText(locale, 'تقديري', 'provisional')}</span>`
     : '';

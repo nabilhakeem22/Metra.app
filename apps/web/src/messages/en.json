@@ -703,7 +703,12 @@
       "linear_meter": "Linear meter",
       "pcs": "Pcs",
       "lump_sum": "Lump sum",
-      "day": "Day"
+      "day": "Day",
+      "kg": "Kg",
+      "ton": "Ton",
+      "liter": "Liter",
+      "cbm": "m³",
+      "roll": "Roll"
     },
     "status": {
       "active": "Active",
@@ -1204,7 +1209,12 @@
           "linear_meter": "m.l",
           "pcs": "pcs",
           "lump_sum": "lump sum",
-          "day": "day"
+          "day": "day",
+          "kg": "kg",
+          "ton": "ton",
+          "liter": "liter",
+          "cbm": "m³",
+          "roll": "roll"
         },
         "issue": "Issue BOQ",
         "issueConfirmTitle": "Issue this BOQ?",
@@ -2665,5 +2675,21 @@
       "too_many": "You sent many requests in the last minute. Wait a minute, then try again.",
       "uncertain": "We could not confirm your answer was received. Refresh the page to check before sending it again."
     }
+  },
+  "marketBook": {
+    "units": {
+      "ton": "Ton",
+      "kg": "Kg",
+      "sqm": "m²",
+      "cbm": "m³",
+      "linear_meter": "Linear meter",
+      "liter": "Liter",
+      "pcs": "Pcs",
+      "roll": "Roll",
+      "bag": "Bag",
+      "pack": "Pack",
+      "thousand_bricks": "1000 bricks"
+    },
+    "unitNotSupported": "Your price book has no unit for this item, so it can't be added."
   }
 }

@@ -194,7 +194,13 @@ Each **price page** of the PDF has, top to bottom:
   the far left). Months after the bulletin month are empty cells;
 - the **price-basis line** in the coloured band under the table, e.g.
   «الأسعار من قوائم بعض الشركات المنتجة - الأسعار شاملة الضرائب دون النقل»;
-- a chart whose legend lists every row's name (`legendLabelsAr`, the row-count cross-check);
+- a chart whose legend lists the rows' names (`legendLabelsAr`, the row-count cross-check:
+  a legend with MORE labels than the table has rows blocks (B13, a row was missed); a SHORTER
+  one is a warning (F7), because the bulletin truncates some legends, e.g. July 2026 PDF pages
+  76 to 79 and 86). Copy the legend as printed. If the chart plainly belongs to another table
+  (its labels and its value range match none of this table's rows; July 2026 PDF page 130
+  charts the 14 to 24 inch pipes above a 28 to 40 inch table), write `legendLabelsAr: []` and
+  report the page in your hand-over;
 - often a **side table «معدل تغير الأسعار بين عامي 2025-2026»** for ONE charted row: the 2025
   price per month («السعر»), the printed % per month («معدل التغير») and «المتوسط», which is the
   **2025 average**, not a 2026 figure;
@@ -224,8 +230,13 @@ printed number and coverage runs over `1..lastPrintedPage`.
 - `labelAr` is the item name; `specAr` the size or grade («2 مم», «30x30x3 سم»).
 - `nameEn` / `specEn`: a plain English name the owner reviews in review.html.
 - `unitLabelAr` is the row's unit as printed, in logical order with Western digits. The map in
-  `src/units.ts` must know it (B3): طن, كجم, م2, م3, متر طولي / م.ط, لتر, عدد, اللوح, عود,
-  شيكارة, «اللفة (100 م.ط)». An unknown unit: stop and tell the owner.
+  `src/units.ts` must know it (B3): طن, كجم, م2 / متر مربع / متر مسطح, م3, متر طولي / م.ط,
+  لتر, عدد, اللوح, عود, شيكارة, عبوة, ألف طوبة, and a **roll with its pack size**. A roll is
+  one unit `roll` plus the pack, read off the label, and different packs are different items
+  (give each its own key): «اللفة (100 م.ط)» and «اللفة (30 متر)» are one length (100 m,
+  30 m); «لفة 34×3م» and «لفة عدد 34 ماسورة بطول 3 متر» are 34 pieces of 3 m. A missing
+  bracket, م / متر / م.ط and × / x / * are all read. A roll label with no readable size, or
+  any other unknown unit: stop and tell the owner.
 
 ## 4. Reading rules
 
@@ -258,8 +269,14 @@ The comma-shaped mark «،» (or «٫») inside a number is the **decimal point*
 - **R9 Suspension stamps.** A stamp «التسعير متوقف ...» printed across a table: set
   `suspendedNoteAr`. Mark a slot `"suspended"` only when the stamp clearly covers that month's
   column (its `verbatimCells` entry is the stamp's text); otherwise the row is `unreadable`.
-- **R10 Names.** When the row label is only a size («2مم»), the item name comes from the page
-  heading or the chart title («أسلاك نحاس معزول») and the size goes to `specAr`.
+- **R10 Names.** The naming convention, the same in every part file:
+  - when the printed row label is only a size or a qualifier («2مم», «أبيض», «30x30»), the item
+    name comes from the page heading or the description box («أسلاك نحاس معزول»), the label
+    goes to `specAr`, and the row is `inferred` with rule R10;
+  - when the row label already names the material («بورتلاندي عادي معبأ», «زجاج شفاف»), it is
+    `labelAr` as printed and the row stays `read`;
+  - two items with the same label and a different unit (marble tiles in م2 and marble stairs in
+    م.ط) are two items: give them distinct keys (`..._tiles`, `..._stairs`).
 
 **Basis per page.** Read the basis line of every page; it changes from page to page.
 `includesTaxes` is false when it says the prices exclude VAT («لا تشمل ضريبة القيمة المضافة»);
@@ -283,7 +300,7 @@ the MD.
 | P6 | 7 (2) steel sections | medium beams July «٥١٠٠٠» against a 2025 price «٣٨٥٠٠»; the yearly table prints «%٤٠» | keep 51000 (`read`); `market:check` flags F8 (32.5 computed, 40 printed) | the checker lists, it never fixes; neither do you |
 | P7 | 140 (110) bridge bearings | the March column of all six rows is one merged cell «نظرا للظروف الاقتصادية التسعير متوقف»; other months read clearly («٨٧٢١», «١٥٩٦٠», «٢٩٨١١») | `suspendedNoteAr` set; March `"suspended"` on every row with the stamp text in `verbatimCells[2]`; unit «عدد» | R9 on the PDF is certain; in the MD the same page is unreadable |
 | P8 | 55 (38) plastic paints | row 1 unit «كجم», rows 2 to 4 one merged «لتر» cell; yearly % «%٢،٠», «%٠،٤» | `defaultUnitLabelAr` null; row 1 "كجم", rows 2 to 4 "لتر"; `printedPct` "2.0", "0.4" | R3 merged unit cells; one-decimal % |
-| P9 | 62 (43) copper wire | row labels «٢مم», «٣مم», «٤مم», «٦مم»; unit «اللفة (١٠٠م.ط)»; the yearly table describes the 4 mm row | `labelAr` «أسلاك نحاس معزول» from the description title, `specAr` "2 مم"...; unit "اللفة (100 م.ط)"; `yearly.rowId` "p62.r3" | R10; the charted row is not always row 1 |
+| P9 | 62 (43) copper wire | row labels «٢مم», «٣مم», «٤مم», «٦مم»; unit «اللفة (١٠٠م.ط)»; the yearly table describes the 4 mm row | `labelAr` «أسلاك نحاس معزول» from the description title, `specAr` "2 مم"..., `inferred` R10; unit "اللفة (100 م.ط)" (a roll of 100 m); `yearly.rowId` "p62.r3" | R10; the charted row is not always row 1 |
 
 MD-only readings of the same pages (for `readFrom: "md"`):
 
@@ -299,7 +316,8 @@ MD-only readings of the same pages (for `readFrom: "md"`):
 
 - Every row: the count of non-empty cells on the page equals the non-null slots you wrote, and
   every `verbatimCells` entry is the printed text of that cell.
-- Every page: `rows.length` equals the chart legend (`legendLabelsAr`); the basis line is read.
+- Every page: the chart legend (`legendLabelsAr`) has no more labels than the table has rows;
+  the basis line is read.
 - Every charted row: your values against the printed yearly % (F8) and «المتوسط» (F9).
 - `pages` and `skippedPages` cover every PDF page exactly once (B8).
 - All values in Western digits; every Arabic text in logical order.

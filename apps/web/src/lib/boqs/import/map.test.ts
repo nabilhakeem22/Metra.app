@@ -153,7 +153,7 @@ describe('normalizeUnit', () => {
 
   it('returns null for a unit Metra does not have', () => {
     // Better a named error in the preview than a silent coercion to sqm.
-    expect(normalizeUnit('tonne')).toBeNull();
+    expect(normalizeUnit('barrel')).toBeNull();
     expect(normalizeUnit('')).toBeNull();
   });
 });
@@ -217,17 +217,17 @@ describe('mapRows', () => {
     // Header is row 1, so the first data row is row 2. The cell travels as
     // `value` rather than baked into an English sentence, so the ar-EG catalogue
     // can interpolate it.
-    const g = grid('Description,Unit,Qty,Rate\nWalls,tonne,10,50');
+    const g = grid('Description,Unit,Qty,Rate\nWalls,barrel,10,50');
     const res = mapRows(g, autoDetectMapping(g.rows[0] as string[]));
     expect(res.rows[0]?.rowNumber).toBe(2);
-    expect(res.rows[0]?.issues[0]).toEqual({ code: 'unit_unknown', value: 'tonne' });
+    expect(res.rows[0]?.issues[0]).toEqual({ code: 'unit_unknown', value: 'barrel' });
   });
 
   it('reports every bad row instead of stopping at the first', () => {
     const g = grid(
       [
         'Description,Unit,Qty,Rate',
-        'Walls,tonne,10,50',
+        'Walls,barrel,10,50',
         'Ceiling,m2,abc,50',
         'Floor,m2,10,50',
       ].join('\n'),

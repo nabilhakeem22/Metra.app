@@ -26,9 +26,9 @@
 //   * every `create trigger` exists in `pg_trigger` (non-internal);
 //   * every function the manifest defines exists in `pg_proc`;
 //   * the `metra_app` role exists, and is neither LOGIN nor BYPASSRLS;
-//   * five NARROWED tables — boqs, document_categories,
+//   * nine NARROWED tables — boqs, document_categories,
 //     engagement_document_comments, engagement_milestones,
-//     workspace_entitlements — hold exactly the table-level privileges roles.sql
+//     workspace_entitlements and the four SELECT-only market tables — hold exactly the table-level privileges roles.sql
 //     leaves them with after its revokes, AND do not hold the one privilege each
 //     narrowing exists to remove (no DELETE on boqs, no UPDATE/DELETE on the
 //     append-only three, no DELETE on the filing vocabulary). Until wave 8 item 6
@@ -249,6 +249,12 @@ async function grantProblems(sql: Sql): Promise<string[]> {
  *                                 thread the record of what the client asked for.
  *   workspace_entitlements        INSERT-only — an UPDATE here is a member
  *                                 granting themselves a flow or raising a limit.
+ *   market_categories, market_items, market_bulletins,
+ *   market_price_observations     SELECT-only (0061) — official guide prices
+ *                                 every studio reads; only the owner's
+ *                                 `market:publish` CLI writes them, as the
+ *                                 connection role. A metra_app write would let
+ *                                 one studio change what every studio sees.
  *
  * `design_engagements` is NOT in this list: its authority is column-level and is
  * read back separately by `grantProblems`, which is a different question.
@@ -269,6 +275,10 @@ const NARROWED_TABLES: Record<string, readonly TablePrivilege[]> = {
   document_categories: ['delete'],
   engagement_document_comments: ['update', 'delete'],
   engagement_milestones: ['update', 'delete'],
+  market_bulletins: ['insert', 'update', 'delete'],
+  market_categories: ['insert', 'update', 'delete'],
+  market_items: ['insert', 'update', 'delete'],
+  market_price_observations: ['insert', 'update', 'delete'],
   workspace_entitlements: ['update', 'delete'],
 };
 

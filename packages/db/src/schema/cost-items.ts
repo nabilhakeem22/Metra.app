@@ -11,6 +11,7 @@ import {
 } from 'drizzle-orm/pg-core';
 import { bilingual, bilingualCheck, money } from './_helpers';
 import { costItemUnit } from './enums';
+import { marketItems } from './market';
 import { organizations } from './organizations';
 import { orgScoped } from './org-scoped';
 import { sameOrgFk } from './org-ref';
@@ -40,6 +41,14 @@ export const costItems = pgTable(
     etaItemCode: text('eta_item_code'),
     etaCodeType: text('eta_code_type'),
     active: boolean('active').notNull().default(true),
+    /**
+     * The market price book item this cost item follows (0061). ADVISORY: market
+     * data never overwrites the cost or the price. Platform-level target, so a
+     * plain FK; on delete restrict.
+     */
+    marketItemId: uuid('market_item_id').references((): AnyPgColumn => marketItems.id, {
+      onDelete: 'restrict',
+    }),
   },
   (t) => [
     unique('cost_items_org_id_id_unique').on(t.orgId, t.id),
@@ -52,6 +61,9 @@ export const costItems = pgTable(
     ),
     ...sameOrgFk(t, 'section', sections, { onDelete: 'restrict' }),
     index('cost_items_org_active_idx').on(t.orgId, t.active),
+    index('cost_items_org_market_item_idx')
+      .on(t.orgId, t.marketItemId)
+      .where(sql`${t.marketItemId} is not null`),
     // Live since 0019 — the keyset covering index the list endpoints read in
     // order (created_at DESC, id DESC) within an org.
     index('cost_items_org_created_id_idx').on(

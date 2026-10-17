@@ -43,6 +43,7 @@ export const RLS_APPLY_ORDER = [
   'policies/30-contracts-boqs-variations.sql',
   'policies/40-engagements.sql',
   'policies/50-automation.sql',
+  'policies/60-market.sql',
 ] as const;
 
 export type RlsFile = (typeof RLS_APPLY_ORDER)[number];

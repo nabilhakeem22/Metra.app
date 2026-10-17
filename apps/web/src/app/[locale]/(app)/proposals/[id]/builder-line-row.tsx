@@ -5,9 +5,10 @@ import { useLocale, useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { SelectControl } from '@/components/ui/select-control';
+import { BOQ_UNITS } from '@/lib/boqs/edit-input';
 import { formatMoney } from '@/lib/format/money';
 import { FigureInput } from './figure-input';
-import { INPUT_CLASS, UNITS, previewLine, type LineState } from './builder-model';
+import { INPUT_CLASS, previewLine, type LineState } from './builder-model';
 import { CellError, cellA11y } from './draft-cell';
 import type { LineCell } from './draft-field-errors';
 import type { LineFigure } from './draft-completeness';
@@ -86,7 +87,7 @@ export function BuilderLineRow({
           className="h-9 w-auto min-w-16"
           value={line.unit}
           onValueChange={(v) => edit('unit', { unit: v })}
-          options={UNITS.map((u) => ({ value: u, label: u }))}
+          options={BOQ_UNITS.map((u) => ({ value: u, label: u }))}
           {...cellA11y(idOf('unit'), cellOf('unit'))}
         />
         <CellError id={idOf('unit')} error={cellOf('unit')} />

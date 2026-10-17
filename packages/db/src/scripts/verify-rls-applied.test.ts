@@ -45,12 +45,16 @@ interface Catalogues {
 
 const ROLES_SQL = resolve(dirname(fileURLToPath(import.meta.url)), '../rls/roles.sql');
 
-/** The five tables `verify-rls-applied.ts` reads back, in the order it asks. */
+/** The nine tables `verify-rls-applied.ts` reads back, in the order it asks. */
 const NARROWED_TABLE_NAMES = [
   'boqs',
   'document_categories',
   'engagement_document_comments',
   'engagement_milestones',
+  'market_bulletins',
+  'market_categories',
+  'market_items',
+  'market_price_observations',
   'workspace_entitlements',
 ];
 
@@ -207,7 +211,7 @@ describe('verifyRlsApplied', () => {
   });
 
   it('prints the declared counts a green run reports', () => {
-    expect(declaredCounts()).toBe('46 tables, 46 policies, 15 triggers, 44 functions');
+    expect(declaredCounts()).toBe('50 tables, 50 policies, 15 triggers, 44 functions');
   });
 
   it('prints what the GRANT half checked, so a shrinking read-back is visible', () => {
@@ -216,8 +220,9 @@ describe('verifyRlsApplied', () => {
     // they belong in the output rather than only in the source.
     expect(verifiedGrantsSummary()).toBe(
       'grants verified — design_engagements update narrowed to 19 columns with no ' +
-        'table-level update, and 5 narrowed table(s) (boqs, document_categories, ' +
-        'engagement_document_comments, engagement_milestones, workspace_entitlements) ' +
+        'table-level update, and 9 narrowed table(s) (boqs, document_categories, ' +
+        'engagement_document_comments, engagement_milestones, market_bulletins, ' +
+        'market_categories, market_items, market_price_observations, workspace_entitlements) ' +
         'holding exactly what rls/roles.sql leaves them.',
     );
   });
@@ -286,6 +291,22 @@ describe('the five NARROWED tables, read back at the database (wave 8 item 6)', 
   // the narrowing was written.
   it('reports nothing when the database holds exactly what roles.sql leaves', async () => {
     expect(await verifyRlsApplied(fixtureSql({}))).toEqual([]);
+  });
+
+  it('reads the four market tables as SELECT-only (0061)', () => {
+    const roles = readFileSync(ROLES_SQL, 'utf8');
+    for (const table of ['market_bulletins', 'market_categories', 'market_items', 'market_price_observations']) {
+      expect([...tablePrivilegesFor(roles, table)]).toEqual(['select']);
+    }
+  });
+
+  it('reports a market table that metra_app may write to', async () => {
+    const problems = await verifyRlsApplied(
+      fixtureSql({ tableGrants: { market_items: ['select', 'insert'] } }),
+    );
+    const report = problems.join(' | ');
+    expect(report).toContain('still has insert on market_items');
+    expect(report).toContain('has insert on market_items in THIS DATABASE');
   });
 
   it('reads the grant list out of roles.sql, revokes included', () => {

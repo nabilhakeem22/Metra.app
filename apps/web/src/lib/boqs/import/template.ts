@@ -6,6 +6,7 @@
 // and they are the same strings `autoDetectMapping` already recognises, so a
 // returned template maps itself with nothing for the studio to confirm.
 
+import { BOQ_UNITS } from '../edit-input';
 import { CANONICAL_HEADERS, IMPORT_FIELDS, type ImportField } from './map';
 
 /**
@@ -42,14 +43,8 @@ const EXAMPLE: Record<ImportField, string> = {
   costItemCode: '',
 };
 
-/** The five units Metra understands, for the instructions beside the download. */
-export const TEMPLATE_UNITS = [
-  'sqm',
-  'linear_meter',
-  'pcs',
-  'lump_sum',
-  'day',
-] as const;
+/** The units Metra understands, for the instructions beside the download. */
+export const TEMPLATE_UNITS = BOQ_UNITS;
 
 /**
  * RFC 4180 quoting: wrap when the value contains a delimiter, a quote or a

@@ -43,8 +43,10 @@ describe('market:check flags', () => {
     expect(checkFixture(bulletin()).staged.items[0].basisNoteAr).toBeNull();
   });
 
-  it('F7: rows and chart legend disagree', () => {
+  it('F7: a legend shorter than the table is a warning; B13: a longer one blocks', () => {
     expect(brief(checkFixture(bulletin({ pages: [page({ legendLabelsAr: [] })] })))).toEqual(['F7 page 2']);
+    const longer = bulletin({ pages: [page({ legendLabelsAr: ['حديد التسليح', 'حديد مجدول'] })] });
+    expect(brief(checkFixture(longer))).toEqual(['B13 page 2']);
   });
 
   it('F8: integer printing allows 1 point, one-decimal printing 0.15', () => {

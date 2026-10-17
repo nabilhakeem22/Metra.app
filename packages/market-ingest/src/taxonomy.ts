@@ -33,7 +33,7 @@ const TOPS: Top[] = [
     ['vinyl_flooring', 'أرضيات الفينيل', 'Vinyl flooring'],
     ['roof_tiles', 'القرميد', 'Roof tiles'],
     ['cladding_panels', 'ألواح التكسية', 'Cladding panels'],
-    ['facade_base', 'قواعد الواجهات', 'Facade base coats'],
+    ['facade_base', 'أسفل الواجهات والأسوار', 'Facade and fence base cladding'],
   ] },
   { key: 'paints', nameAr: 'الدهانات', nameEn: 'Paints', leaves: [
     ['cementitious_facade', 'دهانات الواجهات الأسمنتية', 'Cementitious facade paints'],
@@ -41,8 +41,8 @@ const TOPS: Top[] = [
     ['wall_putty', 'المعجون', 'Wall putty'],
     ['plastic', 'دهانات البلاستيك', 'Plastic (emulsion) paints'],
     ['primer', 'البرايمر', 'Primers'],
-    ['alkyd', 'دهانات الألكيد', 'Alkyd paints'],
-    ['varnish_sealers', 'الورنيش والسيلر', 'Varnishes and sealers'],
+    ['alkyd', 'اللاكيه', 'Alkyd (lacquer) paints'],
+    ['varnish_sealers', 'دهان الاستر والورنيش', 'Sealers and varnishes'],
   ] },
   { key: 'electrical', nameAr: 'مستلزمات الكهرباء', nameEn: 'Electrical supplies', leaves: [
     ['wires', 'الأسلاك', 'Wires'],

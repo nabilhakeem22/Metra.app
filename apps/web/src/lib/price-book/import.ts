@@ -11,6 +11,11 @@ export const UNIT_TOKENS: readonly CostItemUnit[] = [
   'pcs',
   'lump_sum',
   'day',
+  'kg',
+  'ton',
+  'liter',
+  'cbm',
+  'roll',
 ];
 
 // Retained EN + AR aliases for the 8 seeded defaults (keyed by section.key), so
@@ -32,6 +37,11 @@ const UNIT_ALIASES: Record<CostItemUnit, string[]> = {
   pcs: ['pcs', 'pc', 'piece', 'قطعة', 'عدد'],
   lump_sum: ['lump_sum', 'lump sum', 'ls', 'مقطوعية', 'إجمالي'],
   day: ['day', 'يوم'],
+  kg: ['kg', 'kilo', 'كجم', 'كيلو', 'كيلوجرام'],
+  ton: ['ton', 'tonne', 'طن'],
+  liter: ['liter', 'litre', 'lt', 'لتر'],
+  cbm: ['cbm', 'm3', 'm³', 'متر مكعب', 'م3', 'م³'],
+  roll: ['roll', 'لفة', 'رول'],
 };
 
 function buildLookup<T extends string>(

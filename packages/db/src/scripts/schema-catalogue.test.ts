@@ -21,7 +21,7 @@ import {
 describe('what the code declares', () => {
   it('reads every table off the drizzle schema', () => {
     const tables = declaredTables();
-    expect(tables.size).toBe(46);
+    expect(tables.size).toBe(50);
     // A table picked because it is the one the 4th-TG_ARGV work turns on.
     expect(tables.get('boqs')?.has('source_file_id')).toBe(true);
     expect(tables.get('design_engagements')?.has('revision_count')).toBe(true);

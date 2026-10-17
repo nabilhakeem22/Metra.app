@@ -1,6 +1,8 @@
 // F5 suspended pricing, F6 a price basis other than the bulletin default
-// (taxes in, transport out, no minimum quantity), F7 a row count that differs
-// from the chart legend.
+// (taxes in, transport out, no minimum quantity), and the chart legend against
+// the table: MORE legend labels than rows means a row was missed (B13, blocking);
+// FEWER is the bulletin's own truncated legend (F7, seen on July 2026 PDF pages
+// 76 to 79 and 86), a warning only.
 import { finding, type Finding } from '../findings';
 import type { PageV1 } from '../format';
 import { pageIdOf, type CheckContext } from './context';
@@ -20,8 +22,11 @@ export function checkPageNotes(context: CheckContext): Finding[] {
     if (basisDiffers(page)) {
       findings.push(finding('F6', `price basis differs from the default: "${page.basisNoteAr}"`, { page: pageId }));
     }
-    if (page.rows.length !== page.legendLabelsAr.length) {
-      findings.push(finding('F7', `${page.rows.length} rows but ${page.legendLabelsAr.length} chart legend labels`, { page: pageId }));
+    const [rows, labels] = [page.rows.length, page.legendLabelsAr.length];
+    if (labels > rows) {
+      findings.push(finding('B13', `the chart legend names ${labels} items but the table has ${rows} rows: a row was missed`, { page: pageId }));
+    } else if (labels < rows) {
+      findings.push(finding('F7', `${rows} rows but only ${labels} chart legend labels (the bulletin truncates some legends)`, { page: pageId }));
     }
   }
   for (const { row, pageId, months } of context.rows) {

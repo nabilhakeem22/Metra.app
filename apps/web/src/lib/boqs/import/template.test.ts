@@ -171,7 +171,7 @@ describe('the price-book template', () => {
     // Skipping must not become a way for real problems to disappear.
     const { grid } = decodeCsv(
       `${buildTemplateCsv({ items: [] , includeExample: false })}` +
-        ',,Walls,tonne,10,50,0,no,\r\n',
+        ',,Walls,barrel,10,50,0,no,\r\n',
     );
     const res = mapRows(grid, autoDetectMapping(grid.rows[0] as string[]));
     expect(res.skippedCount).toBe(0);

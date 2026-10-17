@@ -7,6 +7,7 @@ export * from './memberships';
 export * from './audit-log';
 export * from './files';
 export * from './invitations';
+export * from './market';
 export * from './sections';
 export * from './section-defaults';
 export * from './cost-items';

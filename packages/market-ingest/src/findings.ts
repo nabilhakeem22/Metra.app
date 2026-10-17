@@ -3,7 +3,7 @@
 import { byCodePoint } from './order';
 
 export const BLOCKING_CODES = [
-  'B0', 'B1', 'B2', 'B3', 'B4', 'B5', 'B6', 'B7', 'B8', 'B9', 'B10', 'B11', 'B12',
+  'B0', 'B1', 'B2', 'B3', 'B4', 'B5', 'B6', 'B7', 'B8', 'B9', 'B10', 'B11', 'B12', 'B13',
 ] as const;
 export const FLAG_CODES = [
   'F1', 'F2', 'F3', 'F4', 'F5', 'F6', 'F7', 'F8', 'F9', 'F10', 'F11',
@@ -28,13 +28,14 @@ export const FINDING_TITLES: Record<FindingCode, string> = {
   B10: 'Rule cited',
   B11: 'Source reuse',
   B12: 'Verbatim mismatch',
+  B13: 'Rows missing',
   F1: 'Jump',
   F2: 'Restatement',
   F3: 'Dropped item',
   F4: 'New item',
   F5: 'Suspended',
   F6: 'Basis differs',
-  F7: 'Row count',
+  F7: 'Short legend',
   F8: 'Yearly disagreement',
   F9: 'Average disagreement',
   F10: 'Inferred',

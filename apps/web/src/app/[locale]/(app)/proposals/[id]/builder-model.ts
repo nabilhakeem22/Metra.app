@@ -40,8 +40,6 @@ export interface SectionState {
   lines: LineState[];
 }
 
-export const UNITS = ['sqm', 'linear_meter', 'pcs', 'lump_sum', 'day'];
-
 export const INPUT_CLASS =
   'h-9 glass-field outline-none focus-ring-brand focus-visible:border-[color:hsl(var(--brand))] px-2';
 

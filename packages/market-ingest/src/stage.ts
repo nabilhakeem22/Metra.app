@@ -11,7 +11,8 @@ import { monthKey, type CheckContext } from './check/context';
 import { sourceLabelOf } from './normalize';
 import { byCodePoint } from './order';
 import { categoriesFor, topOf } from './taxonomy';
-import { marketUnitOf, type MarketUnit } from './units';
+import type { RollPack } from './roll-pack';
+import { marketUnitOf, type MarketUnit, type UnitReading } from './units';
 
 export const STAGED_FORMAT = 'metra.market-staged.v1';
 
@@ -31,6 +32,8 @@ export interface StagedItem {
   specAr: string | null;
   specEn: string | null;
   unit: MarketUnit;
+  /** A roll's pack size; null for every other unit. */
+  pack: RollPack | null;
   unitLabelAr: string;
   basisNoteAr: string | null;
   sourceLabel: string;
@@ -63,6 +66,7 @@ function stagedData(context: CheckContext): Pick<StagedBulletin, 'categories' | 
   const items: StagedItem[] = [];
   const observations: StagedObservation[] = [];
   for (const { row, page, itemKey, months } of context.rows) {
+    const reading = marketUnitOf(row.unitLabelAr) as UnitReading;
     items.push({
       key: itemKey,
       categoryKey: page.subCategoryKey,
@@ -70,7 +74,8 @@ function stagedData(context: CheckContext): Pick<StagedBulletin, 'categories' | 
       nameEn: row.nameEn,
       specAr: row.specAr,
       specEn: row.specEn,
-      unit: marketUnitOf(row.unitLabelAr) as MarketUnit,
+      unit: reading.unit,
+      pack: reading.pack,
       unitLabelAr: row.unitLabelAr,
       basisNoteAr: basisDiffers(page) ? page.basisNoteAr : null,
       sourceLabel: sourceLabelOf(row.labelAr, row.specAr),

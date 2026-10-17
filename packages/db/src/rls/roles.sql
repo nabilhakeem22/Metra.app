@@ -23,6 +23,13 @@ grant usage on schema public to metra_app;
 -- INSERT — no INSERT/UPDATE/DELETE grant, and the policy's WITH CHECK is false.
 grant select on public.accounts to metra_app;
 
+-- The market price book (0061): platform-level reference data, SELECT ONLY. The
+-- owner's `market:publish` CLI writes it as the connection role; no app path
+-- writes it, so metra_app gets no INSERT, UPDATE or DELETE. The visible rows
+-- are gated by rls/policies/60-market.sql (a member org context; published
+-- bulletins only). verify-rls-applied.ts reads these four back as SELECT-only.
+grant select on public.market_categories, public.market_items, public.market_bulletins, public.market_price_observations to metra_app;
+
 -- Full DML on business tables...
 grant select, insert, update, delete on public.organizations to metra_app;
 grant select, insert, update, delete on public.memberships   to metra_app;
