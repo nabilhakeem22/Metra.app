@@ -8,7 +8,9 @@
     ".": "./src/index.ts",
     "./schema": "./src/schema/index.ts",
     "./client": "./src/client.ts",
-    "./sqlstate": "./src/sqlstate.ts"
+    "./sqlstate": "./src/sqlstate.ts",
+    "./env": "./src/env.ts",
+    "./lock-timeout": "./src/scripts/lock-timeout.ts"
   },
   "scripts": {
     "generate": "drizzle-kit generate",

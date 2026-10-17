@@ -2,7 +2,10 @@
 // overrides, load the published history (none with --offline), run the check,
 // write check.json and staged.json. `market:check` and `market:review` share it,
 // so a review is always of exactly what was just checked.
-import { EMPTY_HISTORY } from '../check/context';
+import { EMPTY_HISTORY, type PublishedHistory } from '../check/context';
+import { HISTORY_VALIDATORS } from '../check/history';
+import { withDatabase } from '../db/connection';
+import { loadHistory } from '../history/load';
 import { runCheck, type CheckOutcome } from '../check/run';
 import { FINDING_TITLES, isBlocking } from '../findings';
 import { jsonBytes, periodPaths, readOptionalJson, readProducerFiles, sha256Hex, sha256OfFile, writeText } from '../staging';
@@ -17,6 +20,7 @@ export interface CheckRunOptions {
 
 export interface CheckRun {
   outcome: CheckOutcome;
+  history: PublishedHistory;
   stagedSha256: string;
   warnings: string[];
 }
@@ -26,16 +30,14 @@ export async function performCheck(options: CheckRunOptions): Promise<CheckRun> 
   const warnings: string[] = [];
   if (options.pdfPath === undefined) warnings.push('the PDF hash was not verified (pass --pdf <path>)');
   if (options.mdPath === undefined) warnings.push('the MD hash was not verified (pass --md <path>)');
-  if (!options.offline) {
-    throw new Error('the database-backed checks are not available yet; run with --offline');
-  }
+  const history = options.offline ? EMPTY_HISTORY : await withDatabase((sql) => loadHistory(sql, options.period));
   const outcome = runCheck({
     period: options.period,
     producerFiles: readProducerFiles(paths),
     mapping: readOptionalJson(paths.mapping, undefined),
     corrections: readOptionalJson(paths.corrections, undefined),
-    history: EMPTY_HISTORY,
-    historyValidators: [],
+    history,
+    historyValidators: options.offline ? [] : HISTORY_VALIDATORS,
     flagPct: flagPctFromEnv(),
     sourceHashes: {
       pdf: options.pdfPath === undefined ? null : sha256OfFile(options.pdfPath),
@@ -49,7 +51,7 @@ export async function performCheck(options: CheckRunOptions): Promise<CheckRun> 
   writeText(paths.check, jsonBytes({ format: 'metra.market-check.v1', period: options.period, offline: options.offline, counts, findings: outcome.findings }));
   const stagedBytes = jsonBytes(outcome.staged);
   writeText(paths.staged, stagedBytes);
-  return { outcome, stagedSha256: sha256Hex(stagedBytes), warnings };
+  return { outcome, history, stagedSha256: sha256Hex(stagedBytes), warnings };
 }
 
 export function blockingCount(run: CheckRun): number {

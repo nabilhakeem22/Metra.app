@@ -11,7 +11,7 @@ import {
 } from 'drizzle-orm/pg-core';
 import { bilingual, bilingualCheck, money } from './_helpers';
 import { costItemUnit } from './enums';
-import { marketItems } from './market';
+import { marketItems } from './market-items';
 import { organizations } from './organizations';
 import { orgScoped } from './org-scoped';
 import { sameOrgFk } from './org-ref';

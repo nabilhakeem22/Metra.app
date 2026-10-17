@@ -7,13 +7,15 @@
   "scripts": {
     "cli": "tsx src/cli.ts",
     "test": "vitest run --dir src",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test:db": "vitest run --config vitest.db.config.ts"
   },
   "dependencies": {
     "@metra/db": "*",
     "postgres": "^3.4.5"
   },
   "devDependencies": {
+    "dotenv": "^16.4.7",
     "tsx": "^4.19.2",
     "vitest": "^2.1.8"
   }

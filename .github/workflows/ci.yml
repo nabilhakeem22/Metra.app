@@ -94,6 +94,15 @@ jobs:
       - name: Unit tests (db)
         run: npm run test -w @metra/db
 
+      # The market price book's gate (packages/market-ingest): the bulletin
+      # format, its guard and every offline check. It is a THIRD tsconfig: no
+      # other step type-checks it (the OpenNext build covers apps/web only).
+      - name: Type check (market-ingest)
+        run: npx tsc --noEmit -p packages/market-ingest
+
+      - name: Unit tests (market-ingest)
+        run: npm run test -w @metra/market-ingest
+
       # The drizzle snapshot is what `generate` DIFFS AGAINST, and meta/ had gone
       # 35 snapshots behind the journal without anything saying so. This
       # regenerates into a fresh EMPTY temp directory and deep-compares against
@@ -164,6 +173,12 @@ jobs:
 
       - name: Action-core DB tests (seeded DB, fabricated OrgContext)
         run: npm run test:actions -w @metra/web
+
+      # market:check against the published history, market:catalogue,
+      # market:publish and market:withdraw, on the same migrated database. They
+      # write only `dbtest_` items and their own bulletins, and remove them.
+      - name: Market CLI DB tests (history checks, publish, withdraw)
+        run: npm run test:db -w @metra/market-ingest
 
       # Additive Cloudflare gate: proves the OpenNext (Workers) bundle still
       # builds. No deploy, no Cloudflare auth — build output only. Runs last so

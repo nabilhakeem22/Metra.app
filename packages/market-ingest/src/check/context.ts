@@ -3,6 +3,7 @@
 import { finding, type Finding } from '../findings';
 import type { MarketBulletinFileV1, Months, PageV1, RowV1 } from '../format';
 import type { Correction, Mapping } from '../overrides';
+import type { RollPack } from '../roll-pack';
 import type { MarketUnit } from '../units';
 
 export interface ResolvedRow {
@@ -21,6 +22,7 @@ export interface ResolvedRow {
 export interface PublishedItem {
   key: string;
   unit: MarketUnit;
+  pack: RollPack | null;
   status: 'active' | 'discontinued';
   sourceLabels: string[];
   /** True when a published bulletin carries an observation of it. */
@@ -36,9 +38,9 @@ export interface EffectivePoint {
 
 export interface PublishedHistory {
   items: Map<string, PublishedItem>;
-  /** itemKey -> 'YYYY-MM' -> the effective point. */
+  /** itemKey -> 'YYYY-MM' -> the effective point, from bulletins BEFORE the checked period. */
   effective: Map<string, Map<string, EffectivePoint>>;
-  /** Every published bulletin's period and source hashes. */
+  /** Every PUBLISHED bulletin's period and source hashes (all periods). */
   bulletins: Array<{ period: string; pdfSha256: string | null; mdSha256: string | null }>;
 }
 

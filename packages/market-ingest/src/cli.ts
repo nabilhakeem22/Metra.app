@@ -1,9 +1,17 @@
 // The market CLI: `npm run market:<command> -- ...` from the repo root.
 // Every failure prints `market:<command> FAILED: <reason>` and exits 1.
+import { catalogueCommand } from './commands/catalogue-command';
 import { checkCommand } from './commands/check-command';
+import { publishCommand } from './commands/publish-command';
+import { reviewCommand } from './commands/review-command';
+import { withdrawCommand } from './commands/withdraw-command';
 
 const COMMANDS: Record<string, (argv: string[]) => Promise<number>> = {
+  catalogue: catalogueCommand,
   check: checkCommand,
+  publish: publishCommand,
+  review: reviewCommand,
+  withdraw: withdrawCommand,
 };
 
 async function main(): Promise<number> {
