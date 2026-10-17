@@ -2317,7 +2317,9 @@ alter table public.organizations
 
 The market price book has ONE database step, and this is it: migration
 `0061_market_price_book.sql` plus one new policy file and one new grant under
-`rls/`. It is validated on branch `validate/market-price-book`.
+`rls/`. It is validated on branch `validate/market-price-book`, which also
+carries `validate/landing-screens` (cdbf99d): its `db:apply-rls` keeps that
+branch's `40-delivery-read.sql` fix.
 
 **THE ORDER (do not change it):**
 
@@ -2332,12 +2334,12 @@ Why this order, one sentence each:
   `market_item_id`, so new code on a database without 0061 fails every price
   book page with 42703.
 - **The current Worker is safe on the 0061 database:** 0061 only ADDS (a
-  nullable column, five enum labels, four new tables nobody reads yet), so
-  the code that serves today never meets anything it does not know. Stated
-  from the construction of the migration; main's own test suite was not
-  replayed against it.
-- **There is no rollback floor:** any Worker version may serve on the 0061
-  database (see *Rolling back*).
+  nullable column, five enum labels, five new tables nobody reads yet). A
+  tester ran main's own action tests on a 0061 database: 1062 of 1063 passed,
+  exactly as on a 0060 one (the one failure is a harness artefact of that
+  test machine, on both).
+- **The rollback floor arrives with the first new unit, not with 0061:** see
+  *Rolling back*.
 
 **What it changes.** No row is touched and nothing is backfilled.
 
@@ -2345,10 +2347,11 @@ Why this order, one sentence each:
 |---|---|
 | `cost_item_unit` | five labels appended: `kg`, `ton`, `liter`, `cbm`, `roll`. IRREVERSIBLE (Postgres cannot drop an enum label); harmless while unused |
 | five new enum types | `market_publisher`, `market_bulletin_status`, `market_unit`, `market_item_status`, `market_observation_status` |
-| four new tables | `market_categories`, `market_items`, `market_bulletins`, `market_price_observations`: platform-level (no `org_id`), empty until the first `market:publish` |
+| five new tables | `market_categories`, `market_items`, `market_bulletins`, `market_price_observations`, `market_item_details`: platform-level (no `org_id`), empty until the first `market:publish` |
+| CHECKs on the data | a price is above 0 and at most 10,000,000, and no month is after its bulletin's month (the observation carries its bulletin's month through a composite FK); each bulletin records the gate's git commit |
 | `cost_items.market_item_id` | new, nullable, every row NULL; FK to `market_items` (on delete restrict, added NOT VALID then validated) and the partial index `cost_items_org_market_item_idx` |
-| `rls/policies/60-market.sql` | the four tables: RLS enabled and forced, one SELECT policy `market_read` each (a member org context; published bulletins only) |
-| `rls/roles.sql` | `metra_app` gets SELECT on the four tables and nothing else |
+| `rls/policies/60-market.sql` | the five tables: RLS enabled and forced, one SELECT policy `market_read` each (a member org context; published bulletins only; an item only while a published bulletin prices it) |
+| `rls/roles.sql` | `metra_app` gets SELECT on the five tables and nothing else |
 
 **1. Put the market price book code in the production checkout.** Detach onto
 the branch. This step adds a workspace package (`packages/market-ingest`) and
@@ -2360,7 +2363,7 @@ cd C:\Users\HP\merta-main
 git fetch origin
 git switch --detach origin/validate/market-price-book
 git log --oneline -1    # a "docs(deploy): ..." commit (this runbook); CI green on it
-git diff --stat 5f82f0e HEAD    # MUST list only docs/DEPLOY.md: the code is exactly what was rehearsed (5f82f0e)
+git diff --stat 4ab2d5d HEAD    # MUST list only docs/DEPLOY.md: the code is exactly what was rehearsed (4ab2d5d)
 ```
 
 If the diff lists any other file, STOP and tell the lead.
@@ -2431,11 +2434,11 @@ same kind):
   then `message: 'function public.app_delivery_choose_concept_by_token(text,uuid,text,text,text,text) does not exist, skipping',`
   then `message: 'role "postgres" has already been granted membership in role "metra_app" by role "postgres"',`
   then `message: 'policy "self_memberships" for relation "public.memberships" does not exist, skipping',`
-  then FOUR new ones, once only (the first run creates the policies they
+  then FIVE new ones, once only (the first run creates the policies they
   drop): `message: 'policy "market_read" for relation "public.market_categories" does not exist, skipping',`
-  and the same for `public.market_items`, `public.market_bulletins` and
-  `public.market_price_observations`. A second `db:apply-rls` prints only the
-  first four.
+  and the same for `public.market_items`, `public.market_bulletins`,
+  `public.market_price_observations` and `public.market_item_details`. A
+  second `db:apply-rls` prints only the first four.
 
 Only a line that starts `Migration failed:` or `apply-rls failed:` is a
 failure. Expected:
@@ -2443,14 +2446,17 @@ failure. Expected:
 - `db:migrate` exits 0 and prints `Migrations applied.`. It does not print a
   count, so run step 4 (a): `migrations` is exactly one higher (62).
 - `db:apply-rls` exits 0 and ends with two lines. The first starts
-  `apply-rls: verified in the catalogues` and goes on `50 tables, 50 policies, 15 triggers, 44 functions, RLS forced on all of them, role metra_app present.`;
+  `apply-rls: verified in the catalogues` and goes on `51 tables, 51 policies, 15 triggers, 44 functions, RLS forced on all of them, role metra_app present.`;
   the second starts `apply-rls: grants verified` and goes on
-  `design_engagements update narrowed to 19 columns with no table-level update, and 9 narrowed table(s) (boqs, document_categories, engagement_document_comments, engagement_milestones, market_bulletins, market_categories, market_items, market_price_observations, workspace_entitlements) holding exactly what rls/roles.sql leaves them.`
-- `assert-schema-applied` exits 0 and prints
-  `assert-schema-applied: OK — 50 declared table(s), every column present.`,
-  then `indexes — 115 declared, all present.`, `constraints — 268 declared, all present.`
-  and `functions — 44 declared, all present.` (the last three are report
-  only and do not fail it).
+  `design_engagements update narrowed to 19 columns with no table-level update, and 10 narrowed table(s) (boqs, document_categories, engagement_document_comments, engagement_milestones, market_bulletins, market_categories, market_item_details, market_items, market_price_observations, workspace_entitlements) holding exactly what rls/roles.sql leaves them.`
+- `assert-schema-applied` exits 0 and prints six lines, in this order:
+  `assert-schema-applied: OK — 51 declared table(s), every column present.`,
+  then `indexes — 116 declared, all present.`, `constraints — 275 declared, all present.`,
+  `functions — 44 declared, all present.`,
+  `orphaned org rows — 44 org-scoped table(s) answered, none holds a row whose org_id names no organization.`
+  and `composite set-null FKs — 13 found (13 declared in src/schema/), every one narrowed to a single non-org_id column.`
+  (The middle four are report only and do not fail it. On an empty database
+  the orphaned-rows line says it read 0 rows from organizations instead.)
 
 **If a command fails, it prints the SQLSTATE and what to do,** on two lines:
 
@@ -2458,21 +2464,21 @@ failure. Expected:
   (or `SQLSTATE 40P01: deadlock detected`) then
   `Migration failed: lock wait or deadlock, safe to re-run at a quieter moment (the whole batch rolled back, nothing was changed).`
   A long query held `cost_items` for more than 3 s. Re-run `db:migrate` a
-  little later. The same two codes from `db:apply-rls` print `apply-rls
-  failed: ...` and end `(this file rolled back; the files before it stay
-  applied).`: re-run `db:apply-rls`.
+  little later (rehearsed by a tester: a 10 s reader gave exactly these lines,
+  everything rolled back, and the re-run applied 0061). The same two codes
+  from `db:apply-rls` print `apply-rls failed: ...` and end `(this file
+  rolled back; the files before it stay applied).`: re-run `db:apply-rls`.
 - `Migration failed: SQLSTATE P0001: 0061 needs PostgreSQL 12 or later ...`:
   the server is too old for this migration. Nothing changed; tell the lead.
 - Any other code ends `tell the lead before running anything else`.
 
-**Locks.** `db:migrate` runs 0061 as ONE transaction. The four new tables
+**Locks.** `db:migrate` runs 0061 as ONE transaction. The five new tables
 are created empty. On `cost_items` it takes ACCESS EXCLUSIVE for the new
 column (metadata only), the NOT VALID foreign key, the validation (every row
 is NULL, so it checks nothing) and one index build, all held until the commit.
-Price book and proposal builder pages opened in that window wait; none fails.
-At pilot size this is well under the migrator's 3 s `lock_timeout`; that is an
-estimate, not a production measurement. `db:apply-rls` adds one policy file
-with four tables, the 4 x 3 s = 12 s worst case of the rule above.
+A tester measured about 357 ms at 1,000,000 cost items (linear, so a few ms at
+pilot size), and 0 app errors under load. `db:apply-rls` adds one policy file
+with five tables, the 5 x 3 s = 15 s worst case of the rule above.
 
 **4. Read-only, after: expected results.** Again each block ON ITS OWN.
 
@@ -2486,9 +2492,9 @@ from drizzle.__drizzle_migrations;
 
 (b) Step 2 (b) again, as its own block. Now `cost_item_units` is
 `sqm,linear_meter,pcs,lump_sum,day,kg,ton,liter,cbm,roll`, `market_relations`
-16, `market_types` 9 and `link_column` 1 (`server_ok` still true).
+21, `market_types` 10 and `link_column` 1 (`server_ok` still true).
 
-(c) 4 rows, one per market table, every one with `rls` true, `forced` true,
+(c) 5 rows, one per market table, every one with `rls` true, `forced` true,
 `policies` 1, `app_select` true, `app_writes` false and `api_roles_read`
 false.
 
@@ -2503,7 +2509,7 @@ select c.relname, c.relrowsecurity as rls, c.relforcerowsecurity as forced,
        has_table_privilege('anon', c.oid, 'select') or has_table_privilege('authenticated', c.oid, 'select') as api_roles_read
 from pg_class c join pg_namespace n on n.oid = c.relnamespace
 where n.nspname = 'public'
-  and c.relname in ('market_categories', 'market_items', 'market_bulletins', 'market_price_observations')
+  and c.relname in ('market_categories', 'market_items', 'market_bulletins', 'market_price_observations', 'market_item_details')
 order by 1;
 ```
 
@@ -2523,8 +2529,9 @@ select count(*) as cost_items, count(market_item_id) as linked from cost_items;
 3. Smoke test on your own studio, with the log open (from
    `C:\Users\HP\merta-main\apps\web`: `npx wrangler tail metra-web`): open the
    price book, open "New item" and check the unit list now ends with kg, ton,
-   liter, m³ and roll, then cancel. Expected: the page loads, and the log shows
-   no `42703` and no `42501`.
+   liter, m³ and roll, then cancel without saving (see *Rolling back*: the
+   first saved item in a new unit sets a floor). Expected: the page loads, and
+   the log shows no `42703` and no `42501`.
 4. Put the production checkout back on main:
 
 ```powershell
@@ -2538,7 +2545,8 @@ git switch --detach origin/main
 **(1) The code** (a price book page fails after the deploy): from
 `C:\Users\HP\merta-main\apps\web`, `npx wrangler rollback <version-id>` with
 the version that served before the merge (`npx wrangler deployments list`).
-Leave the database alone: the older Worker runs on it (see THE ORDER).
+Leave the database alone: the older Worker runs on it (see THE ORDER). Once a
+studio has saved an item in a new unit, read *Rolling back* first.
 
 **(2) The schema, only if the market price book is abandoned.** Roll the code
 back FIRST (1): a Worker with this code reads `cost_items.market_item_id` and
@@ -2557,7 +2565,7 @@ begin;
 drop index if exists public.cost_items_org_market_item_idx;
 alter table public.cost_items drop constraint if exists cost_items_market_item_id_market_items_id_fk;
 alter table public.cost_items drop column if exists market_item_id;
-drop table if exists public.market_price_observations, public.market_bulletins, public.market_items, public.market_categories;
+drop table if exists public.market_item_details, public.market_price_observations, public.market_bulletins, public.market_items, public.market_categories;
 drop type if exists public.market_observation_status, public.market_item_status, public.market_unit, public.market_bulletin_status, public.market_publisher;
 commit;
 ```
@@ -2565,67 +2573,108 @@ commit;
 ## Monthly market bulletin
 
 Once 0061 is applied and the branch is merged, every month's ministry
-bulletin goes through the same five steps. The data is read by a Claude Code
-session; the repo's `market:*` commands are the gate. Nothing here calls an
-API or needs a key. All commands run from `C:\Users\HP\merta-main` on an
-up-to-date `main`; `market:catalogue`, `market:check` (without `--offline`),
-`market:publish` and `market:withdraw` use its `.env` (the production
-database). The working files go to `.market-staging\<YYYY-MM>\` (gitignored).
+bulletin goes through the same steps. A Claude Code session reads the data;
+the repo's `market:*` commands are the gate; you approve. Nothing here calls
+an API or needs a key.
+
+**Two places, kept apart on purpose.** The bulletin is third-party content,
+and a session that reads it must never hold a database credential.
+
+- **The extraction checkout** `C:\Users\HP\metra-bulletins`: a plain clone
+  with NO `.env`. Create it once: `git clone https://github.com/nabilhakeem22/Metra.app C:\Users\HP\metra-bulletins`,
+  then `cd C:\Users\HP\metra-bulletins` and `npm ci`. Each month,
+  `git fetch origin` and `git switch --detach origin/main` there first. The
+  session runs ONLY here, and only `market:check --offline`.
+- **The production checkout** `C:\Users\HP\merta-main`, where you run the
+  database steps. The `market:*` commands read ONLY `MARKET_DATABASE_URL`
+  (never `DATABASE_URL` or the `.env`), so in the PowerShell window you use
+  for them, set it by hand from the `.env`'s `DATABASE_URL` line:
+  `$env:MARKET_DATABASE_URL = '<the DATABASE_URL value>'`. It lives only as
+  long as that window. Never set it in the session's shell.
+- **One staging folder both use:** `C:\Users\HP\market-staging`. In every
+  window: `$env:MARKET_STAGING_DIR = 'C:\Users\HP\market-staging'`.
 
 **1. Put the files in one place**, e.g.
 `C:\Users\HP\market-bulletins\2026-07\bulletin-2026-07.pdf` and, if you have
 it, the MD conversion beside it.
 
-**2. Start a Claude Code session in `C:\Users\HP\merta-main` and paste,
+**2. Write the catalogue** (production checkout, with `MARKET_DATABASE_URL`
+set): `npm run market:catalogue`. It writes
+`C:\Users\HP\market-staging\catalogue.json`, the published keys the session
+reuses.
+
+**3. Start a Claude Code session in `C:\Users\HP\metra-bulletins` and paste,
 with your paths and period:**
 
 ```text
 Read docs/market-price-book/EXTRACTION.md, then extract
 C:\Users\HP\market-bulletins\2026-07\bulletin-2026-07.pdf
 (and C:\Users\HP\market-bulletins\2026-07\bulletin-2026-07.md) for period 2026-07.
-Run npm run market:catalogue first and reuse its keys. Write part files under
-.market-staging/2026-07/parts, run npm run market:check -- --period 2026-07
---pdf <the PDF> --md <the MD>, fix what you can, and hand me the confirm list.
-Never run market:publish.
+The staging folder is C:\Users\HP\market-staging (set MARKET_STAGING_DIR to it);
+its catalogue.json holds the keys to reuse. Write part files under
+C:\Users\HP\market-staging\2026-07\parts, run npm run market:check -- --period 2026-07
+--offline --pdf <the PDF> --md <the MD>, fix what you can, and hand me the confirm list.
+You have no database access and need none. Never edit anything under packages/, and
+never run market:publish.
 ```
 
-**3. Clear the confirm list.** For each row the session lists, open the PDF
-page it names and record the answer in `.market-staging\<YYYY-MM>\`:
+**4. Clear the confirm list.** For each row the session lists, open the PDF
+page it names and record the answer in `C:\Users\HP\market-staging\2026-07\`:
 `corrections.json` for a value (`[{ "rowId": "p11.r1", "month": 7, "value":
 "30.455", "reason": "PDF page 11" }]`; `"value": null` for a cell the page
-shows empty) and `mapping.json` to `map` a row to an existing key, `skip` it,
-or `discontinue` an old key. Then run the check again until it prints
-`market:check passed: nothing blocks`.
+shows empty) and `mapping.json` to `map` a row to an existing key, `skip` it
+(with a reason; review.html lists every skipped row), or `discontinue` an old
+key.
 
-**4. Review.**
+**5. Review** (production checkout, `MARKET_DATABASE_URL` set). Always online
+and always with the source files: publish accepts nothing else.
 
 ```powershell
-npm run market:review -- --period 2026-07 --pdf C:\Users\HP\market-bulletins\2026-07\bulletin-2026-07.pdf
+npm run market:review -- --period 2026-07 --pdf C:\Users\HP\market-bulletins\2026-07\bulletin-2026-07.pdf --md C:\Users\HP\market-bulletins\2026-07\bulletin-2026-07.md
 ```
 
-Open `.market-staging\2026-07\review.html` and read it top to bottom: the
-Blocking section must be empty; the flags, the per-category diff and the new
+It refuses to run if the gate code (`packages/market-ingest`, `packages/db/src`)
+differs from the checked-out commit. Open
+`C:\Users\HP\market-staging\2026-07\review.html` and read it top to bottom:
+the header must say "Nothing blocks" and name the gate commit; the flags, the
+skipped rows, the per-category diff, the item details that change and the new
 items are yours to judge. The command prints `extraction_sha256 = <64
 characters>`: that hash is what you approve.
 
-**5. Publish**, with that hash:
+**6. Publish**, with that hash and the same source files:
 
 ```powershell
-npm run market:publish -- --period 2026-07 --approve <extraction_sha256> --reviewer "Nabil Hakeem"
+npm run market:publish -- --period 2026-07 --approve <extraction_sha256> --reviewer "Nabil Hakeem" --pdf C:\Users\HP\market-bulletins\2026-07\bulletin-2026-07.pdf --md C:\Users\HP\market-bulletins\2026-07\bulletin-2026-07.md
 ```
 
-It refuses (exit 1, `market:publish FAILED: ...`, nothing written) if
-`staged.json` changed since the review, if anything blocks, or if 2026-07 is
-already published (add `--replace` to withdraw that one in the same
-transaction). On success it prints the bulletin id and the counts. Then
-archive `.market-staging\2026-07\` with the PDF.
+Publish re-runs the gate inside its transaction and writes only what it
+computes, so a `staged.json` edited after the review is never published. It
+refuses (exit 1, `market:publish FAILED: ...`, nothing written) if the files,
+the overrides, the published history or the gate changed since the review,
+if the review ran `--offline`, if anything blocks, or if 2026-07 is already
+published (add `--replace` to withdraw that one in the same transaction; the
+corrected names then replace the old ones). On success it prints the bulletin
+id, the counts and the gate commit. Rehearsed on July 2026 (456 rows, the four
+p97 rows skipped by the owner): 63 categories, 456 items, 3181 observations,
+about 2.6 s locally. Then archive `C:\Users\HP\market-staging\2026-07\` with
+the PDF.
 
-**Withdraw** a published bulletin (its months fall back to the previous
-bulletin at once, no deploy):
+**Withdraw** a published bulletin (production checkout, `MARKET_DATABASE_URL`
+set). Its months fall back to the previous bulletin at once, with no deploy;
+the items it discontinued are active again, and the names it printed revert
+to the previous bulletin's:
 
 ```powershell
 npm run market:withdraw -- --period 2026-07 --reason "wrong file"
 ```
+
+**If a publish or a withdraw says `SQLSTATE 55P03`,** another session holds
+the market locks for more than 3 s. The message lists each holder's pid and
+how long its transaction has been open. One open for minutes is a publish
+left behind by a dropped connection: end it in the SQL editor with
+`select pg_terminate_backend(<pid>);` and run the command again. A publish
+or withdraw transaction can never stay open longer than 300 s (the
+`transaction_timeout` it sets), or 60 s idle.
 
 ## Rolling back
 
@@ -2689,9 +2738,27 @@ id. An older version answers 42883 on every review act on the client page.
 Leave the database alone, and never run `db:apply-rls` from a tree older than
 `validate/round-e-db`: it would re-create the six-argument function.
 
-**The market price book (0061) specifically:** no floor. Every Worker
-version runs on the 0061 database (it only adds), so roll back the Worker and
-leave the database alone. Withdrawing market data is not a rollback:
+**The market price book (0061) specifically: a floor that arrives with the
+first new unit.** The 0061 database itself sets none: every Worker version
+runs on it (it only adds), so roll back the Worker and leave the database
+alone. But the code before this merge knows only five units. Once any studio
+has SAVED a cost item, a BOQ, proposal, contract or variation line in kg,
+ton, liter, cbm or roll, a Worker rolled back below the market price book
+deploy cannot save that row again (its validation refuses the unit) and shows
+the unit's code instead of its name. From that first save on, a rollback below
+this deploy leaves those rows read-only and unlabelled: treat that deploy as
+the floor. Before the first such save, any version may serve. Check, read-only:
+
+```sql
+-- Rows in the five units the code before the market price book does not know.
+select (select count(*) from cost_items where unit::text in ('kg','ton','liter','cbm','roll'))
+     + (select count(*) from boq_lines where unit::text in ('kg','ton','liter','cbm','roll'))
+     + (select count(*) from proposal_lines where unit::text in ('kg','ton','liter','cbm','roll'))
+     + (select count(*) from contract_lines where unit::text in ('kg','ton','liter','cbm','roll'))
+     + (select count(*) from variation_order_lines where unit::text in ('kg','ton','liter','cbm','roll')) as rows_in_new_units;
+```
+
+0 means the floor is not set yet. Withdrawing market data is not a rollback:
 `market:withdraw` (*Monthly market bulletin*) takes effect at once, with no
 deploy.
 
