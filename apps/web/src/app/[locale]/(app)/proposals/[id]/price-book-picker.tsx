@@ -2,19 +2,24 @@
 
 import { Search } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { cn } from '@/lib/utils';
+import { formatNumber } from '@/lib/format/number';
 import type { CostItemOption } from './builder-model';
 import { pickerList } from './price-book-picker-model';
+import { PriceBookPickerOption } from './price-book-picker-option';
 import type { SectionOption } from './section-combobox';
+
+const optionIdOf = (listId: string, index: number) => `${listId}-option-${index}`;
 
 /**
  * "From price book": a light searchable list (no new dependency, like
  * SectionCombobox). Items read by NAME in the page's language, the code beside
- * it; grouped by price-book section; type to narrow by name or code; arrows
- * and Enter pick, Escape closes. Lists at most PICKER_LIMIT rows at a time.
+ * it; grouped by price-book section; type to narrow by name or code (every
+ * word, any order). Keyboard: the input keeps focus and names the active
+ * option (aria-activedescendant), which scrolls into view; Enter picks; Escape
+ * closes and returns focus to the button.
  */
 export function PriceBookPicker({
   costItems,
@@ -31,9 +36,10 @@ export function PriceBookPicker({
   const [query, setQuery] = useState('');
   const [active, setActive] = useState(0);
   const rootRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const listId = useId();
   const list = useMemo(() => pickerList(costItems, sections, locale, query), [costItems, sections, locale, query]);
   const flat = useMemo(() => list.groups.flatMap((group) => group.entries), [list]);
-  const listId = useMemo(() => `pb-pick-${Math.random().toString(36).slice(2, 8)}`, []);
 
   useEffect(() => {
     if (!open) return;
@@ -44,10 +50,19 @@ export function PriceBookPicker({
     return () => document.removeEventListener('pointerdown', onDown);
   }, [open]);
 
+  useEffect(() => {
+    if (open) document.getElementById(optionIdOf(listId, active))?.scrollIntoView?.({ block: 'nearest' });
+  }, [open, active, listId]);
+
+  function close() {
+    setOpen(false);
+    triggerRef.current?.focus();
+  }
+
   function pick(item: CostItemOption) {
     onPick(item);
-    setOpen(false);
     setQuery('');
+    close();
   }
 
   function onKeyDown(e: React.KeyboardEvent) {
@@ -61,14 +76,25 @@ export function PriceBookPicker({
       e.preventDefault();
       if (flat[active]) pick(flat[active].item);
     } else if (e.key === 'Escape') {
-      setOpen(false);
+      e.preventDefault();
+      close();
     }
   }
 
   let position = -1;
   return (
     <div ref={rootRef} className="relative">
-      <Button variant="secondary" size="sm" aria-expanded={open} aria-controls={listId} onClick={() => setOpen((was) => !was)}>
+      <Button
+        ref={triggerRef}
+        variant="secondary"
+        size="sm"
+        aria-expanded={open}
+        aria-controls={listId}
+        onClick={() => {
+          setActive(0);
+          setOpen((was) => !was);
+        }}
+      >
         <Search className="size-4" aria-hidden />
         {t('fromPriceBook')}
       </Button>
@@ -80,6 +106,7 @@ export function PriceBookPicker({
             aria-expanded
             aria-controls={listId}
             aria-autocomplete="list"
+            aria-activedescendant={flat[active] ? optionIdOf(listId, active) : undefined}
             aria-label={t('priceBookSearch')}
             placeholder={t('priceBookSearch')}
             value={query}
@@ -98,23 +125,15 @@ export function PriceBookPicker({
                     position += 1;
                     const index = position;
                     return (
-                      <li key={entry.item.id} role="option" aria-selected={index === active}>
-                        <button
-                          type="button"
-                          className={cn(
-                            'flex w-full items-baseline justify-between gap-3 px-2 py-1.5 text-start',
-                            index === active ? 'bg-muted text-foreground' : 'text-popover-foreground',
-                          )}
-                          onPointerDown={(e) => {
-                            e.preventDefault();
-                            pick(entry.item);
-                          }}
-                          onMouseEnter={() => setActive(index)}
-                        >
-                          <span>{entry.name}</span>
-                          <span className="shrink-0 text-caption text-muted-foreground" dir="ltr">{entry.item.code}</span>
-                        </button>
-                      </li>
+                      <PriceBookPickerOption
+                        key={entry.item.id}
+                        id={optionIdOf(listId, index)}
+                        name={entry.name}
+                        code={entry.item.code}
+                        active={index === active}
+                        onPick={() => pick(entry.item)}
+                        onHover={() => setActive(index)}
+                      />
                     );
                   })}
                 </ul>
@@ -122,7 +141,11 @@ export function PriceBookPicker({
             ))}
           </ul>
           {list.matched === 0 && <p className="px-2 py-2 text-caption text-muted-foreground">{t('priceBookNothing')}</p>}
-          {list.hidden > 0 && <p className="px-2 pt-2 text-caption text-muted-foreground">{t('priceBookMore', { count: list.hidden })}</p>}
+          {list.hidden > 0 && (
+            <p className="px-2 pt-2 text-caption text-muted-foreground">
+              {t('priceBookMore', { count: list.hidden, shown: formatNumber(list.hidden, locale) })}
+            </p>
+          )}
         </div>
       )}
     </div>

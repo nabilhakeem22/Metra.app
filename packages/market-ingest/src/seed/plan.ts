@@ -6,18 +6,22 @@ import type { CostItemUnit } from '@metra/db/schema';
 import { studioUnitFor } from '@metra/db/market-units';
 import { comparisonForm } from './compare';
 import { atPriceBookScale, withFivePercentMargin } from './margin';
-import { ITEM_CODE_PREFIX, itemCode, seedNames, type SeedNames } from './naming';
+import { ITEM_CODE_PREFIX, itemCode, printedNames, seedNames, type SeedNames } from './naming';
 import { SectionPlanner } from './sections';
 import { SKIP_REASONS, type ItemToCreate, type MarketSeedItem, type SeedPlan, type SkipReason, type StudioBook } from './types';
 
-/** Why an item is not created, or null. Names clash only with the studio's OWN items. */
+/**
+ * Why an item is not created, or null. Names clash only with the studio's OWN
+ * items, read as the seed names it AND as the bulletin prints it.
+ */
 function skipReason(item: MarketSeedItem, book: StudioBook, linked: Set<string>, code: string, names: SeedNames, ownNames: Set<string>): SkipReason | null {
+  const candidates = [names.nameAr, names.nameEn, ...printedNames(item)].map(comparisonForm);
   if (linked.has(item.id)) return 'already_linked';
   if (item.status !== 'active') return 'discontinued';
   if (studioUnitFor(item.unit) === null) return 'unit_unsupported';
   if (item.latestPrice === null) return 'no_price';
   if (book.items.some((existing) => existing.code === code)) return 'code_clash';
-  return ownNames.has(comparisonForm(names.nameAr)) || ownNames.has(comparisonForm(names.nameEn)) ? 'name_clash' : null;
+  return candidates.some((form) => ownNames.has(form)) ? 'name_clash' : null;
 }
 
 /**

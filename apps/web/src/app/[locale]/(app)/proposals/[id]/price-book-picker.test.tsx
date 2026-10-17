@@ -19,7 +19,8 @@ function option(id: string, overrides: Partial<CostItemOption> = {}): CostItemOp
 
 const OWN = option('own', { code: 'SEED-A-001', sectionId: 'civil', nameEn: 'Wardrobe', nameAr: 'دولاب' });
 const SEEDED = Array.from({ length: 450 }, (_, index) => option(`s${String(index).padStart(3, '0')}`));
-const BOOK = [...SEEDED, OWN, option('pp', { nameAr: 'مواسير بولى بروبلين', nameEn: 'PP pipe' }), option('lost', { sectionId: 'gone', nameEn: 'Orphan', nameAr: 'يتيم' })];
+const WIRE = option('wire', { nameAr: 'أسلاك نحاس معزول 2 مم', nameEn: 'Insulated copper wire 2 mm' });
+const BOOK = [...SEEDED, OWN, WIRE, option('pp', { nameAr: 'مواسير بولى بروبلين', nameEn: 'PP pipe' }), option('lost', { sectionId: 'gone', nameEn: 'Orphan', nameAr: 'يتيم' })];
 
 describe('pickerList', () => {
   it('groups by section, sections and items ordered by name, items without a known section last', () => {
@@ -71,5 +72,20 @@ describe('PriceBookPicker', () => {
     fireEvent.change(screen.getByRole('combobox'), { target: { value: 'zzzz' } });
     expect(screen.queryAllByRole('option')).toHaveLength(0);
     expect(screen.getByText(messageAt('en', 'proposals.builder.priceBookNothing'))).toBeTruthy();
+  });
+
+  it('finds an item typed with Arabic-Indic digits and the words in another order (P1)', () => {
+    open('ar-EG');
+    for (const typed of ['نحاس معزول ٢ مم', 'نحاس ۲', 'معزول أسلاك']) {
+      fireEvent.change(screen.getByRole('combobox'), { target: { value: typed } });
+      expect(screen.getAllByRole('option').map((row) => row.textContent)).toEqual([`${WIRE.nameAr}${WIRE.code}`]);
+    }
+  });
+
+  it('counts the rows it does not show in Latin digits, in Arabic too (Digits)', () => {
+    open('ar-EG');
+    const hidden = String(BOOK.length - PICKER_LIMIT);
+    const more = screen.getByText((text, element) => element?.tagName === 'P' && text.includes(hidden));
+    expect(more.textContent).not.toMatch(/[٠-٩۰-۹]/);
   });
 });

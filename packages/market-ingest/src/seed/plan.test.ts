@@ -161,3 +161,29 @@ describe('seeded names', () => {
   });
 });
 
+describe('a studio item typed as the bulletin prints it (R1)', () => {
+  const own = (nameAr: string): StudioBook => ({ sections: [], items: [{ code: 'OWN', nameAr, nameEn: null, marketItemId: null }] });
+
+  it('clashes with the spaced hyphen the seed rewrites', () => {
+    const board = item({ nameAr: 'بلاطات جبسية', specAr: '60*60 - 9.5 ملى (جيبورد)', nameEn: 'Gypsum ceiling tile', specEn: '60x60, 9.5 mm' });
+    expect(planSeed([board], own('بلاطات جبسية 60*60 - 9.5 ملى (جيبورد)')).skipped.name_clash).toBe(1);
+    const ppr = item({ nameAr: 'مواسير بولي بروبلين أخضر عادي 20 بار', specAr: '1/2" - 20 مم سمك 3.4 مم', nameEn: 'PPR pipe', specEn: '1/2 in' });
+    expect(planSeed([ppr], own('مواسير بولي بروبلين أخضر عادي 20 بار 1/2" - 20 مم سمك 3.4 مم')).skipped.name_clash).toBe(1);
+  });
+
+  it('clashes with both clay twins when the studio has the bare printed name', () => {
+    const twin = item({ id: 'standard', key: 'pipes.drainage_clay_standard.bend_150mm', nameAr: 'كوع فخار', specAr: '150 مم', nameEn: 'Clay bend', specEn: '150 mm', unit: 'pcs', leafKey: 'pipes.drainage_clay_standard', leafNameAr: 'مواسير صرف فخار عادية', leafNameEn: 'Standard clay drainage pipes' });
+    const flexible = { ...twin, id: 'flexible', key: 'pipes.drainage_clay_flexible.bend_150mm', nameEn: 'Clay bend, flexible joint', leafKey: 'pipes.drainage_clay_flexible', leafNameAr: 'مواسير صرف فخار بوصلات مرنة', leafNameEn: 'Flexible-joint clay drainage pipes' };
+    const plan = planSeed([twin, flexible], own('كوع فخار 150 مم'));
+    expect(plan.skipped.name_clash).toBe(2);
+    expect(plan.itemsToCreate).toEqual([]);
+  });
+
+  it('still clashes with the seeded spelling, and a roll typed without its pack', () => {
+    const board = item({ nameAr: 'بلاطات جبسية', specAr: '60*60 - 9.5 ملى', nameEn: 'Board', specEn: null });
+    expect(planSeed([board], own('بلاطات جبسية 60*60، 9.5 ملى')).skipped.name_clash).toBe(1);
+    const wire = item({ nameAr: 'أسلاك نحاس معزول', specAr: '2 مم', unit: 'roll', pack: { lengthM: 100, pieces: null, pieceLengthM: null } });
+    expect(planSeed([wire], own('أسلاك نحاس معزول 2 مم')).skipped.name_clash).toBe(1);
+  });
+});
+

@@ -53,20 +53,34 @@ function specBeyondName(name: string, spec: string | null): string | null {
 }
 
 /**
- * Name, spec, then a roll's pack unless the text already says roll. Arabic
- * " - " separators copied from the bulletin become «، » (the no-dash rule); a
- * hyphen inside a spec (a range such as «4مم-6مم» or «600-700») stays.
+ * The seeded names: the printed names with Arabic " - " separators copied from
+ * the bulletin as «، » (the no-dash rule); a hyphen inside a spec (a range such
+ * as «4مم-6مم» or «600-700») stays.
  */
 function baseNames(item: NamedItem): SeedNames {
+  const printed = printedWithPack(item);
+  return { nameAr: printed.nameAr.replace(/\s+-\s+/g, '، '), nameEn: printed.nameEn };
+}
+
+/** Name, spec (without what the name already says), then a roll's pack unless the text already says roll: no rewrite. */
+function printedWithPack(item: NamedItem): SeedNames {
   const pack = item.pack === null ? null : packWords(item.pack);
   const ar = [item.nameAr, item.specAr].filter(Boolean).join(' ');
   const en = [item.nameEn, specBeyondName(item.nameEn, item.specEn)].filter(Boolean).join(' ');
   const arPack = pack !== null && !comparisonForm(ar).includes('لفه') ? pack.ar : null;
   const enPack = pack !== null && !/\broll\b/i.test(en) ? pack.en : null;
-  return {
-    nameAr: [ar, arPack].filter(Boolean).join(' ').replace(/\s+-\s+/g, '، '),
-    nameEn: [en, enPack].filter(Boolean).join(' '),
-  };
+  return { nameAr: [ar, arPack].filter(Boolean).join(' '), nameEn: [en, enPack].filter(Boolean).join(' ') };
+}
+
+/**
+ * The ways a studio may already have typed this item, as the bulletin prints
+ * it: name and spec, with and without the pack, BEFORE the " - " rewrite and
+ * the sub-category suffix. A studio item read as any of them is a name clash.
+ */
+export function printedNames(item: NamedItem): string[] {
+  const withPack = printedWithPack(item);
+  const bare = [[item.nameAr, item.specAr], [item.nameEn, item.specEn]].map((parts) => parts.filter(Boolean).join(' '));
+  return [withPack.nameAr, withPack.nameEn, ...bare];
 }
 
 /** Make each language's names unique: a name two items share gets each item's sub-category. */

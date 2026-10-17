@@ -161,5 +161,16 @@ describe('a book of hundreds of items (the market seed)', () => {
     expect(ids(filterCostItems(items, { ...ALL, query: 'مرنه' }))).toEqual(['p']);
     expect(ids(filterCostItems(items, { ...ALL, query: 'mkt-x' }))).toEqual(['p']);
   });
+
+  test('Arabic-Indic digits find Latin ones, and the words may come in any order (P1)', () => {
+    const items = [
+      item({ id: 'w', code: 'MKT-w', nameAr: 'أسلاك نحاس معزول 2 مم', nameEn: 'Insulated copper wire 2 mm' }),
+      item({ id: 'v', code: 'MKT-v', nameAr: 'أسلاك نحاس معزول 6 مم', nameEn: 'Insulated copper wire 6 mm' }),
+    ];
+    expect(ids(filterCostItems(items, { ...ALL, query: 'نحاس معزول ٢ مم' }))).toEqual(['w']);
+    expect(ids(filterCostItems(items, { ...ALL, query: 'نحاس ۲' }))).toEqual(['w']);
+    expect(ids(filterCostItems(items, { ...ALL, query: 'معزول نحاس' }))).toEqual(['w', 'v']);
+    expect(ids(filterCostItems(items, { ...ALL, query: 'wire copper 6' }))).toEqual(['v']);
+  });
 });
 

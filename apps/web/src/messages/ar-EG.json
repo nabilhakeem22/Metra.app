@@ -1340,7 +1340,7 @@
       "priceBookSearch": "دوّر بالاسم أو الكود",
       "priceBookOther": "بنود تانية",
       "priceBookNothing": "مفيش بند في دليل الأسعار مطابق",
-      "priceBookMore": "{count, plural, zero {مفيش بنود تانية} one {فيه بند كمان} two {فيه بندين كمان} few {فيه # بنود كمان} many {فيه # بند كمان} other {فيه # بند كمان}}، اكتب عشان تضيّق القايمة",
+      "priceBookMore": "{count, plural, zero {مفيش بنود تانية} one {فيه بند كمان} two {فيه بندين كمان} few {فيه {shown} بنود كمان} many {فيه {shown} بند كمان} other {فيه {shown} بند كمان}}، اكتب عشان تضيّق القايمة",
       "description": "الوصف",
       "qty": "الكمية",
       "unit": "الوحدة",

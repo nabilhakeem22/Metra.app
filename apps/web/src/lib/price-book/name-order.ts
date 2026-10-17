@@ -8,7 +8,8 @@ const TASHKEEL_TATWEEL_FORMAT = /\p{Mn}|\p{Cf}|\u0640/gu;
 /**
  * The form a search compares: lower case, every whitespace run (NBSP too) as
  * one space, and the Arabic spellings a studio types interchangeably folded
- * together: أ/إ/آ as ا, ة as ه, ى and Persian ی as ي, Persian ک as ك, without
+ * together: أ/إ/آ as ا, ة as ه, ى and Persian ی as ي, Persian ک as ك, the
+ * Arabic-Indic digits an Arabic phone keyboard types (٠-٩, ۰-۹) as 0-9, without
  * tashkeel, tatweel or invisible marks.
  */
 export function searchForm(text: string | null | undefined): string {
@@ -19,9 +20,19 @@ export function searchForm(text: string | null | undefined): string {
     .replace(/ة/g, 'ه')
     .replace(/[ىی]/g, 'ي')
     .replace(/ک/g, 'ك')
+    .replace(/[٠-٩]/g, (digit) => String(digit.charCodeAt(0) - 0x0660))
+    .replace(/[۰-۹]/g, (digit) => String(digit.charCodeAt(0) - 0x06f0))
     .replace(/\s+/g, ' ')
     .trim()
     .toLowerCase();
+}
+
+/**
+ * Whether `haystack` holds every word of `needle`, in any order («نحاس أسلاك»
+ * finds «أسلاك نحاس معزول»). Both already in searchForm; an empty needle matches.
+ */
+export function hasEveryWord(haystack: string, needle: string): boolean {
+  return needle.split(' ').every((word) => word === '' || haystack.includes(word));
 }
 
 /** A row's name in the page's language, the other language when that one is empty. */

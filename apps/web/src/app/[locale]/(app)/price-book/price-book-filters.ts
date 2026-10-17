@@ -1,4 +1,4 @@
-import { byName, searchForm } from '@/lib/price-book/name-order';
+import { byName, hasEveryWord, searchForm } from '@/lib/price-book/name-order';
 import type { PriceBookItem, SectionOption } from './types';
 
 // WHICH COST ITEMS THE PRICE BOOK SHOWS, and how they are grouped. PURE and
@@ -20,10 +20,10 @@ export interface PriceBookGroup {
   rows: PriceBookItem[];
 }
 
-/** Search by CODE and by name, in either language, Arabic spellings folded (name-order.ts). */
+/** Search by CODE and by name, in either language, every typed word in any order, Arabic folded (name-order.ts). */
 function matchesQuery(item: PriceBookItem, needle: string): boolean {
   if (needle === '') return true;
-  return searchForm(`${item.code} ${item.nameEn ?? ''} ${item.nameAr ?? ''}`).includes(needle);
+  return hasEveryWord(searchForm(`${item.code} ${item.nameEn ?? ''} ${item.nameAr ?? ''}`), needle);
 }
 
 export function filterCostItems(

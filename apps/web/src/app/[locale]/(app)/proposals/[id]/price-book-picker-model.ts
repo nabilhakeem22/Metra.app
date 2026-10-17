@@ -3,7 +3,7 @@
 // page's language, filtered by what is typed (name in either language, or
 // code). Pure and client-safe. Capped, so a book of 450+ items renders a short
 // list and asks for a few letters instead of drawing every row.
-import { byName, nameIn, searchForm } from '@/lib/price-book/name-order';
+import { byName, hasEveryWord, nameIn, searchForm } from '@/lib/price-book/name-order';
 import type { CostItemOption } from './builder-model';
 import type { SectionOption } from './section-combobox';
 
@@ -30,7 +30,7 @@ export interface PickerList {
 export const PICKER_LIMIT = 60;
 
 function matches(item: CostItemOption, needle: string): boolean {
-  return needle === '' || searchForm(`${item.nameAr ?? ''} ${item.nameEn ?? ''} ${item.code}`).includes(needle);
+  return needle === '' || hasEveryWord(searchForm(`${item.nameAr ?? ''} ${item.nameEn ?? ''} ${item.code}`), needle);
 }
 
 export function pickerList(items: readonly CostItemOption[], sections: readonly SectionOption[], locale: string, query: string): PickerList {
