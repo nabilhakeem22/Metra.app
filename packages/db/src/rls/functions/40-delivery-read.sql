@@ -359,9 +359,11 @@ $$;
 --   handover_acknowledged_at (0058): decided_at of the newest LIVE
 --     handoff_acknowledgement, the client's own or one the studio recorded
 --     for them, else null.
---   rom_acknowledged_at (0058): decided_at of the newest LIVE client
+--   rom_acknowledged_at (0058): decided_at of the newest LIVE
 --     rom_acknowledgement of the CURRENT issuance (acknowledged_issue_at is not
---     distinct from rom_issued_at), only while a band is issued; else null.
+--     distinct from rom_issued_at), the client's own or one the studio recorded
+--     for them (the Gate B guard accepts either), only while a band is issued;
+--     else null.
 --   timeline (0058): the newest 60 of, newest first (at the same instant: a
 --     stage before a decision before a payment, payments by amount, then id):
 --     * { type: 'stage', state, at } per engagement_transitions row of this
@@ -656,12 +658,21 @@ as $$
           -- numbers. `is not distinct from` so a legacy NULL acknowledgement
           -- (recorded before 0049, issuance unknown) does NOT match a real
           -- issuance instant and therefore does not suppress the verb.
+          -- An acknowledgement the studio recorded for the client (a call, a
+          -- WhatsApp) answers it too, as it does for Gate B, until retracted:
+          -- never ask the client again for consent already on file.
           and not exists (
             select 1 from public.engagement_events e
             where e.engagement_id = de.id
-              and e.actor_channel = 'client'
               and e.kind = 'rom_acknowledgement'
               and e.acknowledged_issue_at is not distinct from de.rom_issued_at
+              and (
+                e.actor_channel = 'client'
+                or not exists (
+                  select 1 from public.engagement_events x
+                  where x.org_id = e.org_id and x.supersedes_event_id = e.id
+                )
+              )
           )
         union all
         select 'acknowledge_handoff', 6
@@ -855,8 +866,9 @@ as $$
           where x.org_id = e.org_id and x.supersedes_event_id = e.id
         )
     ),
-    -- Round C (0058): when the client acknowledged the band issued NOW. A
-    -- re-issued band reads as not yet acknowledged.
+    -- Round C (0058): when the client acknowledged the band issued NOW, on
+    -- this page or to the studio, who recorded it (any channel, as Gate B
+    -- reads it). A re-issued band reads as not yet acknowledged.
     'rom_acknowledged_at', case
       when de.rom_issued_at is null then null
       else (
@@ -864,7 +876,6 @@ as $$
         from public.engagement_events e
         where e.engagement_id = de.id
           and e.org_id = de.org_id
-          and e.actor_channel = 'client'
           and e.kind = 'rom_acknowledgement'
           and e.acknowledged_issue_at is not distinct from de.rom_issued_at
           and not exists (

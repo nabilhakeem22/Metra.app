@@ -6,9 +6,11 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Link } from '@/i18n/routing';
 import { formatMoney } from '@/lib/format/money';
+import { formatQuantity } from '@/lib/format/number';
 import { pickLocale } from '@/lib/i18n/pick-locale';
 import type { ProposalDetail } from '@/lib/proposals/queries';
 import { PreviewModal } from '../preview-modal';
+import { useUnitLabel } from '../use-unit-label';
 import { useProposalViewActions } from './use-proposal-view-actions';
 
 export function ProposalView({
@@ -30,6 +32,7 @@ export function ProposalView({
   const tc = useTranslations('contracts');
   const locale = useLocale();
   const { pending, onGenerateContract, onSupersede, onExpire } = useProposalViewActions(detail.id);
+  const unitLabel = useUnitLabel();
   const money = (v: string) => formatMoney(v, locale);
   const loc = (ar: string | null, en: string | null) =>
     pickLocale({ nameAr: ar, nameEn: en }, 'name', locale).value;
@@ -96,7 +99,7 @@ export function ProposalView({
                   <tr key={l.id} className="border-b last:border-0">
                     <td className="px-4 py-2">{loc(l.descriptionAr, l.descriptionEn)}</td>
                     <td className="px-4 py-2 text-muted-foreground" dir="ltr">
-                      {l.qty} {l.unit}
+                      {formatQuantity(l.qty, locale)} {unitLabel(l.unit)}
                     </td>
                     <td className="px-4 py-2 text-end" dir="ltr">{money(l.unitPrice)}</td>
                     <td className="px-4 py-2 text-end" dir="ltr">{money(l.lineTotal)}</td>

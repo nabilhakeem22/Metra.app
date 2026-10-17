@@ -13,12 +13,15 @@ import { CellError, cellA11y } from './draft-cell';
 import type { LineCell } from './draft-field-errors';
 import type { LineFigure } from './draft-completeness';
 import type { DraftCellError } from './use-draft-field-errors';
+import { useUnitLabel } from './use-unit-label';
 
+// Wide enough for a 7-digit amount with a decimal or two: a box shows its figure
+// without trailing zeros (figure-input.tsx), so these hold what studios price.
 const FIGURE_WIDTH: Record<LineFigure, string> = {
-  qty: 'w-16',
-  unitCost: 'w-20',
-  unitPrice: 'w-20',
-  discountPct: 'w-14',
+  qty: 'w-20',
+  unitCost: 'w-24',
+  unitPrice: 'w-24',
+  discountPct: 'w-16',
 };
 
 /**
@@ -44,6 +47,7 @@ export function BuilderLineRow({
 }) {
   const t = useTranslations('proposals');
   const locale = useLocale();
+  const unitLabel = useUnitLabel();
   const si = sectionIndex;
   const li = lineIndex;
   const lt = previewLine(line);
@@ -87,7 +91,7 @@ export function BuilderLineRow({
           className="h-9 w-auto min-w-16"
           value={line.unit}
           onValueChange={(v) => edit('unit', { unit: v })}
-          options={BOQ_UNITS.map((u) => ({ value: u, label: u }))}
+          options={BOQ_UNITS.map((u) => ({ value: u, label: unitLabel(u) }))}
           {...cellA11y(idOf('unit'), cellOf('unit'))}
         />
         <CellError id={idOf('unit')} error={cellOf('unit')} />

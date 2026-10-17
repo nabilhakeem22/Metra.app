@@ -73,7 +73,14 @@
       "proposalsTitle": "Proposals & approvals",
       "proposalsDesc": "Send client-ready proposals, collect sign-offs, and tie payment gates to each stage, so the design only advances when the client and the money say go.",
       "bilingualTitle": "Arabic & English, done right",
-      "bilingualDesc": "Full right-to-left Arabic and English, EGP-native figures, and a bilingual client experience, not an afterthought bolted on the end."
+      "bilingualDesc": "Full right-to-left Arabic and English, EGP-native figures, and a bilingual client experience, not an afterthought bolted on the end.",
+      "shots": {
+        "flow": "A delivery's page in Metra: the stage track at 3D designs, waiting on the client, with the Gate B payment due",
+        "cost": "The proposal builder: quantity, unit cost and unit price on every line, with the total cost and margin under them",
+        "proposals": "The client's page: the final design ready to approve, with its renders, under the studio's bar",
+        "bilingualAr": "The client's budget and payments, in Arabic",
+        "bilingualEn": "The same screen, in English"
+      }
     },
     "how": {
       "eyebrow": "How it works",
