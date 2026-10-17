@@ -2691,10 +2691,17 @@ deleted; anything that would clash is skipped and counted.
 - **Sections:** one per market sub-category that gets at least one item, named
   as the sub-category («الزجاج» / "Glass"). When a studio section already has
   that name, the new one carries its category too («الجبس (الخامات الأساسية)»
-  / "Gypsum (Basic materials)", next to the studio's own "Gypsum"). Each is
-  marked `sections.key = market.<sub-category>`, so a re-run finds it.
+  / "Gypsum (Basic materials)", next to the studio's own "Gypsum"); when even
+  that name is a studio section's, the items go into that section and none is
+  created. Each new one is marked `sections.key = market.<sub-category>`, so a
+  re-run finds it.
 - **Items:** one cost item per market item a published bulletin prices:
-  - the name and spec, and a roll's pack («أسلاك نحاس معزول 2 مم لفة 100 م»);
+  - the name and spec, and a roll's pack unless the text already says roll
+    («أسلاك نحاس معزول 2 مم لفة 100 م»). Names are unique within the seed: two
+    items that would read alike carry their sub-category (the 23 standard and
+    flexible-joint clay pipes and fittings: «كوع فخار 150 مم (مواسير صرف فخار
+    بوصلات مرنة)»). A spaced hyphen copied from the bulletin becomes a comma in
+    Arabic; a range inside a spec stays («سمك 4مم-6مم», «كثافة 600-700»);
   - the studio unit (sqm, linear_meter, pcs, kg, ton, liter, cbm, roll);
   - code `MKT-<market key>` (e.g. `MKT-raw.steel.rebar`);
   - cost = the newest published month with a numeric price (a suspended or
@@ -2704,7 +2711,9 @@ deleted; anything that would clash is skipped and counted.
 - **Skipped, with a count each:** already linked to that market item (so a
   re-run creates nothing), discontinued, no studio unit (bag, pack,
   thousand_bricks), no price, a studio item with the same code, a studio item
-  with the same name.
+  of the studio's OWN with the same name (compared ignoring case, spacing,
+  invisible marks and the Arabic spellings typed interchangeably; the seed's
+  own items never count, so a re-run after a partial undo re-seeds).
 - **Audit:** a `create` row per section and per item, as the app writes them,
   marked `source: market:seed-price-books`. The actor is the studio's earliest
   owner (else its earliest admin), as for the app's automation. A studio with
@@ -2753,8 +2762,11 @@ npm run market:seed-price-books
 ```
 
 The same lines with `created` in place of `to create`. Exit 0, or exit 1
-with `FAILED, nothing written for this studio: <reason>` on each studio that
-failed (the others are seeded): run the same command again. A second run
+with `FAILED, nothing written for this studio: SQLSTATE <code>: <the database's
+reason>` on each studio that failed (the others are seeded), e.g. `SQLSTATE
+55P03: canceling statement due to lock timeout` when a studio was saving the
+same item at that moment: run the same command again. An `--org` id may be
+typed in either case. A second run
 prints `created 0` and every item `already linked`.
 
 **Undo, if ever needed.** Read first (SQL editor, run it alone): each studio's
@@ -2780,8 +2792,10 @@ select o.id as studio_id, coalesce(o.name_en, o.name_ar) as studio, count(*) as 
 
 Then this ONE block deletes only the removable seeded items, and the seed's
 sections left empty; a studio's own items and sections are never touched
-(they carry no `MKT-` code and no `market.` key). Add
-`and c.org_id = '<studio id>'` to the first `where` to undo one studio. The
+(they carry no `MKT-` code and no `market.` key). To undo ONE studio, add
+`and c.org_id = '<studio id>'` to the first `where` AND
+`and s.org_id = '<studio id>'` to the second, or another studio's empty
+seeded section goes too. The
 audit rows stay (the audit trail is append-only). Rehearsed: of 894 seeded
 items, the one edited after seeding stayed with its section, and every other
 seeded item and section went; the default sections and the studios' own items
