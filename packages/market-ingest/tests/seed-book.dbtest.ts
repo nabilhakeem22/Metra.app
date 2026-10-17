@@ -1,12 +1,13 @@
 import { rmSync } from 'node:fs';
 import { MARKET_WRITE_LOCK, buildSeedBook } from '@metra/db/market-seed';
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { rebuildSeedBookCommand } from '../src/commands/rebuild-seed-book-command';
 import { withdrawCommand } from '../src/commands/withdraw-command';
 import { rebuildAndHoldSeedBook, releaseSeedBookHold } from '../src/seed/book-store';
 import { readMarketSeedItems } from '../src/seed/read';
 import { clearMarketTestData, openTestDatabase } from './db-fixture';
 import { bulletinFile, newStaging, publish, stage, type Staging } from './publish-fixture';
-import { clearSeeded, publishFixture, run, sql } from './seed-fixture';
+import { STUDIOS, clearSeeded, publishFixture, run, seededIn, sql } from './seed-fixture';
 
 // The stored seed book the app seeds new studios from (market_seed_book) says
 // what the published book says: market:publish and market:withdraw rebuild it
@@ -56,6 +57,18 @@ describe('market:publish and market:withdraw rebuild the seed book', () => {
     const corrected = await stage(staging, bulletinFile(staging, { nameEn: 'Corrected name' }));
     expect(await publish(staging, '2004-07', corrected, ['--replace'])).toBe(0);
     expect((await storedFixture()).find((row) => row.code === 'MKT-raw.steel.dbtest_rebar')?.name_en).toContain('Corrected name');
+  });
+});
+
+describe('market:rebuild-seed-book', () => {
+  it('stores the published book and seeds no studio', async () => {
+    await publishFixture();
+    const printed: string[] = [];
+    vi.spyOn(console, 'log').mockImplementation((line: string) => void printed.push(line));
+    expect(await rebuildSeedBookCommand([])).toBe(0);
+    expect((await storedFixture()).map((row) => row.code)).toHaveLength(5);
+    expect(printed.join('\n')).toMatch(/the seed book holds \d+ published market item\(s\); no studio was seeded/);
+    for (const orgId of STUDIOS) expect(await seededIn(orgId)).toEqual([]);
   });
 });
 

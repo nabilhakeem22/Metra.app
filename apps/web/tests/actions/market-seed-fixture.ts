@@ -6,7 +6,7 @@ import { createDb } from '@metra/db';
 import { expect } from 'vitest';
 import { seedNewStudioCore } from '@/lib/market-book/seed-core';
 import { createOrgCore } from '@/lib/org/core';
-import { rebuildAndHoldSeedBook } from '../../../../packages/market-ingest/src/seed/book-store';
+import { rebuildSeedBook as rebuildStoredBook } from '../../../../packages/market-ingest/src/seed/book-store';
 import { runSeed } from '../../../../packages/market-ingest/src/seed/run';
 import { ctxFor, raw } from './fixture';
 import { clearMarket, marketRaw, seedBulletin, seedMarketItem } from './market-fixture';
@@ -44,11 +44,11 @@ function ownerConnection() {
   return createDb(process.env.DATABASE_URL as string, { max: 1 });
 }
 
-/** Rebuild the stored seed book from what is published, as market:publish does (its hold ends with this connection). */
+/** Rebuild the stored seed book from what is published, as market:rebuild-seed-book does. */
 export async function rebuildSeedBook(): Promise<void> {
   const { sql } = ownerConnection();
   try {
-    await rebuildAndHoldSeedBook(sql);
+    await rebuildStoredBook(sql);
   } finally {
     await sql.end();
   }
@@ -90,4 +90,21 @@ export async function clearSeedFixture(): Promise<void> {
 
 export async function emptySeedBook(): Promise<void> {
   await marketRaw()`delete from public.market_seed_book`;
+}
+
+/** What an empty book means right now: a bulletin is published (the book is being built), or none is. */
+export async function emptyBookState(): Promise<'preparing' | 'unpublished'> {
+  const [row] = await marketRaw()`select exists (select 1 from public.market_bulletins where status = 'published') as published`;
+  return row.published ? 'preparing' : 'unpublished';
+}
+
+/** Make a studio look as if it signed up `hours` ago. */
+export async function ageStudio(orgId: string, hours: number): Promise<void> {
+  await marketRaw()`update public.organizations set created_at = now() - make_interval(hours => ${hours}) where id = ${orgId}`;
+}
+
+/** The audit source markers of the studio's seed, one per row. */
+export async function seedSources(orgId: string): Promise<string[]> {
+  const rows = await raw.query<{ source: string }>(`select distinct after->>'source' as source from audit_log where org_id = '${orgId}' and after ? 'source'`);
+  return rows.map((row) => row.source);
 }

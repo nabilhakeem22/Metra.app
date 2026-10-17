@@ -1,8 +1,10 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import { seedNewStudioCore } from '@/lib/market-book/seed-core';
 import { closeFixture, raw, teardown } from './fixture';
 import { closeMarketFixture, marketRaw } from './market-fixture';
 import {
-  clearSeedFixture, cliSeed, createStudio, emptySeedBook, publishSeedFixture, rebuildSeedBook, seedAudits, seededRows, signUp,
+  ageStudio, clearSeedFixture, cliSeed, createStudio, emptyBookState, emptySeedBook, publishSeedFixture, rebuildSeedBook, seedAudits,
+  seededRows, seedSources, signUp,
 } from './market-seed-fixture';
 
 // Every new studio gets the market price book right after sign-up, in a
@@ -25,8 +27,9 @@ describe('no bulletin published', () => {
   it('creates the studio and seeds nothing, without an error', async () => {
     await emptySeedBook();
     const errors = vi.spyOn(console, 'error');
+    const expected = await emptyBookState();
     const { ctx, seeded } = await signUp(orgIds, 'Signup no bulletin');
-    expect(seeded).toEqual({ ok: true, data: { published: false, sections: 0, items: 0 } });
+    expect(seeded).toEqual({ ok: true, data: { book: expected, sections: 0, items: 0 } });
     expect(await raw.count('memberships', ctx.orgId)).toBe(1);
     expect(await seededRows(ctx.orgId)).toEqual([]);
     expect(errors).not.toHaveBeenCalled();
@@ -42,7 +45,7 @@ describe('a published market book', () => {
 
   it('gives the new studio exactly what market:seed-price-books gives its twin', async () => {
     const { ctx: signedUp, seeded } = await signUp(orgIds, 'Signup studio');
-    expect(seeded).toMatchObject({ ok: true, data: { published: true } });
+    expect(seeded).toMatchObject({ ok: true, data: { book: 'ready' } });
     const twin = await createStudio(orgIds, 'CLI twin');
     await cliSeed(twin.orgId);
     const rows = await seededRows(signedUp.orgId);
@@ -56,6 +59,22 @@ describe('a published market book', () => {
     expect(audits.map(({ source, ...rest }) => [source, rest])).toEqual(
       (await seedAudits(twin.orgId)).map(({ source, ...rest }) => [source === 'market:seed-price-books' ? 'market:seed-on-signup' : source, rest]),
     );
+  });
+
+  it('marks the rows as the sign-up only for a new studio with an empty book; any later call is a load', async () => {
+    const { ctx } = await signUp(orgIds, 'Signup label new');
+    expect(await seedSources(ctx.orgId)).toEqual(['market:seed-on-signup']);
+    const old = await createStudio(orgIds, 'Signup label old');
+    await ageStudio(old.orgId, 2);
+    expect(await seedNewStudioCore(old)).toMatchObject({ ok: true, data: { book: 'ready' } });
+    expect(await seedSources(old.orgId)).toEqual(['market:seed-from-price-book']);
+  });
+
+  it('says the book is being prepared when a bulletin is published but the book is not built yet', async () => {
+    await emptySeedBook();
+    const { seeded } = await signUp(orgIds, 'Signup preparing');
+    expect(seeded).toEqual({ ok: true, data: { book: 'preparing', sections: 0, items: 0 } });
+    await rebuildSeedBook();
   });
 
   it('never undoes the sign-up: a refused seed leaves the studio, writes nothing and logs one redacted line', async () => {

@@ -13,7 +13,7 @@ const actions = vi.hoisted(() => ({
 }));
 vi.mock('@/lib/org/actions', () => actions);
 vi.mock('@/lib/org/logo-actions', () => actions);
-vi.mock('@/lib/market-book/actions', () => ({ seedNewStudioPriceBook: vi.fn(async () => ({ ok: true })) }));
+vi.mock('@/lib/market-book/seed-request', () => ({ requestMarketSeed: vi.fn() }));
 const router = vi.hoisted(() => ({ push: vi.fn() }));
 vi.mock('@/i18n/routing', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/i18n/routing')>()),

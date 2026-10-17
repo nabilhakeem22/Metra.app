@@ -46,22 +46,32 @@ export async function refreshSeedBook(tx: Transaction): Promise<SeedBookEntry[]>
   return book;
 }
 
-/**
- * The same rebuild in its own transaction, behind any publish or withdrawal in
- * flight, and then HELD: the transaction also takes the market write lock
- * SHARED at session level, so from its commit until `releaseSeedBookHold` no
- * publish or withdrawal can change the book this connection seeds from (the
- * seed writes items by reference to it). The caller must release it, or end
- * the connection.
- */
-export async function rebuildAndHoldSeedBook(sql: PostgresJs): Promise<SeedBookEntry[]> {
+/** The rebuild in its own transaction, behind any publish or withdrawal in flight; `andHold` keeps it (below). */
+async function rebuildLocked(sql: PostgresJs, andHold: boolean): Promise<SeedBookEntry[]> {
   return (await sql.begin(async (tx) => {
     await tx`select set_config('lock_timeout', ${MIGRATION_LOCK_TIMEOUT}, true)`;
     await tx`select pg_advisory_xact_lock(hashtext(${MARKET_WRITE_LOCK}))`;
     const book = await refreshSeedBook(tx);
-    await tx`select pg_advisory_lock_shared(hashtext(${MARKET_WRITE_LOCK}))`;
+    if (andHold) await tx`select pg_advisory_lock_shared(hashtext(${MARKET_WRITE_LOCK}))`;
     return book;
   })) as SeedBookEntry[];
+}
+
+/** `market:rebuild-seed-book`: rebuild the stored book from what is published, and seed no studio. */
+export function rebuildSeedBook(sql: PostgresJs): Promise<SeedBookEntry[]> {
+  return rebuildLocked(sql, false);
+}
+
+/**
+ * The rebuild, then HELD: the transaction also takes the market write lock
+ * SHARED at session level, so from its commit until `releaseSeedBookHold` no
+ * publish or withdrawal can change the book this connection seeds from (the
+ * seed writes items by reference to it). The caller must release it, or end
+ * the connection. Needs a connection that keeps one session (a direct or
+ * session-pooler URL, never the :6543 transaction pooler).
+ */
+export function rebuildAndHoldSeedBook(sql: PostgresJs): Promise<SeedBookEntry[]> {
+  return rebuildLocked(sql, true);
 }
 
 export async function releaseSeedBookHold(sql: PostgresJs): Promise<void> {

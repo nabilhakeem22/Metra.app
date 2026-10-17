@@ -821,6 +821,7 @@
       "marketLoaded": "{count, plural, one {Market price book loaded ({shown} item)} other {Market price book loaded ({shown} items)}}",
       "marketUpToDate": "Your price book already has every market item",
       "marketNotPublished": "The market price book is not published yet",
+      "marketPreparing": "The market price book is being prepared. Try again in a few minutes",
       "sectionAdded": "Section added"
     },
     "confirmDeactivate": {

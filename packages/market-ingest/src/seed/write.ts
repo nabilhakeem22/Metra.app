@@ -5,7 +5,7 @@
 // seeded here and one seeded at sign-up get the same rows and audit trail.
 import { withOrgContext, type MetraDb } from '@metra/db';
 import { planSeed, type SeedBookEntry, type SeedPlan } from '@metra/db/market-seed';
-import { readStudioBook, writeSeedPlan } from '@metra/db/market-seed/db';
+import { holdForSeed, readStudioBook, writeSeedPlan } from '@metra/db/market-seed/db';
 
 export interface StudioContext {
   orgId: string;
@@ -19,6 +19,7 @@ export const SEED_SOURCE = 'market:seed-price-books';
 /** The studio's plan; written in the same transaction unless `dryRun`. */
 export async function seedStudio(db: MetraDb, studio: StudioContext, book: SeedBookEntry[], dryRun: boolean): Promise<SeedPlan> {
   return withOrgContext(db, studio, async (tx) => {
+    await holdForSeed(tx);
     const plan = planSeed(book, await readStudioBook(tx));
     if (!dryRun) await writeSeedPlan(tx, plan, SEED_SOURCE);
     return plan;

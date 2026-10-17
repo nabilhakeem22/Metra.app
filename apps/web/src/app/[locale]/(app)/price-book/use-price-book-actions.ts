@@ -47,7 +47,8 @@ export function usePriceBookActions(): PriceBookActionsApi {
   }
 
   /** Loading the market book twice is not an error: it adds nothing, and the
-   *  studio is told which happened (loaded, nothing new, nothing published yet). */
+   *  studio is told which happened (loaded, nothing new, the book still being
+   *  prepared, nothing published yet). */
   function loadMarketBook(): void {
     startTransition(async () => {
       let result;
@@ -66,7 +67,8 @@ export function usePriceBookActions(): PriceBookActionsApi {
   }
 
   function marketLoadMessage(summary: MarketSeedSummary | undefined): string {
-    if (!summary?.published) return t('toast.marketNotPublished');
+    if (!summary || summary.book === 'unpublished') return t('toast.marketNotPublished');
+    if (summary.book === 'preparing') return t('toast.marketPreparing');
     if (summary.items === 0) return t('toast.marketUpToDate');
     return t('toast.marketLoaded', { count: summary.items, shown: formatNumber(summary.items, locale) });
   }

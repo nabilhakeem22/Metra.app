@@ -8,7 +8,7 @@ import { useFieldErrors } from '@/hooks/use-field-errors';
 import { useFocusFirstInvalid } from '@/hooks/use-focus-first-invalid';
 import { toast } from '@/hooks/use-toast';
 import { useRouter } from '@/i18n/routing';
-import { seedNewStudioPriceBook } from '@/lib/market-book/actions';
+import { requestMarketSeed } from '@/lib/market-book/seed-request';
 import { createOrg } from '@/lib/org/actions';
 import { orgProfileFieldErrors } from '@/lib/org/profile-field-rules';
 import { OnboardingProfileFields, type OnboardingProfileValues } from './onboarding-profile-fields';
@@ -17,16 +17,6 @@ import { useAttachLogo } from './use-attach-logo';
 
 const EMPTY: OnboardingProfileValues = { nameEn: '', nameAr: '', city: '' };
 
-/**
- * The new studio's market price book, as a request of its own (a Worker's CPU
- * budget is per request): fired once the studio exists, never awaited, so it
- * neither holds the navigation nor queues the logo's actions behind it. Its
- * failure is silent on purpose: the server logs it, and the empty price book
- * offers the same load.
- */
-function seedPriceBookInBackground(): void {
-  seedNewStudioPriceBook().catch(() => undefined);
-}
 
 /**
  * Onboarding is ONE screen: the studio's name (Arabic or English, one is
@@ -74,7 +64,10 @@ export function OnboardingWizard() {
         const result = await createOrg(profile);
         if (errors.applyResult(result)) return;
         if (logo) await attachLogo(logo);
-        seedPriceBookInBackground();
+        // The new studio's market price book, in a request of its own (a
+        // Worker's CPU budget is per request), never awaited and silent on
+        // failure: the server logs it, and the empty price book offers the load.
+        requestMarketSeed();
         toast({ title: t('createdTitle') });
         router.push('/dashboard');
       } catch (rejection) {

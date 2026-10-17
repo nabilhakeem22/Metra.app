@@ -1,24 +1,28 @@
 import { act, fireEvent, screen } from '@testing-library/react';
-import { beforeEach, describe, expect, test, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+import { MARKET_SEED_PATH } from '@/lib/market-book/seed-request';
 import { messageAt, renderWithIntl } from '@/test/render-with-intl';
 import { OnboardingWizard } from './wizard';
 
 // A new studio's market price book loads in a request of its own, fired once
-// createOrg has answered: never awaited (the dashboard opens at once) and
-// silent when it fails (the empty price book offers the same load).
+// createOrg (and the logo) answered: a keepalive POST to the seed route, NOT a
+// server action (the router would queue it behind the pending ones and, once
+// the wizard navigated, post it to the dashboard, where it never ran). Never
+// awaited, silent when it fails.
 
 const actions = vi.hoisted(() => ({ createOrg: vi.fn(), createLogoUpload: vi.fn(), setOrgLogo: vi.fn() }));
 vi.mock('@/lib/org/actions', () => actions);
 vi.mock('@/lib/org/logo-actions', () => actions);
-const seed = vi.hoisted(() => ({ seedNewStudioPriceBook: vi.fn() }));
-vi.mock('@/lib/market-book/actions', () => seed);
 const toast = vi.hoisted(() => vi.fn());
 vi.mock('@/hooks/use-toast', () => ({ toast }));
+const order = vi.hoisted(() => [] as string[]);
 const router = vi.hoisted(() => ({ push: vi.fn() }));
 vi.mock('@/i18n/routing', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/i18n/routing')>()),
   useRouter: () => router,
 }));
+
+const fetchMock = vi.fn();
 
 async function createStudio(): Promise<void> {
   renderWithIntl(<OnboardingWizard />, { locale: 'ar-EG' });
@@ -30,21 +34,29 @@ async function createStudio(): Promise<void> {
 }
 
 beforeEach(() => {
-  for (const mock of [actions.createOrg, seed.seedNewStudioPriceBook, toast, router.push]) mock.mockReset();
+  for (const mock of [actions.createOrg, toast, router.push, fetchMock]) mock.mockReset();
+  order.length = 0;
+  router.push.mockImplementation(() => void order.push('navigate'));
+  fetchMock.mockImplementation(() => {
+    order.push('seed');
+    return new Promise(() => {});
+  });
+  vi.stubGlobal('fetch', fetchMock);
 });
 
+afterEach(() => vi.unstubAllGlobals());
+
 describe('the market price book after sign-up', () => {
-  test('is fired once the studio exists, and the dashboard opens without waiting for it', async () => {
+  test('is one keepalive POST to the seed route, before the navigation and not waited for', async () => {
     actions.createOrg.mockResolvedValue({ ok: true });
-    seed.seedNewStudioPriceBook.mockReturnValue(new Promise(() => {}));
     await createStudio();
-    expect(seed.seedNewStudioPriceBook).toHaveBeenCalledTimes(1);
-    expect(router.push).toHaveBeenCalledWith('/dashboard');
+    expect(fetchMock.mock.calls).toEqual([[MARKET_SEED_PATH, { method: 'POST', keepalive: true, credentials: 'same-origin' }]]);
+    expect(order).toEqual(['seed', 'navigate']);
   });
 
   test('says nothing when it fails', async () => {
     actions.createOrg.mockResolvedValue({ ok: true });
-    seed.seedNewStudioPriceBook.mockRejectedValue(new Error('network'));
+    fetchMock.mockImplementation(() => Promise.reject(new TypeError('network')));
     await createStudio();
     await act(async () => {});
     expect(router.push).toHaveBeenCalledWith('/dashboard');
@@ -52,10 +64,10 @@ describe('the market price book after sign-up', () => {
     expect(screen.queryByRole('alert')).toBeNull();
   });
 
-  test('is not fired when the studio was not created', async () => {
+  test('is not sent when the studio was not created', async () => {
     actions.createOrg.mockResolvedValue({ ok: false, error: 'generic' });
     await createStudio();
-    expect(seed.seedNewStudioPriceBook).not.toHaveBeenCalled();
+    expect(fetchMock).not.toHaveBeenCalled();
     expect(router.push).not.toHaveBeenCalled();
   });
 });

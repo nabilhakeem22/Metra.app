@@ -7,7 +7,7 @@
 import { sql } from 'drizzle-orm';
 import type { MetraDb } from '../client';
 import { costItems, sections } from '../schema';
-import { MARKET_WRITE_LOCK } from './lock';
+import { MARKET_WRITE_LOCK, STUDIO_SEED_LOCK } from './lock';
 import type { ItemRef, SeedPlan, SeedPlanEntry, StudioBook } from './types';
 
 /** What the studio already has, as the plan reads it. */
@@ -47,20 +47,33 @@ export async function readSeedBook(tx: MetraDb, withNameForms: boolean): Promise
   });
 }
 
+/** Whether some bulletin is published (RLS shows only published ones): an empty book is then still being built. */
+export async function isMarketPublished(tx: MetraDb): Promise<boolean> {
+  const rows = (await tx.execute(sql`select exists (select 1 from market_bulletins) as published`)) as unknown as Array<{ published: boolean }>;
+  return rows[0].published;
+}
+
 export interface SeedWritten {
   sections: number;
   items: number;
 }
 
 /**
- * Hold the stored seed book steady for the rest of the transaction: the
- * market write lock SHARED, so no publish, withdrawal or rebuild (which take
- * it exclusively) can change the book between the plan and the write. Call it
- * before reading the book. Waits behind a market write within the
- * transaction's lock_timeout.
+ * Take the two locks a seed plans and writes under, for the rest of the
+ * transaction, in this order (every seed takes them alike, so two never wait
+ * on each other crosswise):
+ *  1. the market write lock SHARED: no publish, withdrawal or rebuild (which
+ *     take it exclusively) can change the stored book between the plan and
+ *     the write;
+ *  2. this studio's seed lock (two-key form, a key space apart from the
+ *     market lock): a second seed of the SAME studio (the sign-up request and
+ *     the button, or the CLI) waits, then plans from what the first created
+ *     and adds nothing.
+ * Call it first. Each waits within the transaction's lock_timeout.
  */
-export async function holdSeedBookSteady(tx: MetraDb): Promise<void> {
-  await tx.execute(sql`select pg_advisory_xact_lock_shared(hashtext(${MARKET_WRITE_LOCK}))`);
+export async function holdForSeed(tx: MetraDb): Promise<void> {
+  await tx.execute(sql`select pg_advisory_xact_lock_shared(hashtext(${MARKET_WRITE_LOCK})),
+    pg_advisory_xact_lock(hashtext(${STUDIO_SEED_LOCK}), hashtext(current_setting('app.current_org_id', true)))`);
 }
 
 /**
@@ -69,7 +82,7 @@ export async function holdSeedBookSteady(tx: MetraDb): Promise<void> {
  * for each, marked with `source`. An item travels BY REFERENCE (market item,
  * code, section): its names, unit, cost and price are read from the stored
  * seed book the plan was made from, so the Worker sends a fifth of the bytes.
- * The caller holds that book steady (holdSeedBookSteady, or the CLI's session
+ * The caller holds that book steady (holdForSeed, and for the CLI its session
  * lock); an item the book no longer has fails the whole write, and nothing is
  * written. Nothing to write is no statement at all.
  */

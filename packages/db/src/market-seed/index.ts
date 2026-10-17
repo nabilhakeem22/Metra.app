@@ -4,7 +4,7 @@
 // next/*; the reads and the one write are in ./db.ts (`@metra/db/market-seed/db`).
 export { buildSeedBook } from './book';
 export { comparisonForm } from './compare';
-export { MARKET_WRITE_LOCK } from './lock';
+export { MARKET_WRITE_LOCK, STUDIO_SEED_LOCK } from './lock';
 export { atPriceBookScale, withFivePercentMargin } from './margin';
 export { ITEM_CODE_PREFIX, SECTION_KEY_PREFIX, itemCode, sectionKey } from './naming';
 export { normalizeArabic, toWesternDigits } from './normalize';

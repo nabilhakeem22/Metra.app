@@ -4,8 +4,8 @@ import { messageAt, renderWithIntl, type TestLocale } from '@/test/render-with-i
 import { PriceBookClient } from './price-book-client';
 
 // An empty price book offers the official market price book (the sign-up seed,
-// again) and says which of the three things happened: loaded, nothing new, or
-// nothing published yet. Counts in Latin digits in both languages.
+// again) and says which happened: loaded, nothing new, the book still being
+// prepared, or nothing published yet. Counts in Latin digits in both languages.
 
 const priceBook = vi.hoisted(() => ({
   bulkUpdatePrices: vi.fn(),
@@ -31,7 +31,7 @@ beforeEach(() => {
 });
 
 describe.each<TestLocale>(['en', 'ar-EG'])('the empty price book (%s)', (locale) => {
-  async function load(data: { published: boolean; sections: number; items: number }) {
+  async function load(data: { book: 'ready' | 'preparing' | 'unpublished'; sections: number; items: number }) {
     priceBook.loadMarketPriceBook.mockResolvedValue({ ok: true, data });
     renderWithIntl(<PriceBookClient items={[]} sections={[]} canManage />, { locale });
     await act(async () => {
@@ -42,17 +42,21 @@ describe.each<TestLocale>(['en', 'ar-EG'])('the empty price book (%s)', (locale)
   }
 
   it('says how many market items it loaded, in Latin digits', async () => {
-    const title = await load({ published: true, sections: 55, items: 447 });
+    const title = await load({ book: 'ready', sections: 55, items: 447 });
     expect(title).toContain('447');
     expect(title).not.toMatch(/[٠-٩۰-۹]/);
   });
 
   it('says the book already has every market item when nothing was new', async () => {
-    expect(await load({ published: true, sections: 0, items: 0 })).toBe(messageAt(locale, 'priceBook.toast.marketUpToDate'));
+    expect(await load({ book: 'ready', sections: 0, items: 0 })).toBe(messageAt(locale, 'priceBook.toast.marketUpToDate'));
   });
 
   it('says nothing is published yet when there is no bulletin', async () => {
-    expect(await load({ published: false, sections: 0, items: 0 })).toBe(messageAt(locale, 'priceBook.toast.marketNotPublished'));
+    expect(await load({ book: 'unpublished', sections: 0, items: 0 })).toBe(messageAt(locale, 'priceBook.toast.marketNotPublished'));
+  });
+
+  it('says the book is being prepared when a bulletin is published but its book is not built yet', async () => {
+    expect(await load({ book: 'preparing', sections: 0, items: 0 })).toBe(messageAt(locale, 'priceBook.toast.marketPreparing'));
   });
 
   it('offers no load to a studio member who cannot manage the book', () => {

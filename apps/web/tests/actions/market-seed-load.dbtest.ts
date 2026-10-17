@@ -1,9 +1,9 @@
 import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { MARKET_WRITE_LOCK } from '@metra/db/market-seed';
-import { holdSeedBookSteady, writeSeedPlan } from '@metra/db/market-seed/db';
+import { MARKET_WRITE_LOCK, STUDIO_SEED_LOCK } from '@metra/db/market-seed';
+import { holdForSeed, writeSeedPlan } from '@metra/db/market-seed/db';
 import { withOrgContext } from '@/lib/db/context';
-import { loadMarketPriceBookCore } from '@/lib/market-book/seed-core';
+import { loadMarketPriceBookCore, seedNewStudioCore } from '@/lib/market-book/seed-core';
 import { closeFixture, ctxFor, raw, teardown } from './fixture';
 import { asAppRole, closeMarketFixture, marketRaw } from './market-fixture';
 import { clearSeedFixture, cliSeed, createStudio, publishSeedFixture, rebuildSeedBook, seededRows, signUp } from './market-seed-fixture';
@@ -31,11 +31,11 @@ describe('loadMarketPriceBookCore', () => {
   it('loads a studio that has none, then adds nothing on a second load or after the sign-up seed', async () => {
     const studio = await createStudio(orgIds, 'Load from empty');
     const first = await loadMarketPriceBookCore(studio);
-    expect(first).toMatchObject({ ok: true, data: { published: true } });
+    expect(first).toMatchObject({ ok: true, data: { book: 'ready' } });
     expect(first.data?.items).toBeGreaterThanOrEqual(2);
     const loaded = await seededRows(studio.orgId);
     expect(loaded).toHaveLength(first.data?.items as number);
-    expect(await loadMarketPriceBookCore(studio)).toEqual({ ok: true, data: { published: true, sections: 0, items: 0 } });
+    expect(await loadMarketPriceBookCore(studio)).toEqual({ ok: true, data: { book: 'ready', sections: 0, items: 0 } });
     expect(await seededRows(studio.orgId)).toEqual(loaded);
   });
 
@@ -43,7 +43,7 @@ describe('loadMarketPriceBookCore', () => {
     const { ctx: studio } = await signUp(orgIds, 'Seeded at sign-up');
     const seeded = await seededRows(studio.orgId);
     expect(seeded.length).toBeGreaterThanOrEqual(2);
-    expect(await loadMarketPriceBookCore(studio)).toEqual({ ok: true, data: { published: true, sections: 0, items: 0 } });
+    expect(await loadMarketPriceBookCore(studio)).toEqual({ ok: true, data: { book: 'ready', sections: 0, items: 0 } });
     expect(await seededRows(studio.orgId)).toEqual(seeded);
   });
 
@@ -62,6 +62,47 @@ describe('loadMarketPriceBookCore', () => {
     expect(rows).toEqual(await seededRows(twin.orgId));
   });
 
+  it('two seeds of one studio at once: one loads, the other waits and adds nothing (F2)', async () => {
+    const studio = await createStudio(orgIds, 'Two seeds at once');
+    const answers = await Promise.all([seedNewStudioCore(studio), loadMarketPriceBookCore(studio), seedNewStudioCore(studio)]);
+    expect(answers.every((answer) => answer.ok)).toBe(true);
+    const items = answers.map((answer) => answer.data?.items ?? -1).sort((a, b) => a - b);
+    expect(items.slice(0, 2)).toEqual([0, 0]);
+    expect(items[2]).toBe((await seededRows(studio.orgId)).length);
+  });
+
+  it('holds a seed lock per studio: the same studio waits, another does not', async () => {
+    const studio = await createStudio(orgIds, 'Studio lock');
+    const other = await createStudio(orgIds, 'Studio lock, other');
+    const tryLock = async (orgId: string) => {
+      const [row] = await marketRaw()`select pg_try_advisory_lock(hashtext(${STUDIO_SEED_LOCK}), hashtext(${orgId})) as got`;
+      if (row.got) await marketRaw()`select pg_advisory_unlock(hashtext(${STUDIO_SEED_LOCK}), hashtext(${orgId}))`;
+      return row.got as boolean;
+    };
+    const during = await withOrgContext(studio, async (tx) => {
+      await holdForSeed(tx);
+      return [await tryLock(studio.orgId), await tryLock(other.orgId)];
+    });
+    expect(during).toEqual([false, true]);
+  });
+
+  it('answers a duplicate from the write as nothing new to add, writing nothing (F2, defensive)', async () => {
+    const studio = await createStudio(orgIds, 'Duplicate on write');
+    await marketRaw().unsafe(`create function public.dbtest_duplicate_seed() returns trigger language plpgsql as $$
+      begin
+        if new.org_id = '${studio.orgId}' then raise exception 'dbtest duplicate' using errcode = '23505'; end if;
+        return new;
+      end $$`);
+    await marketRaw().unsafe('create trigger dbtest_duplicate_seed before insert on public.cost_items for each row execute function public.dbtest_duplicate_seed()');
+    try {
+      expect(await loadMarketPriceBookCore(studio)).toEqual({ ok: true, data: { book: 'ready', sections: 0, items: 0 } });
+      expect(await raw.query(`select id from sections where org_id = '${studio.orgId}' and key like 'market.%'`)).toEqual([]);
+    } finally {
+      await marketRaw()`drop trigger if exists dbtest_duplicate_seed on public.cost_items`;
+      await marketRaw()`drop function if exists public.dbtest_duplicate_seed()`;
+    }
+  });
+
   it('refuses a role without price-book create, and writes nothing', async () => {
     const studio = await createStudio(orgIds, 'Load forbidden');
     for (const role of ['project_manager', 'site_engineer', 'accountant', 'viewer'] as const) {
@@ -76,7 +117,7 @@ describe('the stored book a seed writes from', () => {
     const studio = await createStudio(orgIds, 'Hold the book');
     const tryWrite = async () => (await marketRaw()`select pg_try_advisory_lock(hashtext(${MARKET_WRITE_LOCK})) as got`)[0].got as boolean;
     const during = await withOrgContext(studio, async (tx) => {
-      await holdSeedBookSteady(tx);
+      await holdForSeed(tx);
       return tryWrite();
     });
     expect(during).toBe(false);
