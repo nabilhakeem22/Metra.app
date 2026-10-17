@@ -2570,6 +2570,151 @@ drop type if exists public.market_observation_status, public.market_item_status,
 commit;
 ```
 
+### 0062 and the market price book at sign-up: owner runbook
+
+Every new studio gets the market price book automatically at sign-up, and an
+empty price book offers the same load as a button. Both read a derived table,
+the **seed book** (`market_seed_book`): every published market item as a
+studio's price book would receive it, built by the same code as
+`market:seed-price-books`. This is its ONE database step: migration
+`0062_market_seed_book.sql` plus one policy and one grant under `rls/`. It is
+validated on branch `validate/market-seed-on-signup`.
+
+**THE ORDER (do not change it):**
+
+1. **The database goes first**, from the branch (steps 1 to 4 below), while
+   production still runs the current `main`.
+2. **Then** the branch is merged to `main` and deployed, and you build the
+   seed book and run the smoke test (step 5).
+
+Why this order, one sentence each:
+
+- **The new code needs 0062:** the sign-up seed and the empty price book's
+  button read `market_seed_book`; without it the seed fails with 42P01. A
+  sign-up still succeeds (the seed runs after its response and logs one
+  line), but the button answers with an error.
+- **The current Worker is safe on the 0062 database:** 0062 only adds a table
+  nobody reads yet.
+- **There is no rollback floor:** the table is derived data; any Worker
+  version runs on it.
+
+**What it changes.** No row is touched and nothing is backfilled.
+
+| Object | Change |
+|---|---|
+| `market_seed_book` | new platform-level table (no `org_id`), one row per published market item: code, seeded names, the forms a studio's own item clashes with, studio unit, cost and cost x 1.05, sub-category. FK to `market_items` (on delete cascade). Starts EMPTY |
+| `rls/policies/60-market.sql` | RLS enabled and forced on it, one SELECT policy `market_read` (a member org context) |
+| `rls/roles.sql` | `metra_app` gets SELECT on it and nothing else |
+
+Who writes it: `market:publish` and `market:withdraw` rebuild it whole in
+their own transaction, and every REAL `market:seed-price-books` run (not a dry
+run) rebuilds it under the market write lock before it seeds. The app only
+reads it.
+
+**1. Put the code in the production checkout.**
+
+```powershell
+cd C:\Users\HP\merta-main
+git fetch origin
+git switch --detach origin/validate/market-seed-on-signup
+git log --oneline -1    # a "docs(deploy): ..." commit (this runbook); CI green on it
+git diff --stat 67af2aa2 HEAD    # MUST list only docs/DEPLOY.md: the code is exactly what was rehearsed (67af2aa2)
+```
+
+If the diff lists any other file, STOP and tell the lead.
+
+**2. Read-only, before** (Supabase SQL editor), each block ON ITS OWN.
+
+(a) Expect `migrations` 62 and `newest` 1792248953024 (0061's journal stamp).
+
+```sql
+-- 0062 step 2 (a): migrations recorded so far. Run this one alone.
+select count(*) as migrations, max(created_at) as newest
+from drizzle.__drizzle_migrations;
+```
+
+(b) **THE PRE-CHECK: `seed_book` 0, or STOP.**
+
+```sql
+-- 0062 step 2 (b): the pre-check. Run this one alone.
+select count(*) as seed_book from pg_class c join pg_namespace n on n.oid = c.relnamespace
+ where n.nspname = 'public' and c.relname = 'market_seed_book';
+```
+
+**3. Migrate, then apply RLS, then prove it landed.** From
+`C:\Users\HP\merta-main`:
+
+```powershell
+npm run db:migrate
+npm run db:apply-rls
+npm run assert-schema-applied -w @metra/db
+```
+
+Expect `Migrations applied.`, then `apply-rls: verified in the catalogues — 52
+tables, 52 policies, 15 triggers, 44 functions, ...` and a `grants verified`
+line naming 11 narrowed tables (`market_seed_book` among them), then
+`assert-schema-applied: OK — 52 declared table(s), every column present.`
+
+**4. Read-only, after.** Each block ON ITS OWN.
+
+(a) `migrations` 63 and `newest` 1792272891040 (0062's journal stamp): step 2
+(a) again.
+
+(b) One row: `rls` true, `forced` true, `policies` 1, `app_select` true,
+`app_writes` false, `api_roles_read` false, `entries` 0.
+
+```sql
+-- 0062 step 4 (b): the seed book's RLS and grants, and that it is empty. Run this one alone.
+select c.relrowsecurity as rls, c.relforcerowsecurity as forced,
+       (select count(*) from pg_policies p where p.schemaname = 'public' and p.tablename = c.relname) as policies,
+       has_table_privilege('metra_app', c.oid, 'select') as app_select,
+       has_table_privilege('metra_app', c.oid, 'insert')
+         or has_table_privilege('metra_app', c.oid, 'update')
+         or has_table_privilege('metra_app', c.oid, 'delete') as app_writes,
+       has_table_privilege('anon', c.oid, 'select') or has_table_privilege('authenticated', c.oid, 'select') as api_roles_read,
+       (select count(*) from public.market_seed_book) as entries
+from pg_class c join pg_namespace n on n.oid = c.relnamespace
+where n.nspname = 'public' and c.relname = 'market_seed_book';
+```
+
+**5. Afterwards: merge, build the seed book, smoke test.**
+
+1. **Stop and do not merge** if any output in steps 3 or 4 differs from what
+   is written there. Tell the lead what you saw instead.
+2. Tell the lead the database step is done; the lead merges and the Deploy
+   workflow deploys.
+3. **Build the seed book**, only if a bulletin is already published (with
+   none, the first `market:publish` builds it, and until then a new studio
+   simply starts with an empty price book). From the production checkout on
+   an up-to-date `main`, with `$env:MARKET_DATABASE_URL` set as in *Monthly
+   market bulletin*, run the dry run and then the real run of *Seeding studio
+   price books from the market book* below. The real run stores the seed
+   book; studios it seeded before get `created 0`. Then, read-only:
+   `select count(*) from market_seed_book;` equals the dry run's `published
+   market item(s)` (456 for July 2026).
+4. Smoke test, with the log open (`npx wrangler tail metra-web` from
+   `C:\Users\HP\merta-main\apps\web`): sign up a test studio with a second
+   email address. Its price book lists the market items within a few
+   seconds, and the log shows `market seed on sign-up:` with `published:
+   true` and the item count. Tell the lead which test studio to remove.
+5. Put the production checkout back on main (`git switch --detach
+   origin/main` after a fetch).
+
+**Undo, if ever needed.**
+
+**(1) The code:** `npx wrangler rollback <version-id>` with the version that
+served before the merge. Leave the database alone: the older Worker never
+reads the table.
+
+**(2) The schema, only if this is abandoned:** roll the code back FIRST (1),
+then run `drop table if exists public.market_seed_book;` on its own, and tell
+the lead: its policy leaves `60-market.sql` and its grant leaves `roles.sql`
+in the same revert, or the next `db:apply-rls` fails on the missing table.
+
+**(3) The seeded items:** a studio seeded at sign-up or from its empty price
+book has the same `MKT-` codes and market links as one the CLI seeded, so the
+undo of *Seeding studio price books from the market book* removes them too.
+
 ## Monthly market bulletin
 
 Once 0061 is applied and the branch is merged, every month's ministry
@@ -2717,7 +2862,9 @@ deleted; anything that would clash is skipped and counted.
 - **Audit:** a `create` row per section and per item, as the app writes them,
   marked `source: market:seed-price-books`. The actor is the studio's earliest
   owner (else its earliest admin), as for the app's automation. A studio with
-  neither is skipped and named.
+  neither is skipped and named. The app seeds with the same code: a studio
+  seeded at sign-up gets the same rows, marked `market:seed-on-signup`, and
+  one loaded from its empty price book `market:seed-from-price-book`.
 
 **One transaction per studio.** A studio is seeded completely or not at all.
 One studio's failure (say a code typed in the same second) undoes nothing
@@ -2761,7 +2908,9 @@ npm run market:seed-price-books -- --org <studio id>
 npm run market:seed-price-books
 ```
 
-The same lines with `created` in place of `to create`. Exit 0, or exit 1
+The same lines with `created` in place of `to create`. Before it seeds, a
+real run also rebuilds the seed book new studios are seeded from (*0062 and
+the market price book at sign-up*); a dry run does not. Exit 0, or exit 1
 with `FAILED, nothing written for this studio: SQLSTATE <code>: <the database's
 reason>` on each studio that failed (the others are seeded), e.g. `SQLSTATE
 55P03: canceling statement due to lock timeout` when a studio was saving the
