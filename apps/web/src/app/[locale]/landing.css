@@ -63,6 +63,15 @@
   letter-spacing: 0.12em;
   text-transform: uppercase;
 }
+/* Arabic labels: a monospace face and letter-spacing pull Arabic letters apart
+   and break their joining, so RTL labels use the page's Arabic face, untracked. */
+html[dir='rtl'] .landing-mono {
+  font-family: var(--font-sans);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+}
 
 /* Western numerals, always LTR (money/metric figures). */
 .landing-num {
