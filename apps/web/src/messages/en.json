@@ -733,8 +733,8 @@
     },
     "empty": {
       "title": "Your price book is empty",
-      "description": "Load our starter catalogue of common fit-out items, or import your own from a CSV file.",
-      "loadStarter": "Load starter catalogue",
+      "description": "Load the official market price book (the Ministry of Housing bulletin prices), or import your own items from a CSV file.",
+      "loadMarketBook": "Load the official market price book",
       "importExcel": "Import from CSV"
     },
     "actions": {
@@ -818,8 +818,9 @@
       "updated": "Cost item updated",
       "activated": "Item activated",
       "deactivated": "Item deactivated",
-      "starterLoaded": "Starter catalogue loaded ({count} items)",
-      "starterExists": "Starter items are already present",
+      "marketLoaded": "{count, plural, one {Market price book loaded ({shown} item)} other {Market price book loaded ({shown} items)}}",
+      "marketUpToDate": "Your price book already has every market item",
+      "marketNotPublished": "The market price book is not published yet",
       "sectionAdded": "Section added"
     },
     "confirmDeactivate": {

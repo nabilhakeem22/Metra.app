@@ -45,7 +45,7 @@ interface Catalogues {
 
 const ROLES_SQL = resolve(dirname(fileURLToPath(import.meta.url)), '../rls/roles.sql');
 
-/** The ten tables `verify-rls-applied.ts` reads back, in the order it asks. */
+/** The eleven tables `verify-rls-applied.ts` reads back, in the order it asks. */
 const NARROWED_TABLE_NAMES = [
   'boqs',
   'document_categories',
@@ -56,6 +56,7 @@ const NARROWED_TABLE_NAMES = [
   'market_item_details',
   'market_items',
   'market_price_observations',
+  'market_seed_book',
   'workspace_entitlements',
 ];
 
@@ -212,7 +213,7 @@ describe('verifyRlsApplied', () => {
   });
 
   it('prints the declared counts a green run reports', () => {
-    expect(declaredCounts()).toBe('51 tables, 51 policies, 15 triggers, 44 functions');
+    expect(declaredCounts()).toBe('52 tables, 52 policies, 15 triggers, 44 functions');
   });
 
   it('prints what the GRANT half checked, so a shrinking read-back is visible', () => {
@@ -221,10 +222,10 @@ describe('verifyRlsApplied', () => {
     // they belong in the output rather than only in the source.
     expect(verifiedGrantsSummary()).toBe(
       'grants verified — design_engagements update narrowed to 19 columns with no ' +
-        'table-level update, and 10 narrowed table(s) (boqs, document_categories, ' +
+        'table-level update, and 11 narrowed table(s) (boqs, document_categories, ' +
         'engagement_document_comments, engagement_milestones, market_bulletins, ' +
         'market_categories, market_item_details, market_items, market_price_observations, ' +
-        'workspace_entitlements) ' +
+        'market_seed_book, workspace_entitlements) ' +
         'holding exactly what rls/roles.sql leaves them.',
     );
   });
@@ -295,9 +296,9 @@ describe('the five NARROWED tables, read back at the database (wave 8 item 6)', 
     expect(await verifyRlsApplied(fixtureSql({}))).toEqual([]);
   });
 
-  it('reads the five market tables as SELECT-only (0061)', () => {
+  it('reads the six market tables as SELECT-only (0061, 0062)', () => {
     const roles = readFileSync(ROLES_SQL, 'utf8');
-    for (const table of ['market_bulletins', 'market_categories', 'market_item_details', 'market_items', 'market_price_observations']) {
+    for (const table of ['market_bulletins', 'market_categories', 'market_item_details', 'market_items', 'market_price_observations', 'market_seed_book']) {
       expect([...tablePrivilegesFor(roles, table)]).toEqual(['select']);
     }
   });

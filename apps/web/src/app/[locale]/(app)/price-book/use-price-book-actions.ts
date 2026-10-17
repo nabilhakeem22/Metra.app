@@ -1,15 +1,17 @@
 'use client';
 
 import { useTransition, type ReactNode } from 'react';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import { deactivationCopy, useActiveToggle } from '@/hooks/use-active-toggle';
 import { toast } from '@/hooks/use-toast';
 import { describeFailure, describeRejection } from '@/lib/actions/error-message';
 import type { ActionResult } from '@/lib/actions/result';
-import { loadStarterCatalogue, setCostItemActive } from '@/lib/price-book/actions';
+import { formatNumber } from '@/lib/format/number';
+import type { MarketSeedSummary } from '@/lib/market-book/seed-core';
+import { loadMarketPriceBook, setCostItemActive } from '@/lib/price-book/actions';
 import type { PriceBookItem } from './types';
 
-// The price book's row and page actions (activate, load the starter list), and
+// The price book's row and page actions (activate, load the market book), and
 // the toast each raises: neither has a field to say its refusal under. Adding a
 // category lives with its box (./use-section-adder).
 
@@ -18,13 +20,14 @@ export interface PriceBookActionsApi {
   /** The deactivate confirm; rendered once by the page. */
   confirmDialog: ReactNode;
   toggleActive: (item: PriceBookItem) => void;
-  loadStarter: () => void;
+  loadMarketBook: () => void;
 }
 
 export function usePriceBookActions(): PriceBookActionsApi {
   const t = useTranslations('priceBook');
   const te = useTranslations('errors');
   const tc = useTranslations('common');
+  const locale = useLocale();
   const [pending, startTransition] = useTransition();
 
   const refuse = (result: Pick<ActionResult, 'error' | 'params' | 'reference'>) =>
@@ -43,13 +46,13 @@ export function usePriceBookActions(): PriceBookActionsApi {
     void activeToggle.toggle(item);
   }
 
-  /** Loading the starter catalogue twice is not an error — it is a no-op, and the
-   *  studio is told which of the two happened. */
-  function loadStarter(): void {
+  /** Loading the market book twice is not an error: it adds nothing, and the
+   *  studio is told which happened (loaded, nothing new, nothing published yet). */
+  function loadMarketBook(): void {
     startTransition(async () => {
       let result;
       try {
-        result = await loadStarterCatalogue();
+        result = await loadMarketPriceBook();
       } catch (rejection) {
         unreachable(rejection);
         return;
@@ -58,18 +61,20 @@ export function usePriceBookActions(): PriceBookActionsApi {
         refuse(result);
         return;
       }
-      const inserted = result.data?.inserted ?? 0;
-      toast({
-        title:
-          inserted > 0 ? t('toast.starterLoaded', { count: inserted }) : t('toast.starterExists'),
-      });
+      toast({ title: marketLoadMessage(result.data) });
     });
+  }
+
+  function marketLoadMessage(summary: MarketSeedSummary | undefined): string {
+    if (!summary?.published) return t('toast.marketNotPublished');
+    if (summary.items === 0) return t('toast.marketUpToDate');
+    return t('toast.marketLoaded', { count: summary.items, shown: formatNumber(summary.items, locale) });
   }
 
   return {
     pending: pending || activeToggle.pending,
     confirmDialog: activeToggle.dialog,
     toggleActive,
-    loadStarter,
+    loadMarketBook,
   };
 }

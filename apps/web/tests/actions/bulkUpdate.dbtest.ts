@@ -2,7 +2,6 @@ import { sql } from 'drizzle-orm';
 import { afterAll, describe, expect, it } from 'vitest';
 import { withOrgContext } from '@/lib/db/context';
 import { bulkUpdatePricesCore } from '@/lib/price-book/bulk-core';
-import { loadStarterCatalogueCore } from '@/lib/price-book/starter-core';
 import { createCostItemCore } from '@/lib/price-book/core';
 import { listCostItems } from '@/lib/price-book/queries';
 import { closeFixture, ctxFor, raw, seedOrg, teardown } from './fixture';
@@ -142,22 +141,5 @@ describe('price history is append-only', () => {
         tx.execute(sql`delete from public.price_change_lines`),
       ),
     ).rejects.toThrow();
-  });
-});
-
-describe('loadStarterCatalogueCore — idempotent', () => {
-  it('loads 40 items once, then is a no-op', async () => {
-    const { orgId, ownerIds } = await seedOrg({ owners: 1 });
-    orgIds.push(orgId);
-    const ctx = ctxFor(orgId, ownerIds[0], 'owner');
-
-    const first = await loadStarterCatalogueCore(ctx);
-    expect(first.data?.inserted).toBe(40);
-    expect(first.data?.total).toBe(40);
-
-    const second = await loadStarterCatalogueCore(ctx);
-    expect(second.data?.inserted).toBe(0);
-
-    expect(await raw.count('cost_items', orgId)).toBe(40);
   });
 });

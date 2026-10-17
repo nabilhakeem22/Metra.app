@@ -11,8 +11,8 @@ import { STUDIOS, clearSeeded, fixtureItems, planOf, publishFixture, run, seeded
 // and one never priced.
 
 const breakPlan = vi.hoisted(() => ({ on: false }));
-vi.mock('../src/seed/plan', async (original) => {
-  const real = await original<typeof import('../src/seed/plan')>();
+vi.mock('@metra/db/market-seed', async (original) => {
+  const real = await original<typeof import('@metra/db/market-seed')>();
   return {
     ...real,
     planSeed: (...args: Parameters<typeof real.planSeed>) => {

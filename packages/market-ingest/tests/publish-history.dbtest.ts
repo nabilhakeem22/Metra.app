@@ -1,7 +1,7 @@
 import { rmSync } from 'node:fs';
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { withdrawCommand } from '../src/commands/withdraw-command';
-import { MARKET_WRITE_LOCK } from '../src/publish/withdraw';
+import { MARKET_WRITE_LOCK } from '../src/publish/write-lock';
 import { clearMarketTestData, openTestDatabase } from './db-fixture';
 import { bulletinFile, newStaging, publish, stage, type Staging } from './publish-fixture';
 

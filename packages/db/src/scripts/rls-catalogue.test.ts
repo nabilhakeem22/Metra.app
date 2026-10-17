@@ -17,7 +17,7 @@ import {
 // with exact counts.
 
 describe('policiesIn', () => {
-  it('keys by table, because most of the 51 policies share one name', () => {
+  it('keys by table, because most of the 52 policies share one name', () => {
     expect(
       policiesIn(
         'create policy org_isolation on public.clients\n  using (true);\n' +
@@ -91,7 +91,7 @@ describe('functionsIn', () => {
 });
 
 describe('what the real manifest declares', () => {
-  it('finds 51 policies, 15 triggers and 44 functions', () => {
+  it('finds 52 policies, 15 triggers and 44 functions', () => {
     // A guard on the guards: if a parser breaks, these numbers move and the
     // post-apply verification would otherwise silently check nothing.
     //
@@ -103,7 +103,7 @@ describe('what the real manifest declares', () => {
     // (wave 7 S5). An EXISTING declaration that starts being eaten reds here; a
     // NEW one eaten on the day it is written does not, because the count stays
     // where it was.
-    expect(declaredPolicies().size).toBe(51);
+    expect(declaredPolicies().size).toBe(52);
     expect(declaredTriggers().size).toBe(15);
     expect(declaredFunctions().size).toBe(44);
   });

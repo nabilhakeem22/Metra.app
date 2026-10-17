@@ -11,6 +11,7 @@ import { err, type ActionResult } from '@/lib/actions/result';
 import { requireOrg } from '@/lib/auth/require-org';
 import { getSessionUser } from '@/lib/auth/session';
 import { withUserContext } from '@/lib/db/context';
+import { seedAfterSignup } from '@/lib/market-book/seed-after-signup';
 import { canManageOrg } from '@/lib/permissions/can';
 import { createOrgCore, type OrgProfileInput } from './core';
 import { readOrgProfile, type OrgProfileText } from './profile-field-rules';
@@ -19,9 +20,11 @@ export type { OrgProfileInput };
 
 /**
  * Creates the org + owner membership + audit atomically, persisting the profile
- * columns. Does NOT redirect on success — the onboarding wizard may still upload
- * a logo afterwards, then navigates itself. Already-onboarded users are sent to
- * /dashboard (no second org), and a signed-out caller to /login.
+ * columns, then schedules the new studio's market price book for after the
+ * response (seedAfterSignup). Does NOT redirect on success — the onboarding
+ * wizard may still upload a logo afterwards, then navigates itself.
+ * Already-onboarded users are sent to /dashboard (no second org), and a
+ * signed-out caller to /login.
  *
  * Returns the core's coded ActionResult so the wizard can localize the failure;
  * it never throws its own error. (The two redirect() calls still throw the
@@ -43,10 +46,12 @@ export async function createOrg(input: OrgProfileInput): Promise<ActionResult> {
     redirect('/dashboard');
   }
 
-  return createOrgCore(
-    { orgId: randomUUID(), userId: user.id, role: 'owner' },
-    input,
-  );
+  const ctx = { orgId: randomUUID(), userId: user.id, role: 'owner' } as const;
+  const result = await createOrgCore(ctx, input);
+  // The new studio's market price book loads after this response is sent; a
+  // failure there never reaches the sign-up (its empty price book offers it).
+  if (result.ok) seedAfterSignup(ctx);
+  return result;
 }
 
 // --- Org settings (owner/admin only) ---------------------------------------

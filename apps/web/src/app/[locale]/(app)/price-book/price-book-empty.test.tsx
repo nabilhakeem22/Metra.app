@@ -1,0 +1,62 @@
+import { act, fireEvent, screen } from '@testing-library/react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { messageAt, renderWithIntl, type TestLocale } from '@/test/render-with-intl';
+import { PriceBookClient } from './price-book-client';
+
+// An empty price book offers the official market price book (the sign-up seed,
+// again) and says which of the three things happened: loaded, nothing new, or
+// nothing published yet. Counts in Latin digits in both languages.
+
+const priceBook = vi.hoisted(() => ({
+  bulkUpdatePrices: vi.fn(),
+  parseCostImport: vi.fn(),
+  importCostItems: vi.fn(),
+  setCostItemActive: vi.fn(),
+  loadMarketPriceBook: vi.fn(),
+  createCostItem: vi.fn(),
+  updateCostItem: vi.fn(),
+}));
+vi.mock('@/lib/price-book/actions', () => priceBook);
+vi.mock('@/lib/sections/actions', () => ({ addSection: vi.fn() }));
+const toast = vi.hoisted(() => vi.fn());
+vi.mock('@/hooks/use-toast', () => ({ toast }));
+vi.mock('@/i18n/routing', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/i18n/routing')>()),
+  useRouter: () => ({ refresh: vi.fn(), push: vi.fn() }),
+}));
+
+beforeEach(() => {
+  priceBook.loadMarketPriceBook.mockReset();
+  toast.mockReset();
+});
+
+describe.each<TestLocale>(['en', 'ar-EG'])('the empty price book (%s)', (locale) => {
+  async function load(data: { published: boolean; sections: number; items: number }) {
+    priceBook.loadMarketPriceBook.mockResolvedValue({ ok: true, data });
+    renderWithIntl(<PriceBookClient items={[]} sections={[]} canManage />, { locale });
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: messageAt(locale, 'priceBook.empty.loadMarketBook') }));
+    });
+    expect(priceBook.loadMarketPriceBook).toHaveBeenCalledTimes(1);
+    return toast.mock.calls[0][0].title as string;
+  }
+
+  it('says how many market items it loaded, in Latin digits', async () => {
+    const title = await load({ published: true, sections: 55, items: 447 });
+    expect(title).toContain('447');
+    expect(title).not.toMatch(/[٠-٩۰-۹]/);
+  });
+
+  it('says the book already has every market item when nothing was new', async () => {
+    expect(await load({ published: true, sections: 0, items: 0 })).toBe(messageAt(locale, 'priceBook.toast.marketUpToDate'));
+  });
+
+  it('says nothing is published yet when there is no bulletin', async () => {
+    expect(await load({ published: false, sections: 0, items: 0 })).toBe(messageAt(locale, 'priceBook.toast.marketNotPublished'));
+  });
+
+  it('offers no load to a studio member who cannot manage the book', () => {
+    renderWithIntl(<PriceBookClient items={[]} sections={[]} canManage={false} />, { locale });
+    expect(screen.queryByRole('button', { name: messageAt(locale, 'priceBook.empty.loadMarketBook') })).toBeNull();
+  });
+});

@@ -2,7 +2,7 @@
 // roll its pack size (roll-pack.ts). An unknown label is B3; extending this map
 // is a PR, never a session decision.
 import type { MarketUnit } from '@metra/db/schema';
-import { normalizeArabic } from './normalize';
+import { normalizeArabic } from '@metra/db/market-seed';
 import { parseRollPack, type RollPack } from './roll-pack';
 
 export type { MarketUnit };

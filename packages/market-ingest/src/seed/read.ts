@@ -2,9 +2,9 @@
 // context): the published market items with their latest numeric price, the
 // studios, and each studio's actor. Read-only. Everything a studio row is
 // written from runs later inside that studio's RLS transaction.
-import type { PostgresJs } from '../db/connection';
+import type { MarketSeedItem } from '@metra/db/market-seed';
+import type { PostgresJs, Queryable } from '../db/connection';
 import { packOf } from '../history/load';
-import type { MarketSeedItem } from './types';
 
 /**
  * Every item a published bulletin prices (what studios can see), in the
@@ -12,7 +12,7 @@ import type { MarketSeedItem } from './types';
  * value (the newest published bulletin reporting that month) is a number: a
  * suspended or empty month is skipped for the one before it.
  */
-export async function readMarketSeedItems(sql: PostgresJs): Promise<MarketSeedItem[]> {
+export async function readMarketSeedItems(sql: Queryable): Promise<MarketSeedItem[]> {
   const rows = await sql<Array<Record<string, string | number | null>>>`
     with effective as (
       select distinct on (o.item_id, o.period_month) o.item_id, o.period_month, o.status, o.price

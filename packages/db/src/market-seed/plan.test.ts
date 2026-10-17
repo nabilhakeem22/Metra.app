@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { planSeed } from './plan';
+import { buildSeedBook } from './book';
+import { planSeed as planStudio } from './plan';
 import type { MarketSeedItem, StudioBook } from './types';
+
+/** What the CLI does for one studio: the book of the whole published set, then that studio's plan. */
+const planSeed = (items: MarketSeedItem[], studio: StudioBook) => planStudio(buildSeedBook(items), studio);
 
 function item(overrides: Partial<MarketSeedItem> = {}): MarketSeedItem {
   return {

@@ -96,3 +96,18 @@ create policy market_read on public.market_item_details
         and b.status = 'published'
     )
   );
+
+-- THE SEED BOOK (0062): every published item as a studio's price book would
+-- receive it, rebuilt whole by market:publish, market:withdraw and
+-- market:seed-price-books from the published rows only, so it carries no
+-- withdrawn data of its own to hide. Read by the app's seed (a new studio at
+-- sign-up, an empty book's button) inside the studio's org context.
+alter table public.market_seed_book enable row level security;
+alter table public.market_seed_book force  row level security;
+drop policy if exists market_read on public.market_seed_book;
+create policy market_read on public.market_seed_book
+  for select
+  using (
+    (select nullif(current_setting('app.current_org_id', true), '')) is not null
+    and (select public.app_is_current_org_member())
+  );

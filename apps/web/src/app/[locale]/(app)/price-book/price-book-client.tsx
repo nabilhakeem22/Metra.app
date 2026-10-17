@@ -67,7 +67,7 @@ export function PriceBookClient({ items, sections, canManage }: PriceBookClientP
         <PriceBookEmpty
           canManage={canManage}
           pending={actions.pending}
-          onLoadStarter={actions.loadStarter}
+          onLoadMarketBook={actions.loadMarketBook}
           onImport={() => setImportOpen(true)}
         />
       </>

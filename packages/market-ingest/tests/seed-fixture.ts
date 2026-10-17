@@ -6,7 +6,7 @@
 import { ORG_A_ID, ORG_B_ID } from '@metra/db';
 import { createDb } from '@metra/db/client';
 import { runSeed, type StudioOutcome } from '../src/seed/run';
-import type { SeedPlan } from '../src/seed/types';
+import type { SeedPlan } from '@metra/db/market-seed';
 import { openTestDatabase, seedPublished } from './db-fixture';
 
 export const sql = openTestDatabase();

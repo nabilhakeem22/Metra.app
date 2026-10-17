@@ -3,16 +3,10 @@
 // bulletin prints it several ways, all of them seen in July 2026:
 //   «اللفة (100 م.ط)»  «اللفة (30 متر)»  «اللفة 45 متر)» (no opening bracket)
 //   «لفة 34×3م»  «لفة 15×3متر»  «لفة عدد 34 ماسورة بطول 3 متر»
-import { normalizeArabic } from './normalize';
+import { normalizeArabic, type RollPack } from '@metra/db/market-seed';
 
-export interface RollPack {
-  /** One continuous length, in metres: «اللفة (100 م.ط)» = 100. */
-  lengthM: number | null;
-  /** A bundle of pieces: «لفة 34×3م» = 34 pieces ... */
-  pieces: number | null;
-  /** ... each this long, in metres (3). */
-  pieceLengthM: number | null;
-}
+// The pack's shape is the seed's too (a roll is named with it), so it is declared once there.
+export type { RollPack };
 
 const ROLL_WORD = /^(ال)?لفه\s*/;
 const METRE = '(?:م\\.ط|مط|متر طولي|متر|م)';

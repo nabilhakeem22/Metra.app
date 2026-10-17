@@ -11,17 +11,18 @@ import { EmptyState } from '@/components/ui/empty-state';
  *
  * NOT a bare "no items" notice: an empty catalogue is the one state where the
  * studio needs the action more than the explanation, so both routes in (the
- * starter catalogue and an Excel import) are the empty state itself.
+ * official market price book, which a new studio gets at sign-up, and an Excel
+ * import) are the empty state itself.
  */
 export function PriceBookEmpty({
   canManage,
   pending,
-  onLoadStarter,
+  onLoadMarketBook,
   onImport,
 }: {
   canManage: boolean;
   pending: boolean;
-  onLoadStarter: () => void;
+  onLoadMarketBook: () => void;
   onImport: () => void;
 }) {
   const t = useTranslations('priceBook');
@@ -35,9 +36,9 @@ export function PriceBookEmpty({
           action={
             canManage ? (
               <div className="flex flex-wrap justify-center gap-2">
-                <Button variant="default" onClick={onLoadStarter} disabled={pending}>
+                <Button variant="default" onClick={onLoadMarketBook} disabled={pending}>
                   {pending && <Loader2 className="size-4 animate-spin" aria-hidden />}
-                  {t('empty.loadStarter')}
+                  {t('empty.loadMarketBook')}
                 </Button>
                 <Button variant="secondary" onClick={onImport}>
                   <Upload className="size-4" aria-hidden />

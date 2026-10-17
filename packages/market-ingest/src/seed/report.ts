@@ -1,6 +1,6 @@
 // The per-studio lines `market:seed-price-books` prints (dry run and real run
 // alike), and the totals.
-import { SKIP_REASONS, type SkipReason } from './types';
+import { SKIP_REASONS, type SkipReason } from '@metra/db/market-seed';
 import type { SeedRun } from './run';
 
 const REASON_WORDS: Record<SkipReason, string> = {

@@ -22,7 +22,7 @@ const priceBook = vi.hoisted(() => ({
   parseCostImport: vi.fn(),
   importCostItems: vi.fn(),
   setCostItemActive: vi.fn(),
-  loadStarterCatalogue: vi.fn(),
+  loadMarketPriceBook: vi.fn(),
   createCostItem: vi.fn(),
   updateCostItem: vi.fn(),
 }));

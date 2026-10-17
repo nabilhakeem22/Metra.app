@@ -3,7 +3,7 @@
 // key that marks a section the seed created. Names are decided over the WHOLE
 // seed set at once, so they are the same on every run and in every studio, and
 // no two seeded items read alike.
-import type { RollPack } from '../roll-pack';
+import type { RollPack } from './types';
 import { comparisonForm } from './compare';
 
 /** Sections the seed creates carry `market.<sub-category key>` in sections.key. */

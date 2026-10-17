@@ -5,7 +5,7 @@
 // Names compare in the one comparison form (./compare.ts).
 import { comparisonForm } from './compare';
 import { SECTION_KEY_PREFIX, sectionKey } from './naming';
-import type { ItemToCreate, MarketSeedItem, SectionToCreate, StudioBook } from './types';
+import type { ItemToCreate, SectionToCreate, SeedLeaf, StudioBook } from './types';
 
 type Target = ItemToCreate['section'];
 
@@ -35,7 +35,7 @@ export class SectionPlanner {
     return this.takenNames.has(comparisonForm(nameAr)) || this.takenNames.has(comparisonForm(nameEn));
   }
 
-  private decide(item: MarketSeedItem): Target {
+  private decide(item: SeedLeaf): Target {
     const key = sectionKey(item.leafKey);
     const seeded = this.byKey.get(key);
     if (seeded) return { id: seeded };
@@ -52,7 +52,7 @@ export class SectionPlanner {
     return { key };
   }
 
-  target(item: MarketSeedItem): Target {
+  target(item: SeedLeaf): Target {
     const known = this.decided.get(item.leafKey);
     if (known) return known;
     const target = this.decide(item);

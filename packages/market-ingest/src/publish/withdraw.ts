@@ -5,10 +5,9 @@
 // published. `--replace` runs the same step on the bulletin it replaces.
 import { applyMarketWriteTimeouts } from '@metra/db/lock-timeout';
 import type { PostgresJs, Transaction } from '../db/connection';
+import { refreshSeedBook } from '../seed/book-store';
 import { refreshItemDetails } from './details';
-
-/** One market write at a time, publish or withdraw, whoever runs it. */
-export const MARKET_WRITE_LOCK = 'metra.market.publish';
+import { MARKET_WRITE_LOCK } from './write-lock';
 
 export async function withdrawInTransaction(tx: Transaction, bulletinId: string, reason: string): Promise<void> {
   const [row] = await tx<Array<{ discontinued_item_ids: string[] }>>`
@@ -33,6 +32,7 @@ export async function withdrawPeriod(sql: PostgresJs, period: string, reason: st
       select id from market_bulletins where publisher = 'mhuc_cabm' and period_month = ${`${period}-01`} and status = 'published'`;
     if (!current) throw new Error(`no published bulletin for ${period}; nothing was withdrawn`);
     await withdrawInTransaction(tx, current.id, reason);
+    await refreshSeedBook(tx);
     return current.id;
   })) as string;
 }

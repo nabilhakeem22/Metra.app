@@ -3,6 +3,7 @@
 import { refreshApp } from '@/lib/actions/refresh';
 import { err, type ActionResult } from '@/lib/actions/result';
 import { requireOrg } from '@/lib/auth/require-org';
+import { loadMarketPriceBookCore, type MarketSeedSummary } from '@/lib/market-book/seed-core';
 import {
   bulkUpdatePricesCore,
   type BulkUpdateInput,
@@ -15,7 +16,6 @@ import {
   type CostItemInput,
 } from './core';
 import type { ColumnMapping } from './import';
-import { loadStarterCatalogueCore, type StarterLoadSummary } from './starter-core';
 import {
   fileRefused,
   importCostItemsCore,
@@ -63,11 +63,12 @@ export async function bulkUpdatePrices(
   return res;
 }
 
-export async function loadStarterCatalogue(): Promise<
-  ActionResult & { data?: StarterLoadSummary }
+/** The empty price book's load of the official market book (the sign-up seed, again: idempotent). */
+export async function loadMarketPriceBook(): Promise<
+  ActionResult & { data?: MarketSeedSummary }
 > {
   const ctx = await requireOrg();
-  const res = await loadStarterCatalogueCore(ctx);
+  const res = await loadMarketPriceBookCore(ctx);
   if (res.ok) refreshApp();
   return res;
 }

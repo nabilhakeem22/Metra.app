@@ -24,21 +24,33 @@ async function categoryId(): Promise<string> {
   return row.id;
 }
 
+export interface MarketItemOptions {
+  nameAr?: string;
+  nameEn?: string;
+  /** A roll's one-length pack, in metres (a roll needs one). */
+  packLengthM?: number;
+  status?: 'active' | 'discontinued';
+}
+
 /** A fresh market item (unit sqm unless given); its key is unique to this run. */
-export async function seedMarketItem(unit = 'sqm'): Promise<{ id: string; key: string }> {
+export async function seedMarketItem(unit = 'sqm', options: MarketItemOptions = {}): Promise<{ id: string; key: string }> {
   const key = `${CATEGORY.leaf}.dbtest_${randomUUID().replace(/-/g, '').slice(0, 12)}`;
   const [row] = await pg<{ id: string }[]>`
-    insert into public.market_items (key, category_id, name_ar, name_en, unit, unit_label_ar)
-    values (${key}, ${await categoryId()}, 'زجاج شفاف', 'Clear glass', ${unit}::market_unit, 'م2')
+    insert into public.market_items (key, category_id, name_ar, name_en, unit, unit_label_ar, pack_length_m, status)
+    values (${key}, ${await categoryId()}, ${options.nameAr ?? 'زجاج شفاف'}, ${options.nameEn ?? 'Clear glass'}, ${unit}::market_unit, 'م2',
+            ${options.packLengthM ?? null}, ${options.status ?? 'active'}::market_item_status)
     returning id`;
   seeded.items.add(row.id);
   return { id: row.id, key };
 }
 
-/** A published (or withdrawn) bulletin for `period` ('YYYY-MM') with one price per [itemId, 'YYYY-MM', price]. */
+/**
+ * A published (or withdrawn) bulletin for `period` ('YYYY-MM') with one price
+ * per [itemId, 'YYYY-MM', price]; a null price is a suspended month.
+ */
 export async function seedBulletin(
   period: string,
-  observations: Array<[itemId: string, month: string, price: string]>,
+  observations: Array<[itemId: string, month: string, price: string | null]>,
 ): Promise<string> {
   const [bulletin] = await pg<{ id: string }[]>`
     insert into public.market_bulletins
@@ -50,7 +62,7 @@ export async function seedBulletin(
   seeded.bulletins.add(bulletin.id);
   for (const [itemId, month, price] of observations) {
     await pg`insert into public.market_price_observations (item_id, bulletin_id, bulletin_period_month, period_month, status, price, source_pdf_page)
-             values (${itemId}, ${bulletin.id}, ${`${period}-01`}, ${`${month}-01`}, 'priced', ${price}, 1)`;
+             values (${itemId}, ${bulletin.id}, ${`${period}-01`}, ${`${month}-01`}, ${price === null ? 'suspended' : 'priced'}::market_observation_status, ${price}, 1)`;
   }
   return bulletin.id;
 }

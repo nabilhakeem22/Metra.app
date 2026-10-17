@@ -45,9 +45,12 @@ function runtimeUrl(): string {
 //     sat idle with zero errors. Hyperdrive must point at the SESSION pooler.
 // The app is pooler-safe either way: prepare:false, SET LOCAL-only GUCs, and
 // transaction-scoped advisory locks (never session-level ones).
-export function createRuntimeConnection(): { db: MetraDb; sql: PostgresJs } {
+//
+// `max` is lower only for work that runs one transaction on its own connection
+// after the response (./after-response-connection.ts).
+export function createRuntimeConnection(max = 5): { db: MetraDb; sql: PostgresJs } {
   const ssl = isCloudflareRuntime() ? { ssl: false as const } : {};
-  return createDb(runtimeUrl(), { prepare: false, max: 5, ...ssl });
+  return createDb(runtimeUrl(), { prepare: false, max, ...ssl });
 }
 
 // Wall-clock ceiling (ms) for a single withRequestDb call on the Cloudflare

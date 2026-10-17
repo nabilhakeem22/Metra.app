@@ -6,10 +6,12 @@ import { applyMarketWriteTimeouts } from '@metra/db/lock-timeout';
 import { computeCheck } from '../commands/perform-check';
 import type { PostgresJs, Transaction } from '../db/connection';
 import { loadHistory } from '../history/load';
+import { refreshSeedBook } from '../seed/book-store';
 import type { StagedBulletin } from '../stage';
 import { approvedStaged } from './approve';
 import { refreshItemDetails } from './details';
-import { MARKET_WRITE_LOCK, withdrawInTransaction } from './withdraw';
+import { withdrawInTransaction } from './withdraw';
+import { MARKET_WRITE_LOCK } from './write-lock';
 import { discontinueItems, insertDetails, insertObservations, upsertCategories, writeItems } from './writes';
 
 export interface PublishRequest {
@@ -71,6 +73,7 @@ export async function publishPeriod(sql: PostgresJs, request: PublishRequest): P
     await insertDetails(tx, staged, bulletinId);
     await insertObservations(tx, staged, bulletinId, items.ids);
     await refreshItemDetails(tx, [...items.ids.values()]);
+    await refreshSeedBook(tx);
     return {
       bulletinId,
       replaced,
