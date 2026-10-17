@@ -17,7 +17,7 @@ export function Pricing() {
   const t = useTranslations('landing.pricing');
 
   return (
-    <section className="landing-blk" id="pricing">
+    <section className="landing-blk landing-pricing" id="pricing">
       <div className="landing-wrap">
         <div className="landing-sec-head">
           <span className="landing-mono">{t('eyebrow')}</span>
@@ -27,9 +27,7 @@ export function Pricing() {
         <div className="landing-price">
           <div className="landing-price-card">
             <div className="landing-tag">{t('badge')}</div>
-            <div className="landing-mono" style={{ color: 'var(--text-muted)' }}>
-              {t('planName')}
-            </div>
+            <div className="landing-mono landing-plan">{t('planName')}</div>
             <div className="landing-amt">
               {t('amount')}
               <small> {t('amountNote')}</small>

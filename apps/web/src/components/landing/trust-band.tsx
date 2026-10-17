@@ -1,4 +1,5 @@
 import { useTranslations } from 'next-intl';
+import { WordReveal } from './word-reveal';
 
 /**
  * Honest positioning band beneath the hero — a single statement of who Metra is
@@ -10,7 +11,7 @@ export function TrustBand() {
   return (
     <div className="landing-trust">
       <div className="landing-wrap">
-        <p>{t('line')}</p>
+        <WordReveal text={t('line')} />
       </div>
     </div>
   );
