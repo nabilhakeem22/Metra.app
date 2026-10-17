@@ -2313,6 +2313,320 @@ alter table public.organizations
     check ((instapay_address IS NULL OR (instapay_address !~ '[\u00AD\u0600-\u0605\u061C\u06DD\u070F\u0890-\u0891\u08E2\u180E\u200B-\u200F\u202A-\u202E\u2060-\u2064\u2066-\u206F\uFEFF\uFFF9-\uFFFB\U000110BD\U000110CD\U00013430-\U0001343F\U0001BCA0-\U0001BCA3\U0001D173-\U0001D17A\U000E0001\U000E0020-\U000E007F]' AND instapay_address !~ '[\u0001-\u001F\u007F-\u009F]' AND instapay_address ~ '[^\u0009-\u000D\u0020\u00A0\u1680\u2000-\u200A\u2028\u2029\u202F\u205F\u3000\uFEFF\u0085\u2800\u115F\u1160\u3164\uFFA0\u0300-\u036F\u0483-\u0489\u0610-\u061A\u064B-\u065F\u0670\u06D6-\u06DC\u06DF-\u06E4\u06E7-\u06E8\u06EA-\u06ED\u1AB0-\u1ACE\u1DC0-\u1DFF\u20D0-\u20F0\uFE20-\uFE2F\u17B4-\u17B5\u180B-\u180F\uFE00-\uFE0F\U00013440\U00016FE4\U000E0100-\U000E01EF\uE000-\uF8FF\uFDD0-\uFDEF\uFFFE-\uFFFF\U0001FFFE-\U0001FFFF\U0002FFFE-\U0002FFFF\U0003FFFE-\U0003FFFF\U0004FFFE-\U0004FFFF\U0005FFFE-\U0005FFFF\U0006FFFE-\U0006FFFF\U0007FFFE-\U0007FFFF\U0008FFFE-\U0008FFFF\U0009FFFE-\U0009FFFF\U000AFFFE-\U000AFFFF\U000BFFFE-\U000BFFFF\U000CFFFE-\U000CFFFF\U000DFFFE-\U000DFFFF\U000EFFFE-\U000EFFFF\U000F0000-\U0010FFFF]')) AND (bank_name IS NULL OR (bank_name !~ '[\u00AD\u0600-\u0605\u061C\u06DD\u070F\u0890-\u0891\u08E2\u180E\u200B-\u200F\u202A-\u202E\u2060-\u2064\u2066-\u206F\uFEFF\uFFF9-\uFFFB\U000110BD\U000110CD\U00013430-\U0001343F\U0001BCA0-\U0001BCA3\U0001D173-\U0001D17A\U000E0001\U000E0020-\U000E007F]' AND bank_name !~ '[\u0001-\u001F\u007F-\u009F]' AND bank_name ~ '[^\u0009-\u000D\u0020\u00A0\u1680\u2000-\u200A\u2028\u2029\u202F\u205F\u3000\uFEFF\u0085\u2800\u115F\u1160\u3164\uFFA0\u0300-\u036F\u0483-\u0489\u0610-\u061A\u064B-\u065F\u0670\u06D6-\u06DC\u06DF-\u06E4\u06E7-\u06E8\u06EA-\u06ED\u1AB0-\u1ACE\u1DC0-\u1DFF\u20D0-\u20F0\uFE20-\uFE2F\u17B4-\u17B5\u180B-\u180F\uFE00-\uFE0F\U00013440\U00016FE4\U000E0100-\U000E01EF\uE000-\uF8FF\uFDD0-\uFDEF\uFFFE-\uFFFF\U0001FFFE-\U0001FFFF\U0002FFFE-\U0002FFFF\U0003FFFE-\U0003FFFF\U0004FFFE-\U0004FFFF\U0005FFFE-\U0005FFFF\U0006FFFE-\U0006FFFF\U0007FFFE-\U0007FFFF\U0008FFFE-\U0008FFFF\U0009FFFE-\U0009FFFF\U000AFFFE-\U000AFFFF\U000BFFFE-\U000BFFFF\U000CFFFE-\U000CFFFF\U000DFFFE-\U000DFFFF\U000EFFFE-\U000EFFFF\U000F0000-\U0010FFFF]')) AND (bank_account_holder IS NULL OR (bank_account_holder !~ '[\u00AD\u0600-\u0605\u061C\u06DD\u070F\u0890-\u0891\u08E2\u180E\u200B-\u200F\u202A-\u202E\u2060-\u2064\u2066-\u206F\uFEFF\uFFF9-\uFFFB\U000110BD\U000110CD\U00013430-\U0001343F\U0001BCA0-\U0001BCA3\U0001D173-\U0001D17A\U000E0001\U000E0020-\U000E007F]' AND bank_account_holder !~ '[\u0001-\u001F\u007F-\u009F]' AND bank_account_holder ~ '[^\u0009-\u000D\u0020\u00A0\u1680\u2000-\u200A\u2028\u2029\u202F\u205F\u3000\uFEFF\u0085\u2800\u115F\u1160\u3164\uFFA0\u0300-\u036F\u0483-\u0489\u0610-\u061A\u064B-\u065F\u0670\u06D6-\u06DC\u06DF-\u06E4\u06E7-\u06E8\u06EA-\u06ED\u1AB0-\u1ACE\u1DC0-\u1DFF\u20D0-\u20F0\uFE20-\uFE2F\u17B4-\u17B5\u180B-\u180F\uFE00-\uFE0F\U00013440\U00016FE4\U000E0100-\U000E01EF\uE000-\uF8FF\uFDD0-\uFDEF\uFFFE-\uFFFF\U0001FFFE-\U0001FFFF\U0002FFFE-\U0002FFFF\U0003FFFE-\U0003FFFF\U0004FFFE-\U0004FFFF\U0005FFFE-\U0005FFFF\U0006FFFE-\U0006FFFF\U0007FFFE-\U0007FFFF\U0008FFFE-\U0008FFFF\U0009FFFE-\U0009FFFF\U000AFFFE-\U000AFFFF\U000BFFFE-\U000BFFFF\U000CFFFE-\U000CFFFF\U000DFFFE-\U000DFFFF\U000EFFFE-\U000EFFFF\U000F0000-\U0010FFFF]')));
 ```
 
+### 0061 and the market price book database step: owner runbook
+
+The market price book has ONE database step, and this is it: migration
+`0061_market_price_book.sql` plus one new policy file and one new grant under
+`rls/`. It is validated on branch `validate/market-price-book`.
+
+**THE ORDER (do not change it):**
+
+1. **The database goes first**, from the `validate/market-price-book` branch
+   (steps 1 to 4 below), while production still runs the current `main`.
+2. **Then** the branch is merged to `main` and deployed (the Deploy workflow
+   green), and you run the smoke test (step 5).
+
+Why this order, one sentence each:
+
+- **The new code needs 0061:** every read of `cost_items` now names
+  `market_item_id`, so new code on a database without 0061 fails every price
+  book page with 42703.
+- **The current Worker is safe on the 0061 database:** 0061 only ADDS (a
+  nullable column, five enum labels, four new tables nobody reads yet), so
+  the code that serves today never meets anything it does not know. Stated
+  from the construction of the migration; main's own test suite was not
+  replayed against it.
+- **There is no rollback floor:** any Worker version may serve on the 0061
+  database (see *Rolling back*).
+
+**What it changes.** No row is touched and nothing is backfilled.
+
+| Object | Change |
+|---|---|
+| `cost_item_unit` | five labels appended: `kg`, `ton`, `liter`, `cbm`, `roll`. IRREVERSIBLE (Postgres cannot drop an enum label); harmless while unused |
+| five new enum types | `market_publisher`, `market_bulletin_status`, `market_unit`, `market_item_status`, `market_observation_status` |
+| four new tables | `market_categories`, `market_items`, `market_bulletins`, `market_price_observations`: platform-level (no `org_id`), empty until the first `market:publish` |
+| `cost_items.market_item_id` | new, nullable, every row NULL; FK to `market_items` (on delete restrict, added NOT VALID then validated) and the partial index `cost_items_org_market_item_idx` |
+| `rls/policies/60-market.sql` | the four tables: RLS enabled and forced, one SELECT policy `market_read` each (a member org context; published bulletins only) |
+| `rls/roles.sql` | `metra_app` gets SELECT on the four tables and nothing else |
+
+**1. Put the market price book code in the production checkout.** Detach onto
+the branch. This step adds a workspace package (`packages/market-ingest`) and
+no dependency of `db:migrate` or `db:apply-rls`, so the installed
+`node_modules` serve as they are.
+
+```powershell
+cd C:\Users\HP\merta-main
+git fetch origin
+git switch --detach origin/validate/market-price-book
+git log --oneline -1    # a "docs(deploy): ..." commit (this runbook); CI green on it
+git diff --stat 5f82f0e HEAD    # MUST list only docs/DEPLOY.md: the code is exactly what was rehearsed (5f82f0e)
+```
+
+If the diff lists any other file, STOP and tell the lead.
+
+**2. Read-only, before** (Supabase SQL editor). The editor shows only the
+LAST result of what you run, so run each block below ON ITS OWN: paste it,
+run it, note the result, then the next one.
+
+(a) How many migrations are recorded. Expect `migrations` 61 and `newest`
+1791767848859 (0060's journal stamp).
+
+```sql
+-- 0061 step 2 (a): migrations recorded so far. Run this one alone.
+select count(*) as migrations, max(created_at) as newest
+from drizzle.__drizzle_migrations;
+```
+
+(b) **THE PRE-CHECK. Exactly this row, or STOP.** `server_ok` true (0061
+needs PostgreSQL 12 or later; Supabase runs 17), `cost_item_units` exactly
+`sqm,linear_meter,pcs,lump_sum,day`, and `market_relations`,
+`market_types` and `link_column` all 0. Anything else means part of the
+market price book is already in this database: do not run step 3, tell the
+lead.
+
+```sql
+-- 0061 step 2 (b): the pre-check. Run this one alone.
+select current_setting('server_version_num')::integer >= 120000 as server_ok,
+       (select string_agg(e.enumlabel, ',' order by e.enumsortorder)
+          from pg_enum e join pg_type t on t.oid = e.enumtypid
+         where t.typname = 'cost_item_unit') as cost_item_units,
+       (select count(*) from pg_class c join pg_namespace n on n.oid = c.relnamespace
+         where n.nspname = 'public' and c.relname like 'market\_%') as market_relations,
+       (select count(*) from pg_type t join pg_namespace n on n.oid = t.typnamespace
+         where n.nspname = 'public' and t.typname like 'market\_%') as market_types,
+       (select count(*) from information_schema.columns
+         where table_schema = 'public' and table_name = 'cost_items' and column_name = 'market_item_id') as link_column;
+```
+
+(c) How many price book items there are. Note the number; step 4 expects the
+same.
+
+```sql
+-- 0061 step 2 (c): cost items. Run this one alone.
+select count(*) as cost_items from cost_items;
+```
+
+**3. Migrate, then apply RLS, then prove it landed.** In this order, from
+`C:\Users\HP\merta-main` (its `.env` is the production connection):
+
+```powershell
+npm run db:migrate
+npm run db:apply-rls
+npm run assert-schema-applied -w @metra/db
+```
+
+**NOTICE blocks are normal.** Both commands print routine NOTICE blocks
+(several lines each, with `severity: 'NOTICE'` and a `message:` line). They
+are not failures. The production-shaped rehearsal (a database built by main's
+own migrations and main's own `rls/`, with the Supabase API roles) printed
+these `message:` lines (on Supabase a line about a role may differ; any line
+that ends `does not exist, skipping` or `already exists, skipping` is the
+same kind):
+
+- `db:migrate`: `message: 'schema "drizzle" already exists, skipping',` and
+  `message: 'relation "__drizzle_migrations" already exists, skipping',`
+- `db:apply-rls`, in this order:
+  `message: 'function public.app_delivery_respond_by_token(text,text,text,text,text,text) does not exist, skipping',`
+  then `message: 'function public.app_delivery_choose_concept_by_token(text,uuid,text,text,text,text) does not exist, skipping',`
+  then `message: 'role "postgres" has already been granted membership in role "metra_app" by role "postgres"',`
+  then `message: 'policy "self_memberships" for relation "public.memberships" does not exist, skipping',`
+  then FOUR new ones, once only (the first run creates the policies they
+  drop): `message: 'policy "market_read" for relation "public.market_categories" does not exist, skipping',`
+  and the same for `public.market_items`, `public.market_bulletins` and
+  `public.market_price_observations`. A second `db:apply-rls` prints only the
+  first four.
+
+Only a line that starts `Migration failed:` or `apply-rls failed:` is a
+failure. Expected:
+
+- `db:migrate` exits 0 and prints `Migrations applied.`. It does not print a
+  count, so run step 4 (a): `migrations` is exactly one higher (62).
+- `db:apply-rls` exits 0 and ends with two lines. The first starts
+  `apply-rls: verified in the catalogues` and goes on `50 tables, 50 policies, 15 triggers, 44 functions, RLS forced on all of them, role metra_app present.`;
+  the second starts `apply-rls: grants verified` and goes on
+  `design_engagements update narrowed to 19 columns with no table-level update, and 9 narrowed table(s) (boqs, document_categories, engagement_document_comments, engagement_milestones, market_bulletins, market_categories, market_items, market_price_observations, workspace_entitlements) holding exactly what rls/roles.sql leaves them.`
+- `assert-schema-applied` exits 0 and prints
+  `assert-schema-applied: OK — 50 declared table(s), every column present.`,
+  then `indexes — 115 declared, all present.`, `constraints — 268 declared, all present.`
+  and `functions — 44 declared, all present.` (the last three are report
+  only and do not fail it).
+
+**If a command fails, it prints the SQLSTATE and what to do,** on two lines:
+
+- `Migration failed: SQLSTATE 55P03: canceling statement due to lock timeout`
+  (or `SQLSTATE 40P01: deadlock detected`) then
+  `Migration failed: lock wait or deadlock, safe to re-run at a quieter moment (the whole batch rolled back, nothing was changed).`
+  A long query held `cost_items` for more than 3 s. Re-run `db:migrate` a
+  little later. The same two codes from `db:apply-rls` print `apply-rls
+  failed: ...` and end `(this file rolled back; the files before it stay
+  applied).`: re-run `db:apply-rls`.
+- `Migration failed: SQLSTATE P0001: 0061 needs PostgreSQL 12 or later ...`:
+  the server is too old for this migration. Nothing changed; tell the lead.
+- Any other code ends `tell the lead before running anything else`.
+
+**Locks.** `db:migrate` runs 0061 as ONE transaction. The four new tables
+are created empty. On `cost_items` it takes ACCESS EXCLUSIVE for the new
+column (metadata only), the NOT VALID foreign key, the validation (every row
+is NULL, so it checks nothing) and one index build, all held until the commit.
+Price book and proposal builder pages opened in that window wait; none fails.
+At pilot size this is well under the migrator's 3 s `lock_timeout`; that is an
+estimate, not a production measurement. `db:apply-rls` adds one policy file
+with four tables, the 4 x 3 s = 12 s worst case of the rule above.
+
+**4. Read-only, after: expected results.** Again each block ON ITS OWN.
+
+(a) `migrations` 62 and `newest` 1792248953024 (0061's journal stamp).
+
+```sql
+-- 0061 step 4 (a): migrations recorded now. Run this one alone.
+select count(*) as migrations, max(created_at) as newest
+from drizzle.__drizzle_migrations;
+```
+
+(b) Step 2 (b) again, as its own block. Now `cost_item_units` is
+`sqm,linear_meter,pcs,lump_sum,day,kg,ton,liter,cbm,roll`, `market_relations`
+16, `market_types` 9 and `link_column` 1 (`server_ok` still true).
+
+(c) 4 rows, one per market table, every one with `rls` true, `forced` true,
+`policies` 1, `app_select` true, `app_writes` false and `api_roles_read`
+false.
+
+```sql
+-- 0061 step 4 (c): the market tables' RLS and grants. Run this one alone.
+select c.relname, c.relrowsecurity as rls, c.relforcerowsecurity as forced,
+       (select count(*) from pg_policies p where p.schemaname = 'public' and p.tablename = c.relname) as policies,
+       has_table_privilege('metra_app', c.oid, 'select') as app_select,
+       has_table_privilege('metra_app', c.oid, 'insert')
+         or has_table_privilege('metra_app', c.oid, 'update')
+         or has_table_privilege('metra_app', c.oid, 'delete') as app_writes,
+       has_table_privilege('anon', c.oid, 'select') or has_table_privilege('authenticated', c.oid, 'select') as api_roles_read
+from pg_class c join pg_namespace n on n.oid = c.relnamespace
+where n.nspname = 'public'
+  and c.relname in ('market_categories', 'market_items', 'market_bulletins', 'market_price_observations')
+order by 1;
+```
+
+(d) `cost_items` the same number as step 2 (c), and `linked` 0.
+
+```sql
+-- 0061 step 4 (d): cost items, none linked yet. Run this one alone.
+select count(*) as cost_items, count(market_item_id) as linked from cost_items;
+```
+
+**5. Afterwards: merge, smoke test, return the checkout to main.**
+
+1. **Stop and do not merge** if any output in steps 3 or 4 differs from what
+   is written there. Tell the lead what you saw instead.
+2. Tell the lead the database step is done; the lead merges the branch and
+   the Deploy workflow deploys it.
+3. Smoke test on your own studio, with the log open (from
+   `C:\Users\HP\merta-main\apps\web`: `npx wrangler tail metra-web`): open the
+   price book, open "New item" and check the unit list now ends with kg, ton,
+   liter, m³ and roll, then cancel. Expected: the page loads, and the log shows
+   no `42703` and no `42501`.
+4. Put the production checkout back on main:
+
+```powershell
+cd C:\Users\HP\merta-main
+git fetch origin
+git switch --detach origin/main
+```
+
+**Undo, if ever needed.**
+
+**(1) The code** (a price book page fails after the deploy): from
+`C:\Users\HP\merta-main\apps\web`, `npx wrangler rollback <version-id>` with
+the version that served before the merge (`npx wrangler deployments list`).
+Leave the database alone: the older Worker runs on it (see THE ORDER).
+
+**(2) The schema, only if the market price book is abandoned.** Roll the code
+back FIRST (1): a Worker with this code reads `cost_items.market_item_id` and
+fails with 42703 the moment it is gone. Then run this ONE block, which drops
+everything 0061 created except the five `cost_item_unit` labels (they cannot be
+dropped and stay harmless). Rehearsed: step 2 (b) then reads
+`market_relations`, `market_types` and `link_column` 0 again. Then tell the
+lead: `60-market.sql` leaves the manifest and the market grant leaves
+`roles.sql` in the same revert, or the next `db:apply-rls` fails on the
+missing tables. 0061 stays recorded in `drizzle.__drizzle_migrations`; the
+feature comes back only with a new migration.
+
+```sql
+-- 0061 undo (2): the market price book schema, as ONE transaction.
+begin;
+drop index if exists public.cost_items_org_market_item_idx;
+alter table public.cost_items drop constraint if exists cost_items_market_item_id_market_items_id_fk;
+alter table public.cost_items drop column if exists market_item_id;
+drop table if exists public.market_price_observations, public.market_bulletins, public.market_items, public.market_categories;
+drop type if exists public.market_observation_status, public.market_item_status, public.market_unit, public.market_bulletin_status, public.market_publisher;
+commit;
+```
+
+## Monthly market bulletin
+
+Once 0061 is applied and the branch is merged, every month's ministry
+bulletin goes through the same five steps. The data is read by a Claude Code
+session; the repo's `market:*` commands are the gate. Nothing here calls an
+API or needs a key. All commands run from `C:\Users\HP\merta-main` on an
+up-to-date `main`; `market:catalogue`, `market:check` (without `--offline`),
+`market:publish` and `market:withdraw` use its `.env` (the production
+database). The working files go to `.market-staging\<YYYY-MM>\` (gitignored).
+
+**1. Put the files in one place**, e.g.
+`C:\Users\HP\market-bulletins\2026-07\bulletin-2026-07.pdf` and, if you have
+it, the MD conversion beside it.
+
+**2. Start a Claude Code session in `C:\Users\HP\merta-main` and paste,
+with your paths and period:**
+
+```text
+Read docs/market-price-book/EXTRACTION.md, then extract
+C:\Users\HP\market-bulletins\2026-07\bulletin-2026-07.pdf
+(and C:\Users\HP\market-bulletins\2026-07\bulletin-2026-07.md) for period 2026-07.
+Run npm run market:catalogue first and reuse its keys. Write part files under
+.market-staging/2026-07/parts, run npm run market:check -- --period 2026-07
+--pdf <the PDF> --md <the MD>, fix what you can, and hand me the confirm list.
+Never run market:publish.
+```
+
+**3. Clear the confirm list.** For each row the session lists, open the PDF
+page it names and record the answer in `.market-staging\<YYYY-MM>\`:
+`corrections.json` for a value (`[{ "rowId": "p11.r1", "month": 7, "value":
+"30.455", "reason": "PDF page 11" }]`; `"value": null` for a cell the page
+shows empty) and `mapping.json` to `map` a row to an existing key, `skip` it,
+or `discontinue` an old key. Then run the check again until it prints
+`market:check passed: nothing blocks`.
+
+**4. Review.**
+
+```powershell
+npm run market:review -- --period 2026-07 --pdf C:\Users\HP\market-bulletins\2026-07\bulletin-2026-07.pdf
+```
+
+Open `.market-staging\2026-07\review.html` and read it top to bottom: the
+Blocking section must be empty; the flags, the per-category diff and the new
+items are yours to judge. The command prints `extraction_sha256 = <64
+characters>`: that hash is what you approve.
+
+**5. Publish**, with that hash:
+
+```powershell
+npm run market:publish -- --period 2026-07 --approve <extraction_sha256> --reviewer "Nabil Hakeem"
+```
+
+It refuses (exit 1, `market:publish FAILED: ...`, nothing written) if
+`staged.json` changed since the review, if anything blocks, or if 2026-07 is
+already published (add `--replace` to withdraw that one in the same
+transaction). On success it prints the bulletin id and the counts. Then
+archive `.market-staging\2026-07\` with the PDF.
+
+**Withdraw** a published bulletin (its months fall back to the previous
+bulletin at once, no deploy):
+
+```powershell
+npm run market:withdraw -- --period 2026-07 --reason "wrong file"
+```
+
 ## Rolling back
 
 **The lever is `wrangler`, not git.** A git revert has to go through CI and a
@@ -2374,6 +2688,12 @@ in step 2 (f) of *0060 and the Round E database step*. Never run it without an
 id. An older version answers 42883 on every review act on the client page.
 Leave the database alone, and never run `db:apply-rls` from a tree older than
 `validate/round-e-db`: it would re-create the six-argument function.
+
+**The market price book (0061) specifically:** no floor. Every Worker
+version runs on the 0061 database (it only adds), so roll back the Worker and
+leave the database alone. Withdrawing market data is not a rollback:
+`market:withdraw` (*Monthly market bulletin*) takes effect at once, with no
+deploy.
 
 After rolling back, hit an authenticated page and watch `npx wrangler tail
 metra-web` for `42501` (a missing grant), `MT100` (an immutability trigger) and
