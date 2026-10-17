@@ -532,9 +532,9 @@ html[dir='rtl'] .landing-mono {
 }
 
 /* ---------- features ---------- */
-/* A two-column bento: the first card runs the full width with its screen
-   beside the text, the second runs two rows tall, the last two stack beside
-   it. One column on phones, in source order. */
+/* A two-column bento: the first and last cards run the full width with their
+   screen beside the text, the middle two share a row. One column on phones,
+   in source order. */
 .landing-feats {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -548,16 +548,11 @@ html[dir='rtl'] .landing-mono {
     grid-template-rows: auto auto 1fr;
     column-gap: 40px;
   }
-  .landing-feat-wide > .landing-sk {
+  .landing-feat-wide > .landing-screen {
     grid-column: 2;
     grid-row: 1 / span 3;
     margin-block-start: 0;
-  }
-  .landing-feat-tall {
-    grid-row: span 2;
-  }
-  .landing-feat-tall .landing-sk-cols {
-    block-size: 200px;
+    align-self: center;
   }
 }
 @media (max-width: 820px) {
@@ -603,150 +598,79 @@ html[dir='rtl'] .landing-mono {
   line-height: 1.55;
 }
 
-/* ---------- feature "screen" sketches (feature-sketches.tsx) ----------
-   Decorative skeletons of a Metra screen. Bars are tints of the ink, so they
-   hold in both themes; the brand and status tints are the app's own. */
-.landing-sk {
+/* ---------- feature screens (feature-screen.tsx) ----------
+   A real Metra screen (a light-theme capture) in a window frame. The frame
+   follows the theme; the capture stays as it is, so on the dark page the frame
+   gets a lifted rim and a deeper shadow to hold the light picture deliberately. */
+.landing-screen {
   margin-block-start: auto;
   display: flex;
   flex-direction: column;
   background: hsl(var(--background));
   border: 1px solid var(--l-line);
   border-radius: 14px;
-  padding: 10px 12px 14px;
-  --l-sk-bar: color-mix(in srgb, var(--l-ink) 11%, transparent);
-  --l-sk-bar-strong: color-mix(in srgb, var(--l-ink) 26%, transparent);
+  padding: 9px 10px 10px;
+  box-shadow: 0 14px 36px rgba(17, 20, 24, 0.1);
 }
-.landing-sk-top {
+.landing-screen-top {
   display: flex;
   gap: 5px;
-  padding-block-end: 10px;
+  padding-block-end: 9px;
+  padding-inline: 2px;
 }
-.landing-sk-top i {
+.landing-screen-top i {
   inline-size: 7px;
   block-size: 7px;
   border-radius: 50%;
-  background: var(--l-sk-bar-strong);
+  background: color-mix(in srgb, var(--l-ink) 26%, transparent);
 }
-.landing-sk-body {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 9px;
-  background: var(--l-surface);
-  border: 1px solid var(--l-line);
-  border-radius: 10px;
-  padding: 14px;
-}
-.landing-sk-bar {
-  display: block;
-  block-size: 8px;
-  border-radius: 4px;
-  background: var(--l-sk-bar);
-}
-.landing-sk-bar.is-strong {
-  background: var(--l-sk-bar-strong);
-}
-.landing-sk-bar.is-brand {
-  background: var(--l-brand);
-}
-.landing-sk-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding-block: 4px;
-}
-.landing-sk-pill {
-  display: block;
-  inline-size: 46px;
-  block-size: 16px;
-  border-radius: 999px;
-  flex: 0 0 auto;
-}
-.landing-sk-pill.is-brand {
-  background: var(--l-brand-soft);
-  box-shadow: inset 0 0 0 1px var(--brand-tint-border);
-}
-.landing-sk-pill.is-good {
-  background: var(--success-tint);
-}
-.landing-sk-pill.is-wait {
-  background: var(--warn-tint);
-}
-.landing-sk-rail {
-  display: flex;
-  gap: 5px;
-  padding-block-end: 4px;
-}
-.landing-sk-rail i {
-  flex: 1;
-  block-size: 12px;
-  border-radius: 6px;
-  background: var(--l-sk-bar);
-}
-.landing-sk-rail i.is-done {
-  background: color-mix(in srgb, var(--l-brand) 40%, transparent);
-}
-.landing-sk-rail i.is-on {
-  background: var(--l-brand);
-}
-.landing-sk-meter {
-  block-size: 10px;
-  border-radius: 5px;
-  background: var(--l-sk-bar);
-  overflow: hidden;
-}
-.landing-sk-meter i {
-  display: block;
-  block-size: 100%;
-  inline-size: 68%;
-  background: var(--l-brand-grad);
-}
-.landing-sk-cols {
-  block-size: 96px;
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 6px;
-  padding-block-start: 10px;
-  border-block-start: 1px dashed var(--l-line-2);
-}
-.landing-sk-cols i {
-  flex: 0 1 22px;
-  border-radius: 4px 4px 0 0;
-  background: color-mix(in srgb, var(--l-brand) 30%, transparent);
-}
-.landing-sk-cols i:last-child {
-  background: var(--l-brand);
-}
-.landing-sk-total {
-  border-block-start: 1px dashed var(--l-line-2);
-  padding-block-start: 10px;
-}
-.landing-sk-btn {
-  display: block;
-  inline-size: 34%;
-  block-size: 22px;
-  border-radius: 999px;
-  background: var(--l-brand-grad);
-}
-.landing-sk-split {
+.landing-screen-body {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
 }
-.landing-sk-pane {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 9px;
-  padding: 10px;
-  border-radius: 8px;
-  background: hsl(var(--background));
+.landing-screen-body.is-pair {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
 }
-.landing-sk-pane.is-mirrored {
-  align-items: flex-end;
+.landing-screen img {
+  display: block;
+  inline-size: 100%;
+  block-size: auto;
+  border-radius: 9px;
+  border: 1px solid var(--l-line);
+  background: #eef1f7;
+}
+[data-theme='dark'] .landing-screen {
+  background: color-mix(in srgb, #ffffff 7%, var(--l-surface));
+  border-color: rgba(255, 255, 255, 0.12);
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.35),
+    0 22px 50px rgba(0, 0, 0, 0.55);
+}
+[data-theme='dark'] .landing-screen-top i {
+  background: rgba(255, 255, 255, 0.28);
+}
+[data-theme='dark'] .landing-screen img {
+  border-color: rgba(255, 255, 255, 0.16);
+}
+/* Phones: give the picture the card's width back, so it stays legible. */
+@media (max-width: 560px) {
+  .landing-feat {
+    padding: 20px;
+  }
+  .landing-screen {
+    padding: 7px 6px 6px;
+    border-radius: 12px;
+  }
+  .landing-screen-top {
+    padding-block-end: 7px;
+  }
+  .landing-screen-body.is-pair {
+    gap: 6px;
+  }
+  .landing-screen img {
+    border-radius: 7px;
+  }
 }
 
 /* ---------- how it works ---------- */

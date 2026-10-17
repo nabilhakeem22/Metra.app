@@ -6,33 +6,34 @@ import {
   FlowIcon,
   ProposalsIcon,
 } from './feature-icons';
-import { FeatureSketch, type SketchKind } from './feature-sketches';
+import { FeatureScreen } from './feature-screen';
+import type { ScreenKind } from './feature-screens';
 
 /** Where a card sits in the desktop bento; a phone shows one column. */
-type BentoSpan = 'wide' | 'tall' | 'single';
+type BentoSpan = 'wide' | 'single';
 
 interface FeatureDef {
   Icon: FeatureIcon;
-  sketch: SketchKind;
+  screen: ScreenKind;
   span: BentoSpan;
   titleKey: string;
   descKey: string;
 }
 
 const FEATURES: FeatureDef[] = [
-  { Icon: FlowIcon, sketch: 'flow', span: 'wide', titleKey: 'flowTitle', descKey: 'flowDesc' },
-  { Icon: CostIcon, sketch: 'cost', span: 'tall', titleKey: 'costTitle', descKey: 'costDesc' },
+  { Icon: FlowIcon, screen: 'flow', span: 'wide', titleKey: 'flowTitle', descKey: 'flowDesc' },
+  { Icon: CostIcon, screen: 'cost', span: 'single', titleKey: 'costTitle', descKey: 'costDesc' },
   {
     Icon: ProposalsIcon,
-    sketch: 'proposals',
+    screen: 'proposals',
     span: 'single',
     titleKey: 'proposalsTitle',
     descKey: 'proposalsDesc',
   },
   {
     Icon: BilingualIcon,
-    sketch: 'bilingual',
-    span: 'single',
+    screen: 'bilingual',
+    span: 'wide',
     titleKey: 'bilingualTitle',
     descKey: 'bilingualDesc',
   },
@@ -40,7 +41,6 @@ const FEATURES: FeatureDef[] = [
 
 const SPAN_CLASS: Record<BentoSpan, string> = {
   wide: 'landing-feat landing-feat-wide',
-  tall: 'landing-feat landing-feat-tall',
   single: 'landing-feat',
 };
 
@@ -61,14 +61,14 @@ export function FeatureCards() {
           <p>{t('subtitle')}</p>
         </div>
         <div className="landing-feats">
-          {FEATURES.map(({ Icon, sketch, span, titleKey, descKey }) => (
+          {FEATURES.map(({ Icon, screen, span, titleKey, descKey }) => (
             <article className={SPAN_CLASS[span]} key={titleKey}>
               <div className="landing-feat-ic">
                 <Icon />
               </div>
               <h3>{t(titleKey)}</h3>
               <p>{t(descKey)}</p>
-              <FeatureSketch kind={sketch} />
+              <FeatureScreen kind={screen} />
             </article>
           ))}
         </div>
