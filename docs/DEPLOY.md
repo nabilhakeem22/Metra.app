@@ -2676,6 +2676,134 @@ left behind by a dropped connection: end it in the SQL editor with
 or withdraw transaction can never stay open longer than 300 s (the
 `transaction_timeout` it sets), or 60 s idle.
 
+## Seeding studio price books from the market book
+
+An owner step, once the branch carrying it is merged: it fills every studio's
+price book (or the `--org` ones) from the PUBLISHED market book, before the
+studio market screens exist. Run it from the production checkout on an
+up-to-date `main`, in a PowerShell window where you set
+`$env:MARKET_DATABASE_URL` (as in *Monthly market bulletin*; the command reads
+nothing else).
+
+**What it creates, per studio.** Nothing a studio already has is changed or
+deleted; anything that would clash is skipped and counted.
+
+- **Sections:** one per market sub-category that gets at least one item, named
+  as the sub-category («الزجاج» / "Glass"). When a studio section already has
+  that name, the new one carries its category too («الجبس (الخامات الأساسية)»
+  / "Gypsum (Basic materials)", next to the studio's own "Gypsum"). Each is
+  marked `sections.key = market.<sub-category>`, so a re-run finds it.
+- **Items:** one cost item per market item a published bulletin prices:
+  - the name and spec, and a roll's pack («أسلاك نحاس معزول 2 مم لفة 100 م»);
+  - the studio unit (sqm, linear_meter, pcs, kg, ton, liter, cbm, roll);
+  - code `MKT-<market key>` (e.g. `MKT-raw.steel.rebar`);
+  - cost = the newest published month with a numeric price (a suspended or
+    empty month is skipped for the one before it);
+  - price = cost x 1.05, half up at 4 decimals;
+  - `market_item_id` set, active.
+- **Skipped, with a count each:** already linked to that market item (so a
+  re-run creates nothing), discontinued, no studio unit (bag, pack,
+  thousand_bricks), no price, a studio item with the same code, a studio item
+  with the same name.
+- **Audit:** a `create` row per section and per item, as the app writes them,
+  marked `source: market:seed-price-books`. The actor is the studio's earliest
+  owner (else its earliest admin), as for the app's automation. A studio with
+  neither is skipped and named.
+
+**One transaction per studio.** A studio is seeded completely or not at all.
+One studio's failure (say a code typed in the same second) undoes nothing
+for another. Each transaction holds one studio's rows for about a second.
+Re-running retries exactly the failed studios and creates nothing twice. It
+runs as `metra_app` in that studio's org context, so RLS, every foreign key
+and every CHECK apply as for the app.
+
+**1. Dry run, and read it.**
+
+```powershell
+npm run market:seed-price-books -- --dry-run
+```
+
+It writes nothing. A local copy shaped like production (July 2026 published,
+two studios with the default sections) printed:
+
+```text
+DRY RUN, nothing is written. 456 published market item(s); 2 studio(s).
+studio "Org A Fit-out" (00000000-0000-4000-8000-00000000000a)
+  actor 00000000-0000-4000-8000-0000000000a1 (owner)
+  sections: to create 55, already present 0 (1 named with their category, the plain name being taken)
+  items: to create 447, skipped 9
+    already linked 0, discontinued 0, unit unsupported (bag, pack, thousand_bricks) 9, no price 0, code clash 0, name clash 0
+studio "Org B Fit-out" (00000000-0000-4000-8000-00000000000b)
+  ...
+totals: sections to create 110, items to create 894, studios failed 0
+```
+
+Check each studio's line before going on. A studio you do not want seeded (a
+test studio, say) is left out by naming the others with `--org <id>` (repeat
+it), e.g. try one first:
+
+```powershell
+npm run market:seed-price-books -- --org <studio id>
+```
+
+**2. The real run.**
+
+```powershell
+npm run market:seed-price-books
+```
+
+The same lines with `created` in place of `to create`. Exit 0, or exit 1
+with `FAILED, nothing written for this studio: <reason>` on each studio that
+failed (the others are seeded): run the same command again. A second run
+prints `created 0` and every item `already linked`.
+
+**Undo, if ever needed.** Read first (SQL editor, run it alone): each studio's
+seeded items, and how many are still removable (never edited, and in no
+proposal, BOQ, contract, variation or bulk price change).
+
+```sql
+-- Seeded price-book items per studio, and how many are still removable. Read-only.
+select o.id as studio_id, coalesce(o.name_en, o.name_ar) as studio, count(*) as seeded_items,
+       count(*) filter (
+         where c.updated_at = c.created_at
+           and not exists (select 1 from proposal_lines l where l.cost_item_id = c.id)
+           and not exists (select 1 from boq_lines l where l.cost_item_id = c.id)
+           and not exists (select 1 from contract_lines l where l.cost_item_id = c.id)
+           and not exists (select 1 from variation_order_lines l where l.cost_item_id = c.id)
+           and not exists (select 1 from price_change_lines l where l.cost_item_id = c.id)
+       ) as removable
+  from cost_items c join organizations o on o.id = c.org_id
+ where c.market_item_id is not null and c.code like 'MKT-%'
+ group by o.id, o.name_en, o.name_ar
+ order by 2;
+```
+
+Then this ONE block deletes only the removable seeded items, and the seed's
+sections left empty; a studio's own items and sections are never touched
+(they carry no `MKT-` code and no `market.` key). Add
+`and c.org_id = '<studio id>'` to the first `where` to undo one studio. The
+audit rows stay (the audit trail is append-only). Rehearsed: of 894 seeded
+items, the one edited after seeding stayed with its section, and every other
+seeded item and section went; the default sections and the studios' own items
+were untouched.
+
+```sql
+-- Undo the price-book seed: removable seeded items, then empty seeded sections. ONE transaction.
+begin;
+delete from cost_items c
+ where c.market_item_id is not null and c.code like 'MKT-%'
+   and c.updated_at = c.created_at
+   and not exists (select 1 from proposal_lines l where l.cost_item_id = c.id)
+   and not exists (select 1 from boq_lines l where l.cost_item_id = c.id)
+   and not exists (select 1 from contract_lines l where l.cost_item_id = c.id)
+   and not exists (select 1 from variation_order_lines l where l.cost_item_id = c.id)
+   and not exists (select 1 from price_change_lines l where l.cost_item_id = c.id);
+delete from sections s
+ where s.key like 'market.%'
+   and not exists (select 1 from cost_items c where c.section_id = s.id);
+commit;
+```
+
 ## Rolling back
 
 **The lever is `wrangler`, not git.** A git revert has to go through CI and a
