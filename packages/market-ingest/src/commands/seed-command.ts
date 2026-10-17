@@ -15,9 +15,11 @@ export async function seedCommand(argv: string[]): Promise<number> {
     options: { 'dry-run': { type: 'boolean' }, org: { type: 'string', multiple: true } },
     strict: true,
   });
-  const orgIds = values.org ?? [];
-  const malformed = orgIds.filter((id) => !UUID.test(id));
+  const given = values.org ?? [];
+  const malformed = given.filter((id) => !UUID.test(id));
   if (malformed.length > 0) throw new Error(`--org takes an organization id (a uuid), not ${malformed.join(', ')}`);
+  // Postgres prints uuids in lower case; one typed in upper case is the same studio.
+  const orgIds = [...new Set(given.map((id) => id.toLowerCase()))];
   const dryRun = values['dry-run'] === true;
   const run = await withDrizzle((db, sql) => runSeed(db, sql, { dryRun, orgIds }));
   for (const line of seedReport(run, dryRun)) console.log(line);

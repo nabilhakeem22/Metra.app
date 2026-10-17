@@ -95,6 +95,7 @@ describe('useProposalDraft — line edits read the LATEST state, not the render 
       draft.latest().addLine(0, {
         id: 'ci-1',
         code: 'GYP-01',
+        sectionId: null,
         nameEn: 'Gypsum ceiling',
         nameAr: null,
         unit: 'sqm',

@@ -7,7 +7,8 @@
 import { withOrgContext, type MetraDb } from '@metra/db';
 import { auditLog, costItems, sections } from '@metra/db/schema';
 import { sql } from 'drizzle-orm';
-import { planSeed, type MarketSeedItem, type SeedPlan } from './plan';
+import { planSeed } from './plan';
+import type { MarketSeedItem, SeedPlan } from './types';
 
 export interface StudioContext {
   orgId: string;
@@ -53,7 +54,7 @@ async function writePlan(tx: MetraDb, orgId: string, plan: SeedPlan, existingSec
       code: item.code,
       nameAr: item.nameAr,
       nameEn: item.nameEn,
-      sectionId: sectionIds.get(item.sectionKey) as string,
+      sectionId: 'id' in item.section ? item.section.id : (sectionIds.get(item.section.key) as string),
       unit: item.unit,
       defaultUnitCost: item.defaultUnitCost,
       defaultUnitPrice: item.defaultUnitPrice,

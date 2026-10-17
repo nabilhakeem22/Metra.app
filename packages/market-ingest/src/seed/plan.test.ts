@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { planSeed, type MarketSeedItem, type StudioBook } from './plan';
+import { planSeed } from './plan';
+import type { MarketSeedItem, StudioBook } from './types';
 
 function item(overrides: Partial<MarketSeedItem> = {}): MarketSeedItem {
   return {
@@ -29,7 +30,7 @@ describe('planSeed', () => {
     const plan = planSeed([item()], EMPTY);
     expect(plan.sectionsToCreate).toEqual([{ key: 'market.finishing.glass', nameAr: 'الزجاج', nameEn: 'Glass', qualified: false }]);
     expect(plan.itemsToCreate).toEqual([{
-      marketItemId: 'm-glass', sectionKey: 'market.finishing.glass', code: 'MKT-finishing.glass.clear_4mm',
+      marketItemId: 'm-glass', section: { key: 'market.finishing.glass' }, code: 'MKT-finishing.glass.clear_4mm',
       nameAr: 'زجاج شفاف 4 مم', nameEn: 'Clear glass 4 mm', unit: 'sqm', defaultUnitCost: '467.0000', defaultUnitPrice: '490.3500',
     }]);
   });
@@ -94,4 +95,69 @@ describe('planSeed', () => {
     expect(second.sectionsToCreate).toEqual([]);
     expect(second.skipped.already_linked).toBe(1);
   });
+
+  const RLM = String.fromCharCode(0x200f);
+  const ALM = String.fromCharCode(0x061c);
+  const ZWNJ = String.fromCharCode(0x200c);
+  const NBSP = String.fromCharCode(0xa0);
+  const PERSIAN_YEH = String.fromCharCode(0x06cc);
+  const tempered = item({ nameAr: 'زجاج سيكوريت', specAr: '6 مم', nameEn: 'Tempered glass', specEn: '6 mm' });
+  it.each([
+    ['an RLM', `زجاج سيكوريت${RLM} 6 مم`, null],
+    ['a Persian yeh', `زجاج س${PERSIAN_YEH}كور${PERSIAN_YEH}ت 6 مم`, null],
+    ['an ALM and a ZWNJ', `زجاج${ALM} سيكوريت 6${ZWNJ} مم`, null],
+    ['an inner double space', null, 'Tempered  glass 6 mm'],
+    ['an NBSP', null, `Tempered glass${NBSP}6 mm`],
+    ['other letter case', null, 'TEMPERED GLASS 6 MM'],
+  ])('sees a studio name with %s as the same name (F2)', (_label, nameAr, nameEn) => {
+    const book: StudioBook = { sections: [], items: [{ code: 'OWN', nameAr, nameEn, marketItemId: null }] };
+    expect(planSeed([tempered], book).skipped.name_clash).toBe(1);
+  });
+
+  it('puts the items in a studio section that already has the qualified name, instead of a duplicate (F2)', () => {
+    const book: StudioBook = { sections: [{ id: 'mine', key: null, nameAr: null, nameEn: 'glass ' }, { id: 'theirs', key: null, nameAr: null, nameEn: 'Glass  (Finishing materials)' }], items: [] };
+    const plan = planSeed([item()], book);
+    expect(plan.sectionsToCreate).toEqual([]);
+    expect(plan.itemsToCreate[0].section).toEqual({ id: 'theirs' });
+    expect(plan.sectionsPresent).toBe(1);
+  });
+
+  it('never counts its own seeded items as a name clash, so a partial undo re-seeds (F3)', () => {
+    const twin = item({ id: 'standard', key: 'pipes.drainage_clay_standard.elbow_150', nameAr: 'كوع فخار', specAr: '150 مم', nameEn: 'Clay elbow', specEn: '150 mm', unit: 'pcs', leafKey: 'pipes.drainage_clay_standard', leafNameAr: 'مواسير صرف فخار عادية', leafNameEn: 'Standard clay drainage pipes' });
+    const flexible = { ...twin, id: 'flexible', key: 'pipes.drainage_clay_flexible.elbow_150', leafKey: 'pipes.drainage_clay_flexible', leafNameAr: 'مواسير صرف فخار بوصلات مرنة', leafNameEn: 'Flexible-joint clay drainage pipes' };
+    const first = planSeed([twin, flexible], EMPTY);
+    const kept = first.itemsToCreate.find((created) => created.marketItemId === 'standard')!;
+    const afterUndo: StudioBook = { sections: [], items: [{ code: kept.code, nameAr: kept.nameAr, nameEn: kept.nameEn, marketItemId: 'standard' }] };
+    expect(planSeed([twin, flexible], afterUndo).itemsToCreate.map((created) => created.marketItemId)).toEqual(['flexible']);
+  });
+
+  it('gives two items that would read alike their sub-category, in both languages (F3)', () => {
+    const twin = item({ id: 'standard', key: 'pipes.drainage_clay_standard.elbow_150', nameAr: 'كوع فخار', specAr: '150 مم', nameEn: 'Clay elbow', specEn: '150 mm', unit: 'pcs', leafKey: 'pipes.drainage_clay_standard', leafNameAr: 'مواسير صرف فخار عادية', leafNameEn: 'Standard clay drainage pipes' });
+    const flexible = { ...twin, id: 'flexible', key: 'pipes.drainage_clay_flexible.elbow_150', leafKey: 'pipes.drainage_clay_flexible', leafNameAr: 'مواسير صرف فخار بوصلات مرنة', leafNameEn: 'Flexible-joint clay drainage pipes' };
+    const names = planSeed([twin, flexible, item()], EMPTY).itemsToCreate.map(({ nameAr, nameEn }) => [nameAr, nameEn]);
+    expect(names).toEqual([
+      ['كوع فخار 150 مم (مواسير صرف فخار عادية)', 'Clay elbow 150 mm (Standard clay drainage pipes)'],
+      ['كوع فخار 150 مم (مواسير صرف فخار بوصلات مرنة)', 'Clay elbow 150 mm (Flexible-joint clay drainage pipes)'],
+      ['زجاج شفاف 4 مم', 'Clear glass 4 mm'],
+    ]);
+  });
 });
+
+describe('seeded names', () => {
+  it('do not repeat the roll in English, nor a spec part the name already has (F7)', () => {
+    const hose = item({ nameEn: 'Polyethylene conduit hose', specEn: '13 mm, 30 m roll', nameAr: 'خراطيم', specAr: '13 مم', unit: 'roll', pack: { lengthM: 30, pieces: null, pieceLengthM: null } });
+    expect(planSeed([hose], EMPTY).itemsToCreate[0]).toMatchObject({ nameEn: 'Polyethylene conduit hose 13 mm, 30 m roll', nameAr: 'خراطيم 13 مم لفة 30 م' });
+    const upvc = item({ nameEn: 'White UPVC conduit, light gauge', specEn: '20 mm OD, 17.4 mm ID, light gauge', unit: 'roll', pack: { lengthM: null, pieces: 34, pieceLengthM: 3 } });
+    expect(planSeed([upvc], EMPTY).itemsToCreate[0].nameEn).toBe('White UPVC conduit, light gauge 20 mm OD, 17.4 mm ID roll of 34 x 3 m');
+  });
+
+  it('turn an Arabic " - " separator into a comma and keep a range hyphen (no-dash rule)', () => {
+    const ppr = item({ nameAr: 'مواسير بولي بروبلين', specAr: '1/2" - 20 مم سمك 3.4 مم' });
+    const boards = item({ id: 'b', key: 'k.k.b', nameAr: 'ألواح مارموكس', specAr: 'سمك 4مم-6مم' });
+    expect(planSeed([ppr, boards], EMPTY).itemsToCreate.map((created) => created.nameAr)).toEqual([
+      'مواسير بولي بروبلين 1/2"، 20 مم سمك 3.4 مم',
+      'ألواح مارموكس سمك 4مم-6مم',
+    ]);
+  });
+});
+

@@ -8,6 +8,8 @@ import { normalizeDecimalInput } from '@/lib/validation/decimal-input';
 export interface CostItemOption {
   id: string;
   code: string;
+  /** Its price-book section, for the picker's grouping. */
+  sectionId: string | null;
   nameEn: string | null;
   nameAr: string | null;
   unit: string;

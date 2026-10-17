@@ -1,5 +1,6 @@
 'use client';
 
+import { useLocale } from 'next-intl';
 import { useMemo, useState } from 'react';
 import { BulkUpdateDialog } from './bulk-update-dialog';
 import { CostItemForm } from './cost-item-form';
@@ -31,10 +32,11 @@ export function PriceBookClient({ items, sections, canManage }: PriceBookClientP
   const [bulkOpen, setBulkOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const actions = usePriceBookActions();
+  const locale = useLocale();
 
   const groups = useMemo(
-    () => groupBySection(filterCostItems(items, filter), sections),
-    [items, filter, sections],
+    () => groupBySection(filterCostItems(items, filter), sections, locale),
+    [items, filter, sections, locale],
   );
 
   // The four dialogs stay CHILDREN of this component: each is a Radix portal

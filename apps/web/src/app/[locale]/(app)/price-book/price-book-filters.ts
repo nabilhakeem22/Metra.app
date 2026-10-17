@@ -1,3 +1,4 @@
+import { byName, searchForm } from '@/lib/price-book/name-order';
 import type { PriceBookItem, SectionOption } from './types';
 
 // WHICH COST ITEMS THE PRICE BOOK SHOWS, and how they are grouped. PURE and
@@ -19,18 +20,17 @@ export interface PriceBookGroup {
   rows: PriceBookItem[];
 }
 
-/** Search by CODE and by name, in either language. */
+/** Search by CODE and by name, in either language, Arabic spellings folded (name-order.ts). */
 function matchesQuery(item: PriceBookItem, needle: string): boolean {
   if (needle === '') return true;
-  const haystack = `${item.code} ${item.nameEn ?? ''} ${item.nameAr ?? ''}`.toLowerCase();
-  return haystack.includes(needle);
+  return searchForm(`${item.code} ${item.nameEn ?? ''} ${item.nameAr ?? ''}`).includes(needle);
 }
 
 export function filterCostItems(
   items: readonly PriceBookItem[],
   filter: PriceBookFilter,
 ): PriceBookItem[] {
-  const needle = filter.query.trim().toLowerCase();
+  const needle = searchForm(filter.query);
   return items.filter(
     (item) =>
       (filter.sectionId === 'all' || item.sectionId === filter.sectionId) &&
@@ -40,22 +40,25 @@ export function filterCostItems(
 }
 
 /**
- * Group the visible items by section, in the SECTIONS' own order, and drop the
- * empty groups.
+ * Group the visible items by section, sections and rows ordered by their name
+ * in the page's language, and drop the empty groups.
  *
  * Dropping them is the point: a filtered book that still lists twelve empty
  * section headings reads as "nothing matched" twelve times over. An item whose
- * section is not in `sections` is not rendered at all — it has no heading to sit
+ * section is not in `sections` is not rendered at all; it has no heading to sit
  * under, and inventing one would be inventing a section.
  */
 export function groupBySection(
   items: readonly PriceBookItem[],
   sections: readonly SectionOption[],
+  locale: string,
 ): PriceBookGroup[] {
-  return sections
+  const order = byName(locale);
+  return [...sections]
+    .sort(order)
     .map((section) => ({
       section,
-      rows: items.filter((item) => item.sectionId === section.id),
+      rows: items.filter((item) => item.sectionId === section.id).sort(order),
     }))
     .filter((group) => group.rows.length > 0);
 }

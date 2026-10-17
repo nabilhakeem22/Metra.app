@@ -3,24 +3,20 @@
 import { Plus } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { formatMoney } from '@/lib/format/money';
-import { pickLocale } from '@/lib/i18n/pick-locale';
 import type { CostItemOption } from './builder-model';
+import { PriceBookPicker } from './price-book-picker';
+import type { SectionOption } from './section-combobox';
 
 /** Under a section's lines: add a line (blank or from the price book) and the subtotal. */
 export function BuilderSectionFooter({
   costItems,
+  sections,
   onAddLine,
   sectionSubtotal,
 }: {
   costItems: CostItemOption[];
+  sections: SectionOption[];
   onAddLine: (costItem?: CostItemOption) => void;
   sectionSubtotal: string;
 }) {
@@ -33,26 +29,7 @@ export function BuilderSectionFooter({
           <Plus className="size-4" aria-hidden />
           {t('builder.addLine')}
         </Button>
-        {costItems.length > 0 && (
-          <Select
-            value=""
-            onValueChange={(v) => {
-              const ci = costItems.find((c) => c.id === v);
-              if (ci) onAddLine(ci);
-            }}
-          >
-            <SelectTrigger className="w-auto min-w-48">
-              <SelectValue placeholder={t('builder.fromPriceBook')} />
-            </SelectTrigger>
-            <SelectContent>
-              {costItems.map((c) => (
-                <SelectItem key={c.id} value={c.id}>
-                  {c.code} · {pickLocale({ nameAr: c.nameAr, nameEn: c.nameEn }, 'name', locale).value}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        )}
+        {costItems.length > 0 && <PriceBookPicker costItems={costItems} sections={sections} onPick={onAddLine} />}
       </div>
       <span className="text-body font-medium">
         {t('builder.sectionSubtotal')}:{' '}

@@ -96,12 +96,12 @@ describe('groupBySection', () => {
     section('sec-empty', 'Joinery'),
   ];
 
-  test('groups in the SECTIONS own order, not the items order', () => {
+  test('orders the groups by section name in the page language, not the items order', () => {
     const items = [
       item({ id: 'paint', sectionId: 'sec-finishes' }),
       item({ id: 'gypsum', sectionId: 'sec-ceilings' }),
     ];
-    expect(groupBySection(items, sections).map((group) => group.section.id)).toEqual([
+    expect(groupBySection(items, sections, 'en').map((group) => group.section.id)).toEqual([
       'sec-ceilings',
       'sec-finishes',
     ]);
@@ -110,16 +110,16 @@ describe('groupBySection', () => {
   // A filtered book that still lists twelve empty section headings reads as
   // "nothing matched" twelve times over.
   test('a section with no visible rows is DROPPED', () => {
-    const groups = groupBySection([item({ sectionId: 'sec-ceilings' })], sections);
+    const groups = groupBySection([item({ sectionId: 'sec-ceilings' })], sections, 'en');
     expect(groups.map((group) => group.section.id)).toEqual(['sec-ceilings']);
   });
 
   test('an item whose section is unknown is not rendered at all', () => {
-    expect(groupBySection([item({ sectionId: 'sec-ghost' })], sections)).toEqual([]);
+    expect(groupBySection([item({ sectionId: 'sec-ghost' })], sections, 'en')).toEqual([]);
   });
 
   test('no items at all is no groups', () => {
-    expect(groupBySection([], sections)).toEqual([]);
+    expect(groupBySection([], sections, 'en')).toEqual([]);
   });
 
   test('each group carries its own rows and nobody else s', () => {
@@ -128,8 +128,38 @@ describe('groupBySection', () => {
       item({ id: 'b', sectionId: 'sec-ceilings' }),
       item({ id: 'c', sectionId: 'sec-finishes' }),
     ];
-    const groups = groupBySection(items, sections);
+    const groups = groupBySection(items, sections, 'en');
     expect(ids(groups[0]?.rows ?? [])).toEqual(['a', 'b']);
     expect(ids(groups[1]?.rows ?? [])).toEqual(['c']);
   });
 });
+
+describe('a book of hundreds of items (the market seed)', () => {
+  test('rows are ordered by their name in the page language, not by code', () => {
+    const sections = [section('s', 'Glass')];
+    const items = [
+      item({ id: 'z', code: 'MKT-a', nameEn: 'Zinc sheet', nameAr: 'صاج زنك', sectionId: 's' }),
+      item({ id: 'a', code: 'MKT-z', nameEn: 'Aluminium wire', nameAr: 'أسلاك ألومنيوم', sectionId: 's' }),
+    ];
+    expect(ids(groupBySection(items, sections, 'en')[0].rows)).toEqual(['a', 'z']);
+    expect(ids(groupBySection(items, sections, 'ar-EG')[0].rows)).toEqual(['a', 'z']);
+  });
+
+  test('sections are ordered by their Arabic name in Arabic', () => {
+    const sections = [
+      { id: 'b', key: null, nameEn: 'A first in English', nameAr: 'ياء' },
+      { id: 'a', key: null, nameEn: 'Z last in English', nameAr: 'ألف' },
+    ];
+    const items = [item({ id: '1', sectionId: 'a' }), item({ id: '2', sectionId: 'b' })];
+    expect(groupBySection(items, sections, 'ar-EG').map((group) => group.section.id)).toEqual(['a', 'b']);
+    expect(groupBySection(items, sections, 'en').map((group) => group.section.id)).toEqual(['b', 'a']);
+  });
+
+  test('the search folds the Arabic spellings a studio types interchangeably', () => {
+    const items = [item({ id: 'p', code: 'MKT-x', nameAr: 'مواسير بولى بروبلين مرنة', nameEn: 'PP pipe' })];
+    expect(ids(filterCostItems(items, { ...ALL, query: 'بولي' }))).toEqual(['p']);
+    expect(ids(filterCostItems(items, { ...ALL, query: 'مرنه' }))).toEqual(['p']);
+    expect(ids(filterCostItems(items, { ...ALL, query: 'mkt-x' }))).toEqual(['p']);
+  });
+});
+

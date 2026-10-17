@@ -1,5 +1,6 @@
 import { buildTemplateCsv, templateFilename } from '@/lib/boqs/import/template';
 import { requireOrg } from '@/lib/auth/require-org';
+import { byName } from '@/lib/price-book/name-order';
 import { listCostItems } from '@/lib/price-book/queries';
 
 /**
@@ -21,7 +22,10 @@ export async function GET(request: Request): Promise<Response> {
   // project into typing quantities against rates already agreed, and it is what
   // gives an imported line a cost basis — a hand-typed rate has a price and no
   // cost, so margin and budget tracking have nothing to work from later.
-  const items = await listCostItems(ctx, { active: true });
+  // Ordered by name, as the description column reads (English first): with a
+  // seeded book of 450+ items, code order put every MKT- row before the
+  // studio's own.
+  const items = (await listCostItems(ctx, { active: true })).sort(byName('en'));
 
   return new Response(
     buildTemplateCsv({

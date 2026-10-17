@@ -4,7 +4,7 @@
 // written from runs later inside that studio's RLS transaction.
 import type { PostgresJs } from '../db/connection';
 import { packOf } from '../history/load';
-import type { MarketSeedItem } from './plan';
+import type { MarketSeedItem } from './types';
 
 /**
  * Every item a published bulletin prices (what studios can see), in the

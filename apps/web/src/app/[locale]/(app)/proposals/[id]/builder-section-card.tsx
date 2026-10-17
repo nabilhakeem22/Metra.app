@@ -131,6 +131,7 @@ export function BuilderSectionCard({
 
         <BuilderSectionFooter
           costItems={costItems}
+          sections={sectionLibrary}
           onAddLine={(ci) => addLine(si, ci)}
           sectionSubtotal={sectionTotal.sectionSubtotal}
         />

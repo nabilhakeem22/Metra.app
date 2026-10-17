@@ -6,7 +6,8 @@
 // studios that failed. Returns one result per studio, in organization order.
 import type { MetraDb } from '@metra/db';
 import type { PostgresJs } from '../db/connection';
-import type { SeedPlan } from './plan';
+import type { SeedPlan } from './types';
+import { failureReason } from './failure';
 import { readActor, readMarketSeedItems, readStudios, type Studio } from './read';
 import { seedStudio } from './write';
 
@@ -36,7 +37,7 @@ export async function runSeed(db: MetraDb, sql: PostgresJs, options: { dryRun: b
       const plan = await seedStudio(db, { orgId: studio.id, ...actor }, marketItems, options.dryRun);
       outcomes.push({ studio, status: options.dryRun ? 'planned' : 'seeded', actor, plan });
     } catch (error) {
-      outcomes.push({ studio, status: 'failed', error: error instanceof Error ? error.message : String(error) });
+      outcomes.push({ studio, status: 'failed', error: failureReason(error) });
     }
   }
   return { marketItems: marketItems.length, outcomes };

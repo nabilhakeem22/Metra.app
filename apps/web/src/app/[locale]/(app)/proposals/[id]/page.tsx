@@ -59,6 +59,7 @@ export default async function ProposalBuilderPage({
         costItems={costItems.map((c) => ({
           id: c.id,
           code: c.code,
+          sectionId: c.sectionId,
           nameEn: c.nameEn,
           nameAr: c.nameAr,
           unit: c.unit,
