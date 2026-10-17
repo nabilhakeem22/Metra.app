@@ -1,0 +1,20 @@
+{
+  "name": "@metra/market-ingest",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "The gate for the monthly MHUC building-materials bulletin: check, review, publish, withdraw. No network call other than Postgres.",
+  "scripts": {
+    "cli": "tsx src/cli.ts",
+    "test": "vitest run --dir src",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@metra/db": "*",
+    "postgres": "^3.4.5"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.2",
+    "vitest": "^2.1.8"
+  }
+}

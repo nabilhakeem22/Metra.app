@@ -30,7 +30,8 @@
     "i18n:validate": "tsx scripts/i18n/validate.ts",
     "i18n:registers": "tsx scripts/i18n/registers-report.ts",
     "i18n:review": "tsx scripts/i18n/review.ts",
-    "i18n:apply": "tsx scripts/i18n/apply.ts"
+    "i18n:apply": "tsx scripts/i18n/apply.ts",
+    "market:check": "tsx packages/market-ingest/src/cli.ts check"
   },
   "devDependencies": {
     "typescript": "^5.6.3"

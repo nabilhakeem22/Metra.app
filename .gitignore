@@ -58,3 +58,6 @@ npm-debug.log*
 packages/db/_*.mts
 _probe*
 purge-fixture-orgs-*.json
+
+# --- market price book staging (bulletin files, check/staged/review output) ---
+.market-staging/
