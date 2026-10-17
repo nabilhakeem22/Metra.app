@@ -2572,8 +2572,10 @@ commit;
 
 ### 0062 and the market price book at sign-up: owner runbook
 
-Every new studio gets the market price book automatically at sign-up, and an
-empty price book offers the same load as a button. Both read a derived table,
+Every new studio gets the market price book automatically right after
+sign-up (the onboarding screen fires it as a request of its own once the
+studio exists, so it never slows or fails the sign-up), and an empty price
+book offers the same load as a button. Both read a derived table,
 the **seed book** (`market_seed_book`): every published market item as a
 studio's price book would receive it, built by the same code as
 `market:seed-price-books`. This is its ONE database step: migration
@@ -2591,8 +2593,8 @@ Why this order, one sentence each:
 
 - **The new code needs 0062:** the sign-up seed and the empty price book's
   button read `market_seed_book`; without it the seed fails with 42P01. A
-  sign-up still succeeds (the seed runs after its response and logs one
-  line), but the button answers with an error.
+  sign-up still succeeds (the seed is a separate request, and its failure is
+  one log line with a reference), but the button answers with an error.
 - **The current Worker is safe on the 0062 database:** 0062 only adds a table
   nobody reads yet.
 - **There is no rollback floor:** the table is derived data; any Worker
@@ -2609,7 +2611,12 @@ Why this order, one sentence each:
 Who writes it: `market:publish` and `market:withdraw` rebuild it whole in
 their own transaction, and every REAL `market:seed-price-books` run (not a dry
 run) rebuilds it under the market write lock before it seeds. The app only
-reads it.
+reads it. A seed writes each item BY REFERENCE to it (its names and prices are
+taken from the book), so a seed holds the book steady while it runs: the app's
+for the length of one studio's transaction, a real CLI run until it ends. A
+`market:publish` or `market:withdraw` started meanwhile waits up to 3 s and
+then stops with a lock timeout that names the holder; run it again once the
+seed is done.
 
 **1. Put the code in the production checkout.**
 
@@ -2618,7 +2625,7 @@ cd C:\Users\HP\merta-main
 git fetch origin
 git switch --detach origin/validate/market-seed-on-signup
 git log --oneline -1    # a "docs(deploy): ..." commit (this runbook); CI green on it
-git diff --stat 67af2aa2 HEAD    # MUST list only docs/DEPLOY.md: the code is exactly what was rehearsed (67af2aa2)
+git diff --stat 5623727f HEAD    # MUST list only docs/DEPLOY.md: the code is exactly what was rehearsed (5623727f)
 ```
 
 If the diff lists any other file, STOP and tell the lead.
@@ -2695,8 +2702,8 @@ where n.nspname = 'public' and c.relname = 'market_seed_book';
 4. Smoke test, with the log open (`npx wrangler tail metra-web` from
    `C:\Users\HP\merta-main\apps\web`): sign up a test studio with a second
    email address. Its price book lists the market items within a few
-   seconds, and the log shows `market seed on sign-up:` with `published:
-   true` and the item count. Tell the lead which test studio to remove.
+   seconds (a reload may be needed), and the log shows no `42P01`, `42501` or
+   `mutateInOrg failed` line. Tell the lead which test studio to remove.
 5. Put the production checkout back on main (`git switch --detach
    origin/main` after a fetch).
 
@@ -2910,7 +2917,9 @@ npm run market:seed-price-books
 
 The same lines with `created` in place of `to create`. Before it seeds, a
 real run also rebuilds the seed book new studios are seeded from (*0062 and
-the market price book at sign-up*); a dry run does not. Exit 0, or exit 1
+the market price book at sign-up*) and holds it until the run ends, so do not
+publish or withdraw a bulletin during a real run; a dry run does neither. Exit
+0, or exit 1
 with `FAILED, nothing written for this studio: SQLSTATE <code>: <the database's
 reason>` on each studio that failed (the others are seeded), e.g. `SQLSTATE
 55P03: canceling statement due to lock timeout` when a studio was saving the
