@@ -10,7 +10,8 @@
     "./client": "./src/client.ts",
     "./sqlstate": "./src/sqlstate.ts",
     "./env": "./src/env.ts",
-    "./lock-timeout": "./src/scripts/lock-timeout.ts"
+    "./lock-timeout": "./src/scripts/lock-timeout.ts",
+    "./market-units": "./src/market-units.ts"
   },
   "scripts": {
     "generate": "drizzle-kit generate",

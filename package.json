@@ -35,7 +35,8 @@
     "market:check": "tsx packages/market-ingest/src/cli.ts check",
     "market:review": "tsx packages/market-ingest/src/cli.ts review",
     "market:publish": "tsx packages/market-ingest/src/cli.ts publish",
-    "market:withdraw": "tsx packages/market-ingest/src/cli.ts withdraw"
+    "market:withdraw": "tsx packages/market-ingest/src/cli.ts withdraw",
+    "market:seed-price-books": "tsx packages/market-ingest/src/cli.ts seed-price-books"
   },
   "devDependencies": {
     "typescript": "^5.6.3"

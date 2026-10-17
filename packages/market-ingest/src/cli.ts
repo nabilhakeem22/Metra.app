@@ -4,6 +4,7 @@ import { catalogueCommand } from './commands/catalogue-command';
 import { checkCommand } from './commands/check-command';
 import { publishCommand } from './commands/publish-command';
 import { reviewCommand } from './commands/review-command';
+import { seedCommand } from './commands/seed-command';
 import { withdrawCommand } from './commands/withdraw-command';
 
 const COMMANDS: Record<string, (argv: string[]) => Promise<number>> = {
@@ -11,6 +12,7 @@ const COMMANDS: Record<string, (argv: string[]) => Promise<number>> = {
   check: checkCommand,
   publish: publishCommand,
   review: reviewCommand,
+  'seed-price-books': seedCommand,
   withdraw: withdrawCommand,
 };
 

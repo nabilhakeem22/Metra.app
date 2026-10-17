@@ -17,8 +17,10 @@ export interface SeedItem {
   sourceLabel: string;
   pack?: RollPack;
   status?: 'active' | 'discontinued';
-  /** ['YYYY-MM', price] */
-  prices?: Array<[string, string]>;
+  nameAr?: string;
+  nameEn?: string;
+  /** ['YYYY-MM', price], or null for a «التسعير متوقف» month. */
+  prices?: Array<[string, string | null]>;
 }
 
 async function leafId(sql: PostgresJs, leafKey: string): Promise<string> {
@@ -48,14 +50,14 @@ export async function seedPublished(
     const [row] = await sql<{ id: string }[]>`
       insert into market_items (key, category_id, name_ar, name_en, unit, unit_label_ar, source_labels, status,
         pack_length_m, pack_pieces, pack_piece_length_m)
-      values (${item.key}, ${categoryId}, 'بند', 'Item', ${item.unit}::market_unit, 'طن', ${[item.sourceLabel]},
+      values (${item.key}, ${categoryId}, ${item.nameAr ?? 'بند'}, ${item.nameEn ?? 'Item'}, ${item.unit}::market_unit, 'طن', ${[item.sourceLabel]},
         ${item.status ?? 'active'}::market_item_status, ${item.pack?.lengthM ?? null}, ${item.pack?.pieces ?? null},
         ${item.pack?.pieceLengthM ?? null})
       on conflict (key) do update set updated_at = now()
       returning id`;
     for (const [month, price] of item.prices ?? []) {
       await sql`insert into market_price_observations (item_id, bulletin_id, bulletin_period_month, period_month, status, price, source_pdf_page)
-                values (${row.id}, ${bulletin.id}, ${`${period}-01`}, ${`${month}-01`}, 'priced', ${price}, 1)`;
+                values (${row.id}, ${bulletin.id}, ${`${period}-01`}, ${`${month}-01`}, ${price === null ? 'suspended' : 'priced'}, ${price}, 1)`;
     }
   }
   return bulletin.id;
