@@ -11,6 +11,7 @@ import { sql } from 'drizzle-orm';
 import { after } from 'next/server';
 import { loggableFailure } from '@/lib/actions/loggable-failure';
 import { resolveSystemContext } from '@/lib/automation/system-context';
+import { holdRequestConnectionUntil } from '@/lib/db/request-connection';
 import { withDeadline } from '@/lib/http/deadlines';
 import { normalizeRawToken, readSdfJson } from '@/lib/share/sdf-call';
 import { hashShareToken } from '@/lib/share/token';
@@ -79,9 +80,15 @@ function settledWithin(work: Promise<unknown>, ms: number): Promise<boolean> {
   return Promise.race([work.then(() => true, () => true), late]).finally(() => clearTimeout(timer));
 }
 
-/** Let a close that outran the wait finish after the response (best effort). Never throws. */
+/**
+ * Let a close that outran the wait finish after the response (best effort).
+ * The close runs on the request's connection, so the connection is held
+ * until it settles: the request's teardown would otherwise end it between
+ * the close's statements. Never throws.
+ */
 function finishAfterResponse(closing: Promise<boolean>): void {
   try {
+    holdRequestConnectionUntil(closing);
     after(() => closing);
   } catch (err) {
     console.error('handover close not kept past the response:', loggableFailure(err));

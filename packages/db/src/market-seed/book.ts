@@ -31,6 +31,7 @@ export function buildSeedBook(items: MarketSeedItem[]): SeedBookEntry[] {
       nameForms: nameFormsOf(item, named),
       status: item.status,
       unit: studioUnitFor(item.unit),
+      priced: item.latestPrice !== null,
       unitCost: item.latestPrice === null ? null : atPriceBookScale(item.latestPrice),
       unitPrice: item.latestPrice === null ? null : withFivePercentMargin(item.latestPrice),
       leafKey: item.leafKey,

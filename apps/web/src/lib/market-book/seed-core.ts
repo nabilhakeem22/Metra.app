@@ -6,8 +6,8 @@
 // skips, cost, cost x 1.05 and market link. Idempotent: an item already
 // linked is skipped, so a second load adds nothing.
 import type { MetraDb } from '@metra/db';
-import { canClashByName, planSeed } from '@metra/db/market-seed';
-import { readSeedBook, readStudioBook, writeSeedPlan } from '@metra/db/market-seed/db';
+import { canClashByName, planSeedRefs } from '@metra/db/market-seed';
+import { holdSeedBookSteady, readSeedBook, readStudioBook, writeSeedPlan } from '@metra/db/market-seed/db';
 import { mutateInOrg } from '@/lib/actions/mutate';
 import type { ActionResult } from '@/lib/actions/result';
 import type { OrgContext } from '@/lib/db/context';
@@ -27,14 +27,29 @@ export interface MarketSeedSummary {
 
 /** The seed, inside the caller's RLS transaction for the studio. */
 export async function seedStudioPriceBook(tx: MetraDb, source: string): Promise<MarketSeedSummary> {
+  await holdSeedBookSteady(tx);
   const studio = await readStudioBook(tx);
   const book = await readSeedBook(tx, canClashByName(studio));
   if (book.length === 0) return { published: false, sections: 0, items: 0 };
-  const written = await writeSeedPlan(tx, planSeed(book, studio), source);
+  const written = await writeSeedPlan(tx, planSeedRefs(book, studio), source);
   return { published: true, ...written };
 }
 
-/** The empty price book's "load the market price book": owners and admins (price_book create). */
-export async function loadMarketPriceBookCore(ctx: OrgContext): Promise<ActionResult & { data?: MarketSeedSummary }> {
-  return mutateInOrg(ctx, { capability: 'price_book', action: 'create' }, (tx) => seedStudioPriceBook(tx, SEED_SOURCES.emptyPriceBook));
+/** The seed as an action core: owners and admins (price_book create), audited with `source`. */
+function seedCore(ctx: OrgContext, source: string): Promise<ActionResult & { data?: MarketSeedSummary }> {
+  return mutateInOrg(ctx, { capability: 'price_book', action: 'create' }, (tx) => seedStudioPriceBook(tx, source));
+}
+
+/** The empty price book's "load the market price book". */
+export function loadMarketPriceBookCore(ctx: OrgContext): Promise<ActionResult & { data?: MarketSeedSummary }> {
+  return seedCore(ctx, SEED_SOURCES.emptyPriceBook);
+}
+
+/**
+ * The new studio's seed, as ITS OWN REQUEST right after sign-up (the
+ * onboarding wizard fires it): a Worker's CPU budget is per request, and the
+ * sign-up's own request has no room left for it.
+ */
+export function seedNewStudioCore(ctx: OrgContext): Promise<ActionResult & { data?: MarketSeedSummary }> {
+  return seedCore(ctx, SEED_SOURCES.signup);
 }

@@ -1,16 +1,17 @@
 import { randomUUID } from 'node:crypto';
-import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { MARKET_WRITE_LOCK } from '@metra/db/market-seed';
+import { holdSeedBookSteady, writeSeedPlan } from '@metra/db/market-seed/db';
+import { withOrgContext } from '@/lib/db/context';
 import { loadMarketPriceBookCore } from '@/lib/market-book/seed-core';
 import { closeFixture, ctxFor, raw, teardown } from './fixture';
-import { asAppRole, closeMarketFixture } from './market-fixture';
-import { afterTasks, clearSeedFixture, cliSeed, createStudio, publishSeedFixture, rebuildSeedBook, runAfterResponse, seededRows, signUp } from './market-seed-fixture';
+import { asAppRole, closeMarketFixture, marketRaw } from './market-fixture';
+import { clearSeedFixture, cliSeed, createStudio, publishSeedFixture, rebuildSeedBook, seededRows, signUp } from './market-seed-fixture';
 
 // The empty price book's "load the official market price book": the sign-up
 // seed again, for a studio whose seed failed or that emptied its book. It adds
 // nothing twice, is for owners and admins only, and the seed book it reads is
 // SELECT-only reference data that only a member org context sees.
-
-vi.mock('next/server', () => ({ after: (task: () => Promise<unknown>) => void afterTasks.push(task) }));
 
 const orgIds: string[] = [];
 
@@ -39,8 +40,7 @@ describe('loadMarketPriceBookCore', () => {
   });
 
   it('adds nothing to a studio the sign-up already seeded', async () => {
-    const studio = await signUp(orgIds, 'Seeded at sign-up');
-    await runAfterResponse();
+    const { ctx: studio } = await signUp(orgIds, 'Seeded at sign-up');
     const seeded = await seededRows(studio.orgId);
     expect(seeded.length).toBeGreaterThanOrEqual(2);
     expect(await loadMarketPriceBookCore(studio)).toEqual({ ok: true, data: { published: true, sections: 0, items: 0 } });
@@ -68,6 +68,32 @@ describe('loadMarketPriceBookCore', () => {
       expect(await loadMarketPriceBookCore(ctxFor(studio.orgId, studio.userId, role))).toEqual({ ok: false, error: 'forbidden' });
     }
     expect(await seededRows(studio.orgId)).toEqual([]);
+  });
+});
+
+describe('the stored book a seed writes from', () => {
+  it('cannot be rebuilt while a seed holds it', async () => {
+    const studio = await createStudio(orgIds, 'Hold the book');
+    const tryWrite = async () => (await marketRaw()`select pg_try_advisory_lock(hashtext(${MARKET_WRITE_LOCK})) as got`)[0].got as boolean;
+    const during = await withOrgContext(studio, async (tx) => {
+      await holdSeedBookSteady(tx);
+      return tryWrite();
+    });
+    expect(during).toBe(false);
+    expect(await tryWrite()).toBe(true);
+    await marketRaw()`select pg_advisory_unlock(hashtext(${MARKET_WRITE_LOCK}))`;
+  });
+
+  it('refuses a planned item the book does not have, and writes nothing at all', async () => {
+    const studio = await createStudio(orgIds, 'Stale plan');
+    const plan = {
+      sectionsPresent: 0,
+      sectionsToCreate: [{ key: 'market.finishing.glass', nameAr: 'الزجاج', nameEn: 'Glass', qualified: false }],
+      itemsToCreate: [{ marketItemId: randomUUID(), section: { key: 'market.finishing.glass' }, code: 'MKT-gone', nameAr: 'x', nameEn: 'x', unit: 'sqm' as const, defaultUnitCost: '1.0000', defaultUnitPrice: '1.0500' }],
+      skipped: { already_linked: 0, discontinued: 0, unit_unsupported: 0, no_price: 0, code_clash: 0, name_clash: 0 },
+    };
+    await expect(withOrgContext(studio, (tx) => writeSeedPlan(tx, plan, 'dbtest'))).rejects.toThrow('no longer has 1 planned item');
+    expect(await raw.query(`select id from sections where org_id = '${studio.orgId}' and key like 'market.%'`)).toEqual([]);
   });
 });
 

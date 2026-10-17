@@ -18,7 +18,8 @@ vi.mock('@metra/db/market-seed', async (original) => {
     planSeed: (...args: Parameters<typeof real.planSeed>) => {
       const plan = real.planSeed(...args);
       if (!breakPlan.on || plan.itemsToCreate.length === 0) return plan;
-      return { ...plan, itemsToCreate: [...plan.itemsToCreate, { ...plan.itemsToCreate[0], code: 'MKT-broken', defaultUnitCost: '-1.0000' }] };
+      // The same item twice: the database refuses the second (a unique code per studio).
+      return { ...plan, itemsToCreate: [...plan.itemsToCreate, plan.itemsToCreate[0]] };
     },
   };
 });
@@ -108,7 +109,7 @@ describe('market:seed-price-books', () => {
     await publishFixture();
     breakPlan.on = true;
     expect(await seedCommand(['--org', ORG_A_ID])).toBe(1);
-    expect(printed.join('\n')).toContain('FAILED, nothing written for this studio: SQLSTATE 23514');
+    expect(printed.join('\n')).toContain('FAILED, nothing written for this studio: SQLSTATE 23505');
     expect(await seededIn(ORG_A_ID)).toEqual([]);
     expect(await sql`select id from sections where org_id = ${ORG_A_ID} and key like 'market.%'`).toEqual([]);
     breakPlan.on = false;

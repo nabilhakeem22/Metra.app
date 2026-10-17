@@ -41,21 +41,27 @@ export interface SeedLeaf {
   topNameEn: string;
 }
 
-/**
- * One market item as EVERY studio's seed reads it: the studio-independent half
- * of the plan (./book.ts), built once per published book, so one studio's plan
- * is set lookups only.
- */
-export interface SeedBookEntry extends SeedLeaf {
+/** What a studio's plan decides from, per market item: all the app reads of the stored book (./db.ts). */
+export interface SeedPlanEntry extends SeedLeaf {
   marketItemId: string;
   code: string;
-  nameAr: string;
-  nameEn: string;
   /** The comparison forms a studio's own item clashes with: the seeded names and the bulletin's printed spellings. */
   nameForms: string[];
   status: 'active' | 'discontinued';
   /** The studio unit, or null when none fits (bag, pack, thousand_bricks). */
   unit: CostItemUnit | null;
+  /** Whether some month has a numeric price (else the item is skipped: no price). */
+  priced: boolean;
+}
+
+/**
+ * One market item as EVERY studio's seed receives it: the studio-independent
+ * half of the plan (./book.ts), built once per published book, so one studio's
+ * plan is set lookups only.
+ */
+export interface SeedBookEntry extends SeedPlanEntry {
+  nameAr: string;
+  nameEn: string;
   /** Cost and selling price at the price-book scale, or null when no month has a numeric price. */
   unitCost: string | null;
   unitPrice: string | null;
@@ -77,11 +83,15 @@ export interface SectionToCreate {
   qualified: boolean;
 }
 
-export interface ItemToCreate {
+/** An item to create, by reference: what the one write needs (its names and prices come from the stored book). */
+export interface ItemRef {
   marketItemId: string;
   /** A section this plan creates (by key), or a section the studio already has (by id). */
   section: { key: string } | { id: string };
   code: string;
+}
+
+export interface ItemToCreate extends ItemRef {
   nameAr: string;
   nameEn: string;
   unit: CostItemUnit;
@@ -89,10 +99,11 @@ export interface ItemToCreate {
   defaultUnitPrice: string;
 }
 
-export interface SeedPlan {
+/** One studio's plan; `Item` is the full ItemToCreate (the CLI) or an ItemRef (the app). */
+export interface SeedPlan<Item extends ItemRef = ItemToCreate> {
   /** Existing sections the seed's items go to (made by an earlier seed, or of the same name). */
   sectionsPresent: number;
   sectionsToCreate: SectionToCreate[];
-  itemsToCreate: ItemToCreate[];
+  itemsToCreate: Item[];
   skipped: Record<SkipReason, number>;
 }

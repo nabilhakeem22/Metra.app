@@ -3,11 +3,11 @@
 // the previous published bulletin; the items it discontinued are active again;
 // and the details of every item it printed are re-derived from what is still
 // published. `--replace` runs the same step on the bulletin it replaces.
+import { MARKET_WRITE_LOCK } from '@metra/db/market-seed';
 import { applyMarketWriteTimeouts } from '@metra/db/lock-timeout';
 import type { PostgresJs, Transaction } from '../db/connection';
 import { refreshSeedBook } from '../seed/book-store';
 import { refreshItemDetails } from './details';
-import { MARKET_WRITE_LOCK } from './write-lock';
 
 export async function withdrawInTransaction(tx: Transaction, bulletinId: string, reason: string): Promise<void> {
   const [row] = await tx<Array<{ discontinued_item_ids: string[] }>>`

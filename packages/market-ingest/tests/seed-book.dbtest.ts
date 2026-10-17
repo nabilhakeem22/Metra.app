@@ -1,9 +1,10 @@
 import { rmSync } from 'node:fs';
-import { buildSeedBook } from '@metra/db/market-seed';
+import { MARKET_WRITE_LOCK, buildSeedBook } from '@metra/db/market-seed';
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { withdrawCommand } from '../src/commands/withdraw-command';
+import { rebuildAndHoldSeedBook, releaseSeedBookHold } from '../src/seed/book-store';
 import { readMarketSeedItems } from '../src/seed/read';
-import { clearMarketTestData } from './db-fixture';
+import { clearMarketTestData, openTestDatabase } from './db-fixture';
 import { bulletinFile, newStaging, publish, stage, type Staging } from './publish-fixture';
 import { clearSeeded, publishFixture, run, sql } from './seed-fixture';
 
@@ -59,6 +60,19 @@ describe('market:publish and market:withdraw rebuild the seed book', () => {
 });
 
 describe('market:seed-price-books and the stored book', () => {
+  it('holds the stored book against any publish or withdrawal from its rebuild until it is released', async () => {
+    const seeding = openTestDatabase();
+    const tryPublish = async () => (await sql`select pg_try_advisory_xact_lock(hashtext(${MARKET_WRITE_LOCK})) as got`)[0].got as boolean;
+    try {
+      await rebuildAndHoldSeedBook(seeding);
+      expect(await tryPublish()).toBe(false);
+      await releaseSeedBookHold(seeding);
+      expect(await tryPublish()).toBe(true);
+    } finally {
+      await seeding.end();
+    }
+  });
+
   it('a dry run stores nothing; a real run stores exactly the book it seeded with', async () => {
     await publishFixture();
     await run(true);

@@ -4,10 +4,9 @@
 // published (market:publish, market:withdraw) or under the same market write
 // lock (market:seed-price-books). The owner's connection writes it; metra_app
 // can only read it.
-import { buildSeedBook, type SeedBookEntry } from '@metra/db/market-seed';
+import { MARKET_WRITE_LOCK, buildSeedBook, type SeedBookEntry } from '@metra/db/market-seed';
 import { MIGRATION_LOCK_TIMEOUT } from '@metra/db/lock-timeout';
 import type { PostgresJs, Transaction } from '../db/connection';
-import { MARKET_WRITE_LOCK } from '../publish/write-lock';
 import { readMarketSeedItems } from './read';
 
 async function storeSeedBook(tx: Transaction, book: SeedBookEntry[]): Promise<void> {
@@ -47,11 +46,24 @@ export async function refreshSeedBook(tx: Transaction): Promise<SeedBookEntry[]>
   return book;
 }
 
-/** The same rebuild in its own transaction, behind any publish or withdrawal in flight. */
-export async function refreshSeedBookLocked(sql: PostgresJs): Promise<SeedBookEntry[]> {
+/**
+ * The same rebuild in its own transaction, behind any publish or withdrawal in
+ * flight, and then HELD: the transaction also takes the market write lock
+ * SHARED at session level, so from its commit until `releaseSeedBookHold` no
+ * publish or withdrawal can change the book this connection seeds from (the
+ * seed writes items by reference to it). The caller must release it, or end
+ * the connection.
+ */
+export async function rebuildAndHoldSeedBook(sql: PostgresJs): Promise<SeedBookEntry[]> {
   return (await sql.begin(async (tx) => {
     await tx`select set_config('lock_timeout', ${MIGRATION_LOCK_TIMEOUT}, true)`;
     await tx`select pg_advisory_xact_lock(hashtext(${MARKET_WRITE_LOCK}))`;
-    return refreshSeedBook(tx);
+    const book = await refreshSeedBook(tx);
+    await tx`select pg_advisory_lock_shared(hashtext(${MARKET_WRITE_LOCK}))`;
+    return book;
   })) as SeedBookEntry[];
+}
+
+export async function releaseSeedBookHold(sql: PostgresJs): Promise<void> {
+  await sql`select pg_advisory_unlock_shared(hashtext(${MARKET_WRITE_LOCK}))`;
 }

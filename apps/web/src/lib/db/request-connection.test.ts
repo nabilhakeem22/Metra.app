@@ -34,7 +34,7 @@ vi.mock('@/lib/cf/context', () => ({
 
 vi.mock('@metra/db', () => ({ createDb: createDbMock }));
 
-const { getRequestConnection } = await import('./request-connection');
+const { getRequestConnection, holdRequestConnectionUntil } = await import('./request-connection');
 
 describe('getRequestConnection — shared request-scoped connection', () => {
   beforeEach(() => {
@@ -78,6 +78,36 @@ describe('getRequestConnection — shared request-scoped connection', () => {
 
     // A second teardown invocation is a guarded no-op (idempotent close).
     await afterCallbacks[0]();
+    expect(endSpy).toHaveBeenCalledTimes(1);
+  });
+
+  // BEFORE the hold existed, the teardown ended the socket at once, so work that
+  // ran on after the response failed every statement it started afterwards with
+  // CONNECTION_ENDED (the handover close's later steps). The test above is that
+  // unheld behaviour, kept for work nobody holds.
+  it('waits for held work before it ends the connection, which stays the same until then', async () => {
+    const { sql } = getRequestConnection();
+    const endSpy = sql.end as unknown as ReturnType<typeof vi.fn>;
+    let finish!: () => void;
+    holdRequestConnectionUntil(new Promise<void>((resolve) => { finish = resolve; }));
+    await afterCallbacks[0]();
+    const drained = runtime.ctx.waitUntil.mock.calls[0][0] as Promise<void>;
+    await Promise.resolve();
+    expect(endSpy).not.toHaveBeenCalled();
+    expect(getRequestConnection().sql).toBe(sql);
+    finish();
+    await drained;
+    expect(endSpy).toHaveBeenCalledTimes(1);
+    expect(createDbMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('still ends after held work that fails, and holds nothing once the teardown began', async () => {
+    const { sql } = getRequestConnection();
+    const endSpy = sql.end as unknown as ReturnType<typeof vi.fn>;
+    holdRequestConnectionUntil(Promise.reject(new Error('the close failed')));
+    await afterCallbacks[0]();
+    holdRequestConnectionUntil(new Promise(() => {}));
+    await (runtime.ctx.waitUntil.mock.calls[0][0] as Promise<void>);
     expect(endSpy).toHaveBeenCalledTimes(1);
   });
 

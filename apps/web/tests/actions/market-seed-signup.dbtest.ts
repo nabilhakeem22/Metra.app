@@ -2,15 +2,13 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { closeFixture, raw, teardown } from './fixture';
 import { closeMarketFixture, marketRaw } from './market-fixture';
 import {
-  afterTasks, clearSeedFixture, cliSeed, createStudio, emptySeedBook, publishSeedFixture, rebuildSeedBook, runAfterResponse,
-  seedAudits, seededRows, signUp,
+  clearSeedFixture, cliSeed, createStudio, emptySeedBook, publishSeedFixture, rebuildSeedBook, seedAudits, seededRows, signUp,
 } from './market-seed-fixture';
 
-// Every new studio gets the market price book at sign-up, after the response:
-// exactly what market:seed-price-books gives a studio, never at the cost of
-// the sign-up itself, and nothing at all while no bulletin is published.
-
-vi.mock('next/server', () => ({ after: (task: () => Promise<unknown>) => void afterTasks.push(task) }));
+// Every new studio gets the market price book right after sign-up, in a
+// request of its own: exactly what market:seed-price-books gives a studio,
+// never at the cost of the studio itself, and nothing at all while no
+// bulletin is published.
 
 const orgIds: string[] = [];
 
@@ -27,8 +25,8 @@ describe('no bulletin published', () => {
   it('creates the studio and seeds nothing, without an error', async () => {
     await emptySeedBook();
     const errors = vi.spyOn(console, 'error');
-    const ctx = await signUp(orgIds, 'Signup no bulletin');
-    await runAfterResponse();
+    const { ctx, seeded } = await signUp(orgIds, 'Signup no bulletin');
+    expect(seeded).toEqual({ ok: true, data: { published: false, sections: 0, items: 0 } });
     expect(await raw.count('memberships', ctx.orgId)).toBe(1);
     expect(await seededRows(ctx.orgId)).toEqual([]);
     expect(errors).not.toHaveBeenCalled();
@@ -43,9 +41,9 @@ describe('a published market book', () => {
   });
 
   it('gives the new studio exactly what market:seed-price-books gives its twin', async () => {
-    const signedUp = await signUp(orgIds, 'Signup studio');
+    const { ctx: signedUp, seeded } = await signUp(orgIds, 'Signup studio');
+    expect(seeded).toMatchObject({ ok: true, data: { published: true } });
     const twin = await createStudio(orgIds, 'CLI twin');
-    await runAfterResponse();
     await cliSeed(twin.orgId);
     const rows = await seededRows(signedUp.orgId);
     expect(rows).toEqual(await seededRows(twin.orgId));
@@ -60,7 +58,7 @@ describe('a published market book', () => {
     );
   });
 
-  it('never fails the sign-up: a refused seed leaves the studio, writes nothing and logs one redacted line', async () => {
+  it('never undoes the sign-up: a refused seed leaves the studio, writes nothing and logs one redacted line', async () => {
     await marketRaw().unsafe(`create function public.dbtest_refuse_signup_seed() returns trigger language plpgsql as $$
       begin
         if new.code like 'MKT-%' and exists (select 1 from public.organizations o where o.id = new.org_id and o.name_en = 'Signup refused') then
@@ -70,14 +68,13 @@ describe('a published market book', () => {
       end $$`);
     await marketRaw().unsafe('create trigger dbtest_refuse_signup_seed before insert on public.cost_items for each row execute function public.dbtest_refuse_signup_seed()');
     const errors = vi.spyOn(console, 'error').mockImplementation(() => undefined);
-    const ctx = await signUp(orgIds, 'Signup refused');
-    await runAfterResponse();
+    const { ctx, seeded } = await signUp(orgIds, 'Signup refused');
+    expect(seeded).toMatchObject({ ok: false, error: 'generic' });
     expect(await raw.count('memberships', ctx.orgId)).toBe(1);
     expect(await seededRows(ctx.orgId)).toEqual([]);
     expect(await raw.query(`select id from sections where org_id = '${ctx.orgId}' and key like 'market.%'`)).toEqual([]);
     expect(errors).toHaveBeenCalledTimes(1);
     const line = JSON.stringify(errors.mock.calls[0]);
-    expect(line).toContain('market seed on sign-up failed');
     expect(line).toContain('P0001');
     expect(line).not.toMatch(/insert into|params|MKT-|\d{3,}\.\d{4}/);
     errors.mockRestore();

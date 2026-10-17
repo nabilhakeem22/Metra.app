@@ -1,26 +1,15 @@
 // Helpers for the market-seed DB tests: a small published market book that
-// covers every seed path, the REAL sign-up path (createOrgCore, then the
-// schedule createOrg makes) with `after()` captured so a test can run what the
-// platform would run after the response, and the owner's CLI on a twin studio.
-//
-// next/server must be mocked by the test FILE (vi.mock is hoisted per file);
-// the capture below is what that mock pushes into.
+// covers every seed path, the REAL sign-up path (createOrgCore, then the seed
+// request the onboarding wizard fires), and the owner's CLI on a twin studio.
 import { randomUUID } from 'node:crypto';
 import { createDb } from '@metra/db';
 import { expect } from 'vitest';
-import { seedAfterSignup } from '@/lib/market-book/seed-after-signup';
+import { seedNewStudioCore } from '@/lib/market-book/seed-core';
 import { createOrgCore } from '@/lib/org/core';
-import { refreshSeedBookLocked } from '../../../../packages/market-ingest/src/seed/book-store';
+import { rebuildAndHoldSeedBook } from '../../../../packages/market-ingest/src/seed/book-store';
 import { runSeed } from '../../../../packages/market-ingest/src/seed/run';
 import { ctxFor, raw } from './fixture';
 import { clearMarket, marketRaw, seedBulletin, seedMarketItem } from './market-fixture';
-
-/** What `after()` was handed, in order; run by `runAfterResponse`. */
-export const afterTasks: Array<() => Promise<unknown>> = [];
-
-export async function runAfterResponse(): Promise<void> {
-  for (const task of afterTasks.splice(0)) await task();
-}
 
 /** A studio created by createOrgCore alone: no seed scheduled (the CLI's twin). */
 export async function createStudio(orgIds: string[], name: string) {
@@ -31,11 +20,10 @@ export async function createStudio(orgIds: string[], name: string) {
   return ctx;
 }
 
-/** A sign-up as createOrg does it: the core, then the seed scheduled on success. */
+/** A sign-up: the studio, then the seed request the wizard fires once it exists; its answer. */
 export async function signUp(orgIds: string[], name: string) {
   const ctx = await createStudio(orgIds, name);
-  seedAfterSignup(ctx);
-  return ctx;
+  return { ctx, seeded: await seedNewStudioCore(ctx) };
 }
 
 /** Five items: two seeded (one a roll, named with its pack), and a bag, a never-priced and a discontinued one skipped. */
@@ -56,11 +44,11 @@ function ownerConnection() {
   return createDb(process.env.DATABASE_URL as string, { max: 1 });
 }
 
-/** Rebuild the stored seed book from what is published, as market:publish does. */
+/** Rebuild the stored seed book from what is published, as market:publish does (its hold ends with this connection). */
 export async function rebuildSeedBook(): Promise<void> {
   const { sql } = ownerConnection();
   try {
-    await refreshSeedBookLocked(sql);
+    await rebuildAndHoldSeedBook(sql);
   } finally {
     await sql.end();
   }

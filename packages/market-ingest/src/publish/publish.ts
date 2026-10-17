@@ -2,6 +2,7 @@
 // timeouts, re-run the gate against the published history, refuse unless its
 // output hashes to the approved value, and write exactly that output. Nothing
 // read from staged.json is ever written. Everything or nothing.
+import { MARKET_WRITE_LOCK } from '@metra/db/market-seed';
 import { applyMarketWriteTimeouts } from '@metra/db/lock-timeout';
 import { computeCheck } from '../commands/perform-check';
 import type { PostgresJs, Transaction } from '../db/connection';
@@ -11,7 +12,6 @@ import type { StagedBulletin } from '../stage';
 import { approvedStaged } from './approve';
 import { refreshItemDetails } from './details';
 import { withdrawInTransaction } from './withdraw';
-import { MARKET_WRITE_LOCK } from './write-lock';
 import { discontinueItems, insertDetails, insertObservations, upsertCategories, writeItems } from './writes';
 
 export interface PublishRequest {

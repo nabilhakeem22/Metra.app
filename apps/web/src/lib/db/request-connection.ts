@@ -14,8 +14,11 @@ export interface RequestConn {
 // Internal holder adds a once-only close guard so the request-end teardown is
 // idempotent: if `after` were ever invoked more than once, the second sql.end()
 // must be a no-op rather than a double-close of an already-drained socket.
+// `held` is the work started in the request that may outlive the response
+// (holdRequestConnectionUntil): the teardown waits for it before it ends.
 interface Holder extends RequestConn {
   closed: boolean;
+  held: Set<Promise<void>>;
 }
 
 // Keyed by the current request's ExecutionContext object — stable within a
@@ -49,11 +52,12 @@ export function getRequestConnection(): RequestConn {
   if (existing) return { db: existing.db, sql: existing.sql };
 
   const { db, sql } = createRuntimeConnection();
-  const holder: Holder = { db, sql, closed: false };
+  const holder: Holder = { db, sql, closed: false, held: new Set() };
   store.set(ctx, holder);
 
   // Register the once-only teardown for THIS request. `after` (next/server) runs
-  // after the response is sent: drop the store entry and close the socket exactly
+  // after the response is sent: once the held work has settled
+  // (holdRequestConnectionUntil), drop the store entry and close the socket exactly
   // once, deferring the drain via ctx.waitUntil so it neither blocks the response
   // nor lets the read loop bleed into the next request. The `closed` guard makes a
   // repeat invocation a no-op. A mid-request DbDeadlineError never reaches here —
@@ -69,10 +73,9 @@ export function getRequestConnection(): RequestConn {
   // the render alive. The graceful drain still runs wherever after() IS wired.
   try {
     after(async () => {
-      store.delete(ctx);
       if (holder.closed) return;
       holder.closed = true;
-      ctx.waitUntil(sql.end({ timeout: 5 }));
+      ctx.waitUntil(endWhenIdle(holder, () => store.delete(ctx)));
     });
   } catch (err) {
     console.warn(
@@ -82,4 +85,40 @@ export function getRequestConnection(): RequestConn {
   }
 
   return { db, sql };
+}
+
+/**
+ * The teardown proper: wait for every piece of held work (more may be held
+ * while waiting), then forget the connection and end it. Until then a later
+ * `withRequestDb` in that work still gets this same connection.
+ */
+async function endWhenIdle(holder: Holder, forget: () => void): Promise<void> {
+  while (holder.held.size > 0) await Promise.all([...holder.held]);
+  forget();
+  await holder.sql.end({ timeout: 5 });
+}
+
+/**
+ * Keep the request's connection open until `work` settles: for DB work started
+ * in the request that may run on after the response (`after(() => work)`).
+ *
+ * WHY: the teardown above runs in `after()`, and Next starts every `after()`
+ * callback at once, so without this it ends the socket while that work is
+ * still going: postgres.js lets a transaction already open finish, but every
+ * statement or transaction the work starts afterwards fails with
+ * CONNECTION_ENDED (and one still open 5 s later is cut). Call it during the
+ * request. Never throws; a rejection of `work` is the caller's to handle.
+ * Off-platform there is no request connection to hold.
+ */
+export function holdRequestConnectionUntil(work: Promise<unknown>): void {
+  if (!isCloudflareRuntime()) return;
+  getRequestConnection();
+  const holder = store.get(cfExecutionContext());
+  if (!holder || holder.closed) return;
+  const settled = work.then(
+    () => undefined,
+    () => undefined,
+  );
+  holder.held.add(settled);
+  void settled.then(() => holder.held.delete(settled));
 }

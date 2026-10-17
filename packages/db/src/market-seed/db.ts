@@ -7,7 +7,8 @@
 import { sql } from 'drizzle-orm';
 import type { MetraDb } from '../client';
 import { costItems, sections } from '../schema';
-import type { SeedBookEntry, SeedPlan, StudioBook } from './types';
+import { MARKET_WRITE_LOCK } from './lock';
+import type { ItemRef, SeedPlan, SeedPlanEntry, StudioBook } from './types';
 
 /** What the studio already has, as the plan reads it. */
 export async function readStudioBook(tx: MetraDb): Promise<StudioBook> {
@@ -18,29 +19,31 @@ export async function readStudioBook(tx: MetraDb): Promise<StudioBook> {
 }
 
 type StoredLeaf = [leafNameAr: string, leafNameEn: string, topNameAr: string, topNameEn: string];
-type StoredEntry = [string, string, string, string, string[], SeedBookEntry['status'], SeedBookEntry['unit'], string | null, string | null, string];
+type StoredEntry = [string, string, string[], SeedPlanEntry['status'], SeedPlanEntry['unit'], boolean, string];
 
 /**
- * The stored seed book (market_seed_book), in its order. ONE row of ONE text
- * value, parsed by JSON.parse: the cheapest way a Worker can receive 450
- * entries. Each sub-category's names travel once, and the name forms only when
- * `withNameForms` (`canClashByName`: a studio with no item of its own cannot
- * clash, so a new studio reads a quarter less). Empty when no bulletin is published, or the book
- * was never built.
+ * The stored seed book (market_seed_book) as a studio's plan reads it, in its
+ * order: what the plan DECIDES from and nothing else. Names and prices stay in
+ * the database, where the write takes them (writeSeedPlan); each sub-category's
+ * names travel once; the name forms only when `withNameForms`
+ * (`canClashByName`: a studio with no item of its own cannot clash). ONE row
+ * of ONE text value, parsed by JSON.parse: the cheapest way a Worker can
+ * receive 450 entries. Empty when no bulletin is published, or the book was
+ * never built.
  */
-export async function readSeedBook(tx: MetraDb, withNameForms: boolean): Promise<SeedBookEntry[]> {
+export async function readSeedBook(tx: MetraDb, withNameForms: boolean): Promise<SeedPlanEntry[]> {
   const rows = (await tx.execute(sql`
     select json_build_array(
              coalesce((select json_object_agg(leaf_key, json_build_array(leaf_name_ar, leaf_name_en, top_name_ar, top_name_en))
                          from (select distinct leaf_key, leaf_name_ar, leaf_name_en, top_name_ar, top_name_en from market_seed_book) leaves), '{}'),
-             coalesce((select json_agg(json_build_array(item_id, code, name_ar, name_en,
+             coalesce((select json_agg(json_build_array(item_id, code,
                                 case when ${withNameForms} then name_forms else '{}'::text[] end,
-                                status, unit, unit_cost::text, unit_price::text, leaf_key) order by position)
+                                status, unit, unit_cost is not null, leaf_key) order by position)
                          from market_seed_book), '[]'))::text as book`)) as unknown as Array<{ book: string }>;
   const [leaves, entries] = JSON.parse(rows[0].book) as [Record<string, StoredLeaf>, StoredEntry[]];
-  return entries.map(([marketItemId, code, nameAr, nameEn, nameForms, status, unit, unitCost, unitPrice, leafKey]) => {
+  return entries.map(([marketItemId, code, nameForms, status, unit, priced, leafKey]) => {
     const [leafNameAr, leafNameEn, topNameAr, topNameEn] = leaves[leafKey];
-    return { marketItemId, code, nameAr, nameEn, nameForms, status, unit, unitCost, unitPrice, leafKey, leafNameAr, leafNameEn, topNameAr, topNameEn };
+    return { marketItemId, code, nameForms, status, unit, priced, leafKey, leafNameAr, leafNameEn, topNameAr, topNameEn };
   });
 }
 
@@ -50,24 +53,34 @@ export interface SeedWritten {
 }
 
 /**
+ * Hold the stored seed book steady for the rest of the transaction: the
+ * market write lock SHARED, so no publish, withdrawal or rebuild (which take
+ * it exclusively) can change the book between the plan and the write. Call it
+ * before reading the book. Waits behind a market write within the
+ * transaction's lock_timeout.
+ */
+export async function holdSeedBookSteady(tx: MetraDb): Promise<void> {
+  await tx.execute(sql`select pg_advisory_xact_lock_shared(hashtext(${MARKET_WRITE_LOCK}))`);
+}
+
+/**
  * Writes `plan` in ONE set-based statement: the new sections, the cost items
  * (into a new section by its key, or an existing one by id), and an audit row
- * for each, marked with `source`. The rows travel as two JSON parameters, so
- * the Worker builds no per-row SQL. Nothing to write is no statement at all.
+ * for each, marked with `source`. An item travels BY REFERENCE (market item,
+ * code, section): its names, unit, cost and price are read from the stored
+ * seed book the plan was made from, so the Worker sends a fifth of the bytes.
+ * The caller holds that book steady (holdSeedBookSteady, or the CLI's session
+ * lock); an item the book no longer has fails the whole write, and nothing is
+ * written. Nothing to write is no statement at all.
  */
-export async function writeSeedPlan(tx: MetraDb, plan: SeedPlan, source: string): Promise<SeedWritten> {
+export async function writeSeedPlan(tx: MetraDb, plan: SeedPlan<ItemRef>, source: string): Promise<SeedWritten> {
   if (plan.sectionsToCreate.length === 0 && plan.itemsToCreate.length === 0) return { sections: 0, items: 0 };
   const sectionRows = JSON.stringify(plan.sectionsToCreate.map((section) => ({ key: section.key, name_ar: section.nameAr, name_en: section.nameEn })));
   const itemRows = JSON.stringify(plan.itemsToCreate.map((item) => ({
     market_item_id: item.marketItemId,
+    code: item.code,
     section_id: 'id' in item.section ? item.section.id : null,
     section_key: 'key' in item.section ? item.section.key : null,
-    code: item.code,
-    name_ar: item.nameAr,
-    name_en: item.nameEn,
-    unit: item.unit,
-    cost: item.defaultUnitCost,
-    price: item.defaultUnitPrice,
   })));
   const rows = (await tx.execute(sql`
     with actor as (
@@ -85,9 +98,9 @@ export async function writeSeedPlan(tx: MetraDb, plan: SeedPlan, source: string)
         from actor, new_sections n
     ), new_items as (
       insert into cost_items (org_id, code, name_ar, name_en, section_id, unit, default_unit_cost, default_unit_price, market_item_id)
-      select actor.org_id, i.code, i.name_ar, i.name_en, coalesce(i.section_id, n.id), i.unit, i.cost, i.price, i.market_item_id
-        from actor, jsonb_to_recordset(${itemRows}::text::jsonb) as i(market_item_id uuid, section_id uuid, section_key text, code text,
-               name_ar text, name_en text, unit cost_item_unit, cost numeric, price numeric)
+      select actor.org_id, b.code, b.name_ar, b.name_en, coalesce(i.section_id, n.id), b.unit, b.unit_cost, b.unit_price, b.item_id
+        from actor, jsonb_to_recordset(${itemRows}::text::jsonb) as i(market_item_id uuid, code text, section_id uuid, section_key text)
+        join market_seed_book b on b.item_id = i.market_item_id and b.code = i.code
         left join new_sections n on n.key = i.section_key
       returning id, code, name_ar, name_en, section_id, unit, market_item_id, default_unit_cost, default_unit_price
     ), item_audit as (
@@ -99,5 +112,8 @@ export async function writeSeedPlan(tx: MetraDb, plan: SeedPlan, source: string)
         from actor, new_items c
     )
     select (select count(*)::int from new_sections) as sections, (select count(*)::int from new_items) as items`)) as unknown as SeedWritten[];
+  if (rows[0].items !== plan.itemsToCreate.length) {
+    throw new Error(`the stored seed book no longer has ${plan.itemsToCreate.length - rows[0].items} planned item(s); nothing was written`);
+  }
   return rows[0];
 }

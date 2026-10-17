@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { buildSeedBook } from './book';
 import { comparisonForm } from './compare';
-import { canClashByName, planSeed } from './plan';
+import { canClashByName, planSeed, planSeedRefs } from './plan';
 import type { MarketSeedItem } from './types';
 
 function item(overrides: Partial<MarketSeedItem> = {}): MarketSeedItem {
@@ -64,5 +64,25 @@ describe('canClashByName', () => {
     const studio = { sections: [], items: [{ code: 'MKT-other', nameAr: 'زجاج شفاف 4 مم', nameEn: null, marketItemId: null }] };
     const book = buildSeedBook([item()]);
     expect(planSeed(book.map((entry) => ({ ...entry, nameForms: [] })), studio)).toEqual(planSeed(book, studio));
+  });
+});
+
+describe('planSeedRefs', () => {
+  it('decides exactly as planSeed: the same items, sections and skips, by reference', () => {
+    const book = buildSeedBook([
+      item(),
+      item({ id: 'm-roll', key: 'electrical.wires.copper', nameAr: 'سلك', nameEn: 'Wire', unit: 'roll', pack: { lengthM: 100, pieces: null, pieceLengthM: null }, leafKey: 'electrical.wires', leafNameAr: 'أسلاك', leafNameEn: 'Wires' }),
+      item({ id: 'm-bag', key: 'raw.cement.bag', nameAr: 'أسمنت', nameEn: 'Cement', unit: 'bag' }),
+      item({ id: 'm-none', key: 'raw.cement.none', nameAr: 'جبس', nameEn: 'Gypsum', latestPrice: null }),
+      item({ id: 'm-own', key: 'finishing.glass.own', nameAr: 'مرآة', nameEn: 'Mirror' }),
+    ]);
+    const studio = {
+      sections: [{ id: 's-glass', key: null, nameAr: null, nameEn: 'Glass' }],
+      items: [{ code: 'OWN', nameAr: 'مرآة 4 مم', nameEn: null, marketItemId: null }],
+    };
+    const full = planSeed(book, studio);
+    const refs = planSeedRefs(book.map(({ nameAr: _ar, nameEn: _en, unitCost: _cost, unitPrice: _price, ...decided }) => decided), studio);
+    expect(refs).toEqual({ ...full, itemsToCreate: full.itemsToCreate.map(({ marketItemId, section, code }) => ({ marketItemId, section, code })) });
+    expect(full.skipped).toMatchObject({ unit_unsupported: 1, no_price: 1, name_clash: 1 });
   });
 });
