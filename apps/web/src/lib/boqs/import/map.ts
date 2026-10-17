@@ -5,8 +5,8 @@
 // Nothing here knows what a CSV is. It takes a SheetGrid, so the same code
 // serves an XLSX decoder unchanged.
 
-import type { BoqUnit } from '@/lib/boqs/edit-input';
 import { readMoney } from '@/lib/money/read';
+import { unitFromToken } from '@/lib/units/unit-aliases';
 import type { SheetGrid } from './decode';
 
 /** The fields a BOQ line can be imported from. Order drives the template. */
@@ -169,27 +169,9 @@ function readCell(
   return null;
 }
 
-/** Metra's unit list, and what studios actually write for each. */
-const UNIT_ALIASES: Record<BoqUnit, string[]> = {
-  sqm: ['sqm', 'm2', 'm²', 'sq m', 'sq.m', 'square meter', 'متر مربع', 'م2', 'م²'],
-  linear_meter: ['lm', 'l.m', 'm', 'meter', 'metre', 'linear meter', 'متر طولي', 'م ط', 'مط'],
-  pcs: ['pcs', 'pc', 'piece', 'no', 'nos', 'each', 'ea', 'عدد', 'قطعة'],
-  lump_sum: ['ls', 'lump sum', 'lumpsum', 'sum', 'مقطوعية', 'جملة'],
-  day: ['day', 'days', 'يوم', 'أيام'],
-  kg: ['kg', 'kgs', 'kilo', 'kilogram', 'كجم', 'كيلو', 'كيلوجرام'],
-  ton: ['ton', 'tons', 'tonne', 'طن'],
-  liter: ['liter', 'litre', 'liters', 'litres', 'lt', 'لتر'],
-  cbm: ['cbm', 'm3', 'm³', 'cubic meter', 'متر مكعب', 'م3', 'م³'],
-  roll: ['roll', 'rolls', 'لفة', 'رول'],
-};
-
+/** The shared alias table (lib/units/unit-aliases.ts), so both importers agree. */
 export function normalizeUnit(raw: string): string | null {
-  const t = norm(raw);
-  if (t === '') return null;
-  for (const [unit, aliases] of Object.entries(UNIT_ALIASES)) {
-    if (unit === t || aliases.some((a) => norm(a) === t)) return unit;
-  }
-  return null;
+  return unitFromToken(raw);
 }
 
 const TRUTHY = new Set(['1', 'true', 'yes', 'y', 'نعم', 'صح', '✓', 'x']);

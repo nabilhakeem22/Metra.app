@@ -11,6 +11,7 @@ export * from './market-categories';
 export * from './market-items';
 export * from './market-bulletins';
 export * from './market-price-observations';
+export * from './market-item-details';
 export * from './sections';
 export * from './section-defaults';
 export * from './cost-items';

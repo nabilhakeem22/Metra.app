@@ -16,6 +16,10 @@ assertLocalDatabase({
   damage: 'publishes and deletes market bulletins and items',
 });
 
+// The CLI reads MARKET_DATABASE_URL and nothing else (an extracting session must
+// never hold a credential); these tests point it at the same LOCAL database.
+process.env.MARKET_DATABASE_URL = process.env.DATABASE_URL;
+
 export default defineConfig({
   test: {
     include: [resolve(dir, 'tests/**/*.dbtest.ts').replace(/\\/g, '/')],

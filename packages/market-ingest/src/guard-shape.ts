@@ -13,7 +13,19 @@ export interface ShapeContext {
 const DECIMAL = /^[0-9]+(\.[0-9]{1,4})?$/;
 const ARABIC_INDIC_DIGIT = /[\u0660-\u0669\u06F0-\u06F9]/;
 const SHA256 = /^[0-9a-f]{64}$/;
+const INVISIBLE_OR_BIDI = /[\u200B-\u200F\u202A-\u202E\u2066-\u2069\uFEFF]/;
 const EM_OR_EN_DASH = /[\u2013\u2014]/;
+
+/** C0 and C1 control characters; tab, line feed and carriage return pass unless `strict`. */
+function hasControlCharacter(value: string, strict: boolean): boolean {
+  for (const character of value) {
+    const code = character.codePointAt(0) ?? 0;
+    const control = code < 0x20 || (code >= 0x7f && code <= 0x9f);
+    const whitespace = code === 0x09 || code === 0x0a || code === 0x0d;
+    if (control && (strict || !whitespace)) return true;
+  }
+  return false;
+}
 
 export class ShapeReader {
   readonly findings: Finding[] = [];
@@ -48,6 +60,7 @@ export class ShapeReader {
       return;
     }
     if (options.nonEmpty && value.trim() === '') this.fail('B0', at, 'must not be empty');
+    this.hiddenCharacters(value, at, options.displayed === true);
     if (!options.displayed) return;
     if (ARABIC_INDIC_DIGIT.test(value)) {
       this.fail('B2', at, 'Arabic-Indic digit in a text studios see; write Western digits (verbatimCells keep the printed form)');
@@ -113,6 +126,19 @@ export class ShapeReader {
   stringArray(value: unknown, at: ShapeContext): void {
     if (!Array.isArray(value) || value.some((item) => typeof item !== 'string')) {
       this.fail('B0', at, 'expected an array of strings');
+      return;
     }
+    value.forEach((item: string, index) => this.hiddenCharacters(item, { ...at, path: `${at.path}[${index}]` }, true));
+  }
+
+  /**
+   * Bidi controls, zero-width characters and control characters are refused in
+   * EVERY text: an RLO can make "00583" render as "38500" on the review page,
+   * so a wrong reading would look confirmed. A text studios see may not hold a
+   * tab or a line break either.
+   */
+  private hiddenCharacters(value: string, at: ShapeContext, displayed: boolean): void {
+    if (INVISIBLE_OR_BIDI.test(value)) this.fail('B0', at, 'holds a bidi control or an invisible character (U+200B to U+200F, U+202A to U+202E, U+2066 to U+2069, U+FEFF)');
+    if (hasControlCharacter(value, displayed)) this.fail('B0', at, 'holds a control character');
   }
 }

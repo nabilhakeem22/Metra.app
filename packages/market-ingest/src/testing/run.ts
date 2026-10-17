@@ -26,6 +26,7 @@ export function checkFixture(file: MarketBulletinFileV1 | null, options: Fixture
     historyValidators: [],
     flagPct: 15,
     sourceHashes: { pdf: null, md: null },
+    gateCommit: null,
   });
 }
 

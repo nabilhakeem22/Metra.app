@@ -13,10 +13,19 @@ export interface ResolvedRow {
   pageId: number;
   /** The key the row publishes under: the mapping's `map` key, else proposedKey. */
   itemKey: string;
+  /** True when mapping.json maps the row to an existing key. */
+  mapped: boolean;
   /** The row's months after corrections. */
   months: Months;
   /** 1..12, the months a correction set. */
   correctedMonths: ReadonlySet<number>;
+}
+
+export interface SkippedRow {
+  rowId: string;
+  pageId: number;
+  labelAr: string;
+  reason: string;
 }
 
 export interface PublishedItem {
@@ -25,8 +34,19 @@ export interface PublishedItem {
   pack: RollPack | null;
   status: 'active' | 'discontinued';
   sourceLabels: string[];
+  /** The printed details studios see now (review.html lists what a bulletin changes). */
+  details: ItemDetails;
   /** True when a published bulletin carries an observation of it. */
   hasHistory: boolean;
+}
+
+export interface ItemDetails {
+  nameAr: string;
+  nameEn: string;
+  specAr: string | null;
+  specEn: string | null;
+  unitLabelAr: string;
+  basisNoteAr: string | null;
 }
 
 export interface EffectivePoint {
@@ -54,6 +74,8 @@ export interface CheckContext {
   rows: ResolvedRow[];
   /** Item keys the mapping discontinues. */
   discontinueKeys: string[];
+  /** Rows mapping.json skips, with the owner's reason (listed in review.html). */
+  skippedRows: SkippedRow[];
   corrections: Correction[];
   history: PublishedHistory;
   /** F1 threshold in percent. */
@@ -74,7 +96,7 @@ export function resolveRows(
   file: MarketBulletinFileV1,
   mapping: Mapping,
   corrections: Correction[],
-): { rows: ResolvedRow[]; discontinueKeys: string[]; findings: Finding[] } {
+): { rows: ResolvedRow[]; discontinueKeys: string[]; skippedRows: SkippedRow[]; findings: Finding[] } {
   const findings: Finding[] = [];
   const allRowIds = new Set(file.pages.flatMap((page) => page.rows.map((row) => row.rowId)));
   for (const rowId of Object.keys(mapping)) {
@@ -87,10 +109,14 @@ export function resolveRows(
   }
   const rows: ResolvedRow[] = [];
   const discontinueKeys: string[] = [];
+  const skippedRows: SkippedRow[] = [];
   for (const page of file.pages) {
     for (const row of page.rows) {
       const entry = mapping[row.rowId];
-      if (entry?.action === 'skip') continue;
+      if (entry?.action === 'skip') {
+        skippedRows.push({ rowId: row.rowId, pageId: pageIdOf(file, page), labelAr: row.labelAr, reason: entry.reason });
+        continue;
+      }
       if (entry?.action === 'discontinue') discontinueKeys.push(entry.itemKey);
       const months = [...row.months] as Months;
       const correctedMonths = new Set<number>();
@@ -103,10 +129,11 @@ export function resolveRows(
         page,
         pageId: pageIdOf(file, page),
         itemKey: entry?.action === 'map' ? entry.itemKey : row.proposedKey,
+        mapped: entry?.action === 'map',
         months,
         correctedMonths,
       });
     }
   }
-  return { rows, discontinueKeys: [...new Set(discontinueKeys)].sort(), findings };
+  return { rows, discontinueKeys: [...new Set(discontinueKeys)].sort(), skippedRows, findings };
 }

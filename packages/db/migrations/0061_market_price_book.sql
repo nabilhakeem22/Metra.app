@@ -1,17 +1,17 @@
 -- 0061: the market price book. SCHEMA ONLY: five cost_item_unit labels, five
--- new enum types, four new platform-level tables, one nullable column on
+-- new enum types, five new platform-level tables, one nullable column on
 -- cost_items with its FK and index. No data touched, no backfill, no policy, no
 -- grant, no trigger, no apply-rls function referenced (RLS and the SELECT-only
--- grant for the four tables live in rls/policies/60-market.sql and
+-- grant for the five tables live in rls/policies/60-market.sql and
 -- rls/roles.sql, applied by `db:apply-rls` AFTER this file).
 --
 -- WHAT IT ADDS.
 --   * `cost_item_unit` gains kg, ton, liter, cbm and roll (owner decision D3),
 --     so supply items priced by weight, volume or roll can sit in a price book.
 --     IRREVERSIBLE: Postgres cannot drop an enum label. Harmless if unused.
---   * market_categories, market_items, market_bulletins and
---     market_price_observations: the Ministry of Housing's monthly
---     building-materials guide prices. NO org_id: every studio reads them, only
+--   * market_categories, market_items, market_bulletins,
+--     market_price_observations and market_item_details: the Ministry of
+--     Housing's monthly building-materials guide prices. NO org_id: every studio reads them, only
 --     the owner's `market:publish` CLI writes them (as the BYPASSRLS connection
 --     role, the same trust boundary as `db:migrate`).
 --   * cost_items.market_item_id: an ADVISORY link to a market item; market data
@@ -30,7 +30,7 @@
 -- a transaction block is refused outright) fail with a sentence instead of a
 -- bare error. Supabase and CI run 17. Same shape as 0028, 0033, 0042 and 0048.
 --
--- LOCKS. Four CREATE TABLEs on new, empty relations. ADD COLUMN with no default
+-- LOCKS. Five CREATE TABLEs on new, empty relations. ADD COLUMN with no default
 -- is metadata-only. The FK is added NOT VALID (no scan while holding the lock)
 -- and then VALIDATEd (SHARE UPDATE EXCLUSIVE; the column is all NULL, so the
 -- scan finds nothing to check), the 0052 pattern. The partial index on
@@ -130,6 +130,8 @@ CREATE TABLE "market_bulletins" (
   "published_on" date,
   "extraction_method" text NOT NULL,
   "extraction_sha256" text NOT NULL,
+  "gate_commit" text NOT NULL,
+  "discontinued_item_ids" uuid[] DEFAULT '{}'::uuid[] NOT NULL,
   "reviewed_by" text NOT NULL,
   "reviewed_at" timestamp with time zone NOT NULL,
   "published_at" timestamp with time zone DEFAULT now() NOT NULL,
@@ -139,6 +141,8 @@ CREATE TABLE "market_bulletins" (
   CONSTRAINT "market_bulletins_pdf_sha256_format" CHECK (source_pdf_sha256 ~ '^[0-9a-f]{64}$'),
   CONSTRAINT "market_bulletins_md_sha256_format" CHECK (source_md_sha256 ~ '^[0-9a-f]{64}$'),
   CONSTRAINT "market_bulletins_extraction_sha256_format" CHECK (extraction_sha256 ~ '^[0-9a-f]{64}$'),
+  CONSTRAINT "market_bulletins_gate_commit_format" CHECK ("gate_commit" ~ '^[0-9a-f]{40}$'),
+  CONSTRAINT "market_bulletins_id_period_unique" UNIQUE ("id", "period_month"),
   CONSTRAINT "market_bulletins_pdf_named" CHECK (("source_pdf_file_name" IS NULL) = ("source_pdf_sha256" IS NULL)),
   CONSTRAINT "market_bulletins_md_named" CHECK (("source_md_file_name" IS NULL) = ("source_md_sha256" IS NULL)),
   CONSTRAINT "market_bulletins_extraction_method" CHECK (
@@ -161,6 +165,7 @@ CREATE TABLE "market_price_observations" (
   "id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
   "item_id" uuid NOT NULL,
   "bulletin_id" uuid NOT NULL,
+  "bulletin_period_month" date NOT NULL,
   "period_month" date NOT NULL,
   "status" "market_observation_status" NOT NULL,
   "price" numeric(18, 4),
@@ -169,20 +174,44 @@ CREATE TABLE "market_price_observations" (
   CONSTRAINT "market_price_observations_item_month_bulletin_unique" UNIQUE ("item_id", "period_month", "bulletin_id"),
   CONSTRAINT "market_price_observations_period_first_day" CHECK (extract(day from "period_month") = 1),
   CONSTRAINT "market_price_observations_priced_iff_price" CHECK (("status" = 'priced') = ("price" IS NOT NULL)),
-  CONSTRAINT "market_price_observations_price_positive" CHECK ("price" > 0),
+  -- The gate's B1 and B2, again at the database: a value the checker would
+  -- refuse cannot be stored whatever wrote it (the publish CLI is the only
+  -- writer, but its input is a file).
+  CONSTRAINT "market_price_observations_price_range" CHECK ("price" > 0 AND "price" <= 10000000),
+  CONSTRAINT "market_price_observations_month_not_after_bulletin" CHECK ("period_month" <= "bulletin_period_month"),
   CONSTRAINT "market_price_observations_source_page" CHECK (
     ("source_pdf_page" IS NOT NULL OR "source_printed_page" IS NOT NULL)
     AND coalesce("source_pdf_page", 1) > 0 AND coalesce("source_printed_page", 1) > 0
   ),
   CONSTRAINT "market_price_observations_item_id_market_items_id_fk"
     FOREIGN KEY ("item_id") REFERENCES "public"."market_items"("id") ON DELETE RESTRICT,
-  CONSTRAINT "market_price_observations_bulletin_id_market_bulletins_id_fk"
-    FOREIGN KEY ("bulletin_id") REFERENCES "public"."market_bulletins"("id") ON DELETE RESTRICT
+  CONSTRAINT "market_price_observations_bulletin_period_fk"
+    FOREIGN KEY ("bulletin_id", "bulletin_period_month") REFERENCES "public"."market_bulletins"("id", "period_month") ON DELETE RESTRICT
 );
 CREATE INDEX "market_price_observations_item_month_idx"
   ON "market_price_observations" USING btree ("item_id", "period_month" DESC);
 CREATE INDEX "market_price_observations_bulletin_idx"
   ON "market_price_observations" USING btree ("bulletin_id");
+
+CREATE TABLE "market_item_details" (
+  "id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+  "item_id" uuid NOT NULL,
+  "bulletin_id" uuid NOT NULL,
+  "name_ar" text NOT NULL,
+  "name_en" text NOT NULL,
+  "spec_ar" text,
+  "spec_en" text,
+  "unit_label_ar" text NOT NULL,
+  "basis_note_ar" text,
+  CONSTRAINT "market_item_details_item_bulletin_unique" UNIQUE ("item_id", "bulletin_id"),
+  CONSTRAINT "market_item_details_names_present" CHECK (btrim("name_ar") <> '' AND btrim("name_en") <> ''),
+  CONSTRAINT "market_item_details_item_id_market_items_id_fk"
+    FOREIGN KEY ("item_id") REFERENCES "public"."market_items"("id") ON DELETE RESTRICT,
+  CONSTRAINT "market_item_details_bulletin_id_market_bulletins_id_fk"
+    FOREIGN KEY ("bulletin_id") REFERENCES "public"."market_bulletins"("id") ON DELETE RESTRICT
+);
+CREATE INDEX "market_item_details_bulletin_idx"
+  ON "market_item_details" USING btree ("bulletin_id");
 
 ALTER TABLE "cost_items" ADD COLUMN "market_item_id" uuid;
 ALTER TABLE "cost_items" ADD CONSTRAINT "cost_items_market_item_id_market_items_id_fk"

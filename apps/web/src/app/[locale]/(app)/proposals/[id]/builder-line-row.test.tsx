@@ -74,7 +74,7 @@ function UnitName({ unit }: { unit: string }) {
 
 describe('a unit with no name yet in the catalogue', () => {
   it('shows its code rather than breaking the page', () => {
-    renderWithIntl(<UnitName unit="kg" />, { locale: 'ar-EG' });
-    expect(document.querySelector('[data-testid="unit"]')!.textContent).toBe('kg');
+    renderWithIntl(<UnitName unit="barrel" />, { locale: 'ar-EG' });
+    expect(document.querySelector('[data-testid="unit"]')!.textContent).toBe('barrel');
   });
 });

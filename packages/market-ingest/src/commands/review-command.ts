@@ -3,6 +3,7 @@
 // review.html and prints extraction_sha256 = sha256(staged.json), the hash the
 // owner approves.
 import { parseArgs } from 'node:util';
+import { readGate, requireCleanGate } from '../gate';
 import { renderReview } from '../review/html';
 import { periodPaths, writeText } from '../staging';
 import { requirePeriod } from './options';
@@ -16,10 +17,11 @@ export async function reviewCommand(argv: string[]): Promise<number> {
   });
   const period = requirePeriod(values.period);
   const offline = values.offline === true;
+  requireCleanGate(readGate(), 'market:review');
   const run = await performCheck({ period, offline, mdPath: values.md, pdfPath: values.pdf });
   const { findings, context } = run.outcome;
   const path = periodPaths(period).review;
-  writeText(path, renderReview({ period, findings, context, stagedSha256: run.stagedSha256, history: run.history, offline }));
+  writeText(path, renderReview({ period, findings, context, stagedSha256: run.stagedSha256, history: run.history, offline, provenance: run.outcome.staged.provenance }));
   for (const warning of run.warnings) console.log(`warning: ${warning}`);
   console.log(`wrote ${path}`);
   console.log(`extraction_sha256 = ${run.stagedSha256}`);

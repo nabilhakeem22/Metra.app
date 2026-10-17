@@ -39,9 +39,9 @@ export async function seedPublished(
 ): Promise<string> {
   const [bulletin] = await sql<{ id: string }[]>`
     insert into market_bulletins (publisher, period_month, status, source_pdf_file_name, source_pdf_sha256,
-      source_page_count, extraction_method, extraction_sha256, reviewed_by, reviewed_at)
+      source_page_count, extraction_method, extraction_sha256, gate_commit, reviewed_by, reviewed_at)
     values ('mhuc_cabm', ${`${period}-01`}, 'published', 'seed.pdf', ${source.pdfSha256 ?? 'c'.repeat(64)},
-      113, 'session:pdf', ${'d'.repeat(64)}, ${REVIEWER}, now())
+      113, 'session:pdf', ${'d'.repeat(64)}, ${'e'.repeat(40)}, ${REVIEWER}, now())
     returning id`;
   for (const item of items) {
     const categoryId = await leafId(sql, item.key.split('.').slice(0, 2).join('.'));
@@ -54,14 +54,16 @@ export async function seedPublished(
       on conflict (key) do update set updated_at = now()
       returning id`;
     for (const [month, price] of item.prices ?? []) {
-      await sql`insert into market_price_observations (item_id, bulletin_id, period_month, status, price, source_pdf_page)
-                values (${row.id}, ${bulletin.id}, ${`${month}-01`}, 'priced', ${price}, 1)`;
+      await sql`insert into market_price_observations (item_id, bulletin_id, bulletin_period_month, period_month, status, price, source_pdf_page)
+                values (${row.id}, ${bulletin.id}, ${`${period}-01`}, ${`${month}-01`}, 'priced', ${price}, 1)`;
     }
   }
   return bulletin.id;
 }
 
 export async function clearMarketTestData(sql: PostgresJs): Promise<void> {
+  await sql`delete from market_item_details d using market_items i
+             where i.id = d.item_id and i.key like '%.dbtest\\_%'`;
   await sql`delete from market_price_observations o using market_items i
              where i.id = o.item_id and i.key like '%.dbtest\\_%'`;
   await sql`delete from market_price_observations o using market_bulletins b

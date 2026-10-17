@@ -4,7 +4,7 @@
 import { finding, isBlocking, sortFindings, type Finding } from '../findings';
 import { mergeProducerFiles, type ProducerFile } from '../merge';
 import { guardCorrections, guardMapping } from '../overrides';
-import { buildStaged, type StagedBulletin } from '../stage';
+import { buildStaged, type StagedBulletin, type StagedProvenance } from '../stage';
 import { resolveRows, type CheckContext, type PublishedHistory } from './context';
 import { checkCoverage } from './coverage';
 import { checkIdentity } from './identity';
@@ -28,6 +28,8 @@ export interface CheckInput {
   flagPct: number;
   /** sha256 of the source files as found on disk, when the operator passed them. */
   sourceHashes: { pdf: string | null; md: string | null };
+  /** The gate's git commit, recorded in staged.json. */
+  gateCommit: string | null;
 }
 
 export interface CheckOutcome {
@@ -37,6 +39,14 @@ export interface CheckOutcome {
 }
 
 const VALIDATORS = [checkSlots, checkIdentity, checkCoverage, checkReadings, checkVerbatim, checkPageNotes, checkYearly, checkSeries, checkNewItems];
+
+function provenanceOf(input: CheckInput): StagedProvenance {
+  return {
+    historyChecked: input.historyValidators.length > 0,
+    gateCommit: input.gateCommit,
+    sourcesVerified: { pdf: input.sourceHashes.pdf !== null, md: input.sourceHashes.md !== null },
+  };
+}
 
 function sourceFindings(input: CheckInput, context: CheckContext): Finding[] {
   const findings: Finding[] = [];
@@ -58,7 +68,7 @@ export function runCheck(input: CheckInput): CheckOutcome {
   const early = [...merged.findings, ...mapping.findings, ...corrections.findings];
   if (merged.file === null || early.length > 0) {
     const findings = sortFindings(early);
-    return { findings, context: null, staged: buildStaged(input.period, null, findings) };
+    return { findings, context: null, staged: buildStaged(input.period, provenanceOf(input), null, findings) };
   }
   const resolved = resolveRows(merged.file, mapping.mapping, corrections.corrections);
   const context: CheckContext = {
@@ -66,6 +76,7 @@ export function runCheck(input: CheckInput): CheckOutcome {
     bulletinMonth: Number(merged.file.period.slice(5)),
     rows: resolved.rows,
     discontinueKeys: resolved.discontinueKeys,
+    skippedRows: resolved.skippedRows,
     corrections: corrections.corrections,
     history: input.history,
     flagPct: input.flagPct,
@@ -75,7 +86,7 @@ export function runCheck(input: CheckInput): CheckOutcome {
     ...sourceFindings(input, context),
     ...[...VALIDATORS, ...input.historyValidators].flatMap((validate) => validate(context)),
   ]);
-  return { findings, context, staged: buildStaged(input.period, context, findings) };
+  return { findings, context, staged: buildStaged(input.period, provenanceOf(input), context, findings) };
 }
 
 export function blockingOf(findings: Finding[]): Finding[] {

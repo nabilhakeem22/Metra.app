@@ -30,7 +30,20 @@ describe('the import alias maps', () => {
     ['لتر', 'liter'],
     ['م3', 'cbm'],
     ['لفة', 'roll'],
-  ])('read the Arabic %s as %s', (label, unit) => {
+    ['الطن', 'ton'],
+    ['اللفة', 'roll'],
+    ['لفه', 'roll'],
+    ['اللتر', 'liter'],
+    ['كيلو جرام', 'kg'],
+    ['كغ', 'kg'],
+    ['L', 'liter'],
+    ['ltr', 'liter'],
+    ['tons', 'ton'],
+    ['kgs', 'kg'],
+    ['rolls', 'roll'],
+    ['م ط', 'linear_meter'],
+    ['متر مسطح', 'sqm'],
+  ])('read %s as %s, the same in both importers', (label, unit) => {
     expect(resolveUnit(label)).toBe(unit);
     expect(normalizeUnit(label)).toBe(unit);
   });

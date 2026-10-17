@@ -11,7 +11,7 @@ import type { PostgresJs } from '../client';
  * (milliseconds here) as a plain number, so the check compares that.
  */
 interface Timeout {
-  name: 'lock_timeout' | 'statement_timeout';
+  name: 'lock_timeout' | 'statement_timeout' | 'idle_in_transaction_session_timeout' | 'transaction_timeout';
   text: string;
   ms: number;
 }
@@ -123,3 +123,26 @@ export async function applyMigrationTimeouts(sql: PostgresJs): Promise<void> {
 export async function applyRlsTimeouts(sql: PostgresJs): Promise<void> {
   await applyTimeouts(sql, [LOCK_TIMEOUT, RLS_STATEMENT_TIMEOUT]);
 }
+
+/**
+ * The market price book's writes (`market:publish`, `market:withdraw`), run by
+ * the owner over a WAN link. On top of the migrator's two: a transaction left
+ * open by a sleeping laptop or a dropped link must not hold the market locks
+ * for ever (measured: a half-open publish held 25 locks for 3 min 46 s, and
+ * `statement_timeout` did not fire because the backend sat in ClientRead).
+ * `idle_in_transaction_session_timeout` ends an idle one after 60 s, and
+ * `transaction_timeout` (PostgreSQL 17+, which Supabase runs) ends ANY
+ * transaction after 300 s, in every state. On a server older than 17 the last
+ * one does not exist and is skipped, with a line saying so.
+ */
+const IDLE_IN_TRANSACTION_TIMEOUT: Timeout = { name: 'idle_in_transaction_session_timeout', text: '60s', ms: 60_000 };
+const TRANSACTION_TIMEOUT: Timeout = { name: 'transaction_timeout', text: '300s', ms: 300_000 };
+
+export async function applyMarketWriteTimeouts(sql: PostgresJs): Promise<void> {
+  const [row] = (await sql`select current_setting('server_version_num')::integer as version`) as unknown as Array<{ version: number }>;
+  const timeouts = [LOCK_TIMEOUT, MIGRATION_STATEMENT_TIMEOUT, IDLE_IN_TRANSACTION_TIMEOUT];
+  if (row.version >= 170000) timeouts.push(TRANSACTION_TIMEOUT);
+  else console.log('transaction_timeout skipped: it needs PostgreSQL 17, this server is older');
+  await applyTimeouts(sql, timeouts);
+}
+

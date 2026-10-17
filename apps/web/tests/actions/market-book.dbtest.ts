@@ -4,14 +4,14 @@ import { sql } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { withOrgContext, type OrgContext } from '@/lib/db/context';
 import { closeFixture, ctxFor, raw, seedOrg, teardown } from './fixture';
-import { asAppRole, closeMarketFixture, marketRaw, seedBulletin, seedMarketItem, withdrawBulletin } from './market-fixture';
+import { asAppRole, closeMarketFixture, marketRaw, seedBulletin, seedDetails, seedMarketItem, withdrawBulletin } from './market-fixture';
 
 // The market price book at the database (plan AC 1 to 5): platform-level tables
 // that every member org reads, nobody writes through the app, and that hide a
 // withdrawn bulletin's figures. Periods sit in 2001/2002 so no real bulletin
 // can collide with the one-published-per-period index.
 
-const TABLES = ['market_categories', 'market_items', 'market_bulletins', 'market_price_observations'];
+const TABLES = ['market_categories', 'market_items', 'market_bulletins', 'market_price_observations', 'market_item_details'];
 const orgIds: string[] = [];
 let ctx: OrgContext;
 let item: { id: string; key: string };
@@ -21,7 +21,7 @@ beforeAll(async () => {
   orgIds.push(orgId);
   ctx = ctxFor(orgId, ownerIds[0], 'owner');
   item = await seedMarketItem();
-  await seedBulletin('2002-03', [[item.id, '2002-03', '400']]);
+  await seedDetails(item.id, await seedBulletin('2002-03', [[item.id, '2002-03', '400']]));
 });
 
 afterAll(async () => {
@@ -83,6 +83,19 @@ describe('withdrawn bulletins and the effective price (AC 3, 4)', () => {
     expect(await effective()).toEqual([{ price: '100.0000', bulletin_month: '2001-07-01' }]);
   });
 
+  it('hides an item whose only prices are in a withdrawn bulletin, and its details (S3)', async () => {
+    const orphan = await seedMarketItem();
+    const bulletin = await seedBulletin('2001-10', [[orphan.id, '2001-10', '75']]);
+    await seedDetails(orphan.id, bulletin);
+    const visible = () => withOrgContext(ctx, async (tx) => ({
+      items: (await tx.execute(sql`select id from public.market_items where id = ${orphan.id}`)).length,
+      details: (await tx.execute(sql`select id from public.market_item_details where item_id = ${orphan.id}`)).length,
+    }));
+    expect(await visible()).toEqual({ items: 1, details: 1 });
+    await withdrawBulletin(bulletin);
+    expect(await visible()).toEqual({ items: 0, details: 0 });
+  });
+
   it('hides a withdrawn bulletin and its observations even without the join', async () => {
     const hidden = await seedMarketItem();
     const bulletin = await seedBulletin('2001-11', [[hidden.id, '2001-11', '90']]);
@@ -107,6 +120,12 @@ describe('cost_items.market_item_id (AC 5)', () => {
     await insert(linked.id, 'MKT-LINKED');
     expect(await refusal(() => marketRaw()`delete from public.market_items where id = ${linked.id}`)).toBe('23503');
     await marketRaw()`delete from public.cost_items where org_id = ${ctx.orgId} and code = 'MKT-LINKED'`;
+  });
+
+  it('refuses a price above 10,000,000 and a month after the bulletin month at the database (S2)', async () => {
+    const guarded = await seedMarketItem();
+    expect(await refusal(() => seedBulletin('2001-05', [[guarded.id, '2001-05', '10000001']]))).toBe('23514');
+    expect(await refusal(() => seedBulletin('2001-04', [[guarded.id, '2001-05', '100']]))).toBe('23514');
   });
 
   it('takes the new studio units, and a roll market item needs its pack', async () => {

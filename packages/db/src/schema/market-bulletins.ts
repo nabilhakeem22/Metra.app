@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm';
-import { boolean, check, date, integer, pgTable, smallint, text, timestamp, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
+import { boolean, check, date, integer, pgTable, smallint, text, timestamp, unique, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
 import { marketBulletinStatus, marketPublisher } from './enums';
 
 /**
@@ -32,6 +32,10 @@ export const marketBulletins = pgTable(
     publishedOn: date('published_on', { mode: 'string' }),
     extractionMethod: text('extraction_method').notNull(),
     extractionSha256: text('extraction_sha256').notNull(),
+    /** The commit of the gate (packages/market-ingest) that checked and published it. */
+    gateCommit: text('gate_commit').notNull(),
+    /** Items this bulletin discontinued; a withdrawal makes them active again. */
+    discontinuedItemIds: uuid('discontinued_item_ids').array().notNull().default(sql`'{}'::uuid[]`),
     reviewedBy: text('reviewed_by').notNull(),
     reviewedAt: timestamp('reviewed_at', { withTimezone: true }).notNull(),
     publishedAt: timestamp('published_at', { withTimezone: true }).notNull().defaultNow(),
@@ -43,6 +47,9 @@ export const marketBulletins = pgTable(
     check('market_bulletins_pdf_sha256_format', sql.raw(`source_pdf_sha256 ~ ${SHA256}`)),
     check('market_bulletins_md_sha256_format', sql.raw(`source_md_sha256 ~ ${SHA256}`)),
     check('market_bulletins_extraction_sha256_format', sql.raw(`extraction_sha256 ~ ${SHA256}`)),
+    check('market_bulletins_gate_commit_format', sql`${t.gateCommit} ~ '^[0-9a-f]{40}$'`),
+    // The target of the observations' composite FK, which carries the bulletin month.
+    unique('market_bulletins_id_period_unique').on(t.id, t.periodMonth),
     check('market_bulletins_pdf_named', sql`(${t.sourcePdfFileName} is null) = (${t.sourcePdfSha256} is null)`),
     check('market_bulletins_md_named', sql`(${t.sourceMdFileName} is null) = (${t.sourceMdSha256} is null)`),
     check(

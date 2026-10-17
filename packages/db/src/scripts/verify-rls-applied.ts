@@ -26,9 +26,9 @@
 //   * every `create trigger` exists in `pg_trigger` (non-internal);
 //   * every function the manifest defines exists in `pg_proc`;
 //   * the `metra_app` role exists, and is neither LOGIN nor BYPASSRLS;
-//   * nine NARROWED tables — boqs, document_categories,
+//   * ten NARROWED tables — boqs, document_categories,
 //     engagement_document_comments, engagement_milestones,
-//     workspace_entitlements and the four SELECT-only market tables — hold exactly the table-level privileges roles.sql
+//     workspace_entitlements and the five SELECT-only market tables — hold exactly the table-level privileges roles.sql
 //     leaves them with after its revokes, AND do not hold the one privilege each
 //     narrowing exists to remove (no DELETE on boqs, no UPDATE/DELETE on the
 //     append-only three, no DELETE on the filing vocabulary). Until wave 8 item 6
@@ -250,7 +250,8 @@ async function grantProblems(sql: Sql): Promise<string[]> {
  *   workspace_entitlements        INSERT-only — an UPDATE here is a member
  *                                 granting themselves a flow or raising a limit.
  *   market_categories, market_items, market_bulletins,
- *   market_price_observations     SELECT-only (0061) — official guide prices
+ *   market_price_observations,
+ *   market_item_details           SELECT-only (0061) — official guide prices
  *                                 every studio reads; only the owner's
  *                                 `market:publish` CLI writes them, as the
  *                                 connection role. A metra_app write would let
@@ -277,6 +278,7 @@ const NARROWED_TABLES: Record<string, readonly TablePrivilege[]> = {
   engagement_milestones: ['update', 'delete'],
   market_bulletins: ['insert', 'update', 'delete'],
   market_categories: ['insert', 'update', 'delete'],
+  market_item_details: ['insert', 'update', 'delete'],
   market_items: ['insert', 'update', 'delete'],
   market_price_observations: ['insert', 'update', 'delete'],
   workspace_entitlements: ['update', 'delete'],

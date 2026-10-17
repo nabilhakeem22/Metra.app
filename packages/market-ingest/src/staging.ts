@@ -5,7 +5,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
+export const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 
 export function stagingRoot(): string {
   const configured = process.env.MARKET_STAGING_DIR;

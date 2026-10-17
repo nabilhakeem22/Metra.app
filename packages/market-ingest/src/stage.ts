@@ -49,10 +49,21 @@ export interface StagedObservation {
   printedPage: number | null;
 }
 
+/** How the staged file was produced; part of the approved bytes. */
+export interface StagedProvenance {
+  /** False when checked with --offline: B6, B7, B11, F2 and F3 did not run, so publish refuses it. */
+  historyChecked: boolean;
+  /** The gate's git commit (null when git could not answer). */
+  gateCommit: string | null;
+  /** Whether the PDF and the MD named in the file were hashed from disk. */
+  sourcesVerified: { pdf: boolean; md: boolean };
+}
+
 export interface StagedBulletin {
   format: typeof STAGED_FORMAT;
   publisher: 'mhuc_cabm';
   period: string;
+  provenance: StagedProvenance;
   readFrom: ReadFrom | null;
   source: SourceV1 | null;
   blocking: Finding[];
@@ -107,13 +118,19 @@ function stagedData(context: CheckContext): Pick<StagedBulletin, 'categories' | 
   };
 }
 
-export function buildStaged(period: string, context: CheckContext | null, findings: Finding[]): StagedBulletin {
+export function buildStaged(
+  period: string,
+  provenance: StagedProvenance,
+  context: CheckContext | null,
+  findings: Finding[],
+): StagedBulletin {
   const blocking = findings.filter(isBlocking);
   const empty = { categories: [], items: [], observations: [], discontinue: [] };
   return {
     format: STAGED_FORMAT,
     publisher: 'mhuc_cabm',
     period,
+    provenance,
     readFrom: context?.file.readFrom ?? null,
     source: context?.file.source ?? null,
     blocking,

@@ -17,10 +17,18 @@
 -- only writer is the owner's `market:publish` CLI, which runs as the BYPASSRLS
 -- connection role: the same trust boundary as `db:migrate`.
 --
--- WITHDRAWN DATA IS INVISIBLE. A withdrawn bulletin is not returned, and an
--- observation is visible only through a PUBLISHED bulletin, so a withdrawal
--- (`market:withdraw`) falls back to the previous bulletin's figures with no
--- deploy and no row deleted.
+-- WITHDRAWN DATA IS INVISIBLE. A withdrawn bulletin is not returned; an
+-- observation and an item's per-bulletin details are visible only through a
+-- PUBLISHED bulletin; and an ITEM is visible only while some published
+-- bulletin prices it, so a wrong file's new names vanish with its withdrawal
+-- (`market:withdraw`), which falls back to the previous bulletin with no
+-- deploy and no row deleted. Categories stay visible: their names come from
+-- the code (packages/market-ingest/src/taxonomy.ts), never from a file.
+--
+-- EVALUATED ONCE PER QUERY. The org-context test and the membership function
+-- are wrapped in `(select ...)`, so the planner runs them as one InitPlan
+-- instead of once per row (measured 7 to 14x slower unwrapped on the C4
+-- series read; market-book-plans.dbtest.ts pins the plan shape).
 
 alter table public.market_categories enable row level security;
 alter table public.market_categories force  row level security;
@@ -28,8 +36,8 @@ drop policy if exists market_read on public.market_categories;
 create policy market_read on public.market_categories
   for select
   using (
-    nullif(current_setting('app.current_org_id', true), '') is not null
-    and public.app_is_current_org_member()
+    (select nullif(current_setting('app.current_org_id', true), '')) is not null
+    and (select public.app_is_current_org_member())
   );
 
 alter table public.market_items enable row level security;
@@ -38,8 +46,14 @@ drop policy if exists market_read on public.market_items;
 create policy market_read on public.market_items
   for select
   using (
-    nullif(current_setting('app.current_org_id', true), '') is not null
-    and public.app_is_current_org_member()
+    (select nullif(current_setting('app.current_org_id', true), '')) is not null
+    and (select public.app_is_current_org_member())
+    and exists (
+      select 1 from public.market_price_observations o
+      join public.market_bulletins b on b.id = o.bulletin_id
+      where o.item_id = market_items.id
+        and b.status = 'published'
+    )
   );
 
 alter table public.market_bulletins enable row level security;
@@ -48,8 +62,8 @@ drop policy if exists market_read on public.market_bulletins;
 create policy market_read on public.market_bulletins
   for select
   using (
-    nullif(current_setting('app.current_org_id', true), '') is not null
-    and public.app_is_current_org_member()
+    (select nullif(current_setting('app.current_org_id', true), '')) is not null
+    and (select public.app_is_current_org_member())
     and status = 'published'
   );
 
@@ -59,11 +73,26 @@ drop policy if exists market_read on public.market_price_observations;
 create policy market_read on public.market_price_observations
   for select
   using (
-    nullif(current_setting('app.current_org_id', true), '') is not null
-    and public.app_is_current_org_member()
+    (select nullif(current_setting('app.current_org_id', true), '')) is not null
+    and (select public.app_is_current_org_member())
     and exists (
       select 1 from public.market_bulletins b
       where b.id = market_price_observations.bulletin_id
+        and b.status = 'published'
+    )
+  );
+
+alter table public.market_item_details enable row level security;
+alter table public.market_item_details force  row level security;
+drop policy if exists market_read on public.market_item_details;
+create policy market_read on public.market_item_details
+  for select
+  using (
+    (select nullif(current_setting('app.current_org_id', true), '')) is not null
+    and (select public.app_is_current_org_member())
+    and exists (
+      select 1 from public.market_bulletins b
+      where b.id = market_item_details.bulletin_id
         and b.status = 'published'
     )
   );

@@ -1,5 +1,5 @@
 {
-  "id": "449f7c97-8e4b-4a17-83db-dd3862fc1c73",
+  "id": "1e65214a-db81-4523-9ea2-6fb34d60385d",
   "prevId": "7531f2d3-0bcf-4bc4-bf39-85e1fbd9e823",
   "version": "7",
   "dialect": "postgresql",
@@ -851,228 +851,6 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "public.market_bulletins": {
-      "name": "market_bulletins",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "gen_random_uuid()"
-        },
-        "publisher": {
-          "name": "publisher",
-          "type": "market_publisher",
-          "typeSchema": "public",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "period_month": {
-          "name": "period_month",
-          "type": "date",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "status": {
-          "name": "status",
-          "type": "market_bulletin_status",
-          "typeSchema": "public",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "source_pdf_file_name": {
-          "name": "source_pdf_file_name",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "source_pdf_sha256": {
-          "name": "source_pdf_sha256",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "source_md_file_name": {
-          "name": "source_md_file_name",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "source_md_sha256": {
-          "name": "source_md_sha256",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "source_page_count": {
-          "name": "source_page_count",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "region_key": {
-          "name": "region_key",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'greater_cairo'"
-        },
-        "collection_from_day": {
-          "name": "collection_from_day",
-          "type": "smallint",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 14
-        },
-        "collection_to_day": {
-          "name": "collection_to_day",
-          "type": "smallint",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 16
-        },
-        "includes_taxes": {
-          "name": "includes_taxes",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": true
-        },
-        "includes_transport": {
-          "name": "includes_transport",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": false
-        },
-        "published_on": {
-          "name": "published_on",
-          "type": "date",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "extraction_method": {
-          "name": "extraction_method",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "extraction_sha256": {
-          "name": "extraction_sha256",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "reviewed_by": {
-          "name": "reviewed_by",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "reviewed_at": {
-          "name": "reviewed_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "published_at": {
-          "name": "published_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "withdrawn_at": {
-          "name": "withdrawn_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "withdrawn_reason": {
-          "name": "withdrawn_reason",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        }
-      },
-      "indexes": {
-        "market_bulletins_one_published_per_period": {
-          "name": "market_bulletins_one_published_per_period",
-          "columns": [
-            {
-              "expression": "publisher",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "period_month",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "where": "\"market_bulletins\".\"status\" = 'published'",
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {},
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {
-        "market_bulletins_period_first_day": {
-          "name": "market_bulletins_period_first_day",
-          "value": "extract(day from \"market_bulletins\".\"period_month\") = 1"
-        },
-        "market_bulletins_pdf_sha256_format": {
-          "name": "market_bulletins_pdf_sha256_format",
-          "value": "source_pdf_sha256 ~ '^[0-9a-f]{64}$'"
-        },
-        "market_bulletins_md_sha256_format": {
-          "name": "market_bulletins_md_sha256_format",
-          "value": "source_md_sha256 ~ '^[0-9a-f]{64}$'"
-        },
-        "market_bulletins_extraction_sha256_format": {
-          "name": "market_bulletins_extraction_sha256_format",
-          "value": "extraction_sha256 ~ '^[0-9a-f]{64}$'"
-        },
-        "market_bulletins_pdf_named": {
-          "name": "market_bulletins_pdf_named",
-          "value": "(\"market_bulletins\".\"source_pdf_file_name\" is null) = (\"market_bulletins\".\"source_pdf_sha256\" is null)"
-        },
-        "market_bulletins_md_named": {
-          "name": "market_bulletins_md_named",
-          "value": "(\"market_bulletins\".\"source_md_file_name\" is null) = (\"market_bulletins\".\"source_md_sha256\" is null)"
-        },
-        "market_bulletins_extraction_method": {
-          "name": "market_bulletins_extraction_method",
-          "value": "(\"market_bulletins\".\"extraction_method\" = 'session:pdf' and \"market_bulletins\".\"source_pdf_sha256\" is not null) or (\"market_bulletins\".\"extraction_method\" = 'session:md' and \"market_bulletins\".\"source_md_sha256\" is not null)"
-        },
-        "market_bulletins_page_count_positive": {
-          "name": "market_bulletins_page_count_positive",
-          "value": "\"market_bulletins\".\"source_page_count\" > 0"
-        },
-        "market_bulletins_collection_days": {
-          "name": "market_bulletins_collection_days",
-          "value": "1 <= \"market_bulletins\".\"collection_from_day\" and \"market_bulletins\".\"collection_from_day\" <= \"market_bulletins\".\"collection_to_day\" and \"market_bulletins\".\"collection_to_day\" <= 31"
-        },
-        "market_bulletins_reviewer_present": {
-          "name": "market_bulletins_reviewer_present",
-          "value": "btrim(\"market_bulletins\".\"reviewed_by\") <> ''"
-        },
-        "market_bulletins_withdrawn_iff_reason": {
-          "name": "market_bulletins_withdrawn_iff_reason",
-          "value": "(\"market_bulletins\".\"status\" = 'withdrawn') = (\"market_bulletins\".\"withdrawn_at\" is not null and \"market_bulletins\".\"withdrawn_reason\" is not null)"
-        }
-      },
-      "isRLSEnabled": false
-    },
     "public.market_categories": {
       "name": "market_categories",
       "schema": "",
@@ -1358,6 +1136,254 @@
       },
       "isRLSEnabled": false
     },
+    "public.market_bulletins": {
+      "name": "market_bulletins",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "publisher": {
+          "name": "publisher",
+          "type": "market_publisher",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "period_month": {
+          "name": "period_month",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "market_bulletin_status",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "source_pdf_file_name": {
+          "name": "source_pdf_file_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "source_pdf_sha256": {
+          "name": "source_pdf_sha256",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "source_md_file_name": {
+          "name": "source_md_file_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "source_md_sha256": {
+          "name": "source_md_sha256",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "source_page_count": {
+          "name": "source_page_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "region_key": {
+          "name": "region_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'greater_cairo'"
+        },
+        "collection_from_day": {
+          "name": "collection_from_day",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 14
+        },
+        "collection_to_day": {
+          "name": "collection_to_day",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 16
+        },
+        "includes_taxes": {
+          "name": "includes_taxes",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "includes_transport": {
+          "name": "includes_transport",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "published_on": {
+          "name": "published_on",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "extraction_method": {
+          "name": "extraction_method",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "extraction_sha256": {
+          "name": "extraction_sha256",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "gate_commit": {
+          "name": "gate_commit",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "discontinued_item_ids": {
+          "name": "discontinued_item_ids",
+          "type": "uuid[]",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'::uuid[]"
+        },
+        "reviewed_by": {
+          "name": "reviewed_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "reviewed_at": {
+          "name": "reviewed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "published_at": {
+          "name": "published_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "withdrawn_at": {
+          "name": "withdrawn_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "withdrawn_reason": {
+          "name": "withdrawn_reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "market_bulletins_one_published_per_period": {
+          "name": "market_bulletins_one_published_per_period",
+          "columns": [
+            {
+              "expression": "publisher",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "period_month",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"market_bulletins\".\"status\" = 'published'",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "market_bulletins_id_period_unique": {
+          "name": "market_bulletins_id_period_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "id",
+            "period_month"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "market_bulletins_period_first_day": {
+          "name": "market_bulletins_period_first_day",
+          "value": "extract(day from \"market_bulletins\".\"period_month\") = 1"
+        },
+        "market_bulletins_pdf_sha256_format": {
+          "name": "market_bulletins_pdf_sha256_format",
+          "value": "source_pdf_sha256 ~ '^[0-9a-f]{64}$'"
+        },
+        "market_bulletins_md_sha256_format": {
+          "name": "market_bulletins_md_sha256_format",
+          "value": "source_md_sha256 ~ '^[0-9a-f]{64}$'"
+        },
+        "market_bulletins_extraction_sha256_format": {
+          "name": "market_bulletins_extraction_sha256_format",
+          "value": "extraction_sha256 ~ '^[0-9a-f]{64}$'"
+        },
+        "market_bulletins_gate_commit_format": {
+          "name": "market_bulletins_gate_commit_format",
+          "value": "\"market_bulletins\".\"gate_commit\" ~ '^[0-9a-f]{40}$'"
+        },
+        "market_bulletins_pdf_named": {
+          "name": "market_bulletins_pdf_named",
+          "value": "(\"market_bulletins\".\"source_pdf_file_name\" is null) = (\"market_bulletins\".\"source_pdf_sha256\" is null)"
+        },
+        "market_bulletins_md_named": {
+          "name": "market_bulletins_md_named",
+          "value": "(\"market_bulletins\".\"source_md_file_name\" is null) = (\"market_bulletins\".\"source_md_sha256\" is null)"
+        },
+        "market_bulletins_extraction_method": {
+          "name": "market_bulletins_extraction_method",
+          "value": "(\"market_bulletins\".\"extraction_method\" = 'session:pdf' and \"market_bulletins\".\"source_pdf_sha256\" is not null) or (\"market_bulletins\".\"extraction_method\" = 'session:md' and \"market_bulletins\".\"source_md_sha256\" is not null)"
+        },
+        "market_bulletins_page_count_positive": {
+          "name": "market_bulletins_page_count_positive",
+          "value": "\"market_bulletins\".\"source_page_count\" > 0"
+        },
+        "market_bulletins_collection_days": {
+          "name": "market_bulletins_collection_days",
+          "value": "1 <= \"market_bulletins\".\"collection_from_day\" and \"market_bulletins\".\"collection_from_day\" <= \"market_bulletins\".\"collection_to_day\" and \"market_bulletins\".\"collection_to_day\" <= 31"
+        },
+        "market_bulletins_reviewer_present": {
+          "name": "market_bulletins_reviewer_present",
+          "value": "btrim(\"market_bulletins\".\"reviewed_by\") <> ''"
+        },
+        "market_bulletins_withdrawn_iff_reason": {
+          "name": "market_bulletins_withdrawn_iff_reason",
+          "value": "(\"market_bulletins\".\"status\" = 'withdrawn') = (\"market_bulletins\".\"withdrawn_at\" is not null and \"market_bulletins\".\"withdrawn_reason\" is not null)"
+        }
+      },
+      "isRLSEnabled": false
+    },
     "public.market_price_observations": {
       "name": "market_price_observations",
       "schema": "",
@@ -1378,6 +1404,12 @@
         "bulletin_id": {
           "name": "bulletin_id",
           "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "bulletin_period_month": {
+          "name": "bulletin_period_month",
+          "type": "date",
           "primaryKey": false,
           "notNull": true
         },
@@ -1465,15 +1497,17 @@
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
-        "market_price_observations_bulletin_id_market_bulletins_id_fk": {
-          "name": "market_price_observations_bulletin_id_market_bulletins_id_fk",
+        "market_price_observations_bulletin_period_fk": {
+          "name": "market_price_observations_bulletin_period_fk",
           "tableFrom": "market_price_observations",
           "tableTo": "market_bulletins",
           "columnsFrom": [
-            "bulletin_id"
+            "bulletin_id",
+            "bulletin_period_month"
           ],
           "columnsTo": [
-            "id"
+            "id",
+            "period_month"
           ],
           "onDelete": "restrict",
           "onUpdate": "no action"
@@ -1501,13 +1535,142 @@
           "name": "market_price_observations_priced_iff_price",
           "value": "(\"market_price_observations\".\"status\" = 'priced') = (\"market_price_observations\".\"price\" is not null)"
         },
-        "market_price_observations_price_positive": {
-          "name": "market_price_observations_price_positive",
-          "value": "\"market_price_observations\".\"price\" > 0"
+        "market_price_observations_price_range": {
+          "name": "market_price_observations_price_range",
+          "value": "\"market_price_observations\".\"price\" > 0 and \"market_price_observations\".\"price\" <= 10000000"
+        },
+        "market_price_observations_month_not_after_bulletin": {
+          "name": "market_price_observations_month_not_after_bulletin",
+          "value": "\"market_price_observations\".\"period_month\" <= \"market_price_observations\".\"bulletin_period_month\""
         },
         "market_price_observations_source_page": {
           "name": "market_price_observations_source_page",
           "value": "(\"market_price_observations\".\"source_pdf_page\" is not null or \"market_price_observations\".\"source_printed_page\" is not null) and coalesce(\"market_price_observations\".\"source_pdf_page\", 1) > 0 and coalesce(\"market_price_observations\".\"source_printed_page\", 1) > 0"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.market_item_details": {
+      "name": "market_item_details",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "item_id": {
+          "name": "item_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "bulletin_id": {
+          "name": "bulletin_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name_ar": {
+          "name": "name_ar",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name_en": {
+          "name": "name_en",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "spec_ar": {
+          "name": "spec_ar",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "spec_en": {
+          "name": "spec_en",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "unit_label_ar": {
+          "name": "unit_label_ar",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "basis_note_ar": {
+          "name": "basis_note_ar",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "market_item_details_bulletin_idx": {
+          "name": "market_item_details_bulletin_idx",
+          "columns": [
+            {
+              "expression": "bulletin_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "market_item_details_item_id_market_items_id_fk": {
+          "name": "market_item_details_item_id_market_items_id_fk",
+          "tableFrom": "market_item_details",
+          "tableTo": "market_items",
+          "columnsFrom": [
+            "item_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "market_item_details_bulletin_id_market_bulletins_id_fk": {
+          "name": "market_item_details_bulletin_id_market_bulletins_id_fk",
+          "tableFrom": "market_item_details",
+          "tableTo": "market_bulletins",
+          "columnsFrom": [
+            "bulletin_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "market_item_details_item_bulletin_unique": {
+          "name": "market_item_details_item_bulletin_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "item_id",
+            "bulletin_id"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "market_item_details_names_present": {
+          "name": "market_item_details_names_present",
+          "value": "btrim(\"market_item_details\".\"name_ar\") <> '' and btrim(\"market_item_details\".\"name_en\") <> ''"
         }
       },
       "isRLSEnabled": false

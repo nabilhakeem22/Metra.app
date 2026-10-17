@@ -27,8 +27,8 @@ grant select on public.accounts to metra_app;
 -- owner's `market:publish` CLI writes it as the connection role; no app path
 -- writes it, so metra_app gets no INSERT, UPDATE or DELETE. The visible rows
 -- are gated by rls/policies/60-market.sql (a member org context; published
--- bulletins only). verify-rls-applied.ts reads these four back as SELECT-only.
-grant select on public.market_categories, public.market_items, public.market_bulletins, public.market_price_observations to metra_app;
+-- bulletins only). verify-rls-applied.ts reads these five back as SELECT-only.
+grant select on public.market_categories, public.market_items, public.market_bulletins, public.market_price_observations, public.market_item_details to metra_app;
 
 -- Full DML on business tables...
 grant select, insert, update, delete on public.organizations to metra_app;

@@ -6,6 +6,7 @@ import { FINDING_TITLES, isBlocking, type Finding, type FindingCode } from '../f
 import { percentChange } from '../percent';
 import { describePack } from '../roll-pack';
 import { marketUnitOf } from '../units';
+import type { StagedProvenance } from '../stage';
 import { escapeHtml, ltr, section, table, type Cell } from './html-parts';
 
 export interface ReviewInput {
@@ -15,6 +16,7 @@ export interface ReviewInput {
   stagedSha256: string;
   history: PublishedHistory;
   offline: boolean;
+  provenance: StagedProvenance;
 }
 
 const at = (item: Finding): Cell[] => [ltr(item.page), ltr(item.rowId), ltr(item.month)];
@@ -38,7 +40,9 @@ export function headerSection(input: ReviewInput): string {
     ['MD', ltr(source?.mdFileName ?? '-')],
     ['MD sha256', ltr(source?.mdSha256 ?? '-')],
     ['extraction_sha256', ltr(input.stagedSha256)],
-    ['history', input.offline ? 'offline: B6, B7, B11, F2 and F3 did not run' : 'checked against the published bulletins'],
+    ['history', input.offline ? 'OFFLINE: B6, B7, B11, F2 and F3 did not run; publish refuses this hash' : 'checked against the published bulletins'],
+    ['sources hashed from disk', `PDF ${input.provenance.sourcesVerified.pdf ? 'yes' : 'NO'}, MD ${input.provenance.sourcesVerified.md ? 'yes' : 'NO'}`],
+    ['gate commit', ltr(input.provenance.gateCommit ?? 'unknown')],
   ];
   return `<h1>Market bulletin review ${escapeHtml(input.period)}</h1>\n${verdict}\n${table(['field', 'value'], rows)}`;
 }

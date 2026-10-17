@@ -49,6 +49,7 @@ async function check(file: MarketBulletinFileV1, mapping?: unknown) {
     historyValidators: HISTORY_VALIDATORS,
     flagPct: 15,
     sourceHashes: { pdf: null, md: null },
+    gateCommit: null,
   });
   return outcome.findings.filter((item) => item.code !== 'F4').map((item) => `${item.code} ${item.rowId ?? item.message}`);
 }
@@ -94,9 +95,29 @@ describe('market:check against the published history', () => {
     expect(findings).toEqual(['F2 p2.r1']);
   });
 
+  it('F2 compares canonical decimals: "3800.0" restates nothing (F1)', async () => {
+    const same = months('3800', '3800', '3800', '3800.0', '3900.00', '3900');
+    expect(await check(fileWith([cementRow({ months: same, verbatimCells: printedCells(same) })]))).toEqual([
+      'F3 raw.steel.dbtest_dropped has published prices and is missing from this bulletin',
+    ]);
+  });
+
+  it('F2 names a published month the file leaves empty (F5)', async () => {
+    const gap = months('3800', '3800', '3800', null, '3900', '3900');
+    const findings = await check(fileWith([cementRow({ months: gap, verbatimCells: printedCells(gap) })]));
+    expect(findings).toContain('F2 p2.r1');
+    const history = await loadHistory(sql, PERIOD);
+    expect(history.effective.get('raw.steel.dbtest_cement')?.get('2003-04')?.price).toBe('3800');
+  });
+
+  it('B0: a map to a key that is not published (F6)', async () => {
+    const findings = await check(fileWith([cementRow()]), { 'p2.r1': { action: 'map', itemKey: 'raw.steel.dbtest_typo' } });
+    expect(findings).toContain('B0 p2.r1');
+  });
+
   it('B0: discontinue of a key that is not an active published item', async () => {
     const findings = await check(fileWith([cementRow()]), { 'p2.r1': { action: 'discontinue', itemKey: 'raw.steel.dbtest_nothing' } });
-    expect(findings).toContain('B0 mapping.json discontinues raw.steel.dbtest_nothing, which is not an active published item');
+    expect(findings).toContain('B0 mapping.json discontinues raw.steel.dbtest_nothing, which is not a published item');
   });
 });
 

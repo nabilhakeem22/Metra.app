@@ -113,6 +113,25 @@ describe('guardBulletinFile', () => {
     expect(guardBulletinFile(verbatimOnly).ok).toBe(true);
   });
 
+  it.each([
+    ['an RLO in a label', 'labelAr', 'كمر' + '%sRLO'],
+    ['a zero-width space in the MD tokens', 'mdTokens', '38200%sZWSP 38200'],
+    ['a BOM in the notes', 'notes', '%sBOM note'],
+    ['a control character in the notes', 'notes', 'a%sCTRL b'],
+    ['a line break in a label', 'labelAr', 'كمر%sLF وسط'],
+  ])('refuses %s, in every text field (S4)', (_label, field, template) => {
+    const marks: Record<string, string> = { RLO: String.fromCharCode(0x202e), ZWSP: String.fromCharCode(0x200b), BOM: String.fromCharCode(0xfeff), CTRL: String.fromCharCode(0x07), LF: String.fromCharCode(0x0a) };
+    const mark = Object.keys(marks).find((name) => template.includes(name)) as string;
+    const value = template.replace(`%s${mark}`, marks[mark]);
+    const file = asJson(bulletin({ pages: [page({ rows: [row({ [field]: value })] })] }));
+    expect(refusal(file).map((item) => item.code)).toContain('B0');
+  });
+
+  it('keeps a line break in the MD tokens and the notes', () => {
+    const file = asJson(bulletin({ pages: [page({ rows: [row({ notes: 'line one' + String.fromCharCode(0x0a) + 'line two' })] })] }));
+    expect(guardBulletinFile(file).ok).toBe(true);
+  });
+
   it('refuses a non-object input outright', () => {
     expect(refusal([]).map((item) => item.message)).toEqual(['$: expected an object']);
   });

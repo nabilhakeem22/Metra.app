@@ -3,23 +3,31 @@
 //   B7  identity clash: a NEW key whose label, unit and pack equal a published
 //       item's under another key (map it instead of minting a duplicate);
 //   B11 source reuse: this PDF or MD is already published for another period;
-//   F2  restatement: a month an earlier bulletin published now reads differently;
+//   F2  restatement: a month an earlier bulletin published now reads differently,
+//       or is empty now (a dropped cell is the classic misread);
 //   F3  dropped: an active item with published history is missing from this file;
-//   B0  a `discontinue` in mapping.json that names no active published item.
+//   B0  a `discontinue` that names no published item (one already discontinued
+//       is accepted: a --replace repeats its mapping), or a `map` to a
+//       key that is not published (a typo would mint a new item).
+// Values are compared as canonical decimals: "144.0" and "144" are one price.
 import { finding, type Finding } from '../findings';
 import { describePack, samePack } from '../roll-pack';
-import { sourceLabelOf } from '../normalize';
+import { canonicalDecimal, sourceLabelOf } from '../normalize';
 import { marketUnitOf } from '../units';
 import { monthKey, type CheckContext } from './context';
 
 function checkIdentityHistory(context: CheckContext): Finding[] {
   const findings: Finding[] = [];
   const published = [...context.history.items.values()];
-  for (const { row, pageId, itemKey } of context.rows) {
+  for (const { row, pageId, itemKey, mapped } of context.rows) {
     const reading = marketUnitOf(row.unitLabelAr);
     if (reading === null) continue;
     const at = { rowId: row.rowId, page: pageId };
     const existing = context.history.items.get(itemKey);
+    if (mapped && !existing) {
+      findings.push(finding('B0', `mapping.json maps ${row.rowId} to ${itemKey}, which is not a published item: "map" reuses an existing key`, at));
+      continue;
+    }
     if (existing) {
       if (existing.unit !== reading.unit || !samePack(existing.pack, reading.pack)) {
         findings.push(
@@ -58,10 +66,10 @@ function checkRestatements(context: CheckContext): Finding[] {
     const series = context.history.effective.get(itemKey);
     if (!series) continue;
     months.forEach((slot, index) => {
-      if (slot === null) return;
+      if (index + 1 > context.bulletinMonth) return;
       const before = series.get(monthKey(context.file, index + 1));
       if (!before) return;
-      const now = slot === 'suspended' ? 'suspended' : slot;
+      const now = slot === null ? 'empty' : slot === 'suspended' ? 'suspended' : canonicalDecimal(slot);
       const then = before.status === 'suspended' ? 'suspended' : (before.price ?? 'empty');
       if (now !== then) {
         findings.push(finding('F2', `"${row.labelAr}" month ${index + 1} was ${then} in the ${before.bulletinPeriod} bulletin and reads ${now} now`, { rowId: row.rowId, page: pageId, month: index + 1 }));
@@ -81,8 +89,8 @@ function checkDropped(context: CheckContext): Finding[] {
 
 function checkDiscontinued(context: CheckContext): Finding[] {
   return context.discontinueKeys
-    .filter((key) => context.history.items.get(key)?.status !== 'active')
-    .map((key) => finding('B0', `mapping.json discontinues ${key}, which is not an active published item`));
+    .filter((key) => !context.history.items.has(key))
+    .map((key) => finding('B0', `mapping.json discontinues ${key}, which is not a published item`));
 }
 
 export const HISTORY_VALIDATORS = [checkIdentityHistory, checkSourceReuse, checkRestatements, checkDropped, checkDiscontinued];

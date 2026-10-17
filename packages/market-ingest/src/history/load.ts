@@ -2,13 +2,19 @@
 // B7, B11, F1, F2, F3). Read-only, as the connection role: what is PUBLISHED,
 // never what a studio's RLS view happens to show.
 import type { EffectivePoint, PublishedHistory, PublishedItem } from '../check/context';
-import type { PostgresJs } from '../db/connection';
+import type { Queryable } from '../db/connection';
 import { canonicalDecimal } from '../normalize';
 import type { RollPack } from '../roll-pack';
 import type { MarketUnit } from '../units';
 
 interface ItemRow {
   key: string;
+  name_ar: string;
+  name_en: string;
+  spec_ar: string | null;
+  spec_en: string | null;
+  unit_label_ar: string;
+  basis_note_ar: string | null;
   unit: MarketUnit;
   status: 'active' | 'discontinued';
   source_labels: string[];
@@ -28,16 +34,25 @@ export function packOf(row: Pick<ItemRow, 'pack_length_m' | 'pack_pieces' | 'pac
 }
 
 /** `period` is the bulletin being checked ('YYYY-MM'); effective prices come from EARLIER bulletins only. */
-export async function loadHistory(sql: PostgresJs, period: string): Promise<PublishedHistory> {
+export async function loadHistory(sql: Queryable, period: string): Promise<PublishedHistory> {
   const itemRows = await sql<ItemRow[]>`
     select i.key, i.unit, i.status, i.source_labels, i.pack_length_m, i.pack_pieces, i.pack_piece_length_m,
+           i.name_ar, i.name_en, i.spec_ar, i.spec_en, i.unit_label_ar, i.basis_note_ar,
            exists (select 1 from market_price_observations o join market_bulletins b on b.id = o.bulletin_id
                     where o.item_id = i.id and b.status = 'published') as has_history
       from market_items i`;
   const items = new Map<string, PublishedItem>(
     itemRows.map((row) => [
       row.key,
-      { key: row.key, unit: row.unit, pack: packOf(row), status: row.status, sourceLabels: row.source_labels, hasHistory: row.has_history },
+      {
+        key: row.key,
+        unit: row.unit,
+        pack: packOf(row),
+        status: row.status,
+        sourceLabels: row.source_labels,
+        details: { nameAr: row.name_ar, nameEn: row.name_en, specAr: row.spec_ar, specEn: row.spec_en, unitLabelAr: row.unit_label_ar, basisNoteAr: row.basis_note_ar },
+        hasHistory: row.has_history,
+      },
     ]),
   );
   const pointRows = await sql<Array<{ key: string; month: string; status: EffectivePoint['status']; price: string | null; bulletin_period: string }>>`

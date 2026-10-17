@@ -43,16 +43,22 @@ export async function seedBulletin(
   const [bulletin] = await pg<{ id: string }[]>`
     insert into public.market_bulletins
       (publisher, period_month, status, source_pdf_file_name, source_pdf_sha256, source_page_count,
-       extraction_method, extraction_sha256, reviewed_by, reviewed_at)
+       extraction_method, extraction_sha256, gate_commit, reviewed_by, reviewed_at)
     values ('mhuc_cabm', ${`${period}-01`}, 'published', 'dbtest.pdf', ${'a'.repeat(64)}, 113,
-            'session:pdf', ${'b'.repeat(64)}, 'dbtest', now())
+            'session:pdf', ${'b'.repeat(64)}, ${'c'.repeat(40)}, 'dbtest', now())
     returning id`;
   seeded.bulletins.add(bulletin.id);
   for (const [itemId, month, price] of observations) {
-    await pg`insert into public.market_price_observations (item_id, bulletin_id, period_month, status, price, source_pdf_page)
-             values (${itemId}, ${bulletin.id}, ${`${month}-01`}, 'priced', ${price}, 1)`;
+    await pg`insert into public.market_price_observations (item_id, bulletin_id, bulletin_period_month, period_month, status, price, source_pdf_page)
+             values (${itemId}, ${bulletin.id}, ${`${period}-01`}, ${`${month}-01`}, 'priced', ${price}, 1)`;
   }
   return bulletin.id;
+}
+
+/** The item's details as `bulletinId` printed them. */
+export async function seedDetails(itemId: string, bulletinId: string): Promise<void> {
+  await pg`insert into public.market_item_details (item_id, bulletin_id, name_ar, name_en, unit_label_ar)
+           values (${itemId}, ${bulletinId}, 'زجاج شفاف', 'Clear glass', 'م2')`;
 }
 
 export async function withdrawBulletin(bulletinId: string): Promise<void> {
@@ -92,6 +98,7 @@ export async function clearMarket(): Promise<void> {
   const bulletins = [...seeded.bulletins];
   const items = [...seeded.items];
   await pg`delete from public.market_price_observations where bulletin_id = any(${bulletins}::uuid[]) or item_id = any(${items}::uuid[])`;
+  await pg`delete from public.market_item_details where bulletin_id = any(${bulletins}::uuid[]) or item_id = any(${items}::uuid[])`;
   await pg`delete from public.market_bulletins where id = any(${bulletins}::uuid[])`;
   await pg`delete from public.market_items where id = any(${items}::uuid[])`;
   seeded.bulletins.clear();

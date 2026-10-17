@@ -4,6 +4,7 @@
 // are REJECTED per-row (category_invalid) — import never auto-creates a section.
 import type { CostItemUnit } from '@metra/db';
 import { readMoneyString } from '@/lib/money/read';
+import { unitFromToken } from '@/lib/units/unit-aliases';
 
 export const UNIT_TOKENS: readonly CostItemUnit[] = [
   'sqm',
@@ -31,30 +32,6 @@ const DEFAULT_SECTION_ALIASES: Record<string, string[]> = {
   preliminaries: ['preliminaries', 'أعمال تمهيدية', 'تمهيدية'],
 };
 
-const UNIT_ALIASES: Record<CostItemUnit, string[]> = {
-  sqm: ['sqm', 'm2', 'm²', 'متر مربع', 'م2', 'م²'],
-  linear_meter: ['linear_meter', 'linear meter', 'lm', 'متر طولي', 'م.ط'],
-  pcs: ['pcs', 'pc', 'piece', 'قطعة', 'عدد'],
-  lump_sum: ['lump_sum', 'lump sum', 'ls', 'مقطوعية', 'إجمالي'],
-  day: ['day', 'يوم'],
-  kg: ['kg', 'kilo', 'كجم', 'كيلو', 'كيلوجرام'],
-  ton: ['ton', 'tonne', 'طن'],
-  liter: ['liter', 'litre', 'lt', 'لتر'],
-  cbm: ['cbm', 'm3', 'm³', 'متر مكعب', 'م3', 'م³'],
-  roll: ['roll', 'لفة', 'رول'],
-};
-
-function buildLookup<T extends string>(
-  aliases: Record<T, string[]>,
-): Map<string, T> {
-  const m = new Map<string, T>();
-  for (const key of Object.keys(aliases) as T[]) {
-    for (const alias of aliases[key]) m.set(norm(alias), key);
-  }
-  return m;
-}
-
-const UNIT_LOOKUP = buildLookup(UNIT_ALIASES);
 
 // §4.1 Arabic normalization so plain/hamza'd forms match: fold alef variants,
 // taa-marbuta -> haa, alef-maqsura -> yaa, and drop tashkeel + tatweel.
@@ -103,9 +80,9 @@ export function resolveSection(
   return null;
 }
 
+/** The shared alias table (lib/units/unit-aliases.ts), so both importers agree. */
 export function resolveUnit(text: string): CostItemUnit | null {
-  if (!text) return null;
-  return UNIT_LOOKUP.get(norm(text)) ?? null;
+  return text ? unitFromToken(text) : null;
 }
 
 export type ImportRowError =

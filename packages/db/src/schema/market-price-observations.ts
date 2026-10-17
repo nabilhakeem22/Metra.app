@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm';
-import { check, date, index, integer, pgTable, unique, uuid, type AnyPgColumn } from 'drizzle-orm/pg-core';
+import { check, date, foreignKey, index, integer, pgTable, unique, uuid, type AnyPgColumn } from 'drizzle-orm/pg-core';
 import { money } from './_helpers';
 import { marketObservationStatus } from './enums';
 import { marketBulletins } from './market-bulletins';
@@ -20,9 +20,9 @@ export const marketPriceObservations = pgTable(
     itemId: uuid('item_id')
       .notNull()
       .references((): AnyPgColumn => marketItems.id, { onDelete: 'restrict' }),
-    bulletinId: uuid('bulletin_id')
-      .notNull()
-      .references((): AnyPgColumn => marketBulletins.id, { onDelete: 'restrict' }),
+    bulletinId: uuid('bulletin_id').notNull(),
+    /** The bulletin's own month, carried so a CHECK can refuse a month after it. */
+    bulletinPeriodMonth: date('bulletin_period_month', { mode: 'string' }).notNull(),
     periodMonth: date('period_month', { mode: 'string' }).notNull(),
     status: marketObservationStatus('status').notNull(),
     price: money('price'),
@@ -33,7 +33,13 @@ export const marketPriceObservations = pgTable(
     unique('market_price_observations_item_month_bulletin_unique').on(t.itemId, t.periodMonth, t.bulletinId),
     check('market_price_observations_period_first_day', sql`extract(day from ${t.periodMonth}) = 1`),
     check('market_price_observations_priced_iff_price', sql`(${t.status} = 'priced') = (${t.price} is not null)`),
-    check('market_price_observations_price_positive', sql`${t.price} > 0`),
+    check('market_price_observations_price_range', sql`${t.price} > 0 and ${t.price} <= 10000000`),
+    check('market_price_observations_month_not_after_bulletin', sql`${t.periodMonth} <= ${t.bulletinPeriodMonth}`),
+    foreignKey({
+      name: 'market_price_observations_bulletin_period_fk',
+      columns: [t.bulletinId, t.bulletinPeriodMonth],
+      foreignColumns: [marketBulletins.id, marketBulletins.periodMonth],
+    }).onDelete('restrict'),
     check(
       'market_price_observations_source_page',
       sql`(${t.sourcePdfPage} is not null or ${t.sourcePrintedPage} is not null) and coalesce(${t.sourcePdfPage}, 1) > 0 and coalesce(${t.sourcePrintedPage}, 1) > 0`,
