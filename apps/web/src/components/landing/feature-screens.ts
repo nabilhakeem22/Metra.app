@@ -17,7 +17,7 @@ const SIZES: Record<ScreenKind, Record<ScreenLanguage, ScreenSize>> = {
   flow: { ar: { width: 1169, height: 808 }, en: { width: 1169, height: 787 } },
   cost: { ar: { width: 1180, height: 1305 }, en: { width: 1180, height: 1300 } },
   proposals: { ar: { width: 976, height: 1032 }, en: { width: 976, height: 1062 } },
-  bilingual: { ar: { width: 585, height: 722 }, en: { width: 585, height: 710 } },
+  bilingual: { ar: { width: 585, height: 644 }, en: { width: 585, height: 638 } },
 };
 
 export interface ScreenImage extends ScreenSize {
