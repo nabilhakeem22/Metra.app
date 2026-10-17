@@ -61,14 +61,15 @@ function checkSiblings(context: CheckContext): Finding[] {
       const changes = siblings.flatMap((resolved) => {
         const [before, after] = [resolved.months[month - 2], resolved.months[month - 1]];
         if (before === null || after === null || before === 'suspended' || after === 'suspended') return [];
-        return [{ resolved, change: Number(percentChange(before, after)) }];
+        const printed = percentChange(before, after) ?? '0.0';
+        return [{ resolved, printed, change: Number(printed) }];
       });
       if (changes.length < 2) continue;
-      for (const { resolved, change } of changes) {
+      for (const { resolved, printed, change } of changes) {
         const othersFlat = changes.every((other) => other.resolved === resolved || other.change === 0);
         if (Math.abs(change) > SIBLING_PCT && othersFlat) {
           findings.push(
-            finding('F11', `"${resolved.row.labelAr}" moves ${change}% in month ${month} while every sibling row stays flat: check the column on the PDF`, {
+            finding('F11', `"${resolved.row.labelAr}" moves ${printed}% in month ${month} while every sibling row stays flat: check the column on the PDF`, {
               rowId: resolved.row.rowId,
               page: resolved.pageId,
               month,
