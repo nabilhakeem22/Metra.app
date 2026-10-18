@@ -9,17 +9,23 @@ import { PRICE_BOOK_PAGE_SIZE, priceBookViewSearch, type PriceBookView } from '@
 
 /**
  * Which of the matching items this page shows, and links to the pages either
- * side: real links (?page=), so a page opens in a new tab or is shared. Not
+ * side: real links (?page=), so a page opens in a new tab or is shared. Each
+ * link carries the toolbar's filters as chosen (`viewAt`), so a filter clicked
+ * just before is not undone by a page its answer has not reached yet. Not
  * prefetched: each prefetch is one more render of a page nobody may open. A
  * single page has nothing to page through and renders nothing.
  */
 export function PriceBookPager({
-  view,
+  viewAt,
+  onFollow,
   page,
   pageCount,
   matched,
 }: {
-  view: PriceBookView;
+  /** The view a link to `page` opens. */
+  viewAt: (page: number) => PriceBookView;
+  /** A link is being followed. */
+  onFollow: () => void;
   page: number;
   pageCount: number;
   matched: number;
@@ -29,7 +35,7 @@ export function PriceBookPager({
   if (pageCount <= 1) return null;
   const first = (page - 1) * PRICE_BOOK_PAGE_SIZE + 1;
   const last = Math.min(page * PRICE_BOOK_PAGE_SIZE, matched);
-  const pageHref = (target: number) => `/price-book${priceBookViewSearch({ ...view, page: target })}`;
+  const pageHref = (target: number) => `/price-book${priceBookViewSearch(viewAt(target))}`;
 
   return (
     <nav aria-label={t('label')} className="flex flex-wrap items-center justify-between gap-2">
@@ -43,7 +49,7 @@ export function PriceBookPager({
       <div className="flex items-center gap-2">
         {page > 1 && (
           <Button asChild variant="secondary" size="sm">
-            <Link href={pageHref(page - 1)} prefetch={false} rel="prev">
+            <Link href={pageHref(page - 1)} prefetch={false} rel="prev" onClick={onFollow}>
               <ChevronLeft className="size-4 rtl:-scale-x-100" aria-hidden />
               {t('previous')}
             </Link>
@@ -51,7 +57,7 @@ export function PriceBookPager({
         )}
         {page < pageCount && (
           <Button asChild variant="secondary" size="sm">
-            <Link href={pageHref(page + 1)} prefetch={false} rel="next">
+            <Link href={pageHref(page + 1)} prefetch={false} rel="next" onClick={onFollow}>
               {t('next')}
               <ChevronRight className="size-4 rtl:-scale-x-100" aria-hidden />
             </Link>

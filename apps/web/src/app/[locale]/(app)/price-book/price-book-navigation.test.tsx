@@ -127,6 +127,54 @@ describe('the paged price book', () => {
       expect(router.replace.mock.calls.map(([href]) => href)).toEqual(['/price-book?active=1', '/price-book?q=tile&active=1']);
     });
 
+    /** Type (or clear) the box, wait out the pause, and let the server answer the request it sent. */
+    async function search(rerender: (ui: React.ReactElement) => void, text: string) {
+      fireEvent.change(box(), { target: { value: text } });
+      await pause();
+      rerender(client(answer(router.replace.mock.calls.at(-1)?.[0] as string)));
+    }
+
+    test('Back to a view asked for earlier (and since left) is adopted: the box follows the rows (N1)', async () => {
+      const { rerender } = render(client(FIRST_VIEW));
+      await search(rerender, 'tile');
+      await search(rerender, '');
+      await search(rerender, 'gyp');
+      expect(box().value).toBe('gyp');
+      rerender(client(FIRST_VIEW));
+      expect(box().value).toBe('');
+    });
+
+    test('the sidebar link to the bare price book after a filter toggled on, off and on is adopted (N1)', () => {
+      const { rerender } = render(client(FIRST_VIEW));
+      for (let toggle = 0; toggle < 3; toggle += 1) {
+        fireEvent.click(screen.getByRole('checkbox'));
+        rerender(client(answer(router.replace.mock.calls.at(-1)?.[0] as string)));
+      }
+      expect((screen.getByRole('checkbox') as HTMLInputElement).checked).toBe(true);
+      rerender(client(FIRST_VIEW));
+      expect((screen.getByRole('checkbox') as HTMLInputElement).checked).toBe(false);
+    });
+
+    test('a stale answer while a newer request is unanswered is ignored; the newer one lands and matches', async () => {
+      const { rerender } = render(client(FIRST_VIEW));
+      fireEvent.click(screen.getByRole('checkbox'));
+      fireEvent.change(box(), { target: { value: 'gyp' } });
+      await pause();
+      const [stale, newer] = router.replace.mock.calls.map(([href]) => href as string);
+      rerender(client(answer(stale)));
+      expect(box().value).toBe('gyp');
+      rerender(client(answer(newer)));
+      expect(box().value).toBe('gyp');
+      expect((screen.getByRole('checkbox') as HTMLInputElement).checked).toBe(true);
+    });
+
+    test('a pager link carries a filter clicked before its page arrived (N2)', () => {
+      render(client(FIRST_VIEW));
+      fireEvent.click(screen.getByRole('checkbox'));
+      const links = screen.getAllByRole('link').map((link) => link.getAttribute('href'));
+      expect(links.some((href) => href?.endsWith('/price-book?active=1&page=3'))).toBe(true);
+    });
+
     test('a search past the length cap is cut in the URL only, never in the box (F4)', async () => {
       const { rerender } = render(client(FIRST_VIEW));
       const long = 'gypsum '.padEnd(230, 'x');

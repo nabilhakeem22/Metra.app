@@ -98,7 +98,7 @@ export function PriceBookClient({ view, book, sections, canManage }: PriceBookCl
           }}
           onToggleActive={actions.toggleActive}
         />
-        <PriceBookPager view={view} page={book.page} pageCount={book.pageCount} matched={book.matched} />
+        <PriceBookPager viewAt={navigation.intendedView} onFollow={navigation.flush} page={book.page} pageCount={book.pageCount} matched={book.matched} />
       </div>
     </div>
   );
