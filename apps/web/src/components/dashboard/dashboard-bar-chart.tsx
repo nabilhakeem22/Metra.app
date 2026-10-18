@@ -1,12 +1,5 @@
 import { Card, CardContent } from '@/components/ui/card';
-
-/** One month's column: the segments stack bottom-up in the order given. */
-export interface ChartColumn {
-  /** `YYYY-MM` — the caller supplies the display label separately, localized. */
-  month: string;
-  label: string;
-  segments: Array<{ key: string; value: number }>;
-}
+import type { ChartColumn } from '@/lib/dashboard/chart-columns';
 
 /** A series: the segment key, its label, and the colour token that draws it. */
 export interface ChartSeries {
@@ -113,14 +106,14 @@ export function DashboardBarChart({
                       />
                       {labelOf(segment.key)}
                       <span className="ms-auto font-medium tabular-nums text-foreground" dir="ltr">
-                        {segment.value}
+                        {segment.display ?? segment.value}
                       </span>
                     </p>
                   ))}
                   <p className="mt-0.5 flex items-center gap-3 border-t border-[color:var(--rule)] pt-0.5 text-caption font-semibold">
                     {totalLabel}
                     <span className="ms-auto tabular-nums" dir="ltr">
-                      {total}
+                      {column.totalDisplay ?? total}
                     </span>
                   </p>
                   </div>
@@ -154,10 +147,10 @@ export function DashboardBarChart({
 
                 {/* The real numbers, for screen readers and for touch. */}
                 <span className="sr-only">
-                  {column.label}: {totalLabel} {total}
+                  {column.label}: {totalLabel} {column.totalDisplay ?? total}
                   {column.segments
                     .filter((s) => s.value > 0)
-                    .map((s) => `, ${labelOf(s.key)} ${s.value}`)
+                    .map((s) => `, ${labelOf(s.key)} ${s.display ?? s.value}`)
                     .join('')}
                 </span>
               </div>

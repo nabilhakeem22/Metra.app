@@ -2,6 +2,8 @@ import { describe, expect, test, vi } from 'vitest';
 import { screen } from '@testing-library/react';
 import { messageAt, renderWithIntl, TEST_NOW } from '@/test/render-with-intl';
 import type { DashboardDelivery } from '@/lib/dashboard/queries';
+import { canSeeRescueLedger } from '@/lib/dashboard/rescue-ledger/visibility';
+import type { MemberRole } from '@/lib/permissions/roles';
 import { DashboardView, type DashboardViewProps } from './dashboard-view';
 
 // Three children are replaced by MARKER stubs, each for a stated reason:
@@ -23,6 +25,11 @@ vi.mock('@/components/dashboard/getting-started', () => ({
 }));
 vi.mock('@/components/dashboard/dashboard-range-filter', () => ({
   DashboardRangeFilter: () => <div data-testid="range-filter" />,
+}));
+// The rescue ledger island fetches its own route on mount; its marker echoes the
+// window it was handed. `rescue-ledger-section.test.tsx` covers the island.
+vi.mock('./rescue-ledger-section', () => ({
+  RescueLedgerSection: ({ range }: { range: number }) => <div data-testid="rescue-ledger">{range}</div>,
 }));
 
 const en = (path: string) => messageAt('en', path);
@@ -70,6 +77,7 @@ function renderView(overrides: Partial<DashboardViewProps> = {}) {
         dismissed: false,
       }}
       firm={null}
+      rescue={null}
       deliveries={{
         rows: [delivery('d-1'), delivery('d-2')],
         totalActive: 17,
@@ -161,5 +169,21 @@ describe('DashboardView — the fence proves BOTH ways', () => {
   test('deliveries = null removes the panel entirely', () => {
     renderView({ deliveries: null });
     expect(screen.queryByTestId('deliveries-panel')).toBeNull();
+  });
+});
+
+describe('DashboardView: the rescue ledger island (D1)', () => {
+  // The page hands `rescue` exactly when canSeeRescueLedger says so; the view
+  // renders the island for it and nothing otherwise.
+  const rescueFor = (role: MemberRole) => (canSeeRescueLedger(role, { restrictFirmDashboard: false }) ? { range: 12 as const } : null);
+
+  test.each(['owner', 'admin', 'accountant'] as const)('%s gets the island, with the dashboard window', (role) => {
+    renderView({ rescue: rescueFor(role) });
+    expect(screen.getByTestId('rescue-ledger').textContent).toBe('12');
+  });
+
+  test.each(['project_manager', 'site_engineer', 'viewer'] as const)('%s gets nothing where the ledger would be', (role) => {
+    renderView({ rescue: rescueFor(role) });
+    expect(screen.queryByTestId('rescue-ledger')).toBeNull();
   });
 });

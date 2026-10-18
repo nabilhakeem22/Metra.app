@@ -8,11 +8,13 @@
 import { fillMonths, type MonthlyBucket, type RangeMonths } from './range';
 import type { ClientsMonth, ProjectsMonth } from './queries';
 
-/** One bar: its month, its rendered label, and the segments that stack in it. */
+/** One bar: its month, its rendered label, and the segments that stack in it.
+ *  `display` / `totalDisplay` replace the raw numbers a reader sees (money). */
 export interface ChartColumn {
   month: string;
   label: string;
-  segments: Array<{ key: string; value: number }>;
+  segments: Array<{ key: string; value: number; display?: string }>;
+  totalDisplay?: string;
 }
 
 /** One donut slice. */

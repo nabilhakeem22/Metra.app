@@ -251,6 +251,38 @@
       "emptyNoProject": "Add a project for your client, then start its delivery.",
       "emptyNoDelivery": "No delivery started yet.",
       "emptyAllClosed": "Every delivery is closed."
+    },
+    "rescue": {
+      "title": "Rescue ledger",
+      "summary": "What Metra caught for you in the last {n} months, from your own records.",
+      "basedOnYourData": "Based on your data",
+      "cards": {
+        "collected": "Collected",
+        "collectedHint": "Real payments only. Never added to estimates.",
+        "heldFees": "Stage fees paid while the stage was held",
+        "changeOrders": "Extra revisions billed and paid",
+        "moneyInputs": "{payments} payments on {deliveries} deliveries",
+        "stagesMoved": "Stages moved after a follow up",
+        "stagesMovedInputs": "Metra flagged {followups} waits, you sent or prepared a reminder, and the stage moved.",
+        "protectedTitle": "Protected · estimated",
+        "protectedLocked": "Shows once market rates are set. It will never be added to collected money."
+      },
+      "charts": {
+        "collected": "Collected per month",
+        "collectedSummary": "Money collected in the last {n} months, split by held stage fees and change orders.",
+        "stagesMoved": "Stages moved per month",
+        "stagesMovedSummary": "Stages that moved after a follow up in the last {n} months."
+      },
+      "series": {
+        "heldFees": "Held stage fees",
+        "changeOrders": "Change orders",
+        "stagesMoved": "Stages moved"
+      },
+      "total": "Total",
+      "empty": "Nothing caught in this period yet.",
+      "loading": "Loading the ledger",
+      "loadFailed": "We could not load the ledger.",
+      "retry": "Try again"
     }
   },
   "team": {
