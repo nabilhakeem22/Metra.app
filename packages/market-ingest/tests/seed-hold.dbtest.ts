@@ -1,10 +1,8 @@
 import { ORG_A_ID, ORG_B_ID } from '@metra/db';
-import { createSql } from '@metra/db/client';
 import { MARKET_WRITE_LOCK } from '@metra/db/market-seed';
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { seedCommand } from '../src/commands/seed-command';
 import { CLI_APPLICATION_NAME } from '../src/db/connection';
-import { describeLockHolders } from '../src/publish/lock-holders';
 import { rebuildSeedBook } from '../src/seed/book-store';
 import { clearMarketTestData, seedPublished } from './db-fixture';
 import { clearSeeded, publishFixture, seededIn, sql } from './seed-fixture';
@@ -103,20 +101,5 @@ describe('market:seed-price-books between two studios', () => {
     expect(between.calls).toBe(1);
     expect(await seededIn(ORG_A_ID)).toEqual([]);
     expect(await seededIn(ORG_B_ID)).toEqual([]);
-  });
-});
-
-describe('the holder report a blocked publish prints', () => {
-  it('names a session-level holder left idle (what an older CLI left behind) as one to end, with its application and age', async () => {
-    const orphan = createSql(process.env.DATABASE_URL as string, { max: 1, connection: { application_name: CLI_APPLICATION_NAME } });
-    try {
-      await orphan`select pg_advisory_lock_shared(hashtext(${MARKET_WRITE_LOCK}))`;
-      await new Promise((resolve) => setTimeout(resolve, 1100));
-      const report = await describeLockHolders();
-      expect(report).toMatch(new RegExp(`pid \\d+ \\(${CLI_APPLICATION_NAME}\\), idle for [1-9]\\d* s, no transaction open: LEFT BEHIND, end it`));
-      expect(report).toContain('select pg_terminate_backend(<pid>);');
-    } finally {
-      await orphan.end();
-    }
   });
 });

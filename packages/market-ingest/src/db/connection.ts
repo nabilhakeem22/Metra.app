@@ -26,6 +26,13 @@ export const CLI_APPLICATION_NAME = 'metra-market-cli';
 
 const CLI_CONNECTION = { max: 1, connection: { application_name: CLI_APPLICATION_NAME } };
 
+/**
+ * How long closing the connection may take (seconds) before it is destroyed.
+ * Measured: once the backend was terminated under a statement, a bare
+ * `sql.end()` never settled, so the command never printed its report.
+ */
+const END_TIMEOUT_SECONDS = 5;
+
 function databaseUrl(): string {
   const url = process.env[DATABASE_URL_VARIABLE];
   if (url === undefined || url.trim() === '') {
@@ -46,7 +53,7 @@ export async function withDrizzle<T>(work: (db: MetraDb, sql: PostgresJs) => Pro
   try {
     return await work(db, sql);
   } finally {
-    await sql.end();
+    await sql.end({ timeout: END_TIMEOUT_SECONDS });
   }
 }
 
@@ -56,6 +63,6 @@ export async function withDatabase<T>(work: (sql: PostgresJs) => Promise<T>): Pr
   try {
     return await work(sql);
   } finally {
-    await sql.end();
+    await sql.end({ timeout: END_TIMEOUT_SECONDS });
   }
 }

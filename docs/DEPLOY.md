@@ -2835,7 +2835,10 @@ BEHIND one in the SQL editor with `select pg_terminate_backend(<pid>);` and
 run the command again. LEFT BEHIND is an idle session with no transaction
 open (it can hold the lock only at session level, which no market command
 takes any more, and no timeout ends it: a SQL editor tab, or a seed run from
-before this change) or a transaction open 60 s or more. A publish or
+before this change) or a transaction idle in its current state for more
+than 60 s. A holder running a statement is never LEFT BEHIND, however old
+its transaction: a publish may take up to 300 s. Only the market locks are
+listed, never another advisory lock on the database. A publish or
 withdraw transaction can never stay open longer than 300 s (the
 `transaction_timeout` it sets), or 60 s idle; a studio's seed transaction 30 s
 idle.
@@ -2933,7 +2936,10 @@ studio's transaction, never between studios, so a dropped connection leaves
 no lock behind. A publish or withdrawal during the run makes it stop at the
 next studio: `STOPPED, nothing written for this studio: the market price book
 changed during this run`, the studios after it `not reached`, exit 1; run the
-same command again. A dry run rebuilds nothing. Exit 0, or exit 1
+same command again. A connection lost mid-run (a dropped link) stops it the
+same way at the studio it was on (`CONNECTION LOST on this studio`), with the
+totals; that studio is written only if its commit had reached the database,
+and a re-run completes it. A dry run rebuilds nothing. Exit 0, or exit 1
 with `FAILED, nothing written for this studio: SQLSTATE <code>: <the database's
 reason>` on each studio that failed (the others are seeded), e.g. `SQLSTATE
 55P03: canceling statement due to lock timeout` when a studio was saving the

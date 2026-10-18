@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { LEFT_BEHIND_AFTER_SECONDS, isLeftBehind, lockHolderReport, type LockHolder } from './lock-holder-report';
+import { LEFT_BEHIND_IDLE_SECONDS, isLeftBehind, lockHolderReport, type LockHolder } from './lock-holder-report';
 
-// R1: an idle session holding a market lock with no transaction open used to
-// print "transaction open ? s" and advice that named only a stuck publish,
-// so a seed left behind by a dropped link read as something to wait for.
+// An idle session holding a market lock with no transaction open used to
+// print "transaction open ? s" and advice that named only a stuck publish, so
+// a seed left behind by a dropped link read as something to wait for. And a
+// verdict on transaction AGE told the owner to kill a healthy publish past
+// 60 s, which may run 300 s (overnight round, R1).
 
 const holder = (overrides: Partial<LockHolder>): LockHolder => ({
   pid: 34300,
@@ -22,22 +24,30 @@ describe('the lock holder report', () => {
     expect(report).toMatch(/no timeout ends it/);
   });
 
-  it('tells the owner to wait for a transaction that is still at work', () => {
-    const report = lockHolderReport([holder({ state: 'idle in transaction', transactionSeconds: 4 })]);
-    expect(report).toContain('pid 34300 (metra-market-cli), idle in transaction, transaction open 4 s: running, wait for it');
+  it('calls a publish running one long statement "running", however old its transaction', () => {
+    const report = lockHolderReport([holder({ state: 'active', transactionSeconds: 68, stateSeconds: 68 })]);
+    expect(report).toContain('pid 34300 (metra-market-cli), active for 68 s, transaction open 68 s: running, wait for it');
+    expect(isLeftBehind(holder({ state: 'active', transactionSeconds: 299, stateSeconds: 299 }))).toBe(false);
+  });
+
+  it('calls a slow-link publish with short gaps between statements "running", however old its transaction', () => {
+    const report = lockHolderReport([holder({ state: 'idle in transaction', transactionSeconds: 68, stateSeconds: 1 })]);
+    expect(report).toContain('pid 34300 (metra-market-cli), idle in transaction for 1 s, transaction open 68 s: running, wait for it');
     expect(report).toMatch(/a publish, a withdrawal or a studio seed still at work: wait for it/);
   });
 
-  it('marks a transaction open past the bound as left behind, and one just under it as running', () => {
-    expect(isLeftBehind(holder({ transactionSeconds: LEFT_BEHIND_AFTER_SECONDS }))).toBe(true);
-    expect(isLeftBehind(holder({ transactionSeconds: LEFT_BEHIND_AFTER_SECONDS - 1 }))).toBe(false);
-    // Active with no transaction is a statement on its way: never "end it" on its own.
-    expect(isLeftBehind(holder({ state: 'active', transactionSeconds: null }))).toBe(false);
+  it('marks a transaction idle past the longest idle timeout as left behind, and one at it as running', () => {
+    const idle = (stateSeconds: number, state = 'idle in transaction') => holder({ state, transactionSeconds: stateSeconds + 5, stateSeconds });
+    expect(LEFT_BEHIND_IDLE_SECONDS).toBe(60);
+    expect(isLeftBehind(idle(LEFT_BEHIND_IDLE_SECONDS + 1))).toBe(true);
+    expect(isLeftBehind(idle(LEFT_BEHIND_IDLE_SECONDS + 1, 'idle in transaction (aborted)'))).toBe(true);
+    expect(isLeftBehind(idle(LEFT_BEHIND_IDLE_SECONDS))).toBe(false);
   });
 
-  it('says so when a session has no application name or a missing age', () => {
+  it('says so when a session has no application name or a missing age, and never says end it on no evidence', () => {
     const report = lockHolderReport([holder({ applicationName: '', state: null, transactionSeconds: null, stateSeconds: null })]);
     expect(report).toContain('pid 34300 (no application name), unknown state for ? s, no transaction open: running, wait for it');
+    expect(isLeftBehind(holder({ state: 'idle in transaction', stateSeconds: null }))).toBe(false);
   });
 
   it('says to run again when nobody holds a market lock', () => {

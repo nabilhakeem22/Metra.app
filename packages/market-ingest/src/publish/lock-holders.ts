@@ -1,6 +1,7 @@
 // What to tell the owner when a market write waited 3 s for a lock (55P03):
 // every session holding a market lock, read from pg_locks and
 // pg_stat_activity, as ./lock-holder-report.ts words it.
+import { MARKET_WRITE_LOCK, STUDIO_SEED_LOCK } from '@metra/db/market-seed';
 import { withDatabase } from '../db/connection';
 import { lockHolderReport, type LockHolder } from './lock-holder-report';
 
@@ -12,7 +13,17 @@ interface HolderRow {
   state_seconds: number | null;
 }
 
-/** The sessions holding a market lock, the longest-held first (an idle one with no transaction counts from when it went idle). */
+/**
+ * The sessions holding a market lock, the longest-held first (an idle one with
+ * no transaction counts from when it went idle). A market lock is a lock on a
+ * market_ table, or one of the two market advisory keys and no other key on
+ * the database (the app's number allocators, other services). How pg_locks
+ * spells the two keys:
+ *  - MARKET_WRITE_LOCK, one bigint key (hashtext's int4, sign-extended):
+ *    objsubid 1, its high 32 bits in classid and its low 32 in objid;
+ *  - STUDIO_SEED_LOCK, the two-key form (it, then the org): objsubid 2, the
+ *    first key in classid as an unsigned 32-bit oid.
+ */
 export async function readLockHolders(): Promise<LockHolder[]> {
   const rows = await withDatabase((sql) => sql<HolderRow[]>`
     select * from (
@@ -21,7 +32,9 @@ export async function readLockHolders(): Promise<LockHolder[]> {
              extract(epoch from now() - a.state_change)::integer as state_seconds
         from pg_locks l join pg_stat_activity a on a.pid = l.pid
        where a.pid <> pg_backend_pid() and l.granted
-         and (l.locktype = 'advisory'
+         and ((l.locktype = 'advisory'
+               and ((l.objsubid = 1 and ((l.classid::bigint << 32) | l.objid::bigint) = hashtext(${MARKET_WRITE_LOCK})::bigint)
+                 or (l.objsubid = 2 and l.classid::bigint = (hashtext(${STUDIO_SEED_LOCK})::bigint & 4294967295))))
               or l.relation in (select c.oid from pg_class c where c.relname like 'market\\_%'))
     ) holders
      order by coalesce(transaction_seconds, state_seconds) desc nulls last, pid`);
