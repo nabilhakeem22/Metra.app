@@ -39,6 +39,7 @@ vi.mock('@/lib/proposals/actions', () => ({
   getProposalPreviewHtml: vi.fn(),
 }));
 vi.mock('@/lib/sections/actions', () => ({ addSection: vi.fn() }));
+vi.mock('@/lib/price-book/picker-actions', () => ({ searchPriceBookPicker: vi.fn() }));
 vi.mock('@/hooks/use-toast', () => ({ toast: vi.fn() }));
 
 const en = (path: string) => messageAt('en', path);
@@ -85,7 +86,7 @@ function renderBoqBuilder() {
       boqMode={{ engagementId: 'e-1', clientCanOpenNow: false, canSend: true }}
       canSend={false}
       seeMargin={false}
-      costItems={[]}
+      hasPriceBook={false}
       sectionLibrary={[]}
     />,
     { locale: 'en' },

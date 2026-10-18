@@ -11,6 +11,9 @@ import type { CostItemOption } from './builder-model';
 import { PriceBookPicker } from './price-book-picker';
 import type { SectionOption } from './section-combobox';
 
+const server = vi.hoisted(() => ({ searchPriceBookPicker: vi.fn() }));
+vi.mock('@/lib/price-book/picker-actions', () => server);
+
 const SECTIONS: SectionOption[] = [{ id: 'glass', nameEn: 'Glass', nameAr: 'الزجاج' }];
 const BOOK: CostItemOption[] = Array.from({ length: 8 }, (_, index) => ({
   id: `i${index}`,
@@ -31,6 +34,7 @@ const press = (key: string) => fireEvent.keyDown(combobox(), { key });
 let scrolled: Array<{ id: string; options: unknown }>;
 
 beforeEach(() => {
+  server.searchPriceBookPicker.mockResolvedValue({ ok: true, data: { items: BOOK, matched: BOOK.length } });
   scrolled = [];
   Element.prototype.scrollIntoView = function scrollIntoView(this: Element, options?: unknown) {
     scrolled.push({ id: this.id, options });
@@ -41,16 +45,17 @@ afterEach(() => {
   delete (Element.prototype as Partial<Element>).scrollIntoView;
 });
 
-function open() {
+async function open() {
   const onPick = vi.fn();
-  renderWithIntl(<PriceBookPicker costItems={BOOK} sections={SECTIONS} onPick={onPick} />, { locale: 'en' });
+  renderWithIntl(<PriceBookPicker sections={SECTIONS} onPick={onPick} />, { locale: 'en' });
   fireEvent.click(trigger());
+  await screen.findAllByRole('option');
   return onPick;
 }
 
 describe('PriceBookPicker keyboard and screen reader (P2)', () => {
-  it('names the active option on the input and scrolls it into view', () => {
-    open();
+  it('names the active option on the input and scrolls it into view', async () => {
+    await open();
     press('ArrowDown');
     press('ArrowDown');
     const third = screen.getAllByRole('option')[2];
@@ -60,21 +65,22 @@ describe('PriceBookPicker keyboard and screen reader (P2)', () => {
     expect(scrolled.at(-1)).toEqual({ id: third.id, options: { block: 'nearest' } });
   });
 
-  it('Escape closes the list and gives focus back to the button', () => {
-    open();
+  it('Escape closes the list and gives focus back to the button', async () => {
+    await open();
     expect(document.activeElement).toBe(combobox());
     press('Escape');
     expect(screen.queryByRole('listbox')).toBeNull();
     expect(document.activeElement).toBe(trigger());
   });
 
-  it('a reopened list starts at the first match, so Enter adds that one', () => {
-    const onPick = open();
+  it('a reopened list starts at the first match, so Enter adds that one', async () => {
+    const onPick = await open();
     press('ArrowDown');
     press('ArrowDown');
     press('ArrowDown');
     press('Escape');
     fireEvent.click(trigger());
+    await screen.findAllByRole('option');
     const first = screen.getAllByRole('option')[0];
     expect(combobox().getAttribute('aria-activedescendant')).toBe(first.id);
     press('Enter');
@@ -84,8 +90,8 @@ describe('PriceBookPicker keyboard and screen reader (P2)', () => {
 });
 
 describe('PriceBookPicker pointer (P3)', () => {
-  it('a touch or press that starts a scroll picks nothing; a click picks', () => {
-    const onPick = open();
+  it('a touch or press that starts a scroll picks nothing; a click picks', async () => {
+    const onPick = await open();
     const row = screen.getAllByRole('option')[1].querySelector('button') as HTMLButtonElement;
     fireEvent.touchStart(row);
     fireEvent.pointerDown(row);
@@ -100,12 +106,12 @@ describe('PriceBookPicker pointer (P3)', () => {
 describe('PriceBookPicker list id (P4)', () => {
   const picker = () => (
     <NextIntlClientProvider locale="en" messages={messagesFor('en')} timeZone="UTC">
-      <PriceBookPicker costItems={BOOK} sections={SECTIONS} onPick={() => {}} />
+      <PriceBookPicker sections={SECTIONS} onPick={() => {}} />
     </NextIntlClientProvider>
   );
 
-  it('the button controls the listbox it opens', () => {
-    open();
+  it('the button controls the listbox it opens', async () => {
+    await open();
     expect(trigger().getAttribute('aria-controls')).toBe(screen.getByRole('listbox').id);
   });
 

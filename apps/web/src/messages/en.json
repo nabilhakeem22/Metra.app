@@ -695,6 +695,13 @@
     "addSectionPlaceholder": "New section name",
     "activeOnly": "Active only",
     "itemsCount": "{count} items",
+    "noMatch": "Nothing in the price book matches",
+    "pager": {
+      "label": "Price book pages",
+      "range": "{from} to {to} of {total}",
+      "previous": "Previous page",
+      "next": "Next page"
+    },
     "categories": {
       "civil": "Civil",
       "gypsum": "Gypsum",
@@ -1342,6 +1349,7 @@
       "priceBookSearch": "Search by name or code",
       "priceBookOther": "Other items",
       "priceBookNothing": "Nothing in the price book matches",
+      "priceBookLoading": "Loading the price book",
       "priceBookMore": "{count, plural, one {{shown} more item} other {{shown} more items}}: type to narrow the list",
       "description": "Description",
       "qty": "Qty",

@@ -6,6 +6,7 @@ import { pickOption } from '@/test/pick-option';
 import { messageAt, renderWithIntl, type TestLocale } from '@/test/render-with-intl';
 import { BulkUpdateDialog } from './bulk-update-dialog';
 import { ImportWizard } from './import-wizard';
+import { FIRST_VIEW } from '@/lib/price-book/page-params';
 import { PriceBookClient } from './price-book-client';
 import type { PriceBookItem } from './types';
 
@@ -21,6 +22,7 @@ const priceBook = vi.hoisted(() => ({
   bulkUpdatePrices: vi.fn(),
   parseCostImport: vi.fn(),
   importCostItems: vi.fn(),
+  findExistingCostItemCodes: vi.fn(),
   setCostItemActive: vi.fn(),
   loadMarketPriceBook: vi.fn(),
   createCostItem: vi.fn(),
@@ -85,7 +87,7 @@ describe.each<TestLocale>(['en', 'ar-EG'])('price-book forms (%s)', (locale) => 
   });
 
   test('import: the file', async () => {
-    show(<ImportWizard open onOpenChange={() => {}} existingCodes={[]} sections={SECTIONS} />);
+    show(<ImportWizard open onOpenChange={() => {}} sections={SECTIONS} />);
     await expectFieldErrorsRenderUnderFields({
       fields: ['file'],
       controlIdOf: () => 'import-file',
@@ -103,7 +105,7 @@ describe.each<TestLocale>(['en', 'ar-EG'])('price-book forms (%s)', (locale) => 
 
   test('import: Preview says which required column is unmapped, under it', async () => {
     priceBook.parseCostImport.mockResolvedValue({ ok: true, data: { header: ['Code', 'Other'], data: [] } });
-    show(<ImportWizard open onOpenChange={() => {}} existingCodes={[]} sections={SECTIONS} />);
+    show(<ImportWizard open onOpenChange={() => {}} sections={SECTIONS} />);
     await act(async () => {
       fireEvent.change(document.getElementById('import-file')!, {
         target: { files: [new File(['code\n'], 'items.csv', { type: 'text/csv' })] },
@@ -119,7 +121,14 @@ describe.each<TestLocale>(['en', 'ar-EG'])('price-book forms (%s)', (locale) => 
   });
 
   test('the category box', async () => {
-    show(<PriceBookClient items={[ITEM]} sections={SECTIONS} canManage />);
+    show(
+      <PriceBookClient
+        view={FIRST_VIEW}
+        book={{ rows: [ITEM], sectionCounts: { 's-1': 1 }, matched: 1, page: 1, pageCount: 1, hasAnyItem: true }}
+        sections={SECTIONS}
+        canManage
+      />,
+    );
     fireEvent.change(document.getElementById('pb-new-section')!, { target: { value: 'Joinery' } });
     await expectFieldErrorsRenderUnderFields({
       fields: ['name'],

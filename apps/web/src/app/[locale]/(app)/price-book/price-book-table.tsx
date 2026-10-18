@@ -7,13 +7,10 @@ import { Card, CardContent } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { OverflowMenu } from '@/components/ui/overflow-menu';
 import { formatMoney } from '@/lib/format/money';
+import { formatNumber } from '@/lib/format/number';
 import { pickLocale } from '@/lib/i18n/pick-locale';
+import type { PriceBookGroup } from './price-book-groups';
 import type { PriceBookItem, SectionOption } from './types';
-
-export interface PriceBookGroup {
-  section: SectionOption;
-  rows: PriceBookItem[];
-}
 
 export function PriceBookTable({
   groups,
@@ -38,7 +35,7 @@ export function PriceBookTable({
     return (
       <Card>
         <CardContent className="py-4">
-          <EmptyState title={t('empty.title')} />
+          <EmptyState title={t('noMatch')} />
         </CardContent>
       </Card>
     );
@@ -54,7 +51,7 @@ export function PriceBookTable({
                 {sectionName(group.section)}
               </h2>
               <span className="text-caption text-muted-foreground">
-                {t('itemsCount', { count: group.rows.length })}
+                {t('itemsCount', { count: formatNumber(group.matched, locale) })}
               </span>
             </div>
             <div className="overflow-x-auto">

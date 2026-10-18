@@ -23,3 +23,16 @@ export interface SectionOption {
   nameEn: string | null;
   nameAr: string | null;
 }
+
+/** One page of the book, as the server read it (lib/price-book/page-query.ts). */
+export interface PriceBookPageData {
+  rows: PriceBookItem[];
+  /** Matching items per section, across every page. */
+  sectionCounts: Record<string, number>;
+  /** Matching items, across every page. */
+  matched: number;
+  page: number;
+  pageCount: number;
+  /** Whether the book holds any item at all, whatever the filters. */
+  hasAnyItem: boolean;
+}

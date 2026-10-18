@@ -695,6 +695,13 @@
     "addSectionPlaceholder": "اسم القسم الجديد",
     "activeOnly": "النشط بس",
     "itemsCount": "{count} بند",
+    "noMatch": "مفيش بند في دليل الأسعار مطابق",
+    "pager": {
+      "label": "صفحات دليل الأسعار",
+      "range": "من {from} لحد {to} من أصل {total}",
+      "previous": "الصفحة اللي فاتت",
+      "next": "الصفحة الجاية"
+    },
     "categories": {
       "civil": "مدني",
       "gypsum": "جبس",
@@ -1342,6 +1349,7 @@
       "priceBookSearch": "دوّر بالاسم أو الكود",
       "priceBookOther": "بنود تانية",
       "priceBookNothing": "مفيش بند في دليل الأسعار مطابق",
+      "priceBookLoading": "بنحمّل دليل الأسعار",
       "priceBookMore": "{count, plural, zero {مفيش بنود تانية} one {فيه بند كمان} two {فيه بندين كمان} few {فيه {shown} بنود كمان} many {فيه {shown} بند كمان} other {فيه {shown} بند كمان}}، اكتب عشان تضيّق القايمة",
       "description": "الوصف",
       "qty": "الكمية",

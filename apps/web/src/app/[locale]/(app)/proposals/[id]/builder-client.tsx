@@ -8,7 +8,6 @@ import { countSendable } from '@/lib/boq-proposals/count';
 import type { ProposalDetail } from '@/lib/proposals/queries';
 import { BoqModeBar } from './boq-mode-bar';
 import { useBuilderActions } from './builder-actions';
-import type { CostItemOption } from './builder-model';
 import { BuilderSections } from './builder-sections';
 import { BuilderShareLink } from './builder-share-link';
 import { BuilderToolbar } from './builder-toolbar';
@@ -38,14 +37,15 @@ export function ProposalBuilder({
   boqMode,
   canSend,
   seeMargin,
-  costItems,
+  hasPriceBook,
   sectionLibrary,
 }: {
   detail: ProposalDetail;
   boqMode: BoqModeProps | null;
   canSend: boolean;
   seeMargin: boolean;
-  costItems: CostItemOption[];
+  /** Whether the studio has an active price-book item: the picker loads them on demand. */
+  hasPriceBook: boolean;
   sectionLibrary: SectionOption[];
 }) {
   const t = useTranslations('proposals');
@@ -125,7 +125,7 @@ export function ProposalBuilder({
         <BuilderSections
           draft={draft}
           seeMargin={seeMargin}
-          costItems={costItems}
+          hasPriceBook={hasPriceBook}
           sectionLibrary={sectionLibrary}
           cells={autosave.cells}
         />

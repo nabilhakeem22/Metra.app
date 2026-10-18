@@ -3,7 +3,6 @@
 import { Plus } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
-import type { CostItemOption } from './builder-model';
 import { BuilderSectionCard } from './builder-section-card';
 import type { SectionOption } from './section-combobox';
 import type { DraftFieldErrorsApi } from './use-draft-field-errors';
@@ -13,13 +12,13 @@ import type { ProposalDraftApi } from './use-proposal-draft';
 export function BuilderSections({
   draft,
   seeMargin,
-  costItems,
+  hasPriceBook,
   sectionLibrary,
   cells,
 }: {
   draft: ProposalDraftApi;
   seeMargin: boolean;
-  costItems: CostItemOption[];
+  hasPriceBook: boolean;
   sectionLibrary: SectionOption[];
   cells: DraftFieldErrorsApi;
 }) {
@@ -33,7 +32,7 @@ export function BuilderSections({
           sectionIndex={sectionIndex}
           sectionTotal={draft.totals.sectionTotals[sectionIndex]}
           seeMargin={seeMargin}
-          costItems={costItems}
+          hasPriceBook={hasPriceBook}
           sectionLibrary={sectionLibrary}
           patchSection={draft.patchSection}
           patchLine={draft.patchLine}

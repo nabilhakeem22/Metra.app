@@ -28,7 +28,7 @@ export function BuilderSectionCard({
   sectionIndex,
   sectionTotal,
   seeMargin,
-  costItems,
+  hasPriceBook,
   sectionLibrary,
   patchSection,
   patchLine,
@@ -43,7 +43,7 @@ export function BuilderSectionCard({
   sectionIndex: number;
   sectionTotal: SectionTotals;
   seeMargin: boolean;
-  costItems: CostItemOption[];
+  hasPriceBook: boolean;
   sectionLibrary: SectionOption[];
   patchSection: (si: number, patch: Partial<SectionState>) => void;
   patchLine: (si: number, li: number, patch: Partial<LineState>) => void;
@@ -130,7 +130,7 @@ export function BuilderSectionCard({
         </div>
 
         <BuilderSectionFooter
-          costItems={costItems}
+          hasPriceBook={hasPriceBook}
           sections={sectionLibrary}
           onAddLine={(ci) => addLine(si, ci)}
           sectionSubtotal={sectionTotal.sectionSubtotal}

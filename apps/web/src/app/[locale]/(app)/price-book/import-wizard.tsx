@@ -11,15 +11,14 @@ import { useImportWizard } from './use-import-wizard';
 export interface ImportWizardProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  existingCodes: string[];
   sections: SectionOption[];
 }
 
 /** The price-book import: upload, map, preview, import (use-import-wizard.ts). */
-export function ImportWizard({ open, onOpenChange, existingCodes, sections }: ImportWizardProps) {
+export function ImportWizard({ open, onOpenChange, sections }: ImportWizardProps) {
   const t = useTranslations('priceBook');
   const th = useTranslations('hints.priceBook');
-  const wizard = useImportWizard({ existingCodes, sections });
+  const wizard = useImportWizard({ sections });
 
   function close() {
     onOpenChange(false);
@@ -58,6 +57,7 @@ export function ImportWizard({ open, onOpenChange, existingCodes, sections }: Im
               setField={wizard.setField}
               reset={wizard.reset}
               onPreview={wizard.onPreview}
+              pending={wizard.pending}
               errors={wizard.mapErrors}
             />
           )}

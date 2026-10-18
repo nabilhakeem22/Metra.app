@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { byName, hasEveryWord, nameIn, searchForm } from './name-order';
+import { byName, nameIn, searchForm } from './name-order';
 
 describe('name-order', () => {
   it('folds what studios type interchangeably', () => {
@@ -14,14 +14,6 @@ describe('name-order', () => {
     expect(searchForm('نحاس ۲ مم')).toBe('نحاس 2 مم');
     expect(searchForm('٠١٢٣٤٥٦٧٨٩')).toBe('0123456789');
     expect(searchForm('۰۱۲۳۴۵۶۷۸۹')).toBe('0123456789');
-  });
-
-  it('matches every typed word, in any order (P1)', () => {
-    const haystack = searchForm('أسلاك نحاس معزول 2 مم');
-    expect(hasEveryWord(haystack, searchForm('نحاس أسلاك'))).toBe(true);
-    expect(hasEveryWord(haystack, searchForm('2 مم معزول'))).toBe(true);
-    expect(hasEveryWord(haystack, searchForm('نحاس ألومنيوم'))).toBe(false);
-    expect(hasEveryWord(haystack, '')).toBe(true);
   });
 
   it('reads the name in the page language, the other one when empty', () => {

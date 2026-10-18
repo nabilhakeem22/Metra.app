@@ -1,9 +1,9 @@
-// What the builder's "From price book" picker lists: the studio's active items
-// grouped by price-book section, sections and items ordered by name in the
-// page's language, filtered by what is typed (name in either language, or
-// code). Pure and client-safe. Capped, so a book of 450+ items renders a short
-// list and asks for a few letters instead of drawing every row.
-import { byName, hasEveryWord, nameIn, searchForm } from '@/lib/price-book/name-order';
+// What the builder's "From price book" picker lists for one answer of the
+// server (lib/price-book/picker-query.ts): the items under their section, in
+// the order the server gave them (sections and items by name in the page's
+// language, items whose section the builder does not know last). Pure and
+// client-safe.
+import { nameIn } from '@/lib/price-book/name-order';
 import type { CostItemOption } from './builder-model';
 import type { SectionOption } from './section-combobox';
 
@@ -23,38 +23,20 @@ export interface PickerList {
   groups: PickerGroup[];
   /** How many items matched, shown or not. */
   matched: number;
-  /** How many matched items the cap left out. */
+  /** How many matched items the answer left out. */
   hidden: number;
 }
 
-export const PICKER_LIMIT = 60;
-
-function matches(item: CostItemOption, needle: string): boolean {
-  return needle === '' || hasEveryWord(searchForm(`${item.nameAr ?? ''} ${item.nameEn ?? ''} ${item.code}`), needle);
-}
-
-export function pickerList(items: readonly CostItemOption[], sections: readonly SectionOption[], locale: string, query: string): PickerList {
-  const needle = searchForm(query);
-  const order = byName(locale);
+export function pickerList(items: readonly CostItemOption[], sections: readonly SectionOption[], locale: string, matched: number): PickerList {
   const known = new Map(sections.map((section) => [section.id, section]));
-  const found = items.filter((item) => matches(item, needle));
-  const bySection = new Map<string | null, CostItemOption[]>();
-  for (const item of found) {
-    const key = item.sectionId !== null && known.has(item.sectionId) ? item.sectionId : null;
-    bySection.set(key, [...(bySection.get(key) ?? []), item]);
+  const groups: PickerGroup[] = [];
+  for (const item of items) {
+    const section = item.sectionId === null ? undefined : known.get(item.sectionId);
+    const sectionId = section?.id ?? null;
+    const entry = { item, name: nameIn(item, locale) || item.code };
+    const group = groups.find((candidate) => candidate.sectionId === sectionId);
+    if (group) group.entries.push(entry);
+    else groups.push({ sectionId, title: section ? nameIn(section, locale) : null, entries: [entry] });
   }
-  const orderedSections = [...known.values()].filter((section) => bySection.has(section.id)).sort(order);
-  const ordered: PickerGroup[] = [
-    ...orderedSections.map((section) => ({ sectionId: section.id, title: nameIn(section, locale), entries: [] as PickerEntry[] })),
-    ...(bySection.has(null) ? [{ sectionId: null, title: null, entries: [] as PickerEntry[] }] : []),
-  ];
-  let room = PICKER_LIMIT;
-  for (const group of ordered) {
-    const sorted = [...(bySection.get(group.sectionId) ?? [])].sort(order);
-    group.entries = sorted.slice(0, Math.max(room, 0)).map((item) => ({ item, name: nameIn(item, locale) || item.code }));
-    room -= group.entries.length;
-  }
-  const groups = ordered.filter((group) => group.entries.length > 0);
-  const shown = groups.reduce((sum, group) => sum + group.entries.length, 0);
-  return { groups, matched: found.length, hidden: found.length - shown };
+  return { groups, matched, hidden: Math.max(matched - items.length, 0) };
 }

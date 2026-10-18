@@ -3,19 +3,11 @@
 // (types + pure helpers only) so both the parent client component and its child
 // client components can import it.
 import { coerceMoneyInput, computeLine } from '@/lib/aggregates/proposal-totals';
+import type { PickerItem } from '@/lib/price-book/picker-types';
 import { normalizeDecimalInput } from '@/lib/validation/decimal-input';
 
-export interface CostItemOption {
-  id: string;
-  code: string;
-  /** Its price-book section, for the picker's grouping. */
-  sectionId: string | null;
-  nameEn: string | null;
-  nameAr: string | null;
-  unit: string;
-  defaultUnitCost: string;
-  defaultUnitPrice: string;
-}
+/** A price-book item a new line is copied from (the picker's answer, picker-types.ts). */
+export type CostItemOption = PickerItem;
 
 export interface LineState {
   /** This session's handle on the row, never sent: how a save's receipt finds

@@ -1,7 +1,9 @@
 import { act, fireEvent, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { messageAt, renderWithIntl, type TestLocale } from '@/test/render-with-intl';
+import { FIRST_VIEW } from '@/lib/price-book/page-params';
 import { PriceBookClient } from './price-book-client';
+import type { PriceBookPageData } from './types';
 
 // An empty price book offers the official market price book (the sign-up seed,
 // again) and says which happened: loaded, nothing new, the book still being
@@ -11,6 +13,7 @@ const priceBook = vi.hoisted(() => ({
   bulkUpdatePrices: vi.fn(),
   parseCostImport: vi.fn(),
   importCostItems: vi.fn(),
+  findExistingCostItemCodes: vi.fn(),
   setCostItemActive: vi.fn(),
   loadMarketPriceBook: vi.fn(),
   createCostItem: vi.fn(),
@@ -25,6 +28,9 @@ vi.mock('@/i18n/routing', async (importOriginal) => ({
   useRouter: () => ({ refresh: vi.fn(), push: vi.fn() }),
 }));
 
+/** A book with nothing in it at all (not a filter that matched nothing). */
+const EMPTY_BOOK: PriceBookPageData = { rows: [], sectionCounts: {}, matched: 0, page: 1, pageCount: 1, hasAnyItem: false };
+
 beforeEach(() => {
   priceBook.loadMarketPriceBook.mockReset();
   toast.mockReset();
@@ -33,7 +39,7 @@ beforeEach(() => {
 describe.each<TestLocale>(['en', 'ar-EG'])('the empty price book (%s)', (locale) => {
   async function load(data: { book: 'ready' | 'preparing' | 'unpublished'; sections: number; items: number }) {
     priceBook.loadMarketPriceBook.mockResolvedValue({ ok: true, data });
-    renderWithIntl(<PriceBookClient items={[]} sections={[]} canManage />, { locale });
+    renderWithIntl(<PriceBookClient view={FIRST_VIEW} book={EMPTY_BOOK} sections={[]} canManage />, { locale });
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: messageAt(locale, 'priceBook.empty.loadMarketBook') }));
     });
@@ -60,7 +66,7 @@ describe.each<TestLocale>(['en', 'ar-EG'])('the empty price book (%s)', (locale)
   });
 
   it('offers no load to a studio member who cannot manage the book', () => {
-    renderWithIntl(<PriceBookClient items={[]} sections={[]} canManage={false} />, { locale });
+    renderWithIntl(<PriceBookClient view={FIRST_VIEW} book={EMPTY_BOOK} sections={[]} canManage={false} />, { locale });
     expect(screen.queryByRole('button', { name: messageAt(locale, 'priceBook.empty.loadMarketBook') })).toBeNull();
   });
 });

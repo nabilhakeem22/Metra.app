@@ -16,6 +16,7 @@ import {
   type CostItemInput,
 } from './core';
 import type { ColumnMapping } from './import';
+import { findExistingCodesCore } from './import-existing';
 import {
   fileRefused,
   importCostItemsCore,
@@ -83,6 +84,14 @@ export async function parseCostImport(
   if (file.size > MAX_IMPORT_BYTES) return fileRefused('import_too_large');
   const bytes = new Uint8Array(await file.arrayBuffer());
   return parseCostImportCore(ctx, { bytes });
+}
+
+/** The import preview's question: which of these codes the book already has. */
+export async function findExistingCostItemCodes(
+  codes: string[],
+): Promise<ActionResult & { data?: string[] }> {
+  const ctx = await requireOrg();
+  return findExistingCodesCore(ctx, codes);
 }
 
 export async function importCostItems(input: {

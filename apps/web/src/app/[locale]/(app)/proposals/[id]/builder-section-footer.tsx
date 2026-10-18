@@ -10,12 +10,12 @@ import type { SectionOption } from './section-combobox';
 
 /** Under a section's lines: add a line (blank or from the price book) and the subtotal. */
 export function BuilderSectionFooter({
-  costItems,
+  hasPriceBook,
   sections,
   onAddLine,
   sectionSubtotal,
 }: {
-  costItems: CostItemOption[];
+  hasPriceBook: boolean;
   sections: SectionOption[];
   onAddLine: (costItem?: CostItemOption) => void;
   sectionSubtotal: string;
@@ -29,7 +29,7 @@ export function BuilderSectionFooter({
           <Plus className="size-4" aria-hidden />
           {t('builder.addLine')}
         </Button>
-        {costItems.length > 0 && <PriceBookPicker costItems={costItems} sections={sections} onPick={onAddLine} />}
+        {hasPriceBook && <PriceBookPicker sections={sections} onPick={onAddLine} />}
       </div>
       <span className="text-body font-medium">
         {t('builder.sectionSubtotal')}:{' '}

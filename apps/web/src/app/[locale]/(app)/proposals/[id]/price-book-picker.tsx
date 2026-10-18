@@ -5,28 +5,29 @@ import { useLocale, useTranslations } from 'next-intl';
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { formatNumber } from '@/lib/format/number';
+import { cn } from '@/lib/utils';
 import type { CostItemOption } from './builder-model';
 import { pickerList } from './price-book-picker-model';
 import { PriceBookPickerOption } from './price-book-picker-option';
+import { PriceBookPickerStatus } from './price-book-picker-status';
 import type { SectionOption } from './section-combobox';
+import { usePriceBookSearch } from './use-price-book-search';
 
 const optionIdOf = (listId: string, index: number) => `${listId}-option-${index}`;
 
 /**
  * "From price book": a light searchable list (no new dependency, like
- * SectionCombobox). Items read by NAME in the page's language, the code beside
- * it; grouped by price-book section; type to narrow by name or code (every
- * word, any order). Keyboard: the input keeps focus and names the active
- * option (aria-activedescendant), which scrolls into view; Enter picks; Escape
- * closes and returns focus to the button.
+ * SectionCombobox). Its items are asked of the server while it is open
+ * (use-price-book-search), never carried in the page. Items read by NAME in the
+ * page's language, the code beside it; grouped by price-book section; type to
+ * narrow by name or code (every word, any order). Keyboard: the input keeps
+ * focus and names the active option (aria-activedescendant), which scrolls into
+ * view; Enter picks; Escape closes and returns focus to the button.
  */
 export function PriceBookPicker({
-  costItems,
   sections,
   onPick,
 }: {
-  costItems: CostItemOption[];
   sections: SectionOption[];
   onPick: (costItem: CostItemOption) => void;
 }) {
@@ -38,7 +39,11 @@ export function PriceBookPicker({
   const rootRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const listId = useId();
-  const list = useMemo(() => pickerList(costItems, sections, locale, query), [costItems, sections, locale, query]);
+  const answer = usePriceBookSearch(open, query, locale);
+  const list = useMemo(
+    () => pickerList(answer.search?.items ?? [], sections, locale, answer.search?.matched ?? 0),
+    [answer.search, sections, locale],
+  );
   const flat = useMemo(() => list.groups.flatMap((group) => group.entries), [list]);
 
   useEffect(() => {
@@ -74,7 +79,8 @@ export function PriceBookPicker({
       setActive((index) => Math.max(index - 1, 0));
     } else if (e.key === 'Enter') {
       e.preventDefault();
-      if (flat[active]) pick(flat[active].item);
+      // An answer still on its way would pick from the list of what WAS typed.
+      if (!answer.stale && flat[active]) pick(flat[active].item);
     } else if (e.key === 'Escape') {
       e.preventDefault();
       close();
@@ -116,7 +122,13 @@ export function PriceBookPicker({
             }}
             onKeyDown={onKeyDown}
           />
-          <ul id={listId} role="listbox" aria-label={t('fromPriceBook')} className="mt-2 max-h-72 overflow-auto">
+          <ul
+            id={listId}
+            role="listbox"
+            aria-label={t('fromPriceBook')}
+            aria-busy={answer.stale}
+            className={cn('mt-2 max-h-72 overflow-auto', answer.stale && 'opacity-60')}
+          >
             {list.groups.map((group) => (
               <li key={group.sectionId ?? 'other'} role="presentation">
                 <p className="px-2 pb-1 pt-2 text-caption font-medium text-muted-foreground">{group.title ?? t('priceBookOther')}</p>
@@ -140,12 +152,7 @@ export function PriceBookPicker({
               </li>
             ))}
           </ul>
-          {list.matched === 0 && <p className="px-2 py-2 text-caption text-muted-foreground">{t('priceBookNothing')}</p>}
-          {list.hidden > 0 && (
-            <p className="px-2 pt-2 text-caption text-muted-foreground">
-              {t('priceBookMore', { count: list.hidden, shown: formatNumber(list.hidden, locale) })}
-            </p>
-          )}
+          <PriceBookPickerStatus answer={answer} matched={list.matched} hidden={list.hidden} />
         </div>
       )}
     </div>

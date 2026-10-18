@@ -1,12 +1,22 @@
 // The builder's "From price book" picker with a seeded book (450+ items): it
-// reads by name, groups by section, finds by name or code, and stays short.
-import { fireEvent, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+// asks the server for its items only when opened, reads by name, groups by
+// section, finds by name or code, and stays short. The server's SQL (search,
+// order, limit) is tested against Postgres in
+// tests/actions/price-book-search.dbtest.ts; here the server is a stand-in that
+// answers the same way.
+import { act, fireEvent, screen } from '@testing-library/react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { searchForm } from '@/lib/price-book/name-order';
+import { PICKER_LIMIT } from '@/lib/price-book/picker-types';
 import { messageAt, renderWithIntl } from '@/test/render-with-intl';
 import type { CostItemOption } from './builder-model';
 import { PriceBookPicker } from './price-book-picker';
-import { PICKER_LIMIT, pickerList } from './price-book-picker-model';
+import { pickerList } from './price-book-picker-model';
 import type { SectionOption } from './section-combobox';
+import { PICKER_PAUSE_MS } from './use-price-book-search';
+
+const server = vi.hoisted(() => ({ searchPriceBookPicker: vi.fn() }));
+vi.mock('@/lib/price-book/picker-actions', () => server);
 
 const SECTIONS: SectionOption[] = [
   { id: 'glass', nameEn: 'Glass', nameAr: 'الزجاج' },
@@ -20,72 +30,112 @@ function option(id: string, overrides: Partial<CostItemOption> = {}): CostItemOp
 const OWN = option('own', { code: 'SEED-A-001', sectionId: 'civil', nameEn: 'Wardrobe', nameAr: 'دولاب' });
 const SEEDED = Array.from({ length: 450 }, (_, index) => option(`s${String(index).padStart(3, '0')}`));
 const WIRE = option('wire', { nameAr: 'أسلاك نحاس معزول 2 مم', nameEn: 'Insulated copper wire 2 mm' });
-const BOOK = [...SEEDED, OWN, WIRE, option('pp', { nameAr: 'مواسير بولى بروبلين', nameEn: 'PP pipe' }), option('lost', { sectionId: 'gone', nameEn: 'Orphan', nameAr: 'يتيم' })];
+const BOOK = [OWN, ...SEEDED, WIRE, option('pp', { nameAr: 'مواسير بولى بروبلين', nameEn: 'PP pipe' })];
+
+/** The server's answer as picker-query.ts gives it: every word, in the book's order, at most PICKER_LIMIT. */
+function answerFor(query: string) {
+  const words = searchForm(query).split(' ').filter(Boolean);
+  const found = BOOK.filter((item) => words.every((word) => searchForm(`${item.code} ${item.nameEn} ${item.nameAr}`).includes(word)));
+  return { ok: true, data: { items: found.slice(0, PICKER_LIMIT), matched: found.length } };
+}
+
+beforeEach(() => {
+  server.searchPriceBookPicker.mockReset();
+  server.searchPriceBookPicker.mockImplementation(async (query: string) => answerFor(query));
+});
 
 describe('pickerList', () => {
-  it('groups by section, sections and items ordered by name, items without a known section last', () => {
-    const list = pickerList([OWN, option('b', { nameEn: 'Beta' }), option('a', { nameEn: 'Alpha' }), BOOK[BOOK.length - 1]], SECTIONS, 'en', '');
+  it('keeps the server order under section headings, items whose section the builder does not know last', () => {
+    const list = pickerList([OWN, option('a', { nameEn: 'Alpha' }), option('b', { nameEn: 'Beta' }), option('lost', { sectionId: null })], SECTIONS, 'en', 4);
     expect(list.groups.map((group) => group.title)).toEqual(['Civil', 'Glass', null]);
     expect(list.groups[1].entries.map((entry) => entry.name)).toEqual(['Alpha', 'Beta']);
   });
 
-  it('finds by the name in either language, Arabic spellings folded, and by the code', () => {
-    expect(pickerList(BOOK, SECTIONS, 'ar-EG', 'بولي').groups.flatMap((group) => group.entries.map((entry) => entry.item.id))).toEqual(['pp']);
-    expect(pickerList(BOOK, SECTIONS, 'en', 'wardrobe').matched).toBe(1);
-    expect(pickerList(BOOK, SECTIONS, 'en', 'seed-a-001').matched).toBe(1);
-  });
-
-  it('lists at most PICKER_LIMIT rows and says how many more matched', () => {
-    const list = pickerList(BOOK, SECTIONS, 'en', '');
-    const shown = list.groups.reduce((sum, group) => sum + group.entries.length, 0);
-    expect(shown).toBe(PICKER_LIMIT);
-    expect(list.hidden).toBe(BOOK.length - PICKER_LIMIT);
+  it('says how many matches the answer left out', () => {
+    const list = pickerList(SEEDED.slice(0, PICKER_LIMIT), SECTIONS, 'en', 452);
+    expect(list.matched).toBe(452);
+    expect(list.hidden).toBe(452 - PICKER_LIMIT);
   });
 });
 
 describe('PriceBookPicker', () => {
-  function open(locale: 'ar-EG' | 'en' = 'ar-EG') {
+  async function open(locale: 'ar-EG' | 'en' = 'ar-EG') {
     const onPick = vi.fn();
-    renderWithIntl(<PriceBookPicker costItems={BOOK} sections={SECTIONS} onPick={onPick} />, { locale });
+    renderWithIntl(<PriceBookPicker sections={SECTIONS} onPick={onPick} />, { locale });
+    expect(server.searchPriceBookPicker).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole('button', { name: messageAt(locale, 'proposals.builder.fromPriceBook') }));
+    expect(screen.getByRole('status').textContent).toBe(messageAt(locale, 'proposals.builder.priceBookLoading'));
+    await screen.findAllByRole('option');
     return onPick;
   }
 
-  it('shows names first in the page language with the code beside them, under section headings', () => {
-    open('ar-EG');
-    const first = screen.getAllByRole('option')[0];
-    expect(first.textContent).toBe('دولابSEED-A-001');
+  async function type(text: string) {
+    fireEvent.change(screen.getByRole('combobox'), { target: { value: text } });
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, PICKER_PAUSE_MS + 50));
+    });
+  }
+
+  it('asks the server only when opened, then shows names first with the code beside them, under section headings', async () => {
+    await open('ar-EG');
+    expect(server.searchPriceBookPicker).toHaveBeenCalledWith('', 'ar-EG');
+    expect(screen.getAllByRole('option')[0].textContent).toBe('دولابSEED-A-001');
     expect(screen.getByText('أعمال مدنية')).toBeTruthy();
     expect(screen.getAllByRole('option')).toHaveLength(PICKER_LIMIT);
   });
 
-  it('narrows as the studio types a name, and Enter adds the item', () => {
-    const onPick = open('en');
-    fireEvent.change(screen.getByRole('combobox'), { target: { value: 'wardr' } });
+  it('narrows as the studio types a name, and Enter adds the item', async () => {
+    const onPick = await open('en');
+    await type('wardr');
     expect(screen.getAllByRole('option')).toHaveLength(1);
     fireEvent.keyDown(screen.getByRole('combobox'), { key: 'Enter' });
     expect(onPick).toHaveBeenCalledWith(OWN);
   });
 
-  it('says so when nothing matches', () => {
-    open('en');
-    fireEvent.change(screen.getByRole('combobox'), { target: { value: 'zzzz' } });
+  it('Enter while the answer for what was just typed is on its way picks nothing', async () => {
+    const onPick = await open('en');
+    fireEvent.change(screen.getByRole('combobox'), { target: { value: 'wardr' } });
+    fireEvent.keyDown(screen.getByRole('combobox'), { key: 'Enter' });
+    expect(onPick).not.toHaveBeenCalled();
+    await type('wardr');
+    fireEvent.keyDown(screen.getByRole('combobox'), { key: 'Enter' });
+    expect(onPick).toHaveBeenCalledWith(OWN);
+  });
+
+  it('says so when nothing matches', async () => {
+    await open('en');
+    await type('zzzz');
     expect(screen.queryAllByRole('option')).toHaveLength(0);
     expect(screen.getByText(messageAt('en', 'proposals.builder.priceBookNothing'))).toBeTruthy();
   });
 
-  it('finds an item typed with Arabic-Indic digits and the words in another order (P1)', () => {
-    open('ar-EG');
+  it('finds an item typed with Arabic-Indic digits and the words in another order (P1)', async () => {
+    await open('ar-EG');
     for (const typed of ['نحاس معزول ٢ مم', 'نحاس ۲', 'معزول أسلاك']) {
-      fireEvent.change(screen.getByRole('combobox'), { target: { value: typed } });
+      await type(typed);
       expect(screen.getAllByRole('option').map((row) => row.textContent)).toEqual([`${WIRE.nameAr}${WIRE.code}`]);
     }
   });
 
-  it('counts the rows it does not show in Latin digits, in Arabic too (Digits)', () => {
-    open('ar-EG');
+  it('counts the rows it does not show in Latin digits, in Arabic too (Digits)', async () => {
+    await open('ar-EG');
     const hidden = String(BOOK.length - PICKER_LIMIT);
     const more = screen.getByText((text, element) => element?.tagName === 'P' && text.includes(hidden));
     expect(more.textContent).not.toMatch(/[٠-٩۰-۹]/);
+  });
+
+  it('reuses an answer for a search it already asked, folded («بولى» is «بولي»)', async () => {
+    await open('ar-EG');
+    await type('بولى');
+    await type('');
+    await type('بولي');
+    expect(server.searchPriceBookPicker.mock.calls.map(([query]) => query)).toEqual(['', 'بولي']);
+  });
+
+  it('says why when the server cannot answer, with the reference', async () => {
+    server.searchPriceBookPicker.mockResolvedValue({ ok: false, error: 'generic', reference: 'PB-7Q2' });
+    renderWithIntl(<PriceBookPicker sections={SECTIONS} onPick={vi.fn()} />, { locale: 'en' });
+    fireEvent.click(screen.getByRole('button', { name: messageAt('en', 'proposals.builder.fromPriceBook') }));
+    expect((await screen.findByRole('alert')).textContent).toContain('PB-7Q2');
   });
 });

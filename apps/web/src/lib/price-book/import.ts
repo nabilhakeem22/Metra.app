@@ -138,6 +138,11 @@ function cell(row: string[], i: number | undefined): string {
   return typeof v === 'string' ? v.trim() : '';
 }
 
+/** The codes a sheet carries under its mapping, as validateImportRows reads them (blank cells left out). */
+export function importedCodes(rows: string[][], mapping: ColumnMapping): string[] {
+  return rows.map((row) => cell(row, mapping.code)).filter((code) => code !== '');
+}
+
 // A cost/price cell in an imported price-book sheet. Comma-as-thousands is
 // accepted and stripped; an ambiguous separator ("1,5", "1.234,56", "1,2,3") is
 // REFUSED and the row becomes cost_invalid/price_invalid rather than silently

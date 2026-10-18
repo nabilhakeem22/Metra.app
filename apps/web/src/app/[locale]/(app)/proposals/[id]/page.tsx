@@ -3,9 +3,9 @@ import { notFound, redirect } from 'next/navigation';
 import { PageHeader } from '@/components/ui/page-header';
 import { requireOrg } from '@/lib/auth/require-org';
 import { getEngagementBoqReleasable } from '@/lib/engagements/queries';
-import { listCostItems } from '@/lib/price-book/queries';
 import { resolveSeeMargin } from '@/lib/org/queries';
 import { can } from '@/lib/permissions/can';
+import { hasActiveCostItem } from '@/lib/price-book/picker-query';
 import { getProposalWithLines } from '@/lib/proposals/queries';
 import { listSections } from '@/lib/sections/queries';
 import { formatProposalNumber, proposalYear } from '@/lib/format/proposal-number';
@@ -27,7 +27,8 @@ export default async function ProposalBuilderPage({
   if (detail.status !== 'draft') redirect(`/proposals/${id}/view`);
 
   const t = await getTranslations('proposals');
-  const costItems = await listCostItems(ctx, { active: true });
+  // The picker asks for its items when it opens; the page only says there are any.
+  const hasPriceBook = await hasActiveCostItem(ctx);
   const sectionLibrary = await listSections(ctx);
 
   // BOQ mode is decided HERE, from the row, never from the URL. Its Q- number is
@@ -56,16 +57,7 @@ export default async function ProposalBuilderPage({
         boqMode={boqMode}
         canSend={can(ctx.role, 'proposals_send', 'approve')}
         seeMargin={seeMargin}
-        costItems={costItems.map((c) => ({
-          id: c.id,
-          code: c.code,
-          sectionId: c.sectionId,
-          nameEn: c.nameEn,
-          nameAr: c.nameAr,
-          unit: c.unit,
-          defaultUnitCost: c.defaultUnitCost,
-          defaultUnitPrice: c.defaultUnitPrice,
-        }))}
+        hasPriceBook={hasPriceBook}
         sectionLibrary={sectionLibrary.map((s) => ({
           id: s.id,
           nameEn: s.nameEn,

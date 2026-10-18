@@ -6,8 +6,8 @@ import { useFieldErrors } from '@/hooks/use-field-errors';
 import { toast } from '@/hooks/use-toast';
 import type { FieldErrors } from '@/lib/actions/field-errors';
 import { invariant } from '@/lib/actions/invariant';
-import { importCostItems, parseCostImport } from '@/lib/price-book/actions';
-import { validateImportRows, type ColumnMapping, type ValidatedRow } from '@/lib/price-book/import';
+import { findExistingCostItemCodes, importCostItems, parseCostImport } from '@/lib/price-book/actions';
+import { importedCodes, validateImportRows, type ColumnMapping, type ValidatedRow } from '@/lib/price-book/import';
 import { guessMapping } from './import-wizard-guess';
 import { REQUIRED, type FieldKey } from './import-wizard-fields';
 import type { SectionOption } from './types';
@@ -28,10 +28,11 @@ function unmappedRequired(mapping: ColumnMapping): FieldErrors<FieldKey> {
 /**
  * The price-book import, step by step: read the file (a refusal of it is said
  * under the file box), map its columns (Preview says which required column is
- * still unmapped, under that column), preview, import (a failure is said above
- * the buttons by its cause).
+ * still unmapped, under that column), preview (which codes the book already has
+ * is asked of the server then: the page holds one page of the book), import (a
+ * failure is said above the buttons by its cause).
  */
-export function useImportWizard(options: { existingCodes: string[]; sections: SectionOption[] }) {
+export function useImportWizard(options: { sections: SectionOption[] }) {
   const t = useTranslations('priceBook');
   const te = useTranslations('errors');
   const [step, setStep] = useState<ImportStep>('upload');
@@ -43,7 +44,7 @@ export function useImportWizard(options: { existingCodes: string[]; sections: Se
   const mapErrors = useFieldErrors({ fields: REQUIRED, translate: te });
 
   // Case-SENSITIVE, matching the DB unique(org_id, code).
-  const existing = useMemo(() => new Set(options.existingCodes), [options.existingCodes]);
+  const [existing, setExisting] = useState<Set<string>>(new Set());
   const preview: ValidatedRow[] = useMemo(() => {
     if (step !== 'preview' || !mapping) return [];
     return validateImportRows(data, mapping, existing, options.sections);
@@ -82,7 +83,18 @@ export function useImportWizard(options: { existingCodes: string[]; sections: Se
   }
 
   function onPreview() {
-    if (mapping && !mapErrors.applyLocal(unmappedRequired(mapping))) setStep('preview');
+    if (!mapping || mapErrors.applyLocal(unmappedRequired(mapping))) return;
+    startTransition(async () => {
+      try {
+        const res = await findExistingCostItemCodes(importedCodes(data, mapping));
+        if (mapErrors.applyResult(res)) return;
+        invariant(res.data, 'findExistingCostItemCodes answered ok without codes');
+        setExisting(new Set(res.data));
+        setStep('preview');
+      } catch (rejection) {
+        mapErrors.applyRejection(rejection);
+      }
+    });
   }
 
   function runImport(onDone: () => void) {
