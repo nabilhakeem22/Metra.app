@@ -2584,17 +2584,20 @@ validated on branch `validate/market-seed-on-signup`.
 
 **THE ORDER (do not change it):**
 
-1. **The database goes first**, from the branch (steps 1 to 4 below), while
+1. **The database goes first**, from the branch (steps 1 to 4 below): the
+   table, its RLS, and the seed book built from what is published, while
    production still runs the current `main`.
-2. **Then** the branch is merged to `main` and deployed, and you build the
-   seed book and run the smoke test (step 5).
+2. **Then** the branch is merged to `main` and deployed, and you run the
+   smoke test (step 5).
 
 Why this order, one sentence each:
 
-- **The new code needs 0062:** the sign-up seed and the empty price book's
-  button read `market_seed_book`; without it the seed fails with 42P01. A
-  sign-up still succeeds (the seed is a separate request, and its failure is
-  one log line with a reference), but the button answers with an error.
+- **The new code needs 0062, with the book built:** the sign-up seed (`POST
+  /api/price-book/market-seed`) and the empty price book's button read
+  `market_seed_book`; without the table they fail with 42P01, and with the
+  table still empty a new studio gets nothing and the button says the book
+  is being prepared. A sign-up itself always succeeds (the seed is a separate
+  request, and its failure is one log line with a reference).
 - **The current Worker is safe on the 0062 database:** 0062 only adds a table
   nobody reads yet.
 - **There is no rollback floor:** the table is derived data; any Worker
@@ -2609,8 +2612,9 @@ Why this order, one sentence each:
 | `rls/roles.sql` | `metra_app` gets SELECT on it and nothing else |
 
 Who writes it: `market:publish` and `market:withdraw` rebuild it whole in
-their own transaction, and every REAL `market:seed-price-books` run (not a dry
-run) rebuilds it under the market write lock before it seeds. The app only
+their own transaction; `market:rebuild-seed-book` rebuilds it and seeds no
+studio (step 3); and every REAL `market:seed-price-books` run (not a dry run)
+rebuilds it under the market write lock before it seeds. The app only
 reads it. A seed writes each item BY REFERENCE to it (its names and prices are
 taken from the book), so a seed holds the book steady while it runs: the app's
 for the length of one studio's transaction, a real CLI run until it ends. A
@@ -2625,7 +2629,7 @@ cd C:\Users\HP\merta-main
 git fetch origin
 git switch --detach origin/validate/market-seed-on-signup
 git log --oneline -1    # a "docs(deploy): ..." commit (this runbook); CI green on it
-git diff --stat 5623727f HEAD    # MUST list only docs/DEPLOY.md: the code is exactly what was rehearsed (5623727f)
+git diff --stat a01ffb84 HEAD    # MUST list only docs/DEPLOY.md: the code is exactly what was rehearsed (a01ffb84)
 ```
 
 If the diff lists any other file, STOP and tell the lead.
@@ -2648,19 +2652,26 @@ select count(*) as seed_book from pg_class c join pg_namespace n on n.oid = c.re
  where n.nspname = 'public' and c.relname = 'market_seed_book';
 ```
 
-**3. Migrate, then apply RLS, then prove it landed.** From
-`C:\Users\HP\merta-main`:
+**3. Migrate, apply RLS, prove it landed, then build the seed book.** From
+`C:\Users\HP\merta-main`, in a PowerShell window where you also set
+`$env:MARKET_DATABASE_URL` as in *Monthly market bulletin* (the direct or
+session-pooler connection, never the `:6543` transaction pooler):
 
 ```powershell
 npm run db:migrate
 npm run db:apply-rls
 npm run assert-schema-applied -w @metra/db
+npm run market:rebuild-seed-book
 ```
 
 Expect `Migrations applied.`, then `apply-rls: verified in the catalogues — 52
 tables, 52 policies, 15 triggers, 44 functions, ...` and a `grants verified`
 line naming 11 narrowed tables (`market_seed_book` among them), then
-`assert-schema-applied: OK — 52 declared table(s), every column present.`
+`assert-schema-applied: OK — 52 declared table(s), every column present.`,
+then `market:rebuild-seed-book: the seed book holds 456 published market
+item(s); no studio was seeded` (456 with July 2026 published; 0 with no
+bulletin, and the first `market:publish` builds it). It writes the book only:
+no studio row, ever.
 
 **4. Read-only, after.** Each block ON ITS OWN.
 
@@ -2668,10 +2679,11 @@ line naming 11 narrowed tables (`market_seed_book` among them), then
 (a) again.
 
 (b) One row: `rls` true, `forced` true, `policies` 1, `app_select` true,
-`app_writes` false, `api_roles_read` false, `entries` 0.
+`app_writes` false, `api_roles_read` false, `entries` the number step 3
+printed (456 for July 2026).
 
 ```sql
--- 0062 step 4 (b): the seed book's RLS and grants, and that it is empty. Run this one alone.
+-- 0062 step 4 (b): the seed book's RLS and grants, and its size. Run this one alone.
 select c.relrowsecurity as rls, c.relforcerowsecurity as forced,
        (select count(*) from pg_policies p where p.schemaname = 'public' and p.tablename = c.relname) as policies,
        has_table_privilege('metra_app', c.oid, 'select') as app_select,
@@ -2684,27 +2696,18 @@ from pg_class c join pg_namespace n on n.oid = c.relnamespace
 where n.nspname = 'public' and c.relname = 'market_seed_book';
 ```
 
-**5. Afterwards: merge, build the seed book, smoke test.**
+**5. Afterwards: merge, smoke test.**
 
 1. **Stop and do not merge** if any output in steps 3 or 4 differs from what
    is written there. Tell the lead what you saw instead.
 2. Tell the lead the database step is done; the lead merges and the Deploy
    workflow deploys.
-3. **Build the seed book**, only if a bulletin is already published (with
-   none, the first `market:publish` builds it, and until then a new studio
-   simply starts with an empty price book). From the production checkout on
-   an up-to-date `main`, with `$env:MARKET_DATABASE_URL` set as in *Monthly
-   market bulletin*, run the dry run and then the real run of *Seeding studio
-   price books from the market book* below. The real run stores the seed
-   book; studios it seeded before get `created 0`. Then, read-only:
-   `select count(*) from market_seed_book;` equals the dry run's `published
-   market item(s)` (456 for July 2026).
-4. Smoke test, with the log open (`npx wrangler tail metra-web` from
+3. Smoke test, with the log open (`npx wrangler tail metra-web` from
    `C:\Users\HP\merta-main\apps\web`): sign up a test studio with a second
    email address. Its price book lists the market items within a few
    seconds (a reload may be needed), and the log shows no `42P01`, `42501` or
    `mutateInOrg failed` line. Tell the lead which test studio to remove.
-5. Put the production checkout back on main (`git switch --detach
+4. Put the production checkout back on main (`git switch --detach
    origin/main` after a fetch).
 
 **Undo, if ever needed.**
@@ -2830,9 +2833,10 @@ or withdraw transaction can never stay open longer than 300 s (the
 
 ## Seeding studio price books from the market book
 
-An owner step, once the branch carrying it is merged: it fills every studio's
-price book (or the `--org` ones) from the PUBLISHED market book, before the
-studio market screens exist. Run it from the production checkout on an
+An owner step, once the branch carrying it is merged: it fills the price books
+of the studios you name with `--org` from the PUBLISHED market book (a new
+studio gets it at sign-up on its own: *0062 and the market price book at
+sign-up*). Run it from the production checkout on an
 up-to-date `main`, in a PowerShell window where you set
 `$env:MARKET_DATABASE_URL` (as in *Monthly market bulletin*; the command reads
 nothing else).
@@ -2901,18 +2905,16 @@ studio "Org B Fit-out" (00000000-0000-4000-8000-00000000000b)
 totals: sections to create 110, items to create 894, studios failed 0
 ```
 
-Check each studio's line before going on. A studio you do not want seeded (a
-test studio, say) is left out by naming the others with `--org <id>` (repeat
-it), e.g. try one first:
+Check each studio's line before going on, and note the ids of the studios to
+seed: a real run ALWAYS names them.
+
+**2. The real run, for the studios you named.** Never run it without
+`--org`: a bare real run seeds EVERY studio, test studios included. Try one
+first, then the rest (repeat `--org`):
 
 ```powershell
 npm run market:seed-price-books -- --org <studio id>
-```
-
-**2. The real run.**
-
-```powershell
-npm run market:seed-price-books
+npm run market:seed-price-books -- --org <studio id> --org <studio id>
 ```
 
 The same lines with `created` in place of `to create`. Before it seeds, a
