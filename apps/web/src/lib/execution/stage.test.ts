@@ -16,6 +16,9 @@ function contract(overrides: Partial<ExecutionContractFacts> = {}): ExecutionCon
     pendingClaimCount: 0,
     unbilledVariationCount: 0,
     finalAccountOutstanding: null,
+    unpaidRequestCount: 1,
+    openVariationCount: 0,
+    finalAccountBalance: '4960.0000',
     ...overrides,
   };
 }
@@ -38,6 +41,7 @@ const situations: Record<string, ExecutionFacts> = {
   'final account outstanding': withContract({ finalAccountOutstanding: '4960.0000' }),
   'final account with a claim': withContract({ finalAccountOutstanding: '4960.0000', pendingClaimCount: 1 }),
   'final account paid': withContract({ finalAccountOutstanding: '0.0000' }),
+  'everything paid, nothing left to bill': withContract({ unpaidRequestCount: 0, finalAccountBalance: '0.0000' }),
   terminated: withContract({ status: 'terminated', finalAccountOutstanding: '4960.0000' }),
 };
 
@@ -75,6 +79,7 @@ describe('executionStage', () => {
     ['final account outstanding', 'final_account', 'record_payment'],
     ['final account with a claim', 'final_account', 'review_payment_claim'],
     ['final account paid', 'settled', null],
+    ['everything paid, nothing left to bill', 'settled', null],
     ['terminated', 'terminated', null],
   ] as const)('%s -> %s, next %s', (situation, stage, next) => {
     expect(executionStage(situations[situation])).toEqual({ stage, next });
@@ -89,5 +94,32 @@ describe('executionStage', () => {
     for (const overrides of [{}, { scheduleValid: false }, { pendingClaimCount: 3 }, { finalAccountOutstanding: '0' }]) {
       expect(executionStage(withContract({ ...overrides, status: 'terminated' })).stage).toBe('terminated');
     }
+  });
+
+  describe('settling without a final account request', () => {
+    const paidUp = { unpaidRequestCount: 0, openVariationCount: 0, pendingClaimCount: 0, finalAccountBalance: '0' };
+
+    it('settles when everything is paid and the balance is zero or below', () => {
+      expect(executionStage(withContract(paidUp)).stage).toBe('settled');
+      expect(executionStage(withContract({ ...paidUp, finalAccountBalance: '-2480.0000' }))).toEqual({
+        stage: 'settled',
+        next: null,
+      });
+    });
+
+    it.each([
+      ['a request is still unpaid', { unpaidRequestCount: 1 }, 'prepare_final_account'],
+      ['a change order is open', { openVariationCount: 1 }, 'prepare_final_account'],
+      ['a claim is pending', { pendingClaimCount: 1 }, 'review_payment_claim'],
+      ['a final account would still bill', { finalAccountBalance: '0.0001' }, 'prepare_final_account'],
+    ] as const)('stays in progress when %s', (_reason, overrides, next) => {
+      expect(executionStage(withContract({ ...paidUp, ...overrides }))).toEqual({ stage: 'in_progress', next });
+    });
+
+    it('an issued final account request still decides on its own outstanding', () => {
+      const issued = { ...paidUp, finalAccountBalance: '0' };
+      expect(executionStage(withContract({ ...issued, finalAccountOutstanding: '100' })).stage).toBe('final_account');
+      expect(executionStage(withContract({ ...issued, finalAccountOutstanding: '0' })).stage).toBe('settled');
+    });
   });
 });

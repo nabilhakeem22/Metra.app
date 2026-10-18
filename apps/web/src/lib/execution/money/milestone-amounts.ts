@@ -6,6 +6,7 @@
 // Every row but the last rounds half away from zero (`pctOf`, or a share of
 // the VAT for an amount row); the LAST row takes the remainder, so the rows
 // add up to the contract value and its VAT exactly, to the piastre.
+import { invariant } from '@/lib/actions/invariant';
 import { formatMoney4, parseMoney4, pctOf } from '@/lib/aggregates/proposal-totals';
 import type { CleanScheduleRow } from './schedule';
 
@@ -14,9 +15,11 @@ export interface MilestoneAmount {
   taxAmount: string;
 }
 
-/** round(total x part / whole), half away from zero; all three are >= 0. */
+/** round(total x part / whole), half up. A negative figure is a caller's bug:
+ *  the rounding below is only right for non-negative ones, so it throws. */
 function proportionalShare(total4: bigint, part4: bigint, whole4: bigint): bigint {
-  if (whole4 <= 0n) return 0n;
+  invariant(total4 >= 0n && part4 >= 0n && whole4 >= 0n, 'proportionalShare: negative input');
+  if (whole4 === 0n) return 0n;
   return (2n * total4 * part4 + whole4) / (2n * whole4);
 }
 

@@ -100,4 +100,19 @@ describe('validateSchedule', () => {
     const result = validateSchedule(rows, '1000');
     expect(result.ok && result.rows[0]).toMatchObject({ labelAr: null, labelEn: 'On handover' });
   });
+
+  it('refuses a contract value too small for its split: some row would bill nothing', () => {
+    // 50% of 0.0001 rounds to 0.0001, leaving 0 for the last row.
+    expect(validateSchedule(percentRows('50', '50'), '0.0001')).toEqual({
+      ok: false,
+      errors: { milestones: { code: 'out_of_range', params: { min: '0.0001', max: '0.0001' } } },
+    });
+    // Two thirds round up to 0.0001 each and leave nothing for the third.
+    expect(validateSchedule(percentRows('33.33', '33.33', '33.34'), '0.0002').ok).toBe(false);
+  });
+
+  it('accepts the same split once every row bills at least a piastre fraction', () => {
+    expect(validateSchedule(percentRows('50', '50'), '0.0002').ok).toBe(true);
+    expect(validateSchedule(percentRows('33.33', '33.33', '33.34'), '0.0003').ok).toBe(true);
+  });
 });

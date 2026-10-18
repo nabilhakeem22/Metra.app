@@ -10,12 +10,15 @@ import { formatMoney4, parseMoney4 } from '@/lib/aggregates/proposal-totals';
 import { readMoneyField } from '@/lib/validation/field-rules';
 import { clean } from '@/lib/validation/text';
 import { boundedText, requiredText } from '@/lib/validation/text-field-rules';
+import { milestoneAmounts } from './milestone-amounts';
 
 export const MAX_SCHEDULE_ROWS = 12;
 export const MAX_SCHEDULE_LABEL_CHARS = 80;
 
 /** The smallest row a schedule takes: one piastre, or 0.01 percent. */
 const MIN_ROW_VALUE = '0.01';
+/** The smallest amount a payment request can carry (its CHECK is amount > 0). */
+const MIN_ROW_AMOUNT = '0.0001';
 const HUNDRED_PERCENT_4 = parseMoney4('100');
 
 /** One row as the studio typed it. */
@@ -82,8 +85,9 @@ function shapeError(rows: ScheduleRowInput[]): FieldError | null {
  * Validate a whole schedule against the contract value. Errors sit under
  * `milestones.{i}.label`, `milestones.{i}.value` (every bad row at once), or
  * `milestones` for the schedule as a whole: no rows, more than 12, a mixed
- * basis, or rows that do not add up (`schedule_sum_mismatch`, params
- * {expected, actual}).
+ * basis, rows that do not add up (`schedule_sum_mismatch`, params
+ * {expected, actual}), or a contract value too small for the split
+ * (`out_of_range`, params {min, max}: some row would bill 0 or less).
  */
 export function validateSchedule(rows: ScheduleRowInput[], originalValue: string): ScheduleValidation {
   const shape = shapeError(rows);
@@ -107,14 +111,25 @@ export function validateSchedule(rows: ScheduleRowInput[], originalValue: string
     const params = { expected: plainDecimal(target4), actual: plainDecimal(sum4) };
     return { ok: false, errors: { milestones: { code: 'schedule_sum_mismatch', params } } };
   }
-  return {
-    ok: true,
-    rows: rows.map((row, index) => ({
-      labelAr: clean(row.labelAr),
-      labelEn: clean(row.labelEn),
-      basis: row.basis,
-      value: formatMoney4(clean4[index]),
-      sortOrder: index,
-    })),
-  };
+  const cleanRows = rows.map((row, index) => ({
+    labelAr: clean(row.labelAr),
+    labelEn: clean(row.labelEn),
+    basis: row.basis,
+    value: formatMoney4(clean4[index]),
+    sortOrder: index,
+  }));
+  if (billsNothingOnSomeRow(cleanRows, originalValue)) {
+    const params = { min: MIN_ROW_AMOUNT, max: plainDecimal(parseMoney4(originalValue)) };
+    return { ok: false, errors: { milestones: { code: 'out_of_range', params } } };
+  }
+  return { ok: true, rows: cleanRows };
+}
+
+/**
+ * A contract value too small for its split: once rounded, some row would
+ * request 0 or less, which no payment request can carry. Read with the SAME
+ * `milestoneAmounts` the requests are issued with (the VAT does not move it).
+ */
+function billsNothingOnSomeRow(rows: CleanScheduleRow[], originalValue: string): boolean {
+  return milestoneAmounts(rows, originalValue, '0').some((row) => parseMoney4(row.amount) <= 0n);
 }

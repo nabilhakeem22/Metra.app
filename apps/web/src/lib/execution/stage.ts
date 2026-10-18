@@ -2,7 +2,9 @@
 // A21): the design machine ends at `execution`, and everything after it hangs
 // off the BOQ contract. PURE and CLIENT-SAFE, so the cockpit card and its test
 // read one rule. Each live stage has exactly one next action; a settled or a
-// terminated contract has none left.
+// terminated contract has none left. A contract settles when its final account
+// request is paid, or with no final account at all when everything requested
+// is paid and a final account would bill nothing.
 import type { ContractStatus } from '@metra/db';
 import { parseMoney4 } from '@/lib/aggregates/proposal-totals';
 
@@ -46,6 +48,12 @@ export interface ExecutionContractFacts {
   unbilledVariationCount: number;
   /** What is still due on the issued final account request; null when none is issued. */
   finalAccountOutstanding: string | null;
+  /** Issued requests with something still due on them. */
+  unpaidRequestCount: number;
+  /** Change orders still awaiting a decision (internal_approved or issued). */
+  openVariationCount: number;
+  /** `computeFinalAccount(...).balance`: what a final account would still bill. */
+  finalAccountBalance: string;
 }
 
 export interface ExecutionFacts {
@@ -67,8 +75,23 @@ function inProgressNext(contract: ExecutionContractFacts): ExecutionNextAction {
   return 'prepare_final_account';
 }
 
+/**
+ * Settled with no final account request: everything requested is paid,
+ * nothing is waiting on the client or on a change order, and a final account
+ * would have nothing left to bill.
+ */
+function settledWithoutFinalAccount(contract: ExecutionContractFacts): boolean {
+  return (
+    contract.unpaidRequestCount === 0 &&
+    contract.openVariationCount === 0 &&
+    contract.pendingClaimCount === 0 &&
+    parseMoney4(contract.finalAccountBalance) <= 0n
+  );
+}
+
 function signedStage(contract: ExecutionContractFacts): ExecutionStageResult {
   if (contract.finalAccountOutstanding === null) {
+    if (settledWithoutFinalAccount(contract)) return { stage: 'settled', next: null };
     return { stage: 'in_progress', next: inProgressNext(contract) };
   }
   if (parseMoney4(contract.finalAccountOutstanding) <= 0n) return { stage: 'settled', next: null };

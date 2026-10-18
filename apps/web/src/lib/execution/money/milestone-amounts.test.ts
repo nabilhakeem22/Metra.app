@@ -56,4 +56,13 @@ describe('milestoneAmounts', () => {
       { amount: '5000.0000', taxAmount: '600.0000' },
     ]);
   });
+
+  it('throws on a negative figure in the VAT share: a caller bug, never valid input', () => {
+    expect(() => milestoneAmounts(rows('amount', '100', '100'), '200', '-10')).toThrow(
+      'proportionalShare: negative input',
+    );
+    expect(() => milestoneAmounts(rows('amount', '-100', '300'), '200', '10')).toThrow(
+      'proportionalShare: negative input',
+    );
+  });
 });
