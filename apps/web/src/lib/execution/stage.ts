@@ -68,10 +68,17 @@ export interface ExecutionContractFacts {
   /** Change orders still awaiting a decision (internal_approved or issued). */
   openVariationCount: number;
   /**
-   * What is left to bill. While no final account request is issued it MUST be
-   * `billingBalance(...)` (money/final-account.ts): measured residuals are left
-   * out, so a mid-job reading never steers the card. Once one is issued it is
-   * the issued final account's figures (its final value minus every issued request).
+   * What is left to bill WITHOUT measured residuals: `billingBalance(...)`
+   * (money/final-account.ts). STEERING reads it (whether the next milestone
+   * still fits), so a mid-job reading never steers the card.
+   */
+  billingBalance: string;
+  /**
+   * What is left to bill WITH measured residuals: `computeFinalAccount(...).balance`.
+   * The END STATE reads it, once nothing is left to bill, unpaid, claimed or
+   * open: above 0 prepare the final account, below 0 a refund, 0 settled.
+   * Once a final account request is issued, both balances come from the issued
+   * final account's figures (its final value minus every issued request).
    */
   finalAccountBalance: string;
 }
@@ -91,20 +98,24 @@ function step(stage: ExecutionStage, kind: Exclude<ExecutionNextActionKind, 'ref
   return { stage, next: { kind } };
 }
 
-/** Nothing is owed by the client; a negative balance is a refund owed to them. */
+/** End state on the full balance: nothing owed by the client; below 0 a refund owed to them. */
 function settled(contract: ExecutionContractFacts): ExecutionStageResult {
   const balance4 = parseMoney4(contract.finalAccountBalance);
   if (balance4 >= 0n) return { stage: 'settled', next: null };
   return { stage: 'settled', next: { kind: 'refund_due', amount: formatMoney4(-balance4) } };
 }
 
-/** The next milestone still fits in what the final account would bill. */
+/** Steering: the next milestone still fits in what is left to bill, measurements aside. */
 function milestoneWithinBalance(contract: ExecutionContractFacts): boolean {
   const milestone = contract.nextUnbilledMilestone;
-  return milestone !== null && parseMoney4(milestone.amount) <= parseMoney4(contract.finalAccountBalance);
+  return milestone !== null && parseMoney4(milestone.amount) <= parseMoney4(contract.billingBalance);
 }
 
-/** No final account request yet: claims first, then billing, then waiting, then the final account. */
+/**
+ * No final account request yet: claims first, then billing and waiting (the
+ * steering, on `billingBalance`), then the end state on the FULL balance:
+ * the final account while it would bill more, settled or a refund otherwise.
+ */
 function inProgress(contract: ExecutionContractFacts): ExecutionStageResult {
   if (contract.pendingClaimCount > 0) return step('in_progress', 'review_payment_claim');
   if (milestoneWithinBalance(contract)) return step('in_progress', 'send_milestone_request');
@@ -115,7 +126,8 @@ function inProgress(contract: ExecutionContractFacts): ExecutionStageResult {
   return settled(contract);
 }
 
-/** The final account request is issued: settled only once every request and claim is cleared. */
+/** The final account request is issued: settled only once every request and claim is
+ *  cleared. Both balances are its figures here, so this branch reads `finalAccountBalance`. */
 function finalAccount(contract: ExecutionContractFacts, outstanding: string): ExecutionStageResult {
   if (contract.pendingClaimCount > 0) return step('final_account', 'review_payment_claim');
   // The balance grew after the final account was issued (a request was voided):

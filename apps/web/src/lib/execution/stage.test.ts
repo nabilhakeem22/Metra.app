@@ -23,6 +23,7 @@ function contract(overrides: Partial<ExecutionContractFacts> = {}): ExecutionCon
     finalAccountOutstanding: null,
     unpaidRequestCount: 0,
     openVariationCount: 0,
+    billingBalance: '0',
     finalAccountBalance: '0',
     ...overrides,
   };
@@ -52,6 +53,7 @@ const situations: [string, ExecutionFacts, ExecutionStageResult][] = [
       nextUnbilledMilestone: { id: 'm2', amount: '62000' },
       unbilledVariationCount: 1,
       unpaidRequestCount: 1,
+      billingBalance: '62000',
       finalAccountBalance: '62000',
     }),
     { stage: 'in_progress', next: { kind: 'send_milestone_request' } },
@@ -100,7 +102,7 @@ const situations: [string, ExecutionFacts, ExecutionStageResult][] = [
   ],
   [
     'R1: final account issued, then a request voided under it',
-    withContract({ finalAccountOutstanding: '0', finalAccountBalance: '24800.0000' }),
+    withContract({ finalAccountOutstanding: '0', billingBalance: '24800.0000', finalAccountBalance: '24800.0000' }),
     { stage: 'final_account', next: { kind: 'review_final_account' } },
   ],
   ['final account paid, nothing owed', withContract({ finalAccountOutstanding: '0' }), { stage: 'settled', next: null }],
@@ -116,10 +118,11 @@ function signedGrid(): ExecutionContractFacts[] {
         for (const unbilledVariationCount of [0, 1])
           for (const unpaidRequestCount of [0, 1])
             for (const openVariationCount of [0, 1])
-              for (const finalAccountBalance of ['-50', '0', '50']) {
+              for (const billingBalance of ['-50', '0', '50'])
+                for (const finalAccountBalance of ['-50', '0', '50']) {
                 grid.push(contract({
                   finalAccountOutstanding, nextUnbilledMilestone, pendingClaimCount,
-                  unbilledVariationCount, unpaidRequestCount, openVariationCount, finalAccountBalance,
+                  unbilledVariationCount, unpaidRequestCount, openVariationCount, billingBalance, finalAccountBalance,
                 }));
               }
   return grid;
@@ -177,7 +180,7 @@ describe('executionStage', () => {
   it('R2: suggests a milestone only while the balance still covers it', () => {
     for (const facts of signedGrid()) {
       if (stageOf(facts).next?.kind !== 'send_milestone_request') continue;
-      expect(parseMoney4(facts.nextUnbilledMilestone!.amount) <= parseMoney4(facts.finalAccountBalance)).toBe(true);
+      expect(parseMoney4(facts.nextUnbilledMilestone!.amount) <= parseMoney4(facts.billingBalance)).toBe(true);
     }
   });
 
@@ -210,7 +213,12 @@ describe('executionStage', () => {
         approvedVariationNetDeltas: [netDelta], measuredLines: [],
         issuedRequestsTotal: formatMoney4(requested.reduce((sum, row) => sum + parseMoney4(row.amount), 0n)),
       });
-      return contract({ nextUnbilledMilestone: { id: 'next', amount: next.amount }, finalAccountBalance: balance });
+      // No measurements here, so the steering and the full balance agree.
+      return contract({
+        nextUnbilledMilestone: { id: 'next', amount: next.amount },
+        billingBalance: balance,
+        finalAccountBalance: balance,
+      });
     }
 
     it('the milestones are 62,000, 37,200 and 24,800', () => {
@@ -257,14 +265,45 @@ describe('executionStage', () => {
     };
     const nextMilestone = { id: 'm2', amount: '37200.0000' };
 
-    it('with billingBalance the next milestone is suggested, not a refund', () => {
-      const facts = contract({ nextUnbilledMilestone: nextMilestone, finalAccountBalance: billingBalance(midJob) });
+    it('steering on billingBalance suggests the next milestone, though the full balance is negative', () => {
+      const facts = contract({
+        nextUnbilledMilestone: nextMilestone,
+        billingBalance: billingBalance(midJob),
+        finalAccountBalance: computeFinalAccount(midJob).balance,
+      });
+      expect(facts.finalAccountBalance).toBe('-49600.0000');
       expect(stageOf(facts)).toEqual({ stage: 'in_progress', next: { kind: 'send_milestone_request' } });
     });
+  });
 
-    it('the full final account balance would have read as a refund: why the card must not use it', () => {
-      const facts = contract({ nextUnbilledMilestone: nextMilestone, finalAccountBalance: computeFinalAccount(midJob).balance });
-      expect(stageOf(facts).next?.kind).toBe('refund_due');
+  describe('the end state reads the full balance, measurements included', () => {
+    // Fully billed and paid at 124,000; a provisional line of 200 at 100 measured at 240.
+    const overMeasured: FinalAccountInput = {
+      originalValue: '124000', taxRate: '14', supervisionPct: '10', discountPct: '0',
+      approvedVariationNetDeltas: [],
+      measuredLines: [{
+        lineId: 'p', qty: '200', unitPrice: '100', discountPct: '0', provisional: true,
+        measuredQty: '240', variationQty: '0',
+      }],
+      issuedRequestsTotal: '124000',
+    };
+
+    it('a fully billed job with an over-measured provisional line prepares the final account', () => {
+      const facts = contract({
+        billingBalance: billingBalance(overMeasured),
+        finalAccountBalance: computeFinalAccount(overMeasured).balance,
+      });
+      expect([facts.billingBalance, facts.finalAccountBalance]).toEqual(['0.0000', '4960.0000']);
+      expect(stageOf(facts)).toEqual({ stage: 'in_progress', next: { kind: 'prepare_final_account' } });
+    });
+
+    it('an under-measured one surfaces the refund, and an exact one settles', () => {
+      const under = { ...overMeasured, measuredLines: [{ ...overMeasured.measuredLines[0], measuredQty: '180' }] };
+      const exact = { ...overMeasured, measuredLines: [{ ...overMeasured.measuredLines[0], measuredQty: '200' }] };
+      const factsOf = (input: FinalAccountInput) =>
+        contract({ billingBalance: billingBalance(input), finalAccountBalance: computeFinalAccount(input).balance });
+      expect(stageOf(factsOf(under))).toEqual({ stage: 'settled', next: { kind: 'refund_due', amount: '2480.0000' } });
+      expect(stageOf(factsOf(exact))).toEqual({ stage: 'settled', next: null });
     });
   });
 });
