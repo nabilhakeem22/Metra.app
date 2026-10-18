@@ -2745,7 +2745,7 @@ delivery page) is apply-rls only, around Nov 18, with its own runbook.
    production still runs the current `main`.
 2. **Then, right after `db:apply-rls`,** the lead merges the branch to `main`
    and the Deploy workflow deploys it, and you run the smoke test (step 5).
-   Do not leave a gap between the two (see the last two reasons).
+   Do not leave a gap between the two (see the last reason).
 
 Why this order, one sentence each:
 
@@ -2757,16 +2757,11 @@ Why this order, one sentence each:
   functions only add keys. Rehearsed: the current app's own contract and
   change-order code, unchanged, reads, acknowledges and responds on the 0063
   database.
-- **One thing a client CAN see, from `db:apply-rls` on:** a contract link
-  (/c) now carries the first 50 lines of each section. The /c page that loads
-  the rest of a longer section is NOT in this branch: it ships with PR A3
-  ("contract from BOQ", about a week later). So from `db:apply-rls` until PR A3
-  is deployed, a client opening a contract with a section of more than 50 lines
-  sees only its first 50 lines, and their acknowledgement covers all of them
-  anyway (the snapshot's digest is over every line). Step 2 (e) counts the
-  contracts this can touch: issued, not yet signed, with such a section. If it
-  is not 0, tell the lead before step 3, so those clients can be told or PR A3
-  can go first.
+- **No client sees a change:** the contract link (/c) still shows every line
+  of every section, exactly as today; it only carries more keys (the
+  schedule, a digest of every line, the item codes). The lazy loading of long
+  sections arrives with PR A3, and the snapshot is only cut to 50 lines per
+  section in DB step B (Nov 18), once that page is live.
 - **A signature or a change-order decision now also writes studio
   notifications,** for every contract, quote contracts included. This branch
   teaches the bell to show them ("The client signed contract C-2026-0007",
@@ -2786,7 +2781,7 @@ Why this order, one sentence each:
 | six new tables | `contract_payment_milestones`, `payment_requests`, `contract_payments`, `contract_payment_claims`, `contract_cost_entries`, `contract_line_measurements` (the FINAL measured quantity per line at handover, ordered by an identity `seq`): per studio (`org_id`), empty. Every link to a line, a section, a request, a milestone or a change order is a 3-column foreign key, so it can only name a row of the SAME contract |
 | `rls/policies/35-execution.sql` | the six tables: RLS enabled and forced, one `org_isolation` policy each, and two triggers (the schedule freezes with its contract; a payment request can only go issued to void) |
 | `rls/functions/35-execution.sql` | the payment request's frozen guard |
-| `rls/functions/30-contracts-variations.sql` | the contract link (/c) adds the payment schedule, a digest of every line, and 50 lines per section with a new function for the rest; signing notifies owners, admins and project managers; the change-order link (/v) adds VAT, supervision and the extra days; a decision notifies the same three roles |
+| `rls/functions/30-contracts-variations.sql` | the contract link (/c) adds the payment schedule, a digest of every line, item codes and the provisional flag, and still carries every line (a new function serves one section's lines 100 at a time, for PR A3's page); signing notifies owners, admins and project managers; the change-order link (/v) adds VAT, supervision and the extra days; a decision notifies the same three roles |
 | every `rls/policies/*.sql` | **the policy speed-up:** each studio policy now reads the org context and the membership check ONCE per query instead of once per row (`(select ...)`). Same answer, about 40 times faster on a big contract (measured: 492.6 ms before, 11.4 ms after, on a 50,000-line contract). Applied by this same `db:apply-rls`; nothing extra to run |
 | `rls/roles.sql` | `metra_app`: full access to the schedule; requests, claims and costs without delete; payments and measurements insert and read only. The new client function is callable by `metra_app` only |
 
@@ -2855,24 +2850,6 @@ select count(*) as policies,
          '\(\s*SELECT app_is_current_org_member\(\) AS app_is_current_org_member\)', '', 'g')
          ~ 'app_is_current_org_member\(\)') as per_row
 from pg_policies where schemaname = 'public';
-```
-
-(e) **Who the 50-line window can touch.** Contracts sent to a client and
-not yet signed that have a section of more than 50 lines. Expect
-`exposed_contracts` 0. If it is not 0, STOP and tell the lead the two
-numbers (see THE ORDER); signed contracts are not counted, their client has
-already acknowledged.
-
-```sql
--- 0063 step 2 (e): issued, unsigned contracts with a section over 50 lines. Run this one alone.
-select count(distinct per_section.contract_id) as exposed_contracts,
-       coalesce(max(per_section.lines), 0) as longest_section
-from (select l.contract_id, l.section_id, count(*) as lines
-        from public.contract_lines l
-        join public.contracts c on c.id = l.contract_id and c.org_id = l.org_id
-       where c.status = 'issued'
-       group by l.contract_id, l.section_id
-      having count(*) > 50) as per_section;
 ```
 
 **3. Migrate, then apply RLS, then prove it landed.** In this order, from
