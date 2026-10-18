@@ -6,8 +6,10 @@
 // Each live stage has exactly one next action, and it is never one the server
 // would refuse: `prepare_final_account` only appears when the final account
 // core would accept it (balance > 0, no open change order, none issued yet).
-// A contract is settled only when nothing is owed either way: no unpaid
-// request, no pending claim, no open change order and no balance left to bill.
+// A milestone is only suggested while the final account balance still covers
+// it, so a de-scope never steers the studio into over-billing. A contract is
+// settled only when nothing is owed either way: no unpaid request, no pending
+// claim, no open change order and no balance left to bill.
 // Settled has no next action, except a refund the studio owes an over-billed
 // client (credit notes are out of scope; this only surfaces it).
 import type { ContractStatus } from '@metra/db';
@@ -38,6 +40,7 @@ export const EXECUTION_NEXT_ACTION_KINDS = [
   'record_payment',
   'await_variation_answer',
   'prepare_final_account',
+  'review_final_account',
   'refund_due',
 ] as const;
 
@@ -53,8 +56,8 @@ export interface ExecutionContractFacts {
   status: ContractStatus;
   /** The draft schedule passes `validateSchedule`. */
   scheduleValid: boolean;
-  /** The first schedule row with no issued request, if any. */
-  nextUnbilledMilestoneId: string | null;
+  /** The first schedule row with no issued request, and what it would bill. */
+  nextUnbilledMilestone: { id: string; amount: string } | null;
   pendingClaimCount: number;
   /** Approved change orders that add money and have no issued request. */
   unbilledVariationCount: number;
@@ -90,10 +93,16 @@ function settled(contract: ExecutionContractFacts): ExecutionStageResult {
   return { stage: 'settled', next: { kind: 'refund_due', amount: formatMoney4(-balance4) } };
 }
 
+/** The next milestone still fits in what the final account would bill. */
+function milestoneWithinBalance(contract: ExecutionContractFacts): boolean {
+  const milestone = contract.nextUnbilledMilestone;
+  return milestone !== null && parseMoney4(milestone.amount) <= parseMoney4(contract.finalAccountBalance);
+}
+
 /** No final account request yet: claims first, then billing, then waiting, then the final account. */
 function inProgress(contract: ExecutionContractFacts): ExecutionStageResult {
   if (contract.pendingClaimCount > 0) return step('in_progress', 'review_payment_claim');
-  if (contract.nextUnbilledMilestoneId !== null) return step('in_progress', 'send_milestone_request');
+  if (milestoneWithinBalance(contract)) return step('in_progress', 'send_milestone_request');
   if (contract.unbilledVariationCount > 0) return step('in_progress', 'send_variation_request');
   if (contract.unpaidRequestCount > 0) return step('in_progress', 'record_payment');
   if (contract.openVariationCount > 0) return step('in_progress', 'await_variation_answer');
@@ -104,6 +113,9 @@ function inProgress(contract: ExecutionContractFacts): ExecutionStageResult {
 /** The final account request is issued: settled only once every request and claim is cleared. */
 function finalAccount(contract: ExecutionContractFacts, outstanding: string): ExecutionStageResult {
   if (contract.pendingClaimCount > 0) return step('final_account', 'review_payment_claim');
+  // The balance grew after the final account was issued (a request was voided):
+  // it no longer bills everything, so it is never settled like this.
+  if (parseMoney4(contract.finalAccountBalance) > 0n) return step('final_account', 'review_final_account');
   if (parseMoney4(outstanding) > 0n || contract.unpaidRequestCount > 0) {
     return step('final_account', 'record_payment');
   }

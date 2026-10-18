@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { parseMoney4 } from '@/lib/aggregates/proposal-totals';
+import { formatMoney4, parseMoney4 } from '@/lib/aggregates/proposal-totals';
+import { computeFinalAccount } from './money/final-account';
+import { milestoneAmounts, type MilestoneAmount } from './money/milestone-amounts';
+import type { CleanScheduleRow } from './money/schedule';
 import {
   EXECUTION_NEXT_ACTION_KINDS,
   EXECUTION_STAGES,
@@ -14,7 +17,7 @@ function contract(overrides: Partial<ExecutionContractFacts> = {}): ExecutionCon
   return {
     status: 'signed',
     scheduleValid: true,
-    nextUnbilledMilestoneId: null,
+    nextUnbilledMilestone: null,
     pendingClaimCount: 0,
     unbilledVariationCount: 0,
     finalAccountOutstanding: null,
@@ -40,12 +43,17 @@ const situations: [string, ExecutionFacts, ExecutionStageResult][] = [
   ['sent, not signed', withContract({ status: 'issued' }), { stage: 'awaiting_signature', next: { kind: 'record_signed_offline' } }],
   [
     'a claim pending beside a milestone to bill',
-    withContract({ pendingClaimCount: 1, nextUnbilledMilestoneId: 'm2', unpaidRequestCount: 1 }),
+    withContract({ pendingClaimCount: 1, nextUnbilledMilestone: { id: 'm2', amount: '37200' }, unpaidRequestCount: 1 }),
     { stage: 'in_progress', next: { kind: 'review_payment_claim' } },
   ],
   [
     'a milestone to bill',
-    withContract({ nextUnbilledMilestoneId: 'm2', unbilledVariationCount: 1, unpaidRequestCount: 1, finalAccountBalance: '62000' }),
+    withContract({
+      nextUnbilledMilestone: { id: 'm2', amount: '62000' },
+      unbilledVariationCount: 1,
+      unpaidRequestCount: 1,
+      finalAccountBalance: '62000',
+    }),
     { stage: 'in_progress', next: { kind: 'send_milestone_request' } },
   ],
   [
@@ -90,6 +98,11 @@ const situations: [string, ExecutionFacts, ExecutionStageResult][] = [
     withContract({ finalAccountOutstanding: '0', pendingClaimCount: 1 }),
     { stage: 'final_account', next: { kind: 'review_payment_claim' } },
   ],
+  [
+    'R1: final account issued, then a request voided under it',
+    withContract({ finalAccountOutstanding: '0', finalAccountBalance: '24800.0000' }),
+    { stage: 'final_account', next: { kind: 'review_final_account' } },
+  ],
   ['final account paid, nothing owed', withContract({ finalAccountOutstanding: '0' }), { stage: 'settled', next: null }],
   ['terminated', withContract({ status: 'terminated', ...FINAL_ISSUED }), { stage: 'terminated', next: null }],
 ];
@@ -98,14 +111,14 @@ const situations: [string, ExecutionFacts, ExecutionStageResult][] = [
 function signedGrid(): ExecutionContractFacts[] {
   const grid: ExecutionContractFacts[] = [];
   for (const finalAccountOutstanding of [null, '0', '100'])
-    for (const nextUnbilledMilestoneId of [null, 'm1'])
+    for (const nextUnbilledMilestone of [null, { id: 'm1', amount: '50' }])
       for (const pendingClaimCount of [0, 1])
         for (const unbilledVariationCount of [0, 1])
           for (const unpaidRequestCount of [0, 1])
             for (const openVariationCount of [0, 1])
               for (const finalAccountBalance of ['-50', '0', '50']) {
                 grid.push(contract({
-                  finalAccountOutstanding, nextUnbilledMilestoneId, pendingClaimCount,
+                  finalAccountOutstanding, nextUnbilledMilestone, pendingClaimCount,
                   unbilledVariationCount, unpaidRequestCount, openVariationCount, finalAccountBalance,
                 }));
               }
@@ -151,9 +164,20 @@ describe('executionStage', () => {
       // Without a final account request, nothing may be left to bill either. With
       // one, it billed whatever the schedule and the change orders had left.
       if (facts.finalAccountOutstanding !== null) continue;
-      expect(facts.nextUnbilledMilestoneId).toBeNull();
       expect(facts.unbilledVariationCount).toBe(0);
-      expect(parseMoney4(facts.finalAccountBalance) <= 0n).toBe(true);
+    }
+  });
+
+  it('R1: is never settled while the final account balance is above 0', () => {
+    for (const facts of signedGrid()) {
+      if (stageOf(facts).stage === 'settled') expect(parseMoney4(facts.finalAccountBalance) <= 0n).toBe(true);
+    }
+  });
+
+  it('R2: suggests a milestone only while the balance still covers it', () => {
+    for (const facts of signedGrid()) {
+      if (stageOf(facts).next?.kind !== 'send_milestone_request') continue;
+      expect(parseMoney4(facts.nextUnbilledMilestone!.amount) <= parseMoney4(facts.finalAccountBalance)).toBe(true);
     }
   });
 
@@ -171,5 +195,52 @@ describe('executionStage', () => {
     for (const facts of signedGrid()) {
       expect(stageOf({ ...facts, status: 'terminated' })).toEqual({ stage: 'terminated', next: null });
     }
+  });
+
+  describe('R2: 50/30/20 on 124,000 after a de-scope', () => {
+    const schedule: CleanScheduleRow[] = ['50', '30', '20'].map((value, sortOrder) => ({
+      labelAr: 'دفعة', labelEn: null, basis: 'percent', value, sortOrder,
+    }));
+    const [first, second, third] = milestoneAmounts(schedule, '124000', '14000');
+
+    /** The facts once the given milestones are requested and paid, with this de-scope approved. */
+    function factsAfter(requested: MilestoneAmount[], netDelta: string, next: MilestoneAmount): ExecutionContractFacts {
+      const { balance } = computeFinalAccount({
+        originalValue: '124000', taxRate: '14', supervisionPct: '10', discountPct: '0',
+        approvedVariationNetDeltas: [netDelta], measuredLines: [],
+        issuedRequestsTotal: formatMoney4(requested.reduce((sum, row) => sum + parseMoney4(row.amount), 0n)),
+      });
+      return contract({ nextUnbilledMilestone: { id: 'next', amount: next.amount }, finalAccountBalance: balance });
+    }
+
+    it('the milestones are 62,000, 37,200 and 24,800', () => {
+      expect([first.amount, second.amount, third.amount]).toEqual(['62000.0000', '37200.0000', '24800.0000']);
+    });
+
+    it('a -20,000 de-scope (charge -24,800) absorbs the last milestone: settled, nothing suggested', () => {
+      const facts = factsAfter([first, second], '-20000', third);
+      expect(facts.finalAccountBalance).toBe('0.0000');
+      expect(stageOf(facts)).toEqual({ stage: 'settled', next: null });
+    });
+
+    it('while the balance still covers the next milestone it is suggested', () => {
+      const facts = factsAfter([first], '-20000', second);
+      // 124,000 - 24,800 - 62,000 = 37,200, exactly the second milestone
+      expect(facts.finalAccountBalance).toBe('37200.0000');
+      expect(stageOf(facts).next).toEqual({ kind: 'send_milestone_request' });
+    });
+
+    it('a balance above 0 but below the next milestone suggests the final account instead', () => {
+      // -10,000 de-scope: charge -12,400, leaving 12,400 against a 24,800 milestone
+      const facts = factsAfter([first, second], '-10000', third);
+      expect(facts.finalAccountBalance).toBe('12400.0000');
+      expect(stageOf(facts)).toEqual({ stage: 'in_progress', next: { kind: 'prepare_final_account' } });
+    });
+
+    it('a de-scope larger than the unbilled milestone surfaces the refund', () => {
+      const facts = factsAfter([first, second], '-30000', third);
+      // 124,000 - 37,200 - 99,200 = -12,400
+      expect(stageOf(facts)).toEqual({ stage: 'settled', next: { kind: 'refund_due', amount: '12400.0000' } });
+    });
   });
 });

@@ -478,7 +478,7 @@
       "no_longer_exists": "That choice no longer exists; it may have been deleted. Pick another one.",
       "unprintable": "This has hidden or control characters. Clear it and type it again instead of pasting.",
       "schedule_sum_mismatch": "The rows add up to {actual}; they must add up to {expected}.",
-      "schedule_value_too_small": "The contract value {value} is too small for this split."
+      "schedule_value_too_small": "The contract value {value} is too small for this split. Use fewer payments or change the shares."
     },
     "file_too_large": "That file is too large; the limit is 100 MB. Choose a smaller file or compress it.",
     "file_type_not_allowed": "This file type is not accepted for this kind of file. Choose a file in one of the accepted formats.",
@@ -2714,7 +2714,7 @@
         "no_longer_exists": "This choice is no longer available. Please choose another one.",
         "unprintable": "This contains hidden or control characters. Please clear it and type it again instead of pasting.",
         "schedule_sum_mismatch": "The rows add up to {actual}, but they must add up to {expected}.",
-        "schedule_value_too_small": "The contract value {value} is too small for this split."
+        "schedule_value_too_small": "The contract value {value} is too small for this split. Use fewer payments or change the shares."
       },
       "generic": "We could not complete your request because of a problem on our side. Nothing you entered was lost; please try again shortly.",
       "comments_too_many": "You have sent many messages in the last hour. Please try again later, within the hour, or contact your design team directly.",
