@@ -44,10 +44,12 @@ export function VariationLineRow({
   const locale = useLocale();
   const [query, setQuery] = useState('');
   const search = useBaselineLineSearch(contractId, query);
+  // The line picked earlier stays offered while a later search does not find it.
   const picked =
     line.contractLineId && !search.options.some((option) => option.value === line.contractLineId)
       ? [{ value: line.contractLineId, label: line.contractLineLabel }]
       : [];
+  const baselineOptions = [...picked, ...search.options];
   const cell = (column: VoLineColumn) => ({
     id: variationLineControlId(line.key, column),
     ...create.errors.bind(variationLinePath(line.key, column)),
@@ -59,7 +61,7 @@ export function VariationLineRow({
         ? { contractLineId: '', contractLineLabel: '' }
         : {
             contractLineId: value,
-            contractLineLabel: search.options.find((option) => option.value === value)?.label ?? '',
+            contractLineLabel: baselineOptions.find((option) => option.value === value)?.label ?? '',
           },
     );
 
@@ -77,7 +79,7 @@ export function VariationLineRow({
           className="h-9 w-auto min-w-40"
           value={line.contractLineId || NET_DELTA}
           onValueChange={pickBaseline}
-          options={[{ value: NET_DELTA, label: tv('netDelta') }, ...picked, ...search.options]}
+          options={[{ value: NET_DELTA, label: tv('netDelta') }, ...baselineOptions]}
         />
       </FormField>
       <FormField {...cell('description')} label={tv('line.description')}>
