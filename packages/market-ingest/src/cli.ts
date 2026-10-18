@@ -7,6 +7,7 @@ import { rebuildSeedBookCommand } from './commands/rebuild-seed-book-command';
 import { reviewCommand } from './commands/review-command';
 import { seedCommand } from './commands/seed-command';
 import { withdrawCommand } from './commands/withdraw-command';
+import { guardDriverWriteAfterClose } from './db/driver-close-guard';
 
 const COMMANDS: Record<string, (argv: string[]) => Promise<number>> = {
   catalogue: catalogueCommand,
@@ -33,4 +34,5 @@ async function main(): Promise<number> {
   }
 }
 
+guardDriverWriteAfterClose();
 main().then((code) => process.exit(code));

@@ -16,9 +16,10 @@ interface HolderRow {
 /**
  * The sessions holding a market lock, the longest-held first (an idle one with
  * no transaction counts from when it went idle). A market lock is a lock on a
- * market_ table, or one of the two market advisory keys and no other key on
- * the database (the app's number allocators, other services). How pg_locks
- * spells the two keys:
+ * market_ table, or one of the two market advisory keys, and no other key
+ * (the app's number allocators, other services), all IN THIS DATABASE:
+ * pg_locks shows the whole server's, and another database's oids and keys
+ * can coincide with ours. How pg_locks spells the two keys:
  *  - MARKET_WRITE_LOCK, one bigint key (hashtext's int4, sign-extended):
  *    objsubid 1, its high 32 bits in classid and its low 32 in objid;
  *  - STUDIO_SEED_LOCK, the two-key form (it, then the org): objsubid 2, the
@@ -32,6 +33,7 @@ export async function readLockHolders(): Promise<LockHolder[]> {
              extract(epoch from now() - a.state_change)::integer as state_seconds
         from pg_locks l join pg_stat_activity a on a.pid = l.pid
        where a.pid <> pg_backend_pid() and l.granted
+         and l.database = (select oid from pg_database where datname = current_database())
          and ((l.locktype = 'advisory'
                and ((l.objsubid = 1 and ((l.classid::bigint << 32) | l.objid::bigint) = hashtext(${MARKET_WRITE_LOCK})::bigint)
                  or (l.objsubid = 2 and l.classid::bigint = (hashtext(${STUDIO_SEED_LOCK})::bigint & 4294967295))))

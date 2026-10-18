@@ -60,13 +60,21 @@ describe('packages/market-ingest makes no network call (AC 23)', () => {
     expect(tsImports(sample)).toEqual(['x1', 'x2', 'x3', 'x4', 'x5']);
   });
 
-  it('spawns git and nothing else', () => {
+  // The one other process a TEST may start: this package's own CLI on the
+  // same Node binary (seed-connection-lost.dbtest.ts runs it as the owner
+  // does, to see what a lost connection does to the whole process). Never in
+  // the package's sources.
+  const OWN_CLI = /\bspawn\(process\.execPath, \['--import=tsx', 'src\/cli\.ts'/g;
+  const isTest = (path: string) => relative(packageRoot, path).split(/[\\/]/)[0] === 'tests';
+
+  it('spawns git and nothing else (and, from a test, its own CLI)', () => {
     for (const path of tsFiles) {
       const source = readFileSync(path, 'utf8');
       if (!source.includes('node:child_process')) continue;
       const spawns = source.match(/\b(?:exec|execSync|execFile|execFileSync|spawn|spawnSync|fork)\(/g) ?? [];
       const gitCalls = source.match(/\bexecFileSync\('git'/g) ?? [];
-      expect({ file: relative(packageRoot, path), spawns: spawns.length }).toEqual({ file: relative(packageRoot, path), spawns: gitCalls.length });
+      const ownCli = isTest(path) ? (source.match(OWN_CLI) ?? []) : [];
+      expect({ file: relative(packageRoot, path), spawns: spawns.length }).toEqual({ file: relative(packageRoot, path), spawns: gitCalls.length + ownCli.length });
     }
   });
 
