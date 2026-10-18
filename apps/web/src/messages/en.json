@@ -460,6 +460,7 @@
     "uncertain": "We could not confirm your change was saved: the server was busy or the connection dropped. Refresh the page to check before trying again.",
     "check_fields": "Some fields need fixing. Look for the message under each one.",
     "busy": "Someone was changing the same record at that moment. Refresh the page to see the latest, then try again.",
+    "market_book_busy": "The market price book is being loaded or updated right now, so this request added nothing. Try again in a few minutes.",
     "malformed": "This page sent something we did not expect. Refresh the page and try again.",
     "record_not_found": "This no longer exists; someone may have deleted it. Refresh the page.",
     "logo_image_unsupported": "This file cannot be used as a logo. Choose a PNG, JPG or WebP image of 2 MB or less.",
@@ -2695,6 +2696,18 @@
       "token_invalid": "This link is no longer available. Please contact your design team.",
       "too_many": "You sent many requests in the last minute. Wait a minute, then try again.",
       "uncertain": "We could not confirm your answer was received. Refresh the page to check before sending it again."
+    },
+    "units": {
+      "sqm": "m²",
+      "linear_meter": "linear m",
+      "pcs": "pcs",
+      "lump_sum": "lump sum",
+      "day": "day",
+      "kg": "kg",
+      "ton": "ton",
+      "liter": "liter",
+      "cbm": "m³",
+      "roll": "roll"
     }
   },
   "marketBook": {

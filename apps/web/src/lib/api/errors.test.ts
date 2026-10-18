@@ -12,6 +12,7 @@ const ALL_CODES: ActionCode[] = [
   'uncertain',
   'check_fields',
   'busy',
+  'market_book_busy',
   'malformed',
   'record_not_found',
   'logo_image_unsupported',

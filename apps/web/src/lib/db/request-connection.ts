@@ -3,6 +3,7 @@ import { after } from 'next/server';
 import type { MetraDb, PostgresJs } from '@metra/db';
 import { cfExecutionContext, isCloudflareRuntime } from '@/lib/cf/context';
 import { loggableFailure } from '@/lib/actions/loggable-failure';
+import { settledWithin } from '@/lib/async/settled-within';
 import { createRuntimeConnection } from './client';
 
 /** The one postgres.js instance (+ drizzle handle) shared across a request. */
@@ -88,12 +89,28 @@ export function getRequestConnection(): RequestConn {
 }
 
 /**
- * The teardown proper: wait for every piece of held work (more may be held
- * while waiting), then forget the connection and end it. Until then a later
- * `withRequestDb` in that work still gets this same connection.
+ * The most the teardown waits for held work before it ends the connection
+ * anyway. A held work item that never settles must not keep a connection (one
+ * of the session pooler's 15) open until the platform's waitUntil limit; the
+ * one caller today holds a close bounded at 4 s (HANDOVER_CLOSE_BUDGET_MS).
+ */
+export const HELD_WORK_CAP_MS = 12_000;
+
+/** Every piece of held work settled, including any held while waiting. */
+async function heldWorkSettled(holder: Holder): Promise<void> {
+  while (holder.held.size > 0) await Promise.all([...holder.held]);
+}
+
+/**
+ * The teardown proper: wait for the held work, at most HELD_WORK_CAP_MS,
+ * then forget the connection and end it (a statement still running then has
+ * 5 s to finish). Until then a later `withRequestDb` in that work still gets
+ * this same connection. Past the cap: one redacted line, a count and the cap.
  */
 async function endWhenIdle(holder: Holder, forget: () => void): Promise<void> {
-  while (holder.held.size > 0) await Promise.all([...holder.held]);
+  if (holder.held.size > 0 && !(await settledWithin(heldWorkSettled(holder), HELD_WORK_CAP_MS))) {
+    console.error('request connection ended with held work still running:', { heldWork: holder.held.size, capMs: HELD_WORK_CAP_MS });
+  }
   forget();
   await holder.sql.end({ timeout: 5 });
 }

@@ -8,6 +8,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Centered, Row } from '@/components/share/link-page-parts';
 import { LinkNameField } from '@/components/share/link-name-field';
 import { PortalFailureAlert } from '@/components/share/portal-failure-alert';
+import { useClientUnitName } from '@/components/share/use-client-unit-name';
 import { formatMoney } from '@/lib/format/money';
 import { formatPercent, formatQuantity } from '@/lib/format/number';
 import {
@@ -27,6 +28,7 @@ export function PublicProposalView({
   proposal: PublicProposal | null;
 }) {
   const t = useTranslations('proposals.p');
+  const unitName = useClientUnitName();
   const locale = useLocale();
   const [pending, startTransition] = useTransition();
   const [outcome, setOutcome] = useState<ProposalOutcome>(null);
@@ -90,7 +92,7 @@ export function PublicProposalView({
                   <tr key={l.id} className="border-b last:border-0">
                     <td className="px-4 py-2">{pick(l.description_ar, l.description_en)}</td>
                     <td className="px-4 py-2 text-muted-foreground" dir="ltr">
-                      {formatQuantity(l.qty, locale)} {l.unit}
+                      {formatQuantity(l.qty, locale)} {unitName(l.unit)}
                     </td>
                     <td className="px-4 py-2 text-end" dir="ltr">{m(l.unit_price)}</td>
                     <td className="px-4 py-2 text-end" dir="ltr">{m(l.line_total)}</td>

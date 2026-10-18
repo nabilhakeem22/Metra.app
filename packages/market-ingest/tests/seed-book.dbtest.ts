@@ -1,18 +1,18 @@
 import { rmSync } from 'node:fs';
-import { MARKET_WRITE_LOCK, buildSeedBook } from '@metra/db/market-seed';
+import { buildSeedBook } from '@metra/db/market-seed';
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { rebuildSeedBookCommand } from '../src/commands/rebuild-seed-book-command';
 import { withdrawCommand } from '../src/commands/withdraw-command';
-import { rebuildAndHoldSeedBook, releaseSeedBookHold } from '../src/seed/book-store';
 import { readMarketSeedItems } from '../src/seed/read';
-import { clearMarketTestData, openTestDatabase } from './db-fixture';
+import { clearMarketTestData } from './db-fixture';
 import { bulletinFile, newStaging, publish, stage, type Staging } from './publish-fixture';
 import { STUDIOS, clearSeeded, publishFixture, run, seededIn, sql } from './seed-fixture';
 
 // The stored seed book the app seeds new studios from (market_seed_book) says
 // what the published book says: market:publish and market:withdraw rebuild it
 // in their own transaction, and a real market:seed-price-books run stores
-// exactly the book it seeded with; a dry run stores nothing.
+// exactly the book it seeded with; a dry run stores nothing. What a run holds
+// (nothing between studios) is seed-hold.dbtest.ts.
 
 vi.mock('../src/gate', async (original) => ({
   ...(await original<typeof import('../src/gate')>()),
@@ -73,19 +73,6 @@ describe('market:rebuild-seed-book', () => {
 });
 
 describe('market:seed-price-books and the stored book', () => {
-  it('holds the stored book against any publish or withdrawal from its rebuild until it is released', async () => {
-    const seeding = openTestDatabase();
-    const tryPublish = async () => (await sql`select pg_try_advisory_xact_lock(hashtext(${MARKET_WRITE_LOCK})) as got`)[0].got as boolean;
-    try {
-      await rebuildAndHoldSeedBook(seeding);
-      expect(await tryPublish()).toBe(false);
-      await releaseSeedBookHold(seeding);
-      expect(await tryPublish()).toBe(true);
-    } finally {
-      await seeding.end();
-    }
-  });
-
   it('a dry run stores nothing; a real run stores exactly the book it seeded with', async () => {
     await publishFixture();
     await run(true);

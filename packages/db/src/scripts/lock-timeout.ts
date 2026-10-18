@@ -138,6 +138,9 @@ export async function applyRlsTimeouts(sql: PostgresJs): Promise<void> {
 const IDLE_IN_TRANSACTION_TIMEOUT: Timeout = { name: 'idle_in_transaction_session_timeout', text: '60s', ms: 60_000 };
 const TRANSACTION_TIMEOUT: Timeout = { name: 'transaction_timeout', text: '300s', ms: 300_000 };
 
+/** How long a market write may sit idle in its transaction before the server ends it (the holder report reads it). */
+export const MARKET_WRITE_IDLE_IN_TRANSACTION_MS = IDLE_IN_TRANSACTION_TIMEOUT.ms;
+
 export async function applyMarketWriteTimeouts(sql: PostgresJs): Promise<void> {
   const [row] = (await sql`select current_setting('server_version_num')::integer as version`) as unknown as Array<{ version: number }>;
   const timeouts = [LOCK_TIMEOUT, MIGRATION_STATEMENT_TIMEOUT, IDLE_IN_TRANSACTION_TIMEOUT];

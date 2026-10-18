@@ -16,6 +16,8 @@ export const ACTION_CODE_PROBLEM: Record<ActionCode, ApiProblemKind> = {
   check_fields: 'bad-request',
   // A deadlock: another write held what this one needed. Repeat after a refresh.
   busy: 'conflict',
+  // The market price book is being rebuilt; nothing was written. Repeat later.
+  market_book_busy: 'rate-limited',
   malformed: 'bad-request',
   record_not_found: 'not-found',
   logo_image_unsupported: 'bad-request',

@@ -34,7 +34,7 @@ vi.mock('@/lib/cf/context', () => ({
 
 vi.mock('@metra/db', () => ({ createDb: createDbMock }));
 
-const { getRequestConnection, holdRequestConnectionUntil } = await import('./request-connection');
+const { HELD_WORK_CAP_MS, getRequestConnection, holdRequestConnectionUntil } = await import('./request-connection');
 
 describe('getRequestConnection — shared request-scoped connection', () => {
   beforeEach(() => {
@@ -109,6 +109,43 @@ describe('getRequestConnection — shared request-scoped connection', () => {
     holdRequestConnectionUntil(new Promise(() => {}));
     await (runtime.ctx.waitUntil.mock.calls[0][0] as Promise<void>);
     expect(endSpy).toHaveBeenCalledTimes(1);
+  });
+
+  // R6: a held work item that never settles kept the teardown waiting, and the
+  // connection open, until the platform's waitUntil limit.
+  it('ends the connection at the cap when held work never settles, with one redacted line', async () => {
+    vi.useFakeTimers();
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      const { sql } = getRequestConnection();
+      const endSpy = sql.end as unknown as ReturnType<typeof vi.fn>;
+      holdRequestConnectionUntil(new Promise(() => {}));
+      await afterCallbacks[0]();
+      const drained = runtime.ctx.waitUntil.mock.calls[0][0] as Promise<void>;
+      await vi.advanceTimersByTimeAsync(HELD_WORK_CAP_MS - 1);
+      expect(endSpy).not.toHaveBeenCalled();
+      await vi.advanceTimersByTimeAsync(1);
+      await drained;
+      expect(endSpy).toHaveBeenCalledTimes(1);
+      expect(logged).toHaveBeenCalledTimes(1);
+      expect(logged).toHaveBeenCalledWith('request connection ended with held work still running:', { heldWork: 1, capMs: HELD_WORK_CAP_MS });
+    } finally {
+      logged.mockRestore();
+      vi.useRealTimers();
+    }
+  });
+
+  it('logs nothing when held work settles before the cap', async () => {
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      getRequestConnection();
+      holdRequestConnectionUntil(Promise.resolve());
+      await afterCallbacks[0]();
+      await (runtime.ctx.waitUntil.mock.calls[0][0] as Promise<void>);
+      expect(logged).not.toHaveBeenCalled();
+    } finally {
+      logged.mockRestore();
+    }
   });
 
   it('throws off-platform (getDb is the correct path there)', () => {

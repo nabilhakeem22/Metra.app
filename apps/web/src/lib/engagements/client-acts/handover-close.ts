@@ -10,15 +10,15 @@ import 'server-only';
 import { sql } from 'drizzle-orm';
 import { after } from 'next/server';
 import { loggableFailure } from '@/lib/actions/loggable-failure';
+import { settledWithin } from '@/lib/async/settled-within';
 import { resolveSystemContext } from '@/lib/automation/system-context';
 import { holdRequestConnectionUntil } from '@/lib/db/request-connection';
-import { withDeadline } from '@/lib/http/deadlines';
 import { normalizeRawToken, readSdfJson } from '@/lib/share/sdf-call';
 import { hashShareToken } from '@/lib/share/token';
 import { isUuid } from '@/lib/uuid';
 import { closeAcknowledgedHandover } from '../handover-close';
 
-/** The most the client's answer waits for the close (target read, actor, executor). */
+/** The most closeHandoverByToken's answer waits for the close (target read, actor, executor); the close itself goes on. */
 export const HANDOVER_CLOSE_BUDGET_MS = 4_000;
 
 /** What app_delivery_close_target_by_token answered, or null when it is not that shape. */
@@ -44,21 +44,66 @@ async function closeByHash(hash: string): Promise<boolean> {
   return (await closeAcknowledgedHandover(systemCtx, target.engagementId, 'client')) === 'closed';
 }
 
+type CloseOutcome = { closed: boolean } | { failure: unknown };
+
+function outcomeOf(work: Promise<boolean>): Promise<CloseOutcome> {
+  return work.then((closed) => ({ closed }), (failure: unknown) => ({ failure }));
+}
+
+/** One redacted line for a close that failed; `late` when it failed after its deadline. */
+function logFailure(failure: unknown, late: boolean): void {
+  console.error(late ? 'handover close by token failed after its deadline:' : 'handover close by token failed:', loggableFailure(failure));
+}
+
 /**
- * Close the delivery whose client just confirmed the handover. True only when
- * THIS call closed it. Never throws and never waits past
- * HANDOVER_CLOSE_BUDGET_MS; a failure is one redacted log line (no token, no
- * ids), and the confirmation stands either way.
+ * A close still running at the deadline is NOT a failure: it goes on, the
+ * request's connection held for it (withHandoverClose, up to the teardown's
+ * HELD_WORK_CAP_MS), and on a slow link it commits seconds later. So the
+ * deadline logs that it is still running, and the close's own outcome is
+ * logged when it settles.
  */
-export async function closeHandoverByToken(rawToken: string): Promise<boolean> {
-  const token = normalizeRawToken(rawToken);
-  if (!token) return false;
-  try {
-    return await withDeadline(closeByHash(hashShareToken(token)), HANDOVER_CLOSE_BUDGET_MS, 'handover close');
-  } catch (err) {
-    console.error('handover close by token failed:', loggableFailure(err));
+function reportLateOutcome(outcome: Promise<CloseOutcome>): void {
+  console.warn('handover close still running past its deadline:', { deadlineMs: HANDOVER_CLOSE_BUDGET_MS });
+  void outcome.then((late) => {
+    if ('failure' in late) logFailure(late.failure, true);
+    else console.warn('handover close finished after its deadline:', { closed: late.closed });
+  });
+}
+
+/** Whether the close closed the delivery within HANDOVER_CLOSE_BUDGET_MS. Never rejects. */
+async function answerWithin(outcome: Promise<CloseOutcome>): Promise<boolean> {
+  if (!(await settledWithin(outcome, HANDOVER_CLOSE_BUDGET_MS))) {
+    reportLateOutcome(outcome);
     return false;
   }
+  const settled = await outcome;
+  if ('closed' in settled) return settled.closed;
+  logFailure(settled.failure, false);
+  return false;
+}
+
+/** A close under way: the answer its caller reads (bounded), and the close itself (`finished`, never rejects). */
+interface CloseUnderWay {
+  answer: Promise<boolean>;
+  finished: Promise<unknown>;
+}
+
+function startClose(rawToken: string): CloseUnderWay {
+  const token = normalizeRawToken(rawToken);
+  if (!token) return { answer: Promise.resolve(false), finished: Promise.resolve() };
+  const outcome = outcomeOf(closeByHash(hashShareToken(token)));
+  return { answer: answerWithin(outcome), finished: outcome };
+}
+
+/**
+ * Close the delivery whose client just confirmed the handover. True only when
+ * THIS call closed it within HANDOVER_CLOSE_BUDGET_MS. Never throws and never
+ * waits past that; a failure is one redacted log line (no token, no ids), a
+ * close still running at the deadline a line saying so and then one with its
+ * outcome, and the confirmation stands either way.
+ */
+export function closeHandoverByToken(rawToken: string): Promise<boolean> {
+  return startClose(rawToken).answer;
 }
 
 /**
@@ -71,25 +116,18 @@ export async function closeHandoverByToken(rawToken: string): Promise<boolean> {
  */
 export const HANDOVER_CLOSE_WAIT_MS = 1_500;
 
-/** True when `work` settled within `ms`. Never rejects. */
-function settledWithin(work: Promise<unknown>, ms: number): Promise<boolean> {
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  const late = new Promise<boolean>((resolve) => {
-    timer = setTimeout(() => resolve(false), ms);
-  });
-  return Promise.race([work.then(() => true, () => true), late]).finally(() => clearTimeout(timer));
-}
-
 /**
  * Let a close that outran the wait finish after the response (best effort).
  * The close runs on the request's connection, so the connection is held
- * until it settles: the request's teardown would otherwise end it between
- * the close's statements. Never throws.
+ * until THE CLOSE ITSELF settles, not its bounded answer: the request's
+ * teardown would otherwise end it between the close's statements once the
+ * answer gave up at HANDOVER_CLOSE_BUDGET_MS. The teardown's own cap
+ * (HELD_WORK_CAP_MS) bounds the hold. Never throws.
  */
-function finishAfterResponse(closing: Promise<boolean>): void {
+function finishAfterResponse(finished: Promise<unknown>): void {
   try {
-    holdRequestConnectionUntil(closing);
-    after(() => closing);
+    holdRequestConnectionUntil(finished);
+    after(() => finished);
   } catch (err) {
     console.error('handover close not kept past the response:', loggableFailure(err));
   }
@@ -110,8 +148,8 @@ export async function withHandoverClose<TAnswer>(
   answer: () => Promise<TAnswer>,
 ): Promise<TAnswer> {
   if (verb !== 'acknowledge_handoff' || !written.ok) return answer();
-  const closing = closeHandoverByToken(rawToken);
-  const [result, settled] = await Promise.all([answer(), settledWithin(closing, HANDOVER_CLOSE_WAIT_MS)]);
-  if (!settled) finishAfterResponse(closing);
+  const close = startClose(rawToken);
+  const [result, settled] = await Promise.all([answer(), settledWithin(close.finished, HANDOVER_CLOSE_WAIT_MS)]);
+  if (!settled) finishAfterResponse(close.finished);
   return result;
 }

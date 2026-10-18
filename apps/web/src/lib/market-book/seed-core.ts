@@ -12,7 +12,7 @@ import { holdForSeed, isMarketPublished, readSeedBook, readStudioBook, writeSeed
 import { sqlstateOf } from '@metra/db/sqlstate';
 import { sql } from 'drizzle-orm';
 import { mutateInOrg } from '@/lib/actions/mutate';
-import type { ActionResult } from '@/lib/actions/result';
+import { ActionError, type ActionResult } from '@/lib/actions/result';
 import type { OrgContext } from '@/lib/db/context';
 
 /** Marks the audit rows of each app path, as `market:seed-price-books` marks the CLI's. Chosen on the server. */
@@ -32,6 +32,24 @@ export interface MarketSeedSummary {
 }
 
 const UNIQUE_VIOLATION = '23505';
+const LOCK_NOT_AVAILABLE = '55P03';
+
+/**
+ * Hold the book and the studio (holdForSeed, the transaction's first
+ * statement). A lock timeout there is a wait behind a publish or withdrawal
+ * rebuilding the book (it holds it exclusively for seconds over a slow link),
+ * or behind another seed of this studio: this transaction has written nothing,
+ * so it is answered `market_book_busy` (try again shortly), never the
+ * `uncertain` a lock timeout gets elsewhere.
+ */
+async function holdOrBusy(tx: MetraDb): Promise<void> {
+  try {
+    await holdForSeed(tx);
+  } catch (error) {
+    if (sqlstateOf(error) === LOCK_NOT_AVAILABLE) throw new ActionError('market_book_busy');
+    throw error;
+  }
+}
 
 /**
  * The write, in a savepoint (a nested transaction: postgres.js fails the whole
@@ -57,7 +75,7 @@ async function isNewStudio(tx: MetraDb): Promise<boolean> {
 
 /** The seed inside the caller's RLS transaction for the studio; `source` is decided from what the studio already has. */
 async function seedStudioPriceBook(tx: MetraDb, sourceFor: (studioIsEmpty: boolean) => Promise<string>): Promise<MarketSeedSummary> {
-  await holdForSeed(tx);
+  await holdOrBusy(tx);
   const studio = await readStudioBook(tx);
   const book = await readSeedBook(tx, canClashByName(studio));
   if (book.length === 0) return { book: (await isMarketPublished(tx)) ? 'preparing' : 'unpublished', sections: 0, items: 0 };

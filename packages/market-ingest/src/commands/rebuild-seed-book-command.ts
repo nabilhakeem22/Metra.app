@@ -10,6 +10,6 @@ import { rebuildSeedBook } from '../seed/book-store';
 export async function rebuildSeedBookCommand(argv: string[]): Promise<number> {
   parseArgs({ args: argv, options: {}, strict: true });
   const book = await withDatabase(rebuildSeedBook);
-  console.log(`market:rebuild-seed-book: the seed book holds ${book.length} published market item(s); no studio was seeded`);
+  console.log(`market:rebuild-seed-book: the seed book holds ${book.entries.length} published market item(s); no studio was seeded`);
   return 0;
 }

@@ -10,6 +10,11 @@ export type CommonActionCode =
   // A deadlock rolled this attempt back; its partner may be an earlier attempt
   // of the same act, so it is not a definite refusal (retry-policy.ts).
   | 'busy'
+  // A seed of the market price book waited past the lock timeout for the book
+  // (a publish or withdrawal rebuilding it) or for another seed of the same
+  // studio. Its transaction had written NOTHING yet, and a seed is idempotent,
+  // so unlike `uncertain` it is safe to say so and to try again.
+  | 'market_book_busy'
   // Input no form can produce (a forged id, an enum outside its select).
   | 'malformed'
   // The row is gone or moved to another workspace (someone deleted it).

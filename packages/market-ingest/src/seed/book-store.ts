@@ -2,9 +2,9 @@
 // WHOLE from what is published, by the one seed implementation
 // (@metra/db/market-seed), inside the transaction that changed what is
 // published (market:publish, market:withdraw) or under the same market write
-// lock (market:seed-price-books). The owner's connection writes it; metra_app
-// can only read it.
-import { MARKET_WRITE_LOCK, buildSeedBook, type SeedBookEntry } from '@metra/db/market-seed';
+// lock (market:rebuild-seed-book, and market:seed-price-books before it seeds).
+// The owner's connection writes it; metra_app can only read it.
+import { MARKET_WRITE_LOCK, SEED_BOOK_VERSION_QUERY, buildSeedBook, type SeedBookEntry } from '@metra/db/market-seed';
 import { MIGRATION_LOCK_TIMEOUT } from '@metra/db/lock-timeout';
 import type { PostgresJs, Transaction } from '../db/connection';
 import { readMarketSeedItems } from './read';
@@ -46,34 +46,25 @@ export async function refreshSeedBook(tx: Transaction): Promise<SeedBookEntry[]>
   return book;
 }
 
-/** The rebuild in its own transaction, behind any publish or withdrawal in flight; `andHold` keeps it (below). */
-async function rebuildLocked(sql: PostgresJs, andHold: boolean): Promise<SeedBookEntry[]> {
-  return (await sql.begin(async (tx) => {
-    await tx`select set_config('lock_timeout', ${MIGRATION_LOCK_TIMEOUT}, true)`;
-    await tx`select pg_advisory_xact_lock(hashtext(${MARKET_WRITE_LOCK}))`;
-    const book = await refreshSeedBook(tx);
-    if (andHold) await tx`select pg_advisory_lock_shared(hashtext(${MARKET_WRITE_LOCK}))`;
-    return book;
-  })) as SeedBookEntry[];
-}
-
-/** `market:rebuild-seed-book`: rebuild the stored book from what is published, and seed no studio. */
-export function rebuildSeedBook(sql: PostgresJs): Promise<SeedBookEntry[]> {
-  return rebuildLocked(sql, false);
+/** The stored book, and the digest a studio's transaction checks it against (@metra/db/market-seed version.ts). */
+export interface StoredSeedBook {
+  entries: SeedBookEntry[];
+  version: string;
 }
 
 /**
- * The rebuild, then HELD: the transaction also takes the market write lock
- * SHARED at session level, so from its commit until `releaseSeedBookHold` no
- * publish or withdrawal can change the book this connection seeds from (the
- * seed writes items by reference to it). The caller must release it, or end
- * the connection. Needs a connection that keeps one session (a direct or
- * session-pooler URL, never the :6543 transaction pooler).
+ * Rebuild the stored book from what is published, in its own transaction,
+ * behind any publish or withdrawal in flight (the market write lock,
+ * exclusively, for that transaction only). Nothing is held once it commits:
+ * a real `market:seed-price-books` run holds the book per studio instead
+ * (holdForSeed), and checks there that it is still this one.
  */
-export function rebuildAndHoldSeedBook(sql: PostgresJs): Promise<SeedBookEntry[]> {
-  return rebuildLocked(sql, true);
-}
-
-export async function releaseSeedBookHold(sql: PostgresJs): Promise<void> {
-  await sql`select pg_advisory_unlock_shared(hashtext(${MARKET_WRITE_LOCK}))`;
+export async function rebuildSeedBook(sql: PostgresJs): Promise<StoredSeedBook> {
+  return (await sql.begin(async (tx) => {
+    await tx`select set_config('lock_timeout', ${MIGRATION_LOCK_TIMEOUT}, true)`;
+    await tx`select pg_advisory_xact_lock(hashtext(${MARKET_WRITE_LOCK}))`;
+    const entries = await refreshSeedBook(tx);
+    const [{ version }] = await tx.unsafe<Array<{ version: string }>>(SEED_BOOK_VERSION_QUERY);
+    return { entries, version };
+  })) as StoredSeedBook;
 }

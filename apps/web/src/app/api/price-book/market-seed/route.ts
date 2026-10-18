@@ -7,10 +7,16 @@ import { seedNewStudioCore } from '@/lib/market-book/seed-core';
 // onboarding wizard asks right after sign-up (lib/market-book/seed-request.ts).
 // The studio comes from the session (requireOrg re-checks the membership); the
 // caller sends nothing. Owners and admins only (price_book create, in the core);
-// idempotent, and a second call while the first runs waits for it.
+// idempotent, and a second call while the first runs waits for it. A seed
+// that waited out the lock timeout behind a publish wrote nothing: 503 with
+// retry-after, never the 500 of a failure.
 export const dynamic = 'force-dynamic';
 
-const answer = (body: object, status: number) => NextResponse.json(body, { status, headers: { 'cache-control': 'no-store' } });
+const answer = (body: object, status: number, headers: Record<string, string> = {}) =>
+  NextResponse.json(body, { status, headers: { 'cache-control': 'no-store', ...headers } });
+
+/** How long a seed that met the market book being rebuilt should wait before it asks again (seconds). */
+const BUSY_RETRY_AFTER_SECONDS = '60';
 
 /** A cookie-authenticated write: refuse a request another site's page sent (the browser always sends Origin on a POST). */
 function fromThisSite(request: Request): boolean {
@@ -29,5 +35,6 @@ export async function POST(request: Request): Promise<Response> {
   if (!(await getSessionUser())) return answer({ error: 'Unauthorized' }, 401);
   const result = await seedNewStudioCore(await requireOrg());
   if (result.ok) return answer({ ok: true, ...result.data }, 200);
+  if (result.error === 'market_book_busy') return answer({ ok: false, error: result.error }, 503, { 'retry-after': BUSY_RETRY_AFTER_SECONDS });
   return answer({ ok: false, error: result.error, reference: result.reference }, result.error === 'forbidden' ? 403 : 500);
 }
