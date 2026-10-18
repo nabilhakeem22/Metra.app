@@ -9,6 +9,7 @@ import type { MetraDb } from '../client';
 import { costItems, sections } from '../schema';
 import { MARKET_WRITE_LOCK, STUDIO_SEED_LOCK } from './lock';
 import type { ItemRef, SeedPlan, SeedPlanEntry, StudioBook } from './types';
+import { SEED_BOOK_VERSION_QUERY } from './version';
 
 /** What the studio already has, as the plan reads it. */
 export async function readStudioBook(tx: MetraDb): Promise<StudioBook> {
@@ -47,6 +48,12 @@ export async function readSeedBook(tx: MetraDb, withNameForms: boolean): Promise
   });
 }
 
+/** The digest of the stored seed book as `tx` sees it (./version.ts). */
+export async function readSeedBookVersion(tx: MetraDb): Promise<string> {
+  const rows = (await tx.execute(sql.raw(SEED_BOOK_VERSION_QUERY))) as unknown as Array<{ version: string }>;
+  return rows[0].version;
+}
+
 /** Whether some bulletin is published (RLS shows only published ones): an empty book is then still being built. */
 export async function isMarketPublished(tx: MetraDb): Promise<boolean> {
   const rows = (await tx.execute(sql`select exists (select 1 from market_bulletins) as published`)) as unknown as Array<{ published: boolean }>;
@@ -82,9 +89,9 @@ export async function holdForSeed(tx: MetraDb): Promise<void> {
  * for each, marked with `source`. An item travels BY REFERENCE (market item,
  * code, section): its names, unit, cost and price are read from the stored
  * seed book the plan was made from, so the Worker sends a fifth of the bytes.
- * The caller holds that book steady (holdForSeed, and for the CLI its session
- * lock); an item the book no longer has fails the whole write, and nothing is
- * written. Nothing to write is no statement at all.
+ * The caller holds that book steady (holdForSeed; the CLI also checks it is
+ * the book its run planned from, readSeedBookVersion); an item the book no
+ * longer has fails the whole write, and nothing is written. Nothing to write is no statement at all.
  */
 export async function writeSeedPlan(tx: MetraDb, plan: SeedPlan<ItemRef>, source: string): Promise<SeedWritten> {
   if (plan.sectionsToCreate.length === 0 && plan.itemsToCreate.length === 0) return { sections: 0, items: 0 };

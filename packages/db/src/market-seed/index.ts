@@ -10,3 +10,4 @@ export { ITEM_CODE_PREFIX, SECTION_KEY_PREFIX, itemCode, sectionKey } from './na
 export { normalizeArabic, toWesternDigits } from './normalize';
 export { canClashByName, planSeed, planSeedRefs } from './plan';
 export * from './types';
+export { SEED_BOOK_VERSION_QUERY } from './version';

@@ -1,7 +1,7 @@
 // The per-studio lines `market:seed-price-books` prints (dry run and real run
 // alike), and the totals.
 import { SKIP_REASONS, type SkipReason } from '@metra/db/market-seed';
-import type { SeedRun } from './run';
+import type { SeedRun, StudioOutcome } from './run';
 
 const REASON_WORDS: Record<SkipReason, string> = {
   already_linked: 'already linked',
@@ -12,6 +12,22 @@ const REASON_WORDS: Record<SkipReason, string> = {
   name_clash: 'name clash',
 };
 
+type UnplannedOutcome = Exclude<StudioOutcome, { plan: unknown }>;
+
+/** The one line of a studio that has no plan. */
+function unplannedLine(outcome: UnplannedOutcome): string {
+  switch (outcome.status) {
+    case 'no_actor':
+      return '  skipped: the studio has no owner or admin membership';
+    case 'failed':
+      return `  FAILED, nothing written for this studio: ${outcome.error}`;
+    case 'book_changed':
+      return '  STOPPED, nothing written for this studio: the market price book changed during this run (a publish or withdrawal)';
+    case 'not_reached':
+      return '  not reached: the run stopped before this studio';
+  }
+}
+
 export function seedReport(run: SeedRun, dryRun: boolean): string[] {
   const verb = dryRun ? 'to create' : 'created';
   const lines = [`${dryRun ? 'DRY RUN, nothing is written. ' : ''}${run.marketItems} published market item(s); ${run.outcomes.length} studio(s).`];
@@ -19,12 +35,8 @@ export function seedReport(run: SeedRun, dryRun: boolean): string[] {
   let items = 0;
   for (const outcome of run.outcomes) {
     lines.push(`studio "${outcome.studio.name}" (${outcome.studio.id})`);
-    if (outcome.status === 'no_actor') {
-      lines.push('  skipped: the studio has no owner or admin membership');
-      continue;
-    }
-    if (outcome.status === 'failed') {
-      lines.push(`  FAILED, nothing written for this studio: ${outcome.error}`);
+    if (!('plan' in outcome)) {
+      lines.push(unplannedLine(outcome));
       continue;
     }
     const { plan } = outcome;
@@ -39,5 +51,8 @@ export function seedReport(run: SeedRun, dryRun: boolean): string[] {
   }
   const failed = run.outcomes.filter((outcome) => outcome.status === 'failed').length;
   lines.push(`totals: sections ${verb} ${sections}, items ${verb} ${items}, studios failed ${failed}`);
+  if (run.outcomes.some((outcome) => outcome.status === 'book_changed')) {
+    lines.push('STOPPED: the market price book changed during this run. Run the same command again: it plans from the new book and creates nothing twice.');
+  }
   return lines;
 }

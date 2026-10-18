@@ -16,6 +16,16 @@ export type Queryable = PostgresJs | Transaction;
 
 export const DATABASE_URL_VARIABLE = 'MARKET_DATABASE_URL';
 
+/**
+ * How this CLI's sessions read in pg_stat_activity, so a lock holder names
+ * itself in the report a blocked publish prints (publish/lock-holders.ts).
+ * Sent in the startup packet; a pooler that drops it shows the login's
+ * default instead, and the report still prints the session's state and age.
+ */
+export const CLI_APPLICATION_NAME = 'metra-market-cli';
+
+const CLI_CONNECTION = { max: 1, connection: { application_name: CLI_APPLICATION_NAME } };
+
 function databaseUrl(): string {
   const url = process.env[DATABASE_URL_VARIABLE];
   if (url === undefined || url.trim() === '') {
@@ -27,12 +37,12 @@ function databaseUrl(): string {
 }
 
 export function openDatabase(): PostgresJs {
-  return createSql(databaseUrl(), { max: 1 });
+  return createSql(databaseUrl(), CLI_CONNECTION);
 }
 
 /** The same connection with drizzle over it, for the org-scoped (RLS) writes of the seed. */
 export async function withDrizzle<T>(work: (db: MetraDb, sql: PostgresJs) => Promise<T>): Promise<T> {
-  const { db, sql } = createDb(databaseUrl(), { max: 1 });
+  const { db, sql } = createDb(databaseUrl(), CLI_CONNECTION);
   try {
     return await work(db, sql);
   } finally {

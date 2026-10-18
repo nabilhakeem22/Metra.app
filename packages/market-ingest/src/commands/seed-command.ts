@@ -1,7 +1,8 @@
 // `npm run market:seed-price-books -- [--dry-run] [--org <id>]...`
 // The owner's step that fills studio price books from the published market
-// book. Exit 1 when any studio failed (the others are committed; a re-run
-// retries the failed ones and creates nothing twice).
+// book. Exit 1 when any studio failed, or the run stopped because the book
+// changed under it (the others are committed; a re-run retries the rest and
+// creates nothing twice).
 import { parseArgs } from 'node:util';
 import { withDrizzle } from '../db/connection';
 import { seedReport } from '../seed/report';
@@ -23,5 +24,5 @@ export async function seedCommand(argv: string[]): Promise<number> {
   const dryRun = values['dry-run'] === true;
   const run = await withDrizzle((db, sql) => runSeed(db, sql, { dryRun, orgIds }));
   for (const line of seedReport(run, dryRun)) console.log(line);
-  return run.outcomes.some((outcome) => outcome.status === 'failed') ? 1 : 0;
+  return run.outcomes.some((outcome) => outcome.status === 'failed' || outcome.status === 'book_changed') ? 1 : 0;
 }

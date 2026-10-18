@@ -2616,11 +2616,14 @@ their own transaction; `market:rebuild-seed-book` rebuilds it and seeds no
 studio (step 3); and every REAL `market:seed-price-books` run (not a dry run)
 rebuilds it under the market write lock before it seeds. The app only
 reads it. A seed writes each item BY REFERENCE to it (its names and prices are
-taken from the book), so a seed holds the book steady while it runs: the app's
-for the length of one studio's transaction, a real CLI run until it ends. A
-`market:publish` or `market:withdraw` started meanwhile waits up to 3 s and
-then stops with a lock timeout that names the holder; run it again once the
-seed is done.
+taken from the book), so a seed holds the book steady for the length of one
+studio's transaction, the app's and a real CLI run's alike. Between two
+studios a CLI run holds nothing: each studio's transaction checks the book is
+still the one the run planned from, and when a publish or withdrawal changed
+it the run stops there (`STOPPED`, exit 1) and a re-run plans from the new
+book. A `market:publish` or `market:withdraw` that meets a seed waits up to
+3 s and then stops with a lock timeout that names the holder; run it again a
+moment later.
 
 **1. Put the code in the production checkout.**
 
@@ -2824,12 +2827,18 @@ npm run market:withdraw -- --period 2026-07 --reason "wrong file"
 ```
 
 **If a publish or a withdraw says `SQLSTATE 55P03`,** another session holds
-the market locks for more than 3 s. The message lists each holder's pid and
-how long its transaction has been open. One open for minutes is a publish
-left behind by a dropped connection: end it in the SQL editor with
-`select pg_terminate_backend(<pid>);` and run the command again. A publish
-or withdraw transaction can never stay open longer than 300 s (the
-`transaction_timeout` it sets), or 60 s idle.
+the market locks for more than 3 s. The message lists each holder: its pid,
+its application (`metra-market-cli` for the market commands), its state, how
+long its transaction has been open (or, with none open, how long it has been
+idle), and `running, wait for it` or `LEFT BEHIND, end it`. End a LEFT
+BEHIND one in the SQL editor with `select pg_terminate_backend(<pid>);` and
+run the command again. LEFT BEHIND is an idle session with no transaction
+open (it can hold the lock only at session level, which no market command
+takes any more, and no timeout ends it: a SQL editor tab, or a seed run from
+before this change) or a transaction open 60 s or more. A publish or
+withdraw transaction can never stay open longer than 300 s (the
+`transaction_timeout` it sets), or 60 s idle; a studio's seed transaction 30 s
+idle.
 
 ## Seeding studio price books from the market book
 
@@ -2919,9 +2928,12 @@ npm run market:seed-price-books -- --org <studio id> --org <studio id>
 
 The same lines with `created` in place of `to create`. Before it seeds, a
 real run also rebuilds the seed book new studios are seeded from (*0062 and
-the market price book at sign-up*) and holds it until the run ends, so do not
-publish or withdraw a bulletin during a real run; a dry run does neither. Exit
-0, or exit 1
+the market price book at sign-up*); it holds that book only inside each
+studio's transaction, never between studios, so a dropped connection leaves
+no lock behind. A publish or withdrawal during the run makes it stop at the
+next studio: `STOPPED, nothing written for this studio: the market price book
+changed during this run`, the studios after it `not reached`, exit 1; run the
+same command again. A dry run rebuilds nothing. Exit 0, or exit 1
 with `FAILED, nothing written for this studio: SQLSTATE <code>: <the database's
 reason>` on each studio that failed (the others are seeded), e.g. `SQLSTATE
 55P03: canceling statement due to lock timeout` when a studio was saving the
