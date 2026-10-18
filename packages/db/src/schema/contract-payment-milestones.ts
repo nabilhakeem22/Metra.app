@@ -43,6 +43,9 @@ export const contractPaymentMilestones = pgTable(
   },
   (t) => [
     unique('contract_payment_milestones_org_id_id_unique').on(t.orgId, t.id),
+    // The target of payment_requests' 3-column milestone FK: a request can only
+    // bill a milestone of ITS OWN contract.
+    unique('contract_payment_milestones_org_contract_id_unique').on(t.orgId, t.contractId, t.id),
     // Also the index of the contract FK below, hence its `index: false`.
     unique('contract_payment_milestones_org_contract_sort_unique').on(
       t.orgId,

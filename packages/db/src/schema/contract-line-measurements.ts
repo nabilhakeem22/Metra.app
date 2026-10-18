@@ -1,5 +1,6 @@
 import { sql } from 'drizzle-orm';
 import {
+  bigint,
   check,
   date,
   index,
@@ -20,8 +21,11 @@ import { sameContractFk } from './org-ref';
  * Site measurements (الحصر على الموقع) of an execution contract's lines (Stage
  * 2, 0063): an APPEND-ONLY ledger. A reading is the FINAL MEASURED QUANTITY of
  * one line, entered at handover (owner decision, Oct 19). The most recently
- * RECORDED reading wins (`created_at desc, id desc`, the index below), whatever
- * its `measured_on`, so a correction is a new reading. The final account bills
+ * RECORDED reading wins: the highest `seq` (an identity, assigned at insert in
+ * recording order; the index below), whatever its `measured_on`, so a
+ * correction is a new reading. Not `created_at`: that is the transaction's
+ * START time, so two readings of one transaction would tie and a long
+ * transaction would sort before readings it committed after. The final account bills
  * a provisional line's measured difference and flags a firm one's (owner
  * decision D2a). Site progress (deliveries, photos, notes) is not this table:
  * that is Stage 3's site diary.
@@ -38,6 +42,7 @@ export const contractLineMeasurements = pgTable(
       .references((): AnyPgColumn => organizations.id, { onDelete: 'restrict' }),
     contractId: uuid('contract_id').notNull(),
     contractLineId: uuid('contract_line_id').notNull(),
+    seq: bigint('seq', { mode: 'number' }).generatedAlwaysAsIdentity().notNull(),
     measuredQty: money('measured_qty').notNull(),
     measuredOn: date('measured_on').notNull(),
     note: text('note'),
@@ -53,8 +58,7 @@ export const contractLineMeasurements = pgTable(
     index('contract_line_measurements_org_line_latest_idx').on(
       t.orgId,
       t.contractLineId,
-      t.createdAt.desc(),
-      t.id.desc(),
+      t.seq.desc(),
     ),
     index('contract_line_measurements_org_contract_idx').on(t.orgId, t.contractId),
     uniqueIndex('contract_line_measurements_idempotency_key_uniq')

@@ -15,12 +15,17 @@
 --   * contract_lines: `item_code` (null) and `provisional` (false) copied from a
 --     BOQ line, and unique (org_id, contract_id, id) for the 3-column FKs.
 --   * contract_sections: unique (org_id, contract_id, id), same reason.
---   * variation_orders: `time_extension_days` (null, 0 to 3650).
+--   * variation_orders: `time_extension_days` (null, 0 to 3650), and unique
+--     (org_id, contract_id, id) for the payment request's 3-column FK.
 --   * contract_payment_milestones (the payment schedule the client signs),
 --     payment_requests (frozen documents), contract_payments (append-only
 --     ledger), contract_payment_claims (a client's "I paid"),
 --     contract_cost_entries (actual costs, voidable) and
---     contract_line_measurements (append-only site readings).
+--     contract_line_measurements (append-only FINAL measured quantities at
+--     handover; `seq`, an identity, orders the readings as recorded).
+--   * 3-COLUMN FKs make "of THIS contract" a database fact: a cost entry's line
+--     and section, a measurement's line, a payment's and a claim's request, and
+--     a request's milestone and change order.
 --
 -- THE TWO SET NULL FKs ARE BORN NARROWED (the 0052 rule):
 -- `contract_payment_claims_confirmedPayment_same_org_fk` and
@@ -50,7 +55,7 @@
 --                      constant default) and one unique index build, the
 --                      biggest step (linear in contract lines);
 --   variation_orders   ACCESS EXCLUSIVE: metadata-only ADD COLUMN, one CHECK
---                      scan of an all-NULL column.
+--                      scan of an all-NULL column, one unique index build.
 -- The new tables' FKs then take SHARE ROW EXCLUSIVE on contracts,
 -- contract_sections, contract_lines, variation_orders, cost_items and
 -- organizations for the instant of each ADD (the tables are new and empty, so
@@ -93,6 +98,8 @@ BEGIN
     ADD CONSTRAINT variation_orders_time_extension_days_range
     CHECK (time_extension_days between 0 and 3650) NOT VALID;
   ALTER TABLE public.variation_orders VALIDATE CONSTRAINT variation_orders_time_extension_days_range;
+  ALTER TABLE public.variation_orders
+    ADD CONSTRAINT variation_orders_org_contract_id_unique UNIQUE (org_id, contract_id, id);
 END $$;
 
 CREATE TYPE "public"."payment_request_kind" AS ENUM ('milestone', 'variation', 'final_account');
@@ -111,6 +118,7 @@ CREATE TABLE "contract_payment_milestones" (
   "value" numeric(18, 4) NOT NULL,
   "sort_order" integer NOT NULL,
   CONSTRAINT "contract_payment_milestones_org_id_id_unique" UNIQUE ("org_id", "id"),
+  CONSTRAINT "contract_payment_milestones_org_contract_id_unique" UNIQUE ("org_id", "contract_id", "id"),
   CONSTRAINT "contract_payment_milestones_org_contract_sort_unique" UNIQUE ("org_id", "contract_id", "sort_order"),
   CONSTRAINT "contract_payment_milestones_label_present" CHECK (length(regexp_replace(coalesce("label_ar", ''), '[[:space:]]', '', 'g')) > 0 or length(regexp_replace(coalesce("label_en", ''), '[[:space:]]', '', 'g')) > 0),
   CONSTRAINT "contract_payment_milestones_label_length" CHECK (coalesce(char_length(label_ar), 0) <= 80 and coalesce(char_length(label_en), 0) <= 80),
@@ -150,8 +158,6 @@ CREATE TABLE "payment_requests" (
   CONSTRAINT "payment_requests_void_pair" CHECK ((status = 'void') = (voided_at is not null) and (voided_at is null) = (voided_by is null))
 );
 CREATE INDEX "payment_requests_org_contract_issued_idx" ON "payment_requests" USING btree ("org_id", "contract_id", "issued_on" DESC, "id" DESC);
-CREATE INDEX "payment_requests_milestone_idx" ON "payment_requests" USING btree ("org_id", "milestone_id");
-CREATE INDEX "payment_requests_variationOrder_idx" ON "payment_requests" USING btree ("org_id", "variation_order_id");
 CREATE UNIQUE INDEX "payment_requests_one_per_milestone" ON "payment_requests" USING btree ("org_id", "milestone_id") WHERE status = 'issued' and milestone_id is not null;
 CREATE UNIQUE INDEX "payment_requests_one_per_variation" ON "payment_requests" USING btree ("org_id", "variation_order_id") WHERE status = 'issued' and variation_order_id is not null;
 CREATE UNIQUE INDEX "payment_requests_one_final_account" ON "payment_requests" USING btree ("org_id", "contract_id") WHERE status = 'issued' and kind = 'final_account';
@@ -250,6 +256,7 @@ CREATE TABLE "contract_line_measurements" (
   "updated_at" timestamp with time zone DEFAULT now() NOT NULL,
   "contract_id" uuid NOT NULL,
   "contract_line_id" uuid NOT NULL,
+  "seq" bigint GENERATED ALWAYS AS IDENTITY NOT NULL,
   "measured_qty" numeric(18, 4) NOT NULL,
   "measured_on" date NOT NULL,
   "note" text,
@@ -259,7 +266,7 @@ CREATE TABLE "contract_line_measurements" (
   CONSTRAINT "contract_line_measurements_qty_nonneg" CHECK (measured_qty >= 0),
   CONSTRAINT "contract_line_measurements_note_length" CHECK (char_length(note) <= 500)
 );
-CREATE INDEX "contract_line_measurements_org_line_latest_idx" ON "contract_line_measurements" USING btree ("org_id", "contract_line_id", "created_at" DESC, "id" DESC);
+CREATE INDEX "contract_line_measurements_org_line_latest_idx" ON "contract_line_measurements" USING btree ("org_id", "contract_line_id", "seq" DESC);
 CREATE INDEX "contract_line_measurements_org_contract_idx" ON "contract_line_measurements" USING btree ("org_id", "contract_id");
 CREATE UNIQUE INDEX "contract_line_measurements_idempotency_key_uniq" ON "contract_line_measurements" USING btree ("org_id", "contract_id", "idempotency_key") WHERE idempotency_key is not null;
 
@@ -274,10 +281,10 @@ ALTER TABLE "payment_requests" ADD CONSTRAINT "payment_requests_org_id_organizat
   FOREIGN KEY ("org_id") REFERENCES "public"."organizations"("id") ON DELETE RESTRICT;
 ALTER TABLE "payment_requests" ADD CONSTRAINT "payment_requests_contract_same_org_fk"
   FOREIGN KEY ("org_id", "contract_id") REFERENCES "public"."contracts"("org_id", "id") ON DELETE RESTRICT;
-ALTER TABLE "payment_requests" ADD CONSTRAINT "payment_requests_milestone_same_org_fk"
-  FOREIGN KEY ("org_id", "milestone_id") REFERENCES "public"."contract_payment_milestones"("org_id", "id") ON DELETE RESTRICT;
-ALTER TABLE "payment_requests" ADD CONSTRAINT "payment_requests_variationOrder_same_org_fk"
-  FOREIGN KEY ("org_id", "variation_order_id") REFERENCES "public"."variation_orders"("org_id", "id") ON DELETE RESTRICT;
+ALTER TABLE "payment_requests" ADD CONSTRAINT "payment_requests_milestone_same_contract_fk"
+  FOREIGN KEY ("org_id", "contract_id", "milestone_id") REFERENCES "public"."contract_payment_milestones"("org_id", "contract_id", "id") ON DELETE RESTRICT;
+ALTER TABLE "payment_requests" ADD CONSTRAINT "payment_requests_variationOrder_same_contract_fk"
+  FOREIGN KEY ("org_id", "contract_id", "variation_order_id") REFERENCES "public"."variation_orders"("org_id", "contract_id", "id") ON DELETE RESTRICT;
 
 ALTER TABLE "contract_payments" ADD CONSTRAINT "contract_payments_org_id_organizations_id_fk"
   FOREIGN KEY ("org_id") REFERENCES "public"."organizations"("id") ON DELETE RESTRICT;

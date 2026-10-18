@@ -18,7 +18,7 @@ import { contracts } from './contracts';
 import { paymentRequestKind, paymentRequestStatus } from './enums';
 import { organizations } from './organizations';
 import { orgScoped } from './org-scoped';
-import { sameOrgFk } from './org-ref';
+import { sameContractFk, sameOrgFk } from './org-ref';
 import { variationOrders } from './variation-orders';
 
 /**
@@ -89,8 +89,11 @@ export const paymentRequests = pgTable(
     // `index: false` on the contract FK: the request list index below leads with
     // the same two columns.
     ...sameOrgFk(t, 'contract', contracts, { onDelete: 'restrict', index: false }),
-    ...sameOrgFk(t, 'milestone', contractPaymentMilestones, { onDelete: 'restrict' }),
-    ...sameOrgFk(t, 'variationOrder', variationOrders, { onDelete: 'restrict' }),
+    // 3-column: the milestone and the change order must be OF THIS CONTRACT, as a
+    // database fact. Their RESTRICT checks read the request list index below,
+    // which leads with (org_id, contract_id).
+    sameContractFk(t, 'milestone', contractPaymentMilestones),
+    sameContractFk(t, 'variationOrder', variationOrders),
     // The contract's request list, newest first.
     index('payment_requests_org_contract_issued_idx').on(
       t.orgId,

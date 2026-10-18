@@ -36,6 +36,10 @@ describe('notificationHref', () => {
     expect(notificationHref(item({ entityType: 'engagement', entityId: 'e7' }))).toBe(
       '/engagements/e7',
     );
+    // A /c signature or a /v decision opens the contract (0063).
+    expect(notificationHref(item({ entityType: 'contract', entityId: 'c3' }))).toBe(
+      '/contracts/c3',
+    );
   });
 
   it('returns null when there is nothing to link to', () => {

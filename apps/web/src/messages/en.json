@@ -1547,6 +1547,9 @@
       "client_handover_acknowledged": "The client confirmed receiving the handover on {delivery}.",
       "client_payment_claimed": "{hasMilestone, select, yes {The client says they paid ({milestone}) on {delivery}. Confirm it from the delivery.} other {The client says they made a payment on {delivery}. Confirm it from the delivery.}}",
       "client_commented": "{commentCount, plural, one {The client left a comment on {delivery}.} other {The client left {count} comments on {delivery}.}}",
+      "client_contract_signed": "{hasDocument, select, yes {The client signed contract {document} on its link.} other {The client signed a contract on its link.}}",
+      "client_variation_approved": "{hasDocument, select, yes {The client approved change order {document}.} other {The client approved a change order.}}",
+      "client_variation_rejected": "{hasDocument, select, yes {The client rejected change order {document}.} other {The client rejected a change order.}}",
       "client_page_details_changed": "{hasActor, select, yes {{actor} changed the contact and payment details your clients see. Check them in Settings.} other {The contact and payment details your clients see were changed. Check them in Settings.}}"
     },
     "viewAll": "View all"

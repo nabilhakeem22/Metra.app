@@ -1,4 +1,10 @@
+import { createTranslator } from 'next-intl';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { notificationBody, notificationHref } from '@/components/notifications/feed-item';
+import { cairoYear } from '@/lib/format/doc-number';
+import { loadNotificationFeed } from '@/lib/notifications/feed';
+import en from '@/messages/en.json';
+import ar from '@/messages/ar-EG.json';
 import {
   acknowledgeContractByToken,
   contractPayloadHash,
@@ -15,7 +21,7 @@ import {
   tamper,
   type ExecutionContract,
 } from './execution-fixture';
-import { closeFixture, seedOrg, teardown } from './fixture';
+import { closeFixture, ctxFor, seedOrg, teardown } from './fixture';
 
 // Stage 2 DB step A, the client side: the replaced /c and /v SQL
 // (rls/functions/30-contracts-variations.sql). The snapshot stays ADDITIVE, so
@@ -334,4 +340,48 @@ describe('/v: the charge breakdown keys and the decision notifications (D4a, AC1
       expect(count.n).toBe(3);
     });
   }
+});
+
+describe('the studio feed renders a /c signature and a /v decision on a PROPOSAL contract', () => {
+  it('names C- and VO- numbers in both locales and opens the contract', async () => {
+    const { clientId, projectId } = await seedClientProject(orgId);
+    const [proposal] = await ownerQuery<{ id: string }>(
+      `insert into public.proposals (org_id, number, title_en, client_id, project_id, status)
+       values ($1, 600000 + floor(random() * 99999)::int, 'Quote', $2, $3, 'accepted') returning id`,
+      [orgId, clientId, projectId],
+    );
+    const token = mintShareToken();
+    const [created] = await ownerQuery<{ id: string; number: number }>(
+      `insert into public.contracts (org_id, number, title_en, source_proposal_id, client_id, project_id,
+                                     status, token_hash, share_expires_at)
+       values ($1, 500000 + floor(random() * 99999)::int, 'Quote contract', $2, $3, $4, 'draft', $5,
+               now() + interval '30 days') returning id, number`,
+      [orgId, proposal.id, clientId, projectId, token.hash],
+    );
+    await ownerQuery(`update public.contracts set status = 'issued' where id = $1`, [created.id]);
+    expect(await acknowledgeContractByToken(token.raw, { actorName: 'Client' })).toEqual({ ok: true });
+    const voToken = mintShareToken();
+    const variation = await seedVariation(orgId, { contractId: created.id, projectId }, 'issued', {
+      tokenHash: voToken.hash,
+    });
+    expect(await respondToVariationByToken(voToken.raw, { decision: 'approve', actorName: 'Client' })).toEqual({
+      ok: true,
+    });
+
+    const feed = await loadNotificationFeed(ctxFor(orgId, members.pm, 'project_manager'), 50);
+    const mine = feed.items.filter((item) => item.entityId === created.id);
+    expect(mine.map((item) => item.bodyKey).sort()).toEqual(['client_contract_signed', 'client_variation_approved']);
+    const year = cairoYear(new Date());
+    for (const [locale, messages] of [['en', en], ['ar-EG', ar]] as const) {
+      const translate = createTranslator({ locale, messages, namespace: 'notifications.body' }) as unknown as (
+        key: string,
+        values?: Record<string, string | number>,
+      ) => string;
+      const bodies = mine.map((item) => notificationBody(item, translate, (iso) => iso, locale, () => null));
+      for (const body of bodies) expect(body.length, `${locale} empty bell line`).toBeGreaterThan(0);
+      expect(bodies.join(' ')).toContain(`C-${String(year)}-${String(created.number).padStart(4, '0')}`);
+      expect(bodies.join(' ')).toContain(`VO-${String(year)}-${String(variation.number).padStart(4, '0')}`);
+    }
+    for (const item of mine) expect(notificationHref(item)).toBe(`/contracts/${created.id}`);
+  });
 });

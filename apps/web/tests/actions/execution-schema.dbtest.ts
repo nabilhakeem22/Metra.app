@@ -271,7 +271,30 @@ describe('payment_requests: CHECKs and partial uniques (AC14, AC15, AC29)', () =
     ).toBe('payment_requests_one_final_account');
   });
 
-  it("refuses a milestone of another org's contract (the same-org FK, 23503)", async () => {
+  it("refuses another contract's milestone or change order, same org (the 3-column FKs, 23503)", async () => {
+    const sibling = await seedExecutionContract(orgId, { state: 'draft' });
+    const siblingMilestone = await seedMilestone(orgId, sibling.contractId, 0);
+    await ownerQuery(`update public.contracts set status = 'issued' where id = $1`, [sibling.contractId]);
+    const siblingVariation = await seedVariation(orgId, sibling, 'approved');
+    const milestoneError = await insertRequest(contract.contractId, {
+      kind: 'milestone',
+      milestone_id: siblingMilestone,
+    }).catch((caught: { code?: string; constraint_name?: string }) => caught);
+    expect(milestoneError).toMatchObject({
+      code: '23503',
+      constraint_name: 'payment_requests_milestone_same_contract_fk',
+    });
+    const variationError = await insertRequest(contract.contractId, {
+      kind: 'variation',
+      variation_order_id: siblingVariation.id,
+    }).catch((caught: { code?: string; constraint_name?: string }) => caught);
+    expect(variationError).toMatchObject({
+      code: '23503',
+      constraint_name: 'payment_requests_variationOrder_same_contract_fk',
+    });
+  });
+
+  it("refuses a milestone of another org's contract (the 3-column FK, 23503)", async () => {
     const foreign = await seedExecutionContract(otherOrgId, { state: 'draft' });
     const foreignMilestone = await seedMilestone(otherOrgId, foreign.contractId, 0);
     expect(
@@ -559,17 +582,48 @@ describe('contract_line_measurements (AC24 DB part)', () => {
       [orgId, contractId, lineId, qty, measuredOn, ownerId],
     );
 
-  it('the latest RECORDED final reading leads the index order, whatever its measured_on', async () => {
-    const lineId = contract.lineIds[0][0];
-    await measure(lineId, '12', '2026-10-10');
-    await measure(lineId, '9', '2026-10-01');
+  const latestOf = async (lineId: string) => {
     const [latest] = await app<{ measured_qty: string }>(
       `select measured_qty from public.contract_line_measurements
         where org_id = $1 and contract_line_id = $2
-        order by created_at desc, id desc limit 1`,
+        order by seq desc limit 1`,
       [orgId, lineId],
     );
-    expect(latest.measured_qty).toBe('9.0000');
+    return latest.measured_qty;
+  };
+
+  it('the latest RECORDED final reading wins (highest seq), whatever its measured_on', async () => {
+    const lineId = contract.lineIds[0][0];
+    await measure(lineId, '12', '2026-10-10');
+    await measure(lineId, '9', '2026-10-01');
+    expect(await latestOf(lineId)).toBe('9.0000');
+  });
+
+  it('orders two readings of ONE transaction as recorded (created_at ties; seq does not)', async () => {
+    const lineId = contract.lineIds[0][1];
+    const rows = await app<{ seq: number; created_at: Date }>(
+      `insert into public.contract_line_measurements
+         (org_id, contract_id, contract_line_id, measured_qty, measured_on, recorded_by)
+       values ($1, $2, $3, 20, '2026-10-19', $4), ($1, $2, $3, 21, '2026-10-19', $4)
+       returning seq, created_at`,
+      [orgId, contract.contractId, lineId, ownerId],
+    );
+    expect(rows[0].created_at.getTime()).toBe(rows[1].created_at.getTime());
+    expect(Number(rows[1].seq)).toBeGreaterThan(Number(rows[0].seq));
+    expect(await latestOf(lineId)).toBe('21.0000');
+  });
+
+  it('refuses a hand-written seq (GENERATED ALWAYS, 428C9)', async () => {
+    expect(
+      await sqlstate(
+        app(
+          `insert into public.contract_line_measurements
+             (org_id, contract_id, contract_line_id, seq, measured_qty, measured_on, recorded_by)
+           values ($1, $2, $3, 999999999, 1, '2026-10-19', $4)`,
+          [orgId, contract.contractId, contract.lineIds[0][1], ownerId],
+        ),
+      ),
+    ).toBe('428C9');
   });
 
   it('refuses a negative quantity (23514) and a line of another contract (23503)', async () => {

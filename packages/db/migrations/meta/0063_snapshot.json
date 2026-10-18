@@ -1,5 +1,5 @@
 {
-  "id": "48cc7372-ac10-469d-84fa-59b162778b20",
+  "id": "0cfbcc4e-1c17-4718-82e7-4769e6fe7883",
   "prevId": "7be106b2-1466-4280-abd4-8ab66335806f",
   "version": "7",
   "dialect": "postgresql",
@@ -7297,6 +7297,15 @@
             "id"
           ]
         },
+        "variation_orders_org_contract_id_unique": {
+          "name": "variation_orders_org_contract_id_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "org_id",
+            "contract_id",
+            "id"
+          ]
+        },
         "variation_orders_org_id_number_unique": {
           "name": "variation_orders_org_id_number_unique",
           "nullsNotDistinct": false,
@@ -7901,6 +7910,15 @@
             "id"
           ]
         },
+        "contract_payment_milestones_org_contract_id_unique": {
+          "name": "contract_payment_milestones_org_contract_id_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "org_id",
+            "contract_id",
+            "id"
+          ]
+        },
         "contract_payment_milestones_org_contract_sort_unique": {
           "name": "contract_payment_milestones_org_contract_sort_unique",
           "nullsNotDistinct": false,
@@ -8048,48 +8066,6 @@
         }
       },
       "indexes": {
-        "payment_requests_milestone_idx": {
-          "name": "payment_requests_milestone_idx",
-          "columns": [
-            {
-              "expression": "org_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "milestone_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "payment_requests_variationOrder_idx": {
-          "name": "payment_requests_variationOrder_idx",
-          "columns": [
-            {
-              "expression": "org_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "variation_order_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
         "payment_requests_org_contract_issued_idx": {
           "name": "payment_requests_org_contract_issued_idx",
           "columns": [
@@ -8219,31 +8195,35 @@
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
-        "payment_requests_milestone_same_org_fk": {
-          "name": "payment_requests_milestone_same_org_fk",
+        "payment_requests_milestone_same_contract_fk": {
+          "name": "payment_requests_milestone_same_contract_fk",
           "tableFrom": "payment_requests",
           "tableTo": "contract_payment_milestones",
           "columnsFrom": [
             "org_id",
+            "contract_id",
             "milestone_id"
           ],
           "columnsTo": [
             "org_id",
+            "contract_id",
             "id"
           ],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
-        "payment_requests_variationOrder_same_org_fk": {
-          "name": "payment_requests_variationOrder_same_org_fk",
+        "payment_requests_variationOrder_same_contract_fk": {
+          "name": "payment_requests_variationOrder_same_contract_fk",
           "tableFrom": "payment_requests",
           "tableTo": "variation_orders",
           "columnsFrom": [
             "org_id",
+            "contract_id",
             "variation_order_id"
           ],
           "columnsTo": [
             "org_id",
+            "contract_id",
             "id"
           ],
           "onDelete": "restrict",
@@ -9182,6 +9162,23 @@
           "primaryKey": false,
           "notNull": true
         },
+        "seq": {
+          "name": "seq",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true,
+          "identity": {
+            "type": "always",
+            "name": "contract_line_measurements_seq_seq",
+            "schema": "public",
+            "increment": "1",
+            "startWith": "1",
+            "minValue": "1",
+            "maxValue": "9223372036854775807",
+            "cache": "1",
+            "cycle": false
+          }
+        },
         "measured_qty": {
           "name": "measured_qty",
           "type": "numeric(18, 4)",
@@ -9230,13 +9227,7 @@
               "nulls": "last"
             },
             {
-              "expression": "created_at",
-              "isExpression": false,
-              "asc": false,
-              "nulls": "last"
-            },
-            {
-              "expression": "id",
+              "expression": "seq",
               "isExpression": false,
               "asc": false,
               "nulls": "last"
