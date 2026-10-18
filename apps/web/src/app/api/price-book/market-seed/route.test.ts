@@ -53,4 +53,12 @@ describe('POST /api/price-book/market-seed', () => {
     expect(failed.status).toBe(500);
     expect(await failed.json()).toEqual({ ok: false, error: 'generic', reference: 'ABC123' });
   });
+
+  it('answers a seed that met the market book being rebuilt 503 with retry-after: nothing was written', async () => {
+    deps.seedNewStudioCore.mockResolvedValueOnce({ ok: false, error: 'market_book_busy' });
+    const busy = await post(SAME_SITE);
+    expect(busy.status).toBe(503);
+    expect(busy.headers.get('retry-after')).toBe('60');
+    expect(await busy.json()).toEqual({ ok: false, error: 'market_book_busy' });
+  });
 });
