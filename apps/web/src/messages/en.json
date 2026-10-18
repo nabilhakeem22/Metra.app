@@ -2688,6 +2688,18 @@
       "token_invalid": "This link is no longer available. Please contact your design team.",
       "too_many": "You sent many requests in the last minute. Wait a minute, then try again.",
       "uncertain": "We could not confirm your answer was received. Refresh the page to check before sending it again."
+    },
+    "units": {
+      "sqm": "m²",
+      "linear_meter": "linear m",
+      "pcs": "pcs",
+      "lump_sum": "lump sum",
+      "day": "day",
+      "kg": "kg",
+      "ton": "ton",
+      "liter": "liter",
+      "cbm": "m³",
+      "roll": "roll"
     }
   },
   "marketBook": {

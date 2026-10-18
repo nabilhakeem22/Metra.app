@@ -50,7 +50,7 @@ export const CLIENT_NAMESPACES = {
   /** app/[locale]/d: the client's delivery page. */
   deliveryLink: ['app', 'delivery', 'portal.errors'],
   /** app/[locale]/p: the client's proposal link. */
-  proposalLink: ['portal.errors', 'proposals.p'],
+  proposalLink: ['portal.errors', 'portal.units', 'proposals.p'],
   /** app/[locale]/v: the client's variation link. */
   variationLink: ['portal.errors', 'variations.client'],
 } as const satisfies Record<string, readonly string[]>;

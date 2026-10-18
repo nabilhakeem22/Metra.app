@@ -12,9 +12,10 @@ import { resolveUnit } from './import';
 const catalogs = { en, 'ar-EG': ar } as const;
 
 describe.each(Object.entries(catalogs))('the %s catalog', (_locale, catalog) => {
-  it.each([...COST_ITEM_UNITS])('labels %s in the price book and the BOQ sheet', (unit) => {
+  it.each([...COST_ITEM_UNITS])('labels %s in the price book, the BOQ sheet and the client link pages', (unit) => {
     expect(catalog.priceBook.units[unit].trim()).not.toBe('');
     expect(catalog.projects.profile.boq.unit[unit].trim()).not.toBe('');
+    expect(catalog.portal.units[unit].trim()).not.toBe('');
   });
 });
 
