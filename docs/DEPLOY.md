@@ -2743,26 +2743,36 @@ delivery page) is apply-rls only, around Nov 18, with its own runbook.
 
 1. **The database goes first**, from the branch (steps 1 to 4 below), while
    production still runs the current `main`.
-2. **Then** the lead merges the branch to `main` and the Deploy workflow
-   deploys it, **within the hour** (see the second reason), and you run the
-   smoke test (step 5).
+2. **Then, right after `db:apply-rls`,** the lead merges the branch to `main`
+   and the Deploy workflow deploys it, and you run the smoke test (step 5).
+   Do not leave a gap between the two (see the last two reasons).
 
 Why this order, one sentence each:
 
 - **The new code needs 0063:** the contract and change-order reads now name
   `source_boq_id`, `item_code`, `provisional` and `time_extension_days`, so
   new code on a database without 0063 fails every contract page with 42703.
-- **The current Worker is safe on the 0063 database, with one visible
-  difference:** 0063 only ADDS (nullable columns, new tables nobody reads yet),
-  and the replaced client functions only add keys. The difference: a client
-  opening a contract link (/c) whose section has more than 50 lines sees the
-  first 50 of that section until the new code is deployed (the new page loads
-  the rest). Rehearsed: the current app's own contract and change-order code,
-  unchanged, reads, acknowledges and responds on the 0063 database.
+- **The current Worker is safe on the 0063 database:** 0063 only ADDS
+  (nullable columns, new tables nobody reads yet), and the replaced client
+  functions only add keys. Rehearsed: the current app's own contract and
+  change-order code, unchanged, reads, acknowledges and responds on the 0063
+  database.
+- **One thing a client CAN see, from `db:apply-rls` on:** a contract link
+  (/c) now carries the first 50 lines of each section. The /c page that loads
+  the rest of a longer section is NOT in this branch: it ships with PR A3
+  ("contract from BOQ", about a week later). So from `db:apply-rls` until PR A3
+  is deployed, a client opening a contract with a section of more than 50 lines
+  sees only its first 50 lines, and their acknowledgement covers all of them
+  anyway (the snapshot's digest is over every line). Step 2 (e) counts the
+  contracts this can touch: issued, not yet signed, with such a section. If it
+  is not 0, tell the lead before step 3, so those clients can be told or PR A3
+  can go first.
 - **A signature or a change-order decision now also writes studio
-  notifications:** until the new code is deployed the bell shows them as an
-  empty line (an older Worker renders an unknown notification as nothing,
-  never an error). Merging within the hour keeps that window short.
+  notifications,** for every contract, quote contracts included. This branch
+  teaches the bell to show them ("The client signed contract C-2026-0007",
+  "approved change order VO-..."). Until it is deployed, the current Worker
+  shows them as an empty line (it renders an unknown notification as nothing,
+  never as an error), which is why the merge follows `db:apply-rls` at once.
 
 **What it changes.** No existing row is updated and nothing is backfilled.
 
@@ -2771,9 +2781,9 @@ Why this order, one sentence each:
 | `contracts` | `source_proposal_id` may be empty; new `source_boq_id` (the issued BOQ an execution contract comes from) with its same-org FK, one contract per BOQ, and the CHECK `contracts_one_source` (exactly one of the two is set; every existing contract has a proposal and no BOQ) |
 | `contract_lines` | new `item_code` (empty) and `provisional` (false), and one unique index `(org_id, contract_id, id)` |
 | `contract_sections` | one unique index `(org_id, contract_id, id)` |
-| `variation_orders` | new `time_extension_days` (empty), CHECK 0 to 3650 |
+| `variation_orders` | new `time_extension_days` (empty), CHECK 0 to 3650, and one unique index `(org_id, contract_id, id)` |
 | three new enum types | `payment_request_kind`, `payment_request_status`, `cost_category` |
-| six new tables | `contract_payment_milestones`, `payment_requests`, `contract_payments`, `contract_payment_claims`, `contract_cost_entries`, `contract_line_measurements`: per studio (`org_id`), empty |
+| six new tables | `contract_payment_milestones`, `payment_requests`, `contract_payments`, `contract_payment_claims`, `contract_cost_entries`, `contract_line_measurements` (the FINAL measured quantity per line at handover, ordered by an identity `seq`): per studio (`org_id`), empty. Every link to a line, a section, a request, a milestone or a change order is a 3-column foreign key, so it can only name a row of the SAME contract |
 | `rls/policies/35-execution.sql` | the six tables: RLS enabled and forced, one `org_isolation` policy each, and two triggers (the schedule freezes with its contract; a payment request can only go issued to void) |
 | `rls/functions/35-execution.sql` | the payment request's frozen guard |
 | `rls/functions/30-contracts-variations.sql` | the contract link (/c) adds the payment schedule, a digest of every line, and 50 lines per section with a new function for the rest; signing notifies owners, admins and project managers; the change-order link (/v) adds VAT, supervision and the extra days; a decision notifies the same three roles |
@@ -2847,6 +2857,24 @@ select count(*) as policies,
 from pg_policies where schemaname = 'public';
 ```
 
+(e) **Who the 50-line window can touch.** Contracts sent to a client and
+not yet signed that have a section of more than 50 lines. Expect
+`exposed_contracts` 0. If it is not 0, STOP and tell the lead the two
+numbers (see THE ORDER); signed contracts are not counted, their client has
+already acknowledged.
+
+```sql
+-- 0063 step 2 (e): issued, unsigned contracts with a section over 50 lines. Run this one alone.
+select count(distinct per_section.contract_id) as exposed_contracts,
+       coalesce(max(per_section.lines), 0) as longest_section
+from (select l.contract_id, l.section_id, count(*) as lines
+        from public.contract_lines l
+        join public.contracts c on c.id = l.contract_id and c.org_id = l.org_id
+       where c.status = 'issued'
+       group by l.contract_id, l.section_id
+      having count(*) > 50) as per_section;
+```
+
 **3. Migrate, then apply RLS, then prove it landed.** In this order, from
 `C:\Users\HP\merta-main` (its `.env` is the production connection):
 
@@ -2858,7 +2886,7 @@ npm run assert-schema-applied -w @metra/db
 
 **NOTICE blocks are normal.** Both commands print routine NOTICE blocks with
 a `message:` line. The production-shaped rehearsal (a database built by the
-0062 code, 200 contracts, 100,000 contract lines and 400 change orders on it,
+0062 code, 200 contracts, 1,000,000 contract lines and 400 change orders on it,
 then this branch) printed these, and on Supabase a line about a role may
 differ; any line that ends `does not exist, skipping` or `already exists,
 skipping` is the same kind:
@@ -2891,7 +2919,7 @@ failure. Expected:
   re-created in their new form (step 4 (d) shows it).
 - `assert-schema-applied` exits 0 and prints six lines, in this order:
   `assert-schema-applied: OK — 58 declared table(s), every column present.`,
-  then `indexes — 135 declared, all present.`, `constraints — 337 declared, all present.`,
+  then `indexes — 133 declared, all present.`, `constraints — 339 declared, all present.`,
   `functions — 46 declared, all present.`,
   `orphaned org rows — 50 org-scoped table(s) answered, none holds a row whose org_id names no organization.`
   and `composite set-null FKs — 15 found (15 declared in src/schema/), every one narrowed to a single non-org_id column.`
@@ -2929,10 +2957,11 @@ It holds ACCESS EXCLUSIVE (no reads, no writes) on `contracts`,
 commit, and SHARE ROW EXCLUSIVE (reads go on, writes wait) on `boqs`,
 `cost_items` and `organizations` for the foreign keys. The largest step is
 the new unique index on `contract_lines`, linear in its rows. Measured on the
-rehearsal server: about 0.4 s in all at 100,000 contract lines (0.25 s on the
-existing tables) and about 1.6 s at 1,000,000; an app reader polling a
-contract's lines every 20 ms through the 100,000-line run waited at most
-337 ms and saw 0 errors. `design_engagements` (the table every client act
+rehearsal server: about 0.35 s in all at 100,000 contract lines (0.21 to
+0.24 s on the existing tables) and about 1.9 to 2.1 s at 1,000,000; an app
+reader polling a contract's lines every 20 ms through the real 1,000,000-line
+run waited at most 2,002 ms and saw 0 errors (the app's own lock wait is 5 s).
+Step 2 (c) gives the size to compare with. `design_engagements` (the table every client act
 locks) is not touched. Pilot volumes are far below 100,000 lines. Estimates
 from a local server, not a production measurement. `db:apply-rls` adds one
 policy file with six NEW tables (nothing waits on them), and every existing
