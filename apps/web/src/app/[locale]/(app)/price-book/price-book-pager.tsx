@@ -17,15 +17,12 @@ import { PRICE_BOOK_PAGE_SIZE, priceBookViewSearch, type PriceBookView } from '@
  */
 export function PriceBookPager({
   viewAt,
-  onFollow,
   page,
   pageCount,
   matched,
 }: {
   /** The view a link to `page` opens. */
   viewAt: (page: number) => PriceBookView;
-  /** A link is being followed. */
-  onFollow: () => void;
   page: number;
   pageCount: number;
   matched: number;
@@ -49,7 +46,7 @@ export function PriceBookPager({
       <div className="flex items-center gap-2">
         {page > 1 && (
           <Button asChild variant="secondary" size="sm">
-            <Link href={pageHref(page - 1)} prefetch={false} rel="prev" onClick={onFollow}>
+            <Link href={pageHref(page - 1)} prefetch={false} rel="prev">
               <ChevronLeft className="size-4 rtl:-scale-x-100" aria-hidden />
               {t('previous')}
             </Link>
@@ -57,7 +54,7 @@ export function PriceBookPager({
         )}
         {page < pageCount && (
           <Button asChild variant="secondary" size="sm">
-            <Link href={pageHref(page + 1)} prefetch={false} rel="next" onClick={onFollow}>
+            <Link href={pageHref(page + 1)} prefetch={false} rel="next">
               {t('next')}
               <ChevronRight className="size-4 rtl:-scale-x-100" aria-hidden />
             </Link>
