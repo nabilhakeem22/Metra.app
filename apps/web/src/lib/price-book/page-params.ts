@@ -1,6 +1,7 @@
 // Which page of the price book is on screen, as it reads in the URL
 // (?q=&section=&active=1&page=), so a link opens the same page. PURE and
 // client-safe: the server page reads it, the toolbar and the pager write it.
+import { cleanSearchQuery } from '@/lib/search/query-input';
 import { isUuid } from '@/lib/uuid';
 
 /** Rows per page: one page of a 2,000-item book renders like a 50-item book. */
@@ -33,7 +34,7 @@ export function readPriceBookView(params: SearchParams): PriceBookView {
   const section = single(params.section);
   const page = Number.parseInt(single(params.page), 10);
   return {
-    query: single(params.q).slice(0, MAX_SEARCH_LENGTH),
+    query: cleanSearchQuery(single(params.q), MAX_SEARCH_LENGTH),
     sectionId: isUuid(section) ? section.toLowerCase() : null,
     activeOnly: single(params.active) === '1',
     page: Number.isInteger(page) && page >= 1 ? Math.min(page, MAX_PAGE) : 1,
