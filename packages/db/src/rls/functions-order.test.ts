@@ -126,3 +126,34 @@ describe('rls/functions/* definition order', () => {
     expect(violations).toEqual([]);
   });
 });
+
+describe('every trigger function is created before the file that attaches it', () => {
+  // A `create trigger ... execute function public.f()` fails with 42883 if f
+  // does not exist yet, and apply-rls reports it against the POLICY file. Stage
+  // 2 (0063) added a trigger function in a new functions/ file and a policy
+  // file that attaches it; this pins the manifest order those two depend on.
+  const definedIn = new Map<string, number>();
+  const attachedIn: Array<{ name: string; file: string; index: number }> = [];
+  RLS_APPLY_ORDER.forEach((file, index) => {
+    const sql = scannable(readFileSync(resolve(here, file), 'utf8'));
+    for (const match of sql.matchAll(/create\s+or\s+replace\s+function\s+public\.(\w+)\s*\(/gi)) {
+      const name = match[1].toLowerCase();
+      if (!definedIn.has(name)) definedIn.set(name, index);
+    }
+    for (const match of sql.matchAll(/execute\s+function\s+public\.(\w+)\s*\(/gi)) {
+      attachedIn.push({ name: match[1].toLowerCase(), file, index });
+    }
+  });
+
+  it('finds the triggers it is meant to be checking', () => {
+    expect(attachedIn.length).toBeGreaterThanOrEqual(17);
+    expect(attachedIn.map((entry) => entry.name)).toContain('enforce_payment_request_frozen');
+  });
+
+  it('attaches no trigger function before its CREATE has run', () => {
+    const violations = attachedIn
+      .filter((entry) => !(definedIn.has(entry.name) && definedIn.get(entry.name)! <= entry.index))
+      .map((entry) => `${entry.file} attaches ${entry.name}, created later or never`);
+    expect(violations).toEqual([]);
+  });
+});

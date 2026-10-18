@@ -26,6 +26,14 @@
 --
 -- nullif(..., '') makes an unset/reset GUC NULL -> predicate false -> 0 rows
 -- (fails closed). Idempotent.
+--
+-- EVERY POLICY IN policies/* IS WRAPPED (Stage 2, DB step A): each GUC read and
+-- each membership helper call is written `(select ...)`, so the planner runs it
+-- ONCE per query as an InitPlan instead of once per row. Same answer: the
+-- helpers take no argument and are STABLE, and a GUC does not change inside a
+-- statement, so per-row and once-per-query evaluation cannot differ. The B1
+-- security tester measured a 50,000-line contract read at 445 ms unwrapped and
+-- 17.6 ms wrapped. A new policy uses the wrapped form too.
 
 -- organizations: no org_id column; the tenant boundary is its own id. WITH CHECK
 -- stays bootstrap-open (id = ORG only) so createOrg's founding org insert works
@@ -35,11 +43,11 @@ alter table public.organizations force  row level security;
 drop policy if exists org_isolation on public.organizations;
 create policy org_isolation on public.organizations
   using (
-    id = nullif(current_setting('app.current_org_id', true), '')::uuid
-    and public.app_is_current_org_member()
+    id = (select nullif(current_setting('app.current_org_id', true), '')::uuid)
+    and (select public.app_is_current_org_member())
   )
   with check (
-    id = nullif(current_setting('app.current_org_id', true), '')::uuid
+    id = (select nullif(current_setting('app.current_org_id', true), '')::uuid)
   );
 
 -- accounts: the billing/ownership entity ABOVE tenancy (no org_id, so the shared
@@ -60,8 +68,8 @@ create policy account_isolation on public.accounts
     exists (
       select 1 from public.organizations o
       where o.account_id = accounts.id
-        and o.id = nullif(current_setting('app.current_org_id', true), '')::uuid
-        and public.app_is_current_org_member()
+        and o.id = (select nullif(current_setting('app.current_org_id', true), '')::uuid)
+        and (select public.app_is_current_org_member())
     )
   )
   with check (false);
@@ -74,16 +82,16 @@ drop policy if exists org_isolation on public.memberships;
 drop policy if exists self_memberships on public.memberships;
 create policy org_isolation on public.memberships
   using (
-    org_id = nullif(current_setting('app.current_org_id', true), '')::uuid
-    and public.app_is_current_org_member()
+    org_id = (select nullif(current_setting('app.current_org_id', true), '')::uuid)
+    and (select public.app_is_current_org_member())
   )
   with check (
-    org_id = nullif(current_setting('app.current_org_id', true), '')::uuid
+    org_id = (select nullif(current_setting('app.current_org_id', true), '')::uuid)
     and (
-      public.app_is_current_org_member()
+      (select public.app_is_current_org_member())
       or (
-        user_id = nullif(current_setting('app.current_user_id', true), '')::uuid
-        and public.app_can_bootstrap_membership()
+        user_id = (select nullif(current_setting('app.current_user_id', true), '')::uuid)
+        and (select public.app_can_bootstrap_membership())
       )
     )
   );
@@ -94,12 +102,12 @@ alter table public.files force  row level security;
 drop policy if exists org_isolation on public.files;
 create policy org_isolation on public.files
   using (
-    org_id = nullif(current_setting('app.current_org_id', true), '')::uuid
-    and public.app_is_current_org_member()
+    org_id = (select nullif(current_setting('app.current_org_id', true), '')::uuid)
+    and (select public.app_is_current_org_member())
   )
   with check (
-    org_id = nullif(current_setting('app.current_org_id', true), '')::uuid
-    and public.app_is_current_org_member()
+    org_id = (select nullif(current_setting('app.current_org_id', true), '')::uuid)
+    and (select public.app_is_current_org_member())
   );
 
 -- audit_log (append-only via grants; still org-isolated + membership-gated)
@@ -108,12 +116,12 @@ alter table public.audit_log force  row level security;
 drop policy if exists org_isolation on public.audit_log;
 create policy org_isolation on public.audit_log
   using (
-    org_id = nullif(current_setting('app.current_org_id', true), '')::uuid
-    and public.app_is_current_org_member()
+    org_id = (select nullif(current_setting('app.current_org_id', true), '')::uuid)
+    and (select public.app_is_current_org_member())
   )
   with check (
-    org_id = nullif(current_setting('app.current_org_id', true), '')::uuid
-    and public.app_is_current_org_member()
+    org_id = (select nullif(current_setting('app.current_org_id', true), '')::uuid)
+    and (select public.app_is_current_org_member())
   );
 
 -- invitations
@@ -122,12 +130,12 @@ alter table public.invitations force  row level security;
 drop policy if exists org_isolation on public.invitations;
 create policy org_isolation on public.invitations
   using (
-    org_id = nullif(current_setting('app.current_org_id', true), '')::uuid
-    and public.app_is_current_org_member()
+    org_id = (select nullif(current_setting('app.current_org_id', true), '')::uuid)
+    and (select public.app_is_current_org_member())
   )
   with check (
-    org_id = nullif(current_setting('app.current_org_id', true), '')::uuid
-    and public.app_is_current_org_member()
+    org_id = (select nullif(current_setting('app.current_org_id', true), '')::uuid)
+    and (select public.app_is_current_org_member())
   );
 
 

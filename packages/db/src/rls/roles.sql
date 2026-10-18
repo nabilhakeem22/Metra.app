@@ -68,6 +68,24 @@ grant select, insert, update, delete on public.boq_sections      to metra_app;
 grant select, insert, update, delete on public.boq_lines         to metra_app;
 grant select, insert, update, delete on public.variation_orders      to metra_app;
 grant select, insert, update, delete on public.variation_order_lines to metra_app;
+-- Stage 2 execution (0063). The payment schedule is the contract's terms: full
+-- DML while the contract is a draft, frozen with it after by
+-- trg_contract_payment_milestones_parent_draft (policies/35-execution.sql).
+grant select, insert, update, delete on public.contract_payment_milestones to metra_app;
+-- A payment request is a frozen document: INSERT, and the one UPDATE
+-- trg_payment_requests_frozen admits (issued -> void). Never DELETE: a void
+-- keeps its number. The revokes below converge a database provisioned with a
+-- wider grant; on a fresh one they are no-ops after these lines.
+grant select, insert, update on public.payment_requests to metra_app;
+revoke delete on public.payment_requests from metra_app;
+-- A client's "I paid" on a request: the studio confirms or dismisses it
+-- (UPDATE of status + resolution columns), like client_payment_claims. No
+-- DELETE: a resolved claim is retained.
+grant select, insert, update on public.contract_payment_claims to metra_app;
+revoke delete on public.contract_payment_claims from metra_app;
+-- Actual costs: editable and voidable (voided_at / voided_by), never deleted.
+grant select, insert, update on public.contract_cost_entries to metra_app;
+revoke delete on public.contract_cost_entries from metra_app;
 -- Design Engagements (Step 1): the engagement record is mutable (create + Step 2
 -- state transitions); the transition ledger is append-only (granted below).
 --
@@ -220,6 +238,15 @@ grant select, insert on public.payment_events          to metra_app;
 -- so any UPDATE/DELETE raises a permission error at the database.
 grant select, insert on public.engagement_events       to metra_app;
 grant select, insert on public.automation_run_log  to metra_app;
+-- Stage 2 execution (0063): the contract's payment ledger and the site
+-- measurement ledger are append-only. A recorded payment is never edited or
+-- removed (a mistaken bill is voided before it is paid, never the payment),
+-- and a measurement is corrected by a NEW reading (the latest recorded wins).
+-- SELECT + INSERT only; the revokes converge an older, wider grant.
+grant select, insert on public.contract_payments          to metra_app;
+revoke update, delete on public.contract_payments from metra_app;
+grant select, insert on public.contract_line_measurements to metra_app;
+revoke update, delete on public.contract_line_measurements from metra_app;
 
 -- Future-proofing for composite-FK trigger functions.
 grant execute on function public.enforce_same_org() to metra_app;
@@ -291,6 +318,14 @@ grant execute on function public.app_variation_by_token(text) to metra_app;
 revoke execute on function public.app_variation_by_token(text) from public;
 grant execute on function public.app_variation_respond_by_token(text, text, text, text, text) to metra_app;
 revoke execute on function public.app_variation_respond_by_token(text, text, text, text, text) from public;
+-- Stage 2 (0063): the /c lines of one section, 100 at a time, by token. Same
+-- treatment; also locked down in place, right after its CREATE
+-- (functions/30-contracts-variations.sql), so there is no window while
+-- apply-rls runs. The payment request frozen guard is a plain trigger function
+-- (not a definer), granted for symmetry with the child-draft guards above.
+grant execute on function public.app_contract_section_lines_by_token(text, uuid, integer) to metra_app;
+revoke execute on function public.app_contract_section_lines_by_token(text, uuid, integer) from public;
+grant execute on function public.enforce_payment_request_frozen() to metra_app;
 
 -- Bootstrap user->org lookup (SECURITY DEFINER, scoped to app.current_user_id).
 -- Least privilege: CREATE FUNCTION grants EXECUTE to PUBLIC by default. Revoke
@@ -482,6 +517,10 @@ begin
       );
       execute format(
         'revoke execute on function public.app_variation_respond_by_token(text, text, text, text, text) from %I',
+        r
+      );
+      execute format(
+        'revoke execute on function public.app_contract_section_lines_by_token(text, uuid, integer) from %I',
         r
       );
       -- Client Delivery Portal token SDFs (S1).

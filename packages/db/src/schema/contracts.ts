@@ -12,6 +12,7 @@ import {
   type AnyPgColumn,
 } from 'drizzle-orm/pg-core';
 import { bilingual, bilingualCheck, money } from './_helpers';
+import { boqs } from './boqs';
 import { clients } from './clients';
 import { contractStatus } from './enums';
 import { organizations } from './organizations';
@@ -21,7 +22,9 @@ import { projects } from './projects';
 import { proposals } from './proposals';
 
 /**
- * Contracts (عقود, P1 Slice 4). Generated from an ACCEPTED proposal: sections,
+ * Contracts (عقود, P1 Slice 4). Generated from an ACCEPTED proposal, or (Stage 2,
+ * 0063) from an ISSUED BOQ as an execution contract: exactly one of
+ * `sourceProposalId` / `sourceBoqId` is set (`contracts_one_source`). Sections,
  * lines and totals are deep-copied at generation time and then frozen once the
  * contract leaves `draft` (enforce_immutable_when, SQLSTATE MT100). `number` is a
  * per-org int sequence rendered `C-YYYY-NNNN`.
@@ -41,8 +44,11 @@ export const contracts = pgTable(
       .references((): AnyPgColumn => organizations.id, { onDelete: 'restrict' }),
     number: integer('number').notNull(),
     ...bilingual('title'),
-    // One contract per accepted proposal (unique below).
-    sourceProposalId: uuid('source_proposal_id').notNull(),
+    // One contract per accepted proposal (unique below). Null on a BOQ contract.
+    sourceProposalId: uuid('source_proposal_id'),
+    // Stage 2 (0063): the issued BOQ an execution contract was generated from.
+    // One contract per BOQ (unique below). Null on a proposal contract.
+    sourceBoqId: uuid('source_boq_id'),
     clientId: uuid('client_id').notNull(),
     projectId: uuid('project_id').notNull(),
     status: contractStatus('status').notNull().default('draft'),
@@ -96,7 +102,14 @@ export const contracts = pgTable(
       t.orgId,
       t.sourceProposalId,
     ),
+    // One execution contract per BOQ, per org (0063). Also the index of the
+    // source BOQ FK below, which is why that FK passes `index: false`.
+    unique('contracts_org_id_source_boq_unique').on(t.orgId, t.sourceBoqId),
     unique('contracts_token_hash_unique').on(t.tokenHash),
+    check(
+      'contracts_one_source',
+      sql`num_nonnulls(source_proposal_id, source_boq_id) = 1`,
+    ),
     bilingualCheck('contracts', 'title'),
     check(
       'contracts_end_after_start',
@@ -112,6 +125,7 @@ export const contracts = pgTable(
     ),
     check('contracts_tax_rate_range', sql`tax_rate >= 0 and tax_rate <= 100`),
     ...sameOrgFk(t, 'sourceProposal', proposals, { onDelete: 'restrict' }),
+    ...sameOrgFk(t, 'sourceBoq', boqs, { onDelete: 'restrict', index: false }),
     ...sameOrgFk(t, 'client', clients, { onDelete: 'restrict' }),
     ...sameOrgFk(t, 'project', projects, { onDelete: 'restrict' }),
     index('contracts_org_status_idx').on(t.orgId, t.status),

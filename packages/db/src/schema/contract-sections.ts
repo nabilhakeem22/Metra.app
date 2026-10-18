@@ -31,6 +31,9 @@ export const contractSections = pgTable(
   },
   (t) => [
     unique('contract_sections_org_id_id_unique').on(t.orgId, t.id),
+    // The target of the 3-column FK from cost entries (0063): a cost booked to a
+    // section of ANOTHER contract is refused by the database.
+    unique('contract_sections_org_contract_id_unique').on(t.orgId, t.contractId, t.id),
     bilingualCheck('contract_sections', 'title'),
     // `index: false` — `contract_sections_org_contract_sort_idx` below leads with
     // the same two columns. 0053 created `contract_sections_contract_idx` and

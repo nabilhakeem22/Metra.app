@@ -26,9 +26,10 @@
 //   * every `create trigger` exists in `pg_trigger` (non-internal);
 //   * every function the manifest defines exists in `pg_proc`;
 //   * the `metra_app` role exists, and is neither LOGIN nor BYPASSRLS;
-//   * eleven NARROWED tables — boqs, document_categories,
+//   * sixteen NARROWED tables — boqs, document_categories,
 //     engagement_document_comments, engagement_milestones,
-//     workspace_entitlements and the six SELECT-only market tables — hold exactly the table-level privileges roles.sql
+//     workspace_entitlements, the six SELECT-only market tables and the five
+//     Stage 2 execution tables that may not be deleted from (0063) — hold exactly the table-level privileges roles.sql
 //     leaves them with after its revokes, AND do not hold the one privilege each
 //     narrowing exists to remove (no DELETE on boqs, no UPDATE/DELETE on the
 //     append-only three, no DELETE on the filing vocabulary). Until wave 8 item 6
@@ -257,6 +258,14 @@ async function grantProblems(sql: Sql): Promise<string[]> {
  *                                 `market:publish` CLI writes them, as the
  *                                 connection role. A metra_app write would let
  *                                 one studio change what every studio sees.
+ *   contract_payments,
+ *   contract_line_measurements    append-only (0063) — a recorded payment and a
+ *                                 site reading are never edited or removed; a
+ *                                 correction is a new reading.
+ *   payment_requests,
+ *   contract_payment_claims,
+ *   contract_cost_entries         no DELETE (0063) — a request is voided, a
+ *                                 claim resolved, a cost voided; none deleted.
  *
  * `design_engagements` is NOT in this list: its authority is column-level and is
  * read back separately by `grantProblems`, which is a different question.
@@ -284,6 +293,11 @@ const NARROWED_TABLES: Record<string, readonly TablePrivilege[]> = {
   market_price_observations: ['insert', 'update', 'delete'],
   market_seed_book: ['insert', 'update', 'delete'],
   workspace_entitlements: ['update', 'delete'],
+  contract_line_measurements: ['update', 'delete'],
+  contract_payment_claims: ['delete'],
+  contract_payments: ['update', 'delete'],
+  contract_cost_entries: ['delete'],
+  payment_requests: ['delete'],
 };
 
 /** One cell of the table-privilege read-back. */

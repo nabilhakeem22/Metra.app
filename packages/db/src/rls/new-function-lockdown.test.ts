@@ -88,6 +88,27 @@ const LOCKED_DOWN_IN_PLACE: readonly LockedDown[] = [
     grantsApp: true,
   },
   { file: 'rom-issue-trigger.sql', signature: 'public.clear_rom_issue_on_band_change()', grantsApp: true },
+  // Stage 2 (0063): the new /c lines reader, and the four /c and /v functions
+  // the same file replaces (an existing ACL is kept by CREATE OR REPLACE, so for
+  // those the block is convergence; it is pinned so the file stays the place
+  // that locks down what it writes).
+  {
+    file: 'functions/30-contracts-variations.sql',
+    signature: 'public.app_contract_section_lines_by_token(text, uuid, integer)',
+    grantsApp: true,
+  },
+  { file: 'functions/30-contracts-variations.sql', signature: 'public.app_contract_by_token(text)', grantsApp: true },
+  {
+    file: 'functions/30-contracts-variations.sql',
+    signature: 'public.app_contract_ack_by_token(text, text, text, text, text)',
+    grantsApp: true,
+  },
+  { file: 'functions/30-contracts-variations.sql', signature: 'public.app_variation_by_token(text)', grantsApp: true },
+  {
+    file: 'functions/30-contracts-variations.sql',
+    signature: 'public.app_variation_respond_by_token(text, text, text, text, text)',
+    grantsApp: true,
+  },
 ];
 
 /** The argument types a CREATE declares, as `pg_proc` would list them: `text, uuid`. */

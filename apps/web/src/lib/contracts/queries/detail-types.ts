@@ -43,7 +43,8 @@ export interface ContractDetail {
   titleEn: string | null;
   status: ContractStatus;
   currency: string;
-  sourceProposalId: string;
+  /** Null on an execution contract generated from a BOQ (0063). */
+  sourceProposalId: string | null;
   signatureDate: string | null;
   startDate: string | null;
   endDate: string | null;
