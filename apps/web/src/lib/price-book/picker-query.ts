@@ -3,7 +3,8 @@ import { costItems } from '@metra/db';
 import { and, asc, eq, sql } from 'drizzle-orm';
 import { withOrgContext, type OrgContext } from '@/lib/db/context';
 import { PICKER_LIMIT, type PickerSearch } from './picker-types';
-import { everyWordSql, nameInSql, nameSortKeySql } from './search-sql';
+import { everyWordSql } from '@/lib/search/words-sql';
+import { nameInSql, nameSortKeySql } from './search-sql';
 import { rankedSections } from './section-rank';
 
 /**

@@ -2,22 +2,15 @@
 
 import type { CostItemUnit } from '@metra/db';
 import { Trash2 } from 'lucide-react';
-import { useLocale, useTranslations } from 'next-intl';
-import { useState } from 'react';
+import { useTranslations } from 'next-intl';
 import { FormField } from '@/components/ui/form-field';
 import { Input } from '@/components/ui/input';
 import { SelectControl } from '@/components/ui/select-control';
-import { formatNumber } from '@/lib/format/number';
 import { UNIT_TOKENS } from '@/lib/price-book/import';
 import { variationLinePath } from '@/lib/variations/line-fields';
+import { BaselineLinePicker } from './baseline-line-picker';
 import type { DraftVoLine } from './contract-vo-types';
-import { useBaselineLineSearch } from './use-baseline-line-search';
 import type { VariationCreateApi, VoLineColumn } from './use-variation-create';
-
-// Radix Select forbids an empty-string item value, so the "net delta" choice
-// (stored as '' on the line) rides a sentinel that is mapped back to '' at the
-// state boundary: the persisted contractLineId stays byte-identical.
-const NET_DELTA = '__net_delta__';
 
 /** The DOM id of one line cell (by row key); its refusal sits under it. */
 export function variationLineControlId(key: string, column: VoLineColumn): string {
@@ -26,8 +19,8 @@ export function variationLineControlId(key: string, column: VoLineColumn): strin
 
 /**
  * One line of a new variation order: each cell labelled, its refusal under it.
- * Its contract line is found by searching (use-baseline-line-search.ts), so the
- * picker never holds the whole contract; a failed search is said under the box.
+ * Its contract line is picked by search (baseline-line-picker.tsx), on a line
+ * of its own above the other cells.
  */
 export function VariationLineRow({
   index,
@@ -41,47 +34,21 @@ export function VariationLineRow({
   create: VariationCreateApi;
 }) {
   const tv = useTranslations('variations');
-  const locale = useLocale();
-  const [query, setQuery] = useState('');
-  const search = useBaselineLineSearch(contractId, query);
-  // The line picked earlier stays offered while a later search does not find it.
-  const picked =
-    line.contractLineId && !search.options.some((option) => option.value === line.contractLineId)
-      ? [{ value: line.contractLineId, label: line.contractLineLabel }]
-      : [];
-  const baselineOptions = [...picked, ...search.options];
   const cell = (column: VoLineColumn) => ({
     id: variationLineControlId(line.key, column),
     ...create.errors.bind(variationLinePath(line.key, column)),
   });
   const update = (patch: Partial<DraftVoLine>) => create.updateLine(index, patch);
-  const pickBaseline = (value: string) =>
-    update(
-      value === NET_DELTA
-        ? { contractLineId: '', contractLineLabel: '' }
-        : {
-            contractLineId: value,
-            contractLineLabel: baselineOptions.find((option) => option.value === value)?.label ?? '',
-          },
-    );
 
   return (
     <div className="flex flex-wrap items-start gap-2">
-      <FormField
-        id={`${variationLineControlId(line.key, 'contractLineId')}-find`}
-        label={tv('line.find')}
-        error={search.failure}
-      >
-        <Input className="w-40" value={query} onChange={(e) => setQuery(e.target.value)} />
-      </FormField>
-      <FormField {...cell('contractLineId')} label={tv('line.baseline')}>
-        <SelectControl
-          className="h-9 w-auto min-w-40"
-          value={line.contractLineId || NET_DELTA}
-          onValueChange={pickBaseline}
-          options={[{ value: NET_DELTA, label: tv('netDelta') }, ...baselineOptions]}
-        />
-      </FormField>
+      <BaselineLinePicker
+        contractId={contractId}
+        field={cell('contractLineId')}
+        contractLineId={line.contractLineId}
+        contractLineLabel={line.contractLineLabel}
+        onPick={update}
+      />
       <FormField {...cell('description')} label={tv('line.description')}>
         <Input
           className="w-40"
@@ -116,11 +83,6 @@ export function VariationLineRow({
       >
         <Trash2 className="size-4 text-muted-foreground" aria-hidden />
       </button>
-      {search.capped && (
-        <p className="basis-full text-caption text-muted-foreground">
-          {tv('line.capped', { count: formatNumber(search.options.length, locale) })}
-        </p>
-      )}
     </div>
   );
 }

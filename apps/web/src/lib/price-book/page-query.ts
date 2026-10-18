@@ -3,7 +3,8 @@ import { costItems, type CostItem, type MetraDb } from '@metra/db';
 import { and, asc, eq, sql } from 'drizzle-orm';
 import { withOrgContext, type OrgContext } from '@/lib/db/context';
 import { PRICE_BOOK_PAGE_SIZE, type PriceBookView } from './page-params';
-import { everyWordSql, nameInSql, nameSortKeySql } from './search-sql';
+import { everyWordSql } from '@/lib/search/words-sql';
+import { nameInSql, nameSortKeySql } from './search-sql';
 import { rankedSections } from './section-rank';
 
 /** One row of the price book table: only what the table and the edit form show. */

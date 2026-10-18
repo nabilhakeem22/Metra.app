@@ -8,8 +8,9 @@ import 'server-only';
 // deliberate — a field that is not on the object cannot be rendered by accident
 // or serialized into an API response.
 import { contractLines, contractSections, type MetraDb } from '@metra/db';
-import { asc, eq } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import type { ContractDetailLine, ContractDetailSection } from './detail-types';
+import { LINE_ORDER, SECTION_ORDER } from './line-view';
 
 type ContractLineRow = typeof contractLines.$inferSelect;
 
@@ -65,12 +66,12 @@ export async function loadContractSections(
     .select()
     .from(contractSections)
     .where(eq(contractSections.contractId, contractId))
-    .orderBy(asc(contractSections.sortOrder));
+    .orderBy(...SECTION_ORDER);
   const allLines = await tx
     .select()
     .from(contractLines)
     .where(eq(contractLines.contractId, contractId))
-    .orderBy(asc(contractLines.sortOrder));
+    .orderBy(...LINE_ORDER);
   const linesBySection = groupLinesBySection(allLines);
 
   return sections.map((section) => ({

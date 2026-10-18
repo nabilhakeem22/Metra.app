@@ -6,7 +6,7 @@
 // answers the same way.
 import { act, fireEvent, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { searchForm } from '@/lib/price-book/name-order';
+import { searchForm } from '@/lib/search/fold';
 import { PICKER_LIMIT } from '@/lib/price-book/picker-types';
 import { messageAt, renderWithIntl } from '@/test/render-with-intl';
 import type { CostItemOption } from './builder-model';

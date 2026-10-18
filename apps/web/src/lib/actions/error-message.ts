@@ -68,3 +68,18 @@ export type ShownFailure = Pick<ActionResult, 'error' | 'params' | 'reference'> 
 export function describeShownFailure(failure: ShownFailure, t: Translate): string {
   return 'rejection' in failure ? describeRejection(failure.rejection, t) : describeFailure(failure, t);
 }
+
+/**
+ * A failed READ as one sentence. As describeShownFailure, except that the
+ * sentences written for a save ("what you entered is still here") give way to
+ * `couldNotLoad`, since a load puts nothing the person typed at stake; a
+ * reference, when there is one, still follows it. A coded refusal
+ * (forbidden, record_not_found...) keeps its own message.
+ */
+export function describeReadFailure(failure: ShownFailure, t: Translate, couldNotLoad: string): string {
+  const withReference = (reference: string | undefined) =>
+    reference ? `${couldNotLoad} ${t('reference', { reference })}` : couldNotLoad;
+  if ('rejection' in failure) return withReference(digestOf(failure.rejection));
+  if (failure.error === undefined || failure.error === 'generic') return withReference(failure.reference);
+  return resolveActionError(failure.error, t, failure.params);
+}

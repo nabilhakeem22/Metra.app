@@ -18,6 +18,8 @@ export type {
   ContractDetailLine,
   ContractDetailSection,
   ContractHeaderDetail,
+  ContractLineOption,
+  ContractLineOptionsPage,
   ContractLinesPage,
   ContractLineView,
   ContractPageDetail,

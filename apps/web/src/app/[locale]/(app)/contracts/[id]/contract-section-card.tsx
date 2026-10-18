@@ -4,30 +4,36 @@ import { Loader2 } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { useRouter } from '@/i18n/routing';
 import type { ContractSectionSummary } from '@/lib/contracts/queries';
 import { formatNumber } from '@/lib/format/number';
 import { pickLocale } from '@/lib/i18n/pick-locale';
+import type { KeptSectionLines } from './use-kept-section-lines';
 import { useSectionLines } from './use-section-lines';
 
 /**
  * One contract section: its title and subtotal, the lines shown so far, and
  * "show lines" while more remain (a page at a time, use-section-lines.ts). A
- * failed ask is said under the button that made it.
+ * failed ask is said under the button that made it; when the lines are not
+ * this workspace's to show any more, with a way to reload the page.
  */
 export function ContractSectionCard({
   contractId,
   section,
+  kept,
   m,
 }: {
   contractId: string;
   section: ContractSectionSummary;
+  kept: KeptSectionLines;
   m: (v: string) => string;
 }) {
   const t = useTranslations('contracts.lines');
   const locale = useLocale();
+  const router = useRouter();
   const pick = (ar: string | null, en: string | null) =>
     pickLocale({ nameAr: ar, nameEn: en }, 'name', locale).value;
-  const shown = useSectionLines(contractId, section);
+  const shown = useSectionLines(contractId, section, kept);
 
   return (
     <Card>
@@ -68,8 +74,13 @@ export function ContractSectionCard({
             </Button>
             {shown.failure && (
               <p className="text-body text-destructive" role="alert">
-                {shown.failure}
+                {shown.failure.message}
               </p>
+            )}
+            {shown.failure?.gone && (
+              <Button size="sm" variant="secondary" onClick={() => router.refresh()}>
+                {t('reload')}
+              </Button>
             )}
           </div>
         )}

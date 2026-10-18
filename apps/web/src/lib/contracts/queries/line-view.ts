@@ -1,9 +1,9 @@
 import 'server-only';
-// The columns of a line as the contract page shows it, and the one order every
-// page-side line read uses. Shared by the opening window (./section-summaries.ts),
-// the per-section pages (./section-lines.ts) and the variation picker
-// (./line-search.ts), so a line reads the same and sits in the same place
-// wherever it is shown.
+// The columns of a line as the contract page shows it, and the ONE order every
+// contract line read uses: the opening window (./section-summaries.ts), the
+// per-section pages (./section-lines.ts), the variation picker
+// (./line-search.ts) and the PDF (./detail-sections.ts). So a line sits in the
+// same place on the page and in print, ties in sort_order included.
 //
 // NO COST COLUMN IS HERE: unitCost, lineCost and lineMargin never leave the
 // database on these reads, so there is no margin gate to forget.

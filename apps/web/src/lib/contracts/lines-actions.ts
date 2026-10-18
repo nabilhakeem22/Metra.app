@@ -3,7 +3,12 @@
 import type { ActionResult } from '@/lib/actions/result';
 import { requireOrg } from '@/lib/auth/require-org';
 import { loadSectionLinesCore, searchBaselineLinesCore } from './lines-core';
-import type { ContractLinesPage, LineSearchRequest, SectionLinesRequest } from './queries';
+import type {
+  ContractLineOptionsPage,
+  ContractLinesPage,
+  LineSearchRequest,
+  SectionLinesRequest,
+} from './queries';
 
 /** The contract page's "show lines": one section's next page (lines-core.ts). */
 export async function loadSectionLines(
@@ -16,7 +21,7 @@ export async function loadSectionLines(
 /** The variation form's baseline-line picker, asked on demand (lines-core.ts). */
 export async function searchBaselineLines(
   request: LineSearchRequest,
-): Promise<ActionResult & { data?: ContractLinesPage }> {
+): Promise<ActionResult & { data?: ContractLineOptionsPage }> {
   const ctx = await requireOrg();
   return searchBaselineLinesCore(ctx, request);
 }

@@ -13,6 +13,7 @@ import type { VariationListRow } from '@/lib/variations/queries';
 import { ContractOverview } from './contract-overview';
 import type { ContractAction } from './contract-vo-types';
 import { CONTRACT_TABS, type ContractTab } from './tabs';
+import { useKeptSectionLines } from './use-kept-section-lines';
 import { VariationRegister } from './variation-register';
 
 export function ContractDetailClient({
@@ -36,6 +37,7 @@ export function ContractDetailClient({
   const locale = useLocale();
   const router = useRouter();
   const [tab, setTab] = useState<ContractTab>('overview');
+  const keptLines = useKeptSectionLines();
   const [pending, startTransition] = useTransition();
   const [link, setLink] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -104,6 +106,7 @@ export function ContractDetailClient({
       {tab === 'overview' ? (
         <ContractOverview
           detail={detail}
+          keptLines={keptLines}
           canManage={canManage}
           canIssue={canIssue}
           pending={pending}

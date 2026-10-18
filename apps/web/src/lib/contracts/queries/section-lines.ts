@@ -7,6 +7,7 @@ import { contractLines } from '@metra/db';
 import { and, eq, sql } from 'drizzle-orm';
 import { withOrgContext, type OrgContext } from '@/lib/db/context';
 import type { ContractLinesPage } from './detail-types';
+import { isKnownSectionPosition } from './line-positions';
 import { LINE_ORDER, LINE_VIEW_COLUMNS, LINES_PAGE_SIZE } from './line-view';
 
 export interface SectionLinesRequest {
@@ -27,13 +28,14 @@ function pastCursor(sectionId: string, afterLineId: string) {
 
 /**
  * At most LINES_PAGE_SIZE lines of one section of one contract, in order, and
- * whether more follow. A section of another contract, or of another studio
- * (row-level security), answers an empty page.
+ * whether more follow. Null when the section is not one of the contract's, the
+ * cursor not one of the section's lines, or either is another studio's
+ * (row-level security): asked only when the page comes back empty.
  */
 export function listSectionLines(
   ctx: OrgContext,
   request: SectionLinesRequest,
-): Promise<ContractLinesPage> {
+): Promise<ContractLinesPage | null> {
   return withOrgContext(ctx, async (tx) => {
     const rows = await tx
       .select(LINE_VIEW_COLUMNS)
@@ -47,6 +49,7 @@ export function listSectionLines(
       )
       .orderBy(...LINE_ORDER)
       .limit(LINES_PAGE_SIZE + 1);
+    if (rows.length === 0 && !(await isKnownSectionPosition(tx, request))) return null;
     return { lines: rows.slice(0, LINES_PAGE_SIZE), hasMore: rows.length > LINES_PAGE_SIZE };
   });
 }

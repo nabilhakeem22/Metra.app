@@ -53,6 +53,21 @@ export interface ContractLinesPage {
   hasMore: boolean;
 }
 
+/** A contract line as the variation picker offers it: what it reads as, and its section. */
+export interface ContractLineOption {
+  id: string;
+  descriptionAr: string | null;
+  descriptionEn: string | null;
+  sectionTitleAr: string | null;
+  sectionTitleEn: string | null;
+}
+
+/** One picker answer (never more than 50 lines) and whether more matched after them. */
+export interface ContractLineOptionsPage {
+  lines: ContractLineOption[];
+  hasMore: boolean;
+}
+
 /**
  * A section as the contract page opens it: its line count from SQL, and only
  * the lines that fall inside the page's opening window (the first 50 lines of

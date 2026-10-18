@@ -7,9 +7,11 @@ import { Card, CardContent } from '@/components/ui/card';
 import type { ContractPageDetail } from '@/lib/contracts/queries';
 import { ContractHeaderForm } from './contract-header-form';
 import { ContractSectionCard } from './contract-section-card';
+import type { KeptSectionLines } from './use-kept-section-lines';
 
 export function ContractOverview({
   detail,
+  keptLines,
   canManage,
   canIssue,
   pending,
@@ -18,6 +20,7 @@ export function ContractOverview({
   onTerminate,
 }: {
   detail: ContractPageDetail;
+  keptLines: KeptSectionLines;
   canManage: boolean;
   canIssue: boolean;
   pending: boolean;
@@ -70,7 +73,7 @@ export function ContractOverview({
       )}
 
       {detail.sections.map((section) => (
-        <ContractSectionCard key={section.id} contractId={detail.id} section={section} m={m} />
+        <ContractSectionCard key={section.id} contractId={detail.id} section={section} kept={keptLines} m={m} />
       ))}
     </div>
   );
