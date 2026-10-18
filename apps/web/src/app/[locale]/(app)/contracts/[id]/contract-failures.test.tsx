@@ -1,6 +1,6 @@
 import { act, fireEvent, screen } from '@testing-library/react';
 import { describe, expect, test, vi } from 'vitest';
-import type { ContractDetail } from '@/lib/contracts/queries';
+import type { ContractPageDetail } from '@/lib/contracts/queries';
 import { messageAt, renderWithIntl, type TestLocale } from '@/test/render-with-intl';
 import { ContractsClient } from '../contracts-client';
 import { ContractDetailClient } from './contract-detail-client';
@@ -19,6 +19,11 @@ const contracts = vi.hoisted(() => ({
   terminateContract: vi.fn(),
 }));
 vi.mock('@/lib/contracts/actions', () => contracts);
+const lineReads = vi.hoisted(() => ({
+  loadSectionLines: vi.fn(),
+  searchBaselineLines: vi.fn(async () => ({ ok: true, data: { lines: [], hasMore: false } })),
+}));
+vi.mock('@/lib/contracts/lines-actions', () => lineReads);
 const variations = vi.hoisted(() => ({
   createVariationDraft: vi.fn(),
   saveVariationDraft: vi.fn(),
@@ -42,7 +47,7 @@ const DETAIL = {
   originalValue: '1000.0000',
   revisedValue: '1000.0000',
   sections: [],
-} as unknown as ContractDetail;
+} as unknown as ContractPageDetail;
 
 async function press(name: string) {
   await act(async () => {
@@ -106,7 +111,6 @@ describe.each<TestLocale>(['en', 'ar-EG'])('contract screens say the cause, not 
         contractId="k-1"
         contractStatus="issued"
         variations={[]}
-        baselineLines={[]}
         canDraftVariation
         canPriceVariation={false}
         pending={false}

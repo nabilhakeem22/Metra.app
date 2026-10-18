@@ -1,14 +1,12 @@
-import { organizations } from '@metra/db';
 import { getTranslations } from 'next-intl/server';
 import { notFound } from 'next/navigation';
 import { PageHeader } from '@/components/ui/page-header';
 import { requireOrg } from '@/lib/auth/require-org';
-import { getContractWithLines } from '@/lib/contracts/queries';
-import { withOrgContext } from '@/lib/db/context';
+import { getContractPage } from '@/lib/contracts/queries';
 import { docYear, formatDocNumber } from '@/lib/format/doc-number';
-import { can, canSeeMargin } from '@/lib/permissions/can';
+import { resolveSeeMargin } from '@/lib/org/queries';
+import { can } from '@/lib/permissions/can';
 import { listVariations } from '@/lib/variations/queries';
-import { eq } from 'drizzle-orm';
 import { ContractDetailClient } from './contract-detail-client';
 
 export default async function ContractDetailPage({
@@ -21,15 +19,8 @@ export default async function ContractDetailPage({
   const { id } = await params;
 
   const t = await getTranslations('contracts');
-  const [org] = await withOrgContext(ctx, (tx) =>
-    tx
-      .select({ hide: organizations.hideMarginFromPm })
-      .from(organizations)
-      .where(eq(organizations.id, ctx.orgId))
-      .limit(1),
-  );
-  const seeMargin = canSeeMargin(ctx.role, org?.hide ?? true);
-  const detail = await getContractWithLines(ctx, id, seeMargin);
+  const seeMargin = await resolveSeeMargin(ctx);
+  const detail = await getContractPage(ctx, id, seeMargin);
   if (!detail) notFound();
   const variations = await listVariations(ctx, { contractId: id });
 

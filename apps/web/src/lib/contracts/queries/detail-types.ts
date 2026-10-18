@@ -1,5 +1,5 @@
-// The contract detail shapes the page, the PDF template and the public API
-// serializer all read.
+// The contract detail shapes: the PDF's (every line) and the page's (sections
+// counted in SQL, lines a page at a time).
 //
 // PURE TYPES ONLY — no `server-only`, no runtime value — so a client component
 // can name `ContractDetail` without pulling the query layer into its bundle.
@@ -36,7 +36,40 @@ export interface ContractDetailSection {
   lines: ContractDetailLine[];
 }
 
-export interface ContractDetail {
+/** A line as the contract page shows it. It carries no cost, so it has no margin gate to keep. */
+export interface ContractLineView {
+  id: string;
+  descriptionAr: string | null;
+  descriptionEn: string | null;
+  qty: string;
+  unit: string;
+  unitPrice: string;
+  lineTotal: string;
+}
+
+/** One request's lines (never more than 50) and whether more follow them. */
+export interface ContractLinesPage {
+  lines: ContractLineView[];
+  hasMore: boolean;
+}
+
+/**
+ * A section as the contract page opens it: its line count from SQL, and only
+ * the lines that fall inside the page's opening window (the first 50 lines of
+ * the whole contract). The rest load on demand, a page at a time.
+ */
+export interface ContractSectionSummary {
+  id: string;
+  titleAr: string | null;
+  titleEn: string | null;
+  sortOrder: number;
+  sectionSubtotal: string;
+  lineCount: number;
+  openingLines: ContractLineView[];
+}
+
+/** Everything about a contract but its sections. */
+export interface ContractHeaderDetail {
   id: string;
   number: number;
   titleAr: string | null;
@@ -79,8 +112,17 @@ export interface ContractDetail {
   originalValue: string;
   // Computed aggregate (A3): originalValue + Σ approved-VO netDeltas.
   revisedValue: string;
-  sections: ContractDetailSection[];
   // margin-gated
   totalCost?: string;
   totalMargin?: string;
+}
+
+/** The contract with every line: what the PDF prints. */
+export interface ContractDetail extends ContractHeaderDetail {
+  sections: ContractDetailSection[];
+}
+
+/** The contract as its page opens: bounded whatever the contract's size. */
+export interface ContractPageDetail extends ContractHeaderDetail {
+  sections: ContractSectionSummary[];
 }

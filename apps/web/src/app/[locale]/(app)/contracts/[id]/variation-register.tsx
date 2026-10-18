@@ -4,7 +4,7 @@ import { Plus } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
 import type { VariationListRow } from '@/lib/variations/queries';
-import type { BaselineLine, ContractAction } from './contract-vo-types';
+import type { ContractAction } from './contract-vo-types';
 import { useVariationCreate } from './use-variation-create';
 import { VariationCreateForm } from './variation-create-form';
 import { VariationTable } from './variation-table';
@@ -14,7 +14,6 @@ export function VariationRegister({
   contractId,
   contractStatus,
   variations,
-  baselineLines,
   canDraftVariation,
   canPriceVariation,
   pending,
@@ -24,7 +23,6 @@ export function VariationRegister({
   contractId: string;
   contractStatus: string;
   variations: VariationListRow[];
-  baselineLines: BaselineLine[];
   canDraftVariation: boolean;
   canPriceVariation: boolean;
   pending: boolean;
@@ -46,7 +44,7 @@ export function VariationRegister({
           </Button>
         )}
       </div>
-      {create.open && <VariationCreateForm create={create} baselineLines={baselineLines} />}
+      {create.open && <VariationCreateForm create={create} contractId={contractId} />}
       <VariationTable
         variations={variations}
         canPriceVariation={canPriceVariation}

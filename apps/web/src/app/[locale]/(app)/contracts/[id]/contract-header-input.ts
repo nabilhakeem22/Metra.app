@@ -1,6 +1,6 @@
 // The contract header form's typed state, and its two conversions: from the
 // stored contract, and to the save input. Plain functions, testable alone.
-import type { ContractDetail } from '@/lib/contracts/queries';
+import type { ContractHeaderDetail } from '@/lib/contracts/queries';
 
 /** Every box of the header form; a refusal the server names sits under its box. */
 export const CONTRACT_HEADER_FIELDS = [
@@ -17,7 +17,7 @@ export const CONTRACT_HEADER_FIELDS = [
 
 export type HeaderForm = Record<(typeof CONTRACT_HEADER_FIELDS)[number], string>;
 
-export function headerFormOf(detail: ContractDetail): HeaderForm {
+export function headerFormOf(detail: ContractHeaderDetail): HeaderForm {
   return {
     signatureDate: detail.signatureDate ?? '',
     startDate: detail.startDate ?? '',

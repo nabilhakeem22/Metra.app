@@ -28,7 +28,7 @@ import {
   acknowledgeContractByToken,
   getContractByToken,
 } from '@/lib/contracts/public';
-import { getContractWithLines } from '@/lib/contracts/queries';
+import { getContractPage } from '@/lib/contracts/queries';
 import { closeFixture, ctxFor, raw, seedOrg, teardown } from './fixture';
 import type { OrgContext } from '@/lib/db/context';
 import type { MemberRole } from '@metra/db';
@@ -92,12 +92,13 @@ describe('generateContractCore (AC1, AC2, AC3)', () => {
     const res = await generateContractCore(ctx, { proposalId });
     expect(res.ok).toBe(true);
     const contractId = (res as { data?: string }).data!;
-    const detail = await getContractWithLines(ctx, contractId, true);
+    const detail = await getContractPage(ctx, contractId, true);
     expect(detail).not.toBeNull();
     expect(detail!.status).toBe('draft');
     expect(detail!.originalValue).toBe(total);
     expect(detail!.sections).toHaveLength(1);
-    expect(detail!.sections[0].lines).toHaveLength(2);
+    expect(detail!.sections[0].lineCount).toBe(2);
+    expect(detail!.sections[0].openingLines).toHaveLength(2);
     // Revised == original when there are no approved VOs.
     expect(detail!.revisedValue).toBe(total);
   });
@@ -255,7 +256,7 @@ describe('contract draft header edit', () => {
     expect(
       (await saveContractDraftCore(base.ctx, { id: contractId, header: { retentionPct: '5', advancePct: '10' } })).ok,
     ).toBe(true);
-    const d = await getContractWithLines(base.ctx, contractId, true);
+    const d = await getContractPage(base.ctx, contractId, true);
     expect(d!.retentionPct).toBe('5.0000');
     expect(d!.advancePct).toBe('10.0000');
     await issueContractCore(base.ctx, { id: contractId });

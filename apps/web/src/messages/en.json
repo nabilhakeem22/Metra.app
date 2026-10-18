@@ -1600,6 +1600,10 @@
       "originalValue": "Original value",
       "advancePct": "Advance %",
       "retentionPct": "Retention %"
+    },
+    "lines": {
+      "show": "Show lines ({count})",
+      "showMore": "Show more lines ({count} left)"
     }
   },
   "variations": {
@@ -1621,7 +1625,9 @@
       "qty": "Quantity",
       "remove": "Remove line",
       "unit": "Unit",
-      "unitPrice": "Unit price"
+      "unitPrice": "Unit price",
+      "find": "Find a contract line",
+      "capped": "Showing the first {count} lines only. Type a word from the description to reach the rest."
     },
     "saveDraft": "Save draft",
     "saved": "Saved",
