@@ -17,8 +17,6 @@ export const MAX_SCHEDULE_LABEL_CHARS = 80;
 
 /** The smallest row a schedule takes: one piastre, or 0.01 percent. */
 const MIN_ROW_VALUE = '0.01';
-/** The smallest amount a payment request can carry (its CHECK is amount > 0). */
-const MIN_ROW_AMOUNT = '0.0001';
 const HUNDRED_PERCENT_4 = parseMoney4('100');
 
 /** One row as the studio typed it. */
@@ -87,11 +85,16 @@ function shapeError(rows: ScheduleRowInput[]): FieldError | null {
  * `milestones` for the schedule as a whole: no rows, more than 12, a mixed
  * basis, rows that do not add up (`schedule_sum_mismatch`, params
  * {expected, actual}), or a contract value too small for the split
- * (`out_of_range`, params {min, max}: some row would bill 0 or less).
+ * (`schedule_value_too_small`, params {value}).
  */
-export function validateSchedule(rows: ScheduleRowInput[], originalValue: string): ScheduleValidation {
+export function validateSchedule(
+  rows: ScheduleRowInput[],
+  originalValue: string,
+  taxAmount: string,
+): ScheduleValidation {
   const shape = shapeError(rows);
   if (shape) return { ok: false, errors: { milestones: shape } };
+  if (parseMoney4(originalValue) <= 0n) return valueTooSmall(originalValue);
 
   const percent = rows[0].basis === 'percent';
   const target4 = percent ? HUNDRED_PERCENT_4 : parseMoney4(originalValue);
@@ -118,18 +121,25 @@ export function validateSchedule(rows: ScheduleRowInput[], originalValue: string
     value: formatMoney4(clean4[index]),
     sortOrder: index,
   }));
-  if (billsNothingOnSomeRow(cleanRows, originalValue)) {
-    const params = { min: MIN_ROW_AMOUNT, max: plainDecimal(parseMoney4(originalValue)) };
-    return { ok: false, errors: { milestones: { code: 'out_of_range', params } } };
-  }
+  if (!everyRowBillable(cleanRows, originalValue, taxAmount)) return valueTooSmall(originalValue);
   return { ok: true, rows: cleanRows };
 }
 
+function valueTooSmall(originalValue: string): ScheduleValidation {
+  const params = { value: plainDecimal(parseMoney4(originalValue)) };
+  return { ok: false, errors: { milestones: { code: 'schedule_value_too_small', params } } };
+}
+
 /**
- * A contract value too small for its split: once rounded, some row would
- * request 0 or less, which no payment request can carry. Read with the SAME
- * `milestoneAmounts` the requests are issued with (the VAT does not move it).
+ * Every row can become a payment request: an amount above 0 and a VAT share
+ * from 0 to that amount (the request's CHECKs). Read with the SAME
+ * `milestoneAmounts` the requests are issued with; only a contract value too
+ * small for its split fails it.
  */
-function billsNothingOnSomeRow(rows: CleanScheduleRow[], originalValue: string): boolean {
-  return milestoneAmounts(rows, originalValue, '0').some((row) => parseMoney4(row.amount) <= 0n);
+function everyRowBillable(rows: CleanScheduleRow[], originalValue: string, taxAmount: string): boolean {
+  return milestoneAmounts(rows, originalValue, taxAmount).every((row) => {
+    const amount4 = parseMoney4(row.amount);
+    const tax4 = parseMoney4(row.taxAmount);
+    return amount4 > 0n && tax4 >= 0n && tax4 <= amount4;
+  });
 }

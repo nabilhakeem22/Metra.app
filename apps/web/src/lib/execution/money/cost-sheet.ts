@@ -6,9 +6,11 @@
 //   budget            = Σ contract line_cost + Σ approved change-order line_cost
 //   value ex VAT      = original_value - tax_amount + Σ approved orders (works + supervision)
 //   planned margin    = value ex VAT - budget
-//   projected margin  = value ex VAT - Σ per row max(budget, actual)
-// Costs booked against the whole contract sit in their own row (budget 0), so
-// they count in full; the change-order budget sits in another (actual 0).
+//   projected margin  = value ex VAT - max(total budget, total actual)  (lead ruling F3/F4; supersedes A17's per-section max)
+// The total budget carries de-scopes (it can go down) and the total actual is
+// every live cost entry. Per-row variance and over-budget flags are display
+// only. Costs booked against the whole contract sit in their own row (budget 0);
+// the change orders' budget sits in another that shows the budget only.
 import { formatMoney4, marginPct, parseMoney4 } from '@/lib/aggregates/proposal-totals';
 import { variationCharge } from './variation-charge';
 
@@ -44,9 +46,10 @@ export interface CostSheetRow {
   titleAr: string | null;
   titleEn: string | null;
   budgetCost: string;
-  actualCost: string;
-  /** actual - budget: above zero is over budget. */
-  variance: string;
+  /** Null on the change-orders row: cost entries are booked to sections, never to it. */
+  actualCost: string | null;
+  /** actual - budget, above zero is over budget; null where actual is. */
+  variance: string | null;
   overBudget: boolean;
 }
 
@@ -89,12 +92,13 @@ function costRows(input: CostSheetInput): CostSheetRow[] {
     rows.push(costRow('whole_contract', { ...untitled, budgetCost: '0', actualCost: input.unallocatedActualCost }));
   }
   if (parseMoney4(input.approvedVariationsCost) !== 0n) {
-    rows.push(costRow('change_orders', { ...untitled, budgetCost: input.approvedVariationsCost, actualCost: '0' }));
+    const budgetCost = formatMoney4(parseMoney4(input.approvedVariationsCost));
+    rows.push({ kind: 'change_orders', ...untitled, budgetCost, actualCost: null, variance: null, overBudget: false });
   }
   return rows;
 }
 
-function sum4(values: string[]): bigint {
+function sum4(values: (string | null)[]): bigint {
   return values.reduce((total, value) => total + parseMoney4(value), 0n);
 }
 
@@ -114,16 +118,13 @@ function contractValue(input: CostSheetInput): CostSheet['value'] {
   };
 }
 
-/** Planned against the budget; projected against the larger of budget and actual per row. */
-function contractMargin(valueExVat: string, rows: CostSheetRow[]): NonNullable<CostSheet['margin']> {
+/** Planned against the total budget; projected against the larger of total budget and total actual. */
+function contractMargin(valueExVat: string, totals: CostSheet['totals']): NonNullable<CostSheet['margin']> {
   const value4 = parseMoney4(valueExVat);
-  const exposure4 = rows.reduce((total, row) => {
-    const budget4 = parseMoney4(row.budgetCost);
-    const actual4 = parseMoney4(row.actualCost);
-    return total + (actual4 > budget4 ? actual4 : budget4);
-  }, 0n);
-  const planned = formatMoney4(value4 - sum4(rows.map((row) => row.budgetCost)));
-  const projected = formatMoney4(value4 - exposure4);
+  const budget4 = parseMoney4(totals.budgetCost);
+  const actual4 = parseMoney4(totals.actualCost);
+  const planned = formatMoney4(value4 - budget4);
+  const projected = formatMoney4(value4 - (actual4 > budget4 ? actual4 : budget4));
   return { planned, projected, plannedPct: marginPct(planned, valueExVat), projectedPct: marginPct(projected, valueExVat) };
 }
 
@@ -133,6 +134,10 @@ export function buildCostSheet(input: CostSheetInput, canSeeMargin: boolean): Co
   const rows = costRows(input);
   const requested4 = parseMoney4(input.requestedTotal);
   const paid4 = parseMoney4(input.paidTotal);
+  const totals = {
+    budgetCost: formatMoney4(sum4(rows.map((row) => row.budgetCost))),
+    actualCost: formatMoney4(sum4(rows.map((row) => row.actualCost))),
+  };
   return {
     value,
     billing: {
@@ -141,10 +146,7 @@ export function buildCostSheet(input: CostSheetInput, canSeeMargin: boolean): Co
       outstanding: formatMoney4(requested4 - paid4),
     },
     sections: rows,
-    totals: {
-      budgetCost: formatMoney4(sum4(rows.map((row) => row.budgetCost))),
-      actualCost: formatMoney4(sum4(rows.map((row) => row.actualCost))),
-    },
-    margin: canSeeMargin ? contractMargin(value.valueExVat, rows) : null,
+    totals,
+    margin: canSeeMargin ? contractMargin(value.valueExVat, totals) : null,
   };
 }

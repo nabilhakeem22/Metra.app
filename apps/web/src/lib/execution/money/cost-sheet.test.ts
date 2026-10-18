@@ -36,7 +36,7 @@ describe('buildCostSheet', () => {
       ['section', 'a', '40000.0000', '45000.0000', '5000.0000', true],
       ['section', 'b', '30000.0000', '20000.0000', '-10000.0000', false],
       ['whole_contract', null, '0.0000', '3000.0000', '3000.0000', true],
-      ['change_orders', null, '6000.0000', '0.0000', '-6000.0000', false],
+      ['change_orders', null, '6000.0000', null, null, false],
     ]);
     expect(sections[0]).toMatchObject({ titleAr: 'نجارة', titleEn: 'Joinery' });
   });
@@ -45,13 +45,55 @@ describe('buildCostSheet', () => {
     expect(buildCostSheet(input, true).totals).toEqual({ budgetCost: '76000.0000', actualCost: '68000.0000' });
   });
 
-  it('planned margin is against the budget, projected against max(budget, actual) per row', () => {
+  it('planned margin is against the budget, projected against max(total budget, total actual)', () => {
     const { margin } = buildCostSheet(input, true);
-    // 121,000 - 76,000 ; 121,000 - (45,000 + 30,000 + 3,000 + 6,000)
+    // 121,000 - 76,000 ; 121,000 - max(76,000, 68,000): a section over budget
+    // is offset by one under it, so only the totals decide.
     expect(margin?.planned).toBe('45000.0000');
-    expect(margin?.projected).toBe('37000.0000');
+    expect(margin?.projected).toBe('45000.0000');
     expect(margin?.plannedPct).toBeCloseTo(37.19, 2);
-    expect(margin?.projectedPct).toBeCloseTo(30.58, 2);
+    expect(margin?.projectedPct).toBeCloseTo(37.19, 2);
+  });
+
+  it('projected margin falls once total actual passes total budget', () => {
+    const over = { ...input, sections: [{ ...input.sections[0], actualCost: '60000' }, input.sections[1]] };
+    // actual 60,000 + 20,000 + 3,000 = 83,000 > budget 76,000
+    expect(buildCostSheet(over, true).margin?.projected).toBe('38000.0000');
+  });
+
+  it('F3: a de-scope with nothing spent leaves projected equal to planned, and is not over budget', () => {
+    const sheet = buildCostSheet(
+      {
+        ...input,
+        approvedVariationNetDeltas: ['-10000'],
+        approvedVariationsCost: '-8000',
+        sections: [{ sectionId: 'a', titleAr: null, titleEn: 'A', budgetCost: '70000', actualCost: '0' }],
+        unallocatedActualCost: '0',
+      },
+      true,
+    );
+    // value ex VAT 124,000 - 14,000 - 10,000 - 1,000 = 99,000 ; budget 70,000 - 8,000
+    expect(sheet.totals.budgetCost).toBe('62000.0000');
+    expect(sheet.margin).toMatchObject({ planned: '37000.0000', projected: '37000.0000' });
+    expect(sheet.sections[1]).toEqual({
+      kind: 'change_orders', sectionId: null, titleAr: null, titleEn: null,
+      budgetCost: '-8000.0000', actualCost: null, variance: null, overBudget: false,
+    });
+  });
+
+  it('F4: change-order work booked to its section counts its budget once', () => {
+    const sheet = buildCostSheet(
+      {
+        ...input,
+        sections: [{ sectionId: 'a', titleAr: null, titleEn: 'A', budgetCost: '70000', actualCost: '76000' }],
+        unallocatedActualCost: '0',
+      },
+      true,
+    );
+    // 121,000 - max(70,000 + 6,000, 76,000)
+    expect(sheet.margin).toMatchObject({ planned: '45000.0000', projected: '45000.0000' });
+    // The section still shows it ran 6,000 over its own budget.
+    expect(sheet.sections[0]).toMatchObject({ variance: '6000.0000', overBudget: true });
   });
 
   it('hides the margin from a reader who may not see it', () => {

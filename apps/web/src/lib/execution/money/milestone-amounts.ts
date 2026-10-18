@@ -3,9 +3,11 @@
 //
 // Milestones are on `original_value` only (plan A7): approved change orders
 // bill on their own, and remeasurement only reaches the final account.
-// Every row but the last rounds half away from zero (`pctOf`, or a share of
-// the VAT for an amount row); the LAST row takes the remainder, so the rows
-// add up to the contract value and its VAT exactly, to the piastre.
+// Every row rounds half away from zero (`pctOf`, or a share of the VAT for an
+// amount row), then two remainders keep the sums exact to the piastre: the
+// LAST row takes the amount remainder (plan A6), and the row with the LARGEST
+// amount (the last of them on a tie) takes the VAT remainder, so the rounding
+// of many rows never lands on a small one and drives its VAT below zero.
 import { invariant } from '@/lib/actions/invariant';
 import { formatMoney4, parseMoney4, pctOf } from '@/lib/aggregates/proposal-totals';
 import type { CleanScheduleRow } from './schedule';
@@ -32,6 +34,15 @@ function rowShare(row: CleanScheduleRow, value4: bigint, tax4: bigint): { amount
   return { amount4: rowValue4, tax4: proportionalShare(tax4, rowValue4, value4) };
 }
 
+/** The row that absorbs the VAT remainder: the largest amount, the last on a tie. */
+function largestRow(amounts4: bigint[]): number {
+  return amounts4.reduce((largest, amount4, index) => (amount4 >= amounts4[largest] ? index : largest), 0);
+}
+
+function sumExcept(values4: bigint[], skip: number): bigint {
+  return values4.reduce((total, value4, index) => (index === skip ? total : total + value4), 0n);
+}
+
 /**
  * The amount and VAT of each row, in row order. `rows` come from
  * `validateSchedule`, so they share one basis and add up; the remainder rule
@@ -42,17 +53,15 @@ export function milestoneAmounts(
   originalValue: string,
   taxAmount: string,
 ): MilestoneAmount[] {
+  if (rows.length === 0) return [];
   const value4 = parseMoney4(originalValue);
   const tax4 = parseMoney4(taxAmount);
-  let billed4 = 0n;
-  let billedTax4 = 0n;
-  return rows.map((row, index) => {
-    const last = index === rows.length - 1;
-    const share = last
-      ? { amount4: value4 - billed4, tax4: tax4 - billedTax4 }
-      : rowShare(row, value4, tax4);
-    billed4 += share.amount4;
-    billedTax4 += share.tax4;
-    return { amount: formatMoney4(share.amount4), taxAmount: formatMoney4(share.tax4) };
-  });
+  const shares = rows.map((row) => rowShare(row, value4, tax4));
+  const amounts4 = shares.map((share) => share.amount4);
+  const taxes4 = shares.map((share) => share.tax4);
+  const last = rows.length - 1;
+  amounts4[last] = value4 - sumExcept(amounts4, last);
+  const taxRow = largestRow(amounts4);
+  taxes4[taxRow] = tax4 - sumExcept(taxes4, taxRow);
+  return amounts4.map((amount4, index) => ({ amount: formatMoney4(amount4), taxAmount: formatMoney4(taxes4[index]) }));
 }

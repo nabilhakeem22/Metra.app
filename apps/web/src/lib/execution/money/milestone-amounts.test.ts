@@ -65,4 +65,36 @@ describe('milestoneAmounts', () => {
       'proportionalShare: negative input',
     );
   });
+
+  it('F6: the VAT remainder goes to the largest row, never driving a tiny last row negative', () => {
+    // 1,000,000 BOQ at 1% VAT: 1,010,000 with 10,000 VAT; ten rows of 9,090.5,
+    // one of 919,094.99 and a last row of 0.01. Each of the first eleven rounds
+    // its VAT share up, which used to leave -0.0004 on the last row.
+    const schedule = rows('amount', ...Array.from({ length: 10 }, () => '9090.5000'), '919094.9900', '0.0100');
+    const amounts = milestoneAmounts(schedule, '1010000.0000', '10000.0000');
+    for (const row of amounts) {
+      expect(parseMoney4(row.taxAmount) >= 0n).toBe(true);
+      expect(parseMoney4(row.taxAmount) <= parseMoney4(row.amount)).toBe(true);
+    }
+    expect(amounts[11]).toEqual({ amount: '0.0100', taxAmount: '0.0001' });
+    expect(total(amounts, 'amount')).toBe('1010000.0000');
+    expect(total(amounts, 'taxAmount')).toBe('10000.0000');
+  });
+
+  it('the amount remainder stays on the last row while a larger earlier row takes the VAT remainder', () => {
+    const amounts = milestoneAmounts(rows('percent', '60', '40'), '1000.0001', '120.0001');
+    // 60% of 1,000.0001 = 600.00006 -> 600.0001; the last row takes 400.0000.
+    expect(amounts.map((row) => row.amount)).toEqual(['600.0001', '400.0000']);
+    // 40% of 120.0001 = 48.00004 -> 48.0000; the larger first row takes 72.0001.
+    expect(amounts.map((row) => row.taxAmount)).toEqual(['72.0001', '48.0000']);
+  });
+
+  it('on a tie for the largest amount the last of them takes the VAT remainder', () => {
+    const amounts = milestoneAmounts(rows('percent', '50', '50'), '100', '0.0003');
+    // 50% of 0.0003 = 0.00015 -> 0.0002 on the first; the tied last row takes 0.0001.
+    expect(amounts).toEqual([
+      { amount: '50.0000', taxAmount: '0.0002' },
+      { amount: '50.0000', taxAmount: '0.0001' },
+    ]);
+  });
 });

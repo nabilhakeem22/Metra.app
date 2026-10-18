@@ -11,7 +11,7 @@ function amountRows(...values: string[]): ScheduleRowInput[] {
 
 describe('validateSchedule', () => {
   it('accepts 50/30/20 and returns canonical rows in order', () => {
-    const result = validateSchedule(percentRows('50', '30', '20'), '124000');
+    const result = validateSchedule(percentRows('50', '30', '20'), '124000', '14000');
     expect(result).toEqual({
       ok: true,
       rows: [
@@ -23,7 +23,7 @@ describe('validateSchedule', () => {
   });
 
   it('AC6: 50/30 refuses under milestones with expected 100, actual 80', () => {
-    expect(validateSchedule(percentRows('50', '30'), '124000')).toEqual({
+    expect(validateSchedule(percentRows('50', '30'), '124000', '0')).toEqual({
       ok: false,
       errors: { milestones: { code: 'schedule_sum_mismatch', params: { expected: '100', actual: '80' } } },
     });
@@ -31,15 +31,15 @@ describe('validateSchedule', () => {
 
   it('AC6: a mixed basis is refused under milestones', () => {
     const rows = [...percentRows('50'), ...amountRows('62000')];
-    expect(validateSchedule(rows, '124000')).toEqual({
+    expect(validateSchedule(rows, '124000', '0')).toEqual({
       ok: false,
       errors: { milestones: { code: 'contract_schedule_invalid' } },
     });
   });
 
   it('amounts must add up to the contract value to the piastre', () => {
-    expect(validateSchedule(amountRows('62000', '62000'), '124000').ok).toBe(true);
-    expect(validateSchedule(amountRows('62000', '61999.9999'), '124000')).toEqual({
+    expect(validateSchedule(amountRows('62000', '62000'), '124000', '0').ok).toBe(true);
+    expect(validateSchedule(amountRows('62000', '61999.9999'), '124000', '0')).toEqual({
       ok: false,
       errors: {
         milestones: { code: 'schedule_sum_mismatch', params: { expected: '124000', actual: '123999.9999' } },
@@ -48,13 +48,13 @@ describe('validateSchedule', () => {
   });
 
   it('a percent split with decimals that sums to exactly 100 is accepted', () => {
-    expect(validateSchedule(percentRows('33.33', '33.33', '33.34'), '1000').ok).toBe(true);
+    expect(validateSchedule(percentRows('33.33', '33.33', '33.34'), '1000', '0').ok).toBe(true);
   });
 
   it('refuses an empty schedule and one past 12 rows under milestones', () => {
-    expect(validateSchedule([], '1000')).toEqual({ ok: false, errors: { milestones: { code: 'required' } } });
+    expect(validateSchedule([], '1000', '0')).toEqual({ ok: false, errors: { milestones: { code: 'required' } } });
     const tooMany = percentRows(...Array.from({ length: MAX_SCHEDULE_ROWS + 1 }, () => '1'));
-    expect(validateSchedule(tooMany, '1000')).toEqual({
+    expect(validateSchedule(tooMany, '1000', '0')).toEqual({
       ok: false,
       errors: { milestones: { code: 'schedule_too_long' } },
     });
@@ -67,7 +67,7 @@ describe('validateSchedule', () => {
       { labelAr: 'ج', labelEn: 'x'.repeat(81), basis: 'percent', value: '' },
       { labelAr: 'د', labelEn: null, basis: 'percent', value: '٥٠' },
     ];
-    expect(validateSchedule(rows, '1000')).toEqual({
+    expect(validateSchedule(rows, '1000', '0')).toEqual({
       ok: false,
       errors: {
         'milestones.0.label': { code: 'required' },
@@ -80,7 +80,7 @@ describe('validateSchedule', () => {
   });
 
   it('refuses a zero, a negative or a share over the target under the value box', () => {
-    const result = validateSchedule(percentRows('0', '-5', '100.0001'), '1000');
+    const result = validateSchedule(percentRows('0', '-5', '100.0001'), '1000', '0');
     expect(result).toEqual({
       ok: false,
       errors: {
@@ -89,7 +89,7 @@ describe('validateSchedule', () => {
         'milestones.2.value': { code: 'out_of_range', params: { min: '0.01', max: '100' } },
       },
     });
-    expect(validateSchedule(amountRows('2000'), '1000.5')).toEqual({
+    expect(validateSchedule(amountRows('2000'), '1000.5', '0')).toEqual({
       ok: false,
       errors: { 'milestones.0.value': { code: 'out_of_range', params: { min: '0.01', max: '1000.5' } } },
     });
@@ -97,22 +97,45 @@ describe('validateSchedule', () => {
 
   it('trims labels and keeps either language alone', () => {
     const rows: ScheduleRowInput[] = [{ labelAr: null, labelEn: '  On handover  ', basis: 'percent', value: '100' }];
-    const result = validateSchedule(rows, '1000');
+    const result = validateSchedule(rows, '1000', '0');
     expect(result.ok && result.rows[0]).toMatchObject({ labelAr: null, labelEn: 'On handover' });
   });
 
-  it('refuses a contract value too small for its split: some row would bill nothing', () => {
+  it('F7: refuses a contract value too small for its split, under milestones', () => {
     // 50% of 0.0001 rounds to 0.0001, leaving 0 for the last row.
-    expect(validateSchedule(percentRows('50', '50'), '0.0001')).toEqual({
+    expect(validateSchedule(percentRows('50', '50'), '0.0001', '0')).toEqual({
       ok: false,
-      errors: { milestones: { code: 'out_of_range', params: { min: '0.0001', max: '0.0001' } } },
+      errors: { milestones: { code: 'schedule_value_too_small', params: { value: '0.0001' } } },
     });
     // Two thirds round up to 0.0001 each and leave nothing for the third.
-    expect(validateSchedule(percentRows('33.33', '33.33', '33.34'), '0.0002').ok).toBe(false);
+    expect(validateSchedule(percentRows('33.33', '33.33', '33.34'), '0.0002', '0')).toEqual({
+      ok: false,
+      errors: { milestones: { code: 'schedule_value_too_small', params: { value: '0.0002' } } },
+    });
+  });
+
+  it('F7: a contract value of 0 or below is too small for any split, before any row is read', () => {
+    const tooSmall = { ok: false, errors: { milestones: { code: 'schedule_value_too_small', params: { value: '0' } } } };
+    expect(validateSchedule(percentRows('50', '50'), '0', '0')).toEqual(tooSmall);
+    expect(validateSchedule(amountRows('10'), '0', '0')).toEqual(tooSmall);
   });
 
   it('accepts the same split once every row bills at least a piastre fraction', () => {
-    expect(validateSchedule(percentRows('50', '50'), '0.0002').ok).toBe(true);
-    expect(validateSchedule(percentRows('33.33', '33.33', '33.34'), '0.0003').ok).toBe(true);
+    expect(validateSchedule(percentRows('50', '50'), '0.0002', '0').ok).toBe(true);
+    expect(validateSchedule(percentRows('33.33', '33.33', '33.34'), '0.0003', '0').ok).toBe(true);
+  });
+
+  it('F6: a low-VAT schedule with a tiny last row is accepted with no negative VAT', () => {
+    const rows = amountRows(...Array.from({ length: 10 }, () => '9090.5000'), '919094.9900', '0.0100');
+    const result = validateSchedule(rows, '1010000.0000', '10000.0000');
+    expect(result.ok).toBe(true);
+  });
+
+  it('F6: refuses a split whose VAT share on some row would fall below 0 or above its amount', () => {
+    // VAT larger than the value: some row must carry more VAT than its amount.
+    expect(validateSchedule(percentRows('50', '50'), '0.0002', '0.0003')).toEqual({
+      ok: false,
+      errors: { milestones: { code: 'schedule_value_too_small', params: { value: '0.0002' } } },
+    });
   });
 });
