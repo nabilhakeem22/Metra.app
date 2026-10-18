@@ -96,13 +96,14 @@ Set `DEPLOY_ENABLED` **last**: it is the flag that arms the workflow.
 Run `npm run db:migrate`, then `npm run db:apply-rls` (RLS, roles and functions
 live there, never in a migration).
 
-`db:apply-rls` **verifies itself now.** After the sixteen files it re-reads
+`db:apply-rls` **verifies itself now.** After the nineteen files it re-reads
 `pg_class`, `pg_policies`, `pg_trigger`, `pg_proc` and `pg_roles` on the same
 connection and exits **1** listing anything the manifest declares that the
-database does not have: every schema table RLS-enabled **and** forced, all 46
-policies, all 15 triggers, all 44 functions, and `metra_app` present and neither
+database does not have: every schema table RLS-enabled **and** forced, all 58
+policies, all 17 triggers, all 46 functions, and `metra_app` present and neither
 LOGIN nor BYPASSRLS. A green run ends with `apply-rls: verified in the
-catalogues — 46 tables, 46 policies, 15 triggers, 44 functions, ...`. Before
+catalogues — 58 tables, 58 policies, 17 triggers, 46 functions, ...` (from
+0063; each runbook below quotes the figures of its own day). Before
 this, the only post-condition was that no statement threw — which says a file
 RAN, not that its objects exist. Indexes and constraints are deliberately **not**
 checked here: they carry the 0017 case-fold drift and would be red on every
@@ -2727,6 +2728,302 @@ in the same revert, or the next `db:apply-rls` fails on the missing table.
 **(3) The seeded items:** a studio seeded at sign-up or from its empty price
 book has the same `MKT-` codes and market links as one the CLI seeded, so the
 undo of *Seeding studio price books from the market book* removes them too.
+
+### 0063 and Stage 2 DB step A (execution first release): owner runbook
+
+Stage 2 (contract from BOQ, payment requests, payments, costs, measurements)
+has TWO database steps, and this is the first: migration
+`0063_execution_first_release.sql` plus `db:apply-rls` (two new files under
+`rls/`, the replaced contract and change-order client functions, and the
+policy speed-up below). It is validated on branch
+`validate/stage2-a2-schema`. The second step (the client "I paid" on the
+delivery page) is apply-rls only, around Nov 18, with its own runbook.
+
+**THE ORDER (do not change it):**
+
+1. **The database goes first**, from the branch (steps 1 to 4 below), while
+   production still runs the current `main`.
+2. **Then** the lead merges the branch to `main` and the Deploy workflow
+   deploys it, **within the hour** (see the second reason), and you run the
+   smoke test (step 5).
+
+Why this order, one sentence each:
+
+- **The new code needs 0063:** the contract and change-order reads now name
+  `source_boq_id`, `item_code`, `provisional` and `time_extension_days`, so
+  new code on a database without 0063 fails every contract page with 42703.
+- **The current Worker is safe on the 0063 database, with one visible
+  difference:** 0063 only ADDS (nullable columns, new tables nobody reads yet),
+  and the replaced client functions only add keys. The difference: a client
+  opening a contract link (/c) whose section has more than 50 lines sees the
+  first 50 of that section until the new code is deployed (the new page loads
+  the rest). Rehearsed: the current app's own contract and change-order code,
+  unchanged, reads, acknowledges and responds on the 0063 database.
+- **A signature or a change-order decision now also writes studio
+  notifications:** until the new code is deployed the bell shows them as an
+  empty line (an older Worker renders an unknown notification as nothing,
+  never an error). Merging within the hour keeps that window short.
+
+**What it changes.** No existing row is updated and nothing is backfilled.
+
+| Object | Change |
+|---|---|
+| `contracts` | `source_proposal_id` may be empty; new `source_boq_id` (the issued BOQ an execution contract comes from) with its same-org FK, one contract per BOQ, and the CHECK `contracts_one_source` (exactly one of the two is set; every existing contract has a proposal and no BOQ) |
+| `contract_lines` | new `item_code` (empty) and `provisional` (false), and one unique index `(org_id, contract_id, id)` |
+| `contract_sections` | one unique index `(org_id, contract_id, id)` |
+| `variation_orders` | new `time_extension_days` (empty), CHECK 0 to 3650 |
+| three new enum types | `payment_request_kind`, `payment_request_status`, `cost_category` |
+| six new tables | `contract_payment_milestones`, `payment_requests`, `contract_payments`, `contract_payment_claims`, `contract_cost_entries`, `contract_line_measurements`: per studio (`org_id`), empty |
+| `rls/policies/35-execution.sql` | the six tables: RLS enabled and forced, one `org_isolation` policy each, and two triggers (the schedule freezes with its contract; a payment request can only go issued to void) |
+| `rls/functions/35-execution.sql` | the payment request's frozen guard |
+| `rls/functions/30-contracts-variations.sql` | the contract link (/c) adds the payment schedule, a digest of every line, and 50 lines per section with a new function for the rest; signing notifies owners, admins and project managers; the change-order link (/v) adds VAT, supervision and the extra days; a decision notifies the same three roles |
+| every `rls/policies/*.sql` | **the policy speed-up:** each studio policy now reads the org context and the membership check ONCE per query instead of once per row (`(select ...)`). Same answer, about 40 times faster on a big contract (measured: 492.6 ms before, 11.4 ms after, on a 50,000-line contract). Applied by this same `db:apply-rls`; nothing extra to run |
+| `rls/roles.sql` | `metra_app`: full access to the schedule; requests, claims and costs without delete; payments and measurements insert and read only. The new client function is callable by `metra_app` only |
+
+**1. Put the Stage 2 schema code in the production checkout.** This step adds
+no dependency of `db:migrate` or `db:apply-rls`, so the installed
+`node_modules` serve as they are.
+
+```powershell
+cd C:\Users\HP\merta-main
+git fetch origin
+git switch --detach origin/validate/stage2-a2-schema
+git log --oneline -1    # a "docs(deploy): ..." commit (this runbook); CI green on it
+git diff --stat <A2_SHA> HEAD    # MUST list only docs/DEPLOY.md: the code is exactly what was rehearsed (<A2_SHA>)
+```
+
+`<A2_SHA>` is filled in by the lead after the testers' rounds. If it still
+reads `<A2_SHA>`, or the diff lists any other file, STOP and tell the lead.
+
+**2. Read-only, before** (Supabase SQL editor). The editor shows only the
+LAST result of what you run, so run each block below ON ITS OWN.
+
+(a) Expect `migrations` 63 and `newest` 1792272891040 (0062's journal stamp).
+
+```sql
+-- 0063 step 2 (a): migrations recorded so far. Run this one alone.
+select count(*) as migrations, max(created_at) as newest
+from drizzle.__drizzle_migrations;
+```
+
+(b) **THE PRE-CHECK. Exactly this row, or STOP:** every column 0. Anything
+else means part of Stage 2 is already in this database (or, for
+`contracts_without_proposal`, a contract the CHECK would refuse): do not run
+step 3, tell the lead.
+
+```sql
+-- 0063 step 2 (b): the pre-check. Run this one alone.
+select
+  (select count(*) from information_schema.columns where table_schema = 'public' and table_name = 'contracts' and column_name = 'source_boq_id') as boq_column,
+  (select count(*) from information_schema.columns where table_schema = 'public' and table_name = 'variation_orders' and column_name = 'time_extension_days') as extension_column,
+  (select count(*) from pg_class c join pg_namespace n on n.oid = c.relnamespace where n.nspname = 'public' and c.relname in ('contract_payment_milestones', 'payment_requests', 'contract_payments', 'contract_payment_claims', 'contract_cost_entries', 'contract_line_measurements')) as execution_tables,
+  (select count(*) from pg_type t join pg_namespace n on n.oid = t.typnamespace where n.nspname = 'public' and t.typname in ('payment_request_kind', 'payment_request_status', 'cost_category')) as execution_types,
+  (select count(*) from public.contracts where source_proposal_id is null) as contracts_without_proposal;
+```
+
+(c) The sizes the migration works on. Note the five numbers; step 4 (e)
+expects the same. `most_lines_in_one_contract` and `contract_lines` set how
+long the migration holds the contract tables (see *Locks*).
+
+```sql
+-- 0063 step 2 (c): the contract tables' sizes. Run this one alone.
+select (select count(*) from public.contracts) as contracts,
+       (select count(*) from public.contract_sections) as contract_sections,
+       (select count(*) from public.contract_lines) as contract_lines,
+       (select coalesce(max(n), 0) from (select count(*) as n from public.contract_lines group by contract_id) per_contract) as most_lines_in_one_contract,
+       (select count(*) from public.variation_orders) as variation_orders;
+```
+
+(d) How many studio policies still read the membership check once per row.
+Expect `policies` 52 and `per_row` 46 (the six market policies are already
+in the once-per-query form). Note them; step 4 (d) expects 58 and 0.
+
+```sql
+-- 0063 step 2 (d): policies that read the membership check per row. Run this one alone.
+select count(*) as policies,
+       count(*) filter (where regexp_replace(coalesce(qual, '') || ' ' || coalesce(with_check, ''),
+         '\(\s*SELECT app_is_current_org_member\(\) AS app_is_current_org_member\)', '', 'g')
+         ~ 'app_is_current_org_member\(\)') as per_row
+from pg_policies where schemaname = 'public';
+```
+
+**3. Migrate, then apply RLS, then prove it landed.** In this order, from
+`C:\Users\HP\merta-main` (its `.env` is the production connection):
+
+```powershell
+npm run db:migrate
+npm run db:apply-rls
+npm run assert-schema-applied -w @metra/db
+```
+
+**NOTICE blocks are normal.** Both commands print routine NOTICE blocks with
+a `message:` line. The production-shaped rehearsal (a database built by the
+0062 code, 200 contracts, 100,000 contract lines and 400 change orders on it,
+then this branch) printed these, and on Supabase a line about a role may
+differ; any line that ends `does not exist, skipping` or `already exists,
+skipping` is the same kind:
+
+- `db:migrate`: `message: 'schema "drizzle" already exists, skipping',` and
+  `message: 'relation "__drizzle_migrations" already exists, skipping',`
+- `db:apply-rls`, in this order:
+  `message: 'function public.app_delivery_respond_by_token(text,text,text,text,text,text) does not exist, skipping',`
+  then `message: 'function public.app_delivery_choose_concept_by_token(text,uuid,text,text,text,text) does not exist, skipping',`
+  then `message: 'role "postgres" has already been granted membership in role "metra_app" by role "postgres"',`
+  then `message: 'policy "self_memberships" for relation "public.memberships" does not exist, skipping',`
+  then SIX new ones, once only: `message: 'policy "org_isolation" for relation "public.contract_payment_milestones" does not exist, skipping',`
+  and the same for `public.payment_requests`, `public.contract_payments`,
+  `public.contract_payment_claims`, `public.contract_cost_entries` and
+  `public.contract_line_measurements`, then TWO new ones, once only:
+  `message: 'trigger "trg_contract_payment_milestones_parent_draft" for relation "public.contract_payment_milestones" does not exist, skipping',`
+  and `message: 'trigger "trg_payment_requests_frozen" for relation "public.payment_requests" does not exist, skipping',`.
+  A second `db:apply-rls` prints only the first four.
+
+Only a line that starts `Migration failed:` or `apply-rls failed:` is a
+failure. Expected:
+
+- `db:migrate` exits 0 and prints `Migrations applied.`. It does not print a
+  count, so run step 4 (a): `migrations` is exactly one higher (64).
+- `db:apply-rls` exits 0 and ends with two lines. The first starts
+  `apply-rls: verified in the catalogues` and goes on `58 tables, 58 policies, 17 triggers, 46 functions, RLS forced on all of them, role metra_app present.`;
+  the second starts `apply-rls: grants verified` and goes on
+  `design_engagements update narrowed to 19 columns with no table-level update, and 16 narrowed table(s) (boqs, contract_cost_entries, contract_line_measurements, contract_payment_claims, contract_payments, document_categories, engagement_document_comments, engagement_milestones, market_bulletins, market_categories, market_item_details, market_items, market_price_observations, market_seed_book, payment_requests, workspace_entitlements) holding exactly what rls/roles.sql leaves them.`
+  The policy speed-up prints nothing of its own: the same 58 policies are
+  re-created in their new form (step 4 (d) shows it).
+- `assert-schema-applied` exits 0 and prints six lines, in this order:
+  `assert-schema-applied: OK — 58 declared table(s), every column present.`,
+  then `indexes — 135 declared, all present.`, `constraints — 337 declared, all present.`,
+  `functions — 46 declared, all present.`,
+  `orphaned org rows — 50 org-scoped table(s) answered, none holds a row whose org_id names no organization.`
+  and `composite set-null FKs — 15 found (15 declared in src/schema/), every one narrowed to a single non-org_id column.`
+  (The middle four are report only and do not fail it.)
+
+**If a command fails, it prints the SQLSTATE and what to do,** on two lines:
+
+- `Migration failed: SQLSTATE 55P03: canceling statement due to lock timeout`
+  (or `SQLSTATE 40P01: deadlock detected`) then
+  `Migration failed: lock wait or deadlock, safe to re-run at a quieter moment (the whole batch rolled back, nothing was changed).`
+  A long query held a contract table for more than 3 s. Re-run `db:migrate` a
+  little later. Rehearsed: a reader holding `contract_lines` for 10 s gave
+  exactly these two lines after 3 s, `migrations` stayed 63, no column was
+  added, and the re-run after the reader finished applied 0063. The same two
+  codes from `db:apply-rls` print `apply-rls failed: ...` and end `(this file
+  rolled back; the files before it stay applied).`: re-run `db:apply-rls`.
+- `Migration failed: SQLSTATE 23514: ... "contracts_one_source"`: a contract
+  without a proposal, which step 2 (b) would have shown. Nothing changed; tell
+  the lead.
+- `Migration failed: SQLSTATE P0001: 0063: ... composite set-null foreign
+  key(s) ...`: a foreign key the 0052 rule forbids. Nothing changed; tell the
+  lead.
+- Any other code ends `tell the lead before running anything else`.
+
+**Safe to re-run.** `db:migrate` records 0063 only when the whole batch
+commits, so after any failure a re-run starts again from 0062; after a
+success it finds nothing pending and prints `Migrations applied.` again
+(rehearsed). Every statement under `rls/` is idempotent: a second
+`db:apply-rls` prints the same two verified lines and only the first four
+notices (rehearsed). `assert-schema-applied` only reads.
+
+**Locks.** `db:migrate` runs 0063 as ONE transaction with a 3 s lock wait.
+It holds ACCESS EXCLUSIVE (no reads, no writes) on `contracts`,
+`contract_sections`, `contract_lines` and `variation_orders` until the
+commit, and SHARE ROW EXCLUSIVE (reads go on, writes wait) on `boqs`,
+`cost_items` and `organizations` for the foreign keys. The largest step is
+the new unique index on `contract_lines`, linear in its rows. Measured on the
+rehearsal server: about 0.4 s in all at 100,000 contract lines (0.25 s on the
+existing tables) and about 1.6 s at 1,000,000; an app reader polling a
+contract's lines every 20 ms through the 100,000-line run waited at most
+337 ms and saw 0 errors. `design_engagements` (the table every client act
+locks) is not touched. Pilot volumes are far below 100,000 lines. Estimates
+from a local server, not a production measurement. `db:apply-rls` adds one
+policy file with six NEW tables (nothing waits on them), and every existing
+policy file runs as it always does (the 11 x 3 s = 33 s worst case of
+`10-catalogue.sql` is unchanged).
+
+**4. Read-only, after: expected results.** Each block ON ITS OWN.
+
+(a) `migrations` 64 and `newest` 1792363603266 (0063's journal stamp): step 2
+(a) again.
+
+(b) Step 2 (b) again: now `boq_column` 1, `extension_column` 1,
+`execution_tables` 6, `execution_types` 3 and `contracts_without_proposal` 0.
+
+(c) 6 rows, every one with `rls` true, `forced` true, `policies` 1 and
+`api_roles_read` false; `app_privileges` exactly:
+`contract_cost_entries` S,I,U; `contract_line_measurements` S,I;
+`contract_payment_claims` S,I,U; `contract_payment_milestones` S,I,U,D;
+`contract_payments` S,I; `payment_requests` S,I,U. And `triggers` 1 on
+`contract_payment_milestones` and on `payment_requests`, 0 on the others.
+
+```sql
+-- 0063 step 4 (c): the six tables' RLS, grants and triggers. Run this one alone.
+select c.relname, c.relrowsecurity as rls, c.relforcerowsecurity as forced,
+       (select count(*) from pg_policies p where p.schemaname = 'public' and p.tablename = c.relname) as policies,
+       concat_ws(',',
+         case when has_table_privilege('metra_app', c.oid, 'select') then 'S' end,
+         case when has_table_privilege('metra_app', c.oid, 'insert') then 'I' end,
+         case when has_table_privilege('metra_app', c.oid, 'update') then 'U' end,
+         case when has_table_privilege('metra_app', c.oid, 'delete') then 'D' end) as app_privileges,
+       has_table_privilege('anon', c.oid, 'select') or has_table_privilege('authenticated', c.oid, 'select') as api_roles_read,
+       (select count(*) from pg_trigger t where t.tgrelid = c.oid and not t.tgisinternal) as triggers
+from pg_class c join pg_namespace n on n.oid = c.relnamespace
+where n.nspname = 'public'
+  and c.relname in ('contract_payment_milestones', 'payment_requests', 'contract_payments', 'contract_payment_claims', 'contract_cost_entries', 'contract_line_measurements')
+order by 1;
+```
+
+(d) Step 2 (d) again: now `policies` 58 and `per_row` 0.
+
+(e) Step 2 (c) again: the same five numbers as before.
+
+(f) The client functions: 5 rows, every one with `app_execute` true and
+`public_execute` false and `api_roles_execute` false.
+
+```sql
+-- 0063 step 4 (f): who may call the contract and change-order client functions. Run this one alone.
+select p.proname,
+       has_function_privilege('metra_app', p.oid, 'execute') as app_execute,
+       exists (select 1 from aclexplode(p.proacl) a where a.grantee = 0) as public_execute,
+       coalesce((select bool_or(has_function_privilege(r.oid, p.oid, 'execute')) from pg_roles r
+                  where r.rolname in ('anon', 'authenticated', 'service_role')), false) as api_roles_execute
+from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+where n.nspname = 'public'
+  and p.proname in ('app_contract_by_token', 'app_contract_section_lines_by_token', 'app_contract_ack_by_token',
+                    'app_variation_by_token', 'app_variation_respond_by_token')
+order by 1;
+```
+
+**5. Afterwards: merge, smoke test, return the checkout to main.**
+
+1. **Stop and do not merge** if any output in steps 3 or 4 differs from what
+   is written there. Tell the lead what you saw instead.
+2. Tell the lead the database step is done; the lead merges the branch and
+   the Deploy workflow deploys it (within the hour, see THE ORDER).
+3. Smoke test on your own studio, with the log open (from
+   `C:\Users\HP\merta-main\apps\web`: `npx wrangler tail metra-web`): open a
+   project, its contracts list and one contract, and the price book. Expected:
+   every page loads, and the log shows no `42703`, no `42501` and no
+   `mutateInOrg failed`. If a client contract link of yours exists, open it:
+   it shows the contract as before.
+4. Put the production checkout back on main:
+
+```powershell
+cd C:\Users\HP\merta-main
+git fetch origin
+git switch --detach origin/main
+```
+
+**Undo, if ever needed.**
+
+**(1) The code** (a contract page fails after the deploy): from
+`C:\Users\HP\merta-main\apps\web`, `npx wrangler rollback <version-id>` with
+the version that served before the merge (`npx wrangler deployments list`).
+Leave the database alone: the older Worker runs on it (see THE ORDER).
+
+**(2) The schema, only if Stage 2 is abandoned, and only while no execution
+contract exists.** Tell the lead first: it is a revert of `rls/` and a new
+migration, never a hand edit here. The policy speed-up is NOT undone by it
+and needs no undo: it changes how often the same check runs, not what it
+answers.
 
 ## Monthly market bulletin
 
