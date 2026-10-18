@@ -10,9 +10,9 @@ import 'server-only';
 import { sql } from 'drizzle-orm';
 import { after } from 'next/server';
 import { loggableFailure } from '@/lib/actions/loggable-failure';
+import { settledWithin } from '@/lib/async/settled-within';
 import { resolveSystemContext } from '@/lib/automation/system-context';
 import { holdRequestConnectionUntil } from '@/lib/db/request-connection';
-import { withDeadline } from '@/lib/http/deadlines';
 import { normalizeRawToken, readSdfJson } from '@/lib/share/sdf-call';
 import { hashShareToken } from '@/lib/share/token';
 import { isUuid } from '@/lib/uuid';
@@ -44,21 +44,50 @@ async function closeByHash(hash: string): Promise<boolean> {
   return (await closeAcknowledgedHandover(systemCtx, target.engagementId, 'client')) === 'closed';
 }
 
+type CloseOutcome = { closed: boolean } | { failure: unknown };
+
+function outcomeOf(work: Promise<boolean>): Promise<CloseOutcome> {
+  return work.then((closed) => ({ closed }), (failure: unknown) => ({ failure }));
+}
+
+/** One redacted line for a close that failed; `late` when it failed after its deadline. */
+function logFailure(failure: unknown, late: boolean): void {
+  console.error(late ? 'handover close by token failed after its deadline:' : 'handover close by token failed:', loggableFailure(failure));
+}
+
+/**
+ * A close still running at the deadline is NOT a failure (fix round R6): it
+ * goes on, its open transaction finishing as the request's connection ends,
+ * and on a slow link it commits seconds later. So the deadline logs that it
+ * is still running, and the close's own outcome is logged when it settles.
+ */
+function reportLateOutcome(outcome: Promise<CloseOutcome>): void {
+  console.warn('handover close still running past its deadline:', { deadlineMs: HANDOVER_CLOSE_BUDGET_MS });
+  void outcome.then((late) => {
+    if ('failure' in late) logFailure(late.failure, true);
+    else console.warn('handover close finished after its deadline:', { closed: late.closed });
+  });
+}
+
 /**
  * Close the delivery whose client just confirmed the handover. True only when
- * THIS call closed it. Never throws and never waits past
- * HANDOVER_CLOSE_BUDGET_MS; a failure is one redacted log line (no token, no
- * ids), and the confirmation stands either way.
+ * THIS call closed it within HANDOVER_CLOSE_BUDGET_MS. Never throws and never
+ * waits past that; a failure is one redacted log line (no token, no ids), a
+ * close still running at the deadline a line saying so and then one with its
+ * outcome, and the confirmation stands either way.
  */
 export async function closeHandoverByToken(rawToken: string): Promise<boolean> {
   const token = normalizeRawToken(rawToken);
   if (!token) return false;
-  try {
-    return await withDeadline(closeByHash(hashShareToken(token)), HANDOVER_CLOSE_BUDGET_MS, 'handover close');
-  } catch (err) {
-    console.error('handover close by token failed:', loggableFailure(err));
+  const outcome = outcomeOf(closeByHash(hashShareToken(token)));
+  if (!(await settledWithin(outcome, HANDOVER_CLOSE_BUDGET_MS))) {
+    reportLateOutcome(outcome);
     return false;
   }
+  const settled = await outcome;
+  if ('closed' in settled) return settled.closed;
+  logFailure(settled.failure, false);
+  return false;
 }
 
 /**
@@ -70,15 +99,6 @@ export async function closeHandoverByToken(rawToken: string): Promise<boolean> {
  * normally lands before the page's refresh reads the delivery.
  */
 export const HANDOVER_CLOSE_WAIT_MS = 1_500;
-
-/** True when `work` settled within `ms`. Never rejects. */
-function settledWithin(work: Promise<unknown>, ms: number): Promise<boolean> {
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  const late = new Promise<boolean>((resolve) => {
-    timer = setTimeout(() => resolve(false), ms);
-  });
-  return Promise.race([work.then(() => true, () => true), late]).finally(() => clearTimeout(timer));
-}
 
 /**
  * Let a close that outran the wait finish after the response (best effort).
