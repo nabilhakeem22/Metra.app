@@ -17,8 +17,9 @@ export interface ChartSeries {
  * the tooltip is ordinary HTML, undistorted, and the whole thing stays responsive
  * without measuring anything.
  *
- * STILL ZERO JAVASCRIPT. The read-out is revealed by `group-hover`, so this remains
- * a server component. A tooltip is not worth shipping a client bundle for.
+ * NO STATE. The read-out is revealed by `group-hover`, so this needs no JavaScript
+ * of its own: a plain module that renders the same in a server tree and inside the
+ * rescue ledger's client island. A tooltip is not worth shipping state for.
  *
  * ACCESSIBILITY: every column carries a visually-hidden sentence with its real
  * numbers, so a screen reader gets the DATA rather than the one summary line the SVG
