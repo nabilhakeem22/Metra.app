@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { computeFinalAccount, type FinalAccountInput, type MeasuredLine } from './final-account';
+import { billingBalance, computeFinalAccount, type FinalAccountInput, type MeasuredLine } from './final-account';
 
 function line(overrides: Partial<MeasuredLine> & Pick<MeasuredLine, 'lineId'>): MeasuredLine {
   return {
@@ -99,3 +99,26 @@ describe('computeFinalAccount', () => {
     expect(account.balance).toBe('0.0000');
   });
 });
+
+describe('billingBalance', () => {
+  // R4: 124,000; a provisional line of 1,000 at 100 read at 100 mid-job; 62,000 issued.
+  const midJob: FinalAccountInput = {
+    ...base,
+    measuredLines: [line({ lineId: 'p', qty: '1000', unitPrice: '100', provisional: true, measuredQty: '100' })],
+    issuedRequestsTotal: '62000',
+  };
+
+  it('leaves measured residuals out: contract plus change orders minus issued requests', () => {
+    expect(billingBalance(midJob)).toBe('62000.0000');
+    expect(billingBalance({ ...midJob, approvedVariationNetDeltas: ['10000'] })).toBe('74400.0000');
+  });
+
+  it('the full final account still counts the same residual', () => {
+    const account = computeFinalAccount(midJob);
+    // -900 x 100 = -90,000 works; with VAT and supervision -111,600
+    expect(account.billedLines).toEqual([{ lineId: 'p', residualQty: '-900.0000', works: '-90000.0000' }]);
+    expect(account.adjustmentCharge).toBe('-111600.0000');
+    expect(account.balance).toBe('-49600.0000');
+  });
+});
+

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { formatMoney4, parseMoney4 } from '@/lib/aggregates/proposal-totals';
-import { computeFinalAccount } from './money/final-account';
+import { billingBalance, computeFinalAccount, type FinalAccountInput } from './money/final-account';
 import { milestoneAmounts, type MilestoneAmount } from './money/milestone-amounts';
 import type { CleanScheduleRow } from './money/schedule';
 import {
@@ -241,6 +241,30 @@ describe('executionStage', () => {
       const facts = factsAfter([first, second], '-30000', third);
       // 124,000 - 37,200 - 99,200 = -12,400
       expect(stageOf(facts)).toEqual({ stage: 'settled', next: { kind: 'refund_due', amount: '12400.0000' } });
+    });
+  });
+
+  describe('R4: a mid-job measurement never steers the card', () => {
+    // 124,000; a provisional line of 1,000 at 100 read at 100; 62,000 issued and paid.
+    const midJob: FinalAccountInput = {
+      originalValue: '124000', taxRate: '14', supervisionPct: '10', discountPct: '0',
+      approvedVariationNetDeltas: [],
+      measuredLines: [{
+        lineId: 'p', qty: '1000', unitPrice: '100', discountPct: '0', provisional: true,
+        measuredQty: '100', variationQty: '0',
+      }],
+      issuedRequestsTotal: '62000',
+    };
+    const nextMilestone = { id: 'm2', amount: '37200.0000' };
+
+    it('with billingBalance the next milestone is suggested, not a refund', () => {
+      const facts = contract({ nextUnbilledMilestone: nextMilestone, finalAccountBalance: billingBalance(midJob) });
+      expect(stageOf(facts)).toEqual({ stage: 'in_progress', next: { kind: 'send_milestone_request' } });
+    });
+
+    it('the full final account balance would have read as a refund: why the card must not use it', () => {
+      const facts = contract({ nextUnbilledMilestone: nextMilestone, finalAccountBalance: computeFinalAccount(midJob).balance });
+      expect(stageOf(facts).next?.kind).toBe('refund_due');
     });
   });
 });

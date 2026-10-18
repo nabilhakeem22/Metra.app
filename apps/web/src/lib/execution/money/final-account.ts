@@ -99,3 +99,14 @@ export function computeFinalAccount(input: FinalAccountInput): FinalAccount {
     flaggedLines,
   };
 }
+
+/**
+ * The balance with measured residuals left out: contract plus approved change
+ * orders, minus issued requests (computeFinalAccount with no measured lines).
+ * Before a final account request is issued, the delivery card steers on this;
+ * measured differences enter only when the studio prepares the final account,
+ * so a mid-job progress reading never reads as a refund or a shortfall.
+ */
+export function billingBalance(input: Omit<FinalAccountInput, 'measuredLines'>): string {
+  return computeFinalAccount({ ...input, measuredLines: [] }).balance;
+}

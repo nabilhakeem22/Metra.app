@@ -67,7 +67,12 @@ export interface ExecutionContractFacts {
   unpaidRequestCount: number;
   /** Change orders still awaiting a decision (internal_approved or issued). */
   openVariationCount: number;
-  /** `computeFinalAccount(...).balance`: what a final account would still bill. */
+  /**
+   * What is left to bill. While no final account request is issued it MUST be
+   * `billingBalance(...)` (money/final-account.ts): measured residuals are left
+   * out, so a mid-job reading never steers the card. Once one is issued it is
+   * the issued final account's figures (its final value minus every issued request).
+   */
   finalAccountBalance: string;
 }
 
