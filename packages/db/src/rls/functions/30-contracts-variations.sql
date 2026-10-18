@@ -126,17 +126,17 @@ $$;
 --     a scale-4 STRING (a jsonb numeric reaches JavaScript as a float, and the
 --     money law is strings). Amounts are derived by the app from
 --     original_value (milestoneAmounts);
---   * per section `line_count`, and `lines` CAPPED to the first 50 by
---     (sort_order, id). The rest load 100 at a time through
---     app_contract_section_lines_by_token below. An older app shows the first
---     50 lines of a longer section until the new code is deployed (the
---     accepted risk in the plan; the runbook says merge within the hour);
+--   * per section `line_count`. `lines` still carries EVERY line of the
+--     section, ordered (sort_order, id), exactly as before: NO CAP in DB step
+--     A (lead ruling, Oct 19), so no client ever sees a truncated contract.
+--     The cap to the first 50 per section lands in DB step B (apply-rls only,
+--     a re-definition of this function in this file), after the /c page loads
+--     the rest through app_contract_section_lines_by_token below (A3.6);
 --   * line `item_code` and `provisional` (a BOQ contract's; null / false on a
 --     proposal contract's);
 --   * `lines_digest`: sha256 over EVERY line's client-visible fields, in order,
---     plus the schedule. The acknowledgement hash covers the snapshot, so with
---     this digest in it the client acknowledges all lines, not only the 50 the
---     snapshot carries;
+--     plus the schedule. The acknowledgement hash covers the snapshot, so once
+--     step B caps the lines the client still acknowledges every line;
 --   * `time_extension_days_total`: the days the APPROVED change orders add to
 --     the finish date.
 -- Every sub-read names `org_id = c.org_id`: the indexes lead with org_id, and
@@ -264,7 +264,6 @@ as $$
                 from public.contract_lines l
                 where l.org_id = s.org_id and l.section_id = s.id
                 order by l.sort_order, l.id
-                limit 50
               ) lx
             ), '[]'::jsonb)
           ) as sec
@@ -300,14 +299,15 @@ end
 $$;
 
 -- Stage 2 (0063): the lines of ONE section of the token's contract, 100 at a
--- time, for "show lines" on /c (A20: the snapshot carries only the first 50 per
--- section). Same visibility as app_contract_by_token (issued or signed; the
+-- time, for "show lines" on /c (A20). Shipped in DB step A so A3.6 can move the
+-- page to it; the snapshot keeps every line until DB step B caps it at 50 per
+-- section. Same visibility as app_contract_by_token (issued or signed; the
 -- page shows an expired contract read-only, so expiry does not hide lines).
 -- Answers NULL, uniformly, for an unknown token, a contract not issued or
 -- signed, or a section id that is not a section of THAT contract: no oracle
 -- about other contracts' sections. `p_offset` is clamped to 0..100000 (null =
--- 0); lines are ordered (sort_order, id), the snapshot's order, so offset 50
--- continues exactly where the snapshot stopped. Cost-blind: the same line keys
+-- 0); lines are ordered (sort_order, id), the snapshot's order, so once the
+-- snapshot is capped, offset 50 continues exactly where it stops. Cost-blind: the same line keys
 -- as the snapshot, no unit_cost / line_cost / line_margin.
 create or replace function public.app_contract_section_lines_by_token(
   p_hash text,

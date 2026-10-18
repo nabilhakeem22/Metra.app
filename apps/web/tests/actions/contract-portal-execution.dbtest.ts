@@ -24,7 +24,8 @@ import {
 import { closeFixture, ctxFor, seedOrg, teardown } from './fixture';
 
 // Stage 2 DB step A, the client side: the replaced /c and /v SQL
-// (rls/functions/30-contracts-variations.sql). The snapshot stays ADDITIVE, so
+// (rls/functions/30-contracts-variations.sql). The snapshot stays ADDITIVE and
+// still carries EVERY line (no cap in step A: lead ruling Oct 19), so
 // the app deployed BEFORE this SQL (lib/contracts/public.ts and
 // lib/variations/public.ts, exercised here unchanged) keeps working between
 // `db:apply-rls` and the deploy; the new lines reader pages the rest; the
@@ -111,12 +112,12 @@ describe('app_contract_by_token: a 600-line execution contract (AC11, A20)', () 
     snapshot = await snapshotOf(contract.rawToken!);
   });
 
-  it('carries at most 50 lines per section, the first 50 by sort order, and every section line_count', () => {
+  it('still carries EVERY line of each section, by sort order, plus each section line_count (no cap in step A)', () => {
     const sections = snapshot.sections as Section[];
     expect(sections.map((section) => section.line_count)).toEqual([350, 250]);
     for (const [index, section] of sections.entries()) {
-      expect(section.lines).toHaveLength(50);
-      expect(section.lines.map((line) => line.id)).toEqual(contract.lineIds[index].slice(0, 50));
+      expect(section.lines).toHaveLength(section.line_count);
+      expect(section.lines.map((line) => line.id)).toEqual(contract.lineIds[index]);
     }
     expect(sections[0].lines[4]).toMatchObject({ item_code: 'A-5', provisional: true });
     expect(sections[0].lines[3]).toMatchObject({ item_code: 'A-4', provisional: false });
@@ -141,7 +142,8 @@ describe('app_contract_by_token: a 600-line execution contract (AC11, A20)', () 
     const read = await getContractByToken(contract.rawToken!);
     expect(read?.id).toBe(contract.contractId);
     expect(read?.sections).toHaveLength(2);
-    expect(read?.sections[0].lines).toHaveLength(50);
+    expect(read?.sections[0].lines).toHaveLength(350);
+    expect(read?.sections[1].lines).toHaveLength(250);
     expect(contractPayloadHash(read!)).toMatch(/^[0-9a-f]{64}$/);
   });
 
@@ -172,6 +174,14 @@ describe('app_contract_by_token: a 600-line execution contract (AC11, A20)', () 
   });
 });
 
+describe('DB step B (Nov 18): the snapshot cap', () => {
+  // Moves here with the step B re-definition of app_contract_by_token, after
+  // A3.6 has the /c page loading lines through the reader below (plan, DB step
+  // B addendum). AC11's snapshot half: a 600-line contract carries at most 50
+  // lines per section, the first 50 by (sort_order, id).
+  it.todo('carries at most 50 lines per section, the first 50 by sort order');
+});
+
 describe('app_contract_section_lines_by_token: the rest, 100 at a time (AC11)', () => {
   let contract: ExecutionContract;
   let sibling: ExecutionContract;
@@ -181,7 +191,7 @@ describe('app_contract_section_lines_by_token: the rest, 100 at a time (AC11)', 
     sibling = await seedExecutionContract(orgId, { linesPerSection: [3], state: 'issued' });
   });
 
-  it('pages a section in (sort_order, id) order, continuing where the snapshot stopped', async () => {
+  it('pages a section in (sort_order, id) order, from any offset (offset 50 continues a capped snapshot)', async () => {
     const first = await sectionLines(contract.rawToken, contract.sectionIds[0], 50);
     expect(first).toMatchObject({ section_id: contract.sectionIds[0], offset: 50, line_count: 350 });
     expect(first!.lines.map((line) => line.id)).toEqual(contract.lineIds[0].slice(50, 150));
@@ -231,7 +241,8 @@ describe('the acknowledgement covers every line and the schedule (AC12)', () => 
     const before = await getContractByToken(contract.rawToken!);
     const digestBefore = (before as unknown as { lines_digest: string }).lines_digest;
 
-    // Line 100 is not in the snapshot's 50; only the digest can see it.
+    // Line 100: beyond the 50 the step-B snapshot will carry, so after the cap
+    // only the digest sees it. The digest is asserted on its own for that day.
     await tamper(`update public.contract_lines set unit_price = 101 where id = $1`, [contract.lineIds[0][99]]);
     const afterLine = await getContractByToken(contract.rawToken!);
     const digestAfterLine = (afterLine as unknown as { lines_digest: string }).lines_digest;
